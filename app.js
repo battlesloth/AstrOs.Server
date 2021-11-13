@@ -5,7 +5,7 @@ require('./api/models/db');
 require('./api/config/passport');
 
 const { Worker } = require('worker_threads');
-const superagent  = require('superagent');
+const superagent = require('superagent');
 const cookieParser = require('cookie-parser');
 const createError = require('http-errors');
 const express = require('express');
@@ -32,12 +32,12 @@ app.use(passport.initialize());
 app.use('/api', routesApi);
 
 // catch 404 and forward to error handler
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
   next(createError(404));
 });
 
 // error handler
-app.use(function(err, req, res, next) {
+app.use(function (err, req, res, next) {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
@@ -48,44 +48,45 @@ app.use(function(err, req, res, next) {
 });
 
 // websocket
-const httpServer = require("http").createServer(app);
+const WebSocket = require('ws');
+const {v4: uuidv4} = require('uuid');
 
-httpServer.listen(5000, () =>{
-  console.log("Websocket started on port 5000");
-});   
+const ws = new WebSocket.Server({ port: 5000 });
 
-httpServer.on('error', (e) => {
-  if (e.code === 'EADDRINUSE') {
-    console.log('Address in use, retrying...');
-    setTimeout(() => {
-      server.close();
-      server.listen(PORT, HOST);
-    }, 1000);
-  } else {
-    console.log(`Websocket error : ${e.code}`);
-  }
+const clients = new Map();
+
+// only one client at a time
+ws.on('connection', (conn) => {
+  const id = uuidv4();
+  const metadata = { id };
+
+  clients.set(conn, metadata);
 });
 
-const websocket = require("socket.io");
 
-const io = websocket(httpServer);
-
-io.on('connection', socket =>{
-  console.log(`Socket connected: ${socket}`);
-})
+function sendToClients(msg){
+  const str = JSON.stringify(msg);
+  [...clients.keys()].forEach((client) =>{
+    try {
+      client.send(str);
+    } catch (err) {
+      console.log(`websocket send error: ${err}`);
+    }
+  });
+}
 
 //monitor task
 
-const headMoitor = new Worker('./background_tasks/esp_monitor.js', {monitor: 'head unit'});
+const coreMonitor = new Worker('./background_tasks/esp_monitor.js', { monitor: 'core' });
 
-headMoitor.on('message', msg => {
+coreMonitor.on('message', msg => {
   console.log(`${msg.module}:${msg.status}`);
-  io.emit(JSON.stringify(msg));
+  sendToClients({module: 'core', status: msg.status});
 });
 
-headMoitor.on('exit', exit =>{console.log(exit);});
-headMoitor.on('error', err =>{console.log(err);});
+coreMonitor.on('exit', exit => { console.log(exit); });
+coreMonitor.on('error', err => { console.log(err); });
 
-setInterval(() =>{headMoitor.postMessage({monitor: '192.168.50.22'})}, 5000);
+setInterval(() => { coreMonitor.postMessage({ monitor: '192.168.50.22' }) }, 5000);
 
 module.exports = app;
