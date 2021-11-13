@@ -1,4 +1,5 @@
 import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
+import { last } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 
 @Component({
@@ -10,21 +11,28 @@ export class StatusComponent implements AfterViewInit {
 
   @ViewChild('core', { static: false }) coreEl!: ElementRef;
 
-   subject = webSocket('ws://localhost:5000');
+  private coreUp: boolean;
 
-  constructor(private renderer: Renderer2) { 
+  subject = webSocket('ws://localhost:5000');
+
+  constructor(private renderer: Renderer2) {
+    this.coreUp = true;
+
     this.subject.subscribe({
-      next:(msg) => this.processMessage(msg),
+      next: (msg) => this.processMessage(msg),
       error: (err) => console.log(err),
       complete: () => console.log('socket disconnected')
     });
   }
+  ngAfterViewInit(): void {
+    throw new Error('Method not implemented.');
+  }
 
-  processMessage(message: any){
-    if (message['module']){
-      switch(message['module']){
+  processMessage(message: any) {
+    if (message['module']) {
+      switch (message['module']) {
         case 'core':
-          this.handleStatus(message['status'], this.coreEl)
+          this.coreUp = this.handleStatus(message['status'], this.coreEl, this.coreUp);
           break;
         case 'dome':
           break;
@@ -33,24 +41,22 @@ export class StatusComponent implements AfterViewInit {
         case 'legs':
           break;
       }
-
-      console.log(message['status']);
     }
   }
 
-  handleStatus(status: string,el: ElementRef){
-    if (status === 'up'){
-      this.renderer.setStyle(el.nativeElement, 'visibility', 'hidden');
+  handleStatus(status: string, el: ElementRef, isUp: boolean): boolean {
+    if (status === 'up') {
+      if (!isUp) {
+        this.renderer.setStyle(el.nativeElement, 'visibility', 'hidden');
+      }
+      return true;
     } else {
-      this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');
+      if (isUp) {
+        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');
+      }
+      return false;
     }
   }
-
-  ngAfterViewInit(){
-    console.log(this.coreEl.nativeElement)
-  }
-  
-  ngOnInit(): void {
-  }
-
 }
+
+

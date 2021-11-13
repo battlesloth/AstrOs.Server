@@ -1,8 +1,16 @@
+<div id="mySidenav" class="sidenav" #sideNav>
+  <a (click)="closeMenu()" class="closebtn">&times;</a>
+  <a (click)="closeMenu()" routerLink="/status">Status</a>
+  <a (click)="closeMenu()" routerLink="/scripter">Scripter</a>
+  <a (click)="closeMenu()" routerLink="/modules">Modules</a>
+  <a (click)="closeMenu()" routerLink="/settings">Settings</a>
+</div>
+
 <div class="container">
   <div class="navbar-main">
     <div class="navbar-left">
       <ul class="nav navbar-nav">
-        <li><a routerLink="/status">Astr-Os</a></li>
+        <li><a (click)="showMenu()">>Astr-Os</a></li>
       </ul>
     </div>
     <div class="navbar-divider"></div>

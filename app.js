@@ -87,6 +87,6 @@ coreMonitor.on('message', msg => {
 coreMonitor.on('exit', exit => { console.log(exit); });
 coreMonitor.on('error', err => { console.log(err); });
 
-setInterval(() => { coreMonitor.postMessage({ monitor: '192.168.50.22' }) }, 10000);
+setInterval(() => { coreMonitor.postMessage({ monitor: '192.168.50.22' }) }, 5000);
 
 module.exports = app;

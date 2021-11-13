@@ -8,7 +8,7 @@ parentPort.on('message', data => {
 function monitorModule(module) {
     const agent = superagent.agent();
     agent.get(`http://${module}`)
-        .timeout({response: 9000})
+        .timeout({response: 4000})
         .then(res => {
             parentPort.postMessage({module:module,status:res.body.status});
         })
