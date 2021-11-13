@@ -1,0 +1,18 @@
+<div class="form-container">
+    <div class="form-border"></div>
+    <form (submit)="login()">
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="username" class="form-control" name="username" placeholder="Enter username" [(ngModel)]="credentials.username" />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" class="form-control" name="password" placeholder="Password"
+          [(ngModel)]="credentials.password" />
+      </div>
+      <div class="form-button">
+        <button type="submit" class="btn btn-default">Sign in!</button>
+      </div>
+    </form>
+    <div class="form-border"></div>
+  </div>

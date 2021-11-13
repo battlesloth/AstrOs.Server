@@ -1,0 +1,20 @@
+<div class="container">
+  <div class="navbar-main">
+    <div class="navbar-left">
+      <ul class="nav navbar-nav">
+        <li><a routerLink="/status">Astr-Os</a></li>
+      </ul>
+    </div>
+    <div class="navbar-divider"></div>
+    <div class="navbar-right">
+      <ul class="nav navbar-nav navbar-right">
+        <li *ngIf="auth.isLoggedIn()">
+          <a routerLink="/profile">{{ auth.getUserDetails()?.username | titlecase }}</a>
+        </li>
+        <li *ngIf="auth.isLoggedIn()"><a href="javascript: void(0);" (click)="logout()">Logout</a></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<router-outlet></router-outlet>

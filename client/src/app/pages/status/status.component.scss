@@ -1,0 +1,48 @@
+.img-container {
+    display: flex;
+    justify-content: center;
+}
+
+
+img {
+    max-width: 300px;
+
+}
+
+.bottom {
+
+    position: absolute;
+    z-index: 0;
+}
+
+.top {
+    position: absolute;
+    z-index: 1;
+}
+
+.hidden {
+    visibility: hidden;
+}
+
+.blink {
+    animation: blink 1s;
+    animation-iteration-count: infinite;
+}
+
+@keyframes blink {
+    0% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@media only screen and (max-width: 480px){
+    img {
+        max-width: 60%;
+    }
+}

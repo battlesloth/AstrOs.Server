@@ -1,0 +1,53 @@
+ @import "../assets/styles/variables";
+ 
+ .container{
+    background-color: $color-dark;
+    color: $color-pale;
+    text-shadow:
+    -2px -2px 0 $dark-blue,  
+     2px -2px 0 $dark-blue,
+     -2px 2px 0 $dark-blue,
+      2px 2px 0 $dark-blue;
+    
+ 
+
+    margin: 0;
+    padding: 2rem;
+ }
+
+
+.navbar-main {
+    font-size: x-large;
+    display: flex;
+    flex-direction: row;
+    text-align: center;
+
+    a { 
+        color: inherit;
+        text-decoration: none; 
+        font-size: 34px;
+        font-family: $swfont;
+    }
+
+    ul {
+        margin: 1rem;
+        padding: 0;    
+    }
+    
+    li{
+        display: inline;
+        margin: 1rem;
+    }
+}
+
+.navbar-divider{
+    flex-grow: 1;
+}
+
+@media only screen and (max-width: 480px){
+    .navbar-main{
+        a {
+            font-size: 28px;
+        }
+    }
+}

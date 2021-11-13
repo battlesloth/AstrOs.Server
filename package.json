@@ -1,0 +1,25 @@
+{
+  "name": "astrosserver",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www"
+  },
+  "dependencies": {
+    "appdata-path": "^1.0.0",
+    "cookie-parser": "~1.4.4",
+    "debug": "~2.6.9",
+    "dotenv": "^10.0.0",
+    "express": "~4.16.1",
+    "express-jwt": "^6.1.0",
+    "http-errors": "~1.6.3",
+    "install": "^0.13.0",
+    "morgan": "~1.9.1",
+    "passport": "^0.5.0",
+    "passport-local": "^1.0.0",
+    "pug": "^3.0.2",
+    "socket.io": "^4.3.2",
+    "sqlite3": "^5.0.2",
+    "superagent": "^6.1.0"
+  }
+}
