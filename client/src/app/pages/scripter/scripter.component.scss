@@ -1,3 +1,107 @@
+@import '../../../assets/styles/variables';
+
 .container {
-    
+    display: flex;
+    flex-direction: column;
+    max-height: 400px;
+    margin: 0 auto;
+    padding: 50px;
+    background-color: $color-medium;
+}
+
+.scripter-container {
+    background-color: black;
+    display: flex;
+    flex-direction: row;
+    border: 2px solid black;
+    overflow-y: scroll;
+}
+
+.scripter-modules{
+    width: 200px;
+    padding-bottom: 17px;
+}
+
+.scripter-timeline{
+    width: 90%;
+   
+
+}
+
+
+.scripter-timeline-header-row{
+    white-space: nowrap;
+}
+
+.scripter-timeline-header-period {
+    background-color: burlywood;
+    color: black;
+    border-bottom: 2px solid black;
+    border-right: 1px solid black;
+    text-align: center;
+    width: 40px;
+    height: 24px;
+    display: inline-block;
+    user-select: none;
+}
+
+.scripter-timeline-row{
+    white-space: nowrap;
+    border-bottom: 1px solid black;
+    padding: 0;
+    margin: 0;
+    height: 80px;
+}
+
+.scripter-timeline-period {
+    background-color: cadetblue;
+    color: black;
+    border-right: 1px solid darkslategray;
+    text-align: center;
+    width: 40px;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    display: inline-block;
+}
+
+.scripter-module-header-row {
+    background-color: darkcyan;
+    color: white;
+    border-bottom: 2px solid black;
+    border-right: 2px solid black;
+    height: 24px;
+    text-align: center;
+}
+
+.scripter-module-row {
+    background-color: darkcyan;
+    color: white;
+    border-bottom: 1px solid black;
+    border-right: 2px solid black;
+    height: 80px;
+    text-align: center;
+}
+
+.scripter-row-item {
+    background-color: white;
+    border: 1px dashed grey;
+    height: 50px;
+    display: inline-block;
+}
+
+.script-item{
+    position: absolute;
+    height: 10px;
+    top: 5xp;
+    width: calc(2*100%);
+    z-index: 100;
+    background-color: olive;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.drag-hide {
+    transition: 0.01s;
+    transform: translateX(-9999px);
 }

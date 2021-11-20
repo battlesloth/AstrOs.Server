@@ -24,8 +24,8 @@ export class StatusComponent implements AfterViewInit {
       complete: () => console.log('socket disconnected')
     });
   }
+  
   ngAfterViewInit(): void {
-    throw new Error('Method not implemented.');
   }
 
   processMessage(message: any) {

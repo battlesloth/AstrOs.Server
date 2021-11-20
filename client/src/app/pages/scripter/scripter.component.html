@@ -1,3 +1,20 @@
 <div class="container">
-    
+    <div class="scripter-container" #scripter>
+        <div class="scripter-modules" #scripterModules></div>
+        <div class="scripter-timeline" #scripterTimeline></div>
+            <!-- an hidden div is created to set the position of appearance of the menu-->
+    <div style="visibility: hidden; position: fixed;" [style.left.px]="menuTopLeft.x" [style.top.px]="menuTopLeft.y"
+    [matMenuTriggerFor]="rightMenu"></div>
+
+
+<!-- standar material menu -->
+<mat-menu #rightMenu="matMenu">
+    <ng-template matMenuContent let-item="item">
+        <button mat-menu-item>Clicked</button>
+        <button mat-menu-item>Fixed menu</button>
+    </ng-template>
+</mat-menu>
+    </div>
+
+
 </div>

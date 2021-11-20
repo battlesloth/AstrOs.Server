@@ -10,18 +10,20 @@ export class AppComponent {
 
   @ViewChild('sideNav', { static: false }) sideNav!: ElementRef;
 
-  constructor(public auth: AuthenticationService, 
-    private renderer: Renderer2){} 
+  constructor(public auth: AuthenticationService,
+    private renderer: Renderer2) { }
 
-  logout(){
+  logout() {
     this.auth.logout();
   }
 
-  showMenu(){
-    this.renderer.setStyle(this.sideNav.nativeElement, 'width', '250px');
+  showMenu() {
+    if (this.auth.isLoggedIn()) {
+      this.renderer.setStyle(this.sideNav.nativeElement, 'width', '250px');
+    }
   }
 
-  closeMenu(){
+  closeMenu() {
     this.renderer.setStyle(this.sideNav.nativeElement, 'width', '0px');
   }
 }

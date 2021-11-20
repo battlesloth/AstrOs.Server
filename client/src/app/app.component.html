@@ -1,4 +1,4 @@
-<div id="mySidenav" class="sidenav" #sideNav>
+<div *ngIf="auth.isLoggedIn()" id="mySidenav" class="sidenav" #sideNav>
   <a (click)="closeMenu()" class="closebtn">&times;</a>
   <a (click)="closeMenu()" routerLink="/status">Status</a>
   <a (click)="closeMenu()" routerLink="/scripter">Scripter</a>
