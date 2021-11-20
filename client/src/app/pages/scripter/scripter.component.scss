@@ -3,7 +3,7 @@
 .container {
     display: flex;
     flex-direction: column;
-    max-height: 400px;
+    max-height: 80%;
     margin: 0 auto;
     padding: 50px;
     background-color: $color-medium;
@@ -14,11 +14,14 @@
     display: flex;
     flex-direction: row;
     border: 2px solid black;
+    border-radius: 10px;
     overflow-y: scroll;
 }
 
 .scripter-modules{
-    width: 200px;
+    flex-basis: 200px;
+    flex-grow: 0;
+    flex-shrink: 0;
     padding-bottom: 17px;
 }
 
@@ -31,15 +34,87 @@
 
 .scripter-timeline-header-row{
     white-space: nowrap;
+    background-color: burlywood;
+    background-image: 
+    linear-gradient(90deg, 
+      rgba(73, 73, 73, 0.5) 0, 
+      rgba(73, 73, 73, 0.5) 2%, 
+      transparent 2%
+    ), 
+    linear-gradient(180deg, 
+    burlywood 50%, 
+      transparent 50%
+    ), 
+    linear-gradient(90deg, 
+      transparent 50%, 
+      rgba(73, 73, 73, 0.5) 50%, 
+      rgba(73, 73, 73, 0.5) 52%, 
+      transparent 52%
+    ), 
+    linear-gradient(180deg, 
+    burlywood 70%, 
+      transparent 70%
+    ), 
+    linear-gradient(90deg, 
+      transparent 10%,
+      rgba(73, 73, 73, 0.4) 10%, 
+      rgba(73, 73, 73, 0.4) 12%, 
+      transparent 12%, 
+      
+      transparent 20%,
+      rgba(73, 73, 73, 0.4) 20%, 
+      rgba(73, 73, 73, 0.4) 22%, 
+      transparent 22%, 
+      
+      transparent 30%, 
+      rgba(73, 73, 73, 0.4) 30%,
+      rgba(73, 73, 73, 0.4) 32%, 
+      transparent 32%, 
+      
+      transparent 40%, 
+      rgba(73, 73, 73, 0.4) 40%, 
+      rgba(73, 73, 73, 0.4) 42%, 
+      transparent 42%, 
+      
+      transparent 60%, 
+      rgba(73, 73, 73, 0.4) 60%, 
+      rgba(73, 73, 73, 0.4) 62%, 
+      transparent 62%, 
+      
+      transparent 70%, 
+      rgba(73, 73, 73, 0.4) 70%, 
+      rgba(73, 73, 73, 0.4) 72%, 
+      transparent 72%, 
+      
+      transparent 80%, 
+      rgba(73, 73, 73, 0.4) 80%, 
+      rgba(73, 73, 73, 0.4) 82%, 
+      transparent 82%, 
+      
+      transparent 90%, 
+      rgba(73, 73, 73, 0.4) 90%, 
+      rgba(73, 73, 73, 0.4) 92%, 
+      transparent 92%
+    );
+  background-size: 41px 24px;
+  background-repeat: repeat-x;
+}
+
+.scripter-timeline-header-period-spacer {
+    border-bottom: 2px solid black;
+    color: transparent;
+    text-align: center;
+    width: 21px;
+    height: 24px;
+    display: inline-block;
+    user-select: none;
 }
 
 .scripter-timeline-header-period {
-    background-color: burlywood;
     color: black;
     border-bottom: 2px solid black;
-    border-right: 1px solid black;
     text-align: center;
-    width: 40px;
+    width: 41px;
     height: 24px;
     display: inline-block;
     user-select: none;
@@ -47,6 +122,7 @@
 
 .scripter-timeline-row{
     white-space: nowrap;
+    position: relative;
     border-bottom: 1px solid black;
     padding: 0;
     margin: 0;
@@ -66,7 +142,7 @@
 }
 
 .scripter-module-header-row {
-    background-color: darkcyan;
+    background-color: burlywood;
     color: white;
     border-bottom: 2px solid black;
     border-right: 2px solid black;
@@ -74,34 +150,23 @@
     text-align: center;
 }
 
-.scripter-module-row {
+.scripter-module {
     background-color: darkcyan;
     color: white;
     border-bottom: 1px solid black;
     border-right: 2px solid black;
     height: 80px;
+    border-radius: 10px;
     text-align: center;
 }
 
-.scripter-row-item {
-    background-color: white;
-    border: 1px dashed grey;
-    height: 50px;
-    display: inline-block;
-}
-
-.script-item{
+.scripter-timeline-marker{
     position: absolute;
-    height: 10px;
-    top: 5xp;
-    width: calc(2*100%);
+    height: 80px;
+    top: 0px;
     z-index: 100;
-    background-color: olive;
-    border-radius: 5px;
+    background-color: yellow;
+    border-radius: 20px;
     cursor: pointer;
 }
 
-.drag-hide {
-    transition: 0.01s;
-    transform: translateX(-9999px);
-}
