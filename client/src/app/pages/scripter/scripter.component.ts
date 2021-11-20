@@ -43,10 +43,9 @@ export class ScripterComponent implements AfterViewInit {
   @ViewChild('scripterModules', { static: false }) moduleEl!: ElementRef;
   @ViewChild('scripterTimeline', { static: false }) timelineEl!: ElementRef;
 
-
+  private modules: Map<string, ScriptModule>;
 
   private items: Array<ScriptItem>;
-  private components: Array<ScriptModule>;
 
   menuTopLeft = { x: 0, y: 0 };
 
@@ -57,21 +56,7 @@ export class ScripterComponent implements AfterViewInit {
       new ScriptItem('t3', '3', new Date('2021/6/2'), new Date('2021/6/3')),
     );
 
-
-    this.components = new Array<ScriptModule>(
-      new ScriptModule('1', 'Module Slot 1'),
-      new ScriptModule('2', 'Module Slot 2'),
-      new ScriptModule('3', 'Module Slot 3'),
-      new ScriptModule('4', 'Module Slot 4'),
-      new ScriptModule('5', 'Module Slot 5'),
-      new ScriptModule('6', 'Module Slot 6'),
-      new ScriptModule('7', 'Module Slot 7'),
-      new ScriptModule('8', 'Module Slot 8'),
-      new ScriptModule('9', 'Module Slot 9'),
-      new ScriptModule('10', 'Module Slot 10'),
-      new ScriptModule('11', 'Module Slot 11'),
-      new ScriptModule('12', 'Module Slot 12')
-    );
+    this.modules = new Map<string, ScriptModule>();
 
   }
 
@@ -87,16 +72,25 @@ export class ScripterComponent implements AfterViewInit {
     this.menuTrigger.openMenu();
   }
 
+  onAddModuleClick(event: MouseEvent) {
+    const module = `test-${this.modules.size}`;
+    
+    this.modules.set(module, new ScriptModule(module, module));
+
+    this.addModule(module);
+    this.appendAddModuleLine();
+  }
+
   onAddEvent(item: Item): void {
 
     const line = document.getElementById(item.timeline);
 
     if (line != null) {
       let left = Math.floor((item.xPos - line.offsetLeft) / 41) * 41;
-      
-      if (Math.floor(item.xPos - line.offsetLeft) - left > 20){
-        left +=20;
-      } else{
+
+      if (Math.floor(item.xPos - line.offsetLeft) - left > 20) {
+        left += 20;
+      } else {
         left -= 20;
       }
 
@@ -108,6 +102,8 @@ export class ScripterComponent implements AfterViewInit {
       this.renderer.appendChild(line, floater);
     }
   }
+
+
 
   ngAfterViewInit(): void {
 
@@ -135,32 +131,83 @@ export class ScripterComponent implements AfterViewInit {
 
     this.renderer.appendChild(this.timelineEl.nativeElement, timelineheader);
 
-    let count = 0;
 
-    this.components.forEach(element => {
-      const moduleDiv = this.renderer.createElement('div');
-      this.renderer.setAttribute(moduleDiv, 'class', 'scripter-module');
-      const text = this.renderer.createText(element.name);
-      this.renderer.appendChild(moduleDiv, text);
-      this.renderer.appendChild(this.moduleEl.nativeElement, moduleDiv);
-
-      const timelineDiv = this.renderer.createElement('div');
-      this.renderer.setAttribute(timelineDiv, 'class', 'scripter-timeline-row');
-
-
-      for (let i = 0; i < 30; i++) {
-        const timeDiv = this.renderer.createElement('div');
-        this.renderer.setAttribute(timeDiv, 'class', 'scripter-timeline-period');
-        this.renderer.appendChild(timelineDiv, timeDiv);
-      }
-
-      this.renderer.setAttribute(timelineDiv, 'id', `${element.id}-timeline`)
-      this.renderer.listen(timelineDiv, 'contextmenu', (evt) => { this.onTimelineRightClick(evt, `${element.id}-timeline`) })
-
-      this.renderer.appendChild(this.timelineEl.nativeElement, timelineDiv);
-    });
+    this.appendAddModuleLine();
 
   }
+
+  private addModule(name: string) {
+    const addModule = document.getElementById(`${name}-module`);
+
+    if (addModule == null) {
+      const addModuleDiv = this.renderer.createElement('div');
+      this.renderer.setAttribute(addModuleDiv, 'class', 'scripter-module');
+      const addModuleText = this.renderer.createText(name);
+      this.renderer.appendChild(addModuleDiv, addModuleText);
+      this.renderer.setAttribute(addModuleDiv, 'id', `${name}-module`);
+      this.renderer.appendChild(this.moduleEl.nativeElement, addModuleDiv);
+    } else {
+      console.log(`${name}-module already exists!`);
+      return;
+    }
+
+    const timelineDiv = this.renderer.createElement('div');
+    this.renderer.setAttribute(timelineDiv, 'class', 'scripter-timeline-row');
+
+    for (let i = 0; i < 30; i++) {
+      const timeDiv = this.renderer.createElement('div');
+      this.renderer.setAttribute(timeDiv, 'class', 'scripter-timeline-period');
+      this.renderer.appendChild(timelineDiv, timeDiv);
+    }
+
+    this.renderer.setAttribute(timelineDiv, 'id', `${name}-module-timeline`);
+    this.renderer.listen(timelineDiv, 'contextmenu', (evt) => this.onTimelineRightClick(evt, `${name}-module-timeline`));
+
+
+    this.renderer.appendChild(this.timelineEl.nativeElement, timelineDiv);
+  }
+
+
+  private appendAddModuleLine() {
+
+    const addModule = document.getElementById('add-module');
+
+    if (addModule != null) {
+      addModule.remove();
+    }
+
+    const addModuleDiv = this.renderer.createElement('div');
+    this.renderer.setAttribute(addModuleDiv, 'class', 'scripter-module');
+    const addModuleText = this.renderer.createText('Add Module');
+
+    this.renderer.appendChild(addModuleDiv, addModuleText);
+
+    this.renderer.setAttribute(addModuleDiv, 'id', 'add-module');
+
+    this.renderer.listen(addModuleDiv, 'click', (evt) => this.onAddModuleClick(evt));
+
+    this.renderer.appendChild(this.moduleEl.nativeElement, addModuleDiv);
+
+
+    const addModuleTimeline = document.getElementById('add-module-timeline');
+
+    if (addModuleTimeline != null) {
+      addModuleTimeline.remove();
+    }
+    const timelineDiv = this.renderer.createElement('div');
+    this.renderer.setAttribute(timelineDiv, 'class', 'scripter-timeline-row');
+
+    for (let i = 0; i < 30; i++) {
+      const timeDiv = this.renderer.createElement('div');
+      this.renderer.setAttribute(timeDiv, 'class', 'scripter-timeline-period');
+      this.renderer.appendChild(timelineDiv, timeDiv);
+    }
+
+    this.renderer.setAttribute(timelineDiv, 'id', 'add-module-timeline');
+
+    this.renderer.appendChild(this.timelineEl.nativeElement, timelineDiv);
+  }
+
 
   ngOnInit(): void {
   }
