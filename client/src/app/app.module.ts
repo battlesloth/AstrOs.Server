@@ -12,6 +12,11 @@ import { StatusComponent } from './pages/status/status.component';
 import { ScripterComponent } from './pages/scripter/scripter.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatMenuModule } from '@angular/material/menu';
+import { ModulesComponent } from './pages/modules/modules.component';
+import {MatExpansionModule} from '@angular/material/expansion'
+import {MatSidenavModule} from '@angular/material/sidenav'
+import {MatToolbarModule} from '@angular/material/toolbar'
+import {MatListModule} from '@angular/material/list'
 
 @NgModule({
   declarations: [
@@ -21,6 +26,7 @@ import { MatMenuModule } from '@angular/material/menu';
     HomeComponent,
     StatusComponent,
     ScripterComponent,
+    ModulesComponent
   ],
   imports: [
     BrowserModule,
@@ -28,7 +34,11 @@ import { MatMenuModule } from '@angular/material/menu';
     FormsModule,
     HttpClientModule,
     BrowserAnimationsModule,
-    MatMenuModule
+    MatMenuModule,
+    MatExpansionModule,
+    MatSidenavModule,
+    MatToolbarModule,
+    MatListModule
   ],
   providers: [],
   bootstrap: [AppComponent]

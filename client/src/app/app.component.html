@@ -1,9 +1,9 @@
-<div *ngIf="auth.isLoggedIn()" id="mySidenav" class="sidenav" #sideNav>
-  <a (click)="closeMenu()" class="closebtn">&times;</a>
+<div *ngIf="auth.isLoggedIn()" (click)="closeMenu()" id="mySidenav" class="sidenav" #sideNav>
   <a (click)="closeMenu()" routerLink="/status">Status</a>
   <a (click)="closeMenu()" routerLink="/scripter">Scripter</a>
   <a (click)="closeMenu()" routerLink="/modules">Modules</a>
   <a (click)="closeMenu()" routerLink="/settings">Settings</a>
+  <a *ngIf="auth.isLoggedIn()" href="javascript: void(0);" (click)="logout()">Logout</a>
 </div>
 
 <div class="container">
@@ -11,15 +11,6 @@
     <div class="navbar-left">
       <ul class="nav navbar-nav">
         <li><a (click)="showMenu()">>Astr-Os</a></li>
-      </ul>
-    </div>
-    <div class="navbar-divider"></div>
-    <div class="navbar-right">
-      <ul class="nav navbar-nav navbar-right">
-        <li *ngIf="auth.isLoggedIn()">
-          <a routerLink="/profile">{{ auth.getUserDetails()?.username | titlecase }}</a>
-        </li>
-        <li *ngIf="auth.isLoggedIn()"><a href="javascript: void(0);" (click)="logout()">Logout</a></li>
       </ul>
     </div>
   </div>

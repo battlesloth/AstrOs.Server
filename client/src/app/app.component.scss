@@ -40,11 +40,6 @@
     }
 }
 
-.navbar-divider{
-    flex-grow: 1;
-}
-
-
 .sidenav {
     height: 100%;
     width: 0;
@@ -55,11 +50,11 @@
     background-color: $dark-blue;
     overflow-x: hidden;
     transition: 0.5s;
-    padding-top: 60px;
+    padding-top: 20px;
    a {
-    padding: 8px 8px 8px 32px;
+    margin: 30px 40px 30px 20px;
     text-decoration: none;
-    font-size: 32px;
+    font-size: 28px;
     font-weight: bold;
     font-family: sans-serif;
     color: $color-pale;
@@ -71,13 +66,6 @@
     color: $light-blue;
   }
   
-   .closebtn {
-    position: absolute;
-    top: 0;
-    right: 25px;
-    font-size: 36px;
-    margin-left: 50px;
-  }
 }
 
 @media only screen and (max-width: 480px){

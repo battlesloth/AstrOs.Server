@@ -19,7 +19,7 @@ export class AppComponent {
 
   showMenu() {
     if (this.auth.isLoggedIn()) {
-      this.renderer.setStyle(this.sideNav.nativeElement, 'width', '250px');
+      this.renderer.setStyle(this.sideNav.nativeElement, 'width', '200px');
     }
   }
 
