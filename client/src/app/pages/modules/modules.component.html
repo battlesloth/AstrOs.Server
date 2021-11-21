@@ -15,7 +15,13 @@
                     <mat-expansion-panel-header>
                         <mat-panel-title>I2C configuration</mat-panel-title>
                     </mat-expansion-panel-header>
-                    <p>subpanel.content</p>
+                    <ul>
+                        <li *ngFor="let channel of coreModule.i2cModule.channels">
+                            <div class="i2c-channel">
+                                <span>{{channel.id}}:{{channel.name}}</span>
+                            </div>
+                        </li>
+                    </ul>
                 </mat-expansion-panel>
                 <mat-expansion-panel>
                     <mat-expansion-panel-header>

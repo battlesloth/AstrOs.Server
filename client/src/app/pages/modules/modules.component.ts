@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
-
+import { ControlModule } from './control-module';
 
 @Component({
   selector: 'app-modules',
@@ -10,7 +10,17 @@ import { MatExpansionPanel } from '@angular/material/expansion';
 })
 export class ModulesComponent implements OnInit {
 
-  constructor() { }
+
+
+  coreModule: ControlModule;
+  domeModule: ControlModule;
+  bodyModule: ControlModule;
+
+  constructor() { 
+    this.coreModule = new ControlModule('core', 'Core Dome Module');
+    this.domeModule = new ControlModule('dome', 'Outer Dome Module');
+    this.bodyModule = new ControlModule('body', 'Body Module'); 
+  }
 
   ngOnInit(): void {
   }
