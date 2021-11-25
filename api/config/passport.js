@@ -1,8 +1,8 @@
 var passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const User = require('../models/users');
-const DataAccess = require('../../dal/data_access');
-const UserRepository = require('../../dal/user_repository');
+const DataAccess = require('../dal/data_access');
+const UserRepository = require('../dal/user_repository');
 
 passport.use(
     new LocalStrategy(

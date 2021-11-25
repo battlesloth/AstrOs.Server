@@ -1,12 +1,9 @@
-const User = require('../api/models/users');
+const User = require('../models/users');
 
 class UserRepository {
     constructor(dao) {
         this.dao = dao;
-    }
-
-    createTable() {
-
+        this.dao.connect();
     }
 
     async add(name, passwordhash, salt) {

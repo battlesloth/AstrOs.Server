@@ -1,7 +1,11 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
-require('./api/models/db');
+const DataAccess = require('./api/dal/data_access');
+
+var db = new DataAccess();
+db.setup();
+
 require('./api/config/passport');
 
 const { Worker } = require('worker_threads');

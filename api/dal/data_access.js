@@ -5,58 +5,61 @@ const sqlite3 = require('sqlite3');
 
 class DataAccess {
     constructor() {
+        this.appdataPath = appdata("astrosserver");
+        this.databaseFile = '/database.sqlite3'
+    }
 
-        const appdataPath = appdata("astrosserver");
+    async connect(){
+        this.db = new sqlite3.Database(`${this.appdataPath}${this.databaseFile}`, (err) => {
 
-        if (!fs.existsSync(appdataPath)){
-            fs.mkdirSync(appdataPath, { recursive: true });
+            if (err) {
+                console.log('Could not connect to database', err);
+            }
+            else {
+                console.log('Connected to database');
+            }
+        });
+    }
+
+    async setup() {
+
+        if (!fs.existsSync(this.appdataPath)) {
+            fs.mkdirSync(this.appdataPath, { recursive: true });
         }
 
-        if (!fs.existsSync(`${appdataPath}/database.sqlite3`)){
-            fs.writeFile(`${appdataPath}/database.sqlite3`,'', function(err){
+        if (!fs.existsSync(`${this.appdataPath}${this.databaseFile}`)) {
+            fs.writeFile(`${this.appdataPath}${this.databaseFile}`, '', function (err) {
                 if (err) throw err;
                 console.log('Created database file');
             });
         }
 
-        const dbFilePath = `${appdataPath}/database.sqlite3`;    
-        console.log(`Database path: ${dbFilePath}`)
+        console.log(`Database path: ${this.appdataPath}${this.databaseFile}`)
 
-        this.db = new sqlite3.Database(dbFilePath, (err) =>{
-
-            if (err){
-                console.log('Could not connect to database', err);
-            }
-            else
-            {
-                console.log('Connected to database');
-                this.setup();
-            }
-        });
-    }
-
-    async setup(){
+        await this.connect();
+        
         let result = await this.getVersion();
         const version = parseInt(result, 10);
 
-        if (Number.isNaN(version) || version < 1){
+        if (Number.isNaN(version) || version < 1) {
             console.log('Setting up database...');
 
             await this.setupV1Tables();
             await this.setV1Values();
-            
+
             console.log('Database set up complete!');
-        } 
-        else{
+        }
+        else {
             console.log(`Database at version ${version.toString()}`);
         }
+
     }
 
-    async getVersion(){
+    async getVersion() {
         let result = '0';
         const sql = `
         SELECT value FROM settings where Key = 'version'`;
-        try{
+        try {
             result = await this.get(sql, [])
                 .then((version) => {
                     const first = version[0].value;
@@ -66,12 +69,12 @@ class DataAccess {
                     console.log(err);
                     return '0';
                 });
-        } catch {}
+        } catch { }
 
         return result;
     }
 
-    async setupV1Tables(){
+    async setupV1Tables() {
         let sql = `
         CREATE TABLE IF NOT EXISTS settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,13 +82,13 @@ class DataAccess {
             value TEXT)`;
 
         await this.run(sql)
-            .then(() =>{
+            .then(() => {
                 console.log("Created settings table")
             })
-            .catch((err) =>{
+            .catch((err) => {
                 console.log(`Error creating setting table: ${err}`);
             });
-        
+
         sql = `
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,67 +97,65 @@ class DataAccess {
             salt TEXT)`;
 
         await this.run(sql)
-            .then(() =>{
+            .then(() => {
                 console.log("Created users table")
             })
-            .catch((err) =>{
+            .catch((err) => {
                 console.log(`Error creating user table: ${err}`);
             });
     }
 
-    async setV1Values(){
+    async setV1Values() {
         const salt = crypto.randomBytes(16).toString('hex');
         const hash = crypto
-        .pbkdf2Sync("password", salt, 1000, 64, 'sha512')
-        .toString('hex');
-        
+            .pbkdf2Sync("password", salt, 1000, 64, 'sha512')
+            .toString('hex');
+
         let sql = `
         INSERT INTO users (user, hash, salt) VALUES (?,?,?)`;
 
         await this.run(sql, ["admin", hash, salt])
-            .then(() =>{
+            .then(() => {
                 console.log("Added default admin")
             })
-            .catch((err) =>{
+            .catch((err) => {
                 console.log(`Error adding default admin: ${err}`);
             });;
 
         sql = `INSERT INTO settings (Key, Value) VALUES ('version', '1')`;
 
-        await this.run(sql, []) .then(() =>{
+        await this.run(sql, []).then(() => {
             console.log("Updated database to version 1");
         })
-        .catch((err) =>{
-            console.log(`Error updating database version: ${err}`);
-        });;
+            .catch((err) => {
+                console.log(`Error updating database version: ${err}`);
+            });;
     }
 
-    run(sql, params = []){
-        return new Promise((resolve, reject) =>{
-            this.db.run(sql, params, function (err){
-                if (err){
+    run(sql, params = []) {
+        return new Promise((resolve, reject) => {
+            this.db.run(sql, params, function (err) {
+                if (err) {
                     console.log('Error running sql ' + sql);
                     console.log(err);
                     reject(err);
                 }
-                else
-                {
+                else {
                     resolve({ id: this.lastID });
                 }
             })
         });
     }
 
-    get(sql, params = []){
-        return new Promise((resolve, reject) =>{
+    get(sql, params = []) {
+        return new Promise((resolve, reject) => {
             this.db.all(sql, params, (err, rows) => {
-                if (err){
+                if (err) {
                     console.log('Error running sql ' + sql);
                     console.log(err);
-                    reject(err);    
+                    reject(err);
                 }
-                else 
-                {
+                else {
                     resolve(rows);
                 }
             })

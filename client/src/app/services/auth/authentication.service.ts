@@ -41,7 +41,7 @@ export class AuthenticationService {
 
   public logout(): void {
     this.token = "";
-    window.localStorage.removeItem("orang-token");
+    window.localStorage.removeItem("astros-token");
     this.router.navigateByUrl("/");
   }
 
@@ -67,12 +67,12 @@ export class AuthenticationService {
   }
 
   private saveToken(token: string): void {
-    localStorage.setItem("orang-token", token);
+    localStorage.setItem("astros-token", token);
   }
 
   private getToken(): string {
     if (!this.token){
-      this.token = localStorage.getItem("orang-token") || '';
+      this.token = localStorage.getItem("astros-token") || '';
     }
     return this.token;
   }

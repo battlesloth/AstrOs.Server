@@ -11,7 +11,11 @@ export class AppComponent {
   @ViewChild('sideNav', { static: false }) sideNav!: ElementRef;
 
   constructor(public auth: AuthenticationService,
-    private renderer: Renderer2) { }
+    private renderer: Renderer2) {
+      var test = 'test';
+      var anoter = test + 'test';
+
+     }
 
   logout() {
     this.auth.logout();

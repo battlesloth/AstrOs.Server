@@ -20,7 +20,7 @@
             "name": "angular",
             "type": "node",
             "request": "launch",
-            "cwd": "${workspaceFolder}\\client",
+            "cwd": "${workspaceFolder}/client",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run-script",
@@ -29,17 +29,21 @@
             "console": "externalTerminal"
         },
         {
-            "type": "edge",
+            "type": "pwa-msedge",
             "request": "launch",
             "name": "browser",
             "url": "http://localhost:4200",
-            "webRoot": "${workspaceFolder}\\client"
+            "webRoot": "${workspaceFolder}/client/src"
         },
     ],
     "compounds": [
         {
             "name": "server/client",
-            "configurations": ["nodejs", "angular", "browser"]
+            "configurations": [
+                "nodejs",
+                "angular",
+                "browser"
+            ]
         }
     ]
 }

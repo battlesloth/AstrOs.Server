@@ -1,5 +1,5 @@
-const ctrlAuth = require('../controllers/authentication');
-const ctrlProfile = require('../controllers/profile');
+const ctrlAuth = require('../controllers/authentication_controller');
+const ctrlModule = require('../controllers/module_controller')
 
 const jwt = require('express-jwt');
 const auth = jwt({
@@ -11,7 +11,7 @@ const auth = jwt({
 const express = require('express');
 const router = express.Router();
 
-router.get('/profile/', auth, ctrlProfile.profileRead);
+router.get('/modules/', auth, ctrlModule.getModules);
 
 router.post('/login', ctrlAuth.login);
 
