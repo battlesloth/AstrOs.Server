@@ -67,6 +67,7 @@ export class I2CModule {
 }
 
 export enum PwmType{
+    unassigned,
     servo,
     led,
     other

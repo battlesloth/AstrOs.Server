@@ -9,9 +9,7 @@ import { ControlModule, PwmChannel, I2cChannel, PwmType, UartType } from '../../
   styleUrls: ['./modules.component.scss'],
   viewProviders: [MatExpansionPanel]
 })
-export class ModulesComponent implements OnInit, AfterViewInit {
-
-
+export class ModulesComponent implements OnInit {
 
   coreModule: ControlModule;
   domeModule: ControlModule;
@@ -23,9 +21,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
     this.domeModule = new ControlModule('dome', 'Outer Dome Module');
     this.bodyModule = new ControlModule('body', 'Body Module'); 
   }
-  ngAfterViewInit(): void {
-    //var result = this.modulesService.getModules();
-  }
+
 
   ngOnInit(): void {
     const observer = {
@@ -35,6 +31,19 @@ export class ModulesComponent implements OnInit, AfterViewInit {
 
     this.modulesService.getModules().subscribe(observer);
     
+  }
+
+  saveModuleSettings(){
+    const observer = {
+      next: (result: any) => console.log('module settings saved!'), 
+      error: (err: any) => console.error(err)
+    };
+
+    this.modulesService.saveModules([
+      {key: 'core', value: this.coreModule},
+      {key: 'dome', value: this.domeModule},
+      {key: 'body', value: this.bodyModule},
+    ]).subscribe(observer);
   }
 
   private parseModules(modules: any){
@@ -65,7 +74,8 @@ export class ModulesComponent implements OnInit, AfterViewInit {
     module.uartModule.type = <UartType>  data.uartModule.type;
     
     data.pwmModule.channels.forEach((channel: any) => {
-      module.pwmModule.channels[channel.id] =  new PwmChannel(channel.id, channel.name, <PwmType> channel.type);   
+      var type = PwmType[channel.type as keyof typeof PwmType];
+      module.pwmModule.channels[channel.id] =  new PwmChannel(channel.id, channel.name, type);   
     });
    
     data.i2cModule.channels.forEach((channel: any) => {

@@ -3,13 +3,20 @@ const appdata = require('appdata-path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3');
 
+const SettingsTable = require('./tables/settings_table');
+const UsersTable = require('./tables/users_table');
+const ModulesTable = require('./tables/modules_table');
+const PwmChannelsTable = require('./tables/pwm_channels_table');
+const I2cChannelsTable = require('./tables/i2c_channels_table');
+const {ModuleId, PwmType} = require('../models/module')
+
 class DataAccess {
     constructor() {
         this.appdataPath = appdata("astrosserver");
         this.databaseFile = '/database.sqlite3'
     }
 
-    async connect(){
+    async connect() {
         this.db = new sqlite3.Database(`${this.appdataPath}${this.databaseFile}`, (err) => {
 
             if (err) {
@@ -37,7 +44,7 @@ class DataAccess {
         console.log(`Database path: ${this.appdataPath}${this.databaseFile}`)
 
         await this.connect();
-        
+
         let result = await this.getVersion();
         const version = parseInt(result, 10);
 
@@ -57,10 +64,8 @@ class DataAccess {
 
     async getVersion() {
         let result = '0';
-        const sql = `
-        SELECT value FROM settings where Key = 'version'`;
         try {
-            result = await this.get(sql, [])
+            result = await this.get(SettingsTable.Select, ["version"])
                 .then((version) => {
                     const first = version[0].value;
                     return first;
@@ -75,34 +80,16 @@ class DataAccess {
     }
 
     async setupV1Tables() {
-        let sql = `
-        CREATE TABLE IF NOT EXISTS settings (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            key TEXT UNIQUE,
-            value TEXT)`;
 
-        await this.run(sql)
-            .then(() => {
-                console.log("Created settings table")
-            })
-            .catch((err) => {
-                console.log(`Error creating setting table: ${err}`);
-            });
+        await this.createTable(SettingsTable.Table, SettingsTable.Create);
 
-        sql = `
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user TEXT UNIQUE,
-            hash TEXT,
-            salt TEXT)`;
+        await this.createTable(UsersTable.Table, UsersTable.Create);
 
-        await this.run(sql)
-            .then(() => {
-                console.log("Created users table")
-            })
-            .catch((err) => {
-                console.log(`Error creating user table: ${err}`);
-            });
+        await this.createTable(ModulesTable.Table, ModulesTable.Create);
+
+        await this.createTable(PwmChannelsTable.Table, PwmChannelsTable.Create);
+
+        await this.createTable(I2cChannelsTable.Table, I2cChannelsTable.Create);
     }
 
     async setV1Values() {
@@ -111,25 +98,47 @@ class DataAccess {
             .pbkdf2Sync("password", salt, 1000, 64, 'sha512')
             .toString('hex');
 
-        let sql = `
-        INSERT INTO users (user, hash, salt) VALUES (?,?,?)`;
-
-        await this.run(sql, ["admin", hash, salt])
+        await this.run(UsersTable.Insert, ["admin", hash, salt])
             .then(() => {
                 console.log("Added default admin")
             })
-            .catch((err) => {
-                console.log(`Error adding default admin: ${err}`);
-            });;
+            .catch((err) => console.error(`Error adding default admin: ${err}`));
 
-        sql = `INSERT INTO settings (Key, Value) VALUES ('version', '1')`;
+        const modules = [ModuleId.CORE, ModuleId.DOME, ModuleId.BODY];
 
-        await this.run(sql, []).then(() => {
+        for (let m = 0; m < modules.length; m++) {
+            let name = modules[m];
+            
+            await this.run(ModulesTable.Insert, [name, name])
+            .catch((err) => console.error(`Error adding ${name} module: ${err}`));
+
+            for (let i = 0; i < 36; i++) {
+                await this.run(PwmChannelsTable.Insert, [name, i, "unassigned", PwmType.UNASSIGNED, 0, 0])
+                .catch((err) => console.error(`Error adding pwm channel ${i}: ${err}`))
+            }
+
+            for (let i = 0; i < 128; i++) {
+                await this.run(I2cChannelsTable.Insert, [name, i, "unassigned"])
+                .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
+            }
+        }
+        
+        await this.run(SettingsTable.Insert, ["version", "1"]).then(() => {
             console.log("Updated database to version 1");
         })
             .catch((err) => {
                 console.log(`Error updating database version: ${err}`);
             });;
+    }
+
+    async createTable(tableName, query) {
+        await this.run(query)
+            .then(() => {
+                console.log(`Created ${tableName} table`)
+            })
+            .catch((err) => {
+                console.log(`Error creating ${tableName} table: ${err}`);
+            });
     }
 
     run(sql, params = []) {

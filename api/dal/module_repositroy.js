@@ -15,6 +15,10 @@ class ModuleRepository{
      
         return map;
     }
+
+    async saveModules(modules){
+        return true;
+    }
 }
 
 module.exports = ModuleRepository;

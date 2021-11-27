@@ -2,11 +2,13 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import {ControlModule} from "../../models/control-module";
 
 @Injectable({
   providedIn: 'root'
 })
-export class ModulesService {
+export class ModulesService  {
+  
 
   private token: string;
 
@@ -29,6 +31,22 @@ export class ModulesService {
 
       return request;
    }
+
+  public saveModules(modules: { key: string; value: ControlModule; }[]) : Observable<any> {
+    let base$;
+
+      base$ = this.http.post('/api/modules', modules, {
+        headers: {Authorization: `Bearer ${this.getToken()}`}
+      });
+
+      const request = base$.pipe(
+        map((data: any) =>{
+          return data;
+        })
+      );
+
+      return request;
+  }
 
    private getToken(): string {
     if (!this.token){

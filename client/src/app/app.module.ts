@@ -5,7 +5,6 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { FormsModule} from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
-import { ProfileComponent } from './pages/profile/profile.component';
 import { LoginComponent } from './pages/login/login.component';
 import { HomeComponent } from './pages/home/home.component';
 import { StatusComponent } from './pages/status/status.component';
@@ -23,7 +22,6 @@ import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.
 @NgModule({
   declarations: [
     AppComponent,
-    ProfileComponent,
     LoginComponent,
     HomeComponent,
     StatusComponent,

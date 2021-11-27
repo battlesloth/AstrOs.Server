@@ -11,10 +11,15 @@ const UartType = {
 }
 
 const PwmType = {
-    UNASSIGNED: "unassigned",
-    SERVO: "servo",
-    LED: "led",
-    OTHER: "other"
+    UNASSIGNED: 0,
+    // no limit
+    CONTINUOUS_SERVO: 1,
+    // limit0
+    POSITIONAL_SERVO: 2,
+    // limit0 and limit1
+    LINEAR_SERVO: 3,
+    LED: 4,
+    HIGH_LOW: 5
 }
 
 class Module{
@@ -45,10 +50,12 @@ class PwmModule{
 }
 
 class PwmChannel {
-    constructor(id, name, type){
+    constructor(id, name, type, limit0, limit1){
         this.id = id;
         this.name = name;
         this.type = type;
+        this.limit0 = limit0;
+        this.limit1 = limit1;
     }
 }
 
