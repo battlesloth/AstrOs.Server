@@ -73,13 +73,13 @@ export class ModulesComponent implements OnInit {
     module.uartModule.name = data.uartModule.name;
     module.uartModule.type = <UartType>  data.uartModule.type;
     
-    data.pwmModule.channels.forEach((channel: any) => {
-      var type = PwmType[channel.type as keyof typeof PwmType];
-      module.pwmModule.channels[channel.id] =  new PwmChannel(channel.id, channel.name, type);   
+    data.pwmModule.channels.forEach((ch: any) => {
+      module.pwmModule.channels[ch.id] =  
+        new PwmChannel(ch.id, ch.name, ch.type, ch.limit0, ch.limit1);   
     });
    
-    data.i2cModule.channels.forEach((channel: any) => {
-      module.i2cModule.channels[channel.id] =  new I2cChannel(channel.id, channel.name);   
+    data.i2cModule.channels.forEach((ch: any) => {
+      module.i2cModule.channels[ch.id] =  new I2cChannel(ch.id, ch.name);   
     });
   }
 

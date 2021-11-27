@@ -1,5 +1,5 @@
 const DataAccess = require('../dal/data_access');
-const ModuleRepository = require('../dal/module_repositroy');
+const ModuleRepository = require('../dal/module_repository');
 
 module.exports.getModules = async (req, res, next) =>{
     try {
@@ -11,8 +11,9 @@ module.exports.getModules = async (req, res, next) =>{
         res.status(200);
 
         result = [];
-        modules.forEach((value, key) =>{
-            result.push({key: key, value: value})
+        
+        modules.forEach((module) =>{
+            result.push({key: module.id, value: module})
         });
 
         res.json(result);

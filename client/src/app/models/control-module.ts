@@ -68,24 +68,26 @@ export class I2CModule {
 
 export enum PwmType{
     unassigned,
-    servo,
+    continuous_servo,
+    positional_servo,
+    linear_servo,
     led,
-    other
+    high_low
 }
 
 export class PwmChannel {
     id: number;
     name: string;
     type: PwmType;
+    limit0: number;
+    limit1: number;
 
-    constructor(id: number, name: string, type: PwmType){
-        if (name === null){
-            this.name = "unnamed";
-        } else{
-            this.name = name;
-        }
+    constructor(id: number, name: string, type: PwmType, limit0: number, limit1: number){
+        this.name = name;
         this.id = id;
         this.type = type;
+        this.limit0 = limit0;
+        this.limit1 = limit1;
     }
 }
 

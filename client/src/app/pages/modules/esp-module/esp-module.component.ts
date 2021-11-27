@@ -16,9 +16,11 @@ export class EspModuleComponent implements OnInit {
 
   pwmTypeOptions = [
     {id: PwmType.unassigned, name: "Unassigned"},
-    {id: PwmType.servo, name: "Servo"},
+    {id: PwmType.continuous_servo, name: "Continuous Servo"},
+    {id: PwmType.positional_servo, name: "Positional Servo"},
+    {id: PwmType.linear_servo, name: "Linear Servo"},
     {id: PwmType.led, name: "LED"},
-    {id: PwmType.other, name: "Other"}
+    {id: PwmType.high_low, name: "High/Low"}
   ]
 
 

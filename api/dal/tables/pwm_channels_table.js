@@ -23,8 +23,9 @@ const insert =
 (${moduleId}, ${channelId}, ${name}, ${type}, ${limit0}, ${limit1}) 
 VALUES (?, ?, ?, ?, ?, ?)`;
 
-const select =
+const selectAll =
 `SELECT ${channelId}, ${name}, ${type}, ${limit0}, ${limit1}
+FROM ${table}
 WHERE ${moduleId} = ?` ;
 
 const update =
@@ -43,7 +44,7 @@ module.exports = Object.freeze({
     Limit0: limit0,
     Limit1: limit1,
     Create: create,
-    Select: select,
+    SelectAll: selectAll,
     Insert: insert,
     Update: update
 });

@@ -1,4 +1,5 @@
 const User = require('../models/users');
+const Table = require('./tables/users_table');
 
 class UserRepository {
     constructor(dao) {
@@ -6,24 +7,9 @@ class UserRepository {
         this.dao.connect();
     }
 
-    async add(name, passwordhash, salt) {
-        const sql = `
-        INSERT INTO users (user, hash, salt) VALUES(?, ?, ?)`;
-
-        await this.dao.run(sql, [name, passwordhash, salt])
-            .then(id => { })
-            .catch((err) => {
-                console.log(err);
-                return 0;
-            });
-
-    }
-
     async getByUsername(name) {
-        const sql = `
-        SELECT user, hash, salt FROM users WHERE user = ?`;
-        
-        let result = await this.dao.get(sql, [name])
+
+        let result = await this.dao.get(Table.select, [name])
         .then((val) => {
             return new User(val[0].user, val[0].hash, val[0].salt );
         })

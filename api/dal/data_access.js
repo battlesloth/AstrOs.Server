@@ -8,7 +8,8 @@ const UsersTable = require('./tables/users_table');
 const ModulesTable = require('./tables/modules_table');
 const PwmChannelsTable = require('./tables/pwm_channels_table');
 const I2cChannelsTable = require('./tables/i2c_channels_table');
-const {ModuleId, PwmType} = require('../models/module')
+const {ModuleId, PwmType} = require('../models/module');
+const { Module } = require('module');
 
 class DataAccess {
     constructor() {
@@ -51,8 +52,8 @@ class DataAccess {
         if (Number.isNaN(version) || version < 1) {
             console.log('Setting up database...');
 
-            await this.setupV1Tables();
-            await this.setV1Values();
+            await this.setupV1Tables()
+            .then(async () => await this.setV1Values());
 
             console.log('Database set up complete!');
         }
@@ -106,10 +107,15 @@ class DataAccess {
 
         const modules = [ModuleId.CORE, ModuleId.DOME, ModuleId.BODY];
 
+        const nameMap = new Map();
+        nameMap.set(ModuleId.CORE, "Dome Core Module");
+        nameMap.set(ModuleId.DOME, "Dome Surface Module");
+        nameMap.set(ModuleId.BODY, "Body Module");
+
         for (let m = 0; m < modules.length; m++) {
             let name = modules[m];
             
-            await this.run(ModulesTable.Insert, [name, name])
+            await this.run(ModulesTable.Insert, [name, nameMap[name]])
             .catch((err) => console.error(`Error adding ${name} module: ${err}`));
 
             for (let i = 0; i < 36; i++) {

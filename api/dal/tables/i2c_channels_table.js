@@ -18,7 +18,8 @@ const insert =
 VALUES (?, ?, ?)`;
 
 const selectAll =
-`SELECT ${channelId}, ${name}, 
+`SELECT ${channelId}, ${name} 
+FROM ${table}
 WHERE ${moduleId} = ?` ;
 
 const update =

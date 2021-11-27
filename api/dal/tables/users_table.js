@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS ${table} (
 
 const insert = `INSERT INTO ${table} (${user}, ${hash}, ${salt}) VALUES (?, ?, ?)`
 
+const select =  `SELECT ${user}, ${hash}, ${salt} FROM ${table} WHERE ${user} = ?`
+
 module.exports = Object.freeze({
     Table: table,
     Id: id,
@@ -19,5 +21,6 @@ module.exports = Object.freeze({
     Hash: hash,
     Salt: salt,
     Create: create,
-    Insert: insert
+    Insert: insert,
+    select: select
 });
