@@ -9,7 +9,7 @@ const ModulesTable = require('./tables/modules_table');
 const PwmChannelsTable = require('./tables/pwm_channels_table');
 const I2cChannelsTable = require('./tables/i2c_channels_table');
 const {ModuleId, PwmType} = require('../models/module');
-const { Module } = require('module');
+
 
 class DataAccess {
     constructor() {

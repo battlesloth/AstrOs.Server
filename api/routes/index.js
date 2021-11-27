@@ -12,7 +12,7 @@ const express = require('express');
 const router = express.Router();
 
 router.get('/modules/', auth, ctrlModule.getModules);
-router.post('/modules/', auth, ctrlModule.saveModules);
+router.put('/modules/', auth, ctrlModule.saveModules);
 
 router.post('/login', ctrlAuth.login);
 

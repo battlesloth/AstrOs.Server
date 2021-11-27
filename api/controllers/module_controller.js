@@ -9,14 +9,7 @@ module.exports.getModules = async (req, res, next) =>{
         var modules = await repo.getModules();
 
         res.status(200);
-
-        result = [];
-        
-        modules.forEach((module) =>{
-            result.push({key: module.id, value: module})
-        });
-
-        res.json(result);
+        res.json(modules);
 
     } catch (error) {
         console.log(error);
@@ -35,10 +28,11 @@ module.exports.saveModules = async (req, res, next) =>{
 
         if (await repo.saveModules(req.body)){
             res.status(200);
+            res.json({message: 'success'});
         } else {
             res.status(500);
             res.json({
-                message: 'Save failed'
+                message: 'failed'
             });
         }  
     } catch (error) {

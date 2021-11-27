@@ -1,4 +1,4 @@
-const { ModuleId, Module, PwmType, PwmChannel, I2cChannel } = require('../models/module');
+const { ModuleId, ControlModule, PwmType, PwmChannel, I2cChannel } = require('../models/module');
 const ModuleTable = require('./tables/modules_table');
 const PwmTable = require('./tables/pwm_channels_table');
 const I2cTable = require('./tables/i2c_channels_table');
@@ -18,7 +18,7 @@ class ModuleRepository {
             
             let moduleId = modules[m];
 
-            let module = new Module(moduleId,"");
+            let module = new ControlModule(moduleId,"");
 
             await this.dao.get(ModuleTable.Select, [moduleId])
             .then((val) =>{
@@ -62,7 +62,7 @@ class ModuleRepository {
     async saveModules(modules) {
 
         for (let m = 0; m < modules.length; m++) {
-            let mod = modules[m].value;
+            let mod = modules[m];
             
             await this.dao.run(ModuleTable.UpdateName, [mod.name, mod.moduleId])
             .catch((err) => {

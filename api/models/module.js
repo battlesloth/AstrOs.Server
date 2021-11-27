@@ -1,4 +1,3 @@
-
 const ModuleId = {
     CORE: "core",
     DOME: "dome",
@@ -6,9 +5,10 @@ const ModuleId = {
 }
 
 const UartType = {
-    NONE: "none",
-    KANGAROO: "kangaroo"
+    NONE: 0,
+    KANGAROO: 1
 }
+
 
 const PwmType = {
     UNASSIGNED: 0,
@@ -22,7 +22,8 @@ const PwmType = {
     HIGH_LOW: 5
 }
 
-class Module{
+
+class ControlModule{
     constructor(id, name){
         this.id = id;  
         this.name = name;
@@ -31,6 +32,7 @@ class Module{
         this.i2cModule = new I2cModule();
     }
 }
+
 
 class UartModule{
     constructor(){
@@ -80,7 +82,7 @@ module.exports = {
     ModuleId : ModuleId,
     UartType : UartType,
     PwmType: PwmType,
-    Module : Module,
+    ControlModule : ControlModule,
     UartModule : UartModule,
     PwmModule : PwmModule,
     PwmChannel : PwmChannel,

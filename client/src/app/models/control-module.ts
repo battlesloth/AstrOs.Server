@@ -1,31 +1,41 @@
 
-export class ControlModule{
-    name: string;
-    id: string;
-    ipAddress!: string;
-
-    uartModule: UartModule;
-    i2cModule: I2CModule;
-    pwmModule: PwmModule;
-
-    constructor(id: string, name: string){
-        this.id = id;
-        this.name = name;
-        this.uartModule = new UartModule();
-        this.i2cModule = new I2CModule();
-        this.pwmModule = new PwmModule();
-    }
-}
-
 export enum UartType{
     none,
     kangaroo
 }
 
+export enum PwmType{
+    unassigned,
+    continuous_servo,
+    positional_servo,
+    linear_servo,
+    led,
+    high_low
+}
+
+export class ControlModule{
+    id: string;
+    name: string;
+    ipAddress!: string;
+
+    uartModule: UartModule;
+    pwmModule: PwmModule;
+    i2cModule: I2cModule;
+
+    constructor(id: string, name: string){
+        this.id = id;
+        this.name = name;
+        this.uartModule = new UartModule();
+        this.pwmModule = new PwmModule();
+        this.i2cModule = new I2cModule(); 
+    }
+}
+
+
 export class UartModule {
     name: string;
     type: UartType;
-    uartContoller: any;
+    module: any;
 
     constructor(){
         this.name = "unnamed";
@@ -44,36 +54,14 @@ export class KangarooController{
     }
 }
 
-export class I2cChannel {
-    id: number;
-    name: string;
-    
-    constructor(id: number, name: string){
-        if (name === null){
-            this.name = "unnamed";
-        } else{
-            this.name = name;
-        }
-        this.id = id;
-    }
-}
-
-export class I2CModule {
-    channels: Array<I2cChannel>;
+export class PwmModule {
+    channels: Array<PwmChannel>;
 
     constructor(){
-        this.channels = new Array<I2cChannel>();
+        this.channels = new Array<PwmChannel>();
     }
 }
 
-export enum PwmType{
-    unassigned,
-    continuous_servo,
-    positional_servo,
-    linear_servo,
-    led,
-    high_low
-}
 
 export class PwmChannel {
     id: number;
@@ -91,10 +79,29 @@ export class PwmChannel {
     }
 }
 
-export class PwmModule {
-    channels: Array<PwmChannel>;
+
+export class I2cModule {
+    channels: Array<I2cChannel>;
 
     constructor(){
-        this.channels = new Array<PwmChannel>();
+        this.channels = new Array<I2cChannel>();
     }
 }
+
+export class I2cChannel {
+    id: number;
+    name: string;
+    
+    constructor(id: number, name: string){
+        if (name === null){
+            this.name = "unnamed";
+        } else{
+            this.name = name;
+        }
+        this.id = id;
+    }
+}
+
+
+
+

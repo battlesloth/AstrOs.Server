@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, of } from 'rxjs';
+import { catchError, map, tap } from 'rxjs/operators';
 import {ControlModule} from "../../models/control-module";
 
 @Injectable({
@@ -16,42 +16,38 @@ export class ModulesService  {
     this.token = '';
    }
 
-   public getModules(): Observable<any> {
-     let base$;
-
-      base$ = this.http.get('/api/modules', {
+   public getModules(): Observable<ControlModule[]> {
+     
+      return this.http.get<ControlModule[]>('/api/modules', {
         headers: {Authorization: `Bearer ${this.getToken()}`}
-      });
-
-      const request = base$.pipe(
-        map((data: any) =>{
-          return data;
-        })
+      })
+      .pipe( tap(_ => console.log('loaded modules')),
+        catchError(this.handleError<ControlModule[]>('getModules', []))
       );
-
-      return request;
    }
 
-  public saveModules(modules: { key: string; value: ControlModule; }[]) : Observable<any> {
-    let base$;
-
-      base$ = this.http.post('/api/modules', modules, {
+  public saveModules(modules: ControlModule[]) : Observable<any> {
+      return this.http.put<any>('/api/modules', modules, {
         headers: {Authorization: `Bearer ${this.getToken()}`}
-      });
-
-      const request = base$.pipe(
-        map((data: any) =>{
-          return data;
-        })
+      })
+      .pipe(
+        tap(_ => console.log(`saveModule result: ${_.message}`)),
+        catchError(this.handleError<any>('saveModules'))
       );
-
-      return request;
   }
 
    private getToken(): string {
     if (!this.token){
-      this.token = localStorage.getItem("astros-token") || '';
+      this.token = localStorage.getItem('astros-token') || '';
     }
     return this.token;
+  }
+
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> =>{
+      console.error(error);
+
+      return of(result as T);
+    }
   }
 }

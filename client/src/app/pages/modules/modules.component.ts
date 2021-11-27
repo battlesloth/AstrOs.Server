@@ -1,5 +1,6 @@
-import { AfterViewInit, Component, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ModulesService } from 'src/app/services/modules/modules.service';
 import { ControlModule, PwmChannel, I2cChannel, PwmType, UartType } from '../../models/control-module';
 
@@ -11,76 +12,67 @@ import { ControlModule, PwmChannel, I2cChannel, PwmType, UartType } from '../../
 })
 export class ModulesComponent implements OnInit {
 
-  coreModule: ControlModule;
-  domeModule: ControlModule;
-  bodyModule: ControlModule;
+  coreModule!: ControlModule;
+  domeModule!: ControlModule;
+  bodyModule!: ControlModule;
 
-  constructor(private modulesService: ModulesService) { 
+  constructor(private modulesService: ModulesService,
+    private snackBar: MatSnackBar) {
 
-    this.coreModule = new ControlModule('core', 'Core Dome Module');
-    this.domeModule = new ControlModule('dome', 'Outer Dome Module');
-    this.bodyModule = new ControlModule('body', 'Body Module'); 
-  }
+        this.coreModule = new ControlModule('core', 'Core Dome Module');
+        this.domeModule = new ControlModule('dome', 'Outer Dome Module');
+        this.bodyModule = new ControlModule('body', 'Body Module'); 
+      }
 
 
   ngOnInit(): void {
     const observer = {
-      next: (result: any) => this.parseModules(result), 
+      next: (result: any) => this.parseModules(result),
       error: (err: any) => console.error(err)
     };
 
     this.modulesService.getModules().subscribe(observer);
-    
+
   }
 
-  saveModuleSettings(){
+  saveModuleSettings() {
     const observer = {
-      next: (result: any) => console.log('module settings saved!'), 
-      error: (err: any) => console.error(err)
+      next: (result: any) => {
+        if (result.message === 'success') {
+          console.log('module settings saved!')
+          this.snackBar.open('Module settings saved!', 'OK', {duration: 2000});
+        } else {
+          console.log('module settings save failed!', 'OK', {duration: 2000})
+          this.snackBar.open('Module settings save failed!', 'OK', {duration: 2000});
+        }
+      },
+      error: (err: any) => {
+        console.error(err);
+        this.snackBar.open('Module settings save failed!');
+      }
     };
 
-    this.modulesService.saveModules([
-      {key: 'core', value: this.coreModule},
-      {key: 'dome', value: this.domeModule},
-      {key: 'body', value: this.bodyModule},
-    ]).subscribe(observer);
+    this.modulesService.saveModules([this.coreModule, this.domeModule, this.bodyModule])
+      .subscribe(observer);
   }
 
-  private parseModules(modules: any){
-    modules.forEach((module: any) => {
+  private parseModules(modules: ControlModule[]) {
+    modules.forEach((module: ControlModule) => {
       try {
-        switch (module.key){
+        switch (module.id) {
           case 'core':
-            this.populateModule(this.coreModule, module.value);
+            this.coreModule = module;
             break;
           case 'dome':
-            this.populateModule(this.domeModule, module.value);
+            this.domeModule = module;
             break;
           case 'body':
-            this.populateModule(this.bodyModule, module.value);
+            this.bodyModule = module;
             break;
         };
-      } catch(err) {
+      } catch (err) {
         console.error(err);
       }
     });
   }
-
-  private populateModule(module: ControlModule, data: any){
-    module.id = data.id;
-    module.name = data.name;
-    
-    module.uartModule.name = data.uartModule.name;
-    module.uartModule.type = <UartType>  data.uartModule.type;
-    
-    data.pwmModule.channels.forEach((ch: any) => {
-      module.pwmModule.channels[ch.id] =  
-        new PwmChannel(ch.id, ch.name, ch.type, ch.limit0, ch.limit1);   
-    });
-   
-    data.i2cModule.channels.forEach((ch: any) => {
-      module.i2cModule.channels[ch.id] =  new I2cChannel(ch.id, ch.name);   
-    });
-  }
-
 }
