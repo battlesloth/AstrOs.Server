@@ -14,9 +14,10 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatMenuModule } from '@angular/material/menu';
 import { ModulesComponent } from './pages/modules/modules.component';
 import {MatExpansionModule} from '@angular/material/expansion'
-import {MatSidenavModule} from '@angular/material/sidenav'
 import {MatToolbarModule} from '@angular/material/toolbar'
-import {MatListModule} from '@angular/material/list'
+import {MatListModule} from '@angular/material/list';
+import { EspModuleComponent } from './pages/modules/esp-module/esp-module.component';
+import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.component'
 
 
 @NgModule({
@@ -27,7 +28,9 @@ import {MatListModule} from '@angular/material/list'
     HomeComponent,
     StatusComponent,
     ScripterComponent,
-    ModulesComponent
+    ModulesComponent,
+    EspModuleComponent,
+    DriveModuleComponent
   ],
   imports: [
     BrowserModule,
@@ -37,7 +40,6 @@ import {MatListModule} from '@angular/material/list'
     BrowserAnimationsModule,
     MatMenuModule,
     MatExpansionModule,
-    MatSidenavModule,
     MatToolbarModule,
     MatListModule
   ],

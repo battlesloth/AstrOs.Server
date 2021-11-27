@@ -24,7 +24,7 @@ describe('AppComponent', () => {
     const fixture = TestBed.createComponent(AppComponent);
     const app = fixture.componentInstance;
     expect(app.title).toEqual('client');
-  });
+  }); 
 
   it('should render title', () => {
     const fixture = TestBed.createComponent(AppComponent);

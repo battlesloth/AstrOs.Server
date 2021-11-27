@@ -1,4 +1,5 @@
 import { Component, ElementRef, Renderer2, ViewChild, ViewEncapsulation } from '@angular/core';
+import { Router } from '@angular/router';
 import { AuthenticationService } from './services/auth/authentication.service';
 
 @Component({
@@ -8,13 +9,16 @@ import { AuthenticationService } from './services/auth/authentication.service';
 })
 export class AppComponent {
 
+  title = "AstOs"
+
   @ViewChild('sideNav', { static: false }) sideNav!: ElementRef;
 
   constructor(public auth: AuthenticationService,
-    private renderer: Renderer2) {
-      var test = 'test';
-      var anoter = test + 'test';
-
+    private renderer: Renderer2, private router: Router) {
+      if (auth.isLoggedIn()) {
+        router.navigate(['modules']);
+        //router.navigate(['status']);
+      }
      }
 
   logout() {

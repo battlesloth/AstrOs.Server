@@ -23,6 +23,14 @@ body {
     font-size: 1.6rem;
 
     background-color: $color-pale;
+
+    button {
+        font-size: x-large;
+        padding: 10px 20px;
+        background: $color-dark;
+        color: $color-pale;
+        
+    }
 }
 
 .page{

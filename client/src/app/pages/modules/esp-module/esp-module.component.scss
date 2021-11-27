@@ -1,0 +1,88 @@
+@import "./src/assets/styles/variables";
+
+.pwm-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+
+    li {
+        border: 2px solid $color-dark;
+       padding: 10px;
+    }
+
+    .pwm-channel {
+
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+
+        .label {
+            font-size: large;
+            width: 120px;
+        }
+
+        .input {
+            flex-grow: 1;
+            margin: 0px;
+            max-width: 400px;
+            margin-right: 20px;
+            input {
+                font-size: large;
+                width: 100%;
+                
+            }
+        }
+
+        .type {
+            width: 120px;
+            text-align: center;
+            margin: 0px;
+
+            select {
+                padding-top:4px;
+                width: 100%;
+                max-width: 100px;
+                font-size: large;
+                display: block;
+
+            }
+        }
+    }
+}
+
+.i2c-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+
+    li {
+        border: 2px solid $color-dark;
+       padding: 10px;
+    }
+
+    .i2c-channel {
+       
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+
+        .label {
+            font-size: large;
+            width: 120px;
+        }
+
+        .input {
+            flex-grow: 1;
+            max-width: 400px;
+
+            input {
+                font-size: large;
+                width: 100%;
+            }
+        }
+    }
+}

@@ -22,8 +22,8 @@ class Module{
         this.id = id;  
         this.name = name;
         this.uartModule = new UartModule();
-        this.PwmModule = new PwmModule();
-        this.I2cModule = new I2cModule();
+        this.pwmModule = new PwmModule();
+        this.i2cModule = new I2cModule();
     }
 }
 

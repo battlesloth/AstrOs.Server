@@ -1,0 +1,39 @@
+<mat-accordion>
+    <mat-expansion-panel>
+        <mat-expansion-panel-header>
+            <mat-panel-title>Serial Port configuration</mat-panel-title>
+        </mat-expansion-panel-header>
+        <p>subpanel.content</p>
+    </mat-expansion-panel>
+    <mat-expansion-panel>
+        <mat-expansion-panel-header>
+            <mat-panel-title>PWM configuration</mat-panel-title>
+        </mat-expansion-panel-header>
+        <ul class="pwm-list">
+            <li *ngFor="let channel of module.pwmModule.channels">
+                <div class="pwm-channel">
+                    <div class="label">Channel {{channel.id}}</div>
+                    <div class="input"><input matInput placeholder="Name" value="{{channel.name}}" /></div>
+                    <div class="type">
+                        <select title="type" id="type">
+                            <option value="test">test</option>
+                        </select>
+                    </div>
+                </div>
+            </li>
+        </ul>
+    </mat-expansion-panel>
+    <mat-expansion-panel>
+        <mat-expansion-panel-header>
+            <mat-panel-title>I2C configuration</mat-panel-title>
+        </mat-expansion-panel-header>
+        <ul class="i2c-list">
+            <li *ngFor="let channel of module.i2cModule.channels">
+                <div class="i2c-channel">
+                    <div class="label">Channel {{channel.id}}</div>
+                    <div class="input"><input matInput placeholder="Name" value="{{channel.name}}" /></div>
+                </div>
+            </li>
+        </ul>
+    </mat-expansion-panel>
+</mat-accordion>

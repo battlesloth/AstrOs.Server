@@ -10,7 +10,13 @@ module.exports.getModules = async (req, res, next) =>{
         var modules = await repo.getModules();
 
         res.status(200);
-        res.json(Array.from(modules.entries()));
+
+        result = [];
+        modules.forEach((value, key) =>{
+            result.push({key: key, value: value})
+        });
+
+        res.json(result);
 
     } catch (error) {
         console.log(error);
