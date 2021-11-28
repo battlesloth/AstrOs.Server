@@ -43,6 +43,8 @@ export class ScripterComponent implements AfterViewInit {
   @ViewChild('scripterModules', { static: false }) moduleEl!: ElementRef;
   @ViewChild('scripterTimeline', { static: false }) timelineEl!: ElementRef;
 
+  private seconds : number = 600;
+
   private modules: Map<string, ScriptModule>;
 
   private items: Array<ScriptItem>;
@@ -84,9 +86,11 @@ export class ScripterComponent implements AfterViewInit {
   onAddEvent(item: Item): void {
 
     const line = document.getElementById(item.timeline);
+    const scrollContainer = document.getElementById("scripter-container");
 
-    if (line != null) {
-      let left = Math.floor((item.xPos - line.offsetLeft) / 41) * 41;
+    if (line != null && scrollContainer != null) {
+
+      let left = Math.floor((item.xPos + scrollContainer.scrollLeft - line.offsetLeft) / 41) * 41;
 
       if (Math.floor(item.xPos - line.offsetLeft) - left > 20) {
         left += 20;
@@ -121,7 +125,7 @@ export class ScripterComponent implements AfterViewInit {
     this.renderer.appendChild(spacerDiv, text);
     this.renderer.appendChild(timelineheader, spacerDiv);
 
-    for (let i = 1; i < 30; i++) {
+    for (let i = 1; i < this.seconds; i++) {
       const timeDiv = this.renderer.createElement('div');
       this.renderer.setAttribute(timeDiv, 'class', 'scripter-timeline-header-period');
       const text = this.renderer.createText(i.toString());
@@ -154,7 +158,7 @@ export class ScripterComponent implements AfterViewInit {
     const timelineDiv = this.renderer.createElement('div');
     this.renderer.setAttribute(timelineDiv, 'class', 'scripter-timeline-row');
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < this.seconds; i++) {
       const timeDiv = this.renderer.createElement('div');
       this.renderer.setAttribute(timeDiv, 'class', 'scripter-timeline-period');
       this.renderer.appendChild(timelineDiv, timeDiv);
@@ -197,7 +201,7 @@ export class ScripterComponent implements AfterViewInit {
     const timelineDiv = this.renderer.createElement('div');
     this.renderer.setAttribute(timelineDiv, 'class', 'scripter-timeline-row');
 
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < this.seconds; i++) {
       const timeDiv = this.renderer.createElement('div');
       this.renderer.setAttribute(timeDiv, 'class', 'scripter-timeline-period');
       this.renderer.appendChild(timelineDiv, timeDiv);

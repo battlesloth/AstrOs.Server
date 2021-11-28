@@ -15,9 +15,17 @@
                     <div class="label">Channel {{channel.id}}</div>
                     <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.name" /></div>
                     <div class="type">
-                        <select title="PWM Type" (ngModelChange)="pwmTypeChange(channel.id, $event)" [(ngModel)]=channel.type >
-                            <option *ngFor="let pwmType of pwmTypeOptions" [ngValue]="pwmType.id">{{pwmType.name}}</option>
+                        <select title="PWM Type" (ngModelChange)="pwmTypeChange(channel.id, $event)"
+                            [(ngModel)]=channel.type>
+                            <option *ngFor="let pwmType of pwmTypeOptions" [ngValue]="pwmType.id">{{pwmType.name}}
+                            </option>
                         </select>
+                    </div>
+                    <div class="limit">
+                        <input matInput placeholder="0" [(ngModel)]="channel.limit0"/>
+                    </div>
+                    <div class="limit">
+                        <input matInput placeholder="0" [(ngModel)]="channel.limit1"/>
                     </div>
                 </div>
             </li>
