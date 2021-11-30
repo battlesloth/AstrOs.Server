@@ -36,12 +36,9 @@ export interface Item {
   templateUrl: './scripter.component.html',
   styleUrls: ['./scripter.component.scss']
 })
-export class ScripterComponent implements AfterViewInit {
+export class ScripterComponent implements OnInit {
 
   @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;
-
-  @ViewChild('scripterModules', { static: false }) moduleEl!: ElementRef;
-  @ViewChild('scripterTimeline', { static: false }) timelineEl!: ElementRef;
 
   private seconds : number = 600;
 
@@ -49,9 +46,13 @@ export class ScripterComponent implements AfterViewInit {
 
   private items: Array<ScriptItem>;
 
+  timeLineArray: Array<number>;
+
   menuTopLeft = { x: 0, y: 0 };
 
   constructor(private renderer: Renderer2) {
+    this.timeLineArray = Array.from({length: this.seconds}, (_, i) => i + 1)
+
     this.items = new Array<ScriptItem>(
       new ScriptItem('t1', '1', new Date('2021/6/1'), new Date('2021/6/4')),
       new ScriptItem('t2', '2', new Date('2021/6/3'), new Date('2021/6/4')),
@@ -75,144 +76,11 @@ export class ScripterComponent implements AfterViewInit {
   }
 
   onAddModuleClick(event: MouseEvent) {
-    const module = `test-${this.modules.size}`;
-    
-    this.modules.set(module, new ScriptModule(module, module));
-
-    this.addModule(module);
-    this.appendAddModuleLine();
-  }
-
-  onAddEvent(item: Item): void {
-
-    const line = document.getElementById(item.timeline);
-    const scrollContainer = document.getElementById("scripter-container");
-
-    if (line != null && scrollContainer != null) {
-
-      let left = Math.floor((item.xPos + scrollContainer.scrollLeft - line.offsetLeft) / 41) * 41;
-
-      if (Math.floor(item.xPos - line.offsetLeft) - left > 20) {
-        left += 20;
-      } else {
-        left -= 20;
-      }
-
-      const floater = this.renderer.createElement('div');
-      this.renderer.setAttribute(floater, 'class', 'scripter-timeline-marker');
-      this.renderer.setStyle(floater, 'top', `0px`);
-      this.renderer.setStyle(floater, 'left', `${left}px`);
-      this.renderer.setStyle(floater, 'width', '40px');
-      this.renderer.appendChild(line, floater);
-    }
-  }
-
-
-
-  ngAfterViewInit(): void {
-
-    const div = this.renderer.createElement('div');
-    this.renderer.setAttribute(div, 'class', 'scripter-module-header-row');
-    this.renderer.appendChild(this.moduleEl.nativeElement, div);
-
-    const timelineheader = this.renderer.createElement('div');
-    this.renderer.setAttribute(timelineheader, 'class', 'scripter-timeline-header-row');
-
-
-    const spacerDiv = this.renderer.createElement('div');
-    this.renderer.setAttribute(spacerDiv, 'class', 'scripter-timeline-header-period-spacer');
-    const text = this.renderer.createText('.');
-    this.renderer.appendChild(spacerDiv, text);
-    this.renderer.appendChild(timelineheader, spacerDiv);
-
-    for (let i = 1; i < this.seconds; i++) {
-      const timeDiv = this.renderer.createElement('div');
-      this.renderer.setAttribute(timeDiv, 'class', 'scripter-timeline-header-period');
-      const text = this.renderer.createText(i.toString());
-      this.renderer.appendChild(timeDiv, text);
-      this.renderer.appendChild(timelineheader, timeDiv);
-    }
-
-    this.renderer.appendChild(this.timelineEl.nativeElement, timelineheader);
-
-
-    this.appendAddModuleLine();
 
   }
 
-  private addModule(name: string) {
-    const addModule = document.getElementById(`${name}-module`);
-
-    if (addModule == null) {
-      const addModuleDiv = this.renderer.createElement('div');
-      this.renderer.setAttribute(addModuleDiv, 'class', 'scripter-module');
-      const addModuleText = this.renderer.createText(name);
-      this.renderer.appendChild(addModuleDiv, addModuleText);
-      this.renderer.setAttribute(addModuleDiv, 'id', `${name}-module`);
-      this.renderer.appendChild(this.moduleEl.nativeElement, addModuleDiv);
-    } else {
-      console.log(`${name}-module already exists!`);
-      return;
-    }
-
-    const timelineDiv = this.renderer.createElement('div');
-    this.renderer.setAttribute(timelineDiv, 'class', 'scripter-timeline-row');
-
-    for (let i = 0; i < this.seconds; i++) {
-      const timeDiv = this.renderer.createElement('div');
-      this.renderer.setAttribute(timeDiv, 'class', 'scripter-timeline-period');
-      this.renderer.appendChild(timelineDiv, timeDiv);
-    }
-
-    this.renderer.setAttribute(timelineDiv, 'id', `${name}-module-timeline`);
-    this.renderer.listen(timelineDiv, 'contextmenu', (evt) => this.onTimelineRightClick(evt, `${name}-module-timeline`));
-
-
-    this.renderer.appendChild(this.timelineEl.nativeElement, timelineDiv);
-  }
-
-
-  private appendAddModuleLine() {
-
-    const addModule = document.getElementById('add-module');
-
-    if (addModule != null) {
-      addModule.remove();
-    }
-
-    const addModuleDiv = this.renderer.createElement('div');
-    this.renderer.setAttribute(addModuleDiv, 'class', 'scripter-module');
-    const addModuleText = this.renderer.createText('Add Module');
-
-    this.renderer.appendChild(addModuleDiv, addModuleText);
-
-    this.renderer.setAttribute(addModuleDiv, 'id', 'add-module');
-
-    this.renderer.listen(addModuleDiv, 'click', (evt) => this.onAddModuleClick(evt));
-
-    this.renderer.appendChild(this.moduleEl.nativeElement, addModuleDiv);
-
-
-    const addModuleTimeline = document.getElementById('add-module-timeline');
-
-    if (addModuleTimeline != null) {
-      addModuleTimeline.remove();
-    }
-    const timelineDiv = this.renderer.createElement('div');
-    this.renderer.setAttribute(timelineDiv, 'class', 'scripter-timeline-row');
-
-    for (let i = 0; i < this.seconds; i++) {
-      const timeDiv = this.renderer.createElement('div');
-      this.renderer.setAttribute(timeDiv, 'class', 'scripter-timeline-period');
-      this.renderer.appendChild(timelineDiv, timeDiv);
-    }
-
-    this.renderer.setAttribute(timelineDiv, 'id', 'add-module-timeline');
-
-    this.renderer.appendChild(this.timelineEl.nativeElement, timelineDiv);
-  }
-
-
+  onAddEvent(item: Item): void {}
+  
   ngOnInit(): void {
   }
 

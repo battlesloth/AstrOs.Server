@@ -18,7 +18,8 @@ import { MatListModule } from '@angular/material/list';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { EspModuleComponent } from './pages/modules/esp-module/esp-module.component';
-import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.component'
+import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.component';
+import { ScriptRowComponent } from './pages/scripter/script-row/script-row.component'
 
 
 @NgModule({
@@ -30,7 +31,8 @@ import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.
     ScripterComponent,
     ModulesComponent,
     EspModuleComponent,
-    DriveModuleComponent
+    DriveModuleComponent,
+    ScriptRowComponent
   ],
   imports: [
     BrowserModule,
