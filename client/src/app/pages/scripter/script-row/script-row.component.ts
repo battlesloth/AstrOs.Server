@@ -1,4 +1,5 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
+import { ScriptChannel } from 'src/app/models/script-channel';
 
 @Component({
   selector: 'app-script-row',
@@ -7,7 +8,15 @@ import { Component, OnInit } from '@angular/core';
 })
 export class ScriptRowComponent implements OnInit {
 
-  constructor() { }
+  @Input()
+  channel!: ScriptChannel
+
+  timeLineArray: Array<number>;
+  private seconds: number = 300;
+
+  constructor() { 
+    this.timeLineArray = Array.from({length: this.seconds}, (_, i) => i + 1)
+  }
 
   ngOnInit(): void {
   }

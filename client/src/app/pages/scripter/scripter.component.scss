@@ -1,8 +1,7 @@
 @import '../../../assets/styles/variables';
 
 .container {
-  display: flex;
-  flex-direction: column;
+
   max-height: 80%;
   margin: 0 auto;
   padding: 50px;
@@ -12,10 +11,16 @@
 .scripter-container {
   background-color: black;
   display: flex;
-  flex-direction: row;
+
   border: 2px solid black;
   border-radius: 10px;
   overflow-y: scroll;
+}
+
+
+.scripter-body {
+display: flex;
+flex-direction: column;
 }
 
 .scripter-header {
@@ -45,15 +50,20 @@
 }
 
 .timeline-spacer {
-  width: 30px;
+  width: 29px;
   background-color: burlywood;
+  border-bottom: 2px solid black;
 }
 
 .timeline-header {
   width: 60px;
+  border-bottom: 2px solid black;
 }
 
 .timeline-gradient {
+  -ms-user-select: none;
+  -webkit-user-select: none;
+  user-select:none;
   text-align: center;
 
   background-color: burlywood;

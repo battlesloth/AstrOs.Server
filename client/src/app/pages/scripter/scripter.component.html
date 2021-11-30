@@ -1,12 +1,20 @@
 <div class="container">
-    <div id="scripter-container" class="scripter-container">
-        <div class="scripter-header">
-            <div class="scripter-module-header" #scripterModules></div>
-            <div class=" timeline-spacer"></div>
-            <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item}}</div>
-            <!-- an hidden div is created to set the position of appearance of the menu-->
+    <div class="scripter-container">
+        <div class="scripter-body">
+            <div class="scripter-header">
+                <div class="scripter-module-header"></div>
+                <div class=" timeline-spacer"></div>
+                <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item}}</div>
+            </div>
+            <app-script-row *ngFor="let channel of scriptChannels" id="timeline-{{channel.id}}" (contextmenu)="onTimelineRightClick($event, channel.id)" [channel]="channel"></app-script-row>
         </div>
-        <div style="visibility: hidden; position: fixed;" [style.left.px]="menuTopLeft.x" [style.top.px]="menuTopLeft.y" [matMenuTriggerFor]="rightMenu"></div>
+
+
+
+        <!-- an hidden div is created to set the position of appearance of the menu-->
+        <div style="visibility: hidden; position: fixed;" [style.left.px]="menuTopLeft.x" [style.top.px]="menuTopLeft.y"
+            [matMenuTriggerFor]="rightMenu"></div>
+
 
 
         <!-- standard material menu -->
@@ -16,6 +24,4 @@
             </ng-template>
         </mat-menu>
     </div>
-
-
 </div>

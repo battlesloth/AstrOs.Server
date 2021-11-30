@@ -1,0 +1,31 @@
+.script-row-container{
+    display: flex;
+    flex-direction: row;
+}
+
+.module-container {
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0px;
+    background-color: darkslategray;
+    color: white;
+    border-bottom: 2px solid black;
+    border-right: 2px solid black;
+    height: 140px;
+    width: 200px;
+    text-align: center;
+}
+
+.timeline-segment {
+    background-color: teal;
+    border-bottom: 2px solid black;
+    border-right: 2px solid black;
+    height: 140px;    
+    width: 58px;
+}
+
+.timeline-spacer{
+    background-color: teal;
+    height: 140px;
+    width: 29px;
+}
