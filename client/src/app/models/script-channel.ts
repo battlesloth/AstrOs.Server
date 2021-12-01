@@ -1,5 +1,4 @@
 export enum ScriptChannelType{
-    Add,
     Uart,
     Pwm,
     I2c,

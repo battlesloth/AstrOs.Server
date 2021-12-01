@@ -6,7 +6,15 @@
                 <div class=" timeline-spacer"></div>
                 <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item}}</div>
             </div>
-            <app-script-row *ngFor="let channel of scriptChannels" id="timeline-{{channel.id}}" (contextmenu)="onTimelineRightClick($event, channel.id)" [channel]="channel"></app-script-row>
+            <app-script-row *ngFor="let channel of scriptChannels" id="timeline-{{channel.id}}" (timelineCallback)="timelineCallback($event)" [channel]="channel"></app-script-row>
+            <div class="add-row-container">
+                <div class="add-row-channel" (click)="addChannel()">
+                    <div>Add</div>
+                    <div>Channel</div>
+                </div>
+                <div *ngFor="let item of timeLineArray" class="add-row-segment"></div>
+                <div class="add-row-spacer"></div>
+            </div>
         </div>
 
 

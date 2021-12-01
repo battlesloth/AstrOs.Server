@@ -11,21 +11,26 @@
     color: white;
     border-bottom: 2px solid black;
     border-right: 2px solid black;
-    height: 140px;
+    height: 100px;
     width: 200px;
     text-align: center;
+}
+
+.timeline-container{
+    display: flex;
+    flex-direction: row;
 }
 
 .timeline-segment {
     background-color: teal;
     border-bottom: 2px solid black;
     border-right: 2px solid black;
-    height: 140px;    
+    height: 100px;    
     width: 58px;
 }
 
 .timeline-spacer{
     background-color: teal;
-    height: 140px;
+    height: 100px;
     width: 29px;
 }

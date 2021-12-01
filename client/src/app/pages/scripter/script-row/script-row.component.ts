@@ -1,5 +1,6 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { EventEmitter, Component, Input, OnInit, Output } from '@angular/core';
 import { ScriptChannel } from 'src/app/models/script-channel';
+
 
 @Component({
   selector: 'app-script-row',
@@ -11,6 +12,8 @@ export class ScriptRowComponent implements OnInit {
   @Input()
   channel!: ScriptChannel
 
+  @Output("timelineCallback") timelineCallback: EventEmitter<any> = new EventEmitter();
+
   timeLineArray: Array<number>;
   private seconds: number = 300;
 
@@ -21,4 +24,9 @@ export class ScriptRowComponent implements OnInit {
   ngOnInit(): void {
   }
 
+  onTimelineRightClick(event: MouseEvent): void {
+    event.preventDefault();
+
+    this.timelineCallback.emit({event: event, id: this.channel.id});
+  }
 }

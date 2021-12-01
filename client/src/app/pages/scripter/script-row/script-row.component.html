@@ -1,5 +1,7 @@
 <div class="script-row-container">
     <div class="module-container"></div>
+    <div class="timeline-container" (contextmenu)="onTimelineRightClick($event)">
     <div *ngFor="let item of timeLineArray;" class="timeline-segment"></div>
+    </div>
     <div class="timeline-spacer"></div>
 <div>

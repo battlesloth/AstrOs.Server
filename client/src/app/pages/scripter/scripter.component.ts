@@ -30,28 +30,51 @@ export class ScripterComponent implements OnInit {
     this.timeLineArray = Array.from({ length: this.seconds }, (_, i) => i + 1)
 
     this.scriptChannels = new Array<ScriptChannel>(
-      new ScriptChannel(1, ScriptChannelType.Add, 300)
+      new ScriptChannel(1, ScriptChannelType.Pwm, this.seconds)
     );
-
   }
 
 
-  onTimelineRightClick(event: MouseEvent, timeline: number) {
-    event.preventDefault();
+  timelineCallback(msg: any) {
+    
+    msg.event.preventDefault();
 
-    this.menuTopLeft.x = event.clientX;
-    this.menuTopLeft.y = event.clientY;
+    this.menuTopLeft.x = msg.event.clientX;
+    this.menuTopLeft.y = msg.event.clientY;
 
-    this.menuTrigger.menuData = { 'item': { 'timeline': timeline, 'xPos': event.clientX } };
+    this.menuTrigger.menuData = { 'item': { 'timeline': msg.id.timeline, 'xPos': msg.event.clientX } };
 
     this.menuTrigger.openMenu();
   }
 
-  onAddModuleClick(event: MouseEvent) {
-
+  addChannel(): void {
+    this.scriptChannels.push(
+      new ScriptChannel(2, ScriptChannelType.Uart, 300)
+    );
   }
 
-  onAddEvent(item: Item): void { }
+  onAddEvent(item: any): void {
+    const line = document.getElementById(item.timeline);
+    const scrollContainer = document.getElementById("scripter-container");
+
+    if (line != null && scrollContainer != null) {
+
+      let left = Math.floor((item.xPos + scrollContainer.scrollLeft - line.offsetLeft) / 41) * 41;
+
+      if (Math.floor(item.xPos - line.offsetLeft) - left > 20) {
+        left += 20;
+      } else {
+        left -= 20;
+      }
+
+      const floater = this.renderer.createElement('div');
+      this.renderer.setAttribute(floater, 'class', 'scripter-timeline-marker');
+      this.renderer.setStyle(floater, 'top', `0px`);
+      this.renderer.setStyle(floater, 'left', `${left}px`);
+      this.renderer.setStyle(floater, 'width', '40px');
+      this.renderer.appendChild(line, floater);
+    }
+  }
 
   ngOnInit(): void {
   }

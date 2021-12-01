@@ -1,8 +1,8 @@
 @import '../../../assets/styles/variables';
 
 .container {
-
-  max-height: 80%;
+  display: flex;
+  height: 80%;
   margin: 0 auto;
   padding: 50px;
   background-color: $color-medium;
@@ -11,7 +11,6 @@
 .scripter-container {
   background-color: black;
   display: flex;
-
   border: 2px solid black;
   border-radius: 10px;
   overflow-y: scroll;
@@ -24,6 +23,9 @@ flex-direction: column;
 }
 
 .scripter-header {
+  position: -webkit-sticky;
+  position: sticky;
+  top: 0px;
   display: flex;
   flex-direction: row;
 }
@@ -40,6 +42,7 @@ flex-direction: column;
   position: -webkit-sticky;
   position: sticky;
   left: 0px;
+  top: 0px;
   background-color: burlywood;
   color: white;
   border-bottom: 2px solid black;
@@ -83,63 +86,41 @@ flex-direction: column;
   background-repeat: no-repeat;
 }
 
-.scripter-timeline-header-period-spacer {
-  border-bottom: 2px solid black;
-  color: transparent;
-  text-align: center;
-  width: 21px;
-  height: 24px;
-  display: inline-block;
-  -webkit-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
+
+.add-row-container{
+  display: flex;
+  flex-direction: row;
 }
 
-.scripter-timeline-header-period {
-  color: black;
-  border-bottom: 2px solid black;
-  text-align: center;
-  width: 41px;
-  height: 24px;
-  display: inline-block;
-  -webkit-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
-
-.scripter-timeline-row {
-  white-space: nowrap;
-  position: relative;
-  border-bottom: 1px solid black;
-  padding: 0;
-  margin: 0;
-  height: 80px;
-}
-
-.scripter-timeline-period {
-  background-color: cadetblue;
-  color: black;
-  border-right: 1px solid darkslategray;
-  text-align: center;
-  width: 40px;
-  height: 100%;
-  padding: 0;
-  margin: 0;
-  display: inline-block;
-}
-
-
-
-.scripter-module {
-  background-color: darkcyan;
+.add-row-channel {
+  position: -webkit-sticky;
+  position: sticky;
+  left: 0px;
+  background-color: darkslategray;
   color: white;
-  border-bottom: 1px solid black;
+  border-bottom: 2px solid black;
   border-right: 2px solid black;
-  height: 80px;
-  border-radius: 10px;
+  height: 100px;
+  width: 200px;
+  font-family: sans-serif;
+  font-size: x-large;
+  line-height: 48px;
   text-align: center;
 }
 
+.add-row-segment {
+  background-color: teal;
+  border-bottom: 2px solid black;
+  border-right: 2px solid black;
+  height: 100px;    
+  width: 58px;
+}
+
+.add-row-spacer{
+  background-color: teal;
+  height: 100px;
+  width: 29px;
+}
 .scripter-timeline-marker {
   position: absolute;
   height: 80px;
