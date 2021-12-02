@@ -19,7 +19,8 @@ import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { EspModuleComponent } from './pages/modules/esp-module/esp-module.component';
 import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.component';
-import { ScriptRowComponent } from './pages/scripter/script-row/script-row.component'
+import { ScriptRowComponent } from './pages/scripter/script-row/script-row.component';
+import { ModalModule } from './modal';
 
 
 @NgModule({
@@ -44,7 +45,8 @@ import { ScriptRowComponent } from './pages/scripter/script-row/script-row.compo
     MatExpansionModule,
     MatToolbarModule,
     MatListModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    ModalModule
   ],
   providers: [],
   bootstrap: [AppComponent]

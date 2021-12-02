@@ -130,3 +130,16 @@ flex-direction: column;
   border-radius: 20px;
   cursor: pointer;
 }
+
+.scripter-modal {
+
+  width: 600px;
+
+  
+}
+
+@media only screen and (max-width: 620px){
+.scripter-modal {
+      width: 400px;
+  }
+}

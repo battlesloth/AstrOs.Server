@@ -1,8 +1,7 @@
-import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
-import { DOCUMENT } from '@angular/common'
+import { Component, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
 import { ScriptChannel, ScriptChannelType } from 'src/app/models/script-channel';
-
+import { ModalService } from '../../modal';
 
 export interface Item {
   timeline: string;
@@ -26,7 +25,7 @@ export class ScripterComponent implements OnInit {
 
   menuTopLeft = { x: 0, y: 0 };
 
-  constructor(private renderer: Renderer2) {
+  constructor(private modalService: ModalService, private renderer: Renderer2) {
     this.timeLineArray = Array.from({ length: this.seconds }, (_, i) => i + 1)
 
     this.scriptChannels = new Array<ScriptChannel>(
@@ -34,6 +33,16 @@ export class ScripterComponent implements OnInit {
     );
   }
 
+  ngOnInit(): void {
+  }
+
+  openModal(id: string){
+    this.modalService.open(id);
+  }
+
+  closeModal(id: string){
+    this.modalService.close(id);
+  }
 
   timelineCallback(msg: any) {
     
@@ -75,8 +84,4 @@ export class ScripterComponent implements OnInit {
       this.renderer.appendChild(line, floater);
     }
   }
-
-  ngOnInit(): void {
-  }
-
 }

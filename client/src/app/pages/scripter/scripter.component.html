@@ -6,9 +6,10 @@
                 <div class=" timeline-spacer"></div>
                 <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item}}</div>
             </div>
-            <app-script-row *ngFor="let channel of scriptChannels" id="timeline-{{channel.id}}" (timelineCallback)="timelineCallback($event)" [channel]="channel"></app-script-row>
+            <app-script-row *ngFor="let channel of scriptChannels" id="timeline-{{channel.id}}"
+                (timelineCallback)="timelineCallback($event)" [channel]="channel"></app-script-row>
             <div class="add-row-container">
-                <div class="add-row-channel" (click)="addChannel()">
+                <div class="add-row-channel" (click)="openModal('custom-modal-1')">
                     <div>Add</div>
                     <div>Channel</div>
                 </div>
@@ -33,3 +34,11 @@
         </mat-menu>
     </div>
 </div>
+
+<astros-modal id="custom-modal-1" style="display: none;">
+    <div  class="scripter-modal">
+        <h1>A Custom Modal Window!</h1>
+        <p>Body here</p>
+        <button (click)="closeModal('custom-modal-1');">Close</button>
+    </div>
+</astros-modal>
