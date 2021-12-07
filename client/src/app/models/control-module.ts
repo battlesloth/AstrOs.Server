@@ -1,4 +1,9 @@
 
+export enum ChannelType{
+    I2c,
+    Pwm
+}
+
 export enum UartType{
     none,
     kangaroo

@@ -114,8 +114,8 @@ class DataAccess {
 
         for (let m = 0; m < modules.length; m++) {
             let name = modules[m];
-            
-            await this.run(ModulesTable.Insert, [name, nameMap[name]])
+
+            await this.run(ModulesTable.Insert, [name, nameMap.get(name)])
             .catch((err) => console.error(`Error adding ${name} module: ${err}`));
 
             for (let i = 0; i < 36; i++) {
