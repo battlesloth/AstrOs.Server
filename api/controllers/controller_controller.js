@@ -1,12 +1,13 @@
 const DataAccess = require('../dal/data_access');
-const ModuleRepository = require('../dal/module_repository');
+const ControllerRepository = require('../dal/controller_repository');
+const { Controller } = require('../models/controller');
 
-module.exports.getModules = async (req, res, next) =>{
+module.exports.getControllers = async (req, res, next) =>{
     try {
         const dao = new DataAccess();
-        const repo = new ModuleRepository(dao);
+        const repo = new ControllerRepository(dao);
 
-        var modules = await repo.getModules();
+        var modules = await repo.getControllers();
 
         res.status(200);
         res.json(modules);
@@ -21,12 +22,12 @@ module.exports.getModules = async (req, res, next) =>{
     }
 }
 
-module.exports.saveModules = async (req, res, next) =>{
+module.exports.saveControllers = async (req, res, next) =>{
     try {
         const dao = new DataAccess();
         const repo = new ModuleRepository(dao);
 
-        if (await repo.saveModules(req.body)){
+        if (await repo.saveControllers(req.body)){
             res.status(200);
             res.json({message: 'success'});
         } else {

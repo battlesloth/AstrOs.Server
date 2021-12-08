@@ -1,7 +1,7 @@
-const ModuleId = {
-    CORE: "core",
-    DOME: "dome",
-    BODY: "body"
+const ControllerId = {
+    CORE: 1,
+    DOME: 2,
+    BODY: 3
 }
 
 const UartType = {
@@ -23,7 +23,7 @@ const PwmType = {
 }
 
 
-class ControlModule{
+class Controller{
     constructor(id, name){
         this.id = id;  
         this.name = name;
@@ -79,10 +79,10 @@ class I2cChannel{
 
 
 module.exports = {
-    ModuleId : ModuleId,
+    ControllerId : ControllerId,
     UartType : UartType,
     PwmType: PwmType,
-    ControlModule : ControlModule,
+    Controller : Controller,
     UartModule : UartModule,
     PwmModule : PwmModule,
     PwmChannel : PwmChannel,

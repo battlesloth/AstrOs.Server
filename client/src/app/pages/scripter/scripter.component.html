@@ -37,24 +37,31 @@
 
 <astros-modal id="channel-add-modal" style="display: none;">
     <div class="scripter-modal">
-        <h1>A Custom Modal Window!</h1>
+        <h1>Select Channel</h1>
         <div class="modal-body">
-            <select id="controller-select" title="Contoller" [(ngModel)]="selectedController" (change)="modalChange($event)">
+            <select id="controller-select" title="Contoller" [(ngModel)]="selectedController"
+                (change)="modalChange($event)">
                 <option value="" disabled selected>Select Contoller</option>
-                <option *ngFor="let kv of scriptResources?.modules | keyvalue" value="{{kv.key}}">{{kv.value.name}}</option>
+                <option *ngFor="let kv of scriptResources?.modules | keyvalue" value="{{kv.key}}">{{kv.value.name}}
+                </option>
             </select>
-            <select id="module-select" title="Module" disabled [(ngModel)]="selectedModule" (change)="modalChange($event)">
+            <select id="module-select" title="Module" disabled [(ngModel)]="selectedModule"
+                (change)="modalChange($event)">
                 <option value="" disabled selected>Select Module</option>
                 <option *ngFor="let kv of availableModules | keyvalue" value="{{kv.key}}">{{kv.value}}</option>
             </select>
-            <select id="channel-select" title="Channel" disabled [(ngModel)]="selectedChannel" (change)="modalChange($event)">
+            <select id="channel-select" title="Channel" disabled [(ngModel)]="selectedChannel"
+                (change)="modalChange($event)">
                 <option value="-1" disabled selected>Select Channel</option>
                 <option *ngFor="let ch of availableChannels" value="{{ch}}">{{ch}}</option>
             </select>
         </div>
         <div class="modal-buttons">
-            <button (click)="addChannel();">Add</button>
-            <button (click)="closeModal('channel-add-modal');">Close</button>
+            <div class="button-spacer"></div>
+            <div class="button-grouper">
+                <button (click)="addChannel();">Add</button>
+                <button (click)="closeModal('channel-add-modal');">Close</button>
+            </div>
         </div>
     </div>
 </astros-modal>

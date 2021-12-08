@@ -1,29 +1,29 @@
-const table = 'modules';
+const table = 'controllers';
 const id = 'id';
-const moduleId = 'moduleId';
+const controllerId = 'controllerId';
 const name = 'name';
 const create = `
 CREATE TABLE IF NOT EXISTS ${table} (
     ${id} INTEGER PRIMARY KEY AUTOINCREMENT,
-    ${moduleId} TEXT UNIQUE,
+    ${controllerId} INTEGER UNIQUE,
     ${name} TEXT)`;
 
 const insert = `
 INSERT INTO ${table} 
-(${moduleId}, ${name}) 
+(${controllerId}, ${name}) 
 VALUES (?, ?)`;
 
 const select = `
 SELECT ${name}
 FROM ${table}
-WHERE ${moduleId} = ?`;
+WHERE ${controllerId} = ?`;
 
-const updateName = `UPDATE ${table} SET ${name} = ? WHERE ${moduleId} = ?`;
+const updateName = `UPDATE ${table} SET ${name} = ? WHERE ${controllerId} = ?`;
 
 module.exports = Object.freeze({
     Table: table,
     Id: id,
-    ModuleId: moduleId,
+    ControllerId: controllerId,
     Name: name,
     Create: create,
     Insert: insert,

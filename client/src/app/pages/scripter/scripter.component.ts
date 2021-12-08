@@ -2,7 +2,7 @@ import { KeyValue } from '@angular/common';
 import { newArray } from '@angular/compiler/src/util';
 import { Component, KeyValueDiffers, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
-import { ControlModule } from 'src/app/models/control-module';
+import { ChannelType, ControllerType, ControlModule } from 'src/app/models/control-module';
 import { ScriptChannel, ScriptChannelType } from 'src/app/models/script-channel';
 import { ScriptResources } from 'src/app/models/script-resources';
 import { ModulesService } from 'src/app/services/modules/modules.service';
@@ -24,10 +24,12 @@ export class ScripterComponent implements OnInit {
 
   private seconds: number = 300;
 
+  private channelCount: number = 0;
+
   scriptResources!: ScriptResources;
 
 
-  selectedController: string = '';
+  selectedController: ControllerType = ControllerType.none;
 
   availableModules: Map<string, string>;
   selectedModule: string = '';
@@ -56,9 +58,7 @@ export class ScripterComponent implements OnInit {
 
     this.availableChannels = new Array<number>(0,1,2);
 
-    this.scriptChannels = new Array<ScriptChannel>(
-      new ScriptChannel(1, ScriptChannelType.Pwm, this.seconds)
-    );
+    this.scriptChannels = new Array<ScriptChannel>();
   }
 
   ngOnInit(): void {
@@ -78,7 +78,7 @@ export class ScripterComponent implements OnInit {
 
   closeModal(id: string) {
     this.modalService.close(id);
-    this.selectedController = '';
+    this.selectedController = ControllerType.none;
     this.selectedModule = '';
     this.selectedChannel = -1;
 
@@ -100,21 +100,66 @@ export class ScripterComponent implements OnInit {
 
   modalChange($event: any) {
     if ($event.target.id === 'controller-select'){
-      document.getElementById('module-select')?.removeAttribute('disabled');  
+      if ($event.target.value === 'audio'){
+        document.getElementById('module-select')?.setAttribute('disabled', 'disabled');  
+      }
+      else{
+        document.getElementById('module-select')?.removeAttribute('disabled');  
+      }
     }
-    if ($event.target.id === 'module-select'){
+    else if ($event.target.id === 'module-select' ){
+
+      switch($event.target.value){
+        case 'uart':
+          document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
+          return;
+        case 'pwm':
+          const pwmChannels = this.scriptResources.unusedPwm.get(this.selectedController);
+          if (pwmChannels){
+            this.availableChannels = Array.from(pwmChannels);
+          }
+          break
+        case 'i2c':
+          const i2cChannels = this.scriptResources.unusedI2c.get(this.selectedController);
+          if (i2cChannels){
+            this.availableChannels = Array.from(i2cChannels);
+          }
+          break;
+      }
+
       document.getElementById('channel-select')?.removeAttribute('disabled');  
     }
-    var test = $event;
   }
 
   addChannel(): void {
     this.closeModal('channel-add-modal');
 
-    //this.scriptChannels.push(
+    this.channelCount++;
 
-    //  new ScriptChannel(2, ScriptChannelType.Uart, 300)
-    //);
+    let name = this.scriptResources.controllers.get(this.selectedController)?.name;
+
+    if (!name){
+      name = ''
+    }
+
+    let type = ScriptChannelType.None;
+
+    switch (this.selectedModule){
+      case 'uart':
+        type = ScriptChannelType.Uart;
+        break;
+      case 'pwm':
+        type = ScriptChannelType.Pwm;
+        break;
+      case 'i2c':
+        type = ScriptChannelType.I2c;
+        break;
+    }
+
+    this.scriptChannels.push(
+      new ScriptChannel(this.channelCount, this.selectedController, 
+        name, type, this.selectedChannel, this.seconds)
+    );
   }
 
   onAddEvent(item: any): void {

@@ -5,10 +5,11 @@ const sqlite3 = require('sqlite3');
 
 const SettingsTable = require('./tables/settings_table');
 const UsersTable = require('./tables/users_table');
-const ModulesTable = require('./tables/modules_table');
+const ControllersTable = require('./tables/controllers_table');
 const PwmChannelsTable = require('./tables/pwm_channels_table');
 const I2cChannelsTable = require('./tables/i2c_channels_table');
-const {ModuleId, PwmType} = require('../models/module');
+const {ControllerId, PwmType} = require('../models/controller');
+const controller = require('../models/controller');
 
 
 class DataAccess {
@@ -86,7 +87,7 @@ class DataAccess {
 
         await this.createTable(UsersTable.Table, UsersTable.Create);
 
-        await this.createTable(ModulesTable.Table, ModulesTable.Create);
+        await this.createTable(ControllersTable.Table, ControllersTable.Create);
 
         await this.createTable(PwmChannelsTable.Table, PwmChannelsTable.Create);
 
@@ -105,18 +106,18 @@ class DataAccess {
             })
             .catch((err) => console.error(`Error adding default admin: ${err}`));
 
-        const modules = [ModuleId.CORE, ModuleId.DOME, ModuleId.BODY];
+        const controllers = [ControllerId.CORE, ControllerId.DOME, ControllerId.BODY];
 
         const nameMap = new Map();
-        nameMap.set(ModuleId.CORE, "Dome Core Module");
-        nameMap.set(ModuleId.DOME, "Dome Surface Module");
-        nameMap.set(ModuleId.BODY, "Body Module");
+        nameMap.set(ControllerId.CORE, "Dome Core Controller");
+        nameMap.set(ControllerId.DOME, "Dome Surface Controller");
+        nameMap.set(ControllerId.BODY, "Body Controller");
 
-        for (let m = 0; m < modules.length; m++) {
-            let name = modules[m];
+        for (let m = 0; m < controllers.length; m++) {
+            let name = controllers[m];
 
-            await this.run(ModulesTable.Insert, [name, nameMap.get(name)])
-            .catch((err) => console.error(`Error adding ${name} module: ${err}`));
+            await this.run(ControllersTable.Insert, [name, nameMap.get(name)])
+            .catch((err) => console.error(`Error adding ${name} controller: ${err}`));
 
             for (let i = 0; i < 36; i++) {
                 await this.run(PwmChannelsTable.Insert, [name, i, "unassigned", PwmType.UNASSIGNED, 0, 0])

@@ -1,37 +1,37 @@
 const table = 'i2c_channels';
 const id = 'id';
-const moduleId = 'moduleId';
+const controllerId = 'controllerId';
 const channelId = 'channelId';
 const name = 'name';
 
 const create =`
 CREATE TABLE IF NOT EXISTS ${table} (
     ${id} INTEGER PRIMARY KEY AUTOINCREMENT,
-    ${moduleId} TEXT,
+    ${controllerId} INTEGER,
     ${channelId} INTEGER,
     ${name} TEXT,
-    UNIQUE(${moduleId}, ${channelId}) ON CONFLICT REPLACE)`;
+    UNIQUE(${controllerId}, ${channelId}) ON CONFLICT REPLACE)`;
 
 const insert = 
 `INSERT INTO ${table} 
-(${moduleId}, ${channelId}, ${name}) 
+(${controllerId}, ${channelId}, ${name}) 
 VALUES (?, ?, ?)`;
 
 const selectAll =
 `SELECT ${channelId}, ${name} 
 FROM ${table}
-WHERE ${moduleId} = ?` ;
+WHERE ${controllerId} = ?` ;
 
 const update =
 `UPDATE ${table} 
 SET ${name} = ? 
-WHERE ${moduleId} = ? AND ${channelId} = ?`;
+WHERE ${controllerId} = ? AND ${channelId} = ?`;
 
 
 module.exports = Object.freeze({
     Table: table,
     Id: id,
-    ModuleId: moduleId,
+    ControllerId: controllerId,
     ChannelId: channelId,
     Name: name,
     Create: create,

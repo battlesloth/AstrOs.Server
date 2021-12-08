@@ -1,7 +1,17 @@
+export enum ControllerType{
+    none,
+    core,
+    dome,
+    body,
+    audio
+}
+
 
 export enum ChannelType{
-    I2c,
-    Pwm
+    none,
+    uart,
+    i2c,
+    pwm
 }
 
 export enum UartType{
@@ -19,7 +29,8 @@ export enum PwmType{
 }
 
 export class ControlModule{
-    id: string;
+    id: ControllerType;
+
     name: string;
     ipAddress!: string;
 
@@ -27,7 +38,7 @@ export class ControlModule{
     pwmModule: PwmModule;
     i2cModule: I2cModule;
 
-    constructor(id: string, name: string){
+    constructor(id: ControllerType, name: string){
         this.id = id;
         this.name = name;
         this.uartModule = new UartModule();

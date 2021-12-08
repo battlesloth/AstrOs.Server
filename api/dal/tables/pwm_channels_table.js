@@ -1,6 +1,6 @@
 const table = 'pwm_channels';
 const id = 'id';
-const moduleId = 'moduleId';
+const controllerId = 'controllerId';
 const channelId = 'channelId';
 const name = 'name';
 const type = 'type';
@@ -10,34 +10,34 @@ const limit1 = 'limit1';
 const create =`
 CREATE TABLE IF NOT EXISTS ${table} (
     ${id} INTEGER PRIMARY KEY AUTOINCREMENT,
-    ${moduleId} TEXT,
+    ${controllerId} INTEGER,
     ${channelId} INTEGER,
     ${name} TEXT,
     ${type} INTEGER,
     ${limit0} INTEGER,
     ${limit1} INTEGER,
-    UNIQUE(${moduleId}, ${channelId}) ON CONFLICT REPLACE)`;
+    UNIQUE(${controllerId}, ${channelId}) ON CONFLICT REPLACE)`;
 
 const insert = 
 `INSERT INTO ${table} 
-(${moduleId}, ${channelId}, ${name}, ${type}, ${limit0}, ${limit1}) 
+(${controllerId}, ${channelId}, ${name}, ${type}, ${limit0}, ${limit1}) 
 VALUES (?, ?, ?, ?, ?, ?)`;
 
 const selectAll =
 `SELECT ${channelId}, ${name}, ${type}, ${limit0}, ${limit1}
 FROM ${table}
-WHERE ${moduleId} = ?` ;
+WHERE ${controllerId} = ?` ;
 
 const update =
 `UPDATE ${table} 
 SET ${name} = ?, ${type} = ?, ${limit0} = ?, ${limit1} = ? 
-WHERE ${moduleId} = ? AND ${channelId} = ?`;
+WHERE ${controllerId} = ? AND ${channelId} = ?`;
 
 
 module.exports = Object.freeze({
     Table: table,
     Id: id,
-    ModuleId: moduleId,
+    ControllerId: controllerId,
     ChannelId: channelId,
     Name: name,
     Type: type,
