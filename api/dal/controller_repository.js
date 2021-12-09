@@ -12,13 +12,13 @@ class ControllerRepository {
     async getControllers() {
         let result = [];
 
-        const modules = [ControllerId.CORE, ControllerId.DOME, ControllerId.BODY];
+        const controllers = [ControllerId.CORE, ControllerId.DOME, ControllerId.BODY];
 
-        for (let m = 0; c < modules.length; c++) {
+        for (let c = 0; c < controllers.length; c++) {
             
-            let controllerId = modules[c];
+            let controllerId = controllers[c];
 
-            let controller = new Controller(id,"");
+            let controller = new Controller(controllerId,"");
 
             await this.dao.get(ControllersTable.Select, [controllerId])
             .then((val) =>{
@@ -32,7 +32,7 @@ class ControllerRepository {
             await this.dao.get(PwmTable.SelectAll, [controllerId])
             .then((val) =>{
                 val.forEach(ch => {
-                    module.pwmModule.channels[ch.channelId] =
+                    controller.pwmModule.channels[ch.channelId] =
                         new PwmChannel(ch.channelId, ch.name, ch.type, ch.limit0, ch.limit1);
                 });
             })
@@ -44,7 +44,7 @@ class ControllerRepository {
             await this.dao.get(I2cTable.SelectAll, [controllerId])
             .then((val) =>{
                 val.forEach(ch => {
-                    module.i2cModule.channels[ch.channelId] = 
+                    controller.i2cModule.channels[ch.channelId] = 
                         new I2cChannel(ch.channelId, ch.name);
                 });
             })
@@ -53,7 +53,7 @@ class ControllerRepository {
                 throw 'error';
             });
 
-            result.push(module);
+            result.push(controller);
         }
 
         return result;

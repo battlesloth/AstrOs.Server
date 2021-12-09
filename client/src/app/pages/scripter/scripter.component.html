@@ -41,8 +41,8 @@
         <div class="modal-body">
             <select id="controller-select" title="Contoller" [(ngModel)]="selectedController"
                 (change)="modalChange($event)">
-                <option value="" disabled selected>Select Contoller</option>
-                <option *ngFor="let kv of scriptResources?.modules | keyvalue" value="{{kv.key}}">{{kv.value.name}}
+                <option value="0" disabled selected>Select Contoller</option>
+                <option *ngFor="let kv of scriptResources?.controllers | keyvalue" value="{{kv.key}}">{{kv.value.name}}
                 </option>
             </select>
             <select id="module-select" title="Module" disabled [(ngModel)]="selectedModule"

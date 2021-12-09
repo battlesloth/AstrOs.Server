@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { ModulesService } from 'src/app/services/modules/modules.service';
-import { ControlModule, PwmChannel, I2cChannel, PwmType, UartType } from '../../models/control-module';
+import { ControllerService } from 'src/app/services/controllers/controller.service';
+import { ControlModule, PwmChannel, I2cChannel, PwmType, UartType, ControllerType } from '../../models/control-module';
 
 @Component({
   selector: 'app-modules',
@@ -16,12 +16,12 @@ export class ModulesComponent implements OnInit {
   domeModule!: ControlModule;
   bodyModule!: ControlModule;
 
-  constructor(private modulesService: ModulesService,
+  constructor(private modulesService: ControllerService,
     private snackBar: MatSnackBar) {
 
-        this.coreModule = new ControlModule('core', 'Core Dome Module');
-        this.domeModule = new ControlModule('dome', 'Outer Dome Module');
-        this.bodyModule = new ControlModule('body', 'Body Module'); 
+        this.coreModule = new ControlModule(ControllerType.core, 'Core Dome Module');
+        this.domeModule = new ControlModule(ControllerType.dome, 'Outer Dome Module');
+        this.bodyModule = new ControlModule(ControllerType.body, 'Body Module'); 
       }
 
 
@@ -31,7 +31,7 @@ export class ModulesComponent implements OnInit {
       error: (err: any) => console.error(err)
     };
 
-    this.modulesService.getModules().subscribe(observer);
+    this.modulesService.getControllers().subscribe(observer);
 
   }
 
@@ -52,7 +52,7 @@ export class ModulesComponent implements OnInit {
       }
     };
 
-    this.modulesService.saveModules([this.coreModule, this.domeModule, this.bodyModule])
+    this.modulesService.saveControllers([this.coreModule, this.domeModule, this.bodyModule])
       .subscribe(observer);
   }
 
@@ -60,13 +60,13 @@ export class ModulesComponent implements OnInit {
     modules.forEach((module: ControlModule) => {
       try {
         switch (module.id) {
-          case 'core':
+          case ControllerType.core:
             this.coreModule = module;
             break;
-          case 'dome':
+          case ControllerType.dome:
             this.domeModule = module;
             break;
-          case 'body':
+          case ControllerType.body:
             this.bodyModule = module;
             break;
         };

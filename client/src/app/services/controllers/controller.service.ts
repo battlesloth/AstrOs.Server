@@ -7,7 +7,7 @@ import {ControlModule} from "../../models/control-module";
 @Injectable({
   providedIn: 'root'
 })
-export class ModulesService  {
+export class ControllerService  {
   
 
   private token: string;
@@ -16,23 +16,23 @@ export class ModulesService  {
     this.token = '';
    }
 
-   public getModules(): Observable<ControlModule[]> {
+   public getControllers(): Observable<ControlModule[]> {
      
-      return this.http.get<ControlModule[]>('/api/modules', {
+      return this.http.get<ControlModule[]>('/api/controllers', {
         headers: {Authorization: `Bearer ${this.getToken()}`}
       })
-      .pipe( tap(_ => console.log('loaded modules')),
-        catchError(this.handleError<ControlModule[]>('getModules', []))
+      .pipe( tap(_ => console.log('loaded controllers')),
+        catchError(this.handleError<ControlModule[]>('get', []))
       );
    }
 
-  public saveModules(modules: ControlModule[]) : Observable<any> {
-      return this.http.put<any>('/api/modules', modules, {
+  public saveControllers(controllers: ControlModule[]) : Observable<any> {
+      return this.http.put<any>('/api/controllers', controllers, {
         headers: {Authorization: `Bearer ${this.getToken()}`}
       })
       .pipe(
-        tap(_ => console.log(`saveModule result: ${_.message}`)),
-        catchError(this.handleError<any>('saveModules'))
+        tap(_ => console.log(`saveControllers result: ${_.message}`)),
+        catchError(this.handleError<any>('saveControllers'))
       );
   }
 

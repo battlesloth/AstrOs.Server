@@ -5,7 +5,7 @@ import { MatMenuTrigger } from '@angular/material/menu'
 import { ChannelType, ControllerType, ControlModule } from 'src/app/models/control-module';
 import { ScriptChannel, ScriptChannelType } from 'src/app/models/script-channel';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ModulesService } from 'src/app/services/modules/modules.service';
+import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ModalService } from '../../modal';
 
 export interface Item {
@@ -46,7 +46,7 @@ export class ScripterComponent implements OnInit {
   modules: Map<string, ControlModule>;
 
   constructor(private modalService: ModalService, private renderer: Renderer2,
-    private modulesService: ModulesService,) {
+    private modulesService: ControllerService) {
 
     this.timeLineArray = Array.from({ length: this.seconds }, (_, i) => i + 1)
 
@@ -69,7 +69,7 @@ export class ScripterComponent implements OnInit {
       error: (err: any) => console.error(err)
     };
 
-    this.modulesService.getModules().subscribe(observer);
+    this.modulesService.getControllers().subscribe(observer);
   }
 
   openModal(id: string) {
@@ -100,8 +100,12 @@ export class ScripterComponent implements OnInit {
 
   modalChange($event: any) {
     if ($event.target.id === 'controller-select'){
-      if ($event.target.value === 'audio'){
-        document.getElementById('module-select')?.setAttribute('disabled', 'disabled');  
+      if (+$event.target.value === ControllerType.audio){
+        this.selectedModule = '';
+        this.selectedChannel = -1;
+        document.getElementById('module-select')?.setAttribute('disabled', 'disabled');
+        document.getElementById('channel-select')?.setAttribute('disabled', 'disabled')
+        return  
       }
       else{
         document.getElementById('module-select')?.removeAttribute('disabled');  
@@ -111,6 +115,7 @@ export class ScripterComponent implements OnInit {
 
       switch($event.target.value){
         case 'uart':
+          this.selectedChannel = -1;
           document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
           return;
         case 'pwm':
