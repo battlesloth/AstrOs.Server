@@ -4,6 +4,8 @@
 }
 
 .module-container {
+    display: flex;
+    flex-direction: column;
     position: -webkit-sticky;
     position: sticky;
     left: 0px;
@@ -14,7 +16,39 @@
     height: 100px;
     width: 200px;
     text-align: center;
+
+
+    .title {
+        font-size: x-large;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        margin: 4px 8px;
+        padding: 0px 0px 4px 0px;
+    }
+
+    .spacer{
+        flex-grow: 1;
+    }
+
+    .button-bar{
+        text-align: right;
+        padding: 0px 0px 4px 0px;
+        button {
+            font-size: large;
+            padding: 0;
+            margin: 0px 12px 0px 0px;
+            border: none;
+            background-color: transparent;
+            color: white;
+            cursor: pointer;
+        }
+    }
 }
+
+
+
+
 
 .timeline-container{
     display: flex;

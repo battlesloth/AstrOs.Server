@@ -1,19 +1,28 @@
-import { KeyValue } from "@angular/common";
-import { ChannelType, ControllerType, ControlModule, UartType } from "./control-module";
+import { ControllerType, ControlModule, UartModule, UartType } from "./control-module";
+import { ScriptChannelType } from "./script-channel";
 
 
 export class ControllerDetails {
     id: ControllerType;
     name: string;
     //type:name
-    uart: KeyValue<UartType, string>
+    uart: UartModule
 
-    constructor(id: ControllerType, name: string, uartType: UartType, uartName: string) {
+    constructor(id: ControllerType, name: string, uart: UartModule) {
         this.id = id;
         this.name = name;
-        this.uart = {key: uartType, value: uartName};
+        this.uart = uart;
     }
+}
 
+export class ChannelValue {
+    available: boolean;
+    channel: any
+
+    constructor(channel: any){
+        this.available = true;
+        this.channel = channel;
+    }
 }
 
 export class ScriptResources {
@@ -21,31 +30,28 @@ export class ScriptResources {
 
     uartAvailable: Map<ControllerType, boolean>;
 
-    unusedPwm: Map<ControllerType, Array<number>>;
-    usedPwm: Map<ControllerType, Array<number>>;
-
-    unusedI2c: Map<ControllerType, Array<number>>;
-    usedI2c: Map<ControllerType, Array<number>>;
+    pwmChannels: Map<ControllerType, Array<ChannelValue>>;
+    
+    i2cChannels: Map<ControllerType, Array<ChannelValue>>;
     
     constructor(controllers: Array<ControlModule>) {
         this.controllers = new Map<ControllerType, ControllerDetails>();
-        this.unusedPwm = new Map<ControllerType, Array<number>>();
-        this.usedPwm = new Map<ControllerType, Array<number>>();
-        this.unusedI2c = new Map<ControllerType, Array<number>>();
-        this.usedI2c = new Map<ControllerType, Array<number>>();
-
+        this.pwmChannels = new Map<ControllerType, Array<any>>();
+        this.i2cChannels = new Map<ControllerType, Array<any>>();
         this.uartAvailable = new Map<ControllerType, boolean>();
 
-        this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio,'Audio Playback', UartType.none, ''))
+        this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback', new UartModule()));
 
         controllers.forEach( con =>{
             this.uartAvailable.set(con.id, true);
 
-            this.controllers.set(con.id, new ControllerDetails(con.id, con.name, con.uartModule.type, con.uartModule.name));
-            this.unusedPwm.set(con.id,
-                Array.from({ length: con.pwmModule.channels.length }, (_, i) => i ));
-            this.unusedI2c.set(con.id,
-                Array.from({ length: con.i2cModule.channels.length }, (_, i) => i ));
+            this.controllers.set(con.id, new ControllerDetails(con.id, con.name, con.uartModule));
+            
+            this.pwmChannels.set(con.id, con.pwmModule.channels.map( ch => new ChannelValue(ch)));
+            this.i2cChannels.set(con.id, con.i2cModule.channels.map( ch => new ChannelValue(ch)));
+
+            this.pwmChannels.get(con.id)?.sort((a, b) => {return a.channel.id - b.channel.id});
+            this.i2cChannels.get(con.id)?.sort((a, b) => {return a.channel.id - b.channel.id});
         });
     }
 
@@ -57,60 +63,58 @@ export class ScriptResources {
         return false;
     }
 
-    addChannel(controller: ControllerType, type: ChannelType, id: number ) : void {
+    addChannel(controller: ControllerType, type: ScriptChannelType, id: number ) : any {
         
         if (controller === ControllerType.audio){
             this.controllers.delete(ControllerType.audio);
-            return
+            return undefined;
         }
         
         switch(type){
-            case ChannelType.uart:
+            case ScriptChannelType.Uart:
                 this.uartAvailable.set(controller, false);
-                break 
-            case ChannelType.pwm:
-                this.usedPwm.get(controller)?.push(id);
-                const pwmIdx = this.unusedPwm.get(controller)?.indexOf(id, 0);
+                return this.controllers.get(controller)?.uart;
+            case ScriptChannelType.Pwm:
+                const pwmIdx = this.pwmChannels.get(controller)?.findIndex( x=> x.channel.id === id);
                 if (pwmIdx && pwmIdx > -1) {
-                    this.unusedPwm.get(controller)?.splice(pwmIdx, 1);
+                    this.pwmChannels.get(controller)![pwmIdx].available = false;
+                    return this.pwmChannels.get(controller)![pwmIdx].channel
+                }
+                break
+            case ScriptChannelType.I2c:
+                const i2cIdx = this.i2cChannels.get(controller)?.findIndex( x=> x.channel.id === id);
+                if (i2cIdx && i2cIdx > -1) {
+                    this.i2cChannels.get(controller)![i2cIdx].available = false;
+                    return this.pwmChannels.get(controller)![i2cIdx].channel
                 }
                 break;
-            case ChannelType.i2c:
-                this.usedI2c.get(controller)?.push(id);
-                const i2cIdx = this.unusedI2c.get(controller)?.indexOf(id, 0);
-                if (i2cIdx && i2cIdx > -1) {
-                    this.unusedI2c.get(controller)?.splice(i2cIdx, 1);
-                }    
-                break;
         }
+
+        return undefined;
     }
 
-    removeChannel(controller: ControllerType, type: ChannelType, id: number ) : void {
+    removeChannel(controller: ControllerType, type: ScriptChannelType, id: number ) : void {
         
         if (controller === ControllerType.audio){
-            this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio,'Audio Playback', UartType.none, ''))
+            this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio,'Audio Playback', new UartModule()))
             return
         }
         
         switch(type){
-            case ChannelType.uart:
+            case ScriptChannelType.Uart:
                 this.uartAvailable.set(controller, true);
-                break
-            case ChannelType.pwm:
-                this.unusedPwm.get(controller)?.push(id);
-                this.unusedPwm.get(controller)?.sort();
-                const pwmIdx = this.usedPwm.get(controller)?.indexOf(id, 0);
+                break 
+            case ScriptChannelType.Pwm:
+                const pwmIdx = this.pwmChannels.get(controller)?.findIndex( x=> x.channel.id === id);
                 if (pwmIdx && pwmIdx > -1) {
-                    this.usedPwm.get(controller)?.splice(pwmIdx, 1);
+                    this.pwmChannels.get(controller)![pwmIdx].available = true;
                 }
                 break;
-            case ChannelType.i2c:
-                this.unusedI2c.get(controller)?.push(id);
-                this.unusedI2c.get(controller)?.sort();
-                const i2cIdx = this.usedI2c.get(controller)?.indexOf(id, 0);
+            case ScriptChannelType.I2c:
+                const i2cIdx = this.i2cChannels.get(controller)?.findIndex( x=> x.channel.id === id);
                 if (i2cIdx && i2cIdx > -1) {
-                    this.usedI2c.get(controller)?.splice(i2cIdx, 1);
-                }    
+                    this.i2cChannels.get(controller)![i2cIdx].available = false;
+                }
                 break;
         }
     }

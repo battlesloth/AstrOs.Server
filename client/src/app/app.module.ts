@@ -21,6 +21,7 @@ import { EspModuleComponent } from './pages/modules/esp-module/esp-module.compon
 import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.component';
 import { ScriptRowComponent } from './pages/scripter/script-row/script-row.component';
 import { ModalModule } from './modal';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
 
 @NgModule({
@@ -46,7 +47,8 @@ import { ModalModule } from './modal';
     MatToolbarModule,
     MatListModule,
     MatSnackBarModule,
-    ModalModule
+    ModalModule,
+    FontAwesomeModule
   ],
   providers: [],
   bootstrap: [AppComponent]

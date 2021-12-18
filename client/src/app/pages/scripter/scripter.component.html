@@ -7,7 +7,8 @@
                 <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item}}</div>
             </div>
             <app-script-row *ngFor="let channel of scriptChannels" id="timeline-{{channel.id}}"
-                (timelineCallback)="timelineCallback($event)" [channel]="channel"></app-script-row>
+                (timelineCallback)="timelineCallback($event)"
+                (removeCallback)="removeCallback($event)" [channel]="channel"></app-script-row>
             <div class="add-row-container">
                 <div class="add-row-channel" (click)="openModal('channel-add-modal')">
                     <div>Add</div>
@@ -53,7 +54,9 @@
             <select id="channel-select" title="Channel" disabled [(ngModel)]="selectedChannel"
                 (change)="modalChange($event)">
                 <option value="-1" disabled selected>Select Channel</option>
-                <option *ngFor="let ch of availableChannels" value="{{ch}}">{{ch}}</option>
+                <ng-container *ngFor="let ch of availableChannels">
+                    <option *ngIf="ch.available" value="{{ch.channel.id}}">{{ch.channel.id}} - {{ch.channel.name}}</option>
+                </ng-container>
             </select>
         </div>
         <div class="modal-buttons">

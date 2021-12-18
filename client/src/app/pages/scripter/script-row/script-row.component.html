@@ -1,5 +1,17 @@
 <div class="script-row-container">
-    <div class="module-container"></div>
+    <div class="module-container">
+        <div class="title" *ngIf="channel.channel">{{channel.channel.name}}</div>
+        <div class="title" *ngIf="!channel.channel">{{channel.controllerName}}</div>
+        
+        <div *ngIf="channel.channel">{{channel.controllerName}}</div>
+        <div  *ngIf="channel.type === 1">UART</div>
+        <div  *ngIf="channel.type === 2"><span>PWM Channel: </span>{{channel.channel?.id}} </div>
+        <div  *ngIf="channel.type === 3"><span>I2C Channel: </span>{{channel.channel?.id}} </div>
+        <div class="spacer"></div>
+        <div class="button-bar">
+            <button title="Remove" (click)="remove()"><fa-icon [icon]="faTrash"></fa-icon></button>
+        </div>
+    </div>
     <div class="timeline-container" (contextmenu)="onTimelineRightClick($event)">
     <div *ngFor="let item of timeLineArray;" class="timeline-segment"></div>
     </div>

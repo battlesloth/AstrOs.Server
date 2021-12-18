@@ -1,10 +1,8 @@
-import { KeyValue } from '@angular/common';
-import { newArray } from '@angular/compiler/src/util';
-import { Component, KeyValueDiffers, OnInit, Renderer2, ViewChild } from '@angular/core';
+import { Component,  OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
-import { ChannelType, ControllerType, ControlModule } from 'src/app/models/control-module';
+import { ControllerType, ControlModule, I2cChannel, PwmChannel, PwmType, UartModule } from 'src/app/models/control-module';
 import { ScriptChannel, ScriptChannelType } from 'src/app/models/script-channel';
-import { ScriptResources } from 'src/app/models/script-resources';
+import { ChannelValue, ScriptResources } from 'src/app/models/script-resources';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ModalService } from '../../modal';
 
@@ -21,44 +19,50 @@ export interface Item {
 export class ScripterComponent implements OnInit {
 
   @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;
+  
 
   private seconds: number = 300;
+  timeLineArray: Array<number>;
+  menuTopLeft = { x: 0, y: 0 };
 
-  private channelCount: number = 0;
-
+  
   scriptResources!: ScriptResources;
-
 
   selectedController: ControllerType = ControllerType.none;
 
   availableModules: Map<string, string>;
   selectedModule: string = '';
 
-  availableChannels: Array<number>;
+  availableChannels: Array<ChannelValue>;
   selectedChannel: number = -1;
 
   scriptChannels: Array<ScriptChannel>;
+  private channelCount: number = 0;
 
-  timeLineArray: Array<number>;
-
-  menuTopLeft = { x: 0, y: 0 };
-
-  modules: Map<string, ControlModule>;
-
+  
   constructor(private modalService: ModalService, private renderer: Renderer2,
     private modulesService: ControllerService) {
 
     this.timeLineArray = Array.from({ length: this.seconds }, (_, i) => i + 1)
 
-    this.modules = new Map<string, ControlModule>();
     this.availableModules = new Map<string, string>([
       ['uart', 'UART Module'],
       ['pwm', 'PWM Module'],
       ['i2c', 'I2C Module']]);
 
-    this.availableChannels = new Array<number>(0,1,2);
+    this.availableChannels = new Array<ChannelValue>();
 
-    this.scriptChannels = new Array<ScriptChannel>();
+    this.scriptChannels = new Array<ScriptChannel>(
+      new ScriptChannel(1, ControllerType.core, 'Dome Core Controller', ScriptChannelType.Pwm, 
+        new PwmChannel(2, 'Discombultor', PwmType.linear_servo, 10, 100), this.seconds),
+        new ScriptChannel(2, ControllerType.dome, 'Dome Skin Controller', ScriptChannelType.I2c, 
+        new I2cChannel(4, 'A Really Really Long Name Here. Like Really Long'), this.seconds),
+        new ScriptChannel(3, ControllerType.audio, 'Audio Playback', ScriptChannelType.Sound, 
+        undefined, this.seconds),
+        new ScriptChannel(4, ControllerType.body, 'Core Core Controller', ScriptChannelType.Uart, 
+        new UartModule(), this.seconds)
+    
+        );
   }
 
   ngOnInit(): void {
@@ -98,7 +102,28 @@ export class ScripterComponent implements OnInit {
     this.menuTrigger.openMenu();
   }
 
+  removeCallback(msg: any) {
+
+    const chIdx = this.scriptChannels
+      .map((ch) => {return ch.id})
+      .indexOf(msg.id);
+    
+    if (chIdx !== undefined){
+      const channel = this.scriptChannels[chIdx];
+
+      this.scriptChannels.splice(chIdx, 1);
+
+      this.scriptResources.removeChannel(
+        channel.controllerType,
+        channel.type,
+        channel.channel.id
+        );
+    }
+  }
+
   modalChange($event: any) {
+
+    // convert from string value to number for enum
     if ($event.target.id === 'controller-select'){
       if (+$event.target.value === ControllerType.audio){
         this.selectedModule = '';
@@ -119,13 +144,13 @@ export class ScripterComponent implements OnInit {
           document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
           return;
         case 'pwm':
-          const pwmChannels = this.scriptResources.unusedPwm.get(this.selectedController);
+          const pwmChannels = this.scriptResources.pwmChannels.get(+this.selectedController);
           if (pwmChannels){
             this.availableChannels = Array.from(pwmChannels);
           }
           break
         case 'i2c':
-          const i2cChannels = this.scriptResources.unusedI2c.get(this.selectedController);
+          const i2cChannels = this.scriptResources.i2cChannels.get(+this.selectedController);
           if (i2cChannels){
             this.availableChannels = Array.from(i2cChannels);
           }
@@ -137,11 +162,14 @@ export class ScripterComponent implements OnInit {
   }
 
   addChannel(): void {
-    this.closeModal('channel-add-modal');
 
     this.channelCount++;
 
-    let name = this.scriptResources.controllers.get(this.selectedController)?.name;
+    // convert from string value to number for enum
+    const controller = +this.selectedController;
+    const channel = + this.selectedChannel;
+
+    let name = this.scriptResources.controllers.get(controller)?.name;
 
     if (!name){
       name = ''
@@ -161,10 +189,14 @@ export class ScripterComponent implements OnInit {
         break;
     }
 
+    const chValue = this.scriptResources.addChannel(controller, type, channel)
+
     this.scriptChannels.push(
-      new ScriptChannel(this.channelCount, this.selectedController, 
-        name, type, this.selectedChannel, this.seconds)
+      new ScriptChannel(this.channelCount, controller, 
+        name, type, chValue, this.seconds)
     );
+
+    this.closeModal('channel-add-modal');
   }
 
   onAddEvent(item: any): void {
