@@ -9,15 +9,25 @@ export enum ScriptChannelType{
 }
 
 
+export class ScriptEvent {
+
+    time: number
+
+    constructor(time: number) {
+        this.time = time;
+    }
+}
+
 export class ScriptChannel {
-    id: number;
+    id: string;
     controllerType: ControllerType;
     controllerName: string;
     type: ScriptChannelType;
     channel: any;
     maxDuration: number
-    
-    constructor(id: number, controllerType: ControllerType, controllerName: string,
+    events: Array<ScriptEvent>
+
+    constructor(id: string, controllerType: ControllerType, controllerName: string,
         type: ScriptChannelType, channel: any, maxDuration: number){
         this.id = id;
         this.controllerType = controllerType;
@@ -25,5 +35,7 @@ export class ScriptChannel {
         this.type = type;
         this.channel = channel;
         this.maxDuration = maxDuration;
+
+        this.events = new Array<ScriptEvent>();
     }
 }

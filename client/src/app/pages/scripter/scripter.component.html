@@ -6,16 +6,15 @@
                 <div class=" timeline-spacer"></div>
                 <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item}}</div>
             </div>
-            <app-script-row *ngFor="let channel of scriptChannels" id="timeline-{{channel.id}}"
+            <app-script-row *ngFor="let ch of scriptChannels" id="timeline-{{ch.id}}"
                 (timelineCallback)="timelineCallback($event)"
-                (removeCallback)="removeCallback($event)" [channel]="channel"></app-script-row>
+                (removeCallback)="removeCallback($event)" [channel]="ch"></app-script-row>
             <div class="add-row-container">
                 <div class="add-row-channel" (click)="openModal('channel-add-modal')">
                     <div>Add</div>
                     <div>Channel</div>
                 </div>
-                <div *ngFor="let item of timeLineArray" class="add-row-segment"></div>
-                <div class="add-row-spacer"></div>
+                <div class="add-row-timeline-container"></div>
             </div>
         </div>
 

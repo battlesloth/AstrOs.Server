@@ -1,7 +1,8 @@
-import { Component,  OnInit, Renderer2, ViewChild } from '@angular/core';
+import { Component, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
-import { ControllerType, ControlModule, I2cChannel, PwmChannel, PwmType, UartModule } from 'src/app/models/control-module';
-import { ScriptChannel, ScriptChannelType } from 'src/app/models/script-channel';
+import { Guid } from 'guid-typescript';
+import { ChannelType, ControllerType, ControlModule, I2cChannel, PwmChannel, PwmType, UartModule } from 'src/app/models/control-module';
+import { ScriptChannel, ScriptChannelType, ScriptEvent } from 'src/app/models/script-channel';
 import { ChannelValue, ScriptResources } from 'src/app/models/script-resources';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ModalService } from '../../modal';
@@ -19,13 +20,12 @@ export interface Item {
 export class ScripterComponent implements OnInit {
 
   @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;
-  
+
   private segmentWidth: number = 60;
   private seconds: number = 300;
   timeLineArray: Array<number>;
   menuTopLeft = { x: 0, y: 0 };
 
-  
   scriptResources!: ScriptResources;
 
   selectedController: ControllerType = ControllerType.none;
@@ -37,9 +37,7 @@ export class ScripterComponent implements OnInit {
   selectedChannel: number = -1;
 
   scriptChannels: Array<ScriptChannel>;
-  private channelCount: number = 0;
 
-  
   constructor(private modalService: ModalService, private renderer: Renderer2,
     private modulesService: ControllerService) {
 
@@ -53,16 +51,17 @@ export class ScripterComponent implements OnInit {
     this.availableChannels = new Array<ChannelValue>();
 
     this.scriptChannels = new Array<ScriptChannel>(
-      new ScriptChannel(1, ControllerType.core, 'Dome Core Controller', ScriptChannelType.Pwm, 
+      new ScriptChannel(Guid.create().toString(), ControllerType.core, 'Dome Core Controller', ScriptChannelType.Pwm,
         new PwmChannel(2, 'Discombultor', PwmType.linear_servo, 10, 100), this.seconds),
-        new ScriptChannel(2, ControllerType.dome, 'Dome Skin Controller', ScriptChannelType.I2c, 
+      new ScriptChannel(Guid.create().toString(), ControllerType.dome, 'Dome Skin Controller', ScriptChannelType.I2c,
         new I2cChannel(4, 'A Really Really Long Name Here. Like Really Long'), this.seconds),
-        new ScriptChannel(3, ControllerType.audio, 'Audio Playback', ScriptChannelType.Sound, 
+      new ScriptChannel(Guid.create().toString(), ControllerType.audio, 'Audio Playback', ScriptChannelType.Sound,
         undefined, this.seconds),
-        new ScriptChannel(4, ControllerType.body, 'Core Core Controller', ScriptChannelType.Uart, 
-        new UartModule(), this.seconds)
-    
-        );
+      new ScriptChannel(Guid.create().toString(), ControllerType.body, 'Core Core Controller', ScriptChannelType.Uart,
+        new UartModule(), this.seconds));
+
+      this.scriptChannels[0].events.push(new ScriptEvent(4));
+      this.scriptChannels[0].events.push(new ScriptEvent(7));
   }
 
   ngOnInit(): void {
@@ -107,7 +106,7 @@ export class ScripterComponent implements OnInit {
     const chIdx = this.scriptChannels
       .map((ch) => {return ch.id})
       .indexOf(msg.id);
-    
+
     if (chIdx !== undefined){
       const channel = this.scriptChannels[chIdx];
 
@@ -117,53 +116,53 @@ export class ScripterComponent implements OnInit {
         channel.controllerType,
         channel.type,
         channel.channel.id
-        );
+      );
     }
   }
+
+  
 
   modalChange($event: any) {
 
     // convert from string value to number for enum
-    if ($event.target.id === 'controller-select'){
-      if (+$event.target.value === ControllerType.audio){
+    if ($event.target.id === 'controller-select') {
+      if (+$event.target.value === ControllerType.audio) {
         this.selectedModule = '';
         this.selectedChannel = -1;
         document.getElementById('module-select')?.setAttribute('disabled', 'disabled');
         document.getElementById('channel-select')?.setAttribute('disabled', 'disabled')
-        return  
+        return
       }
-      else{
-        document.getElementById('module-select')?.removeAttribute('disabled');  
+      else {
+        document.getElementById('module-select')?.removeAttribute('disabled');
       }
     }
-    else if ($event.target.id === 'module-select' ){
+    else if ($event.target.id === 'module-select') {
 
-      switch($event.target.value){
+      switch ($event.target.value) {
         case 'uart':
           this.selectedChannel = -1;
           document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
           return;
         case 'pwm':
           const pwmChannels = this.scriptResources.pwmChannels.get(+this.selectedController);
-          if (pwmChannels){
+          if (pwmChannels) {
             this.availableChannels = Array.from(pwmChannels);
           }
           break
         case 'i2c':
           const i2cChannels = this.scriptResources.i2cChannels.get(+this.selectedController);
-          if (i2cChannels){
+          if (i2cChannels) {
             this.availableChannels = Array.from(i2cChannels);
           }
           break;
       }
 
-      document.getElementById('channel-select')?.removeAttribute('disabled');  
+      document.getElementById('channel-select')?.removeAttribute('disabled');
     }
   }
 
   addChannel(): void {
-
-    this.channelCount++;
 
     // convert from string value to number for enum
     const controller = +this.selectedController;
@@ -171,13 +170,13 @@ export class ScripterComponent implements OnInit {
 
     let name = this.scriptResources.controllers.get(controller)?.name;
 
-    if (!name){
+    if (!name) {
       name = ''
     }
 
     let type = ScriptChannelType.None;
 
-    switch (this.selectedModule){
+    switch (this.selectedModule) {
       case 'uart':
         type = ScriptChannelType.Uart;
         break;
@@ -190,34 +189,37 @@ export class ScripterComponent implements OnInit {
     }
 
     const chValue = this.scriptResources.addChannel(controller, type, channel)
-
+    
     this.scriptChannels.push(
-      new ScriptChannel(this.channelCount, controller, 
-        name, type, chValue, this.seconds)
+      new ScriptChannel(Guid.create().toString(), controller, name, type, chValue, this.seconds)
     );
 
     this.closeModal('channel-add-modal');
   }
 
   onAddEvent(item: any): void {
+
     const line = document.getElementById(`script-row-${item.timeline}`);
     const scrollContainer = document.getElementById("scripter-container");
 
     if (line != null && scrollContainer != null) {
 
-      let left = 8 + Math.floor((item.xPos + scrollContainer.scrollLeft - line.offsetLeft) / this.segmentWidth) * this.segmentWidth;
+      const clickPos = (item.xPos + scrollContainer.scrollLeft - line.offsetLeft);
 
-      if (Math.floor(item.xPos - line.offsetLeft) - left > 30) {
-        left += 30;
-      } else {
-        left -= 30;
-      }
+      let time = Math.floor(clickPos / this.segmentWidth);
+
+      let left = (time * this.segmentWidth);
+
+      if (Math.floor(clickPos) - left >= 30) {
+        time += 1
+      } 
 
       const floater = this.renderer.createElement('div');
+      const text = this.renderer.createText(time.toString());
+      this.renderer.appendChild(floater, text);
       this.renderer.setAttribute(floater, 'class', 'scripter-timeline-marker');
       this.renderer.setStyle(floater, 'top', `0px`);
-      this.renderer.setStyle(floater, 'left', `${left}px`);
-      this.renderer.setStyle(floater, 'width', '40px');
+      this.renderer.setStyle(floater, 'left', `${(time * this.segmentWidth) - 30}px`);
       this.renderer.appendChild(line, floater);
     }
   }

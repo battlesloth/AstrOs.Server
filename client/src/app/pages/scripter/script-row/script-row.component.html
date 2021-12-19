@@ -11,9 +11,8 @@
         <div class="button-bar">
             <button title="Remove" (click)="remove()"><fa-icon [icon]="faTrash"></fa-icon></button>
         </div>
+    </div> 
+    <div id="script-row-{{channel.id}}" class="timeline-container" (contextmenu)="onTimelineRightClick($event)" #timeline>
+        
     </div>
-    <div id="script-row-{{channel.id}}" class="timeline-container" (contextmenu)="onTimelineRightClick($event)">
-        <div *ngFor="let item of timeLineArray;" class="timeline-segment"></div>
-    </div>
-    <div class="timeline-spacer"></div>
 <div>
