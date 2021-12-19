@@ -16,6 +16,7 @@
     height: 100px;
     width: 200px;
     text-align: center;
+    z-index: 200;
 
 
     .title {
@@ -47,12 +48,10 @@
 }
 
 
-
-
-
 .timeline-container{
     display: flex;
     flex-direction: row;
+    position: relative;
 }
 
 .timeline-segment {

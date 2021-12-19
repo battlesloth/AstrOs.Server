@@ -20,7 +20,7 @@ export class ScripterComponent implements OnInit {
 
   @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;
   
-
+  private segmentWidth: number = 60;
   private seconds: number = 300;
   timeLineArray: Array<number>;
   menuTopLeft = { x: 0, y: 0 };
@@ -97,7 +97,7 @@ export class ScripterComponent implements OnInit {
     this.menuTopLeft.x = msg.event.clientX;
     this.menuTopLeft.y = msg.event.clientY;
 
-    this.menuTrigger.menuData = { 'item': { 'timeline': msg.id.timeline, 'xPos': msg.event.clientX } };
+    this.menuTrigger.menuData = { 'item': { 'timeline': msg.id, 'xPos': msg.event.clientX } };
 
     this.menuTrigger.openMenu();
   }
@@ -200,17 +200,17 @@ export class ScripterComponent implements OnInit {
   }
 
   onAddEvent(item: any): void {
-    const line = document.getElementById(item.timeline);
+    const line = document.getElementById(`script-row-${item.timeline}`);
     const scrollContainer = document.getElementById("scripter-container");
 
     if (line != null && scrollContainer != null) {
 
-      let left = Math.floor((item.xPos + scrollContainer.scrollLeft - line.offsetLeft) / 41) * 41;
+      let left = 8 + Math.floor((item.xPos + scrollContainer.scrollLeft - line.offsetLeft) / this.segmentWidth) * this.segmentWidth;
 
-      if (Math.floor(item.xPos - line.offsetLeft) - left > 20) {
-        left += 20;
+      if (Math.floor(item.xPos - line.offsetLeft) - left > 30) {
+        left += 30;
       } else {
-        left -= 20;
+        left -= 30;
       }
 
       const floater = this.renderer.createElement('div');
