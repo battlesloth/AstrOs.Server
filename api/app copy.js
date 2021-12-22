@@ -1,12 +1,12 @@
 const dotenv = require('dotenv');
 dotenv.config();
 
-const DataAccess = require('./api/dal/data_access');
+const DataAccess = require('./dal/data_access');
 
 var db = new DataAccess();
 db.setup();
 
-require('./api/config/passport');
+require('./config/passport');
 
 const { Worker } = require('worker_threads');
 const superagent = require('superagent');
@@ -17,7 +17,7 @@ const logger = require('morgan');
 const passport = require('passport');
 const path = require('path');
 
-const routesApi = require('./api/routes/index');
+const routesApi = require('./routes/index');
 const { spawn } = require('child_process');
 
 var app = express();

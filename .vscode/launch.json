@@ -8,7 +8,7 @@
             "name": "nodejs",
             "type": "node",
             "request": "launch",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/api",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run-script",
