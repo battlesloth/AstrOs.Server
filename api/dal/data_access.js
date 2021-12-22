@@ -8,6 +8,8 @@ const UsersTable = require('./tables/users_table');
 const ControllersTable = require('./tables/controllers_table');
 const PwmChannelsTable = require('./tables/pwm_channels_table');
 const I2cChannelsTable = require('./tables/i2c_channels_table');
+const ScriptsTable = require('./tables/scripts_table');
+const ScriptEventsTable = require('./tables/script_events_table');
 const {ControllerId, PwmType} = require('../models/controller');
 const controller = require('../models/controller');
 
@@ -92,6 +94,10 @@ class DataAccess {
         await this.createTable(PwmChannelsTable.Table, PwmChannelsTable.Create);
 
         await this.createTable(I2cChannelsTable.Table, I2cChannelsTable.Create);
+    
+        await this.createTable(ScriptsTable.Table, ScriptsTable.Create);
+
+        await this.createTable(ScriptEventsTable.Table, ScriptEventsTable.Create); 
     }
 
     async setV1Values() {
