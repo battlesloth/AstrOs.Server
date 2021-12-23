@@ -1,4 +1,4 @@
-import { ControllerType } from "../ControlModule/ControlModule";
+import { ControllerType } from "../control_module/ControlModule";
 import { ScriptEvent } from "./ScriptEvent";
 
 export enum ScriptChannelType{
@@ -8,7 +8,6 @@ export enum ScriptChannelType{
     I2c,
     Sound
 }
-
 
 export class ScriptChannel {
     id: string;

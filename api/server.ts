@@ -1,5 +1,6 @@
 import Express from "express";
 import Dotenv from "dotenv";
+import { DataAccess } from "./dal/data_access";
 
 class Server {
 
@@ -19,9 +20,10 @@ class Server {
     }
 
     private config() {
-        
-
         Dotenv.config();
+
+        const da = new DataAccess();
+        da.setup();
     }
 
     private run(){
