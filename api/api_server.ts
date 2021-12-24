@@ -8,7 +8,7 @@ import jwt from "express-jwt";
 import Express, { Router, Application } from "express";
 import { HttpError } from "http-errors";
 import { Server, WebSocket } from "ws";
-import { uuid } from "uuidv4";
+import {uuid } from "uuidv4";
 import { Strategy } from "passport-local"
 import { Worker } from "worker_threads";
 
@@ -130,7 +130,7 @@ class ApiServer {
             const id = uuid();
             this.clients.set(id, conn);
 
-            console.log(`${conn.url} connected`);
+            console.log(`${conn} connected`);
         });
     }
 
@@ -144,7 +144,7 @@ class ApiServer {
             this.updateClients(msg);
         });
 
-        setInterval(() => { this.espMonitor.postMessage({monitor: '192.168.50.22'})}, 5000);
+        setInterval(() => { this.espMonitor.postMessage({monitor: 'core', ip: '192.168.50.22'})}, 5000);
     }
 
     private updateClients(msg: any): void {

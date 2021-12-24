@@ -36,7 +36,7 @@ export class User{
         return jsonwebtoken.sign({
             //_id:  _id,
             name: this.name,
-            exp: (expiry.getTime() / 1000).toString()
+            exp: (expiry.getTime() / 1000)
         },
             jwtKey
         );
