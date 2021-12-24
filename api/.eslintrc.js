@@ -13,9 +13,9 @@ module.exports ={
     //    "tslint:recommended"
     //],
     //"jsRules": {},
-    //"rules": {
-    //    "trailing-comma": [ false ],
-    //    "no-console": false
-    //},
+    "rules": {
+        "no-console": 0,
+        "@typescript-eslint/no-explicit-any": "off"
+    },
     //"rulesDirectory": []
 };

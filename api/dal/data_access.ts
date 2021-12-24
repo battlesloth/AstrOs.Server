@@ -177,7 +177,7 @@ export class DataAccess {
         })
             .catch((err) => {
                 console.log(`Error updating database version: ${err}`);
-            });;
+            });
     }
 
     private async createTable(tableName: string, query: string): Promise<void> {

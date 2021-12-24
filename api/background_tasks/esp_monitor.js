@@ -1,4 +1,4 @@
-const { parentPort, workerData } = require("worker_threads");
+const { parentPort } = require("worker_threads");
 const superagent  = require('superagent');
 
 parentPort.on('message', data => {

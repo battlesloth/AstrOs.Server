@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
       "module": "commonjs",
+      "allowJs": true,
       "esModuleInterop": true,
       "target": "es6",
       "noImplicitAny": true,
@@ -9,6 +10,8 @@
       "outDir": "dist",
       "baseUrl": ".",
       "strict": true,
+      "forceConsistentCasingInFileNames": true,
+      "importHelpers": true,
       "paths": {
           "*": [
               "node_modules/*"

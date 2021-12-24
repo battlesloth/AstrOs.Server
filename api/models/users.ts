@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import  jsonwebtoken, { Jwt, Secret }  from 'jsonwebtoken';
+import jsonwebtoken  from 'jsonwebtoken';
 
 export class User{
 

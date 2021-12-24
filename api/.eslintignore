@@ -4,3 +4,4 @@ node_modules
 dist
 .eslintrc.js
 app.js
+/background_tasks

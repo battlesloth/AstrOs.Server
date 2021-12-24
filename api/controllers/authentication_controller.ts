@@ -1,14 +1,17 @@
-const passport = require('passport');
+import passport from "passport";
 
-module.exports.login = (req, res, next) => {
+export class AuthContoller {
+
+  public static route = "/login"
+
+  public static login(req: any, res: any, next: any) {
     passport.authenticate('local', (err, user, info) => {
-
       // If Passport throws/catches an error
       if (err) {
         res.status(404).json(err);
         return;
       }
-  
+
       // If a user is found
       if (user) {
         const token = user.generateJwt();
@@ -21,4 +24,5 @@ module.exports.login = (req, res, next) => {
         res.status(401).json(info);
       }
     })(req, res);
-  };
+  }
+}

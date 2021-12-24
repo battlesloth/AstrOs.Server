@@ -16,13 +16,13 @@ export class ControllerRepository {
     }
 
     public async getControllers() : Promise<Array<ControlModule>> {
-        let result = new Array<ControlModule>();
+        const result = new Array<ControlModule>();
 
         const controllers = [ControllerType.core, ControllerType.dome, ControllerType.body];
 
         for (const ctl of controllers) {
             
-            let controller = new ControlModule(ctl, "");
+            const controller = new ControlModule(ctl, "");
 
             await this.dao.get(ControllersTable.select, [ctl.toString()])
             .then((val: any) =>{
