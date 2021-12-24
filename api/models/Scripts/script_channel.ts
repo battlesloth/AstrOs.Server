@@ -1,5 +1,5 @@
-import { ControllerType } from "../control_module/ControlModule";
-import { ScriptEvent } from "./ScriptEvent";
+import { ControllerType } from "../control_module/control_module";
+import { ScriptEvent } from "./script_event";
 
 export enum ScriptChannelType{
     None,

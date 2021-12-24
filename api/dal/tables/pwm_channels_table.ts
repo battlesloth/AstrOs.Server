@@ -39,6 +39,6 @@ export class PwmChannelsTable {
     ${this.type} = ?,
     ${this.limit0} = ?,
     ${this.limit1} = ?
-    WHERE ${this.controllerId} = ?
-    AND ${this.channelId} = ?`;
+    WHERE ${this.channelId} = ?
+    AND  ${this.controllerId} = ?`;
 }

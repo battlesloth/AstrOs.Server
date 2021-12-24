@@ -1,4 +1,4 @@
-import { I2cChannel } from "./I2cChannel";
+import { I2cChannel } from "./i2c_channel";
 
 
 

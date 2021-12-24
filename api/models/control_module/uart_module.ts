@@ -1,6 +1,7 @@
-import { UartType } from "./ControlModule";
-
-
+export enum UartType{
+    none,
+    kangaroo
+}
 
 export class UartModule {
     name: string;

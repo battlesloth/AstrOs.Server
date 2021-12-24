@@ -26,6 +26,6 @@ export class I2cChannelsTable {
     public static readonly update =
     `UPDATE ${this.table}
     SET ${this.channelName} = ?
-    WHERE ${this.controllerId} = ?
-    AND ${this.channelId} = ?`;
+    WHERE ${this.channelId}  = ?
+    AND ${this.controllerId} = ?`;
 }

@@ -10,7 +10,6 @@ export class Script{
     bodyUploaded: boolean;
     dtBodyUploaded: string;
 
-    
     constructor(id: string,
         scriptName: string,
         description: string,
@@ -20,8 +19,7 @@ export class Script{
         domeUploaded: boolean,
         dtDomeUploaded: string,
         bodyUploaded: boolean,
-        dtBodyUploaded: string,
-    ){
+        dtBodyUploaded: string){
         this.id = id;
         this.scriptName = scriptName;
         this.description = description;

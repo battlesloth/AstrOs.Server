@@ -1,9 +1,9 @@
-import { Script } from "../../models/scripts/Script";
+import { Script } from "../../models/Scripts/script";
 import { ScriptsTable } from "../../dal/tables/scripts_table";
 import { DataAccess } from "../../dal/data_access";
 import { uuid } from "uuidv4";
 
-class ScriptRepository {
+export class ScriptRepository {
 
     dao: DataAccess
 

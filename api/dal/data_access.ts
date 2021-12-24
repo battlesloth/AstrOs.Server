@@ -7,10 +7,10 @@ import { UsersTable } from "./tables/users_table";
 import { ControllersTable } from "./tables/controllers_table";
 import { I2cChannelsTable } from "./tables/i2c_channels_table";
 import { PwmChannelsTable } from "./tables/pwm_channels_table";
+import { PwmType } from "../models/control_module/pwm_channel";
 import { ScriptsTable } from "./tables/scripts_table";
 import { ScriptEventsTable } from "./tables/script_events_table";
-import { PwmType } from "../models/control_module/ControlModule";
-import { ControllerId } from "../models/control_module/ControllerId";
+import { ControllerId } from "../models/control_module/controller_id";
 
 
 export class DataAccess {
@@ -159,7 +159,7 @@ export class DataAccess {
         for (const ctl of controllers) {
 
             await this.run(ControllersTable.insert, [ctl, nameMap.get(ctl)])
-                .catch((err) => console.error(`Error adding ${name} controller: ${err}`));
+                .catch((err) => console.error(`Error adding ${ctl} controller: ${err}`));
 
             for (let i = 0; i < 36; i++) {
                 await this.run(PwmChannelsTable.insert, [ctl, i.toString(), "unassigned", PwmType.unassigned.toString(), "0", "0"])

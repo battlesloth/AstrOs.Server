@@ -1,4 +1,4 @@
-import { PwmChannel } from "./PwmChannel";
+import { PwmChannel } from "./pwm_channel";
 
 
 

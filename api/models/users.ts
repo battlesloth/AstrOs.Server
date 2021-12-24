@@ -1,40 +1,44 @@
-const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
+import crypto from 'crypto';
+import  jsonwebtoken, { Jwt, Secret }  from 'jsonwebtoken';
 
+export class User{
 
-class User{
-    constructor(name, hash = '', salt = ''){
+    name: string;
+    hash: string;
+    salt: string;
+
+    constructor(name: string, hash = '', salt = ''){
         this.name = name;
         this.hash = hash;
         this.salt = salt;
     }
 
-    setPassword(password){
+    public setPassword(password: string) : void {
         this.salt = crypto.randomBytes(16).toString('hex');
         this.hash = crypto
         .pbkdf2Sync(password, this.salt, 1000, 64, 'sha512')
         .toString('hex');
     }
 
-    validatePassword(password){
+    public validatePassword(password: string) : boolean {
         const hash = crypto
         .pbkdf2Sync(password, this.salt, 1000, 64, 'sha512')
         .toString('hex');
         return this.hash === hash;    
     }
 
-    generateJwt(){
+    public generateJwt(): string {
         const expiry = new Date();
         expiry.setDate(expiry.getDate() + 7);
+        
+        const jwtKey : string = (process.env.JWT_KEY as string);
 
-        return jwt.sign({
-            _id: this._id,
+        return jsonwebtoken.sign({
+            //_id:  _id,
             name: this.name,
-            exp: parseInt(expiry.getTime() / 1000)
+            exp: (expiry.getTime() / 1000).toString()
         },
-            process.env.JWT_KEY
+            jwtKey
         );
     }
 }
-
-module.exports = User;

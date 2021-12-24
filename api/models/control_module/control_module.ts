@@ -1,6 +1,6 @@
-import { I2cModule } from "./I2cModule";
-import { PwmModule } from "./PwmModule";
-import { UartModule } from "./UartModule";
+import { I2cModule } from "./i2c_module";
+import { PwmModule } from "./pwm_module";
+import { UartModule } from "./uart_module";
 
 export enum ControllerType{
     none,
@@ -16,20 +16,6 @@ export enum ChannelType{
     uart,
     i2c,
     pwm
-}
-
-export enum UartType{
-    none,
-    kangaroo
-}
-
-export enum PwmType{
-    unassigned,
-    continuous_servo,
-    positional_servo,
-    linear_servo,
-    led,
-    high_low
 }
 
 export class ControlModule{
