@@ -13,7 +13,7 @@
             <li *ngFor="let channel of module.pwmModule.channels">
                 <div class="pwm-channel">
                     <div class="label">Channel {{channel.id}}</div>
-                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.name" /></div>
+                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" /></div>
                     <div class="type">
                         <select title="PWM Type" (ngModelChange)="pwmTypeChange(channel.id, $event)"
                             [(ngModel)]=channel.type>
@@ -39,7 +39,7 @@
             <li *ngFor="let channel of module.i2cModule.channels">
                 <div class="i2c-channel">
                     <div class="label">Channel {{channel.id}}</div>
-                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.name" /></div>
+                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" /></div>
                 </div>
             </li>
         </ul>

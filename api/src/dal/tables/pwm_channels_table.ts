@@ -13,7 +13,7 @@ export class PwmChannelsTable {
     ${this.id} INTEGER PRIMARY KEY AUTOINCREMENT,
     ${this.controllerId} INTEGER,
     ${this.channelId} INTEGER,
-    ${this.channelId} TEXT,
+    ${this.channelName} TEXT,
     ${this.type} INTEGER,
     ${this.limit0} INTEGER,
     ${this.limit1} INTEGER,

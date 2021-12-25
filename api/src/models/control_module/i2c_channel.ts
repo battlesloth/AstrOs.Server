@@ -5,7 +5,7 @@ export class I2cChannel {
     channelName: string;
 
     constructor(id: number, channelName: string) {
-        if (name === null) {
+        if (channelName === null) {
             this.channelName = "unnamed";
         } else {
             this.channelName = channelName;

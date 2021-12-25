@@ -1,7 +1,8 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatFormField } from '@angular/material/form-field';
-import { ControlModule, PwmType } from '../../../models/control-module';
+import { ControlModule } from 'src/app/models/control_module/control_module';
+import { PwmType } from 'src/app/models/control_module/pwm_channel';
 
 @Component({
   selector: 'app-esp-module',
@@ -30,7 +31,7 @@ export class EspModuleComponent implements OnInit {
   }
 
   pwmNameChange(id: number, $event: any){
-    this.module.pwmModule.channels[id].name = $event;
+    this.module.pwmModule.channels[id].channelName = $event;
   }
 
   pwmTypeChange(id: number, $event: any){

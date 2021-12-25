@@ -6,10 +6,18 @@
         {
             "label": "copy .env",
             "type": "shell",
-            "command": "echo Hello",
+            "command": "",
             "windows":{
-                "command": "cmd",
-                "args": ["/C", "if not exist ${workspaceFolder}/api/dist/ mkdir ${workspaceFolder}/api/dist/ && copy ${workspaceFolder}/.env ${workspaceFolder}/api/dist/.env "]         
+                "command": "Copy-Item -Path ${workspaceFolder}/.env -Destination ${workspaceFolder}/api/dist/.env "  
+            }
+        },
+        {
+            "label": "lint and build",
+            "type": "shell",
+            "command": "npm",
+            "args": ["run","build"],
+            "options": {
+                "cwd": "${workspaceFolder}/api"
             }
         }
     ]

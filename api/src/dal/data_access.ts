@@ -2,15 +2,15 @@ import appdata from "appdata-path";
 import { Database } from "sqlite3";
 import fs from "fs";
 import crypto from "crypto";
-import { SettingsTable } from "./tables/settings_table";
-import { UsersTable } from "./tables/users_table";
-import { ControllersTable } from "./tables/controllers_table";
-import { I2cChannelsTable } from "./tables/i2c_channels_table";
-import { PwmChannelsTable } from "./tables/pwm_channels_table";
-import { PwmType } from "../models/control_module/pwm_channel";
-import { ScriptsTable } from "./tables/scripts_table";
-import { ScriptEventsTable } from "./tables/script_events_table";
-import { ControllerId } from "../models/control_module/controller_id";
+import { SettingsTable } from "src/dal/tables/settings_table";
+import { UsersTable } from "src/dal/tables/users_table";
+import { ControllersTable } from "src/dal/tables/controllers_table";
+import { I2cChannelsTable } from "src/dal/tables/i2c_channels_table";
+import { PwmChannelsTable } from "src/dal/tables/pwm_channels_table";
+import { PwmType } from "src/models/control_module/pwm_channel";
+import { ScriptsTable } from "src/dal/tables/scripts_table";
+import { ScriptEventsTable } from "src/dal/tables/script_events_table";
+import { ControllerType } from "src/models/control_module/control_module";
 
 
 export class DataAccess {
@@ -149,25 +149,25 @@ export class DataAccess {
             })
             .catch((err) => console.error(`Error adding default admin: ${err}`));
 
-        const controllers = [ControllerId.CORE, ControllerId.DOME, ControllerId.BODY];
+        const controllers = [ControllerType.core, ControllerType.dome, ControllerType.body];
 
         const nameMap = new Map();
-        nameMap.set(ControllerId.CORE, "Dome Core Controller");
-        nameMap.set(ControllerId.DOME, "Dome Surface Controller");
-        nameMap.set(ControllerId.BODY, "Body Controller");
+        nameMap.set(ControllerType.core, "Dome Core Controller");
+        nameMap.set(ControllerType.dome, "Dome Surface Controller");
+        nameMap.set(ControllerType.body, "Body Controller");
 
         for (const ctl of controllers) {
 
-            await this.run(ControllersTable.insert, [ctl, nameMap.get(ctl)])
+            await this.run(ControllersTable.insert, [ctl.toString(), nameMap.get(ctl)])
                 .catch((err) => console.error(`Error adding ${ctl} controller: ${err}`));
 
             for (let i = 0; i < 36; i++) {
-                await this.run(PwmChannelsTable.insert, [ctl, i.toString(), "unassigned", PwmType.unassigned.toString(), "0", "0"])
+                await this.run(PwmChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned", PwmType.unassigned.toString(), "0", "0"])
                     .catch((err) => console.error(`Error adding pwm channel ${i}: ${err}`))
             }
 
             for (let i = 0; i < 128; i++) {
-                await this.run(I2cChannelsTable.insert, [ctl, i.toString(), "unassigned"])
+                await this.run(I2cChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned"])
                     .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
             }
         }

@@ -1,6 +1,6 @@
-import { Script } from "../../models/Scripts/script";
-import { ScriptsTable } from "../../dal/tables/scripts_table";
-import { DataAccess } from "../../dal/data_access";
+import { Script } from "src/models/Scripts/script";
+import { ScriptsTable } from "src/dal/tables/scripts_table";
+import { DataAccess } from "src/dal/data_access";
 import { uuid } from "uuidv4";
 
 export class ScriptRepository {

@@ -1,10 +1,10 @@
-import { DataAccess } from "../../dal/data_access";
-import { ControlModule, ControllerType } from "../../models/control_module/control_module";
-import { PwmChannel } from "../../models/control_module/pwm_channel";
-import { I2cChannel } from "../../models/control_module/i2c_channel";
-import { ControllersTable } from "../../dal/tables/controllers_table";
-import { PwmChannelsTable } from "../../dal/tables/pwm_channels_table";
-import { I2cChannelsTable } from "../../dal/tables/i2c_channels_table"; 
+import { DataAccess } from "src/dal/data_access";
+import { ControlModule, ControllerType } from "src/models/control_module/control_module";
+import { PwmChannel } from "src/models/control_module/pwm_channel";
+import { I2cChannel } from "src/models/control_module/i2c_channel";
+import { ControllersTable } from "src/dal/tables/controllers_table";
+import { PwmChannelsTable } from "src/dal/tables/pwm_channels_table";
+import { I2cChannelsTable } from "src/dal/tables/i2c_channels_table"; 
 
 export class ControllerRepository {
 
@@ -49,7 +49,7 @@ export class ControllerRepository {
             .then((val: any) =>{
                 val.forEach((ch: any) => {
                     controller.i2cModule.channels[ch.channelId] = 
-                        new I2cChannel(ch.channelId, ch.name);
+                        new I2cChannel(ch.channelId, ch.channelName);
                 });
             })
             .catch((err) => {

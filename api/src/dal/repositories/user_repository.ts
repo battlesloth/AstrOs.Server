@@ -1,6 +1,6 @@
-import { DataAccess } from "../data_access";
-import { UsersTable } from "../tables/users_table";
-import { User } from "../../models/users";
+import { DataAccess } from "src/dal/data_access";
+import { UsersTable } from "src/dal/tables/users_table";
+import { User } from "src/models/users";
 
 export class UserRepository {
 

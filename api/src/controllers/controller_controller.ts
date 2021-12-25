@@ -1,9 +1,9 @@
-import { DataAccess } from "../dal/data_access";
-import { ControllerRepository } from "../dal/repositories/controller_repository";
+import { DataAccess } from "src/dal/data_access";
+import { ControllerRepository } from "src/dal/repositories/controller_repository";
 
 export class ControllerController {
 
-    public static route = '/controller/';
+    public static route = '/controllers/';
 
     public static async getControllers(req: any, res: any, next: any) {
         try {

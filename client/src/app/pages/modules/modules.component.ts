@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, PwmChannel, I2cChannel, PwmType, UartType, ControllerType } from '../../models/control-module';
+import { ControlModule, ControllerType } from 'src/app/models/control_module/control_module';
 
 @Component({
   selector: 'app-modules',
@@ -16,7 +16,7 @@ export class ModulesComponent implements OnInit {
   domeModule!: ControlModule;
   bodyModule!: ControlModule;
 
-  constructor(private modulesService: ControllerService,
+  constructor(private controllerService: ControllerService,
     private snackBar: MatSnackBar) {
 
         this.coreModule = new ControlModule(ControllerType.core, 'Core Dome Module');
@@ -24,14 +24,13 @@ export class ModulesComponent implements OnInit {
         this.bodyModule = new ControlModule(ControllerType.body, 'Body Module'); 
       }
 
-
   ngOnInit(): void {
     const observer = {
       next: (result: any) => this.parseModules(result),
       error: (err: any) => console.error(err)
     };
 
-    this.modulesService.getControllers().subscribe(observer);
+    this.controllerService.getControllers().subscribe(observer);
 
   }
 
@@ -52,7 +51,7 @@ export class ModulesComponent implements OnInit {
       }
     };
 
-    this.modulesService.saveControllers([this.coreModule, this.domeModule, this.bodyModule])
+    this.controllerService.saveControllers([this.coreModule, this.domeModule, this.bodyModule])
       .subscribe(observer);
   }
 

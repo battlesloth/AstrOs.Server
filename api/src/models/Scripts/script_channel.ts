@@ -1,4 +1,5 @@
-import { ControllerType } from "./control-module";
+import { ControllerType } from "src/models/control_module/control_module";
+import { ScriptEvent } from "src/models/Scripts/script_event";
 
 export enum ScriptChannelType{
     None,
@@ -8,16 +9,6 @@ export enum ScriptChannelType{
     Sound
 }
 
-
-export class ScriptEvent {
-
-    time: number
-
-    constructor(time: number) {
-        this.time = time;
-    }
-}
-
 export class ScriptChannel {
     id: string;
     controllerType: ControllerType;
@@ -25,7 +16,7 @@ export class ScriptChannel {
     type: ScriptChannelType;
     channel: any;
     maxDuration: number
-    events: Array<ScriptEvent>
+    events: ScriptEvent[]
 
     constructor(id: string, controllerType: ControllerType, controllerName: string,
         type: ScriptChannelType, channel: any, maxDuration: number){

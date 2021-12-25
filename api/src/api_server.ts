@@ -12,10 +12,10 @@ import {uuid } from "uuidv4";
 import { Strategy } from "passport-local"
 import { Worker } from "worker_threads";
 
-import { DataAccess } from "./dal/data_access";
-import { UserRepository } from "./dal/repositories/user_repository";
-import { ControllerController } from "./controllers/controller_controller";
-import { AuthContoller } from "./controllers/authentication_controller";
+import { DataAccess } from "src/dal/data_access";
+import { UserRepository } from "src/dal/repositories/user_repository";
+import { ControllerController } from "src/controllers/controller_controller";
+import { AuthContoller } from "src/controllers/authentication_controller";
 
 class ApiServer {
 

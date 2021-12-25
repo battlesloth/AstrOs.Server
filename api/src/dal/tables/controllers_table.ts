@@ -16,7 +16,7 @@ export class ControllersTable {
     VALUES (?, ?)`;
 
     public static readonly select =
-    `SELECT ${this.name}
+    `SELECT ${this.controllerName}
     FROM ${this.table}
     WHERE ${this.controllerId} = ?`;
 

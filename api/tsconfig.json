@@ -1,21 +1,28 @@
 {
-  "compilerOptions": {
-      "module": "commonjs",
-      "allowJs": true,
-      "esModuleInterop": true,
-      "target": "es6",
-      "noImplicitAny": true,
-      "moduleResolution": "node",
-      "sourceMap": true,
-      "outDir": "dist",
-      "baseUrl": ".",
-      "strict": true,
-      "forceConsistentCasingInFileNames": true,
-      "importHelpers": true,
-      "paths": {
-          "*": [
-              "node_modules/*"
-          ]
-      }
-  }
+    "compilerOptions": {
+        "baseUrl": ".",
+        "outDir": "dist",
+        "rootDir": "./src",
+        "module": "commonjs",
+        "allowJs": true,
+        "esModuleInterop": true,
+        "target": "es6",
+        "noImplicitAny": true,
+        "moduleResolution": "node",
+        "sourceMap": true,       
+        "strict": true,
+        "forceConsistentCasingInFileNames": true,
+        "importHelpers": true,
+        "paths": {
+            "src/*":[
+                "src/*"
+            ]
+        },
+        "plugins": [
+            {
+                "transform": "@zerollup/ts-transform-paths",
+                "exclude": ["*"]
+            }
+        ]
+    }
 }
