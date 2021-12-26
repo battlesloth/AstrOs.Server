@@ -1,80 +1,86 @@
  @import "../assets/styles/variables";
- 
- .container{
-    background-color: $color-dark;
-    color: $color-pale;
-    text-shadow:
-    -2px -2px 0 $dark-blue,  
-     2px -2px 0 $dark-blue,
-     -2px 2px 0 $dark-blue,
-      2px 2px 0 $dark-blue;
-    
- 
 
-    margin: 0;
-    padding: 2rem;
+ .container {
+     background-color: $color-dark;
+     color: $color-pale;
+     text-shadow:
+         -2px -2px 0 $dark-blue,
+         2px -2px 0 $dark-blue,
+         -2px 2px 0 $dark-blue,
+         2px 2px 0 $dark-blue;
+
+
+
+     margin: 0;
+     padding: 2rem;
  }
 
 
 
 
-.navbar-main {
-    display: flex;
-    flex-direction: row;
-    text-align: center;
-    font-size: 36px;
-    font-family: $swfont;
+ .navbar-main {
+     display: flex;
+     flex-direction: row;
+     text-align: center;
+     font-size: 36px;
+     font-family: $swfont;
 
-    .capital {
-        font-size: 50px;
-    }
+     .capital {
+         font-size: 50px;
+     }
 
-    .navbutton {
-        margin-top: 4px;
-    }
+     .navbutton {
+         margin-top: 4px;
+     }
 
-    .navbutton:after {
-        margin-left: 4px;
-        margin-right: 10px;
-        content: '\2807';
-        font-size: 48px;
-    }
-}
+     .navbutton:after {
+         margin-left: 4px;
+         margin-right: 10px;
+         content: '\2807';
+         font-size: 48px;
+     }
+ }
 
-.sidenav {
-    height: 100%;
-    width: 0;
-    position: fixed;
-    z-index: 1000;
-    top: 0;
-    left: 0;
-    background-color: $dark-blue;
-    overflow-x: hidden;
-    transition: 0.5s;
-    padding-top: 4px;
-   a {
-    margin: 30px 40px 30px 20px;
-    text-decoration: none;
-    font-family: $swfont;
-    font-size: 28px;
-    color: $color-pale;
-    display: block;
-    transition: 0.3s;
-  }
-  
-   a:hover {
-    color: $light-blue;
-  }
-  
-}
+ .sidenav {
+     height: 100%;
+     width: 0;
+     position: fixed;
+     z-index: 1000;
+     top: 0;
+     left: 0;
+     background-color: $dark-blue;
+     overflow-x: hidden;
+     transition: 0.5s;
+     padding-top: 4px;
 
-@media only screen and (max-width: 480px){
-    .navbar-main{
-        a {
-            font-size: 28px;
-        }
-    }
+     a {
+         margin: 30px 40px 30px 20px;
+         text-decoration: none;
+         font-family: $swfont;
+         font-size: 28px;
+         color: $color-pale;
+         display: block;
+         transition: 0.3s;
+     }
 
-    .sidenav {padding-top: 15px;}
-    .sidenav a {font-size: 28px;}
-}
+     a:hover {
+         color: $light-blue;
+     }
+
+ }
+
+ @media only screen and (max-width: 480px) {
+     .navbar-main {
+         a {
+             font-size: 28px;
+         }
+     }
+
+     .sidenav {
+         padding-top: 15px;
+     }
+
+     .sidenav a {
+         font-size: 28px;
+     }
+ }
