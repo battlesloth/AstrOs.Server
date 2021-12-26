@@ -1,11 +1,37 @@
-<ul class="script-list">
-    <li *ngFor="let script of scripts">
-        <div class="script-line">
-            <div class="name-section">{{script.scriptName}}</div>
-            <div class="desc-section">{{script.description}}</div>
-            <div class="upload-section tooltip">Dome <span class="tooltiptext">{{script.dtDomeUploaded | date:'short'}}</span></div>
-            <div class="upload-section tooltip">Core <span class="tooltiptext">{{script.dtCoreUploaded | date:'short'}}</span></div>
-            <div class="upload-section tooltip">Body <span class="tooltiptext">{{script.dtBodyUploaded | date:'short'}}</span></div>
+<div class="script-container">
+    <div class="spacer"></div>
+    <div class="script-body">
+        <div class="button-bar">
+            <div class="title">
+                Scripts
+            </div>
+            <div class="spacer"></div>
+            <div class="button-box">
+                <button class="new-script">New</button>
+            </div>
         </div>
-    </li>
-</ul>
+        <div class="script-list-container">
+            <ul class="script-list">
+                <li *ngFor="let script of scripts">
+                    <div class="script-line">
+                        <div class="name-section">{{script.scriptName}}</div>
+                        <div class="desc-section">{{script.description}}</div>
+                        <div [ngClass]="script.domeUploaded ? 'uploaded' : 'notuploaded'"
+                            class="upload-section tooltip">Dome <span class="tooltiptext">{{script.dtDomeUploaded |
+                                date:'short'}}</span></div>
+                        <div [ngClass]="script.coreUploaded ? 'uploaded' : 'notuploaded'"
+                            class="upload-section tooltip">Core <span class="tooltiptext">{{script.dtCoreUploaded |
+                                date:'short'}}</span></div>
+                        <div [ngClass]="script.bodyUploaded ? 'uploaded' : 'notuploaded'"
+                            class="upload-section tooltip">Body <span class="tooltiptext">{{script.dtBodyUploaded |
+                                date:'short'}}</span></div>
+                        <div class="upload">
+
+                        </div>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="spacer"></div>
+</div>
