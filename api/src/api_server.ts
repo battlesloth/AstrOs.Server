@@ -135,7 +135,7 @@ class ApiServer {
     }
 
     private runBackgroundServices(): void {
-        this.espMonitor = new Worker('./background_tasks/esp_monitor.js', { workerData: {monitor: 'core'}});
+        this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: {monitor: 'core'}});
         this.espMonitor.on('exit', exit => { console.log(exit); });
         this.espMonitor.on('error', err => { console.log(err); });
 

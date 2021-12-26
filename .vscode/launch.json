@@ -15,7 +15,7 @@
                 "start"
             ],
             "console": "externalTerminal",
-            "preLaunchTask": "copy .env"
+            "preLaunchTask": "build server"
         },
         {
             "name": "angular",
