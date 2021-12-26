@@ -1,0 +1,11 @@
+<ul class="script-list">
+    <li *ngFor="let script of scripts">
+        <div class="script-line">
+            <div class="name-section">{{script.scriptName}}</div>
+            <div class="desc-section">{{script.description}}</div>
+            <div class="upload-section tooltip">Dome <span class="tooltiptext">{{script.dtDomeUploaded | date:'short'}}</span></div>
+            <div class="upload-section tooltip">Core <span class="tooltiptext">{{script.dtCoreUploaded | date:'short'}}</span></div>
+            <div class="upload-section tooltip">Body <span class="tooltiptext">{{script.dtBodyUploaded | date:'short'}}</span></div>
+        </div>
+    </li>
+</ul>

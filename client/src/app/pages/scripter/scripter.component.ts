@@ -1,11 +1,16 @@
 import { Component, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
 import { Guid } from 'guid-typescript';
-import { ChannelType, ControllerType, ControlModule, I2cChannel, PwmChannel, PwmType, UartModule } from 'src/app/models/control-module';
-import { ScriptChannel, ScriptChannelType, ScriptEvent } from 'src/app/models/script-channel';
+import { ModalService } from 'src/app/modal';
+import { ControllerType } from 'src/app/models/control_module/control_module';
+import { I2cChannel } from 'src/app/models/control_module/i2c_channel';
+import { PwmChannel, PwmType } from 'src/app/models/control_module/pwm_channel';
+import { UartModule } from 'src/app/models/control_module/uart_module';
 import { ChannelValue, ScriptResources } from 'src/app/models/script-resources';
+import { ScriptChannel, ScriptChannelType } from 'src/app/models/Scripts/script_channel';
+import { ScriptEvent } from 'src/app/models/Scripts/script_event';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ModalService } from '../../modal';
+
 
 export interface Item {
   timeline: string;
@@ -115,7 +120,7 @@ export class ScripterComponent implements OnInit {
       this.scriptResources.removeChannel(
         channel.controllerType,
         channel.type,
-        channel.channel.id
+        channel.channel?.id
       );
     }
   }

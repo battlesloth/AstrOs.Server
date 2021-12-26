@@ -1,6 +1,6 @@
 import { EventEmitter, Component, Input, OnInit, Output, AfterViewInit, Renderer2, ViewChild, ElementRef } from '@angular/core';
-import { ScriptChannel } from 'src/app/models/script-channel';
 import {faTrash, faEdit} from '@fortawesome/free-solid-svg-icons'
+import { ScriptChannel } from 'src/app/models/Scripts/script_channel';
 @
 Component({
   selector: 'app-script-row',

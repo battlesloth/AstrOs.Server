@@ -1,5 +1,10 @@
-import { ControllerType, ControlModule, UartModule, UartType } from "./control-module";
-import { ScriptChannelType } from "./script-channel";
+
+import { ControllerType, ControlModule } from "./control_module/control_module";
+import { I2cChannel } from "./control_module/i2c_channel";
+import { PwmChannel } from "./control_module/pwm_channel";
+import { UartModule } from "./control_module/uart_module";
+import { ScriptChannelType } from "./Scripts/script_channel";
+
 
 
 export class ControllerDetails {
@@ -47,8 +52,8 @@ export class ScriptResources {
 
             this.controllers.set(con.id, new ControllerDetails(con.id, con.name, con.uartModule));
             
-            this.pwmChannels.set(con.id, con.pwmModule.channels.map( ch => new ChannelValue(ch)));
-            this.i2cChannels.set(con.id, con.i2cModule.channels.map( ch => new ChannelValue(ch)));
+            this.pwmChannels.set(con.id, con.pwmModule.channels.map( (ch: PwmChannel) => new ChannelValue(ch)));
+            this.i2cChannels.set(con.id, con.i2cModule.channels.map( (ch: I2cChannel) => new ChannelValue(ch)));
 
             this.pwmChannels.get(con.id)?.sort((a, b) => {return a.channel.id - b.channel.id});
             this.i2cChannels.get(con.id)?.sort((a, b) => {return a.channel.id - b.channel.id});
@@ -76,14 +81,14 @@ export class ScriptResources {
                 return this.controllers.get(controller)?.uart;
             case ScriptChannelType.Pwm:
                 const pwmIdx = this.pwmChannels.get(controller)?.findIndex( x=> x.channel.id === id);
-                if (pwmIdx && pwmIdx > -1) {
+                if (pwmIdx != undefined && pwmIdx > -1) {
                     this.pwmChannels.get(controller)![pwmIdx].available = false;
                     return this.pwmChannels.get(controller)![pwmIdx].channel
                 }
                 break
             case ScriptChannelType.I2c:
                 const i2cIdx = this.i2cChannels.get(controller)?.findIndex( x=> x.channel.id === id);
-                if (i2cIdx && i2cIdx > -1) {
+                if (i2cIdx != undefined && i2cIdx > -1) {
                     this.i2cChannels.get(controller)![i2cIdx].available = false;
                     return this.pwmChannels.get(controller)![i2cIdx].channel
                 }

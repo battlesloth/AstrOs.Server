@@ -54,7 +54,7 @@
                 (change)="modalChange($event)">
                 <option value="-1" disabled selected>Select Channel</option>
                 <ng-container *ngFor="let ch of availableChannels">
-                    <option *ngIf="ch.available" value="{{ch.channel.id}}">{{ch.channel.id}} - {{ch.channel.name}}</option>
+                    <option *ngIf="ch.available" value="{{ch.channel.id}}">{{ch.channel.id}} - {{ch.channel.channelName}}</option>
                 </ng-container>
             </select>
         </div>

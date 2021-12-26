@@ -22,6 +22,7 @@ import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.
 import { ScriptRowComponent } from './pages/scripter/script-row/script-row.component';
 import { ModalModule } from './modal';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { ScriptsComponent } from './pages/scripts/scripts.component';
 
 
 @NgModule({
@@ -34,7 +35,8 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
     ModulesComponent,
     EspModuleComponent,
     DriveModuleComponent,
-    ScriptRowComponent
+    ScriptRowComponent,
+    ScriptsComponent
   ],
   imports: [
     BrowserModule,
