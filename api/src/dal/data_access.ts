@@ -11,6 +11,7 @@ import { PwmType } from "src/models/control_module/pwm_channel";
 import { ScriptsTable } from "src/dal/tables/scripts_table";
 import { ScriptEventsTable } from "src/dal/tables/script_events_table";
 import { ControllerType } from "src/models/control_module/control_module";
+import { ScriptChannelsTable } from "./tables/script_channels_table";
 
 
 export class DataAccess {
@@ -20,7 +21,7 @@ export class DataAccess {
     database!: Database;
 
     constructor() {
-        this.appdataPath = appdata("astroserver");
+        this.appdataPath = appdata("astrosserver");
         this.databaseFile = '/database.sqlite3';
     }
 
@@ -134,6 +135,8 @@ export class DataAccess {
 
         await this.createTable(ScriptsTable.table, ScriptsTable.create);
 
+        await this.createTable(ScriptChannelsTable.table, ScriptChannelsTable.create);
+        
         await this.createTable(ScriptEventsTable.table, ScriptEventsTable.create);
     }
 

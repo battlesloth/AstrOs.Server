@@ -1,3 +1,6 @@
+import { ScriptChannel } from "./script_channel";
+import { ScriptEvent } from "./script_event";
+
 export class Script{
     id: string;
     scriptName: string;
@@ -9,6 +12,7 @@ export class Script{
     dtDomeUploaded: string;
     bodyUploaded: boolean;
     dtBodyUploaded: string;
+    scriptChannels: Array<ScriptChannel>;
 
     constructor(id: string,
         scriptName: string,
@@ -30,5 +34,6 @@ export class Script{
         this.dtDomeUploaded = dtDomeUploaded;
         this.bodyUploaded = bodyUploaded;
         this.dtBodyUploaded = dtBodyUploaded;
+        this.scriptChannels = new Array<ScriptChannel>();
     }
 }

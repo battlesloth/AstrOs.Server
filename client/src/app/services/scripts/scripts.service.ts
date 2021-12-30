@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { catchError, Observable, of, tap } from 'rxjs';
-import { Script } from 'src/app/models/Scripts/script';
-import { ScriptEvent } from 'src/app/models/Scripts/script_event';
+import { Script } from 'src/app/models/scripts/script';
+import { ScriptEvent } from 'src/app/models/scripts/script_event';
 
 @Injectable({
   providedIn: 'root'

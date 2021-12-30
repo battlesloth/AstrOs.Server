@@ -6,16 +6,16 @@ export class ScriptsTable {
     public static readonly description = 'description';
     public static readonly lastSaved = 'lastSaved';
     public static readonly dtCoreUploaded = 'dateTimeCoreUploaded';
-    public static readonly uploadedCore = false;
+    public static readonly uploadedCore = 'uploadedCore';
     public static readonly dtDomeUploaded = 'dateTimeDomeUploaded';
-    public static readonly uploadedDome = false;
+    public static readonly uploadedDome = 'uploadedDome';
     public static readonly dtBodyUploaded = 'dateTimeBodyUploaded';
-    public static readonly uploadedBody = false;
+    public static readonly uploadedBody = 'uploadedBody';
 
     public static readonly create =
     `CREATE TABLE IF NOT EXISTS ${this.table} (
     ${this.id} TEXT PRIMARY KEY,
-    ${this.scriptName} TEXT),
+    ${this.scriptName} TEXT,
     ${this.description} TEXT,
     ${this.lastSaved} TEXT,
     ${this.uploadedCore} INTEGER,
@@ -23,10 +23,10 @@ export class ScriptsTable {
     ${this.uploadedDome} INTEGER,
     ${this.dtDomeUploaded} TEXT,
     ${this.uploadedBody} INTEGER,
-    ${this.dtBodyUploaded} TEXT,`;
+    ${this.dtBodyUploaded} TEXT)`;
 
     public static readonly insert =
-    `INSERT INTO ${this.table}
+    `INSERT OR REPLACE INTO ${this.table}
     (${this.id}, ${this.scriptName}, 
     ${this.description}, ${this.lastSaved},
     ${this.uploadedCore}, ${this.dtCoreUploaded},

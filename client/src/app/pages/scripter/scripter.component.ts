@@ -1,5 +1,6 @@
 import { Component, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
+import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ModalService } from 'src/app/modal';
 import { ControllerType } from 'src/app/models/control_module/control_module';
@@ -7,9 +8,10 @@ import { I2cChannel } from 'src/app/models/control_module/i2c_channel';
 import { PwmChannel, PwmType } from 'src/app/models/control_module/pwm_channel';
 import { UartModule } from 'src/app/models/control_module/uart_module';
 import { ChannelValue, ScriptResources } from 'src/app/models/script-resources';
-import { ScriptChannel, ScriptChannelType } from 'src/app/models/Scripts/script_channel';
-import { ScriptEvent } from 'src/app/models/Scripts/script_event';
+import { ScriptChannel, ScriptChannelType } from 'src/app/models/scripts/script_channel';
+import { ScriptEvent} from 'src/app/models/scripts/script_event';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
+import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 
 
 export interface Item {
@@ -43,8 +45,9 @@ export class ScripterComponent implements OnInit {
 
   scriptChannels: Array<ScriptChannel>;
 
-  constructor(private modalService: ModalService, private renderer: Renderer2,
-    private modulesService: ControllerService) {
+  constructor(private route: ActivatedRoute, private modalService: ModalService, 
+    private renderer: Renderer2, private modulesService: ControllerService, 
+    private scriptService: ScriptsService) {
 
     this.timeLineArray = Array.from({ length: this.seconds }, (_, i) => i + 1)
 
@@ -54,19 +57,7 @@ export class ScripterComponent implements OnInit {
       ['i2c', 'I2C Module']]);
 
     this.availableChannels = new Array<ChannelValue>();
-
-    this.scriptChannels = new Array<ScriptChannel>(
-      new ScriptChannel(Guid.create().toString(), ControllerType.core, 'Dome Core Controller', ScriptChannelType.Pwm,
-        new PwmChannel(2, 'Discombultor', PwmType.linear_servo, 10, 100), this.seconds),
-      new ScriptChannel(Guid.create().toString(), ControllerType.dome, 'Dome Skin Controller', ScriptChannelType.I2c,
-        new I2cChannel(4, 'A Really Really Long Name Here. Like Really Long'), this.seconds),
-      new ScriptChannel(Guid.create().toString(), ControllerType.audio, 'Audio Playback', ScriptChannelType.Sound,
-        undefined, this.seconds),
-      new ScriptChannel(Guid.create().toString(), ControllerType.body, 'Core Core Controller', ScriptChannelType.Uart,
-        new UartModule(), this.seconds));
-
-      this.scriptChannels[0].events.push(new ScriptEvent(4));
-      this.scriptChannels[0].events.push(new ScriptEvent(7));
+    this.scriptChannels = new Array<ScriptChannel>();
   }
 
   ngOnInit(): void {

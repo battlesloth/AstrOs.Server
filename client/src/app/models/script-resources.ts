@@ -3,7 +3,7 @@ import { ControllerType, ControlModule } from "./control_module/control_module";
 import { I2cChannel } from "./control_module/i2c_channel";
 import { PwmChannel } from "./control_module/pwm_channel";
 import { UartModule } from "./control_module/uart_module";
-import { ScriptChannelType } from "./Scripts/script_channel";
+import { ScriptChannelType } from "./scripts/script_channel";
 
 
 
