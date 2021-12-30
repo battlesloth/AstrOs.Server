@@ -2,14 +2,46 @@
 
 .container {
   display: flex;
-  height: 80%;
+  flex-direction: column;
+  height: 84%;
   margin: 0 auto;
-  padding: 50px;
-  background-color: $color-medium;
+  padding: 20px;
+
 }
 
+.script-title {
+  display: flex;
+  flex-direction: row;
+  margin: 8px;
+  input {
+    font-size: 20px;
+    height: 30px;
+    width: 100%;
+  }
+
+  .button-box {
+    float: right;
+
+    button{
+        font-size: x-large;
+        font-family: $swfont;
+        background-color: $dark-blue;
+    }
+  }
+
+
+  .script-name{
+    width: 240px;
+  }
+
+  .script-description{
+    flex-grow: 1;
+  }
+
+}
 .scripter-container {
-  background-color: black;
+  background-color: $color-dark;
+  flex-grow: 1;
   display: flex;
   border: 2px solid black;
   border-radius: 10px;
@@ -38,23 +70,31 @@ flex-direction: column;
 }
 
 .scripter-module-header {
-
+  cursor: pointer;
   position: -webkit-sticky;
   position: sticky;
   left: 0px;
   top: 0px;
-  background-color: burlywood;
+  background-color: $color-medium;
+  font-family: $swfont;
+  font-size: x-large;
   color: white;
+  text-shadow:
+  -2px -2px 0 $dark-blue,
+  2px -2px 0 $dark-blue,
+  -2px 2px 0 $dark-blue,
+  2px 2px 0 $dark-blue;
   border-bottom: 2px solid black;
   border-right: 2px solid black;
-  height: 24px;
+  height: 40px;
+  line-height: 40px;
   width: 200px;
   text-align: center;
 }
 
 .timeline-spacer {
   width: 29px;
-  background-color: burlywood;
+  background-color: $color-pale;
   border-bottom: 2px solid black;
 }
 
@@ -68,8 +108,12 @@ flex-direction: column;
   -webkit-user-select: none;
   user-select:none;
   text-align: center;
-
-  background-color: burlywood;
+  height: 40px;
+  line-height: 40px;
+  background-color: $color-pale;
+  font-weight: 500;  
+  color: black;
+  
   background-image:
     linear-gradient(90deg,
       rgba(73, 73, 73, 0.5) 0,
@@ -87,51 +131,26 @@ flex-direction: column;
 }
 
 
-.add-row-container{
-  display: flex;
-  flex-direction: row;
-}
 
-.add-row-channel {
-  cursor: pointer;
-  position: -webkit-sticky;
-  position: sticky;
-  left: 0px;
-  background-color: darkslategray;
-  color: white;
-  border-bottom: 2px solid black;
-  border-right: 2px solid black;
-  height: 100px;
-  width: 200px;
-  font-family: sans-serif;
-  font-size: x-large;
-  line-height: 48px;
-  text-align: center;
-  z-index: 200;
-}
-
-.add-row-timeline-container{
-  background-color: teal;
-  border-right: 2px solid black;
-  border-bottom: 2px solid black;
-  display: flex;
-  flex-direction: row;
-  position: relative;
-  width: 18030px;
-}
 
 
 .scripter-timeline-marker {
+  text-align: center;
+  color: white;
   position: absolute;
   height: 60px;
   width: 60px;
+  vertical-align: middle;
+  line-height: 60px;
   margin-top: 15px;
   top: 0px;
   z-index: 100;
-  background-color: yellow;
+  background-color: $light-blue;
+  border: 2px solid black;
   border-radius: 50%;
   cursor: pointer;
 }
+
 
 .scripter-modal {
 

@@ -32,10 +32,11 @@ export class ScriptsTable {
     ${this.uploadedCore}, ${this.dtCoreUploaded},
     ${this.uploadedDome}, ${this.dtDomeUploaded},
     ${this.uploadedBody}, ${this.dtBodyUploaded})
-    VALUES (?, ?, ?,
-    0, '1970-01-01 00:00:00.000',
-    0, '1970-01-01 00:00:00.000',
-    0, '1970-01-01 00:00:00.000')`;
+    VALUES (?, ?,
+    ?, ?,
+    ?, ?,
+    ?, ?,
+    ?, ?)`;
 
     public static readonly selectAll =
     `SELECT ${this.id}, 
@@ -48,8 +49,7 @@ export class ScriptsTable {
     ${this.dtDomeUploaded},
     ${this.uploadedBody}, 
     ${this.dtBodyUploaded}
-    FROM ${this.table}
-    WHERE ${this.id} = ?`;
+    FROM ${this.table}`;
 
     public static readonly select =
     `SELECT ${this.id}, 

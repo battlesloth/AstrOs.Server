@@ -3,9 +3,11 @@ import { ScriptRepository } from "src/dal/repositories/script_repository";
 
 export class ScriptsController {
 
-    public static route = '/scripts/'
-    
-    public static async getScripts(req: any, res: any, next: any){
+    public static getRoute = '/scripts/'
+    public static putRoute = '/scripts/'
+    public static getAllRoute = '/scripts/all'
+
+    public static async getAllScripts(req: any, res: any, next: any){
         try {
             const dao = new DataAccess();
             const repo = new ScriptRepository(dao);

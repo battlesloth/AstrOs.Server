@@ -25,7 +25,7 @@ export class ScriptsService {
   }
 
   public getScript(id: string): Observable<Script> {
-    return this.http.get<Script>(`/api/scripts/${id}`, {
+    return this.http.get<Script>(`/api/scripts?id=${id}`, {
       headers: { Authorization: `Bearer ${this.getToken()}` }
     })
       .pipe(tap(_ => console.log(`loaded script ${id}`)),

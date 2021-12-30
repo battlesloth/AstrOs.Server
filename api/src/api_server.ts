@@ -16,6 +16,7 @@ import { DataAccess } from "src/dal/data_access";
 import { UserRepository } from "src/dal/repositories/user_repository";
 import { ControllerController } from "src/controllers/controller_controller";
 import { AuthContoller } from "src/controllers/authentication_controller";
+import { ScriptsController } from "src/controllers/scripts_controller";
 
 class ApiServer {
 
@@ -117,6 +118,10 @@ class ApiServer {
 
         this.router.get(ControllerController.route, auth, ControllerController.getControllers);
         this.router.put(ControllerController.route, auth, ControllerController.saveControllers);
+
+        this.router.get(ScriptsController.getRoute, auth, ScriptsController.getScript);
+        this.router.get(ScriptsController.getAllRoute, auth, ScriptsController.getAllScripts);
+        this.router.put(ScriptsController.putRoute, auth, ScriptsController.saveScript);
     }
 
     private runWebServices(): void {

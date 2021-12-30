@@ -1,3 +1,5 @@
+@import '../../../../assets/styles/variables';
+
 .script-row-container{
     display: flex;
     flex-direction: row;
@@ -9,7 +11,7 @@
     position: -webkit-sticky;
     position: sticky;
     left: 0px;
-    background-color: darkslategray;
+    background-color: $light-blue;
     color: white;
     border-bottom: 2px solid black;
     border-right: 2px solid black;
@@ -66,7 +68,8 @@
   linear-gradient(90deg, var(--ruler-c) 0 var(--ruler-bdw), transparent 0);
   background-repeat: repeat-x;
   background-size:
-  calc(var(--ruler-unit) * var(--ruler-space)) var(--ruler-h),
+  calc(var(--ruler-unit) * var(--ruler-space)) var(--ruler-h);
+  background-position: -1px 0px;
 }
 
 .scripter-timeline-marker {

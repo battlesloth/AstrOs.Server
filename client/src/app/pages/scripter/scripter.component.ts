@@ -1,13 +1,15 @@
 import { Component, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ModalService } from 'src/app/modal';
-import { ControllerType } from 'src/app/models/control_module/control_module';
+import { ControllerType, ControlModule } from 'src/app/models/control_module/control_module';
 import { I2cChannel } from 'src/app/models/control_module/i2c_channel';
 import { PwmChannel, PwmType } from 'src/app/models/control_module/pwm_channel';
 import { UartModule } from 'src/app/models/control_module/uart_module';
 import { ChannelValue, ScriptResources } from 'src/app/models/script-resources';
+import { Script } from 'src/app/models/scripts/script';
 import { ScriptChannel, ScriptChannelType } from 'src/app/models/scripts/script_channel';
 import { ScriptEvent} from 'src/app/models/scripts/script_event';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
@@ -30,6 +32,11 @@ export class ScripterComponent implements OnInit {
 
   private segmentWidth: number = 60;
   private seconds: number = 300;
+  private scriptId: string;
+  private resourcesLoaded: boolean = false;
+
+  script!: Script;
+  
   timeLineArray: Array<number>;
   menuTopLeft = { x: 0, y: 0 };
 
@@ -45,9 +52,11 @@ export class ScripterComponent implements OnInit {
 
   scriptChannels: Array<ScriptChannel>;
 
-  constructor(private route: ActivatedRoute, private modalService: ModalService, 
-    private renderer: Renderer2, private modulesService: ControllerService, 
-    private scriptService: ScriptsService) {
+  constructor(private route: ActivatedRoute, private snackBar: MatSnackBar,
+    private modalService: ModalService, private renderer: Renderer2, 
+    private controllerService: ControllerService, private scriptService: ScriptsService) {
+
+    this.scriptId = this.route.snapshot.paramMap.get('id') ?? '0';
 
     this.timeLineArray = Array.from({ length: this.seconds }, (_, i) => i + 1)
 
@@ -61,14 +70,58 @@ export class ScripterComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    const observer = {
-      next: (result: any) => {
+    const csObserver = {
+      next: (result: ControlModule[]) => {
         this.scriptResources = new ScriptResources(result);
+        this.resourcesLoaded = true;
       },
       error: (err: any) => console.error(err)
     };
 
-    this.modulesService.getControllers().subscribe(observer);
+    this.controllerService.getControllers().subscribe(csObserver);
+    
+    if (this.scriptId === '0'){
+      this.scriptId = Guid.create().toString();
+      this.script = new Script(this.scriptId, "", "", "1970-01-01 00:00:00.000", false, "1970-01-01 00:00:00.000", false, "1970-01-01 00:00:00.000", false, "1970-01-01 00:00:00.000");
+    } else {
+      
+      const ssObserver = {
+        next: async (result: Script) => {
+          this.script = result;
+          this.scriptChannels = this.script.scriptChannels;
+
+          if (!this.resourcesLoaded){
+            await new Promise(f => setTimeout(f, 1000));
+          }
+          
+          this.scriptResources.applyScript(this.script);
+        },
+        error: (err: any) => console.error(err)
+      };
+
+      this.scriptService.getScript(this.scriptId).subscribe(ssObserver)
+    }
+  }
+
+  saveScript(){
+
+    const observer = {
+      next: (result: any) => {
+        if (result.message === 'success') {
+          console.log('module settings saved!')
+          this.snackBar.open('Module settings saved!', 'OK', {duration: 2000});
+        } else {
+          console.log('module settings save failed!', 'OK', {duration: 2000})
+          this.snackBar.open('Module settings save failed!', 'OK', {duration: 2000});
+        }
+      },
+      error: (err: any) => {
+        console.error(err);
+        this.snackBar.open('Module settings save failed!');
+      }
+    };
+
+    this.scriptService.saveScript(this.script).subscribe(observer);
   }
 
   openModal(id: string) {
@@ -99,7 +152,7 @@ export class ScripterComponent implements OnInit {
 
   removeCallback(msg: any) {
 
-    const chIdx = this.scriptChannels
+    let chIdx = this.scriptChannels
       .map((ch) => {return ch.id})
       .indexOf(msg.id);
 
@@ -114,6 +167,14 @@ export class ScripterComponent implements OnInit {
         channel.channel?.id
       );
     }
+
+    chIdx = this.script.scriptChannels
+      .map((ch) => {return ch.id})
+      .indexOf(msg.id);
+
+      if (chIdx !== undefined){
+        this.script.scriptChannels.splice(chIdx, 1);
+      }
   }
 
   
@@ -186,9 +247,10 @@ export class ScripterComponent implements OnInit {
 
     const chValue = this.scriptResources.addChannel(controller, type, channel)
     
-    this.scriptChannels.push(
-      new ScriptChannel(Guid.create().toString(), controller, name, type, chValue, this.seconds)
-    );
+    const ch = new ScriptChannel(Guid.create().toString(), controller, name, type, chValue, this.seconds)
+  
+
+    this.scriptChannels.unshift(ch);
 
     this.closeModal('channel-add-modal');
   }

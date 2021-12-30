@@ -1,8 +1,9 @@
 
-import { ControllerType, ControlModule } from "./control_module/control_module";
+import { ChannelType, ControllerType, ControlModule } from "./control_module/control_module";
 import { I2cChannel } from "./control_module/i2c_channel";
 import { PwmChannel } from "./control_module/pwm_channel";
 import { UartModule } from "./control_module/uart_module";
+import { Script } from "./scripts/script";
 import { ScriptChannelType } from "./scripts/script_channel";
 
 
@@ -31,6 +32,9 @@ export class ChannelValue {
 }
 
 export class ScriptResources {
+
+    private loaded = false;
+
     controllers: Map<ControllerType, ControllerDetails>;
 
     uartAvailable: Map<ControllerType, boolean>;
@@ -57,6 +61,26 @@ export class ScriptResources {
 
             this.pwmChannels.get(con.id)?.sort((a, b) => {return a.channel.id - b.channel.id});
             this.i2cChannels.get(con.id)?.sort((a, b) => {return a.channel.id - b.channel.id});
+        });
+    }
+
+    applyScript(script: Script) : void {
+
+        script.scriptChannels.forEach( ch =>{
+            switch (ch.type){
+                case ScriptChannelType.Uart:
+                    this.uartAvailable.set(ch.controllerType, false); 
+                    break;
+                case ScriptChannelType.Pwm:
+                    this.pwmChannels.get(ch.controllerType)![ch.channel.id].available = false;
+                    break;
+                case ScriptChannelType.I2c:
+                    this.i2cChannels.get(ch.controllerType)![ch.channel.id].available = false;
+                    break;
+                case ScriptChannelType.Sound:
+                    this.controllers.delete(ControllerType.audio); 
+                    break;
+            }
         });
     }
 

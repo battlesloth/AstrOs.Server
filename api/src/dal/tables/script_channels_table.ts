@@ -10,7 +10,7 @@ export class ScriptChannelsTable {
 
     public static readonly create =
     `CREATE TABLE IF NOT EXISTS ${this.table} (
-    ${this.id} INTEGER PRIMARY KEY,
+    ${this.id} TEXT PRIMARY KEY,
     ${this.scriptId} TEXT,
     ${this.controllerType} INTEGER,
     ${this.type} INTEGER)`;
@@ -25,10 +25,10 @@ export class ScriptChannelsTable {
     t.${this.scriptId},
     c.${ControllersTable.controllerName},
     t.${this.controllerType},
-    t.${this.type}, 
+    t.${this.type} 
     FROM ${this.table} AS t
-    INNER JOIN ${ControllersTable.table} AS s
-    ON s.${ControllersTable.controllerId} = t.${this.controllerType} 
+    LEFT JOIN ${ControllersTable.table} AS c
+    ON c.${ControllersTable.controllerId} = t.${this.controllerType} 
     WHERE t.${this.scriptId} = ?`;
 
     public static readonly deleteAllForScript =
