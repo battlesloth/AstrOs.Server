@@ -7,15 +7,17 @@
             </div>
             <div class="spacer"></div>
             <div class="button-box">
-                <button class="new-script">New</button>
+                <button (click)="newScript()" class="new-script">New</button>
             </div>
         </div>
         <div class="script-list-container">
             <ul class="script-list">
                 <li *ngFor="let script of scripts">
                     <div class="script-line">
-                        <div class="name-section">{{script.scriptName}}</div>
-                        <div class="desc-section">{{script.description}}</div>
+                        <div class="click-bar" routerLink="/scripter/{{script.id}}">
+                            <div class="name-section">{{script.scriptName}}</div>
+                            <div class="desc-section">{{script.description}}</div>
+                        </div>
                         <div [ngClass]="script.domeUploaded ? 'uploaded' : 'notuploaded'"
                             class="upload-section tooltip">Dome <span class="tooltiptext">{{script.dtDomeUploaded |
                                 date:'short'}}</span></div>

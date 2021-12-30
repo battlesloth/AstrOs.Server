@@ -23,7 +23,7 @@ export class ControllerService  {
         headers: {Authorization: `Bearer ${this.getToken()}`}
       })
       .pipe( tap(_ => console.log('loaded controllers')),
-        catchError(this.handleError<ControlModule[]>('get', []))
+        catchError(this.handleError<ControlModule[]>('getControllers', []))
       );
    }
 
@@ -37,7 +37,7 @@ export class ControllerService  {
       );
   }
 
-   private getToken(): string {
+  private getToken(): string {
     if (!this.token){
       this.token = localStorage.getItem('astros-token') || '';
     }

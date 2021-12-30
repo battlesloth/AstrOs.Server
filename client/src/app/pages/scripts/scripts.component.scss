@@ -54,6 +54,12 @@
         border-bottom: solid 2px black;
     }
     
+    .click-bar{
+        display: flex;
+        flex-direction: row;
+        flex-grow: 1;
+    }
+
     .name-section {
         font-size: large;
         flex-basis: 240px;

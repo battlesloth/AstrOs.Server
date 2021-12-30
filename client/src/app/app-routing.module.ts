@@ -13,7 +13,7 @@ const routes: Routes = [
   {path: 'status', component: StatusComponent, canActivate:[AuthGuard] },
   {path: 'scripts', component: ScriptsComponent, canActivate:[AuthGuard] },
   {path: 'modules', component: ModulesComponent, canActivate:[AuthGuard]},
-  {path: 'scripter', component: ScripterComponent, canActivate:[AuthGuard]}
+  {path: 'scripter/:id', component: ScripterComponent, canActivate:[AuthGuard]}
 ];
 
 @NgModule({
