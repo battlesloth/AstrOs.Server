@@ -28,9 +28,8 @@ export class ScriptRowComponent implements OnInit, AfterViewInit {
   constructor(private renderer: Renderer2) { 
     this.timeLineArray = Array.from({length: this.seconds}, (_, i) => i + 1)
   }
+  
   ngAfterViewInit(): void {
-
-
 
     this.channel.events.forEach( evt =>{
       const floater = this.renderer.createElement('div');
