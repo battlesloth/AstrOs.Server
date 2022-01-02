@@ -33,6 +33,16 @@ export class PwmChannelsTable {
     FROM ${this.table}
     WHERE ${this.controllerId} = ?`;
 
+    public static readonly select =
+    `SELECT ${this.channelId},
+    ${this.channelName},
+    ${this.type},
+    ${this.limit0},
+    ${this.limit1}
+    FROM ${this.table}
+    WHERE ${this.channelId} = ?
+    AND ${this.controllerId} = ?`;
+
     public static readonly update =
     `UPDATE ${this.table}
     SET ${this.channelName} = ?,

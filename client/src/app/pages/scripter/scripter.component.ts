@@ -11,7 +11,7 @@ import { UartModule } from 'src/app/models/control_module/uart_module';
 import { ChannelValue, ScriptResources } from 'src/app/models/script-resources';
 import { Script } from 'src/app/models/scripts/script';
 import { ScriptChannel, ScriptChannelType } from 'src/app/models/scripts/script_channel';
-import { ScriptEvent} from 'src/app/models/scripts/script_event';
+import { ScriptEvent } from 'src/app/models/scripts/script_event';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 
@@ -36,7 +36,7 @@ export class ScripterComponent implements OnInit {
   private resourcesLoaded: boolean = false;
 
   script!: Script;
-  
+
   timeLineArray: Array<number>;
   menuTopLeft = { x: 0, y: 0 };
 
@@ -53,7 +53,7 @@ export class ScripterComponent implements OnInit {
   scriptChannels: Array<ScriptChannel>;
 
   constructor(private route: ActivatedRoute, private snackBar: MatSnackBar,
-    private modalService: ModalService, private renderer: Renderer2, 
+    private modalService: ModalService, private renderer: Renderer2,
     private controllerService: ControllerService, private scriptService: ScriptsService) {
 
     this.scriptId = this.route.snapshot.paramMap.get('id') ?? '0';
@@ -79,21 +79,21 @@ export class ScripterComponent implements OnInit {
     };
 
     this.controllerService.getControllers().subscribe(csObserver);
-    
-    if (this.scriptId === '0'){
+
+    if (this.scriptId === '0') {
       this.scriptId = Guid.create().toString();
       this.script = new Script(this.scriptId, "", "", "1970-01-01 00:00:00.000", false, "1970-01-01 00:00:00.000", false, "1970-01-01 00:00:00.000", false, "1970-01-01 00:00:00.000");
     } else {
-      
+
       const ssObserver = {
         next: async (result: Script) => {
           this.script = result;
           this.scriptChannels = this.script.scriptChannels;
 
-          if (!this.resourcesLoaded){
+          if (!this.resourcesLoaded) {
             await new Promise(f => setTimeout(f, 1000));
           }
-          
+
           this.scriptResources.applyScript(this.script);
         },
         error: (err: any) => console.error(err)
@@ -103,16 +103,16 @@ export class ScripterComponent implements OnInit {
     }
   }
 
-  saveScript(){
+  saveScript() {
 
     const observer = {
       next: (result: any) => {
         if (result.message === 'success') {
           console.log('module settings saved!')
-          this.snackBar.open('Module settings saved!', 'OK', {duration: 2000});
+          this.snackBar.open('Module settings saved!', 'OK', { duration: 2000 });
         } else {
-          console.log('module settings save failed!', 'OK', {duration: 2000})
-          this.snackBar.open('Module settings save failed!', 'OK', {duration: 2000});
+          console.log('module settings save failed!', 'OK', { duration: 2000 })
+          this.snackBar.open('Module settings save failed!', 'OK', { duration: 2000 });
         }
       },
       error: (err: any) => {
@@ -153,10 +153,10 @@ export class ScripterComponent implements OnInit {
   removeCallback(msg: any) {
 
     let chIdx = this.scriptChannels
-      .map((ch) => {return ch.id})
+      .map((ch) => { return ch.id })
       .indexOf(msg.id);
 
-    if (chIdx !== undefined){
+    if (chIdx !== undefined) {
       const channel = this.scriptChannels[chIdx];
 
       this.scriptChannels.splice(chIdx, 1);
@@ -167,17 +167,9 @@ export class ScripterComponent implements OnInit {
         channel.channel?.id
       );
     }
-
-    chIdx = this.script.scriptChannels
-      .map((ch) => {return ch.id})
-      .indexOf(msg.id);
-
-      if (chIdx !== undefined){
-        this.script.scriptChannels.splice(chIdx, 1);
-      }
   }
 
-  
+
 
   modalChange($event: any) {
 
@@ -223,7 +215,7 @@ export class ScripterComponent implements OnInit {
 
     // convert from string value to number for enum
     const controller = +this.selectedController;
-    const channel = + this.selectedChannel;
+    const channel = +this.selectedChannel;
 
     let name = this.scriptResources.controllers.get(controller)?.name;
 
@@ -233,22 +225,27 @@ export class ScripterComponent implements OnInit {
 
     let type = ScriptChannelType.None;
 
-    switch (this.selectedModule) {
-      case 'uart':
-        type = ScriptChannelType.Uart;
-        break;
-      case 'pwm':
-        type = ScriptChannelType.Pwm;
-        break;
-      case 'i2c':
-        type = ScriptChannelType.I2c;
-        break;
+    if (controller === ControllerType.audio) {
+      type = ScriptChannelType.Sound;
+    } else {
+
+      switch (this.selectedModule) {
+        case 'uart':
+          type = ScriptChannelType.Uart;
+          break;
+        case 'pwm':
+          type = ScriptChannelType.Pwm;
+          break;
+        case 'i2c':
+          type = ScriptChannelType.I2c;
+          break;
+      }
     }
 
     const chValue = this.scriptResources.addChannel(controller, type, channel)
-    
-    const ch = new ScriptChannel(Guid.create().toString(), controller, name, type, chValue, this.seconds)
-  
+
+    const ch = new ScriptChannel(Guid.create().toString(), controller, name, type, channel, chValue, this.seconds)
+
 
     this.scriptChannels.unshift(ch);
 
@@ -256,6 +253,10 @@ export class ScripterComponent implements OnInit {
   }
 
   onAddEvent(item: any): void {
+
+    let chIdx = this.scriptChannels
+    .map((ch) => { return ch.id })
+    .indexOf(item.timeline);
 
     const line = document.getElementById(`script-row-${item.timeline}`);
     const scrollContainer = document.getElementById("scripter-container");
@@ -270,7 +271,7 @@ export class ScripterComponent implements OnInit {
 
       if (Math.floor(clickPos) - left >= 30) {
         time += 1
-      } 
+      }
 
       const floater = this.renderer.createElement('div');
       const text = this.renderer.createText(time.toString());
@@ -279,6 +280,10 @@ export class ScripterComponent implements OnInit {
       this.renderer.setStyle(floater, 'top', `0px`);
       this.renderer.setStyle(floater, 'left', `${(time * this.segmentWidth) - 30}px`);
       this.renderer.appendChild(line, floater);
+
+      const event = new ScriptEvent(Guid.create().toString(), item.timeline, time, "{}")
+
+      this.scriptChannels[chIdx].events.push(event);
     }
   }
 }

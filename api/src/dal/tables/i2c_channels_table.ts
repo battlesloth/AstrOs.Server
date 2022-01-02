@@ -23,6 +23,12 @@ export class I2cChannelsTable {
     FROM ${this.table}
     WHERE ${this.controllerId} = ?`;
 
+    public static readonly select =
+    `SELECT ${this.channelId}, ${this.channelName}
+    FROM ${this.table}
+    WHERE ${this.channelId} = ?
+    AND ${this.controllerId} = ?`;
+
     public static readonly update =
     `UPDATE ${this.table}
     SET ${this.channelName} = ?

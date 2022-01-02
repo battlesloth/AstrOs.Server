@@ -5,12 +5,12 @@ export class ScriptsTable {
     public static readonly scriptName = 'scriptName';
     public static readonly description = 'description';
     public static readonly lastSaved = 'lastSaved';
-    public static readonly dtCoreUploaded = 'dateTimeCoreUploaded';
-    public static readonly uploadedCore = 'uploadedCore';
-    public static readonly dtDomeUploaded = 'dateTimeDomeUploaded';
-    public static readonly uploadedDome = 'uploadedDome';
-    public static readonly dtBodyUploaded = 'dateTimeBodyUploaded';
-    public static readonly uploadedBody = 'uploadedBody';
+    public static readonly dtCoreUploaded = 'dtCoreUploaded';
+    public static readonly coreUploaded = 'coreUploaded';
+    public static readonly dtDomeUploaded = 'dtDomeUploaded';
+    public static readonly domeUploaded = 'domeUploaded';
+    public static readonly dtBodyUploaded = 'dtBodyUploaded';
+    public static readonly bodyUploaded = 'bodyUploaded';
 
     public static readonly create =
     `CREATE TABLE IF NOT EXISTS ${this.table} (
@@ -18,20 +18,20 @@ export class ScriptsTable {
     ${this.scriptName} TEXT,
     ${this.description} TEXT,
     ${this.lastSaved} TEXT,
-    ${this.uploadedCore} INTEGER,
+    ${this.coreUploaded} INTEGER,
     ${this.dtCoreUploaded} TEXT,
-    ${this.uploadedDome} INTEGER,
+    ${this.domeUploaded} INTEGER,
     ${this.dtDomeUploaded} TEXT,
-    ${this.uploadedBody} INTEGER,
+    ${this.bodyUploaded} INTEGER,
     ${this.dtBodyUploaded} TEXT)`;
 
     public static readonly insert =
     `INSERT OR REPLACE INTO ${this.table}
     (${this.id}, ${this.scriptName}, 
     ${this.description}, ${this.lastSaved},
-    ${this.uploadedCore}, ${this.dtCoreUploaded},
-    ${this.uploadedDome}, ${this.dtDomeUploaded},
-    ${this.uploadedBody}, ${this.dtBodyUploaded})
+    ${this.coreUploaded}, ${this.dtCoreUploaded},
+    ${this.domeUploaded}, ${this.dtDomeUploaded},
+    ${this.bodyUploaded}, ${this.dtBodyUploaded})
     VALUES (?, ?,
     ?, ?,
     ?, ?,
@@ -43,11 +43,11 @@ export class ScriptsTable {
     ${this.scriptName}, 
     ${this.description},
     ${this.lastSaved},
-    ${this.uploadedCore}, 
+    ${this.coreUploaded}, 
     ${this.dtCoreUploaded},
-    ${this.uploadedDome}, 
+    ${this.domeUploaded}, 
     ${this.dtDomeUploaded},
-    ${this.uploadedBody}, 
+    ${this.bodyUploaded}, 
     ${this.dtBodyUploaded}
     FROM ${this.table}`;
 
@@ -56,11 +56,11 @@ export class ScriptsTable {
     ${this.scriptName}, 
     ${this.description},
     ${this.lastSaved},
-    ${this.uploadedCore}, 
+    ${this.coreUploaded}, 
     ${this.dtCoreUploaded},
-    ${this.uploadedDome}, 
+    ${this.domeUploaded}, 
     ${this.dtDomeUploaded},
-    ${this.uploadedBody}, 
+    ${this.bodyUploaded}, 
     ${this.dtBodyUploaded}
     FROM ${this.table}
     WHERE ${this.id} = ?`;
@@ -70,11 +70,11 @@ export class ScriptsTable {
     SET ${this.scriptName}} = ?,
     ${this.description} = ?,
     ${this.lastSaved} = ?,
-    ${this.uploadedCore} = ?,
+    ${this.coreUploaded} = ?,
     ${this.dtCoreUploaded} = ?,
-    ${this.uploadedDome} = ?,
+    ${this.domeUploaded} = ?,
     ${this.dtDomeUploaded} = ?,
-    ${this.uploadedBody} = ?,
+    ${this.bodyUploaded} = ?,
     ${this.dtBodyUploaded} = ?
     WHERE ${this.id} = ?`;
 }

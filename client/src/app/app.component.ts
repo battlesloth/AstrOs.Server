@@ -16,7 +16,7 @@ export class AppComponent {
   constructor(public auth: AuthenticationService,
     private renderer: Renderer2, private router: Router) {
       if (auth.isLoggedIn()) {
-        router.navigate(['scripter', '0']);
+        router.navigate(['scripter', '5493096a-122a-a5ed-abce-9d0c801d61f0']);
         //router.navigate(['status']);
       }
      }
