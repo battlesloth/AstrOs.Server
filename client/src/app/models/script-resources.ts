@@ -147,7 +147,7 @@ export class ScriptResources {
                 const i2cIdx = this.i2cChannels.get(controller)?.findIndex(x => x.channel.id === id);
                 if (i2cIdx != undefined && i2cIdx > -1) {
                     this.i2cChannels.get(controller)![i2cIdx].available = false;
-                    return this.pwmChannels.get(controller)![i2cIdx].channel
+                    return this.i2cChannels.get(controller)![i2cIdx].channel
                 }
                 break;
         }

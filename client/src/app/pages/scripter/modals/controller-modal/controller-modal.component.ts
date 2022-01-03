@@ -46,13 +46,13 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
   }
 
   addChannel(){
-    this.clearOptions()
     this.modalCallback.emit({
       id: ModalCallbackEvent.addChannel,
-      controller: this.selectedController,
-      module: this.selectedModule,
-      channel: this.selectedChannel
+      controller: +this.selectedController,
+      module: +this.selectedModule,
+      channel: +this.selectedChannel
     });
+    this.clearOptions()
   }
 
   closeModal(){
