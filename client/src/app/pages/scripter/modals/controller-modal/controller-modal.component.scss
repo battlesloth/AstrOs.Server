@@ -1,0 +1,36 @@
+.scripter-modal {
+
+    width: 400px;
+  
+    select {
+      display: block;
+      font-size: x-large;
+      margin: 20px 10px;
+      width: 380px;
+    }
+  }
+  
+  .modal-buttons{
+    margin-top: 20px;
+    display: flex;
+    flex-direction: row;
+  }
+  
+  .button-spacer {
+    flex-grow: 1;
+  }
+  
+  .button-grouper{
+    button{
+      width: 100px;
+      font-size: large;
+      padding: 5px 0px;
+      margin: 0px 5px;
+    }
+  }
+  
+  @media only screen and (max-width: 620px){
+  .scripter-modal {
+        width: 400px;
+    }
+  }

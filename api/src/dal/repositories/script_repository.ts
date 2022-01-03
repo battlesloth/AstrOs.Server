@@ -6,7 +6,7 @@ import { ChannelType, ControllerType } from "src/models/control_module/control_m
 import { I2cChannel } from "src/models/control_module/i2c_channel";
 import { PwmChannel } from "src/models/control_module/pwm_channel";
 import { Script } from "src/models/scripts/script";
-import { ScriptChannel, ScriptChannelType } from "src/models/scripts/script_channel"
+import { ScriptChannel } from "src/models/scripts/script_channel"
 import { ScriptEvent } from "src/models/scripts/script_event";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { PwmChannelsTable } from "../tables/pwm_channels_table";
@@ -122,13 +122,13 @@ export class ScriptRepository {
             });
 
         switch (channel.type) {
-            case ScriptChannelType.I2c:
+            case ChannelType.i2c:
                 channel.channel = await this.getChannelForScriptChannel(ChannelType.i2c, channel.channelNumber, channel.controllerType)
                 break;
-            case ScriptChannelType.Pwm:
+            case ChannelType.pwm:
                 channel.channel = await this.getChannelForScriptChannel(ChannelType.pwm, channel.channelNumber, channel.controllerType)
                 break;
-            case ScriptChannelType.Uart:
+            case ChannelType.uart:
                 // TODO
                 break;
         }

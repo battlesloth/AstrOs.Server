@@ -23,7 +23,7 @@ import { ScriptRowComponent } from './pages/scripter/script-row/script-row.compo
 import { ModalModule } from './modal';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ScriptsComponent } from './pages/scripts/scripts.component';
-import { EventModalBaseComponent } from './pages/scripter/modals/event-modal-base/event-modal-base.component';
+import { ModalBaseComponent } from './modal/modal-base/modal-base.component';
 import { I2cEventModalComponent } from './pages/scripter/modals/i2c-event-modal/i2c-event-modal.component';
 import { PwmEventModalComponent } from './pages/scripter/modals/pwm-event-modal/pwm-event-modal.component';
 import { ControllerModalComponent } from './pages/scripter/modals/controller-modal/controller-modal.component';
@@ -41,7 +41,7 @@ import { ControllerModalComponent } from './pages/scripter/modals/controller-mod
     DriveModuleComponent,
     ScriptRowComponent,
     ScriptsComponent,
-    EventModalBaseComponent,
+    ModalBaseComponent,
     I2cEventModalComponent,
     PwmEventModalComponent,
     ControllerModalComponent

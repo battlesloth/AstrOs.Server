@@ -4,18 +4,18 @@
         <select id="controller-select" title="Contoller" [(ngModel)]="selectedController"
             (change)="modalChange($event)">
             <option value="0" disabled selected>Select Contoller</option>
-            <option *ngFor="let kv of scriptResources?.controllers | keyvalue" value="{{kv.key}}">{{kv.value.name}}
+            <option *ngFor="let kv of controllers | keyvalue" value="{{kv.key}}">{{kv.value.name}}
             </option>
         </select>
         <select id="module-select" title="Module" disabled [(ngModel)]="selectedModule"
             (change)="modalChange($event)">
-            <option value="" disabled selected>Select Module</option>
-            <option *ngFor="let kv of availableModules | keyvalue" value="{{kv.key}}">{{kv.value}}</option>
+            <option value="0" disabled selected>Select Module</option>
+            <option *ngFor="let kv of modules | keyvalue" value="{{kv.key}}">{{kv.value}}</option>
         </select>
         <select id="channel-select" title="Channel" disabled [(ngModel)]="selectedChannel"
             (change)="modalChange($event)">
             <option value="-1" disabled selected>Select Channel</option>
-            <ng-container *ngFor="let ch of availableChannels">
+            <ng-container *ngFor="let ch of channels">
                 <option *ngIf="ch.available" value="{{ch.channel.id}}">{{ch.channel.id}} - {{ch.channel.channelName}}</option>
             </ng-container>
         </select>
@@ -24,7 +24,7 @@
         <div class="button-spacer"></div>
         <div class="button-grouper">
             <button (click)="addChannel();">Add</button>
-            <button (click)="closeModal('channel-add-modal');">Close</button>
+            <button (click)="closeModal();">Close</button>
         </div>
     </div>
 </div>

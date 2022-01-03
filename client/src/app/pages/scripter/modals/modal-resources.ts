@@ -1,6 +1,6 @@
 export enum ModalCallbackEvent{
     close,
-    setChannel,
+    addChannel,
     addI2cEvent,
     addPwmEvent,
     addUartEvent,

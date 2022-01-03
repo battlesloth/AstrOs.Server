@@ -1,17 +1,17 @@
 import { Component, OnInit } from '@angular/core';
 import { ChannelType, ControllerType } from 'src/app/models/control_module/control_module';
-import { ChannelValue } from 'src/app/models/script-resources';
-import { EventModalBaseComponent } from '../event-modal-base/event-modal-base.component';
-import { ModalResources } from '../modal-resources';
+import { ChannelValue, ControllerDetails } from 'src/app/models/script-resources';
+import { ModalBaseComponent } from '../../../../modal/modal-base/modal-base.component';
+import { ModalCallbackEvent, ModalResources } from '../modal-resources';
 
 @Component({
   selector: 'app-controller-modal',
   templateUrl: './controller-modal.component.html',
   styleUrls: ['./controller-modal.component.scss']
 })
-export class ControllerModalComponent extends EventModalBaseComponent implements OnInit {
+export class ControllerModalComponent extends ModalBaseComponent implements OnInit {
 
-  controllers!: Map<ControllerType, string>;
+  controllers!: Map<ControllerType, ControllerDetails>;
   selectedController: ControllerType = ControllerType.none;
 
   private availableModules!: Map<ControllerType, Map<ChannelType, string>>;
@@ -45,6 +45,29 @@ export class ControllerModalComponent extends EventModalBaseComponent implements
     }
   }
 
+  addChannel(){
+    this.clearOptions()
+    this.modalCallback.emit({
+      id: ModalCallbackEvent.addChannel,
+      controller: this.selectedController,
+      module: this.selectedModule,
+      channel: this.selectedChannel
+    });
+  }
+
+  closeModal(){
+    this.clearOptions()
+    this.modalCallback.emit({id: ModalCallbackEvent.close});
+  }
+
+  private clearOptions(){
+    this.selectedController = ControllerType.none;
+    this.selectedModule = ChannelType.none;
+    this.selectedChannel = -1;
+    document.getElementById('module-select')?.setAttribute('disabled', 'disabled');
+    document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
+  }
+
   private setModules(controllerType: ControllerType) {
     if (controllerType === ControllerType.audio) {
       this.selectedModule = ChannelType.none;
@@ -53,9 +76,9 @@ export class ControllerModalComponent extends EventModalBaseComponent implements
       document.getElementById('channel-select')?.setAttribute('disabled', 'disabled')
     }
     else {
-      const mods = this.availableModules.get(this.selectedController);
+      const mods = this.availableModules.get(+this.selectedController);
       if (mods) {
-        this.modules
+        this.modules = mods;
         document.getElementById('module-select')?.removeAttribute('disabled');
       }
     }
@@ -68,7 +91,7 @@ export class ControllerModalComponent extends EventModalBaseComponent implements
       document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
     }
     else {
-      const chs = this.availableChannels.get(this.selectedController)?.get(channelType);
+      const chs = this.availableChannels.get(+this.selectedController)?.get(channelType);
       if (chs) {
         this.channels = chs;
         document.getElementById('channel-select')?.removeAttribute('disabled');

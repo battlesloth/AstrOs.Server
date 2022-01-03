@@ -15,7 +15,8 @@ export enum ChannelType{
     none,
     uart,
     i2c,
-    pwm
+    pwm,
+    audio
 }
 
 export class ControlModule{
