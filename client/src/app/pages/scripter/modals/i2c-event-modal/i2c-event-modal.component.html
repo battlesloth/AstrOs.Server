@@ -1,1 +1,26 @@
-<p>i2c-event-modal works!</p>
+<div class="i2c-modal">
+    <h1>I2C Event</h1>
+    <div class="modal-body">
+        <div class="spacer"></div>
+        <div class="content">
+            <div>
+                <label for="time">Event Time (seconds)</label>
+                <input name="time" matInput placeholder="Time" type="number"
+                    (keypress)="($event.charCode >= 48 && $event.charCode < 58)" [(ngModel)]="eventTime" />
+            </div>
+            <div>
+                <label for="value">I2C Message</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="eventValue" />
+            </div>
+            <div class="error">{{errorMessage}}</div>
+        </div>
+        <div class="spacer"></div>
+    </div>
+    <div class="modal-buttons">
+        <div class="button-spacer"></div>
+        <div class="button-grouper">
+            <button (click)="addEvent();">Add</button>
+            <button (click)="closeModal();">Close</button>
+        </div>
+    </div>
+</div>

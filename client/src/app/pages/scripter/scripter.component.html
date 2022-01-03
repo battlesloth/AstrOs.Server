@@ -33,7 +33,7 @@
         <!-- standard material menu -->
         <mat-menu #rightMenu="matMenu">
             <ng-template matMenuContent let-item="item">
-                <button (click)="onAddEvent(item)" mat-menu-item>Add Event</button>
+                <button (click)="openNewEventModal(item)" mat-menu-item>Add Event</button>
             </ng-template>
         </mat-menu>
     </div>

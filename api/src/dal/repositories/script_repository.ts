@@ -72,10 +72,10 @@ export class ScriptRepository {
 
                     const channel = new ScriptChannel(ch.id, ch.controllerType,
                         ch.controllerName, ch.type, ch.channelNumber, null, 0)
-                    
-                    if (channel.controllerType == ControllerType.audio){
-                        channel.controllerName ='Audio Playback';
-                    }    
+
+                    if (channel.controllerType == ControllerType.audio) {
+                        channel.controllerName = 'Audio Playback';
+                    }
 
                     channels.push(channel);
                 });
@@ -90,12 +90,12 @@ export class ScriptRepository {
         }
 
         for (const ch of result.scriptChannels) {
-
+        
             await this.dao.get(ScriptEventsTable.selectForChannel, [ch.id])
                 .then((val: any) => {
                     val.forEach((evt: any) => {
                         const event = new ScriptEvent(evt.id, evt.scriptChannel, evt.time, evt.dataJson);
-                        ch.events.push(event);
+                        ch.events.set(event.time, event);
                     });
                 }).catch((err) => {
                     console.log(err);
@@ -108,18 +108,6 @@ export class ScriptRepository {
 
 
     private async configScriptChannel(scriptId: string, channel: ScriptChannel): Promise<ScriptChannel> {
-
-        await this.dao.get(ScriptEventsTable.selectForChannel, [scriptId, channel.id])
-            .then((val: any) => {
-                val.forEach((evt: any) => {
-                    const event = new ScriptEvent(evt.id, evt.scriptChannel,
-                        evt.time, evt.dataJson);
-                    channel.events.push(event);
-                });
-            }).catch((err) => {
-                console.log(err);
-                throw 'error'
-            });
 
         switch (channel.type) {
             case ChannelType.i2c:
@@ -197,21 +185,27 @@ export class ScriptRepository {
                 if (val) { console.log(val); }
             });
 
-        script.scriptChannels.forEach(async (ch: ScriptChannel) => {
+
+        for (const ch of script.scriptChannels){
+
             await this.dao.run(ScriptChannelsTable.insert, [ch.id,
             script.id, ch.controllerType.toString(), ch.type.toString(), ch.channelNumber.toString()])
                 .then((val: any) => {
                     if (val) { console.log(val); }
                 });
 
-            ch.events.forEach(async (evt: ScriptEvent) => {
-                await this.dao.run(ScriptEventsTable.insert, [evt.id,
-                script.id, evt.scriptChannel, evt.time.toString(), evt.dataJson])
-                    .then((val: any) => {
-                        if (val) { console.log(val); }
-                    });
-            })
-        });
+            for (const key of ch.events.keys()) {
+                const evt = ch.events.get(key);
+
+                if (evt) {
+                    await this.dao.run(ScriptEventsTable.insert,
+                        [script.id, evt.scriptChannel, evt.channelType.toString(), evt.time.toString(), evt.dataJson])
+                        .then((val: any) => {
+                            if (val) { console.log(val); }
+                        });
+                }
+            }
+        }
 
         return true;
     }

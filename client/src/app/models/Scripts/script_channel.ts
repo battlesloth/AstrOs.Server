@@ -9,7 +9,7 @@ export class ScriptChannel {
     channel: any;
     channelNumber: number;
     maxDuration: number
-    events: ScriptEvent[]
+    events: Map<number, ScriptEvent>
 
     constructor(id: string, controllerType: ControllerType, controllerName: string,
         type: ChannelType, channelNumber: number, channel: any, maxDuration: number){
@@ -21,6 +21,6 @@ export class ScriptChannel {
         this.channel = channel;
         this.maxDuration = maxDuration;
 
-        this.events = new Array<ScriptEvent>();
+        this.events = new Map<number, ScriptEvent>();
     }
 }

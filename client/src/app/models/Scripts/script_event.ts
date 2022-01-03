@@ -1,13 +1,15 @@
+import { ChannelType } from "../control_module/control_module";
+
 export class ScriptEvent {
 
-    id: string;
     scriptChannel: string;
+    channelType: ChannelType;
     time: number;
     dataJson: string;
 
-    constructor(id: string, scriptChannel: string, time: number, dataJson: string) {
-        this.id = id;
+    constructor(scriptChannel: string, channelType: ChannelType, time: number, dataJson: string) {
         this.scriptChannel = scriptChannel;
+        this.channelType = channelType;
         this.time = time;
         this.dataJson = dataJson;
     }

@@ -1,0 +1,63 @@
+.i2c-modal {
+
+    width: 400px;
+  
+    .modal-body{
+        display: flex;
+        flex-direction: row;
+
+        font-size: large;
+
+        .spacer {
+            flex-grow: 1;
+        }
+        
+        .content {
+            width: 300px;
+            display: inline;
+        }
+     
+        label {
+            display:block;
+            width: 300px;
+            margin-bottom: 2px;
+        }
+
+        input {
+            display:block;
+            width: 300px;
+            height: 28px;
+            margin-bottom: 8px;
+            font-size: large;
+        }
+        .error {
+            text-align: center;
+            color: crimson;
+        }
+    }
+  }
+  
+  .modal-buttons{
+    margin-top: 20px;
+    display: flex;
+    flex-direction: row;
+  }
+  
+  .button-spacer {
+    flex-grow: 1;
+  }
+  
+  .button-grouper{
+    button{
+      width: 100px;
+      font-size: large;
+      padding: 5px 0px;
+      margin: 0px 5px;
+    }
+  }
+  
+  @media only screen and (max-width: 620px){
+  .scripter-modal {
+        width: 400px;
+    }
+  }
