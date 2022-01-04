@@ -23,6 +23,15 @@ export class AudioService {
       );
   }
 
+  public removeAudioFile(id: string): Observable<any> {
+    return this.http.get<AudioFile[]>(`/api/audio/delete?id=${id}`, {
+      headers: { Authorization: `Bearer ${this.getToken()}` }
+    })
+      .pipe(tap(_ => console.log(`deleted audio file id: ${id}`)),
+        catchError(this.handleError<AudioFile[]>('removeAudioFile'))
+      );
+  }
+
   private getToken(): string {
     if (!this.token) {
       this.token = localStorage.getItem('astros-token') || '';

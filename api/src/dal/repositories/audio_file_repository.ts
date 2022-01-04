@@ -17,7 +17,7 @@ export class AudioFileRepository {
         const result = new Array<AudioFile>();
         await this.dao.get(AudioFilesTable.selectAll)
         .then((val: any) => {
-            val.array.forEach((af: any) => {
+            val.forEach((af: any) => {
                 const file = new AudioFile(af.id, af.fileName, af.description, af.duration);
                 result.push(file);
             });

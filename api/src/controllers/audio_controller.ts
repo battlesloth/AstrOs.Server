@@ -13,8 +13,6 @@ export class AudioController {
 
             const files = await repo.getAudioFiles();
 
-            files.push(new AudioFile('1', 'my cool file', 'test', 500));
-
             res.status(200);
             res.json(files);
 

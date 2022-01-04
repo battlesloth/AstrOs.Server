@@ -17,8 +17,9 @@
 
                         <div class="name-section">{{file.fileName}}</div>
                         <div class="desc-section">{{file.description}}</div>
-                        <div>{{file.duration}}</div>
-                        <button title="Remove" (click)="remove()"><fa-icon [icon]="faTrash"></fa-icon></button>
+                        <div class="dur-section">{{file.duration * 1000 | date:'mm:ss'}}</div>
+                        <button title="Play" (click)="playFile(file.id)"><fa-icon [icon]="faPlay"></fa-icon></button>
+                        <button title="Remove" (click)="remove(file.id)"><fa-icon [icon]="faTrash"></fa-icon></button>
                     </div>
                 </li>
             </ul>

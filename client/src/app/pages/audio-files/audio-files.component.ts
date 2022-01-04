@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { faPlay, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { AudioFile } from 'src/app/models/audio-file';
 import { AudioService } from 'src/app/services/audio/audio.service';
 
@@ -11,10 +12,11 @@ import { AudioService } from 'src/app/services/audio/audio.service';
 export class AudioFilesComponent implements OnInit {
 
   faTrash = faTrash;
+  faPlay = faPlay;
 
   audioFiles: Array<AudioFile>;
 
-  constructor(private audioService: AudioService) { 
+  constructor(private snackBar: MatSnackBar,private audioService: AudioService) { 
     this.audioFiles = new Array<AudioFile>();
 
   }
@@ -28,11 +30,35 @@ export class AudioFilesComponent implements OnInit {
     this.audioService.getAudioFiles().subscribe(observer);
   }
 
-  uploadFile(){
-
+  playFile(id: string){
+    this.snackBar.open('TODO: impelement this!', 'OK', { duration: 2000 });
   }
 
-  remove(){
+  uploadFile(){
+    this.snackBar.open('TODO: impelement this!', 'OK', { duration: 2000 });
+  }
 
+  remove(id: string){
+    const observer = {
+      next: (result: any) => {
+        if (result.success){
+          const idx = this.audioFiles
+          .map((f) => { return f.id })
+          .indexOf(id);
+          
+          this.audioFiles.splice(idx, 1);
+
+          this.snackBar.open('File deleted!', 'OK', { duration: 2000 });
+        } else{
+          this.snackBar.open('File delete failed!', 'OK', { duration: 2000 });  
+        }
+      },
+      error: (err: any) => {
+        this.snackBar.open('File delete failed!', 'OK', { duration: 2000 });
+        console.error(err);
+      }
+    };
+
+    this.audioService.removeAudioFile(id).subscribe(observer);
   }
 }
