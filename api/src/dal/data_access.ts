@@ -12,6 +12,7 @@ import { ScriptsTable } from "src/dal/tables/scripts_table";
 import { ScriptEventsTable } from "src/dal/tables/script_events_table";
 import { ControllerType } from "src/models/control_module/control_module";
 import { ScriptChannelsTable } from "./tables/script_channels_table";
+import { AudioFilesTable } from "./tables/audio_files_table";
 
 
 export class DataAccess {
@@ -138,6 +139,8 @@ export class DataAccess {
         await this.createTable(ScriptChannelsTable.table, ScriptChannelsTable.create);
         
         await this.createTable(ScriptEventsTable.table, ScriptEventsTable.create);
+   
+        await this.createTable(AudioFilesTable.table, AudioFilesTable.create);
     }
 
     private async setV1Values(): Promise<void> {

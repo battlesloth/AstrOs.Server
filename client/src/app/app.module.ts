@@ -27,6 +27,7 @@ import { ModalBaseComponent } from './modal/modal-base/modal-base.component';
 import { I2cEventModalComponent } from './pages/scripter/modals/i2c-event-modal/i2c-event-modal.component';
 import { PwmEventModalComponent } from './pages/scripter/modals/pwm-event-modal/pwm-event-modal.component';
 import { ControllerModalComponent } from './pages/scripter/modals/controller-modal/controller-modal.component';
+import { AudioFilesComponent } from './pages/audio-files/audio-files.component';
 
 
 @NgModule({
@@ -44,7 +45,8 @@ import { ControllerModalComponent } from './pages/scripter/modals/controller-mod
     ModalBaseComponent,
     I2cEventModalComponent,
     PwmEventModalComponent,
-    ControllerModalComponent
+    ControllerModalComponent,
+    AudioFilesComponent
   ],
   imports: [
     BrowserModule,
