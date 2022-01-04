@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ChannelType } from 'src/app/models/control_module/control_module';
+import { ScriptEvent } from 'src/app/models/scripts/script_event';
 import { ModalBaseComponent } from '../../../../modal/modal-base/modal-base.component';
 import { ModalCallbackEvent, ModalResources } from '../modal-resources';
 
@@ -10,6 +10,10 @@ import { ModalCallbackEvent, ModalResources } from '../modal-resources';
 })
 export class I2cEventModalComponent extends ModalBaseComponent implements OnInit {
 
+  private scriptEvent!: ScriptEvent;
+  private originalEventTime: number;
+  private callbackType: ModalCallbackEvent;
+
   eventTime: number;
   eventValue: string;
   errorMessage: string;
@@ -17,36 +21,57 @@ export class I2cEventModalComponent extends ModalBaseComponent implements OnInit
   
   constructor() {
     super();
+    this.originalEventTime = 0;
     this.eventTime = 0;
     this.eventValue = '';
     this.errorMessage = '';
+    this.callbackType = ModalCallbackEvent.addEvent;
   }
 
   override ngOnInit(): void {
-    if (this.resources.has(ModalResources.eventId)){
-      const payload = JSON.parse(this.resources.get(ModalResources.payload));
+    if (this.resources.has(ModalResources.callbackType)){
+      this.callbackType = this.resources.get(ModalResources.callbackType);
+    }
+
+    this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
+    
+    if (this.scriptEvent.dataJson != ''){
+      const payload = JSON.parse(this.scriptEvent.dataJson);
       this.eventValue = payload.value;
     }
-    this.eventTime = this.resources.get(ModalResources.time);
+    
+    this.originalEventTime = this.scriptEvent.time;
+    this.eventTime = this.scriptEvent.time;
   }
 
   addEvent(){
 
-    if (this.eventTime > this.maxTime){
+    if (+this.eventTime > this.maxTime){
       this.errorMessage = `Event time cannot be larger than ${this.maxTime}`;
       return;
     }
+   
+    this.scriptEvent.time = +this.eventTime;
+    this.scriptEvent.dataJson = JSON.stringify({value: this.eventValue});
 
     this.modalCallback.emit({
-      id: ModalCallbackEvent.addEvent,
-      channelId: this.resources.get(ModalResources.channelId),
-      channelType: ChannelType.i2c,
-      time: +this.eventTime,
-      payload: JSON.stringify({value: this.eventValue})
+      id: this.callbackType,
+      scriptEvent: this.scriptEvent,
+      originalEventTime: this.originalEventTime
     });
   }
 
+  removeEvent(){
+    this.modalCallback.emit({
+      id: ModalCallbackEvent.removeEvent,
+      channelId: this.scriptEvent.scriptChannel,
+      time: this.originalEventTime
+    })
+  }
+  
   closeModal(){
     this.modalCallback.emit({id: ModalCallbackEvent.close});
   }
+
+
 }

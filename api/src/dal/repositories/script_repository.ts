@@ -91,11 +91,11 @@ export class ScriptRepository {
 
         for (const ch of result.scriptChannels) {
         
-            await this.dao.get(ScriptEventsTable.selectForChannel, [ch.id])
+            await this.dao.get(ScriptEventsTable.selectForChannel, [result.id, ch.id])
                 .then((val: any) => {
                     val.forEach((evt: any) => {
-                        const event = new ScriptEvent(evt.id, evt.scriptChannel, evt.time, evt.dataJson);
-                        ch.events.set(event.time, event);
+                        const event = new ScriptEvent(evt.scriptChannel, evt.channelType, evt.time, evt.dataJson);
+                        ch.eventsKvpArray.push({key: event.time, value: event});
                     });
                 }).catch((err) => {
                     console.log(err);
@@ -194,8 +194,8 @@ export class ScriptRepository {
                     if (val) { console.log(val); }
                 });
 
-            for (const key of ch.events.keys()) {
-                const evt = ch.events.get(key);
+            for (const kvp of ch.eventsKvpArray) {
+                const evt = kvp.value;
 
                 if (evt) {
                     await this.dao.run(ScriptEventsTable.insert,

@@ -14,8 +14,6 @@ export class ModalResources{
     public static readonly channels = 'channels';
 
     // event resources
-    public static readonly channelId = 'channelId';
-    public static readonly eventId = 'eventId';
-    public static readonly time = 'time';
-    public static readonly payload = 'payload'; 
+    public static readonly callbackType = 'callbackType';
+    public static readonly scriptEvent = 'scriptEvent';
 }

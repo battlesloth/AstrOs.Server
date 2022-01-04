@@ -1,14 +1,11 @@
-import { Component, ComponentFactoryResolver, ComponentRef, OnInit, Renderer2, Type, ViewChild, ViewContainerRef } from '@angular/core';
+import { AfterViewChecked, AfterViewInit, Component, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
-import { ModalBaseComponent, ModalService } from 'src/app/modal';
+import { ModalService } from 'src/app/modal';
 import { ChannelType, ControllerType, ControlModule } from 'src/app/models/control_module/control_module';
-import { I2cChannel } from 'src/app/models/control_module/i2c_channel';
-import { PwmChannel, PwmType } from 'src/app/models/control_module/pwm_channel';
-import { UartModule } from 'src/app/models/control_module/uart_module';
-import { ChannelValue, ScriptResources } from 'src/app/models/script-resources';
+import { ScriptResources } from 'src/app/models/script-resources';
 import { Script } from 'src/app/models/scripts/script';
 import { ScriptChannel } from 'src/app/models/scripts/script_channel';
 import { ScriptEvent } from 'src/app/models/scripts/script_event';
@@ -30,7 +27,7 @@ export interface Item {
   templateUrl: './scripter.component.html',
   styleUrls: ['./scripter.component.scss']
 })
-export class ScripterComponent implements OnInit {
+export class ScripterComponent implements OnInit, AfterViewInit, AfterViewChecked {
 
   @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;
 
@@ -42,6 +39,7 @@ export class ScripterComponent implements OnInit {
   private seconds: number = 300;
   private scriptId: string;
   private resourcesLoaded: boolean = false;
+  private renderedEvents: boolean = false;
 
   script!: Script;
   scriptChannels: Array<ScriptChannel>;
@@ -68,6 +66,16 @@ export class ScripterComponent implements OnInit {
     this.scriptChannels = new Array<ScriptChannel>();
     this.components = new Array<any>();
   }
+  ngAfterViewChecked(): void {
+    if (!this.renderedEvents){
+         // Maps don't survive JSON.stringify
+      for (const ch of this.script.scriptChannels) {
+        for (const kvp of ch.eventsKvpArray) {
+          this.renderEvent(ch.id, kvp.key);
+        }
+      }
+    }
+  }
 
   ngOnInit(): void {
     const csObserver = {
@@ -92,15 +100,18 @@ export class ScripterComponent implements OnInit {
 
       const ssObserver = {
         next: async (result: Script) => {
-          this.script = result;
-          this.scriptChannels = this.script.scriptChannels;
 
-          for (const ch of this.scriptChannels){
-            // empty maps from the api end up being empty objects
-            if (!(ch.events instanceof Map)){
-              ch.events = new Map<number, ScriptEvent>();
+          for (const ch of result.scriptChannels) {
+            ch.events = new Map<number, ScriptEvent>();
+      
+            for (const kvp of ch.eventsKvpArray) {
+              ch.events.set(kvp.key, kvp.value);
             }
           }
+
+          this.script = result;
+
+          this.scriptChannels = this.script.scriptChannels;
 
           if (!this.resourcesLoaded) {
             await new Promise(f => setTimeout(f, 1000));
@@ -113,6 +124,11 @@ export class ScripterComponent implements OnInit {
 
       this.scriptService.getScript(this.scriptId).subscribe(ssObserver)
     }
+  }
+
+  ngAfterViewInit(): void {
+
+  
   }
 
   saveScript() {
@@ -133,11 +149,19 @@ export class ScripterComponent implements OnInit {
       }
     };
 
+    // Maps don't survive JSON.stringify
+    for (const ch of this.script.scriptChannels) {
+      for (const key of ch.events.keys()) {
+        ch.eventsKvpArray.push({ key: key, value: ch.events.get(key) });
+      }
+    }
+
     this.scriptService.saveScript(this.script).subscribe(observer);
   }
 
 
   openChannelAddModal() {
+
     this.container.clear();
 
     const modalResources = new Map<string, any>();
@@ -181,42 +205,42 @@ export class ScripterComponent implements OnInit {
       return;
     }
 
-
     let chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(evt.timeline);
 
     const ch = this.scriptChannels[chIdx];
 
-    this.createEventModal(ch.id, ch.type, time, '', '');
+    const event = new ScriptEvent(ch.id, ch.type, time, '');
+    
+    this.createEventModal(event);
+  
   }
-
 
   openEditEventModal(channelId: string, time: number) {
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(channelId);
 
+    if (chIdx > -1){
+      const event = this.scriptChannels[chIdx].events.get(time);
 
+      if (event){
+        this.createEventModal(event);
+      }
+    }
   }
 
-  createEventModal(channelId: string, channelType: ChannelType, time: number, eventId: string, payload: string) {
+  createEventModal(event: ScriptEvent) {
 
     this.container.clear();
 
     const modalResources = new Map<string, any>();
-    modalResources.set(ModalResources.channelId, channelId)
-    modalResources.set(ModalResources.time, time);
-
-    // if there is an event ID, then this is an edit.
-    if (eventId !== '') {
-      modalResources.set(ModalResources.eventId, eventId);
-      modalResources.set(ModalResources.payload, payload);
-    }
-
+    modalResources.set(ModalResources.scriptEvent, event)
+  
     let component: any;
 
-    switch (channelType) {
+    switch (event.channelType) {
       case ChannelType.uart:
         return;
         break;
@@ -247,10 +271,10 @@ export class ScripterComponent implements OnInit {
         this.addChannel(evt.controller, evt.module, evt.channel);
         break;
       case ModalCallbackEvent.addEvent:
-        this.addEvent(evt.channelId, evt.channelType, evt.time, evt.payload);
+        this.addEvent(evt.scriptEvent);
         break;
       case ModalCallbackEvent.editEvent:
-        this.editEvent(evt.channelId, evt.channelType, evt.time, evt.payload, evt.oldTime);
+        this.editEvent(evt.scriptEvent, evt.originalEventTime);
         break;
       case ModalCallbackEvent.removeEvent:
         this.removeEvent(evt.channelId, evt.time);
@@ -293,7 +317,7 @@ export class ScripterComponent implements OnInit {
     }
   }
 
-  addChannel(controller: ControllerType, channelType: ChannelType, channel: number): void {
+  private addChannel(controller: ControllerType, channelType: ChannelType, channel: number): void {
 
     let name = this.scriptResources.controllers.get(controller)?.name;
 
@@ -308,12 +332,33 @@ export class ScripterComponent implements OnInit {
     this.scriptChannels.unshift(ch);
   }
 
-  addEvent(channelId: string, channelType: ChannelType, time: number, payload: string): void {
+  private addEvent(event: ScriptEvent) : void {
 
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
-      .indexOf(channelId);
+      .indexOf(event.scriptChannel);
 
+    this.scriptChannels[chIdx].events.set(event.time, event);
+
+    this.renderEvent(event.scriptChannel, event.time);
+  }
+
+  private editEvent(event: ScriptEvent, oldTime: number) {
+    if (event.time !== oldTime) {
+      this.removeEvent(event.scriptChannel, oldTime);
+      this.addEvent(event);
+    }
+    else {
+
+      const chIdx = this.scriptChannels
+        .map((ch) => { return ch.id })
+        .indexOf(event.scriptChannel);
+
+      this.scriptChannels[chIdx].events.set(event.time, event);
+    }
+  }
+
+  private renderEvent(channelId: string, time: number) {
     const line = document.getElementById(`script-row-${channelId}`);
 
     const floater = this.renderer.createElement('div');
@@ -327,27 +372,6 @@ export class ScripterComponent implements OnInit {
       this.openEditEventModal(channelId, time);
     })
     this.renderer.appendChild(line, floater);
-
-    const event = new ScriptEvent(channelId, channelType, time, payload);
-
-    this.scriptChannels[chIdx].events.set(time, event);
-  }
-
-  editEvent(channelId: string, channelType: ChannelType, time: number, payload: string, oldTime: number) {
-    if (time !== oldTime) {
-      this.removeEvent(channelId, oldTime);
-      this.addEvent(channelId, channelType, time, payload);
-    }
-    else {
-
-      const chIdx = this.scriptChannels
-        .map((ch) => { return ch.id })
-        .indexOf(channelId);
-
-      const event = new ScriptEvent(channelId, channelType, time, payload);
-
-      this.scriptChannels[chIdx].events.set(time, event);
-    }
   }
 
   private removeEvent(channelId: string, time: number) {
