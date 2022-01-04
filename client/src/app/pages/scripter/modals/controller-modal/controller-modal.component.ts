@@ -11,6 +11,8 @@ import { ModalCallbackEvent, ModalResources } from '../modal-resources';
 })
 export class ControllerModalComponent extends ModalBaseComponent implements OnInit {
 
+  errorMessage: string;
+
   controllers!: Map<ControllerType, ControllerDetails>;
   selectedController: ControllerType = ControllerType.none;
 
@@ -24,6 +26,8 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
 
   constructor() {
     super();
+
+    this.errorMessage = '';
 
     this.modules = new Map<ChannelType, string>();
     this.channels = new Array<ChannelValue>();
@@ -46,6 +50,21 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
   }
 
   addChannel(){
+
+    if (+this.selectedController !== ControllerType.audio
+      && +this.selectedModule === ChannelType.none){
+        this.errorMessage = 'Module Selection Required'
+        return;
+    }
+    
+    if (+this.selectedModule !== ChannelType.none
+      && +this.selectedModule !== ChannelType.uart
+      && +this.selectedChannel === -1){
+        this.errorMessage = 'Channel Selection Required'
+        return;
+      }
+    
+
     this.modalCallback.emit({
       id: ModalCallbackEvent.addChannel,
       controller: +this.selectedController,

@@ -19,6 +19,7 @@
                 <option *ngIf="ch.available" value="{{ch.channel.id}}">{{ch.channel.id}} - {{ch.channel.channelName}}</option>
             </ng-container>
         </select>
+        <div class="error">{{errorMessage}}</div>
     </div>
     <div class="modal-buttons">
         <div class="button-spacer"></div>
