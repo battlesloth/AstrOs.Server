@@ -23,6 +23,10 @@ import { ScriptRowComponent } from './pages/scripter/script-row/script-row.compo
 import { ModalModule } from './modal';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ScriptsComponent } from './pages/scripts/scripts.component';
+import { ModalBaseComponent } from './modal/modal-base/modal-base.component';
+import { I2cEventModalComponent } from './pages/scripter/modals/i2c-event-modal/i2c-event-modal.component';
+import { PwmEventModalComponent } from './pages/scripter/modals/pwm-event-modal/pwm-event-modal.component';
+import { ControllerModalComponent } from './pages/scripter/modals/controller-modal/controller-modal.component';
 
 
 @NgModule({
@@ -36,7 +40,11 @@ import { ScriptsComponent } from './pages/scripts/scripts.component';
     EspModuleComponent,
     DriveModuleComponent,
     ScriptRowComponent,
-    ScriptsComponent
+    ScriptsComponent,
+    ModalBaseComponent,
+    I2cEventModalComponent,
+    PwmEventModalComponent,
+    ControllerModalComponent
   ],
   imports: [
     BrowserModule,

@@ -13,7 +13,7 @@
     <div id="scripter-container" class="scripter-container">
         <div  class="scripter-body">
             <div class="scripter-header">
-                <div class="scripter-module-header" (click)="openModal('channel-add-modal')">Add Channel</div>
+                <div class="scripter-module-header" (click)="openChannelAddModal()">Add Channel</div>
                 <div class=" timeline-spacer"></div>
                 <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item}}</div>
             </div>
@@ -33,41 +33,12 @@
         <!-- standard material menu -->
         <mat-menu #rightMenu="matMenu">
             <ng-template matMenuContent let-item="item">
-                <button (click)="onAddEvent(item)" mat-menu-item>Add Event</button>
+                <button (click)="openNewEventModal(item)" mat-menu-item>Add Event</button>
             </ng-template>
         </mat-menu>
     </div>
 </div>
 
-<astros-modal id="channel-add-modal" style="display: none;">
-    <div class="scripter-modal">
-        <h1>Select Channel</h1>
-        <div class="modal-body">
-            <select id="controller-select" title="Contoller" [(ngModel)]="selectedController"
-                (change)="modalChange($event)">
-                <option value="0" disabled selected>Select Contoller</option>
-                <option *ngFor="let kv of scriptResources?.controllers | keyvalue" value="{{kv.key}}">{{kv.value.name}}
-                </option>
-            </select>
-            <select id="module-select" title="Module" disabled [(ngModel)]="selectedModule"
-                (change)="modalChange($event)">
-                <option value="" disabled selected>Select Module</option>
-                <option *ngFor="let kv of availableModules | keyvalue" value="{{kv.key}}">{{kv.value}}</option>
-            </select>
-            <select id="channel-select" title="Channel" disabled [(ngModel)]="selectedChannel"
-                (change)="modalChange($event)">
-                <option value="-1" disabled selected>Select Channel</option>
-                <ng-container *ngFor="let ch of availableChannels">
-                    <option *ngIf="ch.available" value="{{ch.channel.id}}">{{ch.channel.id}} - {{ch.channel.channelName}}</option>
-                </ng-container>
-            </select>
-        </div>
-        <div class="modal-buttons">
-            <div class="button-spacer"></div>
-            <div class="button-grouper">
-                <button (click)="addChannel();">Add</button>
-                <button (click)="closeModal('channel-add-modal');">Close</button>
-            </div>
-        </div>
-    </div>
+<astros-modal id="scripter-modal" style="display: none;">
+    <ng-template #modalContainer></ng-template>
 </astros-modal>

@@ -1,26 +1,19 @@
-import { ControllerType } from "../control_module/control_module";
+import { ChannelType, ControllerType } from "../control_module/control_module";
 import { ScriptEvent } from "./script_event";
-
-export enum ScriptChannelType{
-    None,
-    Uart,
-    Pwm,
-    I2c,
-    Sound
-}
 
 export class ScriptChannel {
     id: string;
     controllerType: ControllerType;
     controllerName: string;
-    type: ScriptChannelType;
+    type: ChannelType;
     channel: any;
     channelNumber: number;
-    maxDuration: number
-    events: ScriptEvent[]
+    maxDuration: number;
+    events: Map<number, ScriptEvent>;
+    eventsKvpArray: Array<any>;
 
     constructor(id: string, controllerType: ControllerType, controllerName: string,
-        type: ScriptChannelType, channelNumber: number, channel: any, maxDuration: number){
+        type: ChannelType, channelNumber: number, channel: any, maxDuration: number){
         this.id = id;
         this.controllerType = controllerType;
         this.controllerName = controllerName;
@@ -29,6 +22,7 @@ export class ScriptChannel {
         this.channel = channel;
         this.maxDuration = maxDuration;
 
-        this.events = new Array<ScriptEvent>();
+        this.events = new Map<number, ScriptEvent>();
+        this.eventsKvpArray = new Array<any>();
     }
 }
