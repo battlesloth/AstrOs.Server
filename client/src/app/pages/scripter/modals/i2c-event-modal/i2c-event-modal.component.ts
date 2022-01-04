@@ -33,6 +33,11 @@ export class I2cEventModalComponent extends ModalBaseComponent implements OnInit
       this.callbackType = this.resources.get(ModalResources.callbackType);
     }
 
+    if (this.callbackType === ModalCallbackEvent.editEvent){
+      var element = document.getElementById("remove_button");
+      element?.classList.remove("hidden");
+    }
+
     this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
     
     if (this.scriptEvent.dataJson != ''){

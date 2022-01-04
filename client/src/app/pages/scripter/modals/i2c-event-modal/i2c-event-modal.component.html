@@ -19,8 +19,10 @@
     <div class="modal-buttons">
         <div class="button-spacer"></div>
         <div class="button-grouper">
-            <button (click)="addEvent();">Add</button>
+            <button (click)="addEvent();">Save</button>
+            <button id="remove_button" class="hidden" (click)="removeEvent();">Remove</button>
             <button (click)="closeModal();">Close</button>
         </div>
+        <div class="button-spacer"></div>
     </div>
 </div>

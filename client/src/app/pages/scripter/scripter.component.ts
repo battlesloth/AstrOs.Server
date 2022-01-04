@@ -27,7 +27,7 @@ export interface Item {
   templateUrl: './scripter.component.html',
   styleUrls: ['./scripter.component.scss']
 })
-export class ScripterComponent implements OnInit, AfterViewInit, AfterViewChecked {
+export class ScripterComponent implements OnInit, AfterViewChecked {
 
   @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;
 
@@ -66,13 +66,17 @@ export class ScripterComponent implements OnInit, AfterViewInit, AfterViewChecke
     this.scriptChannels = new Array<ScriptChannel>();
     this.components = new Array<any>();
   }
+
   ngAfterViewChecked(): void {
-    if (!this.renderedEvents){
-         // Maps don't survive JSON.stringify
-      for (const ch of this.script.scriptChannels) {
-        for (const kvp of ch.eventsKvpArray) {
-          this.renderEvent(ch.id, kvp.key);
+    // "this" needs to exist before we render events
+    if (!this.renderedEvents) {
+      if (this.script != undefined) {
+        for (const ch of this.script.scriptChannels) {
+          for (const kvp of ch.eventsKvpArray) {
+            this.renderEvent(ch.id, kvp.key);
+          }
         }
+        this.renderedEvents = true;
       }
     }
   }
@@ -103,7 +107,7 @@ export class ScripterComponent implements OnInit, AfterViewInit, AfterViewChecke
 
           for (const ch of result.scriptChannels) {
             ch.events = new Map<number, ScriptEvent>();
-      
+
             for (const kvp of ch.eventsKvpArray) {
               ch.events.set(kvp.key, kvp.value);
             }
@@ -126,11 +130,6 @@ export class ScripterComponent implements OnInit, AfterViewInit, AfterViewChecke
     }
   }
 
-  ngAfterViewInit(): void {
-
-  
-  }
-
   saveScript() {
 
     const observer = {
@@ -149,8 +148,13 @@ export class ScripterComponent implements OnInit, AfterViewInit, AfterViewChecke
       }
     };
 
+    
+
     // Maps don't survive JSON.stringify
     for (const ch of this.script.scriptChannels) {
+    
+      ch.eventsKvpArray = [];
+    
       for (const key of ch.events.keys()) {
         ch.eventsKvpArray.push({ key: key, value: ch.events.get(key) });
       }
@@ -212,9 +216,9 @@ export class ScripterComponent implements OnInit, AfterViewInit, AfterViewChecke
     const ch = this.scriptChannels[chIdx];
 
     const event = new ScriptEvent(ch.id, ch.type, time, '');
-    
-    this.createEventModal(event);
-  
+
+    this.createEventModal(event, false);
+
   }
 
   openEditEventModal(channelId: string, time: number) {
@@ -222,22 +226,26 @@ export class ScripterComponent implements OnInit, AfterViewInit, AfterViewChecke
       .map((ch) => { return ch.id })
       .indexOf(channelId);
 
-    if (chIdx > -1){
+    if (chIdx > -1) {
       const event = this.scriptChannels[chIdx].events.get(time);
 
-      if (event){
-        this.createEventModal(event);
+      if (event) {
+        this.createEventModal(event, true);
       }
     }
   }
 
-  createEventModal(event: ScriptEvent) {
+  createEventModal(event: ScriptEvent, isEdit: boolean) {
 
     this.container.clear();
 
     const modalResources = new Map<string, any>();
     modalResources.set(ModalResources.scriptEvent, event)
-  
+    
+    if (isEdit){
+      modalResources.set(ModalResources.callbackType, ModalCallbackEvent.editEvent);
+    }
+
     let component: any;
 
     switch (event.channelType) {
@@ -332,7 +340,7 @@ export class ScripterComponent implements OnInit, AfterViewInit, AfterViewChecke
     this.scriptChannels.unshift(ch);
   }
 
-  private addEvent(event: ScriptEvent) : void {
+  private addEvent(event: ScriptEvent): void {
 
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
