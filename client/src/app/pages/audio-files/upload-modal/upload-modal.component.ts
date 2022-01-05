@@ -15,12 +15,17 @@ export class UploadModalComponent extends ModalBaseComponent implements OnInit {
 
   uploader: FileUploader;
   response: string;
+  private token: string;
 
   constructor() { 
     super();
 
+    this.token = '';
+
     this.uploader = new FileUploader({
       url: '/api/audio/savefile',
+      authToken: this.getToken(),
+      itemAlias: 'file',
       disableMultipart: true,
       formatDataFunctionIsAsync: true,
       formatDataFunction:async (item: any) => {
@@ -53,5 +58,12 @@ export class UploadModalComponent extends ModalBaseComponent implements OnInit {
 
   closeModal(){
     this.modalCallback.emit({id: ModalCallbackEvent.close});
+  }
+
+  private getToken(): string {
+    if (!this.token){
+      this.token = localStorage.getItem('astros-token') || '';
+    }
+    return this.token;
   }
 }

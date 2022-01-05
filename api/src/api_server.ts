@@ -90,7 +90,16 @@ class ApiServer {
 
         const appdataPath = appdata("astrosserver");
 
-        this.upload = multer({dest: `${appdataPath}/files/`})
+        const strorage = multer.diskStorage({
+            destination: (req, file, cb) => {
+                cb(null, `${appdataPath}/files/`);
+            },
+            filename: (req, file, cb) => {
+                cb(null, uuid());
+            }
+        });
+
+        this.upload = multer({storage: strorage }).any();
          
         this.app.use(morgan('dev'))
         this.app.use(cors());
@@ -138,15 +147,23 @@ class ApiServer {
         this.router.get(AudioController.deleteRoute, auth, AudioController.deleteAudioFile);
         
         //https://www.digitalocean.com/community/tutorials/express-file-uploads-with-multer
-        this.router.post('/audio/savefile', this.upload.array('files', 12), async (req, res) =>{
-            try{
-                const collection = req.files;
-                res.sendStatus(200);
-            } catch (err){
-                console.log(err);
-                res.sendStatus(500);
-            }
-        })
+        this.router.route('/audio/savefile').post(auth, (req, res) =>{
+            this.upload(req, res, function (err: any) {
+                 if (err) {
+                     console.log(err);
+                     res.status(500);
+                     res.send();
+                 } else {
+                     res.status(200);
+                     res.send();
+                 }
+            })
+        
+            console.log('testing file upload');
+
+            res.status(200);
+            res.send();
+        });
   
     }
 
