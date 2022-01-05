@@ -19,7 +19,7 @@
                         <div class="desc-section">{{file.description}}</div>
                         <div class="dur-section">{{file.duration * 1000 | date:'mm:ss'}}</div>
                         <button title="Play" (click)="playFile(file.id)"><fa-icon [icon]="faPlay"></fa-icon></button>
-                        <button title="Remove" (click)="remove(file.id)"><fa-icon [icon]="faTrash"></fa-icon></button>
+                        <button title="Remove" (click)="removeFile(file.id)"><fa-icon [icon]="faTrash"></fa-icon></button>
                     </div>
                 </li>
             </ul>
@@ -27,3 +27,8 @@
     </div>
     <div class="spacer"></div>
 </div>
+
+
+<astros-modal id="audio-files-modal" style="display: none;">
+    <ng-template #modalContainer></ng-template>
+</astros-modal>

@@ -13,7 +13,7 @@ import { ControllerService } from 'src/app/services/controllers/controller.servi
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
 import { I2cEventModalComponent } from './modals/i2c-event-modal/i2c-event-modal.component';
-import { ModalCallbackEvent, ModalResources } from './modals/modal-resources';
+import { ModalCallbackEvent, ModalResources } from '../../shared/modal-resources';
 import { PwmEventModalComponent } from './modals/pwm-event-modal/pwm-event-modal.component';
 
 
