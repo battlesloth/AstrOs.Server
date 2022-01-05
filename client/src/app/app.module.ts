@@ -16,7 +16,7 @@ import { MatExpansionModule } from '@angular/material/expansion'
 import { MatToolbarModule } from '@angular/material/toolbar'
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
-
+import { FileUploadModule } from 'ng2-file-upload'
 import { EspModuleComponent } from './pages/modules/esp-module/esp-module.component';
 import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.component';
 import { ScriptRowComponent } from './pages/scripter/script-row/script-row.component';
@@ -62,7 +62,8 @@ import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-mo
     MatListModule,
     MatSnackBarModule,
     ModalModule,
-    FontAwesomeModule
+    FontAwesomeModule,
+    FileUploadModule
   ],
   providers: [],
   bootstrap: [AppComponent]

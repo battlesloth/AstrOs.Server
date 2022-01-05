@@ -1,0 +1,92 @@
+.upload-modal {
+
+    width: 600px;
+  
+    .modal-body{
+        display: flex;
+        flex-direction: row;
+
+        font-size: large;
+
+        .spacer {
+            flex-grow: 1;
+        }
+        
+        .content {
+            width: 500px;
+            overflow-wrap: break-word;
+            display: inline;
+
+            .file-list {
+                margin: 0;
+                padding: 0;
+                list-style-type: none;
+            
+                .file-line {
+                    display: flex;
+                    height: 40px;
+                    line-height: 40px;
+                    flex-direction: row;
+                    font-size: large;
+                    border-bottom: solid 2px black;
+            
+                    .name-section {
+                    
+                        flex-basis: 240px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+                    
+                    .size-section {
+                        flex-grow: 1;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+            
+                    .type-section {
+                        margin-right: 10px;
+                    }
+            
+                    button {
+                        font-size: large;
+                        padding: 0;
+                        margin: 0px 12px;
+                        border: none;
+                        background-color: transparent;
+                        color: dimgray;
+                        cursor: pointer;
+                    }
+                }
+            }
+        }
+    }
+  }
+  
+  .modal-buttons{
+    margin-top: 20px;
+    display: flex;
+    flex-direction: row;
+  }
+  
+  .button-spacer {
+    flex-grow: 1;
+  }
+  
+  .button-grouper{
+    button{
+      width: 100px;
+      font-size: large;
+      padding: 5px 0px;
+      margin: 0px 5px;
+    }
+
+    .hidden {
+      display: none;
+    }
+  }
+  
+  @media only screen and (max-width: 620px){
+  .scripter-modal {
+        width: 400px;
+    }
+  }

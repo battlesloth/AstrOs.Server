@@ -4,6 +4,9 @@ import path from "path";
 import passport from "passport";
 import morgan from "morgan";
 import jwt from "express-jwt";
+import multer from 'multer';
+import cors from 'cors';
+import appdata from 'appdata-path';
 
 import Express, { Router, Application } from "express";
 import { HttpError } from "http-errors";
@@ -29,6 +32,8 @@ class ApiServer {
     private router: Router;
     private websocket!: Server;
     private espMonitor!: Worker;
+
+    upload: any;
 
     constructor() {
         Dotenv.config({ path: __dirname+'/.env' });
@@ -83,7 +88,12 @@ class ApiServer {
         const da = new DataAccess();
         da.setup();
 
+        const appdataPath = appdata("astrosserver");
+
+        this.upload = multer({dest: `${appdataPath}/files/`})
+         
         this.app.use(morgan('dev'))
+        this.app.use(cors());
         this.app.use(Express.json());
         this.app.use(Express.urlencoded({ extended: false }));
         this.app.use(cookieParser());
@@ -126,6 +136,18 @@ class ApiServer {
 
         this.router.get(AudioController.getAll, auth, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, auth, AudioController.deleteAudioFile);
+        
+        //https://www.digitalocean.com/community/tutorials/express-file-uploads-with-multer
+        this.router.post('/audio/savefile', this.upload.array('files', 12), async (req, res) =>{
+            try{
+                const collection = req.files;
+                res.sendStatus(200);
+            } catch (err){
+                console.log(err);
+                res.sendStatus(500);
+            }
+        })
+  
     }
 
     private runWebServices(): void {
