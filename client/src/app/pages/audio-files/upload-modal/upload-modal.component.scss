@@ -17,6 +17,22 @@
             overflow-wrap: break-word;
             display: inline;
 
+            input[type='file'] {
+             display: none;
+            }
+            .upload-button{
+              border: 1px solid dimgray;
+              display: inline-block;
+              margin-top: 8px;
+              padding: 6px 12px;
+              cursor: pointer;
+            }
+
+            .upload-icon{
+              margin-right: 8px;
+              color: dimgray;
+            }
+
             .file-list {
                 margin: 0;
                 padding: 0;

@@ -84,6 +84,15 @@ export class AudioFilesComponent implements OnInit {
       case ModalCallbackEvent.delete:
           this.remove(evt.val);
         break;
+      case ModalCallbackEvent.refresh:
+        const observer = {
+          next: (result: AudioFile[]) => this.audioFiles = result,
+          error: (err: any) => console.error(err)
+        };
+    
+        this.audioService.getAudioFiles().subscribe(observer);
+        break;
+
     }
 
     this.modalService.close('audio-files-modal');

@@ -1,11 +1,8 @@
 <div class="upload-modal">
-    <h1>Upload Audio File</h1>
+    <h1>Upload Audio Files</h1>
     <div class="modal-body">
         <div class="spacer"></div>
         <div class="content">
-            <div>
-                <input title="Upload File"type="file" ng2FileSelect [uploader]="uploader" multiple  />
-            </div>
             <div>
                 <ul class="file-list">
                     <li *ngFor="let item of uploader?.queue">
@@ -13,10 +10,26 @@
                             <div class="name-section">{{item?.file?.name}}</div>
                             <div class="size-section">{{ item?.file?.size/1024/1024 | number:'.2' }} MB</div>
                             <div class="type-section">{{item?.file?.type}}</div>
-                            <button title="Remove" (click)="item.remove()"><fa-icon [icon]="faTrash"></fa-icon></button>
+                            <button title="Remove" (click)="item.remove()">
+                                <fa-icon [icon]="faTrash"></fa-icon>
+                            </button>
                         </div>
                     </li>
                 </ul>
+            </div>
+            <div>
+                <label for="file-upload" class="upload-button">
+                    <fa-icon class="upload-icon" [icon]="faFiles"></fa-icon>Choose Files
+                </label>
+                <input id="file-upload" title="Upload File" type="file" ng2FileSelect [uploader]="uploader" multiple />
+            </div>
+
+            <div>
+                Queue progress:
+                <div class="progress" style="">
+                    <div title="Progress" class="progress-bar" role="progressbar"
+                        [ngStyle]="{ 'width': uploader.progress + '%' }"></div>
+                </div>
             </div>
         </div>
         <div class="spacer"></div>
@@ -24,8 +37,8 @@
     <div class="modal-buttons">
         <div class="button-spacer"></div>
         <div class="button-grouper">
-            <button (click)="uploader.uploadAll();">Upload</button>
-            <button (click)="uploader.cancelAll();">Abort</button>
+            <button [disabled]="uploader.isUploading" (click)="uploader.uploadAll()">Upload</button>
+            <button (click)="uploader.cancelAll()">Abort</button>
             <button (click)="uploader.cancelAll(); closeModal();">Cancel</button>
         </div>
         <div class="button-spacer"></div>

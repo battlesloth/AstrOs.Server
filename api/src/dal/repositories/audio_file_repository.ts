@@ -30,6 +30,23 @@ export class AudioFileRepository {
         return result;
     }
 
+    async insertFile(id: string, fileName: string): Promise<boolean> {
+        
+        let result = false;
+
+        await this.dao.run(AudioFilesTable.insert,
+            [id, fileName, '', '0'])
+        .then((val: any) =>{
+            result = true;
+        })
+        .catch((err) =>{
+            console.log(err);
+            result = false;
+        })
+
+        return result;
+    }
+
     async deleteFile(id: string) : Promise<boolean>{
        
         let result = false;

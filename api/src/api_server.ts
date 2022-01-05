@@ -3,15 +3,15 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import passport from "passport";
 import morgan from "morgan";
-import jwt from "express-jwt";
-import multer from 'multer';
+import jwt, { RequestHandler } from "express-jwt";
+import multer, { Multer } from 'multer';
 import cors from 'cors';
 import appdata from 'appdata-path';
 
 import Express, { Router, Application } from "express";
 import { HttpError } from "http-errors";
 import { Server, WebSocket } from "ws";
-import {uuid } from "uuidv4";
+import { v4 as uuid_v4 } from "uuid";
 import { Strategy } from "passport-local"
 import { Worker } from "worker_threads";
 
@@ -21,6 +21,7 @@ import { ControllerController } from "src/controllers/controller_controller";
 import { AuthContoller } from "src/controllers/authentication_controller";
 import { ScriptsController } from "src/controllers/scripts_controller";
 import { AudioController } from "./controllers/audio_controller";
+import { FileController } from "./controllers/file_controller";
 
 class ApiServer {
 
@@ -33,7 +34,9 @@ class ApiServer {
     private websocket!: Server;
     private espMonitor!: Worker;
 
-    upload: any;
+    private authHandler!: RequestHandler; 
+
+    upload!: Multer;
 
     constructor() {
         Dotenv.config({ path: __dirname+'/.env' });
@@ -44,6 +47,7 @@ class ApiServer {
 
         this.setAuthStrategy();
         this.configApi();
+        this.configFileHandler();
         this.setRoutes();
         this.runWebServices();
         this.runBackgroundServices();
@@ -88,19 +92,6 @@ class ApiServer {
         const da = new DataAccess();
         da.setup();
 
-        const appdataPath = appdata("astrosserver");
-
-        const strorage = multer.diskStorage({
-            destination: (req, file, cb) => {
-                cb(null, `${appdataPath}/files/`);
-            },
-            filename: (req, file, cb) => {
-                cb(null, uuid());
-            }
-        });
-
-        this.upload = multer({storage: strorage }).any();
-         
         this.app.use(morgan('dev'))
         this.app.use(cors());
         this.app.use(Express.json());
@@ -123,48 +114,47 @@ class ApiServer {
             res.locals.error = req.app.get('env') === 'development' ? err : {};
             res.status(err.status || 500);
         });
-    }
 
-    private setRoutes(): void {
         const jwtKey: string = (process.env.JWT_KEY as string);
 
-        const auth = jwt({
+        this.authHandler = jwt({
             secret: jwtKey,
             algorithms: ['HS256'],
             userProperty: 'payload'
         });
 
-        this.router.post(AuthContoller.route, AuthContoller.login);
+    }
 
-        this.router.get(ControllerController.route, auth, ControllerController.getControllers);
-        this.router.put(ControllerController.route, auth, ControllerController.saveControllers);
+    private configFileHandler(){
 
-        this.router.get(ScriptsController.getRoute, auth, ScriptsController.getScript);
-        this.router.get(ScriptsController.getAllRoute, auth, ScriptsController.getAllScripts);
-        this.router.put(ScriptsController.putRoute, auth, ScriptsController.saveScript);
+        const strorage = multer.diskStorage({
+            destination: FileController.HandleStorage,
+            filename: FileController.HandleFileName
+        });
 
-        this.router.get(AudioController.getAll, auth, AudioController.getAllAudioFiles);
-        this.router.get(AudioController.deleteRoute, auth, AudioController.deleteAudioFile);
-        
-        //https://www.digitalocean.com/community/tutorials/express-file-uploads-with-multer
-        this.router.route('/audio/savefile').post(auth, (req, res) =>{
-            this.upload(req, res, function (err: any) {
-                 if (err) {
-                     console.log(err);
-                     res.status(500);
-                     res.send();
-                 } else {
-                     res.status(200);
-                     res.send();
-                 }
-            })
-        
-            console.log('testing file upload');
-
+        this.upload = multer({storage: strorage});
+               
+        this.router.post(FileController.audioUploadRoute, this.upload.any(), (req: any, res: any) =>{
             res.status(200);
             res.send();
-        });
-  
+        }); 
+    }
+
+    private setRoutes(): void {
+       
+        this.router.post(AuthContoller.route, AuthContoller.login);
+
+        this.router.get(ControllerController.route, this.authHandler, ControllerController.getControllers);
+        this.router.put(ControllerController.route, this.authHandler, ControllerController.saveControllers);
+
+        this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
+        this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
+        this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
+
+        this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
+        this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
+        
+
     }
 
     private runWebServices(): void {
@@ -175,7 +165,7 @@ class ApiServer {
         this.websocket = new Server({ port: this.websocketPort });
 
         this.websocket.on('connection', (conn) => {
-            const id = uuid();
+            const id = uuid_v4();
             this.clients.set(id, conn);
 
             console.log(`${conn} connected`);
