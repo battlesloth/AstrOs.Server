@@ -47,6 +47,21 @@ export class AudioFileRepository {
         return result;
     }
 
+    async updateFileDuration(id: string, duration: number){
+        let result = false;
+       
+        await this.dao.run(AudioFilesTable.updateDuration, [duration.toString(), id])
+        .then((val: any) =>{
+            result = true;
+        })
+        .catch((err) =>{
+            console.log(err);
+            result = false;
+        })
+
+        return result;
+    }
+
     async deleteFile(id: string) : Promise<boolean>{
        
         let result = false;

@@ -18,6 +18,12 @@ export class AudioFilesTable {
     (${this.id}, ${this.fileName}, ${this.description}, ${this.duration})
     VALUES (?, ?, ?, ?)`
 
+
+    public static readonly updateDuration =
+    `UPDATE ${this.table}
+    SET ${this.duration} = ?
+    WHERE ${this.id} = ?`
+
     public static readonly selectAll =
     `SELECT ${this.id},
     ${this.fileName},

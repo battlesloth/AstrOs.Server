@@ -3,11 +3,15 @@ import { DataAccess } from 'src/dal/data_access';
 import { AudioFileRepository } from 'src/dal/repositories/audio_file_repository';
 import { v4 as uuid_v4 } from "uuid";
 
+// https://github.com/expressjs/multer/blob/master/StorageEngine.md
 export class FileController {
 
     public static audioUploadRoute = '/audio/savefile';
 
     public static HandleStorage(req: any, file: any, cb: any) {
+        console.log("File saving:");
+        console.log(JSON.stringify(file));
+
         cb(null, `${appdata("astrosserver")}/files/`);
     }
 
