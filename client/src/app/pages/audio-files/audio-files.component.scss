@@ -1,0 +1,84 @@
+@import "../../../assets/styles/variables";
+
+.audio-files-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+
+    .spacer {
+        flex-grow: 1;
+    }
+
+    .audio-files-body {
+
+        padding: 20px;
+        max-width: 1000px;
+        flex-grow: 20;
+
+        .button-bar {
+            display: flex;
+            flex-direction: row;
+            height: 54px;
+            line-height: 54px;
+            
+            .title {
+                width: 200px;
+                font-size: xx-large;
+                font-family: $swfont;   
+            }
+
+
+            .button-box {
+                float: right;
+
+                button{
+                    font-size: x-large;
+                    font-family: $swfont;
+                    background-color: $dark-blue;
+                }
+            }
+        }
+    }
+}
+
+.audio-list {
+    margin: 0;
+    padding: 0;
+    list-style-type: none;
+
+    .file-line {
+        display: flex;
+        height: 40px;
+        line-height: 40px;
+        flex-direction: row;
+        font-size: large;
+        border-bottom: solid 2px black;
+
+        .name-section {
+        
+            flex-basis: 240px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .desc-section {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .dur-section {
+            margin-right: 10px;
+        }
+
+        button {
+            font-size: large;
+            padding: 0;
+            margin: 0px 12px;
+            border: none;
+            background-color: transparent;
+            color: dimgray;
+            cursor: pointer;
+        }
+    }
+}

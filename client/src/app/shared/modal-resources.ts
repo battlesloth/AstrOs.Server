@@ -3,11 +3,18 @@ export enum ModalCallbackEvent{
     addChannel,
     addEvent,
     editEvent,
-    removeEvent
+    removeEvent,
+    delete
 }
 
 
 export class ModalResources{
+    // confirmationModal
+    public static readonly action = 'action';
+    public static readonly message = 'message';
+    public static readonly confirmEvent = 'confirmEvent';
+    public static readonly closeEvent = 'closeEvent';
+
     // channel selection resources
     public static readonly controllers = 'controllers';
     public static readonly modules = 'modules';
@@ -16,4 +23,6 @@ export class ModalResources{
     // event resources
     public static readonly callbackType = 'callbackType';
     public static readonly scriptEvent = 'scriptEvent';
+
+
 }

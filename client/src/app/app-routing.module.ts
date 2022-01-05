@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { AuthGuard } from './auth.guard';
+import { AudioFilesComponent } from './pages/audio-files/audio-files.component';
 import { LoginComponent } from './pages/login/login.component';
 import { ModulesComponent } from './pages/modules/modules.component';
 import { ScripterComponent } from './pages/scripter/scripter.component';
@@ -13,7 +14,8 @@ const routes: Routes = [
   {path: 'status', component: StatusComponent, canActivate:[AuthGuard] },
   {path: 'scripts', component: ScriptsComponent, canActivate:[AuthGuard] },
   {path: 'modules', component: ModulesComponent, canActivate:[AuthGuard]},
-  {path: 'scripter/:id', component: ScripterComponent, canActivate:[AuthGuard]}
+  {path: 'scripter/:id', component: ScripterComponent, canActivate:[AuthGuard]},
+  {path: 'audio-files', component: AudioFilesComponent, canActivate:[AuthGuard]}
 ];
 
 @NgModule({

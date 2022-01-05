@@ -1,0 +1,34 @@
+<div class="audio-files-container">
+    <div class="spacer"></div>
+    <div class="audio-files-body">
+        <div class="button-bar">
+            <div class="title">
+                Audio Files
+            </div>
+            <div class="spacer"></div>
+            <div class="button-box">
+                <button (click)="uploadFile()" class="upload">Upload</button>
+            </div>
+        </div>
+        <div class="audio-list-container">
+            <ul class="audio-list">
+                <li *ngFor="let file of audioFiles">
+                    <div class="file-line">
+
+                        <div class="name-section">{{file.fileName}}</div>
+                        <div class="desc-section">{{file.description}}</div>
+                        <div class="dur-section">{{file.duration * 1000 | date:'mm:ss'}}</div>
+                        <button title="Play" (click)="playFile(file.id)"><fa-icon [icon]="faPlay"></fa-icon></button>
+                        <button title="Remove" (click)="removeFile(file.id)"><fa-icon [icon]="faTrash"></fa-icon></button>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="spacer"></div>
+</div>
+
+
+<astros-modal id="audio-files-modal" style="display: none;">
+    <ng-template #modalContainer></ng-template>
+</astros-modal>

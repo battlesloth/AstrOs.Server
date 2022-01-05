@@ -17,6 +17,7 @@ import { UserRepository } from "src/dal/repositories/user_repository";
 import { ControllerController } from "src/controllers/controller_controller";
 import { AuthContoller } from "src/controllers/authentication_controller";
 import { ScriptsController } from "src/controllers/scripts_controller";
+import { AudioController } from "./controllers/audio_controller";
 
 class ApiServer {
 
@@ -122,6 +123,9 @@ class ApiServer {
         this.router.get(ScriptsController.getRoute, auth, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, auth, ScriptsController.getAllScripts);
         this.router.put(ScriptsController.putRoute, auth, ScriptsController.saveScript);
+
+        this.router.get(AudioController.getAll, auth, AudioController.getAllAudioFiles);
+        this.router.get(AudioController.deleteRoute, auth, AudioController.deleteAudioFile);
     }
 
     private runWebServices(): void {

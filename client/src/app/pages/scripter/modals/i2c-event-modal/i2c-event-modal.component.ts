@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ScriptEvent } from 'src/app/models/scripts/script_event';
 import { ModalBaseComponent } from '../../../../modal/modal-base/modal-base.component';
-import { ModalCallbackEvent, ModalResources } from '../modal-resources';
+import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
 
 @Component({
   selector: 'app-i2c-event-modal',
