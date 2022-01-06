@@ -7,11 +7,12 @@ import { v4 as uuid_v4 } from "uuid";
 export class FileController {
 
     public static audioUploadRoute = '/audio/savefile';
+    
+    public static StoragePath() {
+        return `${appdata("astrosserver")}/files/`;
+    }
 
     public static HandleStorage(req: any, file: any, cb: any) {
-        console.log("File saving:");
-        console.log(JSON.stringify(file));
-
         cb(null, `${appdata("astrosserver")}/files/`);
     }
 
@@ -39,5 +40,15 @@ export class FileController {
         }
 
         cb(null, filename);
+    }
+
+    public static async UpdateFileDurations(){
+
+        const dao = new DataAccess();
+        const repo = new AudioFileRepository(dao);
+
+        const files = await repo.filesNeedingDuration();
+        
+        console.log(`Testing: ${JSON.stringify(files)}`);
     }
 }

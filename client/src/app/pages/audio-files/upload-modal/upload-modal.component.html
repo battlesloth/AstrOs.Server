@@ -21,7 +21,7 @@
                 <label for="file-upload" class="upload-button">
                     <fa-icon class="upload-icon" [icon]="faFiles"></fa-icon>Choose Files
                 </label>
-                <input id="file-upload" title="Upload File" type="file" ng2FileSelect [uploader]="uploader" multiple />
+                <input id="file-upload" title="Upload File" type="file"  ng2FileSelect [uploader]="uploader" multiple />
             </div>
 
             <div>
@@ -37,7 +37,7 @@
     <div class="modal-buttons">
         <div class="button-spacer"></div>
         <div class="button-grouper">
-            <button [disabled]="uploader.isUploading" (click)="uploader.uploadAll()">Upload</button>
+            <button [disabled]="uploader.isUploading || !uploader.getNotUploadedItems().length" (click)="uploader.uploadAll()">Upload</button>
             <button (click)="uploader.cancelAll()">Abort</button>
             <button (click)="uploader.cancelAll(); closeModal();">Cancel</button>
         </div>

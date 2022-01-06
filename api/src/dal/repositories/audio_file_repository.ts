@@ -47,6 +47,23 @@ export class AudioFileRepository {
         return result;
     }
 
+    async filesNeedingDuration() {
+        const result = new Array<string>();
+        
+        await this.dao.get(AudioFilesTable.selectZeroDuration)
+        .then((val: any) => {
+            val.forEach((af: any) => {
+                result.push(af.id);
+            });
+        })
+        .catch((err) => {
+            console.log(err);
+            return result;
+        });
+
+        return result;
+    }
+
     async updateFileDuration(id: string, duration: number){
         let result = false;
        

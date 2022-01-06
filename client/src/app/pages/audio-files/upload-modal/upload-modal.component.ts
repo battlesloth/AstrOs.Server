@@ -26,7 +26,10 @@ export class UploadModalComponent extends ModalBaseComponent implements OnInit {
     
     this.token = localStorage.getItem('astros-token') || '';
     
-    this.uploader = new FileUploader({url: '/api/audio/savefile'});
+    this.uploader = new FileUploader({
+      url: '/api/audio/savefile',
+      itemAlias: 'file'
+    });
 
     //this.uploader = new FileUploader({
     //  url: '/api/audio/savefile',

@@ -7,6 +7,7 @@ import jwt, { RequestHandler } from "express-jwt";
 import multer, { Multer } from 'multer';
 import cors from 'cors';
 import appdata from 'appdata-path';
+import { existsSync, mkdirSync } from 'fs';
 
 import Express, { Router, Application } from "express";
 import { HttpError } from "http-errors";
@@ -34,12 +35,12 @@ class ApiServer {
     private websocket!: Server;
     private espMonitor!: Worker;
 
-    private authHandler!: RequestHandler; 
+    private authHandler!: RequestHandler;
 
-    upload!: Multer;
+    upload!: any;
 
     constructor() {
-        Dotenv.config({ path: __dirname+'/.env' });
+        Dotenv.config({ path: __dirname + '/.env' });
 
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
@@ -125,23 +126,39 @@ class ApiServer {
 
     }
 
-    private configFileHandler(){
+    private configFileHandler() {
 
-        const strorage = multer.diskStorage({
+        if (!existsSync(FileController.StoragePath())) {
+            mkdirSync(FileController.StoragePath())
+        }
+
+        const storage = multer.diskStorage({
             destination: FileController.HandleStorage,
             filename: FileController.HandleFileName
         });
 
-        this.upload = multer({storage: strorage});
-               
-        this.router.post(FileController.audioUploadRoute, this.upload.any(), (req: any, res: any) =>{
-            res.status(200);
+        this.upload = multer({ storage: storage }).array('file', 20);
+
+        this.router.route(FileController.audioUploadRoute).post(async (req, res) => {
+           
+            await this.upload(req, res, async (err: any) => {
+                if (err) {
+                    console.log(err);
+                    res.status(500);
+                } else {
+                    res.status(200);
+                }
+
+                await FileController.UpdateFileDurations();
+            })
+
+            console.log('upload request complete');
             res.send();
-        }); 
+        });
     }
 
     private setRoutes(): void {
-       
+
         this.router.post(AuthContoller.route, AuthContoller.login);
 
         this.router.get(ControllerController.route, this.authHandler, ControllerController.getControllers);
@@ -153,7 +170,7 @@ class ApiServer {
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
-        
+
 
     }
 
@@ -173,24 +190,24 @@ class ApiServer {
     }
 
     private runBackgroundServices(): void {
-        this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: {monitor: 'core'}});
+        this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: { monitor: 'core' } });
         this.espMonitor.on('exit', exit => { console.log(exit); });
         this.espMonitor.on('error', err => { console.log(err); });
 
-        this.espMonitor.on('message', (msg) =>{
+        this.espMonitor.on('message', (msg) => {
             console.log(`${msg.module}:${msg.status}`);
             this.updateClients(msg);
         });
 
-        setInterval(() => { this.espMonitor.postMessage({monitor: 'core', ip: '192.168.50.22'})}, 5000);
+        setInterval(() => { this.espMonitor.postMessage({ monitor: 'core', ip: '192.168.50.22' }) }, 5000);
     }
 
     private updateClients(msg: any): void {
         const str = JSON.stringify(msg);
-        for (const client of this.clients.values()){
-            try{
+        for (const client of this.clients.values()) {
+            try {
                 client.send(str);
-            } catch(err){
+            } catch (err) {
                 console.log(`websocket send error: ${err}`);
             }
         }

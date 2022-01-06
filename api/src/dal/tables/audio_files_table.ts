@@ -34,4 +34,9 @@ export class AudioFilesTable {
     public static readonly delete =
     `DELETE FROM ${this.table}
     WHERE ${this.id} = ?`
+
+    public static readonly selectZeroDuration =
+    `SELECT ${this.id}
+    FROM ${this.table}
+    WHERE ${this.duration} = 0`
 }
