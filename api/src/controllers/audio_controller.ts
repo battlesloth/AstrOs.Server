@@ -1,6 +1,7 @@
 import { DataAccess } from "src/dal/data_access";
 import { AudioFileRepository } from "src/dal/repositories/audio_file_repository";
-import { AudioFile } from "src/models/audio-file";
+import { unlink } from 'fs';
+import appdata from 'appdata-path';
 
 export class AudioController {
     public static getAll = '/audio/all';
@@ -34,17 +35,25 @@ export class AudioController {
 
             const result = await repo.deleteFile(req.query.id);
 
+            if (result) {
+                unlink(`${appdata("astrosserver")}/files/${req.query.id}`, (err) => {
+                    if (err) {
+                        console.error(err)
+                    }
+                });
+            }
+
             res.status(200);
-            res.json({success: true});
+                res.json({ success: true });
 
-        } catch (error) {
-            console.log(error);
+            } catch (error) {
+                console.log(error);
 
-            res.status(500);
-            res.json({
-                message: 'Internal server error'
-            });
+                res.status(500);
+                res.json({
+                    message: 'Internal server error'
+                });
+            }
         }
-    }
 
 }
