@@ -16,7 +16,7 @@ import { MatExpansionModule } from '@angular/material/expansion'
 import { MatToolbarModule } from '@angular/material/toolbar'
 import { MatListModule } from '@angular/material/list';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
-import { FileUploadModule } from 'ng2-file-upload'
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { EspModuleComponent } from './pages/modules/esp-module/esp-module.component';
 import { DriveModuleComponent } from './pages/modules/drive-module/drive-module.component';
 import { ScriptRowComponent } from './pages/scripter/script-row/script-row.component';
@@ -29,7 +29,6 @@ import { PwmEventModalComponent } from './pages/scripter/modals/pwm-event-modal/
 import { ControllerModalComponent } from './pages/scripter/modals/controller-modal/controller-modal.component';
 import { AudioFilesComponent } from './pages/audio-files/audio-files.component';
 import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-modal.component';
-
 
 @NgModule({
   declarations: [
@@ -63,7 +62,7 @@ import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-mo
     MatSnackBarModule,
     ModalModule,
     FontAwesomeModule,
-    FileUploadModule
+    MatProgressBarModule
   ],
   providers: [],
   bootstrap: [AppComponent]

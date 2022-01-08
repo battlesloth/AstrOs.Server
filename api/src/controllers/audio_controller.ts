@@ -36,7 +36,7 @@ export class AudioController {
             const result = await repo.deleteFile(req.query.id);
 
             if (result) {
-                unlink(`${appdata("astrosserver")}/files/${req.query.id}`, (err) => {
+                await unlink(`${appdata("astrosserver")}/files/${req.query.id}`, (err) => {
                     if (err) {
                         console.error(err)
                     }
@@ -44,16 +44,16 @@ export class AudioController {
             }
 
             res.status(200);
-                res.json({ success: true });
+            res.json({ success: true });
 
-            } catch (error) {
-                console.log(error);
+        } catch (error) {
+            console.log(error);
 
-                res.status(500);
-                res.json({
-                    message: 'Internal server error'
-                });
-            }
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
         }
+    }
 
 }

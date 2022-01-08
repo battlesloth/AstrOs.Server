@@ -5,12 +5,16 @@
         <div class="content">
             <div>
                 <ul class="file-list">
-                    <li *ngFor="let item of uploader?.queue">
+                    <li *ngFor="let file of uploadQueue">
                         <div class="file-line">
-                            <div class="name-section">{{item?.file?.name}}</div>
-                            <div class="size-section">{{ item?.file?.size/1024/1024 | number:'.2' }} MB</div>
-                            <div class="type-section">{{item?.file?.type}}</div>
-                            <button title="Remove" (click)="item.remove()">
+                            <div class="name-section">{{file?.fileData?.name}}</div>
+                            <div class="size-section">{{file?.fileData?.size/1024/1024 | number:'.2' }} MB</div>
+                            <div class="progress">
+                                <div class="progress-background">
+                                    <div title="progress" class="progress-bar" role="progressbar" [ngStyle]="{ 'width': file.uploadProgress + '%' }"></div>
+                                </div>
+                            </div>
+                            <button title="Remove" (click)="removeFile(file.fileData.name)">
                                 <fa-icon [icon]="faTrash"></fa-icon>
                             </button>
                         </div>
@@ -21,15 +25,7 @@
                 <label for="file-upload" class="upload-button">
                     <fa-icon class="upload-icon" [icon]="faFiles"></fa-icon>Choose Files
                 </label>
-                <input id="file-upload" title="Upload File" type="file"  ng2FileSelect [uploader]="uploader" multiple />
-            </div>
-
-            <div>
-                Queue progress:
-                <div class="progress" style="">
-                    <div title="Progress" class="progress-bar" role="progressbar"
-                        [ngStyle]="{ 'width': uploader.progress + '%' }"></div>
-                </div>
+                <input id="file-upload" title="Upload File" type="file" (change)="addToQueue($event)" multiple />
             </div>
         </div>
         <div class="spacer"></div>
@@ -37,9 +33,9 @@
     <div class="modal-buttons">
         <div class="button-spacer"></div>
         <div class="button-grouper">
-            <button [disabled]="uploader.isUploading || !uploader.getNotUploadedItems().length" (click)="uploader.uploadAll()">Upload</button>
-            <button (click)="uploader.cancelAll()">Abort</button>
-            <button (click)="uploader.cancelAll(); closeModal();">Cancel</button>
+            <button [disabled]="isUploading || uploadQueue.length === 0" (click)="uploadAll()">Upload</button>
+            <button (click)="cancelAll()">Abort</button>
+            <button (click)="cancelAll(); closeModal();">Cancel</button>
         </div>
         <div class="button-spacer"></div>
     </div>

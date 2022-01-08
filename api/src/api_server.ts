@@ -4,10 +4,10 @@ import path from "path";
 import passport from "passport";
 import morgan from "morgan";
 import jwt, { RequestHandler } from "express-jwt";
-import multer, { Multer } from 'multer';
 import cors from 'cors';
 import appdata from 'appdata-path';
 import { existsSync, mkdirSync } from 'fs';
+import fileUpload from 'express-fileupload';
 
 import Express, { Router, Application } from "express";
 import { HttpError } from "http-errors";
@@ -95,6 +95,7 @@ class ApiServer {
 
         this.app.use(morgan('dev'))
         this.app.use(cors());
+        this.app.use(fileUpload());
         this.app.use(Express.json());
         this.app.use(Express.urlencoded({ extended: false }));
         this.app.use(cookieParser());
@@ -128,33 +129,9 @@ class ApiServer {
 
     private configFileHandler() {
 
-        if (!existsSync(FileController.StoragePath())) {
-            mkdirSync(FileController.StoragePath())
-        }
-
-        const storage = multer.diskStorage({
-            destination: FileController.HandleStorage,
-            filename: FileController.HandleFileName
-        });
-
-        this.upload = multer({ storage: storage }).array('file', 20);
-
-        this.router.route(FileController.audioUploadRoute).post(async (req, res) => {
-           
-            await this.upload(req, res, async (err: any) => {
-                if (err) {
-                    console.log(err);
-                    res.status(500);
-                } else {
-                    res.status(200);
-                }
-
-                await FileController.UpdateFileDurations();
-            })
-
-            console.log('upload request complete');
-            res.send();
-        });
+        this.router.route(FileController.audioUploadRoute).post( (req, res) =>{
+           FileController.HandleFile(req, res);
+        })
     }
 
     private setRoutes(): void {
@@ -170,8 +147,6 @@ class ApiServer {
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
-
-
     }
 
     private runWebServices(): void {
