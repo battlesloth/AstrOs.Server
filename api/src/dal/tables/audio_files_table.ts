@@ -18,6 +18,12 @@ export class AudioFilesTable {
     (${this.id}, ${this.fileName}, ${this.description}, ${this.duration})
     VALUES (?, ?, ?, ?)`
 
+
+    public static readonly updateDuration =
+    `UPDATE ${this.table}
+    SET ${this.duration} = ?
+    WHERE ${this.id} = ?`
+
     public static readonly selectAll =
     `SELECT ${this.id},
     ${this.fileName},
@@ -28,4 +34,9 @@ export class AudioFilesTable {
     public static readonly delete =
     `DELETE FROM ${this.table}
     WHERE ${this.id} = ?`
+
+    public static readonly selectZeroDuration =
+    `SELECT ${this.id}
+    FROM ${this.table}
+    WHERE ${this.duration} = 0`
 }

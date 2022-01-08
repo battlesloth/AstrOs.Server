@@ -3,12 +3,16 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import passport from "passport";
 import morgan from "morgan";
-import jwt from "express-jwt";
+import jwt, { RequestHandler } from "express-jwt";
+import cors from 'cors';
+import appdata from 'appdata-path';
+import { existsSync, mkdirSync } from 'fs';
+import fileUpload from 'express-fileupload';
 
 import Express, { Router, Application } from "express";
 import { HttpError } from "http-errors";
 import { Server, WebSocket } from "ws";
-import {uuid } from "uuidv4";
+import { v4 as uuid_v4 } from "uuid";
 import { Strategy } from "passport-local"
 import { Worker } from "worker_threads";
 
@@ -18,6 +22,7 @@ import { ControllerController } from "src/controllers/controller_controller";
 import { AuthContoller } from "src/controllers/authentication_controller";
 import { ScriptsController } from "src/controllers/scripts_controller";
 import { AudioController } from "./controllers/audio_controller";
+import { FileController } from "./controllers/file_controller";
 
 class ApiServer {
 
@@ -30,8 +35,12 @@ class ApiServer {
     private websocket!: Server;
     private espMonitor!: Worker;
 
+    private authHandler!: RequestHandler;
+
+    upload!: any;
+
     constructor() {
-        Dotenv.config({ path: __dirname+'/.env' });
+        Dotenv.config({ path: __dirname + '/.env' });
 
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
@@ -39,6 +48,7 @@ class ApiServer {
 
         this.setAuthStrategy();
         this.configApi();
+        this.configFileHandler();
         this.setRoutes();
         this.runWebServices();
         this.runBackgroundServices();
@@ -84,6 +94,8 @@ class ApiServer {
         da.setup();
 
         this.app.use(morgan('dev'))
+        this.app.use(cors());
+        this.app.use(fileUpload());
         this.app.use(Express.json());
         this.app.use(Express.urlencoded({ extended: false }));
         this.app.use(cookieParser());
@@ -104,28 +116,37 @@ class ApiServer {
             res.locals.error = req.app.get('env') === 'development' ? err : {};
             res.status(err.status || 500);
         });
-    }
 
-    private setRoutes(): void {
         const jwtKey: string = (process.env.JWT_KEY as string);
 
-        const auth = jwt({
+        this.authHandler = jwt({
             secret: jwtKey,
             algorithms: ['HS256'],
             userProperty: 'payload'
         });
 
+    }
+
+    private configFileHandler() {
+
+        this.router.route(FileController.audioUploadRoute).post( (req, res) =>{
+           FileController.HandleFile(req, res);
+        })
+    }
+
+    private setRoutes(): void {
+
         this.router.post(AuthContoller.route, AuthContoller.login);
 
-        this.router.get(ControllerController.route, auth, ControllerController.getControllers);
-        this.router.put(ControllerController.route, auth, ControllerController.saveControllers);
+        this.router.get(ControllerController.route, this.authHandler, ControllerController.getControllers);
+        this.router.put(ControllerController.route, this.authHandler, ControllerController.saveControllers);
 
-        this.router.get(ScriptsController.getRoute, auth, ScriptsController.getScript);
-        this.router.get(ScriptsController.getAllRoute, auth, ScriptsController.getAllScripts);
-        this.router.put(ScriptsController.putRoute, auth, ScriptsController.saveScript);
+        this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
+        this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
+        this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
 
-        this.router.get(AudioController.getAll, auth, AudioController.getAllAudioFiles);
-        this.router.get(AudioController.deleteRoute, auth, AudioController.deleteAudioFile);
+        this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
+        this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
     }
 
     private runWebServices(): void {
@@ -136,7 +157,7 @@ class ApiServer {
         this.websocket = new Server({ port: this.websocketPort });
 
         this.websocket.on('connection', (conn) => {
-            const id = uuid();
+            const id = uuid_v4();
             this.clients.set(id, conn);
 
             console.log(`${conn} connected`);
@@ -144,24 +165,24 @@ class ApiServer {
     }
 
     private runBackgroundServices(): void {
-        this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: {monitor: 'core'}});
+        this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: { monitor: 'core' } });
         this.espMonitor.on('exit', exit => { console.log(exit); });
         this.espMonitor.on('error', err => { console.log(err); });
 
-        this.espMonitor.on('message', (msg) =>{
+        this.espMonitor.on('message', (msg) => {
             console.log(`${msg.module}:${msg.status}`);
             this.updateClients(msg);
         });
 
-        setInterval(() => { this.espMonitor.postMessage({monitor: 'core', ip: '192.168.50.22'})}, 5000);
+        setInterval(() => { this.espMonitor.postMessage({ monitor: 'core', ip: '192.168.50.22' }) }, 5000);
     }
 
     private updateClients(msg: any): void {
         const str = JSON.stringify(msg);
-        for (const client of this.clients.values()){
-            try{
+        for (const client of this.clients.values()) {
+            try {
                 client.send(str);
-            } catch(err){
+            } catch (err) {
                 console.log(`websocket send error: ${err}`);
             }
         }

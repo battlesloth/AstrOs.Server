@@ -4,7 +4,8 @@ export enum ModalCallbackEvent{
     addEvent,
     editEvent,
     removeEvent,
-    delete
+    delete,
+    refresh
 }
 
 

@@ -30,6 +30,55 @@ export class AudioFileRepository {
         return result;
     }
 
+    async insertFile(id: string, fileName: string): Promise<boolean> {
+        
+        let result = false;
+
+        await this.dao.run(AudioFilesTable.insert,
+            [id, fileName, '', '0'])
+        .then((val: any) =>{
+            result = true;
+        })
+        .catch((err) =>{
+            console.log(err);
+            result = false;
+        })
+
+        return result;
+    }
+
+    async filesNeedingDuration() {
+        const result = new Array<string>();
+        
+        await this.dao.get(AudioFilesTable.selectZeroDuration)
+        .then((val: any) => {
+            val.forEach((af: any) => {
+                result.push(af.id);
+            });
+        })
+        .catch((err) => {
+            console.log(err);
+            return result;
+        });
+
+        return result;
+    }
+
+    async updateFileDuration(id: string, duration: number){
+        let result = false;
+       
+        await this.dao.run(AudioFilesTable.updateDuration, [duration.toString(), id])
+        .then((val: any) =>{
+            result = true;
+        })
+        .catch((err) =>{
+            console.log(err);
+            result = false;
+        })
+
+        return result;
+    }
+
     async deleteFile(id: string) : Promise<boolean>{
        
         let result = false;
