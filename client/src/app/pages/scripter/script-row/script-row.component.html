@@ -1,9 +1,9 @@
 <div class="script-row-container">
     <div class="module-container">
-        <div class="title" *ngIf="channel.channel">{{channel.channel.channelName}}</div>
-        <div class="title" *ngIf="!channel.channel">{{channel.controllerName}}</div>
+        <div class="title" *ngIf="channel.type !== 1 && channel.type !== 4">{{channel.channel.channelName}}</div>
+        <div class="title" *ngIf="channel.type === 1 || channel.type === 4">{{channel.controllerName}}</div>
         
-        <div *ngIf="channel.channel">{{channel.controllerName}}</div>
+        <div *ngIf="channel.type !== 1 && channel.type !== 4">{{channel.controllerName}}</div>
         <div  *ngIf="channel.type === 1">UART</div>
         <div  *ngIf="channel.type === 2"><span>I2C Channel: </span>{{channel.channel?.id}} </div>
         <div  *ngIf="channel.type === 3"><span>PWM Channel: </span>{{channel.channel?.id}} </div>

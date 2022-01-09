@@ -5,14 +5,14 @@ import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
   template: '',
   styleUrls: ['./modal-base.component.scss']
 })
-export class ModalBaseComponent implements OnInit {
+export abstract class ModalBaseComponent implements OnInit {
 
   @Input()
   resources!: Map<string, any>;
 
   @Output("modalCallback") modalCallback: EventEmitter<any> = new EventEmitter();
 
-  constructor() { }
+
 
   ngOnInit(): void {
   }

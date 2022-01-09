@@ -68,7 +68,7 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
     this.modalCallback.emit({
       id: ModalCallbackEvent.addChannel,
       controller: +this.selectedController,
-      module: +this.selectedModule,
+      module: +this.selectedController === ControllerType.audio ? ChannelType.audio : +this.selectedModule,
       channel: +this.selectedChannel
     });
     this.clearOptions()
