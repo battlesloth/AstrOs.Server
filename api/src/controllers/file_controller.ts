@@ -27,7 +27,9 @@ export class FileController {
             console.log(`file: ${file.name}, mimetype: ${file.mimetype}`);
 
             const extensionMap = new Map<string, string>([
-                ['audio/ogg', 'ogg']
+                ['audio/ogg', 'ogg'],
+                ['audio/mpeg', 'mp3'],
+                ['audio/wav', 'wav']
             ]);
 
             filename = `${uuid_v4()}.${extensionMap.get(file.mimetype)}`

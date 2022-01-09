@@ -23,12 +23,13 @@ import { ScriptRowComponent } from './pages/scripter/script-row/script-row.compo
 import { ModalModule } from './modal';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ScriptsComponent } from './pages/scripts/scripts.component';
-import { ModalBaseComponent } from './modal/modal-base/modal-base.component';
 import { I2cEventModalComponent } from './pages/scripter/modals/i2c-event-modal/i2c-event-modal.component';
 import { PwmEventModalComponent } from './pages/scripter/modals/pwm-event-modal/pwm-event-modal.component';
 import { ControllerModalComponent } from './pages/scripter/modals/controller-modal/controller-modal.component';
 import { AudioFilesComponent } from './pages/audio-files/audio-files.component';
 import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-modal.component';
+import { AudioEventModalComponent } from './pages/scripter/modals/audio-event-modal/audio-event-modal.component';
+import { BaseEventModalComponent } from './pages/scripter/modals/base-event-modal/base-event-modal.component';
 
 @NgModule({
   declarations: [
@@ -42,12 +43,13 @@ import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-mo
     DriveModuleComponent,
     ScriptRowComponent,
     ScriptsComponent,
-    ModalBaseComponent,
     I2cEventModalComponent,
     PwmEventModalComponent,
     ControllerModalComponent,
     AudioFilesComponent,
-    UploadModalComponent
+    UploadModalComponent,
+    AudioEventModalComponent,
+    BaseEventModalComponent
   ],
   imports: [
     BrowserModule,

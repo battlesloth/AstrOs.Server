@@ -1,27 +1,37 @@
 import { Component, OnInit } from '@angular/core';
+import { AudioFile } from 'src/app/models/audio-file';
 import { ScriptEvent } from 'src/app/models/scripts/script_event';
-import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
+import { AudioService } from 'src/app/services/audio/audio.service';
+import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 
 @Component({
-  selector: 'app-i2c-event-modal',
-  templateUrl: './i2c-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./i2c-event-modal.component.scss']
+  selector: 'app-audio-event-modal',
+  templateUrl: './audio-event-modal.component.html',
+  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./audio-event-modal.component.scss']
 })
-export class I2cEventModalComponent extends BaseEventModalComponent implements OnInit {
- 
-  eventValue: string;
+export class AudioEventModalComponent extends BaseEventModalComponent implements OnInit {
 
-  constructor() {
+  audioFiles: Array<AudioFile>;
+
+  selectedFile: string;
+
+  constructor(private audioService: AudioService) { 
     super();
-    this.originalEventTime = 0;
-    this.eventTime = 0;
-    this.eventValue = '';
-    this.errorMessage = '';
-    this.callbackType = ModalCallbackEvent.addEvent;
+    this.audioFiles = new Array<AudioFile>();
+    this.selectedFile = '0';
+
+    const observer = {
+      next: (result: AudioFile[]) => this.audioFiles = result,
+      error: (err: any) => console.error(err)
+    };
+
+    this.audioService.getAudioFiles().subscribe(observer);
+
   }
 
   override ngOnInit(): void {
+
     if (this.resources.has(ModalResources.callbackType)){
       this.callbackType = this.resources.get(ModalResources.callbackType);
     }
@@ -35,7 +45,7 @@ export class I2cEventModalComponent extends BaseEventModalComponent implements O
     
     if (this.scriptEvent.dataJson != ''){
       const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.eventValue = payload.value;
+      this.selectedFile = payload.value;
     }
     
     this.originalEventTime = this.scriptEvent.time;
@@ -43,14 +53,13 @@ export class I2cEventModalComponent extends BaseEventModalComponent implements O
   }
 
   addEvent(){
-
     if (+this.eventTime > this.maxTime){
       this.errorMessage = `Event time cannot be larger than ${this.maxTime}`;
       return;
     }
    
     this.scriptEvent.time = +this.eventTime;
-    this.scriptEvent.dataJson = JSON.stringify({value: this.eventValue});
+    this.scriptEvent.dataJson = JSON.stringify({value: this.selectedFile});
 
     this.modalCallback.emit({
       id: this.callbackType,

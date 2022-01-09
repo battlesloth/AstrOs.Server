@@ -15,6 +15,7 @@ import { ControllerModalComponent } from './modals/controller-modal/controller-m
 import { I2cEventModalComponent } from './modals/i2c-event-modal/i2c-event-modal.component';
 import { ModalCallbackEvent, ModalResources } from '../../shared/modal-resources';
 import { PwmEventModalComponent } from './modals/pwm-event-modal/pwm-event-modal.component';
+import { AudioEventModalComponent } from './modals/audio-event-modal/audio-event-modal.component';
 
 
 export interface Item {
@@ -259,7 +260,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         component = this.container.createComponent(PwmEventModalComponent);
         break;
       case ChannelType.audio:
-        return;
+        component = this.container.createComponent(AudioEventModalComponent);
         break;
     }
 
