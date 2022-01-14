@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, Observable, of, tap } from 'rxjs';
+import { catchError, map, Observable, of, tap } from 'rxjs';
 import { AudioFile } from 'src/app/models/audio-file';
 
 @Injectable({
@@ -15,10 +15,16 @@ export class AudioService {
   }
 
   public getAudioFiles(): Observable<any> {
+    
     return this.http.get<AudioFile[]>(`/api/audio/all`, {
       headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
-      .pipe(tap(_ => console.log(`loaded audio files`)),
+    }).pipe(
+      map((files: AudioFile[])=> files.sort((a: AudioFile, b: AudioFile)=>{
+        if (a.fileName < b.fileName) return -1;
+        if (a.fileName > b.fileName) return 1;
+        return 0;
+      }))
+    ).pipe(tap(_ => console.log(`loaded audio files`)),
         catchError(this.handleError<AudioFile[]>('getAudioFiles'))
       );
   }

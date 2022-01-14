@@ -4,6 +4,7 @@ import { I2cChannel } from "./control_module/i2c_channel";
 import { PwmChannel } from "./control_module/pwm_channel";
 import { UartModule } from "./control_module/uart_module";
 import { Script } from "./scripts/script";
+import { ScriptChannel } from "./scripts/script_channel";
 
 export class ControllerDetails {
     id: ControllerType;
