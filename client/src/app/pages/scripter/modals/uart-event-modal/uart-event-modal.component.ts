@@ -1,23 +1,16 @@
 import { Component, OnInit } from '@angular/core';
-import { ModalBaseComponent } from 'src/app/modal';
 import { ScriptEvent } from 'src/app/models/scripts/script_event';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
+import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 
 @Component({
   selector: 'app-uart-event-modal',
   templateUrl: './uart-event-modal.component.html',
-  styleUrls: ['./uart-event-modal.component.scss']
+  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./uart-event-modal.component.scss']
 })
-export class UartEventModalComponent extends ModalBaseComponent implements OnInit {
+export class UartEventModalComponent extends BaseEventModalComponent implements OnInit {
 
-  private scriptEvent!: ScriptEvent;
-  private originalEventTime: number;
-  private callbackType: ModalCallbackEvent;
-
-  eventTime: number;
   eventValue: string;
-  errorMessage: string;
-  maxTime: number = 300;
   
   constructor() {
     super();
@@ -64,17 +57,5 @@ export class UartEventModalComponent extends ModalBaseComponent implements OnIni
       scriptEvent: this.scriptEvent,
       originalEventTime: this.originalEventTime
     });
-  }
-
-  removeEvent(){
-    this.modalCallback.emit({
-      id: ModalCallbackEvent.removeEvent,
-      channelId: this.scriptEvent.scriptChannel,
-      time: this.originalEventTime
-    })
-  }
-  
-  closeModal(){
-    this.modalCallback.emit({id: ModalCallbackEvent.close});
   }
 }

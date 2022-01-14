@@ -1,23 +1,17 @@
 import { Component, OnInit } from '@angular/core';
 import { ScriptEvent } from 'src/app/models/scripts/script_event';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
-import { ModalBaseComponent } from '../../../../modal/modal-base/modal-base.component';
+import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
+
 
 @Component({
   selector: 'app-pwm-event-modal',
   templateUrl: './pwm-event-modal.component.html',
-  styleUrls: ['./pwm-event-modal.component.scss']
+  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./pwm-event-modal.component.scss']
 })
-export class PwmEventModalComponent extends ModalBaseComponent implements OnInit {
+export class PwmEventModalComponent extends BaseEventModalComponent implements OnInit {
 
-  private scriptEvent!: ScriptEvent;
-  private originalEventTime: number;
-  private callbackType: ModalCallbackEvent;
-
-  eventTime: number;
   eventValue: string;
-  errorMessage: string;
-  maxTime: number = 300;
   
   constructor() {
     super();
@@ -64,17 +58,5 @@ export class PwmEventModalComponent extends ModalBaseComponent implements OnInit
       scriptEvent: this.scriptEvent,
       originalEventTime: this.originalEventTime
     });
-  }
-
-  removeEvent(){
-    this.modalCallback.emit({
-      id: ModalCallbackEvent.removeEvent,
-      channelId: this.scriptEvent.scriptChannel,
-      time: this.originalEventTime
-    })
-  }
-  
-  closeModal(){
-    this.modalCallback.emit({id: ModalCallbackEvent.close});
   }
 }
