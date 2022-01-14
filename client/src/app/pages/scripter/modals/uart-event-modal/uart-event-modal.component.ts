@@ -1,14 +1,14 @@
 import { Component, OnInit } from '@angular/core';
+import { ModalBaseComponent } from 'src/app/modal';
 import { ScriptEvent } from 'src/app/models/scripts/script_event';
-import { ModalBaseComponent } from '../../../../modal/modal-base/modal-base.component';
-import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
+import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 
 @Component({
-  selector: 'app-i2c-event-modal',
-  templateUrl: './i2c-event-modal.component.html',
-  styleUrls: ['./i2c-event-modal.component.scss']
+  selector: 'app-uart-event-modal',
+  templateUrl: './uart-event-modal.component.html',
+  styleUrls: ['./uart-event-modal.component.scss']
 })
-export class I2cEventModalComponent extends ModalBaseComponent implements OnInit {
+export class UartEventModalComponent extends ModalBaseComponent implements OnInit {
 
   private scriptEvent!: ScriptEvent;
   private originalEventTime: number;

@@ -29,6 +29,7 @@ import { PwmEventModalComponent } from './pages/scripter/modals/pwm-event-modal/
 import { ControllerModalComponent } from './pages/scripter/modals/controller-modal/controller-modal.component';
 import { AudioFilesComponent } from './pages/audio-files/audio-files.component';
 import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-modal.component';
+import { UartEventModalComponent } from './pages/scripter/modals/uart-event-modal/uart-event-modal.component';
 
 @NgModule({
   declarations: [
@@ -47,7 +48,8 @@ import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-mo
     PwmEventModalComponent,
     ControllerModalComponent,
     AudioFilesComponent,
-    UploadModalComponent
+    UploadModalComponent,
+    UartEventModalComponent
   ],
   imports: [
     BrowserModule,
