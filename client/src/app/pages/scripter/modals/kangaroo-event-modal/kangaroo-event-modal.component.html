@@ -1,0 +1,58 @@
+<div class="event-modal">
+    <h1>Kangaroo Event</h1>
+    <div class="modal-body">
+        <div class="spacer"></div>
+        <div class="content">
+            <div>
+                <label for="time">Event Time (seconds)</label>
+                <input name="time" matInput placeholder="Time" type="number"
+                    (keypress)="($event.charCode >= 48 && $event.charCode < 58)" [(ngModel)]="eventTime" />
+            </div>
+            <hr/>
+            <div>
+                <label for="ch2select">{{channel1}}</label>
+                <select id="ch1select" title="{{channel1}}" [(ngModel)]="ch1Action" (change)="modalChange($event)">
+                    <option value="0" selected>None</option>
+                    <option value="1" selected>Start</option>
+                    <option value="2" selected>Home</option>
+                    <option value="3" selected>Speed</option>
+                    <option value="4" selected>Position</option>
+                </select>
+            </div>
+            <div>
+                <label class="kangaroo-speed-label" for="ch1spd">Speed</label>
+                <input class="kangaroo-input" name="ch1spd" matInput placeholder="Speed" [disabled]="ch1SpdDisabled"  [(ngModel)]="ch1Speed" type="number" />
+                <label class="kangaroo-position-label" for="ch1pos">Position</label>
+                <input class="kangaroo-input" name="ch1pos" matInput placeholder="Position" [disabled]="ch1PosDisabled" [(ngModel)]="ch1Position" type="number" />
+            </div>
+            <hr/>
+            <div>
+                <label for="ch2select">{{channel2}}</label>
+                <select id="ch2select" title="{{channel2}}" [(ngModel)]="ch2Action" (change)="modalChange($event)">
+                    <option value="0" selected>None</option>
+                    <option value="1" selected>Start</option>
+                    <option value="2" selected>Home</option>
+                    <option value="3" selected>Speed</option>
+                    <option value="4" selected>Position</option>
+                </select>
+            </div>
+            <div class="kangaroo-input">
+                <label class="kangaroo-speed-label" for="ch2spd">Speed</label>
+                <input class="kangaroo-input" name="ch2spd" matInput placeholder="Speed" [disabled]="ch2SpdDisabled" [(ngModel)]="ch2Speed" type="number" />
+                <label class="kangaroo-position-label" for="ch2pos">Position</label>
+                <input class="kangaroo-input" name="ch2pos" matInput placeholder="Position" [disabled]="ch2PosDisabled" [(ngModel)]="ch2Position" type="number" />
+            </div>
+            <div class="error">{{errorMessage}}</div>
+        </div>
+        <div class="spacer"></div>
+    </div>
+    <div class="modal-buttons">
+        <div class="button-spacer"></div>
+        <div class="button-grouper">
+            <button (click)="addEvent();">Save</button>
+            <button id="remove_button" class="hidden" (click)="removeEvent();">Remove</button>
+            <button (click)="closeModal();">Close</button>
+        </div>
+        <div class="button-spacer"></div>
+    </div>
+</div>

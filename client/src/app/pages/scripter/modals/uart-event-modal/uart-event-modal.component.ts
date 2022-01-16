@@ -3,13 +3,12 @@ import { ScriptEvent } from 'src/app/models/scripts/script_event';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 
-
 @Component({
-  selector: 'app-pwm-event-modal',
-  templateUrl: './pwm-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./pwm-event-modal.component.scss']
+  selector: 'app-uart-event-modal',
+  templateUrl: './uart-event-modal.component.html',
+  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./uart-event-modal.component.scss']
 })
-export class PwmEventModalComponent extends BaseEventModalComponent implements OnInit {
+export class UartEventModalComponent extends BaseEventModalComponent implements OnInit {
 
   eventValue: string;
   

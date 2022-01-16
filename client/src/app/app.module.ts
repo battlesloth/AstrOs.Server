@@ -30,6 +30,7 @@ import { AudioFilesComponent } from './pages/audio-files/audio-files.component';
 import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-modal.component';
 import { AudioEventModalComponent } from './pages/scripter/modals/audio-event-modal/audio-event-modal.component';
 import { BaseEventModalComponent } from './pages/scripter/modals/base-event-modal/base-event-modal.component';
+import { KangarooEventModalComponent } from './pages/scripter/modals/kangaroo-event-modal/kangaroo-event-modal.component';
 
 @NgModule({
   declarations: [
@@ -49,7 +50,8 @@ import { BaseEventModalComponent } from './pages/scripter/modals/base-event-moda
     AudioFilesComponent,
     UploadModalComponent,
     AudioEventModalComponent,
-    BaseEventModalComponent
+    BaseEventModalComponent,
+    KangarooEventModalComponent
   ],
   imports: [
     BrowserModule,

@@ -25,5 +25,8 @@ export class ModalResources{
     public static readonly callbackType = 'callbackType';
     public static readonly scriptEvent = 'scriptEvent';
 
+    // Uart module types
+    public static readonly genericSerial = 'genericSerial';
+    public static readonly kangaroo = 'kangaroo';
 
 }

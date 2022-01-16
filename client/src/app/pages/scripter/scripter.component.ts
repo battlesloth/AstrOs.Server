@@ -16,6 +16,7 @@ import { I2cEventModalComponent } from './modals/i2c-event-modal/i2c-event-modal
 import { ModalCallbackEvent, ModalResources } from '../../shared/modal-resources';
 import { PwmEventModalComponent } from './modals/pwm-event-modal/pwm-event-modal.component';
 import { AudioEventModalComponent } from './modals/audio-event-modal/audio-event-modal.component';
+import { KangarooEventModalComponent} from './modals/kangaroo-event-modal/kangaroo-event-modal.component';
 
 
 export interface Item {
@@ -251,7 +252,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     switch (event.channelType) {
       case ChannelType.uart:
-        return;
+        component = this.container.createComponent(KangarooEventModalComponent)
         break;
       case ChannelType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);

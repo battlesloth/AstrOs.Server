@@ -1,5 +1,5 @@
 <div class="event-modal">
-    <h1>PWM Event</h1>
+    <h1>Serial Event</h1>
     <div class="modal-body">
         <div class="spacer"></div>
         <div class="content">
@@ -9,7 +9,7 @@
                     (keypress)="($event.charCode >= 48 && $event.charCode < 58)" [(ngModel)]="eventTime" />
             </div>
             <div>
-                <label for="value">PWM Drive</label>
+                <label for="value">Serial Command</label>
                 <input name="value" matInput placeholder="Value" [(ngModel)]="eventValue" />
             </div>
             <div class="error">{{errorMessage}}</div>
@@ -26,3 +26,4 @@
         <div class="button-spacer"></div>
     </div>
 </div>
+
