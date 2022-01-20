@@ -1,6 +1,6 @@
 import { I2cModule } from "src/models/control_module/i2c_module";
 import { PwmModule } from "src/models/control_module/pwm_module";
-import { UartModule } from "src/models/control_module/uart_module";
+import { UartModule, UartType } from "src/models/control_module/uart_module";
 
 export enum ControllerType{
     none,
@@ -32,7 +32,7 @@ export class ControlModule{
     constructor(id: ControllerType, name: string){
         this.id = id;
         this.name = name;
-        this.uartModule = new UartModule();
+        this.uartModule = new UartModule(UartType.none, 'unassigned', {});
         this.pwmModule = new PwmModule();
         this.i2cModule = new I2cModule();
     }

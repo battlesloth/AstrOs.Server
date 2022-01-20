@@ -31,6 +31,8 @@ import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-mo
 import { AudioEventModalComponent } from './pages/scripter/modals/audio-event-modal/audio-event-modal.component';
 import { BaseEventModalComponent } from './pages/scripter/modals/base-event-modal/base-event-modal.component';
 import { KangarooEventModalComponent } from './pages/scripter/modals/kangaroo-event-modal/kangaroo-event-modal.component';
+import { KangarooModuleComponent } from './pages/modules/uart-modules/kangaroo-module/kangaroo-module.component';
+import { GenericSerialModuleComponent } from './pages/modules/uart-modules/generic-serial-module/generic-serial-module.component';
 
 @NgModule({
   declarations: [
@@ -51,7 +53,9 @@ import { KangarooEventModalComponent } from './pages/scripter/modals/kangaroo-ev
     UploadModalComponent,
     AudioEventModalComponent,
     BaseEventModalComponent,
-    KangarooEventModalComponent
+    KangarooEventModalComponent,
+    KangarooModuleComponent,
+    GenericSerialModuleComponent
   ],
   imports: [
     BrowserModule,

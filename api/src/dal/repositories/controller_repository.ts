@@ -5,6 +5,8 @@ import { I2cChannel } from "src/models/control_module/i2c_channel";
 import { ControllersTable } from "src/dal/tables/controllers_table";
 import { PwmChannelsTable } from "src/dal/tables/pwm_channels_table";
 import { I2cChannelsTable } from "src/dal/tables/i2c_channels_table"; 
+import { UartModuleTable } from "../tables/uart_module_table";
+import { UartModule } from "src/models/control_module/uart_module";
 
 export class ControllerRepository {
 
@@ -27,6 +29,17 @@ export class ControllerRepository {
             await this.dao.get(ControllersTable.select, [ctl.toString()])
             .then((val: any) =>{
                 controller.name = val[0].controllerName;
+            })
+            .catch((err: any) => {
+                console.log(err);
+                throw 'error';
+            });
+
+            await this.dao.get(UartModuleTable.select, [ctl.toString()])
+            .then((val: any) =>{
+               
+                const uart = new UartModule(val[0].uartType, val[0].moduleName, JSON.parse(val[0].moduleJson));
+                controller.uartModule = uart;
             })
             .catch((err: any) => {
                 console.log(err);
@@ -73,6 +86,12 @@ export class ControllerRepository {
                 throw 'error';
             });
 
+            await this.dao.run(UartModuleTable.update, [ctl.uartModule.type.toString(),
+                 ctl.uartModule.moduleName, JSON.stringify(ctl.uartModule.module), ctl.id.toString()])
+                 .catch((err: any) =>{
+                     console.log(err);
+                     throw 'error';
+                 })
 
             for (const pwm of ctl.pwmModule.channels) {
                
@@ -95,7 +114,7 @@ export class ControllerRepository {
     
             }
         
-            console.log(`Updated module ${ctl.id}`);
+            console.log(`Updated controller ${ctl.id}`);
         }
 
         return true;

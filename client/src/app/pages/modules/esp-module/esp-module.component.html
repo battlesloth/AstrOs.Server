@@ -3,7 +3,14 @@
         <mat-expansion-panel-header>
             <mat-panel-title>Serial Port configuration</mat-panel-title>
         </mat-expansion-panel-header>
-        <p>subpanel.content</p>
+        <div class="uart-module">
+            <select title="Serial Type" (ngModelChange)="uartTypeChange($event)" [(ngModel)]=uartType>
+                <option value="0" selected>Diabled</option>
+                <option value="1">Generic Serial</option>
+                <option value="2">Kangaroo X2</option>
+            </select>
+        </div>
+        <ng-template #uartContainer></ng-template>
     </mat-expansion-panel>
     <mat-expansion-panel>
         <mat-expansion-panel-header>

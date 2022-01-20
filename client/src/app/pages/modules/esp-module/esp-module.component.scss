@@ -1,5 +1,16 @@
 @import "./src/assets/styles/variables";
 
+.uart-module {
+    select {
+        padding-top: 4px;
+        width: 100%;
+        max-width: 300px;
+        font-size: large;
+        display: block;
+    }
+
+}
+
 .pwm-list {
     list-style-type: none;
     padding: 0;
