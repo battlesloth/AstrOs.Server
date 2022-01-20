@@ -4,11 +4,14 @@
             <mat-panel-title>Serial Port configuration</mat-panel-title>
         </mat-expansion-panel-header>
         <div class="uart-module">
-            <select title="Serial Type" (ngModelChange)="uartTypeChange($event)" [(ngModel)]=uartType>
-                <option value="0" selected>Diabled</option>
-                <option value="1">Generic Serial</option>
-                <option value="2">Kangaroo X2</option>
-            </select>
+            <div class="type">
+                <select title="Serial Type" (ngModelChange)="uartTypeChange($event)" [(ngModel)]=uartType>
+                    <option value="0" selected>Disabled</option>
+                    <option value="1">Generic Serial</option>
+                    <option value="2">Kangaroo X2</option>
+                </select>
+            </div>
+            <div class="input"><input matInput placeholder="Name" [(ngModel)]="module.uartModule.moduleName" /></div>
         </div>
         <ng-template #uartContainer></ng-template>
     </mat-expansion-panel>
@@ -29,10 +32,10 @@
                         </select>
                     </div>
                     <div class="limit">
-                        <input matInput placeholder="0" [(ngModel)]="channel.limit0"/>
+                        <input matInput placeholder="0" [(ngModel)]="channel.limit0" />
                     </div>
                     <div class="limit">
-                        <input matInput placeholder="0" [(ngModel)]="channel.limit1"/>
+                        <input matInput placeholder="0" [(ngModel)]="channel.limit1" />
                     </div>
                 </div>
             </li>

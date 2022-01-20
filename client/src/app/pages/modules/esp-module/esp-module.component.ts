@@ -21,7 +21,7 @@ export class EspModuleComponent implements OnInit {
   @ViewChild('uartContainer', { read: ViewContainerRef }) uartContainer!: ViewContainerRef;
 
   originalUartType!: UartType;
-  originalUartModule!: UartModule;
+  originalUartModule!: any;
   
   components: Array<any>;
   uartType: string;
@@ -50,10 +50,10 @@ export class EspModuleComponent implements OnInit {
       this.uartContainer !== undefined){
 
       this.originalUartType = this.module.uartModule.type;
-      this.originalUartModule = this.module.uartModule;
+      this.originalUartModule = this.copyUartModule(this.module.uartModule);
 
       this.uartType = this.originalUartType.toString();
-      this.setUartModule(this.originalUartType, this.originalUartModule.module);
+      this.setUartModule(this.originalUartType, this.originalUartModule);
     }
   }
 
@@ -78,6 +78,10 @@ export class EspModuleComponent implements OnInit {
       switch (ut){
         case UartType.kangaroo:
           module = new KangarooController();
+          break;
+        default:
+          module = new Object();
+          break;
       }
 
       this.setUartModule(ut, module);
@@ -108,5 +112,22 @@ export class EspModuleComponent implements OnInit {
 
   moduleCallback(evt: any) {
     throw new Error('Method not implemented.');
+  }
+
+  copyUartModule(module: any): any {
+    let temp: any;
+
+    switch (module.type){
+        case UartType.kangaroo:
+            temp = new KangarooController();
+            temp.channelOneName = module.module.channelOneName;
+            temp.channelTwoName = module.module.channelTwoName;
+            break;
+        default:
+            temp = new Object();
+            break;
+    }
+
+    return temp;
   }
 }
