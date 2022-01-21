@@ -1,15 +1,17 @@
 export enum UartType{
     none,
+    genericSerial,
     kangaroo
 }
 
 export class UartModule {
-    name: string;
+    moduleName: string;
     type: UartType;
     module: any;
 
-    constructor() {
-        this.name = "unnamed";
-        this.type = UartType.none;
+    constructor(type: UartType, moduleName: string, module: any) {
+        this.type = type;
+        this.moduleName = moduleName;
+        this.module = module;
     }
 }

@@ -13,6 +13,8 @@ import { ScriptEventsTable } from "src/dal/tables/script_events_table";
 import { ControllerType } from "src/models/control_module/control_module";
 import { ScriptChannelsTable } from "./tables/script_channels_table";
 import { AudioFilesTable } from "./tables/audio_files_table";
+import { UartModule, UartType } from "src/models/control_module/uart_module";
+import { UartModuleTable } from "./tables/uart_module_table";
 
 
 export class DataAccess {
@@ -130,6 +132,8 @@ export class DataAccess {
 
         await this.createTable(ControllersTable.table, ControllersTable.create);
 
+        await this.createTable(UartModuleTable.table, UartModuleTable.create);
+
         await this.createTable(PwmChannelsTable.table, PwmChannelsTable.create);
 
         await this.createTable(I2cChannelsTable.table, I2cChannelsTable.create);
@@ -141,6 +145,7 @@ export class DataAccess {
         await this.createTable(ScriptEventsTable.table, ScriptEventsTable.create);
    
         await this.createTable(AudioFilesTable.table, AudioFilesTable.create);
+
     }
 
     private async setV1Values(): Promise<void> {
@@ -167,6 +172,8 @@ export class DataAccess {
             await this.run(ControllersTable.insert, [ctl.toString(), nameMap.get(ctl)])
                 .catch((err) => console.error(`Error adding ${ctl} controller: ${err}`));
 
+            await this.run(UartModuleTable.insert, [ctl.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
+            
             for (let i = 0; i < 36; i++) {
                 await this.run(PwmChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned", PwmType.unassigned.toString(), "0", "0"])
                     .catch((err) => console.error(`Error adding pwm channel ${i}: ${err}`))

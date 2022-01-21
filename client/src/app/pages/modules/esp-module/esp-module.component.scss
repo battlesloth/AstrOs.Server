@@ -1,5 +1,38 @@
 @import "./src/assets/styles/variables";
 
+.uart-module {
+    
+
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+
+    .type{
+        width: 200px;
+        margin-right: 20px;
+        select {
+            padding-top: 4px;
+            width: 100%;
+            max-width: 300px;
+            font-size: large;
+            display: block;
+        }
+    }
+
+    .input {
+        flex-grow: 1;
+        margin: 0px;
+        max-width: 400px;
+
+        input {
+            padding: 2px;
+            font-size: large;
+            width: 100%;
+        }
+    }
+    
+}
+
 .pwm-list {
     list-style-type: none;
     padding: 0;

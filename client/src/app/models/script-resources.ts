@@ -2,7 +2,7 @@
 import { ChannelType, ControllerType, ControlModule } from "./control_module/control_module";
 import { I2cChannel } from "./control_module/i2c_channel";
 import { PwmChannel } from "./control_module/pwm_channel";
-import { UartModule } from "./control_module/uart_module";
+import { UartModule, UartType } from "./control_module/uart_module";
 import { Script } from "./scripts/script";
 import { ScriptChannel } from "./scripts/script_channel";
 
@@ -47,7 +47,7 @@ export class ScriptResources {
         this.i2cChannels = new Map<ControllerType, Array<any>>();
         this.uartAvailable = new Map<ControllerType, boolean>();
 
-        this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback', new UartModule()));
+        this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback', new UartModule(UartType.none, "unassigned", new Object())));
 
         controllers.forEach(con => {
             this.uartAvailable.set(con.id, true);
@@ -159,7 +159,7 @@ export class ScriptResources {
     removeChannel(controller: ControllerType, type: ChannelType, id: number): void {
 
         if (controller === ControllerType.audio) {
-            this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback', new UartModule()))
+            this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback',  new UartModule(UartType.none, "unassigned", new Object())))
             return
         }
 

@@ -1,5 +1,7 @@
+import { NONE_TYPE } from '@angular/compiler';
 import { EventEmitter, Component, Input, OnInit, Output, AfterViewInit, Renderer2, ViewChild, ElementRef } from '@angular/core';
 import { faTrash, faEdit } from '@fortawesome/free-solid-svg-icons'
+import { UartType } from 'src/app/models/control_module/uart_module';
 import { ScriptChannel } from 'src/app/models/scripts/script_channel';
 @
   Component({
@@ -42,5 +44,18 @@ export class ScriptRowComponent implements OnInit {
     event.preventDefault();
 
     this.timelineCallback.emit({ event: event, id: this.channel.id });
+  }
+
+  serialName(type: UartType): string {
+    switch (type){
+      case UartType.none:
+        return "None";
+      case UartType.genericSerial:
+        return "Generic Serial";
+      case UartType.kangaroo:
+        return "Kangaroo X2";
+      default:
+        return "None";
+    }
   }
 }
