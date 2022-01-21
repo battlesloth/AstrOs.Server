@@ -5,11 +5,13 @@ import { ScriptEventsTable } from "src/dal/tables/script_events_table";
 import { ChannelType, ControllerType } from "src/models/control_module/control_module";
 import { I2cChannel } from "src/models/control_module/i2c_channel";
 import { PwmChannel } from "src/models/control_module/pwm_channel";
+import { UartModule } from "src/models/control_module/uart_module";
 import { Script } from "src/models/scripts/script";
 import { ScriptChannel } from "src/models/scripts/script_channel"
 import { ScriptEvent } from "src/models/scripts/script_event";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { PwmChannelsTable } from "../tables/pwm_channels_table";
+import { UartModuleTable } from "../tables/uart_module_table";
 
 
 export class ScriptRepository {
@@ -117,11 +119,25 @@ export class ScriptRepository {
                 channel.channel = await this.getChannelForScriptChannel(ChannelType.pwm, channel.channelNumber, channel.controllerType)
                 break;
             case ChannelType.uart:
-                // TODO
+                channel.channel = await this.getUartModule(channel.controllerType);
                 break;
         }
 
         return channel;
+    }
+
+    private async getUartModule(controller: ControllerType): Promise<UartModule  | null> {
+        let result: any = null;
+
+        await this.dao.get(UartModuleTable.select, [controller.toString()])
+        .then((val: any) => {
+            result = new UartModule(val[0].uartType, val[0].moduleName, JSON.parse(val[0].moduleJson));
+        }).catch((err) => {
+            console.log(err);
+            throw 'error'
+        });
+
+        return result;
     }
 
     private async getChannelForScriptChannel(type: ChannelType, chId: number, controller: ControllerType): Promise<any> {
