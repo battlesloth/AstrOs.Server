@@ -23,6 +23,8 @@ import { AuthContoller } from "src/controllers/authentication_controller";
 import { ScriptsController } from "src/controllers/scripts_controller";
 import { AudioController } from "./controllers/audio_controller";
 import { FileController } from "./controllers/file_controller";
+import { ScriptUpload } from "./models/scripts/script_upload";
+import { ControllerEndpoint } from "./models/controller_endpoint";
 
 class ApiServer {
 
@@ -183,9 +185,22 @@ class ApiServer {
         this.scriptLoader.on('error', err => { console.log(err); });
         
         this.scriptLoader.on('message', (msg) => {
-            console.log(`${msg.}:${msg.status}`);
+            console.log(`${msg.controller}:${msg.scriptId} => ${msg.status}`);
             this.updateClients(msg);
         });
+    }
+
+    private uploadScript(){
+
+        const controllers = new Array<ControllerEndpoint>(
+            new ControllerEndpoint('core', '', true),
+            new ControllerEndpoint('dome', '', true),
+            new ControllerEndpoint('body', '', true),
+        );
+
+        const msg = new ScriptUpload('1', '1', controllers);
+
+        this.scriptLoader.postMessage(msg);
     }
 
     private updateClients(msg: any): void {
