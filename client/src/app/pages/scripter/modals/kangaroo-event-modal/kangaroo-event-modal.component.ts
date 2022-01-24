@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { KangarooAction, KangarooEvent } from 'src/app/models/scripts/events/kangaroo_event';
 import { ScriptEvent } from 'src/app/models/scripts/script_event';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
@@ -71,20 +72,20 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
     
     if (this.scriptEvent.dataJson != ''){
       const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.ch1Action = payload.ch1Action;
+      this.ch1Action = payload.ch1Action.toString();
       this.ch1Speed = payload.ch1Speed;
       this.ch1Position = payload.ch1Position;
 
-      this.ch2Action = payload.ch2Action;
+      this.ch2Action = payload.ch2Action.toString();
       this.ch2Speed = payload.ch2Speed;
       this.ch2Position = payload.ch2Position;
     }
     
-    this.ch1SpdDisabled = +this.ch1Action !== 3 && +this.ch1Action !== 4;
-    this.ch1PosDisabled = +this.ch1Action !== 4;
+    this.ch1SpdDisabled = +this.ch1Action !== KangarooAction.speed && +this.ch1Action !== KangarooAction.position;
+    this.ch1PosDisabled = +this.ch1Action !== KangarooAction.position;
 
-    this.ch2SpdDisabled = +this.ch2Action !== 3 && +this.ch2Action !== 4;
-    this.ch2PosDisabled = +this.ch2Action !== 4;
+    this.ch2SpdDisabled = +this.ch2Action !== KangarooAction.speed && +this.ch2Action !== KangarooAction.position;
+    this.ch2PosDisabled = +this.ch2Action !== KangarooAction.position;
     
 
     this.originalEventTime = this.scriptEvent.time;
@@ -126,14 +127,11 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
     }
    
     this.scriptEvent.time = +this.eventTime;
-    this.scriptEvent.dataJson = JSON.stringify({
-      ch1Action: this.ch1Action,
-      ch1Speed: this.ch1Speed,
-      ch1Position: this.ch1Position,
-      ch2Action: this.ch2Action,
-      ch2Speed: this.ch2Speed,
-      ch2Position: this.ch2Position
-    });
+   
+    const data = new KangarooEvent(+this.ch1Action, this.ch1Speed ?? 0, this.ch1Position ?? 0, 
+      +this.ch2Action, this.ch2Speed ?? 0, this.ch2Position ?? 0)
+   
+    this.scriptEvent.dataJson = JSON.stringify(data);
 
     this.modalCallback.emit({
       id: this.callbackType,
