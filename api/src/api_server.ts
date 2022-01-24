@@ -35,6 +35,8 @@ class ApiServer {
     private websocket!: Server;
     private espMonitor!: Worker;
 
+    private scriptLoader!: Worker;
+
     private authHandler!: RequestHandler;
 
     upload!: any;
@@ -175,6 +177,15 @@ class ApiServer {
         });
 
         setInterval(() => { this.espMonitor.postMessage({ monitor: 'core', ip: '192.168.50.22' }) }, 5000);
+    
+        this.scriptLoader = new Worker('./dist/background_tasks/script_loader.js')
+        this.scriptLoader.on('exit', exit => { console.log(exit); });
+        this.scriptLoader.on('error', err => { console.log(err); });
+        
+        this.scriptLoader.on('message', (msg) => {
+            console.log(`${msg.}:${msg.status}`);
+            this.updateClients(msg);
+        });
     }
 
     private updateClients(msg: any): void {
