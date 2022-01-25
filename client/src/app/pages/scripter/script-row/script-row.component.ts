@@ -1,8 +1,6 @@
-import { NONE_TYPE } from '@angular/compiler';
-import { EventEmitter, Component, Input, OnInit, Output, AfterViewInit, Renderer2, ViewChild, ElementRef } from '@angular/core';
+import { EventEmitter, Component, Input, OnInit, Output, Renderer2, ViewChild, ElementRef } from '@angular/core';
 import { faTrash, faEdit } from '@fortawesome/free-solid-svg-icons'
-import { UartType } from 'src/app/models/control_module/uart_module';
-import { ScriptChannel } from 'src/app/models/scripts/script_channel';
+import { UartType, ScriptChannel } from 'astros-common';
 @
   Component({
     selector: 'app-script-row',

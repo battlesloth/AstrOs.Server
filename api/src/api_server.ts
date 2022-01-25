@@ -5,8 +5,6 @@ import passport from "passport";
 import morgan from "morgan";
 import jwt, { RequestHandler } from "express-jwt";
 import cors from 'cors';
-import appdata from 'appdata-path';
-import { existsSync, mkdirSync } from 'fs';
 import fileUpload from 'express-fileupload';
 
 import Express, { Router, Application } from "express";
@@ -23,7 +21,7 @@ import { AuthContoller } from "src/controllers/authentication_controller";
 import { ScriptsController } from "src/controllers/scripts_controller";
 import { AudioController } from "./controllers/audio_controller";
 import { FileController } from "./controllers/file_controller";
-import { ScriptUpload } from "./models/scripts/script_upload";
+import { ScriptUpload } from "src/models/scripts/script_upload";
 import { ControllerEndpoint } from "./models/controller_endpoint";
 
 class ApiServer {

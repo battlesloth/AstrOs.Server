@@ -7,13 +7,11 @@ import { UsersTable } from "src/dal/tables/users_table";
 import { ControllersTable } from "src/dal/tables/controllers_table";
 import { I2cChannelsTable } from "src/dal/tables/i2c_channels_table";
 import { PwmChannelsTable } from "src/dal/tables/pwm_channels_table";
-import { PwmType } from "src/models/control_module/pwm_channel";
+import { PwmType, ControllerType, UartType } from "astros-common";
 import { ScriptsTable } from "src/dal/tables/scripts_table";
 import { ScriptEventsTable } from "src/dal/tables/script_events_table";
-import { ControllerType } from "src/models/control_module/control_module";
 import { ScriptChannelsTable } from "./tables/script_channels_table";
 import { AudioFilesTable } from "./tables/audio_files_table";
-import { UartModule, UartType } from "src/models/control_module/uart_module";
 import { UartModuleTable } from "./tables/uart_module_table";
 
 

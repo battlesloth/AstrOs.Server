@@ -1,13 +1,7 @@
 
 import { CommandType } from "src/models/transmission/transmission_format";
 import { Utility } from "src/utility";
-import { ChannelType, ControllerType } from "../src/models/control_module/control_module";
-import { KangarooController } from "../src/models/control_module/kangaroo_controller";
-import { UartModule, UartType } from "../src/models/control_module/uart_module";
-import { KangarooAction, KangarooEvent } from "astros-common";
-import { Script } from "../src/models/scripts/script";
-import { ScriptChannel } from "../src/models/scripts/script_channel";
-import { ScriptEvent } from "../src/models/scripts/script_event";
+import { ChannelType, ControllerType , KangarooController , UartModule, UartType, KangarooAction, KangarooEvent, Script, ScriptChannel, ScriptEvent} from "astros-common";
 import { ScriptConverter } from "../src/script_converter";
 
 function generateKangarooEvent(time: number, ch1Action: KangarooAction, ch1Speed: number, ch1Position: number,

@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ScriptEvent } from 'src/app/models/scripts/script_event';
+import { ScriptEvent } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 

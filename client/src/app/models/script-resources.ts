@@ -1,10 +1,7 @@
 
-import { ChannelType, ControllerType, ControlModule } from "./control_module/control_module";
-import { I2cChannel } from "./control_module/i2c_channel";
-import { PwmChannel } from "./control_module/pwm_channel";
-import { UartModule, UartType } from "./control_module/uart_module";
-import { Script } from "./scripts/script";
-import { ScriptChannel } from "./scripts/script_channel";
+import { ChannelType, ControllerType, ControlModule, 
+    I2cChannel, PwmChannel, UartModule, 
+    UartType, Script } from "astros-common";
 
 export class ControllerDetails {
     id: ControllerType;

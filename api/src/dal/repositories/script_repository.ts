@@ -2,13 +2,7 @@ import { DataAccess } from "src/dal/data_access";
 import { ScriptsTable } from "src/dal/tables/scripts_table";
 import { ScriptChannelsTable } from "src/dal/tables/script_channels_table";
 import { ScriptEventsTable } from "src/dal/tables/script_events_table";
-import { ChannelType, ControllerType } from "src/models/control_module/control_module";
-import { I2cChannel } from "src/models/control_module/i2c_channel";
-import { PwmChannel } from "src/models/control_module/pwm_channel";
-import { UartModule } from "src/models/control_module/uart_module";
-import { Script } from "src/models/scripts/script";
-import { ScriptChannel } from "src/models/scripts/script_channel"
-import { ScriptEvent } from "src/models/scripts/script_event";
+import { ChannelType, ControllerType, I2cChannel, PwmChannel, UartModule, Script, ScriptChannel, ScriptEvent } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { PwmChannelsTable } from "../tables/pwm_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";

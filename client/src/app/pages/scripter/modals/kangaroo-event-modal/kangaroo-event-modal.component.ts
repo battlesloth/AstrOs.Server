@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { KangarooAction, KangarooEvent } from 'astros-common'
-import { ScriptEvent } from 'src/app/models/scripts/script_event';
+import { KangarooAction, KangarooEvent, ScriptEvent } from 'astros-common'
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 

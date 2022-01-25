@@ -1,7 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { Guid } from 'guid-typescript';
-import { Script } from 'src/app/models/scripts/script';
+import { Script } from 'astros-common';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 
 @Component({

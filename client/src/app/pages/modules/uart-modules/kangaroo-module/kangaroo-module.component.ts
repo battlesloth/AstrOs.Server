@@ -1,5 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { KangarooController } from 'src/app/models/control_module/kangaroo_controller';
+import { KangarooController } from 'astros-common';
 
 
 @Component({

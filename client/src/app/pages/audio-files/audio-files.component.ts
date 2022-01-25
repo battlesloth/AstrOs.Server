@@ -2,7 +2,7 @@ import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { faPlay, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
-import { AudioFile } from 'src/app/models/audio-file';
+import { AudioFile } from 'astros-common';
 import { AudioService } from 'src/app/services/audio/audio.service';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { UploadModalComponent } from './upload-modal/upload-modal.component';

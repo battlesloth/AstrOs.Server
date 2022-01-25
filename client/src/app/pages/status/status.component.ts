@@ -1,6 +1,5 @@
-import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
-import { last } from 'rxjs';
-import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
+import { AfterViewInit, Component, ElementRef, Renderer2, ViewChild } from '@angular/core';
+import { webSocket } from 'rxjs/webSocket';
 
 @Component({
   selector: 'app-status',

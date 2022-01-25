@@ -1,5 +1,4 @@
-import { PrivateKeyInput } from "crypto";
-import { AudioFile } from "src/models/audio_file";
+import { AudioFile } from "astros-common";
 import { DataAccess } from "../data_access";
 import { AudioFilesTable } from "../tables/audio_files_table";
 

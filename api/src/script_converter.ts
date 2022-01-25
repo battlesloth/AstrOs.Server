@@ -1,13 +1,8 @@
-import { ChannelType, ControllerType } from "./models/control_module/control_module";
-import { UartType } from "./models/control_module/uart_module";
-import { KangarooAction, KangarooEvent } from "astros-common";
-import { Script } from "./models/scripts/script";
-import { ScriptChannel } from "./models/scripts/script_channel";
-import { ScriptEvent } from "./models/scripts/script_event";
-import { CommandType } from "./models/transmission/transmission_format";
+import { ChannelType, ControllerType, UartType, 
+    KangarooAction, KangarooEvent, Script, 
+    ScriptChannel, ScriptEvent, GenericSerialEvent } from "astros-common";
 import { Utility } from "./utility";
-import { GenericSerialEvent } from "./models/scripts/events/generic_serial_event";
-import { isBreakStatement } from "typescript";
+import { CommandType } from "./models/transmission/transmission_format";
 
 
 
@@ -54,12 +49,12 @@ export class ScriptConverter {
 
             const dome = channelMap.get(ControllerType.dome)?.map(x => x.command).join('');
             result.set(ControllerType.dome, dome ?? '');
-            
+
             const body = channelMap.get(ControllerType.body)?.map(x => x.command).join('');
             result.set(ControllerType.body, body ?? '');
 
             return result;
-        } 
+        }
         catch (err) {
             console.log(`Exception converting script${script.id}: ${err}`)
             return undefined;
@@ -90,7 +85,7 @@ export class ScriptConverter {
         const uartType = channel.channel.type as UartType;
 
         // events in reverse order
-        channel.eventsKvpArray.sort((a, b) => (a.value.time < b.value.time) ? 1 : -1);
+        channel.eventsKvpArray.sort((a: any, b: any) => (a.value.time < b.value.time) ? 1 : -1);
 
         let nextEventTime = 0;
 
@@ -110,8 +105,8 @@ export class ScriptConverter {
                     serialized = this.convertKangaroo(evt, nextEventTime);
                     break;
             }
- 
-            if (serialized.length > 0){
+
+            if (serialized.length > 0) {
                 result.push(new Kvp(kvp.key, serialized));
             }
 
@@ -154,7 +149,7 @@ export class ScriptConverter {
         const evt = JSON.parse(scriptEvent.dataJson) as KangarooEvent;
 
         if (evt.ch1Action != KangarooAction.none) {
-            command = this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position, 
+            command = this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position,
                 // if the ch2 action is none, use timeTill. Otherwise we have 2 actions for the
                 // same time period, so don't delay untill after second action is done.
                 evt.ch2Action === KangarooAction.none ? timeTill : 0);
@@ -176,7 +171,7 @@ export class ScriptConverter {
         const byteArray = new Uint8Array([CommandType.kangaroo, channel,
         spdArray[0], spdArray[1], posArray[0], posArray[1],
         timeArry[0], timeArry[1], timeArry[2], timeArry[3],
-        124]);
+            124]);
 
         const encoder = new TextDecoder();
         return encoder.decode(byteArray);

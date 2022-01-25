@@ -29,8 +29,7 @@
             "args": ["run","build"],
             "options": {
                 "cwd": "${workspaceFolder}/api"
-            },
-            "dependsOn": "build commons"
+            }
         },
         {
             "label": "copy .env",

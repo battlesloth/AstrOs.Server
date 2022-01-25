@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { catchError, map, Observable, of, tap } from 'rxjs';
-import { AudioFile } from 'src/app/models/audio-file';
+import { AudioFile } from 'astros-common';
 
 @Injectable({
   providedIn: 'root'
