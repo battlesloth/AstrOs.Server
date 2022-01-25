@@ -1,4 +1,6 @@
 
+import { CommandType } from "src/models/transmission/transmission_format";
+import { Utility } from "src/utility";
 import { ChannelType, ControllerType } from "../src/models/control_module/control_module";
 import { KangarooController } from "../src/models/control_module/kangaroo_controller";
 import { UartModule, UartType } from "../src/models/control_module/uart_module";
@@ -17,8 +19,8 @@ function generateKangarooEvent(time: number, ch1Action: KangarooAction, ch1Speed
 }
 
 
-describe("test conversion", () => {
-    it("should return test", () => {
+describe("Script Converter Tests", () => {
+    it("kangaroo test", () => {
 
         const script = new Script("1234", "test1",
             "desc1", "1970-01-01 00:00:00.000",
@@ -101,10 +103,23 @@ describe("test conversion", () => {
 
         const result = cvtr.convertScript(script);
 
-        var bytes = result?.get(ControllerType.core);
-
         expect(result?.get(ControllerType.core)?.length).toBeGreaterThan(0);
         expect(result?.get(ControllerType.dome)?.length).toBe(0);
         expect(result?.get(ControllerType.body)?.length).toBe(0);
+
+        var coreVal = result?.get(ControllerType.core);
+
+        var bytes = Utility.asciiToUint8Array(coreVal!); 
+
+        expect(bytes[0]).toBe(CommandType.kangaroo);
+        expect(bytes[12]).toBe(CommandType.kangaroo);
+        expect(bytes[23]).toBe(CommandType.kangaroo);
+        expect(bytes[34]).toBe(CommandType.kangaroo);
+        expect(bytes[45]).toBe(CommandType.kangaroo);
+        expect(bytes[56]).toBe(CommandType.kangaroo);
+        expect(bytes[67]).toBe(CommandType.kangaroo);
+        expect(bytes[78]).toBe(CommandType.kangaroo);
+        expect(bytes[89]).toBe(CommandType.kangaroo);
+
     });
 })

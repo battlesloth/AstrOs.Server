@@ -4,14 +4,10 @@ import { KangarooAction, KangarooEvent } from "./models/scripts/events/kangaroo_
 import { Script } from "./models/scripts/script";
 import { ScriptChannel } from "./models/scripts/script_channel";
 import { ScriptEvent } from "./models/scripts/script_event";
+import { CommandType } from "./models/transmission/transmission_format";
+import { Utility } from "./utility";
 
-enum commandType {
-    none,
-    pwm,
-    i2c,
-    genericSerial,
-    kangaroo
-}
+
 
 class Kvp {
     time: number
@@ -126,8 +122,8 @@ export class ScriptConverter {
         throw new Error("Function not implemented.");
     }
 
-    // |___|___|___|___ ___|___ ___|___ ___ ___ ___|
-    //  evt ch  cmd spd     pos     time till
+    // |___|___|___|___ ___|___ ___|___ ___ ___ ___ '|' |
+    //  evt ch  cmd spd     pos     time till       end
     convertKangaroo(scriptEvent: ScriptEvent, nextEventTime: number): string {
 
         let command = '';
@@ -152,28 +148,17 @@ export class ScriptConverter {
 
     convertChannelEvent(channel: number, action: KangarooAction, speed: number, position: number, timeTill: number) {
 
-        const spdArray = this.numberToByteArray(2, speed);
-        const posArray = this.numberToByteArray(2, position);
-        const timeArry = this.numberToByteArray(4, timeTill);
+        const spdArray = Utility.numberToUint8Array(2, speed);
+        const posArray = Utility.numberToUint8Array(2, position);
+        const timeArry = Utility.numberToUint8Array(4, timeTill);
 
-        const byteArray = [commandType.kangaroo, channel,
+        // 124 is |
+        const byteArray = new Uint8Array([CommandType.kangaroo, channel,
         spdArray[0], spdArray[1], posArray[0], posArray[1],
-        timeArry[0], timeArry[1], timeArry[2], timeArry[3]];
+        timeArry[0], timeArry[1], timeArry[2], timeArry[3],
+        124]);
 
         return String.fromCharCode(...byteArray);
-    }
-
-    numberToByteArray(depth: number, value: number): Array<number> {
-        const bytes = Array<number>();
-
-        let i = depth;
-
-        do {
-            bytes[--i] = value & (255);
-            value = value >> 8;
-        } while (i);
-
-        return bytes;
     }
 }
 
