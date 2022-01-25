@@ -1,11 +1,11 @@
 
-import { ChannelType, ControllerType } from "src/models/control_module/control_module";
-import { KangarooController } from "src/models/control_module/kangaroo_controller";
-import { UartModule, UartType } from "src/models/control_module/uart_module";
-import { KangarooAction, KangarooEvent } from "src/models/scripts/events/kangaroo_event";
-import { Script } from "src/models/scripts/script";
-import { ScriptChannel } from "src/models/scripts/script_channel";
-import { ScriptEvent } from "src/models/scripts/script_event";
+import { ChannelType, ControllerType } from "../src/models/control_module/control_module";
+import { KangarooController } from "../src/models/control_module/kangaroo_controller";
+import { UartModule, UartType } from "../src/models/control_module/uart_module";
+import { KangarooAction, KangarooEvent } from "../src/models/scripts/events/kangaroo_event";
+import { Script } from "../src/models/scripts/script";
+import { ScriptChannel } from "../src/models/scripts/script_channel";
+import { ScriptEvent } from "../src/models/scripts/script_event";
 import { ScriptConverter } from "../src/script_converter";
 
 function generateKangarooEvent(time: number, ch1Action: KangarooAction, ch1Speed: number, ch1Position: number,
@@ -99,6 +99,12 @@ describe("test conversion", () => {
 
         const cvtr = new ScriptConverter();
 
-        expect(cvtr.convertScript(script)).toBe('test');
+        const result = cvtr.convertScript(script);
+
+        var bytes = result?.get(ControllerType.core);
+
+        expect(result?.get(ControllerType.core)?.length).toBeGreaterThan(0);
+        expect(result?.get(ControllerType.dome)?.length).toBe(0);
+        expect(result?.get(ControllerType.body)?.length).toBe(0);
     });
 })

@@ -13,23 +13,69 @@ enum commandType {
     kangaroo
 }
 
+class Kvp {
+    time: number
+    command: string;
+
+    constructor(time: number, command: string) {
+        this.time = time;
+        this.command = command;
+    }
+
+}
+
 export class ScriptConverter {
 
     constructor() {
 
     }
 
-    convertScript(script: Script): Map<ControllerType, string> {
+    convertScript(script: Script): Map<ControllerType, string> | undefined {
 
-        const result = new Map<ControllerType, string>();
+        try {
+            const result = new Map<ControllerType, string>();
 
-        // for each controller
-        // for each channel, map events and convert to serial
-        // take all the maps, insert into array, sort array by time
-        return result;
+            const channelMap = new Map<ControllerType, Array<Kvp>>();
+
+            channelMap.set(ControllerType.core, new Array<Kvp>());
+            channelMap.set(ControllerType.dome, new Array<Kvp>());
+            channelMap.set(ControllerType.body, new Array<Kvp>());
+
+            for (let ch of script.scriptChannels) {
+                const events = this.convertChannel(ch);
+
+                const a = channelMap.get(ch.controllerType)?.concat(events);
+
+                if (a) {
+                    channelMap.set(ch.controllerType, a);
+                }
+            }
+
+            channelMap.get(ControllerType.core)?.sort((a, b) => (a.time > b.time) ? 1 : -1);
+            channelMap.get(ControllerType.dome)?.sort((a, b) => (a.time > b.time) ? 1 : -1);
+            channelMap.get(ControllerType.body)?.sort((a, b) => (a.time > b.time) ? 1 : -1);
+
+            const core = channelMap.get(ControllerType.core)?.map(x => x.command).join('');
+            result.set(ControllerType.core, core ?? '');
+
+            const dome = channelMap.get(ControllerType.dome)?.map(x => x.command).join('');
+            result.set(ControllerType.dome, dome ?? '');
+            
+            const body = channelMap.get(ControllerType.body)?.map(x => x.command).join('');
+            result.set(ControllerType.body, body ?? '');
+
+            return result;
+        } 
+        catch (err) {
+            console.log(`Exception converting script${script.id}: ${err}`)
+            return undefined;
+        }
     }
 
-    convertChannel(channel: ScriptChannel): Map<number, string> {
+    convertChannel(channel: ScriptChannel): Array<Kvp> {
+
+        const result = new Array<Kvp>();
+
         switch (channel.type) {
             case ChannelType.uart:
                 return this.convertSerialEvents(channel);
@@ -38,22 +84,23 @@ export class ScriptConverter {
             case ChannelType.pwm:
                 break
         }
+
+        return result;
     }
 
 
 
-    convertSerialEvents(channel: ScriptChannel): Map<number, string> {
-        const result = new Map<number, string>()
+    convertSerialEvents(channel: ScriptChannel): Array<Kvp> {
+        const result = new Array<Kvp>()
 
         const uartType = channel.channel.type as UartType;
 
         // events in reverse order
-        channel.eventsKvpArray.sort((a, b) => (a.value.time < b.value.time) ? 1 : -1);        
+        channel.eventsKvpArray.sort((a, b) => (a.value.time < b.value.time) ? 1 : -1);
 
         let nextEventTime = 0;
 
         for (let i = 0; i < channel.eventsKvpArray.length; i++) {
-
 
             const kvp = channel.eventsKvpArray[i];
 
@@ -62,10 +109,10 @@ export class ScriptConverter {
             switch (uartType) {
                 case UartType.genericSerial:
                     const gse = this.convertGenericSerial(evt);
-                    result.set(kvp.key, gse);
-                case UartType.genericSerial:
+                    result.push(new Kvp(kvp.key, gse));
+                case UartType.kangaroo:
                     const ke = this.convertKangaroo(evt, nextEventTime);
-                    result.set(kvp.key, ke);
+                    result.push(new Kvp(kvp.key, ke));
             }
 
             nextEventTime = evt.time;
@@ -75,32 +122,58 @@ export class ScriptConverter {
     }
 
 
-
-
     convertGenericSerial(scriptEvent: ScriptEvent): string {
         throw new Error("Function not implemented.");
     }
 
-    // |___|___ ___ ___ ___ ___ ___ ___ ___|
+    // |___|___|___|___ ___|___ ___|___ ___ ___ ___|
     //  evt ch  cmd spd     pos     time till
     convertKangaroo(scriptEvent: ScriptEvent, nextEventTime: number): string {
-        
+
+        let command = '';
+
         let timeTill = 0;
 
-        if (nextEventTime != 0)
-        {
+        if (nextEventTime != 0) {
             timeTill = nextEventTime - scriptEvent.time;
-        } 
+        }
 
         const evt = JSON.parse(scriptEvent.dataJson) as KangarooEvent;
 
+        if (evt.ch1Action != KangarooAction.none) {
+            command = this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position, timeTill);
+        }
+        if (evt.ch2Action != KangarooAction.none) {
+            command = command + this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position, timeTill);
+        }
 
-        if (evt.ch1Action != KangarooAction.none){
-            const byteArray = [commandType.kangaroo, , 0, 0, 0, 0, 0, 0];
-        }
-        if (evt.ch2Action != KangarooAction.none){
-            const byteArray = [commandType.kangaroo, , 0, 0, 0, 0, 0, 0];
-        }
+        return command;
+    }
+
+    convertChannelEvent(channel: number, action: KangarooAction, speed: number, position: number, timeTill: number) {
+
+        const spdArray = this.numberToByteArray(2, speed);
+        const posArray = this.numberToByteArray(2, position);
+        const timeArry = this.numberToByteArray(4, timeTill);
+
+        const byteArray = [commandType.kangaroo, channel,
+        spdArray[0], spdArray[1], posArray[0], posArray[1],
+        timeArry[0], timeArry[1], timeArry[2], timeArry[3]];
+
+        return String.fromCharCode(...byteArray);
+    }
+
+    numberToByteArray(depth: number, value: number): Array<number> {
+        const bytes = Array<number>();
+
+        let i = depth;
+
+        do {
+            bytes[--i] = value & (255);
+            value = value >> 8;
+        } while (i);
+
+        return bytes;
     }
 }
 
