@@ -34,6 +34,8 @@ import { KangarooEventModalComponent } from './pages/scripter/modals/kangaroo-ev
 import { KangarooModuleComponent } from './pages/modules/uart-modules/kangaroo-module/kangaroo-module.component';
 import { GenericSerialModuleComponent } from './pages/modules/uart-modules/generic-serial-module/generic-serial-module.component';
 
+
+
 @NgModule({
   declarations: [
     AppComponent,

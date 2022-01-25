@@ -25,6 +25,7 @@
     "@fortawesome/free-brands-svg-icons": "^5.15.4",
     "@fortawesome/free-regular-svg-icons": "^5.15.4",
     "@fortawesome/free-solid-svg-icons": "^5.15.4",
+    "astros-common": "file:../astros_common",
     "guid-typescript": "^1.0.9",
     "rxjs": "~7.4.0",
     "tslib": "^2.3.0",

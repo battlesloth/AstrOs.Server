@@ -10,6 +10,16 @@
             "args": ["run", "test"],
             "options": {
                 "cwd": "${workspaceFolder}/api"
+            },
+            "dependsOn": "build commons"
+        },
+        {
+            "label": "build commons",
+            "type": "shell",
+            "command": "npm",
+            "args": ["run", "build"],
+            "options": {
+                "cwd": "${workspaceFolder}/astros_common"
             }
         },
         {
@@ -19,7 +29,8 @@
             "args": ["run","build"],
             "options": {
                 "cwd": "${workspaceFolder}/api"
-            }
+            },
+            "dependsOn": "build commons"
         },
         {
             "label": "copy .env",

@@ -1,11 +1,13 @@
 import { ChannelType, ControllerType } from "./models/control_module/control_module";
 import { UartType } from "./models/control_module/uart_module";
-import { KangarooAction, KangarooEvent } from "./models/scripts/events/kangaroo_event";
+import { KangarooAction, KangarooEvent } from "astros-common";
 import { Script } from "./models/scripts/script";
 import { ScriptChannel } from "./models/scripts/script_channel";
 import { ScriptEvent } from "./models/scripts/script_event";
 import { CommandType } from "./models/transmission/transmission_format";
 import { Utility } from "./utility";
+import { GenericSerialEvent } from "./models/scripts/events/generic_serial_event";
+import { isBreakStatement } from "typescript";
 
 
 
@@ -22,10 +24,6 @@ class Kvp {
 
 export class ScriptConverter {
 
-    constructor() {
-
-    }
-
     convertScript(script: Script): Map<ControllerType, string> | undefined {
 
         try {
@@ -37,7 +35,7 @@ export class ScriptConverter {
             channelMap.set(ControllerType.dome, new Array<Kvp>());
             channelMap.set(ControllerType.body, new Array<Kvp>());
 
-            for (let ch of script.scriptChannels) {
+            for (const ch of script.scriptChannels) {
                 const events = this.convertChannel(ch);
 
                 const a = channelMap.get(ch.controllerType)?.concat(events);
@@ -102,13 +100,19 @@ export class ScriptConverter {
 
             const evt = kvp.value as ScriptEvent
 
+            let serialized = '';
+
             switch (uartType) {
                 case UartType.genericSerial:
-                    const gse = this.convertGenericSerial(evt);
-                    result.push(new Kvp(kvp.key, gse));
+                    serialized = this.convertGenericSerial(evt, nextEventTime);
+                    break;
                 case UartType.kangaroo:
-                    const ke = this.convertKangaroo(evt, nextEventTime);
-                    result.push(new Kvp(kvp.key, ke));
+                    serialized = this.convertKangaroo(evt, nextEventTime);
+                    break;
+            }
+ 
+            if (serialized.length > 0){
+                result.push(new Kvp(kvp.key, serialized));
             }
 
             nextEventTime = evt.time;
@@ -117,9 +121,22 @@ export class ScriptConverter {
         return result;
     }
 
+    // |___|___ ___|___ ___ ... ___ ___ '|' |
+    //  evt length  message             end
+    convertGenericSerial(scriptEvent: ScriptEvent, nextEventTime: number): string {
+        let command = '';
 
-    convertGenericSerial(scriptEvent: ScriptEvent): string {
-        throw new Error("Function not implemented.");
+        let timeTill = 0;
+
+        if (nextEventTime != 0) {
+            timeTill = nextEventTime - scriptEvent.time;
+        }
+
+        const evt = JSON.parse(scriptEvent.dataJson) as GenericSerialEvent;
+
+        command = evt.value;
+
+        return command;
     }
 
     // |___|___|___|___ ___|___ ___|___ ___ ___ ___ '|' |
@@ -137,10 +154,13 @@ export class ScriptConverter {
         const evt = JSON.parse(scriptEvent.dataJson) as KangarooEvent;
 
         if (evt.ch1Action != KangarooAction.none) {
-            command = this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position, timeTill);
+            command = this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position, 
+                // if the ch2 action is none, use timeTill. Otherwise we have 2 actions for the
+                // same time period, so don't delay untill after second action is done.
+                evt.ch2Action === KangarooAction.none ? timeTill : 0);
         }
         if (evt.ch2Action != KangarooAction.none) {
-            command = command + this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position, timeTill);
+            command = command + this.convertChannelEvent(2, evt.ch2Action, evt.ch2Speed, evt.ch2Position, timeTill);
         }
 
         return command;
@@ -158,7 +178,8 @@ export class ScriptConverter {
         timeArry[0], timeArry[1], timeArry[2], timeArry[3],
         124]);
 
-        return String.fromCharCode(...byteArray);
+        const encoder = new TextDecoder();
+        return encoder.decode(byteArray);
     }
 }
 

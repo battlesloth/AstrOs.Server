@@ -27,7 +27,8 @@
                 "run-script",
                 "start"
             ],
-            "console": "externalTerminal"
+            "console": "externalTerminal",
+            "preLaunchTask": "build commons"
         },
         {
             "name": "browser",

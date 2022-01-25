@@ -3,6 +3,7 @@
 # compiled output
 /client/dist
 /api/dist
+/astros_common/dist
 /dist
 /tmp
 /out-tsc
@@ -14,6 +15,7 @@
 /node_modules
 /client/node_modules
 /api/node_modules
+/astros_common/node_modules
 
 # profiling files
 chrome-profiler-events*.json

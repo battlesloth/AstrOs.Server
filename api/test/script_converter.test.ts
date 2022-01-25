@@ -4,7 +4,7 @@ import { Utility } from "src/utility";
 import { ChannelType, ControllerType } from "../src/models/control_module/control_module";
 import { KangarooController } from "../src/models/control_module/kangaroo_controller";
 import { UartModule, UartType } from "../src/models/control_module/uart_module";
-import { KangarooAction, KangarooEvent } from "../src/models/scripts/events/kangaroo_event";
+import { KangarooAction, KangarooEvent } from "astros-common";
 import { Script } from "../src/models/scripts/script";
 import { ScriptChannel } from "../src/models/scripts/script_channel";
 import { ScriptEvent } from "../src/models/scripts/script_event";
@@ -107,19 +107,36 @@ describe("Script Converter Tests", () => {
         expect(result?.get(ControllerType.dome)?.length).toBe(0);
         expect(result?.get(ControllerType.body)?.length).toBe(0);
 
-        var coreVal = result?.get(ControllerType.core);
+        const coreVal = result?.get(ControllerType.core);
 
-        var bytes = Utility.asciiToUint8Array(coreVal!); 
+        const bytes = Utility.asciiToUint8Array(coreVal!); 
 
         expect(bytes[0]).toBe(CommandType.kangaroo);
-        expect(bytes[12]).toBe(CommandType.kangaroo);
-        expect(bytes[23]).toBe(CommandType.kangaroo);
-        expect(bytes[34]).toBe(CommandType.kangaroo);
-        expect(bytes[45]).toBe(CommandType.kangaroo);
-        expect(bytes[56]).toBe(CommandType.kangaroo);
-        expect(bytes[67]).toBe(CommandType.kangaroo);
-        expect(bytes[78]).toBe(CommandType.kangaroo);
-        expect(bytes[89]).toBe(CommandType.kangaroo);
+        expect(bytes[1]).toBe(1);
+
+        expect(bytes[11]).toBe(CommandType.kangaroo);
+        expect(bytes[12]).toBe(1);
+
+        expect(bytes[22]).toBe(CommandType.kangaroo);
+        expect(bytes[23]).toBe(1);
+
+        expect(bytes[33]).toBe(CommandType.kangaroo);
+        expect(bytes[34]).toBe(2);
+
+        expect(bytes[44]).toBe(CommandType.kangaroo);
+        expect(bytes[45]).toBe(2);
+
+        expect(bytes[55]).toBe(CommandType.kangaroo);
+        expect(bytes[56]).toBe(1);
+
+        expect(bytes[66]).toBe(CommandType.kangaroo);
+        expect(bytes[67]).toBe(2);
+
+        expect(bytes[77]).toBe(CommandType.kangaroo);
+        expect(bytes[78]).toBe(2);
+
+        expect(bytes[88]).toBe(CommandType.kangaroo);
+        expect(bytes[89]).toBe(1);
 
     });
 })

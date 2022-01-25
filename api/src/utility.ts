@@ -1,11 +1,8 @@
 export class Utility {
-    constructor() {
-        
-    }
 
     public static asciiToUint8Array(str: string): Uint8Array {
-        var chars = [];
-        for (var i = 0; i < str.length; ++i){
+        const chars = [];
+        for (let i = 0; i < str.length; ++i){
           chars.push(str.charCodeAt(i));
         }
         return new Uint8Array(chars);
