@@ -2,9 +2,15 @@ import { ChannelType, ControllerType, UartType,
     KangarooAction, KangarooEvent, Script, 
     ScriptChannel, ScriptEvent, GenericSerialEvent } from "astros-common";
 import { Utility } from "./utility";
-import { CommandType } from "./models/transmission/transmission_format";
 
 
+export enum CommandType {
+    none,
+    pwm,
+    i2c,
+    genericSerial,
+    kangaroo
+}
 
 class Kvp {
     time: number
@@ -19,7 +25,7 @@ class Kvp {
 
 export class ScriptConverter {
 
-    convertScript(script: Script): Map<ControllerType, string> | undefined {
+    convertScript(script: Script): Map<ControllerType, string> {
 
         try {
             const result = new Map<ControllerType, string>();
@@ -57,7 +63,7 @@ export class ScriptConverter {
         }
         catch (err) {
             console.log(`Exception converting script${script.id}: ${err}`)
-            return undefined;
+            return new Map<ControllerType, string>();
         }
     }
 

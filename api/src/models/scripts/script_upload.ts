@@ -1,15 +1,15 @@
+import { ControllerType } from "astros-common";
 import { ControllerEndpoint } from "../controller_endpoint";
 
 export class ScriptUpload {
 
     scriptId: string;
-    script: string;
+    scripts: Map<ControllerType, string>;
     endpoints: Array<ControllerEndpoint>;
 
-
-    constructor(scriptId: string, script: string, endpoints: Array<ControllerEndpoint>){
+    constructor(scriptId: string, scripts: Map<ControllerType, string>, endpoints: Array<ControllerEndpoint>){
         this.scriptId = scriptId;
-        this.script = script;
+        this.scripts = scripts;
         this.endpoints = endpoints;
     } 
 }

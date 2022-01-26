@@ -23,6 +23,10 @@ import { AudioController } from "./controllers/audio_controller";
 import { FileController } from "./controllers/file_controller";
 import { ScriptUpload } from "src/models/scripts/script_upload";
 import { ControllerEndpoint } from "./models/controller_endpoint";
+import { ScriptRepository } from "./dal/repositories/script_repository";
+
+import { ScriptConverter } from "./script_converter";
+import { Script } from "astros-common";
 
 class ApiServer {
 
@@ -188,7 +192,21 @@ class ApiServer {
         });
     }
 
-    private uploadScript(){
+    private async uploadScript(id: string){
+
+        const dao = new DataAccess();
+        const repo = new ScriptRepository(dao);
+
+        const script = await repo.getScript(id) as Script;
+
+        const cvtr = new ScriptConverter();
+         
+        const messages =  cvtr.convertScript(script);
+
+        if (messages.size < 1){
+            console.log(`No controller script values returned for ${id}`);
+            throw new Error(`No controller script values returned for ${id}`);
+        }
 
         const controllers = new Array<ControllerEndpoint>(
             new ControllerEndpoint('core', '', true),
@@ -196,8 +214,9 @@ class ApiServer {
             new ControllerEndpoint('body', '', true),
         );
 
-        const msg = new ScriptUpload('1', '1', controllers);
+        const msg = new ScriptUpload(id, messages, controllers);
 
+        this.updateClients({scriptId: id, message: 'upload started'});
         this.scriptLoader.postMessage(msg);
     }
 
