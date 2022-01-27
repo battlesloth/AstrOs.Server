@@ -135,8 +135,8 @@ class ApiServer {
 
     private configFileHandler() {
 
-        this.router.route(FileController.audioUploadRoute).post( (req, res) =>{
-           FileController.HandleFile(req, res);
+        this.router.route(FileController.audioUploadRoute).post((req, res) => {
+            FileController.HandleFile(req, res);
         })
     }
 
@@ -150,6 +150,8 @@ class ApiServer {
         this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
         this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
+
+        this.router.get(ScriptsController.upload, this.authHandler, this.uploadScript);
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
@@ -181,43 +183,59 @@ class ApiServer {
         });
 
         setInterval(() => { this.espMonitor.postMessage({ monitor: 'core', ip: '192.168.50.22' }) }, 5000);
-    
+
         this.scriptLoader = new Worker('./dist/background_tasks/script_loader.js')
         this.scriptLoader.on('exit', exit => { console.log(exit); });
         this.scriptLoader.on('error', err => { console.log(err); });
-        
+
         this.scriptLoader.on('message', (msg) => {
             console.log(`${msg.controller}:${msg.scriptId} => ${msg.status}`);
             this.updateClients(msg);
         });
     }
 
-    private async uploadScript(id: string){
 
-        const dao = new DataAccess();
-        const repo = new ScriptRepository(dao);
+    private async uploadScript(req: any, res: any, next: any) {
+        try {
+            const id = req.query.id;
 
-        const script = await repo.getScript(id) as Script;
+            const dao = new DataAccess();
+            const repo = new ScriptRepository(dao);
 
-        const cvtr = new ScriptConverter();
-         
-        const messages =  cvtr.convertScript(script);
+            const script = await repo.getScript(id) as Script;
 
-        if (messages.size < 1){
-            console.log(`No controller script values returned for ${id}`);
-            throw new Error(`No controller script values returned for ${id}`);
+            const cvtr = new ScriptConverter();
+
+            const messages = cvtr.convertScript(script);
+
+            if (messages.size < 1) {
+                console.log(`No controller script values returned for ${id}`);
+                throw new Error(`No controller script values returned for ${id}`);
+            }
+
+            const controllers = new Array<ControllerEndpoint>(
+                new ControllerEndpoint('core', '', true),
+                new ControllerEndpoint('dome', '', true),
+                new ControllerEndpoint('body', '', true),
+            );
+
+            const msg = new ScriptUpload(id, messages, controllers);
+
+            this.updateClients({ scriptId: id, message: 'upload started' });
+            
+            this.scriptLoader.postMessage(msg);
+
+            res.status(200);
+            res.json({ message: "success" });
+
+        } catch (error) {
+            console.log(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
         }
-
-        const controllers = new Array<ControllerEndpoint>(
-            new ControllerEndpoint('core', '', true),
-            new ControllerEndpoint('dome', '', true),
-            new ControllerEndpoint('body', '', true),
-        );
-
-        const msg = new ScriptUpload(id, messages, controllers);
-
-        this.updateClients({scriptId: id, message: 'upload started'});
-        this.scriptLoader.postMessage(msg);
     }
 
     private updateClients(msg: any): void {

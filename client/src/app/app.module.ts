@@ -33,6 +33,7 @@ import { BaseEventModalComponent } from './pages/scripter/modals/base-event-moda
 import { KangarooEventModalComponent } from './pages/scripter/modals/kangaroo-event-modal/kangaroo-event-modal.component';
 import { KangarooModuleComponent } from './pages/modules/uart-modules/kangaroo-module/kangaroo-module.component';
 import { GenericSerialModuleComponent } from './pages/modules/uart-modules/generic-serial-module/generic-serial-module.component';
+import { WebsocketService } from './services/websocket/websocket.service';
 
 
 
@@ -74,7 +75,7 @@ import { GenericSerialModuleComponent } from './pages/modules/uart-modules/gener
     FontAwesomeModule,
     MatProgressBarModule
   ],
-  providers: [],
+  providers: [WebsocketService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
