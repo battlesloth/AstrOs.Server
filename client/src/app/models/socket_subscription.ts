@@ -8,12 +8,9 @@ export class SocketSubscription {
 
     id: Guid;
     message: string;
-    callback: SocketCallback;
 
-
-    constructor(id: Guid, message: string, callback: SocketCallback) {
+    constructor(id: Guid, message: string) {
         this.id = id;
         this.message = message;
-        this.callback = callback;
     }
 }

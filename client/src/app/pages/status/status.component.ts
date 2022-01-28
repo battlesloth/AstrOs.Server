@@ -1,5 +1,8 @@
 import { AfterViewInit, Component, ElementRef, Renderer2, ViewChild } from '@angular/core';
+import { Guid } from 'guid-typescript';
 import { webSocket } from 'rxjs/webSocket';
+import { SocketSubscription } from 'src/app/models/socket_subscription';
+import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 
 @Component({
   selector: 'app-status',
@@ -12,22 +15,26 @@ export class StatusComponent implements AfterViewInit {
 
   private coreUp: boolean;
 
+  subscription: SocketSubscription;
   subject = webSocket('ws://localhost:5000');
 
-  constructor(private renderer: Renderer2) {
-    this.coreUp = true;
+  constructor(private renderer: Renderer2, private socket: WebsocketService ) {
+    
+    this.subscription = new SocketSubscription(Guid.create(), 'status', this.statusUpdate)
+    
+    this.socket.subscribe(this.subscription);
 
-    this.subject.subscribe({
-      next: (msg) => this.processMessage(msg),
-      error: (err) => console.log(err),
-      complete: () => console.log('socket disconnected')
-    });
+    this.coreUp = true;
   }
   
   ngAfterViewInit(): void {
   }
 
-  processMessage(message: any) {
+  ngOnDestroy(): void {
+    this.socket.unsubscribe(this.subscription);
+  }
+
+  statusUpdate(message: any) {
     if (message['module']) {
       switch (message['module']) {
         case 'core':
