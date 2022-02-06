@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { KangarooAction, KangarooEvent, ScriptEvent } from 'astros-common'
+import { KangarooAction, KangarooController, KangarooEvent, ScriptEvent } from 'astros-common'
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 
@@ -10,7 +10,7 @@ import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.co
 })
 export class KangarooEventModalComponent extends BaseEventModalComponent implements OnInit {
 
-  kangaroo: any;
+  kangaroo!: KangarooController;
 
   channel1: string;
   ch1Action: string;
@@ -59,14 +59,6 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
 
     this.kangaroo = this.resources.get(ModalResources.kangaroo);
 
-    if (this.kangaroo?.channel1){
-      this.channel1 = this.kangaroo.channel1
-    }
-
-  if (this.kangaroo?.channel2){
-      this.channel2 = this.kangaroo.channel2
-    }
-    
     this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
     
     if (this.scriptEvent.dataJson != ''){

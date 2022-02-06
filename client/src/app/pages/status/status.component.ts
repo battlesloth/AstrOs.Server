@@ -1,7 +1,4 @@
 import { AfterViewInit, Component, ElementRef, Renderer2, ViewChild } from '@angular/core';
-import { Guid } from 'guid-typescript';
-import { webSocket } from 'rxjs/webSocket';
-import { SocketSubscription } from 'src/app/models/socket_subscription';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 
 @Component({
@@ -15,14 +12,14 @@ export class StatusComponent implements AfterViewInit {
 
   private coreUp: boolean;
 
-  subscription: SocketSubscription;
-  subject = webSocket('ws://localhost:5000');
-
   constructor(private renderer: Renderer2, private socket: WebsocketService ) {
     
-    this.subscription = new SocketSubscription(Guid.create(), 'status', this.statusUpdate)
-    
-    this.socket.subscribe(this.subscription);
+    this.socket.messages.subscribe((msg: any)=>{
+
+      if (msg.type === 'status'){
+        this.statusUpdate(msg);
+      }
+    });
 
     this.coreUp = true;
   }
@@ -31,14 +28,13 @@ export class StatusComponent implements AfterViewInit {
   }
 
   ngOnDestroy(): void {
-    this.socket.unsubscribe(this.subscription);
   }
 
   statusUpdate(message: any) {
-    if (message['module']) {
-      switch (message['module']) {
+     {
+      switch (message.module) {
         case 'core':
-          this.coreUp = this.handleStatus(message['status'], this.coreEl, this.coreUp);
+          this.coreUp = this.handleStatus(message.status, this.coreEl, this.coreUp);
           break;
         case 'dome':
           break;

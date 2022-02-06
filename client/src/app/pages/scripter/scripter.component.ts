@@ -5,7 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelType, ControllerType, ControlModule, Script, ScriptChannel, ScriptEvent } from 'astros-common';
+import { ChannelType, ControllerType, ControlModule, KangarooController, Script, ScriptChannel, ScriptEvent, UartModule } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -13,7 +13,7 @@ import { I2cEventModalComponent } from './modals/i2c-event-modal/i2c-event-modal
 import { ModalCallbackEvent, ModalResources } from '../../shared/modal-resources';
 import { PwmEventModalComponent } from './modals/pwm-event-modal/pwm-event-modal.component';
 import { AudioEventModalComponent } from './modals/audio-event-modal/audio-event-modal.component';
-import { KangarooEventModalComponent} from './modals/kangaroo-event-modal/kangaroo-event-modal.component';
+import { KangarooEventModalComponent } from './modals/kangaroo-event-modal/kangaroo-event-modal.component';
 
 
 export interface Item {
@@ -147,13 +147,12 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       }
     };
 
-    
 
     // Maps don't survive JSON.stringify
     for (const ch of this.script.scriptChannels) {
-    
+
       ch.eventsKvpArray = [];
-    
+
       for (const key of ch.events.keys()) {
         ch.eventsKvpArray.push({ key: key, value: ch.events.get(key) });
       }
@@ -240,8 +239,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     const modalResources = new Map<string, any>();
     modalResources.set(ModalResources.scriptEvent, event)
-    
-    if (isEdit){
+
+    if (isEdit) {
       modalResources.set(ModalResources.callbackType, ModalCallbackEvent.editEvent);
     }
 
@@ -250,6 +249,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     switch (event.channelType) {
       case ChannelType.uart:
         component = this.container.createComponent(KangarooEventModalComponent)
+        modalResources.set(ModalResources.kangaroo, this.getKangarooControllerFromChannel(event.scriptChannel));
         break;
       case ChannelType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);
@@ -270,6 +270,23 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     this.modalService.open('scripter-modal');
   }
+
+  //#region resources for modals 
+
+  getKangarooControllerFromChannel(channelId: string): any {
+    
+    const chIdx = this.scriptChannels
+      .map((ch) => { return ch.id })
+      .indexOf(channelId);
+
+    if (chIdx > -1) {
+      const uart = this.scriptChannels[chIdx].channel as UartModule;
+      return uart.module as KangarooController;
+    }
+    
+  }
+
+  //#endregion
 
   modalCallback(evt: any) {
 

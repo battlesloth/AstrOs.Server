@@ -39,7 +39,7 @@ class ApiServer {
     private websocket!: Server;
     private espMonitor!: Worker;
 
-    private scriptLoader!: Worker;
+    scriptLoader!: Worker;
 
     private authHandler!: RequestHandler;
 
@@ -151,7 +151,7 @@ class ApiServer {
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
         this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
 
-        this.router.get(ScriptsController.upload, this.authHandler, this.uploadScript);
+        this.router.get(ScriptsController.upload, this.authHandler, (req: any, res: any, next: any) =>{this.uploadScript(req, res, next);});
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
@@ -189,7 +189,7 @@ class ApiServer {
         this.scriptLoader.on('error', err => { console.log(err); });
 
         this.scriptLoader.on('message', (msg) => {
-            console.log(`${msg.controller}:${msg.scriptId} => ${msg.status}`);
+            console.log(msg);
             this.updateClients(msg);
         });
     }
@@ -221,7 +221,7 @@ class ApiServer {
 
             const msg = new ScriptUpload(id, messages, controllers);
 
-            this.updateClients({ scriptId: id, message: 'upload started' });
+           // this.updateClients({ scriptId: id, message: 'upload started' });
             
             this.scriptLoader.postMessage(msg);
 

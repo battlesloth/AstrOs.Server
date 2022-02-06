@@ -6,16 +6,31 @@ parentPort.on('message', data => {
 })
 
 
+const unknown = 0;
+const sending = 1;
+const success = 2;
+const failed = 3;
+
 function uploadScript(data) {
 
     const agent = superagent.agent();
 
     data.endpoints.forEach(async function (endpoint) {
 
+           // TODO: remove
             await new Promise(resolve => setTimeout(resolve, 2000));
-            parentPort.postMessage({ controller: endpoint.endpointName, sent: true });
+            parentPort.postMessage({ controller: endpoint.endpointName, status: sending, percent: 25 });
 
-            // TODO: remove
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            parentPort.postMessage({ controller: endpoint.endpointName, status: sending, percent: 50 });
+            
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            parentPort.postMessage({ controller: endpoint.endpointName, status: sending, percent: 75 });
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            parentPort.postMessage({ controller: endpoint.endpointName, status: success, percent: 100 });
+
+         
             return;
 
             try {

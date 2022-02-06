@@ -42,6 +42,16 @@ export class ScriptsService {
       );
   }
 
+  public uploadScript(id: string): Observable<any> {
+    return this.http.get<any>(`/api/scripts/upload?id=${id}`, {
+      headers: { Authorization: `Bearer ${this.getToken()}` }
+    })
+      .pipe(
+        tap(_ => console.log(`uploadScript result: ${_.message}`)),
+        catchError(this.handleError<any>('uploadScript'))
+      );
+  }
+
   private getToken(): string {
     if (!this.token) {
       this.token = localStorage.getItem('astros-token') || '';

@@ -19,11 +19,11 @@ function monitorModule(data) {
     agent.get(`http://${uri}`)
         .timeout({response: 4000})
         .then(res => {
-            parentPort.postMessage({type:'status',module:module,status:res.body.status});
+            parentPort.postMessage({type:'status', module:module, status:res.body.status});
         })
         .catch(err => {
             console.log(`Error calling ${data.monitor}:${err.message}`);
-            parentPort.postMessage({type: 'status', module:data.monitor,status:"down"})
+            parentPort.postMessage({type: 'status', module:data.monitor, status:"down"})
         });
 }
 
