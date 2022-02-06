@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, ControllerType } from 'src/app/models/control_module/control_module';
+import { ControlModule, ControllerType } from 'astros-common';
 
 @Component({
   selector: 'app-modules',

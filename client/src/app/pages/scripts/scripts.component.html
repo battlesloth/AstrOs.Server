@@ -27,8 +27,11 @@
                         <div [ngClass]="script.bodyUploaded ? 'uploaded' : 'notuploaded'"
                             class="upload-section tooltip">Body <span class="tooltiptext">{{script.dtBodyUploaded |
                                 date:'short'}}</span></div>
+                        <div class="trash">
+                            <button title="Delete" (click)="removeClicked()"><fa-icon [icon]="faTrash"></fa-icon></button>
+                        </div>
                         <div class="upload">
-
+                            <button title="Upload" (click)="uploadClicked(script.id)"><fa-icon [icon]="faUpload"></fa-icon></button>
                         </div>
                     </div>
                 </li>

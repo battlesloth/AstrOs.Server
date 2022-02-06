@@ -3,7 +3,25 @@
     // for the documentation about the tasks.json format
     "version": "2.0.0",
     "tasks": [
-        
+        {
+            "label": "test api",
+            "type": "shell",
+            "command": "npm",
+            "args": ["run", "test"],
+            "options": {
+                "cwd": "${workspaceFolder}/api"
+            },
+            "dependsOn": "build commons"
+        },
+        {
+            "label": "build commons",
+            "type": "shell",
+            "command": "npm",
+            "args": ["run", "build"],
+            "options": {
+                "cwd": "${workspaceFolder}/astros_common"
+            }
+        },
         {
             "label": "lint and build",
             "type": "shell",

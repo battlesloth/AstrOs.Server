@@ -1,10 +1,7 @@
 import { Component, Input, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatFormField } from '@angular/material/form-field';
-import { ControlModule } from 'src/app/models/control_module/control_module';
-import { KangarooController } from 'src/app/models/control_module/kangaroo_controller';
-import { PwmType } from 'src/app/models/control_module/pwm_channel';
-import { UartModule, UartType } from 'src/app/models/control_module/uart_module';
+import { ControlModule , KangarooController, PwmType, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
 
 @Component({

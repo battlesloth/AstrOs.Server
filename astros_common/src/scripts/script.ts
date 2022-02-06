@@ -11,7 +11,7 @@ export class Script{
     dtDomeUploaded: string;
     bodyUploaded: boolean;
     dtBodyUploaded: string;
-    scriptChannels: Array<ScriptChannel>
+    scriptChannels: Array<ScriptChannel>;
 
     constructor(id: string,
         scriptName: string,

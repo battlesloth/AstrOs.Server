@@ -1,12 +1,9 @@
 import { DataAccess } from "src/dal/data_access";
-import { ControlModule, ControllerType } from "src/models/control_module/control_module";
-import { PwmChannel } from "src/models/control_module/pwm_channel";
-import { I2cChannel } from "src/models/control_module/i2c_channel";
+import { ControlModule, ControllerType, PwmChannel, I2cChannel, UartModule } from "astros-common";
 import { ControllersTable } from "src/dal/tables/controllers_table";
 import { PwmChannelsTable } from "src/dal/tables/pwm_channels_table";
 import { I2cChannelsTable } from "src/dal/tables/i2c_channels_table"; 
 import { UartModuleTable } from "../tables/uart_module_table";
-import { UartModule } from "src/models/control_module/uart_module";
 
 export class ControllerRepository {
 

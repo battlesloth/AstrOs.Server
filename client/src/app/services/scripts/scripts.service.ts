@@ -1,8 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { catchError, Observable, of, tap } from 'rxjs';
-import { Script } from 'src/app/models/scripts/script';
-import { ScriptEvent } from 'src/app/models/scripts/script_event';
+import { Script } from 'astros-common';
 
 @Injectable({
   providedIn: 'root'
@@ -40,6 +39,16 @@ export class ScriptsService {
       .pipe(
         tap(_ => console.log(`saveScript result: ${_.message}`)),
         catchError(this.handleError<any>('saveScript'))
+      );
+  }
+
+  public uploadScript(id: string): Observable<any> {
+    return this.http.get<any>(`/api/scripts/upload?id=${id}`, {
+      headers: { Authorization: `Bearer ${this.getToken()}` }
+    })
+      .pipe(
+        tap(_ => console.log(`uploadScript result: ${_.message}`)),
+        catchError(this.handleError<any>('uploadScript'))
       );
   }
 

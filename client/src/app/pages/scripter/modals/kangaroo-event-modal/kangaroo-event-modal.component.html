@@ -10,8 +10,8 @@
             </div>
             <hr/>
             <div>
-                <label for="ch2select">{{channel1}}</label>
-                <select id="ch1select" title="{{channel1}}" [(ngModel)]="ch1Action" (change)="modalChange($event)">
+                <label class="kangaroo-channel-label" for="ch2select">{{kangaroo?.channelOneName}}</label>
+                <select id="ch1select" title="channel 1" [(ngModel)]="ch1Action" (change)="modalChange($event)">
                     <option value="0" selected>None</option>
                     <option value="1">Start</option>
                     <option value="2">Home</option>
@@ -27,8 +27,8 @@
             </div>
             <hr/>
             <div>
-                <label for="ch2select">{{channel2}}</label>
-                <select id="ch2select" title="{{channel2}}" [(ngModel)]="ch2Action" (change)="modalChange($event)">
+                <label class="kangaroo-channel-label" for="ch2select">{{kangaroo?.channelTwoName}}</label>
+                <select id="ch2select" title="channel 2" [(ngModel)]="ch2Action" (change)="modalChange($event)">
                     <option value="0" selected>None</option>
                     <option value="1">Start</option>
                     <option value="2">Home</option>

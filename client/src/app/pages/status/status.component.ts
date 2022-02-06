@@ -1,6 +1,5 @@
-import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
-import { last } from 'rxjs';
-import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
+import { AfterViewInit, Component, ElementRef, Renderer2, ViewChild } from '@angular/core';
+import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 
 @Component({
   selector: 'app-status',
@@ -13,26 +12,29 @@ export class StatusComponent implements AfterViewInit {
 
   private coreUp: boolean;
 
-  subject = webSocket('ws://localhost:5000');
+  constructor(private renderer: Renderer2, private socket: WebsocketService ) {
+    
+    this.socket.messages.subscribe((msg: any)=>{
 
-  constructor(private renderer: Renderer2) {
-    this.coreUp = true;
-
-    this.subject.subscribe({
-      next: (msg) => this.processMessage(msg),
-      error: (err) => console.log(err),
-      complete: () => console.log('socket disconnected')
+      if (msg.type === 'status'){
+        this.statusUpdate(msg);
+      }
     });
+
+    this.coreUp = true;
   }
   
   ngAfterViewInit(): void {
   }
 
-  processMessage(message: any) {
-    if (message['module']) {
-      switch (message['module']) {
+  ngOnDestroy(): void {
+  }
+
+  statusUpdate(message: any) {
+     {
+      switch (message.module) {
         case 'core':
-          this.coreUp = this.handleStatus(message['status'], this.coreEl, this.coreUp);
+          this.coreUp = this.handleStatus(message.status, this.coreEl, this.coreUp);
           break;
         case 'dome':
           break;

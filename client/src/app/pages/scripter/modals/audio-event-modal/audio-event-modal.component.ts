@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { AudioFile } from 'src/app/models/audio-file';
-import { ScriptEvent } from 'src/app/models/scripts/script_event';
+import { AudioFile, ScriptEvent } from 'astros-common';
 import { AudioService } from 'src/app/services/audio/audio.service';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';

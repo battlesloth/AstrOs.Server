@@ -1,7 +1,6 @@
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { faFileAudio, faTrash} from '@fortawesome/free-solid-svg-icons';
-import { finalize } from 'rxjs';
 
 import { ModalBaseComponent } from 'src/app/modal';
 import { FileUpload } from 'src/app/models/upload-file';
