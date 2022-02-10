@@ -9,7 +9,7 @@
             "command": "npm",
             "args": ["run", "test"],
             "options": {
-                "cwd": "${workspaceFolder}/api"
+                "cwd": "${workspaceFolder}/astros_api"
             },
             "dependsOn": "build commons"
         },
@@ -28,7 +28,7 @@
             "command": "npm",
             "args": ["run","build"],
             "options": {
-                "cwd": "${workspaceFolder}/api"
+                "cwd": "${workspaceFolder}/astros_api"
             }
         },
         {
@@ -36,7 +36,7 @@
             "type": "shell",
             "command": "",
             "windows":{
-                "command": "Copy-Item -Path ${workspaceFolder}/.env -Destination ${workspaceFolder}/api/dist/.env "  
+                "command": "Copy-Item -Path ${workspaceFolder}/.env -Destination ${workspaceFolder}/astros_api/dist/.env "  
             },
             "dependsOn": "lint and build"
         },
@@ -51,11 +51,11 @@
                     "Unrestricted",
                     "-NoProfile",
                     "-File",
-                    "${workspaceFolder}/api/fix_path.ps1" 
+                    "${workspaceFolder}/astros_api/fix_path.ps1" 
                 ]
             },
             "options": {
-                "cwd": "${workspaceFolder}/api"
+                "cwd": "${workspaceFolder}/astros_api"
             },
             "dependsOn": "lint and build"
         },
