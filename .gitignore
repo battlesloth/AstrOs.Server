@@ -1,8 +1,8 @@
 # See http://help.github.com/ignore-files/ for more about ignoring files.
 
 # compiled output
-/client/dist
-/api/dist
+/astros_client/dist
+/astros_api/dist
 /astros_common/dist
 /dist
 /tmp
@@ -13,8 +13,8 @@
 
 # dependencies
 /node_modules
-/client/node_modules
-/api/node_modules
+/astros_client/node_modules
+/astros_api/node_modules
 /astros_common/node_modules
 
 # profiling files
@@ -38,7 +38,7 @@ chrome-profiler-events*.json
 .history/*
 
 # misc
-/client/.angular/cache/*
+/astros_client/.angular/cache/*
 /.sass-cache
 /connect.lock
 /coverage

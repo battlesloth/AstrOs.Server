@@ -8,7 +8,7 @@
             "name": "nodejs",
             "type": "node",
             "request": "launch",
-            "cwd": "${workspaceFolder}/api",
+            "cwd": "${workspaceFolder}/astros_api",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run-script",
@@ -21,7 +21,7 @@
             "name": "angular",
             "type": "node",
             "request": "launch",
-            "cwd": "${workspaceFolder}/client",
+            "cwd": "${workspaceFolder}/astros_client",
             "runtimeExecutable": "npm",
             "runtimeArgs": [
                 "run-script",
@@ -34,7 +34,7 @@
             "type": "pwa-msedge",
             "request": "launch",
             "url": "http://localhost:4200",
-            "webRoot": "${workspaceFolder}/client",
+            "webRoot": "${workspaceFolder}/astros_client",
             "userDataDir": "${workspaceRoot}/.vscode/edge"
         }
     ],
