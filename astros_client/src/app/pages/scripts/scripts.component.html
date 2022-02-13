@@ -18,20 +18,22 @@
                             <div class="name-section">{{script.scriptName}}</div>
                             <div class="desc-section">{{script.description}}</div>
                         </div>
-                        <div [ngClass]="script.domeUploaded ? 'uploaded' : 'notuploaded'"
-                            class="upload-section tooltip">Dome <span class="tooltiptext">{{script.dtDomeUploaded |
+                        <div [ngClass]="uploadStatus(script.domeUploadStatus)"
+                            class="upload-section tooltip">Dome <span class="tooltiptext">{{script.domeUploaded |
                                 date:'short'}}</span></div>
-                        <div [ngClass]="script.coreUploaded ? 'uploaded' : 'notuploaded'"
-                            class="upload-section tooltip">Core <span class="tooltiptext">{{script.dtCoreUploaded |
+                        <div [ngClass]="uploadStatus(script.coreUploadStatus)"
+                            class="upload-section tooltip">Core <span class="tooltiptext">{{script.coreUploaded |
                                 date:'short'}}</span></div>
-                        <div [ngClass]="script.bodyUploaded ? 'uploaded' : 'notuploaded'"
-                            class="upload-section tooltip">Body <span class="tooltiptext">{{script.dtBodyUploaded |
+                        <div [ngClass]="uploadStatus(script.bodyUploadStatus)"
+                            class="upload-section tooltip">Body <span class="tooltiptext">{{script.bodyUploaded |
                                 date:'short'}}</span></div>
-                        <div class="trash">
-                            <button title="Delete" (click)="removeClicked()"><fa-icon [icon]="faTrash"></fa-icon></button>
-                        </div>
-                        <div class="upload">
-                            <button title="Upload" (click)="uploadClicked(script.id)"><fa-icon [icon]="faUpload"></fa-icon></button>
+                        <div class="button-container">
+                            <div class="trash">
+                                <button title="Delete" (click)="removeClicked()"><fa-icon [icon]="faTrash"></fa-icon></button>
+                            </div>
+                            <div class="upload">
+                                <button title="Upload" (click)="uploadClicked(script.id)"><fa-icon [icon]="faUpload"></fa-icon></button>
+                            </div>
                         </div>
                     </div>
                 </li>

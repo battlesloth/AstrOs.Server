@@ -26,7 +26,7 @@ import { ControllerEndpoint } from "./models/controller_endpoint";
 import { ScriptRepository } from "./dal/repositories/script_repository";
 
 import { ScriptConverter } from "./script_converter";
-import { Script } from "astros-common";
+import { ControllerType, Script, TransmissionStatus } from "astros-common";
 
 class ApiServer {
 
@@ -188,8 +188,30 @@ class ApiServer {
         this.scriptLoader.on('exit', exit => { console.log(exit); });
         this.scriptLoader.on('error', err => { console.log(err); });
 
-        this.scriptLoader.on('message', (msg) => {
-            console.log(msg);
+        this.scriptLoader.on('message', async (msg) => {
+
+            if (msg.status === TransmissionStatus.success){
+                const dao = new DataAccess();
+                const repository = new ScriptRepository(dao);
+
+                const options: Intl.DateTimeFormatOptions = {
+                    day: "numeric", month: "numeric", year: "numeric",
+                    hour: "2-digit", minute: "2-digit", second: "2-digit"
+                };
+
+                const date = (new Date()).toLocaleString('en-US', options);
+
+                await repository.updateScriptControllerUploaded(msg.scriptId, msg.controller, date);
+
+                console.log(`Controller ${msg.controller} uploaded for ${msg.scriptId}!`)
+
+                msg.date = date;
+            } else if (msg.status === TransmissionStatus.failed) {
+                console.log(`Controller ${msg.controller} upload failed for ${msg.scriptId}!`)
+            } else {
+                console.log(`Updating transmission status for Controller ${msg.controller}, ${msg.scriptId} => ${msg.status}`);
+            }
+
             this.updateClients(msg);
         });
     }
@@ -214,14 +236,12 @@ class ApiServer {
             }
 
             const controllers = new Array<ControllerEndpoint>(
-                new ControllerEndpoint('core', '', true),
-                new ControllerEndpoint('dome', '', true),
-                new ControllerEndpoint('body', '', true),
+                new ControllerEndpoint('core', ControllerType.core, '', true),
+                new ControllerEndpoint('dome', ControllerType.dome, '', true),
+                new ControllerEndpoint('body', ControllerType.body, '', true),
             );
 
             const msg = new ScriptUpload(id, messages, controllers);
-
-           // this.updateClients({ scriptId: id, message: 'upload started' });
             
             this.scriptLoader.postMessage(msg);
 

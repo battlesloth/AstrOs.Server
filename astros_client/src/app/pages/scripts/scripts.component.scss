@@ -20,18 +20,18 @@
             flex-direction: row;
             height: 54px;
             line-height: 54px;
-            
+
             .title {
                 width: 200px;
                 font-size: xx-large;
-                font-family: $swfont;   
+                font-family: $swfont;
             }
 
 
             .button-box {
                 float: right;
 
-                button{
+                button {
                     font-size: x-large;
                     font-family: $swfont;
                     background-color: $dark-blue;
@@ -53,8 +53,8 @@
         flex-direction: row;
         border-bottom: solid 2px black;
     }
-    
-    .click-bar{
+
+    .click-bar {
         cursor: pointer;
         display: flex;
         flex-direction: row;
@@ -67,13 +67,13 @@
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    
+
     .desc-section {
         flex-grow: 1;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    
+
     .upload-section {
         text-align: center;
         width: 60px;
@@ -81,29 +81,39 @@
         line-height: 24px;
         border: solid 1px black;
         margin: 4px;
-    
     }
-    
+
     .uploaded {
         background-color: green;
         color: white;
     }
-    
+
+    .uploading {
+        background-color: goldenrod;
+        color: black;
+    }
+
     .notuploaded {
         background-color: maroon;
         color: white;
     }
 
-    button {
-        font-size: large;
-        padding: 0;
-        margin: 0px 12px 0px 0px;
-        border: none;
-        background-color: transparent;
-        color: black;
-        cursor: pointer;
+    .button-container {
+        display: flex;
+        flex-direction: row;
+        margin-left: 12px;
+        
+        button {
+            font-size: large;
+            padding: 0;
+            margin: 0px 12px 0px 4px;
+            border: none;
+            background-color: transparent;
+            color: black;
+            cursor: pointer;
+        }
     }
-    
+
 }
 
 
