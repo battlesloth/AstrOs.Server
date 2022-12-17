@@ -140,8 +140,8 @@ export class ScriptConverter {
         return command;
     }
 
-    // |___|___|___|___ ___|___ ___|___ ___ ___ ___ '|' |
-    //  evt ch  cmd spd     pos     time till       end
+    // |___|_________|___|____|____|____;
+    //  evt time_till ch  cmd  spd  pos  
     convertKangaroo(scriptEvent: ScriptEvent, nextEventTime: number): string {
 
         let command = '';
@@ -155,13 +155,16 @@ export class ScriptConverter {
         const evt = JSON.parse(scriptEvent.dataJson) as KangarooEvent;
 
         if (evt.ch1Action != KangarooAction.none) {
-            command = this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position,
+            const evtTime =  evt.ch2Action === KangarooAction.none ? timeTill : 0;
+
+            command = `${CommandType.kangaroo}|${evtTime}|${1}|${evt.ch1Action}|${evt.ch1Speed}|${evt.ch1Position};`;
+                //this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position,
                 // if the ch2 action is none, use timeTill. Otherwise we have 2 actions for the
                 // same time period, so don't delay untill after second action is done.
-                evt.ch2Action === KangarooAction.none ? timeTill : 0);
         }
         if (evt.ch2Action != KangarooAction.none) {
-            command = command + this.convertChannelEvent(2, evt.ch2Action, evt.ch2Speed, evt.ch2Position, timeTill);
+            command = command + `${CommandType.kangaroo}|${timeTill}|${2}|${evt.ch2Action}|${evt.ch2Speed}|${evt.ch2Position};`;
+            //this.convertChannelEvent(2, evt.ch2Action, evt.ch2Speed, evt.ch2Position, timeTill);
         }
 
         return command;
