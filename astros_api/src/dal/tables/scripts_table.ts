@@ -5,11 +5,8 @@ export class ScriptsTable {
     public static readonly scriptName = 'scriptName';
     public static readonly description = 'description';
     public static readonly lastSaved = 'lastSaved';
-    public static readonly dtCoreUploaded = 'dtCoreUploaded';
     public static readonly coreUploaded = 'coreUploaded';
-    public static readonly dtDomeUploaded = 'dtDomeUploaded';
     public static readonly domeUploaded = 'domeUploaded';
-    public static readonly dtBodyUploaded = 'dtBodyUploaded';
     public static readonly bodyUploaded = 'bodyUploaded';
 
     public static readonly create =
@@ -18,25 +15,26 @@ export class ScriptsTable {
     ${this.scriptName} TEXT,
     ${this.description} TEXT,
     ${this.lastSaved} TEXT,
-    ${this.coreUploaded} INTEGER,
-    ${this.dtCoreUploaded} TEXT,
-    ${this.domeUploaded} INTEGER,
-    ${this.dtDomeUploaded} TEXT,
-    ${this.bodyUploaded} INTEGER,
-    ${this.dtBodyUploaded} TEXT)`;
+    ${this.coreUploaded} TEXT,
+    ${this.domeUploaded} TEXT,
+    ${this.bodyUploaded} TEXT)`;
 
     public static readonly insert =
     `INSERT OR REPLACE INTO ${this.table}
-    (${this.id}, ${this.scriptName}, 
-    ${this.description}, ${this.lastSaved},
-    ${this.coreUploaded}, ${this.dtCoreUploaded},
-    ${this.domeUploaded}, ${this.dtDomeUploaded},
-    ${this.bodyUploaded}, ${this.dtBodyUploaded})
-    VALUES (?, ?,
-    ?, ?,
-    ?, ?,
-    ?, ?,
-    ?, ?)`;
+    (${this.id}, 
+    ${this.scriptName}, 
+    ${this.description}, 
+    ${this.lastSaved},
+    ${this.coreUploaded},
+    ${this.domeUploaded},
+    ${this.bodyUploaded})
+    VALUES (?, 
+        ?,
+        ?, 
+        ?,
+        ?,
+        ?,
+        ?)`;
 
     public static readonly selectAll =
     `SELECT ${this.id}, 
@@ -44,11 +42,8 @@ export class ScriptsTable {
     ${this.description},
     ${this.lastSaved},
     ${this.coreUploaded}, 
-    ${this.dtCoreUploaded},
-    ${this.domeUploaded}, 
-    ${this.dtDomeUploaded},
-    ${this.bodyUploaded}, 
-    ${this.dtBodyUploaded}
+    ${this.domeUploaded},
+    ${this.bodyUploaded}
     FROM ${this.table}`;
 
     public static readonly select =
@@ -56,12 +51,9 @@ export class ScriptsTable {
     ${this.scriptName}, 
     ${this.description},
     ${this.lastSaved},
-    ${this.coreUploaded}, 
-    ${this.dtCoreUploaded},
-    ${this.domeUploaded}, 
-    ${this.dtDomeUploaded},
-    ${this.bodyUploaded}, 
-    ${this.dtBodyUploaded}
+    ${this.coreUploaded},
+    ${this.domeUploaded},
+    ${this.bodyUploaded}
     FROM ${this.table}
     WHERE ${this.id} = ?`;
 
@@ -71,10 +63,25 @@ export class ScriptsTable {
     ${this.description} = ?,
     ${this.lastSaved} = ?,
     ${this.coreUploaded} = ?,
-    ${this.dtCoreUploaded} = ?,
     ${this.domeUploaded} = ?,
-    ${this.dtDomeUploaded} = ?,
-    ${this.bodyUploaded} = ?,
-    ${this.dtBodyUploaded} = ?
+    ${this.bodyUploaded} = ?
     WHERE ${this.id} = ?`;
+
+    public static readonly updateScriptCoreUploaded = 
+    `UPDATE ${this.table}
+    SET ${this.coreUploaded} = ?
+    WHERE ${this.id} = ?
+    `;
+
+    public static readonly updateScriptDomeUploaded = 
+    `UPDATE ${this.table}
+    SET ${this.domeUploaded} = ?
+    WHERE ${this.id} = ?
+    `;
+
+    public static readonly updateScriptBodyUploaded = 
+    `UPDATE ${this.table}
+    SET ${this.bodyUploaded} = ?
+    WHERE ${this.id} = ?
+    `;
 }

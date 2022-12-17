@@ -26,9 +26,9 @@ export class ScriptRepository {
                     result.push(
                         new Script(scr.id, scr.scriptName,
                             scr.description, scr.lastSaved,
-                            DataAccess.fromDbBool(scr.coreUploaded), scr.dtCoreUploaded,
-                            DataAccess.fromDbBool(scr.domeUploaded), scr.dtDomeUploaded,
-                            DataAccess.fromDbBool(scr.bodyUploaded), scr.dtBodyUploaded)
+                            scr.coreUploaded,
+                            scr.domeUploaded,
+                            scr.bodyUploaded)
                     );
                 });
             })
@@ -51,9 +51,9 @@ export class ScriptRepository {
 
                 result = new Script(scr.id, scr.scriptName,
                     scr.description, scr.lastSaved,
-                    DataAccess.fromDbBool(scr.coreUploaded), scr.dtCoreUploaded,
-                    DataAccess.fromDbBool(scr.domeUploaded), scr.dtDomeUploaded,
-                    DataAccess.fromDbBool(scr.bodyUploaded), scr.dtBodyUploaded);
+                    scr.coreUploaded,
+                    scr.domeUploaded,
+                    scr.bodyUploaded);
             })
             .catch((err) => {
                 console.log(err);
@@ -86,12 +86,12 @@ export class ScriptRepository {
         }
 
         for (const ch of result.scriptChannels) {
-        
+
             await this.dao.get(ScriptEventsTable.selectForChannel, [result.id, ch.id])
                 .then((val: any) => {
                     val.forEach((evt: any) => {
                         const event = new ScriptEvent(evt.scriptChannel, evt.channelType, evt.time, evt.dataJson);
-                        ch.eventsKvpArray.push({key: event.time, value: event});
+                        ch.eventsKvpArray.push({ key: event.time, value: event });
                     });
                 }).catch((err) => {
                     console.log(err);
@@ -120,16 +120,16 @@ export class ScriptRepository {
         return channel;
     }
 
-    private async getUartModule(controller: ControllerType): Promise<UartModule  | null> {
+    private async getUartModule(controller: ControllerType): Promise<UartModule | null> {
         let result: any = null;
 
         await this.dao.get(UartModuleTable.select, [controller.toString()])
-        .then((val: any) => {
-            result = new UartModule(val[0].uartType, val[0].moduleName, JSON.parse(val[0].moduleJson));
-        }).catch((err) => {
-            console.log(err);
-            throw 'error'
-        });
+            .then((val: any) => {
+                result = new UartModule(val[0].uartType, val[0].moduleName, JSON.parse(val[0].moduleJson));
+            }).catch((err) => {
+                console.log(err);
+                throw 'error'
+            });
 
         return result;
     }
@@ -174,14 +174,53 @@ export class ScriptRepository {
         return result;
     }
 
+    async updateScriptControllerUploaded(id: string, controller: ControllerType, dateTime: string): Promise<boolean> {
+
+        let success = true;
+        let sql = '';
+
+        switch (controller) {
+            case ControllerType.core:
+                sql = ScriptsTable.updateScriptCoreUploaded;
+                break;
+            case ControllerType.dome:
+                sql = ScriptsTable.updateScriptDomeUploaded;
+                break;
+            case ControllerType.body:
+                sql = ScriptsTable.updateScriptBodyUploaded;
+                break;
+        }
+
+        if (sql === ''){
+            console.log('invalid controller type to update script!');
+            return false;
+        }
+
+        await this.dao.run(sql, [dateTime, id])
+            .catch((err: any) =>{
+                console.log(`Exception updating script upload for controller: ${controller} => ${err}`);
+                success = false;
+            });
+
+        return success;
+    }
+
     async saveScript(script: Script): Promise<boolean> {
+
+        const options: Intl.DateTimeFormatOptions = {
+            day: "numeric", month: "numeric", year: "numeric",
+            hour: "2-digit", minute: "2-digit", second: "2-digit"
+        };
+
+        const date = (new Date()).toLocaleString('en-US', options);
 
         await this.dao.run(ScriptsTable.insert,
             [script.id, script.scriptName,
-            script.description, script.lastSaved,
-            DataAccess.toDbBool(script.coreUploaded), script.dtCoreUploaded,
-            DataAccess.toDbBool(script.domeUploaded), script.dtDomeUploaded,
-            DataAccess.toDbBool(script.bodyUploaded), script.dtBodyUploaded])
+            script.description, 
+            date,
+            script.coreUploaded,
+            script.domeUploaded,
+            script.bodyUploaded])
             .then((val: any) => {
                 if (val) { console.log(val); }
             });
@@ -196,7 +235,7 @@ export class ScriptRepository {
             });
 
 
-        for (const ch of script.scriptChannels){
+        for (const ch of script.scriptChannels) {
 
             await this.dao.run(ScriptChannelsTable.insert, [ch.id,
             script.id, ch.controllerType.toString(), ch.type.toString(), ch.channelNumber.toString()])

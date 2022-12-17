@@ -1,5 +1,6 @@
 const { parentPort } = require("worker_threads");
 const superagent = require('superagent');
+const e = require("express");
 
 parentPort.on('message', data => {
     uploadScript(data);
@@ -19,18 +20,17 @@ function uploadScript(data) {
 
            // TODO: remove
             await new Promise(resolve => setTimeout(resolve, 2000));
-            parentPort.postMessage({ controller: endpoint.endpointName, status: sending, percent: 25 });
+            parentPort.postMessage({type: 'scriptUploadStatus', scriptId: data.scriptId, controller: endpoint.type, status: sending, percent: 25 });
 
             await new Promise(resolve => setTimeout(resolve, 2000));
-            parentPort.postMessage({ controller: endpoint.endpointName, status: sending, percent: 50 });
+            parentPort.postMessage({type: 'scriptUploadStatus', scriptId: data.scriptId, controller: endpoint.type, status: sending, percent: 50 });
             
             await new Promise(resolve => setTimeout(resolve, 2000));
-            parentPort.postMessage({ controller: endpoint.endpointName, status: sending, percent: 75 });
+            parentPort.postMessage({type: 'scriptUploadStatus', scriptId: data.scriptId, controller: endpoint.type, status: sending, percent: 75 });
 
             await new Promise(resolve => setTimeout(resolve, 2000));
-            parentPort.postMessage({ controller: endpoint.endpointName, status: success, percent: 100 });
-
-         
+            parentPort.postMessage({type: 'scriptUploadStatus', scriptId: data.scriptId, controller: endpoint.type, status: success, percent: 100 });
+  
             return;
 
             try {

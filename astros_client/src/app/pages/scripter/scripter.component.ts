@@ -95,9 +95,9 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       this.scriptId = Guid.create().toString();
       this.script = new Script(this.scriptId, "",
         "", "1970-01-01 00:00:00.000",
-        false, "1970-01-01 00:00:00.000",
-        false, "1970-01-01 00:00:00.000",
-        false, "1970-01-01 00:00:00.000");
+        "1970-01-01 00:00:00.000",
+        "1970-01-01 00:00:00.000",
+        "1970-01-01 00:00:00.000");
     }
     else {
 

@@ -3,7 +3,8 @@ export enum KangarooAction{
     start,
     home,
     speed,
-    position
+    position,
+    positionIncremental
 }
 
 export class KangarooEvent {
