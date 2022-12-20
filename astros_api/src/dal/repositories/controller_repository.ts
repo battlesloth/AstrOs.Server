@@ -47,7 +47,7 @@ export class ControllerRepository {
             .then((val: any) =>{
                 val.forEach((ch: any) => {
                     controller.pwmModule.channels[ch.channelId] =
-                        new PwmChannel(ch.channelId, ch.channelName, ch.type, ch.limit0, ch.limit1);
+                        new PwmChannel(ch.channelId, ch.channelName, ch.enabled, ch.minPos, ch.maxPos);
                 });
             })
             .catch((err: any) => {
@@ -92,8 +92,8 @@ export class ControllerRepository {
 
             for (const pwm of ctl.pwmModule.channels) {
                
-                await this.dao.run(PwmChannelsTable.update, [pwm.channelName, pwm.type.toString(), 
-                    pwm.limit0.toString(), pwm.limit1.toString(), pwm.id.toString(), ctl.id.toString()])
+                await this.dao.run(PwmChannelsTable.update, [pwm.channelName, pwm.enabled.toString(), 
+                    pwm.minPos.toString(), pwm.maxPos.toString(), pwm.id.toString(), ctl.id.toString()])
                 .catch((err: any) => {
                     console.log(err);
                     throw 'error';

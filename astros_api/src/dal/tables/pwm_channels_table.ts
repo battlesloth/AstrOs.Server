@@ -4,9 +4,9 @@ export class PwmChannelsTable {
     public static readonly controllerId = 'controllerId';
     public static readonly channelId = 'channelId';
     public static readonly channelName = 'channelName';
-    public static readonly type = 'type';
-    public static readonly limit0 = 'limit0';
-    public static readonly limit1 = 'limit1';
+    public static readonly enabled = 'enabled';
+    public static readonly minPos = 'minPos';
+    public static readonly maxPos = 'maxPos';
 
     public static readonly create =
     `CREATE TABLE IF NOT EXISTS ${this.table} (
@@ -14,31 +14,31 @@ export class PwmChannelsTable {
     ${this.controllerId} INTEGER,
     ${this.channelId} INTEGER,
     ${this.channelName} TEXT,
-    ${this.type} INTEGER,
-    ${this.limit0} INTEGER,
-    ${this.limit1} INTEGER,
+    ${this.enabled} INTEGER,
+    ${this.minPos} INTEGER,
+    ${this.maxPos} INTEGER,
     UNIQUE(${this.controllerId}, ${this.channelId}) ON CONFLICT REPLACE)`;
 
     public static readonly insert =
     `INSERT INTO ${this.table}
-    (${this.controllerId}, ${this.channelId}, ${this.channelName}, ${this.type}, ${this.limit0}, ${this.limit1})
+    (${this.controllerId}, ${this.channelId}, ${this.channelName}, ${this.enabled}, ${this.minPos}, ${this.maxPos})
     VALUES (?, ?, ?, ?, ?, ?)`;
 
     public static readonly selectAll =
     `SELECT ${this.channelId},
     ${this.channelName},
-    ${this.type},
-    ${this.limit0},
-    ${this.limit1}
+    ${this.enabled},
+    ${this.minPos},
+    ${this.maxPos}
     FROM ${this.table}
     WHERE ${this.controllerId} = ?`;
 
     public static readonly select =
     `SELECT ${this.channelId},
     ${this.channelName},
-    ${this.type},
-    ${this.limit0},
-    ${this.limit1}
+    ${this.enabled},
+    ${this.minPos},
+    ${this.maxPos}
     FROM ${this.table}
     WHERE ${this.channelId} = ?
     AND ${this.controllerId} = ?`;
@@ -46,9 +46,9 @@ export class PwmChannelsTable {
     public static readonly update =
     `UPDATE ${this.table}
     SET ${this.channelName} = ?,
-    ${this.type} = ?,
-    ${this.limit0} = ?,
-    ${this.limit1} = ?
+    ${this.enabled} = ?,
+    ${this.minPos} = ?,
+    ${this.maxPos} = ?
     WHERE ${this.channelId} = ?
     AND  ${this.controllerId} = ?`;
 }

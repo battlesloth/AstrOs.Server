@@ -34,6 +34,7 @@ import { KangarooEventModalComponent } from './pages/scripter/modals/kangaroo-ev
 import { KangarooModuleComponent } from './pages/modules/uart-modules/kangaroo-module/kangaroo-module.component';
 import { GenericSerialModuleComponent } from './pages/modules/uart-modules/generic-serial-module/generic-serial-module.component';
 import { WebsocketService } from './services/websocket/websocket.service';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
 
 
@@ -73,7 +74,8 @@ import { WebsocketService } from './services/websocket/websocket.service';
     MatSnackBarModule,
     ModalModule,
     FontAwesomeModule,
-    MatProgressBarModule
+    MatProgressBarModule,
+    MatCheckboxModule
   ],
   providers: [WebsocketService],
   bootstrap: [AppComponent]

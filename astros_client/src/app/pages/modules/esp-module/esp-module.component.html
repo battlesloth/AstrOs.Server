@@ -25,17 +25,13 @@
                     <div class="label">Channel {{channel.id}}</div>
                     <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" /></div>
                     <div class="type">
-                        <select title="PWM Type" (ngModelChange)="pwmTypeChange(channel.id, $event)"
-                            [(ngModel)]=channel.type>
-                            <option *ngFor="let pwmType of pwmTypeOptions" [ngValue]="pwmType.id">{{pwmType.name}}
-                            </option>
-                        </select>
+                        <mat-checkbox>Enabled</mat-checkbox>
                     </div>
                     <div class="limit">
-                        <input matInput placeholder="0" [(ngModel)]="channel.limit0" />
+                        <input matInput placeholder="0" [(ngModel)]="channel.minPos" />
                     </div>
                     <div class="limit">
-                        <input matInput placeholder="0" [(ngModel)]="channel.limit1" />
+                        <input matInput placeholder="0" [(ngModel)]="channel.maxPos" />
                     </div>
                 </div>
             </li>

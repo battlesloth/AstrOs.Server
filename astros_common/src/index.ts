@@ -3,7 +3,7 @@ export {ChannelType, ControlModule, ControllerType} from './control_module/contr
 export {I2cChannel} from './control_module/i2c_channel';
 export {I2cModule} from './control_module/i2c_module';
 export {KangarooController} from './control_module/kangaroo_controller';
-export {PwmType, PwmChannel} from './control_module/pwm_channel';
+export {PwmChannel} from './control_module/pwm_channel';
 export {PwmModule} from './control_module/pwm_module';
 export {UartType, UartModule} from './control_module/uart_module';
 export {Script} from './scripts/script';
