@@ -1,6 +1,6 @@
 
 import { ChannelType, ControllerType, ControlModule, 
-    I2cChannel, PwmChannel, UartModule, 
+    I2cChannel, ServoChannel, UartModule, 
     UartType, Script } from "astros-common";
 
 export class ControllerDetails {
@@ -34,13 +34,13 @@ export class ScriptResources {
 
     uartAvailable: Map<ControllerType, boolean>;
 
-    pwmChannels: Map<ControllerType, Array<ChannelValue>>;
+    servoChannels: Map<ControllerType, Array<ChannelValue>>;
 
     i2cChannels: Map<ControllerType, Array<ChannelValue>>;
 
     constructor(controllers: Array<ControlModule>) {
         this.controllers = new Map<ControllerType, ControllerDetails>();
-        this.pwmChannels = new Map<ControllerType, Array<any>>();
+        this.servoChannels = new Map<ControllerType, Array<any>>();
         this.i2cChannels = new Map<ControllerType, Array<any>>();
         this.uartAvailable = new Map<ControllerType, boolean>();
 
@@ -51,10 +51,10 @@ export class ScriptResources {
 
             this.controllers.set(con.id, new ControllerDetails(con.id, con.name, con.uartModule));
 
-            this.pwmChannels.set(con.id, con.pwmModule.channels.map((ch: PwmChannel) => new ChannelValue(ch)));
+            this.servoChannels.set(con.id, con.servoModule.channels.map((ch: ServoChannel) => new ChannelValue(ch)));
             this.i2cChannels.set(con.id, con.i2cModule.channels.map((ch: I2cChannel) => new ChannelValue(ch)));
 
-            this.pwmChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
+            this.servoChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
             this.i2cChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
         });
     }
@@ -66,8 +66,8 @@ export class ScriptResources {
                 case ChannelType.uart:
                     this.uartAvailable.set(ch.controllerType, false);
                     break;
-                case ChannelType.pwm:
-                    this.pwmChannels.get(ch.controllerType)![ch.channel.id].available = false;
+                case ChannelType.servo:
+                    this.servoChannels.get(ch.controllerType)![ch.channel.id].available = false;
                     break;
                 case ChannelType.i2c:
                     this.i2cChannels.get(ch.controllerType)![ch.channel.id].available = false;
@@ -102,7 +102,7 @@ export class ScriptResources {
             }
 
             var vals = new Map<ChannelType, any>();
-            vals.set(ChannelType.pwm, this.pwmChannels.get(ctrl))
+            vals.set(ChannelType.servo, this.servoChannels.get(ctrl))
             vals.set(ChannelType.i2c, this.i2cChannels.get(ctrl))
     
             result.set(ctrl, vals);
@@ -114,7 +114,7 @@ export class ScriptResources {
     private setModuleValues(controler: ControllerType): Map<ChannelType, string> {
         const vals = new Map<ChannelType, string>();
 
-        vals.set(ChannelType.pwm, "PWM");
+        vals.set(ChannelType.servo, "Servo");
         vals.set(ChannelType.i2c, "I2C");
         if (this.uartAvailable.get(controler)) {
             vals.set(ChannelType.uart, "UART");
@@ -134,11 +134,11 @@ export class ScriptResources {
             case ChannelType.uart:
                 this.uartAvailable.set(controller, false);
                 return this.controllers.get(controller)?.uart;
-            case ChannelType.pwm:
-                const pwmIdx = this.pwmChannels.get(controller)?.findIndex(x => x.channel.id === id);
-                if (pwmIdx != undefined && pwmIdx > -1) {
-                    this.pwmChannels.get(controller)![pwmIdx].available = false;
-                    return this.pwmChannels.get(controller)![pwmIdx].channel
+            case ChannelType.servo:
+                const servoIdx = this.servoChannels.get(controller)?.findIndex(x => x.channel.id === id);
+                if (servoIdx != undefined && servoIdx > -1) {
+                    this.servoChannels.get(controller)![servoIdx].available = false;
+                    return this.servoChannels.get(controller)![servoIdx].channel
                 }
                 break
             case ChannelType.i2c:
@@ -164,10 +164,10 @@ export class ScriptResources {
             case ChannelType.uart:
                 this.uartAvailable.set(controller, true);
                 break
-            case ChannelType.pwm:
-                const pwmIdx = this.pwmChannels.get(controller)?.findIndex(x => x.channel.id === id);
-                if (pwmIdx && pwmIdx > -1) {
-                    this.pwmChannels.get(controller)![pwmIdx].available = true;
+            case ChannelType.servo:
+                const servoIdx = this.servoChannels.get(controller)?.findIndex(x => x.channel.id === id);
+                if (servoIdx && servoIdx > -1) {
+                    this.servoChannels.get(controller)![servoIdx].available = true;
                 }
                 break;
             case ChannelType.i2c:

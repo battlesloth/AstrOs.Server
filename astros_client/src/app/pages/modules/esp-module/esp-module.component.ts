@@ -45,12 +45,12 @@ export class EspModuleComponent implements OnInit {
     }
   }
 
-  pwmNameChange(id: number, $event: any){
-    this.module.pwmModule.channels[id].channelName = $event;
+  servoNameChange(id: number, $event: any){
+    this.module.servoModule.channels[id].channelName = $event;
   }
 
-  pwmStatusChange(id: number, $event: any){
-    this.module.pwmModule.channels[id].enabled = $event;
+  servoStatusChange(id: number, $event: any){
+    this.module.servoModule.channels[id].enabled = $event;
   }
 
   uartTypeChange($event: any){

@@ -5,11 +5,11 @@ import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.co
 
 
 @Component({
-  selector: 'app-pwm-event-modal',
-  templateUrl: './pwm-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./pwm-event-modal.component.scss']
+  selector: 'app-servo-event-modal',
+  templateUrl: './servo-event-modal.component.html',
+  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./servo-event-modal.component.scss']
 })
-export class PwmEventModalComponent extends BaseEventModalComponent implements OnInit {
+export class ServoEventModalComponent extends BaseEventModalComponent implements OnInit {
 
   eventValue: string;
   

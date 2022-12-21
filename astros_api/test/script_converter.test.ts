@@ -1,6 +1,8 @@
 
 import { Utility } from "src/utility";
-import { ChannelType, ControllerType , KangarooController , UartModule, UartType, KangarooAction, KangarooEvent, Script, ScriptChannel, ScriptEvent} from "astros-common";
+import { ChannelType, ControllerType , KangarooController, 
+    UartModule, UartType, KangarooAction, KangarooEvent, 
+    Script, ScriptChannel, ScriptEvent, ServoModule, ServoEvent} from "astros-common";
 import { ScriptConverter, CommandType } from "../src/script_converter";
 
 function generateKangarooEvent(time: number, ch1Action: KangarooAction, ch1Speed: number, ch1Position: number,
@@ -11,6 +13,12 @@ function generateKangarooEvent(time: number, ch1Action: KangarooAction, ch1Speed
     return {key: time, value: new ScriptEvent("", ChannelType.uart, time, JSON.stringify(data))};
 }
 
+function generateServoEvent(time: number, channel: number, position: number, speed: number) {
+    
+    const data = new ServoEvent(channel, position, speed);
+    
+    return {key: time, value: new ScriptEvent("", ChannelType.uart, time, JSON.stringify(data))};
+}
 
 describe("Script Converter Tests", () => {
     it("kangaroo test", () => {
@@ -30,7 +38,7 @@ describe("Script Converter Tests", () => {
         // kangaroo example each ___ is unit_8
         // |___|___|___|______|______|______;
         //  evt ch  cmd spd    pos   time till
-        // PWM => 1, I2C => 2, Generic Serial => 3, Kangaroo => 4 
+        // Servo => 1, I2C => 2, Generic Serial => 3, Kangaroo => 4 
         // field*field*field*field
 
         // ROO:4*780*
@@ -138,6 +146,60 @@ describe("Script Converter Tests", () => {
 
         expect(parseInt(evts[8][0])).toBe(CommandType.kangaroo);
         expect(parseInt(evts[8][2])).toBe(1);
+
+    });
+
+    it("serial test", () => {
+
+        const script = new Script("1234", "test1",
+            "desc1", "1970-01-01 00:00:00.000",
+            "1970-01-01 00:00:00.000",
+            "1970-01-01 00:00:00.000",
+            "1970-01-01 00:00:00.000");
+
+        const servoModule = new ServoModule();
+
+
+
+        const channel = new ScriptChannel("1", ControllerType.core, "core", ChannelType.servo, 0, servoModule, 300);
+
+        // cmd|cmd|cmd|cmd|
+
+        // kangaroo example each ___ is unit_8
+        // |___|___|______|______|______;
+        //  evt ch  spd    pos   time till
+        // Servo => 1, I2C => 2, Generic Serial => 3, Kangaroo => 4 
+        // field*field*field*field
+
+        // ROO:4*780*
+
+        channel.eventsKvpArray.push(
+            generateServoEvent(0, 1, 50, 5)
+        );
+       
+        script.scriptChannels = new Array<ScriptChannel>(channel);
+
+        const cvtr = new ScriptConverter();
+
+        const result = cvtr.convertScript(script);
+
+        expect(result?.get(ControllerType.core)?.length).toBeGreaterThan(0);
+        expect(result?.get(ControllerType.dome)?.length).toBe(0);
+        expect(result?.get(ControllerType.body)?.length).toBe(0);
+
+        const coreVal = result?.get(ControllerType.core);
+
+        const evts = Array<Array<string>>();
+
+        const segs = coreVal?.split(';');
+
+        segs?.forEach( e => {
+            evts.push(e.split('|'));
+        });
+
+        expect(coreVal).toBe('');
+
+
 
     });
 })

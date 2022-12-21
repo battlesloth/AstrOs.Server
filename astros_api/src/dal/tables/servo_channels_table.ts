@@ -1,5 +1,5 @@
-export class PwmChannelsTable {
-    public static readonly table = 'pwm_channels';
+export class ServoChannelsTable {
+    public static readonly table = 'servo_channels';
     public static readonly id = 'id';
     public static readonly controllerId = 'controllerId';
     public static readonly channelId = 'channelId';

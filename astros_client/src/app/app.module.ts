@@ -24,7 +24,7 @@ import { ModalModule } from './modal';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ScriptsComponent } from './pages/scripts/scripts.component';
 import { I2cEventModalComponent } from './pages/scripter/modals/i2c-event-modal/i2c-event-modal.component';
-import { PwmEventModalComponent } from './pages/scripter/modals/pwm-event-modal/pwm-event-modal.component';
+import { ServoEventModalComponent } from './pages/scripter/modals/servo-event-modal/servo-event-modal.component';
 import { ControllerModalComponent } from './pages/scripter/modals/controller-modal/controller-modal.component';
 import { AudioFilesComponent } from './pages/audio-files/audio-files.component';
 import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-modal.component';
@@ -51,7 +51,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     ScriptRowComponent,
     ScriptsComponent,
     I2cEventModalComponent,
-    PwmEventModalComponent,
+    ServoEventModalComponent,
     ControllerModalComponent,
     AudioFilesComponent,
     UploadModalComponent,

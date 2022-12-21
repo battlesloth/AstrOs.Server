@@ -1,7 +1,7 @@
 import { DataAccess } from "src/dal/data_access";
-import { ControlModule, ControllerType, PwmChannel, I2cChannel, UartModule } from "astros-common";
+import { ControlModule, ControllerType, ServoChannel, I2cChannel, UartModule } from "astros-common";
 import { ControllersTable } from "src/dal/tables/controllers_table";
-import { PwmChannelsTable } from "src/dal/tables/pwm_channels_table";
+import { ServoChannelsTable } from "src/dal/tables/servo_channels_table";
 import { I2cChannelsTable } from "src/dal/tables/i2c_channels_table"; 
 import { UartModuleTable } from "../tables/uart_module_table";
 
@@ -43,11 +43,11 @@ export class ControllerRepository {
                 throw 'error';
             });
 
-            await this.dao.get(PwmChannelsTable.selectAll, [ctl.toString()])
+            await this.dao.get(ServoChannelsTable.selectAll, [ctl.toString()])
             .then((val: any) =>{
                 val.forEach((ch: any) => {
-                    controller.pwmModule.channels[ch.channelId] =
-                        new PwmChannel(ch.channelId, ch.channelName, ch.enabled, ch.minPos, ch.maxPos);
+                    controller.servoModule.channels[ch.channelId] =
+                        new ServoChannel(ch.channelId, ch.channelName, ch.enabled, ch.minPos, ch.maxPos);
                 });
             })
             .catch((err: any) => {
@@ -90,10 +90,10 @@ export class ControllerRepository {
                      throw 'error';
                  })
 
-            for (const pwm of ctl.pwmModule.channels) {
+            for (const servo of ctl.servoModule.channels) {
                
-                await this.dao.run(PwmChannelsTable.update, [pwm.channelName, pwm.enabled.toString(), 
-                    pwm.minPos.toString(), pwm.maxPos.toString(), pwm.id.toString(), ctl.id.toString()])
+                await this.dao.run(ServoChannelsTable.update, [servo.channelName, servo.enabled.toString(), 
+                    servo.minPos.toString(), servo.maxPos.toString(), servo.id.toString(), ctl.id.toString()])
                 .catch((err: any) => {
                     console.log(err);
                     throw 'error';

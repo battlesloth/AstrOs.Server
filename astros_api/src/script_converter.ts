@@ -1,3 +1,4 @@
+import { ServoEvent } from "astros-common";
 import { ChannelType, ControllerType, UartType, 
     KangarooAction, KangarooEvent, Script, 
     ScriptChannel, ScriptEvent, GenericSerialEvent } from "astros-common";
@@ -6,7 +7,7 @@ import { Utility } from "./utility";
 
 export enum CommandType {
     none,
-    pwm,
+    servo,
     i2c,
     genericSerial,
     kangaroo
@@ -76,7 +77,8 @@ export class ScriptConverter {
                 return this.convertSerialEvents(channel);
             case ChannelType.i2c:
                 break;
-            case ChannelType.pwm:
+            case ChannelType.servo:
+                return this.convertServoEvents(channel);
                 break
         }
 
@@ -168,6 +170,43 @@ export class ScriptConverter {
         }
 
         return command;
+    }
+
+    // |___|_________|___|____|____;
+    //  evt time_till ch  spd  pos  
+    convertServoEvents(channel: ScriptChannel): Array<Kvp> {
+        const result = new Array<Kvp>()
+        // events in reverse order
+        channel.eventsKvpArray.sort((a: any, b: any) => (a.value.time < b.value.time) ? 1 : -1);
+
+        let nextEventTime = 0;
+
+        for (let i = 0; i < channel.eventsKvpArray.length; i++) {
+
+            const kvp = channel.eventsKvpArray[i];
+
+            const evt = kvp.value as ScriptEvent
+
+            let command = '';
+
+            let timeTill = 0;
+    
+            if (nextEventTime != 0) {
+                timeTill = nextEventTime - evt.time;
+            }
+    
+            const serial = JSON.parse(evt.dataJson) as ServoEvent;
+    
+            command = `${CommandType.servo}|${timeTill}|${serial.channelId}|${serial.position}|${serial.speed};`;
+
+            if (command.length > 0) {
+                result.push(new Kvp(kvp.key, command));
+            }
+
+            nextEventTime = evt.time;
+        }
+
+        return result;
     }
 
     convertChannelEvent(channel: number, action: KangarooAction, speed: number, position: number, timeTill: number) {

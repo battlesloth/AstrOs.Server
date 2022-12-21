@@ -1,5 +1,5 @@
 import { I2cModule } from "./i2c_module";
-import { PwmModule } from "./pwm_module";
+import { ServoModule } from "./servo_module";
 import { UartModule, UartType } from "./uart_module";
 
 export enum ControllerType{
@@ -15,7 +15,7 @@ export enum ChannelType{
     none,
     uart,
     i2c,
-    pwm,
+    servo,
     audio
 }
 
@@ -26,14 +26,14 @@ export class ControlModule{
     ipAddress!: string;
 
     uartModule: UartModule;
-    pwmModule: PwmModule;
+    servoModule: ServoModule;
     i2cModule: I2cModule;
 
     constructor(id: ControllerType, name: string){
         this.id = id;
         this.name = name;
         this.uartModule = new UartModule(UartType.none, "unassigned", new Object());
-        this.pwmModule = new PwmModule();
+        this.servoModule = new ServoModule();
         this.i2cModule = new I2cModule();
     }
 }

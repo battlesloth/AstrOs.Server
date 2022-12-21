@@ -1,4 +1,4 @@
-export class PwmChannel {
+export class ServoChannel {
     id: number;
     channelName: string;
     enabled: boolean;

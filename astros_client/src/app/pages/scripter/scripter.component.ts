@@ -11,7 +11,7 @@ import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
 import { I2cEventModalComponent } from './modals/i2c-event-modal/i2c-event-modal.component';
 import { ModalCallbackEvent, ModalResources } from '../../shared/modal-resources';
-import { PwmEventModalComponent } from './modals/pwm-event-modal/pwm-event-modal.component';
+import { ServoEventModalComponent } from './modals/servo-event-modal/servo-event-modal.component';
 import { AudioEventModalComponent } from './modals/audio-event-modal/audio-event-modal.component';
 import { KangarooEventModalComponent } from './modals/kangaroo-event-modal/kangaroo-event-modal.component';
 
@@ -254,8 +254,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       case ChannelType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);
         break;
-      case ChannelType.pwm:
-        component = this.container.createComponent(PwmEventModalComponent);
+      case ChannelType.servo:
+        component = this.container.createComponent(ServoEventModalComponent);
         break;
       case ChannelType.audio:
         component = this.container.createComponent(AudioEventModalComponent);

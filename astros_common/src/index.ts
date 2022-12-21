@@ -3,8 +3,8 @@ export {ChannelType, ControlModule, ControllerType} from './control_module/contr
 export {I2cChannel} from './control_module/i2c_channel';
 export {I2cModule} from './control_module/i2c_module';
 export {KangarooController} from './control_module/kangaroo_controller';
-export {PwmChannel} from './control_module/pwm_channel';
-export {PwmModule} from './control_module/pwm_module';
+export {ServoChannel} from './control_module/servo_channel';
+export {ServoModule} from './control_module/servo_module';
 export {UartType, UartModule} from './control_module/uart_module';
 export {Script} from './scripts/script';
 export {UploadStatus} from './scripts/upload_status';
@@ -12,4 +12,5 @@ export {ScriptChannel} from './scripts/script_channel';
 export {ScriptEvent} from './scripts/script_event';
 export {KangarooAction, KangarooEvent} from './scripts/events/kangaroo_event';
 export {GenericSerialEvent} from './scripts/events/generic_serial_event';
+export {ServoEvent} from './scripts/events/servo_event';
 export {TransmissionStatus} from './networking/transmission_status';

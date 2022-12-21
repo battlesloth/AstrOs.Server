@@ -2,9 +2,9 @@ import { DataAccess } from "src/dal/data_access";
 import { ScriptsTable } from "src/dal/tables/scripts_table";
 import { ScriptChannelsTable } from "src/dal/tables/script_channels_table";
 import { ScriptEventsTable } from "src/dal/tables/script_events_table";
-import { ChannelType, ControllerType, I2cChannel, PwmChannel, UartModule, Script, ScriptChannel, ScriptEvent } from "astros-common";
+import { ChannelType, ControllerType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
-import { PwmChannelsTable } from "../tables/pwm_channels_table";
+import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
 
 
@@ -109,8 +109,8 @@ export class ScriptRepository {
             case ChannelType.i2c:
                 channel.channel = await this.getChannelForScriptChannel(ChannelType.i2c, channel.channelNumber, channel.controllerType)
                 break;
-            case ChannelType.pwm:
-                channel.channel = await this.getChannelForScriptChannel(ChannelType.pwm, channel.channelNumber, channel.controllerType)
+            case ChannelType.servo:
+                channel.channel = await this.getChannelForScriptChannel(ChannelType.servo, channel.channelNumber, channel.controllerType)
                 break;
             case ChannelType.uart:
                 channel.channel = await this.getUartModule(channel.controllerType);
@@ -144,8 +144,8 @@ export class ScriptRepository {
             case ChannelType.i2c:
                 sql = I2cChannelsTable.select;
                 break;
-            case ChannelType.pwm:
-                sql = PwmChannelsTable.select;
+            case ChannelType.servo:
+                sql = ServoChannelsTable.select;
                 break;
             default:
                 return;
@@ -158,8 +158,8 @@ export class ScriptRepository {
                         case ChannelType.i2c:
                             result = new I2cChannel(val[0].channelId, val[0].channelName);
                             break;
-                        case ChannelType.pwm:
-                            result = new PwmChannel(val[0].channelId, val[0].channelName,
+                        case ChannelType.servo:
+                            result = new ServoChannel(val[0].channelId, val[0].channelName,
                                 val[0].type, val[0].limit0, val[0].limit1);
                             break;
                     }
