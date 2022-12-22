@@ -9,8 +9,12 @@
                     (keypress)="($event.charCode >= 48 && $event.charCode < 58)" [(ngModel)]="eventTime" />
             </div>
             <div>
-                <label for="value">Servo Drive</label>
-                <input name="value" matInput placeholder="Value" [(ngModel)]="eventValue" />
+                <label for="value">Position</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="position" />
+            </div>
+            <div>
+                <label for="value">Speed</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="speed" />
             </div>
             <div class="error">{{errorMessage}}</div>
         </div>

@@ -29,4 +29,7 @@ export class ModalResources{
     public static readonly genericSerial = 'genericSerial';
     public static readonly kangaroo = 'kangaroo';
 
+    // Servo module types
+    public static readonly servoId = 'servoId';
+
 }

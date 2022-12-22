@@ -5,7 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelType, ControllerType, ControlModule, KangarooController, Script, ScriptChannel, ScriptEvent, UartModule } from 'astros-common';
+import { ChannelType, ControllerType, ControlModule, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -256,6 +256,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         break;
       case ChannelType.servo:
         component = this.container.createComponent(ServoEventModalComponent);
+        modalResources.set(ModalResources.servoId, this.getServoIdFromChannel(event.scriptChannel))
         break;
       case ChannelType.audio:
         component = this.container.createComponent(AudioEventModalComponent);
@@ -282,6 +283,19 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     if (chIdx > -1) {
       const uart = this.scriptChannels[chIdx].channel as UartModule;
       return uart.module as KangarooController;
+    }
+    
+  }
+
+  getServoIdFromChannel(channelId: string): any {
+    
+    const chIdx = this.scriptChannels
+      .map((ch) => { return ch.id })
+      .indexOf(channelId);
+
+    if (chIdx > -1) {
+      const servo = this.scriptChannels[chIdx].channel as ServoChannel;
+      return servo.id;
     }
     
   }

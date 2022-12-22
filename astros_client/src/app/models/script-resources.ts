@@ -20,8 +20,8 @@ export class ChannelValue {
     available: boolean;
     channel: any
 
-    constructor(channel: any) {
-        this.available = true;
+    constructor(channel: any, available: boolean) {
+        this.available = available;
         this.channel = channel;
     }
 }
@@ -51,8 +51,8 @@ export class ScriptResources {
 
             this.controllers.set(con.id, new ControllerDetails(con.id, con.name, con.uartModule));
 
-            this.servoChannels.set(con.id, con.servoModule.channels.map((ch: ServoChannel) => new ChannelValue(ch)));
-            this.i2cChannels.set(con.id, con.i2cModule.channels.map((ch: I2cChannel) => new ChannelValue(ch)));
+            this.servoChannels.set(con.id, con.servoModule.channels.map((ch: ServoChannel) => new ChannelValue(ch, ch.enabled)));
+            this.i2cChannels.set(con.id, con.i2cModule.channels.map((ch: I2cChannel) => new ChannelValue(ch, true)));
 
             this.servoChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
             this.i2cChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
@@ -166,13 +166,13 @@ export class ScriptResources {
                 break
             case ChannelType.servo:
                 const servoIdx = this.servoChannels.get(controller)?.findIndex(x => x.channel.id === id);
-                if (servoIdx && servoIdx > -1) {
+                if (servoIdx !== undefined && servoIdx > -1) {
                     this.servoChannels.get(controller)![servoIdx].available = true;
                 }
                 break;
             case ChannelType.i2c:
                 const i2cIdx = this.i2cChannels.get(controller)?.findIndex(x => x.channel.id === id);
-                if (i2cIdx && i2cIdx > -1) {
+                if (i2cIdx !== undefined && i2cIdx > -1) {
                     this.i2cChannels.get(controller)![i2cIdx].available = false;
                 }
                 break;
