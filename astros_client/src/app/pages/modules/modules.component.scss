@@ -1,10 +1,13 @@
 @import "../../../assets/styles/variables";
 
+
+
 .module-container {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
 
+     
     .spacer {
         flex: 1;
     }
@@ -26,7 +29,6 @@
                 font-family: $swfont;
             }
 
-
             .button-box {
                 float: right;
 
@@ -34,6 +36,16 @@
                     font-size: x-large;
                     font-family: $swfont;
                     background-color: $dark-blue;
+                }
+            }
+        }
+
+        .module-accordian {
+            .ip-input {
+                input{
+                padding: 2px;
+                font-size: large;
+                width: 200px;
                 }
             }
         }

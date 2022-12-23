@@ -10,11 +10,15 @@
             </div>
             <div>
                 <label for="value">Position</label>
-                <input name="value" matInput placeholder="Value" [(ngModel)]="position" />
+                <input name="value" matInput placeholder="Value" [(ngModel)]="position" type="number" min="0" max="100"
+                (keypress)="($event.charCode >= 48 && $event.charCode < 58)" 
+                (change)= "position < 0 ? position = 0 : position; position > 100 ? position = 100 : position;" />
             </div>
             <div>
                 <label for="value">Speed</label>
-                <input name="value" matInput placeholder="Value" [(ngModel)]="speed" />
+                <input name="value" matInput placeholder="Value" [(ngModel)]="speed" type="number" min="0" max="100"
+                (keypress)="($event.charCode >= 48 && $event.charCode < 58)" 
+                (change)= "speed < 0 ? speed = 0 : speed; speed > 10 ? speed = 10 : speed;"/>
             </div>
             <div class="error">{{errorMessage}}</div>
         </div>

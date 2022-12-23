@@ -26,6 +26,7 @@ export class ControllerRepository {
             await this.dao.get(ControllersTable.select, [ctl.toString()])
             .then((val: any) =>{
                 controller.name = val[0].controllerName;
+                controller.ipAddress = val[0].controllerIp;
             })
             .catch((err: any) => {
                 console.log(err);
@@ -77,7 +78,7 @@ export class ControllerRepository {
 
         for (const ctl of controllers) {
           
-            await this.dao.run(ControllersTable.updateName, [ctl.name, ctl.id.toString()])
+            await this.dao.run(ControllersTable.updateIp, [ctl.ipAddress, ctl.id.toString()])
             .catch((err: any) => {
                 console.log(err);
                 throw 'error';
