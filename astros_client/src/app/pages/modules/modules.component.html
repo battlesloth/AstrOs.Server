@@ -9,11 +9,18 @@
             <div class="button-box">
                 <button (click)="saveModuleSettings()">Save</button>
             </div>
+            <div class="button-box">
+                <button (click)="syncModuleSettings()">Sync</button>
+            </div>
         </div>
         <mat-accordion class="module-accordian">
             <mat-expansion-panel>
                 <mat-expansion-panel-header>
                     <mat-panel-title>Dome Core Module</mat-panel-title>
+                    <div class="warning tooltip" #core>
+                        <span class="tooltiptext">{{coreStatus}}</span>
+                        <fa-icon [icon]="coreWarning"></fa-icon>       
+                    </div>
                 </mat-expansion-panel-header>
                 <ng-container>
                     <div class="ip-input">
@@ -26,6 +33,10 @@
             <mat-expansion-panel>
                 <mat-expansion-panel-header>
                     <mat-panel-title>Dome Surface Module</mat-panel-title>
+                    <div class="warning tooltip" #dome>
+                        <span class="tooltiptext">{{domeStatus}}</span>
+                        <fa-icon [icon]="domeWarning"></fa-icon>       
+                    </div>
                 </mat-expansion-panel-header>
                 <ng-container>
                     <div class="ip-input">
@@ -38,6 +49,10 @@
             <mat-expansion-panel>
                 <mat-expansion-panel-header>
                     <mat-panel-title>Body Module</mat-panel-title>
+                    <div class="warning tooltip" #body>
+                        <span class="tooltiptext">{{bodyStatus}}</span>
+                        <fa-icon [icon]="bodyWarning"></fa-icon>       
+                    </div>   
                 </mat-expansion-panel-header>
                 <ng-container>
                     <div class="ip-input">

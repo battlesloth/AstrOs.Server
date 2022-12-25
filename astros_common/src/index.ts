@@ -13,4 +13,4 @@ export {ScriptEvent} from './scripts/script_event';
 export {KangarooAction, KangarooEvent} from './scripts/events/kangaroo_event';
 export {GenericSerialEvent} from './scripts/events/generic_serial_event';
 export {ServoEvent} from './scripts/events/servo_event';
-export {TransmissionStatus} from './networking/transmission_status';
+export {TransmissionStatus, TransmissionType} from './networking/transmission_status';

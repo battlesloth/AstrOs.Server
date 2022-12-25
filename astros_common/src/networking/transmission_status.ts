@@ -4,3 +4,8 @@ export enum TransmissionStatus{
     success,
     failed
 }
+
+export enum TransmissionType{
+    script,
+    sync
+}
