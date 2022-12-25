@@ -5,7 +5,3 @@ export enum TransmissionStatus{
     failed
 }
 
-export enum TransmissionType{
-    script,
-    sync
-}

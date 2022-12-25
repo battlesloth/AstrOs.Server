@@ -1,4 +1,4 @@
-import { ChannelType } from "../control_module/control_module";
+import { ChannelType } from "../astros_enums";
 
 export class ScriptEvent {
 

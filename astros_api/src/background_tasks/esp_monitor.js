@@ -9,16 +9,20 @@ function checkControllers(data) {
     const agent = superagent.agent();
 
     data.forEach( ctl => {
-
+        if (!!ctl.ip){
         agent.get(`http://${ctl.ip}`)
             .timeout({response: 4000})
             .then(res => {
-                parentPort.postMessage({type:'status', module:ctl.monitor, status:res.body.result, synced: res.body.fingerprint === ctl.fingerprint});
+                parentPort.postMessage({type: 2, controllerType: ctl.controllerType, up: res.body.result === 'up', synced: res.body.fingerprint === ctl.fingerprint});
             })
             .catch(err => {
-                console.log(`Error calling ${data.monitor}:${err.message}`);
-                parentPort.postMessage({type: 'status', module:ctl.monitor, status:"down"})
+                console.log(`Error calling ${ctl.ip}:${err.message}`);
+                parentPort.postMessage({type: 2, controllerType: ctl.controllerType, up: false, synced: false})
             });    
+        } else {
+            console.log(`No IP set for Controller Type ${ctl.controllerType}`);
+            parentPort.postMessage({type: 2, controllerType: ctl.controllerType, up: false, synced: false})
+        }
     });
 }
 

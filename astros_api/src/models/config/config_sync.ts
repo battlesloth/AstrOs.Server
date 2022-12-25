@@ -1,7 +1,7 @@
 import { ControlModule, TransmissionType } from "astros-common";
 import { ControllerConfig } from "./controller_config";
 
-export class ScriptUpload {
+export class ConfigSync {
 
     type: TransmissionType = TransmissionType.sync;
     configs: Array<ControllerConfig>;

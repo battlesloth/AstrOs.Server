@@ -2,9 +2,10 @@ import { Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/co
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, ControllerType } from 'astros-common';
+import { ControlModule, ControllerType, TransmissionType, StatusResponse } from 'astros-common';
 import { faTrash, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
+import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 
 @Component({
   selector: 'app-modules',
@@ -28,7 +29,7 @@ export class ModulesComponent implements OnInit {
 
   coreStatus: string;
   domeStatus: string;
-  bodyStatus: string; 
+  bodyStatus: string;
 
   private coreWarningVis: boolean;
   private domeWarningVis: boolean;
@@ -42,7 +43,7 @@ export class ModulesComponent implements OnInit {
   private moduleDown = "Module Down";
 
   constructor(private controllerService: ControllerService,
-    private snackBar: MatSnackBar,
+    private snackBar: SnackbarService,
     private renderer: Renderer2,
     private socket: WebsocketService) {
 
@@ -52,7 +53,7 @@ export class ModulesComponent implements OnInit {
 
     this.coreStatus = 'Pending...';
     this.domeStatus = 'Pending...';
-    this.bodyStatus = 'Pending...'; 
+    this.bodyStatus = 'Pending...';
 
     this.coreWarningVis = false;
     this.domeWarningVis = false;
@@ -70,8 +71,8 @@ export class ModulesComponent implements OnInit {
     };
 
     this.socket.messages.subscribe((msg: any) => {
-      if (msg.type === 'status') {
-        this.statusUpdate(msg);
+      if (msg.type === TransmissionType.status) {
+        this.statusUpdate(msg as StatusResponse);
       }
     });
 
@@ -84,15 +85,15 @@ export class ModulesComponent implements OnInit {
       next: (result: any) => {
         if (result.message === 'success') {
           console.log('module settings saved!')
-          this.snackBar.open('Module settings saved!', 'OK', { duration: 2000 });
+          this.snackBar.okToast('Module settings saved!');
         } else {
-          console.log('module settings save failed!', 'OK', { duration: 2000 })
-          this.snackBar.open('Module settings save failed!', 'OK', { duration: 2000 });
+          console.log('module settings save failed!')
+          this.snackBar.okToast('Module settings save failed!');
         }
       },
       error: (err: any) => {
         console.error(err);
-        this.snackBar.open('Module settings save failed!');
+        this.snackBar.okToast('Module settings save failed!');
       }
     };
 
@@ -105,15 +106,15 @@ export class ModulesComponent implements OnInit {
       next: (result: any) => {
         if (result.message === 'success') {
           console.log('module sync queued!')
-          this.snackBar.open('Module sync queued!', 'OK', { duration: 2000 });
+          this.snackBar.okToast('Module sync queued!');
         } else {
-            console.log('module sync failed to queue')
-            this.snackBar.open(`Module sync failed to queue.`, 'OK', { duration: 2000 });
+          console.log('module sync failed to queue')
+          this.snackBar.okToast(`Module sync failed to queue.`);
         }
       },
       error: (err: any) => {
         console.error(err);
-        this.snackBar.open('Module sync failed!', 'OK', {duration: 2000});
+        this.snackBar.okToast('Module sync failed!');
       }
     };
 
@@ -141,48 +142,46 @@ export class ModulesComponent implements OnInit {
     });
   }
 
-  statusUpdate(message: any) {
+  statusUpdate(status: StatusResponse) {
     {
-      switch (message.module) {
-        case 'core':
-          this.coreWarningVis = this.updateUi(message.status === 'up', message.synced, this.coreWarningVis, this.coreEl);
-          this.coreColor = this.setColor(message.status === 'up', message.synced, this.coreColor, this.coreEl);
-          if (message.status !== 'up'){
+      switch (status.controllerType) {
+        case ControllerType.core:
+          this.coreWarningVis = this.updateUi(status.up, status.synced, this.coreWarningVis, this.coreEl);
+          this.coreColor = this.setColor(status.up, status.synced, this.coreColor, this.coreEl);
+          if (!status.up) {
             this.coreStatus = this.moduleDown;
-          } else if (!message.synced){
+          } else if (!status.synced) {
             this.coreStatus = this.notSynced;
           }
           break;
-        case 'dome':
-          this.domeWarningVis = this.updateUi(message.status === 'up', message.synced, this.domeWarningVis, this.domeEl);
-          this.domeColor = this.setColor(message.status === 'up', message.synced, this.domeColor, this.domeEl);
-          if (message.status !== 'up'){
+        case ControllerType.dome:
+          this.domeWarningVis = this.updateUi(status.up, status.synced, this.domeWarningVis, this.domeEl);
+          this.domeColor = this.setColor(status.up, status.synced, this.domeColor, this.domeEl);
+          if (!status.up) {
             this.domeStatus = this.moduleDown;
-          } else if (!message.synced){
+          } else if (!status.synced) {
             this.domeStatus = this.notSynced;
           }
           break;
-        case 'body':
-          this.bodyWarningVis = this.updateUi(message.status === 'up', message.synced, this.bodyWarningVis, this.bodyEl);
-          this.bodyColor = this.setColor(message.status === 'up', message.synced, this.bodyColor, this.bodyEl);
-          if (message.status !== 'up'){
+        case ControllerType.body:
+          this.bodyWarningVis = this.updateUi(status.up, status.synced, this.bodyWarningVis, this.bodyEl);
+          this.bodyColor = this.setColor(status.up, status.synced, this.bodyColor, this.bodyEl);
+          if (!status.up) {
             this.bodyStatus = this.moduleDown;
-          } else if (!message.synced){
+          } else if (!status.synced) {
             this.bodyStatus = this.notSynced;
           }
-          break;
-        case 'legs':
           break;
       }
     }
   }
 
-  private setColor(up: boolean, synced: boolean, color: string, el: ElementRef) : string{
+  private setColor(up: boolean, synced: boolean, color: string, el: ElementRef): string {
     if (!up) {
       if (color !== 'red') {
         this.renderer.setStyle(el.nativeElement, 'color', 'red');
       }
-      return 'red'; 
+      return 'red';
     } else if (!synced && color != 'yellow') {
       this.renderer.setStyle(el.nativeElement, 'color', 'yellow');
       return 'yellow';

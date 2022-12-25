@@ -2,20 +2,11 @@ const { parentPort } = require("worker_threads");
 const superagent = require('superagent');
 const e = require("express");
 
-const unknown = 0;
-const sending = 1;
-const success = 2;
-const failed = 3;
-
-const script = 0;
-const sync = 1;
-
-const core = 0;
-const dome = 0;
-const body = 0;
-
 parentPort.on('message', data => {
 
+    const sync = 1;
+    const script = 0;
+    
     switch (data.type) {
         case script:
             uploadScript(data);
@@ -29,6 +20,11 @@ parentPort.on('message', data => {
 
 
 function uploadScript(data) {
+
+    const unknown = 0;
+    const sending = 1;
+    const success = 2;
+    const failed = 3;
 
     const agent = superagent.agent();
 
@@ -77,36 +73,49 @@ function uploadScript(data) {
     });
 }
 
-function uploadConfigs(data) {
+async function uploadConfigs(data) {
+
+    const sync = 1;
+
+    const core = 1;
+    const dome = 2;
+    const body = 3;
 
     const agent = superagent.agent();
 
     const resultMap = new Map();
 
-    data.configs.forEach(config => {
-        try {
-            agent.post(`http://${config.ip}`)
-                .send({ servoChannels: config.servoChannels })
-                .timeout({ response: 4000 })
-                .then(res => {
-                    resultMap.set(config.id) = true;
-                })
-                .catch(err => {
-                    resultMap.set(config.id) = false;
-                });
+    for (const config of data.configs) {
+        if (!!config.ip.trim()) {
+            try {
+                const body = { servoChannels: config.servoChannels };
+                await agent.post(`http://${config.ip}/setconfig`)
+                    .send(body)
+                    .timeout({ response: 4000 })
+                    .then(res => {
+                        resultMap.set(config.id, res.body.fingerprint);
+                    })
+                    .catch(err => {
+                        resultMap.set(config.id, undefined);
+                    });
 
-        } catch (err) {
-            console.log(`Error posting config to controller ${config.ip}: ${err}`);
-            resultMap.set(config.id) = false;
-        };
-
-    });
+            } catch (err) {
+                console.log(`Error posting config to controller ${config.ip}: ${err}`);
+                resultMap.set(config.id, undefined);
+            };
+        } else {
+            console.log(`No IP set for Controller Type ${config.id}`);
+            resultMap.set(config.id, undefined);
+        }
+    };
 
     const result = {
-        type: this.sync,
-        coreSynced: resultMap.get(this.core),
-        domeSynced: resultMap.get(this.dome),
-        bodySynced: resultMap.get(this.body)
+        type: sync,
+        results: [
+            {id: core, synced: resultMap.get(core) !== undefined, fingerprint: resultMap.get(core)},
+            {id: dome, synced: resultMap.get(dome) !== undefined, fingerprint: resultMap.get(dome)},
+            {id: body, synced: resultMap.get(body) !== undefined, fingerprint: resultMap.get(body)},
+        ]
     };
 
     parentPort.postMessage(result);

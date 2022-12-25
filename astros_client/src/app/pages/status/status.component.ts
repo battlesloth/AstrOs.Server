@@ -1,4 +1,5 @@
 import { AfterViewInit, Component, ElementRef, Renderer2, ViewChild } from '@angular/core';
+import { ControllerType, StatusResponse, TransmissionType } from 'astros-common';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 
 @Component({
@@ -28,8 +29,8 @@ export class StatusComponent implements AfterViewInit {
     
     this.socket.messages.subscribe((msg: any)=>{
 
-      if (msg.type === 'status'){
-        this.statusUpdate(msg);
+      if (msg.type === TransmissionType.status){
+        this.statusUpdate(msg as StatusResponse);
       }
     });
 
@@ -48,28 +49,26 @@ export class StatusComponent implements AfterViewInit {
   ngOnDestroy(): void {
   }
 
-  statusUpdate(message: any) {
+  statusUpdate(status: StatusResponse) {
      {
-      switch (message.module) {
-        case 'core':
-          this.coreUp = this.handleStatus(message.status === 'up', this.coreDownEl, this.coreUp);
+      switch (status.controllerType) {
+        case ControllerType.core:
+          this.coreUp = this.handleStatus(status.up, this.coreDownEl, this.coreUp);
           if (this.coreUp){
-            this.coreSynced = this.handleStatus(message.synced, this.coreNotSyncedEl, this.coreSynced);
+            this.coreSynced = this.handleStatus(status.synced, this.coreNotSyncedEl, this.coreSynced);
           }
           break;
-        case 'dome':
-          this.domeUp = this.handleStatus(message.status === 'up', this.domeDownEl, this.domeUp);
+        case ControllerType.dome:
+          this.domeUp = this.handleStatus(status.up, this.domeDownEl, this.domeUp);
           if (this.domeUp){
-            this.domeSynced = this.handleStatus(message.synced, this.domeNotSyncedEl, this.domeSynced);
+            this.domeSynced = this.handleStatus(status.synced, this.domeNotSyncedEl, this.domeSynced);
           }
           break;
-        case 'body':
-          this.bodyUp = this.handleStatus(message.status === 'up', this.bodyDownEl, this.bodyUp);
+        case ControllerType.body:
+          this.bodyUp = this.handleStatus(status.up, this.bodyDownEl, this.bodyUp);
           if (this.bodyUp){
-            this.bodySynced = this.handleStatus(message.synced, this.bodyNotSyncedEl, this.bodySynced);
+            this.bodySynced = this.handleStatus(status.synced, this.bodyNotSyncedEl, this.bodySynced);
           }
-          break;
-        case 'legs':
           break;
       }
     }

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
-import { ControllerType, Script, TransmissionStatus, UploadStatus } from 'astros-common';
+import { ControllerType, Script, ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 
@@ -21,9 +21,8 @@ export class ScriptsComponent implements OnInit {
     this.scripts = new Array<Script>();
 
     this.socket.messages.subscribe((msg: any) => {
-
-      if (msg.type === 'scriptUploadStatus') {
-        this.statusUpdate(msg);
+      if (msg.type === TransmissionType.script) {
+        this.statusUpdate(msg as ScriptResponse);
       }
     });
 
@@ -81,7 +80,7 @@ export class ScriptsComponent implements OnInit {
     }
   }
 
-  statusUpdate(msg: any) {
+  statusUpdate(msg: ScriptResponse) {
 
     const idx = this.scripts
       .map((s) => { return s.id })
@@ -92,7 +91,7 @@ export class ScriptsComponent implements OnInit {
     }
 
 
-    switch (msg.controller as ControllerType) {
+    switch (msg.controllerType as ControllerType) {
       case ControllerType.core:
         if (msg.status === TransmissionStatus.success) {
           this.scripts[idx].coreUploaded = msg.date;

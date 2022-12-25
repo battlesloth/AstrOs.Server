@@ -1,5 +1,6 @@
+import { UploadStatus } from "../astros_enums";
 import { ScriptChannel } from "./script_channel";
-import { UploadStatus } from "./upload_status";
+
 
 export class Script{
     id: string;

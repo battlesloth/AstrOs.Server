@@ -1,26 +1,37 @@
-import { Component, ElementRef, Renderer2, ViewChild, ViewEncapsulation } from '@angular/core';
+import { Component, ElementRef, OnInit, Renderer2, ViewChild, ViewEncapsulation } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router } from '@angular/router';
+import { TransmissionType } from 'astros-common';
 import { AuthenticationService } from './services/auth/authentication.service';
+import { SnackbarService } from './services/snackbar/snackbar.service';
+import { WebsocketService } from './services/websocket/websocket.service';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
 
   title = "AstOs"
 
   @ViewChild('sideNav', { static: false }) sideNav!: ElementRef;
 
   constructor(public auth: AuthenticationService,
-    private renderer: Renderer2, private router: Router) {
-      if (auth.isLoggedIn()) {
-        //router.navigate(['scripter', '47cbbb4a-0077-3568-9585-a41052a7fba1']);
-        router.navigate(['scripts']);
-        //router.navigate(['modules']);
-      }
-     }
+    private renderer: Renderer2,
+    private router: Router,
+    private snackbar: SnackbarService,
+    private socket: WebsocketService) {
+    if (auth.isLoggedIn()) {
+      router.navigate(['status']);
+    }
+  }
+
+  ngOnInit(): void {
+    this.socket.messages.subscribe((msg: any) => {
+        this.handleSocketMessage(msg);
+    });
+  }
 
   logout() {
     this.auth.logout();
@@ -34,5 +45,13 @@ export class AppComponent {
 
   closeMenu() {
     this.renderer.setStyle(this.sideNav.nativeElement, 'width', '0px');
+  }
+
+  private handleSocketMessage(msg: any){
+    switch(msg.type){
+      case TransmissionType.sync:
+        this.snackbar.okToast(msg.message);       
+        break; 
+    }
   }
 }

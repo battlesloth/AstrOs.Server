@@ -14,6 +14,7 @@ import { ModalCallbackEvent, ModalResources } from '../../shared/modal-resources
 import { ServoEventModalComponent } from './modals/servo-event-modal/servo-event-modal.component';
 import { AudioEventModalComponent } from './modals/audio-event-modal/audio-event-modal.component';
 import { KangarooEventModalComponent } from './modals/kangaroo-event-modal/kangaroo-event-modal.component';
+import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 
 
 export interface Item {
@@ -52,7 +53,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   components: Array<any>;
 
   constructor(private route: ActivatedRoute,
-    private snackBar: MatSnackBar,
+    private snackBar: SnackbarService,
     private modalService: ModalService,
     private renderer: Renderer2,
     private controllerService: ControllerService,
@@ -135,15 +136,15 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       next: (result: any) => {
         if (result.message === 'success') {
           console.log('script settings saved!')
-          this.snackBar.open('Script settings saved!', 'OK', { duration: 2000 });
+          this.snackBar.okToast('Script settings saved!');
         } else {
-          console.log('script settings save failed!', 'OK', { duration: 2000 })
-          this.snackBar.open('Script settings save failed!', 'OK', { duration: 2000 });
+          console.log('script settings save failed!')
+          this.snackBar.okToast('Script settings save failed!');
         }
       },
       error: (err: any) => {
         console.error(err);
-        this.snackBar.open('Script settings save failed!');
+        this.snackBar.okToast('Script settings save failed!');
       }
     };
 
@@ -202,7 +203,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         time += 1
       }
     } else {
-      this.snackBar.open('Could not determine event time!', 'OK', { duration: 2000 });
+      this.snackBar.okToast('Could not determine event time!');
       console.log('could not determine event time');
       return;
     }
