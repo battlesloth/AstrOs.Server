@@ -15,7 +15,8 @@ export class BaseEventModalComponent extends ModalBaseComponent implements OnIni
   protected callbackType: ModalCallbackEvent;
 
   eventTime: number;
-  protected maxTime: number = 300;
+  protected maxTime: number = 3000;
+  protected timeFactor = 10;
 
   errorMessage: string;
   
@@ -36,7 +37,7 @@ export class BaseEventModalComponent extends ModalBaseComponent implements OnIni
     this.modalCallback.emit({
       id: ModalCallbackEvent.removeEvent,
       channelId: this.scriptEvent.scriptChannel,
-      time: this.originalEventTime
+      time: this.originalEventTime * this.timeFactor
     })
   }
 

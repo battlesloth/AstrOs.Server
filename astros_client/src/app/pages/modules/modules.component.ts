@@ -55,9 +55,9 @@ export class ModulesComponent implements OnInit {
     this.domeStatus = 'Pending...';
     this.bodyStatus = 'Pending...';
 
-    this.coreWarningVis = false;
-    this.domeWarningVis = false;
-    this.bodyWarningVis = false;
+    this.coreWarningVis = true;
+    this.domeWarningVis = true;
+    this.bodyWarningVis = true;
 
     this.coreColor = 'grey';
     this.domeColor = 'grey';

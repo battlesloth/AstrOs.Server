@@ -38,24 +38,24 @@ export class I2cEventModalComponent extends BaseEventModalComponent implements O
       this.eventValue = payload.value;
     }
     
-    this.originalEventTime = this.scriptEvent.time;
-    this.eventTime = this.scriptEvent.time;
+    this.originalEventTime = this.scriptEvent.time / this.timeFactor;
+    this.eventTime = this.scriptEvent.time / this.timeFactor;
   }
 
   addEvent(){
 
     if (+this.eventTime > this.maxTime){
-      this.errorMessage = `Event time cannot be larger than ${this.maxTime}`;
+      this.errorMessage = `Event time cannot be larger than ${this.maxTime/this.timeFactor}`;
       return;
     }
    
-    this.scriptEvent.time = +this.eventTime;
+    this.scriptEvent.time = +this.eventTime * this.timeFactor;
     this.scriptEvent.dataJson = JSON.stringify({value: this.eventValue});
 
     this.modalCallback.emit({
       id: this.callbackType,
       scriptEvent: this.scriptEvent,
-      originalEventTime: this.originalEventTime
+      originalEventTime: this.originalEventTime * this.timeFactor
     });
   }
 }

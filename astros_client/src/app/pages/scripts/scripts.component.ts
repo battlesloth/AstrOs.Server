@@ -41,8 +41,18 @@ export class ScriptsComponent implements OnInit {
     this.router.navigate(['scripter', '0']);
   }
 
-  removeClicked() {
+  removeClicked(id: string) {
+    const idx = this.scripts
+      .map((s) => { return s.id })
+      .indexOf(id);
 
+    if (idx < 0) {
+      return;
+    }
+
+    this.scripts.splice(idx, 1);
+
+    this.scriptService.deleteScript(id).subscribe();
   }
 
   uploadClicked(id: string) {
@@ -51,7 +61,7 @@ export class ScriptsComponent implements OnInit {
       error: (err: any) => console.error(err)
     };
 
-    
+
     const idx = this.scripts
       .map((s) => { return s.id })
       .indexOf(id);
@@ -130,7 +140,6 @@ export class ScriptsComponent implements OnInit {
         }
         break;
     }
-
 
   }
 

@@ -36,7 +36,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   //[resources]="modalResources"
 
   private segmentWidth: number = 60;
-  private seconds: number = 300;
+  private segments: number = 3000;
+  private segmentFactor: number = 10;
   private scriptId: string;
   private resourcesLoaded: boolean = false;
   private renderedEvents: boolean = false;
@@ -61,7 +62,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     this.scriptId = this.route.snapshot.paramMap.get('id') ?? '0';
 
-    this.timeLineArray = Array.from({ length: this.seconds }, (_, i) => i + 1)
+    this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1)/this.segmentFactor)
 
     this.scriptChannels = new Array<ScriptChannel>();
     this.components = new Array<any>();
@@ -99,6 +100,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         "1970-01-01 00:00:00.000",
         "1970-01-01 00:00:00.000",
         "1970-01-01 00:00:00.000");
+
+        this.scriptChannels = this.script.scriptChannels;
     }
     else {
 
@@ -366,7 +369,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     const chValue = this.scriptResources.addChannel(controller, channelType, channel);
 
-    const ch = new ScriptChannel(Guid.create().toString(), controller, name, channelType, channel, chValue, this.seconds);
+    const ch = new ScriptChannel(Guid.create().toString(), controller, name, channelType, channel, chValue, this.segments);
 
     this.scriptChannels.unshift(ch);
   }
@@ -401,7 +404,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     const line = document.getElementById(`script-row-${channelId}`);
 
     const floater = this.renderer.createElement('div');
-    const text = this.renderer.createText(time.toString());
+    const text = this.renderer.createText((time/10).toFixed(1).toString());
     this.renderer.appendChild(floater, text);
     this.renderer.setAttribute(floater, 'class', 'scripter-timeline-marker');
     this.renderer.setAttribute(floater, 'id', `event-${channelId}-${time}`)

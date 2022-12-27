@@ -15,7 +15,7 @@
             <div class="scripter-header">
                 <div class="scripter-module-header" (click)="openChannelAddModal()">Add Channel</div>
                 <div class=" timeline-spacer"></div>
-                <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item}}</div>
+                <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item.toFixed(1)}}</div>
             </div>
             <app-script-row *ngFor="let ch of scriptChannels" id="timeline-{{ch.id}}"
                 (timelineCallback)="timelineCallback($event)"

@@ -127,7 +127,7 @@ export class ControllerRepository {
 
             for (const servo of ctl.servoModule.channels) {
 
-                await this.dao.run(ServoChannelsTable.update, [servo.channelName, servo.enabled.toString(),
+                await this.dao.run(ServoChannelsTable.update, [servo.channelName, servo.enabled ? '1' : '0',
                 servo.minPos.toString(), servo.maxPos.toString(), servo.id.toString(), ctl.id.toString()])
                     .catch((err: any) => {
                         console.log(err);

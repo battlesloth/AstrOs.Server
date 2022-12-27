@@ -23,10 +23,11 @@ export class ScriptRowComponent implements OnInit {
   @Output("removeCallback") removeCallback: EventEmitter<any> = new EventEmitter();
 
   timeLineArray: Array<number>;
-  private seconds: number = 300;
+  private segments: number = 3000;
+  private segmentFactor: number = 10;
 
   constructor(private renderer: Renderer2) {
-    this.timeLineArray = Array.from({ length: this.seconds }, (_, i) => i + 1)
+    this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1))
   }
 
  

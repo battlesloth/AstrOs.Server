@@ -19,58 +19,40 @@ parentPort.on('message', data => {
 
 
 
-function uploadScript(data) {
+async function uploadScript(data) {
 
-    const unknown = 0;
+    const script = 0;
+
     const sending = 1;
     const success = 2;
     const failed = 3;
 
     const agent = superagent.agent();
 
-    data.endpoints.forEach(async function (endpoint) {
+    for (const config of data.configs) {
+        parentPort.postMessage({type: script, controllerType: config.id, scriptId: data.scriptId, status: sending})
+        if (!!config.ip.trim()) {
+            try {
+                agent.post(`http://${config.ip}/uploadscript`)
+                    .send({scriptId: data.scriptId, script:config.script})
+                    .timeout({ response: 4000 })
+                    .then(res => {
+                        const result = res.body.success = 'true' ? success : failed;
+                        parentPort.postMessage({type: script, controllerType: config.id, scriptId: data.scriptId, status: result})
+                    })
+                    .catch(err => {
+                        parentPort.postMessage({type: script, controllerType: config.id, scriptId: data.scriptId, status: failed})
+                    });
 
-        // TODO: remove
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        parentPort.postMessage({ type: 'scriptUploadStatus', scriptId: data.scriptId, controller: endpoint.type, status: sending, percent: 25 });
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        parentPort.postMessage({ type: 'scriptUploadStatus', scriptId: data.scriptId, controller: endpoint.type, status: sending, percent: 50 });
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        parentPort.postMessage({ type: 'scriptUploadStatus', scriptId: data.scriptId, controller: endpoint.type, status: sending, percent: 75 });
-
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        parentPort.postMessage({ type: 'scriptUploadStatus', scriptId: data.scriptId, controller: endpoint.type, status: success, percent: 100 });
-
-        return;
-
-        try {
-            let uri = '';
-
-            if (endpoint.useIp) {
-                uri = endpoint.ip;
-            } else {
-                uri = endpoint.endpointName;
-            }
-
-            agent.post(`http://${uri}`)
-                .send(data.script)
-                .timeout({ response: 4000 })
-                .then(res => {
-                    parentPort.postMessage({ controller: endpoint.endpointName, scriptId: data.scriptId, sent: res.result });
-                })
-                .catch(err => {
-                    console.log(`Error calling ${data.monitor}:${err.message}`);
-                    parentPort.postMessage({ controller: endpoint.endpointName, scriptId: data.scriptId, sent: false });
-                });
-
-        } catch (err) {
-            console.log(`Error posting script to controller ${endpoint.endpointName}`);
-            console.log(err);
-            parentPort.postMessage({ controller: endpoint.endpointName, scriptId: data.scriptId, sent: false });
-        };
-    });
+            } catch (err) {
+                console.log(`uploadScript|Error posting config to controller ${config.ip}: ${err}`);
+                parentPort.postMessage({type: script, controllerType: config.id, scriptId: data.scriptId, status: failed})
+            };
+        } else {
+            console.log(`uploadScript|No IP set for Controller Type ${config.id}`);
+            parentPort.postMessage({type: script, controllerType: config.id, scriptId: data.scriptId, status: failed})
+        }
+    };
 }
 
 async function uploadConfigs(data) {
@@ -100,11 +82,11 @@ async function uploadConfigs(data) {
                     });
 
             } catch (err) {
-                console.log(`Error posting config to controller ${config.ip}: ${err}`);
+                console.log(`uploadConfigs|Error posting config to controller ${config.ip}: ${err}`);
                 resultMap.set(config.id, undefined);
             };
         } else {
-            console.log(`No IP set for Controller Type ${config.id}`);
+            console.log(`uploadConfigs|No IP set for Controller Type ${config.id}`);
             resultMap.set(config.id, undefined);
         }
     };

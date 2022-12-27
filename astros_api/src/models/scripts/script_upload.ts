@@ -1,16 +1,20 @@
-import { ControllerType, TransmissionType } from "astros-common";
-import { ControllerEndpoint } from "../controller_endpoint";
+import { ControllerType, ControlModule, TransmissionType } from "astros-common";
+import { ScriptConfig } from "./script_config";
 
 export class ScriptUpload {
 
     type: TransmissionType = TransmissionType.script;
     scriptId: string;
-    scripts: Map<ControllerType, string>;
-    endpoints: Array<ControllerEndpoint>;
+    configs: Array<ScriptConfig>;
 
-    constructor(scriptId: string, scripts: Map<ControllerType, string>, endpoints: Array<ControllerEndpoint>){
+    constructor(scriptId: string, scripts: Map<ControllerType, string>, controllers: Array<ControlModule> ){
         this.scriptId = scriptId;
-        this.scripts = scripts;
-        this.endpoints = endpoints;
+        
+        this.configs = new Array<ScriptConfig>();
+
+        controllers.forEach(ctl =>{
+            const cfig = new ScriptConfig(ctl, scripts.get(ctl.id)!)
+            this.configs.push(cfig);
+        });
     } 
 }

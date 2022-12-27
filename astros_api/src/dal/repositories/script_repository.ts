@@ -160,7 +160,7 @@ export class ScriptRepository {
                             break;
                         case ChannelType.servo:
                             result = new ServoChannel(val[0].channelId, val[0].channelName,
-                                val[0].type, val[0].limit0, val[0].limit1);
+                                val[0].enabled, val[0].limit0, val[0].limit1);
                             break;
                     }
                 } catch (error) {
@@ -257,5 +257,19 @@ export class ScriptRepository {
         }
 
         return true;
+    }
+
+    async deleteScript(id: string): Promise<boolean> {
+
+        let success = true;
+        const sql = ScriptsTable.disableScript;
+
+        await this.dao.run(sql, [id])
+            .catch((err: any) =>{
+                console.log(`Exception disabling script for ${id} => ${err}`);
+                success = false;
+            });
+
+        return success;
     }
 }

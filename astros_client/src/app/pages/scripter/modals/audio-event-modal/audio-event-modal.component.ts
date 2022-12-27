@@ -47,23 +47,23 @@ export class AudioEventModalComponent extends BaseEventModalComponent implements
       this.selectedFile = payload.value;
     }
     
-    this.originalEventTime = this.scriptEvent.time;
-    this.eventTime = this.scriptEvent.time;
+    this.originalEventTime = this.scriptEvent.time / this.timeFactor;
+    this.eventTime = this.scriptEvent.time / this.timeFactor;
   }
 
   addEvent(){
     if (+this.eventTime > this.maxTime){
-      this.errorMessage = `Event time cannot be larger than ${this.maxTime}`;
+      this.errorMessage = `Event time cannot be larger than ${this.maxTime/this.timeFactor}`;
       return;
     }
    
-    this.scriptEvent.time = +this.eventTime;
+    this.scriptEvent.time = +this.eventTime * this.timeFactor;
     this.scriptEvent.dataJson = JSON.stringify({value: this.selectedFile});
 
     this.modalCallback.emit({
       id: this.callbackType,
       scriptEvent: this.scriptEvent,
-      originalEventTime: this.originalEventTime
+      originalEventTime: this.originalEventTime * this.timeFactor
     });
   }
 }

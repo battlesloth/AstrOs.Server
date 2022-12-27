@@ -22,7 +22,6 @@ import { ScriptsController } from "src/controllers/scripts_controller";
 import { AudioController } from "./controllers/audio_controller";
 import { FileController } from "./controllers/file_controller";
 import { ScriptUpload } from "src/models/scripts/script_upload";
-import { ControllerEndpoint } from "./models/controller_endpoint";
 import { ScriptRepository } from "./dal/repositories/script_repository";
 
 import { ScriptConverter } from "./script_converter";
@@ -269,7 +268,7 @@ class ApiServer {
         modMap.set(2, 'Dome Module');
         modMap.set(3, 'Body Module');
 
-        await msg.results.forEach(async (r:any) => {
+        for (const r of msg.results)  {
             
             if (r.synced){
                 const dao = new DataAccess();
@@ -281,7 +280,7 @@ class ApiServer {
             } else {
                 result.message += `${modMap.get(r.id)} sync failed, `;
             }
-        });
+        }
 
         result.message = result.message.trim().slice(0, -1);
         return result;
@@ -292,9 +291,10 @@ class ApiServer {
             const id = req.query.id;
 
             const dao = new DataAccess();
-            const repo = new ScriptRepository(dao);
+            const scriptRepo = new ScriptRepository(dao);
+            const ctlRepo = new ControllerRepository(dao);
 
-            const script = await repo.getScript(id) as Script;
+            const script = await scriptRepo.getScript(id) as Script;
 
             const cvtr = new ScriptConverter();
 
@@ -305,11 +305,7 @@ class ApiServer {
                 throw new Error(`No controller script values returned for ${id}`);
             }
 
-            const controllers = new Array<ControllerEndpoint>(
-                new ControllerEndpoint('core', ControllerType.core, '', true),
-                new ControllerEndpoint('dome', ControllerType.dome, '', true),
-                new ControllerEndpoint('body', ControllerType.body, '', true),
-            );
+            const controllers = await ctlRepo.getControllerData();
 
             const msg = new ScriptUpload(id, messages, controllers);
 

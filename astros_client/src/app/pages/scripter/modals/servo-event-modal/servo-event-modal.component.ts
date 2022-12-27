@@ -45,18 +45,18 @@ export class ServoEventModalComponent extends BaseEventModalComponent implements
       this.speed = payload.speed;
     }
     
-    this.originalEventTime = this.scriptEvent.time;
-    this.eventTime = this.scriptEvent.time;
+    this.originalEventTime = this.scriptEvent.time / this.timeFactor;
+    this.eventTime = this.scriptEvent.time / this.timeFactor;
   }
 
   addEvent(){
 
     if (+this.eventTime > this.maxTime){
-      this.errorMessage = `Event time cannot be larger than ${this.maxTime}`;
+      this.errorMessage = `Event time cannot be larger than ${this.maxTime/this.timeFactor}`;
       return;
     }
    
-    this.scriptEvent.time = +this.eventTime;
+    this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
     const data = new ServoEvent(+this.channelId, +this.position, +this.speed);
     this.scriptEvent.dataJson = JSON.stringify(data);
@@ -64,7 +64,7 @@ export class ServoEventModalComponent extends BaseEventModalComponent implements
     this.modalCallback.emit({
       id: this.callbackType,
       scriptEvent: this.scriptEvent,
-      originalEventTime: this.originalEventTime
+      originalEventTime: this.originalEventTime * this.timeFactor
     });
   }
 }

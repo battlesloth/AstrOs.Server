@@ -38,6 +38,10 @@ export class ScriptConverter {
             channelMap.set(ControllerType.body, new Array<Kvp>());
 
             for (const ch of script.scriptChannels) {
+
+                // convert time to 100 ms
+                ch.eventsKvpArray.forEach(x => x.value.time = x.value.time * 100);
+
                 const events = this.convertChannel(ch);
 
                 const a = channelMap.get(ch.controllerType)?.concat(events);

@@ -79,8 +79,8 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
     this.ch2PosDisabled = +this.ch2Action !== KangarooAction.position;
     
 
-    this.originalEventTime = this.scriptEvent.time;
-    this.eventTime = this.scriptEvent.time;
+    this.originalEventTime = this.scriptEvent.time / this.timeFactor;
+    this.eventTime = this.scriptEvent.time / this.timeFactor;
   }
 
   modalChange($event: any) {
@@ -113,11 +113,11 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
   addEvent(){
 
     if (+this.eventTime > this.maxTime){
-      this.errorMessage = `Event time cannot be larger than ${this.maxTime}`;
+      this.errorMessage = `Event time cannot be larger than ${this.maxTime/this.timeFactor}`;
       return;
     }
    
-    this.scriptEvent.time = +this.eventTime;
+    this.scriptEvent.time = +this.eventTime * this.timeFactor;
    
     const data = new KangarooEvent(+this.ch1Action, this.ch1Speed ?? 0, this.ch1Position ?? 0, 
       +this.ch2Action, this.ch2Speed ?? 0, this.ch2Position ?? 0)
@@ -127,7 +127,7 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
     this.modalCallback.emit({
       id: this.callbackType,
       scriptEvent: this.scriptEvent,
-      originalEventTime: this.originalEventTime
+      originalEventTime: this.originalEventTime * this.timeFactor
     });
   }
 }

@@ -1,5 +1,4 @@
 
-import { Utility } from "src/utility";
 import { ChannelType, ControllerType , KangarooController, 
     UartModule, UartType, KangarooAction, KangarooEvent, 
     Script, ScriptChannel, ScriptEvent, ServoModule, ServoEvent} from "astros-common";
@@ -33,11 +32,11 @@ describe("Script Converter Tests", () => {
 
         const channel = new ScriptChannel("1", ControllerType.core, "core", ChannelType.uart, 0, uartModule, 300);
 
-        // cmd|cmd|cmd|cmd|
+        // cmd;cmd;cmd;cmd;
 
-        // kangaroo example each ___ is unit_8
-        // |___|___|___|______|______|______;
-        //  evt ch  cmd spd    pos   time till
+
+        // |___|_________|___|____|____|____;
+        //  evt time_till ch  cmd  spd  pos  
         // Servo => 1, I2C => 2, Generic Serial => 3, Kangaroo => 4 
         // field*field*field*field
 
@@ -159,15 +158,12 @@ describe("Script Converter Tests", () => {
 
         const servoModule = new ServoModule();
 
-
-
         const channel = new ScriptChannel("1", ControllerType.core, "core", ChannelType.servo, 0, servoModule, 300);
 
-        // cmd|cmd|cmd|cmd|
+        // cmd;cmd;cmd;cmd;
 
-        // kangaroo example each ___ is unit_8
-        // |___|___|______|______|______;
-        //  evt ch  spd    pos   time till
+        // |___|_________|___|____|____;
+        //  evt time_till ch  spd  pos  
         // Servo => 1, I2C => 2, Generic Serial => 3, Kangaroo => 4 
         // field*field*field*field
 

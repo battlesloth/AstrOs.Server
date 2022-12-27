@@ -71,4 +71,24 @@ export class ScriptsController {
             });
         }
     }
+
+    public static async deleteScript(req: any, res: any, next: any) {
+        try {
+            const dao = new DataAccess();
+            const repo = new ScriptRepository(dao);
+
+            await repo.deleteScript(req.query.id);
+
+            res.status(200);
+            res.json({ message: 'success' });
+
+        } catch (error) {
+            console.log(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+    }
 }
