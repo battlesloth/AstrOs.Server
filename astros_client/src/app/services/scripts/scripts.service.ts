@@ -58,7 +58,18 @@ export class ScriptsService {
     })
       .pipe(
         tap(_ => console.log(`uploadScript result: ${_.message}`)),
-        catchError(this.handleError<any>('uploadScript'))
+        //catchError(this.handleError<any>('uploadScript'))
+        
+      );
+  }
+
+  public runScript(id: string): Observable<any> {
+    return this.http.get<any>(`/api/scripts/run?id=${id}`, {
+      headers: { Authorization: `Bearer ${this.getToken()}` }
+    })
+      .pipe(
+        tap(_ => console.log(`runScript result: ${_.message}`)),
+        catchError(this.handleError<any>('runScript'))
       );
   }
 

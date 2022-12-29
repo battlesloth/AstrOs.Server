@@ -7,6 +7,7 @@ export class ScriptChannelsTable {
     public static readonly scriptId = 'scriptId';
     public static readonly controllerType = 'controllerType';
     public static readonly type = 'type';
+    public static readonly subType = 'subType';
     public static readonly channelNumber = 'channelNumber'
 
     public static readonly create =
@@ -15,12 +16,13 @@ export class ScriptChannelsTable {
     ${this.scriptId} TEXT,
     ${this.controllerType} INTEGER,
     ${this.type} INTEGER,
+    ${this.subType} INTEGER,
     ${this.channelNumber} INTEGER)`;
 
     public static readonly insert =
     `INSERT INTO ${this.table}
-    (${this.id}, ${this.scriptId}, ${this.controllerType}, ${this.type}, ${this.channelNumber})
-    VALUES (?, ?, ?, ?, ?)`;
+    (${this.id}, ${this.scriptId}, ${this.controllerType}, ${this.type}, ${this.subType}, ${this.channelNumber})
+    VALUES (?, ?, ?, ?, ?, ?)`;
 
     public static readonly selectAllForScript =
     `SELECT t.${this.id}, 
@@ -28,6 +30,7 @@ export class ScriptChannelsTable {
     c.${ControllersTable.controllerName},
     t.${this.controllerType},
     t.${this.type},
+    t.${this.subType},
     t.${this.channelNumber}
     FROM ${this.table} AS t
     LEFT JOIN ${ControllersTable.table} AS c

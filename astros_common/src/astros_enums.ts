@@ -14,6 +14,12 @@ export enum ChannelType {
     audio = 4
 }
 
+export enum ChannelSubType {
+    none = 0,
+    genericSerial = 1,
+    kangaroo = 2
+}
+
 export enum UartType{
     none,
     genericSerial,

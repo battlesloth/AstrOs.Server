@@ -27,8 +27,8 @@ import { ScriptRepository } from "./dal/repositories/script_repository";
 import { ScriptConverter } from "./script_converter";
 import { BaseResponse, ControllerType, Script, TransmissionStatus, TransmissionType } from "astros-common";
 import { ControllerRepository } from "./dal/repositories/controller_repository";
-import { ControllerConfig } from "./models/config/controller_config";
 import { ConfigSync } from "./models/config/config_sync";
+import { ScriptRun } from "./models/scripts/script_run";
 
 class ApiServer {
 
@@ -160,6 +160,7 @@ class ApiServer {
         this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
 
         this.router.get(ScriptsController.upload, this.authHandler, (req: any, res: any, next: any) => { this.uploadScript(req, res, next); });
+        this.router.get(ScriptsController.run, this.authHandler, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
@@ -308,6 +309,32 @@ class ApiServer {
             const controllers = await ctlRepo.getControllerData();
 
             const msg = new ScriptUpload(id, messages, controllers);
+
+            this.moduleLoader.postMessage(msg);
+
+            res.status(200);
+            res.json({ message: "success" });
+
+        } catch (error) {
+            console.log(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    private async runScript(req: any, res: any, next: any) {
+        try {
+            const id = req.query.id;
+
+            const dao = new DataAccess();
+            const ctlRepo = new ControllerRepository(dao);
+
+            const controllers = await ctlRepo.getControllerData();
+
+            const msg = new ScriptRun(id, controllers);
 
             this.moduleLoader.postMessage(msg);
 

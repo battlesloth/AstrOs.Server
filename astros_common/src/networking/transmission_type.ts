@@ -1,5 +1,7 @@
 export enum TransmissionType{
     script,
     sync,
-    status
+    status,
+    run,
+    painc
 }

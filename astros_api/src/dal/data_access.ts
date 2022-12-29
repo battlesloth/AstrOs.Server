@@ -178,8 +178,14 @@ export class DataAccess {
             }
 
             for (let i = 0; i < 128; i++) {
-                await this.run(I2cChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned"])
+
+                if (i === 64 || i === 65){
+                    await this.run(I2cChannelsTable.insert, [ctl.toString(), i.toString(), "reserved", '0'])
                     .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
+                } else {
+                    await this.run(I2cChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned", '0'])
+                    .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
+                }
             }
         }
 

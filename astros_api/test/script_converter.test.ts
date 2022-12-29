@@ -1,26 +1,37 @@
 
-import { ChannelType, ControllerType , KangarooController, 
-    UartModule, UartType, KangarooAction, KangarooEvent, 
-    Script, ScriptChannel, ScriptEvent, ServoModule, ServoEvent} from "astros-common";
+import {
+    ChannelType, ControllerType, KangarooController,
+    UartModule, UartType, KangarooAction, KangarooEvent,
+    Script, ScriptChannel, ScriptEvent, ServoModule, ServoEvent, ChannelSubType, ServoChannel
+} from "astros-common";
 import { ScriptConverter, CommandType } from "../src/script_converter";
 
 function generateKangarooEvent(time: number, ch1Action: KangarooAction, ch1Speed: number, ch1Position: number,
     ch2Action: KangarooAction, ch2Speed: number, ch2Position: number) {
-    
+
     const data = new KangarooEvent(ch1Action, ch1Speed, ch1Position, ch2Action, ch2Speed, ch2Position)
-    
-    return {key: time, value: new ScriptEvent("", ChannelType.uart, time, JSON.stringify(data))};
+
+    return { key: time, value: new ScriptEvent("", ChannelType.uart, ChannelSubType.kangaroo, time, JSON.stringify(data)) };
 }
 
 function generateServoEvent(time: number, channel: number, position: number, speed: number) {
-    
+
     const data = new ServoEvent(channel, position, speed);
-    
-    return {key: time, value: new ScriptEvent("", ChannelType.uart, time, JSON.stringify(data))};
+
+    return { key: time, value: new ScriptEvent("", ChannelType.servo, ChannelSubType.none, time, JSON.stringify(data)) };
 }
 
+
+const _type = 0;
+const _time = 1;
+const _servoChannel = 2;
+const _servoPosition = 3;
+const _servoSpeed = 4;
+
+
+
 describe("Script Converter Tests", () => {
-    it("kangaroo test", () => {
+    it("multi channel test", () => {
 
         const script = new Script("1234", "test1",
             "desc1", "1970-01-01 00:00:00.000",
@@ -28,174 +39,107 @@ describe("Script Converter Tests", () => {
             "1970-01-01 00:00:00.000",
             "1970-01-01 00:00:00.000");
 
-        const uartModule = new UartModule(UartType.kangaroo, "Periscope", new KangarooController());
+        const servoCh0 = new ServoChannel(0, "ch0", true, 500, 2500);
+        const servoCh10 = new ServoChannel(10, "ch10", true, 500, 2500);
+        const servoCh20 = new ServoChannel(20, "ch20", true, 500, 2500);
 
-        const channel = new ScriptChannel("1", ControllerType.core, "core", ChannelType.uart, 0, uartModule, 300);
-
-        // cmd;cmd;cmd;cmd;
-
-
-        // |___|_________|___|____|____|____;
-        //  evt time_till ch  cmd  spd  pos  
-        // Servo => 1, I2C => 2, Generic Serial => 3, Kangaroo => 4 
-        // field*field*field*field
-
-        // ROO:4*780*
+        const channelOne = new ScriptChannel("one", ControllerType.core, "core", ChannelType.servo, ChannelSubType.none, 0, servoCh0, 3000);
+        const channelTen = new ScriptChannel("two", ControllerType.core, "core", ChannelType.servo, ChannelSubType.none, 0, servoCh10, 3000);
+        const channelTwenty = new ScriptChannel("three", ControllerType.core, "core", ChannelType.servo, ChannelSubType.none, 0, servoCh20, 3000);
 
 
-        // lifter up 780, slow
-        channel.eventsKvpArray.push(
-            generateKangarooEvent(0,
-                KangarooAction.position, 100, 780,
-                KangarooAction.none, 0, 0));
+        // move to 50, speed 1, at same time, then delay 1 second
+        channelOne.eventsKvpArray.push(generateServoEvent(0, 0, 50, 1));
+        channelTen.eventsKvpArray.push(generateServoEvent(0, 10, 50, 1));
+        channelTwenty.eventsKvpArray.push(generateServoEvent(0, 20, 50, 1));
 
-        // lifter down 350, slow
-        channel.eventsKvpArray.push(
-            generateKangarooEvent(12 * 1000,
-                KangarooAction.position, 100, 350,
-                KangarooAction.none, 0, 0));
+        // move to 100, speed 3, with a 1 second delay
+        channelOne.eventsKvpArray.push(generateServoEvent(10, 0, 100, 3));
+        channelTen.eventsKvpArray.push(generateServoEvent(20, 10, 100, 3));
+        channelTwenty.eventsKvpArray.push(generateServoEvent(30, 20, 100, 3));
 
-        // lifter up 690, slow
-        channel.eventsKvpArray.push(
-            generateKangarooEvent(18 * 1000,
-                KangarooAction.position, 100, 690,
-                KangarooAction.none, 0, 0));
+        // move to 0 speed 5, at the same time
+        channelOne.eventsKvpArray.push(generateServoEvent(40, 0, 0, 5));
+        channelTen.eventsKvpArray.push(generateServoEvent(40, 10, 0, 5));
+        channelTwenty.eventsKvpArray.push(generateServoEvent(40, 20, 0, 5));
 
-        // spinner ccw, moderate
-        channel.eventsKvpArray.push(
-            generateKangarooEvent(22 * 1000,
-                KangarooAction.none, 0, 0,
-                KangarooAction.position, 700, -350));
-
-        // spinner cw, fast
-        channel.eventsKvpArray.push(
-            generateKangarooEvent(27 * 1000,
-                KangarooAction.none, 0, 0,
-                KangarooAction.position, 2000, 700));
-
-        //lifter up 790, slow
-        channel.eventsKvpArray.push(
-            generateKangarooEvent(30 * 1000,
-                KangarooAction.position, 1000, 790,
-                KangarooAction.none, 0, 0));
-
-        // spinner ccw, mod
-        channel.eventsKvpArray.push(
-            generateKangarooEvent(32 * 1000,
-                KangarooAction.none, 0, 0,
-                KangarooAction.position, 400, 350));
-
-        // spinner home
-        channel.eventsKvpArray.push(
-            generateKangarooEvent(37 * 1000,
-                KangarooAction.none, 0, 0,
-                KangarooAction.home, 0, 0));
-
-        // lifter down -15
-        channel.eventsKvpArray.push(
-            generateKangarooEvent(38 * 1000,
-                KangarooAction.position, 200, -15,
-                KangarooAction.none, 0, 0));
-
-        script.scriptChannels = new Array<ScriptChannel>(channel);
+        script.scriptChannels = new Array<ScriptChannel>(channelOne, channelTen, channelTwenty);
 
         const cvtr = new ScriptConverter();
 
         const result = cvtr.convertScript(script);
 
+        expect(result?.size).toBe(1);
         expect(result?.get(ControllerType.core)?.length).toBeGreaterThan(0);
-        expect(result?.get(ControllerType.dome)?.length).toBe(0);
-        expect(result?.get(ControllerType.body)?.length).toBe(0);
-
-        const coreVal = result?.get(ControllerType.core);
-
-        const evts = Array<Array<string>>();
-
-        const segs = coreVal?.split(';');
-
-        segs?.forEach( e => {
-            evts.push(e.split('|'));
-        });
-
-        expect(coreVal).toBe('4|12000|1|4|100|780;4|6000|1|4|100|350;4|4000|1|4|100|690;4|5000|2|4|700|-350;4|3000|2|4|2000|700;4|2000|1|4|1000|790;4|5000|2|4|400|350;4|1000|2|2|0|0;4|0|1|4|200|-15;');
-
-        expect(parseInt(evts[0][0])).toBe(CommandType.kangaroo);
-        expect(parseInt(evts[0][2])).toBe(1);
-
-        expect(parseInt(evts[1][0])).toBe(CommandType.kangaroo);
-        expect(parseInt(evts[1][2])).toBe(1);
-
-        expect(parseInt(evts[2][0])).toBe(CommandType.kangaroo);
-        expect(parseInt(evts[2][2])).toBe(1);
-
-        expect(parseInt(evts[3][0])).toBe(CommandType.kangaroo);
-        expect(parseInt(evts[3][2])).toBe(2);
-
-        expect(parseInt(evts[4][0])).toBe(CommandType.kangaroo);
-        expect(parseInt(evts[4][2])).toBe(2);
-
-        expect(parseInt(evts[5][0])).toBe(CommandType.kangaroo);
-        expect(parseInt(evts[5][2])).toBe(1);
-
-        expect(parseInt(evts[6][0])).toBe(CommandType.kangaroo);
-        expect(parseInt(evts[6][2])).toBe(2);
-
-        expect(parseInt(evts[7][0])).toBe(CommandType.kangaroo);
-        expect(parseInt(evts[7][2])).toBe(2);
-
-        expect(parseInt(evts[8][0])).toBe(CommandType.kangaroo);
-        expect(parseInt(evts[8][2])).toBe(1);
-
-    });
-
-    it("serial test", () => {
-
-        const script = new Script("1234", "test1",
-            "desc1", "1970-01-01 00:00:00.000",
-            "1970-01-01 00:00:00.000",
-            "1970-01-01 00:00:00.000",
-            "1970-01-01 00:00:00.000");
-
-        const servoModule = new ServoModule();
-
-        const channel = new ScriptChannel("1", ControllerType.core, "core", ChannelType.servo, 0, servoModule, 300);
-
-        // cmd;cmd;cmd;cmd;
-
-        // |___|_________|___|____|____;
-        //  evt time_till ch  spd  pos  
-        // Servo => 1, I2C => 2, Generic Serial => 3, Kangaroo => 4 
-        // field*field*field*field
-
-        // ROO:4*780*
-
-        channel.eventsKvpArray.push(
-            generateServoEvent(0, 1, 50, 5)
-        );
        
-        script.scriptChannels = new Array<ScriptChannel>(channel);
-
-        const cvtr = new ScriptConverter();
-
-        const result = cvtr.convertScript(script);
-
-        expect(result?.get(ControllerType.core)?.length).toBeGreaterThan(0);
-        expect(result?.get(ControllerType.dome)?.length).toBe(0);
-        expect(result?.get(ControllerType.body)?.length).toBe(0);
-
         const coreVal = result?.get(ControllerType.core);
 
         const evts = Array<Array<string>>();
 
         const segs = coreVal?.split(';');
 
-        segs?.forEach( e => {
+        segs?.forEach(e => {
             evts.push(e.split('|'));
         });
 
-        expect(coreVal).toBe('');
 
+        const channels = new Array<string>('0', '10', '20');
 
+        //expect(coreVal).toBe('1|0|0|50|1;1|0|10|50|1;1|1000|20|50|1;1|1000|0|100|3;1|1000|10|100|3;1|1000|20|100|3;1|0|0|0|5;1|0|10|0|5;1|0|20|0|5;');
 
+        expect(parseInt(evts[0][_type])).toBe(CommandType.servo);
+        expect(parseInt(evts[0][_time])).toBe(0);
+        expect(channels.findIndex(x => x === evts[0][_servoChannel])).toBeGreaterThan(-1);
+        expect(parseInt(evts[0][_servoPosition])).toBe(50);
+        expect(parseInt(evts[0][_servoSpeed])).toBe(1);
+
+        expect(parseInt(evts[1][_type])).toBe(CommandType.servo);
+        expect(parseInt(evts[1][_time])).toBe(0);
+        expect(channels.findIndex(x => x === evts[1][_servoChannel])).toBeGreaterThan(-1);
+        expect(parseInt(evts[1][_servoPosition])).toBe(50);
+        expect(parseInt(evts[1][_servoSpeed])).toBe(1);
+
+        expect(parseInt(evts[2][_type])).toBe(CommandType.servo);
+        expect(parseInt(evts[2][_time])).toBe(1000);
+        expect(channels.findIndex(x => x === evts[0][_servoChannel])).toBeGreaterThan(-1);
+        expect(parseInt(evts[2][_servoPosition])).toBe(50);
+        expect(parseInt(evts[2][_servoSpeed])).toBe(1);
+
+        expect(parseInt(evts[3][_type])).toBe(CommandType.servo);
+        expect(parseInt(evts[3][_time])).toBe(1000);
+        expect(parseInt(evts[3][_servoChannel])).toBe(0);
+        expect(parseInt(evts[3][_servoPosition])).toBe(100);
+        expect(parseInt(evts[3][_servoSpeed])).toBe(3);
+
+        expect(parseInt(evts[4][_type])).toBe(CommandType.servo);
+        expect(parseInt(evts[4][_time])).toBe(1000);
+        expect(parseInt(evts[4][_servoChannel])).toBe(10);
+        expect(parseInt(evts[4][_servoPosition])).toBe(100);
+        expect(parseInt(evts[4][_servoSpeed])).toBe(3);
+
+        expect(parseInt(evts[5][_type])).toBe(CommandType.servo);
+        expect(parseInt(evts[5][_time])).toBe(1000);
+        expect(parseInt(evts[5][_servoChannel])).toBe(20);
+        expect(parseInt(evts[5][_servoPosition])).toBe(100);
+        expect(parseInt(evts[5][_servoSpeed])).toBe(3);
+
+        
+        expect(parseInt(evts[6][_type])).toBe(CommandType.servo);
+        expect(parseInt(evts[6][_time])).toBe(0);
+        expect(channels.findIndex(x => x === evts[6][_servoChannel])).toBeGreaterThan(-1);
+        expect(parseInt(evts[6][_servoPosition])).toBe(0);
+        expect(parseInt(evts[6][_servoSpeed])).toBe(5);
+
+        expect(parseInt(evts[7][_type])).toBe(CommandType.servo);
+        expect(parseInt(evts[7][_time])).toBe(0);
+        expect(channels.findIndex(x => x === evts[7][_servoChannel])).toBeGreaterThan(-1);
+        expect(parseInt(evts[7][_servoPosition])).toBe(0);
+        expect(parseInt(evts[7][_servoSpeed])).toBe(5);
+
+        expect(parseInt(evts[8][_type])).toBe(CommandType.servo);
+        expect(parseInt(evts[8][_time])).toBe(0);
+        expect(channels.findIndex(x => x === evts[8][_servoChannel])).toBeGreaterThan(-1);
+        expect(parseInt(evts[8][_servoPosition])).toBe(0);
+        expect(parseInt(evts[8][_servoSpeed])).toBe(5);
     });
 })

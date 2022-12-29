@@ -7,6 +7,7 @@ export class ScriptsController {
     public static putRoute = '/scripts/'
     public static getAllRoute = '/scripts/all'
     public static upload = '/scripts/upload'
+    public static run = '/scripts/run'
 
     public static async getAllScripts(req: any, res: any, next: any){
         try {

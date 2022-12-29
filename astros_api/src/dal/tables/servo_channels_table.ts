@@ -43,6 +43,7 @@ export class ServoChannelsTable {
     WHERE ${this.channelId} = ?
     AND ${this.controllerId} = ?`;
 
+    // 64 and 65 are reserved for the servo breakout board
     public static readonly update =
     `UPDATE ${this.table}
     SET ${this.channelName} = ?,

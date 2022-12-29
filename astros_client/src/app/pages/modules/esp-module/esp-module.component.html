@@ -45,7 +45,10 @@
             <li *ngFor="let channel of module.i2cModule.channels">
                 <div class="i2c-channel">
                     <div class="label">Channel {{channel.id}}</div>
-                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" /></div>
+                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" [disabled]="channel.channelName.toLowerCase() === 'reserved'"/></div>
+                    <div class="enabled">
+                        <mat-checkbox [(ngModel)]="channel.enabled" [disabled]="channel.channelName.toLowerCase() === 'reserved'">Enabled</mat-checkbox>
+                    </div>
                 </div>
             </li>
         </ul>

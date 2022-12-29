@@ -5,7 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelType, ControllerType, ControlModule, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
+import { ChannelSubType, ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -217,7 +217,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     const ch = this.scriptChannels[chIdx];
 
-    const event = new ScriptEvent(ch.id, ch.type, time, '');
+    const event = new ScriptEvent(ch.id, ch.type, ch.subType, time, '');
 
     this.createEventModal(event, false);
 
@@ -257,6 +257,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         break;
       case ChannelType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);
+        modalResources.set(ModalResources.i2cId, this.getI2cIdFromChannel(event.scriptChannel))
         break;
       case ChannelType.servo:
         component = this.container.createComponent(ServoEventModalComponent);
@@ -300,6 +301,19 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     if (chIdx > -1) {
       const servo = this.scriptChannels[chIdx].channel as ServoChannel;
       return servo.id;
+    }
+    
+  }
+
+  getI2cIdFromChannel(channelId: string): any {
+    
+    const chIdx = this.scriptChannels
+      .map((ch) => { return ch.id })
+      .indexOf(channelId);
+
+    if (chIdx > -1) {
+      const i2c = this.scriptChannels[chIdx].channel as I2cChannel;
+      return i2c.id;
     }
     
   }
@@ -369,7 +383,13 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     const chValue = this.scriptResources.addChannel(controller, channelType, channel);
 
-    const ch = new ScriptChannel(Guid.create().toString(), controller, name, channelType, channel, chValue, this.segments);
+    let subType = 0;
+    
+    if (channelType === ChannelType.uart){
+      subType = chValue.type;
+    }
+
+    const ch = new ScriptChannel(Guid.create().toString(), controller, name, channelType, subType, channel, chValue, this.segments);
 
     this.scriptChannels.unshift(ch);
   }

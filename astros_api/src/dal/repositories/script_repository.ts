@@ -67,7 +67,7 @@ export class ScriptRepository {
                 val.forEach((ch: any) => {
 
                     const channel = new ScriptChannel(ch.id, ch.controllerType,
-                        ch.controllerName, ch.type, ch.channelNumber, null, 0)
+                        ch.controllerName, ch.type, ch.subType, ch.channelNumber, null, 0)
 
                     if (channel.controllerType == ControllerType.audio) {
                         channel.controllerName = 'Audio Playback';
@@ -90,7 +90,7 @@ export class ScriptRepository {
             await this.dao.get(ScriptEventsTable.selectForChannel, [result.id, ch.id])
                 .then((val: any) => {
                     val.forEach((evt: any) => {
-                        const event = new ScriptEvent(evt.scriptChannel, evt.channelType, evt.time, evt.dataJson);
+                        const event = new ScriptEvent(evt.scriptChannel, evt.channelType, evt.channelSubType, evt.time, evt.dataJson);
                         ch.eventsKvpArray.push({ key: event.time, value: event });
                     });
                 }).catch((err) => {
@@ -156,7 +156,7 @@ export class ScriptRepository {
                 try {
                     switch (type) {
                         case ChannelType.i2c:
-                            result = new I2cChannel(val[0].channelId, val[0].channelName);
+                            result = new I2cChannel(val[0].channelId, val[0].channelName, val[0].enabled);
                             break;
                         case ChannelType.servo:
                             result = new ServoChannel(val[0].channelId, val[0].channelName,
@@ -238,7 +238,7 @@ export class ScriptRepository {
         for (const ch of script.scriptChannels) {
 
             await this.dao.run(ScriptChannelsTable.insert, [ch.id,
-            script.id, ch.controllerType.toString(), ch.type.toString(), ch.channelNumber.toString()])
+            script.id, ch.controllerType.toString(), ch.type.toString(), ch.subType.toString(), ch.channelNumber.toString()])
                 .then((val: any) => {
                     if (val) { console.log(val); }
                 });
@@ -248,7 +248,7 @@ export class ScriptRepository {
 
                 if (evt) {
                     await this.dao.run(ScriptEventsTable.insert,
-                        [script.id, evt.scriptChannel, evt.channelType.toString(), evt.time.toString(), evt.dataJson])
+                        [script.id, evt.scriptChannel, evt.channelType.toString(), evt.channelSubType, evt.time.toString(), evt.dataJson])
                         .then((val: any) => {
                             if (val) { console.log(val); }
                         });

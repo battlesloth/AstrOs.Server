@@ -4,8 +4,10 @@ const e = require("express");
 
 parentPort.on('message', data => {
 
-    const sync = 1;
     const script = 0;
+    const sync = 1;
+    const run = 3;
+    const painc = 4;
     
     switch (data.type) {
         case script:
@@ -13,7 +15,13 @@ parentPort.on('message', data => {
             break;
         case sync:
             uploadConfigs(data);
-            break
+            break;
+        case run:
+            runScript(data);
+            break;
+        case panic:
+            painc(data);
+            break;
     }
 })
 
@@ -103,3 +111,50 @@ async function uploadConfigs(data) {
     parentPort.postMessage(result);
 }
 
+async function runScript(data) {
+
+    const agent = superagent.agent();
+
+    for (const config of data.configs) {
+        if (!!config.ip.trim()) {
+            try {
+                agent.get(`http://${config.ip}/runscript?scriptId=${data.scriptId}`)
+                    .timeout({ response: 4000 })
+                    .then(res => {
+                    })
+                    .catch(err => {
+                        console.log(`runscript|Error posting config to controller ${config.ip}: ${err}`);
+                    });
+
+            } catch (err) {
+                console.log(`runscript|Error posting config to controller ${config.ip}: ${err}`);
+            };
+        } else {
+            console.log(`runscript|No IP set for Controller Type ${config.id}`);
+        }
+    };
+}
+
+async function panic(data) {
+
+    const agent = superagent.agent();
+
+    for (const config of data.configs) {
+        if (!!config.ip.trim()) {
+            try {
+                agent.get(`http://${config.ip}/panicstop`)
+                    .timeout({ response: 4000 })
+                    .then(res => {
+                    })
+                    .catch(err => {
+                        console.log(`panicstop|Error posting config to controller ${config.ip}: ${err}`);
+                    });
+
+            } catch (err) {
+                console.log(`panicstop|Error posting config to controller ${config.ip}: ${err}`);
+            };
+        } else {
+            console.log(`panicstop|No IP set for Controller Type ${config.id}`);
+        }
+    };
+}

@@ -87,7 +87,7 @@ export class ControllerRepository {
                 .then((val: any) => {
                     val.forEach((ch: any) => {
                         controller.i2cModule.channels[ch.channelId] =
-                            new I2cChannel(ch.channelId, ch.channelName);
+                            new I2cChannel(ch.channelId, ch.channelName, ch.enabled);
                     });
                 })
                 .catch((err) => {
@@ -138,7 +138,7 @@ export class ControllerRepository {
 
             for (const i2c of ctl.i2cModule.channels) {
 
-                await this.dao.run(I2cChannelsTable.update, [i2c.channelName, i2c.id.toString(), ctl.id.toString()])
+                await this.dao.run(I2cChannelsTable.update, [i2c.channelName, i2c.enabled ? '1' : '0', i2c.id.toString(), ctl.id.toString()])
                     .catch((err: any) => {
                         console.log(err);
                         throw 'error';

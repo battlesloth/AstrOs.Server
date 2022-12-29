@@ -32,4 +32,8 @@ export class ModalResources{
     // Servo module types
     public static readonly servoId = 'servoId';
 
+    // I2c module types
+    public static readonly i2cId = 'servoId';
+
+
 }
