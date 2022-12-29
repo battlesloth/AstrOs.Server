@@ -15,6 +15,7 @@ import { ServoEventModalComponent } from './modals/servo-event-modal/servo-event
 import { AudioEventModalComponent } from './modals/audio-event-modal/audio-event-modal.component';
 import { KangarooEventModalComponent } from './modals/kangaroo-event-modal/kangaroo-event-modal.component';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
+import { ScriptTestModalComponent } from './modals/script-test-modal/script-test-modal.component';
 
 
 export interface Item {
@@ -32,8 +33,6 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;
 
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
-  // (modalCallback)="modalCallback($event)"
-  //[resources]="modalResources"
 
   private segmentWidth: number = 60;
   private segments: number = 3000;
@@ -41,6 +40,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   private scriptId: string;
   private resourcesLoaded: boolean = false;
   private renderedEvents: boolean = false;
+
+  backgroundClickDisabled = '0'; 
 
   script!: Script;
   scriptChannels: Array<ScriptChannel>;
@@ -165,6 +166,25 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.scriptService.saveScript(this.script).subscribe(observer);
   }
 
+  testScript() {
+    this.container.clear();
+
+    const modalResources = new Map<string, any>();
+
+    modalResources.set(ModalResources.controllers, this.scriptResources.controllers);
+    
+    const component = this.container.createComponent(ScriptTestModalComponent);
+
+    component.instance.resources = modalResources;
+    component.instance.modalCallback.subscribe((evt: any) => {
+      this.modalCallback(evt);
+    });
+    this.components.push(component);
+
+    this.backgroundClickDisabled = '1';
+
+    this.modalService.open('scripter-modal');
+  }
 
   openChannelAddModal() {
 
@@ -340,6 +360,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.modalService.close('scripter-modal');
     this.container.clear();
     this.components.splice(0, this.components.length);
+    this.backgroundClickDisabled = '0';
   }
 
   timelineCallback(msg: any) {

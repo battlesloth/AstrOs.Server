@@ -8,6 +8,7 @@
         </div>
         <div class="button-box">
             <button (click)="saveScript()">Save</button>
+            <button (click)="testScript()">Test</button>
         </div>
     </div>
     <div id="scripter-container" class="scripter-container">
@@ -39,6 +40,6 @@
     </div>
 </div>
 
-<astros-modal id="scripter-modal" style="display: none;">
+<astros-modal id="scripter-modal"  disableBackgroundClick="{{backgroundClickDisabled}}" style="display: none;">
     <ng-template #modalContainer></ng-template>
 </astros-modal>
