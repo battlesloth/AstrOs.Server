@@ -1,29 +1,28 @@
-const { parentPort } = require("worker_threads");
+const { parentPort, workerData } = require("worker_threads");
 const superagent  = require('superagent');
 
 parentPort.on('message', data => {
-    monitorModule(data);
+    checkControllers(data);
 })
 
-function monitorModule(data) {
+function checkControllers(data) {
     const agent = superagent.agent();
 
-    let uri = '';
-    
-    if (data.ip){
-        uri = data.ip;
-    } else {
-        uri = data.monitor;
-    }
-
-    agent.get(`http://${uri}`)
-        .timeout({response: 4000})
-        .then(res => {
-            parentPort.postMessage({type:'status', module:module, status:res.body.status});
-        })
-        .catch(err => {
-            console.log(`Error calling ${data.monitor}:${err.message}`);
-            parentPort.postMessage({type: 'status', module:data.monitor, status:"down"})
-        });
+    data.forEach( ctl => {
+        if (!!ctl.ip){
+        agent.get(`http://${ctl.ip}`)
+            .timeout({response: 4000})
+            .then(res => {
+                parentPort.postMessage({type: 2, controllerType: ctl.controllerType, up: res.body.result === 'up', synced: res.body.fingerprint === ctl.fingerprint});
+            })
+            .catch(err => {
+                console.log(`Error calling ${ctl.ip}:${err.message}`);
+                parentPort.postMessage({type: 2, controllerType: ctl.controllerType, up: false, synced: false})
+            });    
+        } else {
+            console.log(`No IP set for Controller Type ${ctl.controllerType}`);
+            parentPort.postMessage({type: 2, controllerType: ctl.controllerType, up: false, synced: false})
+        }
+    });
 }
 

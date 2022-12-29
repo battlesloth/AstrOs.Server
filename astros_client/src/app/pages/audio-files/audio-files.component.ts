@@ -6,6 +6,7 @@ import { AudioFile } from 'astros-common';
 import { AudioService } from 'src/app/services/audio/audio.service';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { UploadModalComponent } from './upload-modal/upload-modal.component';
+import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 
 @Component({
   selector: 'app-audio-files',
@@ -22,7 +23,9 @@ export class AudioFilesComponent implements OnInit {
 
   audioFiles: Array<AudioFile>;
 
-  constructor(private snackBar: MatSnackBar, private modalService: ModalService, private audioService: AudioService) { 
+  constructor(private snackBar: SnackbarService,
+      private modalService: ModalService,
+      private audioService: AudioService) { 
     this.audioFiles = new Array<AudioFile>();
 
   }
@@ -37,7 +40,7 @@ export class AudioFilesComponent implements OnInit {
   }
 
   playFile(id: string){
-    this.snackBar.open('TODO: impelement this!', 'OK', { duration: 2000 });
+    this.snackBar.okToast('TODO: impelement this!');
   }
 
   uploadFile(){
@@ -109,13 +112,13 @@ export class AudioFilesComponent implements OnInit {
           
           this.audioFiles.splice(idx, 1);
 
-          this.snackBar.open('File deleted!', 'OK', { duration: 2000 });
+          this.snackBar.okToast('File deleted!');
         } else{
-          this.snackBar.open('File delete failed!', 'OK', { duration: 2000 });  
+          this.snackBar.okToast('File delete failed!');  
         }
       },
       error: (err: any) => {
-        this.snackBar.open('File delete failed!', 'OK', { duration: 2000 });
+        this.snackBar.okToast('File delete failed!');
         console.error(err);
       }
     };

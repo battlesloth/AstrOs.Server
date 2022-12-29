@@ -1,24 +1,26 @@
 import { Component, OnInit } from '@angular/core';
-import { ScriptEvent } from 'astros-common';
+import { ScriptEvent, ServoEvent } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 
 
 @Component({
-  selector: 'app-pwm-event-modal',
-  templateUrl: './pwm-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./pwm-event-modal.component.scss']
+  selector: 'app-servo-event-modal',
+  templateUrl: './servo-event-modal.component.html',
+  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./servo-event-modal.component.scss']
 })
-export class PwmEventModalComponent extends BaseEventModalComponent implements OnInit {
+export class ServoEventModalComponent extends BaseEventModalComponent implements OnInit {
 
-  eventValue: string;
+  channelId!: number;
+  speed: number;
+  position: number;
   
   constructor() {
     super();
     this.originalEventTime = 0;
     this.eventTime = 0;
-    this.eventValue = '';
-    this.errorMessage = '';
+    this.speed = 1;
+    this.position = 0;
     this.callbackType = ModalCallbackEvent.addEvent;
   }
 
@@ -34,29 +36,35 @@ export class PwmEventModalComponent extends BaseEventModalComponent implements O
 
     this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
     
+    this.channelId = <number> this.resources.get(ModalResources.servoId);
+
     if (this.scriptEvent.dataJson != ''){
       const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.eventValue = payload.value;
+      this.channelId = payload.channelId;
+      this.position = payload.position;
+      this.speed = payload.speed;
     }
     
-    this.originalEventTime = this.scriptEvent.time;
-    this.eventTime = this.scriptEvent.time;
+    this.originalEventTime = this.scriptEvent.time / this.timeFactor;
+    this.eventTime = this.scriptEvent.time / this.timeFactor;
   }
 
   addEvent(){
 
     if (+this.eventTime > this.maxTime){
-      this.errorMessage = `Event time cannot be larger than ${this.maxTime}`;
+      this.errorMessage = `Event time cannot be larger than ${this.maxTime/this.timeFactor}`;
       return;
     }
    
-    this.scriptEvent.time = +this.eventTime;
-    this.scriptEvent.dataJson = JSON.stringify({value: this.eventValue});
+    this.scriptEvent.time = +this.eventTime * this.timeFactor;
+
+    const data = new ServoEvent(+this.channelId, +this.position, +this.speed);
+    this.scriptEvent.dataJson = JSON.stringify(data);
 
     this.modalCallback.emit({
       id: this.callbackType,
       scriptEvent: this.scriptEvent,
-      originalEventTime: this.originalEventTime
+      originalEventTime: this.originalEventTime * this.timeFactor
     });
   }
 }

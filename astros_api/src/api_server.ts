@@ -22,11 +22,13 @@ import { ScriptsController } from "src/controllers/scripts_controller";
 import { AudioController } from "./controllers/audio_controller";
 import { FileController } from "./controllers/file_controller";
 import { ScriptUpload } from "src/models/scripts/script_upload";
-import { ControllerEndpoint } from "./models/controller_endpoint";
 import { ScriptRepository } from "./dal/repositories/script_repository";
 
 import { ScriptConverter } from "./script_converter";
-import { ControllerType, Script, TransmissionStatus } from "astros-common";
+import { BaseResponse, ControllerType, Script, TransmissionStatus, TransmissionType } from "astros-common";
+import { ControllerRepository } from "./dal/repositories/controller_repository";
+import { ConfigSync } from "./models/config/config_sync";
+import { ScriptRun } from "./models/scripts/script_run";
 
 class ApiServer {
 
@@ -39,7 +41,7 @@ class ApiServer {
     private websocket!: Server;
     private espMonitor!: Worker;
 
-    scriptLoader!: Worker;
+    moduleLoader!: Worker;
 
     private authHandler!: RequestHandler;
 
@@ -47,21 +49,25 @@ class ApiServer {
 
     constructor() {
         Dotenv.config({ path: __dirname + '/.env' });
-
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
         this.router = Express.Router();
+    }
 
+    public async Init() {
         this.setAuthStrategy();
         this.configApi();
         this.configFileHandler();
         this.setRoutes();
         this.runWebServices();
-        this.runBackgroundServices();
+        await this.runBackgroundServices();
     }
 
-    public static bootstrap(): ApiServer {
-        return new ApiServer();
+    public static async bootstrap(): Promise<ApiServer> {
+
+        const server = new ApiServer();
+        await server.Init();
+        return server;
     }
 
     private setAuthStrategy(): void {
@@ -146,12 +152,15 @@ class ApiServer {
 
         this.router.get(ControllerController.route, this.authHandler, ControllerController.getControllers);
         this.router.put(ControllerController.route, this.authHandler, ControllerController.saveControllers);
+        this.router.get(ControllerController.syncRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllers(req, res, next); });
+
 
         this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
         this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
 
-        this.router.get(ScriptsController.upload, this.authHandler, (req: any, res: any, next: any) =>{this.uploadScript(req, res, next);});
+        this.router.get(ScriptsController.upload, this.authHandler, (req: any, res: any, next: any) => { this.uploadScript(req, res, next); });
+        this.router.get(ScriptsController.run, this.authHandler, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
@@ -172,78 +181,71 @@ class ApiServer {
         });
     }
 
-    private runBackgroundServices(): void {
-        this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: { monitor: 'core' } });
+    private async runBackgroundServices(): Promise<void> {
+
+        this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: {} });
         this.espMonitor.on('exit', exit => { console.log(exit); });
         this.espMonitor.on('error', err => { console.log(err); });
 
         this.espMonitor.on('message', (msg) => {
-            console.log(`${msg.module}:${msg.status}`);
+            console.log(`Controller=${ControllerType[msg.controllerType]};up=${msg.up};synced=${msg.synced}`);
             this.updateClients(msg);
         });
 
-        setInterval(() => { this.espMonitor.postMessage({ monitor: 'core', ip: '192.168.50.22' }) }, 5000);
+        setInterval(() => {
 
-        this.scriptLoader = new Worker('./dist/background_tasks/script_loader.js')
-        this.scriptLoader.on('exit', exit => { console.log(exit); });
-        this.scriptLoader.on('error', err => { console.log(err); });
+            const dao = new DataAccess();
+            const repository = new ControllerRepository(dao);
 
-        this.scriptLoader.on('message', async (msg) => {
+            repository.getControllerData()
+                .then((val: any) => {
 
-            if (msg.status === TransmissionStatus.success){
-                const dao = new DataAccess();
-                const repository = new ScriptRepository(dao);
+                    const ctlList = new Array<any>();
 
-                const options: Intl.DateTimeFormatOptions = {
-                    day: "numeric", month: "numeric", year: "numeric",
-                    hour: "2-digit", minute: "2-digit", second: "2-digit"
-                };
+                    val.forEach(function (ctl: any) {
+                        ctlList.push({ controllerType: ctl.id, ip: ctl.ipAddress, fingerprint: ctl.fingerprint });
+                    });
 
-                const date = (new Date()).toLocaleString('en-US', options);
+                    this.espMonitor.postMessage(ctlList);
+                })
+                .catch((err) => {
+                    console.log(`error getting controler IPs for monitor update: ${err}`);
+                });
 
-                await repository.updateScriptControllerUploaded(msg.scriptId, msg.controller, date);
+        }, 15 * 1000);
 
-                console.log(`Controller ${msg.controller} uploaded for ${msg.scriptId}!`)
+        this.moduleLoader = new Worker('./dist/background_tasks/module_loader.js')
+        this.moduleLoader.on('exit', exit => { console.log(exit); });
+        this.moduleLoader.on('error', err => { console.log(err); });
 
-                msg.date = date;
-            } else if (msg.status === TransmissionStatus.failed) {
-                console.log(`Controller ${msg.controller} upload failed for ${msg.scriptId}!`)
-            } else {
-                console.log(`Updating transmission status for Controller ${msg.controller}, ${msg.scriptId} => ${msg.status}`);
+        this.moduleLoader.on('message', async (msg) => {
+
+            switch (msg.type) {
+                case TransmissionType.script:
+                    await this.handleScriptRepsonse(msg);
+                    this.updateClients(msg);   
+                    break;
+                case TransmissionType.sync:{
+                    const response = await this.handleSyncResponse(msg);
+                    this.updateClients(response);
+                    break;
+                }              
+                   
             }
 
-            this.updateClients(msg);
         });
     }
 
-
-    private async uploadScript(req: any, res: any, next: any) {
+    private async syncControllers(req: any, res: any, next: any) {
         try {
-            const id = req.query.id;
-
             const dao = new DataAccess();
-            const repo = new ScriptRepository(dao);
+            const repo = new ControllerRepository(dao);
 
-            const script = await repo.getScript(id) as Script;
+            const controllers = await repo.getControllers();
 
-            const cvtr = new ScriptConverter();
-
-            const messages = cvtr.convertScript(script);
-
-            if (messages.size < 1) {
-                console.log(`No controller script values returned for ${id}`);
-                throw new Error(`No controller script values returned for ${id}`);
-            }
-
-            const controllers = new Array<ControllerEndpoint>(
-                new ControllerEndpoint('core', ControllerType.core, '', true),
-                new ControllerEndpoint('dome', ControllerType.dome, '', true),
-                new ControllerEndpoint('body', ControllerType.body, '', true),
-            );
-
-            const msg = new ScriptUpload(id, messages, controllers);
+            const msg = new ConfigSync(controllers);
             
-            this.scriptLoader.postMessage(msg);
+            this.moduleLoader.postMessage(msg);
 
             res.status(200);
             res.json({ message: "success" });
@@ -255,6 +257,122 @@ class ApiServer {
             res.json({
                 message: 'Internal server error'
             });
+        }
+    }
+
+    private async handleSyncResponse(msg: any) : Promise<BaseResponse> {
+
+        const result = new BaseResponse(TransmissionType.sync, true, '');
+
+        const modMap = new Map<number, string>();
+        modMap.set(1, 'Core Module');
+        modMap.set(2, 'Dome Module');
+        modMap.set(3, 'Body Module');
+
+        for (const r of msg.results)  {
+            
+            if (r.synced){
+                const dao = new DataAccess();
+                const repository = new ControllerRepository(dao);
+
+                const saved = await repository.updateControllerFingerprint(r.id, r.fingerprint);
+                
+                result.message += `${modMap.get(r.id)} sync ${saved ? 'succeeded' : 'failed'}, `;
+            } else {
+                result.message += `${modMap.get(r.id)} sync failed, `;
+            }
+        }
+
+        result.message = result.message.trim().slice(0, -1);
+        return result;
+    }
+
+    private async uploadScript(req: any, res: any, next: any) {
+        try {
+            const id = req.query.id;
+
+            const dao = new DataAccess();
+            const scriptRepo = new ScriptRepository(dao);
+            const ctlRepo = new ControllerRepository(dao);
+
+            const script = await scriptRepo.getScript(id) as Script;
+
+            const cvtr = new ScriptConverter();
+
+            const messages = cvtr.convertScript(script);
+
+            if (messages.size < 1) {
+                console.log(`No controller script values returned for ${id}`);
+                throw new Error(`No controller script values returned for ${id}`);
+            }
+
+            const controllers = await ctlRepo.getControllerData();
+
+            const msg = new ScriptUpload(id, messages, controllers);
+
+            this.moduleLoader.postMessage(msg);
+
+            res.status(200);
+            res.json({ message: "success" });
+
+        } catch (error) {
+            console.log(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    private async runScript(req: any, res: any, next: any) {
+        try {
+            const id = req.query.id;
+
+            const dao = new DataAccess();
+            const ctlRepo = new ControllerRepository(dao);
+
+            const controllers = await ctlRepo.getControllerData();
+
+            const msg = new ScriptRun(id, controllers);
+
+            this.moduleLoader.postMessage(msg);
+
+            res.status(200);
+            res.json({ message: "success" });
+
+        } catch (error) {
+            console.log(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    private async handleScriptRepsonse(msg: any) {
+
+        if (msg.status === TransmissionStatus.success) {
+            const dao = new DataAccess();
+            const repository = new ScriptRepository(dao);
+
+            const options: Intl.DateTimeFormatOptions = {
+                day: "numeric", month: "numeric", year: "numeric",
+                hour: "2-digit", minute: "2-digit", second: "2-digit"
+            };
+
+            const date = (new Date()).toLocaleString('en-US', options);
+
+            await repository.updateScriptControllerUploaded(msg.scriptId, msg.controller, date);
+
+            console.log(`Controller ${msg.controller} uploaded for ${msg.scriptId}!`)
+
+            msg.date = date;
+        } else if (msg.status === TransmissionStatus.failed) {
+            console.log(`Controller ${msg.controller} upload failed for ${msg.scriptId}!`)
+        } else {
+            console.log(`Updating transmission status for Controller ${msg.controller}, ${msg.scriptId} => ${msg.status}`);
         }
     }
 
@@ -270,4 +388,7 @@ class ApiServer {
     }
 }
 
-ApiServer.bootstrap();
+ApiServer.bootstrap().catch(err => {
+    console.error(err.stack)
+    process.exit(1)
+});

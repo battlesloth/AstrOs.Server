@@ -5,15 +5,16 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelType, ControllerType, ControlModule, KangarooController, Script, ScriptChannel, ScriptEvent, UartModule } from 'astros-common';
+import { ChannelSubType, ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
 import { I2cEventModalComponent } from './modals/i2c-event-modal/i2c-event-modal.component';
 import { ModalCallbackEvent, ModalResources } from '../../shared/modal-resources';
-import { PwmEventModalComponent } from './modals/pwm-event-modal/pwm-event-modal.component';
+import { ServoEventModalComponent } from './modals/servo-event-modal/servo-event-modal.component';
 import { AudioEventModalComponent } from './modals/audio-event-modal/audio-event-modal.component';
 import { KangarooEventModalComponent } from './modals/kangaroo-event-modal/kangaroo-event-modal.component';
+import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 
 
 export interface Item {
@@ -35,7 +36,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   //[resources]="modalResources"
 
   private segmentWidth: number = 60;
-  private seconds: number = 300;
+  private segments: number = 3000;
+  private segmentFactor: number = 10;
   private scriptId: string;
   private resourcesLoaded: boolean = false;
   private renderedEvents: boolean = false;
@@ -52,7 +54,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   components: Array<any>;
 
   constructor(private route: ActivatedRoute,
-    private snackBar: MatSnackBar,
+    private snackBar: SnackbarService,
     private modalService: ModalService,
     private renderer: Renderer2,
     private controllerService: ControllerService,
@@ -60,7 +62,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     this.scriptId = this.route.snapshot.paramMap.get('id') ?? '0';
 
-    this.timeLineArray = Array.from({ length: this.seconds }, (_, i) => i + 1)
+    this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1)/this.segmentFactor)
 
     this.scriptChannels = new Array<ScriptChannel>();
     this.components = new Array<any>();
@@ -98,6 +100,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         "1970-01-01 00:00:00.000",
         "1970-01-01 00:00:00.000",
         "1970-01-01 00:00:00.000");
+
+        this.scriptChannels = this.script.scriptChannels;
     }
     else {
 
@@ -135,15 +139,15 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       next: (result: any) => {
         if (result.message === 'success') {
           console.log('script settings saved!')
-          this.snackBar.open('Script settings saved!', 'OK', { duration: 2000 });
+          this.snackBar.okToast('Script settings saved!');
         } else {
-          console.log('script settings save failed!', 'OK', { duration: 2000 })
-          this.snackBar.open('Script settings save failed!', 'OK', { duration: 2000 });
+          console.log('script settings save failed!')
+          this.snackBar.okToast('Script settings save failed!');
         }
       },
       error: (err: any) => {
         console.error(err);
-        this.snackBar.open('Script settings save failed!');
+        this.snackBar.okToast('Script settings save failed!');
       }
     };
 
@@ -202,7 +206,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         time += 1
       }
     } else {
-      this.snackBar.open('Could not determine event time!', 'OK', { duration: 2000 });
+      this.snackBar.okToast('Could not determine event time!');
       console.log('could not determine event time');
       return;
     }
@@ -213,7 +217,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     const ch = this.scriptChannels[chIdx];
 
-    const event = new ScriptEvent(ch.id, ch.type, time, '');
+    const event = new ScriptEvent(ch.id, ch.type, ch.subType, time, '');
 
     this.createEventModal(event, false);
 
@@ -253,9 +257,11 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         break;
       case ChannelType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);
+        modalResources.set(ModalResources.i2cId, this.getI2cIdFromChannel(event.scriptChannel))
         break;
-      case ChannelType.pwm:
-        component = this.container.createComponent(PwmEventModalComponent);
+      case ChannelType.servo:
+        component = this.container.createComponent(ServoEventModalComponent);
+        modalResources.set(ModalResources.servoId, this.getServoIdFromChannel(event.scriptChannel))
         break;
       case ChannelType.audio:
         component = this.container.createComponent(AudioEventModalComponent);
@@ -282,6 +288,32 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     if (chIdx > -1) {
       const uart = this.scriptChannels[chIdx].channel as UartModule;
       return uart.module as KangarooController;
+    }
+    
+  }
+
+  getServoIdFromChannel(channelId: string): any {
+    
+    const chIdx = this.scriptChannels
+      .map((ch) => { return ch.id })
+      .indexOf(channelId);
+
+    if (chIdx > -1) {
+      const servo = this.scriptChannels[chIdx].channel as ServoChannel;
+      return servo.id;
+    }
+    
+  }
+
+  getI2cIdFromChannel(channelId: string): any {
+    
+    const chIdx = this.scriptChannels
+      .map((ch) => { return ch.id })
+      .indexOf(channelId);
+
+    if (chIdx > -1) {
+      const i2c = this.scriptChannels[chIdx].channel as I2cChannel;
+      return i2c.id;
     }
     
   }
@@ -351,7 +383,13 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     const chValue = this.scriptResources.addChannel(controller, channelType, channel);
 
-    const ch = new ScriptChannel(Guid.create().toString(), controller, name, channelType, channel, chValue, this.seconds);
+    let subType = 0;
+    
+    if (channelType === ChannelType.uart){
+      subType = chValue.type;
+    }
+
+    const ch = new ScriptChannel(Guid.create().toString(), controller, name, channelType, subType, channel, chValue, this.segments);
 
     this.scriptChannels.unshift(ch);
   }
@@ -386,7 +424,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     const line = document.getElementById(`script-row-${channelId}`);
 
     const floater = this.renderer.createElement('div');
-    const text = this.renderer.createText(time.toString());
+    const text = this.renderer.createText((time/10).toFixed(1).toString());
     this.renderer.appendChild(floater, text);
     this.renderer.setAttribute(floater, 'class', 'scripter-timeline-marker');
     this.renderer.setAttribute(floater, 'id', `event-${channelId}-${time}`)

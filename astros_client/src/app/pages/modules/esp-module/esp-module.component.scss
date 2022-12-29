@@ -33,7 +33,7 @@
     
 }
 
-.pwm-list {
+.servo-list {
     list-style-type: none;
     padding: 0;
     margin: 0;
@@ -45,7 +45,7 @@
         padding: 10px;
     }
 
-    .pwm-channel {
+    .servo-channel {
 
         display: flex;
         flex-direction: row;
@@ -130,5 +130,14 @@
                 width: 100%;
             }
         }
+
+        .enabled {
+            width: 120px;
+            text-align: center;
+            margin: 0px;
+            margin-right: 20px;
+
+        }
+
     }
 }

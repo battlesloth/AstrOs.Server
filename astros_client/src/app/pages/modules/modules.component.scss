@@ -1,10 +1,13 @@
 @import "../../../assets/styles/variables";
 
+
+
 .module-container {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
 
+     
     .spacer {
         flex: 1;
     }
@@ -26,7 +29,6 @@
                 font-family: $swfont;
             }
 
-
             .button-box {
                 float: right;
 
@@ -38,5 +40,47 @@
             }
         }
 
+        .module-accordian {
+            .ip-input {
+                input{
+                padding: 2px;
+                font-size: large;
+                width: 200px;
+                }
+            }
+
+            .warning {
+                margin-right: 20px;
+                color: slategray;
+            }
+        }
+
     }
 }
+
+.tooltip {
+    position: relative;
+    display: inline-block;
+    border-bottom: 1px dotted lightgray;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    border-radius: 20px;
+    padding: 5px 0;
+
+    /* Position the tooltip */
+    position: absolute;
+    z-index: 1;
+    top: -5px;
+    right: 200%;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+}
+

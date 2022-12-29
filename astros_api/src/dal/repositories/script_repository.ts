@@ -2,9 +2,9 @@ import { DataAccess } from "src/dal/data_access";
 import { ScriptsTable } from "src/dal/tables/scripts_table";
 import { ScriptChannelsTable } from "src/dal/tables/script_channels_table";
 import { ScriptEventsTable } from "src/dal/tables/script_events_table";
-import { ChannelType, ControllerType, I2cChannel, PwmChannel, UartModule, Script, ScriptChannel, ScriptEvent } from "astros-common";
+import { ChannelType, ControllerType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
-import { PwmChannelsTable } from "../tables/pwm_channels_table";
+import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
 
 
@@ -67,7 +67,7 @@ export class ScriptRepository {
                 val.forEach((ch: any) => {
 
                     const channel = new ScriptChannel(ch.id, ch.controllerType,
-                        ch.controllerName, ch.type, ch.channelNumber, null, 0)
+                        ch.controllerName, ch.type, ch.subType, ch.channelNumber, null, 0)
 
                     if (channel.controllerType == ControllerType.audio) {
                         channel.controllerName = 'Audio Playback';
@@ -90,7 +90,7 @@ export class ScriptRepository {
             await this.dao.get(ScriptEventsTable.selectForChannel, [result.id, ch.id])
                 .then((val: any) => {
                     val.forEach((evt: any) => {
-                        const event = new ScriptEvent(evt.scriptChannel, evt.channelType, evt.time, evt.dataJson);
+                        const event = new ScriptEvent(evt.scriptChannel, evt.channelType, evt.channelSubType, evt.time, evt.dataJson);
                         ch.eventsKvpArray.push({ key: event.time, value: event });
                     });
                 }).catch((err) => {
@@ -109,8 +109,8 @@ export class ScriptRepository {
             case ChannelType.i2c:
                 channel.channel = await this.getChannelForScriptChannel(ChannelType.i2c, channel.channelNumber, channel.controllerType)
                 break;
-            case ChannelType.pwm:
-                channel.channel = await this.getChannelForScriptChannel(ChannelType.pwm, channel.channelNumber, channel.controllerType)
+            case ChannelType.servo:
+                channel.channel = await this.getChannelForScriptChannel(ChannelType.servo, channel.channelNumber, channel.controllerType)
                 break;
             case ChannelType.uart:
                 channel.channel = await this.getUartModule(channel.controllerType);
@@ -144,8 +144,8 @@ export class ScriptRepository {
             case ChannelType.i2c:
                 sql = I2cChannelsTable.select;
                 break;
-            case ChannelType.pwm:
-                sql = PwmChannelsTable.select;
+            case ChannelType.servo:
+                sql = ServoChannelsTable.select;
                 break;
             default:
                 return;
@@ -156,11 +156,11 @@ export class ScriptRepository {
                 try {
                     switch (type) {
                         case ChannelType.i2c:
-                            result = new I2cChannel(val[0].channelId, val[0].channelName);
+                            result = new I2cChannel(val[0].channelId, val[0].channelName, val[0].enabled);
                             break;
-                        case ChannelType.pwm:
-                            result = new PwmChannel(val[0].channelId, val[0].channelName,
-                                val[0].type, val[0].limit0, val[0].limit1);
+                        case ChannelType.servo:
+                            result = new ServoChannel(val[0].channelId, val[0].channelName,
+                                val[0].enabled, val[0].limit0, val[0].limit1);
                             break;
                     }
                 } catch (error) {
@@ -238,7 +238,7 @@ export class ScriptRepository {
         for (const ch of script.scriptChannels) {
 
             await this.dao.run(ScriptChannelsTable.insert, [ch.id,
-            script.id, ch.controllerType.toString(), ch.type.toString(), ch.channelNumber.toString()])
+            script.id, ch.controllerType.toString(), ch.type.toString(), ch.subType.toString(), ch.channelNumber.toString()])
                 .then((val: any) => {
                     if (val) { console.log(val); }
                 });
@@ -248,7 +248,7 @@ export class ScriptRepository {
 
                 if (evt) {
                     await this.dao.run(ScriptEventsTable.insert,
-                        [script.id, evt.scriptChannel, evt.channelType.toString(), evt.time.toString(), evt.dataJson])
+                        [script.id, evt.scriptChannel, evt.channelType.toString(), evt.channelSubType, evt.time.toString(), evt.dataJson])
                         .then((val: any) => {
                             if (val) { console.log(val); }
                         });
@@ -257,5 +257,19 @@ export class ScriptRepository {
         }
 
         return true;
+    }
+
+    async deleteScript(id: string): Promise<boolean> {
+
+        let success = true;
+        const sql = ScriptsTable.disableScript;
+
+        await this.dao.run(sql, [id])
+            .catch((err: any) =>{
+                console.log(`Exception disabling script for ${id} => ${err}`);
+                success = false;
+            });
+
+        return success;
     }
 }

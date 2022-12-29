@@ -4,6 +4,7 @@ import { ControllerRepository } from "src/dal/repositories/controller_repository
 export class ControllerController {
 
     public static route = '/controllers/';
+    public static syncRoute = '/controllers/sync'
 
     public static async getControllers(req: any, res: any, next: any) {
         try {

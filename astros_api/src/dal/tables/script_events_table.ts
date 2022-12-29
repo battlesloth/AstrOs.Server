@@ -2,7 +2,8 @@ export class ScriptEventsTable {
     public static readonly table = 'script_events';
     public static readonly scriptId = 'scriptId';
     public static readonly scriptChannel = 'scriptChannel';
-    public static readonly channelType = 'channelType';
+    public static readonly channelType = 'channelType'
+    public static readonly channelSubType = 'channelSubType';
     public static readonly time = 'time';
     public static readonly dataJson = 'dataJson';
 
@@ -11,19 +12,21 @@ export class ScriptEventsTable {
     ${this.scriptId} TEXT,
     ${this.scriptChannel} TEXT,
     ${this.channelType} INTEGER,
+    ${this.channelSubType} INTEGER,
     ${this.time} INTEGER,
     ${this.dataJson} TEXT,
     UNIQUE(${this.scriptChannel}, ${this.time}) ON CONFLICT REPLACE)`;
 
     public static readonly insert =
     `INSERT INTO ${this.table}
-    (${this.scriptId}, ${this.scriptChannel}, ${this.channelType}, ${this.time}, ${this.dataJson})
-    VALUES (?, ?, ?, ?, ?)`;
+    (${this.scriptId}, ${this.scriptChannel}, ${this.channelType},  ${this.channelSubType}, ${this.time}, ${this.dataJson})
+    VALUES (?, ?, ?, ?, ?, ?)`;
 
     public static readonly selectForChannel =
     `SELECT 
     ${this.scriptChannel}, 
     ${this.channelType},
+    ${this.channelSubType},
     ${this.time}, 
     ${this.dataJson}
     FROM ${this.table}

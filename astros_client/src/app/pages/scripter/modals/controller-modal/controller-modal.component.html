@@ -16,7 +16,7 @@
             (change)="modalChange($event)">
             <option value="-1" disabled selected>Select Channel</option>
             <ng-container *ngFor="let ch of channels">
-                <option *ngIf="ch.available" value="{{ch.channel.id}}">{{ch.channel.id}} - {{ch.channel.channelName}}</option>
+                <option *ngIf="ch.available && ch.channel.channelName.toLowerCase() !== 'reserved'" value="{{ch.channel.id}}">{{ch.channel.id}} - {{ch.channel.channelName}}</option>
             </ng-container>
         </select>
         <div class="error">{{errorMessage}}</div>

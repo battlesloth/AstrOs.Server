@@ -1,5 +1,5 @@
 <div class="event-modal">
-    <h1>PWM Event</h1>
+    <h1>Servo Event</h1>
     <div class="modal-body">
         <div class="spacer"></div>
         <div class="content">
@@ -9,8 +9,16 @@
                     (keypress)="($event.charCode >= 48 && $event.charCode < 58)" [(ngModel)]="eventTime" />
             </div>
             <div>
-                <label for="value">PWM Drive</label>
-                <input name="value" matInput placeholder="Value" [(ngModel)]="eventValue" />
+                <label for="value">Position</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="position" type="number" min="0" max="100"
+                (keypress)="($event.charCode >= 48 && $event.charCode < 58)" 
+                (change)= "position < 0 ? position = 0 : position; position > 100 ? position = 100 : position;" />
+            </div>
+            <div>
+                <label for="value">Speed</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="speed" type="number" min="0" max="100"
+                (keypress)="($event.charCode >= 48 && $event.charCode < 58)" 
+                (change)= "speed < 0 ? speed = 0 : speed; speed > 10 ? speed = 10 : speed;"/>
             </div>
             <div class="error">{{errorMessage}}</div>
         </div>

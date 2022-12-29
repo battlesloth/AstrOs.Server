@@ -6,8 +6,8 @@ import { SettingsTable } from "src/dal/tables/settings_table";
 import { UsersTable } from "src/dal/tables/users_table";
 import { ControllersTable } from "src/dal/tables/controllers_table";
 import { I2cChannelsTable } from "src/dal/tables/i2c_channels_table";
-import { PwmChannelsTable } from "src/dal/tables/pwm_channels_table";
-import { PwmType, ControllerType, UartType } from "astros-common";
+import { ServoChannelsTable } from "src/dal/tables/servo_channels_table";
+import { ControllerType, UartType } from "astros-common";
 import { ScriptsTable } from "src/dal/tables/scripts_table";
 import { ScriptEventsTable } from "src/dal/tables/script_events_table";
 import { ScriptChannelsTable } from "./tables/script_channels_table";
@@ -132,7 +132,7 @@ export class DataAccess {
 
         await this.createTable(UartModuleTable.table, UartModuleTable.create);
 
-        await this.createTable(PwmChannelsTable.table, PwmChannelsTable.create);
+        await this.createTable(ServoChannelsTable.table, ServoChannelsTable.create);
 
         await this.createTable(I2cChannelsTable.table, I2cChannelsTable.create);
 
@@ -172,14 +172,20 @@ export class DataAccess {
 
             await this.run(UartModuleTable.insert, [ctl.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
             
-            for (let i = 0; i < 36; i++) {
-                await this.run(PwmChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned", PwmType.unassigned.toString(), "0", "0"])
-                    .catch((err) => console.error(`Error adding pwm channel ${i}: ${err}`))
+            for (let i = 0; i < 32; i++) {
+                await this.run(ServoChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned", "0", "0", "0"])
+                    .catch((err) => console.error(`Error adding servo channel ${i}: ${err}`))
             }
 
             for (let i = 0; i < 128; i++) {
-                await this.run(I2cChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned"])
+
+                if (i === 64 || i === 65){
+                    await this.run(I2cChannelsTable.insert, [ctl.toString(), i.toString(), "reserved", '0'])
                     .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
+                } else {
+                    await this.run(I2cChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned", '0'])
+                    .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
+                }
             }
         }
 

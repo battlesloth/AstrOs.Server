@@ -37,6 +37,16 @@ export class ControllerService  {
       );
   }
 
+  public syncControllers() : Observable<any> {
+    return this.http.get<any>('/api/controllers/sync', {
+      headers: {Authorization: `Bearer ${this.getToken()}`}
+    })
+    .pipe(
+      tap(_ => console.log(`syncControllers result: ${_.message}`)),
+      catchError(this.handleError<any>('saveControllers'))
+    );
+  }
+
   private getToken(): string {
     if (!this.token){
       this.token = localStorage.getItem('astros-token') || '';

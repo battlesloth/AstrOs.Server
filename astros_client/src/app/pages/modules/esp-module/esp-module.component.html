@@ -17,25 +17,21 @@
     </mat-expansion-panel>
     <mat-expansion-panel>
         <mat-expansion-panel-header>
-            <mat-panel-title>PWM configuration</mat-panel-title>
+            <mat-panel-title>Servo configuration</mat-panel-title>
         </mat-expansion-panel-header>
-        <ul class="pwm-list">
-            <li *ngFor="let channel of module.pwmModule.channels">
-                <div class="pwm-channel">
+        <ul class="servo-list">
+            <li *ngFor="let channel of module.servoModule.channels">
+                <div class="servo-channel">
                     <div class="label">Channel {{channel.id}}</div>
                     <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" /></div>
                     <div class="type">
-                        <select title="PWM Type" (ngModelChange)="pwmTypeChange(channel.id, $event)"
-                            [(ngModel)]=channel.type>
-                            <option *ngFor="let pwmType of pwmTypeOptions" [ngValue]="pwmType.id">{{pwmType.name}}
-                            </option>
-                        </select>
+                        <mat-checkbox [(ngModel)]="channel.enabled">Enabled</mat-checkbox>
                     </div>
                     <div class="limit">
-                        <input matInput placeholder="0" [(ngModel)]="channel.limit0" />
+                        <input matInput placeholder="0" [(ngModel)]="channel.minPos" />
                     </div>
                     <div class="limit">
-                        <input matInput placeholder="0" [(ngModel)]="channel.limit1" />
+                        <input matInput placeholder="0" [(ngModel)]="channel.maxPos" />
                     </div>
                 </div>
             </li>
@@ -49,7 +45,10 @@
             <li *ngFor="let channel of module.i2cModule.channels">
                 <div class="i2c-channel">
                     <div class="label">Channel {{channel.id}}</div>
-                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" /></div>
+                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" [disabled]="channel.channelName.toLowerCase() === 'reserved'"/></div>
+                    <div class="enabled">
+                        <mat-checkbox [(ngModel)]="channel.enabled" [disabled]="channel.channelName.toLowerCase() === 'reserved'">Enabled</mat-checkbox>
+                    </div>
                 </div>
             </li>
         </ul>

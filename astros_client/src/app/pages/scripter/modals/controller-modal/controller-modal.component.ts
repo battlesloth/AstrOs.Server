@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ChannelType, ControllerType } from 'astros-common';
+import { ChannelSubType, ChannelType, ControllerType } from 'astros-common';
 import { ChannelValue, ControllerDetails } from 'src/app/models/script-resources';
 import { ModalBaseComponent } from '../../../../modal/modal-base/modal-base.component';
 import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
@@ -63,7 +63,7 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
         this.errorMessage = 'Channel Selection Required'
         return;
       }
-    
+  
 
     this.modalCallback.emit({
       id: ModalCallbackEvent.addChannel,

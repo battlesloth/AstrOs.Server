@@ -1,8 +1,4 @@
-export enum UartType{
-    none,
-    genericSerial,
-    kangaroo
-}
+import { UartType } from "../astros_enums";
 
 export class UartModule {
     moduleName: string;

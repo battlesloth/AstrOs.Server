@@ -1,14 +1,15 @@
 import { Component, Input, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
+import { MatCheckboxModule } from '@angular/material/checkbox'
 import { MatFormField } from '@angular/material/form-field';
-import { ControlModule , KangarooController, PwmType, UartType } from 'astros-common';
+import { ControlModule , KangarooController, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
 
 @Component({
   selector: 'app-esp-module',
   templateUrl: './esp-module.component.html',
   styleUrls: ['./esp-module.component.scss'],
-  viewProviders: [MatExpansionPanel, MatFormField]
+  viewProviders: [MatExpansionPanel, MatFormField, MatCheckboxModule]
 })
 export class EspModuleComponent implements OnInit {
 
@@ -22,16 +23,6 @@ export class EspModuleComponent implements OnInit {
   
   components: Array<any>;
   uartType: string;
-
-  pwmTypeOptions = [
-    {id: PwmType.unassigned, name: "Unassigned"},
-    {id: PwmType.continuous_servo, name: "Continuous Servo"},
-    {id: PwmType.positional_servo, name: "Positional Servo"},
-    {id: PwmType.linear_servo, name: "Linear Servo"},
-    {id: PwmType.led, name: "LED"},
-    {id: PwmType.high_low, name: "High/Low"}
-  ]
-
 
   constructor() { 
     this.components = new Array<any>();
@@ -54,12 +45,12 @@ export class EspModuleComponent implements OnInit {
     }
   }
 
-  pwmNameChange(id: number, $event: any){
-    this.module.pwmModule.channels[id].channelName = $event;
+  servoNameChange(id: number, $event: any){
+    this.module.servoModule.channels[id].channelName = $event;
   }
 
-  pwmTypeChange(id: number, $event: any){
-    this.module.pwmModule.channels[id].type = $event;
+  servoStatusChange(id: number, $event: any){
+    this.module.servoModule.channels[id].enabled = $event;
   }
 
   uartTypeChange($event: any){

@@ -1,8 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
-import { ControllerType, Script, TransmissionStatus, UploadStatus } from 'astros-common';
+import { faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { ControllerType, Script, ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
+import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 
 @Component({
@@ -14,16 +15,19 @@ export class ScriptsComponent implements OnInit {
 
   faTrash = faTrash;
   faUpload = faUpload;
+  faRun = faPlay;
 
   scripts: Array<Script>
 
-  constructor(private router: Router, private scriptService: ScriptsService, private socket: WebsocketService) {
+  constructor(private router: Router,
+      private scriptService: ScriptsService, 
+      private socket: WebsocketService,
+      private snackBarService: SnackbarService) {
     this.scripts = new Array<Script>();
 
     this.socket.messages.subscribe((msg: any) => {
-
-      if (msg.type === 'scriptUploadStatus') {
-        this.statusUpdate(msg);
+      if (msg.type === TransmissionType.script) {
+        this.statusUpdate(msg as ScriptResponse);
       }
     });
 
@@ -42,17 +46,46 @@ export class ScriptsComponent implements OnInit {
     this.router.navigate(['scripter', '0']);
   }
 
-  removeClicked() {
+  removeClicked(id: string) {
+    const idx = this.scripts
+      .map((s) => { return s.id })
+      .indexOf(id);
 
+    if (idx < 0) {
+      return;
+    }
+
+    this.scripts.splice(idx, 1);
+
+    this.scriptService.deleteScript(id).subscribe();
+  }
+
+
+  runClicked(id: string) {
+    const idx = this.scripts
+      .map((s) => { return s.id })
+      .indexOf(id);
+
+    if (idx < 0) {
+      return;
+    }
+    
+    this.scriptService.runScript(id).subscribe();
   }
 
   uploadClicked(id: string) {
     const observer = {
       next: (result: any) => console.log(result),
-      error: (err: any) => console.error(err)
+      error: (err: any) => {
+        console.error(err);
+        this.snackBarService.okToast('Error requesting upload. Check logs.');
+        this.scripts[idx].coreUploadStatus = UploadStatus.notUploaded;
+        this.scripts[idx].domeUploadStatus = UploadStatus.notUploaded;
+        this.scripts[idx].bodyUploadStatus = UploadStatus.notUploaded;
+      }
     };
 
-    
+
     const idx = this.scripts
       .map((s) => { return s.id })
       .indexOf(id);
@@ -65,7 +98,7 @@ export class ScriptsComponent implements OnInit {
     this.scripts[idx].domeUploadStatus = UploadStatus.uploading;
     this.scripts[idx].bodyUploadStatus = UploadStatus.uploading;
 
-    this.scriptService.uploadScript(id).subscribe();
+    this.scriptService.uploadScript(id).subscribe(observer);
   }
 
   uploadStatus(status: UploadStatus) {
@@ -81,7 +114,7 @@ export class ScriptsComponent implements OnInit {
     }
   }
 
-  statusUpdate(msg: any) {
+  statusUpdate(msg: ScriptResponse) {
 
     const idx = this.scripts
       .map((s) => { return s.id })
@@ -92,7 +125,7 @@ export class ScriptsComponent implements OnInit {
     }
 
 
-    switch (msg.controller as ControllerType) {
+    switch (msg.controllerType as ControllerType) {
       case ControllerType.core:
         if (msg.status === TransmissionStatus.success) {
           this.scripts[idx].coreUploaded = msg.date;
@@ -131,7 +164,6 @@ export class ScriptsComponent implements OnInit {
         }
         break;
     }
-
 
   }
 

@@ -8,6 +8,7 @@ export class ScriptsTable {
     public static readonly coreUploaded = 'coreUploaded';
     public static readonly domeUploaded = 'domeUploaded';
     public static readonly bodyUploaded = 'bodyUploaded';
+    public static readonly enabled = 'enabled';
 
     public static readonly create =
     `CREATE TABLE IF NOT EXISTS ${this.table} (
@@ -17,7 +18,8 @@ export class ScriptsTable {
     ${this.lastSaved} TEXT,
     ${this.coreUploaded} TEXT,
     ${this.domeUploaded} TEXT,
-    ${this.bodyUploaded} TEXT)`;
+    ${this.bodyUploaded} TEXT,
+    ${this.enabled} NUMBER)`;
 
     public static readonly insert =
     `INSERT OR REPLACE INTO ${this.table}
@@ -27,14 +29,16 @@ export class ScriptsTable {
     ${this.lastSaved},
     ${this.coreUploaded},
     ${this.domeUploaded},
-    ${this.bodyUploaded})
+    ${this.bodyUploaded},
+    ${this.enabled})
     VALUES (?, 
         ?,
         ?, 
         ?,
         ?,
         ?,
-        ?)`;
+        ?,
+        1)`;
 
     public static readonly selectAll =
     `SELECT ${this.id}, 
@@ -44,7 +48,8 @@ export class ScriptsTable {
     ${this.coreUploaded}, 
     ${this.domeUploaded},
     ${this.bodyUploaded}
-    FROM ${this.table}`;
+    FROM ${this.table}
+    WHERE ${this.enabled} = 1`;
 
     public static readonly select =
     `SELECT ${this.id}, 
@@ -82,6 +87,12 @@ export class ScriptsTable {
     public static readonly updateScriptBodyUploaded = 
     `UPDATE ${this.table}
     SET ${this.bodyUploaded} = ?
+    WHERE ${this.id} = ?
+    `;
+
+    public static readonly disableScript = 
+    `UPDATE ${this.table}
+    SET ${this.enabled} = 0
     WHERE ${this.id} = ?
     `;
 }
