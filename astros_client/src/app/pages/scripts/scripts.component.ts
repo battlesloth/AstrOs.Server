@@ -1,10 +1,12 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
 import { ControllerType, Script, ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
+import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
+import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 
 @Component({
   selector: 'app-scripts',
@@ -13,6 +15,8 @@ import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 })
 export class ScriptsComponent implements OnInit {
 
+  @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
+
   faTrash = faTrash;
   faUpload = faUpload;
   faRun = faPlay;
@@ -20,9 +24,10 @@ export class ScriptsComponent implements OnInit {
   scripts: Array<Script>
 
   constructor(private router: Router,
-      private scriptService: ScriptsService, 
-      private socket: WebsocketService,
-      private snackBarService: SnackbarService) {
+    private scriptService: ScriptsService,
+    private socket: WebsocketService,
+    private snackBarService: SnackbarService,
+    private modalService: ModalService) {
     this.scripts = new Array<Script>();
 
     this.socket.messages.subscribe((msg: any) => {
@@ -46,7 +51,38 @@ export class ScriptsComponent implements OnInit {
     this.router.navigate(['scripter', '0']);
   }
 
+  modalCallback(evt: any) {
+
+    switch (evt.id) {
+      case ModalCallbackEvent.delete:
+        this.removeFile(evt.val);
+        break;
+    }
+
+    this.modalService.close('scripts-modal');
+    this.container.clear();
+  }
+
   removeClicked(id: string) {
+    this.container.clear();
+
+    const modalResources = new Map<string, any>();
+    modalResources.set(ModalResources.action, 'Confirm Delete')
+    modalResources.set(ModalResources.message, `Are you sure you want to delete script?`);
+    modalResources.set(ModalResources.confirmEvent, { id: ModalCallbackEvent.delete, val: id });
+    modalResources.set(ModalResources.closeEvent, { id: ModalCallbackEvent.close })
+
+    const component = this.container.createComponent(ConfirmModalComponent);
+
+    component.instance.resources = modalResources;
+    component.instance.modalCallback.subscribe((evt: any) => {
+      this.modalCallback(evt);
+    });
+
+    this.modalService.open('scripts-modal');
+  }
+
+  removeFile(id: string) {
     const idx = this.scripts
       .map((s) => { return s.id })
       .indexOf(id);
@@ -60,7 +96,6 @@ export class ScriptsComponent implements OnInit {
     this.scriptService.deleteScript(id).subscribe();
   }
 
-
   runClicked(id: string) {
     const idx = this.scripts
       .map((s) => { return s.id })
@@ -69,7 +104,7 @@ export class ScriptsComponent implements OnInit {
     if (idx < 0) {
       return;
     }
-    
+
     this.scriptService.runScript(id).subscribe();
   }
 
@@ -84,7 +119,6 @@ export class ScriptsComponent implements OnInit {
         this.scripts[idx].bodyUploadStatus = UploadStatus.notUploaded;
       }
     };
-
 
     const idx = this.scripts
       .map((s) => { return s.id })
@@ -123,7 +157,6 @@ export class ScriptsComponent implements OnInit {
     if (idx < 0) {
       return;
     }
-
 
     switch (msg.controllerType as ControllerType) {
       case ControllerType.core:
@@ -164,7 +197,5 @@ export class ScriptsComponent implements OnInit {
         }
         break;
     }
-
   }
-
 }

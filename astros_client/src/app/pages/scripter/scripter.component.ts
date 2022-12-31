@@ -2,7 +2,7 @@ import { AfterViewChecked, Component, OnInit, Renderer2, ViewChild, ViewContaine
 import { MatMenuTrigger } from '@angular/material/menu'
 import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
-import { ModalService } from 'src/app/modal';
+import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
 import { ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
@@ -120,6 +120,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
           this.scriptChannels = this.script.scriptChannels;
 
+          this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
+
           if (!this.resourcesLoaded) {
             await new Promise(f => setTimeout(f, 1000));
           }
@@ -131,6 +133,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       this.scriptService.getScript(this.scriptId).subscribe(ssObserver)
     }
+
+    
   }
 
   saveScript() {
@@ -385,6 +389,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       case ModalCallbackEvent.removeEvent:
         this.removeEvent(evt.channelId, evt.time);
         break;
+      case ModalCallbackEvent.removeChannel:
+        this.removeChannel(evt.val);
     }
 
     this.modalService.close('scripter-modal');
@@ -407,11 +413,34 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   removeCallback(msg: any) {
 
+    this.container.clear();
+
+    const modalResources = new Map<string, any>();
+    modalResources.set(ModalResources.action, 'Delete')
+    modalResources.set(ModalResources.message, 'Are you sure you want to delete channel?');
+    modalResources.set(ModalResources.confirmEvent, {id: ModalCallbackEvent.removeChannel, val: msg.id});
+    modalResources.set(ModalResources.closeEvent, {id: ModalCallbackEvent.close})
+
+    const component = this.container.createComponent(ConfirmModalComponent);
+
+    component.instance.resources = modalResources;
+    component.instance.modalCallback.subscribe((evt: any) => {
+      this.modalCallback(evt);
+    });
+
+    this.components.push(component);
+
+    this.modalService.open('scripter-modal');
+  }
+
+
+  private removeChannel(id: string){
+    
     let chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
-      .indexOf(msg.id);
+      .indexOf(id);
 
-    if (chIdx !== undefined) {
+    if (chIdx !== undefined && chIdx > -1) {
       const channel = this.scriptChannels[chIdx];
 
       this.scriptChannels.splice(chIdx, 1);
@@ -421,6 +450,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         channel.type,
         channel.channel?.id
       );
+
+      this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
     }
   }
 
@@ -442,7 +473,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     const ch = new ScriptChannel(Guid.create().toString(), controller, name, channelType, subType, channel, chValue, this.segments);
 
-    this.scriptChannels.unshift(ch);
+    this.scriptChannels.push(ch);
+    this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
   }
 
   private addEvent(event: ScriptEvent): void {
@@ -498,5 +530,21 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     if (element) {
       element.parentNode?.removeChild(element);
     }
+  }
+
+  private channelCompare(a: ScriptChannel, b: ScriptChannel){
+    let val = a.controllerType - b.controllerType;
+    
+    if (val !== 0){
+      return val;
+    }
+    
+    val = a.type - b.type;
+    
+    if (val !== 0){
+      return val;
+    }
+
+    return a.channel.channelName < b.channel.channelName ? -1 : 1; 
   }
 }

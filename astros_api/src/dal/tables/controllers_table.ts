@@ -26,6 +26,11 @@ export class ControllersTable {
     FROM ${this.table}
     WHERE ${this.controllerId} = ?`;
 
+    public static readonly getIp =
+    `SELECT ${this.controllerIp}
+    FROM ${this.table}
+    WHERE ${this.controllerId} = ?`;
+
     public static readonly updateIp =
     `UPDATE ${this.table}
     SET ${this.controllerIp} = ?

@@ -10,6 +10,7 @@
         <div  *ngIf="channel.type === 3"><span>Servo Channel: </span>{{channel.channel?.id}} </div>
         <div class="spacer"></div>
         <div class="button-bar">
+            <button title="Test" (click)="test()"><fa-icon [icon]="faPlay"></fa-icon></button>
             <button title="Remove" (click)="remove()"><fa-icon [icon]="faTrash"></fa-icon></button>
         </div>
     </div> 

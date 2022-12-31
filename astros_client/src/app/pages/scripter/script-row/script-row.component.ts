@@ -1,5 +1,5 @@
 import { EventEmitter, Component, Input, OnInit, Output, Renderer2, ViewChild, ElementRef } from '@angular/core';
-import { faTrash, faEdit } from '@fortawesome/free-solid-svg-icons'
+import { faTrash, faEdit, faPlay } from '@fortawesome/free-solid-svg-icons'
 import { UartType, ScriptChannel } from 'astros-common';
 @
   Component({
@@ -13,6 +13,7 @@ export class ScriptRowComponent implements OnInit {
   private segmentWidth: number = 60;
   faTrash = faTrash;
   faEdit = faEdit;
+  faPlay = faPlay;
 
   @ViewChild('timeline', { static: false }) timelineEl!: ElementRef;
 
@@ -21,6 +22,7 @@ export class ScriptRowComponent implements OnInit {
 
   @Output("timelineCallback") timelineCallback: EventEmitter<any> = new EventEmitter();
   @Output("removeCallback") removeCallback: EventEmitter<any> = new EventEmitter();
+  @Output("testCallback") testCallback: EventEmitter<any> = new EventEmitter();
 
   timeLineArray: Array<number>;
   private segments: number = 3000;
@@ -38,6 +40,9 @@ export class ScriptRowComponent implements OnInit {
     this.removeCallback.emit({ id: this.channel.id });
   }
 
+  test(): void {
+    this.testCallback.emit({id: this.channel.id})
+  }
 
   onTimelineRightClick(event: MouseEvent): void {
     event.preventDefault();

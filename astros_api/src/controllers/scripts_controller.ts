@@ -5,6 +5,7 @@ export class ScriptsController {
 
     public static getRoute = '/scripts/'
     public static putRoute = '/scripts/'
+    public static deleteRoute = '/scripts/'
     public static getAllRoute = '/scripts/all'
     public static upload = '/scripts/upload'
     public static run = '/scripts/run'

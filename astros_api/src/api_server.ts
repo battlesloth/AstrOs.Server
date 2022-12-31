@@ -41,7 +41,7 @@ class ApiServer {
     private websocket!: Server;
     private espMonitor!: Worker;
 
-    moduleLoader!: Worker;
+    moduleInterface!: Worker;
 
     private authHandler!: RequestHandler;
 
@@ -158,12 +158,15 @@ class ApiServer {
         this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
         this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
+        this.router.delete(ScriptsController.deleteRoute, this.authHandler, ScriptsController.deleteScript);
 
         this.router.get(ScriptsController.upload, this.authHandler, (req: any, res: any, next: any) => { this.uploadScript(req, res, next); });
         this.router.get(ScriptsController.run, this.authHandler, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
+
+        this.router.post('directcommand', this.authHandler, (req: any, res: any, next: any) => { this.directCommand(req, res, next); });
     }
 
     private runWebServices(): void {
@@ -214,11 +217,11 @@ class ApiServer {
 
         }, 15 * 1000);
 
-        this.moduleLoader = new Worker('./dist/background_tasks/module_loader.js')
-        this.moduleLoader.on('exit', exit => { console.log(exit); });
-        this.moduleLoader.on('error', err => { console.log(err); });
+        this.moduleInterface = new Worker('./dist/background_tasks/module_interface.js')
+        this.moduleInterface.on('exit', exit => { console.log(exit); });
+        this.moduleInterface.on('error', err => { console.log(err); });
 
-        this.moduleLoader.on('message', async (msg) => {
+        this.moduleInterface.on('message', async (msg) => {
 
             switch (msg.type) {
                 case TransmissionType.script:
@@ -245,7 +248,7 @@ class ApiServer {
 
             const msg = new ConfigSync(controllers);
             
-            this.moduleLoader.postMessage(msg);
+            this.moduleInterface.postMessage(msg);
 
             res.status(200);
             res.json({ message: "success" });
@@ -309,7 +312,7 @@ class ApiServer {
 
             const msg = new ScriptUpload(id, messages, controllers);
 
-            this.moduleLoader.postMessage(msg);
+            this.moduleInterface.postMessage(msg);
 
             res.status(200);
             res.json({ message: "success" });
@@ -335,7 +338,7 @@ class ApiServer {
 
             const msg = new ScriptRun(id, controllers);
 
-            this.moduleLoader.postMessage(msg);
+            this.moduleInterface.postMessage(msg);
 
             res.status(200);
             res.json({ message: "success" });
@@ -373,6 +376,32 @@ class ApiServer {
         } else {
             console.log(`Updating transmission status for Controller ${msg.controllerType}, ${msg.scriptId} => ${msg.status}`);
         }
+    }
+
+    private async directCommand(req: any, res: any, next: any){
+        try {
+
+            const dao = new DataAccess();
+            const repo = new ControllerRepository(dao);
+
+            req.body.ip = await repo.getControllerIp(req.body.controller);
+
+            console.log(`sending direct command: ${req.body}`);
+
+            this.moduleInterface.postMessage(req.body);
+
+            res.status(200);
+            res.json({ message: "success" });
+
+        } catch (error){
+            console.log(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+        
     }
 
     private updateClients(msg: any): void {

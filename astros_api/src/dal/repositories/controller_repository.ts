@@ -14,6 +14,21 @@ export class ControllerRepository {
         this.dao.connect();
     }
 
+    public async getControllerIp(controller: ControllerType) : Promise<string> {
+        let result = '';
+
+        await this.dao.get(ControllersTable.getIp, [controller.toString()])
+                .then((val: any) => {
+                    result = val[0].controllerIp
+                })
+                .catch((err: any) => {
+                    console.log(err);
+                    throw 'error';
+                });
+
+        return result;
+    }
+
     public async getControllerData(): Promise<Array<ControlModule>> {
         const result = new Array<ControlModule>();
 
