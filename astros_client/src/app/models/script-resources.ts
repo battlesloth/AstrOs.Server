@@ -52,7 +52,7 @@ export class ScriptResources {
             this.controllers.set(con.id, new ControllerDetails(con.id, con.name, con.uartModule));
 
             this.servoChannels.set(con.id, con.servoModule.channels.map((ch: ServoChannel) => new ChannelValue(ch, ch.enabled)));
-            this.i2cChannels.set(con.id, con.i2cModule.channels.map((ch: I2cChannel) => new ChannelValue(ch, true)));
+            this.i2cChannels.set(con.id, con.i2cModule.channels.map((ch: I2cChannel) => new ChannelValue(ch, ch.enabled)));
 
             this.servoChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
             this.i2cChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });

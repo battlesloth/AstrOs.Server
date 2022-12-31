@@ -1,11 +1,10 @@
-import { AfterViewChecked, AfterViewInit, Component, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
+import { AfterViewChecked, Component, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelSubType, ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
+import { ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -166,12 +165,43 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.scriptService.saveScript(this.script).subscribe(observer);
   }
 
-  testScript() {
+  saveBeforeTest() {
+    const observer = {
+      next: (result: any) => {
+        if (result.message === 'success') {
+          console.log('script settings saved!')
+          this.testScript();
+        } else {
+          console.log('script settings save failed!')
+          this.snackBar.okToast('Script settings save failed!');
+        }
+      },
+      error: (err: any) => {
+        console.error(err);
+        this.snackBar.okToast('Script settings save failed!');
+      }
+    };
+
+    // Maps don't survive JSON.stringify
+    for (const ch of this.script.scriptChannels) {
+
+      ch.eventsKvpArray = [];
+
+      for (const key of ch.events.keys()) {
+        ch.eventsKvpArray.push({ key: key, value: ch.events.get(key) });
+      }
+    }
+
+    this.scriptService.saveScript(this.script).subscribe(observer);
+
+  }
+    
+  testScript(){
     this.container.clear();
 
     const modalResources = new Map<string, any>();
 
-    modalResources.set(ModalResources.controllers, this.scriptResources.controllers);
+    modalResources.set(ModalResources.scriptId, this.scriptId);
     
     const component = this.container.createComponent(ScriptTestModalComponent);
 

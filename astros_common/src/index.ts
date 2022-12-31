@@ -1,5 +1,6 @@
 export {AudioFile} from './audio-file';
 export {ControlModule} from './control_module/control_module';
+export {ControlModuleStatus} from './control_module/control_module_status';
 export {I2cChannel} from './control_module/i2c_channel';
 export {I2cModule} from './control_module/i2c_module';
 export {KangarooController} from './control_module/kangaroo_controller';
@@ -22,4 +23,5 @@ export {ControllerType,
     ChannelType, 
     ChannelSubType,
     UartType, 
-    UploadStatus} from './astros_enums';
+    UploadStatus,
+    ControllerStatus} from './astros_enums';

@@ -10,6 +10,9 @@ export enum ModalCallbackEvent{
 
 
 export class ModalResources{
+    // test modal
+    public static readonly scriptId = 'scriptId';
+
     // confirmationModal
     public static readonly action = 'action';
     public static readonly message = 'message';

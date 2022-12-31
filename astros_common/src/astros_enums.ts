@@ -31,3 +31,9 @@ export enum UploadStatus {
     uploading,
     uploaded,
 }
+
+export enum ControllerStatus {
+    up,
+    needsSynced,
+    down,
+}

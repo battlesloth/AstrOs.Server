@@ -303,7 +303,6 @@ class ApiServer {
 
             if (messages.size < 1) {
                 console.log(`No controller script values returned for ${id}`);
-                throw new Error(`No controller script values returned for ${id}`);
             }
 
             const controllers = await ctlRepo.getControllerData();
@@ -364,15 +363,15 @@ class ApiServer {
 
             const date = (new Date()).toLocaleString('en-US', options);
 
-            await repository.updateScriptControllerUploaded(msg.scriptId, msg.controller, date);
+            await repository.updateScriptControllerUploaded(msg.scriptId, msg.controllerType, date);
 
-            console.log(`Controller ${msg.controller} uploaded for ${msg.scriptId}!`)
+            console.log(`Controller ${msg.controllerType} uploaded for ${msg.scriptId}!`)
 
             msg.date = date;
         } else if (msg.status === TransmissionStatus.failed) {
-            console.log(`Controller ${msg.controller} upload failed for ${msg.scriptId}!`)
+            console.log(`Controller ${msg.controllerType} upload failed for ${msg.scriptId}!`)
         } else {
-            console.log(`Updating transmission status for Controller ${msg.controller}, ${msg.scriptId} => ${msg.status}`);
+            console.log(`Updating transmission status for Controller ${msg.controllerType}, ${msg.scriptId} => ${msg.status}`);
         }
     }
 
