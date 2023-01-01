@@ -116,10 +116,8 @@ class ApiServer {
         this.app.use('/api', this.router);
 
         this.app.use((req: any, res: any, next: any) => {
-            next(() => {
-                const err = new HttpError();
-                err.statusCode = 404;
-                return err;
+            res.status(404).json({
+                message: 'Endpoint not found'
             })
         });
 
@@ -129,6 +127,9 @@ class ApiServer {
             res.status(err.status || 500);
         });
 
+
+    
+        
         const jwtKey: string = (process.env.JWT_KEY as string);
 
         this.authHandler = jwt({
@@ -166,7 +167,7 @@ class ApiServer {
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
 
-        this.router.post('directcommand', this.authHandler, (req: any, res: any, next: any) => { this.directCommand(req, res, next); });
+        this.router.post('/directcommand', this.authHandler, (req: any, res: any, next: any) => { this.directCommand(req, res, next); });
     }
 
     private runWebServices(): void {
@@ -386,7 +387,9 @@ class ApiServer {
 
             req.body.ip = await repo.getControllerIp(req.body.controller);
 
-            console.log(`sending direct command: ${req.body}`);
+            req.body.type = TransmissionType.directCommand;
+            
+            console.log(`sending direct command: ${JSON.stringify(req.body)}`);
 
             this.moduleInterface.postMessage(req.body);
 

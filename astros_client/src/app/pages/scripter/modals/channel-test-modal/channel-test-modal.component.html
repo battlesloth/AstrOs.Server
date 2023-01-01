@@ -1,0 +1,37 @@
+<div class="event-modal">
+    <h1>Channel Test</h1>
+    <div class="modal-body">
+        <div class="spacer"></div>
+        <div class="content">
+            <div *ngIf="channelType === 1">
+                <label for="value">Serial Command</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="value" />
+            </div>
+            <div *ngIf="channelType === 2">
+                <label for="value">I2C Command</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="value" />
+            </div>
+            <div *ngIf="channelType === 3">
+                <label for="position">Position</label>
+                <input name="position" matInput placeholder="Position" [(ngModel)]="position" type="number" min="0"
+                    max="100" (keypress)="($event.charCode >= 48 && $event.charCode < 58)"
+                    (change)="position < 0 ? position = 0 : position; position > 100 ? position = 100 : position;" />
+            </div>
+            <div *ngIf="channelType === 3">
+                <label for="speed">Speed</label>
+                <input name="speed" matInput placeholder="Speed" [(ngModel)]="speed" type="number" min="0" max="100"
+                    (keypress)="($event.charCode >= 48 && $event.charCode < 58)"
+                    (change)="speed < 0 ? speed = 0 : speed; speed > 10 ? speed = 10 : speed;" />
+            </div>
+        </div>
+        <div class="spacer"></div>
+    </div>
+    <div class="modal-buttons">
+        <div class="button-spacer"></div>
+        <div class="button-grouper">
+            <button (click)="runClicked();">Send</button>
+            <button (click)="closeModal();">Cancel</button>
+        </div>
+        <div class="button-spacer"></div>
+    </div>
+</div>

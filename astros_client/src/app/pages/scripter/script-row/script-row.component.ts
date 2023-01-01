@@ -22,7 +22,7 @@ export class ScriptRowComponent implements OnInit {
 
   @Output("timelineCallback") timelineCallback: EventEmitter<any> = new EventEmitter();
   @Output("removeCallback") removeCallback: EventEmitter<any> = new EventEmitter();
-  @Output("testCallback") testCallback: EventEmitter<any> = new EventEmitter();
+  @Output("channelTestCallback") channelTestCallback: EventEmitter<any> = new EventEmitter();
 
   timeLineArray: Array<number>;
   private segments: number = 3000;
@@ -41,7 +41,7 @@ export class ScriptRowComponent implements OnInit {
   }
 
   test(): void {
-    this.testCallback.emit({id: this.channel.id})
+    this.channelTestCallback.emit({id: this.channel.id})
   }
 
   onTimelineRightClick(event: MouseEvent): void {

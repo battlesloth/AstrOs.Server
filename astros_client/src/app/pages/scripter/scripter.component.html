@@ -20,7 +20,9 @@
             </div>
             <app-script-row *ngFor="let ch of scriptChannels" id="timeline-{{ch.id}}"
                 (timelineCallback)="timelineCallback($event)"
-                (removeCallback)="removeCallback($event)" [channel]="ch"></app-script-row>
+                (removeCallback)="removeCallback($event)"
+                (channelTestCallback)="channelTestCallback($event)"
+                [channel]="ch"></app-script-row>
         </div>
 
 

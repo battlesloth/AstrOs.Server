@@ -165,15 +165,16 @@ async function panic(data) {
 
 async function runCommand(data) {
 
-    const servo = 0;
-    const i2c = 1;
-    const uart = 2;
+    const uart = 1;
+    const i2c = 2;
+    const servo = 3;
+    const audio = 4;
 
     const agent = superagent.agent();
 
     let uri = '';
 
-    switch (data.type) {
+    switch (data.commandType) {
         case servo:
             uri = 'moveservo';
             break;
@@ -187,20 +188,20 @@ async function runCommand(data) {
 
     if (!!data.ip.trim()) {
         try {
-            agent.post(`http://${config.ip}/${uri}`)
+            agent.post(`http://${data.ip}/${uri}`)
                 .send(data.command)
                 .timeout({ response: 4000 })
                 .then(res => {
                 })
                 .catch(err => {
-                    console.log(`send command|Error posting URI '${uri}' to controller ${config.ip}: ${err}`);
+                    console.log(`send command|Error posting URI '${uri}' to controller ${data.ip}: ${err}`);
                 });
 
         } catch (err) {
-            console.log(`send command|Error posting URI '${uri}' to controller ${config.ip}: ${err}`);
+            console.log(`send command|Error posting URI '${uri}' to controller ${data.ip}: ${err}`);
         };
     } else {
-        console.log(`send command|No IP set for Controller Type ${config.id}`);
+        console.log(`send command|No IP set for Controller Type ${data.id}`);
     }
 
 }
