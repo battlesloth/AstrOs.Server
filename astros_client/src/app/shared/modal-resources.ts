@@ -4,12 +4,22 @@ export enum ModalCallbackEvent{
     addEvent,
     editEvent,
     removeEvent,
+    removeChannel,
+    channelTest,
     delete,
     refresh
 }
 
 
 export class ModalResources{
+    // script test modal
+    public static readonly scriptId = 'scriptId';
+
+    // channel test modal
+    public static readonly channelType = 'channelType';
+    public static readonly controllerType = 'controllerType';
+    public static readonly channelId = 'channelId';
+
     // confirmationModal
     public static readonly action = 'action';
     public static readonly message = 'message';
@@ -33,7 +43,7 @@ export class ModalResources{
     public static readonly servoId = 'servoId';
 
     // I2c module types
-    public static readonly i2cId = 'servoId';
+    public static readonly i2cId = 'i2cId';
 
 
 }

@@ -31,3 +31,31 @@ export enum UploadStatus {
     uploading,
     uploaded,
 }
+
+export enum ControllerStatus {
+    up,
+    needsSynced,
+    down,
+}
+
+export enum TransmissionType{
+    script,
+    sync,
+    status,
+    run,
+    painc,
+    directCommand
+}
+
+export enum TransmissionStatus{
+    unknown,
+    sending,
+    success,
+    failed
+}
+
+export enum DirectCommnandType{
+    servo,
+    i2c,
+    uart
+}

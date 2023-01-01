@@ -8,6 +8,7 @@
         </div>
         <div class="button-box">
             <button (click)="saveScript()">Save</button>
+            <button (click)="saveBeforeTest()">Test</button>
         </div>
     </div>
     <div id="scripter-container" class="scripter-container">
@@ -19,7 +20,9 @@
             </div>
             <app-script-row *ngFor="let ch of scriptChannels" id="timeline-{{ch.id}}"
                 (timelineCallback)="timelineCallback($event)"
-                (removeCallback)="removeCallback($event)" [channel]="ch"></app-script-row>
+                (removeCallback)="removeCallback($event)"
+                (channelTestCallback)="channelTestCallback($event)"
+                [channel]="ch"></app-script-row>
         </div>
 
 
@@ -39,6 +42,6 @@
     </div>
 </div>
 
-<astros-modal id="scripter-modal" style="display: none;">
+<astros-modal id="scripter-modal"  disableBackgroundClick="{{backgroundClickDisabled}}" style="display: none;">
     <ng-template #modalContainer></ng-template>
 </astros-modal>

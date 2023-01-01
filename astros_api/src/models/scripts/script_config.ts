@@ -8,6 +8,6 @@ export class ScriptConfig {
     constructor(controller: ControlModule, script: string){
         this.id = controller.id;
         this.ip = controller.ipAddress;
-        this.script = script;
+        this.script = script === undefined ? '' : script;
     }
 }

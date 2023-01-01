@@ -35,6 +35,8 @@ import { KangarooModuleComponent } from './pages/modules/uart-modules/kangaroo-m
 import { GenericSerialModuleComponent } from './pages/modules/uart-modules/generic-serial-module/generic-serial-module.component';
 import { WebsocketService } from './services/websocket/websocket.service';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { ScriptTestModalComponent } from './pages/scripter/modals/script-test-modal/script-test-modal.component';
+import { ChannelTestModalComponent } from './pages/scripter/modals/channel-test-modal/channel-test-modal.component';
 
 
 
@@ -59,7 +61,9 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
     BaseEventModalComponent,
     KangarooEventModalComponent,
     KangarooModuleComponent,
-    GenericSerialModuleComponent
+    GenericSerialModuleComponent,
+    ScriptTestModalComponent,
+    ChannelTestModalComponent
   ],
   imports: [
     BrowserModule,

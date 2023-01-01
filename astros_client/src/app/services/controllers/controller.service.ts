@@ -2,14 +2,13 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
-import { ControlModule } from 'astros-common';
+import { ChannelType, ControllerType, ControlModule } from 'astros-common';
 
 
 @Injectable({
   providedIn: 'root'
 })
 export class ControllerService  {
-  
 
   private token: string;
 
@@ -47,6 +46,17 @@ export class ControllerService  {
     );
   }
 
+  sendControllerCommand(controller: ControllerType, channelType: ChannelType, command: any) : Observable<any> {
+    return this.http.post<any>('/api/directcommand', {controller: controller, commandType: channelType, command: command},
+     {
+      headers: {Authorization: `Bearer ${this.getToken()}`}
+    })
+    .pipe(
+      tap(_ => console.log(`saveControllers result: ${_.message}`)),
+      catchError(this.handleError<any>('saveControllers'))
+    );
+   }
+  
   private getToken(): string {
     if (!this.token){
       this.token = localStorage.getItem('astros-token') || '';

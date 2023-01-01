@@ -41,7 +41,7 @@ class ApiServer {
     private websocket!: Server;
     private espMonitor!: Worker;
 
-    moduleLoader!: Worker;
+    moduleInterface!: Worker;
 
     private authHandler!: RequestHandler;
 
@@ -116,10 +116,8 @@ class ApiServer {
         this.app.use('/api', this.router);
 
         this.app.use((req: any, res: any, next: any) => {
-            next(() => {
-                const err = new HttpError();
-                err.statusCode = 404;
-                return err;
+            res.status(404).json({
+                message: 'Endpoint not found'
             })
         });
 
@@ -129,6 +127,9 @@ class ApiServer {
             res.status(err.status || 500);
         });
 
+
+    
+        
         const jwtKey: string = (process.env.JWT_KEY as string);
 
         this.authHandler = jwt({
@@ -158,12 +159,15 @@ class ApiServer {
         this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
         this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
+        this.router.delete(ScriptsController.deleteRoute, this.authHandler, ScriptsController.deleteScript);
 
         this.router.get(ScriptsController.upload, this.authHandler, (req: any, res: any, next: any) => { this.uploadScript(req, res, next); });
         this.router.get(ScriptsController.run, this.authHandler, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
+
+        this.router.post('/directcommand', this.authHandler, (req: any, res: any, next: any) => { this.directCommand(req, res, next); });
     }
 
     private runWebServices(): void {
@@ -214,11 +218,11 @@ class ApiServer {
 
         }, 15 * 1000);
 
-        this.moduleLoader = new Worker('./dist/background_tasks/module_loader.js')
-        this.moduleLoader.on('exit', exit => { console.log(exit); });
-        this.moduleLoader.on('error', err => { console.log(err); });
+        this.moduleInterface = new Worker('./dist/background_tasks/module_interface.js')
+        this.moduleInterface.on('exit', exit => { console.log(exit); });
+        this.moduleInterface.on('error', err => { console.log(err); });
 
-        this.moduleLoader.on('message', async (msg) => {
+        this.moduleInterface.on('message', async (msg) => {
 
             switch (msg.type) {
                 case TransmissionType.script:
@@ -245,7 +249,7 @@ class ApiServer {
 
             const msg = new ConfigSync(controllers);
             
-            this.moduleLoader.postMessage(msg);
+            this.moduleInterface.postMessage(msg);
 
             res.status(200);
             res.json({ message: "success" });
@@ -303,14 +307,13 @@ class ApiServer {
 
             if (messages.size < 1) {
                 console.log(`No controller script values returned for ${id}`);
-                throw new Error(`No controller script values returned for ${id}`);
             }
 
             const controllers = await ctlRepo.getControllerData();
 
             const msg = new ScriptUpload(id, messages, controllers);
 
-            this.moduleLoader.postMessage(msg);
+            this.moduleInterface.postMessage(msg);
 
             res.status(200);
             res.json({ message: "success" });
@@ -336,7 +339,7 @@ class ApiServer {
 
             const msg = new ScriptRun(id, controllers);
 
-            this.moduleLoader.postMessage(msg);
+            this.moduleInterface.postMessage(msg);
 
             res.status(200);
             res.json({ message: "success" });
@@ -364,16 +367,44 @@ class ApiServer {
 
             const date = (new Date()).toLocaleString('en-US', options);
 
-            await repository.updateScriptControllerUploaded(msg.scriptId, msg.controller, date);
+            await repository.updateScriptControllerUploaded(msg.scriptId, msg.controllerType, date);
 
-            console.log(`Controller ${msg.controller} uploaded for ${msg.scriptId}!`)
+            console.log(`Controller ${msg.controllerType} uploaded for ${msg.scriptId}!`)
 
             msg.date = date;
         } else if (msg.status === TransmissionStatus.failed) {
-            console.log(`Controller ${msg.controller} upload failed for ${msg.scriptId}!`)
+            console.log(`Controller ${msg.controllerType} upload failed for ${msg.scriptId}!`)
         } else {
-            console.log(`Updating transmission status for Controller ${msg.controller}, ${msg.scriptId} => ${msg.status}`);
+            console.log(`Updating transmission status for Controller ${msg.controllerType}, ${msg.scriptId} => ${msg.status}`);
         }
+    }
+
+    private async directCommand(req: any, res: any, next: any){
+        try {
+
+            const dao = new DataAccess();
+            const repo = new ControllerRepository(dao);
+
+            req.body.ip = await repo.getControllerIp(req.body.controller);
+
+            req.body.type = TransmissionType.directCommand;
+            
+            console.log(`sending direct command: ${JSON.stringify(req.body)}`);
+
+            this.moduleInterface.postMessage(req.body);
+
+            res.status(200);
+            res.json({ message: "success" });
+
+        } catch (error){
+            console.log(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+        
     }
 
     private updateClients(msg: any): void {

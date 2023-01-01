@@ -1,4 +1,4 @@
-import { TransmissionType } from "./transmission_type";
+import { TransmissionType } from "../astros_enums";
 
 export class BaseResponse {
     type: TransmissionType;

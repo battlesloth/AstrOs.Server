@@ -1,0 +1,27 @@
+<div class="event-modal">
+    <h1>Script Test</h1>
+    <div class="modal-body">
+        <div class="spacer"></div>
+        <div class="content">
+            <span>{{status}}</span>
+            <div>
+                <span>Core: {{coreCaption.str}}</span>
+            </div>
+            <div>
+                <span>Dome: {{domeCaption.str}}</span>
+            </div>
+            <div>
+                <span>Body: {{bodyCaption.str}}</span>
+            </div>
+        </div>
+        <div class="spacer"></div>
+    </div>
+    <div class="modal-buttons">
+        <div class="button-spacer"></div>
+        <div class="button-grouper">
+            <button (click)="runClicked();" [disabled]="runDisabled ? 'disabled' : null">Run</button>
+            <button (click)="closeModal();">Cancel</button>
+        </div>
+        <div class="button-spacer"></div>
+    </div>
+</div>

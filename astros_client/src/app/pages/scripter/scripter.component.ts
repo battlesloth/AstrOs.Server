@@ -1,11 +1,10 @@
-import { AfterViewChecked, AfterViewInit, Component, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
+import { AfterViewChecked, Component, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatMenuTrigger } from '@angular/material/menu'
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
-import { ModalService } from 'src/app/modal';
+import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelSubType, ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
+import { ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -15,6 +14,8 @@ import { ServoEventModalComponent } from './modals/servo-event-modal/servo-event
 import { AudioEventModalComponent } from './modals/audio-event-modal/audio-event-modal.component';
 import { KangarooEventModalComponent } from './modals/kangaroo-event-modal/kangaroo-event-modal.component';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
+import { ScriptTestModalComponent } from './modals/script-test-modal/script-test-modal.component';
+import { ChannelTestModalComponent } from './modals/channel-test-modal/channel-test-modal.component';
 
 
 export interface Item {
@@ -32,8 +33,6 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;
 
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
-  // (modalCallback)="modalCallback($event)"
-  //[resources]="modalResources"
 
   private segmentWidth: number = 60;
   private segments: number = 3000;
@@ -41,6 +40,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   private scriptId: string;
   private resourcesLoaded: boolean = false;
   private renderedEvents: boolean = false;
+
+  backgroundClickDisabled = '0';
 
   script!: Script;
   scriptChannels: Array<ScriptChannel>;
@@ -62,7 +63,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     this.scriptId = this.route.snapshot.paramMap.get('id') ?? '0';
 
-    this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1)/this.segmentFactor)
+    this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1) / this.segmentFactor)
 
     this.scriptChannels = new Array<ScriptChannel>();
     this.components = new Array<any>();
@@ -101,7 +102,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         "1970-01-01 00:00:00.000",
         "1970-01-01 00:00:00.000");
 
-        this.scriptChannels = this.script.scriptChannels;
+      this.scriptChannels = this.script.scriptChannels;
     }
     else {
 
@@ -120,6 +121,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
           this.scriptChannels = this.script.scriptChannels;
 
+          this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
+
           if (!this.resourcesLoaded) {
             await new Promise(f => setTimeout(f, 1000));
           }
@@ -131,6 +134,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       this.scriptService.getScript(this.scriptId).subscribe(ssObserver)
     }
+
+
   }
 
   saveScript() {
@@ -151,6 +156,57 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       }
     };
 
+    // Maps don't survive JSON.stringify
+    for (const ch of this.script.scriptChannels) {
+
+      ch.eventsKvpArray = [];
+
+      for (const key of ch.events.keys()) {
+        ch.eventsKvpArray.push({ key: key, value: ch.events.get(key) });
+      }
+    }
+
+    this.scriptService.saveScript(this.script).subscribe(observer);
+  }
+
+//#region testing methods
+
+  openScriptTestModal() {
+    this.container.clear();
+
+    const modalResources = new Map<string, any>();
+
+    modalResources.set(ModalResources.scriptId, this.scriptId);
+
+    const component = this.container.createComponent(ScriptTestModalComponent);
+
+    component.instance.resources = modalResources;
+    component.instance.modalCallback.subscribe((evt: any) => {
+      this.modalCallback(evt);
+    });
+    this.components.push(component);
+
+    this.backgroundClickDisabled = '1';
+
+    this.modalService.open('scripter-modal');
+  }
+
+  saveBeforeTest() {
+    const observer = {
+      next: (result: any) => {
+        if (result.message === 'success') {
+          console.log('script settings saved!')
+          this.openScriptTestModal();
+        } else {
+          console.log('script settings save failed!')
+          this.snackBar.okToast('Script settings save failed!');
+        }
+      },
+      error: (err: any) => {
+        console.error(err);
+        this.snackBar.okToast('Script settings save failed!');
+      }
+    };
 
     // Maps don't survive JSON.stringify
     for (const ch of this.script.scriptChannels) {
@@ -165,6 +221,30 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.scriptService.saveScript(this.script).subscribe(observer);
   }
 
+
+  sendChannelTest(controller: ControllerType, commandType: ChannelType, command: any) {
+
+    const observer = {
+      next: (result: any) => {
+        if (result.message === 'success') {
+          console.log('Test command sent!')
+          this.snackBar.okToast('Test command sent!');
+        } else {
+          console.log('Test command send failed!')
+          this.snackBar.okToast('Test command send failed!');
+        }
+      },
+      error: (err: any) => {
+        console.error(err);
+        this.snackBar.okToast('Test command send failed!');
+      }
+    };
+
+    this.controllerService.sendControllerCommand(controller, commandType, command)
+      .subscribe(observer);
+  }
+
+//#endregion
 
   openChannelAddModal() {
 
@@ -186,7 +266,6 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     this.modalService.open('scripter-modal');
   }
-
 
   openNewEventModal(evt: any) {
     let time = 0;
@@ -280,7 +359,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   //#region resources for modals 
 
   getKangarooControllerFromChannel(channelId: string): any {
-    
+
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(channelId);
@@ -289,11 +368,11 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       const uart = this.scriptChannels[chIdx].channel as UartModule;
       return uart.module as KangarooController;
     }
-    
+
   }
 
   getServoIdFromChannel(channelId: string): any {
-    
+
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(channelId);
@@ -302,11 +381,11 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       const servo = this.scriptChannels[chIdx].channel as ServoChannel;
       return servo.id;
     }
-    
+
   }
 
   getI2cIdFromChannel(channelId: string): any {
-    
+
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(channelId);
@@ -315,7 +394,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       const i2c = this.scriptChannels[chIdx].channel as I2cChannel;
       return i2c.id;
     }
-    
+
   }
 
   //#endregion
@@ -326,6 +405,9 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       case ModalCallbackEvent.addChannel:
         this.addChannel(evt.controller, evt.module, evt.channel);
         break;
+      case ModalCallbackEvent.removeChannel:
+          this.removeChannel(evt.val);
+          break;
       case ModalCallbackEvent.addEvent:
         this.addEvent(evt.scriptEvent);
         break;
@@ -335,12 +417,17 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       case ModalCallbackEvent.removeEvent:
         this.removeEvent(evt.channelId, evt.time);
         break;
+      case ModalCallbackEvent.channelTest:
+        this.sendChannelTest(evt.controller, evt.commandType, evt.command);
     }
 
     this.modalService.close('scripter-modal');
     this.container.clear();
     this.components.splice(0, this.components.length);
+    this.backgroundClickDisabled = '0';
   }
+
+  //#region script row call backs
 
   timelineCallback(msg: any) {
 
@@ -356,11 +443,33 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   removeCallback(msg: any) {
 
+    this.container.clear();
+
+    const modalResources = new Map<string, any>();
+    modalResources.set(ModalResources.action, 'Delete')
+    modalResources.set(ModalResources.message, 'Are you sure you want to delete channel?');
+    modalResources.set(ModalResources.confirmEvent, { id: ModalCallbackEvent.removeChannel, val: msg.id });
+    modalResources.set(ModalResources.closeEvent, { id: ModalCallbackEvent.close })
+
+    const component = this.container.createComponent(ConfirmModalComponent);
+
+    component.instance.resources = modalResources;
+    component.instance.modalCallback.subscribe((evt: any) => {
+      this.modalCallback(evt);
+    });
+
+    this.components.push(component);
+
+    this.modalService.open('scripter-modal');
+  }
+
+  private removeChannel(id: string) {
+
     let chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
-      .indexOf(msg.id);
+      .indexOf(id);
 
-    if (chIdx !== undefined) {
+    if (chIdx !== undefined && chIdx > -1) {
       const channel = this.scriptChannels[chIdx];
 
       this.scriptChannels.splice(chIdx, 1);
@@ -370,8 +479,42 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         channel.type,
         channel.channel?.id
       );
+
+      this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
     }
   }
+
+  channelTestCallback(msg: any) {
+
+    let chIdx = this.scriptChannels
+      .map((ch) => { return ch.id })
+      .indexOf(msg.id);
+
+    if (chIdx !== undefined && chIdx > -1) {
+
+      const ch = this.scriptChannels[chIdx];
+
+      this.container.clear();
+
+      const modalResources = new Map<string, any>();
+
+      modalResources.set(ModalResources.channelType, ch.type);
+      modalResources.set(ModalResources.channelId, ch.channelNumber);
+      modalResources.set(ModalResources.controllerType, ch.controllerType);
+
+      const component = this.container.createComponent(ChannelTestModalComponent);
+
+      component.instance.resources = modalResources;
+      component.instance.modalCallback.subscribe((evt: any) => {
+        this.modalCallback(evt);
+      });
+      this.components.push(component);
+
+      this.modalService.open('scripter-modal');
+    }
+  }
+
+  //#endregion
 
   private addChannel(controller: ControllerType, channelType: ChannelType, channel: number): void {
 
@@ -384,14 +527,15 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     const chValue = this.scriptResources.addChannel(controller, channelType, channel);
 
     let subType = 0;
-    
-    if (channelType === ChannelType.uart){
+
+    if (channelType === ChannelType.uart) {
       subType = chValue.type;
     }
 
     const ch = new ScriptChannel(Guid.create().toString(), controller, name, channelType, subType, channel, chValue, this.segments);
 
-    this.scriptChannels.unshift(ch);
+    this.scriptChannels.push(ch);
+    this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
   }
 
   private addEvent(event: ScriptEvent): void {
@@ -424,7 +568,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     const line = document.getElementById(`script-row-${channelId}`);
 
     const floater = this.renderer.createElement('div');
-    const text = this.renderer.createText((time/10).toFixed(1).toString());
+    const text = this.renderer.createText((time / 10).toFixed(1).toString());
     this.renderer.appendChild(floater, text);
     this.renderer.setAttribute(floater, 'class', 'scripter-timeline-marker');
     this.renderer.setAttribute(floater, 'id', `event-${channelId}-${time}`)
@@ -447,5 +591,21 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     if (element) {
       element.parentNode?.removeChild(element);
     }
+  }
+
+  private channelCompare(a: ScriptChannel, b: ScriptChannel) {
+    let val = a.controllerType - b.controllerType;
+
+    if (val !== 0) {
+      return val;
+    }
+
+    val = a.type - b.type;
+
+    if (val !== 0) {
+      return val;
+    }
+
+    return a.channel.channelName < b.channel.channelName ? -1 : 1;
   }
 }

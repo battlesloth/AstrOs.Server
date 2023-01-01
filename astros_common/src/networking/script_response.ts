@@ -1,7 +1,6 @@
 import { ControllerType } from "../astros_enums";
 import { BaseResponse } from "./base_response";
-import { TransmissionStatus } from "./transmission_status";
-import { TransmissionType } from "./transmission_type";
+import { TransmissionStatus, TransmissionType } from "../astros_enums";
 
 export class ScriptResponse extends BaseResponse{
  
