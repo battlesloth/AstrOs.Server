@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ChannelType, ControllerType } from 'astros-common';
+import { ChannelSubType, ChannelType, ControllerType } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 
@@ -14,6 +14,7 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
   channelId: number = 0;
 
   channelType: ChannelType = ChannelType.none;
+  channelSubType: ChannelSubType = ChannelSubType.none;
   
   speed: number = 1;
   position: number = 0;
@@ -27,6 +28,7 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
   override ngOnInit(): void { 
     this.controller = <ControllerType> this.resources.get(ModalResources.controllerType);
     this.channelType = <ChannelType> this.resources.get(ModalResources.channelType);
+    this.channelSubType = <ChannelSubType> this.resources.get(ModalResources.channelSubType)
     this.channelId = <number> this.resources.get(ModalResources.channelId);
   }
 

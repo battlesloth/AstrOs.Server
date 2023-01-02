@@ -17,6 +17,7 @@ export class ModalResources{
 
     // channel test modal
     public static readonly channelType = 'channelType';
+    public static readonly channelSubType = 'channelSubType';
     public static readonly controllerType = 'controllerType';
     public static readonly channelId = 'channelId';
 

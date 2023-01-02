@@ -4,6 +4,7 @@ import {
     UartModule, UartType, KangarooAction, KangarooEvent,
     Script, ScriptChannel, ScriptEvent, ServoModule, ServoEvent, ChannelSubType, ServoChannel
 } from "astros-common";
+import exp from "constants";
 import { ScriptConverter, CommandType } from "../src/script_converter";
 
 function generateKangarooEvent(time: number, ch1Action: KangarooAction, ch1Speed: number, ch1Position: number,
@@ -24,6 +25,15 @@ function generateServoEvent(time: number, channel: number, position: number, spe
 
 const _type = 0;
 const _time = 1;
+
+    // |___|_________|___|____|____|____;
+    //  evt time_till ch  cmd  spd  pos  
+
+const _kChannel = 2;
+const _kCommand = 3;
+const _kSpd = 4;
+const _kPos = 5;
+
 const _servoChannel = 2;
 const _servoPosition = 3;
 const _servoSpeed = 4;
@@ -31,6 +41,108 @@ const _servoSpeed = 4;
 
 
 describe("Script Converter Tests", () => {
+    it("kanagroo test", ()=>{
+        const script = new Script("1234", "test1",
+        "desc1", "1970-01-01 00:00:00.000",
+        "1970-01-01 00:00:00.000",
+        "1970-01-01 00:00:00.000",
+        "1970-01-01 00:00:00.000");
+
+    const kanagrooCh = new UartModule(UartType.kangaroo, "Periscope", new KangarooController({channelOneName: "ch1 test", channelTwoName: "ch2 test"}));
+   
+    const channelOne = new ScriptChannel("one", ControllerType.core, "core", ChannelType.servo, ChannelSubType.none, 0, kanagrooCh, 3000);
+   
+    channelOne.eventsKvpArray.push(generateKangarooEvent(0, KangarooAction.start, 0, 0, KangarooAction.start, 0, 0,));
+
+    channelOne.eventsKvpArray.push(generateKangarooEvent(10, KangarooAction.home, 0, 0, KangarooAction.home, 0, 0));
+
+    channelOne.eventsKvpArray.push(generateKangarooEvent(20, KangarooAction.position, 100, 1000, KangarooAction.speed, 200, 0));
+
+    channelOne.eventsKvpArray.push(generateKangarooEvent(30, KangarooAction.none, 0, 0, KangarooAction.position, 300, 500));
+
+    channelOne.eventsKvpArray.push(generateKangarooEvent(40, KangarooAction.speed, 400, 0, KangarooAction.none, 0, 0));
+
+
+    script.scriptChannels = new Array<ScriptChannel>(channelOne);
+
+    const cvtr = new ScriptConverter();
+
+    const result = cvtr.convertScript(script);
+
+    expect(result?.size).toBe(1);
+    expect(result?.get(ControllerType.core)?.length).toBeGreaterThan(0);
+
+    const coreVal = result?.get(ControllerType.core);
+
+    const evts = Array<Array<string>>();
+
+    const segs = coreVal?.slice(0,-1).split(';');
+
+    segs?.forEach(e => {
+        evts.push(e.split('|'));
+    });
+
+    expect(evts.length).toBe(8);
+
+    expect(parseInt(evts[0][_type])).toBe(CommandType.kangaroo);
+    expect(parseInt(evts[0][_time])).toBe(0);
+    expect(parseInt(evts[0][_kChannel])).toBe(1);
+    expect(parseInt(evts[0][_kCommand])).toBe(KangarooAction.start);
+    expect(parseInt(evts[0][_kSpd])).toBe(0);
+    expect(parseInt(evts[0][_kPos])).toBe(0);
+
+    expect(parseInt(evts[1][_type])).toBe(CommandType.kangaroo);
+    expect(parseInt(evts[1][_time])).toBe(1000);
+    expect(parseInt(evts[1][_kChannel])).toBe(2);
+    expect(parseInt(evts[1][_kCommand])).toBe(KangarooAction.start);
+    expect(parseInt(evts[1][_kSpd])).toBe(0);
+    expect(parseInt(evts[1][_kPos])).toBe(0);
+     
+    expect(parseInt(evts[2][_type])).toBe(CommandType.kangaroo);
+    expect(parseInt(evts[2][_time])).toBe(0);
+    expect(parseInt(evts[2][_kChannel])).toBe(1);
+    expect(parseInt(evts[2][_kCommand])).toBe(KangarooAction.home);
+    expect(parseInt(evts[2][_kSpd])).toBe(0);
+    expect(parseInt(evts[2][_kPos])).toBe(0);
+
+    expect(parseInt(evts[3][_type])).toBe(CommandType.kangaroo);
+    expect(parseInt(evts[3][_time])).toBe(1000);
+    expect(parseInt(evts[3][_kChannel])).toBe(2);
+    expect(parseInt(evts[3][_kCommand])).toBe(KangarooAction.home);
+    expect(parseInt(evts[3][_kSpd])).toBe(0);
+    expect(parseInt(evts[3][_kPos])).toBe(0);
+
+    expect(parseInt(evts[4][_type])).toBe(CommandType.kangaroo);
+    expect(parseInt(evts[4][_time])).toBe(0);
+    expect(parseInt(evts[4][_kChannel])).toBe(1);
+    expect(parseInt(evts[4][_kCommand])).toBe(KangarooAction.position);
+    expect(parseInt(evts[4][_kSpd])).toBe(100);
+    expect(parseInt(evts[4][_kPos])).toBe(1000);
+
+    expect(parseInt(evts[5][_type])).toBe(CommandType.kangaroo);
+    expect(parseInt(evts[5][_time])).toBe(1000);
+    expect(parseInt(evts[5][_kChannel])).toBe(2);
+    expect(parseInt(evts[5][_kCommand])).toBe(KangarooAction.speed);
+    expect(parseInt(evts[5][_kSpd])).toBe(200);
+    expect(parseInt(evts[5][_kPos])).toBe(0);
+
+    expect(parseInt(evts[6][_type])).toBe(CommandType.kangaroo);
+    expect(parseInt(evts[6][_time])).toBe(1000);
+    expect(parseInt(evts[6][_kChannel])).toBe(2);
+    expect(parseInt(evts[6][_kCommand])).toBe(KangarooAction.position);
+    expect(parseInt(evts[6][_kSpd])).toBe(300);
+    expect(parseInt(evts[6][_kPos])).toBe(500);
+
+    expect(parseInt(evts[7][_type])).toBe(CommandType.kangaroo);
+    expect(parseInt(evts[7][_time])).toBe(0);
+    expect(parseInt(evts[7][_kChannel])).toBe(1);
+    expect(parseInt(evts[7][_kCommand])).toBe(KangarooAction.speed);
+    expect(parseInt(evts[7][_kSpd])).toBe(400);
+    expect(parseInt(evts[7][_kPos])).toBe(0);
+
+
+    }),
+
     it("multi channel test", () => {
 
         const script = new Script("1234", "test1",
@@ -76,7 +188,7 @@ describe("Script Converter Tests", () => {
 
         const evts = Array<Array<string>>();
 
-        const segs = coreVal?.split(';');
+        const segs = coreVal?.slice(0,-1).split(';');
 
         segs?.forEach(e => {
             evts.push(e.split('|'));
@@ -86,6 +198,8 @@ describe("Script Converter Tests", () => {
         const channels = new Array<string>('0', '10', '20');
 
         //expect(coreVal).toBe('1|0|0|50|1;1|0|10|50|1;1|1000|20|50|1;1|1000|0|100|3;1|1000|10|100|3;1|1000|20|100|3;1|0|0|0|5;1|0|10|0|5;1|0|20|0|5;');
+
+        expect(evts.length).toBe(9);
 
         expect(parseInt(evts[0][_type])).toBe(CommandType.servo);
         expect(parseInt(evts[0][_time])).toBe(0);

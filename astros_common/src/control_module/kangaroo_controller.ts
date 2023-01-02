@@ -1,11 +1,10 @@
 
 
 export class KangarooController {
-    channelOneName: string;
-    channelTwoName: string;
+    channelOneName = "channel 1";
+    channelTwoName = "channel 2";
 
-    constructor() {
-        this.channelOneName = "channel 1";
-        this.channelTwoName = "channel 2";
+    constructor(init?: Partial<KangarooController>) {
+        Object.assign(this, init);
     }
 }

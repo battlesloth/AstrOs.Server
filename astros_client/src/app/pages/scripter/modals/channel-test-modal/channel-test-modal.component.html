@@ -3,7 +3,7 @@
     <div class="modal-body">
         <div class="spacer"></div>
         <div class="content">
-            <div *ngIf="channelType === 1">
+            <div *ngIf="channelType === 1 && channelSubType === 1">
                 <label for="value">Serial Command</label>
                 <input name="value" matInput placeholder="Value" [(ngModel)]="value" />
             </div>

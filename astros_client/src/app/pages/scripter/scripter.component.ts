@@ -499,6 +499,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       const modalResources = new Map<string, any>();
 
       modalResources.set(ModalResources.channelType, ch.type);
+      modalResources.set(ModalResources.channelSubType, ch.subType);
       modalResources.set(ModalResources.channelId, ch.channelNumber);
       modalResources.set(ModalResources.controllerType, ch.controllerType);
 
