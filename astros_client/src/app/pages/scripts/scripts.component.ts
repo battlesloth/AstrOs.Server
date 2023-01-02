@@ -40,7 +40,9 @@ export class ScriptsComponent implements OnInit {
 
   ngOnInit(): void {
     const observer = {
-      next: (result: Script[]) => this.scripts = result,
+      next: (result: Script[]) => {
+        this.scripts = result;
+      },
       error: (err: any) => console.error(err)
     };
 
@@ -105,7 +107,18 @@ export class ScriptsComponent implements OnInit {
       return;
     }
 
-    this.scriptService.runScript(id).subscribe();
+    const observer = {
+      next: (result: any) => {
+        console.log(result);
+        this.snackBarService.okToast('Script run queued!');
+      },
+      error: (err: any) => {
+        console.error(err);
+        this.snackBarService.okToast('Error requesting upload. Check logs.');
+      }
+    }
+
+    this.scriptService.runScript(id).subscribe(observer);
   }
 
   uploadClicked(id: string) {

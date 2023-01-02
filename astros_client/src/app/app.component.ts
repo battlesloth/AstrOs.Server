@@ -24,7 +24,7 @@ export class AppComponent implements OnInit {
     private socket: WebsocketService) {
     if (auth.isLoggedIn()) {
       //router.navigate(['status']);
-      router.navigate(['/scripter/948be80d-8134-42b6-32af-1809a3365aa3']);
+      router.navigate(['/scripter/272843a6-58e5-5762-f782-618e57b42223']);
     }
   }
 

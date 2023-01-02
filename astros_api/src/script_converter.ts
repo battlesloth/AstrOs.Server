@@ -118,7 +118,7 @@ export class ScriptConverter {
 
 
     convertUartEvent(evt: ScriptEvent, timeTillNextEvent: number) : string {
-        switch (evt.subType){
+        switch (evt.channelSubType){
             case ChannelSubType.genericSerial:
                 return this.convertGenericSerialEvent(evt, timeTillNextEvent);
             case ChannelSubType.kangaroo:

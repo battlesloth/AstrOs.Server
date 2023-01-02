@@ -4,14 +4,14 @@ export class ScriptEvent {
 
     scriptChannel: string;
     channelType: ChannelType;
-    subType: ChannelSubType;
+    channelSubType: ChannelSubType;
     time: number;
     dataJson: string;
 
-    constructor(scriptChannel: string, channelType: ChannelType, subType: ChannelSubType, time: number, dataJson: string) {
+    constructor(scriptChannel: string, channelType: ChannelType, channleSubType: ChannelSubType, time: number, dataJson: string) {
         this.scriptChannel = scriptChannel;
         this.channelType = channelType;
-        this.subType = subType;
+        this.channelSubType = channleSubType;
         this.time = time;
         this.dataJson = dataJson;
     }

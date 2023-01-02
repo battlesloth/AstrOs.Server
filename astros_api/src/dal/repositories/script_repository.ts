@@ -2,7 +2,7 @@ import { DataAccess } from "src/dal/data_access";
 import { ScriptsTable } from "src/dal/tables/scripts_table";
 import { ScriptChannelsTable } from "src/dal/tables/script_channels_table";
 import { ScriptEventsTable } from "src/dal/tables/script_events_table";
-import { ChannelType, ControllerType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent } from "astros-common";
+import { ChannelType, ControllerType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent, ChannelSubType } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
@@ -90,7 +90,9 @@ export class ScriptRepository {
             await this.dao.get(ScriptEventsTable.selectForChannel, [result.id, ch.id])
                 .then((val: any) => {
                     val.forEach((evt: any) => {
-                        const event = new ScriptEvent(evt.scriptChannel, evt.channelType, evt.channelSubType, evt.time, evt.dataJson);
+                        const event = new ScriptEvent(evt.scriptChannel, evt.channelType, 
+                            evt.channelSubType !== null ? evt.channelSubType : ChannelSubType.none, 
+                            evt.time, evt.dataJson);
                         ch.eventsKvpArray.push({ key: event.time, value: event });
                     });
                 }).catch((err) => {
@@ -248,7 +250,7 @@ export class ScriptRepository {
 
                 if (evt) {
                     await this.dao.run(ScriptEventsTable.insert,
-                        [script.id, evt.scriptChannel, evt.channelType.toString(), evt.channelSubType, evt.time.toString(), evt.dataJson])
+                        [script.id, evt.scriptChannel, evt.channelType.toString(), evt.channelSubType.toString(), evt.time.toString(), evt.dataJson])
                         .then((val: any) => {
                             if (val) { console.log(val); }
                         });

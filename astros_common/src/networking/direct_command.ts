@@ -4,7 +4,7 @@ export class DirectCommand {
     type: DirectCommnandType;
     controller: ControllerType;
     command: any
-    ipAddress: string = '';
+    ipAddress = '';
 
     constructor(type: DirectCommnandType, controller: ControllerType, command: any){
         this.type = type;
