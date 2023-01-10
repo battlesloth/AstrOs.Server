@@ -40,6 +40,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   private scriptId: string;
   private resourcesLoaded: boolean = false;
   private renderedEvents: boolean = false;
+  private characters: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
   backgroundClickDisabled = '0';
 
@@ -95,7 +96,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.controllerService.getControllers().subscribe(csObserver);
 
     if (this.scriptId === '0') {
-      this.scriptId = Guid.create().toString();
+      this.scriptId = this.generateScriptId(5);
+      console.log(`new script id:${this.scriptId}`);
       this.script = new Script(this.scriptId, "",
         "", "1970-01-01 00:00:00.000",
         "1970-01-01 00:00:00.000",
@@ -169,7 +171,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.scriptService.saveScript(this.script).subscribe(observer);
   }
 
-//#region testing methods
+  //#region testing methods
 
   openScriptTestModal() {
     this.container.clear();
@@ -244,7 +246,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       .subscribe(observer);
   }
 
-//#endregion
+  //#endregion
 
   openChannelAddModal() {
 
@@ -403,11 +405,11 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     switch (evt.id) {
       case ModalCallbackEvent.addChannel:
-        this.addChannel(evt.controller, evt.module, evt.channel);
+        this.addChannel(evt.controller, evt.module, evt.channels);
         break;
       case ModalCallbackEvent.removeChannel:
-          this.removeChannel(evt.val);
-          break;
+        this.removeChannel(evt.val);
+        break;
       case ModalCallbackEvent.addEvent:
         this.addEvent(evt.scriptEvent);
         break;
@@ -517,7 +519,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   //#endregion
 
-  private addChannel(controller: ControllerType, channelType: ChannelType, channel: number): void {
+  private addChannel(controller: ControllerType, channelType: ChannelType, channels: Array<number>): void {
 
     let name = this.scriptResources.controllers.get(controller)?.name;
 
@@ -525,17 +527,20 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       name = ''
     }
 
-    const chValue = this.scriptResources.addChannel(controller, channelType, channel);
+    channels.forEach(channel => {
+      const chValue = this.scriptResources.addChannel(controller, channelType, +channel);
 
-    let subType = 0;
+      let subType = 0;
 
-    if (channelType === ChannelType.uart) {
-      subType = chValue.type;
-    }
+      if (channelType === ChannelType.uart) {
+        subType = chValue.type;
+      }
 
-    const ch = new ScriptChannel(Guid.create().toString(), controller, name, channelType, subType, channel, chValue, this.segments);
+      const ch = new ScriptChannel(Guid.create().toString(), controller, name!, channelType, subType, channel, chValue, this.segments);
 
-    this.scriptChannels.push(ch);
+      this.scriptChannels.push(ch);
+    });
+
     this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
   }
 
@@ -608,5 +613,14 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     }
 
     return a.channel.channelName < b.channel.channelName ? -1 : 1;
+  }
+
+  private generateScriptId(length: number): string {
+    let result = `s${Math.floor(Date.now() / 1000)}`;
+    let charactersLength = this.characters.length;
+    for (var i = 0; i < length; i++) {
+      result += this.characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
   }
 }

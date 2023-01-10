@@ -12,7 +12,12 @@
             <option value="0" disabled selected>Select Module</option>
             <option *ngFor="let kv of modules | keyvalue" value="{{kv.key}}">{{kv.value}}</option>
         </select>
-        <select id="channel-select" title="Channel" disabled [(ngModel)]="selectedChannel"
+        <select id="channel-select" 
+            title="Channel" 
+            disabled 
+            
+            [(ngModel)]="selectedChannels"
+            [multiple]="true"
             (change)="modalChange($event)">
             <option value="-1" disabled selected>Select Channel</option>
             <ng-container *ngFor="let ch of channels">
