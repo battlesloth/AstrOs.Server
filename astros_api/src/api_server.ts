@@ -32,8 +32,8 @@ import { ScriptRun } from "./models/scripts/script_run";
 
 class ApiServer {
 
-    private apiPort = 3000;
-    private websocketPort = 5000;
+    private apiPort = 0;
+    private websocketPort = 0;
     private clients: Map<string, WebSocket>;
 
     private app: Application;
@@ -49,6 +49,10 @@ class ApiServer {
 
     constructor() {
         Dotenv.config({ path: __dirname + '/.env' });
+        
+        this.apiPort = Number.parseInt(process.env.API_PORT!);
+        this.websocketPort = Number.parseInt(process.env.WEBSOCKET_PORT!);
+        
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
         this.router = Express.Router();
