@@ -23,6 +23,7 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
   private availableChannels!: Map<ControllerType, Map<ChannelType, Array<ChannelValue>>>;
   channels: Array<ChannelValue>
   selectedChannel: number = -1;
+  selectedChannels: Array<any> = [];
 
   constructor() {
     super();
@@ -59,7 +60,7 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
     
     if (+this.selectedModule !== ChannelType.none
       && +this.selectedModule !== ChannelType.uart
-      && +this.selectedChannel === -1){
+      && +this.selectedChannels.length < 1){
         this.errorMessage = 'Channel Selection Required'
         return;
       }
@@ -69,7 +70,8 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
       id: ModalCallbackEvent.addChannel,
       controller: +this.selectedController,
       module: +this.selectedController === ControllerType.audio ? ChannelType.audio : +this.selectedModule,
-      channel: +this.selectedChannel
+      //channel: +this.selectedChannel
+      channels: this.selectedChannels
     });
     this.clearOptions()
   }

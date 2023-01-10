@@ -23,8 +23,8 @@ export class AppComponent implements OnInit {
     private snackbar: SnackbarService,
     private socket: WebsocketService) {
     if (auth.isLoggedIn()) {
-      //router.navigate(['status']);
-      router.navigate(['/scripter/272843a6-58e5-5762-f782-618e57b42223']);
+      router.navigate(['status']);
+      //router.navigate(['/scripter/272843a6-58e5-5762-f782-618e57b42223']);
     }
   }
 
