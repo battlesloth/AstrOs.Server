@@ -7,9 +7,12 @@ import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
 import { logger } from "src/logger";
+import { Guid } from "guid-typescript";
 
 
 export class ScriptRepository {
+
+    private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
     dao: DataAccess
 
@@ -41,7 +44,7 @@ export class ScriptRepository {
         return result;
     }
 
-    async getScript(id: string): Promise<any> {
+    async getScript(id: string): Promise<Script> {
 
         let result = Script.prototype;
 
@@ -91,8 +94,8 @@ export class ScriptRepository {
             await this.dao.get(ScriptEventsTable.selectForChannel, [result.id, ch.id])
                 .then((val: any) => {
                     val.forEach((evt: any) => {
-                        const event = new ScriptEvent(evt.scriptChannel, evt.channelType, 
-                            evt.channelSubType !== null ? evt.channelSubType : ChannelSubType.none, 
+                        const event = new ScriptEvent(evt.scriptChannel, evt.channelType,
+                            evt.channelSubType !== null ? evt.channelSubType : ChannelSubType.none,
                             evt.time, evt.dataJson);
                         ch.eventsKvpArray.push({ key: event.time, value: event });
                     });
@@ -194,13 +197,13 @@ export class ScriptRepository {
                 break;
         }
 
-        if (sql === ''){
+        if (sql === '') {
             logger.warn('invalid controller type to update script!');
             return false;
         }
 
         await this.dao.run(sql, [dateTime, id])
-            .catch((err: any) =>{
+            .catch((err: any) => {
                 logger.error(`Exception updating script upload for controller: ${controller} => ${err}`);
                 success = false;
             });
@@ -219,8 +222,8 @@ export class ScriptRepository {
 
         await this.dao.run(ScriptsTable.insert,
             [script.id, script.scriptName,
-            script.description, 
-            date,
+            script.description,
+                date,
             script.coreUploaded,
             script.domeUploaded,
             script.bodyUploaded])
@@ -268,11 +271,50 @@ export class ScriptRepository {
         const sql = ScriptsTable.disableScript;
 
         await this.dao.run(sql, [id])
-            .catch((err: any) =>{
+            .catch((err: any) => {
                 logger.error(`Exception disabling script for ${id} => ${err}`);
                 success = false;
             });
 
         return success;
+    }
+
+    async copyScript(id: string): Promise<Script> {
+
+        let result = Script.prototype;
+
+        const script = await this.getScript(id);
+
+        script.id = this.generateScriptId(5);
+        script.scriptName = script.scriptName + ' - copy'
+        for (const ch of script.scriptChannels) 
+        {
+            ch.id = Guid.create().toString();
+            for (const kvp of ch.eventsKvpArray){
+                kvp.value.scriptChannel = ch.id;
+            }
+        }
+
+        const success = await this.saveScript(script)
+            .catch((err: any) => {
+                logger.error(`Exception saving copy script for ${id} => ${err}`);
+            });
+
+        result = new Script(script.id, script.scriptName,
+            script.description, script.lastSaved,
+            script.coreUploaded,
+            script.domeUploaded,
+            script.bodyUploaded)
+
+        return result;
+    }
+
+    private generateScriptId(length: number): string {
+        let result = `s${Math.floor(Date.now() / 1000)}`;
+        const charactersLength = this.characters.length;
+        for (let i = 0; i < length; i++) {
+            result += this.characters.charAt(Math.floor(Math.random() * charactersLength));
+        }
+        return result;
     }
 }

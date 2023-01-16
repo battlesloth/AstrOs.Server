@@ -527,8 +527,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       name = ''
     }
 
-    channels.forEach(channel => {
-      const chValue = this.scriptResources.addChannel(controller, channelType, +channel);
+    if (channelType === ChannelType.audio || ChannelType.uart) {
+      const chValue = this.scriptResources.addChannel(controller, channelType, 0);
 
       let subType = 0;
 
@@ -536,10 +536,26 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         subType = chValue.type;
       }
 
-      const ch = new ScriptChannel(Guid.create().toString(), controller, name!, channelType, subType, channel, chValue, this.segments);
+      const ch = new ScriptChannel(Guid.create().toString(), controller, name!, channelType, subType, 0, chValue, this.segments);
 
       this.scriptChannels.push(ch);
-    });
+    }
+    else 
+    {
+      channels.forEach(channel => {
+        const chValue = this.scriptResources.addChannel(controller, channelType, +channel);
+
+        let subType = 0;
+
+        if (channelType === ChannelType.uart) {
+          subType = chValue.type;
+        }
+
+        const ch = new ScriptChannel(Guid.create().toString(), controller, name!, channelType, subType, channel, chValue, this.segments);
+
+        this.scriptChannels.push(ch);
+      });
+    }
 
     this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
   }

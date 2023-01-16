@@ -173,9 +173,10 @@ class ApiServer {
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
         this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
         this.router.delete(ScriptsController.deleteRoute, this.authHandler, ScriptsController.deleteScript);
+        this.router.get(ScriptsController.copyRoute, this.authHandler, ScriptsController.copyScript);
 
-        this.router.get(ScriptsController.upload, this.authHandler, (req: any, res: any, next: any) => { this.uploadScript(req, res, next); });
-        this.router.get(ScriptsController.run, this.authHandler, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
+        this.router.get(ScriptsController.uploadRoute, this.authHandler, (req: any, res: any, next: any) => { this.uploadScript(req, res, next); });
+        this.router.get(ScriptsController.runRoute, this.authHandler, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);

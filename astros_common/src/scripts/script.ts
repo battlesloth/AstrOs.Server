@@ -3,6 +3,7 @@ import { ScriptChannel } from "./script_channel";
 
 
 export class Script{
+  
     id: string;
     scriptName: string;
     description: string;

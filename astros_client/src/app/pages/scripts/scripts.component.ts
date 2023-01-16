@@ -1,6 +1,6 @@
 import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { Router } from '@angular/router';
-import { faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCopy, faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
 import { ControllerType, Script, ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
@@ -20,6 +20,7 @@ export class ScriptsComponent implements OnInit {
   faTrash = faTrash;
   faUpload = faUpload;
   faRun = faPlay;
+  faCopy = faCopy;
 
   scripts: Array<Script>
 
@@ -41,7 +42,11 @@ export class ScriptsComponent implements OnInit {
   ngOnInit(): void {
     const observer = {
       next: (result: Script[]) => {
-        this.scripts = result;
+        this.scripts = result.sort((a, b) => {
+          if (a.scriptName > b.scriptName) { return 1; }
+          if (a.scriptName < b.scriptName) { return -1; }
+          return 0;
+        });
       },
       error: (err: any) => console.error(err)
     };
@@ -119,6 +124,38 @@ export class ScriptsComponent implements OnInit {
     }
 
     this.scriptService.runScript(id).subscribe(observer);
+  }
+
+  copyClicked(id: string) {
+    const idx = this.scripts
+      .map((s) => { return s.id })
+      .indexOf(id);
+
+    if (idx < 0) {
+      return;
+    }
+
+    const observer = {
+      next: (result: Script) => {
+        if (result === undefined) {
+          this.snackBarService.okToast('Error copying script. Check logs.');
+        } else {
+          this.scripts.push(result);
+
+          this.scripts.sort((a, b) => {
+            if (a.scriptName > b.scriptName) { return 1; }
+            if (a.scriptName < b.scriptName) { return -1; }
+            return 0;
+          });
+        }
+      },
+      error: (err: any) => {
+        console.error(err);
+        this.snackBarService.okToast('Error copying script. Check logs.');
+      }
+    }
+
+    this.scriptService.copyScript(id).subscribe(observer);
   }
 
   uploadClicked(id: string) {

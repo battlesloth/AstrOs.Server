@@ -32,6 +32,16 @@ export class ScriptsService {
       );
   }
 
+
+  public copyScript(id: string): Observable<Script> {
+    return this.http.get<Script>(`/api/scripts/copy?id=${id}`, {
+      headers: { Authorization: `Bearer ${this.getToken()}` }
+    })
+      .pipe(tap(_ => console.log(`loaded script ${id}`)),
+        catchError(this.handleError<Script>('copyScript'))
+      );
+  }
+  
   public saveScript(script: Script): Observable<any> {
     return this.http.put<any>('/api/scripts', script, {
       headers: { Authorization: `Bearer ${this.getToken()}` }
