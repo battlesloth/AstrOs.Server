@@ -4,6 +4,7 @@ import { ControllersTable } from "src/dal/tables/controllers_table";
 import { ServoChannelsTable } from "src/dal/tables/servo_channels_table";
 import { I2cChannelsTable } from "src/dal/tables/i2c_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
+import { logger } from "src/logger";
 
 export class ControllerRepository {
 
@@ -22,7 +23,7 @@ export class ControllerRepository {
                     result = val[0].controllerIp
                 })
                 .catch((err: any) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error';
                 });
 
@@ -45,7 +46,7 @@ export class ControllerRepository {
                     controller.fingerprint = val[0].fingerprint;
                 })
                 .catch((err: any) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error';
                 });
 
@@ -71,7 +72,7 @@ export class ControllerRepository {
                     controller.fingerprint = val[0].fingerprint;
                 })
                 .catch((err: any) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error';
                 });
 
@@ -82,7 +83,7 @@ export class ControllerRepository {
                     controller.uartModule = uart;
                 })
                 .catch((err: any) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error';
                 });
 
@@ -90,11 +91,11 @@ export class ControllerRepository {
                 .then((val: any) => {
                     val.forEach((ch: any) => {
                         controller.servoModule.channels[ch.channelId] =
-                            new ServoChannel(ch.channelId, ch.channelName, ch.enabled, ch.minPos, ch.maxPos);
+                            new ServoChannel(ch.channelId, ch.channelName, ch.enabled, ch.minPos, ch.maxPos, ch.inverted);
                     });
                 })
                 .catch((err: any) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error';
                 });
 
@@ -106,7 +107,7 @@ export class ControllerRepository {
                     });
                 })
                 .catch((err) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error';
                 });
 
@@ -122,30 +123,30 @@ export class ControllerRepository {
 
             await this.dao.run(ControllersTable.updateIp, [ctl.ipAddress, ctl.id.toString()])
                 .catch((err: any) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error';
                 });
 
             // TODO: only wipe fingerprint if there are changes to uart/servo/i2c
             await this.dao.run(ControllersTable.updateFingerprint, ['', ctl.id.toString()])
                 .catch((err: any) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error';
                 });
 
             await this.dao.run(UartModuleTable.update, [ctl.uartModule.type.toString(),
             ctl.uartModule.moduleName, JSON.stringify(ctl.uartModule.module), ctl.id.toString()])
                 .catch((err: any) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error';
                 })
 
             for (const servo of ctl.servoModule.channels) {
 
                 await this.dao.run(ServoChannelsTable.update, [servo.channelName, servo.enabled ? '1' : '0',
-                servo.minPos.toString(), servo.maxPos.toString(), servo.id.toString(), ctl.id.toString()])
+                servo.minPos.toString(), servo.maxPos.toString(),  servo.inverted ? '1' : '0', servo.id.toString(), ctl.id.toString()])
                     .catch((err: any) => {
-                        console.log(err);
+                        logger.error(err);
                         throw 'error';
                     });
 
@@ -155,12 +156,12 @@ export class ControllerRepository {
 
                 await this.dao.run(I2cChannelsTable.update, [i2c.channelName, i2c.enabled ? '1' : '0', i2c.id.toString(), ctl.id.toString()])
                     .catch((err: any) => {
-                        console.log(err);
+                        logger.error(err);
                         throw 'error';
                     });
             }
 
-            console.log(`Updated controller ${ctl.id}`);
+            logger.info(`Updated controller ${ctl.id}`);
         }
 
         return true;
@@ -170,7 +171,7 @@ export class ControllerRepository {
 
         await this.dao.run(ControllersTable.updateIp, [ip, controllerId.toString()])
             .catch((err: any) => {
-                console.log(err);
+                logger.error(err);
                 return false;
             });
 
@@ -181,7 +182,7 @@ export class ControllerRepository {
 
         await this.dao.run(ControllersTable.updateFingerprint, [fingerprint, controllerId.toString()])
             .catch((err: any) => {
-                console.log(err);
+                logger.error(err);
                 return false;
             });
 

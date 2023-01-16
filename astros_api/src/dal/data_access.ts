@@ -13,6 +13,8 @@ import { ScriptEventsTable } from "src/dal/tables/script_events_table";
 import { ScriptChannelsTable } from "./tables/script_channels_table";
 import { AudioFilesTable } from "./tables/audio_files_table";
 import { UartModuleTable } from "./tables/uart_module_table";
+import { logger } from "../logger";
+
 
 
 export class DataAccess {
@@ -48,27 +50,36 @@ export class DataAccess {
         if (!fs.existsSync(`${this.appdataPath}${this.databaseFile}`)) {
             fs.writeFile(`${this.appdataPath}${this.databaseFile}`, '', (err) => {
                 if (err) throw err;
-                console.log('Created database file');
+                logger.info('Created database file');
             });
         }
 
-        console.log(`Database path: ${this.appdataPath}${this.databaseFile}`)
+        logger.info(`Database path: ${this.appdataPath}${this.databaseFile}`)
 
         await this.connect();
 
         const result = await this.getVersion();
-        const version = parseInt(result, 10);
+        let version = parseInt(result, 10);
 
         if (Number.isNaN(version) || version < 1) {
-            console.log('Setting up database...');
+            logger.info('Setting up database...');
 
             await this.setupV1Tables()
                 .then(async () => await this.setV1Values());
 
-            console.log('Database set up complete!');
+            version = 1;
+            logger.info('Database set up complete!');
         }
-        else {
-            console.log(`Database at version ${version.toString()}`);
+        
+        logger.info(`Database at version ${version.toString()}`);
+        
+        switch (version){
+            case 1:
+                await this.upgradeToV2();
+                break
+            default:
+                logger.info('Database up to date');        
+                break;
         }
 
     }
@@ -77,8 +88,8 @@ export class DataAccess {
         return new Promise((resolve, reject) => {
             this.database.run(sql, params, (result: any, err: any) => {
                 if (err) {
-                    console.log('Error running sql ' + sql);
-                    console.log(err);
+                    logger.error('Error running sql ' + sql);
+                    logger.error(err);
                     reject(err);
                 }
                 else {
@@ -92,8 +103,8 @@ export class DataAccess {
         return new Promise((resolve, reject) => {
             this.database.all(sql, params, (err: any, rows: any) => {
                 if (err) {
-                    console.log('Error running sql ' + sql);
-                    console.log(err);
+                    logger.error('Error running sql ' + sql);
+                    logger.error(err);
                     reject(err);
                 }
                 else {
@@ -112,11 +123,11 @@ export class DataAccess {
                     return first;
                 })
                 .catch((err) => {
-                    console.log(err);
+                    logger.error(err);
                     return '0';
                 });
         } catch (ex) {
-            console.log(`Exception getting database version:${ex}`)
+            logger.error(`Exception getting database version:${ex}`)
         }
 
         return result;
@@ -154,7 +165,7 @@ export class DataAccess {
 
         await this.run(UsersTable.insert, ["admin", hash, salt])
             .then(() => {
-                console.log("Added default admin")
+                logger.info("Added default admin")
             })
             .catch((err) => console.error(`Error adding default admin: ${err}`));
 
@@ -190,29 +201,53 @@ export class DataAccess {
         }
 
         await this.run(SettingsTable.insert, ["version", "1"]).then(() => {
-            console.log("Updated database to version 1");
+            logger.info("Updated database to version 1");
         })
             .catch((err) => {
-                console.log(`Error updating database version: ${err}`);
+                logger.error(`Error updating database version: ${err}`);
             });
     }
 
     private async createTable(tableName: string, query: string): Promise<void> {
         await this.run(query)
             .then(() => {
-                console.log(`Created ${tableName} table`)
+                logger.info(`Created ${tableName} table`)
             })
             .catch((err) => {
-                console.log(`Error creating ${tableName} table: ${err}`);
+                logger.error(`Error creating ${tableName} table: ${err}`);
             });
     }
 
     private errorHandler(err: any): void {
         if (err) {
-            console.log('Could not connect to database', err);
+            logger.error('Could not connect to database', err);
         }
         else {
-            console.log('Connected to database');
+            logger.info('Connected to database');
         }
+    }
+
+    private async upgradeToV2(): Promise<void> {
+        logger.info('Upgrading to V2..')
+
+        await this.run(ServoChannelsTable.v2)
+        .then(() => {
+            logger.info("ServoChannelsTable at V2")
+        })
+        .catch((err) => console.error(`Error updating ServoChannelsTable to V2: ${err}`));
+
+        await this.UpdateDbVerion(2);
+
+        logger.info('Upgrade complete!..')
+    } 
+
+    private async UpdateDbVerion(version: number): Promise<void>{
+        await this.run(SettingsTable.update, [version.toString(), "version"])
+        .then(() => {
+            logger.info(`Updated version in  settings to ${version}`);
+        })
+        .catch((err) => {
+            logger.error(`Error updating database version in settings: ${err}`);
+        });
     }
 }

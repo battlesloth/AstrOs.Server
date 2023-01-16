@@ -1,4 +1,5 @@
 import { AudioFile } from "astros-common";
+import { logger } from "src/logger";
 import { DataAccess } from "../data_access";
 import { AudioFilesTable } from "../tables/audio_files_table";
 
@@ -22,7 +23,7 @@ export class AudioFileRepository {
             });
         })
         .catch((err) => {
-            console.log(err);
+            logger.error(err);
             return result;
         });
 
@@ -39,7 +40,7 @@ export class AudioFileRepository {
             result = true;
         })
         .catch((err) =>{
-            console.log(err);
+            logger.error(err);
             result = false;
         })
 
@@ -56,7 +57,7 @@ export class AudioFileRepository {
             });
         })
         .catch((err) => {
-            console.log(err);
+            logger.error(err);
             return result;
         });
 
@@ -71,7 +72,7 @@ export class AudioFileRepository {
             result = true;
         })
         .catch((err) =>{
-            console.log(err);
+            logger.error(err);
             result = false;
         })
 
@@ -87,7 +88,7 @@ export class AudioFileRepository {
             result = true;
         })
         .catch((err) =>{
-            console.log(err);
+            logger.error(err);
             result = false;
         })
 

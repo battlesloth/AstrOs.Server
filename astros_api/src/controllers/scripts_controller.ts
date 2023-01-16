@@ -1,5 +1,6 @@
 import { DataAccess } from "src/dal/data_access";
 import { ScriptRepository } from "src/dal/repositories/script_repository";
+import { logger } from "src/logger";
 
 export class ScriptsController {
 
@@ -21,7 +22,7 @@ export class ScriptsController {
             res.json(scripts);
 
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({
@@ -41,7 +42,7 @@ export class ScriptsController {
             res.json(scripts);
 
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({
@@ -65,7 +66,7 @@ export class ScriptsController {
                 });
             }
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({
@@ -85,7 +86,7 @@ export class ScriptsController {
             res.json({ message: 'success' });
 
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({

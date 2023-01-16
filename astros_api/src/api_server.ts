@@ -8,20 +8,21 @@ import cors from 'cors';
 import fileUpload from 'express-fileupload';
 
 import Express, { Router, Application } from "express";
-import { HttpError } from "http-errors";
 import { Server, WebSocket } from "ws";
 import { v4 as uuid_v4 } from "uuid";
 import { Strategy } from "passport-local"
 import { Worker } from "worker_threads";
 
-import { DataAccess } from "src/dal/data_access";
-import { UserRepository } from "src/dal/repositories/user_repository";
-import { ControllerController } from "src/controllers/controller_controller";
-import { AuthContoller } from "src/controllers/authentication_controller";
-import { ScriptsController } from "src/controllers/scripts_controller";
+import {pinoHttp} from "pino-http";
+
+import { DataAccess } from "./dal/data_access";
+import { UserRepository } from "./dal/repositories/user_repository";
+import { ControllerController } from "./controllers/controller_controller";
+import { AuthContoller } from "./controllers/authentication_controller";
+import { ScriptsController } from "./controllers/scripts_controller";
 import { AudioController } from "./controllers/audio_controller";
 import { FileController } from "./controllers/file_controller";
-import { ScriptUpload } from "src/models/scripts/script_upload";
+import { ScriptUpload } from "./models/scripts/script_upload";
 import { ScriptRepository } from "./dal/repositories/script_repository";
 
 import { ScriptConverter } from "./script_converter";
@@ -29,6 +30,8 @@ import { BaseResponse, ControllerType, Script, TransmissionStatus, TransmissionT
 import { ControllerRepository } from "./dal/repositories/controller_repository";
 import { ConfigSync } from "./models/config/config_sync";
 import { ScriptRun } from "./models/scripts/script_run";
+import { logger } from "./logger";
+
 
 class ApiServer {
 
@@ -109,7 +112,13 @@ class ApiServer {
         const da = new DataAccess();
         da.setup();
 
-        this.app.use(morgan('dev'))
+        const loggerMiddleware  = pinoHttp({
+            logger: logger,
+            autoLogging: true
+        });
+
+        this.app.use(loggerMiddleware);
+        this.app.use(morgan('dev'));
         this.app.use(cors());
         this.app.use(fileUpload());
         this.app.use(Express.json());
@@ -176,7 +185,7 @@ class ApiServer {
 
     private runWebServices(): void {
         this.app.listen(this.apiPort, () => {
-            console.log('The application is listening on port 3000');
+            logger.info('The application is listening on port 3000');
         });
 
         this.websocket = new Server({ port: this.websocketPort });
@@ -185,18 +194,18 @@ class ApiServer {
             const id = uuid_v4();
             this.clients.set(id, conn);
 
-            console.log(`${conn} connected`);
+            logger.info(`${conn.url}:${id} connected`);
         });
     }
 
     private async runBackgroundServices(): Promise<void> {
 
         this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: {} });
-        this.espMonitor.on('exit', exit => { console.log(exit); });
-        this.espMonitor.on('error', err => { console.log(err); });
+        this.espMonitor.on('exit', exit => { logger.info(exit); });
+        this.espMonitor.on('error', err => { logger.error(err); });
 
         this.espMonitor.on('message', (msg) => {
-            console.log(`Controller=${ControllerType[msg.controllerType]};up=${msg.up};synced=${msg.synced}`);
+            logger.info(`Controller=${ControllerType[msg.controllerType]};up=${msg.up};synced=${msg.synced}`);
             this.updateClients(msg);
         });
 
@@ -217,14 +226,14 @@ class ApiServer {
                     this.espMonitor.postMessage(ctlList);
                 })
                 .catch((err) => {
-                    console.log(`error getting controler IPs for monitor update: ${err}`);
+                    logger.error(`error getting controler IPs for monitor update: ${err}`);
                 });
 
         }, 15 * 1000);
 
         this.moduleInterface = new Worker('./dist/background_tasks/module_interface.js')
-        this.moduleInterface.on('exit', exit => { console.log(exit); });
-        this.moduleInterface.on('error', err => { console.log(err); });
+        this.moduleInterface.on('exit', exit => { logger.info(exit); });
+        this.moduleInterface.on('error', err => { logger.error(err); });
 
         this.moduleInterface.on('message', async (msg) => {
 
@@ -259,7 +268,7 @@ class ApiServer {
             res.json({ message: "success" });
 
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({
@@ -310,7 +319,7 @@ class ApiServer {
             const messages = cvtr.convertScript(script);
 
             if (messages.size < 1) {
-                console.log(`No controller script values returned for ${id}`);
+                logger.warn(`No controller script values returned for ${id}`);
             }
 
             const controllers = await ctlRepo.getControllerData();
@@ -323,7 +332,7 @@ class ApiServer {
             res.json({ message: "success" });
 
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({
@@ -349,7 +358,7 @@ class ApiServer {
             res.json({ message: "success" });
 
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({
@@ -373,13 +382,13 @@ class ApiServer {
 
             await repository.updateScriptControllerUploaded(msg.scriptId, msg.controllerType, date);
 
-            console.log(`Controller ${msg.controllerType} uploaded for ${msg.scriptId}!`)
+            logger.info(`Controller ${msg.controllerType} uploaded for ${msg.scriptId}!`)
 
             msg.date = date;
         } else if (msg.status === TransmissionStatus.failed) {
-            console.log(`Controller ${msg.controllerType} upload failed for ${msg.scriptId}!`)
+            logger.warn(`Controller ${msg.controllerType} upload failed for ${msg.scriptId}!`)
         } else {
-            console.log(`Updating transmission status for Controller ${msg.controllerType}, ${msg.scriptId} => ${msg.status}`);
+            logger.info(`Updating transmission status for Controller ${msg.controllerType}, ${msg.scriptId} => ${msg.status}`);
         }
     }
 
@@ -393,7 +402,7 @@ class ApiServer {
 
             req.body.type = TransmissionType.directCommand;
             
-            console.log(`sending direct command: ${JSON.stringify(req.body)}`);
+            logger.info(`sending direct command: ${JSON.stringify(req.body)}`);
 
             this.moduleInterface.postMessage(req.body);
 
@@ -401,7 +410,7 @@ class ApiServer {
             res.json({ message: "success" });
 
         } catch (error){
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({
@@ -417,7 +426,7 @@ class ApiServer {
             try {
                 client.send(str);
             } catch (err) {
-                console.log(`websocket send error: ${err}`);
+                logger.error(`websocket send error: ${err}`);
             }
         }
     }

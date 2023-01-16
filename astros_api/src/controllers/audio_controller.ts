@@ -2,6 +2,7 @@ import { DataAccess } from "src/dal/data_access";
 import { AudioFileRepository } from "src/dal/repositories/audio_file_repository";
 import { unlink } from 'fs';
 import appdata from 'appdata-path';
+import { logger } from "src/logger";
 
 export class AudioController {
     public static getAll = '/audio/all';
@@ -18,7 +19,7 @@ export class AudioController {
             res.json(files);
 
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({
@@ -47,7 +48,7 @@ export class AudioController {
             res.json({ success: true });
 
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({

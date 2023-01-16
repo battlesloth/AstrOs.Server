@@ -7,6 +7,13 @@ export class ServoChannelsTable {
     public static readonly enabled = 'enabled';
     public static readonly minPos = 'minPos';
     public static readonly maxPos = 'maxPos';
+    public static readonly inverted = 'inverted';
+
+    //DB version 2
+    public static readonly v2 = 
+    `ALTER TABLE ${this.table}
+    ADD ${this.inverted} INTEGER DEFAULT 0 NOT NULL
+    `
 
     public static readonly create =
     `CREATE TABLE IF NOT EXISTS ${this.table} (
@@ -21,15 +28,16 @@ export class ServoChannelsTable {
 
     public static readonly insert =
     `INSERT INTO ${this.table}
-    (${this.controllerId}, ${this.channelId}, ${this.channelName}, ${this.enabled}, ${this.minPos}, ${this.maxPos})
-    VALUES (?, ?, ?, ?, ?, ?)`;
+    (${this.controllerId}, ${this.channelId}, ${this.channelName}, ${this.enabled}, ${this.minPos}, ${this.maxPos},${this.inverted})
+    VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
     public static readonly selectAll =
     `SELECT ${this.channelId},
     ${this.channelName},
     ${this.enabled},
     ${this.minPos},
-    ${this.maxPos}
+    ${this.maxPos},
+    ${this.inverted}
     FROM ${this.table}
     WHERE ${this.controllerId} = ?`;
 
@@ -38,7 +46,8 @@ export class ServoChannelsTable {
     ${this.channelName},
     ${this.enabled},
     ${this.minPos},
-    ${this.maxPos}
+    ${this.maxPos},
+    ${this.inverted}
     FROM ${this.table}
     WHERE ${this.channelId} = ?
     AND ${this.controllerId} = ?`;
@@ -49,7 +58,8 @@ export class ServoChannelsTable {
     SET ${this.channelName} = ?,
     ${this.enabled} = ?,
     ${this.minPos} = ?,
-    ${this.maxPos} = ?
+    ${this.maxPos} = ?,
+    ${this.inverted} = ?
     WHERE ${this.channelId} = ?
     AND  ${this.controllerId} = ?`;
 }

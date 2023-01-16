@@ -3,6 +3,7 @@ import { DataAccess } from 'src/dal/data_access';
 import { AudioFileRepository } from 'src/dal/repositories/audio_file_repository';
 import { v4 as uuid_v4 } from "uuid";
 import { UploadedFile } from 'express-fileupload';
+import { logger } from 'src/logger';
 
 // https://github.com/expressjs/multer/blob/master/StorageEngine.md
 export class FileController {
@@ -23,8 +24,8 @@ export class FileController {
             const file = req.files.file as UploadedFile;
             let filename = 'error';
 
-            console.log("File Uploaded:");
-            console.log(`file: ${file.name}, mimetype: ${file.mimetype}`);
+            logger.info("File Uploaded:");
+            logger.info(`file: ${file.name}, mimetype: ${file.mimetype}`);
 
             const extensionMap = new Map<string, string>([
                 ['audio/ogg', 'ogg'],
@@ -38,7 +39,7 @@ export class FileController {
 
             file.mv(path, (err) => {
                 if (err) {
-                    console.log(err);
+                    logger.error(err);
                     return res.status(500).send("Internal server error");
                 }
             });
@@ -51,7 +52,7 @@ export class FileController {
             return res.status(200).send();
 
         } catch (err) {
-            console.log(err);
+            logger.error(err);
             return res.status(500).send("Internal server error");
         }
     }
@@ -63,6 +64,6 @@ export class FileController {
 
         const files = await repo.filesNeedingDuration();
 
-        console.log(`Testing: ${JSON.stringify(files)}`);
+        logger.info(`Testing: ${JSON.stringify(files)}`);
     }
 }

@@ -1,6 +1,7 @@
 const { parentPort } = require("worker_threads");
 const superagent = require('superagent');
 const e = require("express");
+const { logger } = require("../logger");
 
 parentPort.on('message', data => {
 
@@ -57,11 +58,11 @@ async function uploadScript(data) {
                     });
 
             } catch (err) {
-                console.log(`uploadScript|Error posting config to controller ${config.ip}: ${err}`);
+                logger.error(`uploadScript|Error posting config to controller ${config.ip}: ${err}`);
                 parentPort.postMessage({ type: script, controllerType: config.id, scriptId: data.scriptId, status: failed })
             };
         } else {
-            console.log(`uploadScript|No IP set for Controller Type ${config.id}`);
+            logger.warn(`uploadScript|No IP set for Controller Type ${config.id}`);
             parentPort.postMessage({ type: script, controllerType: config.id, scriptId: data.scriptId, status: failed })
         }
     };
@@ -94,11 +95,11 @@ async function uploadConfigs(data) {
                     });
 
             } catch (err) {
-                console.log(`uploadConfigs|Error posting config to controller ${config.ip}: ${err}`);
+                logger.error(`uploadConfigs|Error posting config to controller ${config.ip}: ${err}`);
                 resultMap.set(config.id, undefined);
             };
         } else {
-            console.log(`uploadConfigs|No IP set for Controller Type ${config.id}`);
+            logger.warn(`uploadConfigs|No IP set for Controller Type ${config.id}`);
             resultMap.set(config.id, undefined);
         }
     };
@@ -127,14 +128,14 @@ async function runScript(data) {
                     .then(res => {
                     })
                     .catch(err => {
-                        console.log(`runscript|Error posting config to controller ${config.ip}: ${err}`);
+                        logger.error(`runscript|Error posting config to controller ${config.ip}: ${err}`);
                     });
 
             } catch (err) {
-                console.log(`runscript|Error posting config to controller ${config.ip}: ${err}`);
+                logger.error(`runscript|Error posting config to controller ${config.ip}: ${err}`);
             };
         } else {
-            console.log(`runscript|No IP set for Controller Type ${config.id}`);
+            logger.warn(`runscript|No IP set for Controller Type ${config.id}`);
         }
     };
 }
@@ -151,14 +152,14 @@ async function panic(data) {
                     .then(res => {
                     })
                     .catch(err => {
-                        console.log(`panicstop|Error posting config to controller ${config.ip}: ${err}`);
+                        logger.error(`panicstop|Error posting config to controller ${config.ip}: ${err}`);
                     });
 
             } catch (err) {
-                console.log(`panicstop|Error posting config to controller ${config.ip}: ${err}`);
+                logger.error(`panicstop|Error posting config to controller ${config.ip}: ${err}`);
             };
         } else {
-            console.log(`panicstop|No IP set for Controller Type ${config.id}`);
+            logger.warn(`panicstop|No IP set for Controller Type ${config.id}`);
         }
     };
 }
@@ -194,14 +195,14 @@ async function runCommand(data) {
                 .then(res => {
                 })
                 .catch(err => {
-                    console.log(`send command|Error posting URI '${uri}' to controller ${data.ip}: ${err}`);
+                    logger.error(`send command|Error posting URI '${uri}' to controller ${data.ip}: ${err}`);
                 });
 
         } catch (err) {
-            console.log(`send command|Error posting URI '${uri}' to controller ${data.ip}: ${err}`);
+            logger.error(`send command|Error posting URI '${uri}' to controller ${data.ip}: ${err}`);
         };
     } else {
-        console.log(`send command|No IP set for Controller Type ${data.id}`);
+        logger.warn(`send command|No IP set for Controller Type ${data.id}`);
     }
 
 }

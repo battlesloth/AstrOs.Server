@@ -1,5 +1,6 @@
-const { parentPort, workerData } = require("worker_threads");
+const { parentPort } = require("worker_threads");
 const superagent  = require('superagent');
+const { logger } = require("../logger");
 
 parentPort.on('message', data => {
     checkControllers(data);
@@ -16,11 +17,11 @@ function checkControllers(data) {
                 parentPort.postMessage({type: 2, controllerType: ctl.controllerType, up: res.body.result === 'up', synced: res.body.fingerprint === ctl.fingerprint});
             })
             .catch(err => {
-                console.log(`Error calling ${ctl.ip}:${err.message}`);
+                logger.error(`Error calling ${ctl.ip}:${err.message}`);
                 parentPort.postMessage({type: 2, controllerType: ctl.controllerType, up: false, synced: false})
             });    
         } else {
-            console.log(`No IP set for Controller Type ${ctl.controllerType}`);
+            logger.warn(`No IP set for Controller Type ${ctl.controllerType}`);
             parentPort.postMessage({type: 2, controllerType: ctl.controllerType, up: false, synced: false})
         }
     });

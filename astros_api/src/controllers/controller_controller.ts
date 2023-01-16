@@ -1,5 +1,6 @@
 import { DataAccess } from "src/dal/data_access";
 import { ControllerRepository } from "src/dal/repositories/controller_repository";
+import { logger } from "src/logger";
 
 export class ControllerController {
 
@@ -17,7 +18,7 @@ export class ControllerController {
             res.json(modules);
 
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({
@@ -41,7 +42,7 @@ export class ControllerController {
                 });
             }
         } catch (error) {
-            console.log(error);
+            logger.error(error);
 
             res.status(500);
             res.json({

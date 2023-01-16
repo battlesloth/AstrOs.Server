@@ -6,6 +6,7 @@ import { ChannelType, ControllerType, I2cChannel, ServoChannel, UartModule, Scri
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
+import { logger } from "src/logger";
 
 
 export class ScriptRepository {
@@ -33,7 +34,7 @@ export class ScriptRepository {
                 });
             })
             .catch((err) => {
-                console.log(err);
+                logger.error(err);
                 throw 'error';
             });
 
@@ -56,7 +57,7 @@ export class ScriptRepository {
                     scr.bodyUploaded);
             })
             .catch((err) => {
-                console.log(err);
+                logger.error(err);
                 throw 'error';
             });
 
@@ -76,7 +77,7 @@ export class ScriptRepository {
                     channels.push(channel);
                 });
             }).catch((err) => {
-                console.log(err);
+                logger.error(err);
                 throw 'error'
             });
 
@@ -96,7 +97,7 @@ export class ScriptRepository {
                         ch.eventsKvpArray.push({ key: event.time, value: event });
                     });
                 }).catch((err) => {
-                    console.log(err);
+                    logger.error(err);
                     throw 'error'
                 });
         }
@@ -129,7 +130,7 @@ export class ScriptRepository {
             .then((val: any) => {
                 result = new UartModule(val[0].uartType, val[0].moduleName, JSON.parse(val[0].moduleJson));
             }).catch((err) => {
-                console.log(err);
+                logger.error(err);
                 throw 'error'
             });
 
@@ -162,14 +163,14 @@ export class ScriptRepository {
                             break;
                         case ChannelType.servo:
                             result = new ServoChannel(val[0].channelId, val[0].channelName,
-                                val[0].enabled, val[0].limit0, val[0].limit1);
+                                val[0].enabled, val[0].limit0, val[0].limit1, val[0].inverted);
                             break;
                     }
                 } catch (error) {
-                    console.log(error);
+                    logger.error(error);
                 }
             }).catch((err) => {
-                console.log(err);
+                logger.error(err);
                 throw 'error'
             });
 
@@ -194,13 +195,13 @@ export class ScriptRepository {
         }
 
         if (sql === ''){
-            console.log('invalid controller type to update script!');
+            logger.warn('invalid controller type to update script!');
             return false;
         }
 
         await this.dao.run(sql, [dateTime, id])
             .catch((err: any) =>{
-                console.log(`Exception updating script upload for controller: ${controller} => ${err}`);
+                logger.error(`Exception updating script upload for controller: ${controller} => ${err}`);
                 success = false;
             });
 
@@ -224,16 +225,16 @@ export class ScriptRepository {
             script.domeUploaded,
             script.bodyUploaded])
             .then((val: any) => {
-                if (val) { console.log(val); }
+                if (val) { logger.info(val); }
             });
 
         await this.dao.run(ScriptChannelsTable.deleteAllForScript, [script.id])
             .then((val: any) => {
-                if (val) { console.log(val); }
+                if (val) { logger.info(val); }
             });
         await this.dao.run(ScriptEventsTable.deleteAllForScript, [script.id])
             .then((val: any) => {
-                if (val) { console.log(val); }
+                if (val) { logger.info(val); }
             });
 
 
@@ -242,7 +243,7 @@ export class ScriptRepository {
             await this.dao.run(ScriptChannelsTable.insert, [ch.id,
             script.id, ch.controllerType.toString(), ch.type.toString(), ch.subType.toString(), ch.channelNumber.toString()])
                 .then((val: any) => {
-                    if (val) { console.log(val); }
+                    if (val) { logger.info(val); }
                 });
 
             for (const kvp of ch.eventsKvpArray) {
@@ -252,7 +253,7 @@ export class ScriptRepository {
                     await this.dao.run(ScriptEventsTable.insert,
                         [script.id, evt.scriptChannel, evt.channelType.toString(), evt.channelSubType.toString(), evt.time.toString(), evt.dataJson])
                         .then((val: any) => {
-                            if (val) { console.log(val); }
+                            if (val) { logger.info(val); }
                         });
                 }
             }
@@ -268,7 +269,7 @@ export class ScriptRepository {
 
         await this.dao.run(sql, [id])
             .catch((err: any) =>{
-                console.log(`Exception disabling script for ${id} => ${err}`);
+                logger.error(`Exception disabling script for ${id} => ${err}`);
                 success = false;
             });
 
