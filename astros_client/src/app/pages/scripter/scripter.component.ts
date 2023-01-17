@@ -16,6 +16,7 @@ import { KangarooEventModalComponent } from './modals/kangaroo-event-modal/kanga
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { ScriptTestModalComponent } from './modals/script-test-modal/script-test-modal.component';
 import { ChannelTestModalComponent } from './modals/channel-test-modal/channel-test-modal.component';
+import EventMarkerHelper from './helper/event-marker-helper';
 
 
 export interface Item {
@@ -76,7 +77,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       if (this.script != undefined) {
         for (const ch of this.script.scriptChannels) {
           for (const kvp of ch.eventsKvpArray) {
-            this.renderEvent(ch.id, kvp.key);
+            this.renderEvent(kvp.value);
           }
         }
         this.renderedEvents = true;
@@ -527,7 +528,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       name = ''
     }
 
-    if (channelType === ChannelType.audio || ChannelType.uart) {
+    if (channelType === ChannelType.audio || channelType === ChannelType.uart) {
       const chValue = this.scriptResources.addChannel(controller, channelType, 0);
 
       let subType = 0;
@@ -540,16 +541,11 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       this.scriptChannels.push(ch);
     }
-    else 
-    {
+    else {
       channels.forEach(channel => {
         const chValue = this.scriptResources.addChannel(controller, channelType, +channel);
 
         let subType = 0;
-
-        if (channelType === ChannelType.uart) {
-          subType = chValue.type;
-        }
 
         const ch = new ScriptChannel(Guid.create().toString(), controller, name!, channelType, subType, channel, chValue, this.segments);
 
@@ -568,7 +564,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     this.scriptChannels[chIdx].events.set(event.time, event);
 
-    this.renderEvent(event.scriptChannel, event.time);
+    this.renderEvent(event);
   }
 
   private editEvent(event: ScriptEvent, oldTime: number) {
@@ -586,18 +582,38 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     }
   }
 
-  private renderEvent(channelId: string, time: number) {
-    const line = document.getElementById(`script-row-${channelId}`);
+  private renderEvent(event: ScriptEvent) {//channelId: string, time: number) {
+    const line = document.getElementById(`script-row-${event.scriptChannel}`);
 
     const floater = this.renderer.createElement('div');
-    const text = this.renderer.createText((time / 10).toFixed(1).toString());
-    this.renderer.appendChild(floater, text);
+    const displayText = EventMarkerHelper.generateText(event);
+
+    const line1 = this.renderer.createElement('div');
+    const line1txt = this.renderer.createText(displayText[0]);
+    this.renderer.appendChild(line1, line1txt);
+    this.renderer.appendChild(floater, line1);
+
+    const line2 = this.renderer.createElement('div');
+    const line2txt = this.renderer.createText(displayText[1]);
+    this.renderer.appendChild(line2, line2txt);
+    this.renderer.appendChild(floater, line2);
+
+    const line3 = this.renderer.createElement('div');
+    const line3txt = this.renderer.createText(displayText[2]);
+    this.renderer.appendChild(line3, line3txt);
+    this.renderer.appendChild(floater, line3);
+
+    const line4 = this.renderer.createElement('div');
+    const line4txt = this.renderer.createText(displayText[3]);
+    this.renderer.appendChild(line4, line4txt);
+    this.renderer.appendChild(floater, line4);
+
     this.renderer.setAttribute(floater, 'class', 'scripter-timeline-marker');
-    this.renderer.setAttribute(floater, 'id', `event-${channelId}-${time}`)
-    this.renderer.setStyle(floater, 'top', `0px`);
-    this.renderer.setStyle(floater, 'left', `${(time * this.segmentWidth) - 30}px`);
+    this.renderer.setAttribute(floater, 'id', `event-${event.scriptChannel}-${event.time}`)
+    this.renderer.setStyle(floater, 'top', `-5px`);
+    this.renderer.setStyle(floater, 'left', `${(event.time * this.segmentWidth) - 37}px`);
     this.renderer.listen(floater, 'click', (evt) => {
-      this.openEditEventModal(channelId, time);
+      this.openEditEventModal(event.scriptChannel, event.time);
     })
     this.renderer.appendChild(line, floater);
   }

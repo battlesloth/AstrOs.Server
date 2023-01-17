@@ -139,16 +139,17 @@ flex-direction: column;
   text-align: center;
   color: white;
   position: absolute;
-  height: 60px;
-  width: 60px;
+  height: 74px;
+  width: 74px;
   vertical-align: middle;
-  line-height: 60px;
+  line-height: 18px;
   margin-top: 15px;
+  padding-top: 2px;
   top: 0px;
   z-index: 100;
   background-color: $light-blue;
   border: 2px solid black;
-  border-radius: 50%;
+  border-radius: 15%;
   cursor: pointer;
 }
 
