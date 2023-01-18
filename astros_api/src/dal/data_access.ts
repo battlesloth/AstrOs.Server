@@ -184,7 +184,7 @@ export class DataAccess {
             await this.run(UartModuleTable.insert, [ctl.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
             
             for (let i = 0; i < 32; i++) {
-                await this.run(ServoChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned", "0", "0", "0"])
+                await this.run(ServoChannelsTable.insertV1, [ctl.toString(), i.toString(), "unassigned", "0", "0", "0"])
                     .catch((err) => console.error(`Error adding servo channel ${i}: ${err}`))
             }
 

@@ -26,7 +26,12 @@ export class ServoChannelsTable {
     ${this.maxPos} INTEGER,
     UNIQUE(${this.controllerId}, ${this.channelId}) ON CONFLICT REPLACE)`;
 
-    public static readonly insert =
+    public static readonly insertV1 =
+    `INSERT INTO ${this.table}
+    (${this.controllerId}, ${this.channelId}, ${this.channelName}, ${this.enabled}, ${this.minPos}, ${this.maxPos})
+    VALUES (?, ?, ?, ?, ?, ?)`;
+
+    public static readonly insertV2 =
     `INSERT INTO ${this.table}
     (${this.controllerId}, ${this.channelId}, ${this.channelName}, ${this.enabled}, ${this.minPos}, ${this.maxPos},${this.inverted})
     VALUES (?, ?, ?, ?, ?, ?, ?)`;
