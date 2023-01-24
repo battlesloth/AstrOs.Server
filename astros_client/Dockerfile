@@ -1,4 +1,4 @@
-FROM node:lts-bullseye-slim as build0
+FROM arm64v8/node:18 as build0
 
 WORKDIR /usr/src/commons
 
@@ -26,7 +26,7 @@ COPY --from=build0 /usr/src/commons/dist /usr/src/app/node_modules/astros-common
 COPY ./astros_client/ .
 RUN ng build
 
-FROM nginx:alpine-slim AS run
+FROM arm64v8/nginx:alpine-slim AS run
 
 #RUN npm install -g http-server
 

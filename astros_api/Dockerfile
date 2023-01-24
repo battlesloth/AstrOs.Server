@@ -27,7 +27,7 @@ COPY --from=build0 /usr/src/commons/dist ./node_modules/astros-common
 # I'm sure plenty of people won't like this, but I have other issues to resolve
 # that are higher priority. Feel free to make a pull request changing this
 COPY ./astros_api/dist .
-RUN rm ./.env
+RUN rm -f ./.env
 COPY ./container_files/.env .
 
 FROM --platform=arm64 gcr.io/distroless/nodejs18-debian11
