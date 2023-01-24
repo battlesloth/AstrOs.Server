@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+
+  web:
+    build:
+      context: .
+      dockerfile: ./astros_client/Dockerfile
+    ports:
+      - 8080:80
+    networks:
+      - astronet
+  api:
+    hostname: astros-api
+    build:
+      context: .
+      dockerfile: ./astros_api/Dockerfile
+    volumes:
+      - C:/Test:/root/.config/astrosserver
+    ports:
+      - 3000:3000
+      - 5000:5000
+    networks:
+      - astronet
+
+networks:
+  astronet:
+    external: true

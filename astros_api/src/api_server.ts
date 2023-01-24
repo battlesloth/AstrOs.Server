@@ -13,7 +13,7 @@ import { v4 as uuid_v4 } from "uuid";
 import { Strategy } from "passport-local"
 import { Worker } from "worker_threads";
 
-import {pinoHttp} from "pino-http";
+import { pinoHttp } from "pino-http";
 
 import { DataAccess } from "./dal/data_access";
 import { UserRepository } from "./dal/repositories/user_repository";
@@ -52,10 +52,10 @@ class ApiServer {
 
     constructor() {
         Dotenv.config({ path: __dirname + '/.env' });
-        
+
         this.apiPort = Number.parseInt(process.env.API_PORT!);
         this.websocketPort = Number.parseInt(process.env.WEBSOCKET_PORT!);
-        
+
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
         this.router = Express.Router();
@@ -112,7 +112,7 @@ class ApiServer {
         const da = new DataAccess();
         da.setup();
 
-        const loggerMiddleware  = pinoHttp({
+        const loggerMiddleware = pinoHttp({
             logger: logger,
             autoLogging: true
         });
@@ -141,8 +141,8 @@ class ApiServer {
         });
 
 
-    
-        
+
+
         const jwtKey: string = (process.env.JWT_KEY as string);
 
         this.authHandler = jwt({
@@ -201,7 +201,11 @@ class ApiServer {
 
     private async runBackgroundServices(): Promise<void> {
 
-        this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: {} });
+        if (process.env.DEBUG) {
+            this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: {} });
+        } else {
+            this.espMonitor = new Worker('./background_tasks/esp_monitor.js', { workerData: {} });
+        }
         this.espMonitor.on('exit', exit => { logger.info(exit); });
         this.espMonitor.on('error', err => { logger.error(err); });
 
@@ -232,7 +236,13 @@ class ApiServer {
 
         }, 15 * 1000);
 
-        this.moduleInterface = new Worker('./dist/background_tasks/module_interface.js')
+        if (process.env.DEBUG) {
+            this.moduleInterface = new Worker('./dist/background_tasks/module_interface.js')
+        }
+        else {
+            this.moduleInterface = new Worker('./background_tasks/module_interface.js')
+        }
+
         this.moduleInterface.on('exit', exit => { logger.info(exit); });
         this.moduleInterface.on('error', err => { logger.error(err); });
 
@@ -241,14 +251,14 @@ class ApiServer {
             switch (msg.type) {
                 case TransmissionType.script:
                     await this.handleScriptRepsonse(msg);
-                    this.updateClients(msg);   
+                    this.updateClients(msg);
                     break;
-                case TransmissionType.sync:{
+                case TransmissionType.sync: {
                     const response = await this.handleSyncResponse(msg);
                     this.updateClients(response);
                     break;
-                }              
-                   
+                }
+
             }
 
         });
@@ -262,7 +272,7 @@ class ApiServer {
             const controllers = await repo.getControllers();
 
             const msg = new ConfigSync(controllers);
-            
+
             this.moduleInterface.postMessage(msg);
 
             res.status(200);
@@ -278,7 +288,7 @@ class ApiServer {
         }
     }
 
-    private async handleSyncResponse(msg: any) : Promise<BaseResponse> {
+    private async handleSyncResponse(msg: any): Promise<BaseResponse> {
 
         const result = new BaseResponse(TransmissionType.sync, true, '');
 
@@ -287,14 +297,14 @@ class ApiServer {
         modMap.set(2, 'Dome Module');
         modMap.set(3, 'Body Module');
 
-        for (const r of msg.results)  {
-            
-            if (r.synced){
+        for (const r of msg.results) {
+
+            if (r.synced) {
                 const dao = new DataAccess();
                 const repository = new ControllerRepository(dao);
 
                 const saved = await repository.updateControllerFingerprint(r.id, r.fingerprint);
-                
+
                 result.message += `${modMap.get(r.id)} sync ${saved ? 'succeeded' : 'failed'}, `;
             } else {
                 result.message += `${modMap.get(r.id)} sync failed, `;
@@ -393,7 +403,7 @@ class ApiServer {
         }
     }
 
-    private async directCommand(req: any, res: any, next: any){
+    private async directCommand(req: any, res: any, next: any) {
         try {
 
             const dao = new DataAccess();
@@ -402,7 +412,7 @@ class ApiServer {
             req.body.ip = await repo.getControllerIp(req.body.controller);
 
             req.body.type = TransmissionType.directCommand;
-            
+
             logger.info(`sending direct command: ${JSON.stringify(req.body)}`);
 
             this.moduleInterface.postMessage(req.body);
@@ -410,7 +420,7 @@ class ApiServer {
             res.status(200);
             res.json({ message: "success" });
 
-        } catch (error){
+        } catch (error) {
             logger.error(error);
 
             res.status(500);
@@ -418,7 +428,7 @@ class ApiServer {
                 message: 'Internal server error'
             });
         }
-        
+
     }
 
     private updateClients(msg: any): void {
