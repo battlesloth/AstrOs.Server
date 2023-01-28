@@ -41,28 +41,8 @@
             "dependsOn": "lint and build"
         },
         {
-            "label": "fix paths",
-            "type": "shell",
-            "command": "",
-            "windows":{
-                "command": "powershell",
-                "args": [
-                    "-ExecutionPolicy",
-                    "Unrestricted",
-                    "-NoProfile",
-                    "-File",
-                    "${workspaceFolder}/astros_api/fix_path.ps1" 
-                ]
-            },
-            "options": {
-                "cwd": "${workspaceFolder}/astros_api"
-            },
-            "dependsOn": "lint and build"
-        },
-        {
         "label": "build server",
         "dependsOn": [
-            "fix paths",
             "copy .env"
             ]
         }

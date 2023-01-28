@@ -1,6 +1,6 @@
-import { DataAccess } from "src/dal/data_access";
-import { ControllerRepository } from "src/dal/repositories/controller_repository";
-import { logger } from "src/logger";
+import { DataAccess } from "../dal/data_access";
+import { ControllerRepository } from "../dal/repositories/controller_repository";
+import { logger } from "../logger";
 
 export class ControllerController {
 

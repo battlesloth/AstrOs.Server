@@ -2,7 +2,9 @@
 node_modules
 # don't lint build output (make sure it's set to your correct build folder name)
 dist
+dist_webpack
 .eslintrc.js
 jest.config.js
 app.js
 /src/background_tasks
+webpack.config.js

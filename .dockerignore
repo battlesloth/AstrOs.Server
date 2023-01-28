@@ -9,10 +9,8 @@ astros_client/.angular/**/*
 astros_client/dist
 astros_client/dist/**/*
 
-astros_api/src
-astros_api/src/**/*
-astros_api/test
-astros_api/test/**/*
+astros_api/dist
+astros_api/dist/**/*
 
 astros_common/dist/
 astros_common/dist/**/*

@@ -11,34 +11,43 @@ RUN npm ci --production && npm cache clean --force
 COPY ./astros_common/ .
 RUN tsc
 
-#FROM node:lts-bullseye-slim as run
 FROM build0 as build1
 
 WORKDIR /usr/src/app
 
 COPY ./astros_api/package*.json ./
 
-RUN npm install --omit=dev --python=/usr/bin/python3 && npm cache clean --force
+RUN npm install --python=/usr/bin/python3
+RUN npm install webpack
+RUN npm install webpack-cli
 
 COPY --from=build0 /usr/src/commons/dist ./node_modules/astros-common
 
-# we pull from dist instead of building in a container because
-# we are currently using powershell to fix paths in the typescript includes
-# I'm sure plenty of people won't like this, but I have other issues to resolve
-# that are higher priority. Feel free to make a pull request changing this
-COPY ./astros_api/dist .
-RUN rm -f ./.env
-COPY ./container_files/.env .
+COPY ./astros_api/ .
+RUN ./node_modules/.bin/webpack
+
+COPY ./container_files/.env ./dist
+
+WORKDIR /usr/src/app/dist
+
+FROM build1 as build2
+
+WORKDIR /usr/src/temp/
+
+COPY --from=build1 /usr/src/app/dist /usr/src/temp/
+
+RUN npm install sqlite3 --python=/usr/bin/python3
+RUN npm install bufferutil
+RUN npm install utf-8-validate
 
 FROM --platform=arm64 gcr.io/distroless/nodejs18-debian11
 
-COPY --from=build1 /usr/src/app /app
-COPY --from=build0 /usr/src/commons/dist /app/node_modules/astros-common
-
 WORKDIR /app
+
+COPY --from=build2 /usr/src/temp .
+COPY --from=build0 /usr/src/commons/dist ./node_modules/astros-common
 
 EXPOSE 3000
 EXPOSE 5000
 
-#CMD [ "node", "api_server.js"]
-CMD ["api_server.js"]
+CMD ["bundle.js"]

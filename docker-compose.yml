@@ -6,8 +6,12 @@ services:
     build:
       context: .
       dockerfile: ./astros_client/Dockerfile
+      tags:
+        - dirtknap/astros-web:1.0
+        - dirtknap/astros-web:latest
     ports:
       - 8080:80
+      - 5000:5000
     networks:
       - astronet
   api:
@@ -15,11 +19,11 @@ services:
     build:
       context: .
       dockerfile: ./astros_api/Dockerfile
+      tags:
+        - dirtknap/astros-api:1.0
+        - dirtknap/astros-api:latest
     volumes:
       - C:/Test:/root/.config/astrosserver
-    ports:
-      - 3000:3000
-      - 5000:5000
     networks:
       - astronet
 

@@ -8,7 +8,7 @@ import cors from 'cors';
 import fileUpload from 'express-fileupload';
 
 import Express, { Router, Application } from "express";
-import { Server, WebSocket } from "ws";
+import {WebSocketServer as Server, WebSocket } from "ws";
 import { v4 as uuid_v4 } from "uuid";
 import { Strategy } from "passport-local"
 import { Worker } from "worker_threads";
@@ -201,11 +201,8 @@ class ApiServer {
 
     private async runBackgroundServices(): Promise<void> {
 
-        if (process.env.DEBUG) {
-            this.espMonitor = new Worker('./dist/background_tasks/esp_monitor.js', { workerData: {} });
-        } else {
-            this.espMonitor = new Worker('./background_tasks/esp_monitor.js', { workerData: {} });
-        }
+        this.espMonitor = new Worker(new URL('./background_tasks/esp_monitor.js', import.meta.url));
+
         this.espMonitor.on('exit', exit => { logger.info(exit); });
         this.espMonitor.on('error', err => { logger.error(err); });
 
@@ -236,12 +233,7 @@ class ApiServer {
 
         }, 15 * 1000);
 
-        if (process.env.DEBUG) {
-            this.moduleInterface = new Worker('./dist/background_tasks/module_interface.js')
-        }
-        else {
-            this.moduleInterface = new Worker('./background_tasks/module_interface.js')
-        }
+        this.moduleInterface = new Worker(new URL('./background_tasks/module_interface.js', import.meta.url))
 
         this.moduleInterface.on('exit', exit => { logger.info(exit); });
         this.moduleInterface.on('error', err => { logger.error(err); });

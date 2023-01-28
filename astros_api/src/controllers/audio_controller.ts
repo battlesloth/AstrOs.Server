@@ -1,8 +1,8 @@
-import { DataAccess } from "src/dal/data_access";
-import { AudioFileRepository } from "src/dal/repositories/audio_file_repository";
+import { DataAccess } from "../dal/data_access";
+import { AudioFileRepository } from "../dal/repositories/audio_file_repository";
 import { unlink } from 'fs';
 import appdata from 'appdata-path';
-import { logger } from "src/logger";
+import { logger } from "../logger";
 
 export class AudioController {
     public static getAll = '/audio/all';

@@ -1,9 +1,9 @@
 import appdata from 'appdata-path';
-import { DataAccess } from 'src/dal/data_access';
-import { AudioFileRepository } from 'src/dal/repositories/audio_file_repository';
+import { DataAccess } from '../dal/data_access';
+import { AudioFileRepository } from '../dal/repositories/audio_file_repository';
 import { v4 as uuid_v4 } from "uuid";
 import { UploadedFile } from 'express-fileupload';
-import { logger } from 'src/logger';
+import { logger } from '../logger';
 
 // https://github.com/expressjs/multer/blob/master/StorageEngine.md
 export class FileController {
