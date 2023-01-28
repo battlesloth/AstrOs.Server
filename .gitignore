@@ -3,6 +3,7 @@
 # compiled output
 /astros_client/dist
 /astros_api/dist
+/astros_api/dist_webpack
 /astros_common/dist
 /dist
 /tmp

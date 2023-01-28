@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+
+  web:
+    image: "dirtknap/astros-web:latest"
+    ports:
+      - 80:80
+      - 5000:5000
+    networks:
+      - astronet
+  api:
+    image: "dirtknap/astros-api:latest"
+    hostname: astros-api
+    volumes:
+      - /astros/.config/astrosserver:/root/.config/astrosserver
+    networks:
+      - astronet
+
+networks:
+  astronet:
+    external: true

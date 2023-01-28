@@ -1,12 +1,12 @@
-import { DataAccess } from "src/dal/data_access";
-import { ScriptsTable } from "src/dal/tables/scripts_table";
-import { ScriptChannelsTable } from "src/dal/tables/script_channels_table";
-import { ScriptEventsTable } from "src/dal/tables/script_events_table";
+import { DataAccess } from "../../dal/data_access";
+import { ScriptsTable } from "../../dal/tables/scripts_table";
+import { ScriptChannelsTable } from "../../dal/tables/script_channels_table";
+import { ScriptEventsTable } from "../../dal/tables/script_events_table";
 import { ChannelType, ControllerType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent, ChannelSubType } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
-import { logger } from "src/logger";
+import { logger } from "../../logger";
 import { Guid } from "guid-typescript";
 
 

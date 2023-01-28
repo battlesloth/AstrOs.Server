@@ -1,10 +1,10 @@
-import { DataAccess } from "src/dal/data_access";
+import { DataAccess } from "../../dal/data_access";
 import { ControlModule, ControllerType, ServoChannel, I2cChannel, UartModule } from "astros-common";
-import { ControllersTable } from "src/dal/tables/controllers_table";
-import { ServoChannelsTable } from "src/dal/tables/servo_channels_table";
-import { I2cChannelsTable } from "src/dal/tables/i2c_channels_table";
+import { ControllersTable } from "../../dal/tables/controllers_table";
+import { ServoChannelsTable } from "../../dal/tables/servo_channels_table";
+import { I2cChannelsTable } from "../../dal/tables/i2c_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
-import { logger } from "src/logger";
+import { logger } from "../../logger";
 
 export class ControllerRepository {
 

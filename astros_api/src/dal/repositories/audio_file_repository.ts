@@ -1,5 +1,5 @@
 import { AudioFile } from "astros-common";
-import { logger } from "src/logger";
+import { logger } from "../../logger";
 import { DataAccess } from "../data_access";
 import { AudioFilesTable } from "../tables/audio_files_table";
 

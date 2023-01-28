@@ -1,0 +1,53 @@
+FROM arm64v8/node:18 as build0
+
+WORKDIR /usr/src/commons
+
+RUN npm install typescript -g
+
+COPY ./astros_common/package*.json ./
+
+RUN npm ci --production && npm cache clean --force
+
+COPY ./astros_common/ .
+RUN tsc
+
+FROM build0 as build1
+
+WORKDIR /usr/src/app
+
+COPY ./astros_api/package*.json ./
+
+RUN npm install --python=/usr/bin/python3
+RUN npm install webpack
+RUN npm install webpack-cli
+
+COPY --from=build0 /usr/src/commons/dist ./node_modules/astros-common
+
+COPY ./astros_api/ .
+RUN ./node_modules/.bin/webpack
+
+COPY ./container_files/.env ./dist
+
+WORKDIR /usr/src/app/dist
+
+FROM build1 as build2
+
+WORKDIR /usr/src/temp/
+
+COPY --from=build1 /usr/src/app/dist /usr/src/temp/
+
+RUN npm install sqlite3 --python=/usr/bin/python3
+RUN npm install bufferutil
+RUN npm install utf-8-validate
+
+FROM --platform=arm64 gcr.io/distroless/nodejs18-debian11
+
+WORKDIR /app
+
+COPY --from=build2 /usr/src/temp .
+COPY --from=build0 /usr/src/commons/dist ./node_modules/astros-common
+
+EXPOSE 3000
+EXPOSE 5000
+
+CMD ["bundle.js"]

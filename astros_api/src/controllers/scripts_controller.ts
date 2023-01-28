@@ -1,6 +1,6 @@
-import { DataAccess } from "src/dal/data_access";
-import { ScriptRepository } from "src/dal/repositories/script_repository";
-import { logger } from "src/logger";
+import { DataAccess } from "../dal/data_access";
+import { ScriptRepository } from "../dal/repositories/script_repository";
+import { logger } from "../logger";
 
 export class ScriptsController {
 

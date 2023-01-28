@@ -17,7 +17,7 @@ function timestamp(): string {
 export const logger = pino({
     level: "debug"
     }, 
-    pino.destination(`${appdata("astrosserver")}/astros_${timestamp()}.log`)
+   // pino.destination(`${appdata("astrosserver")}/astros_${timestamp()}.log`)
 )
 
 
