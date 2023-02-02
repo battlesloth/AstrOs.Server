@@ -29,10 +29,10 @@ export class ScriptRepository {
                 val.forEach((scr: any) => {
                     result.push(
                         new Script(scr.id, scr.scriptName,
-                            scr.description, scr.lastSaved,
-                            scr.coreUploaded,
-                            scr.domeUploaded,
-                            scr.bodyUploaded)
+                            scr.description, scr.lastSaved.replace(',', ''),
+                            scr.coreUploaded.replace(',', ''),
+                            scr.domeUploaded.replace(',', ''),
+                            scr.bodyUploaded.replace(',', ''))
                     );
                 });
             })
@@ -54,10 +54,10 @@ export class ScriptRepository {
                 const scr = val[0];
 
                 result = new Script(scr.id, scr.scriptName,
-                    scr.description, scr.lastSaved,
-                    scr.coreUploaded,
-                    scr.domeUploaded,
-                    scr.bodyUploaded);
+                    scr.description, scr.lastSaved.replace(',', ''),
+                    scr.coreUploaded.replace(',', ''),
+                    scr.domeUploaded.replace(',', ''),
+                    scr.bodyUploaded.replace(',', ''));
             })
             .catch((err) => {
                 logger.error(err);
@@ -224,9 +224,9 @@ export class ScriptRepository {
             [script.id, script.scriptName,
             script.description,
                 date,
-            script.coreUploaded,
-            script.domeUploaded,
-            script.bodyUploaded])
+            script.coreUploaded.replace(',', ''),
+            script.domeUploaded.replace(',', ''),
+            script.bodyUploaded.replace(',', '')])
             .then((val: any) => {
                 if (val) { logger.info(val); }
             });
@@ -301,10 +301,10 @@ export class ScriptRepository {
             });
 
         result = new Script(script.id, script.scriptName,
-            script.description, script.lastSaved,
-            script.coreUploaded,
-            script.domeUploaded,
-            script.bodyUploaded)
+            script.description, script.lastSaved.replace(',', ''),
+            script.coreUploaded.replace(',', ''),
+            script.domeUploaded.replace(',', ''),
+            script.bodyUploaded.replace(',', ''))
 
         return result;
     }

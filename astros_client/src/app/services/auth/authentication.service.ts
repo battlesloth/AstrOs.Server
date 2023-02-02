@@ -71,9 +71,9 @@ export class AuthenticationService {
   }
 
   private getToken(): string {
-    if (!this.token){
-      this.token = localStorage.getItem("astros-token") || '';
-    }
+    
+    this.token = localStorage.getItem("astros-token") || '';
+    
     return this.token;
   }
 

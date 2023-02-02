@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: ./astros_client/Dockerfile
       tags:
-        - dirtknap/astros-web:1.0
+        - dirtknap/astros-web:1.0.2
         - dirtknap/astros-web:latest
     ports:
       - 8080:80
@@ -20,7 +20,7 @@ services:
       context: .
       dockerfile: ./astros_api/Dockerfile
       tags:
-        - dirtknap/astros-api:1.0
+        - dirtknap/astros-api:1.0.1
         - dirtknap/astros-api:latest
     volumes:
       - C:/Test:/root/.config/astrosserver

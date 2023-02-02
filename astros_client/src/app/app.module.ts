@@ -37,6 +37,8 @@ import { WebsocketService } from './services/websocket/websocket.service';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ScriptTestModalComponent } from './pages/scripter/modals/script-test-modal/script-test-modal.component';
 import { ChannelTestModalComponent } from './pages/scripter/modals/channel-test-modal/channel-test-modal.component';
+import { RemoteConfigComponent } from './pages/remote-config/remote-config.component';
+import { M5PaperConfigComponent } from './pages/remote-config/m5-paper-config/m5-paper-config.component';
 
 
 
@@ -63,7 +65,9 @@ import { ChannelTestModalComponent } from './pages/scripter/modals/channel-test-
     KangarooModuleComponent,
     GenericSerialModuleComponent,
     ScriptTestModalComponent,
-    ChannelTestModalComponent
+    ChannelTestModalComponent,
+    RemoteConfigComponent,
+    M5PaperConfigComponent
   ],
   imports: [
     BrowserModule,

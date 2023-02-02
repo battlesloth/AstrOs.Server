@@ -19,14 +19,11 @@
                             <div class="desc-section">{{script.description}}</div>
                         </div>
                         <div [ngClass]="uploadStatus(script.domeUploadStatus)"
-                            class="upload-section tooltip">Dome <span class="tooltiptext">{{script.domeUploaded |
-                                date:'short'}}</span></div>
+                            class="upload-section tooltip">Dome <span class="tooltiptext">{{script.domeUploaded}}</span></div>
                         <div [ngClass]="uploadStatus(script.coreUploadStatus)"
-                            class="upload-section tooltip">Core <span class="tooltiptext">{{script.coreUploaded |
-                                date:'short'}}</span></div>
+                            class="upload-section tooltip">Core <span class="tooltiptext">{{script.coreUploaded}}</span></div>
                         <div [ngClass]="uploadStatus(script.bodyUploadStatus)"
-                            class="upload-section tooltip">Body <span class="tooltiptext">{{script.bodyUploaded |
-                                date:'short'}}</span></div>
+                            class="upload-section tooltip">Body <span class="tooltiptext">{{script.bodyUploaded}}</span></div>
                         <div class="button-container">
                             <div class="copy">
                                 <button title="Copy" (click)="copyClicked(script.id)"><fa-icon [icon]="faCopy"></fa-icon></button>
