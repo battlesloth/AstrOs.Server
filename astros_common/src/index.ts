@@ -17,6 +17,7 @@ export {I2cEvent} from './scripts/events/i2c_event';
 export {BaseResponse} from './networking/base_response';
 export {StatusResponse} from './networking/status_repsonse';
 export {ScriptResponse} from './networking/script_response';
+export {M5Page, PageButton} from './remotes/M5Page';
 export {ControllerType, 
     ChannelType, 
     ChannelSubType,
@@ -25,3 +26,4 @@ export {ControllerType,
     ControllerStatus,
     TransmissionType,
     TransmissionStatus} from './astros_enums';
+

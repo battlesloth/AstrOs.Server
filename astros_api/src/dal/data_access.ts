@@ -7,13 +7,14 @@ import { UsersTable } from "./tables/users_table";
 import { ControllersTable } from "./tables/controllers_table";
 import { I2cChannelsTable } from "./tables/i2c_channels_table";
 import { ServoChannelsTable } from "./tables/servo_channels_table";
-import { ControllerType, UartType } from "astros-common";
+import { ControllerType, UartType, M5Page } from "astros-common";
 import { ScriptsTable } from "./tables/scripts_table";
 import { ScriptEventsTable } from "./tables/script_events_table";
 import { ScriptChannelsTable } from "./tables/script_channels_table";
 import { AudioFilesTable } from "./tables/audio_files_table";
 import { UartModuleTable } from "./tables/uart_module_table";
 import { logger } from "../logger";
+import { RemoteConfigTable } from "./tables/remote_config_table";
 
 
 
@@ -76,6 +77,10 @@ export class DataAccess {
         switch (version){
             case 1:
                 await this.upgradeToV2();
+                await this.upgradeToV3();
+                break
+            case 2:
+                await this.upgradeToV3();
                 break
             default:
                 logger.info('Database up to date');        
@@ -238,16 +243,33 @@ export class DataAccess {
 
         await this.UpdateDbVerion(2);
 
-        logger.info('Upgrade complete!..')
+        logger.info('Upgrade complete!')
     } 
+
+
+    private async upgradeToV3(): Promise<void> {
+        logger.info('Upgrading to V3...')
+
+        await this.run(RemoteConfigTable.create)
+        .then(() => {
+            logger.info("Remote Config Table created")
+        })
+        .catch((err) => console.error(`Error Creating Remote Config Table: ${err}`));
+
+        await this.run(RemoteConfigTable.insert, ['m5paper', JSON.stringify(new Array<M5Page>())])
+
+        await this.UpdateDbVerion(3);
+
+        logger.info('Upgrade complete!')
+    }
 
     private async UpdateDbVerion(version: number): Promise<void>{
         await this.run(SettingsTable.update, [version.toString(), "version"])
         .then(() => {
-            logger.info(`Updated version in  settings to ${version}`);
+            logger.info(`Updated version in settings table to ${version}`);
         })
         .catch((err) => {
-            logger.error(`Error updating database version in settings: ${err}`);
+            logger.error(`Error updating database version in settings table: ${err}`);
         });
     }
 }

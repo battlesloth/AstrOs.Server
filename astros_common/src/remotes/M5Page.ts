@@ -1,4 +1,4 @@
- export class M5Page {
+export class M5Page {
 
     button1: PageButton;
     button2: PageButton;

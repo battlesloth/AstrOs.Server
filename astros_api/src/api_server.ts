@@ -31,6 +31,7 @@ import { ControllerRepository } from "./dal/repositories/controller_repository";
 import { ConfigSync } from "./models/config/config_sync";
 import { ScriptRun } from "./models/scripts/script_run";
 import { logger } from "./logger";
+import { RemoteConfigController } from "./controllers/remote_config_controller";
 
 
 class ApiServer {
@@ -163,11 +164,11 @@ class ApiServer {
     private setRoutes(): void {
 
         this.router.post(AuthContoller.route, AuthContoller.login);
+        this.router.post(AuthContoller.reauthRoute, AuthContoller.reauth);
 
         this.router.get(ControllerController.route, this.authHandler, ControllerController.getControllers);
         this.router.put(ControllerController.route, this.authHandler, ControllerController.saveControllers);
         this.router.get(ControllerController.syncRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllers(req, res, next); });
-
 
         this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
@@ -177,6 +178,9 @@ class ApiServer {
 
         this.router.get(ScriptsController.uploadRoute, this.authHandler, (req: any, res: any, next: any) => { this.uploadScript(req, res, next); });
         this.router.get(ScriptsController.runRoute, this.authHandler, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
+
+        this.router.get(RemoteConfigController.getRoute, this.authHandler, RemoteConfigController.getRemoteConfig);
+        this.router.put(RemoteConfigController.putRoute, this.authHandler, RemoteConfigController.saveRemoteConfig);
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
