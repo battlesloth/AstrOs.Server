@@ -32,6 +32,7 @@ import { ConfigSync } from "./models/config/config_sync";
 import { ScriptRun } from "./models/scripts/script_run";
 import { logger } from "./logger";
 import { RemoteConfigController } from "./controllers/remote_config_controller";
+import { SettingsController } from "./controllers/settings_controller";
 
 
 class ApiServer {
@@ -181,6 +182,9 @@ class ApiServer {
 
         this.router.get(RemoteConfigController.getRoute, this.authHandler, RemoteConfigController.getRemoteConfig);
         this.router.put(RemoteConfigController.putRoute, this.authHandler, RemoteConfigController.saveRemoteConfig);
+
+        this.router.get(SettingsController.getRoute, this.authHandler, SettingsController.getSetting);
+        this.router.put(SettingsController.putRoute, this.authHandler, SettingsController.saveSetting);
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);

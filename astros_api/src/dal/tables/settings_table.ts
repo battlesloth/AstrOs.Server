@@ -13,7 +13,7 @@ export class SettingsTable {
     ${this.value} TEXT)`;
 
     public static readonly insert =
-    `INSERT INTO ${this.table}
+    `INSERT OR REPLACE INTO ${this.table}
     (${this.key}, ${this.value})
     VALUES (?, ?)`;
 

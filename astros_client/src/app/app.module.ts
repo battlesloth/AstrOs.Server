@@ -39,6 +39,7 @@ import { ScriptTestModalComponent } from './pages/scripter/modals/script-test-mo
 import { ChannelTestModalComponent } from './pages/scripter/modals/channel-test-modal/channel-test-modal.component';
 import { RemoteConfigComponent } from './pages/remote-config/remote-config.component';
 import { M5PaperConfigComponent } from './pages/remote-config/m5-paper-config/m5-paper-config.component';
+import { SettingsComponent } from './pages/settings/settings.component';
 
 
 
@@ -67,7 +68,8 @@ import { M5PaperConfigComponent } from './pages/remote-config/m5-paper-config/m5
     ScriptTestModalComponent,
     ChannelTestModalComponent,
     RemoteConfigComponent,
-    M5PaperConfigComponent
+    M5PaperConfigComponent,
+    SettingsComponent
   ],
   imports: [
     BrowserModule,

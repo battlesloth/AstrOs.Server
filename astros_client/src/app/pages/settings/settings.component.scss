@@ -1,0 +1,46 @@
+@import "../../../assets/styles/variables";
+
+.container {
+        max-width: 800px;
+        margin: 0 auto;
+ 
+        .setting-row {
+
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            border-bottom: 2px solid black;
+            margin: 20px;
+            .key {
+                font-size: x-large;
+                width: 120px;
+                margin: 10px;
+
+                border-right: 2px solid black;
+            }
+    
+            .value {
+                flex-grow: 1;
+                
+                .api-key {
+                    display: flex;
+                    flex-direction: row;
+                    flex-wrap: nowrap;
+
+                    .text {
+                        flex-grow: 1;
+                        font-size: x-large;
+                        margin: 10px;
+                    }
+
+                    .generate{
+                        float: right;
+                        
+                        button {
+                            padding: 3px 20px;
+                        }
+                    }
+                }
+            }
+        }
+}

@@ -7,6 +7,7 @@ import { ModulesComponent } from './pages/modules/modules.component';
 import { RemoteConfigComponent } from './pages/remote-config/remote-config.component';
 import { ScripterComponent } from './pages/scripter/scripter.component';
 import { ScriptsComponent } from './pages/scripts/scripts.component';
+import { SettingsComponent } from './pages/settings/settings.component';
 import { StatusComponent } from './pages/status/status.component';
 
 const routes: Routes = [
@@ -17,7 +18,8 @@ const routes: Routes = [
   {path: 'modules', component: ModulesComponent, canActivate:[AuthGuard]},
   {path: 'scripter/:id', component: ScripterComponent, canActivate:[AuthGuard]},
   {path: 'audio-files', component: AudioFilesComponent, canActivate:[AuthGuard]},
-  {path: 'remote', component: RemoteConfigComponent, canActivate:[AuthGuard]}
+  {path: 'remote', component: RemoteConfigComponent, canActivate:[AuthGuard]},
+  {path: 'settings', component: SettingsComponent, canActivate:[AuthGuard]}
 ];
 
 @NgModule({
