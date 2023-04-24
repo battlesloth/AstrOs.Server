@@ -18,6 +18,8 @@ export {BaseResponse} from './networking/base_response';
 export {StatusResponse} from './networking/status_repsonse';
 export {ScriptResponse} from './networking/script_response';
 export {M5Page, PageButton} from './remotes/M5Page';
+export {M5ScriptList} from './remotes/M5ScriptList';
+export {M5Button} from './remotes/M5Button';
 export {ControllerType, 
     ChannelType, 
     ChannelSubType,

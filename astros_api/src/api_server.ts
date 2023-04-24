@@ -7,7 +7,7 @@ import jwt, { RequestHandler } from "express-jwt";
 import cors from 'cors';
 import fileUpload from 'express-fileupload';
 
-import Express, { Router, Application } from "express";
+import Express, { Router, Application, RequestHandler as ReqHandler } from "express";
 import {WebSocketServer as Server, WebSocket } from "ws";
 import { v4 as uuid_v4 } from "uuid";
 import { Strategy } from "passport-local"
@@ -33,6 +33,7 @@ import { ScriptRun } from "./models/scripts/script_run";
 import { logger } from "./logger";
 import { RemoteConfigController } from "./controllers/remote_config_controller";
 import { SettingsController } from "./controllers/settings_controller";
+import { ApiKeyValidator } from "./api_key_validator";
 
 
 class ApiServer {
@@ -49,6 +50,7 @@ class ApiServer {
     moduleInterface!: Worker;
 
     private authHandler!: RequestHandler;
+    private  apiKeyValidator!: ReqHandler;
 
     upload!: any;
 
@@ -153,6 +155,7 @@ class ApiServer {
             userProperty: 'payload'
         });
 
+        this.apiKeyValidator = ApiKeyValidator();
     }
 
     private configFileHandler() {
@@ -190,6 +193,12 @@ class ApiServer {
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
 
         this.router.post('/directcommand', this.authHandler, (req: any, res: any, next: any) => { this.directCommand(req, res, next); });
+
+
+        // API key secured routes
+        this.router.get('/remotecontrol', this.apiKeyValidator, (req: any, res: any, next: any)=> {this.runScript(req,res, next);} );
+        this.router.get('/remotecontrolsync', this.apiKeyValidator, RemoteConfigController.syncRemoteConfig);
+
     }
 
     private runWebServices(): void {

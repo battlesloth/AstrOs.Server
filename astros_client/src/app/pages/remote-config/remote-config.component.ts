@@ -1,4 +1,5 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
+import { M5Page, PageButton } from 'astros-common';
 import { RemotesService } from 'src/app/services/remotes/remotes.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { M5PaperConfigComponent } from './m5-paper-config/m5-paper-config.component';
@@ -37,7 +38,25 @@ export class RemoteConfigComponent implements OnInit {
       }
     };
 
-    this.remoteService.saveRemoteConfig(JSON.stringify(this.config.m5Config)).subscribe(observer);
+    const config = new Array<M5Page>();
+    this.config.m5Config.forEach(page => {
+     if (this.hasSettings(page)) {
+       config.push(page);
+     }
+   });
+
+    this.remoteService.saveRemoteConfig(JSON.stringify(config)).subscribe(observer);
   }
 
+  hasSettings(page: any): boolean {
+    for (const key in page) {
+        if (Object.prototype.hasOwnProperty.call(page, key)) {
+            const element = (page[key] as unknown) as PageButton;
+            if (element.id != "0"){
+                return true;
+            }
+        }
+    }
+    return false;
+}
 }

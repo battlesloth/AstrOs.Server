@@ -3,7 +3,6 @@ import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons
 import { M5Page, Script } from 'astros-common';
 import { RemotesService } from 'src/app/services/remotes/remotes.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
-import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 
 
 @Component({
@@ -20,14 +19,12 @@ export class M5PaperConfigComponent implements OnInit {
   scripts: Array<any> = [];
 
   m5Config: Array<M5Page> = [];
-  
+
   currentPage: M5Page;
   currentIndex: number = 0;
 
-  constructor(private scriptService: ScriptsService, 
-    private remoteService: RemotesService) { 
-    this.m5Config.push(new M5Page);
-    this.m5Config.push(new M5Page);
+  constructor(private scriptService: ScriptsService,
+    private remoteService: RemotesService) {
     this.m5Config.push(new M5Page);
 
     this.currentPage = this.m5Config[this.currentIndex];
@@ -42,8 +39,8 @@ export class M5PaperConfigComponent implements OnInit {
           return 0;
         });
 
-        for (const s of scriptList){
-          this.scripts.push({id: s.id, name: s.scriptName});
+        for (const s of scriptList) {
+          this.scripts.push({ id: s.id, name: s.scriptName });
         }
       },
       error: (err: any) => console.error(err)
@@ -51,10 +48,18 @@ export class M5PaperConfigComponent implements OnInit {
 
     const configObserver = {
       next: (result: any) => {
-        let config = JSON.parse(result.value) as Array<M5Page>;
 
-        if (config.length != 0){
-          this.m5Config = config;
+        if (result !== undefined) {
+          let config = JSON.parse(result.value) as Array<M5Page>;
+
+          if (config.length != 0) {
+            this.m5Config = config;
+            this.currentPage = this.m5Config[0];
+          }
+        }
+        else {
+          this.m5Config = new Array<M5Page>();
+          this.m5Config.push(new M5Page());
           this.currentPage = this.m5Config[0];
         }
       }
@@ -64,9 +69,57 @@ export class M5PaperConfigComponent implements OnInit {
     this.remoteService.getRemoteConfig().subscribe(configObserver);
   }
 
-  pageForward(){
+  selectionChange(button: number, id: any) {
+
+    let sIdx = this.scripts
+      .map((s) => { return s.id })
+      .indexOf(id);
+
+    const scriptName = this.scripts[sIdx].name;
+
+    switch (button) {
+      case 1:
+        this.currentPage.button1.id = id;
+        this.currentPage.button1.name = scriptName;
+        break;
+      case 2:
+        this.currentPage.button2.id = id;
+        this.currentPage.button2.name = scriptName;
+        break;
+      case 3:
+        this.currentPage.button3.id = id;
+        this.currentPage.button3.name = scriptName;
+        break;
+      case 4:
+        this.currentPage.button4.id = id;
+        this.currentPage.button4.name = scriptName;
+        break;
+      case 5:
+        this.currentPage.button5.id = id;
+        this.currentPage.button5.name = scriptName;
+        break;
+      case 6:
+        this.currentPage.button6.id = id;
+        this.currentPage.button6.name = scriptName;
+        break;
+      case 7:
+        this.currentPage.button7.id = id;
+        this.currentPage.button7.name = scriptName;
+        break;
+      case 8:
+        this.currentPage.button8.id = id;
+        this.currentPage.button8.name = scriptName;
+        break;
+      case 9:
+        this.currentPage.button9.id = id;
+        this.currentPage.button9.name = scriptName;
+        break;
+    }
+  }
+
+  pageForward() {
     this.currentIndex++;
-    if (this.m5Config.length < this.currentIndex + 1){
+    if (this.m5Config.length < this.currentIndex + 1) {
       this.m5Config.push(new M5Page);
     }
 
@@ -74,9 +127,9 @@ export class M5PaperConfigComponent implements OnInit {
     this.pageNumber = this.currentIndex + 1;
   }
 
-  pageBackward(){
+  pageBackward() {
     this.currentIndex--;
-    if (this.currentIndex < 0){
+    if (this.currentIndex < 0) {
       this.currentIndex = 0;
       return;
     }

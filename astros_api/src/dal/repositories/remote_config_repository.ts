@@ -28,7 +28,7 @@ export class RemoteConfigRepository {
 
     async saveConfig(type: string, json: string) : Promise<boolean> {
 
-        await this.dao.get(RemoteConfigTable.update, [json, type])
+        await this.dao.get(RemoteConfigTable.insert, [type, json])
         .then((val: any) => {
             if (val) { logger.info(val); }
         })
@@ -39,6 +39,5 @@ export class RemoteConfigRepository {
 
         return true;
     }
-
     
 }

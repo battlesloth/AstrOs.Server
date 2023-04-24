@@ -13,7 +13,10 @@ export class RemoteConfigTable {
     public static readonly insert =
     `INSERT INTO ${this.table}
     (${this.type}, ${this.value})
-    VALUES (?, ?)`;
+    VALUES (?, ?)
+    ON CONFLICT(${this.type})
+    DO UPDATE 
+    SET ${this.value} = excluded.${this.value}`;
 
     public static readonly select =
     `SELECT ${this.value}

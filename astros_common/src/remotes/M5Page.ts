@@ -9,9 +9,7 @@ export class M5Page {
     button7: PageButton;
     button8: PageButton;
     button9: PageButton;
-    button10: PageButton;
-    button11: PageButton;
-    button12: PageButton;
+
 
     constructor(){
         this.button1 = new PageButton("0", "None");
@@ -23,9 +21,18 @@ export class M5Page {
         this.button7 = new PageButton("0", "None");
         this.button8 = new PageButton("0", "None");
         this.button9 = new PageButton("0", "None"); 
-        this.button10 = new PageButton("0", "None");
-        this.button11 = new PageButton("0", "None");
-        this.button12 = new PageButton("0", "None"); 
+    }
+
+    hasSettings(): boolean {
+        for (const key in this) {
+            if (Object.prototype.hasOwnProperty.call(this, key)) {
+                const element = (this[key] as unknown) as PageButton;
+                if (element.id != "0"){
+                    return true;
+                }
+            }
+        }
+        return false;
     }
  }
 
