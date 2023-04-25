@@ -8,7 +8,7 @@ parentPort.on('message', data => {
     const script = 0;
     const sync = 1;
     const run = 3;
-    const painc = 4;
+    const panic = 4;
     const directCommand = 5;
 
     switch (data.type) {
@@ -22,7 +22,7 @@ parentPort.on('message', data => {
             runScript(data);
             break;
         case panic:
-            painc(data);
+            panicStop(data);
             break;
         case directCommand:
             runCommand(data);
@@ -140,7 +140,9 @@ async function runScript(data) {
     };
 }
 
-async function panic(data) {
+async function panicStop(data) {
+
+    logger.debug('panicstop|Panic Stop Called');
 
     const agent = superagent.agent();
 

@@ -372,6 +372,10 @@ class ApiServer {
 
             const msg = new ScriptRun(id, controllers);
 
+            if (id === "panic"){
+                msg.type = TransmissionType.panic;
+            }
+
             this.moduleInterface.postMessage(msg);
 
             res.status(200);
