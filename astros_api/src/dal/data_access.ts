@@ -15,6 +15,7 @@ import { AudioFilesTable } from "./tables/audio_files_table";
 import { UartModuleTable } from "./tables/uart_module_table";
 import { logger } from "../logger";
 import { RemoteConfigTable } from "./tables/remote_config_table";
+import { AudioModuleTable } from "./tables/audio_module_table";
 
 
 
@@ -78,10 +79,15 @@ export class DataAccess {
             case 1:
                 await this.upgradeToV2();
                 await this.upgradeToV3();
-                break
+                await this.upgradeToV4();
+                break;
             case 2:
                 await this.upgradeToV3();
-                break
+                await this.upgradeToV4();
+                break;
+            case 3:
+                await this.upgradeToV4();
+                break;
             default:
                 logger.info('Database up to date');        
                 break;
@@ -239,7 +245,10 @@ export class DataAccess {
         .then(() => {
             logger.info("ServoChannelsTable at V2")
         })
-        .catch((err) => console.error(`Error updating ServoChannelsTable to V2: ${err}`));
+        .catch((err) => {
+            console.error(`Error updating ServoChannelsTable to V2: ${err}`);
+            throw err;
+        });
 
         await this.UpdateDbVerion(2);
 
@@ -254,11 +263,31 @@ export class DataAccess {
         .then(() => {
             logger.info("Remote Config Table created")
         })
-        .catch((err) => console.error(`Error Creating Remote Config Table: ${err}`));
+        .catch((err) => {
+            console.error(`Error Creating Remote Config Table: ${err}`);
+            throw err;
+        });
 
         await this.run(RemoteConfigTable.insert, ['m5paper', JSON.stringify(new Array<M5Page>())])
 
         await this.UpdateDbVerion(3);
+
+        logger.info('Upgrade complete!')
+    }
+
+    private async upgradeToV4(): Promise<void> {
+        logger.info('Upgrading to V4...')
+
+        await this.run(AudioModuleTable.create)
+        .then(() => {
+            logger.info("Audio Module Table created")
+        })
+        .catch((err) => {
+            console.error(`Error Creating Audio Module Table: ${err}`);
+            throw err;
+        });
+        
+        await this.UpdateDbVerion(4);
 
         logger.info('Upgrade complete!')
     }

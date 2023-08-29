@@ -1,0 +1,16 @@
+<div class="cyborg">
+    <div class="config">
+        <p>Controller</p>
+        <select title="Controller" (ngModelChange)="controllerChange($event)" [(ngModel)]=controller>
+            <option value="1">Core</option>
+            <option value="2">Dome</option>
+            <option value="3">Body</option>
+        </select>
+        <p>Serial Port</p>
+        <select title="Controller" (ngModelChange)="serialChange($event)" [(ngModel)]=serialPort>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+        </select>
+    </div>
+</div>

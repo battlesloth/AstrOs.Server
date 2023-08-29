@@ -64,8 +64,11 @@
             </mat-expansion-panel>
             <mat-expansion-panel>
                 <mat-expansion-panel-header>
-                    <mat-panel-title>Dirve Configuration</mat-panel-title>
+                    <mat-panel-title>Audio Configuration</mat-panel-title>
                 </mat-expansion-panel-header>
+                <ng-container>
+                    <app-audio-module [module]="audioModule"></app-audio-module>
+                </ng-container>
             </mat-expansion-panel>
         </mat-accordion>
     </div>

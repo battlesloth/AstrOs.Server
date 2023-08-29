@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
+import { ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, ModuleCollection, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -87,8 +87,18 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   ngOnInit(): void {
     const csObserver = {
-      next: (result: ControlModule[]) => {
-        this.scriptResources = new ScriptResources(result);
+      next: (result: ModuleCollection) => {
+
+        const modules = new Array<ControlModule>();
+
+        if (result.domeModule)
+          modules.push(result.domeModule);
+        if (result.coreModule)
+          modules.push(result.coreModule);
+        if (result.bodyModule)
+         modules.push(result.bodyModule);
+
+        this.scriptResources = new ScriptResources(modules);
         this.resourcesLoaded = true;
       },
       error: (err: any) => console.error(err)

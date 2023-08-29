@@ -7,6 +7,8 @@ export {KangarooController} from './control_module/kangaroo_controller';
 export {ServoChannel} from './control_module/servo_channel';
 export {ServoModule} from './control_module/servo_module';
 export {UartModule} from './control_module/uart_module';
+export {AudioModule, AudioModuleType} from './control_module/audio_module';
+export {ModuleCollection} from './control_module/module_collection';
 export {Script} from './scripts/script';
 export {ScriptChannel} from './scripts/script_channel';
 export {ScriptEvent} from './scripts/script_event';
