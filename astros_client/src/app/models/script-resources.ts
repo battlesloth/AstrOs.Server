@@ -1,18 +1,17 @@
 
+import { ContentObserver } from "@angular/cdk/observers";
 import { ChannelType, ControllerType, ControlModule, 
     I2cChannel, ServoChannel, UartModule, 
-    UartType, Script } from "astros-common";
+    UartType, Script, UartChannel } from "astros-common";
 
 export class ControllerDetails {
     id: ControllerType;
     name: string;
     //type:name
-    uart: UartModule
 
-    constructor(id: ControllerType, name: string, uart: UartModule) {
+    constructor(id: ControllerType, name: string) {
         this.id = id;
         this.name = name;
-        this.uart = uart;
     }
 }
 
@@ -31,8 +30,8 @@ export class ScriptResources {
     private loaded = false;
 
     controllers: Map<ControllerType, ControllerDetails>;
-
-    uartAvailable: Map<ControllerType, boolean>;
+    
+    uartChannels: Map<ControllerType, Array<ChannelValue>>;
 
     servoChannels: Map<ControllerType, Array<ChannelValue>>;
 
@@ -42,18 +41,20 @@ export class ScriptResources {
         this.controllers = new Map<ControllerType, ControllerDetails>();
         this.servoChannels = new Map<ControllerType, Array<any>>();
         this.i2cChannels = new Map<ControllerType, Array<any>>();
-        this.uartAvailable = new Map<ControllerType, boolean>();
+        this.uartChannels = new Map<ControllerType, Array<any>>();
 
-        this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback', new UartModule(UartType.none, "unassigned", new Object())));
+        this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback'));
 
         controllers.forEach(con => {
-            this.uartAvailable.set(con.id, true);
+  
 
-            this.controllers.set(con.id, new ControllerDetails(con.id, con.name, con.uartModule));
+            this.controllers.set(con.id, new ControllerDetails(con.id, con.name));
 
+            this.uartChannels.set(con.id, con.uartModule.channels.map((ch: UartChannel) => new ChannelValue(ch, ch.type != UartType.none)))
             this.servoChannels.set(con.id, con.servoModule.channels.map((ch: ServoChannel) => new ChannelValue(ch, ch.enabled)));
             this.i2cChannels.set(con.id, con.i2cModule.channels.map((ch: I2cChannel) => new ChannelValue(ch, ch.enabled)));
 
+            this.uartChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
             this.servoChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
             this.i2cChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
         });
@@ -64,7 +65,7 @@ export class ScriptResources {
         script.scriptChannels.forEach(ch => {
             switch (ch.type) {
                 case ChannelType.uart:
-                    this.uartAvailable.set(ch.controllerType, false);
+                    this.uartChannels.get(ch.controllerType)![ch.channel.id].available = false;
                     break;
                 case ChannelType.servo:
                     this.servoChannels.get(ch.controllerType)![ch.channel.id].available = false;
@@ -102,8 +103,10 @@ export class ScriptResources {
             }
 
             var vals = new Map<ChannelType, any>();
-            vals.set(ChannelType.servo, this.servoChannels.get(ctrl))
-            vals.set(ChannelType.i2c, this.i2cChannels.get(ctrl))
+
+            vals.set(ChannelType.servo, this.servoChannels.get(ctrl));
+            vals.set(ChannelType.i2c, this.i2cChannels.get(ctrl));
+            vals.set(ChannelType.uart, this.uartChannels.get(ctrl));
     
             result.set(ctrl, vals);
         }
@@ -116,10 +119,8 @@ export class ScriptResources {
 
         vals.set(ChannelType.servo, "Servo");
         vals.set(ChannelType.i2c, "I2C");
-        if (this.uartAvailable.get(controler)) {
-            vals.set(ChannelType.uart, "UART");
-        }
-
+        vals.set(ChannelType.uart, "Serial");
+        
         return vals;
     }
 
@@ -132,8 +133,12 @@ export class ScriptResources {
 
         switch (type) {
             case ChannelType.uart:
-                this.uartAvailable.set(controller, false);
-                return this.controllers.get(controller)?.uart;
+                const uartIdx = this.uartChannels.get(controller)?.findIndex(x => x.channel.id === id);
+                if (uartIdx != undefined && uartIdx > -1) {
+                    this.uartChannels.get(controller)![uartIdx].available = false;
+                    return this.uartChannels.get(controller)![uartIdx].channel
+                }
+                break;
             case ChannelType.servo:
                 const servoIdx = this.servoChannels.get(controller)?.findIndex(x => x.channel.id === id);
                 if (servoIdx != undefined && servoIdx > -1) {
@@ -156,14 +161,17 @@ export class ScriptResources {
     removeChannel(controller: ControllerType, type: ChannelType, id: number): void {
 
         if (controller === ControllerType.audio) {
-            this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback',  new UartModule(UartType.none, "unassigned", new Object())))
+            this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback'))
             return
         }
 
         switch (type) {
             case ChannelType.uart:
-                this.uartAvailable.set(controller, true);
-                break
+                const uartIdx = this.uartChannels.get(controller)?.findIndex(x => x.channel.id === id);
+                if (uartIdx !== undefined && uartIdx > -1) {
+                    this.uartChannels.get(controller)![uartIdx].available = true;
+                }
+                break;
             case ChannelType.servo:
                 const servoIdx = this.servoChannels.get(controller)?.findIndex(x => x.channel.id === id);
                 if (servoIdx !== undefined && servoIdx > -1) {

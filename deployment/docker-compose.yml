@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
     hostname: astros-api
     volumes:
-      - /astros/.config/astrosserver:/root/.config/astrosserver
+      - /home/astros/.config/astrosserver:/root/.config/astrosserver
     networks:
       - astronet
 

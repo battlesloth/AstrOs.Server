@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartModule } from 'astros-common';
+import { ChannelSubType, ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, ModuleCollection, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartChannel, UartModule, UartType } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -17,6 +17,7 @@ import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { ScriptTestModalComponent } from './modals/script-test-modal/script-test-modal.component';
 import { ChannelTestModalComponent } from './modals/channel-test-modal/channel-test-modal.component';
 import EventMarkerHelper from './helper/event-marker-helper';
+import { UartEventModalComponent } from './modals/uart-event-modal/uart-event-modal.component';
 
 
 export interface Item {
@@ -87,8 +88,18 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   ngOnInit(): void {
     const csObserver = {
-      next: (result: ControlModule[]) => {
-        this.scriptResources = new ScriptResources(result);
+      next: (result: ModuleCollection) => {
+
+        const modules = new Array<ControlModule>();
+
+        if (result.domeModule)
+          modules.push(result.domeModule);
+        if (result.coreModule)
+          modules.push(result.coreModule);
+        if (result.bodyModule)
+         modules.push(result.bodyModule);
+
+        this.scriptResources = new ScriptResources(modules);
         this.resourcesLoaded = true;
       },
       error: (err: any) => console.error(err)
@@ -334,8 +345,17 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     switch (event.channelType) {
       case ChannelType.uart:
-        component = this.container.createComponent(KangarooEventModalComponent)
-        modalResources.set(ModalResources.kangaroo, this.getKangarooControllerFromChannel(event.scriptChannel));
+        switch (event.channelSubType){
+          case ChannelSubType.genericSerial:
+            component = this.container.createComponent(UartEventModalComponent)
+            modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
+            break;
+          case ChannelSubType.kangaroo:
+            component = this.container.createComponent(KangarooEventModalComponent)
+            modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
+            modalResources.set(ModalResources.kangaroo, this.getKangarooControllerFromChannel(event.scriptChannel));     
+            break;
+        }  
         break;
       case ChannelType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);
@@ -360,6 +380,16 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   //#region resources for modals 
+  getUartChannelFromChannel(channelId: string): any{
+    const chIdx = this.scriptChannels
+      .map((ch) => { return ch.id })
+      .indexOf(channelId);
+
+      if (chIdx > -1){
+        const uart = this.scriptChannels[chIdx].channel as UartChannel;
+        return uart.id;  
+      }
+  }
 
   getKangarooControllerFromChannel(channelId: string): any {
 
@@ -368,10 +398,9 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       .indexOf(channelId);
 
     if (chIdx > -1) {
-      const uart = this.scriptChannels[chIdx].channel as UartModule;
+      const uart = this.scriptChannels[chIdx].channel as UartChannel;
       return uart.module as KangarooController;
     }
-
   }
 
   getServoIdFromChannel(channelId: string): any {
@@ -528,14 +557,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       name = ''
     }
 
-    if (channelType === ChannelType.audio || channelType === ChannelType.uart) {
+    if (channelType === ChannelType.audio) {
       const chValue = this.scriptResources.addChannel(controller, channelType, 0);
 
       let subType = 0;
-
-      if (channelType === ChannelType.uart) {
-        subType = chValue.type;
-      }
 
       const ch = new ScriptChannel(Guid.create().toString(), controller, name!, channelType, subType, 0, chValue, this.segments);
 
@@ -546,6 +571,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         const chValue = this.scriptResources.addChannel(controller, channelType, +channel);
 
         let subType = 0;
+
+        if (channelType === ChannelType.uart) {
+          subType = chValue.type;
+        }
 
         const ch = new ScriptChannel(Guid.create().toString(), controller, name!, channelType, subType, channel, chValue, this.segments);
 

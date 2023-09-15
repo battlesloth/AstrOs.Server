@@ -1,0 +1,27 @@
+@import '../../../assets/styles/variables';
+
+.remote-title {
+    display: flex;
+    flex-direction: row;
+    width: 1200px;
+    margin: 0 auto;
+  
+    .remote-name{
+        font-size: xx-large;
+        font-family: $swfont;
+        margin: auto;
+    }
+
+    .spacer {
+        flex-grow: 1;
+    }
+    .button-box {
+      float: right;
+  
+      button{
+          font-size: x-large;
+          font-family: $swfont;
+          background-color: $dark-blue;
+      }
+    }
+}

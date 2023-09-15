@@ -1,0 +1,31 @@
+<div class="container">
+    <div class="setting-row">
+        <div class="key">
+            API Key
+        </div>
+        <div class="value">
+            <div class="properties">
+                <div class="text">{{apiKey}}</div>
+                <div class="button">
+                    <button (click)="generateApiKey()">Generate</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="setting-row">
+        <div class="key">
+            Format SD Card
+        </div>
+        <div class="value"><div class="properties">
+            <div class="text"></div>
+            <div class="button">
+                <button (click)="popModal('format')">Format</button>
+            </div>
+        </div>
+        </div>
+    </div>
+</div>
+
+<astros-modal id="scripts-modal" disableBackgroundClick="0" style="display: none;">
+    <ng-template #modalContainer></ng-template>
+</astros-modal>

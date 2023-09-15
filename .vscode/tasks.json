@@ -23,6 +23,24 @@
             }
         },
         {
+            "label": "move commons",
+            "type": "shell",
+            "command": "",
+            "windows": {
+                "command": "Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_api/node_modules/astros-common -Recurse -Force ",
+            },
+            "dependsOn": "build commons"
+        },
+        {
+            "label": "move commons package",
+            "type": "shell",
+            "command": "",
+            "windows": {
+                "command": "Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/package.json",
+            },
+            "dependsOn": "move commons"
+        },
+        {
             "label": "lint and build",
             "type": "shell",
             "command": "npm",

@@ -2,7 +2,7 @@ import { DataAccess } from "../../dal/data_access";
 import { ScriptsTable } from "../../dal/tables/scripts_table";
 import { ScriptChannelsTable } from "../../dal/tables/script_channels_table";
 import { ScriptEventsTable } from "../../dal/tables/script_events_table";
-import { ChannelType, ControllerType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent, ChannelSubType } from "astros-common";
+import { ChannelType, ControllerType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent, ChannelSubType, UartChannel } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
@@ -29,10 +29,10 @@ export class ScriptRepository {
                 val.forEach((scr: any) => {
                     result.push(
                         new Script(scr.id, scr.scriptName,
-                            scr.description, scr.lastSaved,
-                            scr.coreUploaded,
-                            scr.domeUploaded,
-                            scr.bodyUploaded)
+                            scr.description, scr.lastSaved.replace(',', ''),
+                            scr.coreUploaded.replace(',', ''),
+                            scr.domeUploaded.replace(',', ''),
+                            scr.bodyUploaded.replace(',', ''))
                     );
                 });
             })
@@ -54,10 +54,10 @@ export class ScriptRepository {
                 const scr = val[0];
 
                 result = new Script(scr.id, scr.scriptName,
-                    scr.description, scr.lastSaved,
-                    scr.coreUploaded,
-                    scr.domeUploaded,
-                    scr.bodyUploaded);
+                    scr.description, scr.lastSaved.replace(',', ''),
+                    scr.coreUploaded.replace(',', ''),
+                    scr.domeUploaded.replace(',', ''),
+                    scr.bodyUploaded.replace(',', ''));
             })
             .catch((err) => {
                 logger.error(err);
@@ -73,6 +73,11 @@ export class ScriptRepository {
                     const channel = new ScriptChannel(ch.id, ch.controllerType,
                         ch.controllerName, ch.type, ch.subType, ch.channelNumber, null, 0)
 
+                    // default UART channels to 1 since we originally only had 1 UART slot
+                    if (channel.type == ChannelType.uart && channel.channelNumber == 0){
+                        channel.channelNumber = 1; 
+                    }
+                    
                     if (channel.controllerType == ControllerType.audio) {
                         channel.controllerName = 'Audio Playback';
                     }
@@ -119,19 +124,19 @@ export class ScriptRepository {
                 channel.channel = await this.getChannelForScriptChannel(ChannelType.servo, channel.channelNumber, channel.controllerType)
                 break;
             case ChannelType.uart:
-                channel.channel = await this.getUartModule(channel.controllerType);
+                channel.channel = await this.getUartChannel(channel.controllerType, channel.channelNumber);
                 break;
         }
 
         return channel;
     }
 
-    private async getUartModule(controller: ControllerType): Promise<UartModule | null> {
+    private async getUartChannel(controller: ControllerType, channel: number): Promise<UartChannel | null> {
         let result: any = null;
 
-        await this.dao.get(UartModuleTable.select, [controller.toString()])
+        await this.dao.get(UartModuleTable.select, [controller.toString(), channel.toString()])
             .then((val: any) => {
-                result = new UartModule(val[0].uartType, val[0].moduleName, JSON.parse(val[0].moduleJson));
+                result = new UartChannel(val[0].uartType, channel, val[0].moduleName, JSON.parse(val[0].moduleJson));
             }).catch((err) => {
                 logger.error(err);
                 throw 'error'
@@ -224,9 +229,9 @@ export class ScriptRepository {
             [script.id, script.scriptName,
             script.description,
                 date,
-            script.coreUploaded,
-            script.domeUploaded,
-            script.bodyUploaded])
+            script.coreUploaded.replace(',', ''),
+            script.domeUploaded.replace(',', ''),
+            script.bodyUploaded.replace(',', '')])
             .then((val: any) => {
                 if (val) { logger.info(val); }
             });
@@ -301,10 +306,10 @@ export class ScriptRepository {
             });
 
         result = new Script(script.id, script.scriptName,
-            script.description, script.lastSaved,
-            script.coreUploaded,
-            script.domeUploaded,
-            script.bodyUploaded)
+            script.description, script.lastSaved.replace(',', ''),
+            script.coreUploaded.replace(',', ''),
+            script.domeUploaded.replace(',', ''),
+            script.bodyUploaded.replace(',', ''))
 
         return result;
     }

@@ -19,7 +19,7 @@ export class ControlModule{
         this.id = id;
         this.name = name;
         this.fingerprint = fingerprint;
-        this.uartModule = new UartModule(UartType.none, "unassigned", new Object());
+        this.uartModule = new UartModule();
         this.servoModule = new ServoModule();
         this.i2cModule = new I2cModule();
     }

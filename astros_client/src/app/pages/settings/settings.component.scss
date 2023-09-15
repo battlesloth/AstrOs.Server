@@ -1,0 +1,47 @@
+@import "../../../assets/styles/variables";
+
+.container {
+        max-width: 800px;
+        margin: 0 auto;
+ 
+        .setting-row {
+
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            border-bottom: 2px solid black;
+            margin: 20px;
+            .key {
+                font-size: x-large;
+                width: 180px;
+                margin: 10px;
+
+                border-right: 2px solid black;
+            }
+    
+            .value {
+                flex-grow: 1;
+                
+                .properties {
+                    display: flex;
+                    flex-direction: row;
+                    flex-wrap: nowrap;
+
+                    .text {
+                        flex-grow: 1;
+                        font-size: x-large;
+                        margin: 10px;
+                    }
+
+                    .button{
+                        float: right;
+                        
+                        button {
+                            width: 140px;
+                            padding: 3px 20px;
+                        }
+                    }
+                }
+            }
+        }
+}

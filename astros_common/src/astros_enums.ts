@@ -43,8 +43,9 @@ export enum TransmissionType{
     sync,
     status,
     run,
-    painc,
-    directCommand
+    panic,
+    directCommand,
+    formatSD
 }
 
 export enum TransmissionStatus{

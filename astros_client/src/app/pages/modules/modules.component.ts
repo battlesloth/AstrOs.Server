@@ -1,8 +1,8 @@
 import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, ControllerType, TransmissionType, StatusResponse, ControllerStatus } from 'astros-common';
-import {  faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { ControlModule, ControllerType, TransmissionType, StatusResponse, ControllerStatus, AudioModule, ModuleCollection } from 'astros-common';
+import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { StatusService } from 'src/app/services/status/status.service';
@@ -27,9 +27,11 @@ export class ModulesComponent implements OnInit, AfterViewInit {
   domeModule!: ControlModule;
   bodyModule!: ControlModule;
 
-  coreCaption: any = {str: 'Pending...'}
-  domeCaption: any = {str: 'Pending...'}
-  bodyCaption: any = {str: 'Pending...'}
+  audioModule!: AudioModule;
+
+  coreCaption: any = { str: 'Pending...' }
+  domeCaption: any = { str: 'Pending...' }
+  bodyCaption: any = { str: 'Pending...' }
 
   private notSynced = "Not Synced";
   private moduleDown = "Module Down";
@@ -46,7 +48,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
     this.status.coreStateObserver.subscribe(value => this.handleStatus(value, this.coreEl, this.coreCaption));
     this.status.domeStateObserver.subscribe(value => this.handleStatus(value, this.domeEl, this.domeCaption));
     this.status.bodyStateObserver.subscribe(value => this.handleStatus(value, this.bodyEl, this.bodyCaption));
-}
+  }
 
   ngOnInit(): void {
     const observer = {
@@ -57,7 +59,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
     this.controllerService.getControllers().subscribe(observer);
   }
 
-    ngAfterViewInit(): void {  
+  ngAfterViewInit(): void {
     this.handleStatus(this.status.getCoreStatus(), this.coreEl, this.coreCaption);
     this.handleStatus(this.status.getDomeStatus(), this.domeEl, this.domeCaption);
     this.handleStatus(this.status.getBodyStatus(), this.bodyEl, this.bodyCaption);
@@ -81,7 +83,8 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       }
     };
 
-    this.controllerService.saveControllers([this.coreModule, this.domeModule, this.bodyModule])
+    this.audioModule.entries = Array.from(this.audioModule.settings.entries());
+    this.controllerService.saveControllers(new ModuleCollection(this.audioModule, this.coreModule, this.domeModule, this.bodyModule))
       .subscribe(observer);
   }
 
@@ -106,89 +109,20 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       .subscribe(observer);
   }
 
-  private parseModules(modules: ControlModule[]) {
-    modules.forEach((module: ControlModule) => {
-      try {
-        switch (module.id) {
-          case ControllerType.core:
-            this.coreModule = module;
-            break;
-          case ControllerType.dome:
-            this.domeModule = module;
-            break;
-          case ControllerType.body:
-            this.bodyModule = module;
-            break;
-        };
-      } catch (err) {
-        console.error(err);
-      }
-    });
+  private parseModules(modules: ModuleCollection) {
+    try {
+      this.audioModule = modules.audioModule ?? this.audioModule;
+      this.audioModule.settings = new Map<string, string>(this.audioModule.entries);
+      this.coreModule = modules.coreModule ?? this.coreModule;
+      this.domeModule = modules.domeModule ?? this.domeModule;
+      this.bodyModule = modules.bodyModule ?? this.bodyModule;
+    } catch (err) {
+      console.error(err);
+    }
   }
 
-  //statusUpdate(status: StatusResponse) {
-  //  {
-  //    switch (status.controllerType) {
-  //      case ControllerType.core:
-  //        this.coreWarningVis = this.updateUi(status.up, status.synced, this.coreWarningVis, this.coreEl);
-  //        this.coreColor = this.setColor(status.up, status.synced, this.coreColor, this.coreEl);
-  //        if (!status.up) {
-  //          this.coreStatus = this.moduleDown;
-  //        } else if (!status.synced) {
-  //          this.coreStatus = this.notSynced;
-  //        }
-  //        break;
-  //      case ControllerType.dome:
-  //        this.domeWarningVis = this.updateUi(status.up, status.synced, this.domeWarningVis, this.domeEl);
-  //        this.domeColor = this.setColor(status.up, status.synced, this.domeColor, this.domeEl);
-  //        if (!status.up) {
-  //          this.domeStatus = this.moduleDown;
-  //        } else if (!status.synced) {
-  //          this.domeStatus = this.notSynced;
-  //        }
-  //        break;
-  //      case ControllerType.body:
-  //        this.bodyWarningVis = this.updateUi(status.up, status.synced, this.bodyWarningVis, this.bodyEl);
-  //        this.bodyColor = this.setColor(status.up, status.synced, this.bodyColor, this.bodyEl);
-  //        if (!status.up) {
-  //          this.bodyStatus = this.moduleDown;
-  //        } else if (!status.synced) {
-  //          this.bodyStatus = this.notSynced;
-  //        }
-  //        break;
-  //    }
-  //  }
-  //}
-//
-  //private setColor(up: boolean, synced: boolean, color: string, el: ElementRef): string {
-  //  if (!up) {
-  //    if (color !== 'red') {
-  //      this.renderer.setStyle(el.nativeElement, 'color', 'red');
-  //    }
-  //    return 'red';
-  //  } else if (!synced && color != 'yellow') {
-  //    this.renderer.setStyle(el.nativeElement, 'color', 'yellow');
-  //    return 'yellow';
-  //  }
-  //  return 'red';
-  //}
-//
-  //private updateUi(up: boolean, synced: boolean, visible: boolean, el: ElementRef): boolean {
-  //  if (up && synced) {
-  //    if (visible) {
-  //      this.renderer.setStyle(el.nativeElement, 'visibility', 'hidden');
-  //    }
-  //    return false;
-  //  } else {
-  //    if (!visible) {
-  //      this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');
-  //    }
-  //  }
-  //  return true;
-  //}
-
-  handleStatus(status: ControllerStatus, el: ElementRef, caption: any){
-    switch (status){
+  handleStatus(status: ControllerStatus, el: ElementRef, caption: any) {
+    switch (status) {
       case ControllerStatus.up:
         caption.str = '';
         this.renderer.setStyle(el.nativeElement, 'visibility', 'hidden');
@@ -196,12 +130,12 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       case ControllerStatus.needsSynced:
         caption.str = this.notSynced;
         this.renderer.setStyle(el.nativeElement, 'color', 'yellow');
-        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');      
+        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');
         break;
       case ControllerStatus.down:
         caption.str = this.moduleDown;
         this.renderer.setStyle(el.nativeElement, 'color', 'red');
-        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');        
+        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');
         break;
     }
   }

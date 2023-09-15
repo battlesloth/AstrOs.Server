@@ -14,8 +14,10 @@ import { WebsocketService } from './services/websocket/websocket.service';
 export class AppComponent implements OnInit {
 
   title = "AstOs"
+  private menuOpen: boolean = false;
 
   @ViewChild('sideNav', { static: false }) sideNav!: ElementRef;
+  @ViewChild('clickDetector', { static: false }) clickDetector!: ElementRef;
 
   constructor(public auth: AuthenticationService,
     private renderer: Renderer2,
@@ -23,14 +25,14 @@ export class AppComponent implements OnInit {
     private snackbar: SnackbarService,
     private socket: WebsocketService) {
     if (auth.isLoggedIn()) {
-      router.navigate(['status']);
-      //router.navigate(['/scripter/s1673888226Cd4g3']);
+      router.navigate(['scripts']);
+      //router.navigate(['status']);
     }
   }
 
   ngOnInit(): void {
     this.socket.messages.subscribe((msg: any) => {
-        this.handleSocketMessage(msg);
+      this.handleSocketMessage(msg);
     });
   }
 
@@ -41,18 +43,28 @@ export class AppComponent implements OnInit {
   showMenu() {
     if (this.auth.isLoggedIn()) {
       this.renderer.setStyle(this.sideNav.nativeElement, 'width', '220px');
+      this.renderer.setStyle(this.clickDetector.nativeElement, 'width', '100%');
+      this.menuOpen = true;
     }
   }
 
   closeMenu() {
     this.renderer.setStyle(this.sideNav.nativeElement, 'width', '0px');
+    this.renderer.setStyle(this.clickDetector.nativeElement, 'width', '0px');
+    this.menuOpen = false
   }
 
-  private handleSocketMessage(msg: any){
-    switch(msg.type){
+  containerClicked() {
+    if (this.menuOpen) {
+      this.closeMenu();
+    }
+  }
+
+  private handleSocketMessage(msg: any) {
+    switch (msg.type) {
       case TransmissionType.sync:
-        this.snackbar.okToast(msg.message);       
-        break; 
+        this.snackbar.okToast(msg.message);
+        break;
     }
   }
 }

@@ -2,8 +2,9 @@ import { Component, Input, OnInit, ViewChild, ViewContainerRef } from '@angular/
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatCheckboxModule } from '@angular/material/checkbox'
 import { MatFormField } from '@angular/material/form-field';
-import { ControlModule , KangarooController, UartType } from 'astros-common';
+import { ControlModule , KangarooController, UartChannel, UartModule, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
+import { scheduled } from 'rxjs';
 
 @Component({
   selector: 'app-esp-module',
@@ -16,32 +17,49 @@ export class EspModuleComponent implements OnInit {
   @Input()
   module!: ControlModule;
   
-  @ViewChild('uartContainer', { read: ViewContainerRef }) uartContainer!: ViewContainerRef;
+  @ViewChild('uart1Container', { read: ViewContainerRef }) uart1Container!: ViewContainerRef;
+  @ViewChild('uart2Container', { read: ViewContainerRef }) uart2Container!: ViewContainerRef;
 
-  originalUartType!: UartType;
-  originalUartModule!: any;
+  originalUart1Type!: UartType;
+  originalUart1Module!: any;
+  
+  originalUart2Type!: UartType;
+  originalUart2Module!: any;
   
   components: Array<any>;
-  uartType: string;
+  uart1Type: string;
+  uart2Type: string;
+
 
   constructor() { 
     this.components = new Array<any>();
-    this.uartType = '0';
+    this.uart1Type = '0';
+    this.uart2Type = '0';
   }
 
   ngOnInit(): void {
   }
 
   ngOnChanges(){
-    if (this.originalUartType === undefined && 
+    if (this.originalUart1Type === undefined && 
       this.module !== undefined && 
-      this.uartContainer !== undefined){
+      this.uart1Container !== undefined){
 
-      this.originalUartType = this.module.uartModule.type;
-      this.originalUartModule = this.copyUartModule(this.module.uartModule);
+      this.originalUart1Type = this.module.uartModule.channels[0].type;
+      this.originalUart1Module = this.copyUartModule(this.module.uartModule.channels[0]);
 
-      this.uartType = this.originalUartType.toString();
-      this.setUartModule(this.originalUartType, this.originalUartModule);
+      this.uart1Type = this.originalUart1Type.toString();
+      this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);
+    }
+    if (this.originalUart2Type === undefined && 
+      this.module !== undefined && 
+      this.uart2Container !== undefined){
+
+      this.originalUart2Type = this.module.uartModule.channels[1].type;
+      this.originalUart2Module = this.copyUartModule(this.module.uartModule.channels[1]);
+
+      this.uart2Type = this.originalUart2Type.toString();
+      this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);
     }
   }
 
@@ -53,14 +71,17 @@ export class EspModuleComponent implements OnInit {
     this.module.servoModule.channels[id].enabled = $event;
   }
 
-  uartTypeChange($event: any){
+  uartTypeChange($event: any, channel: number){
 
     const ut = +$event;
 
-    if (ut === this.originalUartType){
-      this.setUartModule(this.originalUartType, this.originalUartModule);
-      
-    } else {
+    if (channel == 1 && ut === this.originalUart1Type){
+      this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);
+    }
+    else if (channel == 2 && ut === this.originalUart2Type){
+      this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);
+    }  
+    else {
 
       let module: any;
       switch (ut){
@@ -72,30 +93,41 @@ export class EspModuleComponent implements OnInit {
           break;
       }
 
-      this.setUartModule(ut, module);
+      this.setUartModuleForSlot(ut, module, channel);
     }
   }
 
-  setUartModule(uartType: UartType, module: any){
+  setUartModuleForSlot(uartType: UartType, module: any, channel: number){
+    switch (channel){
+      case 1:
+        this.setUartModule(uartType, module, this.uart1Container, this.module.uartModule.channels[0]);
+        break;
+      case 2:
+        this.setUartModule(uartType, module, this.uart2Container, this.module.uartModule.channels[1]);
+        break;
+    }
+  }
+
+  setUartModule(uartType: UartType, module: any, container: ViewContainerRef, uartChannel: UartChannel ){
     let component: any;
     
-    this.uartContainer.clear()
+    container.clear()
     this.components.splice(0, this.components.length);
 
     switch (uartType){
       case UartType.kangaroo:
-        component = this.uartContainer.createComponent(KangarooModuleComponent);
+        component = container.createComponent(KangarooModuleComponent);
         break;
     }
 
-    this.module.uartModule.type = uartType;
-    this.module.uartModule.module = module;
+    uartChannel.type = uartType;
+    uartChannel.module = module;
 
     if (component){
       component.instance.module = module; 
 
       this.components.push(component);
-    } 
+    }
   }
 
   moduleCallback(evt: any) {

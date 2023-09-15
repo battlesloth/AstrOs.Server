@@ -59,7 +59,6 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
     }
     
     if (+this.selectedModule !== ChannelType.none
-      && +this.selectedModule !== ChannelType.uart
       && +this.selectedChannels.length < 1){
         this.errorMessage = 'Channel Selection Required'
         return;
@@ -107,7 +106,7 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
 
   private setChannels(channelType: ChannelType) {
 
-    if (channelType == ChannelType.uart || channelType == ChannelType.none) {
+    if (channelType == ChannelType.none) {
       this.selectedChannel = -1;
       document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
     }

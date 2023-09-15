@@ -1,0 +1,61 @@
+.format-modal {
+
+    width: 400px;
+
+    .modal-body {
+        display: flex;
+        flex-direction: row;
+
+        font-size: large;
+
+        .spacer {
+            flex-grow: 1;
+        }
+
+        .content {
+            width: 300px;
+            overflow-wrap: break-word;
+            display: inline;
+
+             
+                ::ng-deep .mat-checkbox .mat-checkbox-frame {
+                    border-color: black;
+                    background-color: #dddddd
+                }
+
+                ::ng-deep .mat-checkbox-checked.mat-accent:not(.mat-checkbox-disabled) .mat-checkbox-background {
+                    border-color: black;
+                    background-color:  #dddddd !important;
+                  }
+        }
+    }
+}
+
+.modal-buttons {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: row;
+}
+
+.button-spacer {
+    flex-grow: 1;
+}
+
+.button-grouper {
+    button {
+        width: 100px;
+        font-size: large;
+        padding: 5px 0px;
+        margin: 0px 5px;
+    }
+
+    .hidden {
+        display: none;
+    }
+}
+
+@media only screen and (max-width: 620px) {
+    .scripter-modal {
+        width: 400px;
+    }
+}

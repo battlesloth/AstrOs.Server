@@ -6,7 +6,10 @@ export {I2cModule} from './control_module/i2c_module';
 export {KangarooController} from './control_module/kangaroo_controller';
 export {ServoChannel} from './control_module/servo_channel';
 export {ServoModule} from './control_module/servo_module';
+export {UartChannel} from './control_module/uart_channel';
 export {UartModule} from './control_module/uart_module';
+export {AudioModule, AudioModuleType} from './control_module/audio_module';
+export {ModuleCollection} from './control_module/module_collection';
 export {Script} from './scripts/script';
 export {ScriptChannel} from './scripts/script_channel';
 export {ScriptEvent} from './scripts/script_event';
@@ -17,6 +20,9 @@ export {I2cEvent} from './scripts/events/i2c_event';
 export {BaseResponse} from './networking/base_response';
 export {StatusResponse} from './networking/status_repsonse';
 export {ScriptResponse} from './networking/script_response';
+export {M5Page, PageButton} from './remotes/M5Page';
+export {M5ScriptList} from './remotes/M5ScriptList';
+export {M5Button} from './remotes/M5Button';
 export {ControllerType, 
     ChannelType, 
     ChannelSubType,
@@ -25,3 +31,4 @@ export {ControllerType,
     ControllerStatus,
     TransmissionType,
     TransmissionStatus} from './astros_enums';
+

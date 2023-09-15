@@ -7,7 +7,8 @@ export enum ModalCallbackEvent{
     removeChannel,
     channelTest,
     delete,
-    refresh
+    refresh,
+    formatSD
 }
 
 

@@ -25,14 +25,15 @@ function generateServoEvent(time: number, channel: number, position: number, spe
 
 const _type = 0;
 const _time = 1;
+const _serialCh = 2;
 
-    // |___|_________|___|____|____|____;
-    //  evt time_till ch  cmd  spd  pos  
+    // |___|_________|__________|___|____|____|____;
+    //  evt time_till serial ch  ch  cmd  spd  pos  
 
-const _kChannel = 2;
-const _kCommand = 3;
-const _kSpd = 4;
-const _kPos = 5;
+const _kChannel = 3;
+const _kCommand = 4;
+const _kSpd = 5;
+const _kPos = 6;
 
 const _servoChannel = 2;
 const _servoPosition = 3;
@@ -151,9 +152,9 @@ describe("Script Converter Tests", () => {
             "1970-01-01 00:00:00.000",
             "1970-01-01 00:00:00.000");
 
-        const servoCh0 = new ServoChannel(0, "ch0", true, 500, 2500);
-        const servoCh10 = new ServoChannel(10, "ch10", true, 500, 2500);
-        const servoCh20 = new ServoChannel(20, "ch20", true, 500, 2500);
+        const servoCh0 = new ServoChannel(0, "ch0", true, 500, 2500, false);
+        const servoCh10 = new ServoChannel(10, "ch10", true, 500, 2500, false);
+        const servoCh20 = new ServoChannel(20, "ch20", true, 500, 2500, false);
 
         const channelOne = new ScriptChannel("one", ControllerType.core, "core", ChannelType.servo, ChannelSubType.none, 0, servoCh0, 3000);
         const channelTen = new ScriptChannel("two", ControllerType.core, "core", ChannelType.servo, ChannelSubType.none, 0, servoCh10, 3000);

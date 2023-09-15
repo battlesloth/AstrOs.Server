@@ -1,0 +1,26 @@
+<div class="format-modal">
+    <h1>Format Module SD Card</h1>
+    <div class="modal-body">
+        <div class="spacer"></div>
+        <div class="content">
+            <div class="selection">
+                <mat-checkbox [(ngModel)]="core">Core</mat-checkbox>
+            </div>
+            <div>
+                <mat-checkbox [(ngModel)]="dome">Dome</mat-checkbox>
+            </div>
+            <div>
+                <mat-checkbox [(ngModel)]="body">Body</mat-checkbox>
+            </div>
+        </div>
+        <div class="spacer"></div>
+    </div>
+    <div class="modal-buttons">
+        <div class="button-spacer"></div>
+        <div class="button-grouper">
+            <button (click)="ok();">OK</button>
+            <button (click)="closeModal();">Close</button>
+        </div>
+        <div class="button-spacer"></div>
+    </div>
+</div>

@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
-import { ChannelType, ControllerType, ControlModule } from 'astros-common';
+import { ChannelType, ControllerType, ControlModule, ModuleCollection } from 'astros-common';
 
 
 @Injectable({
@@ -16,17 +16,17 @@ export class ControllerService  {
     this.token = '';
    }
 
-   public getControllers(): Observable<ControlModule[]> {
+   public getControllers(): Observable<ModuleCollection> {
      
-      return this.http.get<ControlModule[]>('/api/controllers', {
+      return this.http.get<ModuleCollection>('/api/controllers', {
         headers: {Authorization: `Bearer ${this.getToken()}`}
       })
-      .pipe( tap(_ => console.log('loaded controllers')),
-        catchError(this.handleError<ControlModule[]>('getControllers', []))
+      .pipe( tap(_ => console.log('loaded modules')),
+        catchError(this.handleError<ModuleCollection>('getControllers'))
       );
    }
 
-  public saveControllers(controllers: ControlModule[]) : Observable<any> {
+  public saveControllers(controllers: ModuleCollection) : Observable<any> {
       return this.http.put<any>('/api/controllers', controllers, {
         headers: {Authorization: `Bearer ${this.getToken()}`}
       })

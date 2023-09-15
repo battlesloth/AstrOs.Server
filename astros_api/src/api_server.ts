@@ -7,7 +7,7 @@ import jwt, { RequestHandler } from "express-jwt";
 import cors from 'cors';
 import fileUpload from 'express-fileupload';
 
-import Express, { Router, Application } from "express";
+import Express, { Router, Application, RequestHandler as ReqHandler } from "express";
 import {WebSocketServer as Server, WebSocket } from "ws";
 import { v4 as uuid_v4 } from "uuid";
 import { Strategy } from "passport-local"
@@ -31,6 +31,9 @@ import { ControllerRepository } from "./dal/repositories/controller_repository";
 import { ConfigSync } from "./models/config/config_sync";
 import { ScriptRun } from "./models/scripts/script_run";
 import { logger } from "./logger";
+import { RemoteConfigController } from "./controllers/remote_config_controller";
+import { SettingsController } from "./controllers/settings_controller";
+import { ApiKeyValidator } from "./api_key_validator";
 
 
 class ApiServer {
@@ -47,6 +50,7 @@ class ApiServer {
     moduleInterface!: Worker;
 
     private authHandler!: RequestHandler;
+    private  apiKeyValidator!: ReqHandler;
 
     upload!: any;
 
@@ -151,6 +155,7 @@ class ApiServer {
             userProperty: 'payload'
         });
 
+        this.apiKeyValidator = ApiKeyValidator();
     }
 
     private configFileHandler() {
@@ -163,11 +168,11 @@ class ApiServer {
     private setRoutes(): void {
 
         this.router.post(AuthContoller.route, AuthContoller.login);
+        this.router.post(AuthContoller.reauthRoute, AuthContoller.reauth);
 
         this.router.get(ControllerController.route, this.authHandler, ControllerController.getControllers);
         this.router.put(ControllerController.route, this.authHandler, ControllerController.saveControllers);
         this.router.get(ControllerController.syncRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllers(req, res, next); });
-
 
         this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
@@ -178,10 +183,23 @@ class ApiServer {
         this.router.get(ScriptsController.uploadRoute, this.authHandler, (req: any, res: any, next: any) => { this.uploadScript(req, res, next); });
         this.router.get(ScriptsController.runRoute, this.authHandler, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
 
+        this.router.get(RemoteConfigController.getRoute, this.authHandler, RemoteConfigController.getRemoteConfig);
+        this.router.put(RemoteConfigController.putRoute, this.authHandler, RemoteConfigController.saveRemoteConfig);
+
+        this.router.get(SettingsController.getRoute, this.authHandler, SettingsController.getSetting);
+        this.router.put(SettingsController.putRoute, this.authHandler, SettingsController.saveSetting);
+        this.router.post(SettingsController.formatSDRoute, this.authHandler, (req: any, res: any, next: any) => { this.formatSD(req, res, next); })
+
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
 
         this.router.post('/directcommand', this.authHandler, (req: any, res: any, next: any) => { this.directCommand(req, res, next); });
+
+
+        // API key secured routes
+        this.router.get('/remotecontrol', this.apiKeyValidator, (req: any, res: any, next: any)=> {this.runScript(req,res, next);} );
+        this.router.get('/remotecontrolsync', this.apiKeyValidator, RemoteConfigController.syncRemoteConfig);
+
     }
 
     private runWebServices(): void {
@@ -355,6 +373,10 @@ class ApiServer {
 
             const msg = new ScriptRun(id, controllers);
 
+            if (id === "panic"){
+                msg.type = TransmissionType.panic;
+            }
+
             this.moduleInterface.postMessage(msg);
 
             res.status(200);
@@ -421,6 +443,35 @@ class ApiServer {
             });
         }
 
+    }
+
+    private async formatSD(req: any, res: any, next: any){
+        try {
+
+            const dao = new DataAccess();
+            const repo = new ControllerRepository(dao);
+
+            for (const module of req.body.modules){
+
+                const ip = await repo.getControllerIp(module);
+
+                const msg = {ip: ip, type: TransmissionType.formatSD};
+                logger.info(`sending format SD command: ${JSON.stringify(msg)}`);
+
+                this.moduleInterface.postMessage(msg);
+            }
+            
+            res.status(200);
+            res.json({ message: "success" });
+
+        } catch (error) {
+            logger.error(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
     }
 
     private updateClients(msg: any): void {

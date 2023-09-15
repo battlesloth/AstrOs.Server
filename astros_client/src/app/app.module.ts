@@ -31,12 +31,22 @@ import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-mo
 import { AudioEventModalComponent } from './pages/scripter/modals/audio-event-modal/audio-event-modal.component';
 import { BaseEventModalComponent } from './pages/scripter/modals/base-event-modal/base-event-modal.component';
 import { KangarooEventModalComponent } from './pages/scripter/modals/kangaroo-event-modal/kangaroo-event-modal.component';
+import { UartEventModalComponent } from './pages/scripter/modals/uart-event-modal/uart-event-modal.component';
 import { KangarooModuleComponent } from './pages/modules/uart-modules/kangaroo-module/kangaroo-module.component';
 import { GenericSerialModuleComponent } from './pages/modules/uart-modules/generic-serial-module/generic-serial-module.component';
 import { WebsocketService } from './services/websocket/websocket.service';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ScriptTestModalComponent } from './pages/scripter/modals/script-test-modal/script-test-modal.component';
 import { ChannelTestModalComponent } from './pages/scripter/modals/channel-test-modal/channel-test-modal.component';
+import { RemoteConfigComponent } from './pages/remote-config/remote-config.component';
+import { M5PaperConfigComponent } from './pages/remote-config/m5-paper-config/m5-paper-config.component';
+import { SettingsComponent } from './pages/settings/settings.component';
+import { AudioModuleComponent } from './pages/modules/audio-module/audio-module.component';
+import { DfPlayerComponent } from './pages/modules/audio-module/df-player/df-player.component';
+import { CyborgComponent } from './pages/modules/audio-module/cyborg/cyborg.component';
+import { ServerComponent } from './pages/modules/audio-module/server/server.component';
+import { DisabledComponent } from './pages/modules/audio-module/disabled/disabled.component';
+import { FormatModalComponent } from './pages/settings/modals/format-modal/format-modal.component';
 
 
 
@@ -60,10 +70,20 @@ import { ChannelTestModalComponent } from './pages/scripter/modals/channel-test-
     AudioEventModalComponent,
     BaseEventModalComponent,
     KangarooEventModalComponent,
+    UartEventModalComponent,
     KangarooModuleComponent,
     GenericSerialModuleComponent,
     ScriptTestModalComponent,
-    ChannelTestModalComponent
+    ChannelTestModalComponent,
+    RemoteConfigComponent,
+    M5PaperConfigComponent,
+    SettingsComponent,
+    AudioModuleComponent,
+    DfPlayerComponent,
+    CyborgComponent,
+    ServerComponent,
+    DisabledComponent,
+    FormatModalComponent
   ],
   imports: [
     BrowserModule,

@@ -6,7 +6,7 @@
     "prebuild": "eslint . --ext .js,.jsx,.ts,.tsx",
     "build_old": "tsc -p tsconfig.prod.json",
     "build": "webpack",
-    "start": "node ./dist_webpack/bundle.js",
+    "start": "node ./dist/bundle.js",
     "test": "jest"
   },
   "dependencies": {
