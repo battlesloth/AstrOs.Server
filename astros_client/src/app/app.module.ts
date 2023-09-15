@@ -31,6 +31,7 @@ import { UploadModalComponent } from './pages/audio-files/upload-modal/upload-mo
 import { AudioEventModalComponent } from './pages/scripter/modals/audio-event-modal/audio-event-modal.component';
 import { BaseEventModalComponent } from './pages/scripter/modals/base-event-modal/base-event-modal.component';
 import { KangarooEventModalComponent } from './pages/scripter/modals/kangaroo-event-modal/kangaroo-event-modal.component';
+import { UartEventModalComponent } from './pages/scripter/modals/uart-event-modal/uart-event-modal.component';
 import { KangarooModuleComponent } from './pages/modules/uart-modules/kangaroo-module/kangaroo-module.component';
 import { GenericSerialModuleComponent } from './pages/modules/uart-modules/generic-serial-module/generic-serial-module.component';
 import { WebsocketService } from './services/websocket/websocket.service';
@@ -45,6 +46,7 @@ import { DfPlayerComponent } from './pages/modules/audio-module/df-player/df-pla
 import { CyborgComponent } from './pages/modules/audio-module/cyborg/cyborg.component';
 import { ServerComponent } from './pages/modules/audio-module/server/server.component';
 import { DisabledComponent } from './pages/modules/audio-module/disabled/disabled.component';
+import { FormatModalComponent } from './pages/settings/modals/format-modal/format-modal.component';
 
 
 
@@ -68,6 +70,7 @@ import { DisabledComponent } from './pages/modules/audio-module/disabled/disable
     AudioEventModalComponent,
     BaseEventModalComponent,
     KangarooEventModalComponent,
+    UartEventModalComponent,
     KangarooModuleComponent,
     GenericSerialModuleComponent,
     ScriptTestModalComponent,
@@ -79,7 +82,8 @@ import { DisabledComponent } from './pages/modules/audio-module/disabled/disable
     DfPlayerComponent,
     CyborgComponent,
     ServerComponent,
-    DisabledComponent
+    DisabledComponent,
+    FormatModalComponent
   ],
   imports: [
     BrowserModule,

@@ -10,6 +10,7 @@ import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.co
 })
 export class KangarooEventModalComponent extends BaseEventModalComponent implements OnInit {
 
+  uartChannel!: number;
   kangaroo!: KangarooController;
 
   channel1: string;
@@ -57,6 +58,7 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
       element?.classList.remove("hidden");
     }
 
+    this.uartChannel = this.resources.get(ModalResources.channelId);
     this.kangaroo = this.resources.get(ModalResources.kangaroo);
 
     this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
@@ -119,7 +121,7 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
    
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
    
-    const data = new KangarooEvent(+this.ch1Action, this.ch1Speed ?? 0, this.ch1Position ?? 0, 
+    const data = new KangarooEvent(this.uartChannel ,+this.ch1Action, this.ch1Speed ?? 0, this.ch1Position ?? 0, 
       +this.ch2Action, this.ch2Speed ?? 0, this.ch2Position ?? 0)
    
     this.scriptEvent.dataJson = JSON.stringify(data);

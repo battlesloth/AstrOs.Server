@@ -13,7 +13,7 @@
             margin: 20px;
             .key {
                 font-size: x-large;
-                width: 120px;
+                width: 180px;
                 margin: 10px;
 
                 border-right: 2px solid black;
@@ -22,7 +22,7 @@
             .value {
                 flex-grow: 1;
                 
-                .api-key {
+                .properties {
                     display: flex;
                     flex-direction: row;
                     flex-wrap: nowrap;
@@ -33,10 +33,11 @@
                         margin: 10px;
                     }
 
-                    .generate{
+                    .button{
                         float: right;
                         
                         button {
+                            width: 140px;
                             padding: 3px 20px;
                         }
                     }

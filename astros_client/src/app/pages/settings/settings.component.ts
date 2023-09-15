@@ -1,7 +1,10 @@
 import { KeyValue } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
+import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { SettingsService } from 'src/app/services/settings/settings.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
+import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
+import { FormatModalComponent } from './modals/format-modal/format-modal.component';
 
 @Component({
   selector: 'app-settings',
@@ -9,10 +12,14 @@ import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
   styleUrls: ['./settings.component.scss']
 })
 export class SettingsComponent implements OnInit {
+  @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
 
   apiKey ="";
   private characters: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  constructor(private settingsService: SettingsService) { }
+  
+  constructor(private settingsService: SettingsService, 
+    private snackBarService: SnackbarService,
+    private modalService: ModalService) { }
 
   ngOnInit(): void {
     const observer = {
@@ -45,6 +52,54 @@ export class SettingsComponent implements OnInit {
     };
 
     this.settingsService.saveSetting({key: 'apikey', value: result}).subscribe(observer);
+  }
+
+  modalCallback(evt: any) {
+
+    switch (evt.id) {
+      case ModalCallbackEvent.formatSD:
+        this.formatSD(evt.val);
+        break;
+    }
+
+    this.modalService.close('scripts-modal');
+    this.container.clear();
+  }
+
+  popModal(val: string) {
+    this.container.clear();
+    const modalResources = new Map<string, any>();
+   
+    let component: any;
+
+    switch (val){
+      case 'format':
+        component = this.container.createComponent(FormatModalComponent);
+        break; 
+      default:
+        return;
+    }
+    
+    component.instance.resources = modalResources;
+    component.instance.modalCallback.subscribe((evt: any) => {
+      this.modalCallback(evt);
+    });
+
+    this.modalService.open('scripts-modal');
+  }
+
+  formatSD(val: Array<number>){
+    const observer = {
+      next: (result: any) => {
+        this.snackBarService.okToast('Format queued!');
+      },
+      error: (err: any) => {
+        this.snackBarService.okToast('Error requesting format. Check logs.');
+        console.error(err);
+      }
+    };
+
+    this.settingsService.formatSD(val).subscribe(observer);
   }
 
 }

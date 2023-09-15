@@ -1,5 +1,5 @@
 import { DataAccess } from "../../dal/data_access";
-import { ControlModule, ControllerType, ServoChannel, I2cChannel, UartModule, AudioModule, AudioModuleType } from "astros-common";
+import { ControlModule, ControllerType, ServoChannel, I2cChannel, UartModule, AudioModule, AudioModuleType, UartChannel } from "astros-common";
 import { ControllersTable } from "../../dal/tables/controllers_table";
 import { ServoChannelsTable } from "../../dal/tables/servo_channels_table";
 import { I2cChannelsTable } from "../../dal/tables/i2c_channels_table";
@@ -77,11 +77,24 @@ export class ControllerRepository {
                     throw 'error';
                 });
 
-            await this.dao.get(UartModuleTable.select, [ctl.toString()])
+            controller.uartModule = new UartModule();
+
+            await this.dao.get(UartModuleTable.select, [ctl.toString(), '1'])
                 .then((val: any) => {
 
-                    const uart = new UartModule(val[0].uartType, val[0].moduleName, JSON.parse(val[0].moduleJson));
-                    controller.uartModule = uart;
+                    const uart = new UartChannel(val[0].uartType, 1, val[0].moduleName, JSON.parse(val[0].moduleJson));
+                    controller.uartModule.channels.push(uart);
+                })
+                .catch((err: any) => {
+                    logger.error(err);
+                    throw 'error';
+                });
+
+            await this.dao.get(UartModuleTable.select, [ctl.toString(), '2'])
+                .then((val: any) => {
+
+                    const uart = new UartChannel(val[0].uartType, 2, val[0].moduleName, JSON.parse(val[0].moduleJson));
+                    controller.uartModule.channels.push(uart);
                 })
                 .catch((err: any) => {
                     logger.error(err);
@@ -135,12 +148,16 @@ export class ControllerRepository {
                     throw 'error';
                 });
 
-            await this.dao.run(UartModuleTable.update, [ctl.uartModule.type.toString(),
-            ctl.uartModule.moduleName, JSON.stringify(ctl.uartModule.module), ctl.id.toString()])
-                .catch((err: any) => {
-                    logger.error(err);
-                    throw 'error';
-                })
+            for (const uart of ctl.uartModule.channels){
+
+                await this.dao.run(UartModuleTable.update, [uart.type.toString(),
+                uart.channelName, JSON.stringify(uart.module), ctl.id.toString(), uart.id.toString()])
+                    .catch((err: any) => {
+                        logger.error(err);
+                        throw 'error';
+                    })
+    
+            }
 
             for (const servo of ctl.servoModule.channels) {
 
@@ -221,27 +238,27 @@ export class ControllerRepository {
         let type = '';
 
         await this.dao.get(AudioModuleTable.getType, [])
-        .then((val: any) => {
-            type = val[0]
-        })
-        .catch((err: any) => {
-            logger.error(err);
-            type = 'error';
-        });
-
-        // if our type has changed, delete all current settings
-        if (type !== AudioModule.getType(module)){
-            await this.dao.run(AudioModuleTable.deleteAll, [])
+            .then((val: any) => {
+                type = val[0]
+            })
             .catch((err: any) => {
                 logger.error(err);
+                type = 'error';
             });
+
+        // if our type has changed, delete all current settings
+        if (type !== AudioModule.getType(module)) {
+            await this.dao.run(AudioModuleTable.deleteAll, [])
+                .catch((err: any) => {
+                    logger.error(err);
+                });
         }
 
         await this.dao.run(AudioModuleTable.insert, ["type", AudioModule.getType(module)])
-        .catch((err: any) => {
-            logger.error(err);
-            return false;
-        });
+            .catch((err: any) => {
+                logger.error(err);
+                return false;
+            });
 
         module.entries.forEach(async (val: [string, string]) => {
             await this.dao.run(AudioModuleTable.insert, [val[0], val[1]])
@@ -249,7 +266,7 @@ export class ControllerRepository {
                     logger.error(err);
                     return false;
                 });
-        }); 
+        });
 
         return true;
     }

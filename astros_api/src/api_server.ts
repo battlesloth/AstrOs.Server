@@ -188,6 +188,7 @@ class ApiServer {
 
         this.router.get(SettingsController.getRoute, this.authHandler, SettingsController.getSetting);
         this.router.put(SettingsController.putRoute, this.authHandler, SettingsController.saveSetting);
+        this.router.post(SettingsController.formatSDRoute, this.authHandler, (req: any, res: any, next: any) => { this.formatSD(req, res, next); })
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
         this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
@@ -442,6 +443,35 @@ class ApiServer {
             });
         }
 
+    }
+
+    private async formatSD(req: any, res: any, next: any){
+        try {
+
+            const dao = new DataAccess();
+            const repo = new ControllerRepository(dao);
+
+            for (const module of req.body.modules){
+
+                const ip = await repo.getControllerIp(module);
+
+                const msg = {ip: ip, type: TransmissionType.formatSD};
+                logger.info(`sending format SD command: ${JSON.stringify(msg)}`);
+
+                this.moduleInterface.postMessage(msg);
+            }
+            
+            res.status(200);
+            res.json({ message: "success" });
+
+        } catch (error) {
+            logger.error(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
     }
 
     private updateClients(msg: any): void {

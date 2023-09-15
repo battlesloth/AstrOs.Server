@@ -80,13 +80,19 @@ export class DataAccess {
                 await this.upgradeToV2();
                 await this.upgradeToV3();
                 await this.upgradeToV4();
+                await this.upgradeToV5();
                 break;
             case 2:
                 await this.upgradeToV3();
                 await this.upgradeToV4();
+                await this.upgradeToV5();
                 break;
             case 3:
                 await this.upgradeToV4();
+                await this.upgradeToV5();
+                break;
+            case 4:
+                await this.upgradeToV5();
                 break;
             default:
                 logger.info('Database up to date');        
@@ -192,7 +198,7 @@ export class DataAccess {
             await this.run(ControllersTable.insert, [ctl.toString(), nameMap.get(ctl)])
                 .catch((err) => console.error(`Error adding ${ctl} controller: ${err}`));
 
-            await this.run(UartModuleTable.insert, [ctl.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
+            await this.run(UartModuleTable.insertV1, [ctl.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
             
             for (let i = 0; i < 32; i++) {
                 await this.run(ServoChannelsTable.insertV1, [ctl.toString(), i.toString(), "unassigned", "0", "0", "0"])
@@ -288,6 +294,63 @@ export class DataAccess {
         });
         
         await this.UpdateDbVerion(4);
+
+        logger.info('Upgrade complete!')
+    }
+
+    private async upgradeToV5(): Promise<void> {
+        logger.info('Upgrading to V5...')
+
+        await this.run(UartModuleTable.v5Update)
+        .then(() => {
+            logger.info("Uart Table updated")
+        })
+        .catch((err) => {
+            console.error(`Error updating UART Table: ${err}`);
+            throw err;
+        });
+
+        await this.run(UartModuleTable.v5Rename)
+        .then(() => {
+            logger.info("Uart Table renamed")
+        })
+        .catch((err) => {
+            console.error(`Error renaming UART Table: ${err}`);
+            throw err;
+        });
+
+        await this.run(UartModuleTable.v5NewTable)
+        .then(() => {
+            logger.info("Uart Table new table")
+        })
+        .catch((err) => {
+            console.error(`Error creating new UART Table: ${err}`);
+            throw err;
+        });
+        
+        await this.run(UartModuleTable.v5Copy)
+        .then(() => {
+            logger.info("Uart Table copy")
+        })
+        .catch((err) => {
+            console.error(`Error copying UART Table: ${err}`);
+            throw err;
+        });
+
+        await this.run(UartModuleTable.v5Drop)
+        .then(() => {
+            logger.info("Uart Table drop")
+        })
+        .catch((err) => {
+            console.error(`Error dropping old table: ${err}`);
+            throw err;
+        });
+
+        await this.run(UartModuleTable.insert, ['1', '2', UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
+        await this.run(UartModuleTable.insert, ['2', '2', UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
+        await this.run(UartModuleTable.insert, ['3', '2', UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
+    
+        await this.UpdateDbVerion(5);
 
         logger.info('Upgrade complete!')
     }

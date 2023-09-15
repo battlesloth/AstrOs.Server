@@ -34,6 +34,17 @@ export class SettingsService {
       );
   }
 
+
+  public formatSD(modules: Array<number>): Observable<any> {
+    return this.http.post<Array<number>>(`/api/settings/formatSD`, {modules: modules},
+     {
+      headers: { Authorization: `Bearer ${this.getToken()}` }
+    })
+      .pipe(tap(_ => console.log('SD Format Queued')),
+        catchError(this.handleError<any>('formatSD'))
+      );
+  }
+
   private getToken(): string {
     if (!this.token) {
       this.token = localStorage.getItem('astros-token') || '';

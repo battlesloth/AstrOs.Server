@@ -1,19 +1,35 @@
 <mat-accordion>
     <mat-expansion-panel>
         <mat-expansion-panel-header>
-            <mat-panel-title>Serial Port configuration</mat-panel-title>
+            <mat-panel-title>Serial Port 1 configuration</mat-panel-title>
         </mat-expansion-panel-header>
         <div class="uart-module">
             <div class="type">
-                <select title="Serial Type" (ngModelChange)="uartTypeChange($event)" [(ngModel)]=uartType>
+                <select title="Serial Type" (ngModelChange)="uartTypeChange($event, 1)" [(ngModel)]=uart1Type>
                     <option value="0" selected>Disabled</option>
                     <option value="1">Generic Serial</option>
                     <option value="2">Kangaroo X2</option>
                 </select>
             </div>
-            <div class="input"><input matInput placeholder="Name" [(ngModel)]="module.uartModule.moduleName" /></div>
+            <div class="input"><input matInput placeholder="Name" [(ngModel)]="module.uartModule.channels[0].channelName" /></div>
         </div>
-        <ng-template #uartContainer></ng-template>
+        <ng-template #uart1Container></ng-template>
+    </mat-expansion-panel>
+    <mat-expansion-panel>
+        <mat-expansion-panel-header>
+            <mat-panel-title>Serial Port 2 configuration</mat-panel-title>
+        </mat-expansion-panel-header>
+        <div class="uart-module">
+            <div class="type">
+                <select title="Serial Type" (ngModelChange)="uartTypeChange($event, 2)" [(ngModel)]=uart2Type>
+                    <option value="0" selected>Disabled</option>
+                    <option value="1">Generic Serial</option>
+                    <option value="2">Kangaroo X2</option>
+                </select>
+            </div>
+            <div class="input"><input matInput placeholder="Name" [(ngModel)]="module.uartModule.channels[1].channelName" /></div>
+        </div>
+        <ng-template #uart2Container></ng-template>
     </mat-expansion-panel>
     <mat-expansion-panel>
         <mat-expansion-panel-header>

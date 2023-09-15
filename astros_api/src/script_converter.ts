@@ -136,7 +136,7 @@ export class ScriptConverter {
     convertGenericSerialEvent(evt: ScriptEvent, timeTillNextEvent: number) : string {
         const serial = JSON.parse(evt.dataJson) as GenericSerialEvent;
 
-        return `${CommandType.genericSerial}|${timeTillNextEvent}|1|${serial.value};`;
+        return `${CommandType.genericSerial}|${timeTillNextEvent}|${serial.uartChannel}|${serial.value};`;
     }
 
     // |___|_________|__________|___|____|____|____;
@@ -150,13 +150,13 @@ export class ScriptConverter {
         if (kangaroo.ch1Action != KangarooAction.none) {
             const evtTime =  kangaroo.ch2Action === KangarooAction.none ? timeTillNextEvent : 0;
 
-            command = `${CommandType.kangaroo}|${evtTime}|1|${1}|${kangaroo.ch1Action}|${kangaroo.ch1Speed}|${kangaroo.ch1Position};`;
+            command = `${CommandType.kangaroo}|${evtTime}|${kangaroo.uartChannel}|${1}|${kangaroo.ch1Action}|${kangaroo.ch1Speed}|${kangaroo.ch1Position};`;
                 //this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position,
                 // if the ch2 action is none, use timeTill. Otherwise we have 2 actions for the
                 // same time period, so don't delay untill after second action is done.
         }
         if (kangaroo.ch2Action != KangarooAction.none) {
-            command = command + `${CommandType.kangaroo}|${timeTillNextEvent}|1|${2}|${kangaroo.ch2Action}|${kangaroo.ch2Speed}|${kangaroo.ch2Position};`;
+            command = command + `${CommandType.kangaroo}|${timeTillNextEvent}|${kangaroo.uartChannel}|${2}|${kangaroo.ch2Action}|${kangaroo.ch2Speed}|${kangaroo.ch2Position};`;
             //this.convertChannelEvent(2, evt.ch2Action, evt.ch2Speed, evt.ch2Position, timeTill);
         }
 

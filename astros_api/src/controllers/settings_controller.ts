@@ -5,6 +5,7 @@ import { logger } from "../logger";
 export class SettingsController{
     public static getRoute = '/settings/'
     public static putRoute = '/settings/'
+    public static formatSDRoute = '/settings/formatSD'
    
     public static async getSetting(req: any, res: any, next: any) {
         try {

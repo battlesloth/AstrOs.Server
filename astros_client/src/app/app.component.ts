@@ -25,7 +25,7 @@ export class AppComponent implements OnInit {
     private snackbar: SnackbarService,
     private socket: WebsocketService) {
     if (auth.isLoggedIn()) {
-      router.navigate(['modules']);
+      router.navigate(['scripts']);
       //router.navigate(['status']);
     }
   }
