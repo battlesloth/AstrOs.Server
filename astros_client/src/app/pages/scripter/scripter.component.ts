@@ -18,6 +18,7 @@ import { ScriptTestModalComponent } from './modals/script-test-modal/script-test
 import { ChannelTestModalComponent } from './modals/channel-test-modal/channel-test-modal.component';
 import EventMarkerHelper from './helper/event-marker-helper';
 import { UartEventModalComponent } from './modals/uart-event-modal/uart-event-modal.component';
+import { HumanCyborgModalComponent } from './modals/human-cyborg-modal/human-cyborg-modal.component';
 
 
 export interface Item {
@@ -354,6 +355,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
             component = this.container.createComponent(KangarooEventModalComponent)
             modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
             modalResources.set(ModalResources.kangaroo, this.getKangarooControllerFromChannel(event.scriptChannel));     
+            break;
+          case ChannelSubType.humanCyborgRelations:
+            component = this.container.createComponent(HumanCyborgModalComponent)
+            modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
             break;
         }  
         break;

@@ -47,6 +47,7 @@ import { CyborgComponent } from './pages/modules/audio-module/cyborg/cyborg.comp
 import { ServerComponent } from './pages/modules/audio-module/server/server.component';
 import { DisabledComponent } from './pages/modules/audio-module/disabled/disabled.component';
 import { FormatModalComponent } from './pages/settings/modals/format-modal/format-modal.component';
+import { HumanCyborgModalComponent } from './pages/scripter/modals/human-cyborg-modal/human-cyborg-modal.component';
 
 
 
@@ -83,7 +84,8 @@ import { FormatModalComponent } from './pages/settings/modals/format-modal/forma
     CyborgComponent,
     ServerComponent,
     DisabledComponent,
-    FormatModalComponent
+    FormatModalComponent,
+    HumanCyborgModalComponent
   ],
   imports: [
     BrowserModule,
