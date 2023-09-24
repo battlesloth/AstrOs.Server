@@ -1,10 +1,10 @@
 <div class="container">
     <div class="script-title">
         <div class="script-name">
-            <input matInput placeholder="Name" [ngModel]="script?.scriptName" (ngModelChange)="script.scriptName=$event" />
+            <input matInput placeholder="Name" [ngModel]="script.scriptName" (ngModelChange)="script.scriptName=$event" />
         </div>
         <div class="script-description">
-            <input matInput placeholder="Description" [ngModel]="script?.description" (ngModelChange)="script.description=$event" />
+            <input matInput placeholder="Description" [ngModel]="script.description" (ngModelChange)="script.description=$event" />
         </div>
         <div class="button-box">
             <button (click)="saveScript()">Save</button>
