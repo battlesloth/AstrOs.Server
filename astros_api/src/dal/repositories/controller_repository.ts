@@ -1,11 +1,11 @@
 import { DataAccess } from "../../dal/data_access";
-import { ControlModule, ControllerType, ServoChannel, I2cChannel, UartModule, AudioModule, AudioModuleType, UartChannel } from "astros-common";
+import { ControlModule, ControllerType, ServoChannel, I2cChannel, UartModule, UartChannel } from "astros-common";
 import { ControllersTable } from "../../dal/tables/controllers_table";
 import { ServoChannelsTable } from "../../dal/tables/servo_channels_table";
 import { I2cChannelsTable } from "../../dal/tables/i2c_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
 import { logger } from "../../logger";
-import { AudioModuleTable } from "../tables/audio_module_table";
+
 
 export class ControllerRepository {
 
@@ -203,70 +203,6 @@ export class ControllerRepository {
                 logger.error(err);
                 return false;
             });
-
-        return true;
-    }
-
-    public async getAudioModule(): Promise<AudioModule | null> {
-
-        const result = new AudioModule();
-
-        await this.dao.get(AudioModuleTable.selectAll, [])
-            .then((val: any) => {
-
-                val.forEach((x: any) => {
-                    if (x.key === "type") {
-                        result.setType(x.value);
-                    } else {
-                        result.entries.push([x.key, x.value]);
-                    }
-                })
-
-                return result;
-            })
-            .catch((err: any) => {
-                logger.error(err);
-                result.type = AudioModuleType.Disabled;
-                return result;
-            });
-
-        return result;
-    }
-
-    public async saveAudioModule(module: AudioModule): Promise<boolean> {
-
-        let type = '';
-
-        await this.dao.get(AudioModuleTable.getType, [])
-            .then((val: any) => {
-                type = val[0]
-            })
-            .catch((err: any) => {
-                logger.error(err);
-                type = 'error';
-            });
-
-        // if our type has changed, delete all current settings
-        if (type !== AudioModule.getType(module)) {
-            await this.dao.run(AudioModuleTable.deleteAll, [])
-                .catch((err: any) => {
-                    logger.error(err);
-                });
-        }
-
-        await this.dao.run(AudioModuleTable.insert, ["type", AudioModule.getType(module)])
-            .catch((err: any) => {
-                logger.error(err);
-                return false;
-            });
-
-        module.entries.forEach(async (val: [string, string]) => {
-            await this.dao.run(AudioModuleTable.insert, [val[0], val[1]])
-                .catch((err: any) => {
-                    logger.error(err);
-                    return false;
-                });
-        });
 
         return true;
     }

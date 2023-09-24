@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, ControllerType, TransmissionType, StatusResponse, ControllerStatus, AudioModule, ModuleCollection } from 'astros-common';
+import { ControlModule, ControllerType, ControllerStatus, ModuleCollection } from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
@@ -26,8 +26,6 @@ export class ModulesComponent implements OnInit, AfterViewInit {
   coreModule!: ControlModule;
   domeModule!: ControlModule;
   bodyModule!: ControlModule;
-
-  audioModule!: AudioModule;
 
   coreCaption: any = { str: 'Pending...' }
   domeCaption: any = { str: 'Pending...' }
@@ -83,8 +81,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       }
     };
 
-    this.audioModule.entries = Array.from(this.audioModule.settings.entries());
-    this.controllerService.saveControllers(new ModuleCollection(this.audioModule, this.coreModule, this.domeModule, this.bodyModule))
+    this.controllerService.saveControllers(new ModuleCollection(this.coreModule, this.domeModule, this.bodyModule))
       .subscribe(observer);
   }
 
@@ -111,8 +108,6 @@ export class ModulesComponent implements OnInit, AfterViewInit {
 
   private parseModules(modules: ModuleCollection) {
     try {
-      this.audioModule = modules.audioModule ?? this.audioModule;
-      this.audioModule.settings = new Map<string, string>(this.audioModule.entries);
       this.coreModule = modules.coreModule ?? this.coreModule;
       this.domeModule = modules.domeModule ?? this.domeModule;
       this.bodyModule = modules.bodyModule ?? this.bodyModule;

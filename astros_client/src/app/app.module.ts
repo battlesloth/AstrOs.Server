@@ -41,11 +41,6 @@ import { ChannelTestModalComponent } from './pages/scripter/modals/channel-test-
 import { RemoteConfigComponent } from './pages/remote-config/remote-config.component';
 import { M5PaperConfigComponent } from './pages/remote-config/m5-paper-config/m5-paper-config.component';
 import { SettingsComponent } from './pages/settings/settings.component';
-import { AudioModuleComponent } from './pages/modules/audio-module/audio-module.component';
-import { DfPlayerComponent } from './pages/modules/audio-module/df-player/df-player.component';
-import { CyborgComponent } from './pages/modules/audio-module/cyborg/cyborg.component';
-import { ServerComponent } from './pages/modules/audio-module/server/server.component';
-import { DisabledComponent } from './pages/modules/audio-module/disabled/disabled.component';
 import { FormatModalComponent } from './pages/settings/modals/format-modal/format-modal.component';
 import { HumanCyborgModalComponent } from './pages/scripter/modals/human-cyborg-modal/human-cyborg-modal.component';
 
@@ -79,11 +74,6 @@ import { HumanCyborgModalComponent } from './pages/scripter/modals/human-cyborg-
     RemoteConfigComponent,
     M5PaperConfigComponent,
     SettingsComponent,
-    AudioModuleComponent,
-    DfPlayerComponent,
-    CyborgComponent,
-    ServerComponent,
-    DisabledComponent,
     FormatModalComponent,
     HumanCyborgModalComponent
   ],

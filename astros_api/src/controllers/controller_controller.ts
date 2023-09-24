@@ -1,5 +1,5 @@
 
-import { AudioModule, ControlModule, ControllerType, ModuleCollection } from "astros-common";
+import { ControlModule, ControllerType, ModuleCollection } from "astros-common";
 import { DataAccess } from "../dal/data_access";
 import { ControllerRepository } from "../dal/repositories/controller_repository";
 import { logger } from "../logger";
@@ -36,10 +36,6 @@ export class ControllerController {
                 }
             }
 
-            const audioModule = await repo.getAudioModule();
-
-            response.audioModule = audioModule ?? new AudioModule();
-
             res.status(200);
             res.json(response);
 
@@ -74,11 +70,7 @@ export class ControllerController {
                 controllers.push(modules.bodyModule);
             }
             
-            let success = await repo.saveControllers(controllers);
-            
-            if (success && modules.audioModule){
-                success = await repo.saveAudioModule(modules.audioModule);
-            }
+            const success = await repo.saveControllers(controllers);
 
             if (success) {
                 res.status(200);

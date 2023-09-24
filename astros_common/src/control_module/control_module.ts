@@ -1,4 +1,4 @@
-import { ControllerType, UartType } from "../astros_enums";
+import { ControllerType} from "../astros_enums";
 import { I2cModule } from "./i2c_module";
 import { ServoModule } from "./servo_module";
 import { UartModule } from "./uart_module";

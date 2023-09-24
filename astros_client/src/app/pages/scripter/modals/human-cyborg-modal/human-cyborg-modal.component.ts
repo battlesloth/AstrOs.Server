@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 import { HcrCommand, HcrCommandCategory, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, ScriptEvent, humanCyborgRelationsController } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
+import { faBan} from '@fortawesome/free-solid-svg-icons';
 
 
 
@@ -12,6 +13,8 @@ import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resourc
 })
 export class HumanCyborgModalComponent extends BaseEventModalComponent implements OnInit {
 
+  faRemove = faBan;
+
   uartChannel!: number;
   commandCategory: string;
   command!: string;
@@ -20,6 +23,9 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
 
   selectedCommands: Array<HcrCommand>;
   commands: Array<any>;
+
+  hasValueA: Array<HumanCyborgRelationsCmd>;
+  hasValueB: Array<HumanCyborgRelationsCmd>;
 
   constructor() {
     super();
@@ -30,6 +36,27 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
     this.commands = new Array<any>();
     this.commandCategory = HcrCommandCategory.stimuli.toString();
     this.setAvailableCommands(+this.commandCategory);
+
+    this.hasValueA = new Array<HumanCyborgRelationsCmd>();
+    this.hasValueA.push( 
+      HumanCyborgRelationsCmd.minSecondsBetweenMusings,
+      HumanCyborgRelationsCmd.maxSecondsBetweenMusings,
+      HumanCyborgRelationsCmd.playWavOnA,
+      HumanCyborgRelationsCmd.playWavOnB,
+      HumanCyborgRelationsCmd.vocalizerVolume,
+      HumanCyborgRelationsCmd.wavAVolume,
+      HumanCyborgRelationsCmd.wavBVolume,
+      HumanCyborgRelationsCmd.setHappyLevel,
+      HumanCyborgRelationsCmd.setSadLevel,
+      HumanCyborgRelationsCmd.setMadLevel,
+      HumanCyborgRelationsCmd.setScaredLevel
+    );
+
+    this.hasValueB = new Array<HumanCyborgRelationsCmd>();
+    this.hasValueB.push(
+      HumanCyborgRelationsCmd.playSdRandomOnA,
+      HumanCyborgRelationsCmd.playSdRandomOnB
+    );
 
     this.errorMessage = '';
     this.callbackType = ModalCallbackEvent.addEvent;
@@ -49,7 +76,7 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
     
     if (this.scriptEvent.dataJson != ''){
       const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.selectedCommands.push(payload)
+      this.selectedCommands.push(...payload.commands)
     }
 
 
@@ -133,6 +160,14 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
     this.selectedCommands.push(new HcrCommand(crypto.randomUUID().toString(), +this.commandCategory, +this.command, +this.valueA, +this.valueB));
   }
 
+
+  removeCommand(id: string){
+    const cmdIdx = this.selectedCommands?.findIndex(x => x.id === id);
+    if (cmdIdx != undefined && cmdIdx > -1) {
+      this.selectedCommands.splice(cmdIdx, 1);
+    }
+  }
+
   addEvent() {
 
     if (+this.eventTime > this.maxTime) {
@@ -142,9 +177,7 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const cmds = new Array<HcrCommand>();
-
-    const data = new HumanCyborgRelationsEvent(this.uartChannel, cmds);
+    const data = new HumanCyborgRelationsEvent(this.uartChannel, this.selectedCommands);
 
     this.scriptEvent.dataJson = JSON.stringify(data);
 
@@ -156,7 +189,16 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
   }
 
   formatSelectedCommand(cmd: HcrCommand) {
-    return `${this.hcrName(cmd.command)}: ${cmd.valueA} ${cmd.valueB}`
+
+    if (this.hcrHasBValue(cmd.command)){
+      return `${this.hcrName(cmd.command)}: ${cmd.valueA} ${cmd.valueB}`
+    }
+    
+    if (this.hcrHasAValue(cmd.command)){
+      return `${this.hcrName(cmd.command)}: ${cmd.valueA}`
+    }
+
+    return this.hcrName(cmd.command)  
   }
 
   hcrListItem(cmd: HumanCyborgRelationsCmd){
@@ -165,5 +207,13 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
 
   hcrName(cmd: HumanCyborgRelationsCmd){
     return humanCyborgRelationsController.getCommandName(cmd);
+  }
+
+  hcrHasBValue(cmd: HumanCyborgRelationsCmd){
+    return this.hasValueB.find(x => x === cmd) !== undefined
+  }
+   
+  hcrHasAValue(cmd: HumanCyborgRelationsCmd){
+    return this.hasValueA.find(x => x === cmd) !== undefined  
   }
 }
