@@ -9,7 +9,7 @@ export class AuthContoller {
   public static reauthRoute = "/reauth"
 
   public static login(req: any, res: any, next: any) {
-    passport.authenticate('local', (err, user, info) => {
+    passport.authenticate('local', (err: any, user: any, info: any) => {
       // If Passport throws/catches an error
       if (err) {
         res.status(404).json(err);
