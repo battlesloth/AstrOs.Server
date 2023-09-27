@@ -39,6 +39,16 @@
                     <option *ngFor="let command of commands" [ngValue]="command.id">{{command.name}}</option>
                 </select>
             </div>
+            <div>
+                <label for="valueA">Value A</label>
+                <input id="value-a" name="valueA" matInput placeholder="Value A" type="number" step="1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/" 
+                [ngModel]="valueA | number : '1.0-1'" (ngModelChange)="valueA = $event" disabled/>
+            </div>
+            <div>
+                <label for="valueB">Value B</label>
+                <input id="value-b" name="valueB" matInput placeholder="Value B" type="number" step="1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/" 
+                [ngModel]="valueB | number : '1.0-1'" (ngModelChange)="valueB = $event" disabled/>
+            </div>
             <div class="hcr-button-container">
                 <button class="hcr-button" (click)="addCommand()">Add</button>
             </div>

@@ -3,7 +3,6 @@ import { MatExpansionPanel } from '@angular/material/expansion';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ControlModule, ControllerType, ControllerStatus, ModuleCollection } from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
-import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { StatusService } from 'src/app/services/status/status.service';
 

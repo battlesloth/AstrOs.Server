@@ -79,17 +79,31 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
       this.selectedCommands.push(...payload.commands)
     }
 
-
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;
   }
 
   categoryChange($event: any) {
+    this.errorMessage = '';
     this.setAvailableCommands(+this.commandCategory);
   }
 
   commandChange($event: any) {
+    this.errorMessage = '';
+    if (this.hcrHasBValue(+this.command)){
+      document.getElementById('value-a')?.removeAttribute('disabled');
+      document.getElementById('value-b')?.removeAttribute('disabled');
+      return;
+    }
+    if (this.hcrHasAValue(+this.command)){
+      document.getElementById('value-a')?.removeAttribute('disabled');
+      document.getElementById('value-b')?.setAttribute('disabled', 'disabled');
+      return;
+    }
 
+    document.getElementById('value-a')?.setAttribute('disabled', 'disabled');
+    document.getElementById('b')?.setAttribute('disabled', 'disabled');
+  
   }
 
   setAvailableCommands(category: HcrCommandCategory) {
@@ -157,6 +171,30 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
   }
 
   addCommand(){
+
+    let missingA = false; 
+    let missingB = false; 
+    
+    if (this.hcrHasBValue(+this.command)){
+      if (this.valueA === undefined || this.valueA === null){
+        missingA = true;
+      }
+      if (this.valueB === undefined || this.valueB === null){
+        missingB = true;
+      }
+    }
+
+    if (this.hcrHasAValue(+this.command)){
+      if (this.valueA === undefined || this.valueA === null){
+        missingA = true;
+      }
+    }
+
+    if (missingA || missingB){
+      this.errorMessage = `Required Values Missing: ${missingA ? 'A' :'' }${missingA && missingB ? ',': ''}${missingB ? 'B' : ''}`;
+      return;
+    }
+
     this.selectedCommands.push(new HcrCommand(crypto.randomUUID().toString(), +this.commandCategory, +this.command, +this.valueA, +this.valueB));
   }
 
