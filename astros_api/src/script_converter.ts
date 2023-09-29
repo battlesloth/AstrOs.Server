@@ -1,4 +1,4 @@
-import { ServoEvent, I2cEvent, ChannelSubType } from "astros-common";
+import { ServoEvent, I2cEvent, ChannelSubType, HumanCyborgRelationsEvent, humanCyborgRelationsController } from "astros-common";
 import { ChannelType, ControllerType,
     KangarooAction, KangarooEvent, Script, 
     ScriptChannel, ScriptEvent, GenericSerialEvent } from "astros-common";
@@ -122,6 +122,8 @@ export class ScriptConverter {
         switch (evt.channelSubType){
             case ChannelSubType.genericSerial:
                 return this.convertGenericSerialEvent(evt, timeTillNextEvent);
+            case ChannelSubType.humanCyborgRelations:
+                return this.convertHcrEvent(evt, timeTillNextEvent);    
             case ChannelSubType.kangaroo:
                 return this.convertKangarooEvent(evt, timeTillNextEvent);
             default:
@@ -137,6 +139,39 @@ export class ScriptConverter {
         const serial = JSON.parse(evt.dataJson) as GenericSerialEvent;
 
         return `${CommandType.genericSerial}|${timeTillNextEvent}|${serial.uartChannel}|${serial.value};`;
+    }
+
+        // |___|_________|___________|___________;
+    //  evt time_till serial ch   msg 
+    convertHcrEvent(evt: ScriptEvent, timeTillNextEvent: number) : string {
+
+        const hcr = JSON.parse(evt.dataJson) as HumanCyborgRelationsEvent;
+
+        let val = '<';
+
+        for (const cmd of hcr.commands){
+
+            if (cmd.valueA === null || cmd.valueA == undefined){
+                cmd.valueA = 0;
+            }
+
+            if (cmd.valueB === null || cmd.valueB == undefined){
+                cmd.valueB = 0;
+            }
+
+            let cmdS = humanCyborgRelationsController.getCommandString(cmd.command);
+            let re = /#/;
+            cmdS = cmdS.replace(re, cmd.valueA.toString());
+            re = /\*/;
+            cmdS = cmdS.replace(re, cmd.valueB.toString());
+            val += cmdS + ',';
+        }
+
+        val = val.slice(0, -1)
+        
+        val += '>';
+        
+        return `${CommandType.genericSerial}|${timeTillNextEvent}|${hcr.uartChannel}|${val};`;
     }
 
     // |___|_________|__________|___|____|____|____;

@@ -72,6 +72,7 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
       element?.classList.remove("hidden");
     }
 
+    this.uartChannel = <number> this.resources.get(ModalResources.channelId);
     this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
     
     if (this.scriptEvent.dataJson != ''){
