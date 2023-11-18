@@ -18,6 +18,7 @@ import { ScriptTestModalComponent } from './modals/script-test-modal/script-test
 import { ChannelTestModalComponent } from './modals/channel-test-modal/channel-test-modal.component';
 import EventMarkerHelper from './helper/event-marker-helper';
 import { UartEventModalComponent } from './modals/uart-event-modal/uart-event-modal.component';
+import { HumanCyborgModalComponent } from './modals/human-cyborg-modal/human-cyborg-modal.component';
 
 
 export interface Item {
@@ -355,6 +356,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
             modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
             modalResources.set(ModalResources.kangaroo, this.getKangarooControllerFromChannel(event.scriptChannel));     
             break;
+          case ChannelSubType.humanCyborgRelations:
+            component = this.container.createComponent(HumanCyborgModalComponent)
+            modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
+            break;
         }  
         break;
       case ChannelType.i2c:
@@ -597,18 +602,18 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   private editEvent(event: ScriptEvent, oldTime: number) {
-    if (event.time !== oldTime) {
+    //if (event.time !== oldTime) {
       this.removeEvent(event.scriptChannel, oldTime);
       this.addEvent(event);
-    }
-    else {
+   // }
+   // else {
 
-      const chIdx = this.scriptChannels
-        .map((ch) => { return ch.id })
-        .indexOf(event.scriptChannel);
+    //  const chIdx = this.scriptChannels
+    //    .map((ch) => { return ch.id })
+    //    .indexOf(event.scriptChannel);
 
-      this.scriptChannels[chIdx].events.set(event.time, event);
-    }
+    //  this.scriptChannels[chIdx].events.set(event.time, event);
+    //}
   }
 
   private renderEvent(event: ScriptEvent) {//channelId: string, time: number) {

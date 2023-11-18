@@ -58,6 +58,8 @@ export class ScriptRowComponent implements OnInit {
         return "Generic Serial";
       case UartType.kangaroo:
         return "Kangaroo X2";
+      case UartType.humanCyborgRelations:
+        return "Human Cyborg Relations";
       default:
         return "None";
     }

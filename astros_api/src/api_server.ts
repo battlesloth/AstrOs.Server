@@ -3,7 +3,7 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import passport from "passport";
 import morgan from "morgan";
-import jwt, { RequestHandler } from "express-jwt";
+import {expressjwt as jwt}from "express-jwt";
 import cors from 'cors';
 import fileUpload from 'express-fileupload';
 
@@ -49,7 +49,7 @@ class ApiServer {
 
     moduleInterface!: Worker;
 
-    private authHandler!: RequestHandler;
+    private authHandler!: any;
     private  apiKeyValidator!: ReqHandler;
 
     upload!: any;
@@ -152,7 +152,7 @@ class ApiServer {
         this.authHandler = jwt({
             secret: jwtKey,
             algorithms: ['HS256'],
-            userProperty: 'payload'
+            //userProperty: 'payload'
         });
 
         this.apiKeyValidator = ApiKeyValidator();

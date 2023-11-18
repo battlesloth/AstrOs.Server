@@ -1,0 +1,53 @@
+.hcr-primary-label {
+    font-weight:500;
+}
+
+.hcr-listbox-container {
+    display: block;
+    width: 306px;
+    border: 1px solid black;
+}
+
+.hcr-listbox {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    height: 80px;
+    overflow: auto;
+}
+
+.hcr-list-item {
+    display: flex;
+    flex-direction: row;
+}
+
+.hcr-cmd-label{
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hcr-remove-cmd{
+    font-size: large;
+    padding: 0;
+    margin: 0px 4px;
+    border: none;
+    background-color: transparent;
+    color: black;
+    cursor: pointer;
+}
+
+.hcr-button-container {
+    margin-top: 4px;
+    display: flex;
+    justify-content: center;
+}
+
+.hcr-button {
+        height: 28px;
+        font-size: large;
+        width: 60px;
+        padding: 0px;
+
+}

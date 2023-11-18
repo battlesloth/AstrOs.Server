@@ -1,20 +1,20 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { CyborgComponent } from './cyborg.component';
+import { HumanCyborgModalComponent } from './human-cyborg-modal.component';
 
-describe('CyborgComponent', () => {
-  let component: CyborgComponent;
-  let fixture: ComponentFixture<CyborgComponent>;
+describe('HumanCyborgModalComponent', () => {
+  let component: HumanCyborgModalComponent;
+  let fixture: ComponentFixture<HumanCyborgModalComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ CyborgComponent ]
+      declarations: [ HumanCyborgModalComponent ]
     })
     .compileComponents();
   });
 
   beforeEach(() => {
-    fixture = TestBed.createComponent(CyborgComponent);
+    fixture = TestBed.createComponent(HumanCyborgModalComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

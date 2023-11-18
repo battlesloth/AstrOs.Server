@@ -65,7 +65,10 @@ export class ScriptResources {
         script.scriptChannels.forEach(ch => {
             switch (ch.type) {
                 case ChannelType.uart:
-                    this.uartChannels.get(ch.controllerType)![ch.channel.id].available = false;
+                    const uartIdx = this.uartChannels.get(ch.controllerType)?.findIndex(x => x.channel.id === ch.channel.id);
+                    if (uartIdx != undefined && uartIdx > -1) {
+                        this.uartChannels.get(ch.controllerType)![uartIdx].available = false;
+                    }
                     break;
                 case ChannelType.servo:
                     this.servoChannels.get(ch.controllerType)![ch.channel.id].available = false;

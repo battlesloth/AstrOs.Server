@@ -15,7 +15,6 @@ import { AudioFilesTable } from "./tables/audio_files_table";
 import { UartModuleTable } from "./tables/uart_module_table";
 import { logger } from "../logger";
 import { RemoteConfigTable } from "./tables/remote_config_table";
-import { AudioModuleTable } from "./tables/audio_module_table";
 
 
 
@@ -80,19 +79,13 @@ export class DataAccess {
                 await this.upgradeToV2();
                 await this.upgradeToV3();
                 await this.upgradeToV4();
-                await this.upgradeToV5();
                 break;
             case 2:
                 await this.upgradeToV3();
                 await this.upgradeToV4();
-                await this.upgradeToV5();
                 break;
             case 3:
                 await this.upgradeToV4();
-                await this.upgradeToV5();
-                break;
-            case 4:
-                await this.upgradeToV5();
                 break;
             default:
                 logger.info('Database up to date');        
@@ -283,23 +276,6 @@ export class DataAccess {
 
     private async upgradeToV4(): Promise<void> {
         logger.info('Upgrading to V4...')
-
-        await this.run(AudioModuleTable.create)
-        .then(() => {
-            logger.info("Audio Module Table created")
-        })
-        .catch((err) => {
-            console.error(`Error Creating Audio Module Table: ${err}`);
-            throw err;
-        });
-        
-        await this.UpdateDbVerion(4);
-
-        logger.info('Upgrade complete!')
-    }
-
-    private async upgradeToV5(): Promise<void> {
-        logger.info('Upgrading to V5...')
 
         await this.run(UartModuleTable.v5Update)
         .then(() => {

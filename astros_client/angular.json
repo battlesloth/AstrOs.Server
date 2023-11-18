@@ -17,6 +17,9 @@
         "build": {
           "builder": "@angular-devkit/build-angular:browser",
           "options": {
+            "allowedCommonJsDependencies": [
+              "astros_common"
+            ],
             "outputPath": "dist/client",
             "index": "src/index.html",
             "main": "src/main.ts",
@@ -109,5 +112,7 @@
       "style": "scss"
     }
   },
-  "defaultProject": "client"
+  "cli": {
+    "analytics": false
+  }
 }
