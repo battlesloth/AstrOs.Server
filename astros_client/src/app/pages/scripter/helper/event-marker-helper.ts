@@ -1,4 +1,4 @@
-import { ChannelSubType, ChannelType, GenericSerialEvent, I2cEvent, KangarooAction, KangarooEvent, ScriptEvent, ServoEvent } from "astros-common";
+import { ChannelSubType, ChannelType, GenericSerialEvent, HumanCyborgRelationsEvent, I2cEvent, KangarooAction, KangarooEvent, ScriptEvent, ServoEvent } from "astros-common";
 
 export default class EventMarkerHelper {
     static generateText(event: ScriptEvent): Array<string> {
@@ -58,6 +58,8 @@ export default class EventMarkerHelper {
                 return this.genericUart(json);
             case ChannelSubType.kangaroo:
                 return this.kangaroo(json);
+            case ChannelSubType.humanCyborgRelations:
+                return this.humanCyborg(json);
             default:
                 const result = new Array<string>();
                 result[0] = '\u00A0';
@@ -105,6 +107,17 @@ export default class EventMarkerHelper {
             default:
                 return 'error';
         }
+    }
+
+    static humanCyborg(json: string): Array<string> {
+        const evt = JSON.parse(json) as HumanCyborgRelationsEvent;
+        const result = new Array<string>();
+        result[0] = '';
+        result[1] = 'Event Count';
+        result[2] = evt.commands.length.toString();
+        result[3] = '';
+    
+        return result;
     }
 }
 

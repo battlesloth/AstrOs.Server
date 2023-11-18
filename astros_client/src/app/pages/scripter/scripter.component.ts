@@ -602,18 +602,18 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   private editEvent(event: ScriptEvent, oldTime: number) {
-    if (event.time !== oldTime) {
+    //if (event.time !== oldTime) {
       this.removeEvent(event.scriptChannel, oldTime);
       this.addEvent(event);
-    }
-    else {
+   // }
+   // else {
 
-      const chIdx = this.scriptChannels
-        .map((ch) => { return ch.id })
-        .indexOf(event.scriptChannel);
+    //  const chIdx = this.scriptChannels
+    //    .map((ch) => { return ch.id })
+    //    .indexOf(event.scriptChannel);
 
-      this.scriptChannels[chIdx].events.set(event.time, event);
-    }
+    //  this.scriptChannels[chIdx].events.set(event.time, event);
+    //}
   }
 
   private renderEvent(event: ScriptEvent) {//channelId: string, time: number) {
