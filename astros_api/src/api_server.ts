@@ -39,8 +39,6 @@ import { MessageHandler } from "./serial/message_handler";
 const { SerialPort } = eval("require('serialport')");
 const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
 
-//const port = new SerialPort({path:'COM7', baudRate: 9600});
-
 class ApiServer {
 
     private apiPort = 0;
@@ -50,16 +48,17 @@ class ApiServer {
     private app: Application;
     private router: Router;
     private websocket!: Server;
-    private espMonitor!: Worker;
+    
+    //private espMonitor!: Worker;
 
-    moduleInterface!: Worker;
+    //moduleInterface!: Worker;
 
     private authHandler!: any;
     private  apiKeyValidator!: ReqHandler;
 
     upload!: any;
     
-    private messageHandler: MessageHandler;
+    private messageHandler: MessageHandler= new MessageHandler();
     private port: any;
     private parser: any;
     
@@ -72,11 +71,10 @@ class ApiServer {
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
         this.router = Express.Router();
-    
-        this.messageHandler = new MessageHandler();
+
         this.port = new SerialPort({path:process.env.SERIAL_PORT, baudRate: 9600})
         this.parser = this.port.pipe(new DelimiterParser({ delimiter: '\n' }))
-            .on('data', this.handleSerialData);
+            .on('data', (data: any) =>{this.handleSerialData(data)});
     }
 
     public async Init() {
@@ -242,9 +240,97 @@ class ApiServer {
         } catch (err){
             logger.error(`Exception handling serial data: ${err}`);
         }
-
     }
 
+
+    private async syncControllers(req: any, res: any, next: any) {
+        try {
+            this.port.write('sync\n', (err: any) => {
+                if (err) {
+                    logger.error(`Error writing to serial port: ${err.message}`);
+                }
+            });
+        } catch (error) {
+            logger.error(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    private async uploadScript(req: any, res: any, next: any) { 
+        try {
+            this.port.write('upload\n', (err: any) => {
+                if (err) {
+                    logger.error(`Error writing to serial port: ${err.message}`);
+                }
+            });
+        } catch (error) {
+            logger.error(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+        
+    }
+
+    private async runScript(req: any, res: any, next: any) {
+        try {
+            this.port.write('run\n', (err: any) => {
+                if (err) {
+                    logger.error(`Error writing to serial port: ${err.message}`);
+                }
+            });
+        } catch (error) {
+            logger.error(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    private async directCommand(req: any, res: any, next: any) {
+        try {
+            this.port.write('direct\n', (err: any) => {
+                if (err) {
+                    logger.error(`Error writing to serial port: ${err.message}`);
+                }
+            });
+        } catch (error) {
+            logger.error(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    private async formatSD(req: any, res: any, next: any){
+        try {
+            this.port.write('format\n', (err: any) => {
+                if (err) {
+                    logger.error(`Error writing to serial port: ${err.message}`);
+                }
+            });
+        } catch (error) {
+            logger.error(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    
+/*
     private async runBackgroundServices(): Promise<void> {
 
         this.espMonitor = new Worker(new URL('./background_tasks/esp_monitor.js', import.meta.url));
@@ -518,6 +604,7 @@ class ApiServer {
             }
         }
     }
+*/
 }
 
 ApiServer.bootstrap().catch(err => {

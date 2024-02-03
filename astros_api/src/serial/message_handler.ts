@@ -8,21 +8,19 @@ export class MessageHandler {
     onHeartbeat!: (node: string) => void;
     onSyncAck!: () => void;
 
-    public handleMessage(val: Uint8Array) {
-        logger.info(`Serial Message received: ${val}`); 
-        
+    public handleMessage(val: any) : void {
         if (val.length < 19){
             logger.error(`Improper message length: ${val.length}`)
             return;
         }
 
-        const type =  val[16] as SerialMessageType;
+        const msgView = new DataView(new Uint8Array(val).buffer, 0);
+        const type = msgView.getUint8(16);
+        const payloadSize = msgView.getUint16(17);
+        const payloadBytes = new Uint8Array(val.slice(19, 19 + payloadSize));
+        const payload = String.fromCharCode(...payloadBytes);
 
-        const payloadSizeBuffer = new Uint8Array([val[17], val[18]]);
-        const view = new DataView(payloadSizeBuffer.buffer, 0);
-        const payloadSize = view.getUint16(0, true);
-
-        logger.info(`Message=>type: ${type}, payloadSize: ${payloadSize}`);
+        logger.debug(`Message=>type: ${type}, payloadSize: ${payloadSize}, payload: ${payload}`);
 
         switch (type) {
             case SerialMessageType.heartbeat:
@@ -37,6 +35,8 @@ export class MessageHandler {
                 logger.error(`Unknown message type: ${type}`);
                 break;
         }
+
+        return;
     }
 }
 
