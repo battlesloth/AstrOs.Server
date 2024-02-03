@@ -3,7 +3,7 @@
         "baseUrl": ".",
         "outDir": "dist",
         "rootDir": "./src",
-        "module": "esnext",
+        "module": "ESNext",
         "moduleResolution": "node",
         "allowJs": true,
         "esModuleInterop": true,

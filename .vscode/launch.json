@@ -14,7 +14,7 @@
                 "run-script",
                 "start"
             ],
-            "console": "externalTerminal",
+            "console": "integratedTerminal",
             "preLaunchTask": "build server"
         },
         {
@@ -27,7 +27,7 @@
                 "run-script",
                 "start"
             ],
-            "console": "externalTerminal"
+            "console": "integratedTerminal"
         },
         {
             "name": "browser",

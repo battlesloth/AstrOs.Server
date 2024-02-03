@@ -39,6 +39,7 @@ COPY --from=build1 /usr/src/app/dist /usr/src/temp/
 RUN npm install sqlite3 --python=/usr/bin/python3
 RUN npm install bufferutil
 RUN npm install utf-8-validate
+RUN npm install serialport
 
 FROM --platform=arm64 gcr.io/distroless/nodejs18-debian11
 

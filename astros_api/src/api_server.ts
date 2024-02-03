@@ -34,7 +34,12 @@ import { logger } from "./logger";
 import { RemoteConfigController } from "./controllers/remote_config_controller";
 import { SettingsController } from "./controllers/settings_controller";
 import { ApiKeyValidator } from "./api_key_validator";
+import { MessageHandler } from "./serial/message_handler";
 
+const { SerialPort } = eval("require('serialport')");
+const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
+
+//const port = new SerialPort({path:'COM7', baudRate: 9600});
 
 class ApiServer {
 
@@ -53,7 +58,11 @@ class ApiServer {
     private  apiKeyValidator!: ReqHandler;
 
     upload!: any;
-
+    
+    private messageHandler: MessageHandler;
+    private port: any;
+    private parser: any;
+    
     constructor() {
         Dotenv.config({ path: __dirname + '/.env' });
 
@@ -63,15 +72,24 @@ class ApiServer {
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
         this.router = Express.Router();
+    
+        this.messageHandler = new MessageHandler();
+        this.port = new SerialPort({path:process.env.SERIAL_PORT, baudRate: 9600})
+        this.parser = this.port.pipe(new DelimiterParser({ delimiter: '\n' }))
+            .on('data', this.handleSerialData);
     }
 
     public async Init() {
+        logger.info('Setting up authentication strategy');
         this.setAuthStrategy();
+        logger.info('Setting up API server');
         this.configApi();
+        logger.info('Setting up file handler');
         this.configFileHandler();
+        logger.info('Setting up routes');
         this.setRoutes();
+        logger.info('Starting web services');
         this.runWebServices();
-        await this.runBackgroundServices();
     }
 
     public static async bootstrap(): Promise<ApiServer> {
@@ -217,6 +235,16 @@ class ApiServer {
         });
     }
 
+    private handleSerialData(data: any): void {
+        try {
+            logger.debug(`Serial data received: ${data}`);
+            this.messageHandler.handleMessage(data);
+        } catch (err){
+            logger.error(`Exception handling serial data: ${err}`);
+        }
+
+    }
+
     private async runBackgroundServices(): Promise<void> {
 
         this.espMonitor = new Worker(new URL('./background_tasks/esp_monitor.js', import.meta.url));
@@ -230,6 +258,12 @@ class ApiServer {
         });
 
         setInterval(() => {
+
+            this.port.write(`testing1,2,3\n`, (err: any) => {
+                if (err) {
+                    logger.error(`Error writing to serial port: ${err.message}`);
+                }
+            });
 
             const dao = new DataAccess();
             const repository = new ControllerRepository(dao);

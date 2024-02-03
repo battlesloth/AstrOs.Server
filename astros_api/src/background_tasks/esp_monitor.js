@@ -1,6 +1,10 @@
-const { parentPort } = require("worker_threads");
-const superagent  = require('superagent');
-const { logger } = require("../logger");
+import { parentPort } from "worker_threads";
+import superagent  from 'superagent';
+import { logger } from "../logger";
+
+
+
+
 
 parentPort.on('message', data => {
     checkControllers(data);
@@ -9,7 +13,9 @@ parentPort.on('message', data => {
 function checkControllers(data) {
     const agent = superagent.agent();
 
+ 
     data.forEach( ctl => {
+        
         if (!!ctl.ip){
         agent.get(`http://${ctl.ip}`)
             .timeout({response: 4000})
