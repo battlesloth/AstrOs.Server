@@ -4,10 +4,8 @@
   "private": true,
   "scripts": {
     "prebuild": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "build_old": "tsc -p tsconfig.prod.json",
     "build": "webpack",
     "start": "node ./dist/bundle.js",
-    "old_start": "node ./dist/api_server.js",
     "test": "jest"
   },
   "dependencies": {

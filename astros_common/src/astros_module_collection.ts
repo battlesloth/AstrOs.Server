@@ -1,7 +1,7 @@
 
-import { ControlModule } from "./control_module";
+import { ControlModule } from "./control_module/control_module";
 
-export class ModuleCollection {
+export class AstrOsModuleCollection {
     coreModule?: ControlModule;
     domeModule?: ControlModule;
     bodyModule?: ControlModule;

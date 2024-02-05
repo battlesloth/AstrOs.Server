@@ -1,11 +1,3 @@
-export enum ControllerType {
-    none = 0,
-    core = 1,
-    dome = 2,
-    body = 3,
-    audio = 4
-}
-
 export enum ChannelType {
     none = 0,
     uart = 1,

@@ -8,7 +8,7 @@ export class ScriptEventsTable {
     public static readonly dataJson = 'dataJson';
 
     public static readonly create =
-    `CREATE TABLE IF NOT EXISTS ${this.table} (
+        `CREATE TABLE IF NOT EXISTS ${this.table} (
     ${this.scriptId} TEXT,
     ${this.scriptChannel} TEXT,
     ${this.channelType} INTEGER,
@@ -18,12 +18,23 @@ export class ScriptEventsTable {
     UNIQUE(${this.scriptChannel}, ${this.time}) ON CONFLICT REPLACE)`;
 
     public static readonly insert =
-    `INSERT INTO ${this.table}
-    (${this.scriptId}, ${this.scriptChannel}, ${this.channelType},  ${this.channelSubType}, ${this.time}, ${this.dataJson})
-    VALUES (?, ?, ?, ?, ?, ?)`;
+        `INSERT INTO ${this.table}
+    (${this.scriptId}, 
+    ${this.scriptChannel}, 
+    ${this.channelType},  
+    ${this.channelSubType}, 
+    ${this.time},
+    ${this.dataJson})
+    VALUES (
+    ?, 
+    ?, 
+    ?, 
+    ?, 
+    ?, 
+    ?)`;
 
     public static readonly selectForChannel =
-    `SELECT 
+        `SELECT 
     ${this.scriptChannel}, 
     ${this.channelType},
     ${this.channelSubType},
@@ -34,6 +45,6 @@ export class ScriptEventsTable {
     AND ${this.scriptChannel} = ?`;
 
     public static readonly deleteAllForScript =
-    `DELETE FROM ${this.table}
+        `DELETE FROM ${this.table}
     WHERE ${this.scriptId} = ?`
 }

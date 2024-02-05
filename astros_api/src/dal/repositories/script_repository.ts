@@ -2,12 +2,13 @@ import { DataAccess } from "../../dal/data_access";
 import { ScriptsTable } from "../../dal/tables/scripts_table";
 import { ScriptChannelsTable } from "../../dal/tables/script_channels_table";
 import { ScriptEventsTable } from "../../dal/tables/script_events_table";
-import { ChannelType, ControllerType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent, ChannelSubType, UartChannel } from "astros-common";
+import { ChannelType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent, ChannelSubType, UartChannel } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
 import { logger } from "../../logger";
 import { Guid } from "guid-typescript";
+import { ScriptsDeploymentTable } from "../tables/scripts_deployment_table";
 
 
 export class ScriptRepository {
@@ -29,10 +30,8 @@ export class ScriptRepository {
                 val.forEach((scr: any) => {
                     result.push(
                         new Script(scr.id, scr.scriptName,
-                            scr.description, scr.lastSaved.replace(',', ''),
-                            scr.coreUploaded.replace(',', ''),
-                            scr.domeUploaded.replace(',', ''),
-                            scr.bodyUploaded.replace(',', ''))
+                            scr.description, new Date(Date.parse(scr.lastSaved)),
+                        )
                     );
                 });
             })
@@ -40,6 +39,20 @@ export class ScriptRepository {
                 logger.error(err);
                 throw 'error';
             });
+
+
+        for (const scr of result) {
+            await this.dao.get(ScriptsDeploymentTable.selectByScript, [scr.id])
+                .then((val: any) => {
+                    val.forEach((dep: any) => {
+                        scr.setDeploymentDate(dep.controllerId, new Date(Date.parse(dep.lastSaved)));
+                    });
+                })
+                .catch((err) => {
+                    logger.error(err);
+                    throw 'error';
+                });
+        }
 
         return result;
     }
@@ -54,15 +67,25 @@ export class ScriptRepository {
                 const scr = val[0];
 
                 result = new Script(scr.id, scr.scriptName,
-                    scr.description, scr.lastSaved.replace(',', ''),
-                    scr.coreUploaded.replace(',', ''),
-                    scr.domeUploaded.replace(',', ''),
-                    scr.bodyUploaded.replace(',', ''));
+                    scr.description, new Date(Date.parse(scr.lastSaved)));
             })
             .catch((err) => {
                 logger.error(err);
                 throw 'error';
             });
+
+        await this.dao.get(ScriptsDeploymentTable.selectByScript, [id])
+            .then((val: any) => {
+                val.forEach((dep: any) => {
+                    result.setDeploymentDate(dep.controllerId, new Date(Date.parse(dep.lastSaved)));
+                });
+            })
+            .catch((err) => {
+
+                logger.error(err);
+                throw 'error';
+            });
+
 
         const channels = new Array<ScriptChannel>();
 
@@ -70,17 +93,8 @@ export class ScriptRepository {
             .then((val: any) => {
                 val.forEach((ch: any) => {
 
-                    const channel = new ScriptChannel(ch.id, ch.controllerType,
-                        ch.controllerName, ch.type, ch.subType, ch.channelNumber, null, 0)
-
-                    // default UART channels to 1 since we originally only had 1 UART slot
-                    if (channel.type == ChannelType.uart && channel.channelNumber == 0){
-                        channel.channelNumber = 1; 
-                    }
-                    
-                    if (channel.controllerType == ControllerType.audio) {
-                        channel.controllerName = 'Audio Playback';
-                    }
+                    const channel = new ScriptChannel(ch.id, ch.scriptId, ch.controllerId,
+                        ch.type, ch.subType, ch.channelNumber, null, 0);
 
                     channels.push(channel);
                 });
@@ -118,23 +132,23 @@ export class ScriptRepository {
 
         switch (channel.type) {
             case ChannelType.i2c:
-                channel.channel = await this.getChannelForScriptChannel(ChannelType.i2c, channel.channelNumber, channel.controllerType)
+                channel.channel = await this.getChannelForScriptChannel(ChannelType.i2c, channel.channelNumber, channel.controllerId)
                 break;
             case ChannelType.servo:
-                channel.channel = await this.getChannelForScriptChannel(ChannelType.servo, channel.channelNumber, channel.controllerType)
+                channel.channel = await this.getChannelForScriptChannel(ChannelType.servo, channel.channelNumber, channel.controllerId)
                 break;
             case ChannelType.uart:
-                channel.channel = await this.getUartChannel(channel.controllerType, channel.channelNumber);
+                channel.channel = await this.getUartChannel(channel.controllerId, channel.channelNumber);
                 break;
         }
 
         return channel;
     }
 
-    private async getUartChannel(controller: ControllerType, channel: number): Promise<UartChannel | null> {
+    private async getUartChannel(controllerId: number, channel: number): Promise<UartChannel | null> {
         let result: any = null;
 
-        await this.dao.get(UartModuleTable.select, [controller.toString(), channel.toString()])
+        await this.dao.get(UartModuleTable.select, [channel.toString(), controllerId.toString()])
             .then((val: any) => {
                 result = new UartChannel(val[0].uartType, channel, val[0].moduleName, JSON.parse(val[0].moduleJson));
             }).catch((err) => {
@@ -145,7 +159,7 @@ export class ScriptRepository {
         return result;
     }
 
-    private async getChannelForScriptChannel(type: ChannelType, chId: number, controller: ControllerType): Promise<any> {
+    private async getChannelForScriptChannel(type: ChannelType, chId: number, controllerId: number): Promise<any> {
 
         let result = {};
 
@@ -162,7 +176,7 @@ export class ScriptRepository {
                 return;
         }
 
-        await this.dao.get(sql, [chId.toString(), controller.toString()])
+        await this.dao.get(sql, [chId.toString(), controllerId.toString()])
             .then((val: any) => {
                 try {
                     switch (type) {
@@ -185,31 +199,13 @@ export class ScriptRepository {
         return result;
     }
 
-    async updateScriptControllerUploaded(id: string, controller: ControllerType, dateTime: string): Promise<boolean> {
+    async updateScriptControllerUploaded(scriptId: string, controllerId: number, dateTime: Date): Promise<boolean> {
 
         let success = true;
-        let sql = '';
 
-        switch (controller) {
-            case ControllerType.core:
-                sql = ScriptsTable.updateScriptCoreUploaded;
-                break;
-            case ControllerType.dome:
-                sql = ScriptsTable.updateScriptDomeUploaded;
-                break;
-            case ControllerType.body:
-                sql = ScriptsTable.updateScriptBodyUploaded;
-                break;
-        }
-
-        if (sql === '') {
-            logger.warn('invalid controller type to update script!');
-            return false;
-        }
-
-        await this.dao.run(sql, [dateTime, id])
+        await this.dao.run(ScriptsDeploymentTable.insert, [scriptId, controllerId.toString(), dateTime.toISOString()])
             .catch((err: any) => {
-                logger.error(`Exception updating script upload for controller: ${controller} => ${err}`);
+                logger.error(`Exception updating script upload for controller: ${controllerId} => ${err}`);
                 success = false;
             });
 
@@ -218,53 +214,61 @@ export class ScriptRepository {
 
     async saveScript(script: Script): Promise<boolean> {
 
-        const options: Intl.DateTimeFormatOptions = {
-            day: "numeric", month: "numeric", year: "numeric",
-            hour: "2-digit", minute: "2-digit", second: "2-digit"
-        };
+        await this.dao.run("BEGIN TRANSACTION", [])
 
-        const date = (new Date()).toLocaleString('en-US', options);
+        const date = new Date().toISOString()
+        try {
 
-        await this.dao.run(ScriptsTable.insert,
-            [script.id, script.scriptName,
-            script.description,
-                date,
-            script.coreUploaded.replace(',', ''),
-            script.domeUploaded.replace(',', ''),
-            script.bodyUploaded.replace(',', '')])
-            .then((val: any) => {
-                if (val) { logger.info(val); }
-            });
-
-        await this.dao.run(ScriptChannelsTable.deleteAllForScript, [script.id])
-            .then((val: any) => {
-                if (val) { logger.info(val); }
-            });
-        await this.dao.run(ScriptEventsTable.deleteAllForScript, [script.id])
-            .then((val: any) => {
-                if (val) { logger.info(val); }
-            });
-
-
-        for (const ch of script.scriptChannels) {
-
-            await this.dao.run(ScriptChannelsTable.insert, [ch.id,
-            script.id, ch.controllerType.toString(), ch.type.toString(), ch.subType.toString(), ch.channelNumber.toString()])
+            await this.dao.run(ScriptsTable.insert,
+                [script.id, script.scriptName,
+                script.description, date, "1"])
                 .then((val: any) => {
                     if (val) { logger.info(val); }
                 });
 
-            for (const kvp of ch.eventsKvpArray) {
-                const evt = kvp.value;
+            await this.dao.run(ScriptChannelsTable.deleteAllForScript, [script.id])
+                .then((val: any) => {
+                    if (val) { logger.info(val); }
+                });
 
-                if (evt) {
-                    await this.dao.run(ScriptEventsTable.insert,
-                        [script.id, evt.scriptChannel, evt.channelType.toString(), evt.channelSubType.toString(), evt.time.toString(), evt.dataJson])
+            await this.dao.run(ScriptEventsTable.deleteAllForScript, [script.id])
+                .then((val: any) => {
+                    if (val) { logger.info(val); }
+                });
+
+
+            for (const ch of script.scriptChannels) {
+
+                await this.dao.run(ScriptChannelsTable.insert, [ch.id,
+                script.id, ch.controllerId.toString(), ch.type.toString(), ch.subType.toString(), ch.channelNumber.toString()])
+                    .then((val: any) => {
+                        if (val) { logger.info(val); }
+                    });
+
+                for (const kvp of ch.eventsKvpArray) {
+                    const evt = kvp.value;
+
+                    if (evt) {
+                        await this.dao.run(ScriptEventsTable.insert,
+                            [script.id, evt.scriptChannel, evt.channelType.toString(), evt.channelSubType.toString(), evt.time.toString(), evt.dataJson])
+                            .then((val: any) => {
+                                if (val) { logger.info(val); }
+                            });
+                    }
+                }
+
+                for (const [key, value] of script.deploymentStatus) {
+                    await this.dao.run(ScriptsDeploymentTable.insert, [script.id, key.toString(), value.date.toISOString()])
                         .then((val: any) => {
                             if (val) { logger.info(val); }
                         });
                 }
             }
+
+        } catch (err) {
+            logger.error(err);
+            await this.dao.run("ROLLBACK", [])
+            return false;
         }
 
         return true;
@@ -292,13 +296,14 @@ export class ScriptRepository {
 
         script.id = this.generateScriptId(5);
         script.scriptName = script.scriptName + ' - copy'
-        for (const ch of script.scriptChannels) 
-        {
+        for (const ch of script.scriptChannels) {
             ch.id = Guid.create().toString();
-            for (const kvp of ch.eventsKvpArray){
+            for (const kvp of ch.eventsKvpArray) {
                 kvp.value.scriptChannel = ch.id;
             }
         }
+        script.deploymentStatus = new Map<number, { date: Date, status: any }>();
+        script.lastSaved = new Date();
 
         const success = await this.saveScript(script)
             .catch((err: any) => {
@@ -306,10 +311,7 @@ export class ScriptRepository {
             });
 
         result = new Script(script.id, script.scriptName,
-            script.description, script.lastSaved.replace(',', ''),
-            script.coreUploaded.replace(',', ''),
-            script.domeUploaded.replace(',', ''),
-            script.bodyUploaded.replace(',', ''))
+            script.description, new Date(script.lastSaved));
 
         return result;
     }

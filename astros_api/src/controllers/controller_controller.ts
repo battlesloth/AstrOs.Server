@@ -1,5 +1,5 @@
 
-import { ControlModule, ControllerType, ModuleCollection } from "astros-common";
+import { ControlModule, AstrOsModuleCollection } from "astros-common";
 import { DataAccess } from "../dal/data_access";
 import { ControllerRepository } from "../dal/repositories/controller_repository";
 import { logger } from "../logger";
@@ -14,20 +14,19 @@ export class ControllerController {
             const dao = new DataAccess();
             const repo = new ControllerRepository(dao);
 
-            const response =  new ModuleCollection();
+            const response = new AstrOsModuleCollection();
 
             const modules = await repo.getControllers();
 
-            for (const mod of modules)
-            {
-                switch (mod.id){
-                    case ControllerType.core:
+            for (const mod of modules) {
+                switch (mod.location) {
+                    case "core":
                         response.coreModule = mod;
                         break;
-                    case ControllerType.dome:
+                    case "dome":
                         response.domeModule = mod;
                         break;
-                    case ControllerType.body:
+                    case "body":
                         response.bodyModule = mod;
                         break;
                     default:
@@ -55,21 +54,21 @@ export class ControllerController {
             const repo = new ControllerRepository(dao);
 
             const controllers = new Array<ControlModule>();
-            
-            const modules = req.body as ModuleCollection;
 
-            if (modules.domeModule){
+            const modules = req.body as AstrOsModuleCollection;
+
+            if (modules.domeModule) {
                 controllers.push(modules.domeModule);
             }
-            
-            if (modules.coreModule){
+
+            if (modules.coreModule) {
                 controllers.push(modules.coreModule);
             }
-            
-            if (modules.bodyModule){
+
+            if (modules.bodyModule) {
                 controllers.push(modules.bodyModule);
             }
-            
+
             const success = await repo.saveControllers(controllers);
 
             if (success) {

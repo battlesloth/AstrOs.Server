@@ -2,62 +2,46 @@ import { UploadStatus } from "../astros_enums";
 import { ScriptChannel } from "./script_channel";
 
 
-export class Script{
-  
+export class Script {
+
     id: string;
     scriptName: string;
     description: string;
-    lastSaved: string;
-    
-    coreUploaded: string;
-    coreUploadStatus: UploadStatus;
+    lastSaved: Date;
 
-    domeUploaded: string;
-    domeUploadStatus: UploadStatus;
-    
-    bodyUploaded: string;
-    bodyUploadStatus: UploadStatus;
-    
+    // Map<ctl id, {date, status}>
+    deploymentStatus: Map<number, { date: Date, status: UploadStatus }>;
+
     scriptChannels: Array<ScriptChannel>;
 
     constructor(id: string,
         scriptName: string,
         description: string,
-        lastSaved: string,
-        coreUploaded: string,
-        domeUploaded: string,
-        bodyUploaded: string){
+        lastSaved: Date) {
         this.id = id;
         this.scriptName = scriptName;
         this.description = description;
         this.lastSaved = lastSaved;
-        this.coreUploaded = coreUploaded;
-        this.domeUploaded = domeUploaded;
-        this.bodyUploaded = bodyUploaded;
+        this.deploymentStatus = new Map<number, { date: Date, status: UploadStatus }>();
         this.scriptChannels = new Array<ScriptChannel>();
-
-        this.setStatus();
     }
 
-    private setStatus(){
-        this.isNewer(this.bodyUploaded, this.lastSaved) ?
-            this.bodyUploadStatus = UploadStatus.uploaded :
-            this.bodyUploadStatus = UploadStatus.notUploaded;    
-        
-
-        this.isNewer(this.domeUploaded, this.lastSaved) ?
-            this.domeUploadStatus = UploadStatus.uploaded :
-            this.domeUploadStatus = UploadStatus.notUploaded;    
-
-        this.isNewer(this.coreUploaded, this.lastSaved) ?
-            this.coreUploadStatus = UploadStatus.uploaded :
-            this.coreUploadStatus = UploadStatus.notUploaded;    
+    public setDeploymentDates(map: Map<number, Date>): void {
+        for (const [key, value] of map) {
+            this.updateDeployment(key, value);
+        }
     }
 
-    private isNewer(uploaded: string, saved: string): boolean {
-        const upD = new Date(uploaded);
-        const savedD = new Date(saved);
+    public setDeploymentDate(controllerId: number, date: Date): void {
+        this.updateDeployment(controllerId, date);
+    }
 
-        return (upD > savedD); 
+    public getStatus(controllerId: number): UploadStatus {
+        return this.deploymentStatus.get(controllerId).status;
+    }
+
+    public updateDeployment(controllerId: number, date: Date): void {
+        const status = date > this.lastSaved ? UploadStatus.uploaded : UploadStatus.notUploaded;
+        this.deploymentStatus.set(controllerId, { date: date, status: status });
     }
 }

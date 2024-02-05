@@ -1,5 +1,6 @@
 export {AudioFile} from './audio-file';
 export {ControlModule} from './control_module/control_module';
+export {AstrOsModuleCollection} from './astros_module_collection';
 export {ControlModuleStatus} from './control_module/control_module_status';
 export {I2cChannel} from './control_module/i2c_channel';
 export {I2cModule} from './control_module/i2c_module';
@@ -9,7 +10,6 @@ export {ServoChannel} from './control_module/servo_channel';
 export {ServoModule} from './control_module/servo_module';
 export {UartChannel} from './control_module/uart_channel';
 export {UartModule} from './control_module/uart_module';
-export {ModuleCollection} from './control_module/module_collection';
 export {Script} from './scripts/script';
 export {ScriptChannel} from './scripts/script_channel';
 export {ScriptEvent} from './scripts/script_event';
@@ -24,8 +24,8 @@ export {ScriptResponse} from './networking/script_response';
 export {M5Page, PageButton} from './remotes/M5Page';
 export {M5ScriptList} from './remotes/M5ScriptList';
 export {M5Button} from './remotes/M5Button';
-export {ControllerType, 
-    ChannelType, 
+export {AstrOsConstants} from './astros_constants';
+export {ChannelType, 
     ChannelSubType,
     UartType, 
     UploadStatus,

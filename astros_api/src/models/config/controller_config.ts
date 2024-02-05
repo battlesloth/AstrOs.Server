@@ -1,18 +1,22 @@
 import { ControlModule } from "astros-common";
 import { ServoConfig } from "./servo_config";
 
-export class ControllerConfig{
+export class ControllerConfig {
     id: number;
-    ip: string;
+    location: string;
+    name: string;
+    address: string;
     servoChannels: Array<ServoConfig>;
 
-    constructor(controller: ControlModule){
+    constructor(controller: ControlModule) {
         this.id = controller.id;
-        this.ip = controller.ipAddress;
+        this.location = controller.location;
+        this.name = controller.name;
+        this.address = controller.address;
 
         this.servoChannels = new Array<ServoConfig>();
-    
-        controller.servoModule.channels.forEach(ch =>{
+
+        controller.servoModule.channels.forEach(ch => {
             this.servoChannels.push(new ServoConfig(ch.id, ch.minPos, ch.maxPos, ch.enabled, ch.inverted));
         })
     }

@@ -1,19 +1,18 @@
-import { ControllerType } from "../astros_enums";
 import { BaseResponse } from "./base_response";
 import { TransmissionStatus, TransmissionType } from "../astros_enums";
 
 export class ScriptResponse extends BaseResponse{
  
     scriptId: string;
-    controllerType: ControllerType;
+    controllerId: number;
     status: TransmissionStatus
-    date: string;
+    date: Date;
 
-    constructor(scriptId: string, controllerType: ControllerType, status: TransmissionStatus, date: string){
+    constructor(scriptId: string, controllerId: number, status: TransmissionStatus, date: Date){
         super(TransmissionType.script, true, '');
 
         this.scriptId = scriptId;
-        this.controllerType = controllerType;
+        this.controllerId = controllerId;
         this.date = date;
     }
 }
