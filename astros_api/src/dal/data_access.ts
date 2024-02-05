@@ -175,7 +175,8 @@ export class DataAccess {
             })
             .catch((err) => console.error(`Error adding default admin: ${err}`));
 
-        await this.run(RemoteConfigTable.insert, ['m5page', JSON.stringify(new Array<M5Page>)]);
+        await this.run(RemoteConfigTable.insert, ['m5page', JSON.stringify(new Array<M5Page>)])
+            .then(() => { logger.info("Added default remote config") });
 
         // default controllers for AstrOs
         // TODO: refactor this so it's injected so we can make this app more generally useful
@@ -187,9 +188,9 @@ export class DataAccess {
         nameMap.set(AstrOsConstants.DOME, { location: AstrOsConstants.DOME, description: "Dome Surface Controller" });
         nameMap.set(AstrOsConstants.BODY, { location: AstrOsConstants.BODY, description: "Body Controller" });
 
-        for (const ctl of controllers) {
+        for await (const ctl of controllers) {
 
-            await this.run(ControllersTable.insert, [ctl, "", nameMap.get(ctl), "", ""])
+            await this.run(ControllersTable.insert, [ctl, ctl, nameMap.get(ctl).description, "", ""])
                 .catch((err) => console.error(`Error adding ${ctl} controller: ${err}`));
 
             let id = "0";
@@ -200,7 +201,8 @@ export class DataAccess {
 
             // add 3 uart modules per controller
             for (let i = 0; i < 3; i++) {
-                await this.run(UartModuleTable.insert, [id, i.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
+                await this.run(UartModuleTable.insert, [id, i.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())])
+                    .catch((err) => console.error(`Error adding uart module ${i} to ${ctl} controller: ${err}`));
             }
 
             for (let i = 0; i < 32; i++) {
@@ -219,6 +221,8 @@ export class DataAccess {
                         .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
                 }
             }
+
+            logger.info(`Added default controller ${ctl}`);
         }
 
         await this.run(SettingsTable.insert, ["version", "1"]).then(() => {
