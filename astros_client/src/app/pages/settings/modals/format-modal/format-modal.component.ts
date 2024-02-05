@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { ControllerType } from 'astros-common';
 import { ModalBaseComponent } from 'src/app/modal';
 import { ModalCallbackEvent } from 'src/app/shared/modal-resources';
 
@@ -16,23 +15,23 @@ export class FormatModalComponent extends ModalBaseComponent implements OnInit {
 
   constructor() {
     super();
-   }
+  }
 
   override ngOnInit(): void {
   }
 
-  ok(){
+  ok() {
 
     const result = new Array<number>();
 
-    if (this.core){
-      result.push(ControllerType.core);
+    if (this.core) {
+      result.push(1);
     }
-    if (this.dome){
-      result.push(ControllerType.dome);
+    if (this.dome) {
+      result.push(2);
     }
-    if (this.body){
-      result.push(ControllerType.body);
+    if (this.body) {
+      result.push(3);
     }
 
     this.modalCallback.emit({
@@ -41,7 +40,7 @@ export class FormatModalComponent extends ModalBaseComponent implements OnInit {
     })
   }
 
-  closeModal(){
-    this.modalCallback.emit({id: ModalCallbackEvent.close});
+  closeModal() {
+    this.modalCallback.emit({ id: ModalCallbackEvent.close });
   }
 }

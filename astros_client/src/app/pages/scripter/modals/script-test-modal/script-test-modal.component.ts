@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, OnInit } from '@angular/core';
-import { ControllerType, ScriptResponse, TransmissionStatus, TransmissionType } from 'astros-common';
+import { ScriptResponse, TransmissionStatus, TransmissionType } from 'astros-common';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 import { ModalResources } from 'src/app/shared/modal-resources';
@@ -8,9 +8,9 @@ import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.co
 @Component({
   selector: 'app-script-test-modal',
   templateUrl: './script-test-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./script-test-modal.component.scss']
+  styleUrls: ['../base-event-modal/base-event-modal.component.scss', './script-test-modal.component.scss']
 })
-export class ScriptTestModalComponent  extends BaseEventModalComponent implements OnInit, AfterViewInit {
+export class ScriptTestModalComponent extends BaseEventModalComponent implements OnInit, AfterViewInit {
 
   uploadInProgress: boolean = true;
   runDisabled: boolean = true;
@@ -19,12 +19,12 @@ export class ScriptTestModalComponent  extends BaseEventModalComponent implement
   domeUpload: TransmissionStatus = TransmissionStatus.sending;
   bodyUpload: TransmissionStatus = TransmissionStatus.sending;
 
-  coreCaption: any = {str: 'Uploading'};
-  domeCaption: any = {str: 'Uploading'};
-  bodyCaption: any = {str: 'Uploading'};
+  coreCaption: any = { str: 'Uploading' };
+  domeCaption: any = { str: 'Uploading' };
+  bodyCaption: any = { str: 'Uploading' };
 
   status: string;
-  
+
   scriptId: string = '';
 
   constructor(private socket: WebsocketService, private scriptService: ScriptsService) {
@@ -38,7 +38,7 @@ export class ScriptTestModalComponent  extends BaseEventModalComponent implement
     });
 
   }
-  
+
   override ngOnInit(): void {
     this.scriptId = this.resources.get(ModalResources.scriptId);
 
@@ -56,51 +56,51 @@ export class ScriptTestModalComponent  extends BaseEventModalComponent implement
       }
     };
 
-    if (this.scriptId != ''){
+    if (this.scriptId != '') {
       this.scriptService.uploadScript(this.scriptId).subscribe(observer);
     }
     else {
       this.status = 'Script ID missing, close dialog to continue.'
     }
   }
-  
+
   ngAfterViewInit(): void {
-   
+
   }
 
-  runClicked(){
-      console.log(`Running script: ${this.scriptId}`)
-      this.scriptService.runScript(this.scriptId).subscribe();
-      this.closeModal();
+  runClicked() {
+    console.log(`Running script: ${this.scriptId}`)
+    this.scriptService.runScript(this.scriptId).subscribe();
+    this.closeModal();
   }
 
-  statusUpdate(msg: ScriptResponse){
-    switch (msg.controllerType){
-      case ControllerType.core:
+  statusUpdate(msg: ScriptResponse) {
+    switch (msg.controllerId) {
+      case 1:
         this.coreUpload = msg.status;
         this.setCaption(this.coreCaption, msg.status);
         break;
-      case ControllerType.dome:
+      case 2:
         this.domeUpload = msg.status;
         this.setCaption(this.domeCaption, msg.status);
         break;
-      case ControllerType.body:
+      case 3:
         this.bodyUpload = msg.status;
         this.setCaption(this.bodyCaption, msg.status);
         break;
-    }    
+    }
 
-    if (this.coreUpload > 1 && this.domeUpload > 1 && this.bodyUpload > 1){
+    if (this.coreUpload > 1 && this.domeUpload > 1 && this.bodyUpload > 1) {
       this.status = "Upload Complete."
       this.uploadInProgress = false;
-      if (this.coreUpload + this.domeUpload + this.bodyUpload > 6){
+      if (this.coreUpload + this.domeUpload + this.bodyUpload > 6) {
         this.runDisabled = false;
       }
     }
   }
 
-  setCaption(caption: any, status: TransmissionStatus){
-    switch (status){
+  setCaption(caption: any, status: TransmissionStatus) {
+    switch (status) {
       case TransmissionStatus.success:
         caption.str = "Success"
         break;

@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, ControllerType, ControllerStatus, ModuleCollection } from 'astros-common';
+import { ControlModule, ControllerStatus, AstrOsModuleCollection, AstrOsConstants } from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { StatusService } from 'src/app/services/status/status.service';
@@ -38,9 +38,9 @@ export class ModulesComponent implements OnInit, AfterViewInit {
     private renderer: Renderer2,
     private status: StatusService) {
 
-    this.coreModule = new ControlModule(ControllerType.core, 'Core Dome Module', '');
-    this.domeModule = new ControlModule(ControllerType.dome, 'Outer Dome Module', '');
-    this.bodyModule = new ControlModule(ControllerType.body, 'Body Module', '');
+    this.coreModule = new ControlModule(1, AstrOsConstants.CORE, AstrOsConstants.CORE, 'Core Dome Module', '', '');
+    this.domeModule = new ControlModule(2, AstrOsConstants.DOME, AstrOsConstants.DOME, 'Outer Dome Module', '', '');
+    this.bodyModule = new ControlModule(3, AstrOsConstants.BODY, AstrOsConstants.BODY, 'Body Module', '', '');
 
     this.status.coreStateObserver.subscribe(value => this.handleStatus(value, this.coreEl, this.coreCaption));
     this.status.domeStateObserver.subscribe(value => this.handleStatus(value, this.domeEl, this.domeCaption));
@@ -80,7 +80,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       }
     };
 
-    this.controllerService.saveControllers(new ModuleCollection(this.coreModule, this.domeModule, this.bodyModule))
+    this.controllerService.saveControllers(new AstrOsModuleCollection(this.coreModule, this.domeModule, this.bodyModule))
       .subscribe(observer);
   }
 
@@ -105,7 +105,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       .subscribe(observer);
   }
 
-  private parseModules(modules: ModuleCollection) {
+  private parseModules(modules: AstrOsModuleCollection) {
     try {
       this.coreModule = modules.coreModule ?? this.coreModule;
       this.domeModule = modules.domeModule ?? this.domeModule;

@@ -23,13 +23,29 @@
             }
         },
         {
-            "label": "move commons package",
+            "label": "move commons to api",
             "type": "shell",
             "command": "",
             "windows": {
                 "command": "rm -R ${workspaceFolder}/astros_api/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_api/node_modules/astros-common -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/package.json",
             },
             "dependsOn": "build commons"
+        },
+        {
+            "label": "move commons to client",
+            "type": "shell",
+            "command": "",
+            "windows": {
+                "command": "rm -R ${workspaceFolder}/astros_client/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_client/node_modules/astros-common -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/package.json",
+            },
+            "dependsOn": "build commons"
+        },
+        {
+            "label": "move commons package",
+            "dependsOn":[
+                "move commons to api",
+                "move commons to client"
+            ]
         },
         {
             "label": "lint and build",

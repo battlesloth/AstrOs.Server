@@ -1,7 +1,7 @@
 import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { faCopy, faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
-import { ControllerType, Script, ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
+import { Script, ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
@@ -164,9 +164,6 @@ export class ScriptsComponent implements OnInit {
       error: (err: any) => {
         console.error(err);
         this.snackBarService.okToast('Error requesting upload. Check logs.');
-        this.scripts[idx].coreUploadStatus = UploadStatus.notUploaded;
-        this.scripts[idx].domeUploadStatus = UploadStatus.notUploaded;
-        this.scripts[idx].bodyUploadStatus = UploadStatus.notUploaded;
       }
     };
 
@@ -177,10 +174,6 @@ export class ScriptsComponent implements OnInit {
     if (idx < 0) {
       return;
     }
-
-    this.scripts[idx].coreUploadStatus = UploadStatus.uploading;
-    this.scripts[idx].domeUploadStatus = UploadStatus.uploading;
-    this.scripts[idx].bodyUploadStatus = UploadStatus.uploading;
 
     this.scriptService.uploadScript(id).subscribe(observer);
   }
@@ -208,44 +201,9 @@ export class ScriptsComponent implements OnInit {
       return;
     }
 
-    switch (msg.controllerType as ControllerType) {
-      case ControllerType.core:
-        if (msg.status === TransmissionStatus.success) {
-          this.scripts[idx].coreUploaded = msg.date;
-          this.scripts[idx].coreUploadStatus = UploadStatus.uploaded;
-        }
-        else if (msg.status === TransmissionStatus.sending) {
-          this.scripts[idx].coreUploadStatus = UploadStatus.uploading;
-        }
-        else if (msg.status === TransmissionStatus.failed) {
-          this.scripts[idx].coreUploadStatus = UploadStatus.notUploaded;
-        }
-        break;
-      case ControllerType.dome:
-        if (msg.status === TransmissionStatus.success) {
-          this.scripts[idx].domeUploaded = msg.date;
-          this.scripts[idx].domeUploadStatus = UploadStatus.uploaded;
-        }
-        else if (msg.status === TransmissionStatus.sending) {
-          this.scripts[idx].domeUploadStatus = UploadStatus.uploading;
-
-        }
-        else if (msg.status === TransmissionStatus.failed) {
-          this.scripts[idx].domeUploadStatus = UploadStatus.notUploaded;
-        }
-        break;
-      case ControllerType.body:
-        if (msg.status === TransmissionStatus.success) {
-          this.scripts[idx].bodyUploaded = msg.date;
-          this.scripts[idx].bodyUploadStatus = UploadStatus.uploaded;
-        }
-        else if (msg.status === TransmissionStatus.sending) {
-          this.scripts[idx].bodyUploadStatus = UploadStatus.uploading;
-        }
-        else if (msg.status === TransmissionStatus.failed) {
-          this.scripts[idx].bodyUploadStatus = UploadStatus.notUploaded;
-        }
-        break;
+    if (msg.status === TransmissionStatus.success) {
+      this.scripts[idx].setDeploymentDate(msg.controllerId, msg.date);
     }
+
   }
 }

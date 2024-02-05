@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelSubType, ChannelType, ControllerType, ControlModule, I2cChannel, KangarooController, ModuleCollection, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartChannel, UartModule, UartType } from 'astros-common';
+import { ChannelSubType, ChannelType, ControlModule, I2cChannel, KangarooController, AstrOsModuleCollection, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartChannel, UartModule, UartType } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -89,7 +89,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   ngOnInit(): void {
     const csObserver = {
-      next: (result: ModuleCollection) => {
+      next: (result: AstrOsModuleCollection) => {
 
         const modules = new Array<ControlModule>();
 
@@ -98,7 +98,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         if (result.coreModule)
           modules.push(result.coreModule);
         if (result.bodyModule)
-         modules.push(result.bodyModule);
+          modules.push(result.bodyModule);
 
         this.scriptResources = new ScriptResources(modules);
         this.resourcesLoaded = true;
@@ -112,10 +112,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       this.scriptId = this.generateScriptId(5);
       console.log(`new script id:${this.scriptId}`);
       this.script = new Script(this.scriptId, "",
-        "", "1970-01-01 00:00:00.000",
-        "1970-01-01 00:00:00.000",
-        "1970-01-01 00:00:00.000",
-        "1970-01-01 00:00:00.000");
+        "", new Date(Date.parse("1970-01-01 00:00:00.000")));
 
       this.scriptChannels = this.script.scriptChannels;
     }
@@ -237,7 +234,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
 
-  sendChannelTest(controller: ControllerType, commandType: ChannelType, command: any) {
+  sendChannelTest(controllerId: number, commandType: ChannelType, command: any) {
 
     const observer = {
       next: (result: any) => {
@@ -255,7 +252,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       }
     };
 
-    this.controllerService.sendControllerCommand(controller, commandType, command)
+    this.controllerService.sendControllerCommand(controllerId, commandType, command)
       .subscribe(observer);
   }
 
@@ -346,7 +343,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     switch (event.channelType) {
       case ChannelType.uart:
-        switch (event.channelSubType){
+        switch (event.channelSubType) {
           case ChannelSubType.genericSerial:
             component = this.container.createComponent(UartEventModalComponent)
             modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
@@ -354,13 +351,13 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
           case ChannelSubType.kangaroo:
             component = this.container.createComponent(KangarooEventModalComponent)
             modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
-            modalResources.set(ModalResources.kangaroo, this.getKangarooControllerFromChannel(event.scriptChannel));     
+            modalResources.set(ModalResources.kangaroo, this.getKangarooControllerFromChannel(event.scriptChannel));
             break;
           case ChannelSubType.humanCyborgRelations:
             component = this.container.createComponent(HumanCyborgModalComponent)
             modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
             break;
-        }  
+        }
         break;
       case ChannelType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);
@@ -385,15 +382,15 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   //#region resources for modals 
-  getUartChannelFromChannel(channelId: string): any{
+  getUartChannelFromChannel(channelId: string): any {
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(channelId);
 
-      if (chIdx > -1){
-        const uart = this.scriptChannels[chIdx].channel as UartChannel;
-        return uart.id;  
-      }
+    if (chIdx > -1) {
+      const uart = this.scriptChannels[chIdx].channel as UartChannel;
+      return uart.id;
+    }
   }
 
   getKangarooControllerFromChannel(channelId: string): any {
@@ -512,7 +509,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       this.scriptChannels.splice(chIdx, 1);
 
       this.scriptResources.removeChannel(
-        channel.controllerType,
+        channel.controllerId,
         channel.type,
         channel.channel?.id
       );
@@ -538,7 +535,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       modalResources.set(ModalResources.channelType, ch.type);
       modalResources.set(ModalResources.channelSubType, ch.subType);
       modalResources.set(ModalResources.channelId, ch.channelNumber);
-      modalResources.set(ModalResources.controllerType, ch.controllerType);
+      modalResources.set(ModalResources.controllerType, ch.controllerId);
 
       const component = this.container.createComponent(ChannelTestModalComponent);
 
@@ -554,26 +551,26 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   //#endregion
 
-  private addChannel(controller: ControllerType, channelType: ChannelType, channels: Array<number>): void {
+  private addChannel(controllerId: number, channelType: ChannelType, channels: Array<number>): void {
 
-    let name = this.scriptResources.controllers.get(controller)?.name;
+    let name = this.scriptResources.controllers.get(controllerId)?.name;
 
     if (!name) {
       name = ''
     }
 
     if (channelType === ChannelType.audio) {
-      const chValue = this.scriptResources.addChannel(controller, channelType, 0);
+      const chValue = this.scriptResources.addChannel(controllerId, channelType, 0);
 
       let subType = 0;
 
-      const ch = new ScriptChannel(Guid.create().toString(), controller, name!, channelType, subType, 0, chValue, this.segments);
+      const ch = new ScriptChannel(Guid.create().toString(), this.scriptId, controllerId, channelType, subType, 0, chValue, this.segments);
 
       this.scriptChannels.push(ch);
     }
     else {
       channels.forEach(channel => {
-        const chValue = this.scriptResources.addChannel(controller, channelType, +channel);
+        const chValue = this.scriptResources.addChannel(controllerId, channelType, +channel);
 
         let subType = 0;
 
@@ -581,7 +578,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
           subType = chValue.type;
         }
 
-        const ch = new ScriptChannel(Guid.create().toString(), controller, name!, channelType, subType, channel, chValue, this.segments);
+        const ch = new ScriptChannel(Guid.create().toString(), this.scriptId, controllerId, channelType, subType, channel, chValue, this.segments);
 
         this.scriptChannels.push(ch);
       });
@@ -603,10 +600,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   private editEvent(event: ScriptEvent, oldTime: number) {
     //if (event.time !== oldTime) {
-      this.removeEvent(event.scriptChannel, oldTime);
-      this.addEvent(event);
-   // }
-   // else {
+    this.removeEvent(event.scriptChannel, oldTime);
+    this.addEvent(event);
+    // }
+    // else {
 
     //  const chIdx = this.scriptChannels
     //    .map((ch) => { return ch.id })
@@ -666,7 +663,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   private channelCompare(a: ScriptChannel, b: ScriptChannel) {
-    let val = a.controllerType - b.controllerType;
+    let val = a.controllerId - b.controllerId;
 
     if (val !== 0) {
       return val;

@@ -1,15 +1,17 @@
 
 import { ContentObserver } from "@angular/cdk/observers";
-import { ChannelType, ControllerType, ControlModule, 
-    I2cChannel, ServoChannel, UartModule, 
-    UartType, Script, UartChannel } from "astros-common";
+import {
+    ChannelType, ControlModule,
+    I2cChannel, ServoChannel, UartModule,
+    UartType, Script, UartChannel
+} from "astros-common";
 
 export class ControllerDetails {
-    id: ControllerType;
+    id: number;
     name: string;
     //type:name
 
-    constructor(id: ControllerType, name: string) {
+    constructor(id: number, name: string) {
         this.id = id;
         this.name = name;
     }
@@ -29,24 +31,24 @@ export class ScriptResources {
 
     private loaded = false;
 
-    controllers: Map<ControllerType, ControllerDetails>;
-    
-    uartChannels: Map<ControllerType, Array<ChannelValue>>;
+    controllers: Map<number, ControllerDetails>;
 
-    servoChannels: Map<ControllerType, Array<ChannelValue>>;
+    uartChannels: Map<number, Array<ChannelValue>>;
 
-    i2cChannels: Map<ControllerType, Array<ChannelValue>>;
+    servoChannels: Map<number, Array<ChannelValue>>;
+
+    i2cChannels: Map<number, Array<ChannelValue>>;
 
     constructor(controllers: Array<ControlModule>) {
-        this.controllers = new Map<ControllerType, ControllerDetails>();
-        this.servoChannels = new Map<ControllerType, Array<any>>();
-        this.i2cChannels = new Map<ControllerType, Array<any>>();
-        this.uartChannels = new Map<ControllerType, Array<any>>();
+        this.controllers = new Map<number, ControllerDetails>();
+        this.servoChannels = new Map<number, Array<any>>();
+        this.i2cChannels = new Map<number, Array<any>>();
+        this.uartChannels = new Map<number, Array<any>>();
 
-        this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback'));
+        this.controllers.set(4, new ControllerDetails(4, 'Audio Playback'));
 
         controllers.forEach(con => {
-  
+
 
             this.controllers.set(con.id, new ControllerDetails(con.id, con.name));
 
@@ -65,43 +67,43 @@ export class ScriptResources {
         script.scriptChannels.forEach(ch => {
             switch (ch.type) {
                 case ChannelType.uart:
-                    const uartIdx = this.uartChannels.get(ch.controllerType)?.findIndex(x => x.channel.id === ch.channel.id);
+                    const uartIdx = this.uartChannels.get(ch.controllerId)?.findIndex(x => x.channel.id === ch.channel.id);
                     if (uartIdx != undefined && uartIdx > -1) {
-                        this.uartChannels.get(ch.controllerType)![uartIdx].available = false;
+                        this.uartChannels.get(ch.controllerId)![uartIdx].available = false;
                     }
                     break;
                 case ChannelType.servo:
-                    this.servoChannels.get(ch.controllerType)![ch.channel.id].available = false;
+                    this.servoChannels.get(ch.controllerId)![ch.channel.id].available = false;
                     break;
                 case ChannelType.i2c:
-                    this.i2cChannels.get(ch.controllerType)![ch.channel.id].available = false;
+                    this.i2cChannels.get(ch.controllerId)![ch.channel.id].available = false;
                     break;
                 case ChannelType.audio:
-                    this.controllers.delete(ControllerType.audio);
+                    this.controllers.delete(4);
                     break;
             }
         });
     }
 
-    getAvailableModules(): Map<ControllerType, Map<ChannelType, string>> {
-        const result = new Map<ControllerType, Map<ChannelType, string>>();
+    getAvailableModules(): Map<number, Map<ChannelType, string>> {
+        const result = new Map<number, Map<ChannelType, string>>();
 
         for (const ctrl of this.controllers.keys()) {
-            if (ctrl === ControllerType.audio || ctrl === ControllerType.none){
+            if (ctrl === 4 || ctrl === 0) {
                 continue;
             }
-                    
+
             result.set(ctrl, this.setModuleValues(ctrl));
         }
 
         return result;
     }
 
-    getAvailableChannels(): Map<ControllerType, Map<ChannelType, Array<ChannelValue>>> {
-        const result = new Map<ControllerType, Map<ChannelType, any>>()
+    getAvailableChannels(): Map<number, Map<ChannelType, Array<ChannelValue>>> {
+        const result = new Map<number, Map<ChannelType, any>>()
 
-        for (const ctrl of this.controllers.keys()){
-            if (ctrl === ControllerType.audio || ctrl === ControllerType.none){
+        for (const ctrl of this.controllers.keys()) {
+            if (ctrl === 4 || ctrl === 0) {
                 continue;
             }
 
@@ -110,27 +112,27 @@ export class ScriptResources {
             vals.set(ChannelType.servo, this.servoChannels.get(ctrl));
             vals.set(ChannelType.i2c, this.i2cChannels.get(ctrl));
             vals.set(ChannelType.uart, this.uartChannels.get(ctrl));
-    
+
             result.set(ctrl, vals);
         }
 
         return result;
     }
 
-    private setModuleValues(controler: ControllerType): Map<ChannelType, string> {
+    private setModuleValues(controler: number): Map<ChannelType, string> {
         const vals = new Map<ChannelType, string>();
 
         vals.set(ChannelType.servo, "Servo");
         vals.set(ChannelType.i2c, "I2C");
         vals.set(ChannelType.uart, "Serial");
-        
+
         return vals;
     }
 
-    addChannel(controller: ControllerType, type: ChannelType, id: number): any {
+    addChannel(controller: number, type: ChannelType, id: number): any {
 
-        if (controller === ControllerType.audio) {
-            this.controllers.delete(ControllerType.audio);
+        if (controller === 4) {
+            this.controllers.delete(4);
             return undefined;
         }
 
@@ -161,10 +163,10 @@ export class ScriptResources {
         return undefined;
     }
 
-    removeChannel(controller: ControllerType, type: ChannelType, id: number): void {
+    removeChannel(controller: number, type: ChannelType, id: number): void {
 
-        if (controller === ControllerType.audio) {
-            this.controllers.set(ControllerType.audio, new ControllerDetails(ControllerType.audio, 'Audio Playback'))
+        if (controller === 4) {
+            this.controllers.set(4, new ControllerDetails(4, 'Audio Playback'))
             return
         }
 

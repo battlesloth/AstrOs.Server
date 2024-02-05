@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { ControllerStatus, ControllerType, StatusResponse, TransmissionType } from 'astros-common';
+import { ControllerStatus, AstrOsConstants, StatusResponse, TransmissionType } from 'astros-common';
 import { Subject, throwError } from 'rxjs';
 import { WebsocketService } from '../websocket/websocket.service';
 
@@ -46,14 +46,14 @@ export class StatusService {
 
   statusUpdate(status: StatusResponse) {
     {
-      switch (status.controllerType) {
-        case ControllerType.core:
+      switch (status.controllerLocation) {
+        case AstrOsConstants.CORE:
           this.setStatus(status, this.coreStateObserver);
           break;
-        case ControllerType.dome:
+        case AstrOsConstants.DOME:
           this.setStatus(status, this.domeStateObserver);
           break;
-        case ControllerType.body:
+        case AstrOsConstants.BODY:
           this.setStatus(status, this.bodyStateObserver);
           break;
       }

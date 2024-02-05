@@ -24,8 +24,7 @@
                 </mat-expansion-panel-header>
                 <ng-container>
                     <div class="ip-input">
-                        <input name="coreIp" matInput placeholder="IP Address" [(ngModel)]="coreModule.ipAddress"
-                        pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" />        
+                        <input name="coreIp" matInput placeholder="Fix Me" [(ngModel)]="coreModule.name"/>        
                     </div>
                     <app-esp-module [module]="coreModule"></app-esp-module>
                 </ng-container>
@@ -40,8 +39,7 @@
                 </mat-expansion-panel-header>
                 <ng-container>
                     <div class="ip-input">
-                        <input name="domeIp" matInput placeholder="IP Address" [(ngModel)]="domeModule.ipAddress"
-                        pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" />        
+                        <input name="domeIp" matInput placeholder="Fix Me" [(ngModel)]="domeModule.name"/>        
                     </div>
                     <app-esp-module [module]="domeModule"></app-esp-module>
                 </ng-container>
@@ -56,8 +54,7 @@
                 </mat-expansion-panel-header>
                 <ng-container>
                     <div class="ip-input">
-                        <input name="bodyIp" matInput placeholder="IP Address" [(ngModel)]="bodyModule.ipAddress"
-                        pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" />        
+                        <input name="bodyIp" matInput placeholder="Fix Me" [(ngModel)]="bodyModule.name" />        
                     </div>
                     <app-esp-module [module]="bodyModule"></app-esp-module>
                 </ng-container>
