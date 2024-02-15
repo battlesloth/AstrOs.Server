@@ -1,25 +1,25 @@
 
-import { ControlModule, AstrOsModuleCollection } from "astros-common";
+import { ControlModule, AstrOsLocationCollection } from "astros-common";
 import { DataAccess } from "../dal/data_access";
-import { ControllerRepository } from "../dal/repositories/controller_repository";
 import { logger } from "../logger";
+import { LocationsRepository } from "../dal/repositories/locations_repository";
 
-export class ControllerController {
+export class LocationsController {
 
-    public static route = '/controllers/';
-    public static syncRoute = '/controllers/sync'
+    public static route = '/locations/';
+    public static syncRoute = '/locations/sync'
 
-    public static async getControllers(req: any, res: any, next: any) {
+    public static async getLocations(req: any, res: any, next: any) {
         try {
             const dao = new DataAccess();
-            const repo = new ControllerRepository(dao);
+            const repo = new LocationsRepository(dao);
 
-            const response = new AstrOsModuleCollection();
+            const response = new AstrOsLocationCollection();
 
-            const modules = await repo.getControllers();
+            const modules = await repo.getLocations();
 
             for (const mod of modules) {
-                switch (mod.location) {
+                switch (mod.locationName) {
                     case "core":
                         response.coreModule = mod;
                         break;
@@ -48,28 +48,28 @@ export class ControllerController {
         }
     }
 
-    public static async saveControllers(req: any, res: any, next: any) {
+    public static async saveLocations(req: any, res: any, next: any) {
         try {
             const dao = new DataAccess();
-            const repo = new ControllerRepository(dao);
+            const repo = new LocationsRepository(dao);
 
             const controllers = new Array<ControlModule>();
 
-            const modules = req.body as AstrOsModuleCollection;
+            const modules = req.body as AstrOsLocationCollection;
+
+            let success = false;
 
             if (modules.domeModule) {
-                controllers.push(modules.domeModule);
+                success = await repo.updateLocation(modules.domeModule) && success;
             }
 
             if (modules.coreModule) {
-                controllers.push(modules.coreModule);
+                success = await repo.updateLocation(modules.coreModule) && success;
             }
 
             if (modules.bodyModule) {
-                controllers.push(modules.bodyModule);
+                success = await repo.updateLocation(modules.bodyModule) && success;
             }
-
-            const success = await repo.saveControllers(controllers);
 
             if (success) {
                 res.status(200);

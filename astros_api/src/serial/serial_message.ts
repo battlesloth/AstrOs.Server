@@ -1,15 +1,50 @@
 
 export enum SerialMessageType {
-    error,
-    heartbeat,
-    sync,
-    syncAck,
-    scriptRun,
-    scriptRunAck,
-    scriptRunNak
+    UNKNOWN,
+    REGISTRATION_SYNC, // from web server
+    REGISTRATION_SYNC_ACK,
+    POLL_ACK,
+    POLL_NAK,
+    DEPLOY_SCRIPT, // from web server
+    DEPLOY_SCRIPT_ACK,
+    DEPLOY_SCRIPT_NAK,
+    RUN_SCRIPT, // from web server
+    RUN_SCRIPT_ACK,
+    RUN_SCRIPT_NAK,
+    RUN_COMMAND, // from web server
+    RUN_COMMAND_ACK,
+    RUN_COMMAND_NAK
 }
 
-export class SerialMessage {        
+export class SerialMsgConst {
+    static readonly REGISTRATION_SYNC = "REGISTRATION_SYNC";
+    static readonly REGISTRATION_SYNC_ACK = "REGISTRATION_SYNC_ACK";
+    static readonly POLL_ACK = "POLL_ACK";
+    static readonly POLL_NAK = "POLL_NAK";
+    static readonly DEPLOY_SCRIPT = "DEPLOY_SCRIPT";
+    static readonly DEPLOY_SCRIPT_ACK = "DEPLOY_SCRIPT_ACK";
+    static readonly DEPLOY_SCRIPT_NAK = "DEPLOY_SCRIPT_NAK";
+    static readonly RUN_SCRIPT = "RUN_SCRIPT";
+    static readonly RUN_SCRIPT_ACK = "RUN_SCRIPT_ACK";
+    static readonly RUN_SCRIPT_NAK = "RUN_SCRIPT_NAK";
+    static readonly RUN_COMMAND = "RUN_COMMAND";
+    static readonly RUN_COMMAND_ACK = "RUN_COMMAND_ACK";
+    static readonly RUN_COMMAND_NAK = "RUN_COMMAND_NAK";
+}
+
+export class SerialMsgValidationResult {
+    public valid: boolean;
+    public type: SerialMessageType;
+    public id: string;
+
+    constructor() {
+        this.valid = false;
+        this.type = SerialMessageType.UNKNOWN;
+        this.id = "";
+    }
+}
+
+export class SerialMessage {
     public type: SerialMessageType;
     public node: string;
     public payload: string;

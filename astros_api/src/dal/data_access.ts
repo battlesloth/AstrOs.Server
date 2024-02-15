@@ -16,6 +16,8 @@ import { UartModuleTable } from "./tables/uart_module_table";
 import { logger } from "../logger";
 import { RemoteConfigTable } from "./tables/remote_config_table";
 import { ScriptsDeploymentTable } from "./tables/scripts_deployment_table";
+import { LocationsTable } from "./tables/locations_table";
+import e from "express";
 
 
 
@@ -68,7 +70,18 @@ export class DataAccess {
             logger.info('Setting up database...');
 
             await this.setupV1Tables()
-                .then(async () => await this.setV1Values());
+                .catch((err) => {
+                    console.error(`Error setting up database: ${err}`);
+                    this.deleteDbFile();
+                    throw err;
+                });
+
+            await this.setV1Values()
+                .catch((err) => {
+                    console.error(`Error setting up initial database values: ${err}`);
+                    this.deleteDbFile();
+                    throw err;
+                });
 
             version = 1;
             logger.info('Database set up complete!');
@@ -142,6 +155,8 @@ export class DataAccess {
 
         await this.createTable(UsersTable.table, UsersTable.create);
 
+        await this.createTable(LocationsTable.table, LocationsTable.create);
+
         await this.createTable(ControllersTable.table, ControllersTable.create);
 
         await this.createTable(UartModuleTable.table, UartModuleTable.create);
@@ -173,41 +188,60 @@ export class DataAccess {
             .then(() => {
                 logger.info("Added default admin")
             })
-            .catch((err) => console.error(`Error adding default admin: ${err}`));
+            .catch((err) => {
+                console.error(`Error adding default admin: ${err}`);
+                throw err;
+            });
 
         await this.run(RemoteConfigTable.insert, ['m5page', JSON.stringify(new Array<M5Page>)])
-            .then(() => { logger.info("Added default remote config") });
+            .then(() => { logger.info("Added default remote config") })
+            .catch((err) => {
+                console.error(`Error adding default remote config: ${err}`);
+                throw err;
+            });
 
-        // default controllers for AstrOs
+        // default locations for AstrOs
         // TODO: refactor this so it's injected so we can make this app more generally useful
 
-        const controllers = [AstrOsConstants.CORE, AstrOsConstants.DOME, AstrOsConstants.BODY];
+        const locations = [AstrOsConstants.CORE, AstrOsConstants.DOME, AstrOsConstants.BODY];
 
         const nameMap = new Map();
-        nameMap.set(AstrOsConstants.CORE, { location: AstrOsConstants.CORE, description: "Dome Core Controller" });
-        nameMap.set(AstrOsConstants.DOME, { location: AstrOsConstants.DOME, description: "Dome Surface Controller" });
-        nameMap.set(AstrOsConstants.BODY, { location: AstrOsConstants.BODY, description: "Body Controller" });
+        nameMap.set(AstrOsConstants.CORE, "Dome Core Controller");
+        nameMap.set(AstrOsConstants.DOME, "Dome Surface Controller");
+        nameMap.set(AstrOsConstants.BODY, "Body Controller");
 
-        for await (const ctl of controllers) {
+        for await (const loc of locations) {
 
-            await this.run(ControllersTable.insert, [ctl, ctl, nameMap.get(ctl).description, "", ""])
-                .catch((err) => console.error(`Error adding ${ctl} controller: ${err}`));
+            let id = "";
 
-            let id = "0";
-
-            await this.get(ControllersTable.selectIdByLocation, [ctl])
+            await this.get(LocationsTable.insert, [loc, nameMap.get(loc), ""])
                 .then((result: any) => { id = result[0].id.toString(); })
-                .catch((err) => console.error(`Error getting id for ${ctl} controller: ${err}`));
+                .catch((err) => {
+                    console.error(`Error adding ${loc} location: ${err}`);
+                    throw err;
+                });
+
+            if (id === "") {
+                logger.error(`Error adding ${loc} location`);
+                throw new Error(`Error adding ${loc} location`);
+            }
 
             // add 3 uart modules per controller
             for (let i = 0; i < 3; i++) {
                 await this.run(UartModuleTable.insert, [id, i.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())])
-                    .catch((err) => console.error(`Error adding uart module ${i} to ${ctl} controller: ${err}`));
+                    .catch((err) => {
+                        console.error(`Error adding uart module ${i} to ${loc} location:: ${err}`);
+                        throw err;
+                    });
             }
 
             for (let i = 0; i < 32; i++) {
-                await this.run(ServoChannelsTable.insert, [id, i.toString(), "unassigned", "0", "0", "0"])
-                    .catch((err) => console.error(`Error adding servo channel ${i}: ${err}`))
+                await this.run(ServoChannelsTable.insert, [id, i.toString(), "unassigned", "0", "0", "0", "0"])
+                    .catch((err) => {
+                        console.error(`Error adding servo channel ${i}: ${err}`);
+                        throw err;
+                    })
+                logger.info(`Added default servo channel ${i} to location ${loc}`);
             }
 
             for (let i = 0; i < 128; i++) {
@@ -215,14 +249,20 @@ export class DataAccess {
                 // reserved for PWM module
                 if (i === 64 || i === 65) {
                     await this.run(I2cChannelsTable.insert, [id, i.toString(), "reserved", '0'])
-                        .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
+                        .catch((err) => {
+                            console.error(`Error adding i2c channel ${i}: ${err}`);
+                            throw err;
+                        })
                 } else {
                     await this.run(I2cChannelsTable.insert, [id, i.toString(), "unassigned", '0'])
-                        .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
+                        .catch((err) => {
+                            console.error(`Error adding i2c channel ${i}: ${err}`);
+                            throw err
+                        });
                 }
             }
 
-            logger.info(`Added default controller ${ctl}`);
+            logger.info(`Added default location ${loc}, id: ${id}`);
         }
 
         await this.run(SettingsTable.insert, ["version", "1"]).then(() => {
@@ -230,6 +270,7 @@ export class DataAccess {
         })
             .catch((err) => {
                 logger.error(`Error updating database version: ${err}`);
+                throw err;
             });
     }
 
@@ -239,7 +280,7 @@ export class DataAccess {
                 logger.info(`Created ${tableName} table`)
             })
             .catch((err) => {
-                logger.error(`Error creating ${tableName} table: ${err}`);
+                throw err;
             });
     }
 
@@ -278,5 +319,19 @@ export class DataAccess {
             .catch((err) => {
                 logger.error(`Error updating database version in settings table: ${err}`);
             });
+    }
+
+
+    private async deleteDbFile(): Promise<void> {
+        logger.info('Deleting database file');
+        if (fs.existsSync(`${this.appdataPath}${this.databaseFile}`)) {
+
+            fs.unlink(`${this.appdataPath}${this.databaseFile}`, (err) => {
+                if (err) throw err;
+                logger.info('deleted database file');
+            });
+        } else {
+            logger.info(`Database file ${this.appdataPath}${this.databaseFile} does not exist`);
+        }
     }
 }

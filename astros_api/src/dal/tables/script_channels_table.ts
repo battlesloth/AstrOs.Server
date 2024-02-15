@@ -5,7 +5,7 @@ export class ScriptChannelsTable {
     public static readonly table = 'script_channels';
     public static readonly id = 'id';
     public static readonly scriptId = 'scriptId';
-    public static readonly controllerId = 'controllerId';
+    public static readonly locationId = 'locationId';
     public static readonly type = 'type';
     public static readonly subType = 'subType';
     public static readonly channelNumber = 'channelNumber'
@@ -14,7 +14,7 @@ export class ScriptChannelsTable {
         `CREATE TABLE IF NOT EXISTS ${this.table} (
     ${this.id} TEXT PRIMARY KEY,
     ${this.scriptId} TEXT,
-    ${this.controllerId} INTEGER,
+    ${this.locationId} INTEGER,
     ${this.type} INTEGER,
     ${this.subType} INTEGER,
     ${this.channelNumber} INTEGER)`;
@@ -23,7 +23,7 @@ export class ScriptChannelsTable {
         `INSERT INTO ${this.table}
     (${this.id}, 
     ${this.scriptId}, 
-    ${this.controllerId}, 
+    ${this.locationId}, 
     ${this.type}, 
     ${this.subType}, 
     ${this.channelNumber})
@@ -38,7 +38,7 @@ export class ScriptChannelsTable {
     public static readonly selectAllForScript =
         `SELECT t.${this.id}, 
     t.${this.scriptId}, 
-    t.${this.controllerId},
+    t.${this.locationId},
     t.${this.type},
     t.${this.subType},
     t.${this.channelNumber}

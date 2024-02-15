@@ -1,7 +1,7 @@
 export class ServoChannelsTable {
   public static readonly table = "servo_channels";
   public static readonly id = "id";
-  public static readonly controllerId = "controllerId";
+  public static readonly locationId = "locationId";
   public static readonly channelId = "channelId";
   public static readonly channelName = "channelName";
   public static readonly enabled = "enabled";
@@ -11,17 +11,17 @@ export class ServoChannelsTable {
 
   public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
     ${this.id} INTEGER PRIMARY KEY AUTOINCREMENT,
-    ${this.controllerId} INTEGER,
+    ${this.locationId} INTEGER,
     ${this.channelId} INTEGER,
     ${this.channelName} TEXT,
     ${this.enabled} INTEGER DEFAULT 1 NOT NULL,
     ${this.minPos} INTEGER DEFAULT 0 NOT NULL,
     ${this.maxPos} INTEGER DEFAULT 0 NOT NULL,
     ${this.inverted} INTEGER DEFAULT 0 NOT NULL,
-    UNIQUE(${this.controllerId}, ${this.channelId}) ON CONFLICT REPLACE)`;
+    UNIQUE(${this.locationId}, ${this.channelId}) ON CONFLICT REPLACE)`;
 
   public static readonly insert = `INSERT INTO ${this.table}
-    (${this.controllerId}, ${this.channelId}, ${this.channelName}, ${this.enabled}, ${this.minPos}, ${this.maxPos},${this.inverted})
+    (${this.locationId}, ${this.channelId}, ${this.channelName}, ${this.enabled}, ${this.minPos}, ${this.maxPos},${this.inverted})
     VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
   public static readonly selectAll = `SELECT ${this.channelId},
@@ -31,7 +31,7 @@ export class ServoChannelsTable {
     ${this.maxPos},
     ${this.inverted}
     FROM ${this.table}
-    WHERE ${this.controllerId} = ?`;
+    WHERE ${this.locationId} = ?`;
 
   public static readonly select = `SELECT ${this.channelId},
     ${this.channelName},
@@ -41,7 +41,7 @@ export class ServoChannelsTable {
     ${this.inverted}
     FROM ${this.table}
     WHERE ${this.channelId} = ?
-    AND ${this.controllerId} = ?`;
+    AND ${this.locationId} = ?`;
 
   public static readonly update = `UPDATE ${this.table}
     SET ${this.channelName} = ?,
@@ -50,5 +50,5 @@ export class ServoChannelsTable {
     ${this.maxPos} = ?,
     ${this.inverted} = ?
     WHERE ${this.channelId} = ?
-    AND  ${this.controllerId} = ?`;
+    AND  ${this.locationId} = ?`;
 }

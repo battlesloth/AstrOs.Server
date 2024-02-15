@@ -1,19 +1,41 @@
-import { logger } from ".././logger";
-import { SerialMessage, SerialMessageType, SerialMsgConst, SerialMsgValidationResult } from "./serial_message";
+import { logger } from "../logger";
+import { SerialMessageType, SerialMsgConst, SerialMsgValidationResult } from "./serial_message";
 
-//|--type--|--validation--|---msg Id---|---------------payload-------------|
-//|--int---RS---string----RS--string---GS--val--US--val--RS--val--US--val--|
+const { SerialPort } = eval("require('serialport')");
+const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
 
-export class MessageHandler {
+export class SerialMessageService {
 
-    failures = 0;
+    private port: any;
+    private parser: any;
 
     groupSep = '\u001d';
     recordSep = '\u001e';
     unitSep = '\u001f';
 
-    onHeartbeat!: (node: string) => void;
-    onSyncAck!: () => void;
+    constructor(port: string, baudRate: number) {
+
+        this.port = new SerialPort({ path: port, baudRate: baudRate })
+        this.parser = this.port.pipe(new DelimiterParser({ delimiter: '\n' }))
+            .on('data', (data: any) => { this.handleMessage(data) });
+
+    }
+
+
+    public sendMessage(msg: string): Promise<boolean> {
+
+        return new Promise<boolean>((resolve, reject) => {
+            this.port.write(msg + '\n', (err: any) => {
+                if (err) {
+                    logger.error(`Error sending serial message: ${err}`);
+                    return false;
+                }
+            });
+
+            return true;
+
+        });
+    }
 
     public handleMessage(val: any): void {
 
@@ -146,6 +168,5 @@ export class MessageHandler {
 
         return result;
     }
+
 }
-
-

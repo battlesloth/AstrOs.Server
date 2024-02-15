@@ -17,7 +17,7 @@ import { pinoHttp } from "pino-http";
 
 import { DataAccess } from "./dal/data_access";
 import { UserRepository } from "./dal/repositories/user_repository";
-import { ControllerController } from "./controllers/controller_controller";
+import { LocationsController } from "./controllers/locations_controller";
 import { AuthContoller } from "./controllers/authentication_controller";
 import { ScriptsController } from "./controllers/scripts_controller";
 import { AudioController } from "./controllers/audio_controller";
@@ -35,9 +35,10 @@ import { RemoteConfigController } from "./controllers/remote_config_controller";
 import { SettingsController } from "./controllers/settings_controller";
 import { ApiKeyValidator } from "./api_key_validator";
 import { MessageHandler } from "./serial/message_handler";
+import { SerialMessageService } from "./serial/serial_message_service";
+import { P } from "pino";
 
-const { SerialPort } = eval("require('serialport')");
-const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
+
 
 class ApiServer {
 
@@ -58,9 +59,10 @@ class ApiServer {
 
     upload!: any;
 
+    private serialMsgSvc: SerialMessageService;
+
     private messageHandler: MessageHandler = new MessageHandler();
-    private port: any;
-    private parser: any;
+
 
     constructor() {
         Dotenv.config({ path: __dirname + '/.env' });
@@ -72,20 +74,25 @@ class ApiServer {
         this.app = Express();
         this.router = Express.Router();
 
-        this.port = new SerialPort({ path: process.env.SERIAL_PORT, baudRate: 9600 })
-        this.parser = this.port.pipe(new DelimiterParser({ delimiter: '\n' }))
-            .on('data', (data: any) => { this.handleSerialData(data) });
+        this.serialMsgSvc = new SerialMessageService(process.env.SERIAL_PORT!, +process.env.BAUD_RATE!);
     }
 
     public async Init() {
         logger.info('Setting up authentication strategy');
         this.setAuthStrategy();
+
         logger.info('Setting up API server');
-        this.configApi();
+        await this.configApi();
+
         logger.info('Setting up file handler');
         this.configFileHandler();
+
         logger.info('Setting up routes');
         this.setRoutes();
+
+        logger.info('Starting background services');
+        this.syncControlModules();
+
         logger.info('Starting web services');
         this.runWebServices();
     }
@@ -93,7 +100,14 @@ class ApiServer {
     public static async bootstrap(): Promise<ApiServer> {
 
         const server = new ApiServer();
-        await server.Init();
+        try {
+            await server.Init();
+        }
+        catch (error) {
+            logger.error(error);
+            throw new Error('Failed to initialize server');
+        }
+
         return server;
     }
 
@@ -128,9 +142,9 @@ class ApiServer {
         );
     }
 
-    private configApi(): void {
+    private async configApi(): Promise<void> {
         const da = new DataAccess();
-        da.setup();
+        await da.setup();
 
         const loggerMiddleware = pinoHttp({
             logger: logger,
@@ -160,9 +174,6 @@ class ApiServer {
             res.status(err.status || 500);
         });
 
-
-
-
         const jwtKey: string = (process.env.JWT_KEY as string);
 
         this.authHandler = jwt({
@@ -186,9 +197,9 @@ class ApiServer {
         this.router.post(AuthContoller.route, AuthContoller.login);
         this.router.post(AuthContoller.reauthRoute, AuthContoller.reauth);
 
-        this.router.get(ControllerController.route, this.authHandler, ControllerController.getControllers);
-        this.router.put(ControllerController.route, this.authHandler, ControllerController.saveControllers);
-        this.router.get(ControllerController.syncRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllers(req, res, next); });
+        this.router.get(LocationsController.route, this.authHandler, LocationsController.getLocations);
+        this.router.put(LocationsController.route, this.authHandler, LocationsController.saveLocations);
+        this.router.get(LocationsController.syncRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllers(req, res, next); });
 
         this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
@@ -211,7 +222,6 @@ class ApiServer {
 
         this.router.post('/directcommand', this.authHandler, (req: any, res: any, next: any) => { this.directCommand(req, res, next); });
 
-
         // API key secured routes
         this.router.get('/remotecontrol', this.apiKeyValidator, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
         this.router.get('/remotecontrolsync', this.apiKeyValidator, RemoteConfigController.syncRemoteConfig);
@@ -233,23 +243,11 @@ class ApiServer {
         });
     }
 
-    private handleSerialData(data: any): void {
-        try {
-            logger.debug(`Serial data received: ${data}`);
-            this.messageHandler.handleMessage(data);
-        } catch (err) {
-            logger.error(`Exception handling serial data: ${err}`);
-        }
-    }
-
 
     private async syncControllers(req: any, res: any, next: any) {
         try {
-            this.port.write('sync\n', (err: any) => {
-                if (err) {
-                    logger.error(`Error writing to serial port: ${err.message}`);
-                }
-            });
+
+            logger.info('syncing controllers');
         } catch (error) {
             logger.error(error);
 
@@ -262,11 +260,8 @@ class ApiServer {
 
     private async uploadScript(req: any, res: any, next: any) {
         try {
-            this.port.write('upload\n', (err: any) => {
-                if (err) {
-                    logger.error(`Error writing to serial port: ${err.message}`);
-                }
-            });
+
+            logger.info('uploading script');
         } catch (error) {
             logger.error(error);
 
@@ -275,16 +270,12 @@ class ApiServer {
                 message: 'Internal server error'
             });
         }
-
     }
 
     private async runScript(req: any, res: any, next: any) {
         try {
-            this.port.write('run\n', (err: any) => {
-                if (err) {
-                    logger.error(`Error writing to serial port: ${err.message}`);
-                }
-            });
+
+            logger.info('running script');
         } catch (error) {
             logger.error(error);
 
@@ -297,11 +288,9 @@ class ApiServer {
 
     private async directCommand(req: any, res: any, next: any) {
         try {
-            this.port.write('direct\n', (err: any) => {
-                if (err) {
-                    logger.error(`Error writing to serial port: ${err.message}`);
-                }
-            });
+
+            logger.info('sending direct command');
+
         } catch (error) {
             logger.error(error);
 
@@ -314,11 +303,8 @@ class ApiServer {
 
     private async formatSD(req: any, res: any, next: any) {
         try {
-            this.port.write('format\n', (err: any) => {
-                if (err) {
-                    logger.error(`Error writing to serial port: ${err.message}`);
-                }
-            });
+
+            logger.info('formatting SD card');
         } catch (error) {
             logger.error(error);
 
@@ -330,6 +316,21 @@ class ApiServer {
     }
 
 
+
+
+    private async syncControlModules(): Promise<void> {
+
+        setInterval(async () => {
+
+            const guid = uuid_v4();
+
+            const msg = `1\u001eREGISTRATION_SYNC\u001e${guid}\u001d\n`;
+
+            await this.serialMsgSvc.sendMessage(msg);
+
+        }, 2 * 1000);
+
+    }
     /*
         private async runBackgroundServices(): Promise<void> {
     
