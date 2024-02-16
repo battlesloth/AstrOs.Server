@@ -1,5 +1,16 @@
+export enum SerialWorkerResponseType {
+    UNKNOWN,
+    TIMEOUT,
+    SEND_SERIAL_MESSAGE,
+    UPDATE_CLIENTS
+}
 
 export enum SerialMessageType {
+
+    // for internal use
+    SERIAL_MSG_RECEIVED = -1,
+
+    // needs to match ESP enums
     UNKNOWN,
     REGISTRATION_SYNC, // from web server
     REGISTRATION_SYNC_ACK,

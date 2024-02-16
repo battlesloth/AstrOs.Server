@@ -34,11 +34,11 @@ import { logger } from "./logger";
 import { RemoteConfigController } from "./controllers/remote_config_controller";
 import { SettingsController } from "./controllers/settings_controller";
 import { ApiKeyValidator } from "./api_key_validator";
-import { MessageHandler } from "./serial/message_handler";
-import { SerialMessageService } from "./serial/serial_message_service";
 import { P } from "pino";
+import { SerialMessageType, SerialWorkerResponseType } from "./serial/serial_message";
 
-
+const { SerialPort } = eval("require('serialport')");
+const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
 
 class ApiServer {
 
@@ -50,19 +50,14 @@ class ApiServer {
     private router: Router;
     private websocket!: Server;
 
-    //private espMonitor!: Worker;
-
-    //moduleInterface!: Worker;
+    private serialWorker!: Worker;
+    private serialPort: any;
+    private serialParser: any;
 
     private authHandler!: any;
     private apiKeyValidator!: ReqHandler;
 
     upload!: any;
-
-    private serialMsgSvc: SerialMessageService;
-
-    private messageHandler: MessageHandler = new MessageHandler();
-
 
     constructor() {
         Dotenv.config({ path: __dirname + '/.env' });
@@ -73,8 +68,6 @@ class ApiServer {
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
         this.router = Express.Router();
-
-        this.serialMsgSvc = new SerialMessageService(process.env.SERIAL_PORT!, +process.env.BAUD_RATE!);
     }
 
     public async Init() {
@@ -90,8 +83,8 @@ class ApiServer {
         logger.info('Setting up routes');
         this.setRoutes();
 
-        logger.info('Starting background services');
-        this.syncControlModules();
+        logger.info('Starting up serial port services');
+        this.setupSerialPort();
 
         logger.info('Starting web services');
         this.runWebServices();
@@ -228,6 +221,23 @@ class ApiServer {
 
     }
 
+    private setupSerialPort(): void {
+        this.serialWorker = new Worker(new URL('./background_tasks/serial_worker.js', import.meta.url));
+
+        this.serialWorker.on('exit', exit => { logger.info(exit); });
+        this.serialWorker.on('error', err => { logger.error(err); });
+
+        this.serialWorker.on('message', (msg) => {
+            this.handleSerialWorkerMessage(msg);
+        });
+
+        this.serialPort = new SerialPort({ path: process.env.SERIAL_PORT!, baudRate: +process.env.BAUD_RATE! });
+        this.serialParser = this.serialPort.pipe(new DelimiterParser({ delimiter: '\n' }))
+            .on('data', (data: any) => {
+                this.serialWorker.postMessage({ type: SerialMessageType.SERIAL_MSG_RECEIVED, data: data.toString() })
+            });
+    }
+
     private runWebServices(): void {
         this.app.listen(this.apiPort, () => {
             logger.info('The application is listening on port 3000');
@@ -244,10 +254,32 @@ class ApiServer {
     }
 
 
+    handleSerialWorkerMessage(msg: any) {
+        switch (msg.type) {
+            case SerialWorkerResponseType.UNKNOWN:
+                logger.error('Invalid message received');
+                break;
+            case SerialWorkerResponseType.SEND_SERIAL_MESSAGE:
+                this.serialPort.write(msg.data, (err: any) => {
+                    if (err) {
+                        logger.error(`Error sending serial message: ${err}`);
+                    }
+                });
+                break;
+            case SerialWorkerResponseType.UPDATE_CLIENTS:
+                this.updateClients(msg);
+                break
+        }
+    }
+
+
     private async syncControllers(req: any, res: any, next: any) {
         try {
 
             logger.info('syncing controllers');
+            this.serialWorker.postMessage({ type: SerialMessageType.REGISTRATION_SYNC, data: null });
+            res.status(200);
+
         } catch (error) {
             logger.error(error);
 
@@ -316,296 +348,295 @@ class ApiServer {
     }
 
 
-
-
-    private async syncControlModules(): Promise<void> {
-
-        setInterval(async () => {
-
-            const guid = uuid_v4();
-
-            const msg = `1\u001eREGISTRATION_SYNC\u001e${guid}\u001d\n`;
-
-            await this.serialMsgSvc.sendMessage(msg);
-
-        }, 2 * 1000);
-
-    }
     /*
-        private async runBackgroundServices(): Promise<void> {
     
-            this.espMonitor = new Worker(new URL('./background_tasks/esp_monitor.js', import.meta.url));
+        private async syncControlModules(): Promise<void> {
     
-            this.espMonitor.on('exit', exit => { logger.info(exit); });
-            this.espMonitor.on('error', err => { logger.error(err); });
+            setInterval(async () => {
     
-            this.espMonitor.on('message', (msg) => {
-                logger.info(`Controller=${ControllerType[msg.controllerType]};up=${msg.up};synced=${msg.synced}`);
-                this.updateClients(msg);
-            });
+                const guid = uuid_v4();
     
-            setInterval(() => {
+                const msg = `1\u001eREGISTRATION_SYNC\u001e${guid}\u001d\n`;
     
-                this.port.write(`testing1,2,3\n`, (err: any) => {
-                    if (err) {
-                        logger.error(`Error writing to serial port: ${err.message}`);
-                    }
+                await this.serialMsgSvc.sendMessage(msg);
+    
+            }, 2 * 1000);
+    
+        }
+        
+            private async runBackgroundServices(): Promise<void> {
+        
+                this.espMonitor = new Worker(new URL('./background_tasks/esp_monitor.js', import.meta.url));
+        
+                this.espMonitor.on('exit', exit => { logger.info(exit); });
+                this.espMonitor.on('error', err => { logger.error(err); });
+        
+                this.espMonitor.on('message', (msg) => {
+                    logger.info(`Controller=${ControllerType[msg.controllerType]};up=${msg.up};synced=${msg.synced}`);
+                    this.updateClients(msg);
                 });
-    
-                const dao = new DataAccess();
-                const repository = new ControllerRepository(dao);
-    
-                repository.getControllerData()
-                    .then((val: any) => {
-    
-                        const ctlList = new Array<any>();
-    
-                        val.forEach(function (ctl: any) {
-                            ctlList.push({ controllerType: ctl.id, ip: ctl.ipAddress, fingerprint: ctl.fingerprint });
-                        });
-    
-                        this.espMonitor.postMessage(ctlList);
-                    })
-                    .catch((err) => {
-                        logger.error(`error getting controler IPs for monitor update: ${err}`);
+        
+                setInterval(() => {
+        
+                    this.port.write(`testing1,2,3\n`, (err: any) => {
+                        if (err) {
+                            logger.error(`Error writing to serial port: ${err.message}`);
+                        }
                     });
-    
-            }, 15 * 1000);
-    
-            this.moduleInterface = new Worker(new URL('./background_tasks/module_interface.js', import.meta.url))
-    
-            this.moduleInterface.on('exit', exit => { logger.info(exit); });
-            this.moduleInterface.on('error', err => { logger.error(err); });
-    
-            this.moduleInterface.on('message', async (msg) => {
-    
-                switch (msg.type) {
-                    case TransmissionType.script:
-                        await this.handleScriptRepsonse(msg);
-                        this.updateClients(msg);
-                        break;
-                    case TransmissionType.sync: {
-                        const response = await this.handleSyncResponse(msg);
-                        this.updateClients(response);
-                        break;
-                    }
-    
-                }
-    
-            });
-        }
-    
-        private async syncControllers(req: any, res: any, next: any) {
-            try {
-                const dao = new DataAccess();
-                const repo = new ControllerRepository(dao);
-    
-                const controllers = await repo.getControllers();
-    
-                const msg = new ConfigSync(controllers);
-    
-                this.moduleInterface.postMessage(msg);
-    
-                res.status(200);
-                res.json({ message: "success" });
-    
-            } catch (error) {
-                logger.error(error);
-    
-                res.status(500);
-                res.json({
-                    message: 'Internal server error'
-                });
-            }
-        }
-    
-        private async handleSyncResponse(msg: any): Promise<BaseResponse> {
-    
-            const result = new BaseResponse(TransmissionType.sync, true, '');
-    
-            const modMap = new Map<number, string>();
-            modMap.set(1, 'Core Module');
-            modMap.set(2, 'Dome Module');
-            modMap.set(3, 'Body Module');
-    
-            for (const r of msg.results) {
-    
-                if (r.synced) {
+        
                     const dao = new DataAccess();
                     const repository = new ControllerRepository(dao);
-    
-                    const saved = await repository.updateControllerFingerprint(r.id, r.fingerprint);
-    
-                    result.message += `${modMap.get(r.id)} sync ${saved ? 'succeeded' : 'failed'}, `;
-                } else {
-                    result.message += `${modMap.get(r.id)} sync failed, `;
-                }
-            }
-    
-            result.message = result.message.trim().slice(0, -1);
-            return result;
-        }
-    
-        private async uploadScript(req: any, res: any, next: any) {
-            try {
-                const id = req.query.id;
-    
-                const dao = new DataAccess();
-                const scriptRepo = new ScriptRepository(dao);
-                const ctlRepo = new ControllerRepository(dao);
-    
-                const script = await scriptRepo.getScript(id) as Script;
-    
-                const cvtr = new ScriptConverter();
-    
-                const messages = cvtr.convertScript(script);
-    
-                if (messages.size < 1) {
-                    logger.warn(`No controller script values returned for ${id}`);
-                }
-    
-                const controllers = await ctlRepo.getControllerData();
-    
-                const msg = new ScriptUpload(id, messages, controllers);
-    
-                this.moduleInterface.postMessage(msg);
-    
-                res.status(200);
-                res.json({ message: "success" });
-    
-            } catch (error) {
-                logger.error(error);
-    
-                res.status(500);
-                res.json({
-                    message: 'Internal server error'
+        
+                    repository.getControllerData()
+                        .then((val: any) => {
+        
+                            const ctlList = new Array<any>();
+        
+                            val.forEach(function (ctl: any) {
+                                ctlList.push({ controllerType: ctl.id, ip: ctl.ipAddress, fingerprint: ctl.fingerprint });
+                            });
+        
+                            this.espMonitor.postMessage(ctlList);
+                        })
+                        .catch((err) => {
+                            logger.error(`error getting controler IPs for monitor update: ${err}`);
+                        });
+        
+                }, 15 * 1000);
+        
+                this.moduleInterface = new Worker(new URL('./background_tasks/module_interface.js', import.meta.url))
+        
+                this.moduleInterface.on('exit', exit => { logger.info(exit); });
+                this.moduleInterface.on('error', err => { logger.error(err); });
+        
+                this.moduleInterface.on('message', async (msg) => {
+        
+                    switch (msg.type) {
+                        case TransmissionType.script:
+                            await this.handleScriptRepsonse(msg);
+                            this.updateClients(msg);
+                            break;
+                        case TransmissionType.sync: {
+                            const response = await this.handleSyncResponse(msg);
+                            this.updateClients(response);
+                            break;
+                        }
+        
+                    }
+        
                 });
             }
-        }
-    
-        private async runScript(req: any, res: any, next: any) {
-            try {
-                const id = req.query.id;
-    
-                const dao = new DataAccess();
-                const ctlRepo = new ControllerRepository(dao);
-    
-                const controllers = await ctlRepo.getControllerData();
-    
-                const msg = new ScriptRun(id, controllers);
-    
-                if (id === "panic"){
-                    msg.type = TransmissionType.panic;
-                }
-    
-                this.moduleInterface.postMessage(msg);
-    
-                res.status(200);
-                res.json({ message: "success" });
-    
-            } catch (error) {
-                logger.error(error);
-    
-                res.status(500);
-                res.json({
-                    message: 'Internal server error'
-                });
-            }
-        }
-    
-        private async handleScriptRepsonse(msg: any) {
-    
-            if (msg.status === TransmissionStatus.success) {
-                const dao = new DataAccess();
-                const repository = new ScriptRepository(dao);
-    
-                const options: Intl.DateTimeFormatOptions = {
-                    day: "numeric", month: "numeric", year: "numeric",
-                    hour: "2-digit", minute: "2-digit", second: "2-digit"
-                };
-    
-                const date = (new Date()).toLocaleString('en-US', options);
-    
-                await repository.updateScriptControllerUploaded(msg.scriptId, msg.controllerType, date);
-    
-                logger.info(`Controller ${msg.controllerType} uploaded for ${msg.scriptId}!`)
-    
-                msg.date = date;
-            } else if (msg.status === TransmissionStatus.failed) {
-                logger.warn(`Controller ${msg.controllerType} upload failed for ${msg.scriptId}!`)
-            } else {
-                logger.info(`Updating transmission status for Controller ${msg.controllerType}, ${msg.scriptId} => ${msg.status}`);
-            }
-        }
-    
-        private async directCommand(req: any, res: any, next: any) {
-            try {
-    
-                const dao = new DataAccess();
-                const repo = new ControllerRepository(dao);
-    
-                req.body.ip = await repo.getControllerIp(req.body.controller);
-    
-                req.body.type = TransmissionType.directCommand;
-    
-                logger.info(`sending direct command: ${JSON.stringify(req.body)}`);
-    
-                this.moduleInterface.postMessage(req.body);
-    
-                res.status(200);
-                res.json({ message: "success" });
-    
-            } catch (error) {
-                logger.error(error);
-    
-                res.status(500);
-                res.json({
-                    message: 'Internal server error'
-                });
-            }
-    
-        }
-    
-        private async formatSD(req: any, res: any, next: any){
-            try {
-    
-                const dao = new DataAccess();
-                const repo = new ControllerRepository(dao);
-    
-                for (const module of req.body.modules){
-    
-                    const ip = await repo.getControllerIp(module);
-    
-                    const msg = {ip: ip, type: TransmissionType.formatSD};
-                    logger.info(`sending format SD command: ${JSON.stringify(msg)}`);
-    
-                    this.moduleInterface.postMessage(msg);
-                }
-                
-                res.status(200);
-                res.json({ message: "success" });
-    
-            } catch (error) {
-                logger.error(error);
-    
-                res.status(500);
-                res.json({
-                    message: 'Internal server error'
-                });
-            }
-        }
-    
-        private updateClients(msg: any): void {
-            const str = JSON.stringify(msg);
-            for (const client of this.clients.values()) {
+        
+            private async syncControllers(req: any, res: any, next: any) {
                 try {
-                    client.send(str);
-                } catch (err) {
-                    logger.error(`websocket send error: ${err}`);
+                    const dao = new DataAccess();
+                    const repo = new ControllerRepository(dao);
+        
+                    const controllers = await repo.getControllers();
+        
+                    const msg = new ConfigSync(controllers);
+        
+                    this.moduleInterface.postMessage(msg);
+        
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
                 }
             }
+        
+            private async handleSyncResponse(msg: any): Promise<BaseResponse> {
+        
+                const result = new BaseResponse(TransmissionType.sync, true, '');
+        
+                const modMap = new Map<number, string>();
+                modMap.set(1, 'Core Module');
+                modMap.set(2, 'Dome Module');
+                modMap.set(3, 'Body Module');
+        
+                for (const r of msg.results) {
+        
+                    if (r.synced) {
+                        const dao = new DataAccess();
+                        const repository = new ControllerRepository(dao);
+        
+                        const saved = await repository.updateControllerFingerprint(r.id, r.fingerprint);
+        
+                        result.message += `${modMap.get(r.id)} sync ${saved ? 'succeeded' : 'failed'}, `;
+                    } else {
+                        result.message += `${modMap.get(r.id)} sync failed, `;
+                    }
+                }
+        
+                result.message = result.message.trim().slice(0, -1);
+                return result;
+            }
+        
+            private async uploadScript(req: any, res: any, next: any) {
+                try {
+                    const id = req.query.id;
+        
+                    const dao = new DataAccess();
+                    const scriptRepo = new ScriptRepository(dao);
+                    const ctlRepo = new ControllerRepository(dao);
+        
+                    const script = await scriptRepo.getScript(id) as Script;
+        
+                    const cvtr = new ScriptConverter();
+        
+                    const messages = cvtr.convertScript(script);
+        
+                    if (messages.size < 1) {
+                        logger.warn(`No controller script values returned for ${id}`);
+                    }
+        
+                    const controllers = await ctlRepo.getControllerData();
+        
+                    const msg = new ScriptUpload(id, messages, controllers);
+        
+                    this.moduleInterface.postMessage(msg);
+        
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
+                }
+            }
+        
+            private async runScript(req: any, res: any, next: any) {
+                try {
+                    const id = req.query.id;
+        
+                    const dao = new DataAccess();
+                    const ctlRepo = new ControllerRepository(dao);
+        
+                    const controllers = await ctlRepo.getControllerData();
+        
+                    const msg = new ScriptRun(id, controllers);
+        
+                    if (id === "panic"){
+                        msg.type = TransmissionType.panic;
+                    }
+        
+                    this.moduleInterface.postMessage(msg);
+        
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
+                }
+            }
+        
+            private async handleScriptRepsonse(msg: any) {
+        
+                if (msg.status === TransmissionStatus.success) {
+                    const dao = new DataAccess();
+                    const repository = new ScriptRepository(dao);
+        
+                    const options: Intl.DateTimeFormatOptions = {
+                        day: "numeric", month: "numeric", year: "numeric",
+                        hour: "2-digit", minute: "2-digit", second: "2-digit"
+                    };
+        
+                    const date = (new Date()).toLocaleString('en-US', options);
+        
+                    await repository.updateScriptControllerUploaded(msg.scriptId, msg.controllerType, date);
+        
+                    logger.info(`Controller ${msg.controllerType} uploaded for ${msg.scriptId}!`)
+        
+                    msg.date = date;
+                } else if (msg.status === TransmissionStatus.failed) {
+                    logger.warn(`Controller ${msg.controllerType} upload failed for ${msg.scriptId}!`)
+                } else {
+                    logger.info(`Updating transmission status for Controller ${msg.controllerType}, ${msg.scriptId} => ${msg.status}`);
+                }
+            }
+        
+            private async directCommand(req: any, res: any, next: any) {
+                try {
+        
+                    const dao = new DataAccess();
+                    const repo = new ControllerRepository(dao);
+        
+                    req.body.ip = await repo.getControllerIp(req.body.controller);
+        
+                    req.body.type = TransmissionType.directCommand;
+        
+                    logger.info(`sending direct command: ${JSON.stringify(req.body)}`);
+        
+                    this.moduleInterface.postMessage(req.body);
+        
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
+                }
+        
+            }
+        
+            private async formatSD(req: any, res: any, next: any){
+                try {
+        
+                    const dao = new DataAccess();
+                    const repo = new ControllerRepository(dao);
+        
+                    for (const module of req.body.modules){
+        
+                        const ip = await repo.getControllerIp(module);
+        
+                        const msg = {ip: ip, type: TransmissionType.formatSD};
+                        logger.info(`sending format SD command: ${JSON.stringify(msg)}`);
+        
+                        this.moduleInterface.postMessage(msg);
+                    }
+                    
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
+                }
+            }
+        */
+    private updateClients(msg: any): void {
+        const str = JSON.stringify(msg);
+        for (const client of this.clients.values()) {
+            try {
+                client.send(str);
+            } catch (err) {
+                logger.error(`websocket send error: ${err}`);
+            }
         }
-    */
+    }
 }
 
 ApiServer.bootstrap().catch(err => {

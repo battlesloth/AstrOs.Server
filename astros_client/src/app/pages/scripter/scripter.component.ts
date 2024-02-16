@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelSubType, ChannelType, ControlModule, I2cChannel, KangarooController, AstrOsModuleCollection, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartChannel, UartModule, UartType } from 'astros-common';
+import { ChannelSubType, ChannelType, ControlModule, I2cChannel, KangarooController, AstrOsLocationCollection, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartChannel, UartModule, UartType, ControllerLocation } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -89,9 +89,9 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   ngOnInit(): void {
     const csObserver = {
-      next: (result: AstrOsModuleCollection) => {
+      next: (result: AstrOsLocationCollection) => {
 
-        const modules = new Array<ControlModule>();
+        const modules = new Array<ControllerLocation>();
 
         if (result.domeModule)
           modules.push(result.domeModule);
@@ -106,7 +106,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       error: (err: any) => console.error(err)
     };
 
-    this.controllerService.getControllers().subscribe(csObserver);
+    this.controllerService.getLocations().subscribe(csObserver);
 
     if (this.scriptId === '0') {
       this.scriptId = this.generateScriptId(5);
@@ -264,7 +264,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     const modalResources = new Map<string, any>();
 
-    modalResources.set(ModalResources.controllers, this.scriptResources.controllers);
+    modalResources.set(ModalResources.controllers, this.scriptResources.locations);
     modalResources.set(ModalResources.modules, this.scriptResources.getAvailableModules());
     modalResources.set(ModalResources.channels, this.scriptResources.getAvailableChannels());
 
@@ -553,7 +553,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   private addChannel(controllerId: number, channelType: ChannelType, channels: Array<number>): void {
 
-    let name = this.scriptResources.controllers.get(controllerId)?.name;
+    let name = this.scriptResources.locations.get(controllerId)?.name;
 
     if (!name) {
       name = ''

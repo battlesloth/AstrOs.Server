@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { ChannelSubType, ChannelType } from 'astros-common';
-import { ChannelValue, ControllerDetails } from 'src/app/models/script-resources';
+import { ChannelValue, LocationDetails } from 'src/app/models/script-resources';
 import { ModalBaseComponent } from '../../../../modal/modal-base/modal-base.component';
 import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
 
@@ -13,7 +13,7 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
 
   errorMessage: string;
 
-  controllers!: Map<number, ControllerDetails>;
+  controllers!: Map<number, LocationDetails>;
   selectedController: number = 0;
 
   private availableModules!: Map<number, Map<ChannelType, string>>;

@@ -14,7 +14,7 @@
                 "run-script",
                 "start"
             ],
-            "console": "externalTerminal",
+            "console": "integratedTerminal",
             "preLaunchTask": "build server"
         },
         {

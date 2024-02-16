@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
-import { ChannelType, ControlModule, AstrOsModuleCollection } from 'astros-common';
+import { ChannelType, ControlModule, AstrOsLocationCollection } from 'astros-common';
 
 
 @Injectable({
@@ -16,33 +16,33 @@ export class ControllerService {
     this.token = '';
   }
 
-  public getControllers(): Observable<AstrOsModuleCollection> {
+  public getLocations(): Observable<AstrOsLocationCollection> {
 
-    return this.http.get<AstrOsModuleCollection>('/api/controllers', {
+    return this.http.get<AstrOsLocationCollection>('/api/locations', {
       headers: { Authorization: `Bearer ${this.getToken()}` }
     })
-      .pipe(tap(_ => console.log('loaded modules')),
-        catchError(this.handleError<AstrOsModuleCollection>('getControllers'))
+      .pipe(tap(_ => console.log('loaded locations')),
+        catchError(this.handleError<AstrOsLocationCollection>('getLocations'))
       );
   }
 
-  public saveControllers(controllers: AstrOsModuleCollection): Observable<any> {
-    return this.http.put<any>('/api/controllers', controllers, {
+  public saveLocations(controllers: AstrOsLocationCollection): Observable<any> {
+    return this.http.put<any>('/api/locations', controllers, {
       headers: { Authorization: `Bearer ${this.getToken()}` }
     })
       .pipe(
-        tap(_ => console.log(`saveControllers result: ${_.message}`)),
-        catchError(this.handleError<any>('saveControllers'))
+        tap(_ => console.log(`saveLocations result: ${_.message}`)),
+        catchError(this.handleError<any>('saveLocations'))
       );
   }
 
-  public syncControllers(): Observable<any> {
-    return this.http.get<any>('/api/controllers/sync', {
+  public syncLocations(): Observable<any> {
+    return this.http.get<any>('/api/locations/sync', {
       headers: { Authorization: `Bearer ${this.getToken()}` }
     })
       .pipe(
-        tap(_ => console.log(`syncControllers result: ${_.message}`)),
-        catchError(this.handleError<any>('saveControllers'))
+        tap(_ => console.log(`syncLocations result: ${_.message}`)),
+        catchError(this.handleError<any>('syncLocations'))
       );
   }
 
@@ -52,8 +52,8 @@ export class ControllerService {
         headers: { Authorization: `Bearer ${this.getToken()}` }
       })
       .pipe(
-        tap(_ => console.log(`saveControllers result: ${_.message}`)),
-        catchError(this.handleError<any>('saveControllers'))
+        tap(_ => console.log(`direct command result: ${_.message}`)),
+        catchError(this.handleError<any>('sendControllerCommand'))
       );
   }
 

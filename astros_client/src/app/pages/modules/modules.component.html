@@ -24,9 +24,9 @@
                 </mat-expansion-panel-header>
                 <ng-container>
                     <div class="ip-input">
-                        <input name="coreIp" matInput placeholder="Fix Me" [(ngModel)]="coreModule.name"/>        
+                        <input name="coreIp" matInput placeholder="Fix Me" [(ngModel)]="coreLocation.locationName"/>        
                     </div>
-                    <app-esp-module [module]="coreModule"></app-esp-module>
+                    <app-esp-module [module]="coreLocation"></app-esp-module>
                 </ng-container>
             </mat-expansion-panel>
             <mat-expansion-panel>
@@ -39,9 +39,9 @@
                 </mat-expansion-panel-header>
                 <ng-container>
                     <div class="ip-input">
-                        <input name="domeIp" matInput placeholder="Fix Me" [(ngModel)]="domeModule.name"/>        
+                        <input name="domeIp" matInput placeholder="Fix Me" [(ngModel)]="domeLocation.locationName"/>        
                     </div>
-                    <app-esp-module [module]="domeModule"></app-esp-module>
+                    <app-esp-module [module]="domeLocation"></app-esp-module>
                 </ng-container>
             </mat-expansion-panel>
             <mat-expansion-panel>
@@ -54,9 +54,9 @@
                 </mat-expansion-panel-header>
                 <ng-container>
                     <div class="ip-input">
-                        <input name="bodyIp" matInput placeholder="Fix Me" [(ngModel)]="bodyModule.name" />        
+                        <input name="bodyIp" matInput placeholder="Fix Me" [(ngModel)]="bodyLocation.locationName" />        
                     </div>
-                    <app-esp-module [module]="bodyModule"></app-esp-module>
+                    <app-esp-module [module]="bodyLocation"></app-esp-module>
                 </ng-container>
             </mat-expansion-panel>
         </mat-accordion>

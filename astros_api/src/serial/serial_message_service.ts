@@ -1,172 +1,112 @@
+import { v4 } from "uuid";
 import { logger } from "../logger";
-import { SerialMessageType, SerialMsgConst, SerialMsgValidationResult } from "./serial_message";
-
-const { SerialPort } = eval("require('serialport')");
-const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
+import { MessageGenerator } from "./message_generator";
+import { MessageHandler } from "./message_handler";
+import { SerialMessageType, SerialWorkerResponseType } from "./serial_message";
+import { ISerialWorkerResponse } from "./serial_worker_response";
+import { SerialMessageTracker } from "./serial_message_tracker";
+import { MessageHelper } from "./message_helper";
 
 export class SerialMessageService {
 
-    private port: any;
-    private parser: any;
+    messageHandler: MessageHandler = new MessageHandler();
+    messageGererator: MessageGenerator = new MessageGenerator();
 
-    groupSep = '\u001d';
-    recordSep = '\u001e';
-    unitSep = '\u001f';
+    messageTracker: Map<string, SerialMessageTracker> = new Map<string, SerialMessageTracker>();
 
-    constructor(port: string, baudRate: number) {
+    messageTimeoutCallback: (msg: ISerialWorkerResponse) => void;
 
-        this.port = new SerialPort({ path: port, baudRate: baudRate })
-        this.parser = this.port.pipe(new DelimiterParser({ delimiter: '\n' }))
-            .on('data', (data: any) => { this.handleMessage(data) });
-
+    constructor(messageTimeoutCallback: (msgId: ISerialWorkerResponse) => void) {
+        this.messageTimeoutCallback = messageTimeoutCallback;
     }
 
+    public generateMessage(type: SerialMessageType, data: any): ISerialWorkerResponse {
 
-    public sendMessage(msg: string): Promise<boolean> {
+        const result: ISerialWorkerResponse = { type: SerialWorkerResponseType.SEND_SERIAL_MESSAGE };
 
-        return new Promise<boolean>((resolve, reject) => {
-            this.port.write(msg + '\n', (err: any) => {
-                if (err) {
-                    logger.error(`Error sending serial message: ${err}`);
-                    return false;
-                }
-            });
+        const msgId = v4();
 
-            return true;
+        result.data = this.messageGererator.generateMessage(type, data, msgId);
 
-        });
+        this.setMessageTimeout(type, msgId);
+
+        return result;
     }
 
-    public handleMessage(val: any): void {
+    public handleMessage(msg: any): ISerialWorkerResponse {
 
-        if (val === null || val === undefined) {
+        const result: ISerialWorkerResponse = { type: SerialWorkerResponseType.UNKNOWN };
+
+        if (msg === null || msg === undefined) {
             logger.error("Received null or undefined message");
-            return;
+            return result;
         }
-        if (val.length === 0) {
+        if (msg.length === 0) {
             logger.error("Received empty message");
-            return;
+            return result;
         }
 
-        const validationResult = this.validateMessage(val.toString());
+        const validationResult = this.messageHandler.validateMessage(msg.toString());
 
         if (!validationResult.valid) {
-            logger.error(`Invalid message: ${val}`);
-            return;
-        }
-
-        logger.debug(`Received message: ${val}`);
-
-        /*
-                val.split('\u001F')
-               
-        
-                if (val.length < 3) {
-                    logger.error(`Improper message length: ${val.length}`)
-                    return;
-                }
-        
-                const msgView = new DataView(new Uint8Array(val).buffer, 0);
-                const type = msgView.getUint8(0);
-                const payloadSize = msgView.getUint16(1);
-                const payloadBytes = new Uint8Array(val.slice(3, 3 + payloadSize));
-                const payload = String.fromCharCode(...payloadBytes);
-        
-                logger.debug(`Message=>type: ${type}, payloadSize: ${payloadSize}, payload: ${payload}`);
-        
-                switch (type) {
-                    case SerialMessageType.heartbeat:
-                        break;
-                    case SerialMessageType.syncAck:
-                        break;
-                    case SerialMessageType.scriptRunAck:
-                        break;
-                    case SerialMessageType.scriptRunNak:
-                        break;
-                    default:
-                        logger.error(`Unknown message type: ${type}`);
-                        break;
-                }
-        */
-        return;
-    }
-
-    private validateMessage(msg: string): SerialMsgValidationResult {
-
-        const result = new SerialMsgValidationResult();
-
-        const parts = msg.split(this.groupSep);
-        if (parts.length !== 2) {
             logger.error(`Invalid message: ${msg}`);
             return result;
         }
 
-        const header = parts[0].split(this.recordSep);
+        logger.debug(`Received message: ${msg}`);
 
-        if (header.length !== 3) {
-            logger.error(`Invalid header: ${parts[0]}`);
-            return result;
+        // remove the message from the tracker
+        if (this.messageTracker.has(validationResult.id)) {
+            this.messageTracker.delete(validationResult.id);
         }
 
-        const type = parseInt(header[0]);
-
-        if (isNaN(type)) {
-            logger.error(`Invalid message type: ${header[0]}`);
-            return result;
-        }
-
-        // TODO: switch to map
-        switch (type) {
-            case SerialMessageType.REGISTRATION_SYNC:
-                result.valid = header[1] === SerialMsgConst.REGISTRATION_SYNC;
+        switch (validationResult.type) {
+            case SerialMessageType.POLL_ACK:
+                result.type = SerialWorkerResponseType.UPDATE_CLIENTS;
+                result.data = validationResult.id;
                 break;
             case SerialMessageType.REGISTRATION_SYNC_ACK:
-                result.valid = header[1] === SerialMsgConst.REGISTRATION_SYNC_ACK;
-                break
-            case SerialMessageType.POLL_ACK:
-                result.valid = header[1] === SerialMsgConst.POLL_ACK;
-                break
-            case SerialMessageType.POLL_NAK:
-                result.valid = header[1] === SerialMsgConst.POLL_NAK;
+                result.type = SerialWorkerResponseType.UPDATE_CLIENTS;
+                result.data = validationResult.id;
                 break;
-            case SerialMessageType.DEPLOY_SCRIPT:
-                result.valid = header[1] === SerialMsgConst.DEPLOY_SCRIPT;
-                break;
-            case SerialMessageType.DEPLOY_SCRIPT_ACK:
-                result.valid = header[1] === SerialMsgConst.DEPLOY_SCRIPT_ACK;
-                break;
-            case SerialMessageType.DEPLOY_SCRIPT_NAK:
-                result.valid = header[1] === SerialMsgConst.DEPLOY_SCRIPT_NAK;
-                break;
-            case SerialMessageType.RUN_SCRIPT:
-                result.valid = header[1] === SerialMsgConst.RUN_SCRIPT;
-                break;
-            case SerialMessageType.RUN_SCRIPT_ACK:
-                result.valid = header[1] === SerialMsgConst.RUN_SCRIPT_ACK;
-                break;
-            case SerialMessageType.RUN_SCRIPT_NAK:
-                result.valid = header[1] === SerialMsgConst.RUN_SCRIPT_NAK;
-                break;
-            case SerialMessageType.RUN_COMMAND:
-                result.valid = header[1] === SerialMsgConst.RUN_COMMAND;
-                break;
-            case SerialMessageType.RUN_COMMAND_ACK:
-                result.valid = header[1] === SerialMsgConst.RUN_COMMAND_ACK;
-                break;
-            case SerialMessageType.RUN_COMMAND_NAK:
-                result.valid = header[1] === SerialMsgConst.RUN_COMMAND_NAK;
-                break;
-            default:
-                logger.error(`Unknown message type: ${type}`);
-                result.valid = false;
-        }
-
-        if (result.valid) {
-            result.type = type;
-            result.id = header[2];
         }
 
         return result;
     }
 
+    setMessageTimeout(type: SerialMessageType, msgId: string) {
+
+        if (this.messageTracker.has(msgId)) {
+            logger.error(`Tracker already exists for message id: ${msgId}`);
+            return;
+        }
+
+        if (MessageHelper.MessageTimeouts.has(type)) {
+            const timeout = MessageHelper.MessageTimeouts.get(type);
+
+            this.messageTracker.set(msgId, new SerialMessageTracker(msgId, type));
+
+            setTimeout(() => {
+                this.handleTimeout(msgId);
+            }, timeout);
+        }
+
+    }
+
+    handleTimeout(msgId: string) {
+        const tracker = this.messageTracker.get(msgId);
+
+        if (tracker === undefined) {
+            logger.debug(`No tracker found for message id: ${msgId}, assume completed`);
+            return;
+        }
+
+        logger.error(`Timeout for message id: ${msgId}`);
+
+        this.messageTracker.delete(msgId);
+
+        const result: ISerialWorkerResponse = { type: SerialWorkerResponseType.TIMEOUT, data: msgId };
+
+        this.messageTimeoutCallback(result);
+    }
 }

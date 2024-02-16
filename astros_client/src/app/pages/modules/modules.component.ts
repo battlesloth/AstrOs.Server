@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, ControllerStatus, AstrOsModuleCollection, AstrOsConstants } from 'astros-common';
+import { ControlModule, ControllerStatus, AstrOsLocationCollection, AstrOsConstants, ControllerLocation } from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { StatusService } from 'src/app/services/status/status.service';
@@ -22,9 +22,9 @@ export class ModulesComponent implements OnInit, AfterViewInit {
   @ViewChild('dome', { static: false }) domeEl!: ElementRef;
   @ViewChild('body', { static: false }) bodyEl!: ElementRef;
 
-  coreModule!: ControlModule;
-  domeModule!: ControlModule;
-  bodyModule!: ControlModule;
+  coreLocation!: ControllerLocation;
+  domeLocation!: ControllerLocation;
+  bodyLocation!: ControllerLocation;
 
   coreCaption: any = { str: 'Pending...' }
   domeCaption: any = { str: 'Pending...' }
@@ -38,9 +38,9 @@ export class ModulesComponent implements OnInit, AfterViewInit {
     private renderer: Renderer2,
     private status: StatusService) {
 
-    this.coreModule = new ControlModule(1, AstrOsConstants.CORE, AstrOsConstants.CORE, 'Core Dome Module', '', '');
-    this.domeModule = new ControlModule(2, AstrOsConstants.DOME, AstrOsConstants.DOME, 'Outer Dome Module', '', '');
-    this.bodyModule = new ControlModule(3, AstrOsConstants.BODY, AstrOsConstants.BODY, 'Body Module', '', '');
+    this.coreLocation = new ControllerLocation(1, AstrOsConstants.CORE, 'Core Dome Module', '');
+    this.domeLocation = new ControllerLocation(2, AstrOsConstants.DOME, 'Outer Dome Module', '');
+    this.bodyLocation = new ControllerLocation(3, AstrOsConstants.BODY, 'Body Module', '');
 
     this.status.coreStateObserver.subscribe(value => this.handleStatus(value, this.coreEl, this.coreCaption));
     this.status.domeStateObserver.subscribe(value => this.handleStatus(value, this.domeEl, this.domeCaption));
@@ -53,7 +53,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       error: (err: any) => console.error(err)
     };
 
-    this.controllerService.getControllers().subscribe(observer);
+    this.controllerService.getLocations().subscribe(observer);
   }
 
   ngAfterViewInit(): void {
@@ -80,7 +80,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       }
     };
 
-    this.controllerService.saveControllers(new AstrOsModuleCollection(this.coreModule, this.domeModule, this.bodyModule))
+    this.controllerService.saveLocations(new AstrOsLocationCollection(this.coreLocation, this.domeLocation, this.bodyLocation))
       .subscribe(observer);
   }
 
@@ -101,15 +101,15 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       }
     };
 
-    this.controllerService.syncControllers()
+    this.controllerService.syncLocations()
       .subscribe(observer);
   }
 
-  private parseModules(modules: AstrOsModuleCollection) {
+  private parseModules(locations: AstrOsLocationCollection) {
     try {
-      this.coreModule = modules.coreModule ?? this.coreModule;
-      this.domeModule = modules.domeModule ?? this.domeModule;
-      this.bodyModule = modules.bodyModule ?? this.bodyModule;
+      this.coreLocation = locations.coreModule ?? this.coreLocation;
+      this.domeLocation = locations.domeModule ?? this.domeLocation;
+      this.bodyLocation = locations.bodyModule ?? this.bodyLocation;
     } catch (err) {
       console.error(err);
     }

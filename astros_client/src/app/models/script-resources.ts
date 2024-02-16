@@ -3,10 +3,10 @@ import { ContentObserver } from "@angular/cdk/observers";
 import {
     ChannelType, ControlModule,
     I2cChannel, ServoChannel, UartModule,
-    UartType, Script, UartChannel
+    UartType, Script, UartChannel, ControllerLocation
 } from "astros-common";
 
-export class ControllerDetails {
+export class LocationDetails {
     id: number;
     name: string;
     //type:name
@@ -31,7 +31,7 @@ export class ScriptResources {
 
     private loaded = false;
 
-    controllers: Map<number, ControllerDetails>;
+    locations: Map<number, LocationDetails>;
 
     uartChannels: Map<number, Array<ChannelValue>>;
 
@@ -39,26 +39,26 @@ export class ScriptResources {
 
     i2cChannels: Map<number, Array<ChannelValue>>;
 
-    constructor(controllers: Array<ControlModule>) {
-        this.controllers = new Map<number, ControllerDetails>();
+    constructor(locations: Array<ControllerLocation>) {
+        this.locations = new Map<number, LocationDetails>();
         this.servoChannels = new Map<number, Array<any>>();
         this.i2cChannels = new Map<number, Array<any>>();
         this.uartChannels = new Map<number, Array<any>>();
 
-        this.controllers.set(4, new ControllerDetails(4, 'Audio Playback'));
+        this.locations.set(4, new LocationDetails(4, 'Audio Playback'));
 
-        controllers.forEach(con => {
+        locations.forEach(loc => {
 
 
-            this.controllers.set(con.id, new ControllerDetails(con.id, con.name));
+            this.locations.set(loc.id, new LocationDetails(loc.id, loc.locationName));
 
-            this.uartChannels.set(con.id, con.uartModule.channels.map((ch: UartChannel) => new ChannelValue(ch, ch.type != UartType.none)))
-            this.servoChannels.set(con.id, con.servoModule.channels.map((ch: ServoChannel) => new ChannelValue(ch, ch.enabled)));
-            this.i2cChannels.set(con.id, con.i2cModule.channels.map((ch: I2cChannel) => new ChannelValue(ch, ch.enabled)));
+            this.uartChannels.set(loc.id, loc.uartModule.channels.map((ch: UartChannel) => new ChannelValue(ch, ch.type != UartType.none)))
+            this.servoChannels.set(loc.id, loc.servoModule.channels.map((ch: ServoChannel) => new ChannelValue(ch, ch.enabled)));
+            this.i2cChannels.set(loc.id, loc.i2cModule.channels.map((ch: I2cChannel) => new ChannelValue(ch, ch.enabled)));
 
-            this.uartChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
-            this.servoChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
-            this.i2cChannels.get(con.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
+            this.uartChannels.get(loc.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
+            this.servoChannels.get(loc.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
+            this.i2cChannels.get(loc.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
         });
     }
 
@@ -79,7 +79,7 @@ export class ScriptResources {
                     this.i2cChannels.get(ch.controllerId)![ch.channel.id].available = false;
                     break;
                 case ChannelType.audio:
-                    this.controllers.delete(4);
+                    this.locations.delete(4);
                     break;
             }
         });
@@ -88,7 +88,7 @@ export class ScriptResources {
     getAvailableModules(): Map<number, Map<ChannelType, string>> {
         const result = new Map<number, Map<ChannelType, string>>();
 
-        for (const ctrl of this.controllers.keys()) {
+        for (const ctrl of this.locations.keys()) {
             if (ctrl === 4 || ctrl === 0) {
                 continue;
             }
@@ -102,7 +102,7 @@ export class ScriptResources {
     getAvailableChannels(): Map<number, Map<ChannelType, Array<ChannelValue>>> {
         const result = new Map<number, Map<ChannelType, any>>()
 
-        for (const ctrl of this.controllers.keys()) {
+        for (const ctrl of this.locations.keys()) {
             if (ctrl === 4 || ctrl === 0) {
                 continue;
             }
@@ -132,7 +132,7 @@ export class ScriptResources {
     addChannel(controller: number, type: ChannelType, id: number): any {
 
         if (controller === 4) {
-            this.controllers.delete(4);
+            this.locations.delete(4);
             return undefined;
         }
 
@@ -163,30 +163,30 @@ export class ScriptResources {
         return undefined;
     }
 
-    removeChannel(controller: number, type: ChannelType, id: number): void {
+    removeChannel(location: number, type: ChannelType, id: number): void {
 
-        if (controller === 4) {
-            this.controllers.set(4, new ControllerDetails(4, 'Audio Playback'))
+        if (location === 4) {
+            this.locations.set(4, new LocationDetails(4, 'Audio Playback'))
             return
         }
 
         switch (type) {
             case ChannelType.uart:
-                const uartIdx = this.uartChannels.get(controller)?.findIndex(x => x.channel.id === id);
+                const uartIdx = this.uartChannels.get(location)?.findIndex(x => x.channel.id === id);
                 if (uartIdx !== undefined && uartIdx > -1) {
-                    this.uartChannels.get(controller)![uartIdx].available = true;
+                    this.uartChannels.get(location)![uartIdx].available = true;
                 }
                 break;
             case ChannelType.servo:
-                const servoIdx = this.servoChannels.get(controller)?.findIndex(x => x.channel.id === id);
+                const servoIdx = this.servoChannels.get(location)?.findIndex(x => x.channel.id === id);
                 if (servoIdx !== undefined && servoIdx > -1) {
-                    this.servoChannels.get(controller)![servoIdx].available = true;
+                    this.servoChannels.get(location)![servoIdx].available = true;
                 }
                 break;
             case ChannelType.i2c:
-                const i2cIdx = this.i2cChannels.get(controller)?.findIndex(x => x.channel.id === id);
+                const i2cIdx = this.i2cChannels.get(location)?.findIndex(x => x.channel.id === id);
                 if (i2cIdx !== undefined && i2cIdx > -1) {
-                    this.i2cChannels.get(controller)![i2cIdx].available = false;
+                    this.i2cChannels.get(location)![i2cIdx].available = false;
                 }
                 break;
         }
