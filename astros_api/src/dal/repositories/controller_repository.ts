@@ -4,6 +4,7 @@ import { ControllersTable } from "../../dal/tables/controllers_table";
 import { logger } from "../../logger";
 
 export class ControllerRepository {
+
     dao: DataAccess;
 
     constructor(dao: DataAccess) {
@@ -11,26 +12,14 @@ export class ControllerRepository {
         this.dao.connect();
     }
 
-
-    public async getControllers(): Promise<Array<ControlModule>> {
-        const result = new Array<ControlModule>();
-        await this.dao
-            .get(ControllersTable.selectAll, [])
-            .then((val: any) => {
-                for (const c of val) {
-                    const control = new ControlModule(
-                        c.id,
-                        c.controllerName,
-                        c.controllerAddress);
-                    result.push(control);
-                }
-            })
-            .catch((err: any) => {
-                logger.error(err);
-                throw "error";
-            });
-
-        return result;
+    insertControllers(controllers: any) {
+        for (const controller of controllers) {
+            this.dao.run(ControllersTable.upsert, [controller.name, controller.address])
+                .catch((err: any) => {
+                    logger.error(err);
+                    throw "error";
+                });
+        }
     }
 
     public async insertController(controller: ControlModule): Promise<number> {
@@ -62,5 +51,47 @@ export class ControllerRepository {
             });
 
         return true;
+    }
+
+    public async getControllers(): Promise<Array<ControlModule>> {
+        const result = new Array<ControlModule>();
+        await this.dao
+            .get(ControllersTable.selectAll, [])
+            .then((val: any) => {
+                for (const c of val) {
+                    const control = new ControlModule(
+                        c.id,
+                        c.controllerName,
+                        c.controllerAddress);
+                    result.push(control);
+                }
+            })
+            .catch((err: any) => {
+                logger.error(err);
+                throw "error";
+            });
+
+        return result;
+    }
+
+    public async getControllerByAddress(address: string): Promise<ControlModule | null> {
+        await this.dao
+            .get(ControllersTable.selectByAddress, [address])
+            .then((val: any) => {
+
+                if (val.length > 0) {
+                    const control = new ControlModule(
+                        val[0].id,
+                        val[0].controllerName,
+                        val[0].controllerAddress);
+                    return control;
+                }
+            })
+            .catch((err: any) => {
+                logger.error(err);
+                throw "error";
+            });
+
+        return null;
     }
 }

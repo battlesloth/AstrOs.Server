@@ -10,14 +10,14 @@ function timestamp(): string {
     const hours = date_ob.getHours();
     const minutes = date_ob.getMinutes();
     const seconds = date_ob.getSeconds();
-    
+
     return `${year}_${month}_${day}_${hours}_${minutes}_${seconds}`;
 }
 
 export const logger = pino({
     level: "debug"
-    }, 
-   // pino.destination(`${appdata("astrosserver")}/astros_${timestamp()}.log`)
+},
+    pino.destination(`${appdata("astrosserver")}/astros_${timestamp()}.log`)
 )
 
 

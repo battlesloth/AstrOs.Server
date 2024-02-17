@@ -1,4 +1,4 @@
-import { ControlModule, ControllerLocation } from "astros-common";
+import { ControllerLocation } from "astros-common";
 import { ServoConfig } from "./servo_config";
 
 export class ControllerConfig {

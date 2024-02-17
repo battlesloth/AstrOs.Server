@@ -20,6 +20,7 @@ export { GenericSerialEvent } from './scripts/events/generic_serial_event';
 export { ServoEvent } from './scripts/events/servo_event';
 export { I2cEvent } from './scripts/events/i2c_event';
 export { BaseResponse } from './networking/base_response';
+export { ControllersResponse } from './networking/controllers_response';
 export { StatusResponse } from './networking/status_repsonse';
 export { ScriptResponse } from './networking/script_response';
 export { M5Page, PageButton } from './remotes/M5Page';

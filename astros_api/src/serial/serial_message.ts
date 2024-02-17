@@ -1,9 +1,3 @@
-export enum SerialWorkerResponseType {
-    UNKNOWN,
-    TIMEOUT,
-    SEND_SERIAL_MESSAGE,
-    UPDATE_CLIENTS
-}
 
 export enum SerialMessageType {
 
@@ -47,11 +41,13 @@ export class SerialMsgValidationResult {
     public valid: boolean;
     public type: SerialMessageType;
     public id: string;
+    public data: string;
 
     constructor() {
         this.valid = false;
         this.type = SerialMessageType.UNKNOWN;
         this.id = "";
+        this.data = "";
     }
 }
 

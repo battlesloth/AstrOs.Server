@@ -16,6 +16,17 @@ export class ControllersTable {
     VALUES (?, ?)
     RETURNING id`;
 
+    public static readonly upsert =
+        `INSERT INTO ${this.table}
+    (${this.controllerName},
+    ${this.controllerAddress})
+    VALUES (?, ?)
+    ON CONFLICT(${this.controllerAddress})
+    DO UPDATE SET
+    ${this.controllerName} = ?
+    ${this.controllerAddress} = ?
+    RETURNING id`;
+
     public static readonly select =
         `SELECT 
     ${this.controllerName},
@@ -29,6 +40,14 @@ export class ControllersTable {
     ${this.controllerName},
     ${this.controllerAddress}
     FROM ${this.table}`;
+
+    public static readonly selectByAddress =
+        `SELECT
+    ${this.id},
+    ${this.controllerName},
+    ${this.controllerAddress}
+    FROM ${this.table}
+    WHERE ${this.controllerAddress} = ?`;
 
     public static readonly update =
         `UPDATE ${this.table}

@@ -2,7 +2,7 @@ import { logger } from "../../logger";
 import { DataAccess } from "../data_access";
 import { LocationsTable } from "../tables/locations_table";
 import { ControllerLocationTable } from "../tables/controller_location_table";
-import { ControlModule, ControllerLocation, I2cChannel, ServoChannel, UartChannel, UartModule } from "astros-common";
+import { ControlModule, ControllerLocation, I2cChannel, ServoChannel, UartChannel } from "astros-common";
 import { UartModuleTable } from "../tables/uart_module_table";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
@@ -37,6 +37,30 @@ export class LocationsRepository {
             });
 
         return result;
+    }
+
+    public async getLocationByController(id: number): Promise<ControllerLocation | null> {
+        await this.dao
+            .get(ControllerLocationTable.selectLocationByController, [id.toString()])
+            .then((val: any) => {
+
+                if (val.length > 0) {
+                    const location = new ControllerLocation(
+                        val[0].id,
+                        val[0].locationName,
+                        val[0].locationDescription,
+                        val[0].configFingerprint
+                    );
+
+                    return location;
+                }
+            })
+            .catch((err: any) => {
+                logger.error(err);
+                throw err;
+            });
+
+        return null;
     }
 
     public async loadLocations(): Promise<Array<ControllerLocation>> {

@@ -13,7 +13,7 @@ export enum ChannelSubType {
     humanCyborgRelations = 3
 }
 
-export enum UartType{
+export enum UartType {
     none = 0,
     genericSerial = 1,
     kangaroo = 2,
@@ -32,24 +32,25 @@ export enum ControllerStatus {
     down,
 }
 
-export enum TransmissionType{
+export enum TransmissionType {
     script,
     sync,
     status,
+    controllers,
     run,
     panic,
     directCommand,
     formatSD
 }
 
-export enum TransmissionStatus{
+export enum TransmissionStatus {
     unknown,
     sending,
     success,
     failed
 }
 
-export enum DirectCommnandType{
+export enum DirectCommnandType {
     servo,
     i2c,
     uart
@@ -101,4 +102,4 @@ export enum HcrCommandCategory {
     stop,
     volume,
     override
-  }
+}

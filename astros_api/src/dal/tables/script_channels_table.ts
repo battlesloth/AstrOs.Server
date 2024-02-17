@@ -1,6 +1,3 @@
-import { ControllersTable } from "./controllers_table";
-
-
 export class ScriptChannelsTable {
     public static readonly table = 'script_channels';
     public static readonly id = 'id';

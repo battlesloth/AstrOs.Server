@@ -2,8 +2,8 @@ import { v4 } from "uuid";
 import { logger } from "../logger";
 import { MessageGenerator } from "./message_generator";
 import { MessageHandler } from "./message_handler";
-import { SerialMessageType, SerialWorkerResponseType } from "./serial_message";
-import { ISerialWorkerResponse } from "./serial_worker_response";
+import { SerialMessageType } from "./serial_message";
+import { ISerialWorkerResponse, SerialWorkerResponseType } from "./serial_worker_response";
 import { SerialMessageTracker } from "./serial_message_tracker";
 import { MessageHelper } from "./message_helper";
 
@@ -35,7 +35,7 @@ export class SerialMessageService {
 
     public handleMessage(msg: any): ISerialWorkerResponse {
 
-        const result: ISerialWorkerResponse = { type: SerialWorkerResponseType.UNKNOWN };
+        let result: ISerialWorkerResponse = { type: SerialWorkerResponseType.UNKNOWN };
 
         if (msg === null || msg === undefined) {
             logger.error("Received null or undefined message");
@@ -62,12 +62,10 @@ export class SerialMessageService {
 
         switch (validationResult.type) {
             case SerialMessageType.POLL_ACK:
-                result.type = SerialWorkerResponseType.UPDATE_CLIENTS;
-                result.data = validationResult.id;
+                result = this.messageHandler.handlePollAck(validationResult.data);
                 break;
             case SerialMessageType.REGISTRATION_SYNC_ACK:
-                result.type = SerialWorkerResponseType.UPDATE_CLIENTS;
-                result.data = validationResult.id;
+                result = this.messageHandler.handleRegistraionSyncAck(validationResult.data);
                 break;
         }
 

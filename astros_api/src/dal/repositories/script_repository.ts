@@ -2,7 +2,7 @@ import { DataAccess } from "../../dal/data_access";
 import { ScriptsTable } from "../../dal/tables/scripts_table";
 import { ScriptChannelsTable } from "../../dal/tables/script_channels_table";
 import { ScriptEventsTable } from "../../dal/tables/script_events_table";
-import { ChannelType, I2cChannel, ServoChannel, UartModule, Script, ScriptChannel, ScriptEvent, ChannelSubType, UartChannel } from "astros-common";
+import { ChannelType, I2cChannel, ServoChannel, Script, ScriptChannel, ScriptEvent, ChannelSubType, UartChannel } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
@@ -305,7 +305,7 @@ export class ScriptRepository {
         script.deploymentStatus = new Map<number, { date: Date, status: any }>();
         script.lastSaved = new Date();
 
-        const success = await this.saveScript(script)
+        await this.saveScript(script)
             .catch((err: any) => {
                 logger.error(`Exception saving copy script for ${id} => ${err}`);
             });

@@ -26,7 +26,10 @@ import { ScriptUpload } from "./models/scripts/script_upload";
 import { ScriptRepository } from "./dal/repositories/script_repository";
 
 import { ScriptConverter } from "./script_converter";
-import { BaseResponse, Script, TransmissionStatus, TransmissionType } from "astros-common";
+import {
+    BaseResponse, ControlModule, Script, StatusResponse, ControllersResponse,
+    TransmissionStatus, TransmissionType
+} from "astros-common";
 import { ControllerRepository } from "./dal/repositories/controller_repository";
 import { ConfigSync } from "./models/config/config_sync";
 import { ScriptRun } from "./models/scripts/script_run";
@@ -35,7 +38,12 @@ import { RemoteConfigController } from "./controllers/remote_config_controller";
 import { SettingsController } from "./controllers/settings_controller";
 import { ApiKeyValidator } from "./api_key_validator";
 import { P } from "pino";
-import { SerialMessageType, SerialWorkerResponseType } from "./serial/serial_message";
+import { SerialMessageType } from "./serial/serial_message";
+import {
+    ISerialWorkerResponse, PollRepsonse, RegistrationResponse,
+    SerialWorkerResponseType
+} from "./serial/serial_worker_response";
+import { LocationsRepository } from "./dal/repositories/locations_repository";
 
 const { SerialPort } = eval("require('serialport')");
 const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
@@ -62,8 +70,8 @@ class ApiServer {
     constructor() {
         Dotenv.config({ path: __dirname + '/.env' });
 
-        this.apiPort = Number.parseInt(process.env.API_PORT!);
-        this.websocketPort = Number.parseInt(process.env.WEBSOCKET_PORT!);
+        this.apiPort = Number.parseInt(process.env.API_PORT || '3000');
+        this.websocketPort = Number.parseInt(process.env.WEBSOCKET_PORT || '5000');
 
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
@@ -231,7 +239,7 @@ class ApiServer {
             this.handleSerialWorkerMessage(msg);
         });
 
-        this.serialPort = new SerialPort({ path: process.env.SERIAL_PORT!, baudRate: +process.env.BAUD_RATE! });
+        this.serialPort = new SerialPort({ path: process.env.SERIAL_PORT || "/dev/ttyS0", baudRate: Number.parseInt(process.env.BAUD_RATE || "9600") });
         this.serialParser = this.serialPort.pipe(new DelimiterParser({ delimiter: '\n' }))
             .on('data', (data: any) => {
                 this.serialWorker.postMessage({ type: SerialMessageType.SERIAL_MSG_RECEIVED, data: data.toString() })
@@ -253,8 +261,7 @@ class ApiServer {
         });
     }
 
-
-    handleSerialWorkerMessage(msg: any) {
+    handleSerialWorkerMessage(msg: ISerialWorkerResponse): void {
         switch (msg.type) {
             case SerialWorkerResponseType.UNKNOWN:
                 logger.error('Invalid message received');
@@ -269,9 +276,64 @@ class ApiServer {
             case SerialWorkerResponseType.UPDATE_CLIENTS:
                 this.updateClients(msg);
                 break
+            case SerialWorkerResponseType.REGISTRATION_SYNC:
+                this.handleResgistraionResponse(msg);
+                break;
+            case SerialWorkerResponseType.POLL:
+                this.handlePollResponse(msg);
+                break
         }
     }
 
+    async handlePollResponse(msg: ISerialWorkerResponse) {
+        try {
+            const val = msg as PollRepsonse;
+
+            const dao = new DataAccess();
+            const controlerRepo = new ControllerRepository(dao);
+            const locationRepo = new LocationsRepository(dao);
+
+            const controller = await controlerRepo.getControllerByAddress(val.controller.address);
+
+            if (controller === null) {
+                logger.error(`Controller not found for address: ${val.controller.address}`);
+                return;
+            }
+
+            const location = await locationRepo.getLocationByController(controller.id);
+
+            if (location === null) {
+                logger.error(`Location not found for controller: ${val.controller.name}`);
+                return;
+            }
+
+            const update = new StatusResponse(controller.id, location.locationName, true, val.controller.fingerprint === location.configFingerprint);
+
+            this.updateClients(update);
+        }
+        catch (error) {
+            logger.error(`Error handling poll response: ${error}`);
+        }
+    }
+
+    async handleResgistraionResponse(msg: ISerialWorkerResponse) {
+        try {
+            const val = msg as RegistrationResponse;
+
+            const dao = new DataAccess();
+            const controllerRepo = new ControllerRepository(dao);
+
+            await controllerRepo.insertControllers(val.controllers);
+
+            const contollers = await controllerRepo.getControllers();
+
+            const update = new ControllersResponse(contollers);
+            this.updateClients(update);
+        }
+        catch (error) {
+            logger.error(`Error handling poll response: ${error}`);
+        }
+    }
 
     private async syncControllers(req: any, res: any, next: any) {
         try {

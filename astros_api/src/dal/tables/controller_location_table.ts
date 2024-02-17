@@ -25,7 +25,6 @@ export class ControllerLocationTable {
     FROM ${this.table}
     WHERE ${this.controllerId} = ?`;
 
-
     public static readonly selectLocationControllers = `SELECT
     l.${LocationsTable.id} as locationId,
     l.${LocationsTable.name} as locationName,
@@ -38,6 +37,14 @@ export class ControllerLocationTable {
     JOIN ${this.table} cl ON l.${LocationsTable.id} = cl.${this.locationId}
     JOIN ${ControllersTable.table} c ON c.${ControllersTable.id} = cl.${this.controllerId}`;
 
+    public static readonly selectLocationByController = `SELECT
+    l.${LocationsTable.id} as locationId,
+    l.${LocationsTable.name} as locationName,
+    l.${LocationsTable.description} as locationDescription,
+    l.${LocationsTable.configFingerprint} as locationFingerprint,
+    FROM ${LocationsTable.table} l
+    JOIN ${this.table} cl ON l.${LocationsTable.id} = cl.${this.locationId}
+    WHERE cl.${this.controllerId} = ?`;
 
     public static readonly selectAll = `SELECT 
     ${this.controllerId}, 

@@ -17,10 +17,6 @@ import { logger } from "../logger";
 import { RemoteConfigTable } from "./tables/remote_config_table";
 import { ScriptsDeploymentTable } from "./tables/scripts_deployment_table";
 import { LocationsTable } from "./tables/locations_table";
-import e from "express";
-
-
-
 
 export class DataAccess {
 

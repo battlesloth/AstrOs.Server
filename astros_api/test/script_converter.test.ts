@@ -1,11 +1,11 @@
 
 import {
     ChannelType, KangarooController, UartType, KangarooAction, KangarooEvent,
-    Script, ScriptChannel, ScriptEvent, ServoEvent, ChannelSubType, ServoChannel, UartChannel, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, HcrCommand, HcrCommandCategory, humanCyborgRelationsController
+    Script, ScriptChannel, ScriptEvent, ServoEvent, ChannelSubType, ServoChannel,
+    UartChannel, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, HcrCommand, HcrCommandCategory
 } from "astros-common";
 import { ScriptConverter, CommandType } from "../src/script_converter";
-import { json } from "stream/consumers";
-import { createTypeReferenceDirectiveResolutionCache, isPropertyAccessOrQualifiedName } from "typescript";
+
 
 function generateKangarooEvent(time: number, ch1Action: KangarooAction, ch1Speed: number, ch1Position: number,
     ch2Action: KangarooAction, ch2Speed: number, ch2Position: number) {

@@ -13,7 +13,7 @@ export class ScriptUpload {
         this.configs = new Array<ScriptConfig>();
 
         controllers.forEach(ctl => {
-            const cfig = new ScriptConfig(ctl, scripts.get(ctl.id)!)
+            const cfig = new ScriptConfig(ctl, scripts.get(ctl.id) || "")
             this.configs.push(cfig);
         });
     }

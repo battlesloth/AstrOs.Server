@@ -1,5 +1,5 @@
 
-import { ControlModule, AstrOsLocationCollection } from "astros-common";
+import { AstrOsLocationCollection } from "astros-common";
 import { DataAccess } from "../dal/data_access";
 import { logger } from "../logger";
 import { LocationsRepository } from "../dal/repositories/locations_repository";
@@ -52,8 +52,6 @@ export class LocationsController {
         try {
             const dao = new DataAccess();
             const repo = new LocationsRepository(dao);
-
-            const controllers = new Array<ControlModule>();
 
             const modules = req.body as AstrOsLocationCollection;
 

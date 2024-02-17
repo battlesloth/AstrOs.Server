@@ -7,7 +7,7 @@ export class StatusResponse extends BaseResponse {
     controllerLocation: string;
     up: boolean;
     synced: boolean
-    l
+
     constructor(controllerId: number, controllerLocation: string, up: boolean, synced: boolean) {
         super(TransmissionType.status, true, '');
 

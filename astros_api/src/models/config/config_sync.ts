@@ -1,4 +1,4 @@
-import { ControlModule, ControllerLocation, TransmissionType } from "astros-common";
+import { ControllerLocation, TransmissionType } from "astros-common";
 import { ControllerConfig } from "./controller_config";
 
 export class ConfigSync {
