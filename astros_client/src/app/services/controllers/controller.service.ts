@@ -21,6 +21,16 @@ export class ControllerService {
     return this.http.get<AstrOsLocationCollection>('/api/locations', {
       headers: { Authorization: `Bearer ${this.getToken()}` }
     })
+      .pipe(tap(_ => console.log('got locations')),
+        catchError(this.handleError<AstrOsLocationCollection>('getLocations'))
+      );
+  }
+
+  public getLoadedLocations(): Observable<AstrOsLocationCollection> {
+
+    return this.http.get<AstrOsLocationCollection>('/api/locations/load', {
+      headers: { Authorization: `Bearer ${this.getToken()}` }
+    })
       .pipe(tap(_ => console.log('loaded locations')),
         catchError(this.handleError<AstrOsLocationCollection>('getLocations'))
       );
@@ -36,12 +46,22 @@ export class ControllerService {
       );
   }
 
-  public syncLocations(): Observable<any> {
-    return this.http.get<any>('/api/locations/sync', {
+  public syncControllers(): Observable<any> {
+    return this.http.get<any>('/api/locations/synccontrollers', {
       headers: { Authorization: `Bearer ${this.getToken()}` }
     })
       .pipe(
-        tap(_ => console.log(`syncLocations result: ${_.message}`)),
+        tap(_ => console.log(`syncControllers result: ${_.message}`)),
+        catchError(this.handleError<any>('syncLocations'))
+      );
+  }
+
+  public syncLocationConfig(): Observable<any> {
+    return this.http.get<any>('/api/locations/syncconfig', {
+      headers: { Authorization: `Bearer ${this.getToken()}` }
+    })
+      .pipe(
+        tap(_ => console.log(`syncLocationConfig result: ${_.message}`)),
         catchError(this.handleError<any>('syncLocations'))
       );
   }

@@ -15,7 +15,11 @@ import { scheduled } from 'rxjs';
 export class EspModuleComponent implements OnInit {
 
   @Input()
+  isMaster: boolean = false;
+
+  @Input()
   module!: ControllerLocation;
+
 
   @ViewChild('uart1Container', { read: ViewContainerRef }) uart1Container!: ViewContainerRef;
   @ViewChild('uart2Container', { read: ViewContainerRef }) uart2Container!: ViewContainerRef;
@@ -41,6 +45,9 @@ export class EspModuleComponent implements OnInit {
   }
 
   ngOnChanges() {
+
+
+
     if (this.originalUart1Type === undefined &&
       this.module !== undefined &&
       this.uart1Container !== undefined) {

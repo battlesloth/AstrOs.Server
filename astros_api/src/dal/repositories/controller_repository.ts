@@ -12,9 +12,9 @@ export class ControllerRepository {
         this.dao.connect();
     }
 
-    insertControllers(controllers: any) {
-        for (const controller of controllers) {
-            this.dao.run(ControllersTable.upsert, [controller.name, controller.address])
+    public async insertControllers(controllers: any) {
+        for (let i = 0; i < controllers.length; i++) {
+            await this.dao.run(ControllersTable.insert, [controllers[i].name, controllers[i].address])
                 .catch((err: any) => {
                     logger.error(err);
                     throw "error";
@@ -75,16 +75,18 @@ export class ControllerRepository {
     }
 
     public async getControllerByAddress(address: string): Promise<ControlModule | null> {
+
+        let control = null;
+
         await this.dao
             .get(ControllersTable.selectByAddress, [address])
             .then((val: any) => {
 
                 if (val.length > 0) {
-                    const control = new ControlModule(
+                    control = new ControlModule(
                         val[0].id,
                         val[0].controllerName,
                         val[0].controllerAddress);
-                    return control;
                 }
             })
             .catch((err: any) => {
@@ -92,6 +94,6 @@ export class ControllerRepository {
                 throw "error";
             });
 
-        return null;
+        return control;
     }
 }

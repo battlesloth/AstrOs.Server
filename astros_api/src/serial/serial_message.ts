@@ -10,6 +10,9 @@ export enum SerialMessageType {
     REGISTRATION_SYNC_ACK,
     POLL_ACK,
     POLL_NAK,
+    DEPLOY_CONFIG, // from web server
+    DEPLOY_CONFIG_ACK,
+    DEPLOY_CONFIG_NAK,
     DEPLOY_SCRIPT, // from web server
     DEPLOY_SCRIPT_ACK,
     DEPLOY_SCRIPT_NAK,

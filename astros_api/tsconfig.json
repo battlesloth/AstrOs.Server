@@ -24,5 +24,12 @@
                 "exclude": ["*"]
             }
         ]
-    }
+    },
+    "exclude": [ 
+        "./jest.config.js",
+        "./webpack.config.js",
+        "dist",
+        "**/*.test.ts",
+        "**/*.mock.ts",
+    ]
 }

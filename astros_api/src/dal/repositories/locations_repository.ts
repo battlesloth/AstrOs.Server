@@ -24,8 +24,8 @@ export class LocationsRepository {
                 for (const c of val) {
                     const location = new ControllerLocation(
                         c.id,
-                        c.locationName,
-                        c.locationDescription,
+                        c.name,
+                        c.description,
                         c.configFingerprint
                     );
                     result.push(location);
@@ -40,19 +40,19 @@ export class LocationsRepository {
     }
 
     public async getLocationByController(id: number): Promise<ControllerLocation | null> {
+
+        let location = null;
+
         await this.dao
             .get(ControllerLocationTable.selectLocationByController, [id.toString()])
             .then((val: any) => {
-
                 if (val.length > 0) {
-                    const location = new ControllerLocation(
+                    location = new ControllerLocation(
                         val[0].id,
                         val[0].locationName,
                         val[0].locationDescription,
                         val[0].configFingerprint
                     );
-
-                    return location;
                 }
             })
             .catch((err: any) => {
@@ -60,7 +60,7 @@ export class LocationsRepository {
                 throw err;
             });
 
-        return null;
+        return location;
     }
 
     public async loadLocations(): Promise<Array<ControllerLocation>> {
@@ -70,13 +70,13 @@ export class LocationsRepository {
             .then((val: any) => {
                 for (const c of val) {
                     const location = new ControllerLocation(
-                        c.id,
+                        c.locationId,
                         c.locationName,
                         c.locationDescription,
                         c.configFingerprint
                     );
 
-                    if (c.controllerId !== null || c.controllerId !== undefined) {
+                    if (c.controllerId !== null && c.controllerId !== undefined) {
                         location.controller = new ControlModule(
                             c.controllerId,
                             c.controllerName,
@@ -92,8 +92,11 @@ export class LocationsRepository {
                 throw "error";
             });
 
-        for (const loc of result) {
-            await this.loadLocationConfiguration(loc);
+
+
+
+        for (let i = 0; i < result.length; i++) {
+            await this.loadLocationConfiguration(result[i]);
         }
 
         return result;
@@ -102,10 +105,15 @@ export class LocationsRepository {
     public async loadLocationConfiguration(location: ControllerLocation): Promise<ControllerLocation> {
 
         // load the 3 uart channels
-        for (let i = 1; i < 4; i++) {
+        for (let i = 0; i < 3; i++) {
             await this.dao
-                .get(UartModuleTable.select, [location.id.toString(), i.toString()])
+                .get(UartModuleTable.select, [i.toString(), location.id.toString()])
                 .then((val: any) => {
+
+                    if (val.length === 0) {
+                        return;
+                    }
+
                     const uart = new UartChannel(
                         val[0].uartType,
                         i,

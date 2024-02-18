@@ -37,7 +37,7 @@ export class Script {
     }
 
     public getStatus(controllerId: number): UploadStatus {
-        return this.deploymentStatus.get(controllerId).status;
+        return this.deploymentStatus.get(controllerId)?.status || UploadStatus.notUploaded;
     }
 
     public updateDeployment(controllerId: number, date: Date): void {

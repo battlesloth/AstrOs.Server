@@ -17,6 +17,7 @@ import { logger } from "../logger";
 import { RemoteConfigTable } from "./tables/remote_config_table";
 import { ScriptsDeploymentTable } from "./tables/scripts_deployment_table";
 import { LocationsTable } from "./tables/locations_table";
+import { ControllerLocationTable } from "./tables/controller_location_table";
 
 export class DataAccess {
 
@@ -155,6 +156,8 @@ export class DataAccess {
 
         await this.createTable(ControllersTable.table, ControllersTable.create);
 
+        await this.createTable(ControllerLocationTable.table, ControllerLocationTable.create);
+
         await this.createTable(UartModuleTable.table, UartModuleTable.create);
 
         await this.createTable(ServoChannelsTable.table, ServoChannelsTable.create);
@@ -196,15 +199,25 @@ export class DataAccess {
                 throw err;
             });
 
+
+        await this.run(ControllersTable.insert, ["master", "00:00:00:00:00:00"])
+            .then(() => {
+                logger.info("Added default master controller")
+            })
+            .catch((err) => {
+                console.error(`Error adding default master controller: ${err}`);
+                throw err;
+            });
+
         // default locations for AstrOs
         // TODO: refactor this so it's injected so we can make this app more generally useful
 
-        const locations = [AstrOsConstants.CORE, AstrOsConstants.DOME, AstrOsConstants.BODY];
+        const locations = [AstrOsConstants.BODY, AstrOsConstants.CORE, AstrOsConstants.DOME];
 
         const nameMap = new Map();
+        nameMap.set(AstrOsConstants.BODY, "Body Controller");
         nameMap.set(AstrOsConstants.CORE, "Dome Core Controller");
         nameMap.set(AstrOsConstants.DOME, "Dome Surface Controller");
-        nameMap.set(AstrOsConstants.BODY, "Body Controller");
 
         for await (const loc of locations) {
 
@@ -260,6 +273,9 @@ export class DataAccess {
 
             logger.info(`Added default location ${loc}, id: ${id}`);
         }
+
+        // set master controller location to body location
+        await this.run(ControllerLocationTable.insert, ["1", "1"]);
 
         await this.run(SettingsTable.insert, ["version", "1"]).then(() => {
             logger.info("Updated database to version 1");

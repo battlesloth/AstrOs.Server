@@ -200,7 +200,9 @@ class ApiServer {
 
         this.router.get(LocationsController.route, this.authHandler, LocationsController.getLocations);
         this.router.put(LocationsController.route, this.authHandler, LocationsController.saveLocations);
-        this.router.get(LocationsController.syncRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllers(req, res, next); });
+        this.router.get(LocationsController.loadRoute, this.authHandler, LocationsController.loadLocations);
+        this.router.get(LocationsController.syncConfigRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllerConfig(req, res, next); });
+        this.router.get(LocationsController.syncControllersRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllers(req, res, next); });
 
         this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
@@ -295,6 +297,9 @@ class ApiServer {
 
             const controller = await controlerRepo.getControllerByAddress(val.controller.address);
 
+
+            logger.info(`${JSON.stringify(controller)}`);
+
             if (controller === null) {
                 logger.error(`Controller not found for address: ${val.controller.address}`);
                 return;
@@ -323,15 +328,15 @@ class ApiServer {
             const dao = new DataAccess();
             const controllerRepo = new ControllerRepository(dao);
 
-            await controllerRepo.insertControllers(val.controllers);
+            await controllerRepo.insertControllers(val.registrations);
 
             const contollers = await controllerRepo.getControllers();
 
-            const update = new ControllersResponse(contollers);
+            const update = new ControllersResponse(val.success, contollers);
             this.updateClients(update);
         }
         catch (error) {
-            logger.error(`Error handling poll response: ${error}`);
+            logger.error(`Error handling registration response: ${error}`);
         }
     }
 
@@ -341,7 +346,24 @@ class ApiServer {
             logger.info('syncing controllers');
             this.serialWorker.postMessage({ type: SerialMessageType.REGISTRATION_SYNC, data: null });
             res.status(200);
+            res.json({ message: "success" });
+        } catch (error) {
+            logger.error(error);
 
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
+    }
+
+    private async syncControllerConfig(req: any, res: any, next: any) {
+        try {
+
+            logger.info('syncing controller config');
+            this.serialWorker.postMessage({ type: SerialMessageType.DEPLOY_CONFIG, data: null });
+            res.status(200);
+            res.json({ message: "success" });
         } catch (error) {
             logger.error(error);
 

@@ -16,6 +16,23 @@
         <mat-accordion class="module-accordian">
             <mat-expansion-panel>
                 <mat-expansion-panel-header>
+                    <mat-panel-title>Body Module</mat-panel-title>
+                    <div class="warning tooltip" #body>
+                        <span class="tooltiptext">{{bodyCaption.str}}</span>
+                        <fa-icon [icon]="bodyWarning"></fa-icon>       
+                    </div>   
+                </mat-expansion-panel-header>
+                <ng-container>
+                    <div class="controller-select">
+                        <select title="Controller Select" disabled>
+                            <option value="0" selected>Master Controller</option>
+                        </select>       
+                    </div>
+                    <app-esp-module [module]="bodyLocation" [isMaster]="true"></app-esp-module>
+                </ng-container>
+            </mat-expansion-panel>
+            <mat-expansion-panel>
+                <mat-expansion-panel-header>
                     <mat-panel-title>Dome Core Module</mat-panel-title>
                     <div class="warning tooltip" #core>
                         <span class="tooltiptext">{{coreCaption.str}}</span>
@@ -23,8 +40,10 @@
                     </div>
                 </mat-expansion-panel-header>
                 <ng-container>
-                    <div class="ip-input">
-                        <input name="coreIp" matInput placeholder="Fix Me" [(ngModel)]="coreLocation.locationName"/>        
+                    <div class="controller-select">
+                        <select title="Controller Select">
+                            <option value="0" selected>Disabled</option>
+                        </select>       
                     </div>
                     <app-esp-module [module]="coreLocation"></app-esp-module>
                 </ng-container>
@@ -38,28 +57,19 @@
                     </div>
                 </mat-expansion-panel-header>
                 <ng-container>
-                    <div class="ip-input">
-                        <input name="domeIp" matInput placeholder="Fix Me" [(ngModel)]="domeLocation.locationName"/>        
+                    <div class="controller-select">
+                        <select title="Controller Select">
+                            <option value="0" selected>Disabled</option>
+                        </select>       
                     </div>
                     <app-esp-module [module]="domeLocation"></app-esp-module>
-                </ng-container>
-            </mat-expansion-panel>
-            <mat-expansion-panel>
-                <mat-expansion-panel-header>
-                    <mat-panel-title>Body Module</mat-panel-title>
-                    <div class="warning tooltip" #body>
-                        <span class="tooltiptext">{{bodyCaption.str}}</span>
-                        <fa-icon [icon]="bodyWarning"></fa-icon>       
-                    </div>   
-                </mat-expansion-panel-header>
-                <ng-container>
-                    <div class="ip-input">
-                        <input name="bodyIp" matInput placeholder="Fix Me" [(ngModel)]="bodyLocation.locationName" />        
-                    </div>
-                    <app-esp-module [module]="bodyLocation"></app-esp-module>
                 </ng-container>
             </mat-expansion-panel>
         </mat-accordion>
     </div>
     <div class="spacer"></div>
 </div>
+
+<astros-modal id="modules-modal"  disableBackgroundClick="{{backgroundClickDisabled}}" style="display: none;">
+    <ng-template #modalContainer></ng-template>
+</astros-modal>

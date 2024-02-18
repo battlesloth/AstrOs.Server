@@ -20,18 +20,19 @@ export class PollRepsonse implements ISerialWorkerResponse {
     controller!: ControlModule;
 
     constructor() {
-        this.type = SerialWorkerResponseType.UPDATE_CLIENTS;
+        this.type = SerialWorkerResponseType.POLL;
     }
 }
 
 export class RegistrationResponse implements ISerialWorkerResponse {
-    [x: string]: any
-    type: SerialWorkerResponseType
-
+    [x: string]: any;
+    type: SerialWorkerResponseType;
+    success: boolean;
     registrations: Array<ControlModule>;
 
-    constructor() {
+    constructor(success: boolean) {
         this.type = SerialWorkerResponseType.REGISTRATION_SYNC;
+        this.success = success;
         this.registrations = [];
     }
 }

@@ -28,6 +28,7 @@ module.exports = {
       output: {
         filename: 'bundle.js',
         path: path.resolve(__dirname, 'dist'),
+        devtoolModuleFilenameTemplate: '[absolute-resource-path]'
       },
       mode: 'production',
       externals: {
@@ -36,5 +37,6 @@ module.exports = {
         bufferutil: "bufferutil",
         "utf-8-validate": "utf-8-validate"
     },
+    devtool: 'source-map'
       
 };

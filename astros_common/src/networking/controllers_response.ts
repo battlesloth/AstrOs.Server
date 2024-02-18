@@ -5,8 +5,8 @@ import { BaseResponse } from "./base_response";
 export class ControllersResponse extends BaseResponse {
     controllers: Array<ControlModule>;
 
-    constructor(controllers: Array<ControlModule>) {
-        super(TransmissionType.controllers, true, '');
+    constructor(success: boolean, controllers: Array<ControlModule>) {
+        super(TransmissionType.controllers, success, '');
         this.controllers = controllers;
     }
 }

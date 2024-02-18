@@ -3,7 +3,7 @@ import { logger } from "../logger";
 import { MessageGenerator } from "./message_generator";
 import { MessageHandler } from "./message_handler";
 import { SerialMessageType } from "./serial_message";
-import { ISerialWorkerResponse, SerialWorkerResponseType } from "./serial_worker_response";
+import { ISerialWorkerResponse, RegistrationResponse, SerialWorkerResponseType } from "./serial_worker_response";
 import { SerialMessageTracker } from "./serial_message_tracker";
 import { MessageHelper } from "./message_helper";
 
@@ -94,6 +94,8 @@ export class SerialMessageService {
     handleTimeout(msgId: string) {
         const tracker = this.messageTracker.get(msgId);
 
+        let result: ISerialWorkerResponse = { type: SerialWorkerResponseType.TIMEOUT, data: msgId };
+
         if (tracker === undefined) {
             logger.debug(`No tracker found for message id: ${msgId}, assume completed`);
             return;
@@ -103,7 +105,15 @@ export class SerialMessageService {
 
         this.messageTracker.delete(msgId);
 
-        const result: ISerialWorkerResponse = { type: SerialWorkerResponseType.TIMEOUT, data: msgId };
+
+        switch (tracker.type) {
+            case SerialMessageType.REGISTRATION_SYNC:
+                result = new RegistrationResponse(false);
+                break;
+            default:
+                break
+        }
+
 
         this.messageTimeoutCallback(result);
     }

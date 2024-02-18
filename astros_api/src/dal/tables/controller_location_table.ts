@@ -27,21 +27,21 @@ export class ControllerLocationTable {
 
     public static readonly selectLocationControllers = `SELECT
     l.${LocationsTable.id} as locationId,
-    l.${LocationsTable.name} as locationName,
+    l.${LocationsTable.locationName} as locationName,
     l.${LocationsTable.description} as locationDescription,
     l.${LocationsTable.configFingerprint} as locationFingerprint,
     c.${ControllersTable.id} as controllerId,
-    c.${ControllersTable.name} as controllerName,
-    c.${ControllersTable.controllerAddress} as controllerAddress,
+    c.${ControllersTable.controllerName} as controllerName,
+    c.${ControllersTable.controllerAddress} as controllerAddress
     FROM ${LocationsTable.table} l
-    JOIN ${this.table} cl ON l.${LocationsTable.id} = cl.${this.locationId}
-    JOIN ${ControllersTable.table} c ON c.${ControllersTable.id} = cl.${this.controllerId}`;
+    LEFT JOIN ${this.table} cl ON l.${LocationsTable.id} = cl.${this.locationId}
+    LEFT JOIN ${ControllersTable.table} c ON c.${ControllersTable.id} = cl.${this.controllerId}`;
 
     public static readonly selectLocationByController = `SELECT
     l.${LocationsTable.id} as locationId,
-    l.${LocationsTable.name} as locationName,
+    l.${LocationsTable.locationName} as locationName,
     l.${LocationsTable.description} as locationDescription,
-    l.${LocationsTable.configFingerprint} as locationFingerprint,
+    l.${LocationsTable.configFingerprint} as locationFingerprint
     FROM ${LocationsTable.table} l
     JOIN ${this.table} cl ON l.${LocationsTable.id} = cl.${this.locationId}
     WHERE cl.${this.controllerId} = ?`;

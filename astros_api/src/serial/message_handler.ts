@@ -58,7 +58,7 @@ export class MessageHandler {
             return response;
         }
 
-        const module = new ControlModule(0, parts[0], parts[1]);
+        const module = new ControlModule(0, parts[1], parts[0]);
         module.fingerprint = parts[2];
         response.controller = module;
 
@@ -67,7 +67,7 @@ export class MessageHandler {
 
     public handleRegistraionSyncAck(msg: string): RegistrationResponse {
 
-        const response = new RegistrationResponse();
+        const response = new RegistrationResponse(true);
 
         const records = msg.split(MessageHelper.RS);
 
@@ -75,12 +75,12 @@ export class MessageHandler {
 
             const units = record.split(MessageHelper.US);
 
-            if (units.length !== 2) {
+            if (units.length < 2) {
                 logger.error(`Invalid registration record: ${record}`);
                 continue;
             }
 
-            const module = new ControlModule(0, units[0], units[1]);
+            const module = new ControlModule(0, units[1], units[0]);
 
             response.registrations.push(module);
         }

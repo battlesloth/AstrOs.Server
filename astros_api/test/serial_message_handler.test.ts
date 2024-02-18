@@ -71,7 +71,7 @@ describe("Serial Message Handler Tests", () => {
 
         const messageHandler = new MessageHandler();
 
-        const message = createMessage(SerialMessageType.POLL_ACK, "123", "name" + US + "mac" + US + "fingerprint");
+        const message = createMessage(SerialMessageType.POLL_ACK, "123", "mac" + US + "name" + US + "fingerprint");
 
         const validation = messageHandler.validateMessage(message);
 
@@ -87,7 +87,7 @@ describe("Serial Message Handler Tests", () => {
 
         const messageHandler = new MessageHandler();
 
-        const message = createMessage(SerialMessageType.POLL_ACK, "123", "name" + US + "mac");
+        const message = createMessage(SerialMessageType.POLL_ACK, "123", "mac" + US + "name");
 
         const validation = messageHandler.validateMessage(message);
 
@@ -100,7 +100,7 @@ describe("Serial Message Handler Tests", () => {
 
         const messageHandler = new MessageHandler();
 
-        const message = createMessage(SerialMessageType.REGISTRATION_SYNC_ACK, "123", "name1" + US + "mac1" + RS + "name2" + US + "mac2");
+        const message = createMessage(SerialMessageType.REGISTRATION_SYNC_ACK, "123", "mac1" + US + "name1" + RS + "mac2" + US + "name2");
 
         const validation = messageHandler.validateMessage(message);
 
@@ -118,7 +118,7 @@ describe("Serial Message Handler Tests", () => {
 
         const messageHandler = new MessageHandler();
 
-        const message = createMessage(SerialMessageType.REGISTRATION_SYNC_ACK, "123", "name1" + US + "mac1" + RS + "name2");
+        const message = createMessage(SerialMessageType.REGISTRATION_SYNC_ACK, "123", "mac1" + US + "name1" + RS + "name2");
 
         const validation = messageHandler.validateMessage(message);
 
