@@ -57,7 +57,7 @@ export class LocationsController {
 
             const modules = req.body as AstrOsLocationCollection;
 
-            let success = false;
+            let success = true;
 
             if (modules.domeModule) {
                 success = await repo.updateLocation(modules.domeModule) && success;

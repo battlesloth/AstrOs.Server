@@ -1,41 +1,48 @@
 import { AfterViewInit, Component, OnInit } from '@angular/core';
 import { BaseEventModalComponent } from '../../scripter/modals/base-event-modal/base-event-modal.component';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
-import { ControllersResponse } from 'astros-common';
+import { AstrOsLocationCollection, ControllersResponse } from 'astros-common';
 import { TransmissionType } from 'astros-common/astros_enums'
 import { ControllerService } from 'src/app/services/controllers/controller.service';
+import { ModalCallbackEvent } from 'src/app/shared/modal-resources';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-loading-modal',
   templateUrl: './loading-modal.component.html',
   styleUrls: ['./loading-modal.component.scss']
 })
-export class LoadingModalComponent extends BaseEventModalComponent implements
-  OnInit, AfterViewInit {
+export class LoadingModalComponent extends BaseEventModalComponent implements OnInit {
 
+  subscription!: Subscription;
+
+  message: string = "Loading Controllers...";
   controllersMsg = TransmissionType.controllers;
+  locations!: AstrOsLocationCollection;
+  controllers!: ControllersResponse;
+
+  locationsLoaded = false;
+  controllersLoaded = false;
+
+  disableButton = true;
 
   constructor(private socket: WebsocketService,
     private controllerService: ControllerService) {
     super();
-
-    this.socket.messages.subscribe((msg: any) => {
-      console.log(`LoadingModalComponent: ${msg.type} ${JSON.stringify(msg)}`);
-      if (msg.type === this.controllersMsg) {
-        this.controllersReceived(msg as ControllersResponse);
-      }
-    });
-  }
-
-  controllersReceived(response: ControllersResponse) {
-    if (response.success) {
-      this.closeModal();
-    } else {
-
-    }
   }
 
   override ngOnInit(): void {
+
+    const locationsObserver = {
+      next: (result: any) => {
+        this.locations = result;
+        this.locationsLoaded = true;
+        this.checkLoadedState();
+      },
+      error: (err: any) => console.error(err)
+    };
+
+    this.controllerService.getLoadedLocations().subscribe(locationsObserver);
 
     const observer = {
       next: (result: any) => { },
@@ -43,8 +50,29 @@ export class LoadingModalComponent extends BaseEventModalComponent implements
     };
 
     this.controllerService.syncControllers().subscribe(observer);
+
+    this.subscription = this.socket.messages.subscribe((msg: any) => {
+      if (msg.type === this.controllersMsg) {
+        this.controllers = msg as ControllersResponse;
+        this.controllersLoaded = true;
+        this.checkLoadedState();
+      }
+    });
   }
 
-  ngAfterViewInit(): void {
+  checkLoadedState() {
+    if (this.locationsLoaded && this.controllersLoaded) {
+      if (this.controllers.success) {
+        this.closeModal();
+      } else {
+        this.disableButton = false;
+        this.message = "Failed to load controllers, using cached values.";
+      }
+    }
+  }
+
+  override closeModal(): void {
+    this.subscription.unsubscribe();
+    this.modalCallback.emit({ id: ModalCallbackEvent.close, response: { controllers: this.controllers.controllers, locations: this.locations } });
   }
 }

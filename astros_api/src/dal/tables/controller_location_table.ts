@@ -7,13 +7,12 @@ export class ControllerLocationTable {
     public static readonly controllerId = "controllerId";
 
     public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
-        ${this.locationId} INTEGER,
+        ${this.locationId} INTEGER PRIMARY KEY,
         ${this.controllerId} INTEGER,
-        PRIMARY KEY (${this.locationId}, ${this.controllerId}),
         FOREIGN KEY (${this.locationId}) REFERENCES ${LocationsTable.table}(${LocationsTable.id}),
         FOREIGN KEY (${this.controllerId}) REFERENCES ${ControllersTable.table}(${ControllersTable.id}))`;
 
-    public static readonly insert = `INSERT INTO ${this.table} 
+    public static readonly insert = `INSERT OR REPLACE INTO ${this.table} 
     (${this.locationId}, ${this.controllerId}) 
     VALUES (?, ?)`;
 

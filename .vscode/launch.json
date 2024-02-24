@@ -42,9 +42,9 @@
         {
             "name": "server/client",
             "configurations": [
-                "nodejs",
+                "browser",
                 "angular",
-                "browser"
+                "nodejs"              
             ]
         }
     ]

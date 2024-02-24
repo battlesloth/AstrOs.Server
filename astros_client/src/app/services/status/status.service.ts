@@ -32,6 +32,16 @@ export class StatusService {
     this.bodyStateObserver.subscribe((value) => { this.bodyState = value });
   }
 
+
+  resetStatus() {
+    this.coreState = ControllerStatus.down;
+    this.domeState = ControllerStatus.down;
+    this.bodyState = ControllerStatus.down;
+    this.coreStateObserver.next(this.coreState);
+    this.domeStateObserver.next(this.domeState);
+    this.bodyStateObserver.next(this.bodyState);
+  }
+
   getCoreStatus(): ControllerStatus {
     return this.coreState;
   }

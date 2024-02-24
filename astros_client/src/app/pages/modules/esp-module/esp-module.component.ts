@@ -1,10 +1,10 @@
-import { Component, Input, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
+import { Component, Input, OnChanges, OnInit, SimpleChanges, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatCheckboxModule } from '@angular/material/checkbox'
 import { MatFormField } from '@angular/material/form-field';
 import { ControlModule, ControllerLocation, KangarooController, UartChannel, UartModule, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
-import { scheduled } from 'rxjs';
+
 
 @Component({
   selector: 'app-esp-module',
@@ -18,11 +18,29 @@ export class EspModuleComponent implements OnInit {
   isMaster: boolean = false;
 
   @Input()
-  module!: ControllerLocation;
+  get module(): any { return this._module; }
+  set module(value: any) {
+    this._module = value;
+    this.setModule();
+  }
+  _module!: ControllerLocation;
 
 
-  @ViewChild('uart1Container', { read: ViewContainerRef }) uart1Container!: ViewContainerRef;
-  @ViewChild('uart2Container', { read: ViewContainerRef }) uart2Container!: ViewContainerRef;
+  @ViewChild('uart1Container', { read: ViewContainerRef })
+  get uart1Container(): ViewContainerRef { return this._uart1Container; }
+  set uart1Container(value: ViewContainerRef) {
+    this._uart1Container = value;
+    this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);
+  }
+  _uart1Container!: ViewContainerRef;
+
+  @ViewChild('uart2Container', { read: ViewContainerRef })
+  get uart2Container(): ViewContainerRef { return this._uart2Container; }
+  set uart2Container(value: ViewContainerRef) {
+    this._uart2Container = value;
+    this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);
+  }
+  _uart2Container!: ViewContainerRef;
 
   originalUart1Type!: UartType;
   originalUart1Module!: any;
@@ -44,30 +62,16 @@ export class EspModuleComponent implements OnInit {
   ngOnInit(): void {
   }
 
-  ngOnChanges() {
+  setModule() {
+    this.originalUart1Type = this.module.uartModule.channels[0].type;
+    this.originalUart1Module = this.copyUartModule(this.module.uartModule.channels[0]);
 
+    this.uart1Type = this.originalUart1Type.toString();
 
+    this.originalUart2Type = this.module.uartModule.channels[1].type;
+    this.originalUart2Module = this.copyUartModule(this.module.uartModule.channels[1]);
 
-    if (this.originalUart1Type === undefined &&
-      this.module !== undefined &&
-      this.uart1Container !== undefined) {
-
-      this.originalUart1Type = this.module.uartModule.channels[0].type;
-      this.originalUart1Module = this.copyUartModule(this.module.uartModule.channels[0]);
-
-      this.uart1Type = this.originalUart1Type.toString();
-      this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);
-    }
-    if (this.originalUart2Type === undefined &&
-      this.module !== undefined &&
-      this.uart2Container !== undefined) {
-
-      this.originalUart2Type = this.module.uartModule.channels[1].type;
-      this.originalUart2Module = this.copyUartModule(this.module.uartModule.channels[1]);
-
-      this.uart2Type = this.originalUart2Type.toString();
-      this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);
-    }
+    this.uart2Type = this.originalUart2Type.toString();
   }
 
   servoNameChange(id: number, $event: any) {

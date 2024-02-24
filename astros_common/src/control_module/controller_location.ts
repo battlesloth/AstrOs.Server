@@ -9,7 +9,7 @@ export class ControllerLocation {
     description: string;
     configFingerprint: string;
 
-    controller?: ControlModule;
+    controller: ControlModule;
 
     uartModule: UartModule;
     servoModule: ServoModule;
@@ -22,6 +22,7 @@ export class ControllerLocation {
         this.description = description;
         this.configFingerprint = configFingerprint;
 
+        this.controller = new ControlModule(0, "", "");
         this.uartModule = new UartModule();
         this.servoModule = new ServoModule();
         this.i2cModule = new I2cModule();

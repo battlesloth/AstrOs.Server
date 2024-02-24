@@ -18,8 +18,14 @@ export class ModulesComponent implements OnInit, AfterViewInit {
 
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
 
+  isLoaded = false;
+
   backgroundClickDisabled: string = '1';
   isMaster: boolean = true;
+
+  possibleControllers: Array<ControlModule> = [];
+  availableDomeControllers: Array<ControlModule> = [];
+  availableCoreControllers: Array<ControlModule> = [];
 
   coreWarning = faExclamationTriangle;
   domeWarning = faExclamationTriangle;
@@ -33,9 +39,9 @@ export class ModulesComponent implements OnInit, AfterViewInit {
   domeLocation!: ControllerLocation;
   bodyLocation!: ControllerLocation;
 
-  coreCaption: any = { str: 'Pending...' }
-  domeCaption: any = { str: 'Pending...' }
-  bodyCaption: any = { str: 'Pending...' }
+  coreCaption: any = { str: 'Module Down' }
+  domeCaption: any = { str: 'Module Down' }
+  bodyCaption: any = { str: 'Module Down' }
 
   private notSynced = "Not Synced";
   private moduleDown = "Module Down";
@@ -46,36 +52,13 @@ export class ModulesComponent implements OnInit, AfterViewInit {
     private renderer: Renderer2,
     private status: StatusService) {
 
-    //this.bodyLocation = new ControllerLocation(1, AstrOsConstants.BODY, 'Body Module', '');
-    //this.bodyLocation.uartModule.channels[0] = { type: UartType.none, id: 0, channelName: 'None', module: {} };
-    //this.bodyLocation.uartModule.channels[1] = { type: UartType.none, id: 1, channelName: 'None', module: {} };
-    //this.coreLocation = new ControllerLocation(2, AstrOsConstants.CORE, 'Core Dome Module', '');
-    //this.coreLocation.uartModule.channels[0] = { type: UartType.none, id: 0, channelName: 'None', module: {} };
-    //this.coreLocation.uartModule.channels[1] = { type: UartType.none, id: 1, channelName: 'None', module: {} };
-    //this.domeLocation = new ControllerLocation(3, AstrOsConstants.DOME, 'Outer Dome Module', '');
-    //this.domeLocation.uartModule.channels[0] = { type: UartType.none, id: 0, channelName: 'None', module: {} };
-    //this.domeLocation.uartModule.channels[1] = { type: UartType.none, id: 1, channelName: 'None', module: {} };
-
-    this.status.coreStateObserver.subscribe(value => this.handleStatus(value, this.coreEl, this.coreCaption));
-    this.status.domeStateObserver.subscribe(value => this.handleStatus(value, this.domeEl, this.domeCaption));
-    this.status.bodyStateObserver.subscribe(value => this.handleStatus(value, this.bodyEl, this.bodyCaption));
   }
 
   ngOnInit(): void {
 
-    const observer = {
-      next: (result: any) => this.parseModules(result),
-      error: (err: any) => console.error(err)
-    };
-
-    this.controllerService.getLoadedLocations().subscribe(observer);
   }
 
   ngAfterViewInit(): void {
-    this.handleStatus(this.status.getCoreStatus(), this.coreEl, this.coreCaption);
-    this.handleStatus(this.status.getDomeStatus(), this.domeEl, this.domeCaption);
-    this.handleStatus(this.status.getBodyStatus(), this.bodyEl, this.bodyCaption);
-
     this.openControllerSyncModal();
   }
 
@@ -88,10 +71,39 @@ export class ModulesComponent implements OnInit, AfterViewInit {
 
     component.instance.resources = modalResources;
     component.instance.modalCallback.subscribe((result: any) => {
-      this.modalService.close('modules-modal');
+      this.modalCallback(result);
     });
 
     this.modalService.open('modules-modal');
+  }
+  modalCallback(evt: any) {
+
+    this.parseModules(evt.response.locations);
+
+    // always filter out the master controller since it's always the body module
+    this.possibleControllers = evt.response.controllers.filter((controller: ControlModule) => controller.id !== 1);
+
+    this.availableCoreControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.domeLocation.controller?.id);
+    this.availableDomeControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.coreLocation.controller?.id);
+
+    this.handleStatus(this.status.getCoreStatus(), this.coreEl, this.coreCaption);
+    this.handleStatus(this.status.getDomeStatus(), this.domeEl, this.domeCaption);
+    this.handleStatus(this.status.getBodyStatus(), this.bodyEl, this.bodyCaption);
+
+    this.status.coreStateObserver.subscribe(value => this.handleStatus(value, this.coreEl, this.coreCaption));
+    this.status.domeStateObserver.subscribe(value => this.handleStatus(value, this.domeEl, this.domeCaption));
+    this.status.bodyStateObserver.subscribe(value => this.handleStatus(value, this.bodyEl, this.bodyCaption));
+
+    this.isLoaded = true;
+
+    this.modalService.close('modules-modal');
+  }
+
+  controllerSelectChanged($event: any) {
+
+    this.availableCoreControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.domeLocation.controller?.id);
+    this.availableDomeControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.coreLocation.controller?.id);
+
   }
 
   saveModuleSettings() {
@@ -113,6 +125,8 @@ export class ModulesComponent implements OnInit, AfterViewInit {
 
     this.controllerService.saveLocations(new AstrOsLocationCollection(this.coreLocation, this.domeLocation, this.bodyLocation))
       .subscribe(observer);
+
+    this.status.resetStatus();
   }
 
   syncModuleSettings() {
