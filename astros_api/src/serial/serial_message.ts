@@ -29,6 +29,9 @@ export class SerialMsgConst {
     static readonly REGISTRATION_SYNC_ACK = "REGISTRATION_SYNC_ACK";
     static readonly POLL_ACK = "POLL_ACK";
     static readonly POLL_NAK = "POLL_NAK";
+    static readonly DEPLOY_CONFIG = "DEPLOY_CONFIG";
+    static readonly DEPLOY_CONFIG_ACK = "DEPLOY_CONFIG_ACK";
+    static readonly DEPLOY_CONFIG_NAK = "DEPLOY_CONFIG_NAK";
     static readonly DEPLOY_SCRIPT = "DEPLOY_SCRIPT";
     static readonly DEPLOY_SCRIPT_ACK = "DEPLOY_SCRIPT_ACK";
     static readonly DEPLOY_SCRIPT_NAK = "DEPLOY_SCRIPT_NAK";

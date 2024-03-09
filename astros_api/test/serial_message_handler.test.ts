@@ -1,7 +1,7 @@
-import { MessageHandler } from "src/serial/message_handler";
-import { MessageHelper } from "src/serial/message_helper";
-import { SerialMessageType } from "src/serial/serial_message";
-import { SerialWorkerResponseType } from "src/serial/serial_worker_response";
+import { MessageHandler } from "../src/serial/message_handler";
+import { MessageHelper } from "../src/serial/message_helper";
+import { SerialMessageType } from "../src/serial/serial_message";
+import { SerialWorkerResponseType } from "../src/serial/serial_worker_response";
 
 const RS = MessageHelper.RS;
 const GS = MessageHelper.GS;
@@ -77,7 +77,7 @@ describe("Serial Message Handler Tests", () => {
 
         const response = messageHandler.handlePollAck(validation.data);
 
-        expect(response.type).toBe(SerialWorkerResponseType.UPDATE_CLIENTS);
+        expect(response.type).toBe(SerialWorkerResponseType.POLL);
         expect(response.controller.name).toBe("name");
         expect(response.controller.address).toBe("mac");
         expect(response.controller.fingerprint).toBe("fingerprint");

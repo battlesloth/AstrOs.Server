@@ -28,7 +28,7 @@ import { ScriptRepository } from "./dal/repositories/script_repository";
 import { ScriptConverter } from "./script_converter";
 import {
     BaseResponse, ControlModule, Script, StatusResponse, ControllersResponse,
-    TransmissionStatus, TransmissionType
+    TransmissionStatus, TransmissionType, ControllerLocation
 } from "astros-common";
 import { ControllerRepository } from "./dal/repositories/controller_repository";
 import { ConfigSync } from "./models/config/config_sync";
@@ -40,6 +40,7 @@ import { ApiKeyValidator } from "./api_key_validator";
 import { P } from "pino";
 import { SerialMessageType } from "./serial/serial_message";
 import {
+    ConfigSyncResponse,
     ISerialWorkerResponse, PollRepsonse, RegistrationResponse,
     SerialWorkerResponseType
 } from "./serial/serial_worker_response";
@@ -284,6 +285,28 @@ class ApiServer {
             case SerialWorkerResponseType.POLL:
                 this.handlePollResponse(msg);
                 break
+            case SerialWorkerResponseType.CONFIG_SYNC:
+                this.handleConfigSync(msg);
+                break;
+        }
+    }
+
+    async handleResgistraionResponse(msg: ISerialWorkerResponse) {
+        try {
+            const val = msg as RegistrationResponse;
+
+            const dao = new DataAccess();
+            const controllerRepo = new ControllerRepository(dao);
+
+            await controllerRepo.insertControllers(val.registrations);
+
+            const contollers = await controllerRepo.getControllers();
+
+            const update = new ControllersResponse(val.success, contollers);
+            this.updateClients(update);
+        }
+        catch (error) {
+            logger.error(`Error handling registration response: ${error}`);
         }
     }
 
@@ -312,6 +335,8 @@ class ApiServer {
                 return;
             }
 
+            logger.info(`msg: ${val.controller.fingerprint}, db: ${location.configFingerprint}`);
+
             const update = new StatusResponse(controller.id, location.locationName, true, val.controller.fingerprint === location.configFingerprint);
 
             this.updateClients(update);
@@ -321,24 +346,28 @@ class ApiServer {
         }
     }
 
-    async handleResgistraionResponse(msg: ISerialWorkerResponse) {
+    async handleConfigSync(msg: ISerialWorkerResponse) {
         try {
-            const val = msg as RegistrationResponse;
+            const val = msg as ConfigSyncResponse;
 
             const dao = new DataAccess();
-            const controllerRepo = new ControllerRepository(dao);
 
-            await controllerRepo.insertControllers(val.registrations);
+            const locationRepo = new LocationsRepository(dao);
 
-            const contollers = await controllerRepo.getControllers();
+            const locationId = await locationRepo.getLocationIdByController(val.controller.address);
 
-            const update = new ControllersResponse(val.success, contollers);
-            this.updateClients(update);
+            if (locationId < 1) {
+                logger.error(`Location not found for controller: ${val.controller.name}`);
+                return;
+            }
+
+            await locationRepo.updateLocationFingerprint(locationId, val.controller.fingerprint);
         }
         catch (error) {
-            logger.error(`Error handling registration response: ${error}`);
+            logger.error(`Error handling config sync response: ${error}`);
         }
     }
+
 
     private async syncControllers(req: any, res: any, next: any) {
         try {
@@ -361,7 +390,32 @@ class ApiServer {
         try {
 
             logger.info('syncing controller config');
-            this.serialWorker.postMessage({ type: SerialMessageType.DEPLOY_CONFIG, data: null });
+
+            const dao = new DataAccess();
+            const repo = new LocationsRepository(dao);
+
+            const locations = await repo.loadLocations();
+
+            const toSync = new Array<ControllerLocation>();
+
+            for (let i = 0; i < locations.length; i++) {
+
+                if (!locations[i].controller.address) {
+                    continue;
+                }
+
+                const ctl = await repo.loadLocationConfiguration(locations[i]);
+
+                if (ctl) {
+                    toSync.push(ctl);
+                }
+
+            }
+
+            const configSync = new ConfigSync(toSync);
+
+            this.serialWorker.postMessage({ type: SerialMessageType.DEPLOY_CONFIG, data: configSync });
+
             res.status(200);
             res.json({ message: "success" });
         } catch (error) {

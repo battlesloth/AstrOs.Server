@@ -4,7 +4,6 @@ import {
     ChannelSubType,
     HumanCyborgRelationsEvent,
     humanCyborgRelationsController,
-    ChannelType,
     KangarooAction,
     KangarooEvent,
     Script,
@@ -12,6 +11,9 @@ import {
     ScriptEvent,
     GenericSerialEvent
 } from "astros-common";
+
+import { ChannelType } from "astros-common/astros_enums";
+
 import { logger } from "./logger";
 
 

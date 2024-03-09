@@ -1,9 +1,10 @@
 
 import {
-    ChannelType, KangarooController, UartType, KangarooAction, KangarooEvent,
+    ChannelType, KangarooController, KangarooAction, KangarooEvent,
     Script, ScriptChannel, ScriptEvent, ServoEvent, ChannelSubType, ServoChannel,
     UartChannel, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, HcrCommand, HcrCommandCategory
 } from "astros-common";
+import { UartType } from "astros-common/astros_enums";
 import { ScriptConverter, CommandType } from "../src/script_converter";
 
 

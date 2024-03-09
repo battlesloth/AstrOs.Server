@@ -63,6 +63,24 @@ export class LocationsRepository {
         return location;
     }
 
+    public async getLocationIdByController(mac: string): Promise<number> {
+        let locationId = -1;
+
+        await this.dao
+            .get(ControllerLocationTable.selectLocationIdByControllerAddress, [mac])
+            .then((val: any) => {
+                if (val.length > 0) {
+                    locationId = val[0].locationId;
+                }
+            })
+            .catch((err: any) => {
+                logger.error(err);
+                throw err;
+            });
+
+        return locationId;
+    }
+
     public async loadLocations(): Promise<Array<ControllerLocation>> {
         const result = new Array<ControllerLocation>();
         await this.dao
@@ -169,13 +187,12 @@ export class LocationsRepository {
     }
 
     public async updateLocation(location: ControllerLocation): Promise<boolean> {
+
         await this.dao
-            .run(LocationsTable.update, [
-                location.locationName,
-                location.description,
+            .run(LocationsTable.updateFingerprint, [
                 // TODO: only wipe fingerprint if there are changes to uart/servo/i2c
                 //location.configFingerprint,
-                "",
+                "outofdate",
                 location.id.toString(),
             ])
             .catch((err: any) => {
@@ -249,6 +266,17 @@ export class LocationsRepository {
 
         await this.dao
             .run(ControllerLocationTable.insert, [locationId.toString(), controllerId.toString()])
+            .catch((err: any) => {
+                logger.error(err);
+                throw "error";
+            });
+
+        return true;
+    }
+
+    public async updateLocationFingerprint(locationId: number, fingerprint: string): Promise<boolean> {
+        await this.dao
+            .run(LocationsTable.updateFingerprint, [fingerprint, locationId.toString()])
             .catch((err: any) => {
                 logger.error(err);
                 throw "error";

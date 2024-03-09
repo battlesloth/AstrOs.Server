@@ -1,7 +1,7 @@
 import { logger } from ".././logger";
 import { SerialMsgValidationResult } from "./serial_message";
 import { MessageHelper } from "./message_helper";
-import { PollRepsonse, RegistrationResponse, SerialWorkerResponseType } from "./serial_worker_response";
+import { ConfigSyncResponse, PollRepsonse, RegistrationResponse, SerialWorkerResponseType } from "./serial_worker_response";
 import { ControlModule } from "astros-common";
 
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
@@ -84,6 +84,25 @@ export class MessageHandler {
 
             response.registrations.push(module);
         }
+
+        return response;
+    }
+
+    handleDeployConfigAck(msg: string): ConfigSyncResponse {
+
+        const response = new ConfigSyncResponse();
+
+        const parts = msg.split(MessageHelper.US);
+
+        if (parts.length !== 3) {
+            logger.error(`Invalid poll ack: ${msg}`);
+            response.type = SerialWorkerResponseType.UNKNOWN;
+            return response;
+        }
+
+        const module = new ControlModule(0, parts[1], parts[0]);
+        module.fingerprint = parts[2];
+        response.controller = module;
 
         return response;
     }

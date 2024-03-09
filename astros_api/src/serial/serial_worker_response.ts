@@ -5,6 +5,7 @@ export enum SerialWorkerResponseType {
     TIMEOUT,
     POLL,
     REGISTRATION_SYNC,
+    CONFIG_SYNC,
     SEND_SERIAL_MESSAGE,
     UPDATE_CLIENTS
 }
@@ -34,5 +35,16 @@ export class RegistrationResponse implements ISerialWorkerResponse {
         this.type = SerialWorkerResponseType.REGISTRATION_SYNC;
         this.success = success;
         this.registrations = [];
+    }
+}
+
+export class ConfigSyncResponse implements ISerialWorkerResponse {
+    [x: string]: any;
+    type: SerialWorkerResponseType;
+
+    controller!: ControlModule;
+
+    constructor() {
+        this.type = SerialWorkerResponseType.CONFIG_SYNC;
     }
 }

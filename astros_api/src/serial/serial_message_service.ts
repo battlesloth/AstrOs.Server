@@ -26,7 +26,7 @@ export class SerialMessageService {
 
         const msgId = v4();
 
-        result.data = this.messageGererator.generateMessage(type, data, msgId);
+        result.data = this.messageGererator.generateMessage(type, msgId, data);
 
         this.setMessageTimeout(type, msgId);
 
@@ -53,7 +53,9 @@ export class SerialMessageService {
             return result;
         }
 
-        logger.debug(`Received message: ${msg}`);
+        if (validationResult.type !== SerialMessageType.POLL_ACK) {
+            logger.debug(`Received message: ${msg}`);
+        }
 
         // remove the message from the tracker
         if (this.messageTracker.has(validationResult.id)) {
@@ -66,6 +68,9 @@ export class SerialMessageService {
                 break;
             case SerialMessageType.REGISTRATION_SYNC_ACK:
                 result = this.messageHandler.handleRegistraionSyncAck(validationResult.data);
+                break;
+            case SerialMessageType.DEPLOY_CONFIG_ACK:
+                result = this.messageHandler.handleDeployConfigAck(validationResult.data);
                 break;
         }
 
