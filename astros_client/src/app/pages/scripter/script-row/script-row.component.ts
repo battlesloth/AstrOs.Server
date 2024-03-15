@@ -1,12 +1,12 @@
 import { EventEmitter, Component, Input, OnInit, Output, Renderer2, ViewChild, ElementRef } from '@angular/core';
 import { faTrash, faEdit, faPlay } from '@fortawesome/free-solid-svg-icons'
 import { UartType, ScriptChannel } from 'astros-common';
-@
-  Component({
-    selector: 'app-script-row',
-    templateUrl: './script-row.component.html',
-    styleUrls: ['./script-row.component.scss']
-  })
+
+@Component({
+  selector: 'app-script-row',
+  templateUrl: './script-row.component.html',
+  styleUrls: ['./script-row.component.scss']
+})
 
 export class ScriptRowComponent implements OnInit {
 
@@ -15,10 +15,22 @@ export class ScriptRowComponent implements OnInit {
   faEdit = faEdit;
   faPlay = faPlay;
 
+  locationName: string = "Location";
+  uartType: string = "None";
+
   @ViewChild('timeline', { static: false }) timelineEl!: ElementRef;
 
+  _channel!: ScriptChannel
+
   @Input()
-  channel!: ScriptChannel
+  set channel(channel: ScriptChannel) {
+    this._channel = channel;
+    this.locationName = this.getLocationName(channel.locationId);
+    this.uartType = this.serialName(channel.channel.type);
+  }
+  get channel(): ScriptChannel {
+    return this._channel;
+  }
 
   @Output("timelineCallback") timelineCallback: EventEmitter<any> = new EventEmitter();
   @Output("removeCallback") removeCallback: EventEmitter<any> = new EventEmitter();
@@ -32,7 +44,7 @@ export class ScriptRowComponent implements OnInit {
     this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1))
   }
 
- 
+
   ngOnInit(): void {
   }
 
@@ -41,7 +53,7 @@ export class ScriptRowComponent implements OnInit {
   }
 
   test(): void {
-    this.channelTestCallback.emit({id: this.channel.id})
+    this.channelTestCallback.emit({ id: this.channel.id })
   }
 
   onTimelineRightClick(event: MouseEvent): void {
@@ -50,8 +62,23 @@ export class ScriptRowComponent implements OnInit {
     this.timelineCallback.emit({ event: event, id: this.channel.id });
   }
 
+  getLocationName(id: number): string {
+    switch (id) {
+      case 1:
+        return "Body";
+      case 2:
+        return "Core";
+      case 3:
+        return "Dome";
+      case 4:
+        return "Audio Playback";
+      default:
+        return "Unknown";
+    }
+  }
+
   serialName(type: UartType): string {
-    switch (type){
+    switch (type) {
       case UartType.none:
         return "None";
       case UartType.genericSerial:

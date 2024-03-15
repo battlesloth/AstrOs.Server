@@ -1,9 +1,7 @@
 
-import { ContentObserver } from "@angular/cdk/observers";
 import {
-    ChannelType, ControlModule,
-    I2cChannel, ServoChannel, UartModule,
-    UartType, Script, UartChannel, ControllerLocation
+    ChannelType, I2cChannel, ServoChannel, UartType,
+    Script, UartChannel, ControllerLocation
 } from "astros-common";
 
 export class LocationDetails {
@@ -45,7 +43,7 @@ export class ScriptResources {
         this.i2cChannels = new Map<number, Array<any>>();
         this.uartChannels = new Map<number, Array<any>>();
 
-        this.locations.set(4, new LocationDetails(4, 'Audio Playback'));
+        //this.locations.set(4, new LocationDetails(4, 'Audio Playback'));
 
         locations.forEach(loc => {
 
@@ -67,16 +65,16 @@ export class ScriptResources {
         script.scriptChannels.forEach(ch => {
             switch (ch.type) {
                 case ChannelType.uart:
-                    const uartIdx = this.uartChannels.get(ch.controllerId)?.findIndex(x => x.channel.id === ch.channel.id);
+                    const uartIdx = this.uartChannels.get(ch.locationId)?.findIndex(x => x.channel.id === ch.channel.id);
                     if (uartIdx != undefined && uartIdx > -1) {
-                        this.uartChannels.get(ch.controllerId)![uartIdx].available = false;
+                        this.uartChannels.get(ch.locationId)![uartIdx].available = false;
                     }
                     break;
                 case ChannelType.servo:
-                    this.servoChannels.get(ch.controllerId)![ch.channel.id].available = false;
+                    this.servoChannels.get(ch.locationId)![ch.channel.id].available = false;
                     break;
                 case ChannelType.i2c:
-                    this.i2cChannels.get(ch.controllerId)![ch.channel.id].available = false;
+                    this.i2cChannels.get(ch.locationId)![ch.channel.id].available = false;
                     break;
                 case ChannelType.audio:
                     this.locations.delete(4);

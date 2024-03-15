@@ -1,5 +1,4 @@
-import { Component, ElementRef, OnInit, Renderer2, ViewChild, ViewEncapsulation } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { TransmissionType } from 'astros-common';
 import { AuthenticationService } from './services/auth/authentication.service';
@@ -25,7 +24,7 @@ export class AppComponent implements OnInit {
     private snackbar: SnackbarService,
     private socket: WebsocketService) {
     if (auth.isLoggedIn()) {
-      router.navigate(['modules']);
+      router.navigate(['scripts']);
       //router.navigate(['status']);
     }
   }

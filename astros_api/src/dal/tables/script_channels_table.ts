@@ -33,14 +33,14 @@ export class ScriptChannelsTable {
     ?)`;
 
     public static readonly selectAllForScript =
-        `SELECT t.${this.id}, 
-    t.${this.scriptId}, 
-    t.${this.locationId},
-    t.${this.type},
-    t.${this.subType},
-    t.${this.channelNumber}
-    FROM ${this.table}
-    WHERE t.${this.scriptId} = ?`;
+        `SELECT ${this.id}, 
+    ${this.scriptId}, 
+    ${this.locationId},
+    ${this.type},
+    ${this.subType},
+    ${this.channelNumber}
+    FROM ${this.table} 
+    WHERE ${this.scriptId} = ?`;
 
     public static readonly deleteAllForScript =
         `DELETE FROM ${this.table}

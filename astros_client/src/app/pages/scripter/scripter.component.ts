@@ -106,7 +106,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       error: (err: any) => console.error(err)
     };
 
-    this.controllerService.getLocations().subscribe(csObserver);
+    this.controllerService.getLoadedLocations().subscribe(csObserver);
 
     if (this.scriptId === '0') {
       this.scriptId = this.generateScriptId(5);
@@ -509,7 +509,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       this.scriptChannels.splice(chIdx, 1);
 
       this.scriptResources.removeChannel(
-        channel.controllerId,
+        channel.locationId,
         channel.type,
         channel.channel?.id
       );
@@ -535,7 +535,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       modalResources.set(ModalResources.channelType, ch.type);
       modalResources.set(ModalResources.channelSubType, ch.subType);
       modalResources.set(ModalResources.channelId, ch.channelNumber);
-      modalResources.set(ModalResources.controllerType, ch.controllerId);
+      modalResources.set(ModalResources.controllerType, ch.locationId);
 
       const component = this.container.createComponent(ChannelTestModalComponent);
 
@@ -663,7 +663,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   private channelCompare(a: ScriptChannel, b: ScriptChannel) {
-    let val = a.controllerId - b.controllerId;
+    let val = a.locationId - b.locationId;
 
     if (val !== 0) {
       return val;

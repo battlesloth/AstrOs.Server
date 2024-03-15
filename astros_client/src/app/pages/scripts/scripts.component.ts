@@ -1,7 +1,8 @@
 import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { faCopy, faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
-import { Script, ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
+import { ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
+import { Script } from 'astros-common/scripts/script';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
@@ -16,6 +17,8 @@ import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resourc
 export class ScriptsComponent implements OnInit {
 
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
+
+  private initialStatusSet: boolean = false;
 
   faTrash = faTrash;
   faUpload = faUpload;
@@ -52,6 +55,30 @@ export class ScriptsComponent implements OnInit {
     };
 
     this.scriptService.getAllScripts().subscribe(observer);
+  }
+
+  ngAfterViewChecked() {
+    if (this.initialStatusSet) { return; }
+    if (this.scripts.length === 0) { return; }
+
+    for (const script of this.scripts) {
+      this.updateUploadStatusElement('body', 1, script.id);
+      this.updateUploadStatusElement('core', 2, script.id);
+      this.updateUploadStatusElement('dome', 3, script.id);
+    }
+
+    this.initialStatusSet = true;
+  }
+
+  updateUploadStatusElement(element: string, controllerId: number, scriptId: string): void {
+    const el = document.getElementById(`${scriptId}_${element}`);
+    if (el === null) { return; }
+    const status = this.getUploadStatus(scriptId, controllerId);
+    el.classList.add(status.s);
+
+    const toolTip = document.getElementById(`${scriptId}_${element}_tooltip`);
+    if (toolTip === null) { return; }
+    toolTip.innerText = status.d;
   }
 
   newScript() {
@@ -178,7 +205,36 @@ export class ScriptsComponent implements OnInit {
     this.scriptService.uploadScript(id).subscribe(observer);
   }
 
-  uploadStatus(status: UploadStatus) {
+  statusUpdate(msg: ScriptResponse) {
+
+    if (msg.status === TransmissionStatus.success) {
+      this.setUploadDate(msg.scriptId, msg.controllerId, msg.date);
+    }
+  }
+
+  getUploadStatus(id: string, controllerId: number): { s: string, d: string } {
+    let dateString = 'Not Uploaded';
+
+    const script = this.getScript(id);
+
+    if (!script) { return { s: 'notuploaded', d: dateString }; }
+
+    const sidx = script.deploymentStatusKvp
+      .map((s) => { return s.key })
+      .indexOf(controllerId.toString());
+
+    if (sidx < 0) { return { s: 'notuploaded', d: dateString }; }
+
+    const kvp = script.deploymentStatusKvp[sidx];
+
+    if (kvp.value.date) {
+      dateString = kvp.value.date.toLocaleString();
+    }
+
+    return { s: this.getUploadStatusClass(kvp.value.value), d: dateString };
+  }
+
+  getUploadStatusClass(status: UploadStatus) {
     switch (status) {
       case UploadStatus.notUploaded:
         return 'notuploaded';
@@ -191,19 +247,29 @@ export class ScriptsComponent implements OnInit {
     }
   }
 
-  statusUpdate(msg: ScriptResponse) {
+  setUploadDate(id: string, controllerId: number, date: Date): void {
+    const script = this.getScript(id);
 
+    if (!script) { return; }
+
+    const sidx = script.deploymentStatusKvp
+      .map((s) => { return s.key })
+      .indexOf(controllerId.toString());
+
+    if (sidx < 0) { return; }
+
+    script.deploymentStatusKvp[sidx].value.date = date;
+  }
+
+  getScript(id: string): Script | undefined {
     const idx = this.scripts
       .map((s) => { return s.id })
-      .indexOf(msg.scriptId as string);
+      .indexOf(id);
 
     if (idx < 0) {
-      return;
+      return undefined;
     }
 
-    if (msg.status === TransmissionStatus.success) {
-      this.scripts[idx].setDeploymentDate(msg.controllerId, msg.date);
-    }
-
+    return this.scripts[idx];
   }
 }

@@ -1,4 +1,5 @@
 import { UploadStatus } from "../astros_enums";
+import { DeploymentStatus } from "./deploymentStatus";
 import { ScriptChannel } from "./script_channel";
 
 
@@ -9,8 +10,7 @@ export class Script {
     description: string;
     lastSaved: Date;
 
-    // Map<ctl id, {date, status}>
-    deploymentStatus: Map<number, { date: Date, status: UploadStatus }>;
+    deploymentStatusKvp: Array<DeploymentStatus>;
 
     scriptChannels: Array<ScriptChannel>;
 
@@ -22,26 +22,7 @@ export class Script {
         this.scriptName = scriptName;
         this.description = description;
         this.lastSaved = lastSaved;
-        this.deploymentStatus = new Map<number, { date: Date, status: UploadStatus }>();
+        this.deploymentStatusKvp = new Array<DeploymentStatus>();
         this.scriptChannels = new Array<ScriptChannel>();
-    }
-
-    public setDeploymentDates(map: Map<number, Date>): void {
-        for (const [key, value] of map) {
-            this.updateDeployment(key, value);
-        }
-    }
-
-    public setDeploymentDate(controllerId: number, date: Date): void {
-        this.updateDeployment(controllerId, date);
-    }
-
-    public getStatus(controllerId: number): UploadStatus {
-        return this.deploymentStatus.get(controllerId)?.status || UploadStatus.notUploaded;
-    }
-
-    public updateDeployment(controllerId: number, date: Date): void {
-        const status = date > this.lastSaved ? UploadStatus.uploaded : UploadStatus.notUploaded;
-        this.deploymentStatus.set(controllerId, { date: date, status: status });
     }
 }

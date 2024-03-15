@@ -61,17 +61,17 @@ export class ScriptConverter {
             // convert from 10ths of a second to ms
             evt.time = evt.time * 100;
 
-            if (map.has(channel.controllerId)) {
-                if (map.get(channel.controllerId)?.has(evt.time)) {
-                    map.get(channel.controllerId)?.get(evt.time)?.push(evt);
+            if (map.has(channel.locationId)) {
+                if (map.get(channel.locationId)?.has(evt.time)) {
+                    map.get(channel.locationId)?.get(evt.time)?.push(evt);
                 } else {
-                    map.get(channel.controllerId)?.set(evt.time, new Array<ScriptEvent>());
-                    map.get(channel.controllerId)?.get(evt.time)?.push(evt);
+                    map.get(channel.locationId)?.set(evt.time, new Array<ScriptEvent>());
+                    map.get(channel.locationId)?.get(evt.time)?.push(evt);
                 }
             } else {
-                map.set(channel.controllerId, new Map<number, Array<ScriptEvent>>());
-                map.get(channel.controllerId)?.set(evt.time, new Array<ScriptEvent>());
-                map.get(channel.controllerId)?.get(evt.time)?.push(evt);
+                map.set(channel.locationId, new Map<number, Array<ScriptEvent>>());
+                map.get(channel.locationId)?.set(evt.time, new Array<ScriptEvent>());
+                map.get(channel.locationId)?.get(evt.time)?.push(evt);
             }
         }
     }

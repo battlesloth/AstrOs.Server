@@ -26,6 +26,8 @@ export { ScriptResponse } from './networking/script_response';
 export { M5Page, PageButton } from './remotes/M5Page';
 export { M5ScriptList } from './remotes/M5ScriptList';
 export { M5Button } from './remotes/M5Button';
+export { Kvp } from './kvp';
+export { DeploymentStatus } from './scripts/deploymentStatus';
 export { AstrOsConstants } from './astros_constants';
 export {
     ChannelType,

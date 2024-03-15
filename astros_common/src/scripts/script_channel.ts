@@ -4,7 +4,7 @@ import { ScriptEvent } from "./script_event";
 export class ScriptChannel {
     id: string;
     scriptId: string;
-    controllerId: number;
+    locationId: number;
     type: ChannelType;
     subType: ChannelSubType;
 
@@ -14,11 +14,11 @@ export class ScriptChannel {
     events: Map<number, ScriptEvent>;
     eventsKvpArray: Array<any>;
 
-    constructor(id: string, scriptId: string, ctlId: number, type: ChannelType,
+    constructor(id: string, scriptId: string, locId: number, type: ChannelType,
         subType: ChannelSubType, channelNumber: number, channel: any, maxDuration: number) {
         this.id = id;
         this.scriptId = scriptId;
-        this.controllerId = ctlId;
+        this.locationId = locId;
         this.type = type;
         this.subType = subType;
         this.channelNumber = channelNumber;

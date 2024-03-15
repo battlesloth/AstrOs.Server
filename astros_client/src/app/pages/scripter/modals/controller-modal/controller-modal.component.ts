@@ -100,6 +100,8 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
       if (mods) {
         this.modules = mods;
         document.getElementById('module-select')?.removeAttribute('disabled');
+        //this.selectedModule = ChannelType.none;
+        this.setChannels(this.selectedModule);
       }
     }
   }
@@ -111,7 +113,7 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
       document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
     }
     else {
-      const chs = this.availableChannels.get(+this.selectedController)?.get(channelType);
+      const chs = this.availableChannels.get(+this.selectedController)?.get(+channelType);
       if (chs) {
         this.channels = chs;
         document.getElementById('channel-select')?.removeAttribute('disabled');

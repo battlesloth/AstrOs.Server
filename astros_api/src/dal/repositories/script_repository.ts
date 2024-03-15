@@ -2,7 +2,7 @@ import { DataAccess } from "../../dal/data_access";
 import { ScriptsTable } from "../../dal/tables/scripts_table";
 import { ScriptChannelsTable } from "../../dal/tables/script_channels_table";
 import { ScriptEventsTable } from "../../dal/tables/script_events_table";
-import { ChannelType, I2cChannel, ServoChannel, Script, ScriptChannel, ScriptEvent, ChannelSubType, UartChannel } from "astros-common";
+import { ChannelType, I2cChannel, ServoChannel, Script, ScriptChannel, ScriptEvent, ChannelSubType, UartChannel, UploadStatus, DeploymentStatus } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
@@ -41,11 +41,14 @@ export class ScriptRepository {
             });
 
 
-        for (const scr of result) {
+        for (let i = 0; i < result.length; i++) {
+            const scr = result[i];
             await this.dao.get(ScriptsDeploymentTable.selectByScript, [scr.id])
                 .then((val: any) => {
                     val.forEach((dep: any) => {
-                        scr.setDeploymentDate(dep.controllerId, new Date(Date.parse(dep.lastSaved)));
+                        const status = new DeploymentStatus(dep.controllerId,
+                            { date: new Date(Date.parse(dep.lastDeployed)), value: UploadStatus.uploaded });
+                        scr.deploymentStatusKvp.push(status);
                     });
                 })
                 .catch((err) => {
@@ -77,7 +80,9 @@ export class ScriptRepository {
         await this.dao.get(ScriptsDeploymentTable.selectByScript, [id])
             .then((val: any) => {
                 val.forEach((dep: any) => {
-                    result.setDeploymentDate(dep.controllerId, new Date(Date.parse(dep.lastSaved)));
+                    const status = new DeploymentStatus(dep.controllerId,
+                        { date: new Date(Date.parse(dep.lastDeployed)), value: UploadStatus.uploaded });
+                    result.deploymentStatusKvp.push(status);
                 });
             })
             .catch((err) => {
@@ -93,7 +98,7 @@ export class ScriptRepository {
             .then((val: any) => {
                 val.forEach((ch: any) => {
 
-                    const channel = new ScriptChannel(ch.id, ch.scriptId, ch.controllerId,
+                    const channel = new ScriptChannel(ch.id, ch.scriptId, ch.locationId,
                         ch.type, ch.subType, ch.channelNumber, null, 0);
 
                     channels.push(channel);
@@ -132,23 +137,23 @@ export class ScriptRepository {
 
         switch (channel.type) {
             case ChannelType.i2c:
-                channel.channel = await this.getChannelForScriptChannel(ChannelType.i2c, channel.channelNumber, channel.controllerId)
+                channel.channel = await this.getChannelForScriptChannel(ChannelType.i2c, channel.channelNumber, channel.locationId)
                 break;
             case ChannelType.servo:
-                channel.channel = await this.getChannelForScriptChannel(ChannelType.servo, channel.channelNumber, channel.controllerId)
+                channel.channel = await this.getChannelForScriptChannel(ChannelType.servo, channel.channelNumber, channel.locationId)
                 break;
             case ChannelType.uart:
-                channel.channel = await this.getUartChannel(channel.controllerId, channel.channelNumber);
+                channel.channel = await this.getUartChannel(channel.locationId, channel.channelNumber);
                 break;
         }
 
         return channel;
     }
 
-    private async getUartChannel(controllerId: number, channel: number): Promise<UartChannel | null> {
+    private async getUartChannel(locationId: number, channel: number): Promise<UartChannel | null> {
         let result: any = null;
 
-        await this.dao.get(UartModuleTable.select, [channel.toString(), controllerId.toString()])
+        await this.dao.get(UartModuleTable.select, [channel.toString(), locationId.toString()])
             .then((val: any) => {
                 result = new UartChannel(val[0].uartType, channel, val[0].moduleName, JSON.parse(val[0].moduleJson));
             }).catch((err) => {
@@ -159,7 +164,7 @@ export class ScriptRepository {
         return result;
     }
 
-    private async getChannelForScriptChannel(type: ChannelType, chId: number, controllerId: number): Promise<any> {
+    private async getChannelForScriptChannel(type: ChannelType, chId: number, locationId: number): Promise<any> {
 
         let result = {};
 
@@ -176,7 +181,7 @@ export class ScriptRepository {
                 return;
         }
 
-        await this.dao.get(sql, [chId.toString(), controllerId.toString()])
+        await this.dao.get(sql, [chId.toString(), locationId.toString()])
             .then((val: any) => {
                 try {
                     switch (type) {
@@ -199,13 +204,13 @@ export class ScriptRepository {
         return result;
     }
 
-    async updateScriptControllerUploaded(scriptId: string, controllerId: number, dateTime: Date): Promise<boolean> {
+    async updateScriptControllerUploaded(scriptId: string, locationId: number, dateTime: Date): Promise<boolean> {
 
         let success = true;
 
-        await this.dao.run(ScriptsDeploymentTable.insert, [scriptId, controllerId.toString(), dateTime.toISOString()])
+        await this.dao.run(ScriptsDeploymentTable.insert, [scriptId, locationId.toString(), dateTime.toISOString()])
             .catch((err: any) => {
-                logger.error(`Exception updating script upload for controller: ${controllerId} => ${err}`);
+                logger.error(`Exception updating script upload for controller: ${locationId} => ${err}`);
                 success = false;
             });
 
@@ -221,7 +226,7 @@ export class ScriptRepository {
 
             await this.dao.run(ScriptsTable.insert,
                 [script.id, script.scriptName,
-                script.description, date, "1"])
+                script.description, date])
                 .then((val: any) => {
                     if (val) { logger.info(val); }
                 });
@@ -237,16 +242,19 @@ export class ScriptRepository {
                 });
 
 
-            for (const ch of script.scriptChannels) {
+            for (let i = 0; i < script.scriptChannels.length; i++) {
+
+                const ch = script.scriptChannels[i];
 
                 await this.dao.run(ScriptChannelsTable.insert, [ch.id,
-                script.id, ch.controllerId.toString(), ch.type.toString(), ch.subType.toString(), ch.channelNumber.toString()])
+                script.id, ch.locationId.toString(), ch.type.toString(), ch.subType.toString(), ch.channelNumber.toString()])
                     .then((val: any) => {
                         if (val) { logger.info(val); }
                     });
 
-                for (const kvp of ch.eventsKvpArray) {
-                    const evt = kvp.value;
+                for (let j = 0; j < ch.eventsKvpArray.length; j++) {
+
+                    const evt = ch.eventsKvpArray[j].value;
 
                     if (evt) {
                         await this.dao.run(ScriptEventsTable.insert,
@@ -256,17 +264,12 @@ export class ScriptRepository {
                             });
                     }
                 }
-
-                for (const [key, value] of script.deploymentStatus) {
-                    await this.dao.run(ScriptsDeploymentTable.insert, [script.id, key.toString(), value.date.toISOString()])
-                        .then((val: any) => {
-                            if (val) { logger.info(val); }
-                        });
-                }
             }
 
+            await this.dao.run("COMMIT", [])
+
         } catch (err) {
-            logger.error(err);
+            logger.error(`Error Saving script: ${err}`);
             await this.dao.run("ROLLBACK", [])
             return false;
         }
@@ -302,7 +305,7 @@ export class ScriptRepository {
                 kvp.value.scriptChannel = ch.id;
             }
         }
-        script.deploymentStatus = new Map<number, { date: Date, status: any }>();
+        script.deploymentStatusKvp = new Array<DeploymentStatus>();
         script.lastSaved = new Date();
 
         await this.saveScript(script)
