@@ -551,26 +551,26 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   //#endregion
 
-  private addChannel(controllerId: number, channelType: ChannelType, channels: Array<number>): void {
+  private addChannel(locationId: number, channelType: ChannelType, channels: Array<number>): void {
 
-    let name = this.scriptResources.locations.get(controllerId)?.name;
+    let name = this.scriptResources.locations.get(locationId)?.name;
 
     if (!name) {
       name = ''
     }
 
     if (channelType === ChannelType.audio) {
-      const chValue = this.scriptResources.addChannel(controllerId, channelType, 0);
+      const chValue = this.scriptResources.addChannel(locationId, channelType, 0);
 
       let subType = 0;
 
-      const ch = new ScriptChannel(Guid.create().toString(), this.scriptId, controllerId, channelType, subType, 0, chValue, this.segments);
+      const ch = new ScriptChannel(Guid.create().toString(), this.scriptId, locationId, channelType, subType, 0, chValue, this.segments);
 
       this.scriptChannels.push(ch);
     }
     else {
       channels.forEach(channel => {
-        const chValue = this.scriptResources.addChannel(controllerId, channelType, +channel);
+        const chValue = this.scriptResources.addChannel(locationId, channelType, +channel);
 
         let subType = 0;
 
@@ -578,7 +578,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
           subType = chValue.type;
         }
 
-        const ch = new ScriptChannel(Guid.create().toString(), this.scriptId, controllerId, channelType, subType, channel, chValue, this.segments);
+        const ch = new ScriptChannel(Guid.create().toString(), this.scriptId, locationId, channelType, subType, channel, chValue, this.segments);
 
         this.scriptChannels.push(ch);
       });

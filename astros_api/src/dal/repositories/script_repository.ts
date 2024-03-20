@@ -9,6 +9,7 @@ import { UartModuleTable } from "../tables/uart_module_table";
 import { logger } from "../../logger";
 import { Guid } from "guid-typescript";
 import { ScriptsDeploymentTable } from "../tables/scripts_deployment_table";
+import { json } from "stream/consumers";
 
 
 export class ScriptRepository {
@@ -240,7 +241,6 @@ export class ScriptRepository {
                 .then((val: any) => {
                     if (val) { logger.info(val); }
                 });
-
 
             for (let i = 0; i < script.scriptChannels.length; i++) {
 

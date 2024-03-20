@@ -101,7 +101,7 @@ export class ScriptsComponent implements OnInit {
     this.container.clear();
 
     const modalResources = new Map<string, any>();
-    modalResources.set(ModalResources.action, 'Confirm Delete')
+    modalResources.set(ModalResources.action, 'Delete')
     modalResources.set(ModalResources.message, `Are you sure you want to delete script?`);
     modalResources.set(ModalResources.confirmEvent, { id: ModalCallbackEvent.delete, val: id });
     modalResources.set(ModalResources.closeEvent, { id: ModalCallbackEvent.close })

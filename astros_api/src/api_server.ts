@@ -432,6 +432,35 @@ class ApiServer {
         try {
 
             logger.info('uploading script');
+
+            const id = req.query.id;
+
+            const dao = new DataAccess();
+            const scriptRepo = new ScriptRepository(dao);
+            const locationsRepo = new LocationsRepository(dao);
+
+            const script = await scriptRepo.getScript(id) as Script;
+
+            const cvtr = new ScriptConverter();
+
+            const messages = cvtr.convertScript(script);
+
+            if (messages.size < 1) {
+                logger.warn(`No locations script values returned for ${id}`);
+            }
+
+            const locations = await locationsRepo.loadLocations();
+
+            logger.debug(`scripts: ${JSON.stringify(messages)}`);
+
+            const msg = new ScriptUpload(id, messages, locations);
+
+            logger.debug(`msg: ${JSON.stringify(msg)}`);
+
+            this.serialWorker.postMessage({ type: SerialMessageType.DEPLOY_SCRIPT, data: msg });
+
+            res.status(200);
+            res.json({ message: "success" });
         } catch (error) {
             logger.error(error);
 
@@ -446,6 +475,10 @@ class ApiServer {
         try {
 
             logger.info('running script');
+
+            res.status(200);
+            res.json({ message: "success" });
+
         } catch (error) {
             logger.error(error);
 
@@ -460,6 +493,9 @@ class ApiServer {
         try {
 
             logger.info('sending direct command');
+
+            res.status(200);
+            res.json({ message: "success" });
 
         } catch (error) {
             logger.error(error);

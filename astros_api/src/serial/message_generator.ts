@@ -6,6 +6,7 @@ import { ConfigSync } from "src/models/config/config_sync";
 import { logger } from "../logger";
 import { MessageHelper } from "./message_helper";
 import { SerialMessageType } from "./serial_message";
+import { ScriptUpload } from "src/models/scripts/script_upload";
 
 export class MessageGenerator {
 
@@ -104,7 +105,34 @@ export class MessageGenerator {
     }
 
     generateDeployScript(data: any) {
-        return "";
+
+        const upload = data as ScriptUpload;
+
+        const result = [this.GS];
+
+        for (const config of upload.configs) {
+            if (!config) {
+                continue;
+            }
+
+            logger.debug(`Generating deploy script message: ${JSON.stringify(config)}`);
+
+            result.push(config.address);
+            result.push(this.US);
+            result.push(config.name);
+            result.push(this.US);
+            result.push(upload.scriptId);
+            result.push(this.US);
+            result.push(config.script);
+            result.push(this.RS);
+        }
+
+        if (result.length > 0) {
+            result.pop();
+        }
+
+        const msg = result.join("");
+        return msg;
     }
 
     generateRegistrationSync(data: any) {
