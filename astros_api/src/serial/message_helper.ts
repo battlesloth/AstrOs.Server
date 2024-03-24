@@ -22,9 +22,13 @@ export class MessageHelper {
     [SerialMessageType.RUN_SCRIPT, SerialMsgConst.RUN_SCRIPT],
     [SerialMessageType.RUN_SCRIPT_ACK, SerialMsgConst.RUN_SCRIPT_ACK],
     [SerialMessageType.RUN_SCRIPT_NAK, SerialMsgConst.RUN_SCRIPT_NAK],
+    [SerialMessageType.PANIC_STOP, SerialMsgConst.PANIC_STOP],
     [SerialMessageType.RUN_COMMAND, SerialMsgConst.RUN_COMMAND],
     [SerialMessageType.RUN_COMMAND_ACK, SerialMsgConst.RUN_COMMAND_ACK],
-    [SerialMessageType.RUN_COMMAND_NAK, SerialMsgConst.RUN_COMMAND_NAK]
+    [SerialMessageType.RUN_COMMAND_NAK, SerialMsgConst.RUN_COMMAND_NAK],
+    [SerialMessageType.FORMAT_SD, SerialMsgConst.FORMAT_SD],
+    [SerialMessageType.FORMAT_SD_ACK, SerialMsgConst.FORMAT_SD_ACK],
+    [SerialMessageType.FORMAT_SD_NAK, SerialMsgConst.FORMAT_SD_NAK]
   ]);
 
   public static readonly MessageTimeouts: Map<SerialMessageType, number> = new Map([

@@ -7,6 +7,7 @@ import { logger } from "../logger";
 import { MessageHelper } from "./message_helper";
 import { SerialMessageType } from "./serial_message";
 import { ScriptUpload } from "src/models/scripts/script_upload";
+import { ScriptRun } from "src/models/scripts/script_run";
 
 export class MessageGenerator {
 
@@ -33,6 +34,12 @@ export class MessageGenerator {
                 break;
             case SerialMessageType.RUN_COMMAND:
                 result += this.generateRunCommand(data);
+                break;
+            case SerialMessageType.PANIC_STOP:
+                result += this.generatePanicStop(data);
+                break;
+            case SerialMessageType.FORMAT_SD:
+                result += this.generateFormatSD(data);
                 break;
             default:
                 logger.error(`Unknown message type: ${type}`);
@@ -96,14 +103,6 @@ export class MessageGenerator {
         return msg;
     }
 
-    generateRunCommand(data: any) {
-        return "";
-    }
-
-    generateRunScript(data: any) {
-        return "";
-    }
-
     generateDeployScript(data: any) {
 
         const upload = data as ScriptUpload;
@@ -135,7 +134,94 @@ export class MessageGenerator {
         return msg;
     }
 
+    generateRunScript(data: any) {
+        const runCommand = data as ScriptRun;
+
+        const result = [this.GS];
+
+        for (const config of runCommand.configs) {
+            if (!config) {
+                continue;
+            }
+
+            logger.debug(`Generating run script message: ${JSON.stringify(config)}`);
+
+            result.push(config.address);
+            result.push(this.US);
+            result.push(config.name);
+            result.push(this.US);
+            result.push(runCommand.scriptId);
+            result.push(this.RS);
+        }
+
+        if (result.length > 0) {
+            result.pop();
+        }
+
+        const msg = result.join("");
+
+        return msg;
+    }
+
+
+    generatePanicStop(data: any) {
+        const runCommand = data as ScriptRun;
+
+        const result = [this.GS];
+
+        for (const config of runCommand.configs) {
+            if (!config) {
+                continue;
+            }
+
+            logger.debug(`Generating panic stop message: ${JSON.stringify(config)}`);
+
+            result.push(config.address);
+            result.push(this.US);
+            result.push(config.name);
+            result.push(this.US);
+            result.push("PANIC");
+            result.push(this.RS);
+        }
+
+        if (result.length > 0) {
+            result.pop();
+        }
+
+        const msg = result.join("");
+
+        return msg;
+    }
+
+    generateRunCommand(data: any) {
+
+        return "";
+    }
+
     generateRegistrationSync(data: any) {
         return "";
+    }
+
+    generateFormatSD(data: any) {
+        const controllers = data as Array<any>;
+
+        const result = [this.GS];
+
+        for (const controller of controllers) {
+            result.push(controller.address);
+            result.push(this.US);
+            result.push(controller.name);
+            result.push(this.US);
+            result.push("FORMAT");
+            result.push(this.RS);
+        }
+
+        if (result.length > 0) {
+            result.pop();
+        }
+
+        const msg = result.join("");
+
+        return msg;
     }
 }

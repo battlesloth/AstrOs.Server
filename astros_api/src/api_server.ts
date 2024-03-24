@@ -27,8 +27,8 @@ import { ScriptRepository } from "./dal/repositories/script_repository";
 
 import { ScriptConverter } from "./script_converter";
 import {
-    BaseResponse, ControlModule, Script, StatusResponse, ControllersResponse,
-    TransmissionStatus, TransmissionType, ControllerLocation
+    Script, StatusResponse, ControllersResponse,
+    TransmissionType, ControllerLocation
 } from "astros-common";
 import { ControllerRepository } from "./dal/repositories/controller_repository";
 import { ConfigSync } from "./models/config/config_sync";
@@ -37,7 +37,6 @@ import { logger } from "./logger";
 import { RemoteConfigController } from "./controllers/remote_config_controller";
 import { SettingsController } from "./controllers/settings_controller";
 import { ApiKeyValidator } from "./api_key_validator";
-import { P } from "pino";
 import { SerialMessageType } from "./serial/serial_message";
 import {
     ConfigSyncResponse,
@@ -219,6 +218,7 @@ class ApiServer {
 
         this.router.get(SettingsController.getRoute, this.authHandler, SettingsController.getSetting);
         this.router.put(SettingsController.putRoute, this.authHandler, SettingsController.saveSetting);
+        this.router.get(SettingsController.controllersRoute, this.authHandler, SettingsController.getControllers);
         this.router.post(SettingsController.formatSDRoute, this.authHandler, (req: any, res: any, next: any) => { this.formatSD(req, res, next); })
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
@@ -320,9 +320,6 @@ class ApiServer {
 
             const controller = await controlerRepo.getControllerByAddress(val.controller.address);
 
-
-            logger.info(`${JSON.stringify(controller)}`);
-
             if (controller === null) {
                 logger.error(`Controller not found for address: ${val.controller.address}`);
                 return;
@@ -334,8 +331,6 @@ class ApiServer {
                 logger.error(`Location not found for controller: ${val.controller.name}`);
                 return;
             }
-
-            logger.info(`msg: ${val.controller.fingerprint}, db: ${location.configFingerprint}`);
 
             const update = new StatusResponse(controller.id, location.locationName, true, val.controller.fingerprint === location.configFingerprint);
 
@@ -476,6 +471,27 @@ class ApiServer {
 
             logger.info('running script');
 
+            const id = req.query.id;
+
+            const dao = new DataAccess();
+            const ctlRepo = new LocationsRepository(dao);
+
+            const locations = await ctlRepo.loadLocations();
+
+            const msg = new ScriptRun(id, locations);
+
+            let msgType = SerialMessageType.RUN_SCRIPT;
+
+            if (id === "panic") {
+                msg.type = TransmissionType.panic;
+                msgType = SerialMessageType.PANIC_STOP;
+            }
+
+
+            logger.debug(`msg: ${JSON.stringify(msg)}`);
+
+            this.serialWorker.postMessage({ type: msgType, data: msg });
+
             res.status(200);
             res.json({ message: "success" });
 
@@ -511,6 +527,14 @@ class ApiServer {
         try {
 
             logger.info('formatting SD card');
+
+            const controllers = req.body.controllers;
+
+            this.serialWorker.postMessage({ type: SerialMessageType.FORMAT_SD, data: controllers });
+
+            res.status(200);
+            res.json({ message: "success" });
+
         } catch (error) {
             logger.error(error);
 

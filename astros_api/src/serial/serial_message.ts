@@ -19,9 +19,13 @@ export enum SerialMessageType {
     RUN_SCRIPT, // from web server
     RUN_SCRIPT_ACK,
     RUN_SCRIPT_NAK,
+    PANIC_STOP,  // from web server
     RUN_COMMAND, // from web server
     RUN_COMMAND_ACK,
-    RUN_COMMAND_NAK
+    RUN_COMMAND_NAK,
+    FORMAT_SD, // from web server
+    FORMAT_SD_ACK,
+    FORMAT_SD_NAK,
 }
 
 export class SerialMsgConst {
@@ -38,9 +42,13 @@ export class SerialMsgConst {
     static readonly RUN_SCRIPT = "RUN_SCRIPT";
     static readonly RUN_SCRIPT_ACK = "RUN_SCRIPT_ACK";
     static readonly RUN_SCRIPT_NAK = "RUN_SCRIPT_NAK";
+    static readonly PANIC_STOP = "PANIC_STOP";
     static readonly RUN_COMMAND = "RUN_COMMAND";
     static readonly RUN_COMMAND_ACK = "RUN_COMMAND_ACK";
     static readonly RUN_COMMAND_NAK = "RUN_COMMAND_NAK";
+    static readonly FORMAT_SD = "FORMAT_SD";
+    static readonly FORMAT_SD_ACK = "FORMAT_SD_ACK";
+    static readonly FORMAT_SD_NAK = "FORMAT_SD_NAK";
 }
 
 export class SerialMsgValidationResult {

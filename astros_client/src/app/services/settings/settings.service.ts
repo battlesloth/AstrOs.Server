@@ -1,6 +1,7 @@
 import { KeyValue } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { ControlModule } from 'astros-common';
 import { Observable, tap, catchError, of } from 'rxjs';
 
 @Injectable({
@@ -23,6 +24,14 @@ export class SettingsService {
       );
   }
 
+  getControllers(): Observable<ControlModule[]> {
+    return this.http.get<ControlModule[]>('/api/settings/controllers', {
+      headers: { Authorization: `Bearer ${this.getToken()}` }
+    })
+      .pipe(tap(_ => console.log('got controllers')),
+        catchError(this.handleError<ControlModule[]>('getControllers'))
+      );
+  }
 
   public saveSetting(setting: KeyValue<string, string>): Observable<any> {
     return this.http.put<any>('/api/settings', setting, {
@@ -35,11 +44,11 @@ export class SettingsService {
   }
 
 
-  public formatSD(modules: Array<number>): Observable<any> {
-    return this.http.post<Array<number>>(`/api/settings/formatSD`, {modules: modules},
-     {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
+  public formatSD(controllers: Array<any>): Observable<any> {
+    return this.http.post<Array<any>>(`/api/settings/formatSD`, { controllers: controllers },
+      {
+        headers: { Authorization: `Bearer ${this.getToken()}` }
+      })
       .pipe(tap(_ => console.log('SD Format Queued')),
         catchError(this.handleError<any>('formatSD'))
       );
