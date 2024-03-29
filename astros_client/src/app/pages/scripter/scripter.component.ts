@@ -190,6 +190,12 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     modalResources.set(ModalResources.scriptId, this.scriptId);
 
+    const locations = new Array<string>();
+
+    this.script.deploymentStatusKvp.forEach((kvp) => { locations.push(kvp.key) });
+
+    modalResources.set(ModalResources.locations, locations);
+
     const component = this.container.createComponent(ScriptTestModalComponent);
 
     component.instance.resources = modalResources;

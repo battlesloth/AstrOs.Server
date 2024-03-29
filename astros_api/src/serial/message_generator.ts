@@ -15,54 +15,57 @@ export class MessageGenerator {
     RS = MessageHelper.RS;
     US = MessageHelper.US;
 
-    generateMessage(type: SerialMessageType, id: string, data: any): any {
+    generateMessage(type: SerialMessageType, id: string, data: any): MessageGeneratorResponse {
 
-        let result = this.generateHeader(type, id);
+        const header = this.generateHeader(type, id);
+        let result: MessageGeneratorResponse;
 
         switch (type) {
             case SerialMessageType.REGISTRATION_SYNC:
-                result += this.generateRegistrationSync(data);
+                result = this.generateRegistrationSync();
                 break;
             case SerialMessageType.DEPLOY_CONFIG:
-                result += this.generateDeployConfig(data);
+                result = this.generateDeployConfig(header, data);
                 break;
             case SerialMessageType.DEPLOY_SCRIPT:
-                result += this.generateDeployScript(data);
+                result = this.generateDeployScript(header, data);
                 break;
             case SerialMessageType.RUN_SCRIPT:
-                result += this.generateRunScript(data);
+                result = this.generateRunScript(header, data);
                 break;
             case SerialMessageType.RUN_COMMAND:
-                result += this.generateRunCommand(data);
+                result = this.generateRunCommand(header, data);
                 break;
             case SerialMessageType.PANIC_STOP:
-                result += this.generatePanicStop(data);
+                result = this.generatePanicStop(header, data);
                 break;
             case SerialMessageType.FORMAT_SD:
-                result += this.generateFormatSD(data);
+                result = this.generateFormatSD(header, data);
                 break;
             default:
                 logger.error(`Unknown message type: ${type}`);
-                return "\n";
+                return new MessageGeneratorResponse("\n", []);
         }
 
-        logger.debug('3');
-        return `${result}${MessageHelper.MessageEOL}`;
+        return result;
     }
 
     generateHeader(type: SerialMessageType, id: string): string {
         return `${type}${this.RS}${MessageHelper.ValidationMap.get(type)}${this.RS}${id}`;
     }
 
-    generateDeployConfig(data: any) {
+    generateDeployConfig(header: string, data: any) {
         const sync = data as ConfigSync;
         const result = [this.GS];
 
+        const controllers = [];
 
         for (const config of sync.configs) {
-            if (!config) {
+            if (!config.address) {
                 continue;
             }
+
+            controllers.push(config.address);
 
             logger.debug(`Generating deploy config message: ${JSON.stringify(config)}`);
 
@@ -100,19 +103,24 @@ export class MessageGenerator {
         }
 
         const msg = result.join("");
-        return msg;
+
+        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers);
     }
 
-    generateDeployScript(data: any) {
+    generateDeployScript(header: string, data: any) {
 
         const upload = data as ScriptUpload;
 
         const result = [this.GS];
 
+        const controllers = [];
+
         for (const config of upload.configs) {
-            if (!config) {
+            if (!config?.address) {
                 continue;
             }
+
+            controllers.push(config.address);
 
             logger.debug(`Generating deploy script message: ${JSON.stringify(config)}`);
 
@@ -131,18 +139,23 @@ export class MessageGenerator {
         }
 
         const msg = result.join("");
-        return msg;
+
+        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers, upload.scriptId);
     }
 
-    generateRunScript(data: any) {
+    generateRunScript(header: string, data: any) {
         const runCommand = data as ScriptRun;
 
         const result = [this.GS];
 
+        const controllers = [];
+
         for (const config of runCommand.configs) {
-            if (!config) {
+            if (!config?.address) {
                 continue;
             }
+
+            controllers.push(config.address);
 
             logger.debug(`Generating run script message: ${JSON.stringify(config)}`);
 
@@ -160,19 +173,22 @@ export class MessageGenerator {
 
         const msg = result.join("");
 
-        return msg;
+        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers, runCommand.scriptId);
     }
 
 
-    generatePanicStop(data: any) {
+    generatePanicStop(header: string, data: any) {
         const runCommand = data as ScriptRun;
 
         const result = [this.GS];
+        const controllers = [];
 
         for (const config of runCommand.configs) {
-            if (!config) {
+            if (!config?.address) {
                 continue;
             }
+
+            controllers.push(config.address);
 
             logger.debug(`Generating panic stop message: ${JSON.stringify(config)}`);
 
@@ -190,24 +206,32 @@ export class MessageGenerator {
 
         const msg = result.join("");
 
-        return msg;
+        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers);
     }
 
-    generateRunCommand(data: any) {
-
-        return "";
+    generateRunCommand(header: string, data: any) {
+        return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
     }
 
-    generateRegistrationSync(data: any) {
-        return "";
+    generateRegistrationSync() {
+        return new MessageGeneratorResponse("", ["00:00:00:00:00:00"]);
     }
 
-    generateFormatSD(data: any) {
+    generateFormatSD(header: string, data: any) {
         const controllers = data as Array<any>;
 
         const result = [this.GS];
 
+        const ctrls = [];
+
         for (const controller of controllers) {
+
+            if (!controller.address) {
+                continue;
+            }
+
+            ctrls.push(controller.address);
+
             result.push(controller.address);
             result.push(this.US);
             result.push(controller.name);
@@ -222,6 +246,18 @@ export class MessageGenerator {
 
         const msg = result.join("");
 
-        return msg;
+        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers);
+    }
+}
+
+export class MessageGeneratorResponse {
+    msg: string;
+    controllers: string[];
+    metaData: any;
+
+    constructor(msg: string, controllers: string[], metaData: any = "") {
+        this.msg = msg;
+        this.controllers = controllers;
+        this.metaData = metaData;
     }
 }

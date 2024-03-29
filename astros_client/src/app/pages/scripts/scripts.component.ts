@@ -25,7 +25,14 @@ export class ScriptsComponent implements OnInit {
   faRun = faPlay;
   faCopy = faCopy;
 
+  _scripts: Array<Script> = new Array<Script>();
+
   scripts: Array<Script>
+
+  locationMap = new Map<number, string>([
+    [1, 'body'],
+    [2, 'core'],
+    [3, 'dome']]);
 
   constructor(private router: Router,
     private scriptService: ScriptsService,
@@ -70,15 +77,39 @@ export class ScriptsComponent implements OnInit {
     this.initialStatusSet = true;
   }
 
-  updateUploadStatusElement(element: string, controllerId: number, scriptId: string): void {
+  updateUploadStatusElement(element: string, locationId: number, scriptId: string): void {
     const el = document.getElementById(`${scriptId}_${element}`);
     if (el === null) { return; }
-    const status = this.getUploadStatus(scriptId, controllerId);
+    const status = this.getUploadStatus(scriptId, locationId);
+    el.classList.remove('uploaded');
+    el.classList.remove('notuploaded');
+    el.classList.remove('uploading');
     el.classList.add(status.s);
 
     const toolTip = document.getElementById(`${scriptId}_${element}_tooltip`);
     if (toolTip === null) { return; }
     toolTip.innerText = status.d;
+  }
+
+  setUploadingStatus(scriptId: string): void {
+
+    const script = this.getScript(scriptId);
+
+    if (!script) { return; }
+
+    for (const location of this.locationMap.entries()) {
+      if (script.deploymentStatusKvp.map((s) => { return s.key }).indexOf(location[0].toString()) > -1) {
+        const el = document.getElementById(`${scriptId}_${location[1]}`);
+        if (el === null) { continue; }
+        el.classList.remove('uploaded');
+        el.classList.remove('notuploaded');
+        el.classList.add('uploading');
+
+        const toolTip = document.getElementById(`${scriptId}_${location}_tooltip`);
+        if (toolTip === null) { continue; }
+        toolTip.innerText = 'Uploading...';
+      }
+    }
   }
 
   newScript() {
@@ -203,16 +234,19 @@ export class ScriptsComponent implements OnInit {
     }
 
     this.scriptService.uploadScript(id).subscribe(observer);
+    this.setUploadingStatus(id);
   }
 
   statusUpdate(msg: ScriptResponse) {
 
     if (msg.status === TransmissionStatus.success) {
-      this.setUploadDate(msg.scriptId, msg.controllerId, msg.date);
+      this.setUploadDate(msg.scriptId, msg.locationId, msg.date);
     }
+
+    this.updateUploadStatusElement(this.locationMap.get(msg.locationId) as string, msg.locationId, msg.scriptId);
   }
 
-  getUploadStatus(id: string, controllerId: number): { s: string, d: string } {
+  getUploadStatus(id: string, locationId: number): { s: string, d: string } {
     let dateString = 'Not Uploaded';
 
     const script = this.getScript(id);
@@ -221,17 +255,26 @@ export class ScriptsComponent implements OnInit {
 
     const sidx = script.deploymentStatusKvp
       .map((s) => { return s.key })
-      .indexOf(controllerId.toString());
+      .indexOf(locationId.toString());
 
     if (sidx < 0) { return { s: 'notuploaded', d: dateString }; }
 
     const kvp = script.deploymentStatusKvp[sidx];
+    let uploadStatus = kvp.value.value;
+
 
     if (kvp.value.date) {
-      dateString = kvp.value.date.toLocaleString();
+      const uploaddate = new Date(kvp.value.date);
+      const scriptdate = new Date(script.lastSaved)
+      if (uploaddate < scriptdate) {
+        uploadStatus = UploadStatus.notUploaded;
+        dateString = ' Out of date ';
+      } else {
+        dateString = uploaddate.toLocaleDateString(navigator.language, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' });
+      }
     }
 
-    return { s: this.getUploadStatusClass(kvp.value.value), d: dateString };
+    return { s: this.getUploadStatusClass(uploadStatus), d: dateString };
   }
 
   getUploadStatusClass(status: UploadStatus) {

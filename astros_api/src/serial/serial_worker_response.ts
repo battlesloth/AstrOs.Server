@@ -6,6 +6,8 @@ export enum SerialWorkerResponseType {
     POLL,
     REGISTRATION_SYNC,
     CONFIG_SYNC,
+    SCRIPT_DEPLOY,
+    SCRIPT_RUN,
     SEND_SERIAL_MESSAGE,
     UPDATE_CLIENTS
 }
@@ -41,10 +43,39 @@ export class RegistrationResponse implements ISerialWorkerResponse {
 export class ConfigSyncResponse implements ISerialWorkerResponse {
     [x: string]: any;
     type: SerialWorkerResponseType;
-
+    success: boolean;
     controller!: ControlModule;
 
-    constructor() {
+    constructor(success: boolean) {
         this.type = SerialWorkerResponseType.CONFIG_SYNC;
+        this.success = success;
+    }
+}
+
+export class ScriptDeployResponse implements ISerialWorkerResponse {
+    [x: string]: any;
+    type: SerialWorkerResponseType;
+    success: boolean;
+    scriptId: string;
+    controller!: ControlModule;
+
+    constructor(success: boolean, scriptId: string) {
+        this.type = SerialWorkerResponseType.SCRIPT_DEPLOY;
+        this.success = success;
+        this.scriptId = scriptId;
+    }
+}
+
+export class ScriptRunResponse implements ISerialWorkerResponse {
+    [x: string]: any;
+    type: SerialWorkerResponseType;
+    success: boolean;
+    scriptId: string;
+    controller!: ControlModule;
+
+    constructor(success: boolean, scriptId: string) {
+        this.type = SerialWorkerResponseType.SCRIPT_RUN;
+        this.success = success;
+        this.scriptId = scriptId;
     }
 }

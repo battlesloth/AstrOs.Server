@@ -28,7 +28,7 @@ import { ScriptRepository } from "./dal/repositories/script_repository";
 import { ScriptConverter } from "./script_converter";
 import {
     Script, StatusResponse, ControllersResponse,
-    TransmissionType, ControllerLocation
+    TransmissionType, ControllerLocation, ScriptResponse, TransmissionStatus
 } from "astros-common";
 import { ControllerRepository } from "./dal/repositories/controller_repository";
 import { ConfigSync } from "./models/config/config_sync";
@@ -288,8 +288,12 @@ class ApiServer {
             case SerialWorkerResponseType.CONFIG_SYNC:
                 this.handleConfigSync(msg);
                 break;
+            case SerialWorkerResponseType.SCRIPT_DEPLOY:
+                this.handleScriptDeployResponse(msg);
+                break;
         }
     }
+
 
     async handleResgistraionResponse(msg: ISerialWorkerResponse) {
         try {
@@ -363,6 +367,36 @@ class ApiServer {
         }
     }
 
+    private async handleScriptDeployResponse(msg: ISerialWorkerResponse) {
+        try {
+            const val = msg as ConfigSyncResponse;
+
+            const dao = new DataAccess();
+            const locationRepo = new LocationsRepository(dao); 0
+            const scriptRepo = new ScriptRepository(dao);
+
+            const locId = await locationRepo.getLocationIdByController(val.controller.address)
+
+            if (val.success) {
+                const now = new Date();
+
+                await scriptRepo.updateScriptControllerUploaded(val.scriptId, locId, now);
+
+                const update = new ScriptResponse(val.scriptId, locId, TransmissionStatus.success, now);
+
+                this.updateClients(update);
+            } else {
+                const deployDate = await scriptRepo.getLastScriptUploadedDate(val.scriptId, locId);
+                const update = new ScriptResponse(val.scriptId, locId, TransmissionStatus.failed, deployDate);
+
+                this.updateClients(update);
+
+            }
+        }
+        catch (error) {
+            logger.error(`Error handling script deploy response: ${error}`);
+        }
+    }
 
     private async syncControllers(req: any, res: any, next: any) {
         try {

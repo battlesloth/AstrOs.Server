@@ -8,7 +8,7 @@ export class ScriptsDeploymentTable {
 
     public static readonly create =
         `CREATE TABLE IF NOT EXISTS ${this.table} (
-    ${this.scriptId} NUMBER PRIMARY KEY,
+    ${this.id} NUMBER PRIMARY KEY,
     ${this.scriptId} TEXT,
     ${this.locationId} NUMBER,
     ${this.lastDeployed} TEXT,
@@ -29,4 +29,10 @@ export class ScriptsDeploymentTable {
     ${this.lastDeployed}
     FROM ${this.table}
     WHERE ${this.scriptId} = ?`;
+
+    public static readonly getDateByScriptAndController =
+        `SELECT ${this.lastDeployed}
+    FROM ${this.table}
+    WHERE ${this.scriptId} = ?
+    AND ${this.locationId} = ?`;
 }

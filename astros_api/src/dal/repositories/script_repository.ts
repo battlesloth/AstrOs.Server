@@ -2,14 +2,17 @@ import { DataAccess } from "../../dal/data_access";
 import { ScriptsTable } from "../../dal/tables/scripts_table";
 import { ScriptChannelsTable } from "../../dal/tables/script_channels_table";
 import { ScriptEventsTable } from "../../dal/tables/script_events_table";
-import { ChannelType, I2cChannel, ServoChannel, Script, ScriptChannel, ScriptEvent, ChannelSubType, UartChannel, UploadStatus, DeploymentStatus } from "astros-common";
+import {
+    ChannelType, I2cChannel, ServoChannel, Script, ScriptChannel,
+    ScriptEvent, ChannelSubType, UartChannel, UploadStatus, DeploymentStatus
+} from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
 import { UartModuleTable } from "../tables/uart_module_table";
 import { logger } from "../../logger";
 import { Guid } from "guid-typescript";
 import { ScriptsDeploymentTable } from "../tables/scripts_deployment_table";
-import { json } from "stream/consumers";
+
 
 
 export class ScriptRepository {
@@ -47,7 +50,7 @@ export class ScriptRepository {
             await this.dao.get(ScriptsDeploymentTable.selectByScript, [scr.id])
                 .then((val: any) => {
                     val.forEach((dep: any) => {
-                        const status = new DeploymentStatus(dep.controllerId,
+                        const status = new DeploymentStatus(dep.locationId.toString(),
                             { date: new Date(Date.parse(dep.lastDeployed)), value: UploadStatus.uploaded });
                         scr.deploymentStatusKvp.push(status);
                     });
@@ -81,7 +84,7 @@ export class ScriptRepository {
         await this.dao.get(ScriptsDeploymentTable.selectByScript, [id])
             .then((val: any) => {
                 val.forEach((dep: any) => {
-                    const status = new DeploymentStatus(dep.controllerId,
+                    const status = new DeploymentStatus(dep.locationId,
                         { date: new Date(Date.parse(dep.lastDeployed)), value: UploadStatus.uploaded });
                     result.deploymentStatusKvp.push(status);
                 });
@@ -216,6 +219,22 @@ export class ScriptRepository {
             });
 
         return success;
+    }
+
+    async getLastScriptUploadedDate(scriptId: string, locationId: number): Promise<Date> {
+        let result = new Date('1970-01-01T00:00:00.000Z');
+
+        await this.dao.get(ScriptsDeploymentTable.getDateByScriptAndController, [scriptId, locationId.toString()])
+            .then((val: any) => {
+                if (val.length > 0) {
+                    result = new Date(Date.parse(val[0].lastDeployed));
+                }
+            })
+            .catch((err: any) => {
+                logger.error(`Exception getting last script uploaded date for controller: ${locationId} => ${err}`);
+            });
+
+        return result;
     }
 
     async saveScript(script: Script): Promise<boolean> {

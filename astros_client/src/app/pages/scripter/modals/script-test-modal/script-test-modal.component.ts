@@ -41,6 +41,27 @@ export class ScriptTestModalComponent extends BaseEventModalComponent implements
 
   override ngOnInit(): void {
     this.scriptId = this.resources.get(ModalResources.scriptId);
+    const locations = this.resources.get(ModalResources.locations);
+
+    let hasBody = false;
+    let hasCore = false;
+    let hasDome = false;
+
+    locations.forEach((location: number) => {
+      switch (location) {
+        case 1:
+          hasBody = true;
+          break;
+        case 2:
+          hasCore = true;
+          break;
+        case 3:
+          hasDome = true;
+          break;
+      }
+    });
+
+    this.setInitialUploadStatus(hasBody, hasCore, hasDome);
 
     const observer = {
       next: (result: any) => console.log(result),
@@ -74,26 +95,52 @@ export class ScriptTestModalComponent extends BaseEventModalComponent implements
     this.closeModal();
   }
 
+  setInitialUploadStatus(hasBody: boolean, hasCore: boolean, hasDome: boolean) {
+    if (hasBody) {
+      this.bodyUpload = TransmissionStatus.sending;
+      this.bodyCaption.str = 'Uploading';
+    } else {
+      this.bodyUpload = TransmissionStatus.success;
+      this.bodyCaption.str = 'Not Assigned';
+    }
+
+    if (hasCore) {
+      this.coreUpload = TransmissionStatus.sending;
+      this.coreCaption.str = 'Uploading';
+    } else {
+      this.coreUpload = TransmissionStatus.success;
+      this.coreCaption.str = 'Not Assigned';
+    }
+
+    if (hasDome) {
+      this.domeUpload = TransmissionStatus.sending;
+      this.domeCaption.str = 'Uploading';
+    } else {
+      this.domeUpload = TransmissionStatus.success;
+      this.domeCaption.str = 'Not Assigned';
+    }
+  }
+
   statusUpdate(msg: ScriptResponse) {
-    switch (msg.controllerId) {
+    switch (msg.locationId) {
       case 1:
+        this.bodyUpload = msg.status;
+        this.setCaption(this.bodyCaption, msg.status);
+        break;
+      case 2:
         this.coreUpload = msg.status;
         this.setCaption(this.coreCaption, msg.status);
         break;
-      case 2:
+      case 3:
         this.domeUpload = msg.status;
         this.setCaption(this.domeCaption, msg.status);
-        break;
-      case 3:
-        this.bodyUpload = msg.status;
-        this.setCaption(this.bodyCaption, msg.status);
         break;
     }
 
     if (this.coreUpload > 1 && this.domeUpload > 1 && this.bodyUpload > 1) {
       this.status = "Upload Complete."
       this.uploadInProgress = false;
-      if (this.coreUpload + this.domeUpload + this.bodyUpload > 6) {
+      if (this.coreUpload + this.domeUpload + this.bodyUpload >= 6) {
         this.runDisabled = false;
       }
     }

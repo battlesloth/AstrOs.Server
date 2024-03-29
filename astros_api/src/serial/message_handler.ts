@@ -1,7 +1,7 @@
 import { logger } from ".././logger";
-import { SerialMsgValidationResult } from "./serial_message";
+import { SerialMessageType, SerialMsgValidationResult } from "./serial_message";
 import { MessageHelper } from "./message_helper";
-import { ConfigSyncResponse, PollRepsonse, RegistrationResponse, SerialWorkerResponseType } from "./serial_worker_response";
+import { ConfigSyncResponse, PollRepsonse, RegistrationResponse, ScriptDeployResponse, ScriptRunResponse, SerialWorkerResponseType } from "./serial_worker_response";
 import { ControlModule } from "astros-common";
 
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
@@ -90,18 +90,58 @@ export class MessageHandler {
 
     handleDeployConfigAck(msg: string): ConfigSyncResponse {
 
-        const response = new ConfigSyncResponse();
+        const response = new ConfigSyncResponse(true);
 
         const parts = msg.split(MessageHelper.US);
 
-        if (parts.length !== 3) {
-            logger.error(`Invalid poll ack: ${msg}`);
+        if (parts.length < 3) {
+            logger.error(`Invalid deploy ack: ${msg}`);
             response.type = SerialWorkerResponseType.UNKNOWN;
             return response;
         }
 
         const module = new ControlModule(0, parts[1], parts[0]);
         module.fingerprint = parts[2];
+        response.controller = module;
+
+        return response;
+    }
+
+    handleDeployScriptAckNak(type: SerialMessageType, msg: string): ScriptDeployResponse {
+
+        const parts = msg.split(MessageHelper.US);
+
+        if (parts.length < 3) {
+            logger.error(`Invalid script deploy ack/nak: ${msg}`);
+
+            return { success: false, type: SerialWorkerResponseType.UNKNOWN } as ScriptDeployResponse;
+        }
+
+        const success = type === SerialMessageType.DEPLOY_SCRIPT_ACK;
+
+        const response = new ScriptDeployResponse(success, parts[2]);
+
+        const module = new ControlModule(0, parts[1], parts[0]);
+        response.controller = module;
+
+        return response;
+    }
+
+    handleRunScriptAckNak(type: SerialMessageType, msg: string): ScriptRunResponse {
+
+        const parts = msg.split(MessageHelper.US);
+
+        if (parts.length < 3) {
+            logger.error(`Invalid script run ack/nak: ${msg}`);
+
+            return { success: false, type: SerialWorkerResponseType.UNKNOWN } as ScriptRunResponse;
+        }
+
+        const success = type === SerialMessageType.RUN_SCRIPT_ACK;
+
+        const response = new ScriptRunResponse(success, parts[2]);
+
+        const module = new ControlModule(0, parts[1], parts[0]);
         response.controller = module;
 
         return response;

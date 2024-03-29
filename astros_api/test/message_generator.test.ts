@@ -23,7 +23,9 @@ describe("Message Generator Tests", () => {
 
         const message = generator.generateMessage(SerialMessageType.REGISTRATION_SYNC, "123", "payload");
 
-        expect(message).toBe(`1${RS}REGISTRATION_SYNC${RS}123\n`);
+        expect(message.controllers.length).toBe(1);
+        expect(message.controllers[0]).toBe("00:00:00:00:00:00");
+        expect(message.msg).toBe(`1${RS}REGISTRATION_SYNC${RS}123\n`);
     });
 
     it("generate Deploy Config", () => {
@@ -45,7 +47,9 @@ describe("Message Generator Tests", () => {
         const configSync = new ConfigSync(locations);
         const message = generator.generateMessage(SerialMessageType.DEPLOY_CONFIG, "123", configSync);
 
-        const groups = message.split(GS);
+        const groups = message.msg.split(GS);
+
+        expect(message.controllers.length).toBe(2);
 
         expect(groups.length).toBe(2);
         expect(groups[0]).toBe(`5${RS}DEPLOY_CONFIG${RS}123`);
