@@ -1,4 +1,4 @@
-export enum ModalCallbackEvent{
+export enum ModalCallbackEvent {
     close,
     addChannel,
     addEvent,
@@ -12,9 +12,10 @@ export enum ModalCallbackEvent{
 }
 
 
-export class ModalResources{
+export class ModalResources {
     // script test modal
     public static readonly scriptId = 'scriptId';
+    public static readonly locations = 'locations';
 
     // channel test modal
     public static readonly channelType = 'channelType';

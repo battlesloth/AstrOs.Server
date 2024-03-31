@@ -28,12 +28,15 @@ module.exports = {
       output: {
         filename: 'bundle.js',
         path: path.resolve(__dirname, 'dist'),
+        devtoolModuleFilenameTemplate: '[absolute-resource-path]'
       },
       mode: 'production',
       externals: {
         sqlite3: 'commonjs sqlite3',
+        serialport: 'serialport',
         bufferutil: "bufferutil",
         "utf-8-validate": "utf-8-validate"
     },
+    devtool: 'source-map'
       
 };

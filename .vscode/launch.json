@@ -14,7 +14,7 @@
                 "run-script",
                 "start"
             ],
-            "console": "externalTerminal",
+            "console": "integratedTerminal",
             "preLaunchTask": "build server"
         },
         {
@@ -27,11 +27,11 @@
                 "run-script",
                 "start"
             ],
-            "console": "externalTerminal"
+            "console": "integratedTerminal"
         },
         {
             "name": "browser",
-            "type": "pwa-msedge",
+            "type": "msedge",
             "request": "launch",
             "url": "http://localhost:4200",
             "webRoot": "${workspaceFolder}/astros_client",
@@ -42,9 +42,9 @@
         {
             "name": "server/client",
             "configurations": [
-                "nodejs",
+                "browser",
                 "angular",
-                "browser"
+                "nodejs"              
             ]
         }
     ]

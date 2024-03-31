@@ -14,7 +14,9 @@
 
         .content {
             width: 300px;
-            overflow-wrap: break-word;
+            height: 120px;
+            overflow-x: hidden;
+            overflow-y: auto;
             display: inline;
 
              
@@ -27,6 +29,18 @@
                     border-color: black;
                     background-color:  #dddddd !important;
                   }
+
+                .controller {
+                    font-size: 20px;
+                    padding-bottom: 4px;
+
+                    input {
+                        height: 20px;
+                        width: 20px;
+                        vertical-align: text-bottom;
+                    }
+
+                }
         }
     }
 }

@@ -1,4 +1,4 @@
-FROM arm64v8/node:18 as build0
+FROM arm64v8/node:20 as build0
 
 WORKDIR /usr/src/commons
 
@@ -39,8 +39,9 @@ COPY --from=build1 /usr/src/app/dist /usr/src/temp/
 RUN npm install sqlite3 --python=/usr/bin/python3
 RUN npm install bufferutil
 RUN npm install utf-8-validate
+RUN npm install serialport
 
-FROM --platform=arm64 gcr.io/distroless/nodejs18-debian11
+FROM --platform=arm64 gcr.io/distroless/nodejs20-debian11
 
 WORKDIR /app
 

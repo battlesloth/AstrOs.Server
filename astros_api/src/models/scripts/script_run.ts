@@ -1,4 +1,4 @@
-import { ControlModule, TransmissionType } from "astros-common";
+import { ControllerLocation, TransmissionType } from "astros-common";
 import { ScriptConfig } from "./script_config";
 
 export class ScriptRun {
@@ -7,14 +7,14 @@ export class ScriptRun {
     scriptId: string;
     configs: Array<ScriptConfig>;
 
-    constructor(scriptId: string, controllers: Array<ControlModule> ){
+    constructor(scriptId: string, locations: Array<ControllerLocation>) {
         this.scriptId = scriptId;
-        
+
         this.configs = new Array<ScriptConfig>();
 
-        controllers.forEach(ctl =>{
-            const cfig = new ScriptConfig(ctl, '')
+        locations.forEach(loc => {
+            const cfig = new ScriptConfig(loc.controller, '')
             this.configs.push(cfig);
         });
-    } 
+    }
 }

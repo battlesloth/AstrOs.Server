@@ -2,12 +2,14 @@ import { ControlModule } from "astros-common";
 
 export class ScriptConfig {
     id: number;
-    ip: string;
+    name: string;
+    address: string;
     script: string;
 
-    constructor(controller: ControlModule, script: string){
+    constructor(controller: ControlModule, script: string) {
         this.id = controller.id;
-        this.ip = controller.ipAddress;
+        this.name = controller.name;
+        this.address = controller.address;
         this.script = script === undefined ? '' : script;
     }
 }

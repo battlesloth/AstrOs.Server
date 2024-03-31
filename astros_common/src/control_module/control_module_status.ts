@@ -1,16 +1,19 @@
-import { ControllerType } from "../astros_enums";
+
 
 export class ControlModuleStatus{
-    id: ControllerType;
-
-    ipAddress: string;
+    id: number;
+    location: string;
+    name: string;
+    address: string;
     
     online: boolean;
     synced: boolean;
 
-    constructor(id: ControllerType){
+    constructor(id: number, location: string, name: string, address: string){
         this.id = id;
-        this.ipAddress = '';
+        this.location = location;
+        this.name = name;
+        this.address = address;
         this.online = false;
         this.synced = false;
     }

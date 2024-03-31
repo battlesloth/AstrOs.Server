@@ -1,7 +1,8 @@
 import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { faCopy, faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
-import { ControllerType, Script, ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
+import { ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
+import { Script } from 'astros-common/scripts/script';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
@@ -17,12 +18,21 @@ export class ScriptsComponent implements OnInit {
 
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
 
+  private initialStatusSet: boolean = false;
+
   faTrash = faTrash;
   faUpload = faUpload;
   faRun = faPlay;
   faCopy = faCopy;
 
+  _scripts: Array<Script> = new Array<Script>();
+
   scripts: Array<Script>
+
+  locationMap = new Map<number, string>([
+    [1, 'body'],
+    [2, 'core'],
+    [3, 'dome']]);
 
   constructor(private router: Router,
     private scriptService: ScriptsService,
@@ -54,6 +64,54 @@ export class ScriptsComponent implements OnInit {
     this.scriptService.getAllScripts().subscribe(observer);
   }
 
+  ngAfterViewChecked() {
+    if (this.initialStatusSet) { return; }
+    if (this.scripts.length === 0) { return; }
+
+    for (const script of this.scripts) {
+      this.updateUploadStatusElement('body', 1, script.id);
+      this.updateUploadStatusElement('core', 2, script.id);
+      this.updateUploadStatusElement('dome', 3, script.id);
+    }
+
+    this.initialStatusSet = true;
+  }
+
+  updateUploadStatusElement(element: string, locationId: number, scriptId: string): void {
+    const el = document.getElementById(`${scriptId}_${element}`);
+    if (el === null) { return; }
+    const status = this.getUploadStatus(scriptId, locationId);
+    el.classList.remove('uploaded');
+    el.classList.remove('notuploaded');
+    el.classList.remove('uploading');
+    el.classList.add(status.s);
+
+    const toolTip = document.getElementById(`${scriptId}_${element}_tooltip`);
+    if (toolTip === null) { return; }
+    toolTip.innerText = status.d;
+  }
+
+  setUploadingStatus(scriptId: string): void {
+
+    const script = this.getScript(scriptId);
+
+    if (!script) { return; }
+
+    for (const location of this.locationMap.entries()) {
+      if (script.deploymentStatusKvp.map((s) => { return s.key }).indexOf(location[0].toString()) > -1) {
+        const el = document.getElementById(`${scriptId}_${location[1]}`);
+        if (el === null) { continue; }
+        el.classList.remove('uploaded');
+        el.classList.remove('notuploaded');
+        el.classList.add('uploading');
+
+        const toolTip = document.getElementById(`${scriptId}_${location}_tooltip`);
+        if (toolTip === null) { continue; }
+        toolTip.innerText = 'Uploading...';
+      }
+    }
+  }
+
   newScript() {
     this.router.navigate(['scripter', '0']);
   }
@@ -74,7 +132,7 @@ export class ScriptsComponent implements OnInit {
     this.container.clear();
 
     const modalResources = new Map<string, any>();
-    modalResources.set(ModalResources.action, 'Confirm Delete')
+    modalResources.set(ModalResources.action, 'Delete')
     modalResources.set(ModalResources.message, `Are you sure you want to delete script?`);
     modalResources.set(ModalResources.confirmEvent, { id: ModalCallbackEvent.delete, val: id });
     modalResources.set(ModalResources.closeEvent, { id: ModalCallbackEvent.close })
@@ -164,9 +222,6 @@ export class ScriptsComponent implements OnInit {
       error: (err: any) => {
         console.error(err);
         this.snackBarService.okToast('Error requesting upload. Check logs.');
-        this.scripts[idx].coreUploadStatus = UploadStatus.notUploaded;
-        this.scripts[idx].domeUploadStatus = UploadStatus.notUploaded;
-        this.scripts[idx].bodyUploadStatus = UploadStatus.notUploaded;
       }
     };
 
@@ -178,14 +233,51 @@ export class ScriptsComponent implements OnInit {
       return;
     }
 
-    this.scripts[idx].coreUploadStatus = UploadStatus.uploading;
-    this.scripts[idx].domeUploadStatus = UploadStatus.uploading;
-    this.scripts[idx].bodyUploadStatus = UploadStatus.uploading;
-
     this.scriptService.uploadScript(id).subscribe(observer);
+    this.setUploadingStatus(id);
   }
 
-  uploadStatus(status: UploadStatus) {
+  statusUpdate(msg: ScriptResponse) {
+
+    if (msg.status === TransmissionStatus.success) {
+      this.setUploadDate(msg.scriptId, msg.locationId, msg.date);
+    }
+
+    this.updateUploadStatusElement(this.locationMap.get(msg.locationId) as string, msg.locationId, msg.scriptId);
+  }
+
+  getUploadStatus(id: string, locationId: number): { s: string, d: string } {
+    let dateString = 'Not Uploaded';
+
+    const script = this.getScript(id);
+
+    if (!script) { return { s: 'notuploaded', d: dateString }; }
+
+    const sidx = script.deploymentStatusKvp
+      .map((s) => { return s.key })
+      .indexOf(locationId.toString());
+
+    if (sidx < 0) { return { s: 'notuploaded', d: dateString }; }
+
+    const kvp = script.deploymentStatusKvp[sidx];
+    let uploadStatus = kvp.value.value;
+
+
+    if (kvp.value.date) {
+      const uploaddate = new Date(kvp.value.date);
+      const scriptdate = new Date(script.lastSaved)
+      if (uploaddate < scriptdate) {
+        uploadStatus = UploadStatus.notUploaded;
+        dateString = ' Out of date ';
+      } else {
+        dateString = uploaddate.toLocaleDateString(navigator.language, { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' });
+      }
+    }
+
+    return { s: this.getUploadStatusClass(uploadStatus), d: dateString };
+  }
+
+  getUploadStatusClass(status: UploadStatus) {
     switch (status) {
       case UploadStatus.notUploaded:
         return 'notuploaded';
@@ -198,54 +290,29 @@ export class ScriptsComponent implements OnInit {
     }
   }
 
-  statusUpdate(msg: ScriptResponse) {
+  setUploadDate(id: string, controllerId: number, date: Date): void {
+    const script = this.getScript(id);
 
+    if (!script) { return; }
+
+    const sidx = script.deploymentStatusKvp
+      .map((s) => { return s.key })
+      .indexOf(controllerId.toString());
+
+    if (sidx < 0) { return; }
+
+    script.deploymentStatusKvp[sidx].value.date = date;
+  }
+
+  getScript(id: string): Script | undefined {
     const idx = this.scripts
       .map((s) => { return s.id })
-      .indexOf(msg.scriptId as string);
+      .indexOf(id);
 
     if (idx < 0) {
-      return;
+      return undefined;
     }
 
-    switch (msg.controllerType as ControllerType) {
-      case ControllerType.core:
-        if (msg.status === TransmissionStatus.success) {
-          this.scripts[idx].coreUploaded = msg.date;
-          this.scripts[idx].coreUploadStatus = UploadStatus.uploaded;
-        }
-        else if (msg.status === TransmissionStatus.sending) {
-          this.scripts[idx].coreUploadStatus = UploadStatus.uploading;
-        }
-        else if (msg.status === TransmissionStatus.failed) {
-          this.scripts[idx].coreUploadStatus = UploadStatus.notUploaded;
-        }
-        break;
-      case ControllerType.dome:
-        if (msg.status === TransmissionStatus.success) {
-          this.scripts[idx].domeUploaded = msg.date;
-          this.scripts[idx].domeUploadStatus = UploadStatus.uploaded;
-        }
-        else if (msg.status === TransmissionStatus.sending) {
-          this.scripts[idx].domeUploadStatus = UploadStatus.uploading;
-
-        }
-        else if (msg.status === TransmissionStatus.failed) {
-          this.scripts[idx].domeUploadStatus = UploadStatus.notUploaded;
-        }
-        break;
-      case ControllerType.body:
-        if (msg.status === TransmissionStatus.success) {
-          this.scripts[idx].bodyUploaded = msg.date;
-          this.scripts[idx].bodyUploadStatus = UploadStatus.uploaded;
-        }
-        else if (msg.status === TransmissionStatus.sending) {
-          this.scripts[idx].bodyUploadStatus = UploadStatus.uploading;
-        }
-        else if (msg.status === TransmissionStatus.failed) {
-          this.scripts[idx].bodyUploadStatus = UploadStatus.notUploaded;
-        }
-        break;
-    }
+    return this.scripts[idx];
   }
 }

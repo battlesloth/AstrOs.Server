@@ -3,12 +3,12 @@ import cookieParser from "cookie-parser";
 import path from "path";
 import passport from "passport";
 import morgan from "morgan";
-import {expressjwt as jwt}from "express-jwt";
+import { expressjwt as jwt } from "express-jwt";
 import cors from 'cors';
 import fileUpload from 'express-fileupload';
 
 import Express, { Router, Application, RequestHandler as ReqHandler } from "express";
-import {WebSocketServer as Server, WebSocket } from "ws";
+import { WebSocketServer as Server, WebSocket } from "ws";
 import { v4 as uuid_v4 } from "uuid";
 import { Strategy } from "passport-local"
 import { Worker } from "worker_threads";
@@ -17,7 +17,7 @@ import { pinoHttp } from "pino-http";
 
 import { DataAccess } from "./dal/data_access";
 import { UserRepository } from "./dal/repositories/user_repository";
-import { ControllerController } from "./controllers/controller_controller";
+import { LocationsController } from "./controllers/locations_controller";
 import { AuthContoller } from "./controllers/authentication_controller";
 import { ScriptsController } from "./controllers/scripts_controller";
 import { AudioController } from "./controllers/audio_controller";
@@ -26,7 +26,10 @@ import { ScriptUpload } from "./models/scripts/script_upload";
 import { ScriptRepository } from "./dal/repositories/script_repository";
 
 import { ScriptConverter } from "./script_converter";
-import { BaseResponse, ControllerType, Script, TransmissionStatus, TransmissionType } from "astros-common";
+import {
+    Script, StatusResponse, ControllersResponse,
+    TransmissionType, ControllerLocation, ScriptResponse, TransmissionStatus
+} from "astros-common";
 import { ControllerRepository } from "./dal/repositories/controller_repository";
 import { ConfigSync } from "./models/config/config_sync";
 import { ScriptRun } from "./models/scripts/script_run";
@@ -34,7 +37,16 @@ import { logger } from "./logger";
 import { RemoteConfigController } from "./controllers/remote_config_controller";
 import { SettingsController } from "./controllers/settings_controller";
 import { ApiKeyValidator } from "./api_key_validator";
+import { SerialMessageType } from "./serial/serial_message";
+import {
+    ConfigSyncResponse,
+    ISerialWorkerResponse, PollRepsonse, RegistrationResponse,
+    SerialWorkerResponseType
+} from "./serial/serial_worker_response";
+import { LocationsRepository } from "./dal/repositories/locations_repository";
 
+const { SerialPort } = eval("require('serialport')");
+const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
 
 class ApiServer {
 
@@ -45,20 +57,21 @@ class ApiServer {
     private app: Application;
     private router: Router;
     private websocket!: Server;
-    private espMonitor!: Worker;
 
-    moduleInterface!: Worker;
+    private serialWorker!: Worker;
+    private serialPort: any;
+    private serialParser: any;
 
     private authHandler!: any;
-    private  apiKeyValidator!: ReqHandler;
+    private apiKeyValidator!: ReqHandler;
 
     upload!: any;
 
     constructor() {
         Dotenv.config({ path: __dirname + '/.env' });
 
-        this.apiPort = Number.parseInt(process.env.API_PORT!);
-        this.websocketPort = Number.parseInt(process.env.WEBSOCKET_PORT!);
+        this.apiPort = Number.parseInt(process.env.API_PORT || '3000');
+        this.websocketPort = Number.parseInt(process.env.WEBSOCKET_PORT || '5000');
 
         this.clients = new Map<string, WebSocket>();
         this.app = Express();
@@ -66,18 +79,36 @@ class ApiServer {
     }
 
     public async Init() {
+        logger.info('Setting up authentication strategy');
         this.setAuthStrategy();
-        this.configApi();
+
+        logger.info('Setting up API server');
+        await this.configApi();
+
+        logger.info('Setting up file handler');
         this.configFileHandler();
+
+        logger.info('Setting up routes');
         this.setRoutes();
+
+        logger.info('Starting up serial port services');
+        this.setupSerialPort();
+
+        logger.info('Starting web services');
         this.runWebServices();
-        await this.runBackgroundServices();
     }
 
     public static async bootstrap(): Promise<ApiServer> {
 
         const server = new ApiServer();
-        await server.Init();
+        try {
+            await server.Init();
+        }
+        catch (error) {
+            logger.error(error);
+            throw new Error('Failed to initialize server');
+        }
+
         return server;
     }
 
@@ -112,9 +143,9 @@ class ApiServer {
         );
     }
 
-    private configApi(): void {
+    private async configApi(): Promise<void> {
         const da = new DataAccess();
-        da.setup();
+        await da.setup();
 
         const loggerMiddleware = pinoHttp({
             logger: logger,
@@ -144,9 +175,6 @@ class ApiServer {
             res.status(err.status || 500);
         });
 
-
-
-
         const jwtKey: string = (process.env.JWT_KEY as string);
 
         this.authHandler = jwt({
@@ -170,9 +198,11 @@ class ApiServer {
         this.router.post(AuthContoller.route, AuthContoller.login);
         this.router.post(AuthContoller.reauthRoute, AuthContoller.reauth);
 
-        this.router.get(ControllerController.route, this.authHandler, ControllerController.getControllers);
-        this.router.put(ControllerController.route, this.authHandler, ControllerController.saveControllers);
-        this.router.get(ControllerController.syncRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllers(req, res, next); });
+        this.router.get(LocationsController.route, this.authHandler, LocationsController.getLocations);
+        this.router.put(LocationsController.route, this.authHandler, LocationsController.saveLocations);
+        this.router.get(LocationsController.loadRoute, this.authHandler, LocationsController.loadLocations);
+        this.router.get(LocationsController.syncConfigRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllerConfig(req, res, next); });
+        this.router.get(LocationsController.syncControllersRoute, this.authHandler, (req: any, res: any, next: any) => { this.syncControllers(req, res, next); });
 
         this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
         this.router.get(ScriptsController.getAllRoute, this.authHandler, ScriptsController.getAllScripts);
@@ -188,6 +218,7 @@ class ApiServer {
 
         this.router.get(SettingsController.getRoute, this.authHandler, SettingsController.getSetting);
         this.router.put(SettingsController.putRoute, this.authHandler, SettingsController.saveSetting);
+        this.router.get(SettingsController.controllersRoute, this.authHandler, SettingsController.getControllers);
         this.router.post(SettingsController.formatSDRoute, this.authHandler, (req: any, res: any, next: any) => { this.formatSD(req, res, next); })
 
         this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
@@ -195,11 +226,27 @@ class ApiServer {
 
         this.router.post('/directcommand', this.authHandler, (req: any, res: any, next: any) => { this.directCommand(req, res, next); });
 
-
         // API key secured routes
-        this.router.get('/remotecontrol', this.apiKeyValidator, (req: any, res: any, next: any)=> {this.runScript(req,res, next);} );
+        this.router.get('/remotecontrol', this.apiKeyValidator, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
         this.router.get('/remotecontrolsync', this.apiKeyValidator, RemoteConfigController.syncRemoteConfig);
 
+    }
+
+    private setupSerialPort(): void {
+        this.serialWorker = new Worker(new URL('./background_tasks/serial_worker.js', import.meta.url));
+
+        this.serialWorker.on('exit', exit => { logger.info(exit); });
+        this.serialWorker.on('error', err => { logger.error(err); });
+
+        this.serialWorker.on('message', (msg) => {
+            this.handleSerialWorkerMessage(msg);
+        });
+
+        this.serialPort = new SerialPort({ path: process.env.SERIAL_PORT || "/dev/ttyS0", baudRate: Number.parseInt(process.env.BAUD_RATE || "9600") });
+        this.serialParser = this.serialPort.pipe(new DelimiterParser({ delimiter: '\n' }))
+            .on('data', (data: any) => {
+                this.serialWorker.postMessage({ type: SerialMessageType.SERIAL_MSG_RECEIVED, data: data.toString() })
+            });
     }
 
     private runWebServices(): void {
@@ -217,77 +264,147 @@ class ApiServer {
         });
     }
 
-    private async runBackgroundServices(): Promise<void> {
+    handleSerialWorkerMessage(msg: ISerialWorkerResponse): void {
+        switch (msg.type) {
+            case SerialWorkerResponseType.UNKNOWN:
+                logger.error('Invalid message received');
+                break;
+            case SerialWorkerResponseType.SEND_SERIAL_MESSAGE:
+                this.serialPort.write(msg.data, (err: any) => {
+                    if (err) {
+                        logger.error(`Error sending serial message: ${err}`);
+                    }
+                });
+                break;
+            case SerialWorkerResponseType.UPDATE_CLIENTS:
+                this.updateClients(msg);
+                break
+            case SerialWorkerResponseType.REGISTRATION_SYNC:
+                this.handleResgistraionResponse(msg);
+                break;
+            case SerialWorkerResponseType.POLL:
+                this.handlePollResponse(msg);
+                break
+            case SerialWorkerResponseType.CONFIG_SYNC:
+                this.handleConfigSync(msg);
+                break;
+            case SerialWorkerResponseType.SCRIPT_DEPLOY:
+                this.handleScriptDeployResponse(msg);
+                break;
+        }
+    }
 
-        this.espMonitor = new Worker(new URL('./background_tasks/esp_monitor.js', import.meta.url));
 
-        this.espMonitor.on('exit', exit => { logger.info(exit); });
-        this.espMonitor.on('error', err => { logger.error(err); });
-
-        this.espMonitor.on('message', (msg) => {
-            logger.info(`Controller=${ControllerType[msg.controllerType]};up=${msg.up};synced=${msg.synced}`);
-            this.updateClients(msg);
-        });
-
-        setInterval(() => {
+    async handleResgistraionResponse(msg: ISerialWorkerResponse) {
+        try {
+            const val = msg as RegistrationResponse;
 
             const dao = new DataAccess();
-            const repository = new ControllerRepository(dao);
+            const controllerRepo = new ControllerRepository(dao);
 
-            repository.getControllerData()
-                .then((val: any) => {
+            await controllerRepo.insertControllers(val.registrations);
 
-                    const ctlList = new Array<any>();
+            const contollers = await controllerRepo.getControllers();
 
-                    val.forEach(function (ctl: any) {
-                        ctlList.push({ controllerType: ctl.id, ip: ctl.ipAddress, fingerprint: ctl.fingerprint });
-                    });
+            const update = new ControllersResponse(val.success, contollers);
+            this.updateClients(update);
+        }
+        catch (error) {
+            logger.error(`Error handling registration response: ${error}`);
+        }
+    }
 
-                    this.espMonitor.postMessage(ctlList);
-                })
-                .catch((err) => {
-                    logger.error(`error getting controler IPs for monitor update: ${err}`);
-                });
+    async handlePollResponse(msg: ISerialWorkerResponse) {
+        try {
+            const val = msg as PollRepsonse;
 
-        }, 15 * 1000);
+            const dao = new DataAccess();
+            const controlerRepo = new ControllerRepository(dao);
+            const locationRepo = new LocationsRepository(dao);
 
-        this.moduleInterface = new Worker(new URL('./background_tasks/module_interface.js', import.meta.url))
+            const controller = await controlerRepo.getControllerByAddress(val.controller.address);
 
-        this.moduleInterface.on('exit', exit => { logger.info(exit); });
-        this.moduleInterface.on('error', err => { logger.error(err); });
-
-        this.moduleInterface.on('message', async (msg) => {
-
-            switch (msg.type) {
-                case TransmissionType.script:
-                    await this.handleScriptRepsonse(msg);
-                    this.updateClients(msg);
-                    break;
-                case TransmissionType.sync: {
-                    const response = await this.handleSyncResponse(msg);
-                    this.updateClients(response);
-                    break;
-                }
-
+            if (controller === null) {
+                logger.error(`Controller not found for address: ${val.controller.address}`);
+                return;
             }
 
-        });
+            const location = await locationRepo.getLocationByController(controller.id);
+
+            if (location === null) {
+                logger.error(`Location not found for controller: ${val.controller.name}`);
+                return;
+            }
+
+            const update = new StatusResponse(controller.id, location.locationName, true, val.controller.fingerprint === location.configFingerprint);
+
+            this.updateClients(update);
+        }
+        catch (error) {
+            logger.error(`Error handling poll response: ${error}`);
+        }
+    }
+
+    async handleConfigSync(msg: ISerialWorkerResponse) {
+        try {
+            const val = msg as ConfigSyncResponse;
+
+            const dao = new DataAccess();
+
+            const locationRepo = new LocationsRepository(dao);
+
+            const locationId = await locationRepo.getLocationIdByController(val.controller.address);
+
+            if (locationId < 1) {
+                logger.error(`Location not found for controller: ${val.controller.name}`);
+                return;
+            }
+
+            await locationRepo.updateLocationFingerprint(locationId, val.controller.fingerprint);
+        }
+        catch (error) {
+            logger.error(`Error handling config sync response: ${error}`);
+        }
+    }
+
+    private async handleScriptDeployResponse(msg: ISerialWorkerResponse) {
+        try {
+            const val = msg as ConfigSyncResponse;
+
+            const dao = new DataAccess();
+            const locationRepo = new LocationsRepository(dao); 0
+            const scriptRepo = new ScriptRepository(dao);
+
+            const locId = await locationRepo.getLocationIdByController(val.controller.address)
+
+            if (val.success) {
+                const now = new Date();
+
+                await scriptRepo.updateScriptControllerUploaded(val.scriptId, locId, now);
+
+                const update = new ScriptResponse(val.scriptId, locId, TransmissionStatus.success, now);
+
+                this.updateClients(update);
+            } else {
+                const deployDate = await scriptRepo.getLastScriptUploadedDate(val.scriptId, locId);
+                const update = new ScriptResponse(val.scriptId, locId, TransmissionStatus.failed, deployDate);
+
+                this.updateClients(update);
+
+            }
+        }
+        catch (error) {
+            logger.error(`Error handling script deploy response: ${error}`);
+        }
     }
 
     private async syncControllers(req: any, res: any, next: any) {
         try {
-            const dao = new DataAccess();
-            const repo = new ControllerRepository(dao);
 
-            const controllers = await repo.getControllers();
-
-            const msg = new ConfigSync(controllers);
-
-            this.moduleInterface.postMessage(msg);
-
+            logger.info('syncing controllers');
+            this.serialWorker.postMessage({ type: SerialMessageType.REGISTRATION_SYNC, data: null });
             res.status(200);
             res.json({ message: "success" });
-
         } catch (error) {
             logger.error(error);
 
@@ -298,40 +415,58 @@ class ApiServer {
         }
     }
 
-    private async handleSyncResponse(msg: any): Promise<BaseResponse> {
+    private async syncControllerConfig(req: any, res: any, next: any) {
+        try {
 
-        const result = new BaseResponse(TransmissionType.sync, true, '');
+            logger.info('syncing controller config');
 
-        const modMap = new Map<number, string>();
-        modMap.set(1, 'Core Module');
-        modMap.set(2, 'Dome Module');
-        modMap.set(3, 'Body Module');
+            const dao = new DataAccess();
+            const repo = new LocationsRepository(dao);
 
-        for (const r of msg.results) {
+            const locations = await repo.loadLocations();
 
-            if (r.synced) {
-                const dao = new DataAccess();
-                const repository = new ControllerRepository(dao);
+            const toSync = new Array<ControllerLocation>();
 
-                const saved = await repository.updateControllerFingerprint(r.id, r.fingerprint);
+            for (let i = 0; i < locations.length; i++) {
 
-                result.message += `${modMap.get(r.id)} sync ${saved ? 'succeeded' : 'failed'}, `;
-            } else {
-                result.message += `${modMap.get(r.id)} sync failed, `;
+                if (!locations[i].controller.address) {
+                    continue;
+                }
+
+                const ctl = await repo.loadLocationConfiguration(locations[i]);
+
+                if (ctl) {
+                    toSync.push(ctl);
+                }
+
             }
-        }
 
-        result.message = result.message.trim().slice(0, -1);
-        return result;
+            const configSync = new ConfigSync(toSync);
+
+            this.serialWorker.postMessage({ type: SerialMessageType.DEPLOY_CONFIG, data: configSync });
+
+            res.status(200);
+            res.json({ message: "success" });
+        } catch (error) {
+            logger.error(error);
+
+            res.status(500);
+            res.json({
+                message: 'Internal server error'
+            });
+        }
     }
 
     private async uploadScript(req: any, res: any, next: any) {
         try {
+
+            logger.info('uploading script');
+
             const id = req.query.id;
 
             const dao = new DataAccess();
             const scriptRepo = new ScriptRepository(dao);
-            const ctlRepo = new ControllerRepository(dao);
+            const locationsRepo = new LocationsRepository(dao);
 
             const script = await scriptRepo.getScript(id) as Script;
 
@@ -340,18 +475,21 @@ class ApiServer {
             const messages = cvtr.convertScript(script);
 
             if (messages.size < 1) {
-                logger.warn(`No controller script values returned for ${id}`);
+                logger.warn(`No locations script values returned for ${id}`);
             }
 
-            const controllers = await ctlRepo.getControllerData();
+            const locations = await locationsRepo.loadLocations();
 
-            const msg = new ScriptUpload(id, messages, controllers);
+            logger.debug(`scripts: ${JSON.stringify(messages)}`);
 
-            this.moduleInterface.postMessage(msg);
+            const msg = new ScriptUpload(id, messages, locations);
+
+            logger.debug(`msg: ${JSON.stringify(msg)}`);
+
+            this.serialWorker.postMessage({ type: SerialMessageType.DEPLOY_SCRIPT, data: msg });
 
             res.status(200);
             res.json({ message: "success" });
-
         } catch (error) {
             logger.error(error);
 
@@ -364,20 +502,29 @@ class ApiServer {
 
     private async runScript(req: any, res: any, next: any) {
         try {
+
+            logger.info('running script');
+
             const id = req.query.id;
 
             const dao = new DataAccess();
-            const ctlRepo = new ControllerRepository(dao);
+            const ctlRepo = new LocationsRepository(dao);
 
-            const controllers = await ctlRepo.getControllerData();
+            const locations = await ctlRepo.loadLocations();
 
-            const msg = new ScriptRun(id, controllers);
+            const msg = new ScriptRun(id, locations);
 
-            if (id === "panic"){
+            let msgType = SerialMessageType.RUN_SCRIPT;
+
+            if (id === "panic") {
                 msg.type = TransmissionType.panic;
+                msgType = SerialMessageType.PANIC_STOP;
             }
 
-            this.moduleInterface.postMessage(msg);
+
+            logger.debug(`msg: ${JSON.stringify(msg)}`);
+
+            this.serialWorker.postMessage({ type: msgType, data: msg });
 
             res.status(200);
             res.json({ message: "success" });
@@ -389,47 +536,13 @@ class ApiServer {
             res.json({
                 message: 'Internal server error'
             });
-        }
-    }
-
-    private async handleScriptRepsonse(msg: any) {
-
-        if (msg.status === TransmissionStatus.success) {
-            const dao = new DataAccess();
-            const repository = new ScriptRepository(dao);
-
-            const options: Intl.DateTimeFormatOptions = {
-                day: "numeric", month: "numeric", year: "numeric",
-                hour: "2-digit", minute: "2-digit", second: "2-digit"
-            };
-
-            const date = (new Date()).toLocaleString('en-US', options);
-
-            await repository.updateScriptControllerUploaded(msg.scriptId, msg.controllerType, date);
-
-            logger.info(`Controller ${msg.controllerType} uploaded for ${msg.scriptId}!`)
-
-            msg.date = date;
-        } else if (msg.status === TransmissionStatus.failed) {
-            logger.warn(`Controller ${msg.controllerType} upload failed for ${msg.scriptId}!`)
-        } else {
-            logger.info(`Updating transmission status for Controller ${msg.controllerType}, ${msg.scriptId} => ${msg.status}`);
         }
     }
 
     private async directCommand(req: any, res: any, next: any) {
         try {
 
-            const dao = new DataAccess();
-            const repo = new ControllerRepository(dao);
-
-            req.body.ip = await repo.getControllerIp(req.body.controller);
-
-            req.body.type = TransmissionType.directCommand;
-
-            logger.info(`sending direct command: ${JSON.stringify(req.body)}`);
-
-            this.moduleInterface.postMessage(req.body);
+            logger.info('sending direct command');
 
             res.status(200);
             res.json({ message: "success" });
@@ -442,25 +555,17 @@ class ApiServer {
                 message: 'Internal server error'
             });
         }
-
     }
 
-    private async formatSD(req: any, res: any, next: any){
+    private async formatSD(req: any, res: any, next: any) {
         try {
 
-            const dao = new DataAccess();
-            const repo = new ControllerRepository(dao);
+            logger.info('formatting SD card');
 
-            for (const module of req.body.modules){
+            const controllers = req.body.controllers;
 
-                const ip = await repo.getControllerIp(module);
+            this.serialWorker.postMessage({ type: SerialMessageType.FORMAT_SD, data: controllers });
 
-                const msg = {ip: ip, type: TransmissionType.formatSD};
-                logger.info(`sending format SD command: ${JSON.stringify(msg)}`);
-
-                this.moduleInterface.postMessage(msg);
-            }
-            
             res.status(200);
             res.json({ message: "success" });
 
@@ -474,6 +579,286 @@ class ApiServer {
         }
     }
 
+
+    /*
+    
+        private async syncControlModules(): Promise<void> {
+    
+            setInterval(async () => {
+    
+                const guid = uuid_v4();
+    
+                const msg = `1\u001eREGISTRATION_SYNC\u001e${guid}\u001d\n`;
+    
+                await this.serialMsgSvc.sendMessage(msg);
+    
+            }, 2 * 1000);
+    
+        }
+        
+            private async runBackgroundServices(): Promise<void> {
+        
+                this.espMonitor = new Worker(new URL('./background_tasks/esp_monitor.js', import.meta.url));
+        
+                this.espMonitor.on('exit', exit => { logger.info(exit); });
+                this.espMonitor.on('error', err => { logger.error(err); });
+        
+                this.espMonitor.on('message', (msg) => {
+                    logger.info(`Controller=${ControllerType[msg.controllerType]};up=${msg.up};synced=${msg.synced}`);
+                    this.updateClients(msg);
+                });
+        
+                setInterval(() => {
+        
+                    this.port.write(`testing1,2,3\n`, (err: any) => {
+                        if (err) {
+                            logger.error(`Error writing to serial port: ${err.message}`);
+                        }
+                    });
+        
+                    const dao = new DataAccess();
+                    const repository = new ControllerRepository(dao);
+        
+                    repository.getControllerData()
+                        .then((val: any) => {
+        
+                            const ctlList = new Array<any>();
+        
+                            val.forEach(function (ctl: any) {
+                                ctlList.push({ controllerType: ctl.id, ip: ctl.ipAddress, fingerprint: ctl.fingerprint });
+                            });
+        
+                            this.espMonitor.postMessage(ctlList);
+                        })
+                        .catch((err) => {
+                            logger.error(`error getting controler IPs for monitor update: ${err}`);
+                        });
+        
+                }, 15 * 1000);
+        
+                this.moduleInterface = new Worker(new URL('./background_tasks/module_interface.js', import.meta.url))
+        
+                this.moduleInterface.on('exit', exit => { logger.info(exit); });
+                this.moduleInterface.on('error', err => { logger.error(err); });
+        
+                this.moduleInterface.on('message', async (msg) => {
+        
+                    switch (msg.type) {
+                        case TransmissionType.script:
+                            await this.handleScriptRepsonse(msg);
+                            this.updateClients(msg);
+                            break;
+                        case TransmissionType.sync: {
+                            const response = await this.handleSyncResponse(msg);
+                            this.updateClients(response);
+                            break;
+                        }
+        
+                    }
+        
+                });
+            }
+        
+            private async syncControllers(req: any, res: any, next: any) {
+                try {
+                    const dao = new DataAccess();
+                    const repo = new ControllerRepository(dao);
+        
+                    const controllers = await repo.getControllers();
+        
+                    const msg = new ConfigSync(controllers);
+        
+                    this.moduleInterface.postMessage(msg);
+        
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
+                }
+            }
+        
+            private async handleSyncResponse(msg: any): Promise<BaseResponse> {
+        
+                const result = new BaseResponse(TransmissionType.sync, true, '');
+        
+                const modMap = new Map<number, string>();
+                modMap.set(1, 'Core Module');
+                modMap.set(2, 'Dome Module');
+                modMap.set(3, 'Body Module');
+        
+                for (const r of msg.results) {
+        
+                    if (r.synced) {
+                        const dao = new DataAccess();
+                        const repository = new ControllerRepository(dao);
+        
+                        const saved = await repository.updateControllerFingerprint(r.id, r.fingerprint);
+        
+                        result.message += `${modMap.get(r.id)} sync ${saved ? 'succeeded' : 'failed'}, `;
+                    } else {
+                        result.message += `${modMap.get(r.id)} sync failed, `;
+                    }
+                }
+        
+                result.message = result.message.trim().slice(0, -1);
+                return result;
+            }
+        
+            private async uploadScript(req: any, res: any, next: any) {
+                try {
+                    const id = req.query.id;
+        
+                    const dao = new DataAccess();
+                    const scriptRepo = new ScriptRepository(dao);
+                    const ctlRepo = new ControllerRepository(dao);
+        
+                    const script = await scriptRepo.getScript(id) as Script;
+        
+                    const cvtr = new ScriptConverter();
+        
+                    const messages = cvtr.convertScript(script);
+        
+                    if (messages.size < 1) {
+                        logger.warn(`No controller script values returned for ${id}`);
+                    }
+        
+                    const controllers = await ctlRepo.getControllerData();
+        
+                    const msg = new ScriptUpload(id, messages, controllers);
+        
+                    this.moduleInterface.postMessage(msg);
+        
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
+                }
+            }
+        
+            private async runScript(req: any, res: any, next: any) {
+                try {
+                    const id = req.query.id;
+        
+                    const dao = new DataAccess();
+                    const ctlRepo = new ControllerRepository(dao);
+        
+                    const controllers = await ctlRepo.getControllerData();
+        
+                    const msg = new ScriptRun(id, controllers);
+        
+                    if (id === "panic"){
+                        msg.type = TransmissionType.panic;
+                    }
+        
+                    this.moduleInterface.postMessage(msg);
+        
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
+                }
+            }
+        
+            private async handleScriptRepsonse(msg: any) {
+        
+                if (msg.status === TransmissionStatus.success) {
+                    const dao = new DataAccess();
+                    const repository = new ScriptRepository(dao);
+        
+                    const options: Intl.DateTimeFormatOptions = {
+                        day: "numeric", month: "numeric", year: "numeric",
+                        hour: "2-digit", minute: "2-digit", second: "2-digit"
+                    };
+        
+                    const date = (new Date()).toLocaleString('en-US', options);
+        
+                    await repository.updateScriptControllerUploaded(msg.scriptId, msg.controllerType, date);
+        
+                    logger.info(`Controller ${msg.controllerType} uploaded for ${msg.scriptId}!`)
+        
+                    msg.date = date;
+                } else if (msg.status === TransmissionStatus.failed) {
+                    logger.warn(`Controller ${msg.controllerType} upload failed for ${msg.scriptId}!`)
+                } else {
+                    logger.info(`Updating transmission status for Controller ${msg.controllerType}, ${msg.scriptId} => ${msg.status}`);
+                }
+            }
+        
+            private async directCommand(req: any, res: any, next: any) {
+                try {
+        
+                    const dao = new DataAccess();
+                    const repo = new ControllerRepository(dao);
+        
+                    req.body.ip = await repo.getControllerIp(req.body.controller);
+        
+                    req.body.type = TransmissionType.directCommand;
+        
+                    logger.info(`sending direct command: ${JSON.stringify(req.body)}`);
+        
+                    this.moduleInterface.postMessage(req.body);
+        
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
+                }
+        
+            }
+        
+            private async formatSD(req: any, res: any, next: any){
+                try {
+        
+                    const dao = new DataAccess();
+                    const repo = new ControllerRepository(dao);
+        
+                    for (const module of req.body.modules){
+        
+                        const ip = await repo.getControllerIp(module);
+        
+                        const msg = {ip: ip, type: TransmissionType.formatSD};
+                        logger.info(`sending format SD command: ${JSON.stringify(msg)}`);
+        
+                        this.moduleInterface.postMessage(msg);
+                    }
+                    
+                    res.status(200);
+                    res.json({ message: "success" });
+        
+                } catch (error) {
+                    logger.error(error);
+        
+                    res.status(500);
+                    res.json({
+                        message: 'Internal server error'
+                    });
+                }
+            }
+        */
     private updateClients(msg: any): void {
         const str = JSON.stringify(msg);
         for (const client of this.clients.values()) {

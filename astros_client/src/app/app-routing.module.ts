@@ -11,15 +11,15 @@ import { SettingsComponent } from './pages/settings/settings.component';
 import { StatusComponent } from './pages/status/status.component';
 
 const routes: Routes = [
-  {path: '', component: LoginComponent},
-  {path: 'login', component: LoginComponent},
-  {path: 'status', component: StatusComponent, canActivate:[AuthGuard] },
-  {path: 'scripts', component: ScriptsComponent, canActivate:[AuthGuard] },
-  {path: 'modules', component: ModulesComponent, canActivate:[AuthGuard]},
-  {path: 'scripter/:id', component: ScripterComponent, canActivate:[AuthGuard]},
-  {path: 'audio-files', component: AudioFilesComponent, canActivate:[AuthGuard]},
-  {path: 'remote', component: RemoteConfigComponent, canActivate:[AuthGuard]},
-  {path: 'settings', component: SettingsComponent, canActivate:[AuthGuard]}
+  { path: '', component: LoginComponent },
+  { path: 'login', component: LoginComponent },
+  { path: 'status', component: StatusComponent, canActivate: [AuthGuard] },
+  { path: 'scripts', component: ScriptsComponent, canActivate: [AuthGuard] },
+  { path: 'modules', component: ModulesComponent, canActivate: [AuthGuard] },
+  { path: 'scripter/:id', component: ScripterComponent, canActivate: [AuthGuard] },
+  { path: 'audio-files', component: AudioFilesComponent, canActivate: [AuthGuard] },
+  { path: 'remote', component: RemoteConfigComponent, canActivate: [AuthGuard] },
+  { path: 'utility', component: SettingsComponent, canActivate: [AuthGuard] }
 ];
 
 @NgModule({

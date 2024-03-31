@@ -1,4 +1,4 @@
-import { ControlModule, TransmissionType } from "astros-common";
+import { ControllerLocation, TransmissionType } from "astros-common";
 import { ControllerConfig } from "./controller_config";
 
 export class ConfigSync {
@@ -6,12 +6,12 @@ export class ConfigSync {
     type: TransmissionType = TransmissionType.sync;
     configs: Array<ControllerConfig>;
 
-    constructor(controllers: Array<ControlModule>){
-        
+    constructor(locations: Array<ControllerLocation>) {
+
         this.configs = new Array<ControllerConfig>();
 
-        controllers.forEach(ctl =>{
-            this.configs.push(new ControllerConfig(ctl));
-        });
-    } 
+        for (const location of locations) {
+            this.configs.push(new ControllerConfig(location));
+        }
+    }
 }

@@ -7,7 +7,7 @@ import { UsersTable } from "./tables/users_table";
 import { ControllersTable } from "./tables/controllers_table";
 import { I2cChannelsTable } from "./tables/i2c_channels_table";
 import { ServoChannelsTable } from "./tables/servo_channels_table";
-import { ControllerType, UartType, M5Page } from "astros-common";
+import { UartType, M5Page, AstrOsConstants } from "astros-common";
 import { ScriptsTable } from "./tables/scripts_table";
 import { ScriptEventsTable } from "./tables/script_events_table";
 import { ScriptChannelsTable } from "./tables/script_channels_table";
@@ -15,8 +15,9 @@ import { AudioFilesTable } from "./tables/audio_files_table";
 import { UartModuleTable } from "./tables/uart_module_table";
 import { logger } from "../logger";
 import { RemoteConfigTable } from "./tables/remote_config_table";
-
-
+import { ScriptsDeploymentTable } from "./tables/scripts_deployment_table";
+import { LocationsTable } from "./tables/locations_table";
+import { ControllerLocationTable } from "./tables/controller_location_table";
 
 export class DataAccess {
 
@@ -30,11 +31,11 @@ export class DataAccess {
     }
 
 
-    public static toDbBool(val: boolean) : string {
+    public static toDbBool(val: boolean): string {
         return val ? "1" : "0";
     }
 
-    public static fromDbBool(val: string) : boolean {
+    public static fromDbBool(val: string): boolean {
         return val === "1";
     }
 
@@ -66,29 +67,31 @@ export class DataAccess {
             logger.info('Setting up database...');
 
             await this.setupV1Tables()
-                .then(async () => await this.setV1Values());
+                .catch((err) => {
+                    console.error(`Error setting up database: ${err}`);
+                    this.deleteDbFile();
+                    throw err;
+                });
+
+            await this.setV1Values()
+                .catch((err) => {
+                    console.error(`Error setting up initial database values: ${err}`);
+                    this.deleteDbFile();
+                    throw err;
+                });
 
             version = 1;
             logger.info('Database set up complete!');
         }
-        
+
         logger.info(`Database at version ${version.toString()}`);
-        
-        switch (version){
+
+        switch (version) {
             case 1:
-                await this.upgradeToV2();
-                await this.upgradeToV3();
-                await this.upgradeToV4();
-                break;
-            case 2:
-                await this.upgradeToV3();
-                await this.upgradeToV4();
-                break;
-            case 3:
-                await this.upgradeToV4();
+                //await this.upgradeToV2();
                 break;
             default:
-                logger.info('Database up to date');        
+                logger.info('Database up to date');
                 break;
         }
 
@@ -149,7 +152,11 @@ export class DataAccess {
 
         await this.createTable(UsersTable.table, UsersTable.create);
 
+        await this.createTable(LocationsTable.table, LocationsTable.create);
+
         await this.createTable(ControllersTable.table, ControllersTable.create);
+
+        await this.createTable(ControllerLocationTable.table, ControllerLocationTable.create);
 
         await this.createTable(UartModuleTable.table, UartModuleTable.create);
 
@@ -159,12 +166,15 @@ export class DataAccess {
 
         await this.createTable(ScriptsTable.table, ScriptsTable.create);
 
+        await this.createTable(ScriptsDeploymentTable.table, ScriptsDeploymentTable.create);
+
         await this.createTable(ScriptChannelsTable.table, ScriptChannelsTable.create);
-        
+
         await this.createTable(ScriptEventsTable.table, ScriptEventsTable.create);
-   
+
         await this.createTable(AudioFilesTable.table, AudioFilesTable.create);
 
+        await this.createTable(RemoteConfigTable.table, RemoteConfigTable.create);
     }
 
     private async setV1Values(): Promise<void> {
@@ -177,44 +187,102 @@ export class DataAccess {
             .then(() => {
                 logger.info("Added default admin")
             })
-            .catch((err) => console.error(`Error adding default admin: ${err}`));
+            .catch((err) => {
+                console.error(`Error adding default admin: ${err}`);
+                throw err;
+            });
 
-        const controllers = [ControllerType.core, ControllerType.dome, ControllerType.body];
+        await this.run(RemoteConfigTable.insert, ['m5page', JSON.stringify(new Array<M5Page>)])
+            .then(() => { logger.info("Added default remote config") })
+            .catch((err) => {
+                console.error(`Error adding default remote config: ${err}`);
+                throw err;
+            });
+
+
+        await this.run(ControllersTable.insert, ["master", "00:00:00:00:00:00"])
+            .then(() => {
+                logger.info("Added default master controller")
+            })
+            .catch((err) => {
+                console.error(`Error adding default master controller: ${err}`);
+                throw err;
+            });
+
+        // default locations for AstrOs
+        // TODO: refactor this so it's injected so we can make this app more generally useful
+
+        const locations = [AstrOsConstants.BODY, AstrOsConstants.CORE, AstrOsConstants.DOME];
 
         const nameMap = new Map();
-        nameMap.set(ControllerType.core, "Dome Core Controller");
-        nameMap.set(ControllerType.dome, "Dome Surface Controller");
-        nameMap.set(ControllerType.body, "Body Controller");
+        nameMap.set(AstrOsConstants.BODY, "Body Controller");
+        nameMap.set(AstrOsConstants.CORE, "Dome Core Controller");
+        nameMap.set(AstrOsConstants.DOME, "Dome Surface Controller");
 
-        for (const ctl of controllers) {
+        for await (const loc of locations) {
 
-            await this.run(ControllersTable.insert, [ctl.toString(), nameMap.get(ctl)])
-                .catch((err) => console.error(`Error adding ${ctl} controller: ${err}`));
+            let id = "";
 
-            await this.run(UartModuleTable.insertV1, [ctl.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
-            
+            await this.get(LocationsTable.insert, [loc, nameMap.get(loc), ""])
+                .then((result: any) => { id = result[0].id.toString(); })
+                .catch((err) => {
+                    console.error(`Error adding ${loc} location: ${err}`);
+                    throw err;
+                });
+
+            if (id === "") {
+                logger.error(`Error adding ${loc} location`);
+                throw new Error(`Error adding ${loc} location`);
+            }
+
+            // add 3 uart modules per controller
+            for (let i = 0; i < 3; i++) {
+                await this.run(UartModuleTable.insert, [id, i.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())])
+                    .catch((err) => {
+                        console.error(`Error adding uart module ${i} to ${loc} location:: ${err}`);
+                        throw err;
+                    });
+            }
+
             for (let i = 0; i < 32; i++) {
-                await this.run(ServoChannelsTable.insertV1, [ctl.toString(), i.toString(), "unassigned", "0", "0", "0"])
-                    .catch((err) => console.error(`Error adding servo channel ${i}: ${err}`))
+                await this.run(ServoChannelsTable.insert, [id, i.toString(), "unassigned", "0", "0", "0", "0"])
+                    .catch((err) => {
+                        console.error(`Error adding servo channel ${i}: ${err}`);
+                        throw err;
+                    })
+                logger.info(`Added default servo channel ${i} to location ${loc}`);
             }
 
             for (let i = 0; i < 128; i++) {
 
-                if (i === 64 || i === 65){
-                    await this.run(I2cChannelsTable.insert, [ctl.toString(), i.toString(), "reserved", '0'])
-                    .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
+                // reserved for PWM module
+                if (i === 64 || i === 65) {
+                    await this.run(I2cChannelsTable.insert, [id, i.toString(), "reserved", '0'])
+                        .catch((err) => {
+                            console.error(`Error adding i2c channel ${i}: ${err}`);
+                            throw err;
+                        })
                 } else {
-                    await this.run(I2cChannelsTable.insert, [ctl.toString(), i.toString(), "unassigned", '0'])
-                    .catch((err) => console.error(`Error adding i2c channel ${i}: ${err}`))
+                    await this.run(I2cChannelsTable.insert, [id, i.toString(), "unassigned", '0'])
+                        .catch((err) => {
+                            console.error(`Error adding i2c channel ${i}: ${err}`);
+                            throw err
+                        });
                 }
             }
+
+            logger.info(`Added default location ${loc}, id: ${id}`);
         }
+
+        // set master controller location to body location
+        await this.run(ControllerLocationTable.insert, ["1", "1"]);
 
         await this.run(SettingsTable.insert, ["version", "1"]).then(() => {
             logger.info("Updated database to version 1");
         })
             .catch((err) => {
                 logger.error(`Error updating database version: ${err}`);
+                throw err;
             });
     }
 
@@ -224,7 +292,7 @@ export class DataAccess {
                 logger.info(`Created ${tableName} table`)
             })
             .catch((err) => {
-                logger.error(`Error creating ${tableName} table: ${err}`);
+                throw err;
             });
     }
 
@@ -237,7 +305,7 @@ export class DataAccess {
         }
     }
 
-    private async upgradeToV2(): Promise<void> {
+    /*private async upgradeToV2(): Promise<void> {
         logger.info('Upgrading to V2..')
 
         await this.run(ServoChannelsTable.v2)
@@ -252,92 +320,30 @@ export class DataAccess {
         await this.UpdateDbVerion(2);
 
         logger.info('Upgrade complete!')
-    } 
-
-
-    private async upgradeToV3(): Promise<void> {
-        logger.info('Upgrading to V3...')
-
-        await this.run(RemoteConfigTable.create)
-        .then(() => {
-            logger.info("Remote Config Table created")
-        })
-        .catch((err) => {
-            console.error(`Error Creating Remote Config Table: ${err}`);
-            throw err;
-        });
-
-        await this.run(RemoteConfigTable.insert, ['m5paper', JSON.stringify(new Array<M5Page>())])
-
-        await this.UpdateDbVerion(3);
-
-        logger.info('Upgrade complete!')
-    }
-
-    private async upgradeToV4(): Promise<void> {
-        logger.info('Upgrading to V4...')
-
-        await this.run(UartModuleTable.v5Update)
-        .then(() => {
-            logger.info("Uart Table updated")
-        })
-        .catch((err) => {
-            console.error(`Error updating UART Table: ${err}`);
-            throw err;
-        });
-
-        await this.run(UartModuleTable.v5Rename)
-        .then(() => {
-            logger.info("Uart Table renamed")
-        })
-        .catch((err) => {
-            console.error(`Error renaming UART Table: ${err}`);
-            throw err;
-        });
-
-        await this.run(UartModuleTable.v5NewTable)
-        .then(() => {
-            logger.info("Uart Table new table")
-        })
-        .catch((err) => {
-            console.error(`Error creating new UART Table: ${err}`);
-            throw err;
-        });
         
-        await this.run(UartModuleTable.v5Copy)
-        .then(() => {
-            logger.info("Uart Table copy")
-        })
-        .catch((err) => {
-            console.error(`Error copying UART Table: ${err}`);
-            throw err;
-        });
+    } */
 
-        await this.run(UartModuleTable.v5Drop)
-        .then(() => {
-            logger.info("Uart Table drop")
-        })
-        .catch((err) => {
-            console.error(`Error dropping old table: ${err}`);
-            throw err;
-        });
-
-        await this.run(UartModuleTable.insert, ['1', '2', UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
-        await this.run(UartModuleTable.insert, ['2', '2', UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
-        await this.run(UartModuleTable.insert, ['3', '2', UartType.none.toString(), "unassigned", JSON.stringify(new Object())]);
-    
-        await this.UpdateDbVerion(5);
-
-        logger.info('Upgrade complete!')
+    private async UpdateDbVerion(version: number): Promise<void> {
+        await this.run(SettingsTable.update, [version.toString(), "version"])
+            .then(() => {
+                logger.info(`Updated version in settings table to ${version}`);
+            })
+            .catch((err) => {
+                logger.error(`Error updating database version in settings table: ${err}`);
+            });
     }
 
-    private async UpdateDbVerion(version: number): Promise<void>{
-        await this.run(SettingsTable.update, [version.toString(), "version"])
-        .then(() => {
-            logger.info(`Updated version in settings table to ${version}`);
-        })
-        .catch((err) => {
-            logger.error(`Error updating database version in settings table: ${err}`);
-        });
+
+    private async deleteDbFile(): Promise<void> {
+        logger.info('Deleting database file');
+        if (fs.existsSync(`${this.appdataPath}${this.databaseFile}`)) {
+
+            fs.unlink(`${this.appdataPath}${this.databaseFile}`, (err) => {
+                if (err) throw err;
+                logger.info('deleted database file');
+            });
+        } else {
+            logger.info(`Database file ${this.appdataPath}${this.databaseFile} does not exist`);
+        }
     }
 }

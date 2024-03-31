@@ -16,53 +16,70 @@
         <mat-accordion class="module-accordian">
             <mat-expansion-panel>
                 <mat-expansion-panel-header>
-                    <mat-panel-title>Dome Core Module</mat-panel-title>
-                    <div class="warning tooltip" #core>
-                        <span class="tooltiptext">{{coreCaption.str}}</span>
-                        <fa-icon [icon]="coreWarning"></fa-icon>       
-                    </div>
-                </mat-expansion-panel-header>
-                <ng-container>
-                    <div class="ip-input">
-                        <input name="coreIp" matInput placeholder="IP Address" [(ngModel)]="coreModule.ipAddress"
-                        pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" />        
-                    </div>
-                    <app-esp-module [module]="coreModule"></app-esp-module>
-                </ng-container>
-            </mat-expansion-panel>
-            <mat-expansion-panel>
-                <mat-expansion-panel-header>
-                    <mat-panel-title>Dome Surface Module</mat-panel-title>
-                    <div class="warning tooltip" #dome>
-                        <span class="tooltiptext">{{domeCaption.str}}</span>
-                        <fa-icon [icon]="domeWarning"></fa-icon>       
-                    </div>
-                </mat-expansion-panel-header>
-                <ng-container>
-                    <div class="ip-input">
-                        <input name="domeIp" matInput placeholder="IP Address" [(ngModel)]="domeModule.ipAddress"
-                        pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" />        
-                    </div>
-                    <app-esp-module [module]="domeModule"></app-esp-module>
-                </ng-container>
-            </mat-expansion-panel>
-            <mat-expansion-panel>
-                <mat-expansion-panel-header>
                     <mat-panel-title>Body Module</mat-panel-title>
                     <div class="warning tooltip" #body>
                         <span class="tooltiptext">{{bodyCaption.str}}</span>
                         <fa-icon [icon]="bodyWarning"></fa-icon>       
                     </div>   
                 </mat-expansion-panel-header>
-                <ng-container>
-                    <div class="ip-input">
-                        <input name="bodyIp" matInput placeholder="IP Address" [(ngModel)]="bodyModule.ipAddress"
-                        pattern="^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$" />        
+                <ng-container  *ngIf="isLoaded" >
+                    <div class="controller-select">
+                        <select title="Controller Select" disabled>
+                            <option value="0" selected>Master Controller</option>
+                        </select>       
                     </div>
-                    <app-esp-module [module]="bodyModule"></app-esp-module>
+                    <app-esp-module [module]="bodyLocation" [isMaster]="true"></app-esp-module>
+                </ng-container>
+            </mat-expansion-panel>
+            <mat-expansion-panel>
+                <mat-expansion-panel-header>
+                    <mat-panel-title>Core Module</mat-panel-title>
+                    <div class="warning tooltip" #core>
+                        <span class="tooltiptext">{{coreCaption.str}}</span>
+                        <fa-icon [icon]="coreWarning"></fa-icon>       
+                    </div>
+                </mat-expansion-panel-header>
+                <ng-container  *ngIf="isLoaded" >
+                    <div class="controller-select">
+                        <select id="core-controller-select" title="Controller Select"
+                        [(ngModel)]="coreLocation.controller.id"
+                        (change)="controllerSelectChanged($event)">
+                            <option [ngValue]="0" selected>Disabled</option>
+                            <ng-container *ngFor="let controller of availableCoreControllers"> 
+                                <option [ngValue]="controller.id">{{controller.name}}</option>
+                            </ng-container>
+                        </select>       
+                    </div>
+                    <app-esp-module [module]="coreLocation"></app-esp-module>
+                </ng-container>
+            </mat-expansion-panel>
+            <mat-expansion-panel>
+                <mat-expansion-panel-header>
+                    <mat-panel-title>Dome Module</mat-panel-title>
+                    <div class="warning tooltip" #dome>
+                        <span class="tooltiptext">{{domeCaption.str}}</span>
+                        <fa-icon [icon]="domeWarning"></fa-icon>       
+                    </div>
+                </mat-expansion-panel-header>
+                <ng-container  *ngIf="isLoaded" >
+                    <div class="controller-select">
+                        <select id="dome-controller-select" title="Controller Select"
+                        [(ngModel)]="domeLocation.controller.id"
+                        (change)="controllerSelectChanged($event)">
+                            <option [ngValue]="0" selected>Disabled</option>
+                            <ng-container *ngFor="let controller of availableDomeControllers"> 
+                                <option [ngValue]="controller.id">{{controller.name}}</option>
+                            </ng-container>
+                        </select>       
+                    </div>
+                    <app-esp-module [module]="domeLocation"></app-esp-module>
                 </ng-container>
             </mat-expansion-panel>
         </mat-accordion>
     </div>
     <div class="spacer"></div>
 </div>
+
+<astros-modal id="modules-modal"  disableBackgroundClick="{{backgroundClickDisabled}}" >
+    <ng-template #modalContainer></ng-template>
+</astros-modal>

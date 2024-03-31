@@ -1,7 +1,7 @@
-const { parentPort } = require("worker_threads");
-const superagent = require('superagent');
-const e = require("express");
-const { logger } = require("../logger");
+import { parentPort } from "worker_threads";
+import superagent from 'superagent';
+import e from "express";
+import { logger } from "../logger";
 
 parentPort.on('message', data => {
 

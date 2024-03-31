@@ -3,7 +3,16 @@
         <mat-expansion-panel-header>
             <mat-panel-title>Serial Port 1 configuration</mat-panel-title>
         </mat-expansion-panel-header>
-        <div class="uart-module">
+        <div *ngIf="isMaster" class="uart-module">
+            <div class="type">
+                <select title="Serial Type" disabled>
+                    <option value="0" selected>Reserved</option>
+                </select>
+            </div>
+            <div class="input"><input matInput placeholder="AstrOs Interface" disabled/></div>
+        </div>
+        
+        <div *ngIf="!isMaster" class="uart-module">
             <div class="type">
                 <select title="Serial Type" (ngModelChange)="uartTypeChange($event, 1)" [(ngModel)]=uart1Type>
                     <option value="0" selected>Disabled</option>
@@ -12,7 +21,7 @@
                     <option value="3">Human Cyborg Relations</option>
                 </select>
             </div>
-            <div class="input"><input matInput placeholder="Name" [(ngModel)]="module.uartModule.channels[0].channelName" /></div>
+            <div class="input"><input matInput placeholder="Name" [(ngModel)]="module.uartModule.channels[0].channelName"/></div>
         </div>
         <ng-template #uart1Container></ng-template>
     </mat-expansion-panel>

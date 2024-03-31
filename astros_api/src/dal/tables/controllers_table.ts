@@ -1,43 +1,57 @@
 export class ControllersTable {
-    public static readonly table = 'controllers';
-    public static readonly id = 'id';
-    public static readonly controllerId = 'controllerId';
-    public static readonly controllerName = 'controllerName';
-    public static readonly controllerIp = 'controllerIp';
-    public static readonly fingerprint = 'fingerprint';
+    public static readonly table = "controllers";
+    public static readonly id = "id";
+    public static readonly controllerName = "controllerName";
+    public static readonly controllerAddress = "controllerAddress";
 
-    public static readonly create =
-    `CREATE TABLE IF NOT EXISTS ${this.table} (
+    public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
     ${this.id} INTEGER PRIMARY KEY AUTOINCREMENT,
-    ${this.controllerId} INTEGER UNIQUE,
-    ${this.controllerName} TEXT,
-    ${this.controllerIp} TEXT,
-    ${this.fingerprint} TEXT)`;
+    ${this.controllerName} TEXT UNIQUE,
+    ${this.controllerAddress} TEXT UNIQUE)`;
 
     public static readonly insert =
-    `INSERT INTO ${this.table}
-    (${this.controllerId}, ${this.controllerName}, ${this.controllerIp}, ${this.fingerprint})
-    VALUES (?, ?, '', 1)`;
+        `INSERT INTO ${this.table}
+    (${this.controllerName}, 
+    ${this.controllerAddress})
+    VALUES (?, ?)
+    RETURNING id`;
+
+    public static readonly upsert =
+        `INSERT INTO ${this.table}
+    (${this.controllerName},
+    ${this.controllerAddress})
+    VALUES (?, ?)
+    ON CONFLICT(${this.controllerAddress})
+    DO UPDATE SET
+    ${this.controllerName} = ?
+    ${this.controllerAddress} = ?
+    RETURNING id`;
 
     public static readonly select =
-    `SELECT ${this.controllerName},
-            ${this.controllerIp},
-            ${this.fingerprint}
+        `SELECT 
+    ${this.controllerName},
+    ${this.controllerAddress}
     FROM ${this.table}
-    WHERE ${this.controllerId} = ?`;
+    WHERE ${this.id} = ?`;
 
-    public static readonly getIp =
-    `SELECT ${this.controllerIp}
+    public static readonly selectAll =
+        `SELECT 
+    ${this.id}, 
+    ${this.controllerName},
+    ${this.controllerAddress}
+    FROM ${this.table}`;
+
+    public static readonly selectByAddress =
+        `SELECT
+    ${this.id},
+    ${this.controllerName},
+    ${this.controllerAddress}
     FROM ${this.table}
-    WHERE ${this.controllerId} = ?`;
+    WHERE ${this.controllerAddress} = ?`;
 
-    public static readonly updateIp =
-    `UPDATE ${this.table}
-    SET ${this.controllerIp} = ?
-    WHERE ${this.controllerId} = ?`;
-
-    public static readonly updateFingerprint =
-    `UPDATE ${this.table}
-    SET ${this.fingerprint} =?
-    WHERE ${this.controllerId} = ?`;
+    public static readonly update =
+        `UPDATE ${this.table}
+    SET ${this.controllerName} = ?,
+    SET ${this.controllerAddress} = ?
+    WHERE ${this.id} = ?`;
 }

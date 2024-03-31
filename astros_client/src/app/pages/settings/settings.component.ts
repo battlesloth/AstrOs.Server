@@ -5,6 +5,7 @@ import { SettingsService } from 'src/app/services/settings/settings.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { FormatModalComponent } from './modals/format-modal/format-modal.component';
+import { ControlModule } from 'astros-common';
 
 @Component({
   selector: 'app-settings',
@@ -14,25 +15,37 @@ import { FormatModalComponent } from './modals/format-modal/format-modal.compone
 export class SettingsComponent implements OnInit {
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
 
-  apiKey ="";
+  apiKey = "";
   private characters: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  
-  constructor(private settingsService: SettingsService, 
+
+  private controllers: Array<ControlModule> = [];
+
+  constructor(private settingsService: SettingsService,
     private snackBarService: SnackbarService,
     private modalService: ModalService) { }
 
   ngOnInit(): void {
-    const observer = {
+    const apiObs = {
       next: (result: KeyValue<string, string>) => {
         this.apiKey = result.value;
       },
       error: (err: any) => console.error(err)
     };
 
-    this.settingsService.getSetting('apikey').subscribe(observer);
+    this.settingsService.getSetting('apikey').subscribe(apiObs);
+
+    const ctrlObs = {
+      next: (result: any) => {
+        this.controllers = result;
+      },
+      error: (err: any) => console.error(err)
+    };
+
+    this.settingsService.getControllers().subscribe(ctrlObs);
+
   }
 
-  generateApiKey(){
+  generateApiKey() {
     let result = '';
     let charactersLength = this.characters.length;
     for (var i = 0; i < 10; i++) {
@@ -51,7 +64,7 @@ export class SettingsComponent implements OnInit {
       }
     };
 
-    this.settingsService.saveSetting({key: 'apikey', value: result}).subscribe(observer);
+    this.settingsService.saveSetting({ key: 'apikey', value: result }).subscribe(observer);
   }
 
   modalCallback(evt: any) {
@@ -69,17 +82,18 @@ export class SettingsComponent implements OnInit {
   popModal(val: string) {
     this.container.clear();
     const modalResources = new Map<string, any>();
-   
+
     let component: any;
 
-    switch (val){
+    switch (val) {
       case 'format':
+        modalResources.set(ModalResources.controllers, this.controllers);
         component = this.container.createComponent(FormatModalComponent);
-        break; 
+        break;
       default:
         return;
     }
-    
+
     component.instance.resources = modalResources;
     component.instance.modalCallback.subscribe((evt: any) => {
       this.modalCallback(evt);
@@ -88,7 +102,7 @@ export class SettingsComponent implements OnInit {
     this.modalService.open('scripts-modal');
   }
 
-  formatSD(val: Array<number>){
+  formatSD(val: Array<any>) {
     const observer = {
       next: (result: any) => {
         this.snackBarService.okToast('Format queued!');

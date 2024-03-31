@@ -1,10 +1,12 @@
-import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, ControllerType, ControllerStatus, ModuleCollection } from 'astros-common';
+import { ControlModule, ControllerStatus, AstrOsLocationCollection, AstrOsConstants, ControllerLocation, UartType } from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { StatusService } from 'src/app/services/status/status.service';
+import { ModalService } from 'src/app/modal';
+import { LoadingModalComponent } from './loading-modal/loading-modal.component';
 
 @Component({
   selector: 'app-modules',
@@ -14,6 +16,17 @@ import { StatusService } from 'src/app/services/status/status.service';
 })
 export class ModulesComponent implements OnInit, AfterViewInit {
 
+  @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
+
+  isLoaded = false;
+
+  backgroundClickDisabled: string = '1';
+  isMaster: boolean = true;
+
+  possibleControllers: Array<ControlModule> = [];
+  availableDomeControllers: Array<ControlModule> = [];
+  availableCoreControllers: Array<ControlModule> = [];
+
   coreWarning = faExclamationTriangle;
   domeWarning = faExclamationTriangle;
   bodyWarning = faExclamationTriangle;
@@ -22,44 +35,74 @@ export class ModulesComponent implements OnInit, AfterViewInit {
   @ViewChild('dome', { static: false }) domeEl!: ElementRef;
   @ViewChild('body', { static: false }) bodyEl!: ElementRef;
 
-  coreModule!: ControlModule;
-  domeModule!: ControlModule;
-  bodyModule!: ControlModule;
+  coreLocation!: ControllerLocation;
+  domeLocation!: ControllerLocation;
+  bodyLocation!: ControllerLocation;
 
-  coreCaption: any = { str: 'Pending...' }
-  domeCaption: any = { str: 'Pending...' }
-  bodyCaption: any = { str: 'Pending...' }
+  coreCaption: any = { str: 'Module Down' }
+  domeCaption: any = { str: 'Module Down' }
+  bodyCaption: any = { str: 'Module Down' }
 
   private notSynced = "Not Synced";
   private moduleDown = "Module Down";
 
   constructor(private controllerService: ControllerService,
     private snackBar: SnackbarService,
+    private modalService: ModalService,
     private renderer: Renderer2,
     private status: StatusService) {
 
-    this.coreModule = new ControlModule(ControllerType.core, 'Core Dome Module', '');
-    this.domeModule = new ControlModule(ControllerType.dome, 'Outer Dome Module', '');
-    this.bodyModule = new ControlModule(ControllerType.body, 'Body Module', '');
+  }
+
+  ngOnInit(): void {
+
+  }
+
+  ngAfterViewInit(): void {
+    this.openControllerSyncModal();
+  }
+
+  openControllerSyncModal() {
+    this.container.clear();
+
+    const modalResources = new Map<string, any>();
+
+    const component = this.container.createComponent(LoadingModalComponent);
+
+    component.instance.resources = modalResources;
+    component.instance.modalCallback.subscribe((result: any) => {
+      this.modalCallback(result);
+    });
+
+    this.modalService.open('modules-modal');
+  }
+  modalCallback(evt: any) {
+
+    this.parseModules(evt.response.locations);
+
+    // always filter out the master controller since it's always the body module
+    this.possibleControllers = evt.response.controllers.filter((controller: ControlModule) => controller.id !== 1);
+
+    this.availableCoreControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.domeLocation.controller?.id);
+    this.availableDomeControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.coreLocation.controller?.id);
+
+    this.handleStatus(this.status.getCoreStatus(), this.coreEl, this.coreCaption);
+    this.handleStatus(this.status.getDomeStatus(), this.domeEl, this.domeCaption);
+    this.handleStatus(this.status.getBodyStatus(), this.bodyEl, this.bodyCaption);
 
     this.status.coreStateObserver.subscribe(value => this.handleStatus(value, this.coreEl, this.coreCaption));
     this.status.domeStateObserver.subscribe(value => this.handleStatus(value, this.domeEl, this.domeCaption));
     this.status.bodyStateObserver.subscribe(value => this.handleStatus(value, this.bodyEl, this.bodyCaption));
+
+    this.isLoaded = true;
+
+    this.modalService.close('modules-modal');
   }
 
-  ngOnInit(): void {
-    const observer = {
-      next: (result: any) => this.parseModules(result),
-      error: (err: any) => console.error(err)
-    };
+  controllerSelectChanged($event: any) {
 
-    this.controllerService.getControllers().subscribe(observer);
-  }
-
-  ngAfterViewInit(): void {
-    this.handleStatus(this.status.getCoreStatus(), this.coreEl, this.coreCaption);
-    this.handleStatus(this.status.getDomeStatus(), this.domeEl, this.domeCaption);
-    this.handleStatus(this.status.getBodyStatus(), this.bodyEl, this.bodyCaption);
+    this.availableCoreControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.domeLocation.controller?.id);
+    this.availableDomeControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.coreLocation.controller?.id);
 
   }
 
@@ -80,8 +123,10 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       }
     };
 
-    this.controllerService.saveControllers(new ModuleCollection(this.coreModule, this.domeModule, this.bodyModule))
+    this.controllerService.saveLocations(new AstrOsLocationCollection(this.coreLocation, this.domeLocation, this.bodyLocation))
       .subscribe(observer);
+
+    this.status.resetStatus();
   }
 
   syncModuleSettings() {
@@ -101,15 +146,15 @@ export class ModulesComponent implements OnInit, AfterViewInit {
       }
     };
 
-    this.controllerService.syncControllers()
+    this.controllerService.syncLocationConfig()
       .subscribe(observer);
   }
 
-  private parseModules(modules: ModuleCollection) {
+  private parseModules(locations: AstrOsLocationCollection) {
     try {
-      this.coreModule = modules.coreModule ?? this.coreModule;
-      this.domeModule = modules.domeModule ?? this.domeModule;
-      this.bodyModule = modules.bodyModule ?? this.bodyModule;
+      this.coreLocation = locations.coreModule ?? this.coreLocation;
+      this.domeLocation = locations.domeModule ?? this.domeLocation;
+      this.bodyLocation = locations.bodyModule ?? this.bodyLocation;
     } catch (err) {
       console.error(err);
     }

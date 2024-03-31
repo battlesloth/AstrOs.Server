@@ -1,14 +1,13 @@
-import { ControllerType, DirectCommnandType } from "../astros_enums";
+import { DirectCommnandType } from "../astros_enums";
 
 export class DirectCommand {
     type: DirectCommnandType;
-    controller: ControllerType;
+    controllerId: number;
     command: any
-    ipAddress = '';
-
-    constructor(type: DirectCommnandType, controller: ControllerType, command: any){
+   
+    constructor(type: DirectCommnandType, controllerId: number, command: any){
         this.type = type;
-        this.controller = controller;
+        this.controllerId = controllerId;
         this.command = command;
     }
 }

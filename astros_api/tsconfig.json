@@ -3,7 +3,7 @@
         "baseUrl": ".",
         "outDir": "dist",
         "rootDir": "./src",
-        "module": "esnext",
+        "module": "ESNext",
         "moduleResolution": "node",
         "allowJs": true,
         "esModuleInterop": true,
@@ -24,5 +24,12 @@
                 "exclude": ["*"]
             }
         ]
-    }
+    },
+    "exclude": [ 
+        "./jest.config.js",
+        "./webpack.config.js",
+        "dist",
+        "**/*.test.ts",
+        "**/*.mock.ts",
+    ]
 }

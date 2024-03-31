@@ -41,11 +41,13 @@
         }
 
         .module-accordian {
-            .ip-input {
-                input{
-                padding: 2px;
-                font-size: large;
-                width: 200px;
+            .controller-select {
+                select {
+                    padding-top: 4px;
+                    width: 100%;
+                    max-width: 300px;
+                    font-size: large;
+                    display: block;
                 }
             }
 

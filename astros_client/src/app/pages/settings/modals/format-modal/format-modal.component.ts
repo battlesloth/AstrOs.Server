@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { ControllerType } from 'astros-common';
+import { ControlModule } from 'astros-common';
 import { ModalBaseComponent } from 'src/app/modal';
-import { ModalCallbackEvent } from 'src/app/shared/modal-resources';
+import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 
 @Component({
   selector: 'app-format-modal',
@@ -10,29 +10,31 @@ import { ModalCallbackEvent } from 'src/app/shared/modal-resources';
 })
 export class FormatModalComponent extends ModalBaseComponent implements OnInit {
 
-  core: boolean = false;
-  dome: boolean = false;
-  body: boolean = false;
+  controllers: Array<any> = [];
 
   constructor() {
     super();
-   }
-
-  override ngOnInit(): void {
   }
 
-  ok(){
-
-    const result = new Array<number>();
-
-    if (this.core){
-      result.push(ControllerType.core);
+  override ngOnInit(): void {
+    if (this.resources.has(ModalResources.controllers)) {
+      for (const controller of this.resources.get(ModalResources.controllers)) {
+        this.controllers.push(
+          {
+            id: controller.id, name: controller.name, address: controller.address, selected: false
+          });
+      }
     }
-    if (this.dome){
-      result.push(ControllerType.dome);
-    }
-    if (this.body){
-      result.push(ControllerType.body);
+  }
+
+  ok() {
+
+    const result = new Array<any>();
+
+    for (const controller of this.controllers) {
+      if (controller.selected) {
+        result.push({ name: controller.name, address: controller.address });
+      }
     }
 
     this.modalCallback.emit({
@@ -41,7 +43,7 @@ export class FormatModalComponent extends ModalBaseComponent implements OnInit {
     })
   }
 
-  closeModal(){
-    this.modalCallback.emit({id: ModalCallbackEvent.close});
+  closeModal() {
+    this.modalCallback.emit({ id: ModalCallbackEvent.close });
   }
 }

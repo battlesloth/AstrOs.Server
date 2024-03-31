@@ -43,6 +43,7 @@ import { M5PaperConfigComponent } from './pages/remote-config/m5-paper-config/m5
 import { SettingsComponent } from './pages/settings/settings.component';
 import { FormatModalComponent } from './pages/settings/modals/format-modal/format-modal.component';
 import { HumanCyborgModalComponent } from './pages/scripter/modals/human-cyborg-modal/human-cyborg-modal.component';
+import { LoadingModalComponent } from './pages/modules/loading-modal/loading-modal.component';
 
 
 
@@ -75,7 +76,8 @@ import { HumanCyborgModalComponent } from './pages/scripter/modals/human-cyborg-
     M5PaperConfigComponent,
     SettingsComponent,
     FormatModalComponent,
-    HumanCyborgModalComponent
+    HumanCyborgModalComponent,
+    LoadingModalComponent
   ],
   imports: [
     BrowserModule,

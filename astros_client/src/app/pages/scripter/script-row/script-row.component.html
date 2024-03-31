@@ -2,10 +2,10 @@
     <div class="module-container">
         <div class="title" *ngIf="channel.type !== 1 && channel.type !== 4">{{channel.channel.channelName}}</div>
         <div class="title" *ngIf="channel.type === 1">{{channel.channel.moduleName}}</div>
-        <div class="title" *ngIf="channel.type === 4">{{channel.controllerName}}</div>
+        <div class="title" *ngIf="channel.type === 4">{{locationName}}</div>
         
-        <div *ngIf="channel.type !== 4">{{channel.controllerName}}</div>
-        <div  *ngIf="channel.type === 1">{{serialName(channel.channel.type)}}</div>
+        <div *ngIf="channel.type !== 4">{{locationName}}</div>
+        <div  *ngIf="channel.type === 1">{{uartType}}</div>
         <div  *ngIf="channel.type === 2"><span>I2C Channel: </span>{{channel.channel?.id}} </div>
         <div  *ngIf="channel.type === 3"><span>Servo Channel: </span>{{channel.channel?.id}} </div>
         <div class="spacer"></div>

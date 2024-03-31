@@ -1,12 +1,4 @@
-export enum ControllerType {
-    none = 0,
-    core = 1,
-    dome = 2,
-    body = 3,
-    audio = 4
-}
-
-export enum ChannelType {
+export const enum ChannelType {
     none = 0,
     uart = 1,
     i2c = 2,
@@ -14,56 +6,57 @@ export enum ChannelType {
     audio = 4
 }
 
-export enum ChannelSubType {
+export const enum ChannelSubType {
     none = 0,
     genericSerial = 1,
     kangaroo = 2,
     humanCyborgRelations = 3
 }
 
-export enum UartType{
+export const enum UartType {
     none = 0,
     genericSerial = 1,
     kangaroo = 2,
     humanCyborgRelations = 3
 }
 
-export enum UploadStatus {
+export const enum UploadStatus {
     notUploaded,
     uploading,
     uploaded,
 }
 
-export enum ControllerStatus {
+export const enum ControllerStatus {
     up,
     needsSynced,
     down,
 }
 
-export enum TransmissionType{
+export const enum TransmissionType {
     script,
     sync,
     status,
+    controllers,
     run,
     panic,
     directCommand,
     formatSD
 }
 
-export enum TransmissionStatus{
+export const enum TransmissionStatus {
     unknown,
     sending,
     success,
     failed
 }
 
-export enum DirectCommnandType{
+export const enum DirectCommnandType {
     servo,
     i2c,
     uart
 }
 
-export enum HumanCyborgRelationsCmd {
+export const enum HumanCyborgRelationsCmd {
     mildHappy = 1,
     extremeHappy = 2,
     mildSad = 3,
@@ -101,7 +94,7 @@ export enum HumanCyborgRelationsCmd {
     setScaredLevel = 35
 }
 
-export enum HcrCommandCategory {
+export const enum HcrCommandCategory {
     none,
     stimuli,
     muse,
@@ -109,4 +102,4 @@ export enum HcrCommandCategory {
     stop,
     volume,
     override
-  }
+}

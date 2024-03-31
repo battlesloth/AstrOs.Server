@@ -1,27 +1,13 @@
-import { ControllerType} from "../astros_enums";
-import { I2cModule } from "./i2c_module";
-import { ServoModule } from "./servo_module";
-import { UartModule } from "./uart_module";
-
-
-export class ControlModule{
-    id: ControllerType;
-
+export class ControlModule {
+    id: number;
     name: string;
-    ipAddress!: string;
-    fingerprint: string;
+    address: string;
+    fingerprint!: string;
 
-    uartModule: UartModule;
-    servoModule: ServoModule;
-    i2cModule: I2cModule;
-
-    constructor(id: ControllerType, name: string, fingerprint: string){
+    constructor(id: number, name: string, address: string) {
         this.id = id;
         this.name = name;
-        this.fingerprint = fingerprint;
-        this.uartModule = new UartModule();
-        this.servoModule = new ServoModule();
-        this.i2cModule = new I2cModule();
+        this.address = address;
     }
 }
 

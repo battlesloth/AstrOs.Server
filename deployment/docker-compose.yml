@@ -1,7 +1,6 @@
 version: "3.8"
 
 services:
-
   web:
     image: "dirtknap/astros-web:latest"
     restart: unless-stopped
@@ -18,6 +17,8 @@ services:
       - /home/astros/.config/astrosserver:/root/.config/astrosserver
     networks:
       - astronet
+    devices:
+      - "/dev/ttyS4:/dev/ttyS0"
 
 networks:
   astronet:
