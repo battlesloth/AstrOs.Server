@@ -3,7 +3,8 @@ export const enum ChannelType {
     uart = 1,
     i2c = 2,
     servo = 3,
-    audio = 4
+    audio = 4,
+    gpio = 5,
 }
 
 export const enum ChannelSubType {

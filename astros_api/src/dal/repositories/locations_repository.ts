@@ -2,10 +2,11 @@ import { logger } from "../../logger";
 import { DataAccess } from "../data_access";
 import { LocationsTable } from "../tables/locations_table";
 import { ControllerLocationTable } from "../tables/controller_location_table";
-import { ControlModule, ControllerLocation, I2cChannel, ServoChannel, UartChannel } from "astros-common";
+import { ControlModule, ControllerLocation, GpioChannel, I2cChannel, ServoChannel, UartChannel } from "astros-common";
 import { UartModuleTable } from "../tables/uart_module_table";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
+import { GpioChannelsTable } from "../tables/gpio_channels_table";
 
 export class LocationsRepository {
 
@@ -183,6 +184,19 @@ export class LocationsRepository {
             });
 
 
+        await this.dao
+            .get(GpioChannelsTable.selectAll, [location.id.toString()])
+            .then((val: any) => {
+                val.forEach((ch: any) => {
+                    location.gpioModule.channels[ch.channelId] = new GpioChannel(
+                        ch.channelId,
+                        ch.channelName,
+                        ch.defaultLow,
+                        ch.enabled
+                    );
+                });
+            })
+
         return location;
     }
 
@@ -242,6 +256,21 @@ export class LocationsRepository {
                     i2c.channelName,
                     i2c.enabled ? "1" : "0",
                     i2c.id.toString(),
+                    location.id.toString(),
+                ])
+                .catch((err: any) => {
+                    logger.error(err);
+                    throw "error";
+                });
+        }
+
+        for (const gpio of location.gpioModule.channels) {
+            await this.dao
+                .run(GpioChannelsTable.update, [
+                    gpio.channelName,
+                    gpio.defaultLow ? "1" : "0",
+                    gpio.enabled ? "1" : "0",
+                    gpio.id.toString(),
                     location.id.toString(),
                 ])
                 .catch((err: any) => {

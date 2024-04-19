@@ -1,4 +1,4 @@
-import { HumanCyborgRelationsCmd } from "../astros_enums";
+import { HumanCyborgRelationsCmd } from "../../astros_enums";
 
 export class humanCyborgRelationsController {
 

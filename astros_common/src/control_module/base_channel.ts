@@ -1,5 +1,4 @@
-
-export class I2cChannel {
+export class BaseChannel {
     id: number;
     channelName: string;
     enabled: boolean;

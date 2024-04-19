@@ -18,6 +18,7 @@ import { RemoteConfigTable } from "./tables/remote_config_table";
 import { ScriptsDeploymentTable } from "./tables/scripts_deployment_table";
 import { LocationsTable } from "./tables/locations_table";
 import { ControllerLocationTable } from "./tables/controller_location_table";
+import { GpioChannelsTable } from "./tables/gpio_channels_table";
 
 export class DataAccess {
 
@@ -164,6 +165,8 @@ export class DataAccess {
 
         await this.createTable(I2cChannelsTable.table, I2cChannelsTable.create);
 
+        await this.createTable(GpioChannelsTable.table, GpioChannelsTable.create);
+
         await this.createTable(ScriptsTable.table, ScriptsTable.create);
 
         await this.createTable(ScriptsDeploymentTable.table, ScriptsDeploymentTable.create);
@@ -269,6 +272,14 @@ export class DataAccess {
                             throw err
                         });
                 }
+            }
+
+            for (let i = 0; i < 10; i++) {
+                await this.run(GpioChannelsTable.insert, [id, i.toString(), "unassigned", "1", "0"])
+                    .catch((err) => {
+                        console.error(`Error adding gpio channel ${i}: ${err}`);
+                        throw err;
+                    })
             }
 
             logger.info(`Added default location ${loc}, id: ${id}`);

@@ -141,3 +141,54 @@
 
     }
 }
+
+.gpio-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+
+    li {
+        border: 2px solid $color-dark;
+        padding: 10px;
+    }
+
+    .gpio-channel {
+
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+
+        .label {
+            font-size: large;
+            width: 120px;
+        }
+
+        .input {
+            flex-grow: 1;
+            max-width: 400px;
+
+            input {
+                font-size: large;
+                width: 100%;
+            }
+        }
+
+        .enabled {
+            width: 120px;
+            text-align: center;
+            margin: 0px;
+            margin-right: 20px;
+
+        }
+
+        .default-low {
+            width: 120px;
+            text-align: center;
+            margin: 0px;
+            margin-right: 20px;
+
+        }
+    }
+}
