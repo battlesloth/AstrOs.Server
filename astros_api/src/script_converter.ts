@@ -9,10 +9,11 @@ import {
     Script,
     ScriptChannel,
     ScriptEvent,
-    GenericSerialEvent
+    GenericSerialEvent,
+    GpioEvent
 } from "astros-common";
 
-import { ChannelType } from "astros-common/astros_enums";
+import { ChannelType } from "astros-common/dist/astros_enums";
 
 import { logger } from "./logger";
 
@@ -22,7 +23,8 @@ export enum CommandType {
     servo,
     i2c,
     genericSerial,
-    kangaroo
+    kangaroo,
+    gpio
 }
 
 export class ScriptConverter {
@@ -112,13 +114,16 @@ export class ScriptConverter {
                         script = this.convertUartEvent(event, timeToSend) + script;
                         break;
                     case ChannelType.servo:
-                        script = this.convertServoEvent(event, timeToSend) + script
+                        script = this.convertServoEvent(event, timeToSend) + script;
                         break;
                     case ChannelType.i2c:
-                        script = this.convertI2cEvent(event, timeToSend) + script
-                        break
+                        script = this.convertI2cEvent(event, timeToSend) + script;
+                        break;
                     case ChannelType.audio:
-                        break
+                        break;
+                    case ChannelType.gpio:
+                        script = this.convertGpioEvent(event, timeToSend) + script;
+                        break;
                 }
             }
 
@@ -224,6 +229,14 @@ export class ScriptConverter {
         const i2c = JSON.parse(evt.dataJson) as I2cEvent;
 
         return `${CommandType.i2c}|${timeTillNextEvent}|${i2c.channelId}|${i2c.message};`;
+    }
+
+    // |___|_________|___|____;
+    //  evt time_till ch  val
+    convertGpioEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
+        const gpio = JSON.parse(evt.dataJson) as GpioEvent;
+
+        return `${CommandType.gpio}|${timeTillNextEvent}|${gpio.channelId}|${gpio.setHigh ? 1 : 0};`;
     }
 }
 

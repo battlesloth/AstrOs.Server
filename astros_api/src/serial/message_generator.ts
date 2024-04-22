@@ -22,7 +22,7 @@ export class MessageGenerator {
 
         switch (type) {
             case SerialMessageType.REGISTRATION_SYNC:
-                result = this.generateRegistrationSync();
+                result = this.generateRegistrationSync(header);
                 break;
             case SerialMessageType.DEPLOY_CONFIG:
                 result = this.generateDeployConfig(header, data);
@@ -213,8 +213,8 @@ export class MessageGenerator {
         return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
     }
 
-    generateRegistrationSync() {
-        return new MessageGeneratorResponse("", ["00:00:00:00:00:00"]);
+    generateRegistrationSync(header: string) {
+        return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, ["00:00:00:00:00:00"]);
     }
 
     generateFormatSD(header: string, data: any) {

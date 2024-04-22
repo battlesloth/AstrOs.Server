@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelSubType, ChannelType, ControlModule, I2cChannel, KangarooController, AstrOsLocationCollection, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartChannel, UartModule, UartType, ControllerLocation } from 'astros-common';
+import { ChannelSubType, ChannelType, I2cChannel, KangarooController, AstrOsLocationCollection, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartChannel, UartModule, UartType, ControllerLocation, GpioChannel, Identifiable, BaseChannel } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
@@ -19,6 +19,7 @@ import { ChannelTestModalComponent } from './modals/channel-test-modal/channel-t
 import EventMarkerHelper from './helper/event-marker-helper';
 import { UartEventModalComponent } from './modals/uart-event-modal/uart-event-modal.component';
 import { HumanCyborgModalComponent } from './modals/human-cyborg-modal/human-cyborg-modal.component';
+import { GpioEventModalComponent } from './modals/gpio-event-modal/gpio-event-modal.component';
 
 
 export interface Item {
@@ -367,14 +368,18 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         break;
       case ChannelType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);
-        modalResources.set(ModalResources.i2cId, this.getI2cIdFromChannel(event.scriptChannel))
+        modalResources.set(ModalResources.i2cId, this.getIdFromChannel(event.scriptChannel))
         break;
       case ChannelType.servo:
         component = this.container.createComponent(ServoEventModalComponent);
-        modalResources.set(ModalResources.servoId, this.getServoIdFromChannel(event.scriptChannel))
+        modalResources.set(ModalResources.servoId, this.getIdFromChannel(event.scriptChannel))
         break;
       case ChannelType.audio:
         component = this.container.createComponent(AudioEventModalComponent);
+        break;
+      case ChannelType.gpio:
+        component = this.container.createComponent(GpioEventModalComponent);
+        modalResources.set(ModalResources.gpioId, this.getIdFromChannel(event.scriptChannel))
         break;
     }
 
@@ -388,6 +393,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   //#region resources for modals 
+
   getUartChannelFromChannel(channelId: string): any {
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
@@ -411,31 +417,17 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     }
   }
 
-  getServoIdFromChannel(channelId: string): any {
-
+  getIdFromChannel(channelId: string): any {
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(channelId);
 
     if (chIdx > -1) {
-      const servo = this.scriptChannels[chIdx].channel as ServoChannel;
+      const servo = this.scriptChannels[chIdx].channel as BaseChannel;
       return servo.id;
     }
-
   }
 
-  getI2cIdFromChannel(channelId: string): any {
-
-    const chIdx = this.scriptChannels
-      .map((ch) => { return ch.id })
-      .indexOf(channelId);
-
-    if (chIdx > -1) {
-      const i2c = this.scriptChannels[chIdx].channel as I2cChannel;
-      return i2c.id;
-    }
-
-  }
 
   //#endregion
 

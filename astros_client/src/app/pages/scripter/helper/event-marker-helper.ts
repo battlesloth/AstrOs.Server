@@ -1,8 +1,8 @@
-import { ChannelSubType, ChannelType, GenericSerialEvent, HumanCyborgRelationsEvent, I2cEvent, KangarooAction, KangarooEvent, ScriptEvent, ServoEvent } from "astros-common";
+import { ChannelSubType, ChannelType, GenericSerialEvent, GpioEvent, HumanCyborgRelationsEvent, I2cEvent, KangarooAction, KangarooEvent, ScriptEvent, ServoEvent } from "astros-common";
 
 export default class EventMarkerHelper {
     static generateText(event: ScriptEvent): Array<string> {
-        
+
         switch (event.channelType) {
             case ChannelType.audio:
                 const rAudio = new Array<string>();
@@ -15,6 +15,8 @@ export default class EventMarkerHelper {
                 return this.servoText(event.dataJson);
             case ChannelType.i2c:
                 return this.i2cText(event.dataJson);
+            case ChannelType.gpio:
+                return this.gpioText(event.dataJson);
             case ChannelType.uart:
                 return this.uartText(event.channelSubType, event.dataJson);
             default:
@@ -24,7 +26,7 @@ export default class EventMarkerHelper {
                 rDefault[2] = '';
                 rDefault[3] = '';
                 return rDefault;
-                
+
         }
     }
 
@@ -51,6 +53,17 @@ export default class EventMarkerHelper {
         return result
     }
 
+    private static gpioText(json: string): Array<string> {
+        const evt = JSON.parse(json) as GpioEvent;
+        const result = new Array<string>();
+        result[0] = '\u00A0';
+        result[1] = 'State:';
+        result[2] = evt.setHigh ? 'High' : 'Low';
+        result[3] = '';
+
+        return result
+    }
+
     private static uartText(subType: ChannelSubType, json: string): Array<string> {
 
         switch (subType) {
@@ -70,7 +83,7 @@ export default class EventMarkerHelper {
         }
     }
 
-    private static genericUart(json: string) : Array<string>{
+    private static genericUart(json: string): Array<string> {
         const evt = JSON.parse(json) as GenericSerialEvent;
         const result = new Array<string>();
         result[0] = '\u00A0';
@@ -82,7 +95,7 @@ export default class EventMarkerHelper {
     }
 
     static kangaroo(json: string): Array<string> {
-        const evt = JSON.parse(json) as KangarooEvent;        
+        const evt = JSON.parse(json) as KangarooEvent;
         const result = new Array<string>();
         result[0] = 'CH 1:';
         result[1] = this.getKangarooActionName(evt.ch1Action);
@@ -116,7 +129,7 @@ export default class EventMarkerHelper {
         result[1] = 'Event Count';
         result[2] = evt.commands.length.toString();
         result[3] = '';
-    
+
         return result;
     }
 }

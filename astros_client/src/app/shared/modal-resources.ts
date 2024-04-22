@@ -48,5 +48,6 @@ export class ModalResources {
     // I2c module types
     public static readonly i2cId = 'i2cId';
 
-
+    // GPIO module types
+    public static readonly gpioId = 'gpioId';
 }

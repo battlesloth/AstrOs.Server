@@ -24,6 +24,7 @@ import { ModalModule } from './modal';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ScriptsComponent } from './pages/scripts/scripts.component';
 import { I2cEventModalComponent } from './pages/scripter/modals/i2c-event-modal/i2c-event-modal.component';
+import { GpioEventModalComponent } from './pages/scripter/modals/gpio-event-modal/gpio-event-modal.component';
 import { ServoEventModalComponent } from './pages/scripter/modals/servo-event-modal/servo-event-modal.component';
 import { ControllerModalComponent } from './pages/scripter/modals/controller-modal/controller-modal.component';
 import { AudioFilesComponent } from './pages/audio-files/audio-files.component';
@@ -60,6 +61,7 @@ import { LoadingModalComponent } from './pages/modules/loading-modal/loading-mod
     ScriptRowComponent,
     ScriptsComponent,
     I2cEventModalComponent,
+    GpioEventModalComponent,
     ServoEventModalComponent,
     ControllerModalComponent,
     AudioFilesComponent,

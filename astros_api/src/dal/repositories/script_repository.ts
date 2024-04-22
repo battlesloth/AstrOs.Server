@@ -4,7 +4,8 @@ import { ScriptChannelsTable } from "../../dal/tables/script_channels_table";
 import { ScriptEventsTable } from "../../dal/tables/script_events_table";
 import {
     ChannelType, I2cChannel, ServoChannel, Script, ScriptChannel,
-    ScriptEvent, ChannelSubType, UartChannel, UploadStatus, DeploymentStatus
+    ScriptEvent, ChannelSubType, UartChannel, UploadStatus, DeploymentStatus,
+    GpioChannel
 } from "astros-common";
 import { I2cChannelsTable } from "../tables/i2c_channels_table";
 import { ServoChannelsTable } from "../tables/servo_channels_table";
@@ -12,6 +13,7 @@ import { UartModuleTable } from "../tables/uart_module_table";
 import { logger } from "../../logger";
 import { Guid } from "guid-typescript";
 import { ScriptsDeploymentTable } from "../tables/scripts_deployment_table";
+import { GpioChannelsTable } from "../tables/gpio_channels_table";
 
 
 
@@ -147,14 +149,17 @@ export class ScriptRepository {
                 channel.channel = await this.getChannelForScriptChannel(ChannelType.servo, channel.channelNumber, channel.locationId)
                 break;
             case ChannelType.uart:
-                channel.channel = await this.getUartChannel(channel.locationId, channel.channelNumber);
+                channel.channel = await this.getUartChannel(channel.channelNumber, channel.locationId);
+                break;
+            case ChannelType.gpio:
+                channel.channel = await this.getChannelForScriptChannel(ChannelType.gpio, channel.channelNumber, channel.locationId);
                 break;
         }
 
         return channel;
     }
 
-    private async getUartChannel(locationId: number, channel: number): Promise<UartChannel | null> {
+    private async getUartChannel(channel: number, locationId: number): Promise<UartChannel | null> {
         let result: any = null;
 
         await this.dao.get(UartModuleTable.select, [channel.toString(), locationId.toString()])
@@ -181,6 +186,9 @@ export class ScriptRepository {
             case ChannelType.servo:
                 sql = ServoChannelsTable.select;
                 break;
+            case ChannelType.gpio:
+                sql = GpioChannelsTable.select;
+                break;
             default:
                 return;
         }
@@ -189,6 +197,9 @@ export class ScriptRepository {
             .then((val: any) => {
                 try {
                     switch (type) {
+                        case ChannelType.gpio:
+                            result = new GpioChannel(val[0].channelId, val[0].channelName, val[0].defaultLow, val[0].enabled);
+                            break;
                         case ChannelType.i2c:
                             result = new I2cChannel(val[0].channelId, val[0].channelName, val[0].enabled);
                             break;

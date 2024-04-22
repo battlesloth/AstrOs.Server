@@ -22,6 +22,7 @@ export { HumanCyborgRelationsEvent, HcrCommand } from './scripts/events/human_cy
 export { GenericSerialEvent } from './scripts/events/generic_serial_event';
 export { ServoEvent } from './scripts/events/servo_event';
 export { I2cEvent } from './scripts/events/i2c_event';
+export { GpioEvent } from './scripts/events/gpio_event';
 export { BaseResponse } from './networking/base_response';
 export { ControllersResponse } from './networking/controllers_response';
 export { StatusResponse } from './networking/status_repsonse';
@@ -43,4 +44,6 @@ export {
     HumanCyborgRelationsCmd,
     HcrCommandCategory
 } from './astros_enums';
-
+export {
+    Identifiable
+} from './astros_interfaces';
