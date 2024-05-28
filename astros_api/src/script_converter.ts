@@ -10,13 +10,11 @@ import {
     ScriptChannel,
     ScriptEvent,
     GenericSerialEvent,
-    GpioEvent
+    GpioEvent,
+    ChannelType
 } from "astros-common";
 
-import { ChannelType } from "astros-common/dist/astros_enums";
-
 import { logger } from "./logger";
-
 
 export enum CommandType {
     none,
@@ -53,6 +51,30 @@ export class ScriptConverter {
             logger.error(`Exception converting script${script.id}: ${err}`)
             return new Map<number, string>();
         }
+    }
+
+    convertCommand(command: any): string {
+
+        let script = '';
+
+        switch (command.channelType) {
+            case ChannelType.uart:
+                script = this.convertUartEvent(command.event, 0);
+                break;
+            case ChannelType.servo:
+                script = this.convertServoEvent(command.event, 0);
+                break;
+            case ChannelType.i2c:
+                script = this.convertI2cEvent(command.event, 0);
+                break;
+            case ChannelType.audio:
+                break;
+            case ChannelType.gpio:
+                script = this.convertGpioEvent(command.event, 0);
+                break;
+        }
+
+        return script;
     }
 
     mapEventsByControllerAndTime(channel: ScriptChannel, map: Map<number, Map<number, Array<ScriptEvent>>>): void {

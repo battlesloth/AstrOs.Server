@@ -210,7 +210,20 @@ export class MessageGenerator {
     }
 
     generateRunCommand(header: string, data: any) {
-        return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
+
+        if (!data.contoller.address) {
+            return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
+        }
+
+        const result = [this.GS];
+
+        result.push(data.controller.address);
+        result.push(this.US);
+        result.push(data.controller.name);
+        result.push(this.US);
+        result.push(data.command);
+
+        return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, [data.contoller.address]);
     }
 
     generateRegistrationSync(header: string) {

@@ -450,7 +450,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         this.removeEvent(evt.channelId, evt.time);
         break;
       case ModalCallbackEvent.channelTest:
-        this.sendChannelTest(evt.controller, evt.commandType, evt.command);
+        this.sendChannelTest(evt.controllerId, evt.commandType, evt.command);
     }
 
     this.modalService.close('scripter-modal');

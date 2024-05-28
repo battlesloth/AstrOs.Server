@@ -27,6 +27,8 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
   spdDisabled: boolean = true;
   posDisabled: boolean = true;
 
+  gpioLevel: number = 0;
+
   constructor() {
     super();
     this.callbackType = ModalCallbackEvent.channelTest;
@@ -60,6 +62,8 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
         } else {
           return { val: this.value };
         }
+      case ChannelType.gpio:
+        return { id: this.channelId, val: this.gpioLevel };
     }
     return {};
   }

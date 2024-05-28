@@ -544,6 +544,19 @@ class ApiServer {
 
             logger.info('sending direct command');
 
+            const dao = new DataAccess();
+            const repo = new ControllerRepository(dao);
+
+            const controller = await repo.getControllerById(req.body.controller);
+
+            logger.debug(`controller: ${JSON.stringify(controller)}`);
+            logger.debug(`req: ${JSON.stringify(req.body)}`);
+
+            const cvtr = new ScriptConverter();
+            const cmd = cvtr.convertCommand(req.body);
+
+            this.serialWorker.postMessage({ type: SerialMessageType.RUN_COMMAND, data: { controller: controller, command: cmd } });
+
             res.status(200);
             res.json({ message: "success" });
 
