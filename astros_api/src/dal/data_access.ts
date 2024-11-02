@@ -195,7 +195,7 @@ export class DataAccess {
                 throw err;
             });
 
-        await this.run(RemoteConfigTable.insert, ['m5page', JSON.stringify(new Array<M5Page>)])
+        await this.run(RemoteConfigTable.insert, ['astrOsScreen', JSON.stringify(new Array<M5Page>)])
             .then(() => { logger.info("Added default remote config") })
             .catch((err) => {
                 console.error(`Error adding default remote config: ${err}`);
@@ -312,7 +312,7 @@ export class DataAccess {
             logger.error('Could not connect to database', err);
         }
         else {
-            logger.info('Connected to database');
+            logger.debug('Connected to database');
         }
     }
 

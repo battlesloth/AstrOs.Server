@@ -26,11 +26,113 @@ TODO
 
 ### And coding style tests
 
-TOD
+TODO
 
 ## Deployment
 
-TODO
+### Armbian Orange Pi 4 LTS Set Up
+
+#### Enable Pi Serial - Armbain Headless
+
+Orange Pi 4 LTS shares SPI1 and UART4 and by default, SPI1 is endabled. To enable UART4 and disable SPI1, you need to create a DT Overlay.
+
+From a termainal on the Orange Pi:
+```
+~$ nano rockschip-uart.dts
+```
+
+Add the following:
+
+```
+/dts-v1/;
+/plugin/;
+
+/{
+ 	compatible="rockchip,rk3399";
+ 	fragment@0{
+ 		target=<&spi1>;
+ 		__overlay__{
+ 			status="disabled";
+ 		};
+ 	};
+
+ 	fragment@1{
+ 		target=<&uart4>;
+ 		__overlay__{
+ 			status="okay";
+ 		};
+ 	};
+};
+```
+
+Build the dtbo file
+
+```
+~$ dtc -@ -Hepapr -I dts -O dtb -o rockchip-uart4.dtbo rockchip-uart4.dts
+```
+
+If /boot/overlay/ doesn't exist, create the folder.
+
+Copy rockchip-uart4.dtbo to /boot/overlay/
+
+Edit boot/armbianEnv.txt and add the following line
+
+```
+overlays=uart4
+```
+
+reboot
+
+
+#### Enable Pi Serial - Armbain Desktop
+
+use Armbian Config utility
+
+#### Setup Docker Environment
+
+create database file/logging location
+
+```
+~$ cd .config
+~$ mkdir astrosserver
+```
+
+Install docker. This may take a while. Especially the "Setting up docker.io" step.
+```
+~$ sudo apt install docker.io
+```
+Create directory to save docker data:
+
+```
+~$ mkdir /home/<user>/Docker/Data/portainer
+```
+
+Install portainer. 
+```
+ ~$ docker pull portainer/portainer
+```
+
+
+
+Create container and auto run portainer 
+```
+docker run -d -p 9000:9000 --restart always \
+-v /var/run/docker.sock:/var/run/docker.sock \
+-v /home/<user>/Docker/Data/portainer:/data portainer/portainer
+```
+
+In Portainer:
+
+Create docker network
+
+portainer>local environment>networks
+        
+Add Network> AstroNet, Bridge
+
+portainer> Stacks
+        give it a name (i.e. astros)
+        add stack, paste docker-compose.yml from deployment
+
 
 ## Built With
 

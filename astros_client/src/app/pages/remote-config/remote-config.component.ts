@@ -13,7 +13,7 @@ export class RemoteConfigComponent implements OnInit {
 
   @ViewChild('config') config!: M5PaperConfigComponent;
 
-  remoteName = "M5 Paper";
+  remoteName = "Astr-Os Screen";
 
   constructor(private remoteService: RemotesService, private snackBar: SnackbarService) { }
 
