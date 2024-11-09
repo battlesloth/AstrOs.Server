@@ -195,6 +195,12 @@ class ApiServer {
 
     private setRoutes(): void {
 
+        this.router.use((err: any, req: any, res: any, next: any) => { 
+                 logger.error('err:', err);
+                 logger.error('req:', req);
+                 logger.error('res:', res);
+         });
+
         this.router.post(AuthContoller.route, AuthContoller.login);
         this.router.post(AuthContoller.reauthRoute, AuthContoller.reauth);
 
@@ -229,6 +235,8 @@ class ApiServer {
         // API key secured routes
         this.router.get('/remotecontrol', this.apiKeyValidator, (req: any, res: any, next: any) => { this.runScript(req, res, next); });
         this.router.get('/remotecontrolsync', this.apiKeyValidator, RemoteConfigController.syncRemoteConfig);
+
+
 
     }
 

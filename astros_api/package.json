@@ -5,7 +5,7 @@
   "scripts": {
     "prebuild": "eslint . --ext .js,.jsx,.ts,.tsx",
     "build": "webpack",
-    "start": "node ./dist/bundle.js",
+    "start": "set DEBUG=express:* & node ./dist/bundle.js",
     "test": "jest"
   },
   "dependencies": {

@@ -6,6 +6,9 @@ import { logger } from "./logger";
 export function ApiKeyValidator() : RequestHandler {
     
     return (async (req, res, next) => {
+
+        logger.info('Validating API key', req);
+
         const dao = new DataAccess();
         const settings = new SettingsRepository(dao);
 

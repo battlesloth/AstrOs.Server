@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve --proxy-config proxy.conf.json --configuration=development",
+    "start": "node --trace-deprecation ./node_modules/@angular/cli/bin/ng serve  --verbose  --host 192.168.137.1 --proxy-config proxy.conf.json --configuration=development",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
