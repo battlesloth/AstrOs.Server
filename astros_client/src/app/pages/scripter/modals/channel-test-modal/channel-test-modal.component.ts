@@ -57,7 +57,7 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
       case ChannelType.servo:
         return { id: this.channelId, position: this.position, speed: this.speed };
       case ChannelType.uart:
-        if (this.channelSubType == ChannelSubType.kangaroo) {
+        if (this.channelSubType === ChannelSubType.kangaroo) {
           return { val: this.getKangarooCommand() };
         } else {
           return { val: this.value };

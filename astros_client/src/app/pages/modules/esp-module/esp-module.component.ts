@@ -86,10 +86,10 @@ export class EspModuleComponent implements OnInit {
 
     const ut = +$event;
 
-    if (channel == 1 && ut === this.originalUart1Type) {
+    if (channel === 1 && ut === this.originalUart1Type) {
       this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);
     }
-    else if (channel == 2 && ut === this.originalUart2Type) {
+    else if (channel === 2 && ut === this.originalUart2Type) {
       this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);
     }
     else {

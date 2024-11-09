@@ -190,11 +190,11 @@ export class ScriptConverter {
 
         for (const cmd of hcr.commands) {
 
-            if (cmd.valueA === null || cmd.valueA == undefined) {
+            if (cmd.valueA === null || cmd.valueA === undefined) {
                 cmd.valueA = 0;
             }
 
-            if (cmd.valueB === null || cmd.valueB == undefined) {
+            if (cmd.valueB === null || cmd.valueB === undefined) {
                 cmd.valueB = 0;
             }
 

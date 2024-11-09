@@ -108,7 +108,7 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
 
   private setChannels(channelType: ChannelType) {
 
-    if (channelType == ChannelType.none) {
+    if (channelType === ChannelType.none) {
       this.selectedChannel = -1;
       document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
     }
