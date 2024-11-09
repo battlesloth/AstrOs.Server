@@ -4,7 +4,7 @@ import { BrowserModule } from '@angular/platform-browser';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
+import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { LoginComponent } from './pages/login/login.component';
 import { HomeComponent } from './pages/home/home.component';
 import { StatusComponent } from './pages/status/status.component';
@@ -48,57 +48,50 @@ import { LoadingModalComponent } from './pages/modules/loading-modal/loading-mod
 
 
 
-@NgModule({
-  declarations: [
-    AppComponent,
-    LoginComponent,
-    HomeComponent,
-    StatusComponent,
-    ScripterComponent,
-    ModulesComponent,
-    EspModuleComponent,
-    DriveModuleComponent,
-    ScriptRowComponent,
-    ScriptsComponent,
-    I2cEventModalComponent,
-    GpioEventModalComponent,
-    ServoEventModalComponent,
-    ControllerModalComponent,
-    AudioFilesComponent,
-    UploadModalComponent,
-    AudioEventModalComponent,
-    BaseEventModalComponent,
-    KangarooEventModalComponent,
-    UartEventModalComponent,
-    KangarooModuleComponent,
-    GenericSerialModuleComponent,
-    ScriptTestModalComponent,
-    ChannelTestModalComponent,
-    RemoteConfigComponent,
-    M5PaperConfigComponent,
-    SettingsComponent,
-    FormatModalComponent,
-    HumanCyborgModalComponent,
-    LoadingModalComponent
-  ],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    FormsModule,
-    HttpClientModule,
-    BrowserAnimationsModule,
-    MatMenuModule,
-    MatExpansionModule,
-    MatToolbarModule,
-    MatListModule,
-    MatSnackBarModule,
-    ModalModule,
-    FontAwesomeModule,
-    MatProgressBarModule,
-    MatCheckboxModule
-  ],
-  providers: [WebsocketService],
-  bootstrap: [AppComponent]
-})
+@NgModule({ declarations: [
+        AppComponent,
+        LoginComponent,
+        HomeComponent,
+        StatusComponent,
+        ScripterComponent,
+        ModulesComponent,
+        EspModuleComponent,
+        DriveModuleComponent,
+        ScriptRowComponent,
+        ScriptsComponent,
+        I2cEventModalComponent,
+        GpioEventModalComponent,
+        ServoEventModalComponent,
+        ControllerModalComponent,
+        AudioFilesComponent,
+        UploadModalComponent,
+        AudioEventModalComponent,
+        BaseEventModalComponent,
+        KangarooEventModalComponent,
+        UartEventModalComponent,
+        KangarooModuleComponent,
+        GenericSerialModuleComponent,
+        ScriptTestModalComponent,
+        ChannelTestModalComponent,
+        RemoteConfigComponent,
+        M5PaperConfigComponent,
+        SettingsComponent,
+        FormatModalComponent,
+        HumanCyborgModalComponent,
+        LoadingModalComponent
+    ],
+    bootstrap: [AppComponent], imports: [BrowserModule,
+        AppRoutingModule,
+        FormsModule,
+        BrowserAnimationsModule,
+        MatMenuModule,
+        MatExpansionModule,
+        MatToolbarModule,
+        MatListModule,
+        MatSnackBarModule,
+        ModalModule,
+        FontAwesomeModule,
+        MatProgressBarModule,
+        MatCheckboxModule], providers: [WebsocketService, provideHttpClient(withInterceptorsFromDi())] })
 export class AppModule { }
 
