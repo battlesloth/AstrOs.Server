@@ -1,10 +1,9 @@
-import { Component, Input, OnChanges, OnInit, SimpleChanges, ViewChild, ViewContainerRef } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatCheckboxModule } from '@angular/material/checkbox'
 import { MatFormField } from '@angular/material/form-field';
-import { ControlModule, ControllerLocation, KangarooController, UartChannel, UartModule, UartType } from 'astros-common';
+import { ControllerLocation, KangarooController, UartChannel, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
-
 
 @Component({
   selector: 'app-esp-module',
@@ -14,8 +13,13 @@ import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaro
 })
 export class EspModuleComponent implements OnInit {
 
+  @Output() openServoTestModal = new EventEmitter<any>();
+
   @Input()
   isMaster: boolean = false;
+
+  @Input()
+  locationId: number = 0;
 
   @Input()
   get module(): any { return this._module; }
@@ -161,4 +165,14 @@ export class EspModuleComponent implements OnInit {
 
     return temp;
   }
+
+  testServoModal(channelId: number) {
+
+    this.openServoTestModal.emit(
+      {
+        controllerId: this.module.controller.id,
+        channelId
+      });
+  }
+
 }

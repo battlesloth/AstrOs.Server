@@ -311,9 +311,6 @@ export class DataAccess {
         if (err) {
             logger.error('Could not connect to database', err);
         }
-        else {
-            logger.debug('Connected to database');
-        }
     }
 
     /*private async upgradeToV2(): Promise<void> {

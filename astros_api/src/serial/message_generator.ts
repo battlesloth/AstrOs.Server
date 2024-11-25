@@ -8,6 +8,7 @@ import { MessageHelper } from "./message_helper";
 import { SerialMessageType } from "./serial_message";
 import { ScriptUpload } from "src/models/scripts/script_upload";
 import { ScriptRun } from "src/models/scripts/script_run";
+import { ServoTest } from "src/models/servo_test";
 
 export class MessageGenerator {
 
@@ -41,6 +42,9 @@ export class MessageGenerator {
                 break;
             case SerialMessageType.FORMAT_SD:
                 result = this.generateFormatSD(header, data);
+                break;
+            case SerialMessageType.SERVO_TEST:
+                result = this.generateServoTestCommand(header, data);
                 break;
             default:
                 logger.error(`Unknown message type: ${type}`);
@@ -223,8 +227,31 @@ export class MessageGenerator {
         result.push(this.US);
         result.push(data.command);
 
-        return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, [data.contoller.address]);
+        const msg = result.join("");
+
+        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, [data.contoller.address]);
     }
+
+    generateServoTestCommand(header: string, data: any){
+
+        const cmd = data as ServoTest;
+
+        if (!cmd.controller.address){
+            return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
+        }
+
+        const result = [this.GS];
+
+        result.push(cmd.controller.address);
+        result.push(this.US);
+        result.push(cmd.controller.name);
+        result.push(this.US);
+        result.push(`${cmd.servoId}:${data.msValue}`)
+        const msg = result.join("");
+
+        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, [cmd.controller.address]);
+    }
+
 
     generateRegistrationSync(header: string) {
         return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, ["00:00:00:00:00:00"]);

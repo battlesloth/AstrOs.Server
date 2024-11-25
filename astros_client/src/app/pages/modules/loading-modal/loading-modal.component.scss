@@ -1,62 +1,62 @@
 .loading-modal {
 
+  width: 300px;
+
+  select {
+    display: block;
+    font-size: large;
+    margin-top: 8px;
     width: 300px;
-
-    select {
-      display: block;
-      font-size: large;
-      margin-top: 8px;
-      width: 300px;
-    }
-  
-    .modal-body{
-        display: flex;
-        flex-direction: row;
-
-        font-size: large;
-
-        .spacer {
-            flex-grow: 1;
-        }
-        
-        .content {
-            width: 300px;
-            display: inline;
-        }
-     
-        label {
-            display:block;
-            width: 300px;
-            margin-bottom: 2px;
-        }
-    }
   }
-  
-  .modal-buttons{
-    margin-top: 20px;
+
+  .modal-body {
     display: flex;
     flex-direction: row;
-  }
-  
-  .button-spacer {
-    flex-grow: 1;
-  }
-  
-  .button-grouper{
-    button{
-      width: 100px;
-      font-size: large;
-      padding: 5px 0px;
-      margin: 0px 5px;
+
+    font-size: large;
+
+    .spacer {
+      flex-grow: 1;
     }
 
-    .hidden {
-      display: none;
+    .content {
+      width: 300px;
+      display: inline;
+    }
+
+    label {
+      display: block;
+      width: 300px;
+      margin-bottom: 2px;
     }
   }
-  
-  @media only screen and (max-width: 620px){
+}
+
+.modal-buttons {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: row;
+}
+
+.button-spacer {
+  flex-grow: 1;
+}
+
+.button-grouper {
+  button {
+    width: 100px;
+    font-size: large;
+    padding: 5px 0px;
+    margin: 0px 5px;
+  }
+
+  .hidden {
+    display: none;
+  }
+}
+
+@media only screen and (max-width: 620px) {
   .loading-modal {
-        width: 400px;
-    }
+    width: 400px;
   }
+}

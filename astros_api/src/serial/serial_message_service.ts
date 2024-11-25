@@ -7,7 +7,6 @@ import { ConfigSyncResponse, ISerialWorkerResponse, RegistrationResponse, Script
 import { SerialMessageTracker } from "./serial_message_tracker";
 import { MessageHelper } from "./message_helper";
 import { ControlModule } from "astros-common";
-import { Script } from "vm";
 
 export class SerialMessageService {
 

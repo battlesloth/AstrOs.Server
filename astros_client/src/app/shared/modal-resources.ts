@@ -8,7 +8,8 @@ export enum ModalCallbackEvent {
     channelTest,
     delete,
     refresh,
-    formatSD
+    formatSD,
+    sendServoMove
 }
 
 
@@ -17,6 +18,10 @@ export class ModalResources {
     public static readonly scriptId = 'scriptId';
     public static readonly locations = 'locations';
 
+    // servo test modal
+    // Defined lower: 'servoId';
+    public static readonly controllerId = 'controllerId';
+   
     // channel test modal
     public static readonly channelType = 'channelType';
     public static readonly channelSubType = 'channelSubType';

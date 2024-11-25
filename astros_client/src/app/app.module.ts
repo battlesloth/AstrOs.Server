@@ -11,6 +11,7 @@ import { StatusComponent } from './pages/status/status.component';
 import { ScripterComponent } from './pages/scripter/scripter.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatSliderModule } from '@angular/material/slider';
 import { ModulesComponent } from './pages/modules/modules.component';
 import { MatExpansionModule } from '@angular/material/expansion'
 import { MatToolbarModule } from '@angular/material/toolbar'
@@ -45,6 +46,7 @@ import { SettingsComponent } from './pages/settings/settings.component';
 import { FormatModalComponent } from './pages/settings/modals/format-modal/format-modal.component';
 import { HumanCyborgModalComponent } from './pages/scripter/modals/human-cyborg-modal/human-cyborg-modal.component';
 import { LoadingModalComponent } from './pages/modules/loading-modal/loading-modal.component';
+import { ServoTestModalComponent } from './pages/modules/servo-test-modal/servo-test-modal.component';
 
 
 
@@ -78,7 +80,8 @@ import { LoadingModalComponent } from './pages/modules/loading-modal/loading-mod
         SettingsComponent,
         FormatModalComponent,
         HumanCyborgModalComponent,
-        LoadingModalComponent
+        LoadingModalComponent,
+        ServoTestModalComponent
     ],
     bootstrap: [AppComponent], imports: [BrowserModule,
         AppRoutingModule,
@@ -92,6 +95,8 @@ import { LoadingModalComponent } from './pages/modules/loading-modal/loading-mod
         ModalModule,
         FontAwesomeModule,
         MatProgressBarModule,
-        MatCheckboxModule], providers: [WebsocketService, provideHttpClient(withInterceptorsFromDi())] })
+        MatCheckboxModule,
+        MatSliderModule
+    ], providers: [WebsocketService, provideHttpClient(withInterceptorsFromDi())] })
 export class AppModule { }
 

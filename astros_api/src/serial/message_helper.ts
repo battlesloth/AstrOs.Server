@@ -28,7 +28,8 @@ export class MessageHelper {
     [SerialMessageType.RUN_COMMAND_NAK, SerialMsgConst.RUN_COMMAND_NAK],
     [SerialMessageType.FORMAT_SD, SerialMsgConst.FORMAT_SD],
     [SerialMessageType.FORMAT_SD_ACK, SerialMsgConst.FORMAT_SD_ACK],
-    [SerialMessageType.FORMAT_SD_NAK, SerialMsgConst.FORMAT_SD_NAK]
+    [SerialMessageType.FORMAT_SD_NAK, SerialMsgConst.FORMAT_SD_NAK],
+    [SerialMessageType.SERVO_TEST, SerialMsgConst.SERVO_TEST]
   ]);
 
   public static readonly MessageTimeouts: Map<SerialMessageType, number> = new Map([

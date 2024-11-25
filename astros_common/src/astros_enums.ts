@@ -41,7 +41,8 @@ export const enum TransmissionType {
     run,
     panic,
     directCommand,
-    formatSD
+    formatSD,
+    servoTest
 }
 
 export const enum TransmissionStatus {
