@@ -1,4 +1,4 @@
-FROM arm64v8/node:20 as build0
+FROM --platform=linux/arm64 arm64v8/node:20 as build0
 
 WORKDIR /usr/src/commons
 

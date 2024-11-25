@@ -9,20 +9,20 @@ import {
     Script,
     ScriptChannel,
     ScriptEvent,
-    GenericSerialEvent
+    GenericSerialEvent,
+    GpioEvent,
+    ChannelType
 } from "astros-common";
 
-import { ChannelType } from "astros-common/astros_enums";
-
 import { logger } from "./logger";
-
 
 export enum CommandType {
     none,
     servo,
     i2c,
     genericSerial,
-    kangaroo
+    kangaroo,
+    gpio
 }
 
 export class ScriptConverter {
@@ -51,6 +51,30 @@ export class ScriptConverter {
             logger.error(`Exception converting script${script.id}: ${err}`)
             return new Map<number, string>();
         }
+    }
+
+    convertCommand(command: any): string {
+
+        let script = '';
+
+        switch (command.channelType) {
+            case ChannelType.uart:
+                script = this.convertUartEvent(command.event, 0);
+                break;
+            case ChannelType.servo:
+                script = this.convertServoEvent(command.event, 0);
+                break;
+            case ChannelType.i2c:
+                script = this.convertI2cEvent(command.event, 0);
+                break;
+            case ChannelType.audio:
+                break;
+            case ChannelType.gpio:
+                script = this.convertGpioEvent(command.event, 0);
+                break;
+        }
+
+        return script;
     }
 
     mapEventsByControllerAndTime(channel: ScriptChannel, map: Map<number, Map<number, Array<ScriptEvent>>>): void {
@@ -112,13 +136,16 @@ export class ScriptConverter {
                         script = this.convertUartEvent(event, timeToSend) + script;
                         break;
                     case ChannelType.servo:
-                        script = this.convertServoEvent(event, timeToSend) + script
+                        script = this.convertServoEvent(event, timeToSend) + script;
                         break;
                     case ChannelType.i2c:
-                        script = this.convertI2cEvent(event, timeToSend) + script
-                        break
+                        script = this.convertI2cEvent(event, timeToSend) + script;
+                        break;
                     case ChannelType.audio:
-                        break
+                        break;
+                    case ChannelType.gpio:
+                        script = this.convertGpioEvent(event, timeToSend) + script;
+                        break;
                 }
             }
 
@@ -163,11 +190,11 @@ export class ScriptConverter {
 
         for (const cmd of hcr.commands) {
 
-            if (cmd.valueA === null || cmd.valueA == undefined) {
+            if (cmd.valueA === null || cmd.valueA === undefined) {
                 cmd.valueA = 0;
             }
 
-            if (cmd.valueB === null || cmd.valueB == undefined) {
+            if (cmd.valueB === null || cmd.valueB === undefined) {
                 cmd.valueB = 0;
             }
 
@@ -224,6 +251,14 @@ export class ScriptConverter {
         const i2c = JSON.parse(evt.dataJson) as I2cEvent;
 
         return `${CommandType.i2c}|${timeTillNextEvent}|${i2c.channelId}|${i2c.message};`;
+    }
+
+    // |___|_________|___|____;
+    //  evt time_till ch  val
+    convertGpioEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
+        const gpio = JSON.parse(evt.dataJson) as GpioEvent;
+
+        return `${CommandType.gpio}|${timeTillNextEvent}|${gpio.channelId}|${gpio.setHigh ? 1 : 0};`;
     }
 }
 

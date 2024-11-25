@@ -2,7 +2,7 @@ import { AfterViewInit, Component, OnInit } from '@angular/core';
 import { BaseEventModalComponent } from '../../scripter/modals/base-event-modal/base-event-modal.component';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 import { AstrOsLocationCollection, ControllersResponse } from 'astros-common';
-import { TransmissionType } from 'astros-common/astros_enums'
+import { TransmissionType } from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ModalCallbackEvent } from 'src/app/shared/modal-resources';
 import { Subscription } from 'rxjs';

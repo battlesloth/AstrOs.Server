@@ -3,7 +3,7 @@ import { MessageHelper } from "../src/serial/message_helper";
 import { SerialMessageType } from "../src/serial/serial_message";
 import { ConfigSync } from "../src/models/config/config_sync";
 import { ControlModule, ControllerLocation, ServoChannel } from "astros-common";
-import exp from "constants";
+
 
 function addServoChannels(location: ControllerLocation) {
     for (let i = 0; i < 32; i++) {

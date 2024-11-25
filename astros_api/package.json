@@ -5,6 +5,7 @@
   "scripts": {
     "prebuild": "eslint . --ext .js,.jsx,.ts,.tsx",
     "build": "webpack",
+    "start-verbose": "set DEBUG=express:* & node ./dist/bundle.js",
     "start": "node ./dist/bundle.js",
     "test": "jest"
   },
@@ -41,7 +42,7 @@
     "@types/express": "^4.17.13",
     "@types/express-fileupload": "^1.2.2",
     "@types/http-errors": "^1.8.1",
-    "@types/jest": "^29.5.5",
+    "@types/jest": "^29.5.12",
     "@types/jsonwebtoken": "^8.5.6",
     "@types/morgan": "^1.9.3",
     "@types/node": "^17.0.2",

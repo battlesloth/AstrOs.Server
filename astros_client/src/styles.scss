@@ -1,3 +1,5 @@
+@use '@angular/material' as mat;
+
 /* You can add global styles to this file, and also import other style files */
 @import "./src/assets/styles/variables";
 @import "../node_modules/@angular/material/prebuilt-themes/purple-green.css";
@@ -13,6 +15,21 @@
 
 :root {
     font-size: 62.5%;
+
+    @include mat.slider-overrides((
+        handle-color: $dark-blue,
+        focus-handle-color: $dark-blue,
+        hover-handle-color: $dark-blue-tint,
+        active-track-color: $dark-blue,
+        inactive-track-color: $dark-blue,
+        with-overlap-handle-outline-color: $dark-blue,
+        ripple-color: $dark-blue,
+        hover-state-layer-color:$dark-blue-tint,
+        focus-state-layer-color:$dark-blue-tint,
+        disabled-active-track-color: $light-blue,
+        disabled-handle-color: $light-blue,
+        disabled-inactive-track-color: $light-blue
+      ));
 }
 
 body {

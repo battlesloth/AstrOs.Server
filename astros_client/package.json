@@ -4,22 +4,23 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json --configuration=development",
+    "start-verbose": "node --trace-deprecation ./node_modules/@angular/cli/bin/ng serve  --verbose --proxy-config proxy.conf.json --configuration=development",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
   "private": true,
   "dependencies": {
-    "@angular/animations": "^16.2.6",
-    "@angular/cdk": "^16.2.5",
-    "@angular/common": "^16.2.6",
-    "@angular/compiler": "^16.2.6",
-    "@angular/core": "^16.2.6",
-    "@angular/forms": "^16.2.6",
-    "@angular/material": "^16.2.5",
-    "@angular/platform-browser": "^16.2.6",
-    "@angular/platform-browser-dynamic": "^16.2.6",
-    "@angular/router": "^16.2.6",
+    "@angular/animations": "^18.2.11",
+    "@angular/cdk": "^18.2.12",
+    "@angular/common": "^18.2.11",
+    "@angular/compiler": "^18.2.11",
+    "@angular/core": "^18.2.11",
+    "@angular/forms": "^18.2.11",
+    "@angular/material": "^18.2.12",
+    "@angular/platform-browser": "^18.2.11",
+    "@angular/platform-browser-dynamic": "^18.2.11",
+    "@angular/router": "^18.2.11",
     "@fortawesome/angular-fontawesome": "^0.10.1",
     "@fortawesome/fontawesome-svg-core": "~1.2.36",
     "@fortawesome/free-brands-svg-icons": "^5.15.4",
@@ -31,12 +32,12 @@
     "rxjs": "~7.4.0",
     "tslib": "^2.3.0",
     "ws": "^8.2.3",
-    "zone.js": "~0.13.3"
+    "zone.js": "~0.14.10"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^16.2.3",
-    "@angular/cli": "^16.2.3",
-    "@angular/compiler-cli": "^16.2.6",
+    "@angular-devkit/build-angular": "^18.2.11",
+    "@angular/cli": "^18.2.11",
+    "@angular/compiler-cli": "^18.2.11",
     "@types/jasmine": "~3.10.0",
     "@types/node": "^12.11.1",
     "jasmine-core": "~3.10.0",
@@ -45,6 +46,6 @@
     "karma-coverage": "~2.0.3",
     "karma-jasmine": "~4.0.0",
     "karma-jasmine-html-reporter": "~1.7.0",
-    "typescript": "~5.1.6"
+    "typescript": "~5.4.5"
   }
 }

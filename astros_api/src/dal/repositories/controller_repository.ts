@@ -74,6 +74,29 @@ export class ControllerRepository {
         return result;
     }
 
+    public async getControllerById(id: number): Promise<ControlModule | null> {
+
+        let control = null;
+
+        await this.dao
+            .get(ControllersTable.select, [id.toString()])
+            .then((val: any) => {
+
+                if (val.length > 0) {
+                    control = new ControlModule(
+                        id,
+                        val[0].controllerName,
+                        val[0].controllerAddress);
+                }
+            })
+            .catch((err: any) => {
+                logger.error(err);
+                throw "error";
+            });
+
+        return control;
+    }
+
     public async getControllerByAddress(address: string): Promise<ControlModule | null> {
 
         let control = null;

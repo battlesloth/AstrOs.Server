@@ -18,6 +18,7 @@ import { RemoteConfigTable } from "./tables/remote_config_table";
 import { ScriptsDeploymentTable } from "./tables/scripts_deployment_table";
 import { LocationsTable } from "./tables/locations_table";
 import { ControllerLocationTable } from "./tables/controller_location_table";
+import { GpioChannelsTable } from "./tables/gpio_channels_table";
 
 export class DataAccess {
 
@@ -164,6 +165,8 @@ export class DataAccess {
 
         await this.createTable(I2cChannelsTable.table, I2cChannelsTable.create);
 
+        await this.createTable(GpioChannelsTable.table, GpioChannelsTable.create);
+
         await this.createTable(ScriptsTable.table, ScriptsTable.create);
 
         await this.createTable(ScriptsDeploymentTable.table, ScriptsDeploymentTable.create);
@@ -192,7 +195,7 @@ export class DataAccess {
                 throw err;
             });
 
-        await this.run(RemoteConfigTable.insert, ['m5page', JSON.stringify(new Array<M5Page>)])
+        await this.run(RemoteConfigTable.insert, ['astrOsScreen', JSON.stringify(new Array<M5Page>)])
             .then(() => { logger.info("Added default remote config") })
             .catch((err) => {
                 console.error(`Error adding default remote config: ${err}`);
@@ -271,6 +274,14 @@ export class DataAccess {
                 }
             }
 
+            for (let i = 0; i < 10; i++) {
+                await this.run(GpioChannelsTable.insert, [id, i.toString(), "unassigned", "1", "0"])
+                    .catch((err) => {
+                        console.error(`Error adding gpio channel ${i}: ${err}`);
+                        throw err;
+                    })
+            }
+
             logger.info(`Added default location ${loc}, id: ${id}`);
         }
 
@@ -299,9 +310,6 @@ export class DataAccess {
     private errorHandler(err: any): void {
         if (err) {
             logger.error('Could not connect to database', err);
-        }
-        else {
-            logger.info('Connected to database');
         }
     }
 

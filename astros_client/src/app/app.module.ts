@@ -4,13 +4,14 @@ import { BrowserModule } from '@angular/platform-browser';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
+import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { LoginComponent } from './pages/login/login.component';
 import { HomeComponent } from './pages/home/home.component';
 import { StatusComponent } from './pages/status/status.component';
 import { ScripterComponent } from './pages/scripter/scripter.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatSliderModule } from '@angular/material/slider';
 import { ModulesComponent } from './pages/modules/modules.component';
 import { MatExpansionModule } from '@angular/material/expansion'
 import { MatToolbarModule } from '@angular/material/toolbar'
@@ -24,6 +25,7 @@ import { ModalModule } from './modal';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ScriptsComponent } from './pages/scripts/scripts.component';
 import { I2cEventModalComponent } from './pages/scripter/modals/i2c-event-modal/i2c-event-modal.component';
+import { GpioEventModalComponent } from './pages/scripter/modals/gpio-event-modal/gpio-event-modal.component';
 import { ServoEventModalComponent } from './pages/scripter/modals/servo-event-modal/servo-event-modal.component';
 import { ControllerModalComponent } from './pages/scripter/modals/controller-modal/controller-modal.component';
 import { AudioFilesComponent } from './pages/audio-files/audio-files.component';
@@ -44,59 +46,57 @@ import { SettingsComponent } from './pages/settings/settings.component';
 import { FormatModalComponent } from './pages/settings/modals/format-modal/format-modal.component';
 import { HumanCyborgModalComponent } from './pages/scripter/modals/human-cyborg-modal/human-cyborg-modal.component';
 import { LoadingModalComponent } from './pages/modules/loading-modal/loading-modal.component';
+import { ServoTestModalComponent } from './pages/modules/servo-test-modal/servo-test-modal.component';
 
 
 
-@NgModule({
-  declarations: [
-    AppComponent,
-    LoginComponent,
-    HomeComponent,
-    StatusComponent,
-    ScripterComponent,
-    ModulesComponent,
-    EspModuleComponent,
-    DriveModuleComponent,
-    ScriptRowComponent,
-    ScriptsComponent,
-    I2cEventModalComponent,
-    ServoEventModalComponent,
-    ControllerModalComponent,
-    AudioFilesComponent,
-    UploadModalComponent,
-    AudioEventModalComponent,
-    BaseEventModalComponent,
-    KangarooEventModalComponent,
-    UartEventModalComponent,
-    KangarooModuleComponent,
-    GenericSerialModuleComponent,
-    ScriptTestModalComponent,
-    ChannelTestModalComponent,
-    RemoteConfigComponent,
-    M5PaperConfigComponent,
-    SettingsComponent,
-    FormatModalComponent,
-    HumanCyborgModalComponent,
-    LoadingModalComponent
-  ],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    FormsModule,
-    HttpClientModule,
-    BrowserAnimationsModule,
-    MatMenuModule,
-    MatExpansionModule,
-    MatToolbarModule,
-    MatListModule,
-    MatSnackBarModule,
-    ModalModule,
-    FontAwesomeModule,
-    MatProgressBarModule,
-    MatCheckboxModule
-  ],
-  providers: [WebsocketService],
-  bootstrap: [AppComponent]
-})
+@NgModule({ declarations: [
+        AppComponent,
+        LoginComponent,
+        HomeComponent,
+        StatusComponent,
+        ScripterComponent,
+        ModulesComponent,
+        EspModuleComponent,
+        DriveModuleComponent,
+        ScriptRowComponent,
+        ScriptsComponent,
+        I2cEventModalComponent,
+        GpioEventModalComponent,
+        ServoEventModalComponent,
+        ControllerModalComponent,
+        AudioFilesComponent,
+        UploadModalComponent,
+        AudioEventModalComponent,
+        BaseEventModalComponent,
+        KangarooEventModalComponent,
+        UartEventModalComponent,
+        KangarooModuleComponent,
+        GenericSerialModuleComponent,
+        ScriptTestModalComponent,
+        ChannelTestModalComponent,
+        RemoteConfigComponent,
+        M5PaperConfigComponent,
+        SettingsComponent,
+        FormatModalComponent,
+        HumanCyborgModalComponent,
+        LoadingModalComponent,
+        ServoTestModalComponent
+    ],
+    bootstrap: [AppComponent], imports: [BrowserModule,
+        AppRoutingModule,
+        FormsModule,
+        BrowserAnimationsModule,
+        MatMenuModule,
+        MatExpansionModule,
+        MatToolbarModule,
+        MatListModule,
+        MatSnackBarModule,
+        ModalModule,
+        FontAwesomeModule,
+        MatProgressBarModule,
+        MatCheckboxModule,
+        MatSliderModule
+    ], providers: [WebsocketService, provideHttpClient(withInterceptorsFromDi())] })
 export class AppModule { }
 

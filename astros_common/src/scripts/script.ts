@@ -1,4 +1,3 @@
-import { UploadStatus } from "../astros_enums";
 import { DeploymentStatus } from "./deploymentStatus";
 import { ScriptChannel } from "./script_channel";
 

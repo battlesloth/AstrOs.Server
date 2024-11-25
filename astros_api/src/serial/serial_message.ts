@@ -26,6 +26,8 @@ export enum SerialMessageType {
     FORMAT_SD, // from web server
     FORMAT_SD_ACK,
     FORMAT_SD_NAK,
+    SERVO_TEST, // from web server
+    SERVO_TEST_ACK
 }
 
 export class SerialMsgConst {
@@ -49,6 +51,8 @@ export class SerialMsgConst {
     static readonly FORMAT_SD = "FORMAT_SD";
     static readonly FORMAT_SD_ACK = "FORMAT_SD_ACK";
     static readonly FORMAT_SD_NAK = "FORMAT_SD_NAK";
+    static readonly SERVO_TEST = "SERVO_TEST";
+    static readonly SERVO_TEST_ACK = "SERVO_TEST_ACK";
 }
 
 export class SerialMsgValidationResult {

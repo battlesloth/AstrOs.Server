@@ -10,11 +10,16 @@ export class RemoteConfigController{
 
 
     public static async syncRemoteConfig(req: any, res: any, next: any){
+
+        logger.info('Syncing remote config to device');
+        
         try {
             const dao = new DataAccess();
             const repo = new RemoteConfigRepository(dao);
 
-            const scripts = await repo.getConfig('m5paper');
+            const scripts = await repo.getConfig('astrOsScreen');
+
+            console.log(scripts);
 
             const val = JSON.parse(scripts.value) as Array<M5Page>;
 
@@ -51,10 +56,10 @@ export class RemoteConfigController{
             const dao = new DataAccess();
             const repo = new RemoteConfigRepository(dao);
 
-            const scripts = await repo.getConfig('m5paper');
+            const scripts = await repo.getConfig('astrOsScreen');
         
             res.status(200);
-            res.json(scripts);
+            res.json(scripts || { value: '[]' });
 
         } catch (error) {
             logger.error(error);
@@ -71,7 +76,7 @@ export class RemoteConfigController{
             const dao = new DataAccess();
             const repo = new RemoteConfigRepository(dao);
 
-            if (await repo.saveConfig('m5paper', req.body.config)) {
+            if (await repo.saveConfig('astrOsScreen', req.body.config)) {
                 res.status(200);
                 res.json({ message: 'success' });
             } else {

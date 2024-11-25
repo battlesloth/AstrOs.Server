@@ -26,11 +26,54 @@ TODO
 
 ### And coding style tests
 
-TOD
+TODO
 
 ## Deployment
 
-TODO
+#### NOTE: Make sure you have enabled the UART on your Raspberry PI
+
+#### Setup Docker Environment
+
+Create database file/logging location.
+```
+~$ cd .config
+~$ mkdir astrosserver
+```
+
+Install docker.
+```
+~$ sudo apt install docker.io
+```
+
+Create directory to save docker data for portainer.
+```
+~$ mkdir /home/<user>/Docker/Data/portainer
+```
+
+Install portainer. 
+```
+ ~$ docker pull portainer/portainer
+```
+
+Create container and auto run portainer 
+```
+docker run -d -p 9000:9000 --restart always \
+-v /var/run/docker.sock:/var/run/docker.sock \
+-v /home/<user>/Docker/Data/portainer:/data portainer/portainer
+```
+
+In Portainer:
+
+Create docker network
+
+portainer>local environment>networks
+        
+Add Network> astronet, Bridge
+
+portainer> Stacks
+* give it a name (i.e. astros)
+* add stack, paste docker-compose.yml from deployment
+
 
 ## Built With
 
@@ -42,7 +85,7 @@ TODO
 
 ## Versioning
 
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags).
+We use [SemVer](http://semver.org/) for versioning.
 
 ## Authors
 

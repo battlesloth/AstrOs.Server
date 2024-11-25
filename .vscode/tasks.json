@@ -73,6 +73,11 @@
             "windows":{
                 "command": "Copy-Item -Path ${workspaceFolder}/.env -Destination ${workspaceFolder}/astros_api/dist/.env "  
             },
+            "options": {
+                "shell": {
+                    "executable": "powershell.exe"
+                }
+            },
             "dependsOn": "lint and build"
         },
         {

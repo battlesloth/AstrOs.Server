@@ -7,6 +7,10 @@ import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { StatusService } from 'src/app/services/status/status.service';
 import { ModalService } from 'src/app/modal';
 import { LoadingModalComponent } from './loading-modal/loading-modal.component';
+import { ServoTestModalComponent } from './servo-test-modal/servo-test-modal.component';
+import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
+import { AlertModalComponent } from 'src/app/modal/alert-modal/alert-modal.component';
+import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 
 @Component({
   selector: 'app-modules',
@@ -47,6 +51,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
   private moduleDown = "Module Down";
 
   constructor(private controllerService: ControllerService,
+    private websocketService: WebsocketService,
     private snackBar: SnackbarService,
     private modalService: ModalService,
     private renderer: Renderer2,
@@ -71,13 +76,13 @@ export class ModulesComponent implements OnInit, AfterViewInit {
 
     component.instance.resources = modalResources;
     component.instance.modalCallback.subscribe((result: any) => {
-      this.modalCallback(result);
+      this.syncModalCallback(result);
     });
 
     this.modalService.open('modules-modal');
   }
-  modalCallback(evt: any) {
 
+  syncModalCallback(evt: any) {
     this.parseModules(evt.response.locations);
 
     // always filter out the master controller since it's always the body module
@@ -97,6 +102,60 @@ export class ModulesComponent implements OnInit, AfterViewInit {
     this.isLoaded = true;
 
     this.modalService.close('modules-modal');
+  }
+
+  openAlertModal(message: string) {
+    this.container.clear();
+
+    const modalResources = new Map<string, any>();
+
+    const component = this.container.createComponent(AlertModalComponent);
+
+    component.instance.resources = modalResources;
+    component.instance.resources.set(ModalResources.message, message);
+
+    component.instance.modalCallback.subscribe((result: any) => {
+      this.modalService.close('modules-modal');
+    });
+
+    this.modalService.open('modules-modal');
+  }
+
+  openServoTestModal(value: { controllerId: number, channelId: number }) {
+
+    if (value.controllerId === 0) {
+      this.openAlertModal("Location for this servo is not set.");
+      return;
+    }
+
+    this.container.clear();
+
+    const modalResources = new Map<string, any>();
+
+    const component = this.container.createComponent(ServoTestModalComponent);
+
+    component.instance.resources = modalResources;
+    component.instance.resources.set(ModalResources.controllerId, value.controllerId);
+    component.instance.resources.set(ModalResources.servoId, value.channelId);
+
+    component.instance.modalCallback.subscribe((result: any) => {
+      this.servoTestModalCallback(result);
+    });
+
+    this.modalService.open('modules-modal');
+  }
+
+  servoTestModalCallback(evt: any) {
+    switch (evt.id) {
+      case ModalCallbackEvent.sendServoMove:
+
+        this.websocketService.sendMessage({ msgType: "SERVO_TEST", data:{controllerId: evt.controllerId, servoId: evt.servoId, value: evt.value }});
+
+        break;
+      case ModalCallbackEvent.close:
+        this.modalService.close('modules-modal');
+        break;
+    }
   }
 
   controllerSelectChanged($event: any) {
