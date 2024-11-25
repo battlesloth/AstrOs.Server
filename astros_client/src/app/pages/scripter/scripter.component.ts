@@ -4,7 +4,18 @@ import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { ChannelSubType, ChannelType, I2cChannel, KangarooController, AstrOsLocationCollection, Script, ScriptChannel, ScriptEvent, ServoChannel, ServoModule, UartChannel, UartModule, UartType, ControllerLocation, GpioChannel, Identifiable, BaseChannel } from 'astros-common';
+import { 
+  ChannelSubType, 
+  ChannelType, 
+  KangarooController, 
+  AstrOsLocationCollection, 
+  Script, 
+  ScriptChannel, 
+  ScriptEvent, 
+  UartChannel, 
+  ControllerLocation, 
+  BaseChannel 
+} from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';

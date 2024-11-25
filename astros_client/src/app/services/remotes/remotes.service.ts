@@ -1,6 +1,5 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { M5Page } from 'astros-common';
 import { catchError, Observable, of, tap } from 'rxjs';
 
 @Injectable({

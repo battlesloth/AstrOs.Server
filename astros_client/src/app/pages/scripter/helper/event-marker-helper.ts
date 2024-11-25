@@ -1,4 +1,15 @@
-import { ChannelSubType, ChannelType, GenericSerialEvent, GpioEvent, HumanCyborgRelationsEvent, I2cEvent, KangarooAction, KangarooEvent, ScriptEvent, ServoEvent } from "astros-common";
+import { 
+    ChannelSubType, 
+    ChannelType, 
+    GenericSerialEvent, 
+    GpioEvent, 
+    HumanCyborgRelationsEvent, 
+    I2cEvent, 
+    KangarooAction, 
+    KangarooEvent, 
+    ScriptEvent, 
+    ServoEvent 
+} from "astros-common";
 
 export default class EventMarkerHelper {
     static generateText(event: ScriptEvent): Array<string> {

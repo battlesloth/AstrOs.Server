@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ChannelSubType, ChannelType } from 'astros-common';
+import { ChannelType } from 'astros-common';
 import { ChannelValue, LocationDetails } from 'src/app/models/script-resources';
 import { ModalBaseComponent } from '../../../../modal/modal-base/modal-base.component';
 import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';

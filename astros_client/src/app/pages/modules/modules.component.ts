@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, ControllerStatus, AstrOsLocationCollection, AstrOsConstants, ControllerLocation, UartType } from 'astros-common';
+import { ControlModule, ControllerStatus, AstrOsLocationCollection, ControllerLocation} from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { StatusService } from 'src/app/services/status/status.service';

@@ -1,6 +1,6 @@
 import { KeyValue } from '@angular/common';
 import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
-import { ConfirmModalComponent, ModalService } from 'src/app/modal';
+import { ModalService } from 'src/app/modal';
 import { SettingsService } from 'src/app/services/settings/settings.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';

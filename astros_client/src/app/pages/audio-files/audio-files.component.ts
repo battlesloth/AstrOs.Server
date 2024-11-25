@@ -1,5 +1,4 @@
 import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { faPlay, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { AudioFile } from 'astros-common';

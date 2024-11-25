@@ -1,8 +1,7 @@
 import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { faCopy, faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
-import { ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus } from 'astros-common';
-import { Script } from 'astros-common';
+import { ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus, Script } from 'astros-common';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';

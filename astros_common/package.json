@@ -2,8 +2,8 @@
     "name": "astros-common",
     "version": "1.0.4",
     "description": "models for AstrOs Server project",
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
+    "main": "index.js",
+    "types": "index.d.ts",
     "files": [
         "/dist"
     ],

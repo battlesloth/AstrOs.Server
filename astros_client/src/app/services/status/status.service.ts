@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ControllerStatus, AstrOsConstants, StatusResponse, TransmissionType } from 'astros-common';
-import { Subject, throwError } from 'rxjs';
+import { Subject } from 'rxjs';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable({

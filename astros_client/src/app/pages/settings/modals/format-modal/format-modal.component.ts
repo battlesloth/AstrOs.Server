@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { ControlModule } from 'astros-common';
 import { ModalBaseComponent } from 'src/app/modal';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 
