@@ -27,7 +27,7 @@
             "type": "shell",
             "command": "",
             "windows": {
-                "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_api/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_api/node_modules/astros-common -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/package.json",
+                "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_api/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/dist -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/package.json",
             },
             "options": {
                 "shell": {
@@ -41,7 +41,7 @@
             "type": "shell",
             "command": "",
             "windows": {
-                "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_client/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_client/node_modules/astros-common -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/package.json",
+                "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_client/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/dist -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/package.json",
             },
             "options": {
                 "shell": {
