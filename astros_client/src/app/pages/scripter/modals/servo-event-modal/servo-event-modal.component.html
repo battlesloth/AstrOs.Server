@@ -9,16 +9,22 @@
                 [ngModel]="eventTime | number : '1.0-1'" (ngModelChange)="eventTime = $event" />
             </div>
             <div>
-                <label for="value">Position</label>
+                <label for="value">Position (0 to 100%)</label>
                 <input name="value" matInput placeholder="Value" [(ngModel)]="position" type="number" min="0" max="100"
                 (keypress)="($event.charCode >= 48 && $event.charCode < 58)" 
                 (change)= "position < 0 ? position = 0 : position; position > 100 ? position = 100 : position;" />
             </div>
             <div>
-                <label for="value">Speed</label>
-                <input name="value" matInput placeholder="Value" [(ngModel)]="speed" type="number" min="0" max="100"
+                <label for="value">Speed (0 to 255, 0 is unlimited)</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="speed" type="number" min="0" max="255"
                 (keypress)="($event.charCode >= 48 && $event.charCode < 58)" 
-                (change)= "speed < 0 ? speed = 0 : speed; speed > 10 ? speed = 10 : speed;"/>
+                (change)= "speed < 0 ? speed = 0 : speed; speed > 255 ? speed = 255 : speed;"/>
+            </div>
+            <div>
+                <label for="value">Accel. (0 to 255, 0 is unlimited)</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="acceleration" type="number" min="0" max="255"
+                (keypress)="($event.charCode >= 48 && $event.charCode < 58)" 
+                (change)= "acceleration < 0 ? acceleration = 0 : acceleration; acceleration > 255 ? acceleration = 255 : acceleration;"/>
             </div>
             <div class="error">{{errorMessage}}</div>
         </div>

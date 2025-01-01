@@ -205,7 +205,7 @@ export class ScriptRepository {
                             break;
                         case ChannelType.servo:
                             result = new ServoChannel(val[0].channelId, val[0].channelName,
-                                val[0].enabled, val[0].limit0, val[0].limit1, val[0].inverted);
+                                val[0].enabled, val[0].limit0, val[0].limit1, val[0].homePos, val[0].inverted);
                             break;
                     }
                 } catch (error) {

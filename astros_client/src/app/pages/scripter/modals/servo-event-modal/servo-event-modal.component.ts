@@ -14,6 +14,7 @@ export class ServoEventModalComponent extends BaseEventModalComponent implements
   channelId!: number;
   speed: number;
   position: number;
+  acceleration: number;
   
   constructor() {
     super();
@@ -21,6 +22,7 @@ export class ServoEventModalComponent extends BaseEventModalComponent implements
     this.eventTime = 0;
     this.speed = 1;
     this.position = 0;
+    this.acceleration = 0;
     this.callbackType = ModalCallbackEvent.addEvent;
   }
 
@@ -39,10 +41,12 @@ export class ServoEventModalComponent extends BaseEventModalComponent implements
     this.channelId = <number> this.resources.get(ModalResources.servoId);
 
     if (this.scriptEvent.dataJson != ''){
+      console.log(this.scriptEvent.dataJson);
       const payload = JSON.parse(this.scriptEvent.dataJson);
       this.channelId = payload.channelId;
       this.position = payload.position;
       this.speed = payload.speed;
+      this.acceleration = payload.acceleration;
     }
     
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
@@ -58,7 +62,7 @@ export class ServoEventModalComponent extends BaseEventModalComponent implements
    
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const data = new ServoEvent(+this.channelId, +this.position, +this.speed);
+    const data = new ServoEvent(+this.channelId, +this.position, +this.speed, +this.acceleration);
     this.scriptEvent.dataJson = JSON.stringify(data);
 
     this.modalCallback.emit({

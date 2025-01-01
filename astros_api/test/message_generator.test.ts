@@ -1,3 +1,4 @@
+import { expect, describe, it } from "@jest/globals";
 import { MessageGenerator } from "../src/serial/message_generator";
 import { MessageHelper } from "../src/serial/message_helper";
 import { SerialMessageType } from "../src/serial/serial_message";
@@ -6,8 +7,8 @@ import { ControlModule, ControllerLocation, ServoChannel } from "astros-common";
 
 
 function addServoChannels(location: ControllerLocation) {
-    for (let i = 0; i < 32; i++) {
-        location.servoModule.channels.push(new ServoChannel(i, "", true, 0, 0, false));
+    for (let i = 0; i < 24; i++) {
+        location.servoModule.channels.push(new ServoChannel(i, "", true, 0, 0, 0, false));
     }
 }
 
@@ -40,7 +41,7 @@ describe("Message Generator Tests", () => {
         const domeLocation = new ControllerLocation(1, "dome", "", "");
         domeLocation.controller = new ControlModule(2, "controller2", "WXYZ");
         addServoChannels(domeLocation);
-        domeLocation.servoModule.channels[31].maxPos = 100;
+        domeLocation.servoModule.channels[21].maxPos = 100;
 
         const locations = new Array<ControllerLocation>(bodyLocation, domeLocation);
 
@@ -61,13 +62,13 @@ describe("Message Generator Tests", () => {
         expect(config1.length).toBe(4);
         expect(config1[0]).toBe("ABCD");
         expect(config1[1]).toBe("controller1");
-        expect(config1[2]).toBe("32");
+        expect(config1[2]).toBe("24");
 
         const servos1 = config1[3].split("|");
-        expect(servos1.length).toBe(32);
+        expect(servos1.length).toBe(24);
 
         const servo_1_0 = servos1[0].split(":");
-        expect(servo_1_0.length).toBe(5);
+        expect(servo_1_0.length).toBe(6);
         expect(servo_1_0[0]).toBe("0");
         expect(servo_1_0[2]).toBe("50");
 
@@ -75,15 +76,15 @@ describe("Message Generator Tests", () => {
         expect(config2.length).toBe(4);
         expect(config2[0]).toBe("WXYZ");
         expect(config2[1]).toBe("controller2");
-        expect(config2[2]).toBe("32");
+        expect(config2[2]).toBe("24");
 
         const servos2 = config2[3].split("|");
-        expect(servos2.length).toBe(32);
+        expect(servos2.length).toBe(24);
 
-        const servo_2_31 = servos2[31].split(":");
-        expect(servo_2_31.length).toBe(5);
-        expect(servo_2_31[0]).toBe("31");
-        expect(servo_2_31[3]).toBe("100");
+        const servo_2_21 = servos2[21].split(":");
+        expect(servo_2_21.length).toBe(6);
+        expect(servo_2_21[0]).toBe("21");
+        expect(servo_2_21[3]).toBe("100");
 
     });
 

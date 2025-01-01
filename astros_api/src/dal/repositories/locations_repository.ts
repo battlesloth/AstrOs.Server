@@ -158,7 +158,8 @@ export class LocationsRepository {
                         ch.enabled,
                         ch.minPos,
                         ch.maxPos,
-                        ch.inverted
+                        ch.homePos,
+                        ch.inverted,                        
                     );
                 });
             })
@@ -240,6 +241,7 @@ export class LocationsRepository {
                     servo.enabled ? "1" : "0",
                     servo.minPos.toString(),
                     servo.maxPos.toString(),
+                    servo.homePos.toString(),
                     servo.inverted ? "1" : "0",
                     servo.id.toString(),
                     location.id.toString(),

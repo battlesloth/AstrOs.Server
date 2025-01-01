@@ -1,3 +1,4 @@
+import { expect, describe, it } from "@jest/globals";
 import { MessageHandler } from "../src/serial/message_handler";
 import { MessageHelper } from "../src/serial/message_helper";
 import { SerialMessageType } from "../src/serial/serial_message";

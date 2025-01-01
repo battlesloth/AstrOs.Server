@@ -242,7 +242,7 @@ export class ScriptConverter {
     convertServoEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
         const servo = JSON.parse(evt.dataJson) as ServoEvent;
 
-        return `${CommandType.servo}|${timeTillNextEvent}|${servo.channelId}|${servo.position}|${servo.speed};`;
+        return `${CommandType.servo}|${timeTillNextEvent}|${servo.channelId}|${servo.position}|${servo.speed}|${servo.acceleration};`;
     }
 
     // |___|_________|___|________;

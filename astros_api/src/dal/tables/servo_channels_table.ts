@@ -7,6 +7,7 @@ export class ServoChannelsTable {
   public static readonly enabled = "enabled";
   public static readonly minPos = "minPos";
   public static readonly maxPos = "maxPos";
+  public static readonly homePos = "homePos";
   public static readonly inverted = "inverted";
 
   public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
@@ -17,18 +18,20 @@ export class ServoChannelsTable {
     ${this.enabled} INTEGER DEFAULT 1 NOT NULL,
     ${this.minPos} INTEGER DEFAULT 0 NOT NULL,
     ${this.maxPos} INTEGER DEFAULT 0 NOT NULL,
+    ${this.homePos} INTEGER DEFAULT 0 NOT NULL,
     ${this.inverted} INTEGER DEFAULT 0 NOT NULL,
     UNIQUE(${this.locationId}, ${this.channelId}) ON CONFLICT REPLACE)`;
 
   public static readonly insert = `INSERT INTO ${this.table}
-    (${this.locationId}, ${this.channelId}, ${this.channelName}, ${this.enabled}, ${this.minPos}, ${this.maxPos},${this.inverted})
-    VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    (${this.locationId}, ${this.channelId}, ${this.channelName}, ${this.enabled}, ${this.minPos}, ${this.maxPos}, ${this.homePos}, ${this.inverted})
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
 
   public static readonly selectAll = `SELECT ${this.channelId},
     ${this.channelName},
     ${this.enabled},
     ${this.minPos},
     ${this.maxPos},
+    ${this.homePos},
     ${this.inverted}
     FROM ${this.table}
     WHERE ${this.locationId} = ?`;
@@ -38,6 +41,7 @@ export class ServoChannelsTable {
     ${this.enabled},
     ${this.minPos},
     ${this.maxPos},
+    ${this.homePos},
     ${this.inverted}
     FROM ${this.table}
     WHERE ${this.channelId} = ?
@@ -48,6 +52,7 @@ export class ServoChannelsTable {
     ${this.enabled} = ?,
     ${this.minPos} = ?,
     ${this.maxPos} = ?,
+    ${this.homePos} = ?,
     ${this.inverted} = ?
     WHERE ${this.channelId} = ?
     AND  ${this.locationId} = ?`;

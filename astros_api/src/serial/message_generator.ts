@@ -84,6 +84,8 @@ export class MessageGenerator {
                 servoConfigs.push(":");
                 servoConfigs.push(ch.maxPos);
                 servoConfigs.push(":");
+                servoConfigs.push(ch.homePos);
+                servoConfigs.push(":");
                 servoConfigs.push(ch.inverted);
                 servoConfigs.push("|");
             }

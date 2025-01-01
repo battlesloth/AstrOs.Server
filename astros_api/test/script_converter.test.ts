@@ -1,4 +1,5 @@
 
+import { expect, describe, it } from "@jest/globals";
 import {
     ChannelType, KangarooController, KangarooAction, KangarooEvent,
     Script, ScriptChannel, ScriptEvent, ServoEvent, ChannelSubType, ServoChannel,
@@ -18,9 +19,9 @@ const generateKangarooEvent = (time: number, ch1Action: KangarooAction, ch1Speed
     return { key: time, value: new ScriptEvent("", ChannelType.uart, ChannelSubType.kangaroo, time, JSON.stringify(data)) };
 };
 
-const generateServoEvent = (time: number, channel: number, position: number, speed: number) => {
+const generateServoEvent = (time: number, channel: number, position: number, speed: number, acceleration: number) => {
 
-    const data = new ServoEvent(channel, position, speed);
+    const data = new ServoEvent(channel, position, speed, acceleration);
 
     return { key: time, value: new ScriptEvent("", ChannelType.servo, ChannelSubType.none, time, JSON.stringify(data)) };
 };
@@ -58,11 +59,12 @@ const _kPos = 6;
 const _val = 3;
 
 // servo command
-// |___|_________|__________|____|____;
-//  evt time_till servo ch   pos  spd  
+// |___|_________|__________|____|____|____;
+//  evt time_till servo ch   pos  spd  acc
 const _servoChannel = 2;
 const _servoPosition = 3;
 const _servoSpeed = 4;
+const _servoAcc = 5;
 
 // gpio command
 // |___|_________|__________|____;
@@ -267,9 +269,9 @@ describe("Script Converter Tests", () => {
 
         const controllerId = 3;
 
-        const servoCh0 = new ServoChannel(0, "ch0", true, 500, 2500, false);
-        const servoCh10 = new ServoChannel(10, "ch10", true, 500, 2500, false);
-        const servoCh20 = new ServoChannel(20, "ch20", true, 500, 2500, false);
+        const servoCh0 = new ServoChannel(0, "ch0", true, 500, 2500, 500, false);
+        const servoCh10 = new ServoChannel(10, "ch10", true, 500, 2500, 500, false);
+        const servoCh20 = new ServoChannel(20, "ch20", true, 500, 2500, 500, false);
 
         const channelOne = new ScriptChannel("one", "ABCD", controllerId, ChannelType.servo, ChannelSubType.none, 0, servoCh0, 3000);
         const channelTen = new ScriptChannel("two", "ABCD", controllerId, ChannelType.servo, ChannelSubType.none, 0, servoCh10, 3000);
@@ -277,19 +279,19 @@ describe("Script Converter Tests", () => {
 
 
         // move to 50, speed 1, at same time, then delay 1 second
-        channelOne.eventsKvpArray.push(generateServoEvent(0, 0, 50, 1));
-        channelTen.eventsKvpArray.push(generateServoEvent(0, 10, 50, 1));
-        channelTwenty.eventsKvpArray.push(generateServoEvent(0, 20, 50, 1));
+        channelOne.eventsKvpArray.push(generateServoEvent(0, 0, 50, 1, 0));
+        channelTen.eventsKvpArray.push(generateServoEvent(0, 10, 50, 1, 0));
+        channelTwenty.eventsKvpArray.push(generateServoEvent(0, 20, 50, 1, 0));
 
         // move to 100, speed 3, with a 1 second delay
-        channelOne.eventsKvpArray.push(generateServoEvent(10, 0, 100, 3));
-        channelTen.eventsKvpArray.push(generateServoEvent(20, 10, 100, 3));
-        channelTwenty.eventsKvpArray.push(generateServoEvent(30, 20, 100, 3));
+        channelOne.eventsKvpArray.push(generateServoEvent(10, 0, 100, 3, 1));
+        channelTen.eventsKvpArray.push(generateServoEvent(20, 10, 100, 3, 1));
+        channelTwenty.eventsKvpArray.push(generateServoEvent(30, 20, 100, 3, 1));
 
         // move to 0 speed 5, at the same time
-        channelOne.eventsKvpArray.push(generateServoEvent(40, 0, 0, 5));
-        channelTen.eventsKvpArray.push(generateServoEvent(40, 10, 0, 5));
-        channelTwenty.eventsKvpArray.push(generateServoEvent(40, 20, 0, 5));
+        channelOne.eventsKvpArray.push(generateServoEvent(40, 0, 0, 5, 255));
+        channelTen.eventsKvpArray.push(generateServoEvent(40, 10, 0, 5, 255));
+        channelTwenty.eventsKvpArray.push(generateServoEvent(40, 20, 0, 5, 255));
 
         script.scriptChannels = new Array<ScriptChannel>(channelOne, channelTen, channelTwenty);
 
@@ -324,6 +326,7 @@ describe("Script Converter Tests", () => {
         expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
         expect(parseInt(evts[evt][_servoPosition])).toBe(50);
         expect(parseInt(evts[evt][_servoSpeed])).toBe(1);
+        expect(parseInt(evts[evt][_servoAcc])).toBe(0);
 
         evt++;
 
@@ -332,6 +335,7 @@ describe("Script Converter Tests", () => {
         expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
         expect(parseInt(evts[evt][_servoPosition])).toBe(50);
         expect(parseInt(evts[evt][_servoSpeed])).toBe(1);
+        expect(parseInt(evts[evt][_servoAcc])).toBe(0)
 
         evt++;
 
@@ -340,6 +344,7 @@ describe("Script Converter Tests", () => {
         expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
         expect(parseInt(evts[evt][_servoPosition])).toBe(50);
         expect(parseInt(evts[evt][_servoSpeed])).toBe(1);
+        expect(parseInt(evts[evt][_servoAcc])).toBe(0)
 
         evt++;
 
@@ -348,7 +353,7 @@ describe("Script Converter Tests", () => {
         expect(parseInt(evts[evt][_servoChannel])).toBe(0);
         expect(parseInt(evts[evt][_servoPosition])).toBe(100);
         expect(parseInt(evts[evt][_servoSpeed])).toBe(3);
-
+        expect(parseInt(evts[evt][_servoAcc])).toBe(1);
         evt++;
 
         expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
@@ -356,6 +361,7 @@ describe("Script Converter Tests", () => {
         expect(parseInt(evts[evt][_servoChannel])).toBe(10);
         expect(parseInt(evts[evt][_servoPosition])).toBe(100);
         expect(parseInt(evts[evt][_servoSpeed])).toBe(3);
+        expect(parseInt(evts[evt][_servoAcc])).toBe(1);
 
         evt++;
 
@@ -364,6 +370,7 @@ describe("Script Converter Tests", () => {
         expect(parseInt(evts[evt][_servoChannel])).toBe(20);
         expect(parseInt(evts[evt][_servoPosition])).toBe(100);
         expect(parseInt(evts[evt][_servoSpeed])).toBe(3);
+        expect(parseInt(evts[evt][_servoAcc])).toBe(1);
 
         evt++;
 
@@ -372,6 +379,7 @@ describe("Script Converter Tests", () => {
         expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
         expect(parseInt(evts[evt][_servoPosition])).toBe(0);
         expect(parseInt(evts[evt][_servoSpeed])).toBe(5);
+        expect(parseInt(evts[evt][_servoAcc])).toBe(255);
 
         evt++;
 
@@ -380,6 +388,7 @@ describe("Script Converter Tests", () => {
         expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
         expect(parseInt(evts[evt][_servoPosition])).toBe(0);
         expect(parseInt(evts[evt][_servoSpeed])).toBe(5);
+        expect(parseInt(evts[evt][_servoAcc])).toBe(255);
 
         evt++;
 
@@ -388,6 +397,7 @@ describe("Script Converter Tests", () => {
         expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
         expect(parseInt(evts[evt][_servoPosition])).toBe(0);
         expect(parseInt(evts[evt][_servoSpeed])).toBe(5);
+        expect(parseInt(evts[evt][_servoAcc])).toBe(255);
     });
 
     it("gpio test", () => {

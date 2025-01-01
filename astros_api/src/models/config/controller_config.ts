@@ -17,7 +17,7 @@ export class ControllerConfig {
         this.servoChannels = new Array<ServoConfig>();
 
         location.servoModule.channels.forEach(ch => {
-            this.servoChannels.push(new ServoConfig(ch.id, ch.minPos, ch.maxPos, ch.enabled, ch.inverted));
+            this.servoChannels.push(new ServoConfig(ch.id, ch.minPos, ch.maxPos, ch.homePos, ch.enabled, ch.inverted));
         })
     }
 }

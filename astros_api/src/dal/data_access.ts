@@ -247,8 +247,8 @@ export class DataAccess {
                     });
             }
 
-            for (let i = 0; i < 32; i++) {
-                await this.run(ServoChannelsTable.insert, [id, i.toString(), "unassigned", "0", "0", "0", "0"])
+            for (let i = 0; i < 24; i++) {
+                await this.run(ServoChannelsTable.insert, [id, i.toString(), "unassigned", "0", "0", "0", "0", "0"])
                     .catch((err) => {
                         console.error(`Error adding servo channel ${i}: ${err}`);
                         throw err;
