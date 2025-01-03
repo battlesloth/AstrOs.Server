@@ -18,10 +18,12 @@ export class HcrCommand {
 
 export class HumanCyborgRelationsEvent {
     uartChannel: number;
+    baudRate: number;
     commands: Array<HcrCommand>;
 
-    constructor(uartChannel: number, commands: Array<HcrCommand>){
+    constructor(uartChannel: number, baudRate: number, commands: Array<HcrCommand>){
         this.uartChannel = uartChannel;
+        this.baudRate = baudRate;
         this.commands = commands;
     }
 }

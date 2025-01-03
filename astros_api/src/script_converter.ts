@@ -1,9 +1,9 @@
 import {
-    ServoEvent,
+    MaestroEvent,
     I2cEvent,
     ChannelSubType,
     HumanCyborgRelationsEvent,
-    humanCyborgRelationsController,
+    HumanCyborgRelationsModule,
     KangarooAction,
     KangarooEvent,
     Script,
@@ -60,9 +60,6 @@ export class ScriptConverter {
         switch (command.channelType) {
             case ChannelType.uart:
                 script = this.convertUartEvent(command.event, 0);
-                break;
-            case ChannelType.servo:
-                script = this.convertServoEvent(command.event, 0);
                 break;
             case ChannelType.i2c:
                 script = this.convertI2cEvent(command.event, 0);
@@ -135,9 +132,6 @@ export class ScriptConverter {
                     case ChannelType.uart:
                         script = this.convertUartEvent(event, timeToSend) + script;
                         break;
-                    case ChannelType.servo:
-                        script = this.convertServoEvent(event, timeToSend) + script;
-                        break;
                     case ChannelType.i2c:
                         script = this.convertI2cEvent(event, timeToSend) + script;
                         break;
@@ -156,7 +150,6 @@ export class ScriptConverter {
     }
 
 
-
     convertUartEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
         switch (evt.channelSubType) {
             case ChannelSubType.genericSerial:
@@ -165,6 +158,8 @@ export class ScriptConverter {
                 return this.convertHcrEvent(evt, timeTillNextEvent);
             case ChannelSubType.kangaroo:
                 return this.convertKangarooEvent(evt, timeTillNextEvent);
+            case ChannelSubType.maestro:
+                return this.convertMaestroEvent(evt, timeTillNextEvent);
             default:
                 logger.warn('ScriptConverter: invalid subtype')
         }
@@ -198,7 +193,7 @@ export class ScriptConverter {
                 cmd.valueB = 0;
             }
 
-            let cmdS = humanCyborgRelationsController.getCommandString(cmd.command);
+            let cmdS = HumanCyborgRelationsModule.getCommandString(cmd.command);
             let re = /#/;
             cmdS = cmdS.replace(re, cmd.valueA.toString());
             re = /\*/;
@@ -239,8 +234,8 @@ export class ScriptConverter {
 
     // |___|_________|___|____|____;
     //  evt time_till ch  spd  pos  
-    convertServoEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
-        const servo = JSON.parse(evt.dataJson) as ServoEvent;
+    convertMaestroEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
+        const servo = JSON.parse(evt.dataJson) as MaestroEvent;
 
         return `${CommandType.servo}|${timeTillNextEvent}|${servo.channelId}|${servo.position}|${servo.speed}|${servo.acceleration};`;
     }

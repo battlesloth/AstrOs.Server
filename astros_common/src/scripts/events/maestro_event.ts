@@ -1,4 +1,4 @@
-export class ServoEvent {
+export class MaestroEvent {
 
     channelId: number
     position: number;

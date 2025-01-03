@@ -4,21 +4,22 @@ import fs from "fs";
 import crypto from "crypto";
 import { SettingsTable } from "./tables/settings_table";
 import { UsersTable } from "./tables/users_table";
-import { ControllersTable } from "./tables/controllers_table";
-import { I2cChannelsTable } from "./tables/i2c_channels_table";
-import { ServoChannelsTable } from "./tables/servo_channels_table";
-import { UartType, M5Page, AstrOsConstants } from "astros-common";
-import { ScriptsTable } from "./tables/scripts_table";
-import { ScriptEventsTable } from "./tables/script_events_table";
-import { ScriptChannelsTable } from "./tables/script_channels_table";
+import { ControllersTable } from "./tables/controller_tables/controllers_table";
+import { I2cChannelsTable } from "./tables/controller_tables/i2c_channels_table";
+import { M5Page, AstrOsConstants } from "astros-common";
+import { ScriptsTable } from "./tables/script_tables/scripts_table";
+import { ScriptEventsTable } from "./tables/script_tables/script_events_table";
+import { ScriptChannelsTable } from "./tables/script_tables/script_channels_table";
 import { AudioFilesTable } from "./tables/audio_files_table";
-import { UartModuleTable } from "./tables/uart_module_table";
+import { UartModuleTable } from "./tables/uart_tables/uart_module_table";
 import { logger } from "../logger";
 import { RemoteConfigTable } from "./tables/remote_config_table";
-import { ScriptsDeploymentTable } from "./tables/scripts_deployment_table";
-import { LocationsTable } from "./tables/locations_table";
-import { ControllerLocationTable } from "./tables/controller_location_table";
-import { GpioChannelsTable } from "./tables/gpio_channels_table";
+import { ScriptsDeploymentTable } from "./tables/script_tables/scripts_deployment_table";
+import { LocationsTable } from "./tables/controller_tables/locations_table";
+import { ControllerLocationTable } from "./tables/controller_tables/controller_location_table";
+import { GpioChannelsTable } from "./tables/controller_tables/gpio_channels_table";
+import { KangarooX2Table } from "./tables/uart_tables/kangaroo_x2_table";
+import { MaestroBoardsTable } from "./tables/uart_tables/maestro_boards_table";
 
 export class DataAccess {
 
@@ -161,7 +162,11 @@ export class DataAccess {
 
         await this.createTable(UartModuleTable.table, UartModuleTable.create);
 
-        await this.createTable(ServoChannelsTable.table, ServoChannelsTable.create);
+        await this.createTable(KangarooX2Table.table, KangarooX2Table.create);
+
+        await this.createTable(MaestroBoardsTable.table, MaestroBoardsTable.create);
+
+        await this.createTable(MaestroBoardsTable.table, MaestroBoardsTable.create);
 
         await this.createTable(I2cChannelsTable.table, I2cChannelsTable.create);
 
@@ -238,40 +243,12 @@ export class DataAccess {
                 throw new Error(`Error adding ${loc} location`);
             }
 
-            // add 3 uart modules per controller
-            for (let i = 0; i < 3; i++) {
-                await this.run(UartModuleTable.insert, [id, i.toString(), UartType.none.toString(), "unassigned", JSON.stringify(new Object())])
-                    .catch((err) => {
-                        console.error(`Error adding uart module ${i} to ${loc} location:: ${err}`);
-                        throw err;
-                    });
-            }
-
-            for (let i = 0; i < 24; i++) {
-                await this.run(ServoChannelsTable.insert, [id, i.toString(), "unassigned", "0", "0", "0", "0", "0"])
-                    .catch((err) => {
-                        console.error(`Error adding servo channel ${i}: ${err}`);
-                        throw err;
-                    })
-                logger.info(`Added default servo channel ${i} to location ${loc}`);
-            }
-
             for (let i = 0; i < 128; i++) {
-
-                // reserved for PWM module
-                if (i === 64 || i === 65) {
-                    await this.run(I2cChannelsTable.insert, [id, i.toString(), "reserved", '0'])
-                        .catch((err) => {
-                            console.error(`Error adding i2c channel ${i}: ${err}`);
-                            throw err;
-                        })
-                } else {
-                    await this.run(I2cChannelsTable.insert, [id, i.toString(), "unassigned", '0'])
-                        .catch((err) => {
-                            console.error(`Error adding i2c channel ${i}: ${err}`);
-                            throw err
-                        });
-                }
+                await this.run(I2cChannelsTable.insert, [id, i.toString(), "unassigned", '0'])
+                    .catch((err) => {
+                        console.error(`Error adding i2c channel ${i}: ${err}`);
+                        throw err
+                    });
             }
 
             for (let i = 0; i < 10; i++) {

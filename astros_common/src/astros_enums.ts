@@ -2,7 +2,7 @@ export const enum ChannelType {
     none = 0,
     uart = 1,
     i2c = 2,
-    servo = 3,
+    pwm = 3,
     audio = 4,
     gpio = 5,
 }
@@ -11,14 +11,16 @@ export const enum ChannelSubType {
     none = 0,
     genericSerial = 1,
     kangaroo = 2,
-    humanCyborgRelations = 3
+    humanCyborgRelations = 3,
+    maestro = 4
 }
 
 export const enum UartType {
     none = 0,
     genericSerial = 1,
     kangaroo = 2,
-    humanCyborgRelations = 3
+    humanCyborgRelations = 3,
+    maestro = 4
 }
 
 export const enum UploadStatus {

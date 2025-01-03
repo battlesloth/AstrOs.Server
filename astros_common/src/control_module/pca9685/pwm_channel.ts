@@ -1,6 +1,6 @@
 import { BaseChannel } from "../base_channel";
 
-export class ServoChannel extends BaseChannel {
+export class PwmChannel extends BaseChannel {
 
     minPos: number;
     maxPos: number;

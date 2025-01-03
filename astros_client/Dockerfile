@@ -26,13 +26,15 @@ COPY --from=build0 /usr/src/commons/dist /usr/src/app/node_modules/astros-common
 COPY ./astros_client/ .
 RUN ng build
 
+RUN dir -s /usr/src/app/dist/client
+
 FROM  --platform=linux/arm64 arm64v8/nginx:stable-alpine-slim AS run
 
 #RUN npm install -g http-server
 
 RUN rm /etc/nginx/conf.d/default.conf 
 
-COPY --from=build1 /usr/src/app/dist/client /usr/share/nginx/html
+COPY --from=build1 /usr/src/app/dist/client/browser /usr/share/nginx/html
 
 COPY ./container_files/nginx.conf /etc/nginx/conf.d/default.conf
 

@@ -1,21 +1,32 @@
 import { DataAccess } from "../../dal/data_access";
-import { ScriptsTable } from "../../dal/tables/scripts_table";
-import { ScriptChannelsTable } from "../../dal/tables/script_channels_table";
-import { ScriptEventsTable } from "../../dal/tables/script_events_table";
+import { ScriptsTable } from "../../dal/tables/script_tables/scripts_table";
+import { ScriptChannelsTable } from "../../dal/tables/script_tables/script_channels_table";
+import { ScriptEventsTable } from "../../dal/tables/script_tables/script_events_table";
 import {
-    ChannelType, I2cChannel, ServoChannel, Script, ScriptChannel,
-    ScriptEvent, ChannelSubType, UartChannel, UploadStatus, DeploymentStatus,
-    GpioChannel
+    ChannelType, 
+    I2cChannel, 
+    Script, 
+    ScriptChannel,
+    ScriptEvent, 
+    ChannelSubType, 
+    UploadStatus, 
+    DeploymentStatus,
+    GpioChannel,
+    MaestroChannel,
+    KangarooX2Channel,
+    UartModule
 } from "astros-common";
-import { I2cChannelsTable } from "../tables/i2c_channels_table";
-import { ServoChannelsTable } from "../tables/servo_channels_table";
-import { UartModuleTable } from "../tables/uart_module_table";
+import { I2cChannelsTable } from "../tables/controller_tables/i2c_channels_table";
+import { UartModuleTable } from "../tables/uart_tables/uart_module_table";
 import { logger } from "../../logger";
 import { Guid } from "guid-typescript";
-import { ScriptsDeploymentTable } from "../tables/scripts_deployment_table";
-import { GpioChannelsTable } from "../tables/gpio_channels_table";
+import { ScriptsDeploymentTable } from "../tables/script_tables/scripts_deployment_table";
+import { GpioChannelsTable } from "../tables/controller_tables/gpio_channels_table";
+import { UartChannel } from "astros-common/dist/control_module/uart/uart_channel";
+import { MaestroChannelTable } from "../tables/uart_tables/maestro_channels_table";
+import { KangarooX2Table } from "../tables/uart_tables/kangaroo_x2_table";
 
-
+type UartScriptChannel = UartChannel | MaestroChannel | KangarooX2Channel | null;
 
 export class ScriptRepository {
 
@@ -145,11 +156,8 @@ export class ScriptRepository {
             case ChannelType.i2c:
                 channel.channel = await this.getChannelForScriptChannel(ChannelType.i2c, channel.channelNumber, channel.locationId)
                 break;
-            case ChannelType.servo:
-                channel.channel = await this.getChannelForScriptChannel(ChannelType.servo, channel.channelNumber, channel.locationId)
-                break;
             case ChannelType.uart:
-                channel.channel = await this.getUartChannel(channel.channelNumber, channel.locationId);
+                channel.channel = await this.getUartChannel(channel);
                 break;
             case ChannelType.gpio:
                 channel.channel = await this.getChannelForScriptChannel(ChannelType.gpio, channel.channelNumber, channel.locationId);
@@ -159,19 +167,140 @@ export class ScriptRepository {
         return channel;
     }
 
-    private async getUartChannel(channel: number, locationId: number): Promise<UartChannel | null> {
-        let result: any = null;
+//#region UART channels
 
-        await this.dao.get(UartModuleTable.select, [channel.toString(), locationId.toString()])
-            .then((val: any) => {
-                result = new UartChannel(val[0].uartType, channel, val[0].moduleName, JSON.parse(val[0].moduleJson));
+    private async getUartChannel(scriptChannel: ScriptChannel): Promise<UartScriptChannel> {
+        let result: UartScriptChannel;
+
+        switch (scriptChannel.subType) {
+            case ChannelSubType.maestro:
+                result = await this.getMaestroChannel(scriptChannel.channel.moduleId, scriptChannel.channel.channelId);
+                break;
+            case ChannelSubType.kangaroo:
+                result = await this.getKangarooChannel(scriptChannel.channel.moduleId);
+                break;
+            default:
+                result = await this.getGenericSerialChannel(scriptChannel.channel.moduleId);
+                break;
+        }
+
+        return result;
+    }
+
+    private async getMaestroChannel(moduleId: string, channelId: number): Promise<MaestroChannel | null> {
+        let result: MaestroChannel | null = null;
+        let module: UartModule;
+
+        await this.dao
+            .get(UartModuleTable.select, [moduleId.toString()])
+            .then(async (val: any) => {
+                module = new UartModule(
+                    val[0].id,
+                    val[0].locationId, 
+                    val[0].uartType,
+                    val[0].uartChannel, 
+                    val[0].baudRate, 
+                    val[0].moduleName);
+
             }).catch((err) => {
                 logger.error(err);
-                throw 'error'
+                throw 'error';
+            });
+
+        await this.dao
+            .get(MaestroChannelTable.select, [channelId.toString(), moduleId,])
+            .then((val: any) => {
+                const ch = val[0];
+                result = new MaestroChannel(
+                    ch.id,
+                    ch.channelName,
+                    ch.enabled,
+                    moduleId,
+                    ch.isServo,
+                    ch.minPos,
+                    ch.maxPos,
+                    ch.homePos,
+                    ch.inverted,
+                    module.uartChannel,
+                    module.baudRate
+                );
+            }).catch((err) => {
+                logger.error(err);
+                throw 'error';
+            });
+        
+            return result;
+    }
+
+    private async getKangarooChannel(moduleId: string): Promise<KangarooX2Channel | null> {
+        let result: KangarooX2Channel | null = null;
+        let module: UartModule;
+
+        await this.dao
+            .get(UartModuleTable.select, [moduleId.toString()])
+            .then(async (val: any) => {
+                module = new UartModule(
+                    val[0].id,
+                    val[0].locationId, 
+                    val[0].uartType,
+                    val[0].uartChannel, 
+                    val[0].baudRate, 
+                    val[0].moduleName);
+
+            }).catch((err) => {
+                logger.error(err);
+                throw 'error';
+            });
+
+        await this.dao
+            .get(KangarooX2Table.selectByParent, [moduleId])
+            .then((val: any) => {
+                const ch = val[0];
+                result = new KangarooX2Channel(
+                    module.name,
+                    ch.id,
+                    moduleId,
+                    module.uartChannel,
+                    module.baudRate,
+                    ch.ch1Name,
+                    ch.ch2Name
+                );
+            })
+            .catch((err) => {
+                logger.error(err);
+                throw 'error';
             });
 
         return result;
     }
+
+    private async getGenericSerialChannel(moduleId: string): 
+        Promise<UartChannel | null> {
+        let result: UartChannel | null = null; 
+
+        this.dao
+            .get(UartModuleTable.select, [moduleId])
+            .then((val: any) => {
+                result = new UartChannel(
+                    0,
+                    val[0].moduleName,
+                    true,
+                    val[0].uartType,
+                    moduleId,
+                    val[0].uartChannel,
+                    val[0].baudRate
+                );
+            })
+            .catch((err) => {
+                logger.error(err);
+                throw 'error';
+            });
+
+        return result;
+    }
+
+    //#endregion 
+ 
 
     private async getChannelForScriptChannel(type: ChannelType, chId: number, locationId: number): Promise<any> {
 
@@ -182,9 +311,6 @@ export class ScriptRepository {
         switch (type) {
             case ChannelType.i2c:
                 sql = I2cChannelsTable.select;
-                break;
-            case ChannelType.servo:
-                sql = ServoChannelsTable.select;
                 break;
             case ChannelType.gpio:
                 sql = GpioChannelsTable.select;
@@ -202,10 +328,6 @@ export class ScriptRepository {
                             break;
                         case ChannelType.i2c:
                             result = new I2cChannel(val[0].channelId, val[0].channelName, val[0].enabled);
-                            break;
-                        case ChannelType.servo:
-                            result = new ServoChannel(val[0].channelId, val[0].channelName,
-                                val[0].enabled, val[0].limit0, val[0].limit1, val[0].homePos, val[0].inverted);
                             break;
                     }
                 } catch (error) {

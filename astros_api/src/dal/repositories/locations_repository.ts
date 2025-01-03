@@ -1,12 +1,31 @@
 import { logger } from "../../logger";
 import { DataAccess } from "../data_access";
-import { LocationsTable } from "../tables/locations_table";
-import { ControllerLocationTable } from "../tables/controller_location_table";
-import { ControlModule, ControllerLocation, GpioChannel, I2cChannel, ServoChannel, UartChannel } from "astros-common";
-import { UartModuleTable } from "../tables/uart_module_table";
-import { I2cChannelsTable } from "../tables/i2c_channels_table";
-import { ServoChannelsTable } from "../tables/servo_channels_table";
-import { GpioChannelsTable } from "../tables/gpio_channels_table";
+import { LocationsTable } from "../tables/controller_tables/locations_table";
+import { ControllerLocationTable } from "../tables/controller_tables/controller_location_table";
+import {
+    ControlModule,
+    ControllerLocation,
+    GpioChannel,
+    HumanCyborgRelationsModule,
+    I2cChannel,
+    KangarooX2,
+    MaestroBoard,
+    MaestroChannel,
+    MaestroModule,
+    UartModule,
+    UartType
+} from "astros-common";
+import { UartModuleTable } from "../tables/uart_tables/uart_module_table";
+import { I2cChannelsTable } from "../tables/controller_tables/i2c_channels_table";
+import { GpioChannelsTable } from "../tables/controller_tables/gpio_channels_table";
+import { MaestroBoardsTable } from "../tables/uart_tables/maestro_boards_table";
+import { MaestroChannelTable } from "../tables/uart_tables/maestro_channels_table";
+import { KangarooX2Table } from "../tables/uart_tables/kangaroo_x2_table";
+
+interface UartMods {
+    id: string,
+    type: number
+}
 
 export class LocationsRepository {
 
@@ -111,9 +130,6 @@ export class LocationsRepository {
                 throw "error";
             });
 
-
-
-
         for (let i = 0; i < result.length; i++) {
             await this.loadLocationConfiguration(result[i]);
         }
@@ -123,50 +139,43 @@ export class LocationsRepository {
 
     public async loadLocationConfiguration(location: ControllerLocation): Promise<ControllerLocation> {
 
-        // load the 3 uart channels
-        for (let i = 0; i < 3; i++) {
-            await this.dao
-                .get(UartModuleTable.select, [i.toString(), location.id.toString()])
-                .then((val: any) => {
-
-                    if (val.length === 0) {
-                        return;
-                    }
-
-                    const uart = new UartChannel(
-                        val[0].uartType,
-                        i,
-                        val[0].moduleName,
-                        JSON.parse(val[0].moduleJson)
-                    );
-
-                    location.uartModule?.channels.push(uart);
-                })
-                .catch((err: any) => {
-                    logger.error(err);
-                    throw "error";
-                });
-        }
-
+        // load uart modules
         await this.dao
-            .get(ServoChannelsTable.selectAll, [location.id.toString()])
+            .get(UartModuleTable.selectAllForLocation, [location.id.toString()])
             .then((val: any) => {
-                val.forEach((ch: any) => {
-                    location.servoModule.channels[ch.channelId] = new ServoChannel(
-                        ch.channelId,
-                        ch.channelName,
-                        ch.enabled,
-                        ch.minPos,
-                        ch.maxPos,
-                        ch.homePos,
-                        ch.inverted,                        
+                val.forEach((uart: any) => {
+                    const module = new UartModule(
+                        uart.id,
+                        location.id,
+                        uart.uartType,
+                        uart.uartChannel,
+                        uart.baudRate,
+                        uart.moduleName
                     );
+                    location.uartModules.push(module);
                 });
             })
             .catch((err: any) => {
                 logger.error(err);
                 throw "error";
             });
+
+        for (const uart of location.uartModules) {
+            switch (uart.uartType) {
+                case UartType.humanCyborgRelations:
+                    uart.subModule = new HumanCyborgRelationsModule();
+                    break;
+                case UartType.kangaroo:
+                    uart.subModule = await this.loadKangarooModule(uart.id);
+                    break;
+                case UartType.maestro:
+                    uart.subModule = await this.loadMaestroModule(uart);
+                    break;
+                default:
+                    uart.subModule = {};
+                    break;
+            }
+        }
 
         await this.dao
             .get(I2cChannelsTable.selectAll, [location.id.toString()])
@@ -219,32 +228,26 @@ export class LocationsRepository {
             await this.setLocationController(location.id, location.controller?.id || 0);
         }
 
-        for (const uart of location.uartModule.channels) {
-            await this.dao
-                .run(UartModuleTable.update, [
-                    uart.type.toString(),
-                    uart.channelName,
-                    JSON.stringify(uart.module),
-                    uart.id.toString(),
-                    location.id.toString()
-                ])
-                .catch((err: any) => {
-                    logger.error(err);
-                    throw "error";
-                });
-        }
+        await this.removeStaleUartModules(location.id, location.uartModules.map(m => m.id));
 
-        for (const servo of location.servoModule.channels) {
+        for (const uart of location.uartModules) {
+
+            switch (uart.uartType) {
+                case UartType.kangaroo:
+                    await this.insertKangarooModule(uart.id, uart.subModule as KangarooX2);
+                    break;
+                case UartType.maestro:
+                    await this.insertMaestroModule(uart.id, uart.subModule as MaestroModule);
+                    break;
+            }
+
             await this.dao
-                .run(ServoChannelsTable.update, [
-                    servo.channelName,
-                    servo.enabled ? "1" : "0",
-                    servo.minPos.toString(),
-                    servo.maxPos.toString(),
-                    servo.homePos.toString(),
-                    servo.inverted ? "1" : "0",
-                    servo.id.toString(),
-                    location.id.toString(),
+                .run(UartModuleTable.insert, [
+                    uart.id,
+                    uart.locationId.toString(),
+                    uart.uartChannel.toString(),
+                    uart.baudRate.toString(),
+                    uart.name
                 ])
                 .catch((err: any) => {
                     logger.error(err);
@@ -313,6 +316,220 @@ export class LocationsRepository {
                 throw "error";
             });
 
-        return true;
+        return true
     }
+
+    //#region Utility methods
+    private async removeStaleUartModules(locationId: number, currentMods: Array<string>) {
+        const uartMods = new Array<UartMods>();
+
+        this.dao
+            .get(UartModuleTable.selectAllForLocation, [locationId.toString()])
+            .then((val: any) => {
+                for (const m of val) {
+                    uartMods.push({ id: m.id, type: m.uartType });
+                }
+            })
+            .catch((err: any) => {
+                logger.error(err);
+                throw "error"
+            })
+
+        for (const uartMod of uartMods) {
+            if (currentMods.includes(uartMod.id)) {
+                continue;
+            }
+
+            switch (uartMod.type) {
+                case UartType.kangaroo:
+                    await this.deleteKangarooModule(uartMod.id);
+                    break;
+                case UartType.maestro:
+                    await this.deleteMaestroModule(uartMod.id);
+                    break;
+                default:
+                    break;
+            }
+
+            await this.dao
+                .run(UartModuleTable.delete, [uartMod.id])
+                .catch((err: any) => {
+                    logger.error(err);
+                    throw err;
+                })
+        }
+    }
+
+    //#endregion
+
+    //#region KangarooX2 methods
+
+    private async insertKangarooModule(parentId: string, module: KangarooX2): Promise<void> {
+        await this.dao
+            .run(KangarooX2Table.insert, [
+                module.id,
+                parentId,
+                module.ch1Name,
+                module.ch2Name
+            ])
+            .catch((err: any) => {
+                logger.error(err);
+                throw "error";
+            });
+    }
+
+    private async loadKangarooModule(uartId: string): Promise<KangarooX2 | null> {
+        let module = null;
+
+        await this.dao
+            .get(KangarooX2Table.selectByParent, [uartId])
+            .then((val: any) => {
+                module = new KangarooX2(
+                    val[0].id,
+                    val[0].ch1Name,
+                    val[0].ch2Name
+                )
+            })
+            .catch((err: any) => {
+                logger.error(err);
+                throw "error";
+            });
+
+        return module;
+    }
+
+    private async deleteKangarooModule(parentId: string): Promise<void> {
+
+        await this.dao
+            .run(KangarooX2Table.deleteByParent, [parentId])
+            .catch((err: any) => {
+                logger.error(err);
+                throw err;
+            })
+    }
+
+    //#endregion
+
+    //#region Maestro methods
+
+    private async insertMaestroModule(parentId: string, module: MaestroModule): Promise<void> {
+        
+        for (const board of module.boards) {
+            await this.dao
+                .run(MaestroBoardsTable.insert, [
+                    board.id,
+                    parentId,
+                    board.boardId.toString(),
+                    board.name
+                ])
+                .catch((err: any) => {
+                    logger.error(err);
+                    throw "error";
+                });
+
+            for (const channel of board.channels) {
+                await this.dao
+                    .run(MaestroChannelTable.insert, [
+                        channel.id.toString(),
+                        board.id,
+                        channel.channelName,
+                        channel.enabled ? "1" : "0",
+                        channel.isServo ? "1" : "0",
+                        channel.minPos.toString(),
+                        channel.maxPos.toString(),
+                        channel.homePos.toString(),
+                        channel.inverted ? "1" : "0"
+                    ])
+                    .catch((err: any) => {
+                        logger.error(err);
+                        throw "error";
+                    });
+            }
+        }
+    }
+
+    private async loadMaestroModule(uartMod: UartModule): Promise<MaestroModule> {
+
+        const module = new MaestroModule();
+
+        await this.dao
+            .get(MaestroBoardsTable.selectAllForParent, [uartMod.id])
+            .then((val: any) => {
+                for (const b of val) {
+                    const board = new MaestroBoard(b.id, b.boardId, b.boardName)
+                    module.boards.push(board);
+                }
+            })
+            .catch((err: any) => {
+                logger.error(err);
+                throw "error";
+            });
+
+
+        for (const board of module.boards) {
+            await this.dao
+                .get(MaestroChannelTable.selectAllForBoard, [board.id])
+                .then((val: any) => {
+                    for (const c of val) {
+                        const ch = new MaestroChannel(
+                            c.id,
+                            c.channelName,
+                            c.enabled,
+                            board.id,
+                            c.isServo,
+                            c.minPos,
+                            c.maxPos,
+                            c.homePos,
+                            c.inverted,
+                            uartMod.uartChannel,
+                            uartMod.baudRate
+                        )
+
+                        board.channels.push(ch);
+                    }
+                })
+                .catch((err: any) => {
+                    logger.error(err);
+                    throw "error";
+                });
+        }
+
+        return module;
+    }
+
+
+    private async deleteMaestroModule(parentId: string): Promise<void> {
+
+        const boardIds = new Array<string>();
+
+        await this.dao
+            .get(MaestroBoardsTable.selectIdsForParent, [parentId])
+            .then((val: any) => {
+                for (const v of val) {
+                    boardIds.push(v);
+                }
+            })
+            .catch((err: any) => {
+                logger.error(err);
+                throw err;
+            })
+
+        for (const id of boardIds) {
+            await this.dao
+                .run(MaestroChannelTable.deleteByBoardId, [id])
+                .catch((err: any) => {
+                    logger.error(err);
+                    throw err;
+                })
+        }
+
+        await this.dao
+            .run(MaestroBoardsTable.deleteByParent, [parentId])
+            .catch((err: any) => {
+                logger.error(err);
+                throw err;
+            });
+    }
+
+    //#endregion
 }

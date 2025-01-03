@@ -1,4 +1,4 @@
-export enum KangarooAction{
+export enum KangarooAction {
     none,
     start,
     home,
@@ -8,18 +8,28 @@ export enum KangarooAction{
 }
 
 export class KangarooEvent {
-      
-        uartChannel: number;
-        ch1Action: KangarooAction;
-        ch1Speed: number;
-        ch1Position: number;
-        ch2Action: KangarooAction;
-        ch2Speed: number;
-        ch2Position: number;
-      
-    constructor(uartChannel: number, ch1Action: KangarooAction, ch1Speed: number, ch1Position: number,
-        ch2Action: KangarooAction, ch2Speed: number, ch2Position: number){
+
+    uartChannel: number;
+    baudRate: number;
+    ch1Action: KangarooAction;
+    ch1Speed: number;
+    ch1Position: number;
+    ch2Action: KangarooAction;
+    ch2Speed: number;
+    ch2Position: number;
+
+    constructor(
+        uartChannel: number,
+        baudRate: number,
+        ch1Action: KangarooAction,
+        ch1Speed: number,
+        ch1Position: number,
+        ch2Action: KangarooAction,
+        ch2Speed: number,
+        ch2Position: number
+    ) {
         this.uartChannel = uartChannel;
+        this.baudRate = baudRate;
         this.ch1Action = ch1Action;
         this.ch1Speed = ch1Speed;
         this.ch1Position = ch1Position;

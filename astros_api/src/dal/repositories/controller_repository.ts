@@ -1,6 +1,6 @@
 import { DataAccess } from "../../dal/data_access";
 import { ControlModule } from "astros-common";
-import { ControllersTable } from "../../dal/tables/controllers_table";
+import { ControllersTable } from "../tables/controller_tables/controllers_table";
 import { logger } from "../../logger";
 
 export class ControllerRepository {

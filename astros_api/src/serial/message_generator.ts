@@ -75,7 +75,7 @@ export class MessageGenerator {
 
             const servoConfigs = [];
 
-            for (const ch of config.servoChannels) {
+            /*for (const ch of config.servoChannels) {
                 servoConfigs.push(ch.id);
                 servoConfigs.push(":");
                 servoConfigs.push(ch.set);
@@ -102,6 +102,7 @@ export class MessageGenerator {
             result.push(this.US);
             result.push(servoConfigs.join(""));
             result.push(this.RS);
+            */
         }
 
         if (result.length > 0) {

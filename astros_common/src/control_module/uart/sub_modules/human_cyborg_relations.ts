@@ -1,6 +1,6 @@
-import { HumanCyborgRelationsCmd } from "../../astros_enums";
+import { HumanCyborgRelationsCmd } from "../../../astros_enums";
 
-export class humanCyborgRelationsController {
+export class HumanCyborgRelationsModule {
 
     static getCommandString(cmd: HumanCyborgRelationsCmd): string {
         switch (cmd) {
