@@ -50,9 +50,9 @@ export class UartModuleTable {
     ${this.uartType}, 
     ${this.uartChannel},
     ${this.baudRate}, 
-    ${this.moduleName},
+    ${this.moduleName}
     FROM ${this.table}
-    AND ${this.locationId} = ?`;
+    WHERE ${this.locationId} = ?`;
 
     public static readonly delete =
         `DELETE FROM ${this.table} WHERE ${this.id} = ?`;

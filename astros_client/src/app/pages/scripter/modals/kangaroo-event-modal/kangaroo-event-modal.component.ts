@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { KangarooAction, KangarooController, KangarooEvent, ScriptEvent } from 'astros-common'
+import { KangarooAction, KangarooX2, KangarooEvent, ScriptEvent } from 'astros-common'
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 
@@ -11,7 +11,8 @@ import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.co
 export class KangarooEventModalComponent extends BaseEventModalComponent implements OnInit {
 
   uartChannel!: number;
-  kangaroo!: KangarooController;
+  baudRate!: number;
+  kangaroo!: KangarooX2;
 
   channel1: string;
   ch1Action: string;
@@ -59,6 +60,7 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
     }
 
     this.uartChannel = this.resources.get(ModalResources.channelId);
+    this.baudRate = this.resources.get(ModalResources.baudRate);
     this.kangaroo = this.resources.get(ModalResources.kangaroo);
 
     this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
@@ -121,7 +123,7 @@ export class KangarooEventModalComponent extends BaseEventModalComponent impleme
    
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
    
-    const data = new KangarooEvent(this.uartChannel ,+this.ch1Action, this.ch1Speed ?? 0, this.ch1Position ?? 0, 
+    const data = new KangarooEvent(this.uartChannel, this.baudRate, +this.ch1Action, this.ch1Speed ?? 0, this.ch1Position ?? 0, 
       +this.ch2Action, this.ch2Speed ?? 0, this.ch2Position ?? 0)
    
     this.scriptEvent.dataJson = JSON.stringify(data);

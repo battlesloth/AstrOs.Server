@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ScriptEvent, ServoEvent } from 'astros-common';
+import { ScriptEvent } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 
@@ -62,8 +62,8 @@ export class ServoEventModalComponent extends BaseEventModalComponent implements
    
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const data = new ServoEvent(+this.channelId, +this.position, +this.speed, +this.acceleration);
-    this.scriptEvent.dataJson = JSON.stringify(data);
+    //const data = new ServoEvent(+this.channelId, +this.position, +this.speed, +this.acceleration);
+    //this.scriptEvent.dataJson = JSON.stringify(data);
 
     this.modalCallback.emit({
       id: this.callbackType,

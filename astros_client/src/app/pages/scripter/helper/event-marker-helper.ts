@@ -7,8 +7,7 @@ import {
     I2cEvent, 
     KangarooAction, 
     KangarooEvent, 
-    ScriptEvent, 
-    ServoEvent 
+    ScriptEvent
 } from "astros-common";
 
 export default class EventMarkerHelper {
@@ -22,8 +21,8 @@ export default class EventMarkerHelper {
                 rAudio[2] = '';
                 rAudio[3] = '';
                 return rAudio;
-            case ChannelType.servo:
-                return this.servoText(event.dataJson);
+            //case ChannelType.servo:
+            //    return this.servoText(event.dataJson);
             case ChannelType.i2c:
                 return this.i2cText(event.dataJson);
             case ChannelType.gpio:
@@ -42,7 +41,7 @@ export default class EventMarkerHelper {
     }
 
 
-    private static servoText(json: string): Array<string> {
+    /*private static servoText(json: string): Array<string> {
         const evt = JSON.parse(json) as ServoEvent;
         const result = new Array<string>();
         result[0] = 'Position:';
@@ -51,7 +50,7 @@ export default class EventMarkerHelper {
         result[3] = evt.speed.toString();
 
         return result;
-    }
+    }*/
 
     private static i2cText(json: string): Array<string> {
         const evt = JSON.parse(json) as I2cEvent;

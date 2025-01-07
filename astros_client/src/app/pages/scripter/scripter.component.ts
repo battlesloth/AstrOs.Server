@@ -6,13 +6,11 @@ import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
 import { 
   ChannelSubType, 
-  ChannelType, 
-  KangarooController, 
+  ChannelType,  
   AstrOsLocationCollection, 
   Script, 
   ScriptChannel, 
-  ScriptEvent, 
-  UartChannel, 
+  ScriptEvent,
   ControllerLocation, 
   BaseChannel 
 } from 'astros-common';
@@ -381,10 +379,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         component = this.container.createComponent(I2cEventModalComponent);
         modalResources.set(ModalResources.i2cId, this.getIdFromChannel(event.scriptChannel))
         break;
-      case ChannelType.servo:
+     /* case ChannelType.servo:
         component = this.container.createComponent(ServoEventModalComponent);
         modalResources.set(ModalResources.servoId, this.getIdFromChannel(event.scriptChannel))
-        break;
+        break; */
       case ChannelType.audio:
         component = this.container.createComponent(AudioEventModalComponent);
         break;
@@ -410,10 +408,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       .map((ch) => { return ch.id })
       .indexOf(channelId);
 
-    if (chIdx > -1) {
+    /*if (chIdx > -1) {
       const uart = this.scriptChannels[chIdx].channel as UartChannel;
       return uart.id;
-    }
+    }*/
   }
 
   getKangarooControllerFromChannel(channelId: string): any {
@@ -422,10 +420,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       .map((ch) => { return ch.id })
       .indexOf(channelId);
 
-    if (chIdx > -1) {
+    /*if (chIdx > -1) {
       const uart = this.scriptChannels[chIdx].channel as UartChannel;
       return uart.module as KangarooController;
-    }
+    }*/
   }
 
   getIdFromChannel(channelId: string): any {

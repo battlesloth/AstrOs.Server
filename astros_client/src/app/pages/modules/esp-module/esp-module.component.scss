@@ -1,5 +1,37 @@
 @import "./src/assets/styles/variables";
 
+.header-box {
+    display: flex;
+    flex-direction: row;
+    width: -webkit-fill-available;
+    margin-right: 30px;
+
+    .header-spacer {
+        flex-grow: 1;
+    }
+
+ 
+    .header-button {
+        button {
+            height: 40px;
+            font-size: small;
+            padding: 5px 10px;
+        }
+    }
+}
+
+.uart-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+
+    li {
+        padding-bottom: 10px;
+    }
+}
+
 .uart-module {
 
 

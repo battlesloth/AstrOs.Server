@@ -11,6 +11,7 @@ import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.co
 export class UartEventModalComponent extends BaseEventModalComponent implements OnInit {
 
   uartChannel!: number;
+  baudRate!: number;
   eventValue: string;
   
   constructor() {
@@ -33,6 +34,7 @@ export class UartEventModalComponent extends BaseEventModalComponent implements 
     }
 
     this.uartChannel = this.resources.get(ModalResources.channelId);
+    this.baudRate = this.resources.get(ModalResources.baudRate);
 
     this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
     
@@ -53,7 +55,7 @@ export class UartEventModalComponent extends BaseEventModalComponent implements 
     }
    
     this.scriptEvent.time = +this.eventTime;
-    this.scriptEvent.dataJson = JSON.stringify(new GenericSerialEvent(this.uartChannel, this.eventValue));
+    this.scriptEvent.dataJson = JSON.stringify(new GenericSerialEvent(this.uartChannel, this.baudRate, this.eventValue,));
 
     this.modalCallback.emit({
       id: this.callbackType,

@@ -2,7 +2,7 @@ import { Component, EventEmitter, Input, OnInit, Output, ViewChild, ViewContaine
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { MatCheckboxModule } from '@angular/material/checkbox'
 import { MatFormField } from '@angular/material/form-field';
-import { ControllerLocation, KangarooController, UartChannel, UartType } from 'astros-common';
+import { ControllerLocation, KangarooX2, UartModule, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
 
 @Component({
@@ -28,13 +28,14 @@ export class EspModuleComponent implements OnInit {
     this.setModule();
   }
   _module!: ControllerLocation;
+  uartPanelOpenState: boolean = false;
 
 
   @ViewChild('uart1Container', { read: ViewContainerRef })
   get uart1Container(): ViewContainerRef { return this._uart1Container; }
   set uart1Container(value: ViewContainerRef) {
     this._uart1Container = value;
-    this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);
+    //this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);
   }
   _uart1Container!: ViewContainerRef;
 
@@ -42,7 +43,7 @@ export class EspModuleComponent implements OnInit {
   get uart2Container(): ViewContainerRef { return this._uart2Container; }
   set uart2Container(value: ViewContainerRef) {
     this._uart2Container = value;
-    this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);
+    //this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);
   }
   _uart2Container!: ViewContainerRef;
 
@@ -67,7 +68,7 @@ export class EspModuleComponent implements OnInit {
   }
 
   setModule() {
-    this.originalUart1Type = this.module.uartModule.channels[0].type;
+    /*this.originalUart1Type = this.module.uartModule.channels[0].type;
     this.originalUart1Module = this.copyUartModule(this.module.uartModule.channels[0]);
 
     this.uart1Type = this.originalUart1Type.toString();
@@ -76,6 +77,7 @@ export class EspModuleComponent implements OnInit {
     this.originalUart2Module = this.copyUartModule(this.module.uartModule.channels[1]);
 
     this.uart2Type = this.originalUart2Type.toString();
+    */
   }
 
   servoNameChange(id: number, $event: any) {
@@ -87,6 +89,8 @@ export class EspModuleComponent implements OnInit {
   }
 
   uartTypeChange($event: any, channel: number) {
+
+    return;
 
     const ut = +$event;
 
@@ -100,9 +104,10 @@ export class EspModuleComponent implements OnInit {
 
       let module: any;
       switch (ut) {
-        case UartType.kangaroo:
-          module = new KangarooController();
+        /*case UartType.kangaroo:
+          module = new KangarooX2();
           break;
+        */
         default:
           module = new Object();
           break;
@@ -123,7 +128,7 @@ export class EspModuleComponent implements OnInit {
     }
   }
 
-  setUartModule(uartType: UartType, module: any, container: ViewContainerRef, uartChannel: UartChannel) {
+  setUartModule(uartType: UartType, module: any, container: ViewContainerRef, uartModule: UartModule) {
     let component: any;
 
     container.clear()
@@ -135,8 +140,8 @@ export class EspModuleComponent implements OnInit {
         break;
     }
 
-    uartChannel.type = uartType;
-    uartChannel.module = module;
+    uartModule.uartType = uartType;
+    uartModule.subModule = module;
 
     if (component) {
       component.instance.module = module;
@@ -149,15 +154,35 @@ export class EspModuleComponent implements OnInit {
     throw new Error('Method not implemented.');
   }
 
+
+  addUartModule(evt: any) {
+    evt.stopPropagation();
+
+    if (!this.uartPanelOpenState){
+      this.uartPanelOpenState = true;
+    }
+
+    this.module.uartModules.push(new UartModule(
+      crypto.randomUUID(),
+      this.module.locationId,
+      UartType.genericSerial,
+      1,
+      9600,
+      "New Serial Module"
+    ));
+    console.log('addUartModule 2', this.uartPanelOpenState);
+    
+  }
+
   copyUartModule(module: any): any {
     let temp: any;
 
     switch (module.type) {
-      case UartType.kangaroo:
+      /*case UartType.kangaroo:
         temp = new KangarooController();
         temp.channelOneName = module.module.channelOneName;
         temp.channelTwoName = module.module.channelTwoName;
-        break;
+        break/*/
       default:
         temp = new Object();
         break;

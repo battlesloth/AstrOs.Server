@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
-import { HcrCommand, HcrCommandCategory, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, ScriptEvent, humanCyborgRelationsController } from 'astros-common';
+import { HcrCommand, HcrCommandCategory, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, ScriptEvent, HumanCyborgRelationsModule } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { faBan} from '@fortawesome/free-solid-svg-icons';
 
@@ -16,6 +16,7 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
   faRemove = faBan;
 
   uartChannel!: number;
+  baudRate!: number;
   commandCategory: string;
   command!: string;
   valueA!: string;
@@ -72,8 +73,9 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
       element?.classList.remove("hidden");
     }
 
-    this.uartChannel = <number> this.resources.get(ModalResources.channelId);
-    this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
+    this.uartChannel = this.resources.get(ModalResources.channelId);
+    this.baudRate = this.resources.get(ModalResources.baudRate);
+    this.scriptEvent = this.resources.get(ModalResources.scriptEvent);
     
     if (this.scriptEvent.dataJson != ''){
       const payload = JSON.parse(this.scriptEvent.dataJson);
@@ -216,7 +218,7 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const data = new HumanCyborgRelationsEvent(this.uartChannel, this.selectedCommands);
+    const data = new HumanCyborgRelationsEvent(this.uartChannel, this.baudRate, this.selectedCommands);
 
     this.scriptEvent.dataJson = JSON.stringify(data);
 
@@ -245,7 +247,7 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
   }
 
   hcrName(cmd: HumanCyborgRelationsCmd){
-    return humanCyborgRelationsController.getCommandName(cmd);
+    return HumanCyborgRelationsModule.getCommandName(cmd);
   }
 
   hcrHasBValue(cmd: HumanCyborgRelationsCmd){

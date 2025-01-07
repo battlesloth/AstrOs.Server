@@ -21,28 +21,27 @@
                     <option value="3">Human Cyborg Relations</option>
                 </select>
             </div>
-            <div class="input"><input matInput placeholder="Name"
-                    [(ngModel)]="module.uartModule.channels[0].channelName" /></div>
+            <div class="input"><input matInput placeholder="Name" /></div>
         </div>
         <ng-template #uart1Container></ng-template>
     </mat-expansion-panel>
-    <mat-expansion-panel>
+    <mat-expansion-panel [expanded]="uartPanelOpenState" (closed)="uartPanelOpenState = false">
         <mat-expansion-panel-header>
-            <mat-panel-title>Serial Port 2 configuration</mat-panel-title>
+            <mat-panel-title>Serial Modules</mat-panel-title>
+            <mat-panel-description>
+                <div class="header-box">
+                    <div class="header-spacer"></div>
+                    <div class="header-button">
+                        <button (click)="addUartModule($event)">Add Serial Module</button>
+                    </div>
+                </div>
+            </mat-panel-description>
         </mat-expansion-panel-header>
-        <div class="uart-module">
-            <div class="type">
-                <select title="Serial Type" (ngModelChange)="uartTypeChange($event, 2)" [(ngModel)]=uart2Type>
-                    <option value="0" selected>Disabled</option>
-                    <option value="1">Generic Serial</option>
-                    <option value="2">Kangaroo X2</option>
-                    <option value="3">Human Cyborg Relations</option>
-                </select>
-            </div>
-            <div class="input"><input matInput placeholder="Name"
-                    [(ngModel)]="module.uartModule.channels[1].channelName" /></div>
-        </div>
-        <ng-template #uart2Container></ng-template>
+        <ul class="uart-list">
+            <li *ngFor="let module of module.uartModules">
+                <app-uart-module></app-uart-module>
+            </li>
+        </ul>
     </mat-expansion-panel>
     <mat-expansion-panel>
         <mat-expansion-panel-header>
@@ -67,6 +66,7 @@
         <mat-expansion-panel-header>
             <mat-panel-title>Servo configuration</mat-panel-title>
         </mat-expansion-panel-header>
+        <!-->
         <ul class="servo-list">
             <li *ngFor="let channel of module.servoModule.channels">
                 <div class="servo-channel">
@@ -100,6 +100,7 @@
                 </div>
             </li>
         </ul>
+    -->
     </mat-expansion-panel>
     <mat-expansion-panel>
         <mat-expansion-panel-header>

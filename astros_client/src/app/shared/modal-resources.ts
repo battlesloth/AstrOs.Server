@@ -27,6 +27,7 @@ export class ModalResources {
     public static readonly channelSubType = 'channelSubType';
     public static readonly controllerType = 'controllerType';
     public static readonly channelId = 'channelId';
+    public static readonly baudRate = 'baudRate';
 
     // confirmationModal
     public static readonly action = 'action';

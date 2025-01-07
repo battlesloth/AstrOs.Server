@@ -36,6 +36,8 @@ export class LoadingModalComponent extends BaseEventModalComponent implements On
       next: (result: any) => {
         this.locations = result;
         this.locationsLoaded = true;
+        this.controllersLoaded = true;
+        this.controllers = { success: true, controllers: [] , type: TransmissionType.controllers, message: "" };
         this.checkLoadedState();
       },
       error: (err: any) => console.error(err)
@@ -43,6 +45,7 @@ export class LoadingModalComponent extends BaseEventModalComponent implements On
 
     this.controllerService.getLoadedLocations().subscribe(locationsObserver);
 
+    return;
     const observer = {
       next: (result: any) => { },
       error: (err: any) => console.error(err)
@@ -71,7 +74,7 @@ export class LoadingModalComponent extends BaseEventModalComponent implements On
   }
 
   override closeModal(): void {
-    this.subscription.unsubscribe();
+    //this.subscription.unsubscribe();
     this.modalCallback.emit({ id: ModalCallbackEvent.close, response: { controllers: this.controllers.controllers, locations: this.locations } });
   }
 }

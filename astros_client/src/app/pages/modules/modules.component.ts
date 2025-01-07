@@ -210,6 +210,8 @@ export class ModulesComponent implements OnInit, AfterViewInit {
   }
 
   private parseModules(locations: AstrOsLocationCollection) {
+
+    console.log(locations);
     try {
       this.coreLocation = locations.coreModule ?? this.coreLocation;
       this.domeLocation = locations.domeModule ?? this.domeLocation;

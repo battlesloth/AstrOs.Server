@@ -1,5 +1,5 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { KangarooController } from 'astros-common';
+import { KangarooX2 } from 'astros-common';
 
 
 @Component({
@@ -10,7 +10,7 @@ import { KangarooController } from 'astros-common';
 export class KangarooModuleComponent implements OnInit {
 
   @Input()
-  module!: KangarooController;
+  module!: KangarooX2;
 
   constructor() {
    }

@@ -54,8 +54,8 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
     switch (this.channelType) {
       case ChannelType.i2c:
         return { id: this.channelId, val: this.value };
-      case ChannelType.servo:
-        return { id: this.channelId, position: this.position, speed: this.speed };
+      //case ChannelType.servo:
+      //  return { id: this.channelId, position: this.position, speed: this.speed };
       case ChannelType.uart:
         if (this.channelSubType === ChannelSubType.kangaroo) {
           return { val: this.getKangarooCommand() };

@@ -47,7 +47,7 @@ import { FormatModalComponent } from './pages/settings/modals/format-modal/forma
 import { HumanCyborgModalComponent } from './pages/scripter/modals/human-cyborg-modal/human-cyborg-modal.component';
 import { LoadingModalComponent } from './pages/modules/loading-modal/loading-modal.component';
 import { ServoTestModalComponent } from './pages/modules/servo-test-modal/servo-test-modal.component';
-
+import { UartModuleComponent } from './pages/modules/uart-modules/uart-module/uart-module.component';
 
 
 @NgModule({ declarations: [
@@ -81,7 +81,8 @@ import { ServoTestModalComponent } from './pages/modules/servo-test-modal/servo-
         FormatModalComponent,
         HumanCyborgModalComponent,
         LoadingModalComponent,
-        ServoTestModalComponent
+        ServoTestModalComponent,
+        UartModuleComponent
     ],
     bootstrap: [AppComponent], imports: [BrowserModule,
         AppRoutingModule,
