@@ -1,5 +1,5 @@
 import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { faCopy, faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
 import { ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus, Script } from 'astros-common';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
@@ -7,11 +7,16 @@ import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
+import { NgFor } from '@angular/common';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { ModalComponent } from '../../modal/modal.component';
 
 @Component({
-  selector: 'app-scripts',
-  templateUrl: './scripts.component.html',
-  styleUrls: ['./scripts.component.scss']
+    selector: 'app-scripts',
+    templateUrl: './scripts.component.html',
+    styleUrls: ['./scripts.component.scss'],
+    standalone: true,
+    imports: [NgFor, RouterLink, FontAwesomeModule, ModalComponent]
 })
 export class ScriptsComponent implements OnInit {
 

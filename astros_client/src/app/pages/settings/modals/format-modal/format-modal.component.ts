@@ -1,11 +1,15 @@
 import { Component, OnInit } from '@angular/core';
 import { ModalBaseComponent } from 'src/app/modal';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
+import { NgFor } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 @Component({
-  selector: 'app-format-modal',
-  templateUrl: './format-modal.component.html',
-  styleUrls: ['./format-modal.component.scss']
+    selector: 'app-format-modal',
+    templateUrl: './format-modal.component.html',
+    styleUrls: ['./format-modal.component.scss'],
+    standalone: true,
+    imports: [NgFor, FormsModule]
 })
 export class FormatModalComponent extends ModalBaseComponent implements OnInit {
 

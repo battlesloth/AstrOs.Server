@@ -1,14 +1,17 @@
 import { Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { TransmissionType } from 'astros-common';
 import { AuthenticationService } from './services/auth/authentication.service';
 import { SnackbarService } from './services/snackbar/snackbar.service';
 import { WebsocketService } from './services/websocket/websocket.service';
+import { NgIf } from '@angular/common';
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+    selector: 'app-root',
+    templateUrl: './app.component.html',
+    styleUrls: ['./app.component.scss'],
+    standalone: true,
+    imports: [RouterLink, NgIf, RouterOutlet]
 })
 export class AppComponent implements OnInit {
 

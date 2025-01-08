@@ -2,11 +2,15 @@ import { Component, OnInit } from '@angular/core';
 import { I2cEvent, ScriptEvent } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
+import { FormsModule } from '@angular/forms';
+import { DecimalPipe } from '@angular/common';
 
 @Component({
-  selector: 'app-i2c-event-modal',
-  templateUrl: './i2c-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./i2c-event-modal.component.scss']
+    selector: 'app-i2c-event-modal',
+    templateUrl: './i2c-event-modal.component.html',
+    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './i2c-event-modal.component.scss'],
+    standalone: true,
+    imports: [FormsModule, DecimalPipe]
 })
 export class I2cEventModalComponent extends BaseEventModalComponent implements OnInit {
  

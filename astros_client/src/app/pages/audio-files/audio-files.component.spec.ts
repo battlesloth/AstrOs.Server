@@ -8,8 +8,8 @@ describe('AudioFilesComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ AudioFilesComponent ]
-    })
+    imports: [AudioFilesComponent]
+})
     .compileComponents();
   });
 

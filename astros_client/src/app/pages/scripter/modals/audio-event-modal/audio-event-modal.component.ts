@@ -3,11 +3,15 @@ import { AudioFile, ScriptEvent } from 'astros-common';
 import { AudioService } from 'src/app/services/audio/audio.service';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
+import { FormsModule } from '@angular/forms';
+import { NgFor, DecimalPipe } from '@angular/common';
 
 @Component({
-  selector: 'app-audio-event-modal',
-  templateUrl: './audio-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./audio-event-modal.component.scss']
+    selector: 'app-audio-event-modal',
+    templateUrl: './audio-event-modal.component.html',
+    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './audio-event-modal.component.scss'],
+    standalone: true,
+    imports: [FormsModule, NgFor, DecimalPipe]
 })
 export class AudioEventModalComponent extends BaseEventModalComponent implements OnInit {
 

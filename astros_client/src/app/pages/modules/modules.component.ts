@@ -1,7 +1,7 @@
 import { AfterViewInit, Component, ElementRef, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
-import { MatExpansionPanel } from '@angular/material/expansion';
+import { MatExpansionPanel, MatAccordion, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ControlModule, ControllerStatus, AstrOsLocationCollection, ControllerLocation} from 'astros-common';
+import { ControlModule, ControllerStatus, AstrOsLocationCollection, ControllerLocation } from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { StatusService } from 'src/app/services/status/status.service';
@@ -11,12 +11,30 @@ import { ServoTestModalComponent } from './servo-test-modal/servo-test-modal.com
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { AlertModalComponent } from 'src/app/modal/alert-modal/alert-modal.component';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { NgIf, NgFor } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { EspModuleComponent } from './esp-module/esp-module.component';
+import { ModalComponent } from '../../modal/modal.component';
 
 @Component({
   selector: 'app-modules',
   templateUrl: './modules.component.html',
   styleUrls: ['./modules.component.scss'],
-  viewProviders: [MatExpansionPanel]
+  viewProviders: [MatExpansionPanel],
+  standalone: true,
+  imports: [
+    MatAccordion,
+    MatExpansionPanel,
+    MatExpansionPanelHeader,
+    MatExpansionPanelTitle,
+    FontAwesomeModule,
+    NgIf,
+    FormsModule,
+    EspModuleComponent,
+    NgFor,
+    ModalComponent
+  ]
 })
 export class ModulesComponent implements OnInit, AfterViewInit {
 
@@ -149,7 +167,7 @@ export class ModulesComponent implements OnInit, AfterViewInit {
     switch (evt.id) {
       case ModalCallbackEvent.sendServoMove:
 
-        this.websocketService.sendMessage({ msgType: "SERVO_TEST", data:{controllerId: evt.controllerId, servoId: evt.servoId, value: evt.value }});
+        this.websocketService.sendMessage({ msgType: "SERVO_TEST", data: { controllerId: evt.controllerId, servoId: evt.servoId, value: evt.value } });
 
         break;
       case ModalCallbackEvent.close:

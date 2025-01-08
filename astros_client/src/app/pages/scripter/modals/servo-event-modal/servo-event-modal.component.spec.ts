@@ -8,8 +8,8 @@ describe('ServoEventModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ ServoEventModalComponent ]
-    })
+    imports: [ServoEventModalComponent]
+})
     .compileComponents();
   });
 

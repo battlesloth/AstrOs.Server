@@ -2,12 +2,16 @@ import { Component, OnInit } from '@angular/core';
 import { ScriptEvent } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
+import { FormsModule } from '@angular/forms';
+import { DecimalPipe } from '@angular/common';
 
 
 @Component({
-  selector: 'app-servo-event-modal',
-  templateUrl: './servo-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./servo-event-modal.component.scss']
+    selector: 'app-servo-event-modal',
+    templateUrl: './servo-event-modal.component.html',
+    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './servo-event-modal.component.scss'],
+    standalone: true,
+    imports: [FormsModule, DecimalPipe]
 })
 export class ServoEventModalComponent extends BaseEventModalComponent implements OnInit {
 

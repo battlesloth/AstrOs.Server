@@ -1,16 +1,31 @@
 import { Component, EventEmitter, Input, OnInit, Output, ViewChild, ViewContainerRef } from '@angular/core';
-import { MatExpansionPanel } from '@angular/material/expansion';
-import { MatCheckboxModule } from '@angular/material/checkbox'
+import { MatExpansionPanel, MatAccordion, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from '@angular/material/expansion';
+import { MatCheckboxModule, MatCheckbox } from '@angular/material/checkbox'
 import { MatFormField } from '@angular/material/form-field';
 import { ControllerLocation, KangarooX2, UartModule, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
 import { EspSubmoduleComponent } from 'src/app/components/esp-submodule/esp-submodule.component';
+import { NgIf, NgFor } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 @Component({
-  selector: 'app-esp-module',
-  templateUrl: './esp-module.component.html',
-  styleUrls: ['./esp-module.component.scss'],
-  viewProviders: [MatExpansionPanel, MatFormField, MatCheckboxModule]
+    selector: 'app-esp-module',
+    templateUrl: './esp-module.component.html',
+    styleUrls: ['./esp-module.component.scss'],
+    viewProviders: [MatExpansionPanel, MatFormField, MatCheckboxModule],
+    standalone: true,
+    imports: [
+      MatAccordion, 
+      MatExpansionPanel, 
+      MatExpansionPanelHeader, 
+      MatExpansionPanelTitle, 
+      NgIf, 
+      FormsModule, 
+      MatExpansionPanelDescription, 
+      NgFor, 
+      MatCheckbox,
+      EspSubmoduleComponent
+    ]
 })
 export class EspModuleComponent implements OnInit {
 

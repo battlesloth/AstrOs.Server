@@ -4,9 +4,10 @@ import { ScriptEvent } from 'astros-common';
 import { ModalCallbackEvent } from 'src/app/shared/modal-resources';
 
 @Component({
-  selector: 'app-base-event-modal',
-  template: '',
-  styleUrls: ['./base-event-modal.component.scss']
+    selector: 'app-base-event-modal',
+    template: '',
+    styleUrls: ['./base-event-modal.component.scss'],
+    standalone: true
 })
 export class BaseEventModalComponent extends ModalBaseComponent implements OnInit {
 

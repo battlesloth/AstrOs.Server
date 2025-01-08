@@ -1,12 +1,16 @@
 import { Component, OnInit } from '@angular/core';
 import { BaseEventModalComponent } from '../../scripter/modals/base-event-modal/base-event-modal.component';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
+import { MatSlider, MatSliderThumb } from '@angular/material/slider';
+import { FormsModule } from '@angular/forms';
 
 
 @Component({
-  selector: 'app-servo-test-modal',
-  templateUrl: './servo-test-modal.component.html',
-  styleUrl: './servo-test-modal.component.scss'
+    selector: 'app-servo-test-modal',
+    templateUrl: './servo-test-modal.component.html',
+    styleUrl: './servo-test-modal.component.scss',
+    standalone: true,
+    imports: [MatSlider, MatSliderThumb, FormsModule]
 })
 export class ServoTestModalComponent extends BaseEventModalComponent implements OnInit {
    

@@ -8,8 +8,8 @@ describe('I2cEventModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ I2cEventModalComponent ]
-    })
+    imports: [I2cEventModalComponent]
+})
     .compileComponents();
   });
 

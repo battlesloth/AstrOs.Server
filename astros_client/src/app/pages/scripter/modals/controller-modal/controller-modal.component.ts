@@ -3,11 +3,15 @@ import { ChannelType } from 'astros-common';
 import { ChannelValue, LocationDetails } from 'src/app/models/script-resources';
 import { ModalBaseComponent } from '../../../../modal/modal-base/modal-base.component';
 import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
+import { FormsModule } from '@angular/forms';
+import { NgFor, NgIf, KeyValuePipe } from '@angular/common';
 
 @Component({
-  selector: 'app-controller-modal',
-  templateUrl: './controller-modal.component.html',
-  styleUrls: ['./controller-modal.component.scss']
+    selector: 'app-controller-modal',
+    templateUrl: './controller-modal.component.html',
+    styleUrls: ['./controller-modal.component.scss'],
+    standalone: true,
+    imports: [FormsModule, NgFor, NgIf, KeyValuePipe]
 })
 export class ControllerModalComponent extends ModalBaseComponent implements OnInit {
 

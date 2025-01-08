@@ -7,9 +7,10 @@ import { ModalCallbackEvent } from 'src/app/shared/modal-resources';
 import { Subscription } from 'rxjs';
 
 @Component({
-  selector: 'app-loading-modal',
-  templateUrl: './loading-modal.component.html',
-  styleUrls: ['./loading-modal.component.scss']
+    selector: 'app-loading-modal',
+    templateUrl: './loading-modal.component.html',
+    styleUrls: ['./loading-modal.component.scss'],
+    standalone: true
 })
 export class LoadingModalComponent extends BaseEventModalComponent implements OnInit {
 

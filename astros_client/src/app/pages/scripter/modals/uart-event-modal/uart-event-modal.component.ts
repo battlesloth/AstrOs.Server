@@ -2,11 +2,15 @@ import { Component, OnInit } from '@angular/core';
 import { GenericSerialEvent, ScriptEvent } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
+import { FormsModule } from '@angular/forms';
+import { DecimalPipe } from '@angular/common';
 
 @Component({
-  selector: 'app-uart-event-modal',
-  templateUrl: './uart-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./uart-event-modal.component.scss']
+    selector: 'app-uart-event-modal',
+    templateUrl: './uart-event-modal.component.html',
+    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './uart-event-modal.component.scss'],
+    standalone: true,
+    imports: [FormsModule, DecimalPipe]
 })
 export class UartEventModalComponent extends BaseEventModalComponent implements OnInit {
 

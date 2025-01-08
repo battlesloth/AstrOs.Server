@@ -8,8 +8,8 @@ describe('M5PaperConfigComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ M5PaperConfigComponent ]
-    })
+    imports: [M5PaperConfigComponent]
+})
     .compileComponents();
   });
 

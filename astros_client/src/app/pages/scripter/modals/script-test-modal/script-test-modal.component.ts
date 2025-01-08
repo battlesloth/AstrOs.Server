@@ -6,9 +6,10 @@ import { ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 
 @Component({
-  selector: 'app-script-test-modal',
-  templateUrl: './script-test-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss', './script-test-modal.component.scss']
+    selector: 'app-script-test-modal',
+    templateUrl: './script-test-modal.component.html',
+    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './script-test-modal.component.scss'],
+    standalone: true
 })
 export class ScriptTestModalComponent extends BaseEventModalComponent implements OnInit, AfterViewInit {
 

@@ -6,11 +6,16 @@ import { AudioService } from 'src/app/services/audio/audio.service';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { UploadModalComponent } from './upload-modal/upload-modal.component';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
+import { NgFor, DatePipe } from '@angular/common';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { ModalComponent } from '../../modal/modal.component';
 
 @Component({
-  selector: 'app-audio-files',
-  templateUrl: './audio-files.component.html',
-  styleUrls: ['./audio-files.component.scss']
+    selector: 'app-audio-files',
+    templateUrl: './audio-files.component.html',
+    styleUrls: ['./audio-files.component.scss'],
+    standalone: true,
+    imports: [NgFor, FontAwesomeModule, ModalComponent, DatePipe]
 })
 export class AudioFilesComponent implements OnInit {
  

@@ -8,8 +8,8 @@ describe('UploadModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ UploadModalComponent ]
-    })
+    imports: [UploadModalComponent]
+})
     .compileComponents();
   });
 

@@ -8,8 +8,8 @@ describe('GenericSerialModuleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ GenericSerialModuleComponent ]
-    })
+    imports: [GenericSerialModuleComponent]
+})
     .compileComponents();
   });
 

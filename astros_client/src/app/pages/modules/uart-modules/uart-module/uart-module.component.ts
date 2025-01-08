@@ -1,11 +1,13 @@
 import { Component } from '@angular/core';
-import { MatExpansionPanel } from '@angular/material/expansion';
+import { MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion';
 
 @Component({
-  selector: 'app-uart-module',
-  templateUrl: './uart-module.component.html',
-  styleUrl: './uart-module.component.scss',
-  viewProviders: [MatExpansionPanel]
+    selector: 'app-uart-module',
+    templateUrl: './uart-module.component.html',
+    styleUrl: './uart-module.component.scss',
+    viewProviders: [MatExpansionPanel],
+    standalone: true,
+    imports: [MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle]
 })
 export class UartModuleComponent {
 

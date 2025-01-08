@@ -6,11 +6,14 @@ import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { FormatModalComponent } from './modals/format-modal/format-modal.component';
 import { ControlModule } from 'astros-common';
+import { ModalComponent } from '../../modal/modal.component';
 
 @Component({
-  selector: 'app-settings',
-  templateUrl: './settings.component.html',
-  styleUrls: ['./settings.component.scss']
+    selector: 'app-settings',
+    templateUrl: './settings.component.html',
+    styleUrls: ['./settings.component.scss'],
+    standalone: true,
+    imports: [ModalComponent]
 })
 export class SettingsComponent implements OnInit {
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;

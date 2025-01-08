@@ -5,9 +5,11 @@ import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { M5PaperConfigComponent } from './m5-paper-config/m5-paper-config.component';
 
 @Component({
-  selector: 'app-remote-config',
-  templateUrl: './remote-config.component.html',
-  styleUrls: ['./remote-config.component.scss']
+    selector: 'app-remote-config',
+    templateUrl: './remote-config.component.html',
+    styleUrls: ['./remote-config.component.scss'],
+    standalone: true,
+    imports: [M5PaperConfigComponent]
 })
 export class RemoteConfigComponent implements OnInit {
 

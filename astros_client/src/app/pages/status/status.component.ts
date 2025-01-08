@@ -3,9 +3,10 @@ import { ControllerStatus } from 'astros-common';
 import { StatusService } from 'src/app/services/status/status.service';
 
 @Component({
-  selector: 'app-status',
-  templateUrl: './status.component.html',
-  styleUrls: ['./status.component.scss']
+    selector: 'app-status',
+    templateUrl: './status.component.html',
+    styleUrls: ['./status.component.scss'],
+    standalone: true
 })
 export class StatusComponent implements AfterViewInit {
 

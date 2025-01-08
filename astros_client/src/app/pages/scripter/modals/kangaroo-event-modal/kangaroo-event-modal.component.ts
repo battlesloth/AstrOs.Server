@@ -2,11 +2,15 @@ import { Component, OnInit } from '@angular/core';
 import { KangarooAction, KangarooX2, KangarooEvent, ScriptEvent } from 'astros-common'
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
+import { FormsModule } from '@angular/forms';
+import { DecimalPipe } from '@angular/common';
 
 @Component({
-  selector: 'app-kangaroo-event-modal',
-  templateUrl: './kangaroo-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss','./kangaroo-event-modal.component.scss']
+    selector: 'app-kangaroo-event-modal',
+    templateUrl: './kangaroo-event-modal.component.html',
+    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './kangaroo-event-modal.component.scss'],
+    standalone: true,
+    imports: [FormsModule, DecimalPipe]
 })
 export class KangarooEventModalComponent extends BaseEventModalComponent implements OnInit {
 

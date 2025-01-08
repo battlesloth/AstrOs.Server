@@ -8,8 +8,8 @@ describe('KangarooEventModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ KangarooEventModalComponent ]
-    })
+    imports: [KangarooEventModalComponent]
+})
     .compileComponents();
   });
 

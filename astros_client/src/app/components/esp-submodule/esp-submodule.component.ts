@@ -1,11 +1,16 @@
 import { Component, ViewChild, ViewContainerRef } from '@angular/core';
-import { MatExpansionPanel } from '@angular/material/expansion';
+import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion';
 
 @Component({
   selector: 'app-esp-submodule',
   templateUrl: './esp-submodule.component.html',
   styleUrl: './esp-submodule.component.scss',
-  imports: [MatExpansionPanel],
+  imports: [
+    MatAccordion,
+    MatExpansionPanel,
+    MatExpansionPanelHeader,
+    MatExpansionPanelTitle
+  ],
   standalone: true
 })
 export class EspSubmoduleComponent {

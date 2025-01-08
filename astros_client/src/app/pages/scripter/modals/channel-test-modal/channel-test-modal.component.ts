@@ -2,11 +2,15 @@ import { Component, OnInit } from '@angular/core';
 import { ChannelSubType, ChannelType, KangarooAction } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
+import { NgIf } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 @Component({
-  selector: 'app-channel-test-modal',
-  templateUrl: './channel-test-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss', './channel-test-modal.component.scss']
+    selector: 'app-channel-test-modal',
+    templateUrl: './channel-test-modal.component.html',
+    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './channel-test-modal.component.scss'],
+    standalone: true,
+    imports: [NgIf, FormsModule]
 })
 export class ChannelTestModalComponent extends BaseEventModalComponent implements OnInit {
 

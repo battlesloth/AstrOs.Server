@@ -3,13 +3,18 @@ import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.co
 import { HcrCommand, HcrCommandCategory, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, ScriptEvent, HumanCyborgRelationsModule } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { faBan} from '@fortawesome/free-solid-svg-icons';
+import { FormsModule } from '@angular/forms';
+import { NgFor, DecimalPipe } from '@angular/common';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
 
 
 @Component({
-  selector: 'app-human-cyborg-modal',
-  templateUrl: './human-cyborg-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss', './human-cyborg-modal.component.scss']
+    selector: 'app-human-cyborg-modal',
+    templateUrl: './human-cyborg-modal.component.html',
+    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './human-cyborg-modal.component.scss'],
+    standalone: true,
+    imports: [FormsModule, NgFor, FontAwesomeModule, DecimalPipe]
 })
 export class HumanCyborgModalComponent extends BaseEventModalComponent implements OnInit {
 

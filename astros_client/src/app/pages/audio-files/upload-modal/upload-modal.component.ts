@@ -5,11 +5,15 @@ import { faFileAudio, faTrash} from '@fortawesome/free-solid-svg-icons';
 import { ModalBaseComponent } from 'src/app/modal';
 import { FileUpload } from 'src/app/models/upload-file';
 import { ModalCallbackEvent } from 'src/app/shared/modal-resources';
+import { NgFor, NgStyle, DecimalPipe } from '@angular/common';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
 @Component({
-  selector: 'app-upload-modal',
-  templateUrl: './upload-modal.component.html',
-  styleUrls: ['./upload-modal.component.scss']
+    selector: 'app-upload-modal',
+    templateUrl: './upload-modal.component.html',
+    styleUrls: ['./upload-modal.component.scss'],
+    standalone: true,
+    imports: [NgFor, NgStyle, FontAwesomeModule, DecimalPipe]
 })
 export class UploadModalComponent extends ModalBaseComponent implements OnInit {
 

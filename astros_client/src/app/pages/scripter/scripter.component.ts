@@ -1,5 +1,5 @@
 import { AfterViewChecked, Component, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
-import { MatMenuTrigger } from '@angular/material/menu'
+import { MatMenuTrigger, MatMenu, MatMenuContent, MatMenuItem } from '@angular/material/menu'
 import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
 import { ConfirmModalComponent, ModalService } from 'src/app/modal';
@@ -29,6 +29,10 @@ import EventMarkerHelper from './helper/event-marker-helper';
 import { UartEventModalComponent } from './modals/uart-event-modal/uart-event-modal.component';
 import { HumanCyborgModalComponent } from './modals/human-cyborg-modal/human-cyborg-modal.component';
 import { GpioEventModalComponent } from './modals/gpio-event-modal/gpio-event-modal.component';
+import { FormsModule } from '@angular/forms';
+import { NgFor } from '@angular/common';
+import { ScriptRowComponent } from './script-row/script-row.component';
+import { ModalComponent } from '../../modal/modal.component';
 
 
 export interface Item {
@@ -37,9 +41,11 @@ export interface Item {
 }
 
 @Component({
-  selector: 'app-scripter',
-  templateUrl: './scripter.component.html',
-  styleUrls: ['./scripter.component.scss']
+    selector: 'app-scripter',
+    templateUrl: './scripter.component.html',
+    styleUrls: ['./scripter.component.scss'],
+    standalone: true,
+    imports: [FormsModule, NgFor, ScriptRowComponent, MatMenuTrigger, MatMenu, MatMenuContent, MatMenuItem, ModalComponent]
 })
 export class ScripterComponent implements OnInit, AfterViewChecked {
 

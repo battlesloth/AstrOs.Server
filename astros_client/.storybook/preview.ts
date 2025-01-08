@@ -4,6 +4,8 @@ import docJson from "../documentation.json";
 import { MatExpansionModule } from "@angular/material/expansion";
 setCompodocJson(docJson);
 
+import '../src/styles.scss';
+
 const preview: Preview = {
   parameters: {
     controls: {

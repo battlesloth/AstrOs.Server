@@ -2,11 +2,15 @@ import { Component, OnInit } from '@angular/core';
 import { GpioEvent, ScriptEvent } from 'astros-common';
 import { ModalCallbackEvent, ModalResources } from '../../../../shared/modal-resources';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
+import { FormsModule } from '@angular/forms';
+import { DecimalPipe } from '@angular/common';
 
 @Component({
-  selector: 'app-gpio-event-modal',
-  templateUrl: './gpio-event-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss', './gpio-event-modal.component.scss']
+    selector: 'app-gpio-event-modal',
+    templateUrl: './gpio-event-modal.component.html',
+    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './gpio-event-modal.component.scss'],
+    standalone: true,
+    imports: [FormsModule, DecimalPipe]
 })
 export class GpioEventModalComponent extends BaseEventModalComponent implements OnInit {
 

@@ -1,11 +1,15 @@
 import { EventEmitter, Component, Input, OnInit, Output, Renderer2, ViewChild, ElementRef } from '@angular/core';
 import { faTrash, faEdit, faPlay } from '@fortawesome/free-solid-svg-icons'
 import { UartType, ScriptChannel } from 'astros-common';
+import { NgIf } from '@angular/common';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
 @Component({
-  selector: 'app-script-row',
-  templateUrl: './script-row.component.html',
-  styleUrls: ['./script-row.component.scss']
+    selector: 'app-script-row',
+    templateUrl: './script-row.component.html',
+    styleUrls: ['./script-row.component.scss'],
+    standalone: true,
+    imports: [NgIf, FontAwesomeModule]
 })
 
 export class ScriptRowComponent implements OnInit {

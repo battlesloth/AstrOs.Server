@@ -2,9 +2,10 @@ import { Component, ElementRef, Input, OnInit, Renderer2 } from '@angular/core';
 import { ModalService } from './modal.service';
 
 @Component({
-  selector: 'astros-modal',
-  templateUrl: './modal.component.html',
-  styleUrls: ['./modal.component.scss']
+    selector: 'astros-modal',
+    templateUrl: './modal.component.html',
+    styleUrls: ['./modal.component.scss'],
+    standalone: true
 })
 export class ModalComponent implements OnInit {
 
