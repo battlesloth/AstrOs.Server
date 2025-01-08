@@ -7,7 +7,9 @@
     "start-verbose": "node --trace-deprecation ./node_modules/@angular/cli/bin/ng serve  --verbose --proxy-config proxy.conf.json --configuration=development",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "storybook": "ng run client:storybook",
+    "build-storybook": "ng run client:build-storybook"
   },
   "private": true,
   "dependencies": {
@@ -21,6 +23,8 @@
     "@angular/platform-browser": "^18.2.11",
     "@angular/platform-browser-dynamic": "^18.2.11",
     "@angular/router": "^18.2.11",
+    "@fontsource/material-icons": "^5.1.1",
+    "@fontsource/roboto": "^5.1.1",
     "@fortawesome/angular-fontawesome": "^0.10.1",
     "@fortawesome/fontawesome-svg-core": "~1.2.36",
     "@fortawesome/free-brands-svg-icons": "^5.15.4",
@@ -35,9 +39,20 @@
     "zone.js": "~0.14.10"
   },
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^1.12.0",
     "@angular-devkit/build-angular": "^18.2.11",
     "@angular/cli": "^18.2.11",
     "@angular/compiler-cli": "^18.2.11",
+    "@chromatic-com/storybook": "^3.2.3",
+    "@compodoc/compodoc": "^1.1.26",
+    "@storybook/addon-docs": "^8.4.7",
+    "@storybook/addon-essentials": "^8.4.7",
+    "@storybook/addon-interactions": "^8.4.7",
+    "@storybook/addon-onboarding": "^8.4.7",
+    "@storybook/angular": "^8.4.7",
+    "@storybook/blocks": "^8.4.7",
+    "@storybook/builder-vite": "^8.4.7",
+    "@storybook/test": "^8.4.7",
     "@types/jasmine": "~3.10.0",
     "@types/node": "^22.10.5",
     "jasmine-core": "~3.10.0",
@@ -46,6 +61,7 @@
     "karma-coverage": "~2.0.3",
     "karma-jasmine": "~4.0.0",
     "karma-jasmine-html-reporter": "~1.7.0",
+    "storybook": "^8.4.7",
     "typescript": "~5.4.5"
   }
 }

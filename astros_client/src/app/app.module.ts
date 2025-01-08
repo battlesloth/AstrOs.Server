@@ -48,6 +48,7 @@ import { HumanCyborgModalComponent } from './pages/scripter/modals/human-cyborg-
 import { LoadingModalComponent } from './pages/modules/loading-modal/loading-modal.component';
 import { ServoTestModalComponent } from './pages/modules/servo-test-modal/servo-test-modal.component';
 import { UartModuleComponent } from './pages/modules/uart-modules/uart-module/uart-module.component';
+import { EspSubmoduleComponent } from './components/esp-submodule/esp-submodule.component';
 
 
 @NgModule({ declarations: [
@@ -97,7 +98,8 @@ import { UartModuleComponent } from './pages/modules/uart-modules/uart-module/ua
         FontAwesomeModule,
         MatProgressBarModule,
         MatCheckboxModule,
-        MatSliderModule
+        MatSliderModule,
+        EspSubmoduleComponent
     ], providers: [WebsocketService, provideHttpClient(withInterceptorsFromDi())] })
 export class AppModule { }
 

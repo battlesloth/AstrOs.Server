@@ -4,6 +4,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox'
 import { MatFormField } from '@angular/material/form-field';
 import { ControllerLocation, KangarooX2, UartModule, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
+import { EspSubmoduleComponent } from 'src/app/components/esp-submodule/esp-submodule.component';
 
 @Component({
   selector: 'app-esp-module',

@@ -1,0 +1,50 @@
+/* You can add global styles to this file, and also import other style files */
+@font-face {
+  src: url('DISTGRG_-webfont.woff') format("woff");
+  font-family: "distant_galaxyregular";
+  font-weight: normal;
+  font-style: normal;
+}
+:root {
+  font-size: 62.5%;
+  --mat-slider-ripple-color: #00236D;
+  --mat-slider-hover-state-layer-color: rgba(0, 35, 109, 0.2666666667);
+  --mat-slider-focus-state-layer-color: rgba(0, 35, 109, 0.2666666667);
+  --mdc-slider-hover-state-layer-color: rgba(0, 35, 109, 0.2666666667);
+  --mdc-slider-handle-color: #00236D;
+  --mdc-slider-focus-handle-color: #00236D;
+  --mdc-slider-hover-handle-color: rgba(0, 35, 109, 0.2666666667);
+  --mdc-slider-active-track-color: #00236D;
+  --mdc-slider-inactive-track-color: #00236D;
+  --mdc-slider-disabled-active-track-color: #5458B1;
+  --mdc-slider-disabled-handle-color: #5458B1;
+  --mdc-slider-disabled-inactive-track-color: #5458B1;
+  --mdc-slider-with-overlap-handle-outline-color: #00236D;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1.6rem;
+  background-color: #E5E5EC;
+}
+body button {
+  font-size: x-large;
+  padding: 10px 20px;
+  background: #767682;
+  color: #E5E5EC;
+}
+
+.page {
+  padding: 2rem;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+}
