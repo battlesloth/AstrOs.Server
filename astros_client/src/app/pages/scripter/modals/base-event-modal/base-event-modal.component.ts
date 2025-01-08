@@ -16,7 +16,7 @@ export class BaseEventModalComponent extends ModalBaseComponent implements OnIni
   protected callbackType: ModalCallbackEvent;
 
   eventTime: number;
-  protected maxTime: number = 3000;
+  protected maxTime = 3000;
   protected timeFactor = 10;
 
   errorMessage: string;

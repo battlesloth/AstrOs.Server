@@ -32,10 +32,10 @@ export class EspModuleComponent implements OnInit {
   @Output() openServoTestModal = new EventEmitter<any>();
 
   @Input()
-  isMaster: boolean = false;
+  isMaster = false;
 
   @Input()
-  locationId: number = 0;
+  locationId = 0;
 
   @Input()
   get module(): any { return this._module; }
@@ -44,7 +44,7 @@ export class EspModuleComponent implements OnInit {
     this.setModule();
   }
   _module!: ControllerLocation;
-  uartPanelOpenState: boolean = false;
+  uartPanelOpenState = false;
 
 
   @ViewChild('uart1Container', { read: ViewContainerRef })
@@ -69,7 +69,7 @@ export class EspModuleComponent implements OnInit {
   originalUart2Type!: UartType;
   originalUart2Module!: any;
 
-  components: Array<any>;
+  components: any[];
   uart1Type: string;
   uart2Type: string;
 

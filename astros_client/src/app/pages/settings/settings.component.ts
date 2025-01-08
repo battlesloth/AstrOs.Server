@@ -19,9 +19,9 @@ export class SettingsComponent implements OnInit {
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
 
   apiKey = "";
-  private characters: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-  private controllers: Array<ControlModule> = [];
+  private controllers: ControlModule[] = [];
 
   constructor(private settingsService: SettingsService,
     private snackBarService: SnackbarService,
@@ -50,8 +50,8 @@ export class SettingsComponent implements OnInit {
 
   generateApiKey() {
     let result = '';
-    let charactersLength = this.characters.length;
-    for (var i = 0; i < 10; i++) {
+    const charactersLength = this.characters.length;
+    for (let i = 0; i < 10; i++) {
       result += this.characters.charAt(Math.floor(Math.random() * charactersLength));
     }
 
@@ -105,7 +105,7 @@ export class SettingsComponent implements OnInit {
     this.modalService.open('scripts-modal');
   }
 
-  formatSD(val: Array<any>) {
+  formatSD(val: any[]) {
     const observer = {
       next: (result: any) => {
         this.snackBarService.okToast('Format queued!');

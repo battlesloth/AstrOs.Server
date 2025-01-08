@@ -14,24 +14,24 @@ import { FormsModule } from '@angular/forms';
 })
 export class ChannelTestModalComponent extends BaseEventModalComponent implements OnInit {
 
-  controllerId: number = 0;
-  channelId: number = 0;
+  controllerId = 0;
+  channelId = 0;
 
   channelType: ChannelType = ChannelType.none;
   channelSubType: ChannelSubType = ChannelSubType.none;
 
-  speed: number = 1;
-  position: number = 0;
-  value: string = '';
+  speed = 1;
+  position = 0;
+  value = '';
 
-  kangarooCh: number = 1;
-  kangarooAction: number = 1;
+  kangarooCh = 1;
+  kangarooAction = 1;
   kangarooSpd?: number;
   kangarooPos?: number;
-  spdDisabled: boolean = true;
-  posDisabled: boolean = true;
+  spdDisabled = true;
+  posDisabled = true;
 
-  gpioLevel: number = 0;
+  gpioLevel = 0;
 
   constructor() {
     super();
@@ -39,10 +39,10 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
   }
 
   override ngOnInit(): void {
-    this.controllerId = <number>this.resources.get(ModalResources.controllerType);
-    this.channelType = <ChannelType>this.resources.get(ModalResources.channelType);
-    this.channelSubType = <ChannelSubType>this.resources.get(ModalResources.channelSubType)
-    this.channelId = <number>this.resources.get(ModalResources.channelId);
+    this.controllerId = this.resources.get(ModalResources.controllerType) as number;
+    this.channelType = this.resources.get(ModalResources.channelType) as ChannelType;
+    this.channelSubType = this.resources.get(ModalResources.channelSubType) as ChannelSubType
+    this.channelId = this.resources.get(ModalResources.channelId) as number;
   }
 
   runClicked() {

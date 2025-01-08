@@ -15,7 +15,7 @@ import { NgFor, DecimalPipe } from '@angular/common';
 })
 export class AudioEventModalComponent extends BaseEventModalComponent implements OnInit {
 
-  audioFiles: Array<AudioFile>;
+  audioFiles: AudioFile[];
 
   selectedFile: string;
 
@@ -40,11 +40,11 @@ export class AudioEventModalComponent extends BaseEventModalComponent implements
     }
 
     if (this.callbackType === ModalCallbackEvent.editEvent){
-      var element = document.getElementById("remove_button");
+      const element = document.getElementById("remove_button");
       element?.classList.remove("hidden");
     }
 
-    this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
+    this.scriptEvent = this.resources.get(ModalResources.scriptEvent) as ScriptEvent;
     
     if (this.scriptEvent.dataJson != ''){
       const payload = JSON.parse(this.scriptEvent.dataJson);

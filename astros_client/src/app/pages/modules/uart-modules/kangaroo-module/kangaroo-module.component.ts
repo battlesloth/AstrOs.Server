@@ -1,4 +1,4 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, OnChanges } from '@angular/core';
 import { KangarooX2 } from 'astros-common';
 import { FormsModule } from '@angular/forms';
 
@@ -10,7 +10,7 @@ import { FormsModule } from '@angular/forms';
     standalone: true,
     imports: [FormsModule]
 })
-export class KangarooModuleComponent implements OnInit {
+export class KangarooModuleComponent implements OnInit, OnChanges {
 
   @Input()
   module!: KangarooX2;

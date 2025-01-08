@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
+import { Component, OnInit, ViewChild, ViewContainerRef, AfterViewChecked } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { faCopy, faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
 import { ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus, Script } from 'astros-common';
@@ -18,20 +18,20 @@ import { ModalComponent } from '../../modal/modal.component';
     standalone: true,
     imports: [NgFor, RouterLink, FontAwesomeModule, ModalComponent]
 })
-export class ScriptsComponent implements OnInit {
+export class ScriptsComponent implements OnInit, AfterViewChecked {
 
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
 
-  private initialStatusSet: boolean = false;
+  private initialStatusSet = false;
 
   faTrash = faTrash;
   faUpload = faUpload;
   faRun = faPlay;
   faCopy = faCopy;
 
-  _scripts: Array<Script> = new Array<Script>();
+  _scripts: Script[] = new Array<Script>();
 
-  scripts: Array<Script>
+  scripts: Script[]
 
   locationMap = new Map<number, string>([
     [1, 'body'],

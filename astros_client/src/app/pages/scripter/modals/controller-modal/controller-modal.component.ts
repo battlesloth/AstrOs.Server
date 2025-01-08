@@ -18,16 +18,16 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
   errorMessage: string;
 
   controllers!: Map<number, LocationDetails>;
-  selectedController: number = 0;
+  selectedController = 0;
 
   private availableModules!: Map<number, Map<ChannelType, string>>;
   modules: Map<ChannelType, string>
   selectedModule: ChannelType = ChannelType.none;
 
-  private availableChannels!: Map<number, Map<ChannelType, Array<ChannelValue>>>;
-  channels: Array<ChannelValue>
-  selectedChannel: number = -1;
-  selectedChannels: Array<any> = [];
+  private availableChannels!: Map<number, Map<ChannelType, ChannelValue[]>>;
+  channels: ChannelValue[]
+  selectedChannel = -1;
+  selectedChannels: any[] = [];
 
   constructor() {
     super();

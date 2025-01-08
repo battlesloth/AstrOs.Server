@@ -13,7 +13,7 @@ import { FormsModule } from '@angular/forms';
 })
 export class FormatModalComponent extends ModalBaseComponent implements OnInit {
 
-  controllers: Array<any> = [];
+  controllers: any[] = [];
 
   constructor() {
     super();

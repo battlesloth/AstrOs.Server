@@ -16,7 +16,7 @@ import { NgIf } from '@angular/common';
 export class AppComponent implements OnInit {
 
   title = "AstOs"
-  private menuOpen: boolean = false;
+  private menuOpen = false;
 
   @ViewChild('sideNav', { static: false }) sideNav!: ElementRef;
   @ViewChild('clickDetector', { static: false }) clickDetector!: ElementRef;

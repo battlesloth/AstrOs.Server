@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, OnInit, Renderer2 } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, Renderer2, OnDestroy } from '@angular/core';
 import { ModalService } from './modal.service';
 
 @Component({
@@ -7,7 +7,7 @@ import { ModalService } from './modal.service';
     styleUrls: ['./modal.component.scss'],
     standalone: true
 })
-export class ModalComponent implements OnInit {
+export class ModalComponent implements OnInit, OnDestroy {
 
   @Input() id: string;
   @Input() disableBackgroundClick: string;

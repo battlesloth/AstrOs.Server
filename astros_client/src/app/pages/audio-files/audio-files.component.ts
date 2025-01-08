@@ -25,7 +25,7 @@ export class AudioFilesComponent implements OnInit {
   faTrash = faTrash;
   faPlay = faPlay;
 
-  audioFiles: Array<AudioFile>;
+  audioFiles: AudioFile[];
 
   constructor(private snackBar: SnackbarService,
       private modalService: ModalService,

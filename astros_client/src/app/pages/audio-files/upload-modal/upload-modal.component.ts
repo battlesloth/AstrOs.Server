@@ -20,10 +20,10 @@ export class UploadModalComponent extends ModalBaseComponent implements OnInit {
   faTrash = faTrash;
   faFiles = faFileAudio;
 
-  uploadQueue: Array<FileUpload>;
+  uploadQueue: FileUpload[];
   isUploading: boolean;
 
-  path: string = '/api/audio/savefile';
+  path = '/api/audio/savefile';
 
   response: string;
 

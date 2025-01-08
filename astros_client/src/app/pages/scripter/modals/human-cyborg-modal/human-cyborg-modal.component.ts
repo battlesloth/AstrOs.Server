@@ -27,11 +27,11 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
   valueA!: string;
   valueB!: string;
 
-  selectedCommands: Array<HcrCommand>;
-  commands: Array<any>;
+  selectedCommands: HcrCommand[];
+  commands: any[];
 
-  hasValueA: Array<HumanCyborgRelationsCmd>;
-  hasValueB: Array<HumanCyborgRelationsCmd>;
+  hasValueA: HumanCyborgRelationsCmd[];
+  hasValueB: HumanCyborgRelationsCmd[];
 
   constructor() {
     super();
@@ -74,7 +74,7 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
     }
 
     if (this.callbackType === ModalCallbackEvent.editEvent){
-      var element = document.getElementById("remove_button");
+      const element = document.getElementById("remove_button");
       element?.classList.remove("hidden");
     }
 

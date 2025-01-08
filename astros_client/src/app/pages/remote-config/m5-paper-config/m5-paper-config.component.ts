@@ -21,12 +21,12 @@ export class M5PaperConfigComponent implements OnInit {
   faBackward = faChevronLeft;
   pageNumber = 1;
 
-  scripts: Array<any> = [];
+  scripts: any[] = [];
 
-  m5Config: Array<M5Page> = [];
+  m5Config: M5Page[] = [];
 
   currentPage: M5Page;
-  currentIndex: number = 0;
+  currentIndex = 0;
 
   constructor(private scriptService: ScriptsService,
     private remoteService: RemotesService) {
@@ -55,7 +55,7 @@ export class M5PaperConfigComponent implements OnInit {
       next: (result: any) => {
 
         if (result !== undefined) {
-          let config = JSON.parse(result.value) as Array<M5Page>;
+          const config = JSON.parse(result.value) as M5Page[];
 
           if (config.length != 0) {
             this.m5Config = config;
@@ -76,7 +76,7 @@ export class M5PaperConfigComponent implements OnInit {
 
   selectionChange(button: number, id: any) {
 
-    let sIdx = this.scripts
+    const sIdx = this.scripts
       .map((s) => { return s.id })
       .indexOf(id);
 

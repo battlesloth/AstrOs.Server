@@ -11,7 +11,7 @@ import {
 } from "astros-common";
 
 export default class EventMarkerHelper {
-    static generateText(event: ScriptEvent): Array<string> {
+    static generateText(event: ScriptEvent): string[] {
 
         switch (event.channelType) {
             case ChannelType.audio:
@@ -52,7 +52,7 @@ export default class EventMarkerHelper {
         return result;
     }*/
 
-    private static i2cText(json: string): Array<string> {
+    private static i2cText(json: string): string[] {
         const evt = JSON.parse(json) as I2cEvent;
         const result = new Array<string>();
         result[0] = '\u00A0';
@@ -63,7 +63,7 @@ export default class EventMarkerHelper {
         return result
     }
 
-    private static gpioText(json: string): Array<string> {
+    private static gpioText(json: string): string[] {
         const evt = JSON.parse(json) as GpioEvent;
         const result = new Array<string>();
         result[0] = '\u00A0';
@@ -74,7 +74,7 @@ export default class EventMarkerHelper {
         return result
     }
 
-    private static uartText(subType: ChannelSubType, json: string): Array<string> {
+    private static uartText(subType: ChannelSubType, json: string): string[] {
 
         switch (subType) {
             case ChannelSubType.genericSerial:
@@ -93,7 +93,7 @@ export default class EventMarkerHelper {
         }
     }
 
-    private static genericUart(json: string): Array<string> {
+    private static genericUart(json: string): string[] {
         const evt = JSON.parse(json) as GenericSerialEvent;
         const result = new Array<string>();
         result[0] = '\u00A0';
@@ -104,7 +104,7 @@ export default class EventMarkerHelper {
         return result
     }
 
-    static kangaroo(json: string): Array<string> {
+    static kangaroo(json: string): string[] {
         const evt = JSON.parse(json) as KangarooEvent;
         const result = new Array<string>();
         result[0] = 'CH 1:';
@@ -132,7 +132,7 @@ export default class EventMarkerHelper {
         }
     }
 
-    static humanCyborg(json: string): Array<string> {
+    static humanCyborg(json: string): string[] {
         const evt = JSON.parse(json) as HumanCyborgRelationsEvent;
         const result = new Array<string>();
         result[0] = '';

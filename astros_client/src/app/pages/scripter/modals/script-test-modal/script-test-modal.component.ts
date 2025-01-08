@@ -13,8 +13,8 @@ import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.co
 })
 export class ScriptTestModalComponent extends BaseEventModalComponent implements OnInit, AfterViewInit {
 
-  uploadInProgress: boolean = true;
-  runDisabled: boolean = true;
+  uploadInProgress = true;
+  runDisabled = true;
 
   coreUpload: TransmissionStatus = TransmissionStatus.sending;
   domeUpload: TransmissionStatus = TransmissionStatus.sending;
@@ -26,7 +26,7 @@ export class ScriptTestModalComponent extends BaseEventModalComponent implements
 
   status: string;
 
-  scriptId: string = '';
+  scriptId = '';
 
   constructor(private socket: WebsocketService, private scriptService: ScriptsService) {
     super();

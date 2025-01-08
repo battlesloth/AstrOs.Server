@@ -32,13 +32,13 @@ export class I2cEventModalComponent extends BaseEventModalComponent implements O
     }
 
     if (this.callbackType === ModalCallbackEvent.editEvent){
-      var element = document.getElementById("remove_button");
+      const element = document.getElementById("remove_button");
       element?.classList.remove("hidden");
     }
 
-    this.scriptEvent = <ScriptEvent> this.resources.get(ModalResources.scriptEvent);
+    this.scriptEvent = this.resources.get(ModalResources.scriptEvent) as ScriptEvent;
     
-    this.channelId = <number> this.resources.get(ModalResources.i2cId);
+    this.channelId = this.resources.get(ModalResources.i2cId) as number;
 
     if (this.scriptEvent.dataJson != ''){
       const payload = JSON.parse(this.scriptEvent.dataJson);

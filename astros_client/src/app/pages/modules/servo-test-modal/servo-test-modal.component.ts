@@ -14,10 +14,10 @@ import { FormsModule } from '@angular/forms';
 })
 export class ServoTestModalComponent extends BaseEventModalComponent implements OnInit {
    
-  servoId: number = 0;
-  controllerId: number = 0;
-  disableSlider: boolean = true;
-  value: number = 1500;
+  servoId = 0;
+  controllerId = 0;
+  disableSlider = true;
+  value = 1500;
 
   constructor() {
     super();

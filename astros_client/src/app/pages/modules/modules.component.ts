@@ -42,12 +42,12 @@ export class ModulesComponent implements OnInit, AfterViewInit {
 
   isLoaded = false;
 
-  backgroundClickDisabled: string = '1';
-  isMaster: boolean = true;
+  backgroundClickDisabled = '1';
+  isMaster = true;
 
-  possibleControllers: Array<ControlModule> = [];
-  availableDomeControllers: Array<ControlModule> = [];
-  availableCoreControllers: Array<ControlModule> = [];
+  possibleControllers: ControlModule[] = [];
+  availableDomeControllers: ControlModule[] = [];
+  availableCoreControllers: ControlModule[] = [];
 
   coreWarning = faExclamationTriangle;
   domeWarning = faExclamationTriangle;

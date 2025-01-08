@@ -34,20 +34,20 @@ export class ScriptResources {
 
     locations: Map<number, LocationDetails>;
 
-    uartChannels: Map<number, Array<ChannelValue>>;
+    uartChannels: Map<number, ChannelValue[]>;
 
-    servoChannels: Map<number, Array<ChannelValue>>;
+    servoChannels: Map<number, ChannelValue[]>;
 
-    i2cChannels: Map<number, Array<ChannelValue>>;
+    i2cChannels: Map<number, ChannelValue[]>;
 
-    gpioChannels: Map<number, Array<ChannelValue>>;
+    gpioChannels: Map<number, ChannelValue[]>;
 
-    constructor(locations: Array<ControllerLocation>) {
+    constructor(locations: ControllerLocation[]) {
         this.locations = new Map<number, LocationDetails>();
-        this.servoChannels = new Map<number, Array<any>>();
-        this.i2cChannels = new Map<number, Array<any>>();
-        this.uartChannels = new Map<number, Array<any>>();
-        this.gpioChannels = new Map<number, Array<any>>();
+        this.servoChannels = new Map<number, any[]>();
+        this.i2cChannels = new Map<number, any[]>();
+        this.uartChannels = new Map<number, any[]>();
+        this.gpioChannels = new Map<number, any[]>();
 
         //this.locations.set(4, new LocationDetails(4, 'Audio Playback'));
 
@@ -107,7 +107,7 @@ export class ScriptResources {
         return result;
     }
 
-    getAvailableChannels(): Map<number, Map<ChannelType, Array<ChannelValue>>> {
+    getAvailableChannels(): Map<number, Map<ChannelType, ChannelValue[]>> {
         const result = new Map<number, Map<ChannelType, any>>()
 
         for (const ctrl of this.locations.keys()) {
@@ -115,7 +115,7 @@ export class ScriptResources {
                 continue;
             }
 
-            var vals = new Map<ChannelType, any>();
+            const vals = new Map<ChannelType, any>();
 
             //vals.set(ChannelType.servo, this.servoChannels.get(ctrl));
             vals.set(ChannelType.i2c, this.i2cChannels.get(ctrl));

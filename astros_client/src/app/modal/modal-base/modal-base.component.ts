@@ -10,7 +10,7 @@ export abstract class ModalBaseComponent implements OnInit {
   @Input()
   resources!: Map<string, any>;
 
-  @Output("modalCallback") modalCallback: EventEmitter<any> = new EventEmitter();
+  @Output() modalCallback = new EventEmitter<any>();
 
 
 

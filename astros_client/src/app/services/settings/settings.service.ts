@@ -44,8 +44,8 @@ export class SettingsService {
   }
 
 
-  public formatSD(controllers: Array<any>): Observable<any> {
-    return this.http.post<Array<any>>(`/api/settings/formatSD`, { controllers: controllers },
+  public formatSD(controllers: any[]): Observable<any> {
+    return this.http.post<any[]>(`/api/settings/formatSD`, { controllers: controllers },
       {
         headers: { Authorization: `Bearer ${this.getToken()}` }
       })

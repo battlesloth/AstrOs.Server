@@ -14,13 +14,13 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
 export class ScriptRowComponent implements OnInit {
 
-  private segmentWidth: number = 60;
+  private segmentWidth = 60;
   faTrash = faTrash;
   faEdit = faEdit;
   faPlay = faPlay;
 
-  locationName: string = "Location";
-  uartType: string = "None";
+  locationName = "Location";
+  uartType = "None";
 
   @ViewChild('timeline', { static: false }) timelineEl!: ElementRef;
 
@@ -36,13 +36,13 @@ export class ScriptRowComponent implements OnInit {
     return this._channel;
   }
 
-  @Output("timelineCallback") timelineCallback: EventEmitter<any> = new EventEmitter();
-  @Output("removeCallback") removeCallback: EventEmitter<any> = new EventEmitter();
-  @Output("channelTestCallback") channelTestCallback: EventEmitter<any> = new EventEmitter();
+  @Output() timelineCallback = new EventEmitter<any>();
+  @Output() removeCallback = new EventEmitter<any>();
+  @Output() channelTestCallback = new EventEmitter<any>();
 
-  timeLineArray: Array<number>;
-  private segments: number = 3000;
-  private segmentFactor: number = 10;
+  timeLineArray: number[];
+  private segments = 3000;
+  private segmentFactor = 10;
 
   constructor(private renderer: Renderer2) {
     this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1))

@@ -124,7 +124,7 @@
               "."
             ],
             "port": 6006,
-            "styles":[
+            "styles": [
               "@angular/material/prebuilt-themes/indigo-pink.css",
               "@fontsource/roboto/300.css",
               "@fontsource/roboto/400.css",
@@ -149,6 +149,15 @@
             ],
             "outputDir": "storybook-static"
           }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html"
+            ]
+          }
         }
       }
     }
@@ -159,6 +168,9 @@
     }
   },
   "cli": {
-    "analytics": false
+    "analytics": false,
+    "schematicCollections": [
+      "angular-eslint"
+    ]
   }
 }

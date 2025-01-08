@@ -16,7 +16,7 @@ export class LoadingModalComponent extends BaseEventModalComponent implements On
 
   subscription!: Subscription;
 
-  message: string = "Loading Controllers...";
+  message = "Loading Controllers...";
   controllersMsg = TransmissionType.controllers;
   locations!: AstrOsLocationCollection;
   controllers!: ControllersResponse;

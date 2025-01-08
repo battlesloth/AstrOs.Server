@@ -53,26 +53,26 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
 
-  private segmentWidth: number = 60;
-  private segments: number = 3000;
-  private segmentFactor: number = 10;
+  private segmentWidth = 60;
+  private segments = 3000;
+  private segmentFactor = 10;
   private scriptId: string;
-  private resourcesLoaded: boolean = false;
-  private renderedEvents: boolean = false;
-  private characters: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  private resourcesLoaded = false;
+  private renderedEvents = false;
+  private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
   backgroundClickDisabled = '0';
 
   script!: Script;
-  scriptChannels: Array<ScriptChannel>;
+  scriptChannels: ScriptChannel[];
 
-  timeLineArray: Array<number>;
+  timeLineArray: number[];
   menuTopLeft = { x: 0, y: 0 };
 
   scriptResources!: ScriptResources;
 
 
-  components: Array<any>;
+  components: any[];
 
   constructor(private route: ActivatedRoute,
     private snackBar: SnackbarService,
@@ -313,7 +313,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       time = Math.floor(clickPos / this.segmentWidth);
 
-      let left = (time * this.segmentWidth);
+      const left = (time * this.segmentWidth);
 
       if (Math.floor(clickPos) - left >= 30) {
         time += 1
@@ -324,7 +324,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       return;
     }
 
-    let chIdx = this.scriptChannels
+    const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(evt.timeline);
 
@@ -512,7 +512,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   private removeChannel(id: string) {
 
-    let chIdx = this.scriptChannels
+    const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(id);
 
@@ -533,7 +533,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   channelTestCallback(msg: any) {
 
-    let chIdx = this.scriptChannels
+    const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(msg.id);
 
@@ -564,7 +564,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   //#endregion
 
-  private addChannel(locationId: number, channelType: ChannelType, channels: Array<number>): void {
+  private addChannel(locationId: number, channelType: ChannelType, channels: number[]): void {
 
     let name = this.scriptResources.locations.get(locationId)?.name;
 
@@ -575,7 +575,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     if (channelType === ChannelType.audio) {
       const chValue = this.scriptResources.addChannel(locationId, channelType, 0);
 
-      let subType = 0;
+      const subType = 0;
 
       const ch = new ScriptChannel(Guid.create().toString(), this.scriptId, locationId, channelType, subType, 0, chValue, this.segments);
 
@@ -693,8 +693,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   private generateScriptId(length: number): string {
     let result = `s${Math.floor(Date.now() / 1000)}`;
-    let charactersLength = this.characters.length;
-    for (var i = 0; i < length; i++) {
+    const charactersLength = this.characters.length;
+    for (let i = 0; i < length; i++) {
       result += this.characters.charAt(Math.floor(Math.random() * charactersLength));
     }
     return result;
