@@ -1,4 +1,4 @@
-import { EventEmitter, Component, Input, OnInit, Output, Renderer2, ViewChild, ElementRef } from '@angular/core';
+import { EventEmitter, Component, Input, Output, Renderer2, ViewChild, ElementRef } from '@angular/core';
 import { faTrash, faEdit, faPlay } from '@fortawesome/free-solid-svg-icons'
 import { UartType, ScriptChannel } from 'astros-common';
 import { NgIf } from '@angular/common';
@@ -12,7 +12,7 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
     imports: [NgIf, FontAwesomeModule]
 })
 
-export class ScriptRowComponent implements OnInit {
+export class ScriptRowComponent {
 
   private segmentWidth = 60;
   faTrash = faTrash;
@@ -36,20 +36,15 @@ export class ScriptRowComponent implements OnInit {
     return this._channel;
   }
 
-  @Output() timelineCallback = new EventEmitter<any>();
-  @Output() removeCallback = new EventEmitter<any>();
-  @Output() channelTestCallback = new EventEmitter<any>();
+  @Output() timelineCallback = new EventEmitter<unknown>();
+  @Output() removeCallback = new EventEmitter<unknown>();
+  @Output() channelTestCallback = new EventEmitter<unknown>();
 
   timeLineArray: number[];
   private segments = 3000;
-  private segmentFactor = 10;
 
   constructor(private renderer: Renderer2) {
     this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1))
-  }
-
-
-  ngOnInit(): void {
   }
 
   remove(): void {

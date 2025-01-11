@@ -7,11 +7,11 @@ import { WebsocketService } from './services/websocket/websocket.service';
 import { NgIf } from '@angular/common';
 
 @Component({
-    selector: 'app-root',
-    templateUrl: './app.component.html',
-    styleUrls: ['./app.component.scss'],
-    standalone: true,
-    imports: [RouterLink, NgIf, RouterOutlet]
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss'],
+  standalone: true,
+  imports: [RouterLink, NgIf, RouterOutlet]
 })
 export class AppComponent implements OnInit {
 
@@ -33,7 +33,7 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.socket.messages.subscribe((msg: any) => {
+    this.socket.messages.subscribe((msg: unknown) => {
       this.handleSocketMessage(msg);
     });
   }
@@ -50,10 +50,21 @@ export class AppComponent implements OnInit {
     }
   }
 
+
+
   closeMenu() {
     this.renderer.setStyle(this.sideNav.nativeElement, 'width', '0px');
     this.renderer.setStyle(this.clickDetector.nativeElement, 'width', '0px');
     this.menuOpen = false
+  }
+
+  containerKeyPressed(event: KeyboardEvent) {
+    if (event.key === 'Escape' ||
+       event.key === 'Esc' ||
+       event.key === 'Enter' ||
+       event.key === 'Space') {
+      this.closeMenu();
+    }
   }
 
   containerClicked() {
@@ -62,11 +73,14 @@ export class AppComponent implements OnInit {
     }
   }
 
-  private handleSocketMessage(msg: any) {
-    switch (msg.type) {
-      case TransmissionType.sync:
-        this.snackbar.okToast(msg.message);
-        break;
+  private handleSocketMessage(msg: unknown) {
+
+    if (msg && typeof msg === 'object' && 'type' in msg && 'message' in msg) {
+      switch (msg.type) {
+        case TransmissionType.sync:
+          this.snackbar.okToast(msg.message as string);
+          break;
+      }
     }
   }
 }

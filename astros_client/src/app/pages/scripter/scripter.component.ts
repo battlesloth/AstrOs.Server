@@ -1,51 +1,95 @@
-import { AfterViewChecked, Component, OnInit, Renderer2, ViewChild, ViewContainerRef } from '@angular/core';
-import { MatMenuTrigger, MatMenu, MatMenuContent, MatMenuItem } from '@angular/material/menu'
+import {
+  AfterViewChecked,
+  Component,
+  ComponentRef,
+  OnInit,
+  Renderer2,
+  ViewChild,
+  ViewContainerRef
+} from '@angular/core';
+import {
+  MatMenuTrigger,
+  MatMenu,
+  MatMenuContent,
+  MatMenuItem
+} from '@angular/material/menu'
 import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
-import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptResources } from 'src/app/models/script-resources';
-import { 
-  ChannelSubType, 
-  ChannelType,  
-  AstrOsLocationCollection, 
-  Script, 
-  ScriptChannel, 
+import {
+  ChannelSubType,
+  ChannelType,
+  AstrOsLocationCollection,
+  Script,
+  ScriptChannel,
   ScriptEvent,
-  ControllerLocation, 
-  BaseChannel 
+  ControllerLocation,
+  BaseChannel
 } from 'astros-common';
-import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ScriptsService } from 'src/app/services/scripts/scripts.service';
-import { ControllerModalComponent } from './modals/controller-modal/controller-modal.component';
-import { I2cEventModalComponent } from './modals/i2c-event-modal/i2c-event-modal.component';
-import { ModalCallbackEvent, ModalResources } from '../../shared/modal-resources';
-import { ServoEventModalComponent } from './modals/servo-event-modal/servo-event-modal.component';
-import { AudioEventModalComponent } from './modals/audio-event-modal/audio-event-modal.component';
-import { KangarooEventModalComponent } from './modals/kangaroo-event-modal/kangaroo-event-modal.component';
-import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
-import { ScriptTestModalComponent } from './modals/script-test-modal/script-test-modal.component';
-import { ChannelTestModalComponent } from './modals/channel-test-modal/channel-test-modal.component';
 import EventMarkerHelper from './helper/event-marker-helper';
-import { UartEventModalComponent } from './modals/uart-event-modal/uart-event-modal.component';
-import { HumanCyborgModalComponent } from './modals/human-cyborg-modal/human-cyborg-modal.component';
-import { GpioEventModalComponent } from './modals/gpio-event-modal/gpio-event-modal.component';
 import { FormsModule } from '@angular/forms';
 import { NgFor } from '@angular/common';
 import { ScriptRowComponent } from './script-row/script-row.component';
-import { ModalComponent } from '../../modal/modal.component';
-
+import {
+  AudioEventModalComponent,
+  ChannelTestModalComponent,
+  ChannelTestModalResources,
+  ChannelTestModalResponse,
+  ControllerModalComponent,
+  ControllerModalResources,
+  ControllerModalResponse,
+  GpioEventModalComponent,
+  GpioEventModalResources,
+  HcrModalResources,
+  HumanCyborgModalComponent,
+  I2cEventModalComponent,
+  I2cEventModalResources,
+  KangarooEventModalComponent,
+  KangarooEventModalResources,
+  ScriptEventModalResources,
+  ScriptEventModalResponse,
+  ScriptTestModalComponent,
+  ScriptTestModalResources,
+  UartEventModalComponent,
+  UartEventModalResources
+} from '@src/components/modals/scripting';
+import {
+  ControllerService,
+  ModalService,
+  ScriptsService,
+  SnackbarService
+} from '@src/services';
+import { ConfirmModalComponent, ConfirmModalEvent, ConfirmModalResources, ModalCallbackEvent, ModalComponent } from '@src/components/modals';
 
 export interface Item {
   timeline: string;
   xPos: number;
 }
 
+type ScripterModal =
+  UartEventModalComponent |
+  KangarooEventModalComponent |
+  I2cEventModalComponent |
+  AudioEventModalComponent |
+  GpioEventModalComponent |
+  HumanCyborgModalComponent;
+
+
 @Component({
-    selector: 'app-scripter',
-    templateUrl: './scripter.component.html',
-    styleUrls: ['./scripter.component.scss'],
-    standalone: true,
-    imports: [FormsModule, NgFor, ScriptRowComponent, MatMenuTrigger, MatMenu, MatMenuContent, MatMenuItem, ModalComponent]
+  selector: 'app-scripter',
+  templateUrl: './scripter.component.html',
+  styleUrls: ['./scripter.component.scss'],
+  standalone: true,
+  imports: [
+    FormsModule,
+    NgFor,
+    ScriptRowComponent,
+    MatMenuTrigger,
+    MatMenu,
+    MatMenuContent,
+    MatMenuItem,
+    ModalComponent
+  ]
 })
 export class ScripterComponent implements OnInit, AfterViewChecked {
 
@@ -60,6 +104,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   private resourcesLoaded = false;
   private renderedEvents = false;
   private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  private removeChannelEvent = 'scripter_removeChannel';
 
   backgroundClickDisabled = '0';
 
@@ -72,7 +117,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   scriptResources!: ScriptResources;
 
 
-  components: any[];
+  components: unknown[];
 
   constructor(private route: ActivatedRoute,
     private snackBar: SnackbarService,
@@ -86,7 +131,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1) / this.segmentFactor)
 
     this.scriptChannels = new Array<ScriptChannel>();
-    this.components = new Array<any>();
+    this.components = new Array<unknown>();
   }
 
   ngAfterViewChecked(): void {
@@ -119,7 +164,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         this.scriptResources = new ScriptResources(modules);
         this.resourcesLoaded = true;
       },
-      error: (err: any) => console.error(err)
+      error: (err: unknown) => console.error(err)
     };
 
     this.controllerService.getLoadedLocations().subscribe(csObserver);
@@ -157,7 +202,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
           this.scriptResources.applyScript(this.script);
         },
-        error: (err: any) => console.error(err)
+        error: (err: unknown) => console.error(err)
       };
 
       this.scriptService.getScript(this.scriptId).subscribe(ssObserver)
@@ -169,16 +214,18 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   saveScript() {
 
     const observer = {
-      next: (result: any) => {
-        if (result.message === 'success') {
-          console.log('script settings saved!')
-          this.snackBar.okToast('Script settings saved!');
+      next: (result: unknown) => {
+        if (result && typeof result === 'object' && 'message' in result) {
+          if (result.message === 'success') {
+            console.log('script settings saved!')
+            this.snackBar.okToast('Script settings saved!');
+          }
         } else {
           console.log('script settings save failed!')
           this.snackBar.okToast('Script settings save failed!');
         }
       },
-      error: (err: any) => {
+      error: (err: unknown) => {
         console.error(err);
         this.snackBar.okToast('Script settings save failed!');
       }
@@ -202,20 +249,20 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   openScriptTestModal() {
     this.container.clear();
 
-    const modalResources = new Map<string, any>();
+    const modalResources = new Map<string, unknown>();
 
-    modalResources.set(ModalResources.scriptId, this.scriptId);
+    modalResources.set(ScriptTestModalResources.scriptId, this.scriptId);
 
     const locations = new Array<string>();
 
     this.script.deploymentStatusKvp.forEach((kvp) => { locations.push(kvp.key) });
 
-    modalResources.set(ModalResources.locations, locations);
+    modalResources.set(ScriptTestModalResources.locations, locations);
 
     const component = this.container.createComponent(ScriptTestModalComponent);
 
     component.instance.resources = modalResources;
-    component.instance.modalCallback.subscribe((evt: any) => {
+    component.instance.modalCallback.subscribe((evt: ModalCallbackEvent) => {
       this.modalCallback(evt);
     });
     this.components.push(component);
@@ -227,16 +274,18 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   saveBeforeTest() {
     const observer = {
-      next: (result: any) => {
-        if (result.message === 'success') {
-          console.log('script settings saved!')
-          this.openScriptTestModal();
+      next: (result: unknown) => {
+        if (result && typeof result === 'object' && 'message' in result) {
+          if (result.message === 'success') {
+            console.log('script settings saved!')
+            this.openScriptTestModal();
+          }
         } else {
           console.log('script settings save failed!')
           this.snackBar.okToast('Script settings save failed!');
         }
       },
-      error: (err: any) => {
+      error: (err: unknown) => {
         console.error(err);
         this.snackBar.okToast('Script settings save failed!');
       }
@@ -256,19 +305,21 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
 
-  sendChannelTest(controllerId: number, commandType: ChannelType, command: any) {
+  sendChannelTest(controllerId: number, commandType: ChannelType, command: unknown) {
 
     const observer = {
-      next: (result: any) => {
-        if (result.message === 'success') {
-          console.log('Test command sent!')
-          this.snackBar.okToast('Test command sent!');
+      next: (result: unknown) => {
+        if (result && typeof result === 'object' && 'message' in result) {
+          if (result.message === 'success') {
+            console.log('Test command sent!')
+            this.snackBar.okToast('Test command sent!');
+          }
         } else {
           console.log('Test command send failed!')
           this.snackBar.okToast('Test command send failed!');
         }
       },
-      error: (err: any) => {
+      error: (err: unknown) => {
         console.error(err);
         this.snackBar.okToast('Test command send failed!');
       }
@@ -284,16 +335,16 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     this.container.clear();
 
-    const modalResources = new Map<string, any>();
+    const modalResources = new Map<string, unknown>();
 
-    modalResources.set(ModalResources.controllers, this.scriptResources.locations);
-    modalResources.set(ModalResources.modules, this.scriptResources.getAvailableModules());
-    modalResources.set(ModalResources.channels, this.scriptResources.getAvailableChannels());
+    modalResources.set(ControllerModalResources.controllers, this.scriptResources.locations);
+    modalResources.set(ControllerModalResources.modules, this.scriptResources.getAvailableModules());
+    modalResources.set(ControllerModalResources.channels, this.scriptResources.getAvailableChannels());
 
     const component = this.container.createComponent(ControllerModalComponent);
 
     component.instance.resources = modalResources;
-    component.instance.modalCallback.subscribe((evt: any) => {
+    component.instance.modalCallback.subscribe((evt: ModalCallbackEvent) => {
       this.modalCallback(evt);
     });
     this.components.push(component);
@@ -301,39 +352,42 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.modalService.open('scripter-modal');
   }
 
-  openNewEventModal(evt: any) {
+  openNewEventModal(evt: unknown) {
     let time = 0;
 
-    const line = document.getElementById(`script-row-${evt.timeline}`);
-    const scrollContainer = document.getElementById("scripter-container");
+    if (evt && typeof evt === 'object' && 'timeline' in evt && 'xPos' in evt) {
 
-    if (line != null && scrollContainer != null) {
+      const line = document.getElementById(`script-row-${evt.timeline}`);
+      const scrollContainer = document.getElementById("scripter-container");
 
-      const clickPos = (evt.xPos + scrollContainer.scrollLeft - line.offsetLeft);
+      if (line != null && scrollContainer != null) {
 
-      time = Math.floor(clickPos / this.segmentWidth);
+        const clickPos = (evt.xPos as number + scrollContainer.scrollLeft - line.offsetLeft);
 
-      const left = (time * this.segmentWidth);
+        time = Math.floor(clickPos / this.segmentWidth);
 
-      if (Math.floor(clickPos) - left >= 30) {
-        time += 1
+        const left = (time * this.segmentWidth);
+
+        if (Math.floor(clickPos) - left >= 30) {
+          time += 1
+        }
       }
-    } else {
-      this.snackBar.okToast('Could not determine event time!');
-      console.log('could not determine event time');
-      return;
+      else {
+        this.snackBar.okToast('Could not determine event time!');
+        console.log('could not determine event time');
+        return;
+      }
+
+      const chIdx = this.scriptChannels
+        .map((ch) => { return ch.id })
+        .indexOf(evt.timeline as string);
+
+      const ch = this.scriptChannels[chIdx];
+
+      const event = new ScriptEvent(ch.id, ch.type, ch.subType, time, '');
+
+      this.createEventModal(event, false);
     }
-
-    const chIdx = this.scriptChannels
-      .map((ch) => { return ch.id })
-      .indexOf(evt.timeline);
-
-    const ch = this.scriptChannels[chIdx];
-
-    const event = new ScriptEvent(ch.id, ch.type, ch.subType, time, '');
-
-    this.createEventModal(event, false);
-
   }
 
   openEditEventModal(channelId: string, time: number) {
@@ -354,52 +408,52 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     this.container.clear();
 
-    const modalResources = new Map<string, any>();
-    modalResources.set(ModalResources.scriptEvent, event)
+    const modalResources = new Map<string, unknown>();
+    modalResources.set(ScriptEventModalResources.scriptEvent, event)
 
     if (isEdit) {
-      modalResources.set(ModalResources.callbackType, ModalCallbackEvent.editEvent);
+      modalResources.set(ScriptEventModalResources.callbackType, ScriptEventModalResources.editEvent);
     }
 
-    let component: any;
+    let component!: ComponentRef<ScripterModal>;
 
     switch (event.channelType) {
       case ChannelType.uart:
         switch (event.channelSubType) {
           case ChannelSubType.genericSerial:
             component = this.container.createComponent(UartEventModalComponent)
-            modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
+            modalResources.set(UartEventModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
             break;
           case ChannelSubType.kangaroo:
             component = this.container.createComponent(KangarooEventModalComponent)
-            modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
-            modalResources.set(ModalResources.kangaroo, this.getKangarooControllerFromChannel(event.scriptChannel));
+            modalResources.set(KangarooEventModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
+            modalResources.set(KangarooEventModalResources.kangaroo, this.getKangarooControllerFromChannel(event.scriptChannel));
             break;
           case ChannelSubType.humanCyborgRelations:
             component = this.container.createComponent(HumanCyborgModalComponent)
-            modalResources.set(ModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
+            modalResources.set(HcrModalResources.channelId, this.getUartChannelFromChannel(event.scriptChannel));
             break;
         }
         break;
       case ChannelType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);
-        modalResources.set(ModalResources.i2cId, this.getIdFromChannel(event.scriptChannel))
+        modalResources.set(I2cEventModalResources.i2cId, this.getIdFromChannel(event.scriptChannel))
         break;
-     /* case ChannelType.servo:
-        component = this.container.createComponent(ServoEventModalComponent);
-        modalResources.set(ModalResources.servoId, this.getIdFromChannel(event.scriptChannel))
-        break; */
+      /* case ChannelType.servo:
+         component = this.container.createComponent(ServoEventModalComponent);
+         modalResources.set(ModalResources.servoId, this.getIdFromChannel(event.scriptChannel))
+         break; */
       case ChannelType.audio:
         component = this.container.createComponent(AudioEventModalComponent);
         break;
       case ChannelType.gpio:
         component = this.container.createComponent(GpioEventModalComponent);
-        modalResources.set(ModalResources.gpioId, this.getIdFromChannel(event.scriptChannel))
+        modalResources.set(GpioEventModalResources.gpioId, this.getIdFromChannel(event.scriptChannel))
         break;
     }
 
     component.instance.resources = modalResources;
-    component.instance.modalCallback.subscribe((evt: any) => {
+    component.instance.modalCallback.subscribe((evt: ModalCallbackEvent) => {
       this.modalCallback(evt);
     });
     this.components.push(component);
@@ -409,8 +463,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   //#region resources for modals 
 
-  getUartChannelFromChannel(channelId: string): any {
-    const chIdx = this.scriptChannels
+  getUartChannelFromChannel(channelId: string) {
+    const _ = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(channelId);
 
@@ -420,9 +474,9 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     }*/
   }
 
-  getKangarooControllerFromChannel(channelId: string): any {
+  getKangarooControllerFromChannel(channelId: string) {
 
-    const chIdx = this.scriptChannels
+    const _ = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(channelId);
 
@@ -432,7 +486,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     }*/
   }
 
-  getIdFromChannel(channelId: string): any {
+  getIdFromChannel(channelId: string): number | null {
     const chIdx = this.scriptChannels
       .map((ch) => { return ch.id })
       .indexOf(channelId);
@@ -441,37 +495,63 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       const servo = this.scriptChannels[chIdx].channel as BaseChannel;
       return servo.id;
     }
+
+    return null;
   }
 
 
   //#endregion
 
-  modalCallback(evt: any) {
+  modalCallback(evt: ModalCallbackEvent) {
 
-    switch (evt.id) {
-      case ModalCallbackEvent.addChannel:
-        this.addChannel(evt.controller, evt.module, evt.channels);
+    switch (evt.type) {
+      case ControllerModalResources.addChannelEvent:
+        {
+          const value = evt.value as ControllerModalResponse
+          this.addChannel(value.controller, value.module, value.channels);
+          break;
+        }
+      case ConfirmModalResources.confirmEvent:
+        this.handleConfirmModalEvent(evt.value as ConfirmModalEvent);
         break;
-      case ModalCallbackEvent.removeChannel:
-        this.removeChannel(evt.val);
-        break;
-      case ModalCallbackEvent.addEvent:
-        this.addEvent(evt.scriptEvent);
-        break;
-      case ModalCallbackEvent.editEvent:
-        this.editEvent(evt.scriptEvent, evt.originalEventTime);
-        break;
-      case ModalCallbackEvent.removeEvent:
-        this.removeEvent(evt.channelId, evt.time);
-        break;
-      case ModalCallbackEvent.channelTest:
-        this.sendChannelTest(evt.controllerId, evt.commandType, evt.command);
+      case ScriptEventModalResources.addEvent:
+        {
+          this.addEvent(evt.value as ScriptEvent);
+          break;
+        }
+      case ScriptEventModalResources.editEvent:
+        {
+          const value = evt.value as ScriptEventModalResponse;
+          this.editEvent(value.scriptEvent, value.time);
+          break;
+        }
+      case ScriptEventModalResources.removeEvent:
+        {
+          const value = evt.value as ScriptEventModalResponse
+          this.removeEvent(value.scriptEvent.scriptChannel, value.time);
+          break;
+        }
+      case ChannelTestModalResources.channelTest:
+        {
+          const value = evt.value as ChannelTestModalResponse;
+          this.sendChannelTest(value.controllerId, value.commandType, value.command);
+          break;
+        }
     }
 
     this.modalService.close('scripter-modal');
     this.container.clear();
     this.components.splice(0, this.components.length);
     this.backgroundClickDisabled = '0';
+  }
+
+
+  handleConfirmModalEvent(evt: ConfirmModalEvent) {
+    switch (evt.id) {
+      case this.removeChannelEvent:
+        this.removeChannel(evt.val as string);
+        break
+    }
   }
 
   //#region script row call backs
@@ -492,16 +572,15 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     this.container.clear();
 
-    const modalResources = new Map<string, any>();
-    modalResources.set(ModalResources.action, 'Delete')
-    modalResources.set(ModalResources.message, 'Are you sure you want to delete channel?');
-    modalResources.set(ModalResources.confirmEvent, { id: ModalCallbackEvent.removeChannel, val: msg.id });
-    modalResources.set(ModalResources.closeEvent, { id: ModalCallbackEvent.close })
+    const modalResources = new Map<string, unknown>();
+    modalResources.set(ConfirmModalResources.action, 'Delete')
+    modalResources.set(ConfirmModalResources.message, 'Are you sure you want to delete channel?');
+    modalResources.set(ConfirmModalResources.confirmEvent, { id: this.removeChannelEvent, val: msg.id });
 
     const component = this.container.createComponent(ConfirmModalComponent);
 
     component.instance.resources = modalResources;
-    component.instance.modalCallback.subscribe((evt: any) => {
+    component.instance.modalCallback.subscribe((evt: ModalCallbackEvent) => {
       this.modalCallback(evt);
     });
 
@@ -543,17 +622,17 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       this.container.clear();
 
-      const modalResources = new Map<string, any>();
+      const modalResources = new Map<string, unknown>();
 
-      modalResources.set(ModalResources.channelType, ch.type);
-      modalResources.set(ModalResources.channelSubType, ch.subType);
-      modalResources.set(ModalResources.channelId, ch.channelNumber);
-      modalResources.set(ModalResources.controllerType, ch.locationId);
+      modalResources.set(ChannelTestModalResources.channelType, ch.type);
+      modalResources.set(ChannelTestModalResources.channelSubType, ch.subType);
+      modalResources.set(ChannelTestModalResources.channelId, ch.channelNumber);
+      modalResources.set(ChannelTestModalResources.controller, ch.locationId);
 
       const component = this.container.createComponent(ChannelTestModalComponent);
 
       component.instance.resources = modalResources;
-      component.instance.modalCallback.subscribe((evt: any) => {
+      component.instance.modalCallback.subscribe((evt: ModalCallbackEvent) => {
         this.modalCallback(evt);
       });
       this.components.push(component);
@@ -585,10 +664,13 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       channels.forEach(channel => {
         const chValue = this.scriptResources.addChannel(locationId, channelType, +channel);
 
-        let subType = 0;
+        if (chValue === undefined){
+          return;
+        }
+        let subType = ChannelSubType.none;
 
         if (channelType === ChannelType.uart) {
-          subType = chValue.type;
+          subType = chValue.subType;
         }
 
         const ch = new ScriptChannel(Guid.create().toString(), this.scriptId, locationId, channelType, subType, channel, chValue, this.segments);
@@ -656,7 +738,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.renderer.setAttribute(floater, 'id', `event-${event.scriptChannel}-${event.time}`)
     this.renderer.setStyle(floater, 'top', `-5px`);
     this.renderer.setStyle(floater, 'left', `${(event.time * this.segmentWidth) - 37}px`);
-    this.renderer.listen(floater, 'click', (evt) => {
+    this.renderer.listen(floater, 'click', (_) => {
       this.openEditEventModal(event.scriptChannel, event.time);
     })
     this.renderer.appendChild(line, floater);

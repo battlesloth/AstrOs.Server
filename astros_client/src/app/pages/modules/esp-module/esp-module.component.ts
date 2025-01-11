@@ -1,8 +1,8 @@
-import { Component, EventEmitter, Input, OnInit, Output, ViewChild, ViewContainerRef } from '@angular/core';
+import { Component, EventEmitter, Input, Output, ViewChild, ViewContainerRef } from '@angular/core';
 import { MatExpansionPanel, MatAccordion, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from '@angular/material/expansion';
 import { MatCheckboxModule, MatCheckbox } from '@angular/material/checkbox'
 import { MatFormField } from '@angular/material/form-field';
-import { ControllerLocation, KangarooX2, UartModule, UartType } from 'astros-common';
+import { ControllerLocation, UartModule, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
 import { EspSubmoduleComponent } from 'src/app/components/esp-submodule/esp-submodule.component';
 import { NgIf, NgFor } from '@angular/common';
@@ -27,7 +27,7 @@ import { FormsModule } from '@angular/forms';
       EspSubmoduleComponent
     ]
 })
-export class EspModuleComponent implements OnInit {
+export class EspModuleComponent {
 
   @Output() openServoTestModal = new EventEmitter<any>();
 
@@ -78,9 +78,6 @@ export class EspModuleComponent implements OnInit {
     this.components = new Array<any>();
     this.uart1Type = '0';
     this.uart2Type = '0';
-  }
-
-  ngOnInit(): void {
   }
 
   setModule() {
@@ -166,7 +163,7 @@ export class EspModuleComponent implements OnInit {
     }
   }
 
-  moduleCallback(evt: any) {
+  moduleCallback(_: unknown) {
     throw new Error('Method not implemented.');
   }
 

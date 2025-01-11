@@ -14,7 +14,7 @@ export class AudioService {
     this.token = '';
   }
 
-  public getAudioFiles(): Observable<any> {
+  public getAudioFiles(): Observable<AudioFile[]> {
     
     return this.http.get<AudioFile[]>(`/api/audio/all`, {
       headers: { Authorization: `Bearer ${this.getToken()}` }
@@ -29,7 +29,7 @@ export class AudioService {
       );
   }
 
-  public removeAudioFile(id: string): Observable<any> {
+  public removeAudioFile(id: string): Observable<AudioFile[]> {
     return this.http.get<AudioFile[]>(`/api/audio/delete?id=${id}`, {
       headers: { Authorization: `Bearer ${this.getToken()}` }
     })
@@ -46,8 +46,8 @@ export class AudioService {
   }
 
   private handleError<T>(operation = 'operation', result?: T) {
-    return (error: any): Observable<T> => {
-      console.error(error);
+    return (error: unknown): Observable<T> => {
+      console.error(operation, error);
       return of(result as T);
     }
   }

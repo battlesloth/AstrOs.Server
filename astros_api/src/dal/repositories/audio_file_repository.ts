@@ -36,7 +36,7 @@ export class AudioFileRepository {
 
         await this.dao.run(AudioFilesTable.insert,
             [id, fileName, '', '0'])
-            .then((_: any) => {
+            .then((_: unknown) => {
                 result = true;
             })
             .catch((err) => {
@@ -68,7 +68,7 @@ export class AudioFileRepository {
         let result = false;
 
         await this.dao.run(AudioFilesTable.updateDuration, [duration.toString(), id])
-            .then((_: any) => {
+            .then((_: unknown) => {
                 result = true;
             })
             .catch((err) => {
@@ -84,7 +84,7 @@ export class AudioFileRepository {
         let result = false;
 
         await this.dao.run(AudioFilesTable.delete, [id])
-            .then((_: any) => {
+            .then((_: unknown) => {
                 result = true;
             })
             .catch((err) => {

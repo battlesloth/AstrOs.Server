@@ -2,15 +2,16 @@
 import {
     ChannelType, 
     I2cChannel,  
-    UartType,
     Script,
     ControllerLocation,
+    GpioChannel,
 } from "astros-common";
+import { ModuleChannelType } from "astros-common/dist/control_module/base_channel";
+import { UartChannel } from "astros-common/dist/control_module/uart/uart_channel";
 
 export class LocationDetails {
     id: number;
     name: string;
-    //type:name
 
     constructor(id: number, name: string) {
         this.id = id;
@@ -19,18 +20,16 @@ export class LocationDetails {
 }
 
 export class ChannelValue {
-    available: boolean;
-    channel: any
+    available: boolean; 
+    channel: ModuleChannelType
 
-    constructor(channel: any, available: boolean) {
+    constructor(channel: ModuleChannelType, available: boolean) {
         this.available = available;
         this.channel = channel;
     }
 }
 
 export class ScriptResources {
-
-    private loaded = false;
 
     locations: Map<number, LocationDetails>;
 
@@ -44,21 +43,17 @@ export class ScriptResources {
 
     constructor(locations: ControllerLocation[]) {
         this.locations = new Map<number, LocationDetails>();
-        this.servoChannels = new Map<number, any[]>();
-        this.i2cChannels = new Map<number, any[]>();
-        this.uartChannels = new Map<number, any[]>();
-        this.gpioChannels = new Map<number, any[]>();
-
-        //this.locations.set(4, new LocationDetails(4, 'Audio Playback'));
+        this.servoChannels = new Map<number, ChannelValue[]>();
+        this.i2cChannels = new Map<number, ChannelValue[]>();
+        this.uartChannels = new Map<number, ChannelValue[]>();
+        this.gpioChannels = new Map<number, ChannelValue[]>();
 
         locations.forEach(loc => {
 
             this.locations.set(loc.id, new LocationDetails(loc.id, loc.locationName));
 
-            //this.uartChannels.set(loc.id, loc.uartModule.channels.map((ch: UartChannel) => new ChannelValue(ch, ch.type != UartType.none)))
-            //this.servoChannels.set(loc.id, loc.servoModule.channels.map((ch: ServoChannel) => new ChannelValue(ch, ch.enabled)));
             this.i2cChannels.set(loc.id, loc.i2cModule.channels.map((ch: I2cChannel) => new ChannelValue(ch, ch.enabled)));
-            this.gpioChannels.set(loc.id, loc.gpioModule.channels.map((ch: any) => new ChannelValue(ch, ch.enabled)));
+            this.gpioChannels.set(loc.id, loc.gpioModule.channels.map((ch: GpioChannel) => new ChannelValue(ch, ch.enabled)));
 
             this.uartChannels.get(loc.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
             this.servoChannels.get(loc.id)?.sort((a, b) => { return a.channel.id - b.channel.id });
@@ -72,22 +67,16 @@ export class ScriptResources {
         script.scriptChannels.forEach(ch => {
             switch (ch.type) {
                 case ChannelType.uart:
-                    const uartIdx = this.uartChannels.get(ch.locationId)?.findIndex(x => x.channel.id === ch.channel.id);
-                    if (uartIdx != undefined && uartIdx > -1) {
-                        this.uartChannels.get(ch.locationId)![uartIdx].available = false;
-                    }
+                    this.provisionChannel(this.uartChannels, ch.locationId, ch.channel.id);
                     break;
-                //case ChannelType.servo:
-                //    this.servoChannels.get(ch.locationId)![ch.channel.id].available = false;
-                //    break;
                 case ChannelType.i2c:
-                    this.i2cChannels.get(ch.locationId)![ch.channel.id].available = false;
+                    this.provisionChannel(this.i2cChannels, ch.locationId, ch.channel.id);
                     break;
                 case ChannelType.audio:
                     this.locations.delete(4);
                     break;
                 case ChannelType.gpio:
-                    this.gpioChannels.get(ch.locationId)![ch.channel.id].available = false;
+                    this.provisionChannel(this.gpioChannels, ch.locationId, ch.channel.id);
                     break;
             }
         });
@@ -108,16 +97,17 @@ export class ScriptResources {
     }
 
     getAvailableChannels(): Map<number, Map<ChannelType, ChannelValue[]>> {
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = new Map<number, Map<ChannelType, any>>()
 
         for (const ctrl of this.locations.keys()) {
             if (ctrl === 4 || ctrl === 0) {
                 continue;
             }
-
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vals = new Map<ChannelType, any>();
 
-            //vals.set(ChannelType.servo, this.servoChannels.get(ctrl));
             vals.set(ChannelType.i2c, this.i2cChannels.get(ctrl));
             vals.set(ChannelType.uart, this.uartChannels.get(ctrl));
             vals.set(ChannelType.gpio, this.gpioChannels.get(ctrl));
@@ -128,10 +118,9 @@ export class ScriptResources {
         return result;
     }
 
-    private setModuleValues(controler: number): Map<ChannelType, string> {
+    private setModuleValues(_: number): Map<ChannelType, string> {
         const vals = new Map<ChannelType, string>();
 
-        //vals.set(ChannelType.servo, "Servo");
         vals.set(ChannelType.i2c, "I2C");
         vals.set(ChannelType.uart, "Serial");
         vals.set(ChannelType.gpio, "GPIO");
@@ -139,7 +128,7 @@ export class ScriptResources {
         return vals;
     }
 
-    addChannel(controller: number, type: ChannelType, id: number): any {
+    addChannel(controller: number, type: ChannelType, id: number): ModuleChannelType | undefined {
 
         if (controller === 4) {
             this.locations.delete(4);
@@ -148,33 +137,21 @@ export class ScriptResources {
 
         switch (type) {
             case ChannelType.uart:
-                const uartIdx = this.uartChannels.get(controller)?.findIndex(x => x.channel.id === id);
-                if (uartIdx != undefined && uartIdx > -1) {
-                    this.uartChannels.get(controller)![uartIdx].available = false;
-                    return this.uartChannels.get(controller)![uartIdx].channel
-                }
-                break;
-          /*  case ChannelType.servo:
-                const servoIdx = this.servoChannels.get(controller)?.findIndex(x => x.channel.id === id);
-                if (servoIdx != undefined && servoIdx > -1) {
-                    this.servoChannels.get(controller)![servoIdx].available = false;
-                    return this.servoChannels.get(controller)![servoIdx].channel
-                }
-            */    break
+                return this.provisionChannel(this.uartChannels, controller, id);
             case ChannelType.i2c:
-                const i2cIdx = this.i2cChannels.get(controller)?.findIndex(x => x.channel.id === id);
-                if (i2cIdx != undefined && i2cIdx > -1) {
-                    this.i2cChannels.get(controller)![i2cIdx].available = false;
-                    return this.i2cChannels.get(controller)![i2cIdx].channel
-                }
-                break;
+                return this.provisionChannel(this.i2cChannels, controller, id);
             case ChannelType.gpio:
-                const gpioIdx = this.gpioChannels.get(controller)?.findIndex(x => x.channel.id === id);
-                if (gpioIdx != undefined && gpioIdx > -1) {
-                    this.gpioChannels.get(controller)![gpioIdx].available = false;
-                    return this.gpioChannels.get(controller)![gpioIdx].channel
-                }
-                break;
+                return this.provisionChannel(this.gpioChannels, controller, id);
+        }
+
+        return undefined;
+    }
+
+    provisionChannel(map: Map<number, ChannelValue[]>, location: number, id: number) :ModuleChannelType | undefined {
+        const idx = map.get(location)?.findIndex(x => x.channel.id === id);
+        if (idx != undefined && idx > -1) {
+            this.gpioChannels.get(location)![idx].available = false;
+            return this.gpioChannels.get(location)![idx].channel
         }
 
         return undefined;
@@ -189,29 +166,21 @@ export class ScriptResources {
 
         switch (type) {
             case ChannelType.uart:
-                const uartIdx = this.uartChannels.get(location)?.findIndex(x => x.channel.id === id);
-                if (uartIdx !== undefined && uartIdx > -1) {
-                    this.uartChannels.get(location)![uartIdx].available = true;
-                }
+                this.deprovisionChannel(this.uartChannels, location, id);
                 break;
-           /* case ChannelType.servo:
-                const servoIdx = this.servoChannels.get(location)?.findIndex(x => x.channel.id === id);
-                if (servoIdx !== undefined && servoIdx > -1) {
-                    this.servoChannels.get(location)![servoIdx].available = true;
-                }
-            */    break;
             case ChannelType.i2c:
-                const i2cIdx = this.i2cChannels.get(location)?.findIndex(x => x.channel.id === id);
-                if (i2cIdx !== undefined && i2cIdx > -1) {
-                    this.i2cChannels.get(location)![i2cIdx].available = false;
-                }
+                this.deprovisionChannel(this.i2cChannels, location, id);
                 break;
             case ChannelType.gpio:
-                const gpioIdx = this.gpioChannels.get(location)?.findIndex(x => x.channel.id === id);
-                if (gpioIdx !== undefined && gpioIdx > -1) {
-                    this.gpioChannels.get(location)![gpioIdx].available = false;
-                }
+                this.deprovisionChannel(this.gpioChannels, location, id);    
                 break;
+        }
+    }
+
+    deprovisionChannel(map: Map<number, ChannelValue[]>, location: number, id: number): void {
+        const idx = map.get(location)?.findIndex(x => x.channel.id === id);
+        if (idx !== undefined && idx > -1) {
+            map.get(location)![idx].available = true;
         }
     }
 } 

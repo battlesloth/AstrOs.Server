@@ -1,12 +1,17 @@
 import { KeyValue } from '@angular/common';
-import { Component, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
-import { ModalService } from 'src/app/modal';
-import { SettingsService } from 'src/app/services/settings/settings.service';
-import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
-import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
-import { FormatModalComponent } from './modals/format-modal/format-modal.component';
+import { Component, ComponentRef, OnInit, ViewChild, ViewContainerRef } from '@angular/core';
+import { 
+  FormatModalComponent,
+  FormatModalResources,
+  ModalCallbackEvent,
+  ModalComponent,
+} from '@src/components/modals';
+import { 
+  ModalService, 
+  SettingsService, 
+  SnackbarService 
+} from '@src/services';
 import { ControlModule } from 'astros-common';
-import { ModalComponent } from '../../modal/modal.component';
 
 @Component({
     selector: 'app-settings',
@@ -32,16 +37,16 @@ export class SettingsComponent implements OnInit {
       next: (result: KeyValue<string, string>) => {
         this.apiKey = result.value;
       },
-      error: (err: any) => console.error(err)
+      error: (err: unknown) => console.error(err)
     };
 
     this.settingsService.getSetting('apikey').subscribe(apiObs);
 
     const ctrlObs = {
-      next: (result: any) => {
+      next: (result: ControlModule[]) => {
         this.controllers = result;
       },
-      error: (err: any) => console.error(err)
+      error: (err: unknown) => console.error(err)
     };
 
     this.settingsService.getControllers().subscribe(ctrlObs);
@@ -58,10 +63,10 @@ export class SettingsComponent implements OnInit {
     this.apiKey = result;
 
     const observer = {
-      next: (result: KeyValue<string, string>) => {
-
+      next: (_: unknown) => {
+        console.log('API key saved');
       },
-      error: (err: any) => {
+      error: (err: unknown) => {
         console.error(err)
         this.apiKey = "Failed to save API key"
       }
@@ -70,11 +75,11 @@ export class SettingsComponent implements OnInit {
     this.settingsService.saveSetting({ key: 'apikey', value: result }).subscribe(observer);
   }
 
-  modalCallback(evt: any) {
+  modalCallback(evt: ModalCallbackEvent) {
 
-    switch (evt.id) {
-      case ModalCallbackEvent.formatSD:
-        this.formatSD(evt.val);
+    switch (evt.type) {
+      case FormatModalResources.formatSdEvent:
+        this.formatSD(evt.value as unknown[]);
         break;
     }
 
@@ -84,13 +89,13 @@ export class SettingsComponent implements OnInit {
 
   popModal(val: string) {
     this.container.clear();
-    const modalResources = new Map<string, any>();
+    const modalResources = new Map<string, unknown>();
 
-    let component: any;
+    let component: ComponentRef<FormatModalComponent>;
 
     switch (val) {
       case 'format':
-        modalResources.set(ModalResources.controllers, this.controllers);
+        modalResources.set(FormatModalResources.controllers, this.controllers);
         component = this.container.createComponent(FormatModalComponent);
         break;
       default:
@@ -98,19 +103,19 @@ export class SettingsComponent implements OnInit {
     }
 
     component.instance.resources = modalResources;
-    component.instance.modalCallback.subscribe((evt: any) => {
+    component.instance.modalCallback.subscribe((evt: ModalCallbackEvent) => {
       this.modalCallback(evt);
     });
 
     this.modalService.open('scripts-modal');
   }
 
-  formatSD(val: any[]) {
+  formatSD(val: unknown[]) {
     const observer = {
-      next: (result: any) => {
+      next: (_: unknown) => {
         this.snackBarService.okToast('Format queued!');
       },
-      error: (err: any) => {
+      error: (err: unknown) => {
         this.snackBarService.okToast('Error requesting format. Check logs.');
         console.error(err);
       }

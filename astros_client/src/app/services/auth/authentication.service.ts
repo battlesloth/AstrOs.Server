@@ -19,7 +19,7 @@ export interface TokenResponse {
 export interface TokenPayload {
   username: string,
   password: string,
-} 
+}
 
 @Injectable({
   providedIn: 'root'
@@ -27,16 +27,16 @@ export interface TokenPayload {
 export class AuthenticationService {
   private token: string;
 
-  constructor(private http: HttpClient, private router: Router) { 
+  constructor(private http: HttpClient, private router: Router) {
     this.token = '';
   }
 
-  public login(user: TokenPayload): Observable<any> {
-    return this.request('post', 'login', user);  
+  public login(user: TokenPayload): Observable<unknown> {
+    return this.request('post', 'login', user);
   }
 
-  public profile(): Observable<any> {
-    return this.request('get', 'profile');  
+  public profile(): Observable<unknown> {
+    return this.request('get', 'profile');
   }
 
   public logout(): void {
@@ -55,12 +55,12 @@ export class AuthenticationService {
     } else {
       return null;
     }
- }
+  }
 
   public isLoggedIn(): boolean {
     const user = this.getUserDetails();
-    if (user){
-      return user.exp > Date.now()/1000;
+    if (user) {
+      return user.exp > Date.now() / 1000;
     } else {
       return false;
     }
@@ -71,9 +71,9 @@ export class AuthenticationService {
   }
 
   private getToken(): string {
-    
+
     this.token = localStorage.getItem("astros-token") || '';
-    
+
     return this.token;
   }
 
@@ -81,7 +81,7 @@ export class AuthenticationService {
     method: "post" | "get",
     type: "login" | "register" | "profile",
     user?: TokenPayload
-  ): Observable<any> {
+  ): Observable<unknown> {
     let base$;
 
     if (method === "post") {
@@ -93,10 +93,11 @@ export class AuthenticationService {
     }
 
     const request = base$.pipe(
-      map((data: any) => {
-        if (data.token) {
-          this.saveToken(data.token);
-        }
+      map((data: unknown) => {
+        if (data && typeof data === "object" && "token" in data)
+          if (data.token) {
+            this.saveToken(data.token as string);
+          }
         return data;
       })
     );

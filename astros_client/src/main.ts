@@ -1,7 +1,4 @@
 import { enableProdMode, importProvidersFrom } from '@angular/core';
-import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
-
-
 import { environment } from './environments/environment';
 import { WebsocketService } from './app/services/websocket/websocket.service';
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';

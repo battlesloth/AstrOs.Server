@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { EspSubmoduleComponent } from './esp-submodule.component';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
 describe('EspSubmoduleComponent', () => {
   let component: EspSubmoduleComponent;

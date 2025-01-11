@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, Renderer2, ViewChild, OnDestroy } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Renderer2, ViewChild} from '@angular/core';
 import { ControllerStatus } from 'astros-common';
 import { StatusService } from 'src/app/services/status/status.service';
 
@@ -8,7 +8,7 @@ import { StatusService } from 'src/app/services/status/status.service';
     styleUrls: ['./status.component.scss'],
     standalone: true
 })
-export class StatusComponent implements AfterViewInit, OnDestroy {
+export class StatusComponent implements AfterViewInit {
 
   @ViewChild('coreDown', { static: false }) coreDownEl!: ElementRef;
   @ViewChild('domeDown', { static: false }) domeDownEl!: ElementRef;
@@ -30,9 +30,6 @@ export class StatusComponent implements AfterViewInit, OnDestroy {
     this.handleStatus(this.status.getDomeStatus(), this.domeNotSyncedEl, this.domeDownEl);
     this.handleStatus(this.status.getBodyStatus(), this.bodyNotSyncedEl, this.bodyDownEl);
 
-  }
-
-  ngOnDestroy(): void {
   }
 
   handleStatus(status: ControllerStatus, syncEl: ElementRef, downEl: ElementRef){

@@ -8,12 +8,17 @@ import { FormsModule } from '@angular/forms';
 import { NgFor } from '@angular/common';
 
 
+interface ScriptSelection {
+  id: string;
+  name: string;
+}
+
 @Component({
-    selector: 'app-m5-paper-config',
-    templateUrl: './m5-paper-config.component.html',
-    styleUrls: ['./m5-paper-config.component.scss'],
-    standalone: true,
-    imports: [FontAwesomeModule, FormsModule, NgFor]
+  selector: 'app-m5-paper-config',
+  templateUrl: './m5-paper-config.component.html',
+  styleUrls: ['./m5-paper-config.component.scss'],
+  standalone: true,
+  imports: [FontAwesomeModule, FormsModule, NgFor]
 })
 export class M5PaperConfigComponent implements OnInit {
 
@@ -21,7 +26,7 @@ export class M5PaperConfigComponent implements OnInit {
   faBackward = faChevronLeft;
   pageNumber = 1;
 
-  scripts: any[] = [];
+  scripts: ScriptSelection[] = [];
 
   m5Config: M5Page[] = [];
 
@@ -48,14 +53,14 @@ export class M5PaperConfigComponent implements OnInit {
           this.scripts.push({ id: s.id, name: s.scriptName });
         }
       },
-      error: (err: any) => console.error(err)
+      error: (err: unknown) => console.error(err)
     };
 
     const configObserver = {
-      next: (result: any) => {
+      next: (result: unknown) => {
 
-        if (result !== undefined) {
-          const config = JSON.parse(result.value) as M5Page[];
+        if (result && typeof result === 'object' && 'value' in result) {
+          const config = JSON.parse(result.value as string) as M5Page[];
 
           if (config.length != 0) {
             this.m5Config = config;
@@ -74,7 +79,7 @@ export class M5PaperConfigComponent implements OnInit {
     this.remoteService.getRemoteConfig().subscribe(configObserver);
   }
 
-  selectionChange(button: number, id: any) {
+  selectionChange(button: number, id: string) {
 
     const sIdx = this.scripts
       .map((s) => { return s.id })

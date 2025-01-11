@@ -5,6 +5,7 @@ import { ButtonComponent } from './button.component';
 import type { User } from './user';
 
 @Component({
+  // eslint-disable-next-line @angular-eslint/component-selector
   selector: 'storybook-header',
   standalone: true,
   imports: [CommonModule, ButtonComponent],
@@ -35,7 +36,7 @@ import type { User } from './user';
         <storybook-button
           *ngIf="user"
           size="small"
-          (onClick)="onLogout.emit($event)"
+          (onClick)="logout.emit($event)"
           label="Log out"
         ></storybook-button>
       </div>
@@ -44,7 +45,7 @@ import type { User } from './user';
           *ngIf="!user"
           size="small"
           class="margin-left"
-          (onClick)="onLogin.emit($event)"
+          (onClick)="login.emit($event)"
           label="Log in"
         ></storybook-button>
         <storybook-button
@@ -52,7 +53,7 @@ import type { User } from './user';
           size="small"
           [primary]="true"
           class="margin-left"
-          (onClick)="onCreateAccount.emit($event)"
+          (onClick)="createAccount.emit($event)"
           label="Sign up"
         ></storybook-button>
       </div>
@@ -66,11 +67,11 @@ export class HeaderComponent {
   user: User | null = null;
 
   @Output()
-  onLogin = new EventEmitter<Event>();
+  login = new EventEmitter<Event>();
 
   @Output()
-  onLogout = new EventEmitter<Event>();
+  logout = new EventEmitter<Event>();
 
   @Output()
-  onCreateAccount = new EventEmitter<Event>();
+  createAccount = new EventEmitter<Event>();
 }

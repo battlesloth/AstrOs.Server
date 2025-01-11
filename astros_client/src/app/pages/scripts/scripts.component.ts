@@ -2,21 +2,30 @@ import { Component, OnInit, ViewChild, ViewContainerRef, AfterViewChecked } from
 import { Router, RouterLink } from '@angular/router';
 import { faCopy, faPlay, faTrash, faUpload } from '@fortawesome/free-solid-svg-icons';
 import { ScriptResponse, TransmissionStatus, TransmissionType, UploadStatus, Script } from 'astros-common';
-import { ConfirmModalComponent, ModalService } from 'src/app/modal';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
-import { ModalCallbackEvent, ModalResources } from 'src/app/shared/modal-resources';
 import { NgFor } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { ModalComponent } from '../../modal/modal.component';
+import { 
+  ModalComponent,
+  ModalCallbackEvent,
+  ConfirmModalComponent,
+  ConfirmModalResources
+ } from '@src/components/modals';
+import { ModalService } from '@src/services';
+
+interface DeleteConfirmEvent {
+  id: string;
+  val: string;
+}
 
 @Component({
-    selector: 'app-scripts',
-    templateUrl: './scripts.component.html',
-    styleUrls: ['./scripts.component.scss'],
-    standalone: true,
-    imports: [NgFor, RouterLink, FontAwesomeModule, ModalComponent]
+  selector: 'app-scripts',
+  templateUrl: './scripts.component.html',
+  styleUrls: ['./scripts.component.scss'],
+  standalone: true,
+  imports: [NgFor, RouterLink, FontAwesomeModule, ModalComponent]
 })
 export class ScriptsComponent implements OnInit, AfterViewChecked {
 
@@ -45,10 +54,11 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     private modalService: ModalService) {
     this.scripts = new Array<Script>();
 
-    this.socket.messages.subscribe((msg: any) => {
-      if (msg.type === TransmissionType.script) {
-        this.statusUpdate(msg as ScriptResponse);
-      }
+    this.socket.messages.subscribe((msg: unknown) => {
+      if (msg && typeof msg === 'object' && 'type' in msg)
+        if (msg.type === TransmissionType.script) {
+          this.statusUpdate(msg as ScriptResponse);
+        }
     });
 
   }
@@ -62,7 +72,7 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
           return 0;
         });
       },
-      error: (err: any) => console.error(err)
+      error: (err: unknown) => console.error(err)
     };
 
     this.scriptService.getAllScripts().subscribe(observer);
@@ -120,12 +130,19 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     this.router.navigate(['scripter', '0']);
   }
 
-  modalCallback(evt: any) {
+  modalCallback(evt: ModalCallbackEvent) {
 
-    switch (evt.id) {
-      case ModalCallbackEvent.delete:
-        this.removeFile(evt.val);
-        break;
+    switch (evt.type) {
+      case ConfirmModalResources.confirmEvent:
+        {
+          {
+            const evtData = evt.value as DeleteConfirmEvent;
+            if (evtData.id === 'script_delete'){
+            this.removeFile(evtData.val );
+            }
+            break;
+          }
+        }
     }
 
     this.modalService.close('scripts-modal');
@@ -135,16 +152,15 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
   removeClicked(id: string) {
     this.container.clear();
 
-    const modalResources = new Map<string, any>();
-    modalResources.set(ModalResources.action, 'Delete')
-    modalResources.set(ModalResources.message, `Are you sure you want to delete script?`);
-    modalResources.set(ModalResources.confirmEvent, { id: ModalCallbackEvent.delete, val: id });
-    modalResources.set(ModalResources.closeEvent, { id: ModalCallbackEvent.close })
+    const modalResources = new Map<string, unknown>();
+    modalResources.set(ConfirmModalResources.action, 'Delete')
+    modalResources.set(ConfirmModalResources.message, `Are you sure you want to delete script?`);
+    modalResources.set(ConfirmModalResources.confirmEvent, { id: 'script_delete', val: id });
 
     const component = this.container.createComponent(ConfirmModalComponent);
 
     component.instance.resources = modalResources;
-    component.instance.modalCallback.subscribe((evt: any) => {
+    component.instance.modalCallback.subscribe((evt: ModalCallbackEvent) => {
       this.modalCallback(evt);
     });
 
@@ -175,11 +191,11 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     }
 
     const observer = {
-      next: (result: any) => {
+      next: (result: unknown) => {
         console.log(result);
         this.snackBarService.okToast('Script run queued!');
       },
-      error: (err: any) => {
+      error: (err: unknown) => {
         console.error(err);
         this.snackBarService.okToast('Error requesting upload. Check logs.');
       }
@@ -211,7 +227,7 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
           });
         }
       },
-      error: (err: any) => {
+      error: (err: unknown) => {
         console.error(err);
         this.snackBarService.okToast('Error copying script. Check logs.');
       }
@@ -222,8 +238,8 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
 
   uploadClicked(id: string) {
     const observer = {
-      next: (result: any) => console.log(result),
-      error: (err: any) => {
+      next: (result: unknown) => console.log(result),
+      error: (err: unknown) => {
         console.error(err);
         this.snackBarService.okToast('Error requesting upload. Check logs.');
       }

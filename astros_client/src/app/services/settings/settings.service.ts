@@ -33,24 +33,27 @@ export class SettingsService {
       );
   }
 
-  public saveSetting(setting: KeyValue<string, string>): Observable<any> {
-    return this.http.put<any>('/api/settings', setting, {
+  public saveSetting(setting: KeyValue<string, string>): Observable<unknown> {
+    return this.http.put<unknown>('/api/settings', setting, {
       headers: { Authorization: `Bearer ${this.getToken()}` }
     })
       .pipe(
-        tap(_ => console.log(`saveRemoteConfig result: ${_.message}`)),
-        catchError(this.handleError<any>('saveRemoteConfig'))
+        tap(val => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`saveRemoteConfig result: ${val.message}`)
+        }),
+        catchError(this.handleError<unknown>('saveRemoteConfig'))
       );
   }
 
 
-  public formatSD(controllers: any[]): Observable<any> {
-    return this.http.post<any[]>(`/api/settings/formatSD`, { controllers: controllers },
+  public formatSD(controllers: unknown[]): Observable<unknown> {
+    return this.http.post<unknown[]>(`/api/settings/formatSD`, { controllers: controllers },
       {
         headers: { Authorization: `Bearer ${this.getToken()}` }
       })
       .pipe(tap(_ => console.log('SD Format Queued')),
-        catchError(this.handleError<any>('formatSD'))
+        catchError(this.handleError<unknown>('formatSD'))
       );
   }
 
@@ -62,8 +65,8 @@ export class SettingsService {
   }
 
   private handleError<T>(operation = 'operation', result?: T) {
-    return (error: any): Observable<T> => {
-      console.error(error);
+    return (error: unknown): Observable<T> => {
+      console.error(operation, error);
       return of(result as T);
     }
   }

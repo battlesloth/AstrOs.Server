@@ -5,6 +5,7 @@ import { HeaderComponent } from './header.component';
 import type { User } from './user';
 
 @Component({
+  // eslint-disable-next-line @angular-eslint/component-selector
   selector: 'storybook-page',
   standalone: true,
   imports: [CommonModule, HeaderComponent],

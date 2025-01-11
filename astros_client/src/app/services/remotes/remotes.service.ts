@@ -23,13 +23,16 @@ export class RemotesService {
   }
 
 
-  public saveRemoteConfig(json: string): Observable<any> {
-    return this.http.put<any>('/api/remoteConfig', {config: json}, {
+  public saveRemoteConfig(json: string): Observable<unknown> {
+    return this.http.put<unknown>('/api/remoteConfig', { config: json }, {
       headers: { Authorization: `Bearer ${this.getToken()}` }
     })
       .pipe(
-        tap(_ => console.log(`saveRemoteConfig result: ${_.message}`)),
-        catchError(this.handleError<any>('saveRemoteConfig'))
+        tap(val => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`saveRemoteConfig result: ${val.message}`)
+        }),
+        catchError(this.handleError<unknown>('saveRemoteConfig'))
       );
   }
 
@@ -41,8 +44,8 @@ export class RemotesService {
   }
 
   private handleError<T>(operation = 'operation', result?: T) {
-    return (error: any): Observable<T> => {
-      console.error(error);
+    return (error: unknown): Observable<T> => {
+      console.error(operation, error);
       return of(result as T);
     }
   }

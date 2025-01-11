@@ -1,12 +1,12 @@
-import { 
-    ChannelSubType, 
-    ChannelType, 
-    GenericSerialEvent, 
-    GpioEvent, 
-    HumanCyborgRelationsEvent, 
-    I2cEvent, 
-    KangarooAction, 
-    KangarooEvent, 
+import {
+    ChannelSubType,
+    ChannelType,
+    GenericSerialEvent,
+    GpioEvent,
+    HumanCyborgRelationsEvent,
+    I2cEvent,
+    KangarooAction,
+    KangarooEvent,
     ScriptEvent
 } from "astros-common";
 
@@ -15,12 +15,7 @@ export default class EventMarkerHelper {
 
         switch (event.channelType) {
             case ChannelType.audio:
-                const rAudio = new Array<string>();
-                rAudio[0] = '\u00A0';
-                rAudio[1] = 'Audio Track'
-                rAudio[2] = '';
-                rAudio[3] = '';
-                return rAudio;
+                return this.generateBasicResponse('Audio Track');
             //case ChannelType.servo:
             //    return this.servoText(event.dataJson);
             case ChannelType.i2c:
@@ -30,15 +25,12 @@ export default class EventMarkerHelper {
             case ChannelType.uart:
                 return this.uartText(event.channelSubType, event.dataJson);
             default:
-                const rDefault = new Array<string>();
-                rDefault[0] = '\u00A0';
-                rDefault[1] = 'error'
-                rDefault[2] = '';
-                rDefault[3] = '';
-                return rDefault;
+                return this.generateBasicResponse('error');
 
         }
     }
+
+
 
 
     /*private static servoText(json: string): Array<string> {
@@ -83,13 +75,8 @@ export default class EventMarkerHelper {
                 return this.kangaroo(json);
             case ChannelSubType.humanCyborgRelations:
                 return this.humanCyborg(json);
-            default:
-                const result = new Array<string>();
-                result[0] = '\u00A0';
-                result[1] = 'error'
-                result[2] = '';
-                result[3] = '';
-                return result;
+            default: 
+                return this.generateBasicResponse('error');
         }
     }
 
@@ -140,6 +127,15 @@ export default class EventMarkerHelper {
         result[2] = evt.commands.length.toString();
         result[3] = '';
 
+        return result;
+    }
+
+    static generateBasicResponse(val: string): string[] {
+        const result = [];
+        result[0] = '\u00A0';
+        result[1] = val;
+        result[2] = '';
+        result[3] = '';
         return result;
     }
 }

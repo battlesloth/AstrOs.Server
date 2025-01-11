@@ -1,19 +1,25 @@
-<div (click)="closeMenu()" id="mySidenav" class="sidenav" #sideNav>
-  <a (click)="closeMenu()" routerLink="/status">Status</a>
-  <a (click)="closeMenu()" routerLink="/scripts">Scripts</a>
-  <a (click)="closeMenu()" routerLink="/remote">Remote</a>
-  <a (click)="closeMenu()" routerLink="/modules">Modules</a>
-  <a (click)="closeMenu()" routerLink="/utility">Utility</a>
-  <a *ngIf="auth.isLoggedIn()" href="javascript: void(0);" (click)="logout()">Logout</a>
+<div (click)="closeMenu()"
+  (keypress)="containerKeyPressed($event)"
+  id="mySidenav" class="sidenav" tabindex="0" #sideNav>
+  <a (click)="closeMenu()" routerLink="/status" tabindex="0">Status</a>
+  <a (click)="closeMenu()" routerLink="/scripts" tabindex="0">Scripts</a>
+  <a (click)="closeMenu()" routerLink="/remote" tabindex="0">Remote</a>
+  <a (click)="closeMenu()" routerLink="/modules" tabindex="0">Modules</a>
+  <a (click)="closeMenu()" routerLink="/utility" tabindex="0">Utility</a>
+  <a *ngIf="auth.isLoggedIn()" href="javascript: void(0);" (click)="logout()" tabindex="0">Logout</a>
 </div>
 
-<div id="clickDetector" class="click-detector" (click)="closeMenu()" #clickDetector></div>
+<div id="clickDetector" class="click-detector" (click)="closeMenu()"
+  (keypress)="containerKeyPressed($event)"
+  tabindex="0" #clickDetector></div>
 
 <div class="container">
   <div class="navbar-main">
 
-<div class="navbutton" (click)="showMenu()"></div>
-<div><span class="capital">A</span>str<span  class="capital">O</span>s</div>
+    <div class="navbutton" (click)="showMenu()"
+      (keypress)="containerKeyPressed($event)"
+      tabindex="0"></div>
+    <div><span class="capital">A</span>str<span class="capital">O</span>s</div>
   </div>
 </div>
 

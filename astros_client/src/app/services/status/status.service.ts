@@ -20,11 +20,13 @@ export class StatusService {
   constructor(private socket: WebsocketService) {
 
     console.log('status started...')
-    this.socket.messages.subscribe((msg: any) => {
-
+    this.socket.messages.subscribe((msg: unknown) => {
+      
+      if (msg && typeof msg === 'object' && 'type' in msg) 
       if (msg.type === TransmissionType.status) {
         this.statusUpdate(msg as StatusResponse);
       }
+
     });
 
     this.coreStateObserver.subscribe((value) => { this.coreState = value });
