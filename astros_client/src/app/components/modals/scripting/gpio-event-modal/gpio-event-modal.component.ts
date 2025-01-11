@@ -1,6 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { GpioEvent, ScriptEvent } from 'astros-common';
-import { BaseEventModalComponent, ScriptEventModalResources } from '../base-event-modal/base-event-modal.component';
+import {
+  BaseEventModalComponent,
+  ScriptEventModalResources,
+} from '../base-event-modal/base-event-modal.component';
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
@@ -10,14 +13,19 @@ export class GpioEventModalResources {
 }
 
 @Component({
-    selector: 'app-gpio-event-modal',
-    templateUrl: './gpio-event-modal.component.html',
-    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './gpio-event-modal.component.scss'],
-    standalone: true,
-    imports: [FormsModule, DecimalPipe]
+  selector: 'app-gpio-event-modal',
+  templateUrl: './gpio-event-modal.component.html',
+  styleUrls: [
+    '../base-event-modal/base-event-modal.component.scss',
+    './gpio-event-modal.component.scss',
+  ],
+  standalone: true,
+  imports: [FormsModule, DecimalPipe],
 })
-export class GpioEventModalComponent extends BaseEventModalComponent implements OnInit {
-
+export class GpioEventModalComponent
+  extends BaseEventModalComponent
+  implements OnInit
+{
   channelId!: number;
   state = 0;
 
@@ -31,17 +39,23 @@ export class GpioEventModalComponent extends BaseEventModalComponent implements 
 
   ngOnInit(): void {
     if (this.resources.has(ScriptEventModalResources.callbackType)) {
-      this.callbackType = this.resources.get(ScriptEventModalResources.callbackType) as string;
+      this.callbackType = this.resources.get(
+        ScriptEventModalResources.callbackType,
+      ) as string;
     }
 
     if (this.callbackType === ScriptEventModalResources.editEvent) {
-      const element = document.getElementById("remove_button");
-      element?.classList.remove("hidden");
+      const element = document.getElementById('remove_button');
+      element?.classList.remove('hidden');
     }
 
-    this.scriptEvent = this.resources.get(ScriptEventModalResources.scriptEvent) as ScriptEvent;
+    this.scriptEvent = this.resources.get(
+      ScriptEventModalResources.scriptEvent,
+    ) as ScriptEvent;
 
-    this.channelId = this.resources.get(GpioEventModalResources.gpioId) as number;
+    this.channelId = this.resources.get(
+      GpioEventModalResources.gpioId,
+    ) as number;
 
     if (this.scriptEvent.dataJson != '') {
       const payload = JSON.parse(this.scriptEvent.dataJson);
@@ -57,7 +71,6 @@ export class GpioEventModalComponent extends BaseEventModalComponent implements 
   }
 
   addEvent() {
-
     if (+this.eventTime > this.maxTime) {
       this.errorMessage = `Event time cannot be larger than ${this.maxTime / this.timeFactor}`;
       return;
@@ -65,17 +78,17 @@ export class GpioEventModalComponent extends BaseEventModalComponent implements 
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const data = new GpioEvent(+this.channelId, +this.state === 1 ? true : false);
+    const data = new GpioEvent(
+      +this.channelId,
+      +this.state === 1 ? true : false,
+    );
 
     this.scriptEvent.dataJson = JSON.stringify(data);
 
-    const evt = new ModalCallbackEvent(
-      this.callbackType,
-      {
-        scriptEvent: this.scriptEvent,
-        time: this.originalEventTime
-      },
-    );
+    const evt = new ModalCallbackEvent(this.callbackType, {
+      scriptEvent: this.scriptEvent,
+      time: this.originalEventTime,
+    });
     this.modalCallback.emit(evt);
   }
 }

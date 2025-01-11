@@ -1,30 +1,36 @@
-import { EventEmitter, Component, Input, Output, Renderer2, ViewChild, ElementRef } from '@angular/core';
-import { faTrash, faEdit, faPlay } from '@fortawesome/free-solid-svg-icons'
+import {
+  EventEmitter,
+  Component,
+  Input,
+  Output,
+  Renderer2,
+  ViewChild,
+  ElementRef,
+} from '@angular/core';
+import { faTrash, faEdit, faPlay } from '@fortawesome/free-solid-svg-icons';
 import { UartType, ScriptChannel } from 'astros-common';
 import { NgIf } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
 @Component({
-    selector: 'app-script-row',
-    templateUrl: './script-row.component.html',
-    styleUrls: ['./script-row.component.scss'],
-    standalone: true,
-    imports: [NgIf, FontAwesomeModule]
+  selector: 'app-script-row',
+  templateUrl: './script-row.component.html',
+  styleUrls: ['./script-row.component.scss'],
+  standalone: true,
+  imports: [NgIf, FontAwesomeModule],
 })
-
 export class ScriptRowComponent {
-
   private segmentWidth = 60;
   faTrash = faTrash;
   faEdit = faEdit;
   faPlay = faPlay;
 
-  locationName = "Location";
-  uartType = "None";
+  locationName = 'Location';
+  uartType = 'None';
 
   @ViewChild('timeline', { static: false }) timelineEl!: ElementRef;
 
-  _channel!: ScriptChannel
+  _channel!: ScriptChannel;
 
   @Input()
   set channel(channel: ScriptChannel) {
@@ -37,22 +43,22 @@ export class ScriptRowComponent {
   }
 
   @Output() timelineCallback = new EventEmitter<unknown>();
-  @Output() removeCallback = new EventEmitter<unknown>();
-  @Output() channelTestCallback = new EventEmitter<unknown>();
+  @Output() removeCallback = new EventEmitter<string>();
+  @Output() channelTestCallback = new EventEmitter<string>();
 
   timeLineArray: number[];
   private segments = 3000;
 
   constructor(private renderer: Renderer2) {
-    this.timeLineArray = Array.from({ length: this.segments }, (_, i) => (i + 1))
+    this.timeLineArray = Array.from({ length: this.segments }, (_, i) => i + 1);
   }
 
   remove(): void {
-    this.removeCallback.emit({ id: this.channel.id });
+    this.removeCallback.emit(this.channel.id);
   }
 
   test(): void {
-    this.channelTestCallback.emit({ id: this.channel.id })
+    this.channelTestCallback.emit(this.channel.id);
   }
 
   onTimelineRightClick(event: MouseEvent): void {
@@ -64,30 +70,30 @@ export class ScriptRowComponent {
   getLocationName(id: number): string {
     switch (id) {
       case 1:
-        return "Body";
+        return 'Body';
       case 2:
-        return "Core";
+        return 'Core';
       case 3:
-        return "Dome";
+        return 'Dome';
       case 4:
-        return "Audio Playback";
+        return 'Audio Playback';
       default:
-        return "Unknown";
+        return 'Unknown';
     }
   }
 
   serialName(type: UartType): string {
     switch (type) {
       case UartType.none:
-        return "None";
+        return 'None';
       case UartType.genericSerial:
-        return "Generic Serial";
+        return 'Generic Serial';
       case UartType.kangaroo:
-        return "Kangaroo X2";
+        return 'Kangaroo X2';
       case UartType.humanCyborgRelations:
-        return "Human Cyborg Relations";
+        return 'Human Cyborg Relations';
       default:
-        return "None";
+        return 'None';
     }
   }
 }

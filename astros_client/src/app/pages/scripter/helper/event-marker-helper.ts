@@ -1,39 +1,34 @@
 import {
-    ChannelSubType,
-    ChannelType,
-    GenericSerialEvent,
-    GpioEvent,
-    HumanCyborgRelationsEvent,
-    I2cEvent,
-    KangarooAction,
-    KangarooEvent,
-    ScriptEvent
-} from "astros-common";
+  ChannelSubType,
+  ChannelType,
+  GenericSerialEvent,
+  GpioEvent,
+  HumanCyborgRelationsEvent,
+  I2cEvent,
+  KangarooAction,
+  KangarooEvent,
+  ScriptEvent,
+} from 'astros-common';
 
 export default class EventMarkerHelper {
-    static generateText(event: ScriptEvent): string[] {
-
-        switch (event.channelType) {
-            case ChannelType.audio:
-                return this.generateBasicResponse('Audio Track');
-            //case ChannelType.servo:
-            //    return this.servoText(event.dataJson);
-            case ChannelType.i2c:
-                return this.i2cText(event.dataJson);
-            case ChannelType.gpio:
-                return this.gpioText(event.dataJson);
-            case ChannelType.uart:
-                return this.uartText(event.channelSubType, event.dataJson);
-            default:
-                return this.generateBasicResponse('error');
-
-        }
+  static generateText(event: ScriptEvent): string[] {
+    switch (event.channelType) {
+      case ChannelType.audio:
+        return this.generateBasicResponse('Audio Track');
+      //case ChannelType.servo:
+      //    return this.servoText(event.dataJson);
+      case ChannelType.i2c:
+        return this.i2cText(event.dataJson);
+      case ChannelType.gpio:
+        return this.gpioText(event.dataJson);
+      case ChannelType.uart:
+        return this.uartText(event.channelSubType, event.dataJson);
+      default:
+        return this.generateBasicResponse('error');
     }
+  }
 
-
-
-
-    /*private static servoText(json: string): Array<string> {
+  /*private static servoText(json: string): Array<string> {
         const evt = JSON.parse(json) as ServoEvent;
         const result = new Array<string>();
         result[0] = 'Position:';
@@ -44,101 +39,97 @@ export default class EventMarkerHelper {
         return result;
     }*/
 
-    private static i2cText(json: string): string[] {
-        const evt = JSON.parse(json) as I2cEvent;
-        const result = new Array<string>();
-        result[0] = '\u00A0';
-        result[1] = 'Message:'
-        result[2] = evt.message;
-        result[3] = '';
+  private static i2cText(json: string): string[] {
+    const evt = JSON.parse(json) as I2cEvent;
+    const result = new Array<string>();
+    result[0] = '\u00A0';
+    result[1] = 'Message:';
+    result[2] = evt.message;
+    result[3] = '';
 
-        return result
+    return result;
+  }
+
+  private static gpioText(json: string): string[] {
+    const evt = JSON.parse(json) as GpioEvent;
+    const result = new Array<string>();
+    result[0] = '\u00A0';
+    result[1] = 'State:';
+    result[2] = evt.setHigh ? 'High' : 'Low';
+    result[3] = '';
+
+    return result;
+  }
+
+  private static uartText(subType: ChannelSubType, json: string): string[] {
+    switch (subType) {
+      case ChannelSubType.genericSerial:
+        return this.genericUart(json);
+      case ChannelSubType.kangaroo:
+        return this.kangaroo(json);
+      case ChannelSubType.humanCyborgRelations:
+        return this.humanCyborg(json);
+      default:
+        return this.generateBasicResponse('error');
     }
+  }
 
-    private static gpioText(json: string): string[] {
-        const evt = JSON.parse(json) as GpioEvent;
-        const result = new Array<string>();
-        result[0] = '\u00A0';
-        result[1] = 'State:';
-        result[2] = evt.setHigh ? 'High' : 'Low';
-        result[3] = '';
+  private static genericUart(json: string): string[] {
+    const evt = JSON.parse(json) as GenericSerialEvent;
+    const result = new Array<string>();
+    result[0] = '\u00A0';
+    result[1] = 'Message:';
+    result[2] = evt.value;
+    result[3] = '';
 
-        return result
+    return result;
+  }
+
+  static kangaroo(json: string): string[] {
+    const evt = JSON.parse(json) as KangarooEvent;
+    const result = new Array<string>();
+    result[0] = 'CH 1:';
+    result[1] = this.getKangarooActionName(evt.ch1Action);
+    result[2] = 'CH 2:';
+    result[3] = this.getKangarooActionName(evt.ch2Action);
+
+    return result;
+  }
+
+  static getKangarooActionName(action: KangarooAction): string {
+    switch (action) {
+      case KangarooAction.start:
+        return 'Start';
+      case KangarooAction.home:
+        return 'Home';
+      case KangarooAction.position:
+        return 'Position';
+      case KangarooAction.speed:
+        return 'Speed';
+      case KangarooAction.none:
+        return 'None';
+      default:
+        return 'error';
     }
+  }
 
-    private static uartText(subType: ChannelSubType, json: string): string[] {
+  static humanCyborg(json: string): string[] {
+    const evt = JSON.parse(json) as HumanCyborgRelationsEvent;
+    const result = new Array<string>();
+    result[0] = '';
+    result[1] = 'Event Count';
+    result[2] = evt.commands.length.toString();
+    result[3] = '';
 
-        switch (subType) {
-            case ChannelSubType.genericSerial:
-                return this.genericUart(json);
-            case ChannelSubType.kangaroo:
-                return this.kangaroo(json);
-            case ChannelSubType.humanCyborgRelations:
-                return this.humanCyborg(json);
-            default: 
-                return this.generateBasicResponse('error');
-        }
-    }
+    return result;
+  }
 
-    private static genericUart(json: string): string[] {
-        const evt = JSON.parse(json) as GenericSerialEvent;
-        const result = new Array<string>();
-        result[0] = '\u00A0';
-        result[1] = 'Message:';
-        result[2] = evt.value;
-        result[3] = '';
-
-        return result
-    }
-
-    static kangaroo(json: string): string[] {
-        const evt = JSON.parse(json) as KangarooEvent;
-        const result = new Array<string>();
-        result[0] = 'CH 1:';
-        result[1] = this.getKangarooActionName(evt.ch1Action);
-        result[2] = 'CH 2:';
-        result[3] = this.getKangarooActionName(evt.ch2Action);
-
-        return result
-    }
-
-    static getKangarooActionName(action: KangarooAction): string {
-        switch (action) {
-            case KangarooAction.start:
-                return 'Start';
-            case KangarooAction.home:
-                return 'Home';
-            case KangarooAction.position:
-                return 'Position';
-            case KangarooAction.speed:
-                return 'Speed';
-            case KangarooAction.none:
-                return 'None';
-            default:
-                return 'error';
-        }
-    }
-
-    static humanCyborg(json: string): string[] {
-        const evt = JSON.parse(json) as HumanCyborgRelationsEvent;
-        const result = new Array<string>();
-        result[0] = '';
-        result[1] = 'Event Count';
-        result[2] = evt.commands.length.toString();
-        result[3] = '';
-
-        return result;
-    }
-
-    static generateBasicResponse(val: string): string[] {
-        const result = [];
-        result[0] = '\u00A0';
-        result[1] = val;
-        result[2] = '';
-        result[3] = '';
-        return result;
-    }
+  static generateBasicResponse(val: string): string[] {
+    const result = [];
+    result[0] = '\u00A0';
+    result[1] = val;
+    result[2] = '';
+    result[3] = '';
+    return result;
+  }
 }
-
-
-

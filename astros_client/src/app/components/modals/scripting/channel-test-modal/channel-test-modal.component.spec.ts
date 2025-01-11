@@ -8,9 +8,8 @@ describe('ChannelTestModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [ChannelTestModalComponent]
-})
-    .compileComponents();
+      imports: [ChannelTestModalComponent],
+    }).compileComponents();
   });
 
   beforeEach(() => {

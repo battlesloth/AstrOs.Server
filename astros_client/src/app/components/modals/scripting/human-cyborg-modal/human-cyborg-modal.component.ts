@@ -1,15 +1,15 @@
 import { Component, OnInit } from '@angular/core';
-import { 
-  BaseEventModalComponent, 
-  ScriptEventModalResources 
+import {
+  BaseEventModalComponent,
+  ScriptEventModalResources,
 } from '../base-event-modal/base-event-modal.component';
-import { 
-  HcrCommand, 
-  HcrCommandCategory, 
-  HumanCyborgRelationsCmd, 
-  HumanCyborgRelationsEvent, 
-  HumanCyborgRelationsModule, 
-  ScriptEvent
+import {
+  HcrCommand,
+  HcrCommandCategory,
+  HumanCyborgRelationsCmd,
+  HumanCyborgRelationsEvent,
+  HumanCyborgRelationsModule,
+  ScriptEvent,
 } from 'astros-common';
 import { faBan } from '@fortawesome/free-solid-svg-icons';
 import { FormsModule } from '@angular/forms';
@@ -31,12 +31,17 @@ export class HcrModalResources {
 @Component({
   selector: 'app-human-cyborg-modal',
   templateUrl: './human-cyborg-modal.component.html',
-  styleUrls: ['../base-event-modal/base-event-modal.component.scss', './human-cyborg-modal.component.scss'],
+  styleUrls: [
+    '../base-event-modal/base-event-modal.component.scss',
+    './human-cyborg-modal.component.scss',
+  ],
   standalone: true,
-  imports: [FormsModule, NgFor, FontAwesomeModule, DecimalPipe]
+  imports: [FormsModule, NgFor, FontAwesomeModule, DecimalPipe],
 })
-export class HumanCyborgModalComponent extends BaseEventModalComponent implements OnInit {
-
+export class HumanCyborgModalComponent
+  extends BaseEventModalComponent
+  implements OnInit
+{
   faRemove = faBan;
 
   uartChannel!: number;
@@ -74,13 +79,13 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
       HumanCyborgRelationsCmd.setHappyLevel,
       HumanCyborgRelationsCmd.setSadLevel,
       HumanCyborgRelationsCmd.setMadLevel,
-      HumanCyborgRelationsCmd.setScaredLevel
+      HumanCyborgRelationsCmd.setScaredLevel,
     );
 
     this.hasValueB = new Array<HumanCyborgRelationsCmd>();
     this.hasValueB.push(
       HumanCyborgRelationsCmd.playSdRandomOnA,
-      HumanCyborgRelationsCmd.playSdRandomOnB
+      HumanCyborgRelationsCmd.playSdRandomOnB,
     );
 
     this.errorMessage = '';
@@ -89,21 +94,27 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
 
   ngOnInit(): void {
     if (this.resources.has(ScriptEventModalResources.callbackType)) {
-      this.callbackType = this.resources.get(ScriptEventModalResources.callbackType) as string;
+      this.callbackType = this.resources.get(
+        ScriptEventModalResources.callbackType,
+      ) as string;
     }
 
     if (this.callbackType === ScriptEventModalResources.editEvent) {
-      const element = document.getElementById("remove_button");
-      element?.classList.remove("hidden");
+      const element = document.getElementById('remove_button');
+      element?.classList.remove('hidden');
     }
 
-    this.uartChannel = this.resources.get(HcrModalResources.channelId) as number;
+    this.uartChannel = this.resources.get(
+      HcrModalResources.channelId,
+    ) as number;
     this.baudRate = this.resources.get(HcrModalResources.baudRate) as number;
-    this.scriptEvent = this.resources.get(HcrModalResources.scriptEvent) as ScriptEvent;
+    this.scriptEvent = this.resources.get(
+      HcrModalResources.scriptEvent,
+    ) as ScriptEvent;
 
     if (this.scriptEvent.dataJson != '') {
       const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.selectedCommands.push(...payload.commands)
+      this.selectedCommands.push(...payload.commands);
     }
 
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
@@ -130,7 +141,6 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
 
     document.getElementById('value-a')?.setAttribute('disabled', 'disabled');
     document.getElementById('b')?.setAttribute('disabled', 'disabled');
-
   }
 
   setAvailableCommands(category: HcrCommandCategory) {
@@ -147,7 +157,8 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
           this.hcrListItem(HumanCyborgRelationsCmd.extremeAngry),
           this.hcrListItem(HumanCyborgRelationsCmd.mildScared),
           this.hcrListItem(HumanCyborgRelationsCmd.extremeScared),
-          this.hcrListItem(HumanCyborgRelationsCmd.overload));
+          this.hcrListItem(HumanCyborgRelationsCmd.overload),
+        );
         break;
       case HcrCommandCategory.muse:
         this.commands.push(
@@ -156,27 +167,31 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
           this.hcrListItem(HumanCyborgRelationsCmd.toggleMuse),
           this.hcrListItem(HumanCyborgRelationsCmd.triggerMusing),
           this.hcrListItem(HumanCyborgRelationsCmd.minSecondsBetweenMusings),
-          this.hcrListItem(HumanCyborgRelationsCmd.maxSecondsBetweenMusings));
+          this.hcrListItem(HumanCyborgRelationsCmd.maxSecondsBetweenMusings),
+        );
         break;
       case HcrCommandCategory.sdWav:
         this.commands.push(
           this.hcrListItem(HumanCyborgRelationsCmd.playWavOnA),
           this.hcrListItem(HumanCyborgRelationsCmd.playWavOnB),
           this.hcrListItem(HumanCyborgRelationsCmd.playSdRandomOnA),
-          this.hcrListItem(HumanCyborgRelationsCmd.playSdRandomOnB));
+          this.hcrListItem(HumanCyborgRelationsCmd.playSdRandomOnB),
+        );
         break;
       case HcrCommandCategory.stop:
         this.commands.push(
           this.hcrListItem(HumanCyborgRelationsCmd.panicStop),
           this.hcrListItem(HumanCyborgRelationsCmd.gracefulStop),
           this.hcrListItem(HumanCyborgRelationsCmd.stopWavOnA),
-          this.hcrListItem(HumanCyborgRelationsCmd.stopWavOnB));
+          this.hcrListItem(HumanCyborgRelationsCmd.stopWavOnB),
+        );
         break;
       case HcrCommandCategory.volume:
         this.commands.push(
           this.hcrListItem(HumanCyborgRelationsCmd.vocalizerVolume),
           this.hcrListItem(HumanCyborgRelationsCmd.wavAVolume),
-          this.hcrListItem(HumanCyborgRelationsCmd.wavBVolume));
+          this.hcrListItem(HumanCyborgRelationsCmd.wavBVolume),
+        );
         break;
       case HcrCommandCategory.override:
         this.commands.push(
@@ -188,7 +203,8 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
           this.hcrListItem(HumanCyborgRelationsCmd.setHappyLevel),
           this.hcrListItem(HumanCyborgRelationsCmd.setSadLevel),
           this.hcrListItem(HumanCyborgRelationsCmd.setMadLevel),
-          this.hcrListItem(HumanCyborgRelationsCmd.setScaredLevel));
+          this.hcrListItem(HumanCyborgRelationsCmd.setScaredLevel),
+        );
         break;
     }
 
@@ -198,7 +214,6 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
   }
 
   addCommand() {
-
     let missingA = false;
     let missingB = false;
 
@@ -222,19 +237,25 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
       return;
     }
 
-    this.selectedCommands.push(new HcrCommand(crypto.randomUUID().toString(), +this.commandCategory, +this.command, +this.valueA, +this.valueB));
+    this.selectedCommands.push(
+      new HcrCommand(
+        crypto.randomUUID().toString(),
+        +this.commandCategory,
+        +this.command,
+        +this.valueA,
+        +this.valueB,
+      ),
+    );
   }
 
-
   removeCommand(id: string) {
-    const cmdIdx = this.selectedCommands?.findIndex(x => x.id === id);
+    const cmdIdx = this.selectedCommands?.findIndex((x) => x.id === id);
     if (cmdIdx != undefined && cmdIdx > -1) {
       this.selectedCommands.splice(cmdIdx, 1);
     }
   }
 
   addEvent() {
-
     if (+this.eventTime > this.maxTime) {
       this.errorMessage = `Event time cannot be larger than ${this.maxTime / this.timeFactor}`;
       return;
@@ -242,35 +263,35 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const data = new HumanCyborgRelationsEvent(this.uartChannel, this.baudRate, this.selectedCommands);
+    const data = new HumanCyborgRelationsEvent(
+      this.uartChannel,
+      this.baudRate,
+      this.selectedCommands,
+    );
 
     this.scriptEvent.dataJson = JSON.stringify(data);
 
-    const evt = new ModalCallbackEvent(
-      this.callbackType,
-      {
-        scriptEvent: this.scriptEvent,
-        time: this.originalEventTime
-      },
-    );
+    const evt = new ModalCallbackEvent(this.callbackType, {
+      scriptEvent: this.scriptEvent,
+      time: this.originalEventTime,
+    });
     this.modalCallback.emit(evt);
   }
 
   formatSelectedCommand(cmd: HcrCommand) {
-
     if (this.hcrHasBValue(cmd.command)) {
-      return `${this.hcrName(cmd.command)}: ${cmd.valueA} ${cmd.valueB}`
+      return `${this.hcrName(cmd.command)}: ${cmd.valueA} ${cmd.valueB}`;
     }
 
     if (this.hcrHasAValue(cmd.command)) {
-      return `${this.hcrName(cmd.command)}: ${cmd.valueA}`
+      return `${this.hcrName(cmd.command)}: ${cmd.valueA}`;
     }
 
-    return this.hcrName(cmd.command)
+    return this.hcrName(cmd.command);
   }
 
   hcrListItem(cmd: HumanCyborgRelationsCmd) {
-    return { id: cmd, name: this.hcrName(cmd) }
+    return { id: cmd, name: this.hcrName(cmd) };
   }
 
   hcrName(cmd: HumanCyborgRelationsCmd) {
@@ -278,10 +299,10 @@ export class HumanCyborgModalComponent extends BaseEventModalComponent implement
   }
 
   hcrHasBValue(cmd: HumanCyborgRelationsCmd) {
-    return this.hasValueB.find(x => x === cmd) !== undefined
+    return this.hasValueB.find((x) => x === cmd) !== undefined;
   }
 
   hcrHasAValue(cmd: HumanCyborgRelationsCmd) {
-    return this.hasValueA.find(x => x === cmd) !== undefined
+    return this.hasValueA.find((x) => x === cmd) !== undefined;
   }
 }

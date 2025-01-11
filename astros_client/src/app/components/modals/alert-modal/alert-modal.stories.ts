@@ -1,10 +1,10 @@
-import { Meta, StoryObj } from "@storybook/angular";
-import { AlertModalComponent } from "./alert-modal.component";
+import { Meta, StoryObj } from '@storybook/angular';
+import { AlertModalComponent } from './alert-modal.component';
 
 const meta: Meta<AlertModalComponent> = {
-    title: "Components/Modals/AlertModal",
-    component: AlertModalComponent,
-    tags: ["autodocs"]
+  title: 'Components/Modals/AlertModal',
+  component: AlertModalComponent,
+  tags: ['autodocs'],
 };
 
 export default meta;
@@ -12,5 +12,5 @@ export default meta;
 type Story = StoryObj<AlertModalComponent>;
 
 export const Default: Story = {
-    args: {},
+  args: {},
 };

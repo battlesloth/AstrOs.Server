@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { ModalBaseComponent, } from '@src/components/modals/modal-base/modal-base.component'; 
+import { ModalBaseComponent } from '@src/components/modals/modal-base/modal-base.component';
 import { ModalCallbackEvent } from '@src/components/modals/modal-base/modal-callback-event';
 import { ScriptEvent } from 'astros-common';
 
@@ -21,10 +21,9 @@ export interface ScriptEventModalResponse {
   selector: 'app-base-event-modal',
   template: '',
   styleUrls: ['./base-event-modal.component.scss'],
-  standalone: true
+  standalone: true,
 })
 export class BaseEventModalComponent extends ModalBaseComponent {
-
   protected scriptEvent!: ScriptEvent;
   protected originalEventTime: number;
   protected callbackType: string;
@@ -45,23 +44,19 @@ export class BaseEventModalComponent extends ModalBaseComponent {
   }
 
   removeEvent() {
-    const evt = new ModalCallbackEvent(
-      ScriptEventModalResources.removeEvent,
-      {
-        scriptEvent: this.scriptEvent,
-        time: this.originalEventTime * this.timeFactor
-      }
-    );
+    const evt = new ModalCallbackEvent(ScriptEventModalResources.removeEvent, {
+      scriptEvent: this.scriptEvent,
+      time: this.originalEventTime * this.timeFactor,
+    });
     this.modalCallback.emit(evt);
   }
 
   closeModal() {
     const evt = new ModalCallbackEvent(
       ScriptEventModalResources.closeEvent,
-      null
+      null,
     );
 
     this.modalCallback.emit(evt);
   }
-
 }

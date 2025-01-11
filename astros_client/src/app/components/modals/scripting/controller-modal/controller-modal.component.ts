@@ -23,25 +23,27 @@ export interface ControllerModalResponse {
 }
 
 @Component({
-    selector: 'app-controller-modal',
-    templateUrl: './controller-modal.component.html',
-    styleUrls: ['./controller-modal.component.scss'],
-    standalone: true,
-    imports: [FormsModule, NgFor, NgIf, KeyValuePipe]
+  selector: 'app-controller-modal',
+  templateUrl: './controller-modal.component.html',
+  styleUrls: ['./controller-modal.component.scss'],
+  standalone: true,
+  imports: [FormsModule, NgFor, NgIf, KeyValuePipe],
 })
-export class ControllerModalComponent extends ModalBaseComponent implements OnInit {
-
+export class ControllerModalComponent
+  extends ModalBaseComponent
+  implements OnInit
+{
   errorMessage: string;
 
   controllers!: Map<number, LocationDetails>;
   selectedController = 0;
 
   private availableModules!: Map<number, Map<ChannelType, string>>;
-  modules: Map<ChannelType, string>
+  modules: Map<ChannelType, string>;
   selectedModule: ChannelType = ChannelType.none;
 
   private availableChannels!: Map<number, Map<ChannelType, ChannelValue[]>>;
-  channels: ChannelValue[]
+  channels: ChannelValue[];
   selectedChannel = -1;
   selectedChannels: unknown[] = [];
 
@@ -55,54 +57,64 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
   }
 
   ngOnInit(): void {
-    this.controllers = this.resources.get(ControllerModalResources.controllers) as Map<number, LocationDetails>;
-    this.availableModules = this.resources.get(ControllerModalResources.modules) as Map<number, Map<ChannelType, string>>;
-    this.availableChannels = this.resources.get(ControllerModalResources.channels) as Map<number, Map<ChannelType, ChannelValue[]>>;
+    this.controllers = this.resources.get(
+      ControllerModalResources.controllers,
+    ) as Map<number, LocationDetails>;
+    this.availableModules = this.resources.get(
+      ControllerModalResources.modules,
+    ) as Map<number, Map<ChannelType, string>>;
+    this.availableChannels = this.resources.get(
+      ControllerModalResources.channels,
+    ) as Map<number, Map<ChannelType, ChannelValue[]>>;
   }
 
   modalChange($event: Event) {
     // convert from string value to number for enum
     if (($event.target as HTMLInputElement).id === 'controller-select') {
       this.setModules(+($event.target as HTMLInputElement).value);
-    }
-    else if (($event.target as HTMLInputElement).id === 'module-select') {
+    } else if (($event.target as HTMLInputElement).id === 'module-select') {
       this.setChannels(+($event.target as HTMLInputElement).value);
     }
   }
 
   addChannel() {
-
-    if (+this.selectedController !== 4
-      && +this.selectedModule === ChannelType.none) {
-      this.errorMessage = 'Module Selection Required'
+    if (
+      +this.selectedController !== 4 &&
+      +this.selectedModule === ChannelType.none
+    ) {
+      this.errorMessage = 'Module Selection Required';
       return;
     }
 
-    if (+this.selectedModule !== ChannelType.none
-      && +this.selectedChannels.length < 1) {
-      this.errorMessage = 'Channel Selection Required'
+    if (
+      +this.selectedModule !== ChannelType.none &&
+      +this.selectedChannels.length < 1
+    ) {
+      this.errorMessage = 'Channel Selection Required';
       return;
     }
-
 
     const evt = new ModalCallbackEvent(
       ControllerModalResources.addChannelEvent,
       {
         controller: +this.selectedController,
-        module: +this.selectedController === 4 ? ChannelType.audio : +this.selectedModule,
-        channels: this.selectedChannels
-      }
+        module:
+          +this.selectedController === 4
+            ? ChannelType.audio
+            : +this.selectedModule,
+        channels: this.selectedChannels,
+      },
     );
 
     this.modalCallback.emit(evt);
-    this.clearOptions()
+    this.clearOptions();
   }
 
   closeModal() {
-    this.clearOptions()
+    this.clearOptions();
     const evt = new ModalCallbackEvent(
       ControllerModalResources.closeEvent,
-      null
+      null,
     );
     this.modalCallback.emit(evt);
   }
@@ -111,18 +123,25 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
     this.selectedController = 0;
     this.selectedModule = ChannelType.none;
     this.selectedChannel = -1;
-    document.getElementById('module-select')?.setAttribute('disabled', 'disabled');
-    document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
+    document
+      .getElementById('module-select')
+      ?.setAttribute('disabled', 'disabled');
+    document
+      .getElementById('channel-select')
+      ?.setAttribute('disabled', 'disabled');
   }
 
   private setModules(controllerId: number) {
     if (controllerId === 4) {
       this.selectedModule = ChannelType.none;
       this.selectedChannel = -1;
-      document.getElementById('module-select')?.setAttribute('disabled', 'disabled');
-      document.getElementById('channel-select')?.setAttribute('disabled', 'disabled')
-    }
-    else {
+      document
+        .getElementById('module-select')
+        ?.setAttribute('disabled', 'disabled');
+      document
+        .getElementById('channel-select')
+        ?.setAttribute('disabled', 'disabled');
+    } else {
       const mods = this.availableModules.get(+this.selectedController);
       if (mods) {
         this.modules = mods;
@@ -134,13 +153,15 @@ export class ControllerModalComponent extends ModalBaseComponent implements OnIn
   }
 
   private setChannels(channelType: ChannelType) {
-
     if (channelType === ChannelType.none) {
       this.selectedChannel = -1;
-      document.getElementById('channel-select')?.setAttribute('disabled', 'disabled');
-    }
-    else {
-      const chs = this.availableChannels.get(+this.selectedController)?.get(+channelType);
+      document
+        .getElementById('channel-select')
+        ?.setAttribute('disabled', 'disabled');
+    } else {
+      const chs = this.availableChannels
+        .get(+this.selectedController)
+        ?.get(+channelType);
       if (chs) {
         this.channels = chs;
         document.getElementById('channel-select')?.removeAttribute('disabled');

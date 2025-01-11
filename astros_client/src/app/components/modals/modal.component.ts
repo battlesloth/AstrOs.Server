@@ -1,27 +1,36 @@
-import { Component, ElementRef, Input, OnInit, Renderer2, OnDestroy } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Input,
+  OnInit,
+  Renderer2,
+  OnDestroy,
+} from '@angular/core';
 import { ModalService } from 'src/app/services/modal/modal.service';
 
 @Component({
-    selector: 'app-astros-modal',
-    templateUrl: './modal.component.html',
-    styleUrls: ['./modal.component.scss'],
-    standalone: true
+  selector: 'app-astros-modal',
+  templateUrl: './modal.component.html',
+  styleUrls: ['./modal.component.scss'],
+  standalone: true,
 })
 export class ModalComponent implements OnInit, OnDestroy {
-
   @Input() id: string;
   @Input() disableBackgroundClick: string;
 
   private element: ElementRef;
 
-  constructor(private renderer: Renderer2, private modalService: ModalService, private el: ElementRef) {
+  constructor(
+    private renderer: Renderer2,
+    private modalService: ModalService,
+    private el: ElementRef,
+  ) {
     this.id = '';
     this.disableBackgroundClick = '';
     this.element = el;
   }
 
   ngOnInit(): void {
-
     if (!this.id || this.id === '') {
       console.error('modal must have an id');
       return;
@@ -31,7 +40,10 @@ export class ModalComponent implements OnInit, OnDestroy {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.element.nativeElement.addEventListener('click', (el: any) => {
-      if (el.target.className === 'astros-modal-background' && !+this.disableBackgroundClick) {
+      if (
+        el.target.className === 'astros-modal-background' &&
+        !+this.disableBackgroundClick
+      ) {
         this.close();
       }
     });

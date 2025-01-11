@@ -8,9 +8,8 @@ describe('UartModuleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [UartModuleComponent]
-    })
-    .compileComponents();
+      imports: [UartModuleComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(UartModuleComponent);
     component = fixture.componentInstance;

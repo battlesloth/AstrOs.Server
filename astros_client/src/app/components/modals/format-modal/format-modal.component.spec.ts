@@ -8,9 +8,8 @@ describe('FormatModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [FormatModalComponent]
-})
-    .compileComponents();
+      imports: [FormatModalComponent],
+    }).compileComponents();
   });
 
   beforeEach(() => {

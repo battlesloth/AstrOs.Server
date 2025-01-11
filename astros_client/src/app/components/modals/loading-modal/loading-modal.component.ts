@@ -1,7 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { BaseEventModalComponent } from '../scripting/base-event-modal/base-event-modal.component';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
-import { AstrOsLocationCollection, ControllersResponse, ControlModule, TransmissionType } from 'astros-common';
+import {
+  AstrOsLocationCollection,
+  ControllersResponse,
+  ControlModule,
+  TransmissionType,
+} from 'astros-common';
 import { ControllerService } from 'src/app/services/controllers/controller.service';
 import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
 import { Subscription } from 'rxjs';
@@ -19,13 +24,15 @@ export interface LoadingModalResponse {
   selector: 'app-loading-modal',
   templateUrl: './loading-modal.component.html',
   styleUrls: ['./loading-modal.component.scss'],
-  standalone: true
+  standalone: true,
 })
-export class LoadingModalComponent extends BaseEventModalComponent implements OnInit {
-
+export class LoadingModalComponent
+  extends BaseEventModalComponent
+  implements OnInit
+{
   subscription!: Subscription;
 
-  message = "Loading Controllers...";
+  message = 'Loading Controllers...';
   controllersMsg = TransmissionType.controllers;
   locations!: AstrOsLocationCollection;
   controllers!: ControllersResponse;
@@ -35,22 +42,28 @@ export class LoadingModalComponent extends BaseEventModalComponent implements On
 
   disableButton = true;
 
-  constructor(private socket: WebsocketService,
-    private controllerService: ControllerService) {
+  constructor(
+    private socket: WebsocketService,
+    private controllerService: ControllerService,
+  ) {
     super();
   }
 
   ngOnInit(): void {
-
     const locationsObserver = {
       next: (result: AstrOsLocationCollection) => {
         this.locations = result;
         this.locationsLoaded = true;
         this.controllersLoaded = true;
-        this.controllers = { success: true, controllers: [], type: TransmissionType.controllers, message: "" };
+        this.controllers = {
+          success: true,
+          controllers: [],
+          type: TransmissionType.controllers,
+          message: '',
+        };
         this.checkLoadedState();
       },
-      error: (err: unknown) => console.error(err)
+      error: (err: unknown) => console.error(err),
     };
 
     this.controllerService.getLoadedLocations().subscribe(locationsObserver);
@@ -58,9 +71,9 @@ export class LoadingModalComponent extends BaseEventModalComponent implements On
     return;
     const observer = {
       next: (_: unknown) => {
-        console.log("Synced controllers");
+        console.log('Synced controllers');
       },
-      error: (err: unknown) => console.error(err)
+      error: (err: unknown) => console.error(err),
     };
 
     this.controllerService.syncControllers().subscribe(observer);
@@ -81,20 +94,17 @@ export class LoadingModalComponent extends BaseEventModalComponent implements On
         this.closeModal();
       } else {
         this.disableButton = false;
-        this.message = "Failed to load controllers, using cached values.";
+        this.message = 'Failed to load controllers, using cached values.';
       }
     }
   }
 
   override closeModal(): void {
     //this.subscription.unsubscribe();
-    const evt = new ModalCallbackEvent(
-      LoadingModalResources.closeEvent,
-      {
-        controllers: this.controllers.controllers,
-        locations: this.locations
-      }
-    );
+    const evt = new ModalCallbackEvent(LoadingModalResources.closeEvent, {
+      controllers: this.controllers.controllers,
+      locations: this.locations,
+    });
 
     this.modalCallback.emit(evt);
   }

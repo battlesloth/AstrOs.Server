@@ -8,9 +8,8 @@ describe('EspSubmoduleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EspSubmoduleComponent]
-    })
-    .compileComponents();
+      imports: [EspSubmoduleComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(EspSubmoduleComponent);
     component = fixture.componentInstance;

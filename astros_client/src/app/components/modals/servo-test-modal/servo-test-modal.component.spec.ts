@@ -8,9 +8,8 @@ describe('ServoTestModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ServoTestModalComponent]
-    })
-    .compileComponents();
+      imports: [ServoTestModalComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(ServoTestModalComponent);
     component = fixture.componentInstance;

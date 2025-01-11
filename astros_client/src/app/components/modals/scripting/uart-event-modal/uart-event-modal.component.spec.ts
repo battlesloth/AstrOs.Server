@@ -8,9 +8,8 @@ describe('UartEventModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [UartEventModalComponent]
-})
-    .compileComponents();
+      imports: [UartEventModalComponent],
+    }).compileComponents();
   });
 
   beforeEach(() => {

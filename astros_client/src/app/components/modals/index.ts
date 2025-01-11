@@ -7,4 +7,3 @@ export * from './servo-test-modal/servo-test-modal.component';
 export * from './upload-modal/upload-modal.component';
 export * from './modal.component';
 export * from './modal-base/modal-callback-event';
-

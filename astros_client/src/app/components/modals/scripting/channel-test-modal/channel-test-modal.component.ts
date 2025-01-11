@@ -21,14 +21,19 @@ export interface ChannelTestModalResponse {
 }
 
 @Component({
-    selector: 'app-channel-test-modal',
-    templateUrl: './channel-test-modal.component.html',
-    styleUrls: ['../base-event-modal/base-event-modal.component.scss', './channel-test-modal.component.scss'],
-    standalone: true,
-    imports: [NgIf, FormsModule]
+  selector: 'app-channel-test-modal',
+  templateUrl: './channel-test-modal.component.html',
+  styleUrls: [
+    '../base-event-modal/base-event-modal.component.scss',
+    './channel-test-modal.component.scss',
+  ],
+  standalone: true,
+  imports: [NgIf, FormsModule],
 })
-export class ChannelTestModalComponent extends BaseEventModalComponent implements OnInit {
-
+export class ChannelTestModalComponent
+  extends BaseEventModalComponent
+  implements OnInit
+{
   controllerId = 0;
   channelId = 0;
 
@@ -54,21 +59,26 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
   }
 
   ngOnInit(): void {
-    this.controllerId = this.resources.get(ChannelTestModalResources.controller) as number;
-    this.channelType = this.resources.get(ChannelTestModalResources.channelType) as ChannelType;
-    this.channelSubType = this.resources.get(ChannelTestModalResources.channelSubType) as ChannelSubType
-    this.channelId = this.resources.get(ChannelTestModalResources.channelId) as number;
+    this.controllerId = this.resources.get(
+      ChannelTestModalResources.controller,
+    ) as number;
+    this.channelType = this.resources.get(
+      ChannelTestModalResources.channelType,
+    ) as ChannelType;
+    this.channelSubType = this.resources.get(
+      ChannelTestModalResources.channelSubType,
+    ) as ChannelSubType;
+    this.channelId = this.resources.get(
+      ChannelTestModalResources.channelId,
+    ) as number;
   }
 
   runClicked() {
-    const evt = new ModalCallbackEvent(
-      ChannelTestModalResources.channelTest,
-      {
-        controllerId: this.controllerId,
-        commandType: this.channelType,
-        command: this.getCommand()  
-      }
-    )
+    const evt = new ModalCallbackEvent(ChannelTestModalResources.channelTest, {
+      controllerId: this.controllerId,
+      commandType: this.channelType,
+      command: this.getCommand(),
+    });
     this.modalCallback.emit(evt);
   }
 
@@ -92,8 +102,8 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
 
   selectChange($event: Event) {
     if (($event.target as HTMLInputElement).id === 'cmdselect') {
-
-      this.spdDisabled = +this.kangarooAction !== 3 && +this.kangarooAction !== 4;
+      this.spdDisabled =
+        +this.kangarooAction !== 3 && +this.kangarooAction !== 4;
       this.posDisabled = +this.kangarooAction !== 4;
 
       if (+this.kangarooAction !== 3 && +this.kangarooAction !== 4) {
@@ -106,21 +116,20 @@ export class ChannelTestModalComponent extends BaseEventModalComponent implement
   }
 
   getKangarooCommand(): string {
-
     let cmd = '';
 
     switch (+this.kangarooAction) {
       case KangarooAction.start:
-        cmd = 'start'
+        cmd = 'start';
         break;
       case KangarooAction.home:
-        cmd = 'home'
+        cmd = 'home';
         break;
       case KangarooAction.speed:
-        cmd = `s${this.kangarooSpd === undefined ? 0 : this.kangarooSpd}`
+        cmd = `s${this.kangarooSpd === undefined ? 0 : this.kangarooSpd}`;
         break;
       case KangarooAction.position:
-        cmd = `p${this.kangarooPos === undefined ? 0 : this.kangarooPos} s${this.kangarooSpd === undefined ? 0 : this.kangarooSpd}`
+        cmd = `p${this.kangarooPos === undefined ? 0 : this.kangarooPos} s${this.kangarooSpd === undefined ? 0 : this.kangarooSpd}`;
         break;
     }
 

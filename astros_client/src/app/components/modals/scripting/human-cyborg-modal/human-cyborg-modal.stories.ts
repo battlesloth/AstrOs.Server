@@ -1,10 +1,10 @@
-import { Meta, StoryObj } from "@storybook/angular";
-import { HumanCyborgModalComponent } from "./human-cyborg-modal.component";
+import { Meta, StoryObj } from '@storybook/angular';
+import { HumanCyborgModalComponent } from './human-cyborg-modal.component';
 
 const meta: Meta<HumanCyborgModalComponent> = {
-    title: "Components/Modals/HumanCyborgModal",
-    component: HumanCyborgModalComponent,
-    tags: ["autodocs"]
+  title: 'Components/Modals/HumanCyborgModal',
+  component: HumanCyborgModalComponent,
+  tags: ['autodocs'],
 };
 
 export default meta;
@@ -12,5 +12,5 @@ export default meta;
 type Story = StoryObj<HumanCyborgModalComponent>;
 
 export const Default: Story = {
-    args: {},
+  args: {},
 };

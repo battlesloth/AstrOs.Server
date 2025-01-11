@@ -1,39 +1,48 @@
 import { Injectable } from '@angular/core';
-import { ControllerStatus, AstrOsConstants, StatusResponse, TransmissionType } from 'astros-common';
+import {
+  ControllerStatus,
+  AstrOsConstants,
+  StatusResponse,
+  TransmissionType,
+} from 'astros-common';
 import { Subject } from 'rxjs';
 import { WebsocketService } from '../websocket/websocket.service';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class StatusService {
-
   private coreState: ControllerStatus = ControllerStatus.down;
-  coreStateObserver: Subject<ControllerStatus> = new Subject<ControllerStatus>();
+  coreStateObserver: Subject<ControllerStatus> =
+    new Subject<ControllerStatus>();
 
   private domeState: ControllerStatus = ControllerStatus.down;
-  domeStateObserver: Subject<ControllerStatus> = new Subject<ControllerStatus>();
+  domeStateObserver: Subject<ControllerStatus> =
+    new Subject<ControllerStatus>();
 
   private bodyState: ControllerStatus = ControllerStatus.down;
-  bodyStateObserver: Subject<ControllerStatus> = new Subject<ControllerStatus>();
+  bodyStateObserver: Subject<ControllerStatus> =
+    new Subject<ControllerStatus>();
 
   constructor(private socket: WebsocketService) {
-
-    console.log('status started...')
+    console.log('status started...');
     this.socket.messages.subscribe((msg: unknown) => {
-      
-      if (msg && typeof msg === 'object' && 'type' in msg) 
-      if (msg.type === TransmissionType.status) {
-        this.statusUpdate(msg as StatusResponse);
-      }
-
+      if (msg && typeof msg === 'object' && 'type' in msg)
+        if (msg.type === TransmissionType.status) {
+          this.statusUpdate(msg as StatusResponse);
+        }
     });
 
-    this.coreStateObserver.subscribe((value) => { this.coreState = value });
-    this.domeStateObserver.subscribe((value) => { this.domeState = value });
-    this.bodyStateObserver.subscribe((value) => { this.bodyState = value });
+    this.coreStateObserver.subscribe((value) => {
+      this.coreState = value;
+    });
+    this.domeStateObserver.subscribe((value) => {
+      this.domeState = value;
+    });
+    this.bodyStateObserver.subscribe((value) => {
+      this.bodyState = value;
+    });
   }
-
 
   resetStatus() {
     this.coreState = ControllerStatus.down;

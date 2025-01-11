@@ -1,10 +1,10 @@
-import { Meta, StoryObj } from "@storybook/angular";
-import { LoadingModalComponent } from "./loading-modal.component";
+import { Meta, StoryObj } from '@storybook/angular';
+import { LoadingModalComponent } from './loading-modal.component';
 
 const meta: Meta<LoadingModalComponent> = {
-    title: "Components/Modals/LoadingModal",
-    component: LoadingModalComponent,
-    tags: ["autodocs"]
+  title: 'Components/Modals/LoadingModal',
+  component: LoadingModalComponent,
+  tags: ['autodocs'],
 };
 
 export default meta;
@@ -12,5 +12,5 @@ export default meta;
 type Story = StoryObj<LoadingModalComponent>;
 
 export const Default: Story = {
-    args: {},
+  args: {},
 };

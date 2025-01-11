@@ -8,9 +8,8 @@ describe('EspModuleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [EspModuleComponent]
-})
-    .compileComponents();
+      imports: [EspModuleComponent],
+    }).compileComponents();
   });
 
   beforeEach(() => {

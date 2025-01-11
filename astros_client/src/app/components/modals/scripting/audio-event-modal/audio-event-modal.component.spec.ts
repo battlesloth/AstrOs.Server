@@ -8,9 +8,8 @@ describe('AudioEventModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [AudioEventModalComponent]
-})
-    .compileComponents();
+      imports: [AudioEventModalComponent],
+    }).compileComponents();
   });
 
   beforeEach(() => {

@@ -8,9 +8,8 @@ describe('KangarooModuleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [KangarooModuleComponent]
-})
-    .compileComponents();
+      imports: [KangarooModuleComponent],
+    }).compileComponents();
   });
 
   beforeEach(() => {

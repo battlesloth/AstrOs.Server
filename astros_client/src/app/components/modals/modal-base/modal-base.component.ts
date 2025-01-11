@@ -7,11 +7,8 @@ import { ModalCallbackEvent } from './modal-callback-event';
   styleUrls: ['./modal-base.component.scss'],
 })
 export abstract class ModalBaseComponent {
-
   @Input()
   resources!: Map<string, unknown>;
 
   @Output() modalCallback = new EventEmitter<ModalCallbackEvent>();
 }
-
-

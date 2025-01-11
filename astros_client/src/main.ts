@@ -1,7 +1,10 @@
 import { enableProdMode, importProvidersFrom } from '@angular/core';
 import { environment } from './environments/environment';
 import { WebsocketService } from './app/services/websocket/websocket.service';
-import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
+import {
+  provideHttpClient,
+  withInterceptorsFromDi,
+} from '@angular/common/http';
 import { BrowserModule, bootstrapApplication } from '@angular/platform-browser';
 import { AppRoutingModule } from './app/app-routing.module';
 import { FormsModule } from '@angular/forms';
@@ -22,10 +25,23 @@ if (environment.production) {
 }
 
 bootstrapApplication(AppComponent, {
-    providers: [
-        importProvidersFrom(BrowserModule, AppRoutingModule, FormsModule, MatMenuModule, MatExpansionModule, MatToolbarModule, MatListModule, MatSnackBarModule, FontAwesomeModule, MatProgressBarModule, MatCheckboxModule, MatSliderModule),
-        WebsocketService, provideHttpClient(withInterceptorsFromDi()),
-        provideAnimations()
-    ]
-})
-  .catch(err => console.error(err));
+  providers: [
+    importProvidersFrom(
+      BrowserModule,
+      AppRoutingModule,
+      FormsModule,
+      MatMenuModule,
+      MatExpansionModule,
+      MatToolbarModule,
+      MatListModule,
+      MatSnackBarModule,
+      FontAwesomeModule,
+      MatProgressBarModule,
+      MatCheckboxModule,
+      MatSliderModule,
+    ),
+    WebsocketService,
+    provideHttpClient(withInterceptorsFromDi()),
+    provideAnimations(),
+  ],
+}).catch((err) => console.error(err));

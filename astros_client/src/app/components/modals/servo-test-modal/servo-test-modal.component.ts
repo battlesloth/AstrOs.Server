@@ -18,14 +18,16 @@ export interface ServoTestMessage {
 }
 
 @Component({
-    selector: 'app-servo-test-modal',
-    templateUrl: './servo-test-modal.component.html',
-    styleUrl: './servo-test-modal.component.scss',
-    standalone: true,
-    imports: [MatSlider, MatSliderThumb, FormsModule]
+  selector: 'app-servo-test-modal',
+  templateUrl: './servo-test-modal.component.html',
+  styleUrl: './servo-test-modal.component.scss',
+  standalone: true,
+  imports: [MatSlider, MatSliderThumb, FormsModule],
 })
-export class ServoTestModalComponent extends BaseEventModalComponent implements OnInit {
-   
+export class ServoTestModalComponent
+  extends BaseEventModalComponent
+  implements OnInit
+{
   servoId = 0;
   controllerId = 0;
   disableSlider = true;
@@ -36,19 +38,20 @@ export class ServoTestModalComponent extends BaseEventModalComponent implements 
   }
 
   ngOnInit(): void {
-    this.servoId = this.resources.get(ServoTestModalResources.servoId) as number;
-    this.controllerId = this.resources.get(ServoTestModalResources.controllerId) as number;
+    this.servoId = this.resources.get(
+      ServoTestModalResources.servoId,
+    ) as number;
+    this.controllerId = this.resources.get(
+      ServoTestModalResources.controllerId,
+    ) as number;
   }
 
   onSliderChange(_: unknown) {
-    const evt = new ModalCallbackEvent(
-      ServoTestModalResources.sendServoMove,
-      {
-        controllerId: this.controllerId,
-        servoId: this.servoId,
-        value: this.value
-      }
-    );
+    const evt = new ModalCallbackEvent(ServoTestModalResources.sendServoMove, {
+      controllerId: this.controllerId,
+      servoId: this.servoId,
+      value: this.value,
+    });
     this.modalCallback.emit(evt);
   }
 
@@ -59,7 +62,7 @@ export class ServoTestModalComponent extends BaseEventModalComponent implements 
   override closeModal(): void {
     const evt = new ModalCallbackEvent(
       ServoTestModalResources.closeEvent,
-      null
+      null,
     );
     this.modalCallback.emit(evt);
   }

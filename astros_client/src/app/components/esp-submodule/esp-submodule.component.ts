@@ -1,5 +1,10 @@
 import { Component, ViewChild, ViewContainerRef } from '@angular/core';
-import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle } from '@angular/material/expansion';
+import {
+  MatAccordion,
+  MatExpansionPanel,
+  MatExpansionPanelHeader,
+  MatExpansionPanelTitle,
+} from '@angular/material/expansion';
 
 @Component({
   selector: 'app-esp-submodule',
@@ -9,14 +14,15 @@ import { MatAccordion, MatExpansionPanel, MatExpansionPanelHeader, MatExpansionP
     MatAccordion,
     MatExpansionPanel,
     MatExpansionPanelHeader,
-    MatExpansionPanelTitle
+    MatExpansionPanelTitle,
   ],
-  standalone: true
+  standalone: true,
 })
 export class EspSubmoduleComponent {
-
   @ViewChild('configContainer', { read: ViewContainerRef })
-  get configContainer(): ViewContainerRef { return this._configContainer; }
+  get configContainer(): ViewContainerRef {
+    return this._configContainer;
+  }
   set configContainer(value: ViewContainerRef) {
     this._configContainer = value;
   }

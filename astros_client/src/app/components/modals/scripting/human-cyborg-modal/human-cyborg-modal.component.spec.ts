@@ -8,9 +8,8 @@ describe('HumanCyborgModalComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-    imports: [HumanCyborgModalComponent]
-})
-    .compileComponents();
+      imports: [HumanCyborgModalComponent],
+    }).compileComponents();
   });
 
   beforeEach(() => {

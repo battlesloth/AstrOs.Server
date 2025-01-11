@@ -1,6 +1,19 @@
-import { Component, EventEmitter, Input, Output, ViewChild, ViewContainerRef } from '@angular/core';
-import { MatExpansionPanel, MatAccordion, MatExpansionPanelHeader, MatExpansionPanelTitle, MatExpansionPanelDescription } from '@angular/material/expansion';
-import { MatCheckboxModule, MatCheckbox } from '@angular/material/checkbox'
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  ViewChild,
+  ViewContainerRef,
+} from '@angular/core';
+import {
+  MatExpansionPanel,
+  MatAccordion,
+  MatExpansionPanelHeader,
+  MatExpansionPanelTitle,
+  MatExpansionPanelDescription,
+} from '@angular/material/expansion';
+import { MatCheckboxModule, MatCheckbox } from '@angular/material/checkbox';
 import { MatFormField } from '@angular/material/form-field';
 import { ControllerLocation, UartModule, UartType } from 'astros-common';
 import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
@@ -9,26 +22,25 @@ import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 @Component({
-    selector: 'app-esp-module',
-    templateUrl: './esp-module.component.html',
-    styleUrls: ['./esp-module.component.scss'],
-    viewProviders: [MatExpansionPanel, MatFormField, MatCheckboxModule],
-    standalone: true,
-    imports: [
-      MatAccordion, 
-      MatExpansionPanel, 
-      MatExpansionPanelHeader, 
-      MatExpansionPanelTitle, 
-      NgIf, 
-      FormsModule, 
-      MatExpansionPanelDescription, 
-      NgFor, 
-      MatCheckbox,
-      EspSubmoduleComponent
-    ]
+  selector: 'app-esp-module',
+  templateUrl: './esp-module.component.html',
+  styleUrls: ['./esp-module.component.scss'],
+  viewProviders: [MatExpansionPanel, MatFormField, MatCheckboxModule],
+  standalone: true,
+  imports: [
+    MatAccordion,
+    MatExpansionPanel,
+    MatExpansionPanelHeader,
+    MatExpansionPanelTitle,
+    NgIf,
+    FormsModule,
+    MatExpansionPanelDescription,
+    NgFor,
+    MatCheckbox,
+    EspSubmoduleComponent,
+  ],
 })
 export class EspModuleComponent {
-
   @Output() openServoTestModal = new EventEmitter<any>();
 
   @Input()
@@ -38,7 +50,9 @@ export class EspModuleComponent {
   locationId = 0;
 
   @Input()
-  get module(): any { return this._module; }
+  get module(): any {
+    return this._module;
+  }
   set module(value: any) {
     this._module = value;
     this.setModule();
@@ -46,9 +60,10 @@ export class EspModuleComponent {
   _module!: ControllerLocation;
   uartPanelOpenState = false;
 
-
   @ViewChild('uart1Container', { read: ViewContainerRef })
-  get uart1Container(): ViewContainerRef { return this._uart1Container; }
+  get uart1Container(): ViewContainerRef {
+    return this._uart1Container;
+  }
   set uart1Container(value: ViewContainerRef) {
     this._uart1Container = value;
     //this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);
@@ -56,7 +71,9 @@ export class EspModuleComponent {
   _uart1Container!: ViewContainerRef;
 
   @ViewChild('uart2Container', { read: ViewContainerRef })
-  get uart2Container(): ViewContainerRef { return this._uart2Container; }
+  get uart2Container(): ViewContainerRef {
+    return this._uart2Container;
+  }
   set uart2Container(value: ViewContainerRef) {
     this._uart2Container = value;
     //this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);
@@ -72,7 +89,6 @@ export class EspModuleComponent {
   components: any[];
   uart1Type: string;
   uart2Type: string;
-
 
   constructor() {
     this.components = new Array<any>();
@@ -102,19 +118,23 @@ export class EspModuleComponent {
   }
 
   uartTypeChange($event: any, channel: number) {
-
     return;
 
     const ut = +$event;
 
     if (channel === 1 && ut === this.originalUart1Type) {
-      this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);
-    }
-    else if (channel === 2 && ut === this.originalUart2Type) {
-      this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);
-    }
-    else {
-
+      this.setUartModuleForSlot(
+        this.originalUart1Type,
+        this.originalUart1Module,
+        1,
+      );
+    } else if (channel === 2 && ut === this.originalUart2Type) {
+      this.setUartModuleForSlot(
+        this.originalUart2Type,
+        this.originalUart2Module,
+        2,
+      );
+    } else {
       let module: any;
       switch (ut) {
         /*case UartType.kangaroo:
@@ -133,18 +153,33 @@ export class EspModuleComponent {
   setUartModuleForSlot(uartType: UartType, module: any, channel: number) {
     switch (channel) {
       case 1:
-        this.setUartModule(uartType, module, this.uart1Container, this.module.uartModule.channels[0]);
+        this.setUartModule(
+          uartType,
+          module,
+          this.uart1Container,
+          this.module.uartModule.channels[0],
+        );
         break;
       case 2:
-        this.setUartModule(uartType, module, this.uart2Container, this.module.uartModule.channels[1]);
+        this.setUartModule(
+          uartType,
+          module,
+          this.uart2Container,
+          this.module.uartModule.channels[1],
+        );
         break;
     }
   }
 
-  setUartModule(uartType: UartType, module: any, container: ViewContainerRef, uartModule: UartModule) {
+  setUartModule(
+    uartType: UartType,
+    module: any,
+    container: ViewContainerRef,
+    uartModule: UartModule,
+  ) {
     let component: any;
 
-    container.clear()
+    container.clear();
     this.components.splice(0, this.components.length);
 
     switch (uartType) {
@@ -167,24 +202,24 @@ export class EspModuleComponent {
     throw new Error('Method not implemented.');
   }
 
-
   addUartModule(evt: any) {
     evt.stopPropagation();
 
-    if (!this.uartPanelOpenState){
+    if (!this.uartPanelOpenState) {
       this.uartPanelOpenState = true;
     }
 
-    this.module.uartModules.push(new UartModule(
-      crypto.randomUUID(),
-      this.module.locationId,
-      UartType.genericSerial,
-      1,
-      9600,
-      "New Serial Module"
-    ));
+    this.module.uartModules.push(
+      new UartModule(
+        crypto.randomUUID(),
+        this.module.locationId,
+        UartType.genericSerial,
+        1,
+        9600,
+        'New Serial Module',
+      ),
+    );
     console.log('addUartModule 2', this.uartPanelOpenState);
-    
   }
 
   copyUartModule(module: any): any {
@@ -205,12 +240,9 @@ export class EspModuleComponent {
   }
 
   testServoModal(channelId: number) {
-
-    this.openServoTestModal.emit(
-      {
-        controllerId: this.module.controller.id,
-        channelId
-      });
+    this.openServoTestModal.emit({
+      controllerId: this.module.controller.id,
+      channelId,
+    });
   }
-
 }

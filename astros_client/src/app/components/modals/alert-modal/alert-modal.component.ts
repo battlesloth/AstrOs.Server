@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ModalBaseComponent, } from '../modal-base/modal-base.component';
+import { ModalBaseComponent } from '../modal-base/modal-base.component';
 import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
 
 export class AlertModalResources {
@@ -10,14 +10,15 @@ export class AlertModalResources {
 @Component({
   selector: 'app-alert-modal',
   templateUrl: './alert-modal.component.html',
-  styleUrl: './alert-modal.component.scss'
+  styleUrl: './alert-modal.component.scss',
 })
 export class AlertModalComponent extends ModalBaseComponent implements OnInit {
-
   message!: string;
   closeEvent!: unknown;
 
-  constructor() { super() }
+  constructor() {
+    super();
+  }
 
   ngOnInit(): void {
     this.message = this.resources.get(AlertModalResources.message) as string;
@@ -26,8 +27,8 @@ export class AlertModalComponent extends ModalBaseComponent implements OnInit {
 
   closeModal() {
     const evt = new ModalCallbackEvent(
-      AlertModalResources.closeEvent, 
-      this.closeEvent
+      AlertModalResources.closeEvent,
+      this.closeEvent,
     );
 
     this.modalCallback.emit(evt);

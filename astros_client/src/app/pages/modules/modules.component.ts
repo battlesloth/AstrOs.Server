@@ -1,43 +1,51 @@
-import { 
-  AfterViewInit, 
-  Component, 
-  ElementRef, 
-  Renderer2, 
-  ViewChild, 
-  ViewContainerRef 
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  Renderer2,
+  ViewChild,
+  ViewContainerRef,
 } from '@angular/core';
-import { 
-  MatExpansionPanel, 
-  MatAccordion, 
-  MatExpansionPanelHeader, 
-  MatExpansionPanelTitle 
+import {
+  MatExpansionPanel,
+  MatAccordion,
+  MatExpansionPanelHeader,
+  MatExpansionPanelTitle,
 } from '@angular/material/expansion';
-import { 
-  ControlModule, 
-  ControllerStatus, 
-  AstrOsLocationCollection, 
-  ControllerLocation 
+import {
+  ControlModule,
+  ControllerStatus,
+  AstrOsLocationCollection,
+  ControllerLocation,
 } from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
-import { 
-  LoadingModalComponent, 
-  LoadingModalResources, 
+import {
+  LoadingModalComponent,
+  LoadingModalResources,
   LoadingModalResponse,
-  ServoTestModalComponent, 
-  ServoTestModalResources, 
+  ServoTestModalComponent,
+  ServoTestModalResources,
   ServoTestMessage,
-  AlertModalComponent, 
-  AlertModalResources,  
+  AlertModalComponent,
+  AlertModalResources,
   ModalComponent,
-  ModalCallbackEvent
+  ModalCallbackEvent,
 } from '@src/components/modals';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EspModuleComponent } from './esp-module/esp-module.component';
-import { ControllerService, ModalService, SnackbarService, StatusService, WebsocketService } from '@src/services';
+import {
+  ControllerService,
+  ModalService,
+  SnackbarService,
+  StatusService,
+  WebsocketService,
+} from '@src/services';
 
-interface Caption { str: string }
+interface Caption {
+  str: string;
+}
 
 @Component({
   selector: 'app-modules',
@@ -55,12 +63,12 @@ interface Caption { str: string }
     FormsModule,
     EspModuleComponent,
     NgFor,
-    ModalComponent
-  ]
+    ModalComponent,
+  ],
 })
 export class ModulesComponent implements AfterViewInit {
-
-  @ViewChild('modalContainer', { read: ViewContainerRef }) container!: ViewContainerRef;
+  @ViewChild('modalContainer', { read: ViewContainerRef })
+  container!: ViewContainerRef;
 
   isLoaded = false;
 
@@ -83,21 +91,21 @@ export class ModulesComponent implements AfterViewInit {
   domeLocation!: ControllerLocation;
   bodyLocation!: ControllerLocation;
 
-  coreCaption: Caption = { str: 'Module Down' }
-  domeCaption: Caption = { str: 'Module Down' }
-  bodyCaption: Caption = { str: 'Module Down' }
+  coreCaption: Caption = { str: 'Module Down' };
+  domeCaption: Caption = { str: 'Module Down' };
+  bodyCaption: Caption = { str: 'Module Down' };
 
-  private notSynced = "Not Synced";
-  private moduleDown = "Module Down";
+  private notSynced = 'Not Synced';
+  private moduleDown = 'Module Down';
 
-  constructor(private controllerService: ControllerService,
+  constructor(
+    private controllerService: ControllerService,
     private websocketService: WebsocketService,
     private snackBar: SnackbarService,
     private modalService: ModalService,
     private renderer: Renderer2,
-    private status: StatusService) {
-
-  }
+    private status: StatusService,
+  ) {}
 
   ngAfterViewInit(): void {
     this.openControllerSyncModal();
@@ -119,7 +127,6 @@ export class ModulesComponent implements AfterViewInit {
   }
 
   syncModalCallback(evt: ModalCallbackEvent) {
-
     if (evt.type !== LoadingModalResources.closeEvent) {
       return;
     }
@@ -129,18 +136,44 @@ export class ModulesComponent implements AfterViewInit {
     this.parseModules(response.locations);
 
     // always filter out the master controller since it's always the body module
-    this.possibleControllers = response.controllers.filter((controller: ControlModule) => controller.id !== 1);
+    this.possibleControllers = response.controllers.filter(
+      (controller: ControlModule) => controller.id !== 1,
+    );
 
-    this.availableCoreControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.domeLocation.controller?.id);
-    this.availableDomeControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.coreLocation.controller?.id);
+    this.availableCoreControllers = this.possibleControllers.filter(
+      (controller: ControlModule) =>
+        controller.id !== this.domeLocation.controller?.id,
+    );
+    this.availableDomeControllers = this.possibleControllers.filter(
+      (controller: ControlModule) =>
+        controller.id !== this.coreLocation.controller?.id,
+    );
 
-    this.handleStatus(this.status.getCoreStatus(), this.coreEl, this.coreCaption);
-    this.handleStatus(this.status.getDomeStatus(), this.domeEl, this.domeCaption);
-    this.handleStatus(this.status.getBodyStatus(), this.bodyEl, this.bodyCaption);
+    this.handleStatus(
+      this.status.getCoreStatus(),
+      this.coreEl,
+      this.coreCaption,
+    );
+    this.handleStatus(
+      this.status.getDomeStatus(),
+      this.domeEl,
+      this.domeCaption,
+    );
+    this.handleStatus(
+      this.status.getBodyStatus(),
+      this.bodyEl,
+      this.bodyCaption,
+    );
 
-    this.status.coreStateObserver.subscribe(value => this.handleStatus(value, this.coreEl, this.coreCaption));
-    this.status.domeStateObserver.subscribe(value => this.handleStatus(value, this.domeEl, this.domeCaption));
-    this.status.bodyStateObserver.subscribe(value => this.handleStatus(value, this.bodyEl, this.bodyCaption));
+    this.status.coreStateObserver.subscribe((value) =>
+      this.handleStatus(value, this.coreEl, this.coreCaption),
+    );
+    this.status.domeStateObserver.subscribe((value) =>
+      this.handleStatus(value, this.domeEl, this.domeCaption),
+    );
+    this.status.bodyStateObserver.subscribe((value) =>
+      this.handleStatus(value, this.bodyEl, this.bodyCaption),
+    );
 
     this.isLoaded = true;
 
@@ -164,10 +197,9 @@ export class ModulesComponent implements AfterViewInit {
     this.modalService.open('modules-modal');
   }
 
-  openServoTestModal(value: { controllerId: number, channelId: number }) {
-
+  openServoTestModal(value: { controllerId: number; channelId: number }) {
     if (value.controllerId === 0) {
-      this.openAlertModal("Location for this servo is not set.");
+      this.openAlertModal('Location for this servo is not set.');
       return;
     }
 
@@ -178,8 +210,14 @@ export class ModulesComponent implements AfterViewInit {
     const component = this.container.createComponent(ServoTestModalComponent);
 
     component.instance.resources = modalResources;
-    component.instance.resources.set(ServoTestModalResources.controllerId, value.controllerId);
-    component.instance.resources.set(ServoTestModalResources.servoId, value.channelId);
+    component.instance.resources.set(
+      ServoTestModalResources.controllerId,
+      value.controllerId,
+    );
+    component.instance.resources.set(
+      ServoTestModalResources.servoId,
+      value.channelId,
+    );
 
     component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {
       this.servoTestModalCallback(result);
@@ -190,20 +228,18 @@ export class ModulesComponent implements AfterViewInit {
 
   servoTestModalCallback(evt: ModalCallbackEvent) {
     switch (evt.type) {
-      case ServoTestModalResources.sendServoMove:
-        {
-          const servoTest = evt.value as ServoTestMessage;
-          this.websocketService.sendMessage(
-            {
-              msgType: "SERVO_TEST",
-              data: {
-                controllerId: servoTest.controllerId,
-                servoId: servoTest.servoId,
-                value: servoTest.value
-              }
-            });
-          break;
-        }
+      case ServoTestModalResources.sendServoMove: {
+        const servoTest = evt.value as ServoTestMessage;
+        this.websocketService.sendMessage({
+          msgType: 'SERVO_TEST',
+          data: {
+            controllerId: servoTest.controllerId,
+            servoId: servoTest.servoId,
+            value: servoTest.value,
+          },
+        });
+        break;
+      }
       case ServoTestModalResources.closeEvent:
         this.modalService.close('modules-modal');
         break;
@@ -211,10 +247,14 @@ export class ModulesComponent implements AfterViewInit {
   }
 
   controllerSelectChanged(_: unknown) {
-
-    this.availableCoreControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.domeLocation.controller?.id);
-    this.availableDomeControllers = this.possibleControllers.filter((controller: ControlModule) => controller.id !== this.coreLocation.controller?.id);
-
+    this.availableCoreControllers = this.possibleControllers.filter(
+      (controller: ControlModule) =>
+        controller.id !== this.domeLocation.controller?.id,
+    );
+    this.availableDomeControllers = this.possibleControllers.filter(
+      (controller: ControlModule) =>
+        controller.id !== this.coreLocation.controller?.id,
+    );
   }
 
   saveModuleSettings() {
@@ -222,10 +262,10 @@ export class ModulesComponent implements AfterViewInit {
       next: (result: unknown) => {
         if (result && typeof result === 'object' && 'message' in result) {
           if (result.message === 'success') {
-            console.log('module settings saved!')
+            console.log('module settings saved!');
             this.snackBar.okToast('Module settings saved!');
           } else {
-            console.log('module settings save failed!')
+            console.log('module settings save failed!');
             this.snackBar.okToast('Module settings save failed!');
           }
         }
@@ -233,10 +273,17 @@ export class ModulesComponent implements AfterViewInit {
       error: (err: unknown) => {
         console.error(err);
         this.snackBar.okToast('Module settings save failed!');
-      }
+      },
     };
 
-    this.controllerService.saveLocations(new AstrOsLocationCollection(this.coreLocation, this.domeLocation, this.bodyLocation))
+    this.controllerService
+      .saveLocations(
+        new AstrOsLocationCollection(
+          this.coreLocation,
+          this.domeLocation,
+          this.bodyLocation,
+        ),
+      )
       .subscribe(observer);
 
     this.status.resetStatus();
@@ -247,10 +294,10 @@ export class ModulesComponent implements AfterViewInit {
       next: (result: unknown) => {
         if (result && typeof result === 'object' && 'message' in result) {
           if (result.message === 'success') {
-            console.log('module sync queued!')
+            console.log('module sync queued!');
             this.snackBar.okToast('Module sync queued!');
           } else {
-            console.log('module sync failed to queue')
+            console.log('module sync failed to queue');
             this.snackBar.okToast(`Module sync failed to queue.`);
           }
         }
@@ -258,15 +305,13 @@ export class ModulesComponent implements AfterViewInit {
       error: (err: unknown) => {
         console.error(err);
         this.snackBar.okToast('Module sync failed!');
-      }
+      },
     };
 
-    this.controllerService.syncLocationConfig()
-      .subscribe(observer);
+    this.controllerService.syncLocationConfig().subscribe(observer);
   }
 
   private parseModules(locations: AstrOsLocationCollection) {
-
     console.log(locations);
     try {
       this.coreLocation = locations.coreModule ?? this.coreLocation;

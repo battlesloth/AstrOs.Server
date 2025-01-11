@@ -1,4 +1,10 @@
-import { Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  OnInit,
+  Renderer2,
+  ViewChild,
+} from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { TransmissionType } from 'astros-common';
 import { AuthenticationService } from './services/auth/authentication.service';
@@ -11,21 +17,22 @@ import { NgIf } from '@angular/common';
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
   standalone: true,
-  imports: [RouterLink, NgIf, RouterOutlet]
+  imports: [RouterLink, NgIf, RouterOutlet],
 })
 export class AppComponent implements OnInit {
-
-  title = "AstOs"
+  title = 'AstOs';
   private menuOpen = false;
 
   @ViewChild('sideNav', { static: false }) sideNav!: ElementRef;
   @ViewChild('clickDetector', { static: false }) clickDetector!: ElementRef;
 
-  constructor(public auth: AuthenticationService,
+  constructor(
+    public auth: AuthenticationService,
     private renderer: Renderer2,
     private router: Router,
     private snackbar: SnackbarService,
-    private socket: WebsocketService) {
+    private socket: WebsocketService,
+  ) {
     if (auth.isLoggedIn()) {
       //router.navigate(['status']);
       router.navigate(['modules']);
@@ -50,19 +57,19 @@ export class AppComponent implements OnInit {
     }
   }
 
-
-
   closeMenu() {
     this.renderer.setStyle(this.sideNav.nativeElement, 'width', '0px');
     this.renderer.setStyle(this.clickDetector.nativeElement, 'width', '0px');
-    this.menuOpen = false
+    this.menuOpen = false;
   }
 
   containerKeyPressed(event: KeyboardEvent) {
-    if (event.key === 'Escape' ||
-       event.key === 'Esc' ||
-       event.key === 'Enter' ||
-       event.key === 'Space') {
+    if (
+      event.key === 'Escape' ||
+      event.key === 'Esc' ||
+      event.key === 'Enter' ||
+      event.key === 'Space'
+    ) {
       this.closeMenu();
     }
   }
@@ -74,7 +81,6 @@ export class AppComponent implements OnInit {
   }
 
   private handleSocketMessage(msg: unknown) {
-
     if (msg && typeof msg === 'object' && 'type' in msg && 'message' in msg) {
       switch (msg.type) {
         case TransmissionType.sync:

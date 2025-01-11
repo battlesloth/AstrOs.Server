@@ -1,7 +1,8 @@
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { faFileAudio, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { ModalBaseComponent, } from '../modal-base/modal-base.component'; import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
+import { ModalBaseComponent } from '../modal-base/modal-base.component';
+import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
 import { FileUpload } from 'src/app/models/upload-file';
 import { NgFor, NgStyle, DecimalPipe } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -17,10 +18,9 @@ export class UploadModalResources {
   templateUrl: './upload-modal.component.html',
   styleUrls: ['./upload-modal.component.scss'],
   standalone: true,
-  imports: [NgFor, NgStyle, FontAwesomeModule, DecimalPipe]
+  imports: [NgFor, NgStyle, FontAwesomeModule, DecimalPipe],
 })
 export class UploadModalComponent extends ModalBaseComponent {
-
   faTrash = faTrash;
   faFiles = faFileAudio;
 
@@ -44,10 +44,9 @@ export class UploadModalComponent extends ModalBaseComponent {
   }
 
   removeFile(toRemove: unknown) {
-
     let filename = '';
 
-    if (toRemove && typeof toRemove === 'object' && 'name' in toRemove){
+    if (toRemove && typeof toRemove === 'object' && 'name' in toRemove) {
       filename = toRemove.name as string;
     } else {
       filename = toRemove as string;
@@ -56,9 +55,9 @@ export class UploadModalComponent extends ModalBaseComponent {
     const idx = this.uploadQueue
       .map((file) => {
         if (typeof file.fileData === 'object' && 'name' in file.fileData) {
-          return file.fileData.name
+          return file.fileData.name;
         }
-        return file.fileData
+        return file.fileData;
       })
       .indexOf(filename);
 
@@ -66,12 +65,11 @@ export class UploadModalComponent extends ModalBaseComponent {
   }
 
   addToQueue(evt: Event) {
-
     const files = (evt.target as HTMLInputElement).files;
 
     if (!files) {
       return;
-    } 
+    }
 
     for (let i = 0; i < files.length; i++) {
       const file = files.item(i);
@@ -81,7 +79,6 @@ export class UploadModalComponent extends ModalBaseComponent {
     }
   }
 
-
   uploadAll() {
     this.isUploading = true;
 
@@ -90,14 +87,16 @@ export class UploadModalComponent extends ModalBaseComponent {
 
       formData.append('file', file.fileData);
 
-      file.subscription = this.http.post(this.path, formData, {
-        reportProgress: true,
-        observe: 'events'
-      }).subscribe((evt) => {
-        if (evt.type === HttpEventType.UploadProgress && evt.total) {
-          file.uploadProgress = Math.round(100 * (evt.loaded / evt.total))
-        }
-      });
+      file.subscription = this.http
+        .post(this.path, formData, {
+          reportProgress: true,
+          observe: 'events',
+        })
+        .subscribe((evt) => {
+          if (evt.type === HttpEventType.UploadProgress && evt.total) {
+            file.uploadProgress = Math.round(100 * (evt.loaded / evt.total));
+          }
+        });
     }
   }
 
@@ -120,10 +119,7 @@ export class UploadModalComponent extends ModalBaseComponent {
   }
 
   closeModal() {
-    const evt = new ModalCallbackEvent(
-      UploadModalResources.refreshEvent,
-      null
-    )
+    const evt = new ModalCallbackEvent(UploadModalResources.refreshEvent, null);
     this.modalCallback.emit(evt);
   }
 }

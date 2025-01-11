@@ -1,31 +1,37 @@
 import { Component } from '@angular/core';
-import { AuthenticationService, TokenPayload } from '../../services/auth/authentication.service';
+import {
+  AuthenticationService,
+  TokenPayload,
+} from '../../services/auth/authentication.service';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 
 @Component({
-    selector: 'app-login',
-    templateUrl: './login.component.html',
-    styleUrls: ['./login.component.scss'],
-    standalone: true,
-    imports: [FormsModule]
+  selector: 'app-login',
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.scss'],
+  standalone: true,
+  imports: [FormsModule],
 })
 export class LoginComponent {
   credentials: TokenPayload = {
-    username: "",
-    password: ""
-  }
+    username: '',
+    password: '',
+  };
 
-  constructor(private auth: AuthenticationService, private router: Router) { }
+  constructor(
+    private auth: AuthenticationService,
+    private router: Router,
+  ) {}
 
-  login(){
+  login() {
     this.auth.login(this.credentials).subscribe(
       () => {
-        this.router.navigateByUrl("/status")
+        this.router.navigateByUrl('/status');
       },
-      err =>{
+      (err) => {
         console.error(err);
-      }
+      },
     );
   }
 }
