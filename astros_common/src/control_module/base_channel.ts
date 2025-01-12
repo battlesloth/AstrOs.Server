@@ -7,32 +7,32 @@ import { MaestroChannel } from "./uart/sub_modules/maestro/maestro_channel";
 import { UartChannel } from "./uart/uart_channel";
 
 export type ModuleChannelType =
-    BaseChannel |
-    GpioChannel |
-    I2cChannel |
-    PwmChannel |
-    UartChannel |
-    KangarooX2Channel |
-    MaestroChannel;
+  | BaseChannel
+  | GpioChannel
+  | I2cChannel
+  | PwmChannel
+  | UartChannel
+  | KangarooX2Channel
+  | MaestroChannel;
 
 export class BaseChannel {
-    id: number;
-    channelName: string;
-    enabled: boolean;
-    subType: ChannelSubType;
-    constructor(
-        id: number,
-        channelName: string,
-        enabled: boolean,
-        subType: ChannelSubType = ChannelSubType.none
-    ) {
-        if (channelName === null) {
-            this.channelName = "unnamed";
-        } else {
-            this.channelName = channelName;
-        }
-        this.id = id;
-        this.enabled = enabled;
-        this.subType = subType;
+  id: number;
+  channelName: string;
+  enabled: boolean;
+  subType: ChannelSubType;
+  constructor(
+    id: number,
+    channelName: string,
+    enabled: boolean,
+    subType: ChannelSubType = ChannelSubType.none,
+  ) {
+    if (channelName === null) {
+      this.channelName = "unnamed";
+    } else {
+      this.channelName = channelName;
     }
+    this.id = id;
+    this.enabled = enabled;
+    this.subType = subType;
+  }
 }

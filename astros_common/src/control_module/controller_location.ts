@@ -5,32 +5,36 @@ import { PwmModule } from "./pca9685/pwm_module";
 import { UartModule } from "./uart/uart_module";
 
 export class ControllerLocation {
-    id: number;
-    locationName: string;
-    description: string;
-    configFingerprint: string;
+  id: number;
+  locationName: string;
+  description: string;
+  configFingerprint: string;
 
-    controller: ControlModule;
+  controller: ControlModule;
 
-    gpioModule: GpioModule;
-    i2cModule: I2cModule;
-    
-    uartModules: UartModule[];
-    pwmModules: PwmModule[];
+  gpioModule: GpioModule;
+  i2cModule: I2cModule;
 
-    constructor(id: number, locationName: string, description: string,
-        configFingerprint: string) {
-        this.id = id;
-        this.locationName = locationName;
-        this.description = description;
-        this.configFingerprint = configFingerprint;
+  uartModules: UartModule[];
+  pwmModules: PwmModule[];
 
-        this.controller = new ControlModule(0, "", "");
-    
-        this.i2cModule = new I2cModule();
-        this.gpioModule = new GpioModule();
-    
-        this.uartModules = new Array<UartModule>();
-        this.pwmModules = new Array<PwmModule>();
-    }
+  constructor(
+    id: number,
+    locationName: string,
+    description: string,
+    configFingerprint: string,
+  ) {
+    this.id = id;
+    this.locationName = locationName;
+    this.description = description;
+    this.configFingerprint = configFingerprint;
+
+    this.controller = new ControlModule(0, "", "");
+
+    this.i2cModule = new I2cModule();
+    this.gpioModule = new GpioModule();
+
+    this.uartModules = new Array<UartModule>();
+    this.pwmModules = new Array<PwmModule>();
+  }
 }
