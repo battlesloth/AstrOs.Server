@@ -1,5 +1,5 @@
 declare namespace Express {
-    export interface Request {
-       savedFiles?: Array<string>
-    }
- }
+  export interface Request {
+    savedFiles?: Array<string>;
+  }
+}

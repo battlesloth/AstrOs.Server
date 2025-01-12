@@ -1,4 +1,3 @@
-
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
 //|--int---RS---string----RS--string---GS--val--US--val--RS--val--US--val--|
 
@@ -11,71 +10,75 @@ import { ScriptRun } from "src/models/scripts/script_run";
 import { ServoTest } from "src/models/servo_test";
 
 export class MessageGenerator {
+  GS = MessageHelper.GS;
+  RS = MessageHelper.RS;
+  US = MessageHelper.US;
 
-    GS = MessageHelper.GS;
-    RS = MessageHelper.RS;
-    US = MessageHelper.US;
+  generateMessage(
+    type: SerialMessageType,
+    id: string,
+    data: any,
+  ): MessageGeneratorResponse {
+    const header = this.generateHeader(type, id);
+    let result: MessageGeneratorResponse;
 
-    generateMessage(type: SerialMessageType, id: string, data: any): MessageGeneratorResponse {
-
-        const header = this.generateHeader(type, id);
-        let result: MessageGeneratorResponse;
-
-        switch (type) {
-            case SerialMessageType.REGISTRATION_SYNC:
-                result = this.generateRegistrationSync(header);
-                break;
-            case SerialMessageType.DEPLOY_CONFIG:
-                result = this.generateDeployConfig(header, data);
-                break;
-            case SerialMessageType.DEPLOY_SCRIPT:
-                result = this.generateDeployScript(header, data);
-                break;
-            case SerialMessageType.RUN_SCRIPT:
-                result = this.generateRunScript(header, data);
-                break;
-            case SerialMessageType.RUN_COMMAND:
-                result = this.generateRunCommand(header, data);
-                break;
-            case SerialMessageType.PANIC_STOP:
-                result = this.generatePanicStop(header, data);
-                break;
-            case SerialMessageType.FORMAT_SD:
-                result = this.generateFormatSD(header, data);
-                break;
-            case SerialMessageType.SERVO_TEST:
-                result = this.generateServoTestCommand(header, data);
-                break;
-            default:
-                logger.error(`Unknown message type: ${type}`);
-                return new MessageGeneratorResponse("\n", []);
-        }
-
-        return result;
+    switch (type) {
+      case SerialMessageType.REGISTRATION_SYNC:
+        result = this.generateRegistrationSync(header);
+        break;
+      case SerialMessageType.DEPLOY_CONFIG:
+        result = this.generateDeployConfig(header, data);
+        break;
+      case SerialMessageType.DEPLOY_SCRIPT:
+        result = this.generateDeployScript(header, data);
+        break;
+      case SerialMessageType.RUN_SCRIPT:
+        result = this.generateRunScript(header, data);
+        break;
+      case SerialMessageType.RUN_COMMAND:
+        result = this.generateRunCommand(header, data);
+        break;
+      case SerialMessageType.PANIC_STOP:
+        result = this.generatePanicStop(header, data);
+        break;
+      case SerialMessageType.FORMAT_SD:
+        result = this.generateFormatSD(header, data);
+        break;
+      case SerialMessageType.SERVO_TEST:
+        result = this.generateServoTestCommand(header, data);
+        break;
+      default:
+        logger.error(`Unknown message type: ${type}`);
+        return new MessageGeneratorResponse("\n", []);
     }
 
-    generateHeader(type: SerialMessageType, id: string): string {
-        return `${type}${this.RS}${MessageHelper.ValidationMap.get(type)}${this.RS}${id}`;
-    }
+    return result;
+  }
 
-    generateDeployConfig(header: string, data: any) {
-        const sync = data as ConfigSync;
-        const result = [this.GS];
+  generateHeader(type: SerialMessageType, id: string): string {
+    return `${type}${this.RS}${MessageHelper.ValidationMap.get(type)}${this.RS}${id}`;
+  }
 
-        const controllers = [];
+  generateDeployConfig(header: string, data: any) {
+    const sync = data as ConfigSync;
+    const result = [this.GS];
 
-        for (const config of sync.configs) {
-            if (!config.address) {
-                continue;
-            }
+    const controllers = [];
 
-            controllers.push(config.address);
+    for (const config of sync.configs) {
+      if (!config.address) {
+        continue;
+      }
 
-            logger.debug(`Generating deploy config message: ${JSON.stringify(config)}`);
+      controllers.push(config.address);
 
-            const servoConfigs = [];
+      logger.debug(
+        `Generating deploy config message: ${JSON.stringify(config)}`,
+      );
 
-            /*for (const ch of config.servoChannels) {
+      const servoConfigs = [];
+
+      /*for (const ch of config.servoChannels) {
                 servoConfigs.push(ch.id);
                 servoConfigs.push(":");
                 servoConfigs.push(ch.set);
@@ -103,204 +106,232 @@ export class MessageGenerator {
             result.push(servoConfigs.join(""));
             result.push(this.RS);
             */
-        }
-
-        if (result.length > 0) {
-            result.pop();
-        }
-
-        const msg = result.join("");
-
-        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers);
     }
 
-    generateDeployScript(header: string, data: any) {
-
-        const upload = data as ScriptUpload;
-
-        const result = [this.GS];
-
-        const controllers = [];
-
-        for (const config of upload.configs) {
-            if (!config?.address) {
-                continue;
-            }
-
-            controllers.push(config.address);
-
-            logger.debug(`Generating deploy script message: ${JSON.stringify(config)}`);
-
-            result.push(config.address);
-            result.push(this.US);
-            result.push(config.name);
-            result.push(this.US);
-            result.push(upload.scriptId);
-            result.push(this.US);
-            result.push(config.script);
-            result.push(this.RS);
-        }
-
-        if (result.length > 0) {
-            result.pop();
-        }
-
-        const msg = result.join("");
-
-        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers, upload.scriptId);
+    if (result.length > 0) {
+      result.pop();
     }
 
-    generateRunScript(header: string, data: any) {
-        const runCommand = data as ScriptRun;
+    const msg = result.join("");
 
-        const result = [this.GS];
+    return new MessageGeneratorResponse(
+      `${header}${msg}${MessageHelper.MessageEOL}`,
+      controllers,
+    );
+  }
 
-        const controllers = [];
+  generateDeployScript(header: string, data: any) {
+    const upload = data as ScriptUpload;
 
-        for (const config of runCommand.configs) {
-            if (!config?.address) {
-                continue;
-            }
+    const result = [this.GS];
 
-            controllers.push(config.address);
+    const controllers = [];
 
-            logger.debug(`Generating run script message: ${JSON.stringify(config)}`);
+    for (const config of upload.configs) {
+      if (!config?.address) {
+        continue;
+      }
 
-            result.push(config.address);
-            result.push(this.US);
-            result.push(config.name);
-            result.push(this.US);
-            result.push(runCommand.scriptId);
-            result.push(this.RS);
-        }
+      controllers.push(config.address);
 
-        if (result.length > 0) {
-            result.pop();
-        }
+      logger.debug(
+        `Generating deploy script message: ${JSON.stringify(config)}`,
+      );
 
-        const msg = result.join("");
-
-        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers, runCommand.scriptId);
+      result.push(config.address);
+      result.push(this.US);
+      result.push(config.name);
+      result.push(this.US);
+      result.push(upload.scriptId);
+      result.push(this.US);
+      result.push(config.script);
+      result.push(this.RS);
     }
 
-
-    generatePanicStop(header: string, data: any) {
-        const runCommand = data as ScriptRun;
-
-        const result = [this.GS];
-        const controllers = [];
-
-        for (const config of runCommand.configs) {
-            if (!config?.address) {
-                continue;
-            }
-
-            controllers.push(config.address);
-
-            logger.debug(`Generating panic stop message: ${JSON.stringify(config)}`);
-
-            result.push(config.address);
-            result.push(this.US);
-            result.push(config.name);
-            result.push(this.US);
-            result.push("PANIC");
-            result.push(this.RS);
-        }
-
-        if (result.length > 0) {
-            result.pop();
-        }
-
-        const msg = result.join("");
-
-        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers);
+    if (result.length > 0) {
+      result.pop();
     }
 
-    generateRunCommand(header: string, data: any) {
+    const msg = result.join("");
 
-        if (!data.contoller.address) {
-            return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
-        }
+    return new MessageGeneratorResponse(
+      `${header}${msg}${MessageHelper.MessageEOL}`,
+      controllers,
+      upload.scriptId,
+    );
+  }
 
-        const result = [this.GS];
+  generateRunScript(header: string, data: any) {
+    const runCommand = data as ScriptRun;
 
-        result.push(data.controller.address);
-        result.push(this.US);
-        result.push(data.controller.name);
-        result.push(this.US);
-        result.push(data.command);
+    const result = [this.GS];
 
-        const msg = result.join("");
+    const controllers = [];
 
-        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, [data.contoller.address]);
+    for (const config of runCommand.configs) {
+      if (!config?.address) {
+        continue;
+      }
+
+      controllers.push(config.address);
+
+      logger.debug(`Generating run script message: ${JSON.stringify(config)}`);
+
+      result.push(config.address);
+      result.push(this.US);
+      result.push(config.name);
+      result.push(this.US);
+      result.push(runCommand.scriptId);
+      result.push(this.RS);
     }
 
-    generateServoTestCommand(header: string, data: any){
-
-        const cmd = data as ServoTest;
-
-        if (!cmd.controller.address){
-            return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
-        }
-
-        const result = [this.GS];
-
-        result.push(cmd.controller.address);
-        result.push(this.US);
-        result.push(cmd.controller.name);
-        result.push(this.US);
-        result.push(`${cmd.servoId}:${data.msValue}`)
-        const msg = result.join("");
-
-        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, [cmd.controller.address]);
+    if (result.length > 0) {
+      result.pop();
     }
 
+    const msg = result.join("");
 
-    generateRegistrationSync(header: string) {
-        return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, ["00:00:00:00:00:00"]);
+    return new MessageGeneratorResponse(
+      `${header}${msg}${MessageHelper.MessageEOL}`,
+      controllers,
+      runCommand.scriptId,
+    );
+  }
+
+  generatePanicStop(header: string, data: any) {
+    const runCommand = data as ScriptRun;
+
+    const result = [this.GS];
+    const controllers = [];
+
+    for (const config of runCommand.configs) {
+      if (!config?.address) {
+        continue;
+      }
+
+      controllers.push(config.address);
+
+      logger.debug(`Generating panic stop message: ${JSON.stringify(config)}`);
+
+      result.push(config.address);
+      result.push(this.US);
+      result.push(config.name);
+      result.push(this.US);
+      result.push("PANIC");
+      result.push(this.RS);
     }
 
-    generateFormatSD(header: string, data: any) {
-        const controllers = data as Array<any>;
-
-        const result = [this.GS];
-
-        const ctrls = [];
-
-        for (const controller of controllers) {
-
-            if (!controller.address) {
-                continue;
-            }
-
-            ctrls.push(controller.address);
-
-            result.push(controller.address);
-            result.push(this.US);
-            result.push(controller.name);
-            result.push(this.US);
-            result.push("FORMAT");
-            result.push(this.RS);
-        }
-
-        if (result.length > 0) {
-            result.pop();
-        }
-
-        const msg = result.join("");
-
-        return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers);
+    if (result.length > 0) {
+      result.pop();
     }
+
+    const msg = result.join("");
+
+    return new MessageGeneratorResponse(
+      `${header}${msg}${MessageHelper.MessageEOL}`,
+      controllers,
+    );
+  }
+
+  generateRunCommand(header: string, data: any) {
+    if (!data.contoller.address) {
+      return new MessageGeneratorResponse(
+        `${header}${MessageHelper.MessageEOL}`,
+        [],
+      );
+    }
+
+    const result = [this.GS];
+
+    result.push(data.controller.address);
+    result.push(this.US);
+    result.push(data.controller.name);
+    result.push(this.US);
+    result.push(data.command);
+
+    const msg = result.join("");
+
+    return new MessageGeneratorResponse(
+      `${header}${msg}${MessageHelper.MessageEOL}`,
+      [data.contoller.address],
+    );
+  }
+
+  generateServoTestCommand(header: string, data: any) {
+    const cmd = data as ServoTest;
+
+    if (!cmd.controller.address) {
+      return new MessageGeneratorResponse(
+        `${header}${MessageHelper.MessageEOL}`,
+        [],
+      );
+    }
+
+    const result = [this.GS];
+
+    result.push(cmd.controller.address);
+    result.push(this.US);
+    result.push(cmd.controller.name);
+    result.push(this.US);
+    result.push(`${cmd.servoId}:${data.msValue}`);
+    const msg = result.join("");
+
+    return new MessageGeneratorResponse(
+      `${header}${msg}${MessageHelper.MessageEOL}`,
+      [cmd.controller.address],
+    );
+  }
+
+  generateRegistrationSync(header: string) {
+    return new MessageGeneratorResponse(
+      `${header}${MessageHelper.MessageEOL}`,
+      ["00:00:00:00:00:00"],
+    );
+  }
+
+  generateFormatSD(header: string, data: any) {
+    const controllers = data as Array<any>;
+
+    const result = [this.GS];
+
+    const ctrls = [];
+
+    for (const controller of controllers) {
+      if (!controller.address) {
+        continue;
+      }
+
+      ctrls.push(controller.address);
+
+      result.push(controller.address);
+      result.push(this.US);
+      result.push(controller.name);
+      result.push(this.US);
+      result.push("FORMAT");
+      result.push(this.RS);
+    }
+
+    if (result.length > 0) {
+      result.pop();
+    }
+
+    const msg = result.join("");
+
+    return new MessageGeneratorResponse(
+      `${header}${msg}${MessageHelper.MessageEOL}`,
+      controllers,
+    );
+  }
 }
 
 export class MessageGeneratorResponse {
-    msg: string;
-    controllers: string[];
-    metaData: any;
+  msg: string;
+  controllers: string[];
+  metaData: any;
 
-    constructor(msg: string, controllers: string[], metaData: any = "") {
-        this.msg = msg;
-        this.controllers = controllers;
-        this.metaData = metaData;
-    }
+  constructor(msg: string, controllers: string[], metaData: any = "") {
+    this.msg = msg;
+    this.controllers = controllers;
+    this.metaData = metaData;
+  }
 }

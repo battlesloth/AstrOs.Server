@@ -2,29 +2,29 @@ import { ControllersTable } from "./controllers_table";
 import { LocationsTable } from "./locations_table";
 
 export class ControllerLocationTable {
-    public static readonly table = "controller_location";
-    public static readonly locationId = "locationId";
-    public static readonly controllerId = "controllerId";
+  public static readonly table = "controller_location";
+  public static readonly locationId = "locationId";
+  public static readonly controllerId = "controllerId";
 
-    public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
+  public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
         ${this.locationId} INTEGER PRIMARY KEY,
         ${this.controllerId} INTEGER,
         FOREIGN KEY (${this.locationId}) REFERENCES ${LocationsTable.table}(${LocationsTable.id}),
         FOREIGN KEY (${this.controllerId}) REFERENCES ${ControllersTable.table}(${ControllersTable.id}))`;
 
-    public static readonly insert = `INSERT OR REPLACE INTO ${this.table} 
+  public static readonly insert = `INSERT OR REPLACE INTO ${this.table} 
     (${this.locationId}, ${this.controllerId}) 
     VALUES (?, ?)`;
 
-    public static readonly selectByLocation = `SELECT ${this.controllerId} 
+  public static readonly selectByLocation = `SELECT ${this.controllerId} 
     FROM ${this.table} 
     WHERE ${this.locationId} = ?`;
 
-    public static readonly selectByController = `SELECT ${this.locationId}
+  public static readonly selectByController = `SELECT ${this.locationId}
     FROM ${this.table}
     WHERE ${this.controllerId} = ?`;
 
-    public static readonly selectLocationControllers = `SELECT
+  public static readonly selectLocationControllers = `SELECT
     l.${LocationsTable.id} as locationId,
     l.${LocationsTable.locationName} as locationName,
     l.${LocationsTable.description} as locationDescription,
@@ -36,7 +36,7 @@ export class ControllerLocationTable {
     LEFT JOIN ${this.table} cl ON l.${LocationsTable.id} = cl.${this.locationId}
     LEFT JOIN ${ControllersTable.table} c ON c.${ControllersTable.id} = cl.${this.controllerId}`;
 
-    public static readonly selectLocationByController = `SELECT
+  public static readonly selectLocationByController = `SELECT
     l.${LocationsTable.id} as locationId,
     l.${LocationsTable.locationName} as locationName,
     l.${LocationsTable.description} as locationDescription,
@@ -45,19 +45,19 @@ export class ControllerLocationTable {
     JOIN ${this.table} cl ON l.${LocationsTable.id} = cl.${this.locationId}
     WHERE cl.${this.controllerId} = ?`;
 
-    public static readonly selectLocationIdByControllerAddress = `SELECT
+  public static readonly selectLocationIdByControllerAddress = `SELECT
     l.${LocationsTable.id} as locationId
     FROM ${LocationsTable.table} l
     JOIN ${this.table} cl ON l.${LocationsTable.id} = cl.${this.locationId}
     JOIN ${ControllersTable.table} c ON c.${ControllersTable.id} = cl.${this.controllerId}
     WHERE c.${ControllersTable.controllerAddress} = ?`;
 
-    public static readonly selectAll = `SELECT 
+  public static readonly selectAll = `SELECT 
     ${this.controllerId}, 
     ${this.locationId} 
     FROM ${this.table}`;
 
-    public static readonly delete = `DELETE FROM ${this.table} 
+  public static readonly delete = `DELETE FROM ${this.table} 
     WHERE ${this.locationId} = ? 
     AND ${this.controllerId} = ?`;
 }

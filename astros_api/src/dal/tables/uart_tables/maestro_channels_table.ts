@@ -1,17 +1,17 @@
 export class MaestroChannelTable {
-    public static readonly table = 'maestro_channels';
-    public static readonly id = 'id';
-    public static readonly maestroBoardId = 'maestroBoardId';
-    public static readonly channelId = 'channelId';
-    public static readonly channelName = 'name';
-    public static readonly enabled = 'enable';
-    public static readonly isServo = 'isServo';
-    public static readonly minPos = 'minPos';
-    public static readonly maxPos = 'maxPos';
-    public static readonly homePos = 'homePos';
-    public static readonly inverted = 'inverted';
+  public static readonly table = "maestro_channels";
+  public static readonly id = "id";
+  public static readonly maestroBoardId = "maestroBoardId";
+  public static readonly channelId = "channelId";
+  public static readonly channelName = "name";
+  public static readonly enabled = "enable";
+  public static readonly isServo = "isServo";
+  public static readonly minPos = "minPos";
+  public static readonly maxPos = "maxPos";
+  public static readonly homePos = "homePos";
+  public static readonly inverted = "inverted";
 
-    public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
+  public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
         ${this.id} INTEGER PRIMARY KEY,
         ${this.maestroBoardId} TEXT,
         ${this.channelId} INTEGER,
@@ -24,8 +24,7 @@ export class MaestroChannelTable {
         ${this.inverted} INTEGER DEFAULT 0 NOT NULL,
         UNIQUE(${this.maestroBoardId}, ${this.channelId}))`;
 
-    public static readonly insert =
-        `INSERT INTO ${this.table} (
+  public static readonly insert = `INSERT INTO ${this.table} (
         ${this.id}
         ${this.maestroBoardId}, 
         ${this.channelId}, 
@@ -49,8 +48,7 @@ export class MaestroChannelTable {
         ${this.inverted} = excluded.${this.inverted}
         `;
 
-    public static readonly selectAllForBoard =
-        `SELECT ${this.channelId},
+  public static readonly selectAllForBoard = `SELECT ${this.channelId},
         ${this.channelName},
         ${this.enabled},
         ${this.isServo},
@@ -61,7 +59,7 @@ export class MaestroChannelTable {
         FROM ${this.table}
         WHERE ${this.maestroBoardId} = ?`;
 
-    public static readonly select = `SELECT ${this.channelId},
+  public static readonly select = `SELECT ${this.channelId},
         ${this.channelName},
         ${this.enabled},
         ${this.isServo},
@@ -73,6 +71,5 @@ export class MaestroChannelTable {
         WHERE ${this.channelId} = ?
         AND ${this.maestroBoardId} = ?`;
 
-    public static readonly deleteByBoardId = 
-        `DELETE FROM ${this.table} WHERE ${this.maestroBoardId} = ?`;
+  public static readonly deleteByBoardId = `DELETE FROM ${this.table} WHERE ${this.maestroBoardId} = ?`;
 }
