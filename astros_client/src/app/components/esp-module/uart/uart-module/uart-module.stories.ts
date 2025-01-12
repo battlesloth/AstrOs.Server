@@ -4,14 +4,14 @@ import {
   moduleMetadata,
   StoryObj,
 } from '@storybook/angular';
-import { EspSubmoduleComponent } from './esp-submodule.component';
 import { importProvidersFrom } from '@angular/core';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatExpansionPanel } from '@angular/material/expansion';
+import { UartModuleComponent } from './uart-module.component';
 
-const meta: Meta<EspSubmoduleComponent> = {
-  title: 'Modules/EspSubmodule',
-  component: EspSubmoduleComponent,
+const meta: Meta<UartModuleComponent> = {
+  title: 'Modules/UartModule',
+  component: UartModuleComponent,
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
@@ -25,7 +25,7 @@ const meta: Meta<EspSubmoduleComponent> = {
 
 export default meta;
 
-type Story = StoryObj<EspSubmoduleComponent>;
+type Story = StoryObj<UartModuleComponent>;
 
 export const Default: Story = {
   args: {},

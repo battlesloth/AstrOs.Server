@@ -16,8 +16,10 @@ import {
 import { MatCheckboxModule, MatCheckbox } from '@angular/material/checkbox';
 import { MatFormField } from '@angular/material/form-field';
 import { ControllerLocation, UartModule, UartType } from 'astros-common';
-import { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';
-import { EspSubmoduleComponent } from 'src/app/components/esp-submodule/esp-submodule.component';
+import {
+  UartModuleComponent,
+  KangarooModuleComponent,
+} from '@src/components/esp-module';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -37,7 +39,7 @@ import { FormsModule } from '@angular/forms';
     MatExpansionPanelDescription,
     NgFor,
     MatCheckbox,
-    EspSubmoduleComponent,
+    UartModuleComponent,
   ],
 })
 export class EspModuleComponent {
@@ -219,7 +221,6 @@ export class EspModuleComponent {
         'New Serial Module',
       ),
     );
-    console.log('addUartModule 2', this.uartPanelOpenState);
   }
 
   copyUartModule(module: any): any {

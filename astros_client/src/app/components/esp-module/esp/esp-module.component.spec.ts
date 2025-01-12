@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { EspModuleComponent } from './esp-module.component';
+import { EspModuleComponent } from '../esp-module.component';
 
 describe('EspModuleComponent', () => {
   let component: EspModuleComponent;

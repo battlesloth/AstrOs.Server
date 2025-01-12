@@ -16,7 +16,7 @@
             <div class="scripter-header">
                 <div class="scripter-module-header" 
                 (click)="openChannelAddModal()"
-                (keypress)="openChannelAddModalKbd()"
+                (keypress)="openChannelAddModalKbd($event)"
                 tabindex="0">Add Channel</div>
                 <div class=" timeline-spacer"></div>
                 <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">{{item.toFixed(1)}}</div>
