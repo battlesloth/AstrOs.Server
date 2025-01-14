@@ -4,6 +4,7 @@ import { ModalCallbackEvent } from './modal-callback-event';
 @Component({
   selector: 'app-modal-base',
   template: '',
+  standalone: true,
   styleUrls: ['./modal-base.component.scss'],
 })
 export abstract class ModalBaseComponent {

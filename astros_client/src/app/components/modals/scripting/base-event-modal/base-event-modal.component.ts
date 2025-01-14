@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { ModalBaseComponent } from '@src/components/modals/modal-base/modal-base.component';
-import { ModalCallbackEvent } from '@src/components/modals/modal-base/modal-callback-event';
+import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 import { ScriptEvent } from 'astros-common';
 
 export class ScriptEventModalResources {

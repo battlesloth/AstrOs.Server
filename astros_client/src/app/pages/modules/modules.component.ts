@@ -29,8 +29,8 @@ import {
   AlertModalComponent,
   AlertModalResources,
   ModalComponent,
-  ModalCallbackEvent,
 } from '@src/components/modals';
+import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-callback-event';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -64,6 +64,7 @@ interface Caption {
     EspModuleComponent,
     NgFor,
     ModalComponent,
+    LoadingModalComponent
   ],
 })
 export class ModulesComponent implements AfterViewInit {
@@ -131,10 +132,12 @@ export class ModulesComponent implements AfterViewInit {
       return;
     }
 
+    console.log('here 1');
     const response = evt.value as LoadingModalResponse;
 
     this.parseModules(response.locations);
 
+  console.log('here 2');
     // always filter out the master controller since it's always the body module
     this.possibleControllers = response.controllers.filter(
       (controller: ControlModule) => controller.id !== 1,
@@ -149,6 +152,7 @@ export class ModulesComponent implements AfterViewInit {
         controller.id !== this.coreLocation.controller?.id,
     );
 
+    console.log('here 3');
     this.handleStatus(
       this.status.getCoreStatus(),
       this.coreEl,
@@ -177,7 +181,9 @@ export class ModulesComponent implements AfterViewInit {
 
     this.isLoaded = true;
 
+    console.log('here 4');
     this.modalService.close('modules-modal');
+    console.log('here 5');
   }
 
   openAlertModal(message: string) {

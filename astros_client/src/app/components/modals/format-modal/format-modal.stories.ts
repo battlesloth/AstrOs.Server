@@ -1,10 +1,22 @@
-import { Meta, StoryObj } from '@storybook/angular';
+import {
+  componentWrapperDecorator,
+  moduleMetadata,
+  Meta,
+  StoryObj,
+} from '@storybook/angular';
 import { FormatModalComponent } from './format-modal.component';
+import { ModalComponent } from '../modal-base/modal.component';
 
 const meta: Meta<FormatModalComponent> = {
   title: 'Components/Modals/FormatModal',
   component: FormatModalComponent,
   tags: ['autodocs'],
+  decorators: [
+    moduleMetadata({
+      imports: [ModalComponent],
+    }),
+    componentWrapperDecorator(ModalComponent),
+  ],
 };
 
 export default meta;

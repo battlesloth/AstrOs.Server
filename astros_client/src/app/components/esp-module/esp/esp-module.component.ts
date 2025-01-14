@@ -16,10 +16,8 @@ import {
 import { MatCheckboxModule, MatCheckbox } from '@angular/material/checkbox';
 import { MatFormField } from '@angular/material/form-field';
 import { ControllerLocation, UartModule, UartType } from 'astros-common';
-import {
-  UartModuleComponent,
-  KangarooModuleComponent,
-} from '@src/components/esp-module';
+import { KangarooModuleComponent } from '../uart/uart-submodules/kangaroo-module/kangaroo-module.component';
+import { UartModuleComponent } from '../uart/uart-module/uart-module.component';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -27,7 +25,7 @@ import { FormsModule } from '@angular/forms';
   selector: 'app-esp-module',
   templateUrl: './esp-module.component.html',
   styleUrls: ['./esp-module.component.scss'],
-  viewProviders: [MatExpansionPanel, MatFormField, MatCheckboxModule],
+  //viewProviders: [MatFormField, MatCheckboxModule],
   standalone: true,
   imports: [
     MatAccordion,

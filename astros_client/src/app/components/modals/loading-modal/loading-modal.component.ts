@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-import { BaseEventModalComponent } from '../scripting/base-event-modal/base-event-modal.component';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
 import {
   AstrOsLocationCollection,
@@ -7,9 +6,10 @@ import {
   ControlModule,
   TransmissionType,
 } from 'astros-common';
-import { ControllerService } from 'src/app/services/controllers/controller.service';
-import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
+import { ControllerService } from '@src/services';
 import { Subscription } from 'rxjs';
+import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
+import { ModalBaseComponent } from '../modal-base/modal-base.component';
 
 export class LoadingModalResources {
   public static closeEvent = 'loading_closeEvent';
@@ -27,7 +27,7 @@ export interface LoadingModalResponse {
   standalone: true,
 })
 export class LoadingModalComponent
-  extends BaseEventModalComponent
+  extends ModalBaseComponent
   implements OnInit
 {
   subscription!: Subscription;
@@ -54,13 +54,6 @@ export class LoadingModalComponent
       next: (result: AstrOsLocationCollection) => {
         this.locations = result;
         this.locationsLoaded = true;
-        this.controllersLoaded = true;
-        this.controllers = {
-          success: true,
-          controllers: [],
-          type: TransmissionType.controllers,
-          message: '',
-        };
         this.checkLoadedState();
       },
       error: (err: unknown) => console.error(err),
@@ -68,7 +61,6 @@ export class LoadingModalComponent
 
     this.controllerService.getLoadedLocations().subscribe(locationsObserver);
 
-    return;
     const observer = {
       next: (_: unknown) => {
         console.log('Synced controllers');
@@ -99,8 +91,8 @@ export class LoadingModalComponent
     }
   }
 
-  override closeModal(): void {
-    //this.subscription.unsubscribe();
+  closeModal(): void {
+    this.subscription.unsubscribe();
     const evt = new ModalCallbackEvent(LoadingModalResources.closeEvent, {
       controllers: this.controllers.controllers,
       locations: this.locations,

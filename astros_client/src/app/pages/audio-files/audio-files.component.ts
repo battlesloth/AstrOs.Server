@@ -7,12 +7,12 @@ import { NgFor, DatePipe } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
   ModalComponent,
-  ModalCallbackEvent,
   ConfirmModalComponent,
   ConfirmModalResources,
   UploadModalComponent,
   UploadModalResources,
 } from '@src/components/modals';
+import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-callback-event';
 import { ModalService } from '@src/services';
 
 interface DeleteConfirmEvent {

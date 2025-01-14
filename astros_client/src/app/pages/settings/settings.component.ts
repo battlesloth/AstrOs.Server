@@ -9,9 +9,9 @@ import {
 import {
   FormatModalComponent,
   FormatModalResources,
-  ModalCallbackEvent,
   ModalComponent,
 } from '@src/components/modals';
+import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-callback-event';
 import { ModalService, SettingsService, SnackbarService } from '@src/services';
 import { ControlModule } from 'astros-common';
 

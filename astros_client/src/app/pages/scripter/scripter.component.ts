@@ -63,9 +63,9 @@ import {
   ConfirmModalComponent,
   ConfirmModalEvent,
   ConfirmModalResources,
-  ModalCallbackEvent,
   ModalComponent,
 } from '@src/components/modals';
+import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-callback-event';
 
 export interface Item {
   timeline: string;

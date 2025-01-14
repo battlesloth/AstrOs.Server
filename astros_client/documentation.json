@@ -3,12 +3,12 @@
     "interfaces": [
         {
             "name": "Caption",
-            "id": "interface-Caption-cc70676a92a742b6899c7dd2ce1bc5b7a1a0be130530a1783417dae6c0418c24dd201161149d4a959c5e2f5ff7ad6095807669ab7445e547abba40f11c4b2315",
+            "id": "interface-Caption-e5cabdd09f9fb8a5bffa54de0bb6921956858d9c958bd16299df089ab2f8134829601a2cd1aeec79be93b620db1cfdd54b0b4b8fb2e1ed06c401bdb60cb9824d",
             "file": "src/app/pages/modules/modules.component.ts",
             "deprecated": false,
             "deprecationMessage": "",
             "type": "interface",
-            "sourceCode": "import {\n  AfterViewInit,\n  Component,\n  ElementRef,\n  Renderer2,\n  ViewChild,\n  ViewContainerRef,\n} from '@angular/core';\nimport {\n  MatExpansionPanel,\n  MatAccordion,\n  MatExpansionPanelHeader,\n  MatExpansionPanelTitle,\n} from '@angular/material/expansion';\nimport {\n  ControlModule,\n  ControllerStatus,\n  AstrOsLocationCollection,\n  ControllerLocation,\n} from 'astros-common';\nimport { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';\nimport {\n  LoadingModalComponent,\n  LoadingModalResources,\n  LoadingModalResponse,\n  ServoTestModalComponent,\n  ServoTestModalResources,\n  ServoTestMessage,\n  AlertModalComponent,\n  AlertModalResources,\n  ModalComponent,\n  ModalCallbackEvent,\n} from '@src/components/modals';\nimport { FontAwesomeModule } from '@fortawesome/angular-fontawesome';\nimport { NgIf, NgFor } from '@angular/common';\nimport { FormsModule } from '@angular/forms';\nimport { EspModuleComponent } from './esp-module/esp-module.component';\nimport {\n  ControllerService,\n  ModalService,\n  SnackbarService,\n  StatusService,\n  WebsocketService,\n} from '@src/services';\n\ninterface Caption {\n  str: string;\n}\n\n@Component({\n  selector: 'app-modules',\n  templateUrl: './modules.component.html',\n  styleUrls: ['./modules.component.scss'],\n  viewProviders: [MatExpansionPanel],\n  standalone: true,\n  imports: [\n    MatAccordion,\n    MatExpansionPanel,\n    MatExpansionPanelHeader,\n    MatExpansionPanelTitle,\n    FontAwesomeModule,\n    NgIf,\n    FormsModule,\n    EspModuleComponent,\n    NgFor,\n    ModalComponent,\n  ],\n})\nexport class ModulesComponent implements AfterViewInit {\n  @ViewChild('modalContainer', { read: ViewContainerRef })\n  container!: ViewContainerRef;\n\n  isLoaded = false;\n\n  backgroundClickDisabled = '1';\n  isMaster = true;\n\n  possibleControllers: ControlModule[] = [];\n  availableDomeControllers: ControlModule[] = [];\n  availableCoreControllers: ControlModule[] = [];\n\n  coreWarning = faExclamationTriangle;\n  domeWarning = faExclamationTriangle;\n  bodyWarning = faExclamationTriangle;\n\n  @ViewChild('core', { static: false }) coreEl!: ElementRef;\n  @ViewChild('dome', { static: false }) domeEl!: ElementRef;\n  @ViewChild('body', { static: false }) bodyEl!: ElementRef;\n\n  coreLocation!: ControllerLocation;\n  domeLocation!: ControllerLocation;\n  bodyLocation!: ControllerLocation;\n\n  coreCaption: Caption = { str: 'Module Down' };\n  domeCaption: Caption = { str: 'Module Down' };\n  bodyCaption: Caption = { str: 'Module Down' };\n\n  private notSynced = 'Not Synced';\n  private moduleDown = 'Module Down';\n\n  constructor(\n    private controllerService: ControllerService,\n    private websocketService: WebsocketService,\n    private snackBar: SnackbarService,\n    private modalService: ModalService,\n    private renderer: Renderer2,\n    private status: StatusService,\n  ) {}\n\n  ngAfterViewInit(): void {\n    this.openControllerSyncModal();\n  }\n\n  openControllerSyncModal() {\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(LoadingModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {\n      this.syncModalCallback(result);\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  syncModalCallback(evt: ModalCallbackEvent) {\n    if (evt.type !== LoadingModalResources.closeEvent) {\n      return;\n    }\n\n    const response = evt.value as LoadingModalResponse;\n\n    this.parseModules(response.locations);\n\n    // always filter out the master controller since it's always the body module\n    this.possibleControllers = response.controllers.filter(\n      (controller: ControlModule) => controller.id !== 1,\n    );\n\n    this.availableCoreControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.domeLocation.controller?.id,\n    );\n    this.availableDomeControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.coreLocation.controller?.id,\n    );\n\n    this.handleStatus(\n      this.status.getCoreStatus(),\n      this.coreEl,\n      this.coreCaption,\n    );\n    this.handleStatus(\n      this.status.getDomeStatus(),\n      this.domeEl,\n      this.domeCaption,\n    );\n    this.handleStatus(\n      this.status.getBodyStatus(),\n      this.bodyEl,\n      this.bodyCaption,\n    );\n\n    this.status.coreStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.coreEl, this.coreCaption),\n    );\n    this.status.domeStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.domeEl, this.domeCaption),\n    );\n    this.status.bodyStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.bodyEl, this.bodyCaption),\n    );\n\n    this.isLoaded = true;\n\n    this.modalService.close('modules-modal');\n  }\n\n  openAlertModal(message: string) {\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(AlertModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.resources.set(AlertModalResources.message, message);\n\n    component.instance.modalCallback.subscribe((_: unknown) => {\n      this.modalService.close('modules-modal');\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  openServoTestModal(value: { controllerId: number; channelId: number }) {\n    if (value.controllerId === 0) {\n      this.openAlertModal('Location for this servo is not set.');\n      return;\n    }\n\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(ServoTestModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.resources.set(\n      ServoTestModalResources.controllerId,\n      value.controllerId,\n    );\n    component.instance.resources.set(\n      ServoTestModalResources.servoId,\n      value.channelId,\n    );\n\n    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {\n      this.servoTestModalCallback(result);\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  servoTestModalCallback(evt: ModalCallbackEvent) {\n    switch (evt.type) {\n      case ServoTestModalResources.sendServoMove: {\n        const servoTest = evt.value as ServoTestMessage;\n        this.websocketService.sendMessage({\n          msgType: 'SERVO_TEST',\n          data: {\n            controllerId: servoTest.controllerId,\n            servoId: servoTest.servoId,\n            value: servoTest.value,\n          },\n        });\n        break;\n      }\n      case ServoTestModalResources.closeEvent:\n        this.modalService.close('modules-modal');\n        break;\n    }\n  }\n\n  controllerSelectChanged(_: unknown) {\n    this.availableCoreControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.domeLocation.controller?.id,\n    );\n    this.availableDomeControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.coreLocation.controller?.id,\n    );\n  }\n\n  saveModuleSettings() {\n    const observer = {\n      next: (result: unknown) => {\n        if (result && typeof result === 'object' && 'message' in result) {\n          if (result.message === 'success') {\n            console.log('module settings saved!');\n            this.snackBar.okToast('Module settings saved!');\n          } else {\n            console.log('module settings save failed!');\n            this.snackBar.okToast('Module settings save failed!');\n          }\n        }\n      },\n      error: (err: unknown) => {\n        console.error(err);\n        this.snackBar.okToast('Module settings save failed!');\n      },\n    };\n\n    this.controllerService\n      .saveLocations(\n        new AstrOsLocationCollection(\n          this.coreLocation,\n          this.domeLocation,\n          this.bodyLocation,\n        ),\n      )\n      .subscribe(observer);\n\n    this.status.resetStatus();\n  }\n\n  syncModuleSettings() {\n    const observer = {\n      next: (result: unknown) => {\n        if (result && typeof result === 'object' && 'message' in result) {\n          if (result.message === 'success') {\n            console.log('module sync queued!');\n            this.snackBar.okToast('Module sync queued!');\n          } else {\n            console.log('module sync failed to queue');\n            this.snackBar.okToast(`Module sync failed to queue.`);\n          }\n        }\n      },\n      error: (err: unknown) => {\n        console.error(err);\n        this.snackBar.okToast('Module sync failed!');\n      },\n    };\n\n    this.controllerService.syncLocationConfig().subscribe(observer);\n  }\n\n  private parseModules(locations: AstrOsLocationCollection) {\n    console.log(locations);\n    try {\n      this.coreLocation = locations.coreModule ?? this.coreLocation;\n      this.domeLocation = locations.domeModule ?? this.domeLocation;\n      this.bodyLocation = locations.bodyModule ?? this.bodyLocation;\n    } catch (err) {\n      console.error(err);\n    }\n  }\n\n  handleStatus(status: ControllerStatus, el: ElementRef, caption: Caption) {\n    switch (status) {\n      case ControllerStatus.up:\n        caption.str = '';\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'hidden');\n        break;\n      case ControllerStatus.needsSynced:\n        caption.str = this.notSynced;\n        this.renderer.setStyle(el.nativeElement, 'color', 'yellow');\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');\n        break;\n      case ControllerStatus.down:\n        caption.str = this.moduleDown;\n        this.renderer.setStyle(el.nativeElement, 'color', 'red');\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');\n        break;\n    }\n  }\n}\n",
+            "sourceCode": "import {\n  AfterViewInit,\n  Component,\n  ElementRef,\n  Renderer2,\n  ViewChild,\n  ViewContainerRef,\n} from '@angular/core';\nimport {\n  MatExpansionPanel,\n  MatAccordion,\n  MatExpansionPanelHeader,\n  MatExpansionPanelTitle,\n} from '@angular/material/expansion';\nimport {\n  ControlModule,\n  ControllerStatus,\n  AstrOsLocationCollection,\n  ControllerLocation,\n} from 'astros-common';\nimport { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';\nimport {\n  LoadingModalComponent,\n  LoadingModalResources,\n  LoadingModalResponse,\n  ServoTestModalComponent,\n  ServoTestModalResources,\n  ServoTestMessage,\n  AlertModalComponent,\n  AlertModalResources,\n  ModalComponent,\n  ModalCallbackEvent,\n} from '@src/components/modals';\nimport { FontAwesomeModule } from '@fortawesome/angular-fontawesome';\nimport { NgIf, NgFor } from '@angular/common';\nimport { FormsModule } from '@angular/forms';\nimport { EspModuleComponent } from '@src/components/esp-module';\nimport {\n  ControllerService,\n  ModalService,\n  SnackbarService,\n  StatusService,\n  WebsocketService,\n} from '@src/services';\n\ninterface Caption {\n  str: string;\n}\n\n@Component({\n  selector: 'app-modules',\n  templateUrl: './modules.component.html',\n  styleUrls: ['./modules.component.scss'],\n  viewProviders: [MatExpansionPanel],\n  standalone: true,\n  imports: [\n    MatAccordion,\n    MatExpansionPanel,\n    MatExpansionPanelHeader,\n    MatExpansionPanelTitle,\n    FontAwesomeModule,\n    NgIf,\n    FormsModule,\n    EspModuleComponent,\n    NgFor,\n    ModalComponent,\n  ],\n})\nexport class ModulesComponent implements AfterViewInit {\n  @ViewChild('modalContainer', { read: ViewContainerRef })\n  container!: ViewContainerRef;\n\n  isLoaded = false;\n\n  backgroundClickDisabled = '1';\n  isMaster = true;\n\n  possibleControllers: ControlModule[] = [];\n  availableDomeControllers: ControlModule[] = [];\n  availableCoreControllers: ControlModule[] = [];\n\n  coreWarning = faExclamationTriangle;\n  domeWarning = faExclamationTriangle;\n  bodyWarning = faExclamationTriangle;\n\n  @ViewChild('core', { static: false }) coreEl!: ElementRef;\n  @ViewChild('dome', { static: false }) domeEl!: ElementRef;\n  @ViewChild('body', { static: false }) bodyEl!: ElementRef;\n\n  coreLocation!: ControllerLocation;\n  domeLocation!: ControllerLocation;\n  bodyLocation!: ControllerLocation;\n\n  coreCaption: Caption = { str: 'Module Down' };\n  domeCaption: Caption = { str: 'Module Down' };\n  bodyCaption: Caption = { str: 'Module Down' };\n\n  private notSynced = 'Not Synced';\n  private moduleDown = 'Module Down';\n\n  constructor(\n    private controllerService: ControllerService,\n    private websocketService: WebsocketService,\n    private snackBar: SnackbarService,\n    private modalService: ModalService,\n    private renderer: Renderer2,\n    private status: StatusService,\n  ) {}\n\n  ngAfterViewInit(): void {\n    this.openControllerSyncModal();\n  }\n\n  openControllerSyncModal() {\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(LoadingModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {\n      this.syncModalCallback(result);\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  syncModalCallback(evt: ModalCallbackEvent) {\n    if (evt.type !== LoadingModalResources.closeEvent) {\n      return;\n    }\n\n    const response = evt.value as LoadingModalResponse;\n\n    this.parseModules(response.locations);\n\n    // always filter out the master controller since it's always the body module\n    this.possibleControllers = response.controllers.filter(\n      (controller: ControlModule) => controller.id !== 1,\n    );\n\n    this.availableCoreControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.domeLocation.controller?.id,\n    );\n    this.availableDomeControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.coreLocation.controller?.id,\n    );\n\n    this.handleStatus(\n      this.status.getCoreStatus(),\n      this.coreEl,\n      this.coreCaption,\n    );\n    this.handleStatus(\n      this.status.getDomeStatus(),\n      this.domeEl,\n      this.domeCaption,\n    );\n    this.handleStatus(\n      this.status.getBodyStatus(),\n      this.bodyEl,\n      this.bodyCaption,\n    );\n\n    this.status.coreStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.coreEl, this.coreCaption),\n    );\n    this.status.domeStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.domeEl, this.domeCaption),\n    );\n    this.status.bodyStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.bodyEl, this.bodyCaption),\n    );\n\n    this.isLoaded = true;\n\n    this.modalService.close('modules-modal');\n  }\n\n  openAlertModal(message: string) {\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(AlertModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.resources.set(AlertModalResources.message, message);\n\n    component.instance.modalCallback.subscribe((_: unknown) => {\n      this.modalService.close('modules-modal');\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  openServoTestModal(value: { controllerId: number; channelId: number }) {\n    if (value.controllerId === 0) {\n      this.openAlertModal('Location for this servo is not set.');\n      return;\n    }\n\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(ServoTestModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.resources.set(\n      ServoTestModalResources.controllerId,\n      value.controllerId,\n    );\n    component.instance.resources.set(\n      ServoTestModalResources.servoId,\n      value.channelId,\n    );\n\n    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {\n      this.servoTestModalCallback(result);\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  servoTestModalCallback(evt: ModalCallbackEvent) {\n    switch (evt.type) {\n      case ServoTestModalResources.sendServoMove: {\n        const servoTest = evt.value as ServoTestMessage;\n        this.websocketService.sendMessage({\n          msgType: 'SERVO_TEST',\n          data: {\n            controllerId: servoTest.controllerId,\n            servoId: servoTest.servoId,\n            value: servoTest.value,\n          },\n        });\n        break;\n      }\n      case ServoTestModalResources.closeEvent:\n        this.modalService.close('modules-modal');\n        break;\n    }\n  }\n\n  controllerSelectChanged(_: unknown) {\n    this.availableCoreControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.domeLocation.controller?.id,\n    );\n    this.availableDomeControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.coreLocation.controller?.id,\n    );\n  }\n\n  saveModuleSettings() {\n    const observer = {\n      next: (result: unknown) => {\n        if (result && typeof result === 'object' && 'message' in result) {\n          if (result.message === 'success') {\n            console.log('module settings saved!');\n            this.snackBar.okToast('Module settings saved!');\n          } else {\n            console.log('module settings save failed!');\n            this.snackBar.okToast('Module settings save failed!');\n          }\n        }\n      },\n      error: (err: unknown) => {\n        console.error(err);\n        this.snackBar.okToast('Module settings save failed!');\n      },\n    };\n\n    this.controllerService\n      .saveLocations(\n        new AstrOsLocationCollection(\n          this.coreLocation,\n          this.domeLocation,\n          this.bodyLocation,\n        ),\n      )\n      .subscribe(observer);\n\n    this.status.resetStatus();\n  }\n\n  syncModuleSettings() {\n    const observer = {\n      next: (result: unknown) => {\n        if (result && typeof result === 'object' && 'message' in result) {\n          if (result.message === 'success') {\n            console.log('module sync queued!');\n            this.snackBar.okToast('Module sync queued!');\n          } else {\n            console.log('module sync failed to queue');\n            this.snackBar.okToast(`Module sync failed to queue.`);\n          }\n        }\n      },\n      error: (err: unknown) => {\n        console.error(err);\n        this.snackBar.okToast('Module sync failed!');\n      },\n    };\n\n    this.controllerService.syncLocationConfig().subscribe(observer);\n  }\n\n  private parseModules(locations: AstrOsLocationCollection) {\n    console.log(locations);\n    try {\n      this.coreLocation = locations.coreModule ?? this.coreLocation;\n      this.domeLocation = locations.domeModule ?? this.domeLocation;\n      this.bodyLocation = locations.bodyModule ?? this.bodyLocation;\n    } catch (err) {\n      console.error(err);\n    }\n  }\n\n  handleStatus(status: ControllerStatus, el: ElementRef, caption: Caption) {\n    switch (status) {\n      case ControllerStatus.up:\n        caption.str = '';\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'hidden');\n        break;\n      case ControllerStatus.needsSynced:\n        caption.str = this.notSynced;\n        this.renderer.setStyle(el.nativeElement, 'color', 'yellow');\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');\n        break;\n      case ControllerStatus.down:\n        caption.str = this.moduleDown;\n        this.renderer.setStyle(el.nativeElement, 'color', 'red');\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');\n        break;\n    }\n  }\n}\n",
             "properties": [
                 {
                     "name": "str",
@@ -7136,8 +7136,8 @@
         },
         {
             "name": "EspModuleComponent",
-            "id": "component-EspModuleComponent-35cb8b053be15aa92dd18f3fefb9223fe1498ed033c5c164ccabfd248aa0331d0fce2817d5d94691efd92c066347c650f1a043ae50702b8de8f0b93a3f59b21c",
-            "file": "src/app/pages/modules/esp-module/esp-module.component.ts",
+            "id": "component-EspModuleComponent-baa2f997acab5076913e94a42dae8c407014116913e6b85d857ca3ab721c351785572d3027aa33a3f380ec7779b8f77945287be79a8c45df864895c583e0773e",
+            "file": "src/app/components/esp-module/esp/esp-module.component.ts",
             "encapsulation": [],
             "entryComponents": [],
             "inputs": [],
@@ -7170,7 +7170,7 @@
                     "defaultValue": "false",
                     "deprecated": false,
                     "deprecationMessage": "",
-                    "line": 47,
+                    "line": 49,
                     "type": "boolean",
                     "decorators": []
                 },
@@ -7179,7 +7179,7 @@
                     "defaultValue": "0",
                     "deprecated": false,
                     "deprecationMessage": "",
-                    "line": 50,
+                    "line": 52,
                     "type": "number",
                     "decorators": []
                 },
@@ -7187,7 +7187,7 @@
                     "name": "module",
                     "deprecated": false,
                     "deprecationMessage": "",
-                    "line": 53,
+                    "line": 55,
                     "type": "any",
                     "decorators": []
                 }
@@ -7198,7 +7198,7 @@
                     "defaultValue": "new EventEmitter<any>()",
                     "deprecated": false,
                     "deprecationMessage": "",
-                    "line": 44,
+                    "line": 46,
                     "type": "EventEmitter"
                 }
             ],
@@ -7211,7 +7211,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 60
+                    "line": 62
                 },
                 {
                     "name": "_uart1Container",
@@ -7221,7 +7221,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 71
+                    "line": 73
                 },
                 {
                     "name": "_uart2Container",
@@ -7231,7 +7231,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 81
+                    "line": 83
                 },
                 {
                     "name": "components",
@@ -7241,7 +7241,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 89
+                    "line": 91
                 },
                 {
                     "name": "originalUart1Module",
@@ -7251,7 +7251,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 84
+                    "line": 86
                 },
                 {
                     "name": "originalUart1Type",
@@ -7261,7 +7261,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 83
+                    "line": 85
                 },
                 {
                     "name": "originalUart2Module",
@@ -7271,7 +7271,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 87
+                    "line": 89
                 },
                 {
                     "name": "originalUart2Type",
@@ -7281,7 +7281,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 86
+                    "line": 88
                 },
                 {
                     "name": "uart1Type",
@@ -7291,7 +7291,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 90
+                    "line": 92
                 },
                 {
                     "name": "uart2Type",
@@ -7301,7 +7301,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 91
+                    "line": 93
                 },
                 {
                     "name": "uartPanelOpenState",
@@ -7312,7 +7312,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 61
+                    "line": 63
                 }
             ],
             "methodsClass": [
@@ -7329,7 +7329,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 205,
+                    "line": 207,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -7357,7 +7357,7 @@
                     "optional": false,
                     "returnType": "any",
                     "typeParameters": [],
-                    "line": 225,
+                    "line": 226,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -7385,7 +7385,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 201,
+                    "line": 203,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -7419,7 +7419,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 112,
+                    "line": 114,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -7462,7 +7462,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 116,
+                    "line": 118,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -7492,7 +7492,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 99,
+                    "line": 101,
                     "deprecated": false,
                     "deprecationMessage": ""
                 },
@@ -7527,7 +7527,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 174,
+                    "line": 176,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -7594,7 +7594,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 153,
+                    "line": 155,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -7640,7 +7640,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 242,
+                    "line": 243,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -7674,7 +7674,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 120,
+                    "line": 122,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -7734,14 +7734,14 @@
                     "name": "MatCheckbox"
                 },
                 {
-                    "name": "EspSubmoduleComponent",
+                    "name": "UartModuleComponent",
                     "type": "component"
                 }
             ],
             "description": "",
             "rawdescription": "\n",
             "type": "component",
-            "sourceCode": "import {\n  Component,\n  EventEmitter,\n  Input,\n  Output,\n  ViewChild,\n  ViewContainerRef,\n} from '@angular/core';\nimport {\n  MatExpansionPanel,\n  MatAccordion,\n  MatExpansionPanelHeader,\n  MatExpansionPanelTitle,\n  MatExpansionPanelDescription,\n} from '@angular/material/expansion';\nimport { MatCheckboxModule, MatCheckbox } from '@angular/material/checkbox';\nimport { MatFormField } from '@angular/material/form-field';\nimport { ControllerLocation, UartModule, UartType } from 'astros-common';\nimport { KangarooModuleComponent } from '../uart-modules/kangaroo-module/kangaroo-module.component';\nimport { EspSubmoduleComponent } from 'src/app/components/esp-submodule/esp-submodule.component';\nimport { NgIf, NgFor } from '@angular/common';\nimport { FormsModule } from '@angular/forms';\n\n@Component({\n  selector: 'app-esp-module',\n  templateUrl: './esp-module.component.html',\n  styleUrls: ['./esp-module.component.scss'],\n  viewProviders: [MatExpansionPanel, MatFormField, MatCheckboxModule],\n  standalone: true,\n  imports: [\n    MatAccordion,\n    MatExpansionPanel,\n    MatExpansionPanelHeader,\n    MatExpansionPanelTitle,\n    NgIf,\n    FormsModule,\n    MatExpansionPanelDescription,\n    NgFor,\n    MatCheckbox,\n    EspSubmoduleComponent,\n  ],\n})\nexport class EspModuleComponent {\n  @Output() openServoTestModal = new EventEmitter<any>();\n\n  @Input()\n  isMaster = false;\n\n  @Input()\n  locationId = 0;\n\n  @Input()\n  get module(): any {\n    return this._module;\n  }\n  set module(value: any) {\n    this._module = value;\n    this.setModule();\n  }\n  _module!: ControllerLocation;\n  uartPanelOpenState = false;\n\n  @ViewChild('uart1Container', { read: ViewContainerRef })\n  get uart1Container(): ViewContainerRef {\n    return this._uart1Container;\n  }\n  set uart1Container(value: ViewContainerRef) {\n    this._uart1Container = value;\n    //this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);\n  }\n  _uart1Container!: ViewContainerRef;\n\n  @ViewChild('uart2Container', { read: ViewContainerRef })\n  get uart2Container(): ViewContainerRef {\n    return this._uart2Container;\n  }\n  set uart2Container(value: ViewContainerRef) {\n    this._uart2Container = value;\n    //this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);\n  }\n  _uart2Container!: ViewContainerRef;\n\n  originalUart1Type!: UartType;\n  originalUart1Module!: any;\n\n  originalUart2Type!: UartType;\n  originalUart2Module!: any;\n\n  components: any[];\n  uart1Type: string;\n  uart2Type: string;\n\n  constructor() {\n    this.components = new Array<any>();\n    this.uart1Type = '0';\n    this.uart2Type = '0';\n  }\n\n  setModule() {\n    /*this.originalUart1Type = this.module.uartModule.channels[0].type;\n    this.originalUart1Module = this.copyUartModule(this.module.uartModule.channels[0]);\n\n    this.uart1Type = this.originalUart1Type.toString();\n\n    this.originalUart2Type = this.module.uartModule.channels[1].type;\n    this.originalUart2Module = this.copyUartModule(this.module.uartModule.channels[1]);\n\n    this.uart2Type = this.originalUart2Type.toString();\n    */\n  }\n\n  servoNameChange(id: number, $event: any) {\n    this.module.servoModule.channels[id].channelName = $event;\n  }\n\n  servoStatusChange(id: number, $event: any) {\n    this.module.servoModule.channels[id].enabled = $event;\n  }\n\n  uartTypeChange($event: any, channel: number) {\n    return;\n\n    const ut = +$event;\n\n    if (channel === 1 && ut === this.originalUart1Type) {\n      this.setUartModuleForSlot(\n        this.originalUart1Type,\n        this.originalUart1Module,\n        1,\n      );\n    } else if (channel === 2 && ut === this.originalUart2Type) {\n      this.setUartModuleForSlot(\n        this.originalUart2Type,\n        this.originalUart2Module,\n        2,\n      );\n    } else {\n      let module: any;\n      switch (ut) {\n        /*case UartType.kangaroo:\n          module = new KangarooX2();\n          break;\n        */\n        default:\n          module = new Object();\n          break;\n      }\n\n      this.setUartModuleForSlot(ut, module, channel);\n    }\n  }\n\n  setUartModuleForSlot(uartType: UartType, module: any, channel: number) {\n    switch (channel) {\n      case 1:\n        this.setUartModule(\n          uartType,\n          module,\n          this.uart1Container,\n          this.module.uartModule.channels[0],\n        );\n        break;\n      case 2:\n        this.setUartModule(\n          uartType,\n          module,\n          this.uart2Container,\n          this.module.uartModule.channels[1],\n        );\n        break;\n    }\n  }\n\n  setUartModule(\n    uartType: UartType,\n    module: any,\n    container: ViewContainerRef,\n    uartModule: UartModule,\n  ) {\n    let component: any;\n\n    container.clear();\n    this.components.splice(0, this.components.length);\n\n    switch (uartType) {\n      case UartType.kangaroo:\n        component = container.createComponent(KangarooModuleComponent);\n        break;\n    }\n\n    uartModule.uartType = uartType;\n    uartModule.subModule = module;\n\n    if (component) {\n      component.instance.module = module;\n\n      this.components.push(component);\n    }\n  }\n\n  moduleCallback(_: unknown) {\n    throw new Error('Method not implemented.');\n  }\n\n  addUartModule(evt: any) {\n    evt.stopPropagation();\n\n    if (!this.uartPanelOpenState) {\n      this.uartPanelOpenState = true;\n    }\n\n    this.module.uartModules.push(\n      new UartModule(\n        crypto.randomUUID(),\n        this.module.locationId,\n        UartType.genericSerial,\n        1,\n        9600,\n        'New Serial Module',\n      ),\n    );\n    console.log('addUartModule 2', this.uartPanelOpenState);\n  }\n\n  copyUartModule(module: any): any {\n    let temp: any;\n\n    switch (module.type) {\n      /*case UartType.kangaroo:\n        temp = new KangarooController();\n        temp.channelOneName = module.module.channelOneName;\n        temp.channelTwoName = module.module.channelTwoName;\n        break/*/\n      default:\n        temp = new Object();\n        break;\n    }\n\n    return temp;\n  }\n\n  testServoModal(channelId: number) {\n    this.openServoTestModal.emit({\n      controllerId: this.module.controller.id,\n      channelId,\n    });\n  }\n}\n",
+            "sourceCode": "import {\n  Component,\n  EventEmitter,\n  Input,\n  Output,\n  ViewChild,\n  ViewContainerRef,\n} from '@angular/core';\nimport {\n  MatExpansionPanel,\n  MatAccordion,\n  MatExpansionPanelHeader,\n  MatExpansionPanelTitle,\n  MatExpansionPanelDescription,\n} from '@angular/material/expansion';\nimport { MatCheckboxModule, MatCheckbox } from '@angular/material/checkbox';\nimport { MatFormField } from '@angular/material/form-field';\nimport { ControllerLocation, UartModule, UartType } from 'astros-common';\nimport {\n  UartModuleComponent,\n  KangarooModuleComponent,\n} from '@src/components/esp-module';\nimport { NgIf, NgFor } from '@angular/common';\nimport { FormsModule } from '@angular/forms';\n\n@Component({\n  selector: 'app-esp-module',\n  templateUrl: './esp-module.component.html',\n  styleUrls: ['./esp-module.component.scss'],\n  viewProviders: [MatExpansionPanel, MatFormField, MatCheckboxModule],\n  standalone: true,\n  imports: [\n    MatAccordion,\n    MatExpansionPanel,\n    MatExpansionPanelHeader,\n    MatExpansionPanelTitle,\n    NgIf,\n    FormsModule,\n    MatExpansionPanelDescription,\n    NgFor,\n    MatCheckbox,\n    UartModuleComponent,\n  ],\n})\nexport class EspModuleComponent {\n  @Output() openServoTestModal = new EventEmitter<any>();\n\n  @Input()\n  isMaster = false;\n\n  @Input()\n  locationId = 0;\n\n  @Input()\n  get module(): any {\n    return this._module;\n  }\n  set module(value: any) {\n    this._module = value;\n    this.setModule();\n  }\n  _module!: ControllerLocation;\n  uartPanelOpenState = false;\n\n  @ViewChild('uart1Container', { read: ViewContainerRef })\n  get uart1Container(): ViewContainerRef {\n    return this._uart1Container;\n  }\n  set uart1Container(value: ViewContainerRef) {\n    this._uart1Container = value;\n    //this.setUartModuleForSlot(this.originalUart1Type, this.originalUart1Module, 1);\n  }\n  _uart1Container!: ViewContainerRef;\n\n  @ViewChild('uart2Container', { read: ViewContainerRef })\n  get uart2Container(): ViewContainerRef {\n    return this._uart2Container;\n  }\n  set uart2Container(value: ViewContainerRef) {\n    this._uart2Container = value;\n    //this.setUartModuleForSlot(this.originalUart2Type, this.originalUart2Module, 2);\n  }\n  _uart2Container!: ViewContainerRef;\n\n  originalUart1Type!: UartType;\n  originalUart1Module!: any;\n\n  originalUart2Type!: UartType;\n  originalUart2Module!: any;\n\n  components: any[];\n  uart1Type: string;\n  uart2Type: string;\n\n  constructor() {\n    this.components = new Array<any>();\n    this.uart1Type = '0';\n    this.uart2Type = '0';\n  }\n\n  setModule() {\n    /*this.originalUart1Type = this.module.uartModule.channels[0].type;\n    this.originalUart1Module = this.copyUartModule(this.module.uartModule.channels[0]);\n\n    this.uart1Type = this.originalUart1Type.toString();\n\n    this.originalUart2Type = this.module.uartModule.channels[1].type;\n    this.originalUart2Module = this.copyUartModule(this.module.uartModule.channels[1]);\n\n    this.uart2Type = this.originalUart2Type.toString();\n    */\n  }\n\n  servoNameChange(id: number, $event: any) {\n    this.module.servoModule.channels[id].channelName = $event;\n  }\n\n  servoStatusChange(id: number, $event: any) {\n    this.module.servoModule.channels[id].enabled = $event;\n  }\n\n  uartTypeChange($event: any, channel: number) {\n    return;\n\n    const ut = +$event;\n\n    if (channel === 1 && ut === this.originalUart1Type) {\n      this.setUartModuleForSlot(\n        this.originalUart1Type,\n        this.originalUart1Module,\n        1,\n      );\n    } else if (channel === 2 && ut === this.originalUart2Type) {\n      this.setUartModuleForSlot(\n        this.originalUart2Type,\n        this.originalUart2Module,\n        2,\n      );\n    } else {\n      let module: any;\n      switch (ut) {\n        /*case UartType.kangaroo:\n          module = new KangarooX2();\n          break;\n        */\n        default:\n          module = new Object();\n          break;\n      }\n\n      this.setUartModuleForSlot(ut, module, channel);\n    }\n  }\n\n  setUartModuleForSlot(uartType: UartType, module: any, channel: number) {\n    switch (channel) {\n      case 1:\n        this.setUartModule(\n          uartType,\n          module,\n          this.uart1Container,\n          this.module.uartModule.channels[0],\n        );\n        break;\n      case 2:\n        this.setUartModule(\n          uartType,\n          module,\n          this.uart2Container,\n          this.module.uartModule.channels[1],\n        );\n        break;\n    }\n  }\n\n  setUartModule(\n    uartType: UartType,\n    module: any,\n    container: ViewContainerRef,\n    uartModule: UartModule,\n  ) {\n    let component: any;\n\n    container.clear();\n    this.components.splice(0, this.components.length);\n\n    switch (uartType) {\n      case UartType.kangaroo:\n        component = container.createComponent(KangarooModuleComponent);\n        break;\n    }\n\n    uartModule.uartType = uartType;\n    uartModule.subModule = module;\n\n    if (component) {\n      component.instance.module = module;\n\n      this.components.push(component);\n    }\n  }\n\n  moduleCallback(_: unknown) {\n    throw new Error('Method not implemented.');\n  }\n\n  addUartModule(evt: any) {\n    evt.stopPropagation();\n\n    if (!this.uartPanelOpenState) {\n      this.uartPanelOpenState = true;\n    }\n\n    this.module.uartModules.push(\n      new UartModule(\n        crypto.randomUUID(),\n        this.module.locationId,\n        UartType.genericSerial,\n        1,\n        9600,\n        'New Serial Module',\n      ),\n    );\n  }\n\n  copyUartModule(module: any): any {\n    let temp: any;\n\n    switch (module.type) {\n      /*case UartType.kangaroo:\n        temp = new KangarooController();\n        temp.channelOneName = module.module.channelOneName;\n        temp.channelTwoName = module.module.channelTwoName;\n        break/*/\n      default:\n        temp = new Object();\n        break;\n    }\n\n    return temp;\n  }\n\n  testServoModal(channelId: number) {\n    this.openServoTestModal.emit({\n      controllerId: this.module.controller.id,\n      channelId,\n    });\n  }\n}\n",
             "assetsDirs": [],
             "styleUrlsData": [
                 {
@@ -7756,7 +7756,7 @@
                 "deprecated": false,
                 "deprecationMessage": "",
                 "args": [],
-                "line": 91
+                "line": 93
             },
             "extends": [],
             "accessors": {
@@ -7776,7 +7776,7 @@
                             }
                         ],
                         "returnType": "void",
-                        "line": 56,
+                        "line": 58,
                         "jsdoctags": [
                             {
                                 "name": "value",
@@ -7793,7 +7793,7 @@
                         "name": "module",
                         "type": "any",
                         "returnType": "any",
-                        "line": 53
+                        "line": 55
                     }
                 },
                 "uart1Container": {
@@ -7812,7 +7812,7 @@
                             }
                         ],
                         "returnType": "void",
-                        "line": 67,
+                        "line": 69,
                         "jsdoctags": [
                             {
                                 "name": "value",
@@ -7829,7 +7829,7 @@
                         "name": "uart1Container",
                         "type": "",
                         "returnType": "ViewContainerRef",
-                        "line": 64
+                        "line": 66
                     }
                 },
                 "uart2Container": {
@@ -7848,7 +7848,7 @@
                             }
                         ],
                         "returnType": "void",
-                        "line": 77,
+                        "line": 79,
                         "jsdoctags": [
                             {
                                 "name": "value",
@@ -7865,111 +7865,11 @@
                         "name": "uart2Container",
                         "type": "",
                         "returnType": "ViewContainerRef",
-                        "line": 74
+                        "line": 76
                     }
                 }
             },
-            "templateData": "<mat-accordion>\r\n    <mat-expansion-panel>\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>Serial Port 1 configuration</mat-panel-title>\r\n        </mat-expansion-panel-header>\r\n        <div *ngIf=\"isMaster\" class=\"uart-module\">\r\n            <div class=\"type\">\r\n                <select title=\"Serial Type\" disabled>\r\n                    <option value=\"0\" selected>Reserved</option>\r\n                </select>\r\n            </div>\r\n            <div class=\"input\"><input matInput placeholder=\"AstrOs Interface\" disabled /></div>\r\n        </div>\r\n\r\n        <div *ngIf=\"!isMaster\" class=\"uart-module\">\r\n            <div class=\"type\">\r\n                <select title=\"Serial Type\" (ngModelChange)=\"uartTypeChange($event, 1)\" [(ngModel)]=uart1Type>\r\n                    <option value=\"0\" selected>Disabled</option>\r\n                    <option value=\"1\">Generic Serial</option>\r\n                    <option value=\"2\">Kangaroo X2</option>\r\n                    <option value=\"3\">Human Cyborg Relations</option>\r\n                </select>\r\n            </div>\r\n            <div class=\"input\"><input matInput placeholder=\"Name\" /></div>\r\n        </div>\r\n        <ng-template #uart1Container></ng-template>\r\n    </mat-expansion-panel>\r\n    <mat-expansion-panel [expanded]=\"uartPanelOpenState\" (closed)=\"uartPanelOpenState = false\">\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>Serial Modules</mat-panel-title>\r\n            <mat-panel-description>\r\n                <div class=\"header-box\">\r\n                    <div class=\"header-spacer\"></div>\r\n                    <div class=\"header-button\">\r\n                        <button (click)=\"addUartModule($event)\">Add Serial Module</button>\r\n                    </div>\r\n                </div>\r\n            </mat-panel-description>\r\n        </mat-expansion-panel-header>\r\n        <ul class=\"uart-list\">\r\n            <li *ngFor=\"let module of module.uartModules\">\r\n                <app-esp-submodule ></app-esp-submodule>\r\n            </li>\r\n        </ul>\r\n    </mat-expansion-panel>\r\n    <mat-expansion-panel>\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>GPIO configuration</mat-panel-title>\r\n        </mat-expansion-panel-header>\r\n        <ul class=\"servo-list\">\r\n            <li *ngFor=\"let channel of module.gpioModule.channels\">\r\n                <div class=\"gpio-channel\">\r\n                    <div class=\"label\">Channel {{channel.id}}</div>\r\n                    <div class=\"input\"><input matInput placeholder=\"Name\" [(ngModel)]=\"channel.channelName\" /></div>\r\n                    <div class=\"enabled\">\r\n                        <mat-checkbox [(ngModel)]=\"channel.enabled\">Enabled</mat-checkbox>\r\n                    </div>\r\n                    <div class=\"enabled\">\r\n                        <mat-checkbox [(ngModel)]=\"channel.defaultLow\">Default Low?</mat-checkbox>\r\n                    </div>\r\n                </div>\r\n            </li>\r\n        </ul>\r\n    </mat-expansion-panel>\r\n    <mat-expansion-panel>\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>Servo configuration</mat-panel-title>\r\n        </mat-expansion-panel-header>\r\n        <!-->\r\n        <ul class=\"servo-list\">\r\n            <li *ngFor=\"let channel of module.servoModule.channels\">\r\n                <div class=\"servo-channel\">\r\n                    <div class=\"servo-channel-row\">\r\n                        <div class=\"label\">Channel {{channel.id}}</div>\r\n                        <div class=\"input\"><input matInput placeholder=\"Name\" [(ngModel)]=\"channel.channelName\" /></div>\r\n                        <div class=\"type\">\r\n                            <mat-checkbox [(ngModel)]=\"channel.enabled\">Enabled</mat-checkbox>\r\n                        </div>\r\n                        <div class=\"type\">\r\n                            <mat-checkbox [(ngModel)]=\"channel.inverted\">Inverted</mat-checkbox>\r\n                        </div>\r\n                    </div>\r\n                    <div class=\"servo-channel-row\">\r\n                        <div class=\"label-ms\">Min μS</div>\r\n                        <div class=\"limit\">\r\n                            <input matInput placeholder=\"0\" [(ngModel)]=\"channel.minPos\" />\r\n                        </div>\r\n                        <div class=\"label-ms\">Max μS</div>\r\n                        <div class=\"limit\">\r\n                            <input matInput placeholder=\"0\" [(ngModel)]=\"channel.maxPos\" />\r\n                        </div>\r\n                        <div class=\"label-ms\">Home μS</div>\r\n                        <div class=\"limit\">\r\n                            <input matInput placeholder=\"0\" [(ngModel)]=\"channel.homePos\" />\r\n                        </div>\r\n                        <div class=\"test-button\">\r\n                            <button (click)=\"testServoModal(channel.id)\">Test</button>\r\n                        </div>\r\n                    </div>\r\n                </div>\r\n            </li>\r\n        </ul>\r\n    -->\r\n    </mat-expansion-panel>\r\n    <mat-expansion-panel>\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>I2C configuration</mat-panel-title>\r\n        </mat-expansion-panel-header>\r\n        <ul class=\"i2c-list\">\r\n            <li *ngFor=\"let channel of module.i2cModule.channels\">\r\n                <div class=\"i2c-channel\">\r\n                    <div class=\"label\">Channel {{channel.id}}</div>\r\n                    <div class=\"input\"><input matInput placeholder=\"Name\" [(ngModel)]=\"channel.channelName\"\r\n                            [disabled]=\"channel.channelName.toLowerCase() === 'reserved'\" /></div>\r\n                    <div class=\"enabled\">\r\n                        <mat-checkbox [(ngModel)]=\"channel.enabled\"\r\n                            [disabled]=\"channel.channelName.toLowerCase() === 'reserved'\">Enabled</mat-checkbox>\r\n                    </div>\r\n                </div>\r\n            </li>\r\n        </ul>\r\n    </mat-expansion-panel>\r\n</mat-accordion>"
-        },
-        {
-            "name": "EspSubmoduleComponent",
-            "id": "component-EspSubmoduleComponent-7d3e4bd050a984e7ec130073163d89ccb9a3778065b15de3ded52156aaf06995b2b9938ab8c0a2d540e4992079e661ded20158f0208143cf36f20ac4ecf4edd7",
-            "file": "src/app/components/esp-submodule/esp-submodule.component.ts",
-            "encapsulation": [],
-            "entryComponents": [],
-            "inputs": [],
-            "outputs": [],
-            "providers": [],
-            "selector": "app-esp-submodule",
-            "styleUrls": [],
-            "styles": [],
-            "templateUrl": [
-                "./esp-submodule.component.html"
-            ],
-            "viewProviders": [],
-            "hostDirectives": [],
-            "inputsClass": [],
-            "outputsClass": [],
-            "propertiesClass": [
-                {
-                    "name": "_configContainer",
-                    "deprecated": false,
-                    "deprecationMessage": "",
-                    "type": "ViewContainerRef",
-                    "indexKey": "",
-                    "optional": false,
-                    "description": "",
-                    "line": 29
-                }
-            ],
-            "methodsClass": [],
-            "deprecated": false,
-            "deprecationMessage": "",
-            "hostBindings": [],
-            "hostListeners": [],
-            "standalone": true,
-            "imports": [
-                {
-                    "name": "MatAccordion"
-                },
-                {
-                    "name": "MatExpansionPanel"
-                },
-                {
-                    "name": "MatExpansionPanelHeader"
-                },
-                {
-                    "name": "MatExpansionPanelTitle"
-                }
-            ],
-            "description": "",
-            "rawdescription": "\n",
-            "type": "component",
-            "sourceCode": "import { Component, ViewChild, ViewContainerRef } from '@angular/core';\nimport {\n  MatAccordion,\n  MatExpansionPanel,\n  MatExpansionPanelHeader,\n  MatExpansionPanelTitle,\n} from '@angular/material/expansion';\n\n@Component({\n  selector: 'app-esp-submodule',\n  templateUrl: './esp-submodule.component.html',\n  styleUrl: './esp-submodule.component.scss',\n  imports: [\n    MatAccordion,\n    MatExpansionPanel,\n    MatExpansionPanelHeader,\n    MatExpansionPanelTitle,\n  ],\n  standalone: true,\n})\nexport class EspSubmoduleComponent {\n  @ViewChild('configContainer', { read: ViewContainerRef })\n  get configContainer(): ViewContainerRef {\n    return this._configContainer;\n  }\n  set configContainer(value: ViewContainerRef) {\n    this._configContainer = value;\n  }\n  _configContainer!: ViewContainerRef;\n}\n",
-            "styleUrl": "./esp-submodule.component.scss",
-            "assetsDirs": [],
-            "styleUrlsData": "",
-            "stylesData": "",
-            "extends": [],
-            "accessors": {
-                "configContainer": {
-                    "name": "configContainer",
-                    "setSignature": {
-                        "name": "configContainer",
-                        "type": "void",
-                        "deprecated": false,
-                        "deprecationMessage": "",
-                        "args": [
-                            {
-                                "name": "value",
-                                "type": "ViewContainerRef",
-                                "deprecated": false,
-                                "deprecationMessage": ""
-                            }
-                        ],
-                        "returnType": "void",
-                        "line": 26,
-                        "jsdoctags": [
-                            {
-                                "name": "value",
-                                "type": "ViewContainerRef",
-                                "deprecated": false,
-                                "deprecationMessage": "",
-                                "tagName": {
-                                    "text": "param"
-                                }
-                            }
-                        ]
-                    },
-                    "getSignature": {
-                        "name": "configContainer",
-                        "type": "",
-                        "returnType": "ViewContainerRef",
-                        "line": 23
-                    }
-                }
-            },
-            "templateData": "<mat-accordion>\r\n    <mat-expansion-panel>\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>Test</mat-panel-title>\r\n        </mat-expansion-panel-header>\r\n        <div>Test</div>\r\n        <ng-template #configContainer></ng-template>\r\n    </mat-expansion-panel>\r\n</mat-accordion>"
+            "templateData": "<mat-accordion>\r\n    <mat-expansion-panel>\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>Serial Port 1 configuration</mat-panel-title>\r\n        </mat-expansion-panel-header>\r\n        <div *ngIf=\"isMaster\" class=\"uart-module\">\r\n            <div class=\"type\">\r\n                <select title=\"Serial Type\" disabled>\r\n                    <option value=\"0\" selected>Reserved</option>\r\n                </select>\r\n            </div>\r\n            <div class=\"input\"><input matInput placeholder=\"AstrOs Interface\" disabled /></div>\r\n        </div>\r\n\r\n        <div *ngIf=\"!isMaster\" class=\"uart-module\">\r\n            <div class=\"type\">\r\n                <select title=\"Serial Type\" (ngModelChange)=\"uartTypeChange($event, 1)\" [(ngModel)]=uart1Type>\r\n                    <option value=\"0\" selected>Disabled</option>\r\n                    <option value=\"1\">Generic Serial</option>\r\n                    <option value=\"2\">Kangaroo X2</option>\r\n                    <option value=\"3\">Human Cyborg Relations</option>\r\n                </select>\r\n            </div>\r\n            <div class=\"input\"><input matInput placeholder=\"Name\" /></div>\r\n        </div>\r\n        <ng-template #uart1Container></ng-template>\r\n    </mat-expansion-panel>\r\n    <mat-expansion-panel [expanded]=\"uartPanelOpenState\" (closed)=\"uartPanelOpenState = false\">\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>Serial Modules</mat-panel-title>\r\n            <mat-panel-description>\r\n                <div class=\"header-box\">\r\n                    <div class=\"header-spacer\"></div>\r\n                    <div class=\"header-button\">\r\n                        <button (click)=\"addUartModule($event)\">Add Serial Module</button>\r\n                    </div>\r\n                </div>\r\n            </mat-panel-description>\r\n        </mat-expansion-panel-header>\r\n        <ul class=\"uart-list\">\r\n            <li *ngFor=\"let module of module.uartModules\">\r\n                <app-uart-module ></app-uart-module>\r\n            </li>\r\n        </ul>\r\n    </mat-expansion-panel>\r\n    <mat-expansion-panel>\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>GPIO configuration</mat-panel-title>\r\n        </mat-expansion-panel-header>\r\n        <ul class=\"servo-list\">\r\n            <li *ngFor=\"let channel of module.gpioModule.channels\">\r\n                <div class=\"gpio-channel\">\r\n                    <div class=\"label\">Channel {{channel.id}}</div>\r\n                    <div class=\"input\"><input matInput placeholder=\"Name\" [(ngModel)]=\"channel.channelName\" /></div>\r\n                    <div class=\"enabled\">\r\n                        <mat-checkbox [(ngModel)]=\"channel.enabled\">Enabled</mat-checkbox>\r\n                    </div>\r\n                    <div class=\"enabled\">\r\n                        <mat-checkbox [(ngModel)]=\"channel.defaultLow\">Default Low?</mat-checkbox>\r\n                    </div>\r\n                </div>\r\n            </li>\r\n        </ul>\r\n    </mat-expansion-panel>\r\n    <mat-expansion-panel>\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>Servo configuration</mat-panel-title>\r\n        </mat-expansion-panel-header>\r\n        <!-->\r\n        <ul class=\"servo-list\">\r\n            <li *ngFor=\"let channel of module.servoModule.channels\">\r\n                <div class=\"servo-channel\">\r\n                    <div class=\"servo-channel-row\">\r\n                        <div class=\"label\">Channel {{channel.id}}</div>\r\n                        <div class=\"input\"><input matInput placeholder=\"Name\" [(ngModel)]=\"channel.channelName\" /></div>\r\n                        <div class=\"type\">\r\n                            <mat-checkbox [(ngModel)]=\"channel.enabled\">Enabled</mat-checkbox>\r\n                        </div>\r\n                        <div class=\"type\">\r\n                            <mat-checkbox [(ngModel)]=\"channel.inverted\">Inverted</mat-checkbox>\r\n                        </div>\r\n                    </div>\r\n                    <div class=\"servo-channel-row\">\r\n                        <div class=\"label-ms\">Min μS</div>\r\n                        <div class=\"limit\">\r\n                            <input matInput placeholder=\"0\" [(ngModel)]=\"channel.minPos\" />\r\n                        </div>\r\n                        <div class=\"label-ms\">Max μS</div>\r\n                        <div class=\"limit\">\r\n                            <input matInput placeholder=\"0\" [(ngModel)]=\"channel.maxPos\" />\r\n                        </div>\r\n                        <div class=\"label-ms\">Home μS</div>\r\n                        <div class=\"limit\">\r\n                            <input matInput placeholder=\"0\" [(ngModel)]=\"channel.homePos\" />\r\n                        </div>\r\n                        <div class=\"test-button\">\r\n                            <button (click)=\"testServoModal(channel.id)\">Test</button>\r\n                        </div>\r\n                    </div>\r\n                </div>\r\n            </li>\r\n        </ul>\r\n    -->\r\n    </mat-expansion-panel>\r\n    <mat-expansion-panel>\r\n        <mat-expansion-panel-header>\r\n            <mat-panel-title>I2C configuration</mat-panel-title>\r\n        </mat-expansion-panel-header>\r\n        <ul class=\"i2c-list\">\r\n            <li *ngFor=\"let channel of module.i2cModule.channels\">\r\n                <div class=\"i2c-channel\">\r\n                    <div class=\"label\">Channel {{channel.id}}</div>\r\n                    <div class=\"input\"><input matInput placeholder=\"Name\" [(ngModel)]=\"channel.channelName\"\r\n                            [disabled]=\"channel.channelName.toLowerCase() === 'reserved'\" /></div>\r\n                    <div class=\"enabled\">\r\n                        <mat-checkbox [(ngModel)]=\"channel.enabled\"\r\n                            [disabled]=\"channel.channelName.toLowerCase() === 'reserved'\">Enabled</mat-checkbox>\r\n                    </div>\r\n                </div>\r\n            </li>\r\n        </ul>\r\n    </mat-expansion-panel>\r\n</mat-accordion>"
         },
         {
             "name": "FormatModalComponent",
@@ -8106,7 +8006,7 @@
         {
             "name": "GenericSerialModuleComponent",
             "id": "component-GenericSerialModuleComponent-01e66b7ae5ba0fd32aecdde30df6e72e298dd4129d737574808cfa844adaa4166a58b625a067951c4e457fa72c18e2079d1b406a52811c15a8a7d34f90fb1209",
-            "file": "src/app/pages/modules/uart-modules/generic-serial-module/generic-serial-module.component.ts",
+            "file": "src/app/components/esp-module/uart/uart-submodules/generic-serial-module/generic-serial-module.component.ts",
             "encapsulation": [],
             "entryComponents": [],
             "inputs": [],
@@ -9911,7 +9811,7 @@
         {
             "name": "KangarooModuleComponent",
             "id": "component-KangarooModuleComponent-d77a617e6198ee775747aceac78d3f065a7303fb2e85a54d602d6b6e43c9f588b6881b9fc1f3dec745f92a8e27e47bc5d419f18dd0d3e1562d5b43391f48775d",
-            "file": "src/app/pages/modules/uart-modules/kangaroo-module/kangaroo-module.component.ts",
+            "file": "src/app/components/esp-module/uart/uart-submodules/kangaroo-module/kangaroo-module.component.ts",
             "encapsulation": [],
             "entryComponents": [],
             "inputs": [],
@@ -10926,7 +10826,7 @@
         },
         {
             "name": "ModulesComponent",
-            "id": "component-ModulesComponent-cc70676a92a742b6899c7dd2ce1bc5b7a1a0be130530a1783417dae6c0418c24dd201161149d4a959c5e2f5ff7ad6095807669ab7445e547abba40f11c4b2315",
+            "id": "component-ModulesComponent-e5cabdd09f9fb8a5bffa54de0bb6921956858d9c958bd16299df089ab2f8134829601a2cd1aeec79be93b620db1cfdd54b0b4b8fb2e1ed06c401bdb60cb9824d",
             "file": "src/app/pages/modules/modules.component.ts",
             "encapsulation": [],
             "entryComponents": [],
@@ -11532,7 +11432,7 @@
             "description": "",
             "rawdescription": "\n",
             "type": "component",
-            "sourceCode": "import {\n  AfterViewInit,\n  Component,\n  ElementRef,\n  Renderer2,\n  ViewChild,\n  ViewContainerRef,\n} from '@angular/core';\nimport {\n  MatExpansionPanel,\n  MatAccordion,\n  MatExpansionPanelHeader,\n  MatExpansionPanelTitle,\n} from '@angular/material/expansion';\nimport {\n  ControlModule,\n  ControllerStatus,\n  AstrOsLocationCollection,\n  ControllerLocation,\n} from 'astros-common';\nimport { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';\nimport {\n  LoadingModalComponent,\n  LoadingModalResources,\n  LoadingModalResponse,\n  ServoTestModalComponent,\n  ServoTestModalResources,\n  ServoTestMessage,\n  AlertModalComponent,\n  AlertModalResources,\n  ModalComponent,\n  ModalCallbackEvent,\n} from '@src/components/modals';\nimport { FontAwesomeModule } from '@fortawesome/angular-fontawesome';\nimport { NgIf, NgFor } from '@angular/common';\nimport { FormsModule } from '@angular/forms';\nimport { EspModuleComponent } from './esp-module/esp-module.component';\nimport {\n  ControllerService,\n  ModalService,\n  SnackbarService,\n  StatusService,\n  WebsocketService,\n} from '@src/services';\n\ninterface Caption {\n  str: string;\n}\n\n@Component({\n  selector: 'app-modules',\n  templateUrl: './modules.component.html',\n  styleUrls: ['./modules.component.scss'],\n  viewProviders: [MatExpansionPanel],\n  standalone: true,\n  imports: [\n    MatAccordion,\n    MatExpansionPanel,\n    MatExpansionPanelHeader,\n    MatExpansionPanelTitle,\n    FontAwesomeModule,\n    NgIf,\n    FormsModule,\n    EspModuleComponent,\n    NgFor,\n    ModalComponent,\n  ],\n})\nexport class ModulesComponent implements AfterViewInit {\n  @ViewChild('modalContainer', { read: ViewContainerRef })\n  container!: ViewContainerRef;\n\n  isLoaded = false;\n\n  backgroundClickDisabled = '1';\n  isMaster = true;\n\n  possibleControllers: ControlModule[] = [];\n  availableDomeControllers: ControlModule[] = [];\n  availableCoreControllers: ControlModule[] = [];\n\n  coreWarning = faExclamationTriangle;\n  domeWarning = faExclamationTriangle;\n  bodyWarning = faExclamationTriangle;\n\n  @ViewChild('core', { static: false }) coreEl!: ElementRef;\n  @ViewChild('dome', { static: false }) domeEl!: ElementRef;\n  @ViewChild('body', { static: false }) bodyEl!: ElementRef;\n\n  coreLocation!: ControllerLocation;\n  domeLocation!: ControllerLocation;\n  bodyLocation!: ControllerLocation;\n\n  coreCaption: Caption = { str: 'Module Down' };\n  domeCaption: Caption = { str: 'Module Down' };\n  bodyCaption: Caption = { str: 'Module Down' };\n\n  private notSynced = 'Not Synced';\n  private moduleDown = 'Module Down';\n\n  constructor(\n    private controllerService: ControllerService,\n    private websocketService: WebsocketService,\n    private snackBar: SnackbarService,\n    private modalService: ModalService,\n    private renderer: Renderer2,\n    private status: StatusService,\n  ) {}\n\n  ngAfterViewInit(): void {\n    this.openControllerSyncModal();\n  }\n\n  openControllerSyncModal() {\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(LoadingModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {\n      this.syncModalCallback(result);\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  syncModalCallback(evt: ModalCallbackEvent) {\n    if (evt.type !== LoadingModalResources.closeEvent) {\n      return;\n    }\n\n    const response = evt.value as LoadingModalResponse;\n\n    this.parseModules(response.locations);\n\n    // always filter out the master controller since it's always the body module\n    this.possibleControllers = response.controllers.filter(\n      (controller: ControlModule) => controller.id !== 1,\n    );\n\n    this.availableCoreControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.domeLocation.controller?.id,\n    );\n    this.availableDomeControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.coreLocation.controller?.id,\n    );\n\n    this.handleStatus(\n      this.status.getCoreStatus(),\n      this.coreEl,\n      this.coreCaption,\n    );\n    this.handleStatus(\n      this.status.getDomeStatus(),\n      this.domeEl,\n      this.domeCaption,\n    );\n    this.handleStatus(\n      this.status.getBodyStatus(),\n      this.bodyEl,\n      this.bodyCaption,\n    );\n\n    this.status.coreStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.coreEl, this.coreCaption),\n    );\n    this.status.domeStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.domeEl, this.domeCaption),\n    );\n    this.status.bodyStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.bodyEl, this.bodyCaption),\n    );\n\n    this.isLoaded = true;\n\n    this.modalService.close('modules-modal');\n  }\n\n  openAlertModal(message: string) {\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(AlertModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.resources.set(AlertModalResources.message, message);\n\n    component.instance.modalCallback.subscribe((_: unknown) => {\n      this.modalService.close('modules-modal');\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  openServoTestModal(value: { controllerId: number; channelId: number }) {\n    if (value.controllerId === 0) {\n      this.openAlertModal('Location for this servo is not set.');\n      return;\n    }\n\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(ServoTestModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.resources.set(\n      ServoTestModalResources.controllerId,\n      value.controllerId,\n    );\n    component.instance.resources.set(\n      ServoTestModalResources.servoId,\n      value.channelId,\n    );\n\n    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {\n      this.servoTestModalCallback(result);\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  servoTestModalCallback(evt: ModalCallbackEvent) {\n    switch (evt.type) {\n      case ServoTestModalResources.sendServoMove: {\n        const servoTest = evt.value as ServoTestMessage;\n        this.websocketService.sendMessage({\n          msgType: 'SERVO_TEST',\n          data: {\n            controllerId: servoTest.controllerId,\n            servoId: servoTest.servoId,\n            value: servoTest.value,\n          },\n        });\n        break;\n      }\n      case ServoTestModalResources.closeEvent:\n        this.modalService.close('modules-modal');\n        break;\n    }\n  }\n\n  controllerSelectChanged(_: unknown) {\n    this.availableCoreControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.domeLocation.controller?.id,\n    );\n    this.availableDomeControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.coreLocation.controller?.id,\n    );\n  }\n\n  saveModuleSettings() {\n    const observer = {\n      next: (result: unknown) => {\n        if (result && typeof result === 'object' && 'message' in result) {\n          if (result.message === 'success') {\n            console.log('module settings saved!');\n            this.snackBar.okToast('Module settings saved!');\n          } else {\n            console.log('module settings save failed!');\n            this.snackBar.okToast('Module settings save failed!');\n          }\n        }\n      },\n      error: (err: unknown) => {\n        console.error(err);\n        this.snackBar.okToast('Module settings save failed!');\n      },\n    };\n\n    this.controllerService\n      .saveLocations(\n        new AstrOsLocationCollection(\n          this.coreLocation,\n          this.domeLocation,\n          this.bodyLocation,\n        ),\n      )\n      .subscribe(observer);\n\n    this.status.resetStatus();\n  }\n\n  syncModuleSettings() {\n    const observer = {\n      next: (result: unknown) => {\n        if (result && typeof result === 'object' && 'message' in result) {\n          if (result.message === 'success') {\n            console.log('module sync queued!');\n            this.snackBar.okToast('Module sync queued!');\n          } else {\n            console.log('module sync failed to queue');\n            this.snackBar.okToast(`Module sync failed to queue.`);\n          }\n        }\n      },\n      error: (err: unknown) => {\n        console.error(err);\n        this.snackBar.okToast('Module sync failed!');\n      },\n    };\n\n    this.controllerService.syncLocationConfig().subscribe(observer);\n  }\n\n  private parseModules(locations: AstrOsLocationCollection) {\n    console.log(locations);\n    try {\n      this.coreLocation = locations.coreModule ?? this.coreLocation;\n      this.domeLocation = locations.domeModule ?? this.domeLocation;\n      this.bodyLocation = locations.bodyModule ?? this.bodyLocation;\n    } catch (err) {\n      console.error(err);\n    }\n  }\n\n  handleStatus(status: ControllerStatus, el: ElementRef, caption: Caption) {\n    switch (status) {\n      case ControllerStatus.up:\n        caption.str = '';\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'hidden');\n        break;\n      case ControllerStatus.needsSynced:\n        caption.str = this.notSynced;\n        this.renderer.setStyle(el.nativeElement, 'color', 'yellow');\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');\n        break;\n      case ControllerStatus.down:\n        caption.str = this.moduleDown;\n        this.renderer.setStyle(el.nativeElement, 'color', 'red');\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');\n        break;\n    }\n  }\n}\n",
+            "sourceCode": "import {\n  AfterViewInit,\n  Component,\n  ElementRef,\n  Renderer2,\n  ViewChild,\n  ViewContainerRef,\n} from '@angular/core';\nimport {\n  MatExpansionPanel,\n  MatAccordion,\n  MatExpansionPanelHeader,\n  MatExpansionPanelTitle,\n} from '@angular/material/expansion';\nimport {\n  ControlModule,\n  ControllerStatus,\n  AstrOsLocationCollection,\n  ControllerLocation,\n} from 'astros-common';\nimport { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';\nimport {\n  LoadingModalComponent,\n  LoadingModalResources,\n  LoadingModalResponse,\n  ServoTestModalComponent,\n  ServoTestModalResources,\n  ServoTestMessage,\n  AlertModalComponent,\n  AlertModalResources,\n  ModalComponent,\n  ModalCallbackEvent,\n} from '@src/components/modals';\nimport { FontAwesomeModule } from '@fortawesome/angular-fontawesome';\nimport { NgIf, NgFor } from '@angular/common';\nimport { FormsModule } from '@angular/forms';\nimport { EspModuleComponent } from '@src/components/esp-module';\nimport {\n  ControllerService,\n  ModalService,\n  SnackbarService,\n  StatusService,\n  WebsocketService,\n} from '@src/services';\n\ninterface Caption {\n  str: string;\n}\n\n@Component({\n  selector: 'app-modules',\n  templateUrl: './modules.component.html',\n  styleUrls: ['./modules.component.scss'],\n  viewProviders: [MatExpansionPanel],\n  standalone: true,\n  imports: [\n    MatAccordion,\n    MatExpansionPanel,\n    MatExpansionPanelHeader,\n    MatExpansionPanelTitle,\n    FontAwesomeModule,\n    NgIf,\n    FormsModule,\n    EspModuleComponent,\n    NgFor,\n    ModalComponent,\n  ],\n})\nexport class ModulesComponent implements AfterViewInit {\n  @ViewChild('modalContainer', { read: ViewContainerRef })\n  container!: ViewContainerRef;\n\n  isLoaded = false;\n\n  backgroundClickDisabled = '1';\n  isMaster = true;\n\n  possibleControllers: ControlModule[] = [];\n  availableDomeControllers: ControlModule[] = [];\n  availableCoreControllers: ControlModule[] = [];\n\n  coreWarning = faExclamationTriangle;\n  domeWarning = faExclamationTriangle;\n  bodyWarning = faExclamationTriangle;\n\n  @ViewChild('core', { static: false }) coreEl!: ElementRef;\n  @ViewChild('dome', { static: false }) domeEl!: ElementRef;\n  @ViewChild('body', { static: false }) bodyEl!: ElementRef;\n\n  coreLocation!: ControllerLocation;\n  domeLocation!: ControllerLocation;\n  bodyLocation!: ControllerLocation;\n\n  coreCaption: Caption = { str: 'Module Down' };\n  domeCaption: Caption = { str: 'Module Down' };\n  bodyCaption: Caption = { str: 'Module Down' };\n\n  private notSynced = 'Not Synced';\n  private moduleDown = 'Module Down';\n\n  constructor(\n    private controllerService: ControllerService,\n    private websocketService: WebsocketService,\n    private snackBar: SnackbarService,\n    private modalService: ModalService,\n    private renderer: Renderer2,\n    private status: StatusService,\n  ) {}\n\n  ngAfterViewInit(): void {\n    this.openControllerSyncModal();\n  }\n\n  openControllerSyncModal() {\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(LoadingModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {\n      this.syncModalCallback(result);\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  syncModalCallback(evt: ModalCallbackEvent) {\n    if (evt.type !== LoadingModalResources.closeEvent) {\n      return;\n    }\n\n    const response = evt.value as LoadingModalResponse;\n\n    this.parseModules(response.locations);\n\n    // always filter out the master controller since it's always the body module\n    this.possibleControllers = response.controllers.filter(\n      (controller: ControlModule) => controller.id !== 1,\n    );\n\n    this.availableCoreControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.domeLocation.controller?.id,\n    );\n    this.availableDomeControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.coreLocation.controller?.id,\n    );\n\n    this.handleStatus(\n      this.status.getCoreStatus(),\n      this.coreEl,\n      this.coreCaption,\n    );\n    this.handleStatus(\n      this.status.getDomeStatus(),\n      this.domeEl,\n      this.domeCaption,\n    );\n    this.handleStatus(\n      this.status.getBodyStatus(),\n      this.bodyEl,\n      this.bodyCaption,\n    );\n\n    this.status.coreStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.coreEl, this.coreCaption),\n    );\n    this.status.domeStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.domeEl, this.domeCaption),\n    );\n    this.status.bodyStateObserver.subscribe((value) =>\n      this.handleStatus(value, this.bodyEl, this.bodyCaption),\n    );\n\n    this.isLoaded = true;\n\n    this.modalService.close('modules-modal');\n  }\n\n  openAlertModal(message: string) {\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(AlertModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.resources.set(AlertModalResources.message, message);\n\n    component.instance.modalCallback.subscribe((_: unknown) => {\n      this.modalService.close('modules-modal');\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  openServoTestModal(value: { controllerId: number; channelId: number }) {\n    if (value.controllerId === 0) {\n      this.openAlertModal('Location for this servo is not set.');\n      return;\n    }\n\n    this.container.clear();\n\n    const modalResources = new Map<string, unknown>();\n\n    const component = this.container.createComponent(ServoTestModalComponent);\n\n    component.instance.resources = modalResources;\n    component.instance.resources.set(\n      ServoTestModalResources.controllerId,\n      value.controllerId,\n    );\n    component.instance.resources.set(\n      ServoTestModalResources.servoId,\n      value.channelId,\n    );\n\n    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {\n      this.servoTestModalCallback(result);\n    });\n\n    this.modalService.open('modules-modal');\n  }\n\n  servoTestModalCallback(evt: ModalCallbackEvent) {\n    switch (evt.type) {\n      case ServoTestModalResources.sendServoMove: {\n        const servoTest = evt.value as ServoTestMessage;\n        this.websocketService.sendMessage({\n          msgType: 'SERVO_TEST',\n          data: {\n            controllerId: servoTest.controllerId,\n            servoId: servoTest.servoId,\n            value: servoTest.value,\n          },\n        });\n        break;\n      }\n      case ServoTestModalResources.closeEvent:\n        this.modalService.close('modules-modal');\n        break;\n    }\n  }\n\n  controllerSelectChanged(_: unknown) {\n    this.availableCoreControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.domeLocation.controller?.id,\n    );\n    this.availableDomeControllers = this.possibleControllers.filter(\n      (controller: ControlModule) =>\n        controller.id !== this.coreLocation.controller?.id,\n    );\n  }\n\n  saveModuleSettings() {\n    const observer = {\n      next: (result: unknown) => {\n        if (result && typeof result === 'object' && 'message' in result) {\n          if (result.message === 'success') {\n            console.log('module settings saved!');\n            this.snackBar.okToast('Module settings saved!');\n          } else {\n            console.log('module settings save failed!');\n            this.snackBar.okToast('Module settings save failed!');\n          }\n        }\n      },\n      error: (err: unknown) => {\n        console.error(err);\n        this.snackBar.okToast('Module settings save failed!');\n      },\n    };\n\n    this.controllerService\n      .saveLocations(\n        new AstrOsLocationCollection(\n          this.coreLocation,\n          this.domeLocation,\n          this.bodyLocation,\n        ),\n      )\n      .subscribe(observer);\n\n    this.status.resetStatus();\n  }\n\n  syncModuleSettings() {\n    const observer = {\n      next: (result: unknown) => {\n        if (result && typeof result === 'object' && 'message' in result) {\n          if (result.message === 'success') {\n            console.log('module sync queued!');\n            this.snackBar.okToast('Module sync queued!');\n          } else {\n            console.log('module sync failed to queue');\n            this.snackBar.okToast(`Module sync failed to queue.`);\n          }\n        }\n      },\n      error: (err: unknown) => {\n        console.error(err);\n        this.snackBar.okToast('Module sync failed!');\n      },\n    };\n\n    this.controllerService.syncLocationConfig().subscribe(observer);\n  }\n\n  private parseModules(locations: AstrOsLocationCollection) {\n    console.log(locations);\n    try {\n      this.coreLocation = locations.coreModule ?? this.coreLocation;\n      this.domeLocation = locations.domeModule ?? this.domeLocation;\n      this.bodyLocation = locations.bodyModule ?? this.bodyLocation;\n    } catch (err) {\n      console.error(err);\n    }\n  }\n\n  handleStatus(status: ControllerStatus, el: ElementRef, caption: Caption) {\n    switch (status) {\n      case ControllerStatus.up:\n        caption.str = '';\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'hidden');\n        break;\n      case ControllerStatus.needsSynced:\n        caption.str = this.notSynced;\n        this.renderer.setStyle(el.nativeElement, 'color', 'yellow');\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');\n        break;\n      case ControllerStatus.down:\n        caption.str = this.moduleDown;\n        this.renderer.setStyle(el.nativeElement, 'color', 'red');\n        this.renderer.setStyle(el.nativeElement, 'visibility', 'visible');\n        break;\n    }\n  }\n}\n",
             "assetsDirs": [],
             "styleUrlsData": [
                 {
@@ -13107,7 +13007,7 @@
                 "OnInit",
                 "AfterViewChecked"
             ],
-            "templateData": "<div class=\"container\">\r\n    <div class=\"script-title\">\r\n        <div class=\"script-name\">\r\n            <input matInput placeholder=\"Name\" [ngModel]=\"script?.scriptName\" (ngModelChange)=\"script.scriptName=$event\" />\r\n        </div>\r\n        <div class=\"script-description\">\r\n            <input matInput placeholder=\"Description\" [ngModel]=\"script?.description\" (ngModelChange)=\"script.description=$event\" />\r\n        </div>\r\n        <div class=\"button-box\">\r\n            <button (click)=\"saveScript()\">Save</button>\r\n            <button (click)=\"saveBeforeTest()\">Test</button>\r\n        </div>\r\n    </div>\r\n    <div id=\"scripter-container\" class=\"scripter-container\">\r\n        <div  class=\"scripter-body\">\r\n            <div class=\"scripter-header\">\r\n                <div class=\"scripter-module-header\" \r\n                (click)=\"openChannelAddModal()\"\r\n                (keypress)=\"openChannelAddModalKbd()\"\r\n                tabindex=\"0\">Add Channel</div>\r\n                <div class=\" timeline-spacer\"></div>\r\n                <div *ngFor=\"let item of timeLineArray;\" class=\"timeline-gradient timeline-header\">{{item.toFixed(1)}}</div>\r\n            </div>\r\n            <app-script-row *ngFor=\"let ch of scriptChannels\" id=\"timeline-{{ch.id}}\"\r\n                (timelineCallback)=\"timelineCallback($event)\"\r\n                (removeCallback)=\"removeCallback($event)\"\r\n                (channelTestCallback)=\"channelTestCallback($event)\"\r\n                [channel]=\"ch\"></app-script-row>\r\n        </div>\r\n\r\n\r\n\r\n        <!-- an hidden div is created to set the position of appearance of the menu-->\r\n        <div style=\"visibility: hidden; position: fixed;\" [style.left.px]=\"menuTopLeft.x\" [style.top.px]=\"menuTopLeft.y\"\r\n            [matMenuTriggerFor]=\"rightMenu\"></div>\r\n\r\n\r\n\r\n        <!-- standard material menu -->\r\n        <mat-menu #rightMenu=\"matMenu\">\r\n            <ng-template matMenuContent let-item=\"item\">\r\n                <button (click)=\"openNewEventModal(item)\" mat-menu-item>Add Event</button>\r\n            </ng-template>\r\n        </mat-menu>\r\n    </div>\r\n</div>\r\n\r\n<app-astros-modal id=\"scripter-modal\"  disableBackgroundClick=\"{{backgroundClickDisabled}}\" style=\"display: none;\">\r\n    <ng-template #modalContainer></ng-template>\r\n</app-astros-modal>"
+            "templateData": "<div class=\"container\">\r\n    <div class=\"script-title\">\r\n        <div class=\"script-name\">\r\n            <input matInput placeholder=\"Name\" [ngModel]=\"script?.scriptName\" (ngModelChange)=\"script.scriptName=$event\" />\r\n        </div>\r\n        <div class=\"script-description\">\r\n            <input matInput placeholder=\"Description\" [ngModel]=\"script?.description\" (ngModelChange)=\"script.description=$event\" />\r\n        </div>\r\n        <div class=\"button-box\">\r\n            <button (click)=\"saveScript()\">Save</button>\r\n            <button (click)=\"saveBeforeTest()\">Test</button>\r\n        </div>\r\n    </div>\r\n    <div id=\"scripter-container\" class=\"scripter-container\">\r\n        <div  class=\"scripter-body\">\r\n            <div class=\"scripter-header\">\r\n                <div class=\"scripter-module-header\" \r\n                (click)=\"openChannelAddModal()\"\r\n                (keypress)=\"openChannelAddModalKbd($event)\"\r\n                tabindex=\"0\">Add Channel</div>\r\n                <div class=\" timeline-spacer\"></div>\r\n                <div *ngFor=\"let item of timeLineArray;\" class=\"timeline-gradient timeline-header\">{{item.toFixed(1)}}</div>\r\n            </div>\r\n            <app-script-row *ngFor=\"let ch of scriptChannels\" id=\"timeline-{{ch.id}}\"\r\n                (timelineCallback)=\"timelineCallback($event)\"\r\n                (removeCallback)=\"removeCallback($event)\"\r\n                (channelTestCallback)=\"channelTestCallback($event)\"\r\n                [channel]=\"ch\"></app-script-row>\r\n        </div>\r\n\r\n\r\n\r\n        <!-- an hidden div is created to set the position of appearance of the menu-->\r\n        <div style=\"visibility: hidden; position: fixed;\" [style.left.px]=\"menuTopLeft.x\" [style.top.px]=\"menuTopLeft.y\"\r\n            [matMenuTriggerFor]=\"rightMenu\"></div>\r\n\r\n\r\n\r\n        <!-- standard material menu -->\r\n        <mat-menu #rightMenu=\"matMenu\">\r\n            <ng-template matMenuContent let-item=\"item\">\r\n                <button (click)=\"openNewEventModal(item)\" mat-menu-item>Add Event</button>\r\n            </ng-template>\r\n        </mat-menu>\r\n    </div>\r\n</div>\r\n\r\n<app-astros-modal id=\"scripter-modal\"  disableBackgroundClick=\"{{backgroundClickDisabled}}\" style=\"display: none;\">\r\n    <ng-template #modalContainer></ng-template>\r\n</app-astros-modal>"
         },
         {
             "name": "ScriptRowComponent",
@@ -16165,7 +16065,7 @@
         {
             "name": "UartModuleComponent",
             "id": "component-UartModuleComponent-264ba6f799630921ec3ba6b4360612a1c2c21755a242a34de84b9407bfdc925a93520f48666c2784ae74bd198c20faaa3ecbff47b99d8a3b5d9915334214cbc7",
-            "file": "src/app/pages/modules/uart-modules/uart-module/uart-module.component.ts",
+            "file": "src/app/components/esp-module/uart/uart-module/uart-module.component.ts",
             "encapsulation": [],
             "entryComponents": [],
             "inputs": [],
@@ -16644,10 +16544,37 @@
                 "status": "low"
             },
             {
-                "filePath": "src/app/components/esp-submodule/esp-submodule.component.ts",
+                "filePath": "src/app/components/esp-module/esp/esp-module.component.ts",
                 "type": "component",
                 "linktype": "component",
-                "name": "EspSubmoduleComponent",
+                "name": "EspModuleComponent",
+                "coveragePercent": 0,
+                "coverageCount": "0/27",
+                "status": "low"
+            },
+            {
+                "filePath": "src/app/components/esp-module/uart/uart-module/uart-module.component.ts",
+                "type": "component",
+                "linktype": "component",
+                "name": "UartModuleComponent",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/app/components/esp-module/uart/uart-submodules/generic-serial-module/generic-serial-module.component.ts",
+                "type": "component",
+                "linktype": "component",
+                "name": "GenericSerialModuleComponent",
+                "coveragePercent": 0,
+                "coverageCount": "0/1",
+                "status": "low"
+            },
+            {
+                "filePath": "src/app/components/esp-module/uart/uart-submodules/kangaroo-module/kangaroo-module.component.ts",
+                "type": "component",
+                "linktype": "component",
+                "name": "KangarooModuleComponent",
                 "coveragePercent": 0,
                 "coverageCount": "0/2",
                 "status": "low"
@@ -17148,15 +17075,6 @@
                 "status": "low"
             },
             {
-                "filePath": "src/app/pages/modules/esp-module/esp-module.component.ts",
-                "type": "component",
-                "linktype": "component",
-                "name": "EspModuleComponent",
-                "coveragePercent": 0,
-                "coverageCount": "0/27",
-                "status": "low"
-            },
-            {
                 "filePath": "src/app/pages/modules/modules.component.ts",
                 "type": "component",
                 "linktype": "component",
@@ -17172,33 +17090,6 @@
                 "name": "Caption",
                 "coveragePercent": 0,
                 "coverageCount": "0/2",
-                "status": "low"
-            },
-            {
-                "filePath": "src/app/pages/modules/uart-modules/generic-serial-module/generic-serial-module.component.ts",
-                "type": "component",
-                "linktype": "component",
-                "name": "GenericSerialModuleComponent",
-                "coveragePercent": 0,
-                "coverageCount": "0/1",
-                "status": "low"
-            },
-            {
-                "filePath": "src/app/pages/modules/uart-modules/kangaroo-module/kangaroo-module.component.ts",
-                "type": "component",
-                "linktype": "component",
-                "name": "KangarooModuleComponent",
-                "coveragePercent": 0,
-                "coverageCount": "0/2",
-                "status": "low"
-            },
-            {
-                "filePath": "src/app/pages/modules/uart-modules/uart-module/uart-module.component.ts",
-                "type": "component",
-                "linktype": "component",
-                "name": "UartModuleComponent",
-                "coveragePercent": 0,
-                "coverageCount": "0/1",
                 "status": "low"
             },
             {

@@ -1,10 +1,22 @@
-import { Meta, StoryObj } from '@storybook/angular';
+import {
+  componentWrapperDecorator,
+  moduleMetadata,
+  Meta,
+  StoryObj,
+} from '@storybook/angular';
 import { KangarooEventModalComponent } from './kangaroo-event-modal.component';
+import { ModalComponent } from '../../modal-base/modal.component';;
 
 const meta: Meta<KangarooEventModalComponent> = {
   title: 'Components/Modals/KangarooEventModal',
   component: KangarooEventModalComponent,
   tags: ['autodocs'],
+  decorators: [
+    moduleMetadata({
+      imports: [ModalComponent],
+    }),
+    componentWrapperDecorator(ModalComponent),
+  ],
 };
 
 export default meta;

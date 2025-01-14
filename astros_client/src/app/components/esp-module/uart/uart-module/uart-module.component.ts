@@ -9,7 +9,6 @@ import {
   selector: 'app-uart-module',
   templateUrl: './uart-module.component.html',
   styleUrl: './uart-module.component.scss',
-  viewProviders: [MatExpansionPanel],
   standalone: true,
   imports: [MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle],
 })

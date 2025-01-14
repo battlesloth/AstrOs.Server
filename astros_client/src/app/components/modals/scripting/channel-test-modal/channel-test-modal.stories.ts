@@ -4,12 +4,12 @@ import {
   Meta,
   StoryObj,
 } from '@storybook/angular';
-import { GpioEventModalComponent } from './gpio-event-modal.component';
+import { ChannelTestModalComponent } from './channel-test-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';;
 
-const meta: Meta<GpioEventModalComponent> = {
-  title: 'Components/Modals/GpioEventModal',
-  component: GpioEventModalComponent,
+const meta: Meta<ChannelTestModalComponent> = {
+  title: 'Components/Modals/ChannelTestModal',
+  component: ChannelTestModalComponent,
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
@@ -21,7 +21,7 @@ const meta: Meta<GpioEventModalComponent> = {
 
 export default meta;
 
-type Story = StoryObj<GpioEventModalComponent>;
+type Story = StoryObj<ChannelTestModalComponent>;
 
 export const Default: Story = {
   args: {},
