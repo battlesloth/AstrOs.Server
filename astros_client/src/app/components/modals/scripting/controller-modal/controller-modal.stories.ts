@@ -5,7 +5,7 @@ import {
   StoryObj,
 } from '@storybook/angular';
 import { ControllerModalComponent } from './controller-modal.component';
-import { ModalComponent } from '../../modal-base/modal.component';;
+import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<ControllerModalComponent> = {
   title: 'Components/Modals/ControllerModal',

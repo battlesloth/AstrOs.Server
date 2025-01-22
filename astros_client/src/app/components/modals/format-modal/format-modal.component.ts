@@ -25,10 +25,10 @@ export class FormatModalResources {
 }
 
 @Component({
-    selector: 'app-format-modal',
-    templateUrl: './format-modal.component.html',
-    styleUrls: ['./format-modal.component.scss'],
-    imports: [NgFor, FormsModule]
+  selector: 'app-format-modal',
+  templateUrl: './format-modal.component.html',
+  styleUrls: ['./format-modal.component.scss'],
+  imports: [NgFor, FormsModule],
 })
 export class FormatModalComponent extends ModalBaseComponent implements OnInit {
   controllers: Controller[] = [];

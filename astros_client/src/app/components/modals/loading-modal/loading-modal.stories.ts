@@ -14,7 +14,7 @@ const meta: Meta<LoadingModalComponent> = {
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
-      imports: [ModalComponent, ControllerService, ],
+      imports: [ModalComponent, ControllerService],
     }),
     componentWrapperDecorator(ModalComponent),
   ],

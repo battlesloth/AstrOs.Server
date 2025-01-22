@@ -16,10 +16,10 @@ import { ModalService, SettingsService, SnackbarService } from '@src/services';
 import { ControlModule } from 'astros-common';
 
 @Component({
-    selector: 'app-settings',
-    templateUrl: './settings.component.html',
-    styleUrls: ['./settings.component.scss'],
-    imports: [ModalComponent]
+  selector: 'app-settings',
+  templateUrl: './settings.component.html',
+  styleUrls: ['./settings.component.scss'],
+  imports: [ModalComponent],
 })
 export class SettingsComponent implements OnInit {
   @ViewChild('modalContainer', { read: ViewContainerRef })

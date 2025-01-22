@@ -21,13 +21,13 @@ export class KangarooEventModalResources {
 }
 
 @Component({
-    selector: 'app-kangaroo-event-modal',
-    templateUrl: './kangaroo-event-modal.component.html',
-    styleUrls: [
-        '../base-event-modal/base-event-modal.component.scss',
-        './kangaroo-event-modal.component.scss',
-    ],
-    imports: [FormsModule, DecimalPipe]
+  selector: 'app-kangaroo-event-modal',
+  templateUrl: './kangaroo-event-modal.component.html',
+  styleUrls: [
+    '../base-event-modal/base-event-modal.component.scss',
+    './kangaroo-event-modal.component.scss',
+  ],
+  imports: [FormsModule, DecimalPipe],
 })
 export class KangarooEventModalComponent
   extends BaseEventModalComponent

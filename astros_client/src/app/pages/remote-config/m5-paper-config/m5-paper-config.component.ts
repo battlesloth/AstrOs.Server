@@ -16,10 +16,10 @@ interface ScriptSelection {
 }
 
 @Component({
-    selector: 'app-m5-paper-config',
-    templateUrl: './m5-paper-config.component.html',
-    styleUrls: ['./m5-paper-config.component.scss'],
-    imports: [FontAwesomeModule, FormsModule, NgFor]
+  selector: 'app-m5-paper-config',
+  templateUrl: './m5-paper-config.component.html',
+  styleUrls: ['./m5-paper-config.component.scss'],
+  imports: [FontAwesomeModule, FormsModule, NgFor],
 })
 export class M5PaperConfigComponent implements OnInit {
   faForward = faChevronRight;

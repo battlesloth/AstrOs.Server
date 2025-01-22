@@ -14,13 +14,13 @@ export class I2cEventModalResources {
 }
 
 @Component({
-    selector: 'app-i2c-event-modal',
-    templateUrl: './i2c-event-modal.component.html',
-    styleUrls: [
-        '../base-event-modal/base-event-modal.component.scss',
-        './i2c-event-modal.component.scss',
-    ],
-    imports: [FormsModule, DecimalPipe]
+  selector: 'app-i2c-event-modal',
+  templateUrl: './i2c-event-modal.component.html',
+  styleUrls: [
+    '../base-event-modal/base-event-modal.component.scss',
+    './i2c-event-modal.component.scss',
+  ],
+  imports: [FormsModule, DecimalPipe],
 })
 export class I2cEventModalComponent
   extends BaseEventModalComponent

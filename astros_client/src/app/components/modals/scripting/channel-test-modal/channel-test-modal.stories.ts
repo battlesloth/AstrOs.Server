@@ -5,7 +5,7 @@ import {
   StoryObj,
 } from '@storybook/angular';
 import { ChannelTestModalComponent } from './channel-test-modal.component';
-import { ModalComponent } from '../../modal-base/modal.component';;
+import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<ChannelTestModalComponent> = {
   title: 'Components/Modals/ChannelTestModal',

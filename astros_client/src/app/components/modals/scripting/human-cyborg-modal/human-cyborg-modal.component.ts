@@ -29,13 +29,13 @@ export class HcrModalResources {
 }
 
 @Component({
-    selector: 'app-human-cyborg-modal',
-    templateUrl: './human-cyborg-modal.component.html',
-    styleUrls: [
-        '../base-event-modal/base-event-modal.component.scss',
-        './human-cyborg-modal.component.scss',
-    ],
-    imports: [FormsModule, NgFor, FontAwesomeModule, DecimalPipe]
+  selector: 'app-human-cyborg-modal',
+  templateUrl: './human-cyborg-modal.component.html',
+  styleUrls: [
+    '../base-event-modal/base-event-modal.component.scss',
+    './human-cyborg-modal.component.scss',
+  ],
+  imports: [FormsModule, NgFor, FontAwesomeModule, DecimalPipe],
 })
 export class HumanCyborgModalComponent
   extends BaseEventModalComponent

@@ -38,10 +38,10 @@ interface DeleteConfirmEvent {
 }
 
 @Component({
-    selector: 'app-scripts',
-    templateUrl: './scripts.component.html',
-    styleUrls: ['./scripts.component.scss'],
-    imports: [NgFor, RouterLink, FontAwesomeModule, ModalComponent]
+  selector: 'app-scripts',
+  templateUrl: './scripts.component.html',
+  styleUrls: ['./scripts.component.scss'],
+  imports: [NgFor, RouterLink, FontAwesomeModule, ModalComponent],
 })
 export class ScriptsComponent implements OnInit, AfterViewChecked {
   @ViewChild('modalContainer', { read: ViewContainerRef })

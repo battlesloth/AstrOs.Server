@@ -48,22 +48,22 @@ interface Caption {
 }
 
 @Component({
-    selector: 'app-modules',
-    templateUrl: './modules.component.html',
-    styleUrls: ['./modules.component.scss'],
-    viewProviders: [MatExpansionPanel],
-    imports: [
-        MatAccordion,
-        MatExpansionPanel,
-        MatExpansionPanelHeader,
-        MatExpansionPanelTitle,
-        FontAwesomeModule,
-        NgIf,
-        FormsModule,
-        EspModuleComponent,
-        NgFor,
-        ModalComponent
-    ]
+  selector: 'app-modules',
+  templateUrl: './modules.component.html',
+  styleUrls: ['./modules.component.scss'],
+  viewProviders: [MatExpansionPanel],
+  imports: [
+    MatAccordion,
+    MatExpansionPanel,
+    MatExpansionPanelHeader,
+    MatExpansionPanelTitle,
+    FontAwesomeModule,
+    NgIf,
+    FormsModule,
+    EspModuleComponent,
+    NgFor,
+    ModalComponent,
+  ],
 })
 export class ModulesComponent implements AfterViewInit {
   @ViewChild('modalContainer', { read: ViewContainerRef })
@@ -135,7 +135,7 @@ export class ModulesComponent implements AfterViewInit {
 
     this.parseModules(response.locations);
 
-  console.log('here 2');
+    console.log('here 2');
     // always filter out the master controller since it's always the body module
     this.possibleControllers = response.controllers.filter(
       (controller: ControlModule) => controller.id !== 1,

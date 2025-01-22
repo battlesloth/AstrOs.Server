@@ -5,7 +5,7 @@ import {
   StoryObj,
 } from '@storybook/angular';
 import { KangarooEventModalComponent } from './kangaroo-event-modal.component';
-import { ModalComponent } from '../../modal-base/modal.component';;
+import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<KangarooEventModalComponent> = {
   title: 'Components/Modals/KangarooEventModal',

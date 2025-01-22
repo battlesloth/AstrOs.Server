@@ -54,11 +54,7 @@ import {
   UartEventModalResources,
 } from '@src/components/modals/scripting';
 import { ControllerService } from '#services/controller';
-import {
-  ModalService,
-  ScriptsService,
-  SnackbarService,
-} from '@src/services';
+import { ModalService, ScriptsService, SnackbarService } from '@src/services';
 
 import {
   ConfirmModalComponent,
@@ -82,19 +78,19 @@ type ScripterModal =
   | HumanCyborgModalComponent;
 
 @Component({
-    selector: 'app-scripter',
-    templateUrl: './scripter.component.html',
-    styleUrls: ['./scripter.component.scss'],
-    imports: [
-        FormsModule,
-        NgFor,
-        ScriptRowComponent,
-        MatMenuTrigger,
-        MatMenu,
-        MatMenuContent,
-        MatMenuItem,
-        ModalComponent,
-    ]
+  selector: 'app-scripter',
+  templateUrl: './scripter.component.html',
+  styleUrls: ['./scripter.component.scss'],
+  imports: [
+    FormsModule,
+    NgFor,
+    ScriptRowComponent,
+    MatMenuTrigger,
+    MatMenu,
+    MatMenuContent,
+    MatMenuItem,
+    ModalComponent,
+  ],
 })
 export class ScripterComponent implements OnInit, AfterViewChecked {
   @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;

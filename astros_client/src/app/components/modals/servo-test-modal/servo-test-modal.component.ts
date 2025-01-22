@@ -18,10 +18,10 @@ export interface ServoTestMessage {
 }
 
 @Component({
-    selector: 'app-servo-test-modal',
-    templateUrl: './servo-test-modal.component.html',
-    styleUrl: './servo-test-modal.component.scss',
-    imports: [MatSlider, MatSliderThumb, FormsModule]
+  selector: 'app-servo-test-modal',
+  templateUrl: './servo-test-modal.component.html',
+  styleUrl: './servo-test-modal.component.scss',
+  imports: [MatSlider, MatSliderThumb, FormsModule],
 })
 export class ServoTestModalComponent
   extends BaseEventModalComponent

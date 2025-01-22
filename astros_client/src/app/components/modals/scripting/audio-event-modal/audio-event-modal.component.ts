@@ -15,13 +15,13 @@ export class AudioEventModalResources {
 }
 
 @Component({
-    selector: 'app-audio-event-modal',
-    templateUrl: './audio-event-modal.component.html',
-    styleUrls: [
-        '../base-event-modal/base-event-modal.component.scss',
-        './audio-event-modal.component.scss',
-    ],
-    imports: [FormsModule, NgFor, DecimalPipe]
+  selector: 'app-audio-event-modal',
+  templateUrl: './audio-event-modal.component.html',
+  styleUrls: [
+    '../base-event-modal/base-event-modal.component.scss',
+    './audio-event-modal.component.scss',
+  ],
+  imports: [FormsModule, NgFor, DecimalPipe],
 })
 export class AudioEventModalComponent
   extends BaseEventModalComponent

@@ -5,7 +5,7 @@ import {
   StoryObj,
 } from '@storybook/angular';
 import { AudioEventModalComponent } from './audio-event-modal.component';
-import { ModalComponent } from '../../modal-base/modal.component';;
+import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<AudioEventModalComponent> = {
   title: 'Components/Modals/AudioEventModal',

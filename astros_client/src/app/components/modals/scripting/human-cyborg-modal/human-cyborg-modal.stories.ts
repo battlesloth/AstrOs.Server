@@ -5,7 +5,7 @@ import {
   StoryObj,
 } from '@storybook/angular';
 import { HumanCyborgModalComponent } from './human-cyborg-modal.component';
-import { ModalComponent } from '../../modal-base/modal.component';;
+import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<HumanCyborgModalComponent> = {
   title: 'Components/Modals/HumanCyborgModal',

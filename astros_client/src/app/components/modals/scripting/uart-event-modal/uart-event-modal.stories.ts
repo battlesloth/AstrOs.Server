@@ -5,7 +5,7 @@ import {
   StoryObj,
 } from '@storybook/angular';
 import { UartEventModalComponent } from './uart-event-modal.component';
-import { ModalComponent } from '../../modal-base/modal.component';;
+import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<UartEventModalComponent> = {
   title: 'Components/Modals/UartEventModal',

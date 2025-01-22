@@ -23,10 +23,10 @@ export interface ControllerModalResponse {
 }
 
 @Component({
-    selector: 'app-controller-modal',
-    templateUrl: './controller-modal.component.html',
-    styleUrls: ['./controller-modal.component.scss'],
-    imports: [FormsModule, NgFor, NgIf, KeyValuePipe]
+  selector: 'app-controller-modal',
+  templateUrl: './controller-modal.component.html',
+  styleUrls: ['./controller-modal.component.scss'],
+  imports: [FormsModule, NgFor, NgIf, KeyValuePipe],
 })
 export class ControllerModalComponent
   extends ModalBaseComponent
