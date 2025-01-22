@@ -62,8 +62,7 @@ interface Caption {
         FormsModule,
         EspModuleComponent,
         NgFor,
-        ModalComponent,
-        LoadingModalComponent
+        ModalComponent
     ]
 })
 export class ModulesComponent implements AfterViewInit {

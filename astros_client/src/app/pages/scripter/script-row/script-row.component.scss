@@ -1,4 +1,4 @@
-@import '../../../../assets/styles/variables';
+@use '../../../../assets/styles/variables' as v;
 
 .script-row-container{
     display: flex;
@@ -11,7 +11,7 @@
     position: -webkit-sticky;
     position: sticky;
     left: 0px;
-    background-color: $light-blue;
+    background-color: v.$light-blue;
     color: white;
     border-bottom: 2px solid black;
     border-right: 2px solid black;

@@ -1,4 +1,4 @@
-@import "../../../assets/styles/variables";
+@use "../../../assets/styles/variables" as v;
 
 
 
@@ -26,7 +26,7 @@
             .title {
                 width: 200px;
                 font-size: xx-large;
-                font-family: $swfont;
+                font-family: v.$swfont;
             }
 
             .button-box {
@@ -34,8 +34,8 @@
 
                 button {
                     font-size: x-large;
-                    font-family: $swfont;
-                    background-color: $dark-blue;
+                    font-family: v.$swfont;
+                    background-color: v.$dark-blue;
                 }
             }
         }

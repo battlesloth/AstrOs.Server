@@ -1,4 +1,4 @@
-@import "./src/assets/styles/variables";
+@use "./src/assets/styles/variables" as v;
 
 .header-box {
     display: flex;
@@ -74,7 +74,7 @@
     overflow-y: auto;
 
     li {
-        border: 2px solid $color-dark;
+        border: 2px solid v.$color-dark;
         padding: 10px;
     }
 
@@ -159,7 +159,7 @@
     overflow-y: auto;
 
     li {
-        border: 2px solid $color-dark;
+        border: 2px solid v.$color-dark;
         padding: 10px;
     }
 
@@ -203,7 +203,7 @@
     overflow-y: auto;
 
     li {
-        border: 2px solid $color-dark;
+        border: 2px solid v.$color-dark;
         padding: 10px;
     }
 

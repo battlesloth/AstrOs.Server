@@ -1,4 +1,4 @@
-@import "../../../../assets/styles/variables";
+@use "../../../../assets/styles/variables" as v;
 
 .container {
 
@@ -19,7 +19,7 @@
 
         .page-number {
             font-size: xx-large;
-            font-family: $swfont;
+            font-family: v.$swfont;
             margin: 12px;
         }
 
@@ -39,7 +39,7 @@
     }
 
     .button-select {
-        background-color: $dark-blue;
+        background-color: v.$dark-blue;
         border: 2px solid black;
         border-radius: 10%;
 
