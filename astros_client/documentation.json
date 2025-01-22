@@ -3862,6 +3862,76 @@
             "hostListeners": []
         },
         {
+            "name": "HttpClientMock",
+            "id": "class-HttpClientMock-04b3b15a0ef41f78de5d81da1412bbddf509b0ea45b5af0b23da9330d92af6f1d18c507ed6915ff62c4f0444066bbe3417f60208b6cf34ca8825d29ca00fe914",
+            "file": "src/app/mocks/http-client.mock.ts",
+            "deprecated": false,
+            "deprecationMessage": "",
+            "type": "class",
+            "sourceCode": "export class HttpClientMock {\r\n\r\n    public get(): void {\r\n        return;\r\n    }\r\n    \r\n    public post(): void {\r\n        return;\r\n    }\r\n    \r\n    public put(): void {\r\n        return;\r\n    }\r\n    \r\n    public delete(): void {\r\n        return;\r\n    }\r\n}",
+            "inputsClass": [],
+            "outputsClass": [],
+            "properties": [],
+            "methods": [
+                {
+                    "name": "delete",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 15,
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "modifierKind": [
+                        125
+                    ]
+                },
+                {
+                    "name": "get",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 3,
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "modifierKind": [
+                        125
+                    ]
+                },
+                {
+                    "name": "post",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 7,
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "modifierKind": [
+                        125
+                    ]
+                },
+                {
+                    "name": "put",
+                    "args": [],
+                    "optional": false,
+                    "returnType": "void",
+                    "typeParameters": [],
+                    "line": 11,
+                    "deprecated": false,
+                    "deprecationMessage": "",
+                    "modifierKind": [
+                        125
+                    ]
+                }
+            ],
+            "indexSignatures": [],
+            "extends": [],
+            "hostBindings": [],
+            "hostListeners": []
+        },
+        {
             "name": "I2cEventModalResources",
             "id": "class-I2cEventModalResources-b79500fca870d01343eea03be1d2f92293295d708001eb1321a4967f501244bef12f2f7a83b67dca54b08ffa3202f8927ec8f9117c27748a41401c850f58ebd8",
             "file": "src/app/components/modals/scripting/i2c-event-modal/i2c-event-modal.component.ts",
@@ -17014,6 +17084,15 @@
                 "name": "UploadModalResources",
                 "coveragePercent": 0,
                 "coverageCount": "0/4",
+                "status": "low"
+            },
+            {
+                "filePath": "src/app/mocks/http-client.mock.ts",
+                "type": "class",
+                "linktype": "classe",
+                "name": "HttpClientMock",
+                "coveragePercent": 0,
+                "coverageCount": "0/5",
                 "status": "low"
             },
             {
