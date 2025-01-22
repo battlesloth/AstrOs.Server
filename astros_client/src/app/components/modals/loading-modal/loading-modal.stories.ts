@@ -6,6 +6,7 @@ import {
 } from '@storybook/angular';
 import { LoadingModalComponent } from './loading-modal.component';
 import { ModalComponent } from '../modal-base/modal.component';
+import { ControllerService } from '#services/controller';
 
 const meta: Meta<LoadingModalComponent> = {
   title: 'Components/Modals/LoadingModal',
@@ -13,7 +14,7 @@ const meta: Meta<LoadingModalComponent> = {
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
-      imports: [ModalComponent],
+      imports: [ModalComponent, ControllerService, ],
     }),
     componentWrapperDecorator(ModalComponent),
   ],

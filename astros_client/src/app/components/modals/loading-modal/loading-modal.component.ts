@@ -1,12 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
+import { ControllerService } from '#services/controller';
 import {
   AstrOsLocationCollection,
   ControllersResponse,
   ControlModule,
   TransmissionType,
 } from 'astros-common';
-import { ControllerService } from '@src/services';
 import { Subscription } from 'rxjs';
 import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
 import { ModalBaseComponent } from '../modal-base/modal-base.component';

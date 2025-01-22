@@ -15,6 +15,12 @@
     "prettier:check": "prettier --check \"src/**/*.ts\"",
     "prettier:write": "prettier --write \"src/**/*.ts\""
   },
+  "imports": {
+    "#services/controller": {
+      "storybook": "./src/app/services/controllers/controller.mock.ts",
+      "default": "./src/app/services/controllers/controller.service.ts"
+    }
+  },
   "private": true,
   "dependencies": {
     "@angular/animations": "^18.2.11",
