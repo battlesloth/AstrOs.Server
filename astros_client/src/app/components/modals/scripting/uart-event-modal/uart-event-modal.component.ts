@@ -15,14 +15,13 @@ export class UartEventModalResources {
 }
 
 @Component({
-  selector: 'app-uart-event-modal',
-  templateUrl: './uart-event-modal.component.html',
-  styleUrls: [
-    '../base-event-modal/base-event-modal.component.scss',
-    './uart-event-modal.component.scss',
-  ],
-  standalone: true,
-  imports: [FormsModule, DecimalPipe],
+    selector: 'app-uart-event-modal',
+    templateUrl: './uart-event-modal.component.html',
+    styleUrls: [
+        '../base-event-modal/base-event-modal.component.scss',
+        './uart-event-modal.component.scss',
+    ],
+    imports: [FormsModule, DecimalPipe]
 })
 export class UartEventModalComponent
   extends BaseEventModalComponent

@@ -21,11 +21,10 @@ interface DeleteConfirmEvent {
 }
 
 @Component({
-  selector: 'app-audio-files',
-  templateUrl: './audio-files.component.html',
-  styleUrls: ['./audio-files.component.scss'],
-  standalone: true,
-  imports: [NgFor, FontAwesomeModule, ModalComponent, DatePipe],
+    selector: 'app-audio-files',
+    templateUrl: './audio-files.component.html',
+    styleUrls: ['./audio-files.component.scss'],
+    imports: [NgFor, FontAwesomeModule, ModalComponent, DatePipe]
 })
 export class AudioFilesComponent implements OnInit {
   @ViewChild('modalContainer', { read: ViewContainerRef })

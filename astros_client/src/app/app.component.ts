@@ -13,11 +13,10 @@ import { WebsocketService } from './services/websocket/websocket.service';
 import { NgIf } from '@angular/common';
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss'],
-  standalone: true,
-  imports: [RouterLink, NgIf, RouterOutlet],
+    selector: 'app-root',
+    templateUrl: './app.component.html',
+    styleUrls: ['./app.component.scss'],
+    imports: [RouterLink, NgIf, RouterOutlet]
 })
 export class AppComponent implements OnInit {
   title = 'AstOs';

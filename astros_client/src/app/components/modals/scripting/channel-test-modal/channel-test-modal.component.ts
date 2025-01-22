@@ -21,14 +21,13 @@ export interface ChannelTestModalResponse {
 }
 
 @Component({
-  selector: 'app-channel-test-modal',
-  templateUrl: './channel-test-modal.component.html',
-  styleUrls: [
-    '../base-event-modal/base-event-modal.component.scss',
-    './channel-test-modal.component.scss',
-  ],
-  standalone: true,
-  imports: [NgIf, FormsModule],
+    selector: 'app-channel-test-modal',
+    templateUrl: './channel-test-modal.component.html',
+    styleUrls: [
+        '../base-event-modal/base-event-modal.component.scss',
+        './channel-test-modal.component.scss',
+    ],
+    imports: [NgIf, FormsModule]
 })
 export class ChannelTestModalComponent
   extends BaseEventModalComponent

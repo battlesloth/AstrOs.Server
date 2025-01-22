@@ -15,9 +15,10 @@ export class ConfirmModalResources {
 }
 
 @Component({
-  selector: 'app-astros-confirm-modal',
-  templateUrl: './confirm-modal.component.html',
-  styleUrls: ['./confirm-modal.component.scss'],
+    selector: 'app-astros-confirm-modal',
+    templateUrl: './confirm-modal.component.html',
+    styleUrls: ['./confirm-modal.component.scss'],
+    standalone: true
 })
 export class ConfirmModalComponent
   extends ModalBaseComponent

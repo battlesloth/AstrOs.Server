@@ -48,24 +48,23 @@ interface Caption {
 }
 
 @Component({
-  selector: 'app-modules',
-  templateUrl: './modules.component.html',
-  styleUrls: ['./modules.component.scss'],
-  viewProviders: [MatExpansionPanel],
-  standalone: true,
-  imports: [
-    MatAccordion,
-    MatExpansionPanel,
-    MatExpansionPanelHeader,
-    MatExpansionPanelTitle,
-    FontAwesomeModule,
-    NgIf,
-    FormsModule,
-    EspModuleComponent,
-    NgFor,
-    ModalComponent,
-    LoadingModalComponent
-  ],
+    selector: 'app-modules',
+    templateUrl: './modules.component.html',
+    styleUrls: ['./modules.component.scss'],
+    viewProviders: [MatExpansionPanel],
+    imports: [
+        MatAccordion,
+        MatExpansionPanel,
+        MatExpansionPanelHeader,
+        MatExpansionPanelTitle,
+        FontAwesomeModule,
+        NgIf,
+        FormsModule,
+        EspModuleComponent,
+        NgFor,
+        ModalComponent,
+        LoadingModalComponent
+    ]
 })
 export class ModulesComponent implements AfterViewInit {
   @ViewChild('modalContainer', { read: ViewContainerRef })

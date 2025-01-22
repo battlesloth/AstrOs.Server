@@ -14,11 +14,10 @@ export class UploadModalResources {
 }
 
 @Component({
-  selector: 'app-upload-modal',
-  templateUrl: './upload-modal.component.html',
-  styleUrls: ['./upload-modal.component.scss'],
-  standalone: true,
-  imports: [NgFor, NgStyle, FontAwesomeModule, DecimalPipe],
+    selector: 'app-upload-modal',
+    templateUrl: './upload-modal.component.html',
+    styleUrls: ['./upload-modal.component.scss'],
+    imports: [NgFor, NgStyle, FontAwesomeModule, DecimalPipe]
 })
 export class UploadModalComponent extends ModalBaseComponent {
   faTrash = faTrash;

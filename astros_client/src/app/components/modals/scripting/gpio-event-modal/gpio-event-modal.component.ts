@@ -13,14 +13,13 @@ export class GpioEventModalResources {
 }
 
 @Component({
-  selector: 'app-gpio-event-modal',
-  templateUrl: './gpio-event-modal.component.html',
-  styleUrls: [
-    '../base-event-modal/base-event-modal.component.scss',
-    './gpio-event-modal.component.scss',
-  ],
-  standalone: true,
-  imports: [FormsModule, DecimalPipe],
+    selector: 'app-gpio-event-modal',
+    templateUrl: './gpio-event-modal.component.html',
+    styleUrls: [
+        '../base-event-modal/base-event-modal.component.scss',
+        './gpio-event-modal.component.scss',
+    ],
+    imports: [FormsModule, DecimalPipe]
 })
 export class GpioEventModalComponent
   extends BaseEventModalComponent

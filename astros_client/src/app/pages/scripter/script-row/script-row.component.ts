@@ -13,11 +13,10 @@ import { NgIf } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 
 @Component({
-  selector: 'app-script-row',
-  templateUrl: './script-row.component.html',
-  styleUrls: ['./script-row.component.scss'],
-  standalone: true,
-  imports: [NgIf, FontAwesomeModule],
+    selector: 'app-script-row',
+    templateUrl: './script-row.component.html',
+    styleUrls: ['./script-row.component.scss'],
+    imports: [NgIf, FontAwesomeModule]
 })
 export class ScriptRowComponent {
   private segmentWidth = 60;

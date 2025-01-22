@@ -22,23 +22,21 @@ import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 @Component({
-  selector: 'app-esp-module',
-  templateUrl: './esp-module.component.html',
-  styleUrls: ['./esp-module.component.scss'],
-  //viewProviders: [MatFormField, MatCheckboxModule],
-  standalone: true,
-  imports: [
-    MatAccordion,
-    MatExpansionPanel,
-    MatExpansionPanelHeader,
-    MatExpansionPanelTitle,
-    NgIf,
-    FormsModule,
-    MatExpansionPanelDescription,
-    NgFor,
-    MatCheckbox,
-    UartModuleComponent,
-  ],
+    selector: 'app-esp-module',
+    templateUrl: './esp-module.component.html',
+    styleUrls: ['./esp-module.component.scss'],
+    imports: [
+        MatAccordion,
+        MatExpansionPanel,
+        MatExpansionPanelHeader,
+        MatExpansionPanelTitle,
+        NgIf,
+        FormsModule,
+        MatExpansionPanelDescription,
+        NgFor,
+        MatCheckbox,
+        UartModuleComponent,
+    ]
 })
 export class EspModuleComponent {
   @Output() openServoTestModal = new EventEmitter<any>();

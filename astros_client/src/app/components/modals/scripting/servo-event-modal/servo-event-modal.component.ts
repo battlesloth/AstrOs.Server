@@ -14,14 +14,13 @@ export class ServoEventModalResources {
 }
 
 @Component({
-  selector: 'app-servo-event-modal',
-  templateUrl: './servo-event-modal.component.html',
-  styleUrls: [
-    '../base-event-modal/base-event-modal.component.scss',
-    './servo-event-modal.component.scss',
-  ],
-  standalone: true,
-  imports: [FormsModule, DecimalPipe],
+    selector: 'app-servo-event-modal',
+    templateUrl: './servo-event-modal.component.html',
+    styleUrls: [
+        '../base-event-modal/base-event-modal.component.scss',
+        './servo-event-modal.component.scss',
+    ],
+    imports: [FormsModule, DecimalPipe]
 })
 export class ServoEventModalComponent
   extends BaseEventModalComponent

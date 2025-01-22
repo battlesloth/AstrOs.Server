@@ -6,10 +6,9 @@ import {
 } from '@angular/material/expansion';
 
 @Component({
-  selector: 'app-uart-module',
-  templateUrl: './uart-module.component.html',
-  styleUrl: './uart-module.component.scss',
-  standalone: true,
-  imports: [MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle],
+    selector: 'app-uart-module',
+    templateUrl: './uart-module.component.html',
+    styleUrl: './uart-module.component.scss',
+    imports: [MatExpansionPanel, MatExpansionPanelHeader, MatExpansionPanelTitle]
 })
 export class UartModuleComponent {}

@@ -8,9 +8,10 @@ export class AlertModalResources {
 }
 
 @Component({
-  selector: 'app-alert-modal',
-  templateUrl: './alert-modal.component.html',
-  styleUrl: './alert-modal.component.scss',
+    selector: 'app-alert-modal',
+    templateUrl: './alert-modal.component.html',
+    styleUrl: './alert-modal.component.scss',
+    standalone: true
 })
 export class AlertModalComponent extends ModalBaseComponent implements OnInit {
   message!: string;
