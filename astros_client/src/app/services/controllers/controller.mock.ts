@@ -1,5 +1,5 @@
 import { Injectable } from "@angular/core";
-import {  ChannelType } from "astros-common";
+//mport {  ChannelType } from "astros-common";
 import { Observable, of } from "rxjs";
 
 @Injectable({
@@ -31,7 +31,7 @@ export class ControllerServiceMock {
 
   sendControllerCommand(
     controllerId: number,
-    channelType: ChannelType,
+    channelType: unknown,
     command: unknown,
   ): Observable<unknown> {
     return of(null);

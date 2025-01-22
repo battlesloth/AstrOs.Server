@@ -9,6 +9,7 @@ import { ModalComponent } from '../modal-base/modal.component';
 import { ControllerService } from '../../../services/controllers/controller.service';
 import { ControllerServiceMock } from '../../../services/controllers/controller.mock';
 
+
 const meta: Meta<LoadingModalComponent> = {
   title: 'Components/Modals/LoadingModal',
   component: LoadingModalComponent,

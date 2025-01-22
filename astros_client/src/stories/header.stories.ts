@@ -13,9 +13,9 @@ const meta: Meta<HeaderComponent> = {
     layout: 'fullscreen',
   },
   args: {
-    onLogin: fn(),
-    onLogout: fn(),
-    onCreateAccount: fn(),
+    login: fn(),
+    logout: fn(),
+    createAccount: fn(),
   },
 };
 

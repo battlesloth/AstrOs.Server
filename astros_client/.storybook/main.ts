@@ -1,6 +1,7 @@
 import type { StorybookConfig } from "@storybook/angular";
 import type { StorybookConfigVite } from "@storybook/builder-vite";
-import { optimizeDeps, UserConfig } from "vite";
+import { buffer } from "node:stream/consumers";
+import { build, optimizeDeps, UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const config: StorybookConfig & StorybookConfigVite = {
@@ -24,7 +25,13 @@ const config: StorybookConfig & StorybookConfigVite = {
           "@angular/compiler",
           "@storybook/blocks",
           "tslib",
+          "astros-common",
         ],
+      },
+      build: {
+        commonjsOptions: {
+          include: ["astros-common","node_modules"],
+        },
       },
       plugins: [
         tsconfigPaths(),
