@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
-import { ControllerService } from '#services/controller';
+import { ControllerService } from '@src/services';
 import {
   AstrOsLocationCollection,
   ControllersResponse,

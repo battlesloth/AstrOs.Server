@@ -53,9 +53,12 @@ import {
   UartEventModalComponent,
   UartEventModalResources,
 } from '@src/components/modals/scripting';
-import { ControllerService } from '#services/controller';
-import { ModalService, ScriptsService, SnackbarService } from '@src/services';
-
+import { 
+  ControllerService,
+  ModalService, 
+  ScriptsService, 
+  SnackbarService 
+} from '@src/services';
 import {
   ConfirmModalComponent,
   ConfirmModalEvent,

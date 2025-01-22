@@ -6,7 +6,8 @@ import {
 } from '@storybook/angular';
 import { LoadingModalComponent } from './loading-modal.component';
 import { ModalComponent } from '../modal-base/modal.component';
-import { ControllerService } from '#services/controller';
+import { ControllerService } from '../../../services/controllers/controller.service';
+import { ControllerServiceMock } from '../../../services/controllers/controller.mock';
 
 const meta: Meta<LoadingModalComponent> = {
   title: 'Components/Modals/LoadingModal',
@@ -14,7 +15,8 @@ const meta: Meta<LoadingModalComponent> = {
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
-      imports: [ModalComponent, ControllerService],
+      imports: [ModalComponent],
+      providers: [{provide: ControllerService, useClass: ControllerServiceMock}],
     }),
     componentWrapperDecorator(ModalComponent),
   ],

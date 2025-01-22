@@ -35,8 +35,8 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EspModuleComponent } from '@src/components/esp-module';
-import { ControllerService } from '#services/controller';
 import {
+  ControllerService,
   ModalService,
   SnackbarService,
   StatusService,
