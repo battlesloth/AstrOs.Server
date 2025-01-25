@@ -1,6 +1,6 @@
 import { Meta, moduleMetadata, StoryObj } from '@storybook/angular';
 import { GenericSerialModuleComponent } from './generic-serial-module.component';
-import { ModuleSubType, ModuleType, UartModule, UartType } from 'astros-common';
+import { UartModule, UartType } from 'astros-common';
 
 const meta: Meta<GenericSerialModuleComponent> = {
   title: 'Modules/Uart/Submodules/GenericSerialModule',

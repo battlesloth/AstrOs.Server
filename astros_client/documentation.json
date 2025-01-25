@@ -6855,7 +6855,7 @@
         },
         {
             "name": "BaseUartSubModuleComponent",
-            "id": "component-BaseUartSubModuleComponent-22fb8f82156b7d2eafdf1c6147659681fe7e57b236202f3d0778c3fb8e35ef01574ad2186b9a4167511d03583d111afc72468b7879f32c45143bcc7c48c4e76a",
+            "id": "component-BaseUartSubModuleComponent-b99158a2b45f248646259e1fabfd03005f3597da19265194a1cf632d7a9e87e8b15c9352d3f33513de251618d8bcb62fbb4e675bbf1af80c93f671a2f0ddbe00",
             "file": "src/app/components/esp-module/uart/uart-submodules/base-uart-sub-module/base-uart-sub-module.component.ts",
             "encapsulation": [],
             "entryComponents": [],
@@ -6940,7 +6940,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 26,
+                    "line": 27,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -6993,11 +6993,11 @@
             "description": "",
             "rawdescription": "\n",
             "type": "component",
-            "sourceCode": "import { AfterViewInit, Component, Input } from '@angular/core';\r\nimport { UartModule } from 'astros-common';\r\n\r\n@Component({\r\n  selector: 'app-base-uart-sub-module',\r\n  template: '',\r\n  styleUrls: ['./base-uart-sub-module.component.scss'],\r\n})\r\nexport abstract class BaseUartSubModuleComponent\r\nimplements AfterViewInit {\r\n  @Input()\r\n  isMaster = false;\r\n\r\n  @Input()\r\n  module!: UartModule;\r\n\r\n  uartChannel!: string;\r\n  baudRate!: string;\r\n\r\n  abstract ngAfterViewInit(): void;\r\n\r\n  onChannelChange(evt: Event) {\r\n    this.module.uartChannel = parseInt(this.uartChannel);\r\n  }\r\n\r\n  onBaudRateChange(evt: Event) {\r\n    this.module.baudRate = parseInt(this.baudRate);\r\n  }\r\n}\r\n",
+            "sourceCode": "import { AfterViewInit, Component, Input } from '@angular/core';\r\nimport { UartModule } from 'astros-common';\r\n\r\n@Component({\r\n  selector: 'app-base-uart-sub-module',\r\n  template: '',\r\n  styleUrls: ['./base-uart-sub-module.component.scss'],\r\n})\r\nexport abstract class BaseUartSubModuleComponent\r\nimplements AfterViewInit {\r\n  @Input()\r\n  isMaster = false;\r\n\r\n  @Input()\r\n  module!: UartModule;\r\n\r\n  uartChannel!: string;\r\n  baudRate!: string;\r\n\r\n  abstract ngAfterViewInit(): void;\r\n\r\n  onChannelChange(evt: Event) {\r\n    console.log('event', evt);\r\n    this.module.uartChannel = parseInt(this.uartChannel);\r\n  }\r\n\r\n  onBaudRateChange(evt: Event) {\r\n    this.module.baudRate = parseInt(this.baudRate);\r\n  }\r\n}\r\n",
             "assetsDirs": [],
             "styleUrlsData": [
                 {
-                    "data": ".uart-settings {\r\n  display: flex;\r\n  flex-direction: row;\r\n\r\n  .uart-settings-spacer {\r\n      width: 20px;\r\n  }\r\n}",
+                    "data": ".uart-settings {\r\n  display: flex;\r\n  flex-direction: row;\r\n\r\n  select {\r\n      width: 100px;\r\n      height: 30px;\r\n      font-size: medium;\r\n  }\r\n\r\n  .uart-settings-spacer {\r\n      width: 20px;\r\n  }\r\n}",
                     "styleUrl": "./base-uart-sub-module.component.scss"
                 }
             ],
@@ -8945,7 +8945,7 @@
         },
         {
             "name": "GenericSerialModuleComponent",
-            "id": "component-GenericSerialModuleComponent-dd317cf52f6046058acb1dd2f3f7627daebcfaa54593627f6b8447427c424637abaa8ae1e868b33eff8978a8b5caa6da212b41f662c2668a622514b021d276a9",
+            "id": "component-GenericSerialModuleComponent-cb70ded24b919e65055d6f6e7e5bc1edd3d3ce8155a9361ffac4f1db201e4f136bd346ba016fa563d34cd4d0f9e25f9fd83c2791bc32cca9cb2ce9648e4f19d8",
             "file": "src/app/components/esp-module/uart/uart-submodules/generic-serial-module/generic-serial-module.component.ts",
             "encapsulation": [],
             "entryComponents": [],
@@ -8954,6 +8954,7 @@
             "providers": [],
             "selector": "app-generic-serial-module",
             "styleUrls": [
+                "../base-uart-sub-module/base-uart-sub-module.component.scss",
                 "./generic-serial-module.component.scss"
             ],
             "styles": [],
@@ -9023,7 +9024,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 13,
+                    "line": 22,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "inheritance": {
@@ -9043,7 +9044,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 26,
+                    "line": 27,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -9098,13 +9099,25 @@
             "hostBindings": [],
             "hostListeners": [],
             "standalone": false,
-            "imports": [],
+            "imports": [
+                {
+                    "name": "NgIf"
+                },
+                {
+                    "name": "FormsModule",
+                    "type": "module"
+                }
+            ],
             "description": "",
             "rawdescription": "\n",
             "type": "component",
-            "sourceCode": "import { AfterViewInit, Component } from '@angular/core';\nimport { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';\n\n@Component({\n  selector: 'app-generic-serial-module',\n  templateUrl: './generic-serial-module.component.html',\n  styleUrls: ['./generic-serial-module.component.scss'],\n})\nexport class GenericSerialModuleComponent\nextends BaseUartSubModuleComponent\nimplements AfterViewInit {\n\n  ngAfterViewInit(): void {\n    if (this.module) {\n      this.uartChannel = this.module.uartChannel.toString();\n      this.baudRate = this.module.baudRate.toString();\n     }\n  }\n}\n",
+            "sourceCode": "import { AfterViewInit, Component } from '@angular/core';\nimport { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';\nimport { FormsModule } from '@angular/forms';\nimport { NgIf } from '@angular/common';\n\n@Component({\n  selector: 'app-generic-serial-module',\n  templateUrl: './generic-serial-module.component.html',\n  styleUrls: [\n    '../base-uart-sub-module/base-uart-sub-module.component.scss',\n    './generic-serial-module.component.scss'\n  ],\n  imports: [\n    NgIf,\n    FormsModule\n  ],\n})\nexport class GenericSerialModuleComponent\nextends BaseUartSubModuleComponent\nimplements AfterViewInit {\n\n  ngAfterViewInit(): void {\n    if (this.module) {\n      this.uartChannel = this.module.uartChannel.toString();\n      this.baudRate = this.module.baudRate.toString();\n     }\n  }\n}\n",
             "assetsDirs": [],
             "styleUrlsData": [
+                {
+                    "data": ".uart-settings {\r\n  display: flex;\r\n  flex-direction: row;\r\n\r\n  select {\r\n      width: 100px;\r\n      height: 30px;\r\n      font-size: medium;\r\n  }\r\n\r\n  .uart-settings-spacer {\r\n      width: 20px;\r\n  }\r\n}",
+                    "styleUrl": "../base-uart-sub-module/base-uart-sub-module.component.scss"
+                },
                 {
                     "data": ".uart-settings {\r\n    display: flex;\r\n    flex-direction: row;\r\n\r\n    .uart-settings-spacer {\r\n        width: 20px;\r\n    }\r\n}",
                     "styleUrl": "./generic-serial-module.component.scss"
@@ -10882,7 +10895,7 @@
         },
         {
             "name": "KangarooModuleComponent",
-            "id": "component-KangarooModuleComponent-add09832e434714d0b9ac59414fc96b70c6d213e9c865c8bb2b724d2ef1be39845ae3209c9f5e69ad32b57dfa7009f09a51befc78bfb0a31d64046f40541c01b",
+            "id": "component-KangarooModuleComponent-47e07846107a8bfd36b8cccc9dfdcabf59edeac16d962498171ebeff850c27f1c2e91b9957f5be1fbaac53fc03b948fec1b3dd88a3e83566f95c3eb81795a523",
             "file": "src/app/components/esp-module/uart/uart-submodules/kangaroo-module/kangaroo-module.component.ts",
             "encapsulation": [],
             "entryComponents": [],
@@ -10891,6 +10904,7 @@
             "providers": [],
             "selector": "app-kangaroo-module",
             "styleUrls": [
+                "../base-uart-sub-module/base-uart-sub-module.component.scss",
                 "./kangaroo-module.component.scss"
             ],
             "styles": [],
@@ -10934,7 +10948,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 16
+                    "line": 23
                 },
                 {
                     "name": "baudRate",
@@ -10970,7 +10984,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 18,
+                    "line": 25,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "inheritance": {
@@ -10990,7 +11004,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 26,
+                    "line": 27,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -11047,6 +11061,9 @@
             "standalone": false,
             "imports": [
                 {
+                    "name": "NgIf"
+                },
+                {
                     "name": "FormsModule",
                     "type": "module"
                 }
@@ -11054,11 +11071,15 @@
             "description": "",
             "rawdescription": "\n",
             "type": "component",
-            "sourceCode": "import { AfterViewInit, Component} from '@angular/core';\nimport { KangarooX2 } from 'astros-common';\nimport { FormsModule } from '@angular/forms';\nimport { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';\n\n@Component({\n  selector: 'app-kangaroo-module',\n  templateUrl: './kangaroo-module.component.html',\n  styleUrls: ['./kangaroo-module.component.scss'],\n  imports: [FormsModule],\n})\nexport class KangarooModuleComponent\nextends BaseUartSubModuleComponent\nimplements AfterViewInit {\n\n  subModule!: KangarooX2;\n\n  ngAfterViewInit(): void {\n    if (this.module) {\n      this.uartChannel = this.module.uartChannel.toString();\n      this.baudRate = this.module.baudRate.toString();\n      this.subModule = this.module.subModule as KangarooX2;\n    }\n  }\n}\n",
+            "sourceCode": "import { AfterViewInit, Component } from '@angular/core';\nimport { KangarooX2 } from 'astros-common';\nimport { FormsModule } from '@angular/forms';\nimport { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';\nimport { NgIf } from '@angular/common';\n\n@Component({\n  selector: 'app-kangaroo-module',\n  templateUrl: './kangaroo-module.component.html',\n  styleUrls: [\n    '../base-uart-sub-module/base-uart-sub-module.component.scss',\n    './kangaroo-module.component.scss'\n  ],\n  imports: [\n    NgIf,\n    FormsModule\n  ],\n})\nexport class KangarooModuleComponent\n  extends BaseUartSubModuleComponent\n  implements AfterViewInit {\n\n  subModule!: KangarooX2;\n\n  ngAfterViewInit(): void {\n    if (this.module) {\n      this.uartChannel = this.module.uartChannel.toString();\n      this.baudRate = this.module.baudRate.toString();\n      this.subModule = this.module.subModule as KangarooX2;\n    }\n  }\n}\n",
             "assetsDirs": [],
             "styleUrlsData": [
                 {
-                    "data": ".kangaroo{\r\n\r\n    margin-top: 20px;\r\n    \r\n    .uart-settings {\r\n        display: flex;\r\n        flex-direction: row;\r\n    \r\n        .uart-settings-spacer {\r\n            width: 20px;\r\n        }\r\n    }\r\n\r\n.kangaroo-label{\r\n            display: inline !important; \r\n            font-size: large;\r\n            margin-right: 20px;\r\n        }\r\n.kangaroo-input {\r\n            display: inline !important; \r\n            padding: 2px;\r\n            font-size: large;\r\n            width: 400px;\r\n        }\r\n}",
+                    "data": ".uart-settings {\r\n  display: flex;\r\n  flex-direction: row;\r\n\r\n  select {\r\n      width: 100px;\r\n      height: 30px;\r\n      font-size: medium;\r\n  }\r\n\r\n  .uart-settings-spacer {\r\n      width: 20px;\r\n  }\r\n}",
+                    "styleUrl": "../base-uart-sub-module/base-uart-sub-module.component.scss"
+                },
+                {
+                    "data": ".kangaroo{\r\n    margin-top: 20px;\r\n.kangaroo-label{\r\n            display: inline !important; \r\n            font-size: large;\r\n            margin-right: 20px;\r\n        }\r\n.kangaroo-input {\r\n            display: inline !important; \r\n            padding: 2px;\r\n            font-size: large;\r\n            width: 400px;\r\n        }\r\n}",
                     "styleUrl": "./kangaroo-module.component.scss"
                 }
             ],
@@ -11069,7 +11090,7 @@
             "implements": [
                 "AfterViewInit"
             ],
-            "templateData": "<div class=\"kangaroo\">\r\n    <div class=\"uart-settings\">\r\n        <select [(ngModel)]=\"uartChannel\" (change)=\"onChannelChange($event)\">\r\n            <option *ngIf=\"!isMaster\" value=\"1\">Channel 1</option>\r\n            <option value=\"2\">Channel 2</option>\r\n        </select>\r\n        <div class=\"uart-settings-spacer\"></div>\r\n        <select [(ngModel)]=\"baudRate\" (change)=\"onBaudRateChange($event)\">\r\n            <option value=\"9600\">9600</option>\r\n            <option value=\"19200\">19200</option>\r\n            <option value=\"38400\">38400</option>\r\n            <option value=\"57600\">57600</option>\r\n            <option value=\"115200\">115200</option>\r\n        </select>\r\n    </div>\r\n    <div >\r\n        <label class=\"kangaroo-label\" for=\"ch1Name\">Channel 1</label>\r\n        <input class=\"kangaroo-input\" name=\"ch1Name\" placeholder=\"Channel 1\"  [(ngModel)]=\"subModule.ch1Name\" />\r\n    </div>\r\n    <div >\r\n        <label class=\"kangaroo-label\" for=\"ch2Name\">Channel 2</label>\r\n        <input class=\"kangaroo-input\" name=\"ch2Name\" placeholder=\"Channel 2\"  [(ngModel)]=\"subModule.ch2Name\" />\r\n    </div>\r\n</div>\r\n"
+            "templateData": "<div class=\"uart-settings\">\r\n    <select [(ngModel)]=\"uartChannel\" (change)=\"onChannelChange($event)\">\r\n        <option *ngIf=\"!isMaster\" value=\"1\">Channel 1</option>\r\n        <option value=\"2\">Channel 2</option>\r\n    </select>\r\n    <div class=\"uart-settings-spacer\"></div>\r\n    <select [(ngModel)]=\"baudRate\" (change)=\"onBaudRateChange($event)\">\r\n        <option value=\"9600\">9600</option>\r\n        <option value=\"19200\">19200</option>\r\n        <option value=\"38400\">38400</option>\r\n        <option value=\"57600\">57600</option>\r\n        <option value=\"115200\">115200</option>\r\n    </select>\r\n</div>\r\n<div class=\"kangaroo\">\r\n    <div >\r\n        <label class=\"kangaroo-label\" for=\"ch1Name\">Channel 1</label>\r\n        <input *ngIf=\"(subModule)\" class=\"kangaroo-input\" name=\"ch1Name\" placeholder=\"Channel 1\"  [(ngModel)]=\"subModule.ch1Name\" />\r\n    </div>\r\n    <div >\r\n        <label class=\"kangaroo-label\" for=\"ch2Name\">Channel 2</label>\r\n        <input *ngIf=\"(subModule)\" class=\"kangaroo-input\" name=\"ch2Name\" placeholder=\"Channel 2\"  [(ngModel)]=\"subModule.ch2Name\" />\r\n    </div>\r\n</div>\r\n"
         },
         {
             "name": "LoadingModalComponent",
@@ -11706,7 +11727,7 @@
         },
         {
             "name": "MaestroModuleComponent",
-            "id": "component-MaestroModuleComponent-d2462b424cbb8a7479d5c9600c4f573193941467875a6e0b68dd17f02c7eb2ffe4f44c53d4fe00a85f75bd63e58547c44ae3bc845c2b9d2a98901b4dfbf51f68",
+            "id": "component-MaestroModuleComponent-0a7cc0f6e5420b6b235723a8bfb04e44df0219091c7d7bf8e8c9ab7490b93020303e0c9f11980016e1790ce5fcda75112bc3438eb3569fb84df16ec0a6377611",
             "file": "src/app/components/esp-module/uart/uart-submodules/maestro-module/maestro-module.component.ts",
             "encapsulation": [],
             "entryComponents": [],
@@ -11714,7 +11735,10 @@
             "outputs": [],
             "providers": [],
             "selector": "app-maestro-module",
-            "styleUrls": [],
+            "styleUrls": [
+                "../base-uart-sub-module/base-uart-sub-module.component.scss",
+                "./maestro-module.component.scss"
+            ],
             "styles": [],
             "templateUrl": [
                 "./maestro-module.component.html"
@@ -11756,7 +11780,7 @@
                     "indexKey": "",
                     "optional": false,
                     "description": "",
-                    "line": 15
+                    "line": 26
                 },
                 {
                     "name": "baudRate",
@@ -11792,7 +11816,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 17,
+                    "line": 28,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "inheritance": {
@@ -11812,7 +11836,7 @@
                     "optional": false,
                     "returnType": "void",
                     "typeParameters": [],
-                    "line": 26,
+                    "line": 27,
                     "deprecated": false,
                     "deprecationMessage": "",
                     "jsdoctags": [
@@ -11867,14 +11891,37 @@
             "hostBindings": [],
             "hostListeners": [],
             "standalone": false,
-            "imports": [],
+            "imports": [
+                {
+                    "name": "NgIf"
+                },
+                {
+                    "name": "NgFor"
+                },
+                {
+                    "name": "FormsModule",
+                    "type": "module"
+                },
+                {
+                    "name": "MaestroChannelComponent",
+                    "type": "component"
+                }
+            ],
             "description": "",
             "rawdescription": "\n",
             "type": "component",
-            "sourceCode": "import { AfterViewInit, Component} from '@angular/core';\nimport { MaestroModule } from 'astros-common';\nimport { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';\n\n@Component({\n  selector: 'app-maestro-module',\n  imports: [],\n  templateUrl: './maestro-module.component.html',\n  styleUrl: './maestro-module.component.scss',\n})\nexport class MaestroModuleComponent \nextends BaseUartSubModuleComponent\nimplements AfterViewInit {\n\n  subModule!: MaestroModule;\n\n  ngAfterViewInit(): void {\n    if (this.module) {\n      this.uartChannel = this.module.uartChannel.toString();\n      this.baudRate = this.module.baudRate.toString();\n      this.subModule = this.module.subModule as MaestroModule;\n    }\n  }\n}\n",
-            "styleUrl": "./maestro-module.component.scss",
+            "sourceCode": "import { AfterViewInit, Component } from '@angular/core';\nimport { MaestroModule } from 'astros-common';\nimport { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';\nimport { FormsModule } from '@angular/forms';\nimport { NgFor, NgIf } from '@angular/common';\nimport { MaestroChannelComponent } from '../maestro-channel/maestro-channel.component';\n\n@Component({\n  selector: 'app-maestro-module',\n  templateUrl: './maestro-module.component.html',\n  styleUrls: [\n    '../base-uart-sub-module/base-uart-sub-module.component.scss',\n    './maestro-module.component.scss',\n  ],\n  imports: [\n    NgIf,\n    NgFor,\n    FormsModule,\n    MaestroChannelComponent\n  ],\n})\nexport class MaestroModuleComponent\n  extends BaseUartSubModuleComponent\n  implements AfterViewInit {\n\n  subModule!: MaestroModule;\n\n  ngAfterViewInit(): void {\n    if (this.module) {\n      this.uartChannel = this.module.uartChannel.toString();\n      this.baudRate = this.module.baudRate.toString();\n      this.subModule = this.module.subModule as MaestroModule;\n    }\n  }\n}\n",
             "assetsDirs": [],
-            "styleUrlsData": "",
+            "styleUrlsData": [
+                {
+                    "data": ".uart-settings {\r\n  display: flex;\r\n  flex-direction: row;\r\n\r\n  select {\r\n      width: 100px;\r\n      height: 30px;\r\n      font-size: medium;\r\n  }\r\n\r\n  .uart-settings-spacer {\r\n      width: 20px;\r\n  }\r\n}",
+                    "styleUrl": "../base-uart-sub-module/base-uart-sub-module.component.scss"
+                },
+                {
+                    "data": ".add-channel {\r\n    font-size: medium;\r\n    height: 30px;\r\n    padding-left: 10px;\r\n    padding-right: 10px; \r\n    padding-top: 4px;\r\n    padding-bottom: 4px;\r\n}",
+                    "styleUrl": "./maestro-module.component.scss"
+                }
+            ],
             "stylesData": "",
             "extends": [
                 "BaseUartSubModuleComponent"
@@ -11882,7 +11929,7 @@
             "implements": [
                 "AfterViewInit"
             ],
-            "templateData": "<div class=\"uart-settings\">\r\n    <select [(ngModel)]=\"uartChannel\" (change)=\"onChannelChange($event)\">\r\n        <option *ngIf=\"!isMaster\" value=\"1\">Channel 1</option>\r\n        <option value=\"2\">Channel 2</option>\r\n    </select>\r\n    <div class=\"uart-settings-spacer\"></div>\r\n    <select [(ngModel)]=\"baudRate\" (change)=\"onBaudRateChange($event)\">\r\n        <option value=\"9600\">9600</option>\r\n        <option value=\"19200\">19200</option>\r\n        <option value=\"38400\">38400</option>\r\n        <option value=\"57600\">57600</option>\r\n        <option value=\"115200\">115200</option>\r\n    </select>\r\n    <div class=\"uart-settings-spacer\"></div>\r\n    <button mat-raised-button color=\"primary\" (click)=\"addChannel()\">Add Channel</button>\r\n</div>\r\n<ul class=\"servo-list\">\r\n    <li *ngFor=\"let channel of module.channels\">\r\n        <app-maestro-channel [channel]=\"channel\" />\r\n    </li>\r\n</ul>\r\n"
+            "templateData": "<div class=\"uart-settings\">\r\n    <select [(ngModel)]=\"uartChannel\" (change)=\"onChannelChange($event)\">\r\n        <option *ngIf=\"!isMaster\" value=\"1\">Channel 1</option>\r\n        <option value=\"2\">Channel 2</option>\r\n    </select>\r\n    <div class=\"uart-settings-spacer\"></div>\r\n    <select [(ngModel)]=\"baudRate\" (change)=\"onBaudRateChange($event)\">\r\n        <option value=\"9600\">9600</option>\r\n        <option value=\"19200\">19200</option>\r\n        <option value=\"38400\">38400</option>\r\n        <option value=\"57600\">57600</option>\r\n        <option value=\"115200\">115200</option>\r\n    </select>\r\n    <div class=\"uart-settings-spacer\"></div>\r\n    <button class=\"add-channel\" mat-raised-button color=\"primary\" (click)=\"addChannel()\">Add Channel</button>\r\n</div>\r\n<ul *ngIf=\"subModule?.boards[0]\" class=\"servo-list\">\r\n    <li *ngFor=\"let channel of subModule.boards[0].channels\">\r\n        <app-maestro-channel [channel]=\"channel\" />\r\n    </li>\r\n</ul>\r\n"
         },
         {
             "name": "ModalBaseComponent",

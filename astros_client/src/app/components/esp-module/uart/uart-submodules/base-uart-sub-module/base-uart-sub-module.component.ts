@@ -19,11 +19,11 @@ implements AfterViewInit {
 
   abstract ngAfterViewInit(): void;
 
-  onChannelChange(evt: Event) {
-    this.module.uartChannel = parseInt(this.uartChannel);
+  onChannelChange(val: string) {
+    this.module.uartChannel = parseInt(val);
   }
 
-  onBaudRateChange(evt: Event) {
-    this.module.baudRate = parseInt(this.baudRate);
+  onBaudRateChange(val: string) {
+    this.module.baudRate = parseInt(val);
   }
 }

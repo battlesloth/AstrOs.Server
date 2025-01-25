@@ -19,12 +19,11 @@ type Story = StoryObj<KangarooModuleComponent>;
 
 export const Default: Story = {
   args: {
-    module: getSerialModule(UartType.kangaroo, 1, 9600),
+    module: getSerialModule( 1, 9600),
   },
 };
 
 function getSerialModule(
-  type: UartType,
   ch: number,
   baudRate: number,
 ): UartModule {
