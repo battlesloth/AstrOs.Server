@@ -8,7 +8,7 @@ import { GpioEventModalComponent } from './gpio-event-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<GpioEventModalComponent> = {
-  title: 'Components/Modals/GpioEventModal',
+  title: 'Modals/Scripting/GpioEventModal',
   component: GpioEventModalComponent,
   tags: ['autodocs'],
   decorators: [

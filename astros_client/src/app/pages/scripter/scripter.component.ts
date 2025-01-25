@@ -53,11 +53,11 @@ import {
   UartEventModalComponent,
   UartEventModalResources,
 } from '@src/components/modals/scripting';
-import { 
+import {
   ControllerService,
-  ModalService, 
-  ScriptsService, 
-  SnackbarService 
+  ModalService,
+  ScriptsService,
+  SnackbarService,
 } from '@src/services';
 import {
   ConfirmModalComponent,

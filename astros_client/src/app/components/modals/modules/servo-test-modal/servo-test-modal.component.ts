@@ -1,8 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { BaseEventModalComponent } from '../scripting/base-event-modal/base-event-modal.component';
+import { BaseEventModalComponent } from '../../scripting/base-event-modal/base-event-modal.component';
 import { MatSlider, MatSliderThumb } from '@angular/material/slider';
 import { FormsModule } from '@angular/forms';
-import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
+import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
 export class ServoTestModalResources {
   public static servoId = 'servoId';

@@ -1,0 +1,17 @@
+<div class="add-module-modal">
+    <h1>Add Module</h1>
+    <div class="modal-body">
+        <select id="module-select" title="Module" [(ngModel)]="selectedModule" (change)="modalChange($event)">
+            <option value="0" disabled selected>Select Module Type</option>
+            <option *ngFor="let o of options" value="{{o.id}}">{{o.value}}</option>
+        </select>
+        </div> 
+        <div class="modal-buttons">
+            <div class="button-spacer"></div>
+            <div class="button-grouper">
+                <button (click)="addModule();">Add</button>
+                <button (click)="closeModal();">Close</button>
+            </div>
+            <div class="button-spacer"></div>
+        </div>
+</div>

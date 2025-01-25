@@ -9,15 +9,14 @@ import { ModalComponent } from '../../modal-base/modal.component';
 import { ScriptsService } from '@src/services';
 import { ScriptsServiceMock } from '@src/services/scripts/scripts.mock';
 
-
 const meta: Meta<ScriptTestModalComponent> = {
-  title: 'Components/Modals/ScriptTestModal',
+  title: 'Modals/Scripting/ScriptTestModal',
   component: ScriptTestModalComponent,
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
       imports: [ModalComponent],
-      providers: [{provide: ScriptsService, useClass: ScriptsServiceMock}],
+      providers: [{ provide: ScriptsService, useClass: ScriptsServiceMock }],
     }),
     componentWrapperDecorator(ModalComponent),
   ],

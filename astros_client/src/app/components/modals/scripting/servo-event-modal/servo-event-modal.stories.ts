@@ -8,7 +8,7 @@ import { ServoEventModalComponent } from './servo-event-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<ServoEventModalComponent> = {
-  title: 'Components/Modals/ServoEventModal',
+  title: 'Modals/Scripting/ServoEventModal',
   component: ServoEventModalComponent,
   tags: ['autodocs'],
   decorators: [

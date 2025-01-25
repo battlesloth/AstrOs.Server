@@ -8,7 +8,7 @@ import { HumanCyborgModalComponent } from './human-cyborg-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<HumanCyborgModalComponent> = {
-  title: 'Components/Modals/HumanCyborgModal',
+  title: 'Modals/Scripting/HumanCyborgModal',
   component: HumanCyborgModalComponent,
   tags: ['autodocs'],
   decorators: [

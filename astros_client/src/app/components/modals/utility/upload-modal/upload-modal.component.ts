@@ -1,8 +1,8 @@
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { faFileAudio, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { ModalBaseComponent } from '../modal-base/modal-base.component';
-import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
+import { ModalBaseComponent } from '../../modal-base/modal-base.component';
+import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 import { FileUpload } from 'src/app/models/upload-file';
 import { NgFor, NgStyle, DecimalPipe } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';

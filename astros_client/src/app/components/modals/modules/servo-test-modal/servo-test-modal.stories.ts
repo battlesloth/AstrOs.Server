@@ -4,12 +4,12 @@ import {
   Meta,
   StoryObj,
 } from '@storybook/angular';
-import { FormatModalComponent } from './format-modal.component';
-import { ModalComponent } from '../modal-base/modal.component';
+import { ServoTestModalComponent } from './servo-test-modal.component';
+import { ModalComponent } from '../../modal-base/modal.component';
 
-const meta: Meta<FormatModalComponent> = {
-  title: 'Components/Modals/FormatModal',
-  component: FormatModalComponent,
+const meta: Meta<ServoTestModalComponent> = {
+  title: 'Modals/Modules/ServoTestModal',
+  component: ServoTestModalComponent,
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
@@ -21,7 +21,7 @@ const meta: Meta<FormatModalComponent> = {
 
 export default meta;
 
-type Story = StoryObj<FormatModalComponent>;
+type Story = StoryObj<ServoTestModalComponent>;
 
 export const Default: Story = {
   args: {},

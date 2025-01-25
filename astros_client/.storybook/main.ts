@@ -1,7 +1,6 @@
 import type { StorybookConfig } from "@storybook/angular";
 import type { StorybookConfigVite } from "@storybook/builder-vite";
-import { buffer } from "node:stream/consumers";
-import { build, optimizeDeps, UserConfig } from "vite";
+import { UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const config: StorybookConfig & StorybookConfigVite = {

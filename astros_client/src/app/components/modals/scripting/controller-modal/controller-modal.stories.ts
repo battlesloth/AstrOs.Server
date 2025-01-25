@@ -8,7 +8,7 @@ import { ControllerModalComponent } from './controller-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<ControllerModalComponent> = {
-  title: 'Components/Modals/ControllerModal',
+  title: 'Modals/Scripting/ControllerModal',
   component: ControllerModalComponent,
   tags: ['autodocs'],
   decorators: [

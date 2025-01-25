@@ -8,7 +8,7 @@ import { AlertModalComponent } from './alert-modal.component';
 import { ModalComponent } from '../modal-base/modal.component';
 
 const meta: Meta<AlertModalComponent> = {
-  title: 'Components/Modals/AlertModal',
+  title: 'Modals/AlertModal',
   component: AlertModalComponent,
   tags: ['autodocs'],
   decorators: [

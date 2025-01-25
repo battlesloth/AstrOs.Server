@@ -11,4 +11,11 @@
         <option value="57600">57600</option>
         <option value="115200">115200</option>
     </select>
+    <div class="uart-settings-spacer"></div>
+    <button class="add-channel" mat-raised-button color="primary" (click)="addChannel()">Add Channel</button>
 </div>
+<ul *ngIf="subModule?.boards[0]" class="servo-list">
+    <li *ngFor="let channel of subModule.boards[0].channels">
+        <app-maestro-channel [channel]="channel" />
+    </li>
+</ul>

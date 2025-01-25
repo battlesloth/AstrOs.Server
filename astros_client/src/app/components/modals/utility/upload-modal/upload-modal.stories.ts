@@ -4,19 +4,19 @@ import {
   Meta,
   StoryObj,
 } from '@storybook/angular';
-import { ModalComponent } from '../modal-base/modal.component';
+import { ModalComponent } from '../../modal-base/modal.component';
 import { UploadModalComponent } from './upload-modal.component';
 import { HttpClient } from '@angular/common/http';
 import { HttpClientMock } from '@src/mocks';
 
 const meta: Meta<UploadModalComponent> = {
-  title: 'Components/Modals/UploadModal',
+  title: 'Modals/Utility/UploadModal',
   component: UploadModalComponent,
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
       imports: [ModalComponent],
-      providers: [{provide: HttpClient, useClass: HttpClientMock}],
+      providers: [{ provide: HttpClient, useClass: HttpClientMock }],
     }),
     componentWrapperDecorator(ModalComponent),
   ],

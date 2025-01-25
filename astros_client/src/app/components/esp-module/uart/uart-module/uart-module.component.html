@@ -1,7 +1,10 @@
 <mat-expansion-panel>
     <mat-expansion-panel-header>
-        <mat-panel-title>Test</mat-panel-title>
+        <mat-panel-title>
+            <div class="header-name">
+                <input matInput placeholder="Name" [(ngModel)]="module.name" (click)="nameClicked($event)" />
+            </div>
+        </mat-panel-title>
     </mat-expansion-panel-header>
-    <div>Test</div>
-    <ng-template #uart2Container></ng-template>
+    <ng-template #uartContainer></ng-template>
 </mat-expansion-panel>

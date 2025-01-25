@@ -8,7 +8,7 @@ import { ChannelTestModalComponent } from './channel-test-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
 
 const meta: Meta<ChannelTestModalComponent> = {
-  title: 'Components/Modals/ChannelTestModal',
+  title: 'Modals/Scripting/ChannelTestModal',
   component: ChannelTestModalComponent,
   tags: ['autodocs'],
   decorators: [

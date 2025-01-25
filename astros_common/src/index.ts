@@ -40,6 +40,8 @@ export { Kvp } from "./kvp";
 export { DeploymentStatus } from "./scripts/deploymentStatus";
 export { AstrOsConstants } from "./astros_constants";
 export {
+  ModuleType,
+  ModuleSubType,
   ChannelType,
   ChannelSubType,
   UartType,

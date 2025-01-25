@@ -8,8 +8,8 @@ import {
   TransmissionType,
 } from 'astros-common';
 import { Subscription } from 'rxjs';
-import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
-import { ModalBaseComponent } from '../modal-base/modal-base.component';
+import { ModalCallbackEvent } from '../..//modal-base/modal-callback-event';
+import { ModalBaseComponent } from '../../modal-base/modal-base.component';
 
 export class LoadingModalResources {
   public static closeEvent = 'loading_closeEvent';

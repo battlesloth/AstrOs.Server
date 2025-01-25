@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { ModalBaseComponent } from '../modal-base/modal-base.component';
-import { ModalCallbackEvent } from '../modal-base/modal-callback-event';
+import { ModalBaseComponent } from '../../modal-base/modal-base.component';
+import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 import { NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 

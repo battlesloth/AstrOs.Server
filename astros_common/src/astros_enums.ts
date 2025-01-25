@@ -1,3 +1,25 @@
+export const enum ModuleType {
+  none = 0,
+  uart = 1,
+  i2c = 2,
+  gpio = 3,
+}
+
+export const enum ModuleSubType {
+  none = 0,
+  // serial subtypes
+  genericSerial = 1,
+  kangaroo = 2,
+  humanCyborgRelationsSerial = 3,
+  maestro = 4,
+
+  // i2c subtypes
+  genericI2C = 101,
+  humanCyborgRelationsI2C = 102,
+  pwmBoard = 103,
+
+}
+
 export const enum ChannelType {
   none = 0,
   uart = 1,

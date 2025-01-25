@@ -8,7 +8,7 @@ import { ConfirmModalComponent } from './confirm-modal.component';
 import { ModalComponent } from '../modal-base/modal.component';
 
 const meta: Meta<ConfirmModalComponent> = {
-  title: 'Components/Modals/ConfirmModal',
+  title: 'Modals/ConfirmModal',
   component: ConfirmModalComponent,
   tags: ['autodocs'],
   decorators: [
