@@ -45,6 +45,13 @@ export const enum UartType {
   maestro = 4,
 }
 
+export const enum I2cType {
+  none = 0,
+  genericI2C = 1,
+  humanCyborgRelations = 2,
+  pwmBoard = 3,
+}
+
 export const enum UploadStatus {
   notUploaded,
   uploading,

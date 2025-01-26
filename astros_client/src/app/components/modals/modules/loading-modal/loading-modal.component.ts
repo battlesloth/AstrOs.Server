@@ -52,6 +52,7 @@ export class LoadingModalComponent
   ngOnInit(): void {
     const locationsObserver = {
       next: (result: AstrOsLocationCollection) => {
+        console.log('Loaded locations');
         this.locations = result;
         this.locationsLoaded = true;
         this.checkLoadedState();
@@ -71,6 +72,8 @@ export class LoadingModalComponent
     this.controllerService.syncControllers().subscribe(observer);
 
     this.subscription = this.socket.messages.subscribe((msg: unknown) => {
+
+      console.log('Received message', msg);
       if (msg && typeof msg === 'object' && 'type' in msg)
         if (msg.type === this.controllersMsg) {
           this.controllers = msg as ControllersResponse;
@@ -92,7 +95,7 @@ export class LoadingModalComponent
   }
 
   closeModal(): void {
-    this.subscription.unsubscribe();
+    this.subscription?.unsubscribe();
     const evt = new ModalCallbackEvent(LoadingModalResources.closeEvent, {
       controllers: this.controllers.controllers,
       locations: this.locations,

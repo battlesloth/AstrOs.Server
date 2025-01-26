@@ -1,7 +1,6 @@
 import { ControlModule } from "./control_module";
 import { GpioModule } from "./gpio/gpio_module";
 import { I2cModule } from "./i2c/i2c_module";
-import { PwmModule } from "./pca9685/pwm_module";
 import { UartModule } from "./uart/uart_module";
 
 export class ControllerLocation {
@@ -13,10 +12,10 @@ export class ControllerLocation {
   controller: ControlModule;
 
   gpioModule: GpioModule;
-  i2cModule: I2cModule;
+  i2cModules: I2cModule[];
 
   uartModules: UartModule[];
-  pwmModules: PwmModule[];
+
 
   constructor(
     id: number,
@@ -31,10 +30,9 @@ export class ControllerLocation {
 
     this.controller = new ControlModule(0, "", "");
 
-    this.i2cModule = new I2cModule();
     this.gpioModule = new GpioModule();
 
+    this.i2cModules = new Array<I2cModule>();
     this.uartModules = new Array<UartModule>();
-    this.pwmModules = new Array<PwmModule>();
   }
 }

@@ -1,23 +1,29 @@
 import { NgIf } from '@angular/common';
 import {
+  AfterContentInit,
   AfterViewInit,
   Component,
   ComponentRef,
+  EventEmitter,
   Input,
+  Output,
   ViewChild,
   ViewContainerRef,
 } from '@angular/core';
 import {
   MatExpansionPanel,
+  MatExpansionPanelDescription,
   MatExpansionPanelHeader,
   MatExpansionPanelTitle,
 } from '@angular/material/expansion';
-import { UartModule, UartType } from 'astros-common';
+import { ModuleType, UartModule, UartType } from 'astros-common';
 import { GenericSerialModuleComponent } from '../uart-submodules/generic-serial-module/generic-serial-module.component';
 import { KangarooModuleComponent } from '../uart-submodules/kangaroo-module/kangaroo-module.component';
 import { MaestroModuleComponent } from '../uart-submodules/maestro-module/maestro-module.component';
 import { FormsModule } from '@angular/forms';
 import { BaseUartSubModuleComponent } from '../uart-submodules/base-uart-sub-module/base-uart-sub-module.component';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { faTimes } from '@fortawesome/free-solid-svg-icons';
 
 
 @Component({
@@ -28,14 +34,17 @@ import { BaseUartSubModuleComponent } from '../uart-submodules/base-uart-sub-mod
     MatExpansionPanel,
     MatExpansionPanelHeader,
     MatExpansionPanelTitle,
+    MatExpansionPanelDescription,
     NgIf,
     GenericSerialModuleComponent,
     KangarooModuleComponent,
     MaestroModuleComponent,
     FormsModule,
+    FontAwesomeModule,
   ],
 })
-export class UartModuleComponent implements AfterViewInit {
+export class UartModuleComponent
+  implements AfterViewInit, AfterContentInit {
   @ViewChild('uartContainer', { read: ViewContainerRef })
   uartContainer!: ViewContainerRef;
 
@@ -45,6 +54,11 @@ export class UartModuleComponent implements AfterViewInit {
   @Input()
   module!: UartModule;
 
+  @Output()
+  removeModuleEvent = new EventEmitter<unknown>();
+
+  subtypeName = '';
+  removeIcon = faTimes;
   component!: ComponentRef<any>;
 
   nameClicked(evt: MouseEvent) {
@@ -55,6 +69,22 @@ export class UartModuleComponent implements AfterViewInit {
     this.setModule();
   }
 
+  ngAfterContentInit(): void {
+    switch (this.module.uartType) {
+      case UartType.genericSerial:
+        this.subtypeName = 'Generic Serial';
+        break;
+      case UartType.kangaroo:
+        this.subtypeName = 'Kangaroo X2';
+        break;
+      case UartType.maestro:
+        this.subtypeName = 'Pololu Maestro';
+        break;
+      default:
+        break;
+    }
+  }
+
   setModule() {
     this.uartContainer?.clear();
 
@@ -63,31 +93,38 @@ export class UartModuleComponent implements AfterViewInit {
     switch (this.module.uartType) {
       case UartType.genericSerial:
         {
-        component = this.uartContainer.createComponent(
-          GenericSerialModuleComponent,
-        ) as ComponentRef<GenericSerialModuleComponent>;
-        component.instance.module = this.module;
-        component.instance.isMaster = this.isMaster;
-        break;
-      }
+          component = this.uartContainer.createComponent(
+            GenericSerialModuleComponent,
+          ) as ComponentRef<GenericSerialModuleComponent>;
+          component.instance.module = this.module;
+          component.instance.isMaster = this.isMaster;
+          break;
+        }
       case UartType.kangaroo:
-       { component = this.uartContainer.createComponent(
-          KangarooModuleComponent,
-        ) as ComponentRef<KangarooModuleComponent>;
-        component.instance.module = this.module;
-        component.instance.isMaster = this.isMaster; 
-        break;}
+        {
+          component = this.uartContainer.createComponent(
+            KangarooModuleComponent,
+          ) as ComponentRef<KangarooModuleComponent>;
+          component.instance.module = this.module;
+          component.instance.isMaster = this.isMaster;
+          break;
+        }
       case UartType.maestro:
         {
-        component = this.uartContainer.createComponent(
-          MaestroModuleComponent,
-        ) as ComponentRef<MaestroModuleComponent>;
-        component.instance.module = this.module;
-        component.instance.isMaster = this.isMaster;
-        break;
-      }
+          component = this.uartContainer.createComponent(
+            MaestroModuleComponent,
+          ) as ComponentRef<MaestroModuleComponent>;
+          component.instance.module = this.module;
+          component.instance.isMaster = this.isMaster;
+          break;
+        }
       default:
         break;
     }
+  }
+
+  removeModule(event: Event) {
+    event.stopPropagation();
+    this.removeModuleEvent.emit({ id: this.module.id, module: ModuleType.uart });
   }
 }

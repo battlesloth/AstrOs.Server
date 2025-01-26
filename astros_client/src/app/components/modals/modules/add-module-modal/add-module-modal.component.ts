@@ -1,16 +1,21 @@
-import { Component, OnInit } from '@angular/core';
+import { AfterContentInit, AfterViewInit, Component, OnInit } from '@angular/core';
 import { ModalBaseComponent } from '../../modal-base/modal-base.component';
 import { ModuleType } from 'astros-common/dist/astros_enums';
 import { ModuleSubType } from 'astros-common/dist/astros_enums';
 import { NgForOf } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
+import { After } from 'v8';
+import { FormsModule } from '@angular/forms';
 
 export class AddModuleModalResources {
   public static moduleType = 'moduleType';
+  public static locationId = 'locationId';
+  public static addEvent = 'add_module_addEvent';
   public static closeEvent = 'add_module_closeEvent';
 }
 
 export interface AddModuleModalResponse {
+  locationId: number;
   moduleType: ModuleType;
   moduleSubType: ModuleSubType;
 }
@@ -22,16 +27,20 @@ export interface ModuleSubTypeSelection {
 
 @Component({
   selector: 'app-add-module-modal',
-  imports: [NgForOf],
+  imports: [
+    NgForOf,
+    FormsModule
+  ],
   templateUrl: './add-module-modal.component.html',
   styleUrl: './add-module-modal.component.scss',
 })
 export class AddModuleModalComponent
   extends ModalBaseComponent
-  implements OnInit
+  implements AfterContentInit
 {
   options: ModuleSubTypeSelection[] = [];
 
+  locationId: number = 0;
   moduleType: ModuleType = ModuleType.none;
   selectedSubType: ModuleSubType = ModuleSubType.none;
 
@@ -75,7 +84,11 @@ export class AddModuleModalComponent
     ]);
   }
 
-  ngOnInit(): void {
+  ngAfterContentInit(): void {
+    this.locationId = this.resources.get(
+      AddModuleModalResources.locationId,
+    ) as number;
+
     this.moduleType = this.resources.get(
       AddModuleModalResources.moduleType,
     ) as ModuleType;
@@ -92,10 +105,18 @@ export class AddModuleModalComponent
   }
 
   addModule() {
-    const evt = new ModalCallbackEvent(AddModuleModalResources.closeEvent, {
+    const evt = new ModalCallbackEvent(AddModuleModalResources.addEvent, {
       moduleType: this.moduleType,
       moduleSubType: this.selectedSubType,
     });
     this.modalCallback.emit(evt);
   }
+
+  closeModal() {
+      const evt = new ModalCallbackEvent(
+        AddModuleModalResources.closeEvent,
+        {}
+      );
+      this.modalCallback.emit(evt);
+    }
 }

@@ -45,6 +45,7 @@ export {
   ChannelType,
   ChannelSubType,
   UartType,
+  I2cType,
   UploadStatus,
   ControllerStatus,
   TransmissionType,

@@ -28,7 +28,13 @@
                             <option value="0" selected>Master Controller</option>
                         </select>       
                     </div>
-                    <app-esp-module (openServoTestModal)="openServoTestModal($event)" [module]="bodyLocation" [isMaster]="true"></app-esp-module>
+                    <app-esp-module
+                        (addModuleEvent)="addModule($event)"
+                        (removeModuleEvent)="removeModule($event)" 
+                        (openServoTestModal)="openServoTestModal($event)" 
+                        [location]="bodyLocation" 
+                        [isMaster]="true"
+                    />
                 </ng-container>
             </mat-expansion-panel>
             <mat-expansion-panel>
@@ -50,7 +56,10 @@
                             </ng-container>
                         </select>       
                     </div>
-                    <app-esp-module (openServoTestModal)="openServoTestModal($event)" [module]="coreLocation"></app-esp-module>
+                    <app-esp-module 
+                        (openServoTestModal)="openServoTestModal($event)" 
+                        [location]="coreLocation"
+                        ></app-esp-module>
                 </ng-container>
             </mat-expansion-panel>
             <mat-expansion-panel>
@@ -72,7 +81,10 @@
                             </ng-container>
                         </select>       
                     </div>
-                    <app-esp-module (openServoTestModal)="openServoTestModal($event)" [module]="domeLocation"></app-esp-module>
+                    <app-esp-module 
+                    (openServoTestModal)="openServoTestModal($event)" 
+                    [location]="domeLocation"
+                    ></app-esp-module>
                 </ng-container>
             </mat-expansion-panel>
         </mat-accordion>

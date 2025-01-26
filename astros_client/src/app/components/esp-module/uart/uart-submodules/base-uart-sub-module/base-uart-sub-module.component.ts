@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, Input } from '@angular/core';
+import { AfterViewInit, Component, Input, OnInit } from '@angular/core';
 import { UartModule } from 'astros-common';
 
 @Component({
@@ -7,7 +7,8 @@ import { UartModule } from 'astros-common';
   styleUrls: ['./base-uart-sub-module.component.scss'],
 })
 export abstract class BaseUartSubModuleComponent
-implements AfterViewInit {
+implements OnInit {
+
   @Input()
   isMaster = false;
 
@@ -17,7 +18,7 @@ implements AfterViewInit {
   uartChannel!: string;
   baudRate!: string;
 
-  abstract ngAfterViewInit(): void;
+  abstract ngOnInit(): void;
 
   onChannelChange(val: string) {
     this.module.uartChannel = parseInt(val);

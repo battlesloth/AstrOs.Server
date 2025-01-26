@@ -8,13 +8,18 @@ import { importProvidersFrom } from '@angular/core';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { EspModuleComponent } from './esp-module.component';
+import { ControllerLocation } from 'astros-common';
+import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 const meta: Meta<EspModuleComponent> = {
   title: 'Modules/EspModule',
   component: EspModuleComponent,
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
-      imports: [MatExpansionPanel],
+      imports: [
+        MatExpansionPanel,
+        FontAwesomeModule
+      ],
     }),
     applicationConfig({
       providers: [importProvidersFrom(BrowserAnimationsModule)],
@@ -27,5 +32,24 @@ export default meta;
 type Story = StoryObj<EspModuleComponent>;
 
 export const Default: Story = {
-  args: {},
+  args: {
+    isMaster: false,
+    locationId: 0,
+    location: getControllerLocation(),
+  },
 };
+
+function getControllerLocation(): ControllerLocation {
+  const loc = new ControllerLocation(
+    0,
+    'Test Location',
+    'ESP',
+    'fingerptint',
+  );
+
+
+  
+
+  return loc;
+
+}

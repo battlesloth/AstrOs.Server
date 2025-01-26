@@ -18,11 +18,11 @@ import { NgIf } from '@angular/common';
 })
 export class KangarooModuleComponent
   extends BaseUartSubModuleComponent
-  implements AfterViewInit {
+  {
 
   subModule!: KangarooX2;
 
-  ngAfterViewInit(): void {
+  ngOnInit(): void {
     if (this.module) {
       this.uartChannel = this.module.uartChannel.toString();
       this.baudRate = this.module.baudRate.toString();

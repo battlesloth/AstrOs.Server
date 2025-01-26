@@ -1,30 +1,4 @@
 <mat-accordion>
-    <mat-expansion-panel>
-        <mat-expansion-panel-header>
-            <mat-panel-title>Serial Port 1 configuration</mat-panel-title>
-        </mat-expansion-panel-header>
-        <div *ngIf="isMaster" class="uart-module">
-            <div class="type">
-                <select title="Serial Type" disabled>
-                    <option value="0" selected>Reserved</option>
-                </select>
-            </div>
-            <div class="input"><input matInput placeholder="AstrOs Interface" disabled /></div>
-        </div>
-
-        <div *ngIf="!isMaster" class="uart-module">
-            <div class="type">
-                <select title="Serial Type" (ngModelChange)="uartTypeChange($event, 1)" [(ngModel)]=uart1Type>
-                    <option value="0" selected>Disabled</option>
-                    <option value="1">Generic Serial</option>
-                    <option value="2">Kangaroo X2</option>
-                    <option value="3">Human Cyborg Relations</option>
-                </select>
-            </div>
-            <div class="input"><input matInput placeholder="Name" /></div>
-        </div>
-        <ng-template #uart1Container></ng-template>
-    </mat-expansion-panel>
     <mat-expansion-panel [expanded]="uartPanelOpenState" (closed)="uartPanelOpenState = false">
         <mat-expansion-panel-header>
             <mat-panel-title>Serial Modules</mat-panel-title>
@@ -32,14 +6,19 @@
                 <div class="header-box">
                     <div class="header-spacer"></div>
                     <div class="header-button">
-                        <button (click)="addUartModule($event)">Add Serial Module</button>
+                        <button (click)="addUartModule($event)">
+                            <fa-icon [icon]="addIcon"/>
+                        </button>
                     </div>
                 </div>
             </mat-panel-description>
         </mat-expansion-panel-header>
-        <ul class="uart-list">
-            <li *ngFor="let module of module.uartModules">
-                <app-uart-module ></app-uart-module>
+        <ul *ngIf="(location?.uartModules)" class="uart-list">
+            <li *ngFor="let module of location.uartModules">
+                <app-uart-module 
+                    (removeModuleEvent)="removeModule($event)" 
+                    [module]="module" 
+                    [isMaster]="isMaster"/>
             </li>
         </ul>
     </mat-expansion-panel>
@@ -47,8 +26,8 @@
         <mat-expansion-panel-header>
             <mat-panel-title>GPIO configuration</mat-panel-title>
         </mat-expansion-panel-header>
-        <ul class="servo-list">
-            <li *ngFor="let channel of module.gpioModule.channels">
+        <ul *ngIf="(location?.gpioModule)" class="servo-list">
+            <li *ngFor="let channel of location.gpioModule.channels">
                 <div class="gpio-channel">
                     <div class="label">Channel {{channel.id}}</div>
                     <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" /></div>
@@ -106,8 +85,8 @@
         <mat-expansion-panel-header>
             <mat-panel-title>I2C configuration</mat-panel-title>
         </mat-expansion-panel-header>
-        <ul class="i2c-list">
-            <li *ngFor="let channel of module.i2cModule.channels">
+        <ul *ngIf="(location?.i2cModule)" class="i2c-list">
+            <li *ngFor="let channel of location.i2cModule.channels">
                 <div class="i2c-channel">
                     <div class="label">Channel {{channel.id}}</div>
                     <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName"

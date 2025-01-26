@@ -23,7 +23,9 @@ const meta: Meta<UartModuleComponent> = {
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
-      imports: [MatExpansionPanel],
+      imports: [
+        MatExpansionPanel,
+      ],
     }),
     applicationConfig({
       providers: [importProvidersFrom(BrowserAnimationsModule)],

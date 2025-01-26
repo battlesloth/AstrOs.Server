@@ -17,9 +17,9 @@ import { NgIf } from '@angular/common';
 })
 export class GenericSerialModuleComponent
 extends BaseUartSubModuleComponent
-implements AfterViewInit {
+ {
 
-  ngAfterViewInit(): void {
+  ngOnInit(): void {
     if (this.module) {
       this.uartChannel = this.module.uartChannel.toString();
       this.baudRate = this.module.baudRate.toString();
