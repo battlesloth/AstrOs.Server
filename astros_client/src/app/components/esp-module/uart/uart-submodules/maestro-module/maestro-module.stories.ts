@@ -1,6 +1,12 @@
 import { Meta, moduleMetadata, StoryObj } from '@storybook/angular';
 import { MaestroModuleComponent } from './maestro-module.component';
-import { MaestroBoard, MaestroChannel, MaestroModule, UartModule, UartType } from 'astros-common';
+import {
+  MaestroBoard,
+  MaestroChannel,
+  MaestroModule,
+  UartModule,
+  UartType,
+} from 'astros-common';
 
 const meta: Meta<MaestroModuleComponent> = {
   title: 'Modules/Uart/Submodules/MaestroModule',
@@ -22,10 +28,7 @@ export const Default: Story = {
   },
 };
 
-function getSerialModule(
-  ch: number,
-  baudRate: number,
-): UartModule {
+function getSerialModule(ch: number, baudRate: number): UartModule {
   const module = new UartModule(
     '1234',
     0,
@@ -37,7 +40,7 @@ function getSerialModule(
 
   const subModule = new MaestroModule();
   subModule.boards = [new MaestroBoard('1234', 1, '')];
-  
+
   subModule.boards[0].channels = [
     getMaestroChannel(0, 'Channel 0', true, '1234', true),
     getMaestroChannel(1, 'Channel 1', true, '1234', true),
@@ -47,7 +50,7 @@ function getSerialModule(
     getMaestroChannel(5, 'Channel 5', true, '1234', true),
     getMaestroChannel(6, 'Channel 6', true, '1234', true),
     getMaestroChannel(7, 'Channel 7', true, '1234', true),
-  ] 
+  ];
   module.subModule = subModule;
   return module;
 }

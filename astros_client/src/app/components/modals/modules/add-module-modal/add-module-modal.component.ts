@@ -1,10 +1,9 @@
-import { AfterContentInit, AfterViewInit, Component, OnInit } from '@angular/core';
+import { AfterContentInit, Component } from '@angular/core';
 import { ModalBaseComponent } from '../../modal-base/modal-base.component';
 import { ModuleType } from 'astros-common/dist/astros_enums';
 import { ModuleSubType } from 'astros-common/dist/astros_enums';
 import { NgForOf } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
-import { After } from 'v8';
 import { FormsModule } from '@angular/forms';
 
 export class AddModuleModalResources {
@@ -27,10 +26,7 @@ export interface ModuleSubTypeSelection {
 
 @Component({
   selector: 'app-add-module-modal',
-  imports: [
-    NgForOf,
-    FormsModule
-  ],
+  imports: [NgForOf, FormsModule],
   templateUrl: './add-module-modal.component.html',
   styleUrl: './add-module-modal.component.scss',
 })
@@ -40,7 +36,7 @@ export class AddModuleModalComponent
 {
   options: ModuleSubTypeSelection[] = [];
 
-  locationId: number = 0;
+  locationId = 0;
   moduleType: ModuleType = ModuleType.none;
   selectedSubType: ModuleSubType = ModuleSubType.none;
 
@@ -113,10 +109,7 @@ export class AddModuleModalComponent
   }
 
   closeModal() {
-      const evt = new ModalCallbackEvent(
-        AddModuleModalResources.closeEvent,
-        {}
-      );
-      this.modalCallback.emit(evt);
-    }
+    const evt = new ModalCallbackEvent(AddModuleModalResources.closeEvent, {});
+    this.modalCallback.emit(evt);
+  }
 }

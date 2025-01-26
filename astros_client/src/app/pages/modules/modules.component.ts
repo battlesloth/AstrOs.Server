@@ -39,10 +39,10 @@ import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-cal
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { 
-  AddModuleEvent, 
-  EspModuleComponent, 
-  RemoveModuleEvent 
+import {
+  AddModuleEvent,
+  EspModuleComponent,
+  RemoveModuleEvent,
 } from '@src/components/esp-module';
 import {
   ControllerService,
@@ -52,7 +52,7 @@ import {
   WebsocketService,
 } from '@src/services';
 import {
-  AddModuleModalComponent, 
+  AddModuleModalComponent,
   AddModuleModalResources,
   LoadingModalComponent,
   LoadingModalResources,
@@ -63,12 +63,9 @@ import {
   AddModuleModalResponse,
 } from '@src/components/modals/modules';
 
-
-
 interface Caption {
   str: string;
 }
-
 
 @Component({
   selector: 'app-modules',
@@ -95,7 +92,6 @@ export class ModulesComponent implements AfterViewInit {
   isLoaded = false;
 
   backgroundClickDisabled = '1';
-  isMaster = true;
 
   possibleControllers: ControlModule[] = [];
   availableDomeControllers: ControlModule[] = [];
@@ -127,11 +123,13 @@ export class ModulesComponent implements AfterViewInit {
     private modalService: ModalService,
     private renderer: Renderer2,
     private status: StatusService,
-  ) { }
+  ) {}
 
   ngAfterViewInit(): void {
     this.openControllerSyncModal();
   }
+
+  //#region Loading Modal
 
   openControllerSyncModal() {
     this.container.clear();
@@ -200,7 +198,9 @@ export class ModulesComponent implements AfterViewInit {
 
     this.modalService.close('modules-modal');
   }
+  //#endregion
 
+  //#region Alert Modal
   openAlertModal(message: string) {
     this.container.clear();
 
@@ -217,10 +217,10 @@ export class ModulesComponent implements AfterViewInit {
 
     this.modalService.open('modules-modal');
   }
+  //#endregion
 
-
+  //#region Module Modals
   addModule(value: AddModuleEvent) {
-
     this.container.clear();
 
     const modalResources = new Map<string, unknown>();
@@ -238,10 +238,28 @@ export class ModulesComponent implements AfterViewInit {
     );
 
     component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {
-      this.modalCallback(result);
+      this.addModalCallback(result);
     });
 
     this.modalService.open('modules-modal');
+  }
+
+  addModalCallback(evt: ModalCallbackEvent) {
+    if (evt.type === AddModuleModalResources.closeEvent) {
+      this.modalService.close('modules-modal');
+      this.container.clear();
+      return;
+    }
+
+    if (evt.type !== AddModuleModalResources.addEvent) {
+      return;
+    }
+
+    const response = evt.value as AddModuleModalResponse;
+    this.doAddModule(response);
+
+    this.modalService.close('modules-modal');
+    this.container.clear();
   }
 
   removeModule(event: RemoveModuleEvent) {
@@ -254,16 +272,13 @@ export class ModulesComponent implements AfterViewInit {
     component.instance.resources = modalResources;
     component.instance.resources.set(
       ConfirmModalResources.action,
-      'Remove Module'
+      'Remove Module',
     );
     component.instance.resources.set(
       ConfirmModalResources.message,
-      'Are you sure you want to remove this module?'
+      'Are you sure you want to remove this module?',
     );
-    component.instance.resources.set(
-      ConfirmModalResources.confirmEvent,
-      event
-    );
+    component.instance.resources.set(ConfirmModalResources.confirmEvent, event);
 
     component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {
       this.removeModuleCallback(result);
@@ -275,7 +290,7 @@ export class ModulesComponent implements AfterViewInit {
   removeModuleCallback(evt: ModalCallbackEvent) {
     if (evt.type === ConfirmModalResources.closeEvent) {
       this.modalService.close('modules-modal');
-      this.container.clear();  
+      this.container.clear();
       return;
     }
 
@@ -284,7 +299,7 @@ export class ModulesComponent implements AfterViewInit {
     }
     const response = evt.value as RemoveModuleEvent;
 
-    switch (response.module){
+    switch (response.module) {
       case ModuleType.uart:
         this.removeUartModule(response.locationId, response.id);
         break;
@@ -298,72 +313,11 @@ export class ModulesComponent implements AfterViewInit {
 
     this.modalService.close('modules-modal');
     this.container.clear();
-  
   }
 
-  modalCallback(evt: ModalCallbackEvent) {
-    switch (evt.type) {
-      case AddModuleModalResources.addEvent: {
-        const response = evt.value as AddModuleModalResponse;
-        this.doAddModule(response);
-        break;
-      }
-      case ConfirmModalResources.confirmEvent:
-        break
-    }
-  
-    this.modalService.close('modules-modal');
-    this.container.clear();
-  }
+  //#endregion
 
-  openServoTestModal(value: { controllerId: number; channelId: number }) {
-    if (value.controllerId === 0) {
-      this.openAlertModal('Location for this servo is not set.');
-      return;
-    }
-
-    this.container.clear();
-
-    const modalResources = new Map<string, unknown>();
-
-    const component = this.container.createComponent(ServoTestModalComponent);
-
-    component.instance.resources = modalResources;
-    component.instance.resources.set(
-      ServoTestModalResources.controllerId,
-      value.controllerId,
-    );
-    component.instance.resources.set(
-      ServoTestModalResources.servoId,
-      value.channelId,
-    );
-
-    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {
-      this.servoTestModalCallback(result);
-    });
-
-    this.modalService.open('modules-modal');
-  }
-
-  servoTestModalCallback(evt: ModalCallbackEvent) {
-    switch (evt.type) {
-      case ServoTestModalResources.sendServoMove: {
-        const servoTest = evt.value as ServoTestMessage;
-        this.websocketService.sendMessage({
-          msgType: 'SERVO_TEST',
-          data: {
-            controllerId: servoTest.controllerId,
-            servoId: servoTest.servoId,
-            value: servoTest.value,
-          },
-        });
-        break;
-      }
-      case ServoTestModalResources.closeEvent:
-        this.modalService.close('modules-modal');
-        break;
-    }
-  }
+  //#region Module logic
 
   doAddModule(response: AddModuleModalResponse) {
     switch (response.moduleType) {
@@ -380,7 +334,6 @@ export class ModulesComponent implements AfterViewInit {
   }
 
   addUartModule(location: number, subType: ModuleSubType) {
-    
     const controller = this.getControllerLocation(location);
 
     const defaultChannel = location === 1 ? 2 : 1;
@@ -400,7 +353,11 @@ export class ModulesComponent implements AfterViewInit {
         module.subModule = new HumanCyborgRelationsModule();
         break;
       case UartType.kangaroo:
-        module.subModule = new KangarooX2(crypto.randomUUID(), 'Channel 1', 'Channel 2');
+        module.subModule = new KangarooX2(
+          crypto.randomUUID(),
+          'Channel 1',
+          'Channel 2',
+        );
         break;
       case UartType.maestro:
         module.subModule = new MaestroModule();
@@ -411,7 +368,6 @@ export class ModulesComponent implements AfterViewInit {
   }
 
   addI2CModule(location: number, subType: ModuleSubType) {
-    
     const controller = this.getControllerLocation(location);
     const i2cType = this.subtypeToI2cType(subType);
     const nextAddress = this.getNextI2CAddress(controller.i2cModules);
@@ -423,12 +379,12 @@ export class ModulesComponent implements AfterViewInit {
 
     const module = new I2cModule(
       crypto.randomUUID(),
-      "New I2C Module",
+      'New I2C Module',
       location,
       nextAddress,
-      i2cType
+      i2cType,
     );
-    
+
     switch (i2cType) {
       case I2cType.genericI2C:
         break;
@@ -441,24 +397,22 @@ export class ModulesComponent implements AfterViewInit {
     controller.i2cModules.push(module);
   }
 
-  addGPIOchannel(location: number, gpioType: ModuleSubType) {
-  }
-
+  addGPIOchannel(location: number, gpioType: ModuleSubType) {}
 
   removeUartModule(location: number, moduleId: string) {
     const controller = this.getControllerLocation(location);
 
-    controller.uartModules = controller.uartModules.filter(
-      (module: UartModule) => module.id !== moduleId,
-    ).sort((a, b) => a.name.localeCompare(b.name));
+    controller.uartModules = controller.uartModules
+      .filter((module: UartModule) => module.id !== moduleId)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   removeI2CModule(location: number, moduleId: string) {
     const controller = this.getControllerLocation(location);
 
-    controller.i2cModules = controller.i2cModules.filter(
-      (module: I2cModule) => module.id !== moduleId,
-    ).sort((a, b) => a.name.localeCompare(b.name));
+    controller.i2cModules = controller.i2cModules
+      .filter((module: I2cModule) => module.id !== moduleId)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   removeGPIOchannel(location: number, channelId: string) {
@@ -470,6 +424,9 @@ export class ModulesComponent implements AfterViewInit {
     */
   }
 
+  //#endregion
+
+  //#region Controller Selection
 
   controllerSelectChanged(_: unknown) {
     this.availableCoreControllers = this.possibleControllers.filter(
@@ -481,6 +438,9 @@ export class ModulesComponent implements AfterViewInit {
         controller.id !== this.coreLocation.controller?.id,
     );
   }
+
+  //#endregion
+  //#region Data Persistence
 
   saveModuleSettings() {
     const observer = {
@@ -536,6 +496,65 @@ export class ModulesComponent implements AfterViewInit {
     this.controllerService.syncLocationConfig().subscribe(observer);
   }
 
+  //#endregion
+
+  //#region Servo Test
+
+  openServoTestModal(value: { controllerId: number; channelId: number }) {
+    if (value.controllerId === 0) {
+      this.openAlertModal('Location for this servo is not set.');
+      return;
+    }
+
+    this.container.clear();
+
+    const modalResources = new Map<string, unknown>();
+
+    const component = this.container.createComponent(ServoTestModalComponent);
+
+    component.instance.resources = modalResources;
+    component.instance.resources.set(
+      ServoTestModalResources.controllerId,
+      value.controllerId,
+    );
+    component.instance.resources.set(
+      ServoTestModalResources.servoId,
+      value.channelId,
+    );
+
+    component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {
+      this.servoTestModalCallback(result);
+    });
+
+    this.modalService.open('modules-modal');
+  }
+
+  servoTestModalCallback(evt: ModalCallbackEvent) {
+    switch (evt.type) {
+      case ServoTestModalResources.sendServoMove: {
+        const servoTest = evt.value as ServoTestMessage;
+        this.websocketService.sendMessage({
+          msgType: 'SERVO_TEST',
+          data: {
+            controllerId: servoTest.controllerId,
+            servoId: servoTest.servoId,
+            value: servoTest.value,
+          },
+        });
+        break;
+      }
+      case ServoTestModalResources.closeEvent: {
+        this.modalService.close('modules-modal');
+        this.container.clear();
+        break;
+      }
+    }
+  }
+
+  //#endregion
+
+  //#region Helper Functions
+
   private parseModules(locations: AstrOsLocationCollection) {
     console.log(locations);
     try {
@@ -547,7 +566,11 @@ export class ModulesComponent implements AfterViewInit {
     }
   }
 
-  handleStatus(status: ControllerStatus, el: ElementRef, caption: Caption) {
+  private handleStatus(
+    status: ControllerStatus,
+    el: ElementRef,
+    caption: Caption,
+  ) {
     switch (status) {
       case ControllerStatus.up:
         caption.str = '';
@@ -614,3 +637,5 @@ export class ModulesComponent implements AfterViewInit {
     return -1;
   }
 }
+
+//#endregion

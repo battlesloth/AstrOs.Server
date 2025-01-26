@@ -23,10 +23,7 @@ export const Default: Story = {
   },
 };
 
-function getSerialModule(
-  ch: number,
-  baudRate: number,
-): UartModule {
+function getSerialModule(ch: number, baudRate: number): UartModule {
   const module = new UartModule(
     '1234',
     0,

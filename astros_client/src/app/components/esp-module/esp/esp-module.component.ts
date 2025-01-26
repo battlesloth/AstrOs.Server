@@ -1,11 +1,4 @@
-import {
-  Component,
-  EventEmitter,
-  Input,
-  Output,
-  ViewChild,
-  ViewContainerRef,
-} from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import {
   MatExpansionPanel,
   MatAccordion,
@@ -13,15 +6,13 @@ import {
   MatExpansionPanelTitle,
   MatExpansionPanelDescription,
 } from '@angular/material/expansion';
-import { MatCheckboxModule, MatCheckbox } from '@angular/material/checkbox';
+import { MatCheckbox } from '@angular/material/checkbox';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { ControllerLocation, ModuleType, UartModule, UartType } from 'astros-common';
-import { KangarooModuleComponent } from '../uart/uart-submodules/kangaroo-module/kangaroo-module.component';
+import { ControllerLocation, ModuleSubType, ModuleType } from 'astros-common';
 import { UartModuleComponent } from '../uart/uart-module/uart-module.component';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
-
 
 export interface AddModuleEvent {
   locationId: number;
@@ -32,6 +23,13 @@ export interface RemoveModuleEvent {
   locationId: number;
   id: string;
   module: ModuleType;
+}
+
+export interface ServoTestEvent {
+  locationId: number;
+  moduleType: ModuleType;
+  moduleSubType: ModuleSubType;
+  channelId: string;
 }
 
 @Component({
@@ -49,7 +47,7 @@ export interface RemoveModuleEvent {
     NgFor,
     MatCheckbox,
     UartModuleComponent,
-    FontAwesomeModule
+    FontAwesomeModule,
   ],
 })
 export class EspModuleComponent {
@@ -60,7 +58,7 @@ export class EspModuleComponent {
   addModuleEvent = new EventEmitter<AddModuleEvent>();
 
   @Output()
-  openServoTestModal = new EventEmitter<any>();
+  openServoTestModal = new EventEmitter<ServoTestEvent>();
 
   @Input()
   isMaster = false;
@@ -70,7 +68,6 @@ export class EspModuleComponent {
 
   @Input()
   location!: ControllerLocation;
-
 
   addIcon = faPlus;
 
@@ -101,10 +98,16 @@ export class EspModuleComponent {
     });
   }
 
-  testServoModal(channelId: number) {
+  testServoModal(
+    module: ModuleType,
+    subType: ModuleSubType,
+    channelId: string,
+  ) {
     this.openServoTestModal.emit({
-      //controllerId: this.module.controller.id,
-      //channelId,
+      locationId: this.locationId,
+      moduleType: module,
+      moduleSubType: subType,
+      channelId: channelId,
     });
   }
 }

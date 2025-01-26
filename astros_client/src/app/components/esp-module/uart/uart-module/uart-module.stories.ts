@@ -16,16 +16,13 @@ import {
   UartType,
 } from 'astros-common';
 
-
 const meta: Meta<UartModuleComponent> = {
   title: 'Modules/Uart/UartModule',
   component: UartModuleComponent,
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
-      imports: [
-        MatExpansionPanel,
-      ],
+      imports: [MatExpansionPanel],
     }),
     applicationConfig({
       providers: [importProvidersFrom(BrowserAnimationsModule)],

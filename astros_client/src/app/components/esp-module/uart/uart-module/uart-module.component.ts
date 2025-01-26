@@ -25,7 +25,6 @@ import { BaseUartSubModuleComponent } from '../uart-submodules/base-uart-sub-mod
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
 
-
 @Component({
   selector: 'app-uart-module',
   templateUrl: './uart-module.component.html',
@@ -43,8 +42,7 @@ import { faTimes } from '@fortawesome/free-solid-svg-icons';
     FontAwesomeModule,
   ],
 })
-export class UartModuleComponent
-  implements AfterViewInit, AfterContentInit {
+export class UartModuleComponent implements AfterViewInit, AfterContentInit {
   @ViewChild('uartContainer', { read: ViewContainerRef })
   uartContainer!: ViewContainerRef;
 
@@ -59,7 +57,7 @@ export class UartModuleComponent
 
   subtypeName = '';
   removeIcon = faTimes;
-  component!: ComponentRef<any>;
+  component!: ComponentRef<unknown>;
 
   nameClicked(evt: MouseEvent) {
     evt.stopPropagation();
@@ -91,33 +89,30 @@ export class UartModuleComponent
     let component: ComponentRef<BaseUartSubModuleComponent>;
 
     switch (this.module.uartType) {
-      case UartType.genericSerial:
-        {
-          component = this.uartContainer.createComponent(
-            GenericSerialModuleComponent,
-          ) as ComponentRef<GenericSerialModuleComponent>;
-          component.instance.module = this.module;
-          component.instance.isMaster = this.isMaster;
-          break;
-        }
-      case UartType.kangaroo:
-        {
-          component = this.uartContainer.createComponent(
-            KangarooModuleComponent,
-          ) as ComponentRef<KangarooModuleComponent>;
-          component.instance.module = this.module;
-          component.instance.isMaster = this.isMaster;
-          break;
-        }
-      case UartType.maestro:
-        {
-          component = this.uartContainer.createComponent(
-            MaestroModuleComponent,
-          ) as ComponentRef<MaestroModuleComponent>;
-          component.instance.module = this.module;
-          component.instance.isMaster = this.isMaster;
-          break;
-        }
+      case UartType.genericSerial: {
+        component = this.uartContainer.createComponent(
+          GenericSerialModuleComponent,
+        ) as ComponentRef<GenericSerialModuleComponent>;
+        component.instance.module = this.module;
+        component.instance.isMaster = this.isMaster;
+        break;
+      }
+      case UartType.kangaroo: {
+        component = this.uartContainer.createComponent(
+          KangarooModuleComponent,
+        ) as ComponentRef<KangarooModuleComponent>;
+        component.instance.module = this.module;
+        component.instance.isMaster = this.isMaster;
+        break;
+      }
+      case UartType.maestro: {
+        component = this.uartContainer.createComponent(
+          MaestroModuleComponent,
+        ) as ComponentRef<MaestroModuleComponent>;
+        component.instance.module = this.module;
+        component.instance.isMaster = this.isMaster;
+        break;
+      }
       default:
         break;
     }
@@ -125,6 +120,9 @@ export class UartModuleComponent
 
   removeModule(event: Event) {
     event.stopPropagation();
-    this.removeModuleEvent.emit({ id: this.module.id, module: ModuleType.uart });
+    this.removeModuleEvent.emit({
+      id: this.module.id,
+      module: ModuleType.uart,
+    });
   }
 }

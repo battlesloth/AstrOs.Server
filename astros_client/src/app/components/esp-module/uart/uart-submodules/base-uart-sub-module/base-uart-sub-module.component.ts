@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { UartModule } from 'astros-common';
 
 @Component({
@@ -6,9 +6,7 @@ import { UartModule } from 'astros-common';
   template: '',
   styleUrls: ['./base-uart-sub-module.component.scss'],
 })
-export abstract class BaseUartSubModuleComponent
-implements OnInit {
-
+export abstract class BaseUartSubModuleComponent implements OnInit {
   @Input()
   isMaster = false;
 

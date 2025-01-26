@@ -1,4 +1,4 @@
-import { AfterViewInit, Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { KangarooX2 } from 'astros-common';
 import { FormsModule } from '@angular/forms';
 import { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';
@@ -9,17 +9,14 @@ import { NgIf } from '@angular/common';
   templateUrl: './kangaroo-module.component.html',
   styleUrls: [
     '../base-uart-sub-module/base-uart-sub-module.component.scss',
-    './kangaroo-module.component.scss'
+    './kangaroo-module.component.scss',
   ],
-  imports: [
-    NgIf,
-    FormsModule
-  ],
+  imports: [NgIf, FormsModule],
 })
 export class KangarooModuleComponent
   extends BaseUartSubModuleComponent
-  {
-
+  implements OnInit
+{
   subModule!: KangarooX2;
 
   ngOnInit(): void {

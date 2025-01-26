@@ -8,9 +8,8 @@ describe('MaestroChannelComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MaestroChannelComponent]
-    })
-    .compileComponents();
+      imports: [MaestroChannelComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(MaestroChannelComponent);
     component = fixture.componentInstance;

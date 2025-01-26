@@ -4,8 +4,6 @@ import { Component } from '@angular/core';
   selector: 'app-maestro-channel',
   imports: [],
   templateUrl: './maestro-channel.component.html',
-  styleUrl: './maestro-channel.component.scss'
+  styleUrl: './maestro-channel.component.scss',
 })
-export class MaestroChannelComponent {
-
-}
+export class MaestroChannelComponent {}

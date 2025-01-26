@@ -72,7 +72,6 @@ export class LoadingModalComponent
     this.controllerService.syncControllers().subscribe(observer);
 
     this.subscription = this.socket.messages.subscribe((msg: unknown) => {
-
       console.log('Received message', msg);
       if (msg && typeof msg === 'object' && 'type' in msg)
         if (msg.type === this.controllersMsg) {

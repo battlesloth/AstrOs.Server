@@ -16,10 +16,7 @@ const meta: Meta<EspModuleComponent> = {
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
-      imports: [
-        MatExpansionPanel,
-        FontAwesomeModule
-      ],
+      imports: [MatExpansionPanel, FontAwesomeModule],
     }),
     applicationConfig({
       providers: [importProvidersFrom(BrowserAnimationsModule)],
@@ -40,16 +37,7 @@ export const Default: Story = {
 };
 
 function getControllerLocation(): ControllerLocation {
-  const loc = new ControllerLocation(
-    0,
-    'Test Location',
-    'ESP',
-    'fingerptint',
-  );
-
-
-  
+  const loc = new ControllerLocation(0, 'Test Location', 'ESP', 'fingerptint');
 
   return loc;
-
 }
