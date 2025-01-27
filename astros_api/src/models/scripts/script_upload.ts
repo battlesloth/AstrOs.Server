@@ -8,7 +8,7 @@ export class ScriptUpload {
 
   constructor(
     scriptId: string,
-    scripts: Map<number, string>,
+    scripts: Map<string, string>,
     locations: Array<ControllerLocation>,
   ) {
     this.scriptId = scriptId;

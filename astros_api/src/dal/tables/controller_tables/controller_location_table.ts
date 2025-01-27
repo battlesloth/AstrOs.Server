@@ -7,7 +7,7 @@ export class ControllerLocationTable {
   public static readonly controllerId = "controllerId";
 
   public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
-        ${this.locationId} INTEGER PRIMARY KEY,
+        ${this.locationId} TEXTPRIMARY KEY,
         ${this.controllerId} INTEGER,
         FOREIGN KEY (${this.locationId}) REFERENCES ${LocationsTable.table}(${LocationsTable.id}),
         FOREIGN KEY (${this.controllerId}) REFERENCES ${ControllersTable.table}(${ControllersTable.id}))`;
@@ -25,7 +25,8 @@ export class ControllerLocationTable {
     WHERE ${this.controllerId} = ?`;
 
   public static readonly selectLocationControllers = `SELECT
-    l.${LocationsTable.id} as locationId,
+    l.${LocationsTable.id} as locationDbId,
+    l.${LocationsTable.locationId} as locationId,
     l.${LocationsTable.locationName} as locationName,
     l.${LocationsTable.description} as locationDescription,
     l.${LocationsTable.configFingerprint} as locationFingerprint,

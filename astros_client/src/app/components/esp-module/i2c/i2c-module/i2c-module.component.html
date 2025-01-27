@@ -1,0 +1,23 @@
+<mat-expansion-panel>
+    <mat-expansion-panel-header>
+        <mat-panel-title>
+            <div class="header-name">
+                <input matInput placeholder="Name" [(ngModel)]="module.name" (click)="nameClicked($event)" />
+            </div>
+        </mat-panel-title>
+        <mat-panel-description>
+            <div class="header-box">
+                <div class="header-spacer"></div>
+                <div class="subtype-name">
+                    <p >{{ subtypeName }}</p>
+                </div>
+                <div class="header-button">
+                    <button (click)="removeModule($event)">
+                        <fa-icon [icon]="removeIcon"/>
+                    </button>
+                </div>
+            </div>
+        </mat-panel-description>
+    </mat-expansion-panel-header>
+    <ng-template #i2cContainer></ng-template>
+</mat-expansion-panel>

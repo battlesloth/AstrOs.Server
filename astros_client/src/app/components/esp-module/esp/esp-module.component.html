@@ -24,6 +24,29 @@
     </mat-expansion-panel>
     <mat-expansion-panel>
         <mat-expansion-panel-header>
+            <mat-panel-title>I2C configuration</mat-panel-title>
+            <mat-panel-description>
+                <div class="header-box">
+                    <div class="header-spacer"></div>
+                    <div class="header-button">
+                        <button (click)="addI2cModule($event)">
+                            <fa-icon [icon]="addIcon"/>
+                        </button>
+                    </div>
+                </div>
+            </mat-panel-description>
+        </mat-expansion-panel-header>
+        <ul *ngIf="(location?.i2cModules)" class="i2c-list">
+            <li *ngFor="let module of location.i2cModules">
+                <app-i2c-module 
+                    (removeModuleEvent)="removeModule($event)" 
+                    [module]="module" 
+                    [isMaster]="isMaster"/>
+            </li> 
+        </ul>
+    </mat-expansion-panel>
+    <mat-expansion-panel>
+        <mat-expansion-panel-header>
             <mat-panel-title>GPIO configuration</mat-panel-title>
         </mat-expansion-panel-header>
         <ul *ngIf="(location?.gpioModule)" class="servo-list">
@@ -80,23 +103,5 @@
             </li>
         </ul>
     -->
-    </mat-expansion-panel>
-    <mat-expansion-panel>
-        <mat-expansion-panel-header>
-            <mat-panel-title>I2C configuration</mat-panel-title>
-        </mat-expansion-panel-header>
-        <ul *ngIf="(location?.i2cModule)" class="i2c-list">
-            <li *ngFor="let channel of location.i2cModule.channels">
-                <div class="i2c-channel">
-                    <div class="label">Channel {{channel.id}}</div>
-                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName"
-                            [disabled]="channel.channelName.toLowerCase() === 'reserved'" /></div>
-                    <div class="enabled">
-                        <mat-checkbox [(ngModel)]="channel.enabled"
-                            [disabled]="channel.channelName.toLowerCase() === 'reserved'">Enabled</mat-checkbox>
-                    </div>
-                </div>
-            </li>
-        </ul>
     </mat-expansion-panel>
 </mat-accordion>

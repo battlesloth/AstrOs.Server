@@ -17,7 +17,6 @@ export const enum ModuleSubType {
   genericI2C = 101,
   humanCyborgRelationsI2C = 102,
   pwmBoard = 103,
-
 }
 
 export const enum ChannelType {

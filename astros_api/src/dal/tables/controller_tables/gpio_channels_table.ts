@@ -9,7 +9,7 @@ export class GpioChannelsTable {
 
   public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
     ${this.id} INTEGER PRIMARY KEY AUTOINCREMENT,
-    ${this.locationId} INTEGER,
+    ${this.locationId} TEXT,
     ${this.channelId} INTEGER,
     ${this.channelName} TEXT,
     ${this.defaultLow} INTEGER,

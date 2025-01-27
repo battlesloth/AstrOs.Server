@@ -9,9 +9,11 @@ import {
   ModalComponent,
   ConfirmModalComponent,
   ConfirmModalResources,
+} from '@src/components/modals';
+import {
   UploadModalComponent,
   UploadModalResources,
-} from '@src/components/modals';
+} from '@src/components/modals/utility';
 import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-callback-event';
 import { ModalService } from '@src/services';
 

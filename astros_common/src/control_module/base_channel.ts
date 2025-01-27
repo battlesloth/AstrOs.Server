@@ -19,6 +19,7 @@ export class BaseChannel {
   id: number;
   channelName: string;
   enabled: boolean;
+
   subType: ChannelSubType;
   constructor(
     id: number,

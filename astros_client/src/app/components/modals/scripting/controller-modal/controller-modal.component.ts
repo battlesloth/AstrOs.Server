@@ -17,7 +17,7 @@ export class ControllerModalResources {
 }
 
 export interface ControllerModalResponse {
-  controller: number;
+  controller: string;
   module: ChannelType;
   channels: number[];
 }

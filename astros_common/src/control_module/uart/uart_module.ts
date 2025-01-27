@@ -2,27 +2,27 @@ import { UartType } from "../../astros_enums";
 
 export class UartModule {
   id: string;
-  locationId: number;
+  name: string;
+  locationId: string;
   uartType: UartType;
   uartChannel: number;
   baudRate: number;
-  name: string;
-  subModule: any;
+  subModule: unknown;
 
   constructor(
     id: string,
-    locationId: number,
+    name: string,
+    locationId: string,
     uartType: UartType,
     uartChannel: number,
     baudRate: number,
-    name: string,
   ) {
     this.id = id;
+    this.name = name;
     this.locationId = locationId;
     this.uartType = uartType;
     this.uartChannel = uartChannel;
     this.baudRate = baudRate;
-    this.name = name;
     this.subModule = {};
   }
 }

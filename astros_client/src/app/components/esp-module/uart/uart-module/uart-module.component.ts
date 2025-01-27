@@ -24,6 +24,7 @@ import { FormsModule } from '@angular/forms';
 import { BaseUartSubModuleComponent } from '../uart-submodules/base-uart-sub-module/base-uart-sub-module.component';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
+import { RemoveModuleEvent } from '../../utility/module-events';
 
 @Component({
   selector: 'app-uart-module',
@@ -53,7 +54,7 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
   module!: UartModule;
 
   @Output()
-  removeModuleEvent = new EventEmitter<unknown>();
+  removeModuleEvent = new EventEmitter<RemoveModuleEvent>();
 
   subtypeName = '';
   removeIcon = faTimes;
@@ -121,6 +122,7 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
   removeModule(event: Event) {
     event.stopPropagation();
     this.removeModuleEvent.emit({
+      locationId: this.module.locationId,
       id: this.module.id,
       module: ModuleType.uart,
     });

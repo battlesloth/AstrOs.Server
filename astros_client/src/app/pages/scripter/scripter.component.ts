@@ -238,7 +238,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       ch.eventsKvpArray = [];
 
       for (const key of ch.events.keys()) {
-        ch.eventsKvpArray.push({ key: key, value: ch.events.get(key) });
+        const val = ch.events.get(key);
+        if (val !== undefined) {
+          ch.eventsKvpArray.push({ key: key, value: val });
+        }
       }
     }
 
@@ -299,7 +302,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       ch.eventsKvpArray = [];
 
       for (const key of ch.events.keys()) {
-        ch.eventsKvpArray.push({ key: key, value: ch.events.get(key) });
+        const val = ch.events.get(key);
+        if (val !== undefined) {
+          ch.eventsKvpArray.push({ key: key, value: val });
+        }
       }
     }
 
@@ -704,7 +710,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   //#endregion
 
   private addChannel(
-    locationId: number,
+    locationId: string,
     channelType: ChannelType,
     channels: number[],
   ): void {
@@ -722,6 +728,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       );
 
       const subType = 0;
+
+      if (chValue === undefined) {
+        return;
+      }
 
       const ch = new ScriptChannel(
         Guid.create().toString(),
@@ -858,7 +868,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   private channelCompare(a: ScriptChannel, b: ScriptChannel) {
-    let val = a.locationId - b.locationId;
+    let val = a.locationId.localeCompare(b.locationId);
 
     if (val !== 0) {
       return val;

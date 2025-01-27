@@ -7,7 +7,7 @@ import {
   ControllerLocation,
   GpioChannel,
   HumanCyborgRelationsModule,
-  I2cChannel,
+  I2cModule,
   KangarooX2,
   MaestroBoard,
   MaestroChannel,
@@ -16,13 +16,18 @@ import {
   UartType,
 } from "astros-common";
 import { UartModuleTable } from "../tables/uart_tables/uart_module_table";
-import { I2cChannelsTable } from "../tables/controller_tables/i2c_channels_table";
+import { I2cModuleTable } from "../tables/i2c_tables/i2c_module_table";
 import { GpioChannelsTable } from "../tables/controller_tables/gpio_channels_table";
 import { MaestroBoardsTable } from "../tables/uart_tables/maestro_boards_table";
 import { MaestroChannelTable } from "../tables/uart_tables/maestro_channels_table";
 import { KangarooX2Table } from "../tables/uart_tables/kangaroo_x2_table";
 
 interface UartMods {
+  id: string;
+  type: number;
+}
+
+interface I2cMods {
   id: string;
   type: number;
 }
@@ -43,6 +48,7 @@ export class LocationsRepository {
         for (const c of val) {
           const location = new ControllerLocation(
             c.id,
+            c.locationId,
             c.name,
             c.description,
             c.configFingerprint,
@@ -69,6 +75,7 @@ export class LocationsRepository {
         if (val.length > 0) {
           location = new ControllerLocation(
             val[0].id,
+            val[0].locationId,
             val[0].locationName,
             val[0].locationDescription,
             val[0].configFingerprint,
@@ -108,6 +115,7 @@ export class LocationsRepository {
       .then((val: any) => {
         for (const c of val) {
           const location = new ControllerLocation(
+            c.locationDbId,
             c.locationId,
             c.locationName,
             c.locationDescription,
@@ -142,16 +150,16 @@ export class LocationsRepository {
   ): Promise<ControllerLocation> {
     // load uart modules
     await this.dao
-      .get(UartModuleTable.selectAllForLocation, [location.id.toString()])
+      .get(UartModuleTable.selectAllForLocation, [location.locationId])
       .then((val: any) => {
         val.forEach((uart: any) => {
           const module = new UartModule(
             uart.id,
-            location.id,
+            uart.moduleName,
+            location.locationId,
             uart.uartType,
             uart.uartChannel,
             uart.baudRate,
-            uart.moduleName,
           );
           location.uartModules.push(module);
         });
@@ -178,15 +186,19 @@ export class LocationsRepository {
       }
     }
 
+    // load i2c modules
     await this.dao
-      .get(I2cChannelsTable.selectAll, [location.id.toString()])
+      .get(I2cModuleTable.selectAllForLocation, [location.locationId])
       .then((val: any) => {
-        val.forEach((ch: any) => {
-          location.i2cModule.channels[ch.channelId] = new I2cChannel(
-            ch.channelId,
-            ch.channelName,
-            ch.enabled,
+        val.forEach((i2c: any) => {
+          const module = new I2cModule(
+            i2c.id,
+            i2c.moduleName,
+            i2c.locationId,
+            i2c.i2cType,
+            i2c.i2cAddress,
           );
+          location.i2cModules.push(module);
         });
       })
       .catch((err) => {
@@ -194,6 +206,7 @@ export class LocationsRepository {
         throw "error";
       });
 
+    // load gpio modules
     await this.dao
       .get(GpioChannelsTable.selectAll, [location.id.toString()])
       .then((val: any) => {
@@ -254,10 +267,10 @@ export class LocationsRepository {
       await this.dao
         .run(UartModuleTable.insert, [
           uart.id,
-          uart.locationId.toString(),
+          uart.name,
+          uart.locationId,
           uart.uartChannel.toString(),
           uart.baudRate.toString(),
-          uart.name,
         ])
         .catch((err: any) => {
           logger.error(err);
@@ -265,13 +278,24 @@ export class LocationsRepository {
         });
     }
 
-    for (const i2c of location.i2cModule.channels) {
+    await this.removeStaleI2CModules(
+      location.id,
+      location.i2cModules.map((m) => m.id),
+    );
+
+    for (const i2c of location.i2cModules) {
+      switch (i2c.type) {
+        default:
+          break;
+      }
+
       await this.dao
-        .run(I2cChannelsTable.update, [
-          i2c.channelName,
-          i2c.enabled ? "1" : "0",
-          i2c.id.toString(),
-          location.id.toString(),
+        .run(I2cModuleTable.insert, [
+          i2c.id,
+          i2c.name,
+          i2c.locationId,
+          i2c.type.toString(),
+          i2c.i2cAddress.toString(),
         ])
         .catch((err: any) => {
           logger.error(err);
@@ -300,12 +324,12 @@ export class LocationsRepository {
   }
 
   public async setLocationController(
-    locationId: number,
+    locationId: string,
     controllerId: number,
   ): Promise<boolean> {
     await this.dao
       .run(ControllerLocationTable.delete, [
-        locationId.toString(),
+        locationId,
         controllerId.toString(),
       ])
       .catch((err: any) => {
@@ -315,7 +339,7 @@ export class LocationsRepository {
 
     await this.dao
       .run(ControllerLocationTable.insert, [
-        locationId.toString(),
+        locationId,
         controllerId.toString(),
       ])
       .catch((err: any) => {
@@ -345,7 +369,7 @@ export class LocationsRepository {
 
   //#region Utility methods
   private async removeStaleUartModules(
-    locationId: number,
+    locationId: string,
     currentMods: Array<string>,
   ) {
     const uartMods = new Array<UartMods>();
@@ -387,6 +411,42 @@ export class LocationsRepository {
     }
   }
 
+  private async removeStaleI2CModules(
+    locationId: string,
+    currentMods: Array<string>,
+  ) {
+    const i2cMods = new Array<I2cMods>();
+
+    this.dao
+      .get(I2cModuleTable.selectAllForLocation, [locationId])
+      .then((val: any) => {
+        for (const m of val) {
+          i2cMods.push({ id: m.id, type: m.i2cType });
+        }
+      })
+      .catch((err: any) => {
+        logger.error(err);
+        throw "error";
+      });
+
+    for (const i2cMod of i2cMods) {
+      if (currentMods.includes(i2cMod.id)) {
+        continue;
+      }
+
+      switch (i2cMod.type) {
+        default:
+          break;
+      }
+
+      await this.dao
+        .run(I2cModuleTable.delete, [i2cMod.id])
+        .catch((err: any) => {
+          logger.error(err);
+          throw err;
+        });
+    }
+  }
   //#endregion
 
   //#region KangarooX2 methods

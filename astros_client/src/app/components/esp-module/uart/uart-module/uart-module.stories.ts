@@ -66,11 +66,11 @@ function getSerialModule(
 ): UartModule {
   const module = new UartModule(
     '1234',
-    0,
+    'Generic Serial',
+    'test',
     type,
     ch,
     baudRate,
-    'Generic Serial',
   );
 
   switch (type) {

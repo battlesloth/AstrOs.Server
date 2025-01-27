@@ -1,7 +1,7 @@
 <div class="script-row-container">
     <div class="module-container">
         <div class="title" *ngIf="channel.type !== 1 && channel.type !== 4">{{channel.channel.channelName}}</div>
-        <div class="title" *ngIf="channel.type === 1">{{channel.channel.moduleName}}</div>
+        <!--<div class="title" *ngIf="channel.type === 1">{{channel.channel.moduleName}}</div>-->
         <div class="title" *ngIf="channel.type === 4">{{locationName}}</div>
         
         <div *ngIf="channel.type !== 4">{{locationName}}</div>

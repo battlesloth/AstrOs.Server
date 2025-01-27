@@ -26,6 +26,7 @@ import {
   MaestroModule,
   I2cModule,
   I2cType,
+  AstrOsConstants,
 } from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import {
@@ -41,9 +42,10 @@ import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   AddModuleEvent,
-  EspModuleComponent,
   RemoveModuleEvent,
-} from '@src/components/esp-module';
+  ServoTestEvent,
+} from '@src/components/esp-module/utility/module-events';
+import { EspModuleComponent } from '@src/components/esp-module';
 import {
   ControllerService,
   ModalService,
@@ -264,7 +266,6 @@ export class ModulesComponent implements AfterViewInit {
 
   removeModule(event: RemoveModuleEvent) {
     this.container.clear();
-
     const modalResources = new Map<string, unknown>();
 
     const component = this.container.createComponent(ConfirmModalComponent);
@@ -288,6 +289,7 @@ export class ModulesComponent implements AfterViewInit {
   }
 
   removeModuleCallback(evt: ModalCallbackEvent) {
+    console.log('evt', evt);
     if (evt.type === ConfirmModalResources.closeEvent) {
       this.modalService.close('modules-modal');
       this.container.clear();
@@ -333,19 +335,19 @@ export class ModulesComponent implements AfterViewInit {
     }
   }
 
-  addUartModule(location: number, subType: ModuleSubType) {
+  addUartModule(location: string, subType: ModuleSubType) {
     const controller = this.getControllerLocation(location);
 
-    const defaultChannel = location === 1 ? 2 : 1;
+    const defaultChannel = location === AstrOsConstants.BODY ? 2 : 1;
     const uartType = this.subtypeToUartType(subType);
 
     const module = new UartModule(
       crypto.randomUUID(),
+      'New Serial Module',
       location,
       uartType,
       defaultChannel,
       9600,
-      'New Serial Module',
     );
 
     switch (uartType) {
@@ -367,7 +369,7 @@ export class ModulesComponent implements AfterViewInit {
     controller.uartModules.push(module);
   }
 
-  addI2CModule(location: number, subType: ModuleSubType) {
+  addI2CModule(location: string, subType: ModuleSubType) {
     const controller = this.getControllerLocation(location);
     const i2cType = this.subtypeToI2cType(subType);
     const nextAddress = this.getNextI2CAddress(controller.i2cModules);
@@ -397,9 +399,9 @@ export class ModulesComponent implements AfterViewInit {
     controller.i2cModules.push(module);
   }
 
-  addGPIOchannel(location: number, gpioType: ModuleSubType) {}
+  addGPIOchannel(location: string, gpioType: ModuleSubType) {}
 
-  removeUartModule(location: number, moduleId: string) {
+  removeUartModule(location: string, moduleId: string) {
     const controller = this.getControllerLocation(location);
 
     controller.uartModules = controller.uartModules
@@ -407,7 +409,7 @@ export class ModulesComponent implements AfterViewInit {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  removeI2CModule(location: number, moduleId: string) {
+  removeI2CModule(location: string, moduleId: string) {
     const controller = this.getControllerLocation(location);
 
     controller.i2cModules = controller.i2cModules
@@ -415,7 +417,7 @@ export class ModulesComponent implements AfterViewInit {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  removeGPIOchannel(location: number, channelId: string) {
+  removeGPIOchannel(location: string, channelId: string) {
     const controller = this.getControllerLocation(location);
 
     /*controller.gpioChannels = controller.gpioChannels.filter(
@@ -500,8 +502,8 @@ export class ModulesComponent implements AfterViewInit {
 
   //#region Servo Test
 
-  openServoTestModal(value: { controllerId: number; channelId: number }) {
-    if (value.controllerId === 0) {
+  openServoTestModal(value: ServoTestEvent) {
+    if (!value.locationId) {
       this.openAlertModal('Location for this servo is not set.');
       return;
     }
@@ -515,7 +517,7 @@ export class ModulesComponent implements AfterViewInit {
     component.instance.resources = modalResources;
     component.instance.resources.set(
       ServoTestModalResources.controllerId,
-      value.controllerId,
+      value.locationId,
     );
     component.instance.resources.set(
       ServoTestModalResources.servoId,
@@ -589,13 +591,13 @@ export class ModulesComponent implements AfterViewInit {
     }
   }
 
-  private getControllerLocation(controllerId: number): ControllerLocation {
-    switch (controllerId) {
-      case 1:
+  private getControllerLocation(locationId: string): ControllerLocation {
+    switch (locationId) {
+      case AstrOsConstants.BODY:
         return this.bodyLocation;
-      case 2:
+      case AstrOsConstants.CORE:
         return this.coreLocation;
-      case 3:
+      case AstrOsConstants.DOME:
         return this.domeLocation;
     }
     return this.bodyLocation;

@@ -6,11 +6,11 @@ import {
   ViewChild,
   ViewContainerRef,
 } from '@angular/core';
+import { ModalComponent } from '@src/components/modals';
 import {
   FormatModalComponent,
   FormatModalResources,
-  ModalComponent,
-} from '@src/components/modals';
+} from '@src/components/modals/utility';
 import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-callback-event';
 import { ModalService, SettingsService, SnackbarService } from '@src/services';
 import { ControlModule } from 'astros-common';

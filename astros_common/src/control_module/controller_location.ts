@@ -4,7 +4,8 @@ import { I2cModule } from "./i2c/i2c_module";
 import { UartModule } from "./uart/uart_module";
 
 export class ControllerLocation {
-  id: number;
+  id: string;
+  locationId: string;
   locationName: string;
   description: string;
   configFingerprint: string;
@@ -16,14 +17,15 @@ export class ControllerLocation {
 
   uartModules: UartModule[];
 
-
   constructor(
-    id: number,
+    id: string,
+    locationId: string,
     locationName: string,
     description: string,
     configFingerprint: string,
   ) {
     this.id = id;
+    this.locationId = locationId;
     this.locationName = locationName;
     this.description = description;
     this.configFingerprint = configFingerprint;

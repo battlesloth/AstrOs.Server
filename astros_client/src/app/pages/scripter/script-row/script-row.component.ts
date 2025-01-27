@@ -8,9 +8,15 @@ import {
   ElementRef,
 } from '@angular/core';
 import { faTrash, faEdit, faPlay } from '@fortawesome/free-solid-svg-icons';
-import { UartType, ScriptChannel } from 'astros-common';
+import {
+  UartType,
+  ScriptChannel,
+  AstrOsConstants,
+  ChannelType,
+} from 'astros-common';
 import { NgIf } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { UartChannel } from 'astros-common/dist/control_module/uart/uart_channel';
 
 @Component({
   selector: 'app-script-row',
@@ -35,7 +41,10 @@ export class ScriptRowComponent {
   set channel(channel: ScriptChannel) {
     this._channel = channel;
     this.locationName = this.getLocationName(channel.locationId);
-    this.uartType = this.serialName(channel.channel.type);
+    if (channel.type === ChannelType.uart) {
+      const ch = channel.channel as UartChannel;
+      this.uartType = this.serialName(ch.uartType);
+    }
   }
   get channel(): ScriptChannel {
     return this._channel;
@@ -66,15 +75,15 @@ export class ScriptRowComponent {
     this.timelineCallback.emit({ event: event, id: this.channel.id });
   }
 
-  getLocationName(id: number): string {
+  getLocationName(id: string): string {
     switch (id) {
-      case 1:
+      case AstrOsConstants.BODY:
         return 'Body';
-      case 2:
+      case AstrOsConstants.CORE:
         return 'Core';
-      case 3:
+      case AstrOsConstants.DOME:
         return 'Dome';
-      case 4:
+      case 'AUDIO':
         return 'Audio Playback';
       default:
         return 'Unknown';

@@ -31,7 +31,6 @@ type Story = StoryObj<EspModuleComponent>;
 export const Default: Story = {
   args: {
     isMaster: false,
-    locationId: 0,
     location: getControllerLocation(),
   },
 };

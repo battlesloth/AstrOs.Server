@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { SettingsTable } from "./tables/settings_table";
 import { UsersTable } from "./tables/users_table";
 import { ControllersTable } from "./tables/controller_tables/controllers_table";
-import { I2cChannelsTable } from "./tables/controller_tables/i2c_channels_table";
+import { I2cModuleTable } from "./tables/i2c_tables/i2c_module_table";
 import { M5Page, AstrOsConstants } from "astros-common";
 import { ScriptsTable } from "./tables/script_tables/scripts_table";
 import { ScriptEventsTable } from "./tables/script_tables/script_events_table";
@@ -165,7 +165,7 @@ export class DataAccess {
 
     await this.createTable(MaestroBoardsTable.table, MaestroBoardsTable.create);
 
-    await this.createTable(I2cChannelsTable.table, I2cChannelsTable.create);
+    await this.createTable(I2cModuleTable.table, I2cModuleTable.create);
 
     await this.createTable(GpioChannelsTable.table, GpioChannelsTable.create);
 
@@ -239,33 +239,18 @@ export class DataAccess {
     nameMap.set(AstrOsConstants.DOME, "Dome Surface Controller");
 
     for await (const loc of locations) {
-      let id = "";
+      const id = crypto.randomUUID();
 
-      await this.get(LocationsTable.insert, [loc, nameMap.get(loc), ""])
-        .then((result: any) => {
-          id = result[0].id.toString();
-        })
-        .catch((err) => {
-          console.error(`Error adding ${loc} location: ${err}`);
-          throw err;
-        });
-
-      if (id === "") {
-        logger.error(`Error adding ${loc} location`);
-        throw new Error(`Error adding ${loc} location`);
-      }
-
-      for (let i = 0; i < 128; i++) {
-        await this.run(I2cChannelsTable.insert, [
-          id,
-          i.toString(),
-          "unassigned",
-          "0",
-        ]).catch((err) => {
-          console.error(`Error adding i2c channel ${i}: ${err}`);
-          throw err;
-        });
-      }
+      await this.get(LocationsTable.insert, [
+        id,
+        loc,
+        loc,
+        nameMap.get(loc),
+        "",
+      ]).catch((err) => {
+        console.error(`Error adding ${loc} location: ${err}`);
+        throw err;
+      });
 
       for (let i = 0; i < 10; i++) {
         await this.run(GpioChannelsTable.insert, [

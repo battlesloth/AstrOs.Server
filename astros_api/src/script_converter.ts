@@ -26,10 +26,10 @@ export enum CommandType {
 }
 
 export class ScriptConverter {
-  convertScript(script: Script): Map<number, string> {
+  convertScript(script: Script): Map<string, string> {
     try {
-      const result = new Map<number, string>();
-      const eventMap = new Map<number, Map<number, Array<ScriptEvent>>>();
+      const result = new Map<string, string>();
+      const eventMap = new Map<string, Map<number, Array<ScriptEvent>>>();
 
       for (const ch of script.scriptChannels) {
         this.mapEventsByControllerAndTime(ch, eventMap);
@@ -46,7 +46,7 @@ export class ScriptConverter {
       return result;
     } catch (err) {
       logger.error(`Exception converting script${script.id}: ${err}`);
-      return new Map<number, string>();
+      return new Map<string, string>();
     }
   }
 
@@ -72,7 +72,7 @@ export class ScriptConverter {
 
   mapEventsByControllerAndTime(
     channel: ScriptChannel,
-    map: Map<number, Map<number, Array<ScriptEvent>>>,
+    map: Map<string, Map<number, Array<ScriptEvent>>>,
   ): void {
     for (const kvp of channel.eventsKvpArray) {
       const evt = kvp.value as ScriptEvent;

@@ -8,10 +8,10 @@ import {
 import { ModuleChannelType } from 'astros-common/dist/control_module/base_channel';
 
 export class LocationDetails {
-  id: number;
+  id: string;
   name: string;
 
-  constructor(id: number, name: string) {
+  constructor(id: string, name: string) {
     this.id = id;
     this.name = name;
   }
@@ -28,32 +28,26 @@ export class ChannelValue {
 }
 
 export class ScriptResources {
-  locations: Map<number, LocationDetails>;
+  locations: Map<string, LocationDetails>;
 
-  uartChannels: Map<number, ChannelValue[]>;
+  uartChannels: Map<string, ChannelValue[]>;
 
-  servoChannels: Map<number, ChannelValue[]>;
+  servoChannels: Map<string, ChannelValue[]>;
 
-  i2cChannels: Map<number, ChannelValue[]>;
+  i2cChannels: Map<string, ChannelValue[]>;
 
-  gpioChannels: Map<number, ChannelValue[]>;
+  gpioChannels: Map<string, ChannelValue[]>;
 
   constructor(locations: ControllerLocation[]) {
-    this.locations = new Map<number, LocationDetails>();
-    this.servoChannels = new Map<number, ChannelValue[]>();
-    this.i2cChannels = new Map<number, ChannelValue[]>();
-    this.uartChannels = new Map<number, ChannelValue[]>();
-    this.gpioChannels = new Map<number, ChannelValue[]>();
+    this.locations = new Map<string, LocationDetails>();
+    this.servoChannels = new Map<string, ChannelValue[]>();
+    this.i2cChannels = new Map<string, ChannelValue[]>();
+    this.uartChannels = new Map<string, ChannelValue[]>();
+    this.gpioChannels = new Map<string, ChannelValue[]>();
 
     locations.forEach((loc) => {
       this.locations.set(loc.id, new LocationDetails(loc.id, loc.locationName));
 
-      this.i2cChannels.set(
-        loc.id,
-        loc.i2cModule.channels.map(
-          (ch: I2cChannel) => new ChannelValue(ch, ch.enabled),
-        ),
-      );
       this.gpioChannels.set(
         loc.id,
         loc.gpioModule.channels.map(
@@ -90,7 +84,6 @@ export class ScriptResources {
           this.provisionChannel(this.i2cChannels, ch.locationId, ch.channel.id);
           break;
         case ChannelType.audio:
-          this.locations.delete(4);
           break;
         case ChannelType.gpio:
           this.provisionChannel(
@@ -106,14 +99,14 @@ export class ScriptResources {
   getAvailableModules(): Map<number, Map<ChannelType, string>> {
     const result = new Map<number, Map<ChannelType, string>>();
 
-    for (const ctrl of this.locations.keys()) {
+    /*for (const ctrl of this.locations.keys()) {
       if (ctrl === 4 || ctrl === 0) {
         continue;
       }
 
       result.set(ctrl, this.setModuleValues(ctrl));
     }
-
+  */
     return result;
   }
 
@@ -121,6 +114,7 @@ export class ScriptResources {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = new Map<number, Map<ChannelType, any>>();
 
+    /*
     for (const ctrl of this.locations.keys()) {
       if (ctrl === 4 || ctrl === 0) {
         continue;
@@ -134,7 +128,7 @@ export class ScriptResources {
 
       result.set(ctrl, vals);
     }
-
+    */
     return result;
   }
 
@@ -149,15 +143,15 @@ export class ScriptResources {
   }
 
   addChannel(
-    controller: number,
+    controller: string,
     type: ChannelType,
     id: number,
   ): ModuleChannelType | undefined {
-    if (controller === 4) {
+    /*if (controller === 4) {
       this.locations.delete(4);
       return undefined;
     }
-
+    */
     switch (type) {
       case ChannelType.uart:
         return this.provisionChannel(this.uartChannels, controller, id);
@@ -171,8 +165,8 @@ export class ScriptResources {
   }
 
   provisionChannel(
-    map: Map<number, ChannelValue[]>,
-    location: number,
+    map: Map<string, ChannelValue[]>,
+    location: string,
     id: number,
   ): ModuleChannelType | undefined {
     const idx = map.get(location)?.findIndex((x) => x.channel.id === id);
@@ -184,12 +178,7 @@ export class ScriptResources {
     return undefined;
   }
 
-  removeChannel(location: number, type: ChannelType, id: number): void {
-    if (location === 4) {
-      this.locations.set(4, new LocationDetails(4, 'Audio Playback'));
-      return;
-    }
-
+  removeChannel(location: string, type: ChannelType, id: number): void {
     switch (type) {
       case ChannelType.uart:
         this.deprovisionChannel(this.uartChannels, location, id);
@@ -204,8 +193,8 @@ export class ScriptResources {
   }
 
   deprovisionChannel(
-    map: Map<number, ChannelValue[]>,
-    location: number,
+    map: Map<string, ChannelValue[]>,
+    location: string,
     id: number,
   ): void {
     const idx = map.get(location)?.findIndex((x) => x.channel.id === id);

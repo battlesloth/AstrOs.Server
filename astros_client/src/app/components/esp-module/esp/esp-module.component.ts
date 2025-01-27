@@ -13,24 +13,12 @@ import { UartModuleComponent } from '../uart/uart-module/uart-module.component';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
-
-export interface AddModuleEvent {
-  locationId: number;
-  module: ModuleType;
-}
-
-export interface RemoveModuleEvent {
-  locationId: number;
-  id: string;
-  module: ModuleType;
-}
-
-export interface ServoTestEvent {
-  locationId: number;
-  moduleType: ModuleType;
-  moduleSubType: ModuleSubType;
-  channelId: string;
-}
+import { I2cModuleComponent } from '../i2c/i2c-module/i2c-module.component';
+import {
+  AddModuleEvent,
+  RemoveModuleEvent,
+  ServoTestEvent,
+} from '../utility/module-events';
 
 @Component({
   selector: 'app-esp-module',
@@ -47,6 +35,7 @@ export interface ServoTestEvent {
     NgFor,
     MatCheckbox,
     UartModuleComponent,
+    I2cModuleComponent,
     FontAwesomeModule,
   ],
 })
@@ -62,9 +51,6 @@ export class EspModuleComponent {
 
   @Input()
   isMaster = false;
-
-  @Input()
-  locationId = 0;
 
   @Input()
   location!: ControllerLocation;
@@ -85,14 +71,23 @@ export class EspModuleComponent {
     }
 
     this.addModuleEvent.emit({
-      locationId: this.locationId,
+      locationId: this.location.locationId,
       module: ModuleType.uart,
+    });
+  }
+
+  addI2cModule(evt: Event) {
+    evt.stopPropagation();
+
+    this.addModuleEvent.emit({
+      locationId: this.location.locationId,
+      module: ModuleType.i2c,
     });
   }
 
   removeModule(evt: RemoveModuleEvent) {
     this.removeModuleEvent.emit({
-      locationId: this.locationId,
+      locationId: this.location.locationId,
       id: evt.id,
       module: evt.module,
     });
@@ -104,7 +99,7 @@ export class EspModuleComponent {
     channelId: string,
   ) {
     this.openServoTestModal.emit({
-      locationId: this.locationId,
+      locationId: this.location.locationId,
       moduleType: module,
       moduleSubType: subType,
       channelId: channelId,

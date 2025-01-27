@@ -14,7 +14,7 @@ export class AddModuleModalResources {
 }
 
 export interface AddModuleModalResponse {
-  locationId: number;
+  locationId: string;
   moduleType: ModuleType;
   moduleSubType: ModuleSubType;
 }
