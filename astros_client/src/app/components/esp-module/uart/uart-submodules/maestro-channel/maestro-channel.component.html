@@ -1,1 +1,21 @@
-<p>maestro-channel works!</p>
+<div class="maestro-channel">
+    <div class="label-row">
+        <div *ngIf="channel" class="label">Channel {{channel.id}}</div>
+        <div class="type-select">
+            <select [(ngModel)]="type" (ngModelChange)="onTypeChanged($event)">
+                <option value="0">Disabled</option>
+                <option value="1">Servo</option>
+                <option value="2">Output</option>
+            </select>
+        </div>
+        <div class="spacer"></div>
+        <div class="test-button">
+            <button (click)="testServoModal()">Test</button>
+        </div>
+    </div>
+    <div *ngIf="channel" class="servo-settings">
+        <app-servo-settings  [enabled]="channel.enabled" [name]="channel.channelName"
+            [isServo]="channel.isServo" [invert]="channel.inverted" [minPulse]="channel.minPos"
+            [maxPulse]="channel.maxPos" [homePosition]="channel.homePos" />
+    </div>
+</div>

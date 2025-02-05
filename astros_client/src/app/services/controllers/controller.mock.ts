@@ -11,9 +11,9 @@ export class ControllerServiceMock {
   public getLocations(): Observable<any> {
     return of(
       new AstrOsLocationCollection(
-        new ControllerLocation(0, AstrOsConstants.CORE, 'Test Location', 'ESP', 'fingerprint'),
-        new ControllerLocation(1, AstrOsConstants.DOME, 'Test Location 2', 'ESP', 'fingerprint'),
-        new ControllerLocation(2, AstrOsConstants.BODY, 'Test Location 3', 'ESP', 'fingerprint'),
+        new ControllerLocation('1234', AstrOsConstants.CORE, 'Test Location', 'ESP', 'fingerprint'),
+        new ControllerLocation('5678', AstrOsConstants.DOME, 'Test Location 2', 'ESP', 'fingerprint'),
+        new ControllerLocation('9010', AstrOsConstants.BODY, 'Test Location 3', 'ESP', 'fingerprint'),
       )
     );
   }
@@ -21,9 +21,9 @@ export class ControllerServiceMock {
   public getLoadedLocations(): Observable<any> {
     return of(
       new AstrOsLocationCollection(
-        new ControllerLocation(0, AstrOsConstants.CORE, 'Test Location', 'ESP', 'fingerprint'),
-        new ControllerLocation(1, AstrOsConstants.DOME, 'Test Location 2', 'ESP', 'fingerprint'),
-        new ControllerLocation(2, AstrOsConstants.BODY, 'Test Location 3', 'ESP', 'fingerprint'),
+        new ControllerLocation('1234', AstrOsConstants.CORE, 'Test Location', 'ESP', 'fingerprint'),
+        new ControllerLocation('5678', AstrOsConstants.DOME, 'Test Location 2', 'ESP', 'fingerprint'),
+        new ControllerLocation('9010', AstrOsConstants.BODY, 'Test Location 3', 'ESP', 'fingerprint'),
       )
     );
   }

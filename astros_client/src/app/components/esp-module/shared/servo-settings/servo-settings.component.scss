@@ -1,0 +1,71 @@
+@use '@angular/material' as mat;
+@use "./src/assets/styles/variables" as v;
+
+
+.servo-channel {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+
+    @include mat.checkbox-overrides((label-text-color: white,
+        ));
+
+    .servo-channel-row:last-child {
+        margin-right: 10px;
+    }
+
+    .servo-channel-row {
+        flex-grow: 1;
+        width: 350px;
+
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+
+        .name {
+            flex-grow: 1;
+            margin: 0px;
+            padding-top: 5px;
+
+            input {
+                padding: 2px;
+                font-size: medium;
+                width: 100%;
+            }
+        }
+
+        .type {
+            text-align: center;
+            margin-top: 0px;
+            margin-bottom: 0px;
+            margin-left: 20px;
+            padding: 0px;
+        }
+
+        .spacer {
+            flex-grow: 1;
+        }
+
+        .ms-value {
+            padding-top: 8px;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+
+            .label-ms {
+                padding-top: 2px;
+                font-size: medium;
+            }
+
+            .limit {
+                margin-left: 8px;
+                input {
+                    width: 40px;
+                    text-align: center;
+                    font-size: medium;
+                }
+            }
+
+        }
+    }
+}

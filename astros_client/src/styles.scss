@@ -30,6 +30,19 @@
         disabled-handle-color: v.$light-blue,
         disabled-inactive-track-color: v.$light-blue
       ));
+
+      @include mat.checkbox-overrides((
+        label-text-color: black,
+        label-text-size: medium,
+        selected-checkmark-color: v.$color-pale,
+        selected-pressed-icon-color: v.$light-blue,
+        selected-focus-icon-color: v.$light-blue,
+        selected-hover-icon-color: v.$light-blue,
+        selected-icon-color: v.$light-blue,
+        selected-focus-state-layer-color: v.$light-blue,
+        selected-hover-state-layer-color: v.$light-blue,
+        unselected-pressed-state-layer-color: v.$light-blue
+    ))
 }
 
 body {

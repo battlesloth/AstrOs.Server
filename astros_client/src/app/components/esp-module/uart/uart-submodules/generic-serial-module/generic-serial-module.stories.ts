@@ -23,14 +23,34 @@ export const Default: Story = {
   },
 };
 
+export const Master: Story = {
+  args: {
+    module: getSerialModule(2, 9600),
+    isMaster: true,
+  },
+};
+
+export const Channel2: Story = {
+  args: {
+    module: getSerialModule(2, 9600),
+  },
+};
+
+export const BaudRate115200: Story = {
+  args: {
+    module: getSerialModule(1, 115200),
+  },
+};
+
+
 function getSerialModule(ch: number, baudRate: number): UartModule {
   const module = new UartModule(
     '1234',
-    0,
+    'Generic Serial',
+    'core',
     UartType.genericSerial,
     ch,
     baudRate,
-    'Generic Serial',
   );
 
   return module;

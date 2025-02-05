@@ -27,6 +27,8 @@ import {
   I2cModule,
   I2cType,
   AstrOsConstants,
+  MaestroBoard,
+  MaestroChannel,
 } from 'astros-common';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import {
@@ -335,6 +337,7 @@ export class ModulesComponent implements AfterViewInit {
     }
   }
 
+  //#region Serial Modules
   addUartModule(location: string, subType: ModuleSubType) {
     const controller = this.getControllerLocation(location);
 
@@ -362,12 +365,61 @@ export class ModulesComponent implements AfterViewInit {
         );
         break;
       case UartType.maestro:
-        module.subModule = new MaestroModule();
+        module.subModule = this.generateMaestroModule(location);
         break;
     }
 
     controller.uartModules.push(module);
   }
+
+
+  generateMaestroModule(location: string) {
+
+    const subModule = new MaestroModule();
+
+    subModule.boards = [
+      new MaestroBoard(
+        crypto.randomUUID(),
+        0,
+        'Board 1',
+        24
+      )
+    ]
+
+    for (let i = 0; i < 24; i++) {
+     
+      const idx = i + 1;
+      subModule.boards[0].channels.push(
+        new MaestroChannel(
+          idx,
+          `Channel ${i + idx}`,
+          false,
+          subModule.boards[0].id,
+          true,
+          500,
+          2500,
+          1250,
+          false,
+          0,
+          0,
+        )
+      );
+    }
+
+    return subModule;
+  }
+
+  removeUartModule(location: string, moduleId: string) {
+    const controller = this.getControllerLocation(location);
+
+    controller.uartModules = controller.uartModules
+      .filter((module: UartModule) => module.id !== moduleId)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  //#endregion
+
+  //#region I2C Modules
 
   addI2CModule(location: string, subType: ModuleSubType) {
     const controller = this.getControllerLocation(location);
@@ -399,16 +451,6 @@ export class ModulesComponent implements AfterViewInit {
     controller.i2cModules.push(module);
   }
 
-  addGPIOchannel(location: string, gpioType: ModuleSubType) {}
-
-  removeUartModule(location: string, moduleId: string) {
-    const controller = this.getControllerLocation(location);
-
-    controller.uartModules = controller.uartModules
-      .filter((module: UartModule) => module.id !== moduleId)
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }
-
   removeI2CModule(location: string, moduleId: string) {
     const controller = this.getControllerLocation(location);
 
@@ -416,6 +458,10 @@ export class ModulesComponent implements AfterViewInit {
       .filter((module: I2cModule) => module.id !== moduleId)
       .sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  //#endregion
+
+  addGPIOchannel(location: string, gpioType: ModuleSubType) {}
 
   removeGPIOchannel(location: string, channelId: string) {
     const controller = this.getControllerLocation(location);

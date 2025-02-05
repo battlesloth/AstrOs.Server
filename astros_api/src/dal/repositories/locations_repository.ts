@@ -508,6 +508,7 @@ export class LocationsRepository {
           parentId,
           board.boardId.toString(),
           board.name,
+          board.channelCount.toString(),
         ])
         .catch((err: any) => {
           logger.error(err);
@@ -542,7 +543,7 @@ export class LocationsRepository {
       .get(MaestroBoardsTable.selectAllForParent, [uartMod.id])
       .then((val: any) => {
         for (const b of val) {
-          const board = new MaestroBoard(b.id, b.boardId, b.boardName);
+          const board = new MaestroBoard(b.id, b.boardId, b.boardName, b.channelCount);
           module.boards.push(board);
         }
       })

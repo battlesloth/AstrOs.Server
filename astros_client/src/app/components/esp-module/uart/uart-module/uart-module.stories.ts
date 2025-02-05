@@ -11,6 +11,7 @@ import { UartModuleComponent } from './uart-module.component';
 import {
   KangarooX2 as KX2,
   MaestroBoard,
+  MaestroChannel,
   MaestroModule,
   UartModule,
   UartType,
@@ -85,10 +86,48 @@ function getSerialModule(
     case UartType.maestro: {
       module.name = 'Maestro';
       const subModule = new MaestroModule();
-      subModule.boards = [new MaestroBoard('1234', 1, '')];
+      subModule.boards = [getMaestroBoard(24)];
       module.subModule = subModule;
       break;
     }
   }
   return module;
+}
+
+function getMaestroBoard(channelCount: number): MaestroBoard {
+  const board = new MaestroBoard('1234', 0, '', channelCount);
+  
+  for (let i = 0; i < 24; i++) {
+    
+    const idx = i + 1;
+    const enabled = idx % 3 !== 0;
+    const servo = (idx % 2 ===0 && idx % 3 !== 0);
+    
+    board.channels.push(
+      getMaestroChannel(idx, `Channel ${i + idx}`, enabled, '1234', servo),
+    );
+  }
+  return board;
+}
+
+function getMaestroChannel(
+  channel: number,
+  name: string,
+  enabled: boolean,
+  boardId: string,
+  servo: boolean,
+): MaestroChannel {
+  return new MaestroChannel(
+    channel,
+    name,
+    enabled,
+    boardId,
+    servo,
+    500,
+    2500,
+    1250,
+    false,
+    0,
+    0,
+  );
 }

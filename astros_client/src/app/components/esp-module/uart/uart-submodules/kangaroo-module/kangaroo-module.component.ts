@@ -11,12 +11,14 @@ import { NgIf } from '@angular/common';
     '../base-uart-sub-module/base-uart-sub-module.component.scss',
     './kangaroo-module.component.scss',
   ],
-  imports: [NgIf, FormsModule],
+  imports: [
+    NgIf,
+    FormsModule
+  ],
 })
 export class KangarooModuleComponent
   extends BaseUartSubModuleComponent
-  implements OnInit
-{
+  implements OnInit {
   subModule!: KangarooX2;
 
   ngOnInit(): void {

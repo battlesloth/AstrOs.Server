@@ -4,28 +4,33 @@ export class MaestroBoardsTable {
   public static readonly parentId = "parentId";
   public static readonly boardId = "boardId";
   public static readonly boardName = "boardName";
+  public static readonly channelCount = "channelCount";
 
   public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
         ${this.id} TEXT PRIMARY KEY,
         ${this.parentId} TEXT,
         ${this.boardId} NUMBER,
-        ${this.boardName} TEXT)`;
+        ${this.boardName} TEXT,
+        ${this.channelCount} NUMBER)`;
 
   public static readonly insert = `INSERT INTO ${this.table} (
         ${this.id}, 
         ${this.parentId},
         ${this.boardId},
-        ${this.boardName})
-        VALUES (?, ?, ?, ?)
+        ${this.boardName},
+        ${this.channelCount})
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(${this.id}) DO UPDATE SET
         ${this.parentId} = excluded.${this.parentId},
         ${this.boardId} = excluded.${this.boardId},
-        ${this.boardName} = excluded.${this.boardName}`;
+        ${this.boardName} = excluded.${this.boardName},
+        ${this.channelCount} = excluded.${this.channelCount}`;
 
   public static readonly selectAllForParent = `SELECT ${this.id},
         ${this.parentId},
         ${this.boardId},
-        ${this.boardName}
+        ${this.boardName},
+        ${this.channelCount}
         FROM ${this.table}
         WHERE ${this.parentId} = ?`;
 

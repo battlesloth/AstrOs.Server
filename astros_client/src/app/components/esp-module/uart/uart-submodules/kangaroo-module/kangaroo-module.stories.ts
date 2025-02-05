@@ -26,11 +26,12 @@ export const Default: Story = {
 function getSerialModule(ch: number, baudRate: number): UartModule {
   const module = new UartModule(
     '1234',
-    0,
+    'Kangaroo X2',
+    'core',
     UartType.kangaroo,
     ch,
     baudRate,
-    'Kangaroo X2',
+
   );
 
   module.subModule = new KX2('', 'Lifter', 'Spinner');

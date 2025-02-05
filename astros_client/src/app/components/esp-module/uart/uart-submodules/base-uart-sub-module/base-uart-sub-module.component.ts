@@ -6,7 +6,7 @@ import { UartModule } from 'astros-common';
   template: '',
   styleUrls: ['./base-uart-sub-module.component.scss'],
 })
-export abstract class BaseUartSubModuleComponent implements OnInit {
+export abstract class BaseUartSubModuleComponent {
   @Input()
   isMaster = false;
 
@@ -15,8 +15,6 @@ export abstract class BaseUartSubModuleComponent implements OnInit {
 
   uartChannel!: string;
   baudRate!: string;
-
-  abstract ngOnInit(): void;
 
   onChannelChange(val: string) {
     this.module.uartChannel = parseInt(val);

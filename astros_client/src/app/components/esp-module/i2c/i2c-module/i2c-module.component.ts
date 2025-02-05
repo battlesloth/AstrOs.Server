@@ -29,7 +29,6 @@ import { RemoveModuleEvent } from '../../utility/module-events';
     MatExpansionPanelHeader,
     MatExpansionPanelTitle,
     MatExpansionPanelDescription,
-    NgIf,
     FormsModule,
     FontAwesomeModule,
   ],

@@ -78,77 +78,7 @@
         padding: 10px;
     }
 
-    .servo-channel {
-        display: flex;
-        flex-direction: column;
-
-        .servo-channel-row {
-            display: flex;
-            flex-direction: row;
-            flex-wrap: wrap;
-
-            .label {
-                font-size: large;
-                width: 120px;
-            }
-            
-            .label-ms {
-                font-size: large;
-                margin-right: 10px;
-            }
-
-            .test-button{
-                button{
-                    height: 30px;
-                    width: 100px;
-                    font-size: large;
-                    padding: 5px 0px;
-                    margin: 0px 5px;
-                }
-            }
-
-            .input {
-                flex-grow: 1;
-                margin: 0px;
-                max-width: 400px;
-                margin-right: 20px;
-
-                input {
-                    padding: 2px;
-                    font-size: large;
-                    width: 100%;
-
-                }
-            }
-
-            .type {
-                width: 120px;
-                text-align: center;
-                margin: 0px;
-                margin-right: 20px;
-
-                select {
-                    padding-top: 4px;
-                    width: 100%;
-                    max-width: 130px;
-                    font-size: large;
-                    display: block;
-
-                }
-            }
-
-            .limit {
-                margin-right: 20px;
-
-                input {
-                    text-align: center;
-                    width: 50px;
-                    padding: 2px;
-                    font-size: large;
-                }
-            }
-        }
-    }
+   
 }
 
 .i2c-list {
