@@ -1,4 +1,3 @@
-import { NgIf } from '@angular/common';
 import {
   AfterContentInit,
   AfterViewInit,
@@ -21,6 +20,14 @@ import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
 import { I2cModule, I2cType, ModuleType } from 'astros-common';
 import { RemoveModuleEvent } from '../../utility/module-events';
+import { GenericI2cModuleComponent } from '../i2c-submodules/generic-i2c-module/generic-i2c-module.component';
+import { Pca9685ModuleComponent } from '../i2c-submodules/pca9685-module/pca9685-module.component';
+import { BaseI2cSubModuleComponent } from '../i2c-submodules/base-i2c-sub-module/base-i2c-sub-module.component';
+
+export interface AddressChangeEvent {
+  old: number;
+  new: number;
+} 
 
 @Component({
   selector: 'app-i2c-module',
@@ -40,13 +47,20 @@ export class I2cModuleComponent implements AfterViewInit, AfterContentInit {
   i2cContainer!: ViewContainerRef;
 
   @Input()
-  isMaster = false;
-
-  @Input()
   module!: I2cModule;
 
+  // here to trigger change detection for object property changes
+  @Input()
+  set updateTrigger(val: number) {
+    console.log('I2C Module Update Trigger: ', val);
+    this.setModule();
+   }
+  
   @Output()
   removeModuleEvent = new EventEmitter<RemoveModuleEvent>();
+
+  @Output()
+  i2cAddressChangedEvent = new EventEmitter<AddressChangeEvent>();
 
   subtypeName = '';
   removeIcon = faTimes;
@@ -79,15 +93,36 @@ export class I2cModuleComponent implements AfterViewInit, AfterContentInit {
   setModule() {
     this.i2cContainer?.clear();
 
+    let component!: ComponentRef<BaseI2cSubModuleComponent>;
+
     switch (this.module.type) {
       case I2cType.genericI2C:
+
+        component = this.i2cContainer.createComponent(
+          GenericI2cModuleComponent,
+        ) as ComponentRef<GenericI2cModuleComponent>;
         break;
       case I2cType.humanCyborgRelations:
-        break;
       case I2cType.pwmBoard:
+        component = this.i2cContainer.createComponent(
+          Pca9685ModuleComponent
+        ) as ComponentRef<Pca9685ModuleComponent>;
         break;
       default:
         break;
+    }
+
+    if (component) {
+      component.instance.module = this.module;
+      component.instance.i2cAddressChangedEvent.subscribe((val: string) => {
+
+        console.log('I2C Address Changed: ', val);
+
+        this.i2cAddressChangedEvent.emit({
+          old: this.module.i2cAddress,
+          new: parseInt(val, 10),
+        });
+      });
     }
   }
 

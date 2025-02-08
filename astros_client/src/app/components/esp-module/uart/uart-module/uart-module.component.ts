@@ -1,4 +1,3 @@
-import { NgIf } from '@angular/common';
 import {
   AfterContentInit,
   AfterViewInit,
@@ -83,35 +82,32 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
   setModule() {
     this.uartContainer?.clear();
 
-    let component: ComponentRef<BaseUartSubModuleComponent>;
+    let component!: ComponentRef<BaseUartSubModuleComponent>;
 
     switch (this.module.uartType) {
-      case UartType.genericSerial: {
+      case UartType.humanCyborgRelations:
+      case UartType.genericSerial:
         component = this.uartContainer.createComponent(
           GenericSerialModuleComponent,
         ) as ComponentRef<GenericSerialModuleComponent>;
-        component.instance.module = this.module;
-        component.instance.isMaster = this.isMaster;
         break;
-      }
-      case UartType.kangaroo: {
+      case UartType.kangaroo:
         component = this.uartContainer.createComponent(
           KangarooModuleComponent,
         ) as ComponentRef<KangarooModuleComponent>;
-        component.instance.module = this.module;
-        component.instance.isMaster = this.isMaster;
         break;
-      }
-      case UartType.maestro: {
+      case UartType.maestro:
         component = this.uartContainer.createComponent(
           MaestroModuleComponent,
         ) as ComponentRef<MaestroModuleComponent>;
-        component.instance.module = this.module;
-        component.instance.isMaster = this.isMaster;
         break;
-      }
       default:
         break;
+    }
+
+    if (component) {
+      component.instance.module = this.module;
+      component.instance.isMaster = this.isMaster;
     }
   }
 

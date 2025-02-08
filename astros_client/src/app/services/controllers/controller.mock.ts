@@ -1,5 +1,5 @@
 import { Injectable } from "@angular/core";
-import { AstrOsConstants, AstrOsLocationCollection, ControllerLocation } from "astros-common";
+import { AstrOsConstants, AstrOsLocationCollection, ControllerLocation, GpioChannel, GpioModule } from "astros-common";
 //mport {  ChannelType } from "astros-common";
 import { Observable, of } from "rxjs";
 
@@ -7,30 +7,22 @@ import { Observable, of } from "rxjs";
   providedIn: 'root',
 })
 export class ControllerServiceMock {
-  
+
   public getLocations(): Observable<any> {
     return of(
-      new AstrOsLocationCollection(
-        new ControllerLocation('1234', AstrOsConstants.CORE, 'Test Location', 'ESP', 'fingerprint'),
-        new ControllerLocation('5678', AstrOsConstants.DOME, 'Test Location 2', 'ESP', 'fingerprint'),
-        new ControllerLocation('9010', AstrOsConstants.BODY, 'Test Location 3', 'ESP', 'fingerprint'),
-      )
+      this.generateLocationCollection()
     );
   }
 
   public getLoadedLocations(): Observable<any> {
     return of(
-      new AstrOsLocationCollection(
-        new ControllerLocation('1234', AstrOsConstants.CORE, 'Test Location', 'ESP', 'fingerprint'),
-        new ControllerLocation('5678', AstrOsConstants.DOME, 'Test Location 2', 'ESP', 'fingerprint'),
-        new ControllerLocation('9010', AstrOsConstants.BODY, 'Test Location 3', 'ESP', 'fingerprint'),
-      )
+      this.generateLocationCollection()
     );
   }
 
   public saveLocations(
     controllers: any,
-): Observable<unknown> {
+  ): Observable<unknown> {
     return of(null);
   }
 
@@ -49,5 +41,28 @@ export class ControllerServiceMock {
   ): Observable<unknown> {
     return of(null);
   }
-  
+
+
+  generateLocationCollection() {
+    const locations = new AstrOsLocationCollection(
+      new ControllerLocation('1234', AstrOsConstants.CORE, 'Test Location', 'ESP', 'fingerprint'),
+      new ControllerLocation('5678', AstrOsConstants.DOME, 'Test Location 2', 'ESP', 'fingerprint'),
+      new ControllerLocation('9010', AstrOsConstants.BODY, 'Test Location 3', 'ESP', 'fingerprint'),
+    );
+
+    locations.bodyModule!.gpioModule = this.generateGpioModule();
+    locations.domeModule!.gpioModule = this.generateGpioModule();
+    locations.coreModule!.gpioModule = this.generateGpioModule();
+
+    return locations;
+  }
+
+  generateGpioModule() {
+    const module = new GpioModule();
+
+    for (let i = 0; i < 10; i++) {
+      module.channels.push(new GpioChannel(i, `Channel ${i}`, false, false));
+    }
+    return module;
+  }
 }

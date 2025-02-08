@@ -136,42 +136,4 @@
         border: 2px solid v.$color-dark;
         padding: 10px;
     }
-
-    .gpio-channel {
-
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-
-        .label {
-            font-size: large;
-            width: 120px;
-        }
-
-        .input {
-            flex-grow: 1;
-            max-width: 400px;
-
-            input {
-                font-size: large;
-                width: 100%;
-            }
-        }
-
-        .enabled {
-            width: 120px;
-            text-align: center;
-            margin: 0px;
-            margin-right: 20px;
-
-        }
-
-        .default-low {
-            width: 120px;
-            text-align: center;
-            margin: 0px;
-            margin-right: 20px;
-
-        }
-    }
 }

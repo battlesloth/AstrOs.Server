@@ -2,7 +2,13 @@
     <mat-expansion-panel-header>
         <mat-panel-title>
             <div class="header-name">
-                <input matInput placeholder="Name" [(ngModel)]="module.name" (click)="nameClicked($event)" />
+                <input 
+                    matInput 
+                    placeholder="Name" 
+                    [(ngModel)]="module.name"
+                    (keydown.space)="$event.stopImmediatePropagation()"  
+                    (click)="nameClicked($event)" 
+                />
             </div>
         </mat-panel-title>
         <mat-panel-description>
@@ -12,7 +18,10 @@
                     <p >{{ subtypeName }}</p>
                 </div>
                 <div class="header-button">
-                    <button (click)="removeModule($event)">
+                    <button
+                        (keydown.enter)="$event.preventDefault();removeModule($event);"
+                        (keydown.space)="$event.preventDefault();removeModule($event);"  
+                        (click)="removeModule($event)">
                         <fa-icon [icon]="removeIcon"/>
                     </button>
                 </div>

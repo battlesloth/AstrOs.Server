@@ -365,7 +365,7 @@ export class ModulesComponent implements AfterViewInit {
         );
         break;
       case UartType.maestro:
-        module.subModule = this.generateMaestroModule(location);
+        module.subModule = this.generateMaestroModule();
         break;
     }
 
@@ -373,7 +373,7 @@ export class ModulesComponent implements AfterViewInit {
   }
 
 
-  generateMaestroModule(location: string) {
+  generateMaestroModule() {
 
     const subModule = new MaestroModule();
 

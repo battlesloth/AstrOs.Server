@@ -53,6 +53,12 @@ export const Maestro: Story = {
   },
 };
 
+export const HumanCyborgRelations: Story = {
+  args: {
+    module: getSerialModule(UartType.humanCyborgRelations, 1, 9600),
+  },
+};
+
 export const MasterModule: Story = {
   args: {
     module: getSerialModule(UartType.genericSerial, 2, 9600),
@@ -90,6 +96,9 @@ function getSerialModule(
       module.subModule = subModule;
       break;
     }
+    case UartType.humanCyborgRelations:
+      module.name = 'Human Cyborg Relations';
+      break;
   }
   return module;
 }

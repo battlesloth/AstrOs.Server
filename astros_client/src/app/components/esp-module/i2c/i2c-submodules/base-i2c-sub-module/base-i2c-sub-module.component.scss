@@ -1,0 +1,10 @@
+.i2c-settings {
+    display: flex;
+    flex-direction: row;
+
+    select {
+        width: 140px;
+        height: 30px;
+        font-size: medium;
+    }
+}

@@ -34,6 +34,7 @@ export const Default: Story = {
 export const Serial: Story = {
   args: {
     resources: new Map<string, unknown>([
+      [AddModuleModalResources.locationId, "core"],
       [AddModuleModalResources.moduleType, ModuleType.uart],
     ]),
   },
@@ -42,6 +43,7 @@ export const Serial: Story = {
 export const I2C: Story = {
   args: {
     resources: new Map<string, unknown>([
+      [AddModuleModalResources.locationId, "core"],
       [AddModuleModalResources.moduleType, ModuleType.i2c],
     ]),
   },
@@ -50,6 +52,7 @@ export const I2C: Story = {
 export const GPIO: Story = {
   args: {
     resources: new Map<string, unknown>([
+      [AddModuleModalResources.locationId, "core"],
       [AddModuleModalResources.moduleType, ModuleType.gpio],
     ]),
   },

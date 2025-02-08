@@ -36,7 +36,7 @@ export class AddModuleModalComponent
 {
   options: ModuleSubTypeSelection[] = [];
 
-  locationId = 0;
+  locationId = "0";
   moduleType: ModuleType = ModuleType.none;
   selectedSubType: ModuleSubType = ModuleSubType.none;
 
@@ -83,7 +83,7 @@ export class AddModuleModalComponent
   ngAfterContentInit(): void {
     this.locationId = this.resources.get(
       AddModuleModalResources.locationId,
-    ) as number;
+    ) as string;
 
     this.moduleType = this.resources.get(
       AddModuleModalResources.moduleType,
@@ -102,6 +102,7 @@ export class AddModuleModalComponent
 
   addModule() {
     const evt = new ModalCallbackEvent(AddModuleModalResources.addEvent, {
+      locationId: this.locationId,
       moduleType: this.moduleType,
       moduleSubType: this.selectedSubType,
     });

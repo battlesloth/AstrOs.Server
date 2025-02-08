@@ -1,0 +1,17 @@
+<div class="gpio-channel">
+    <div class="gpio-channel-row">
+        <div class="label">Channel {{channel.id}}</div>
+        <div class="name">
+            <input matInput placeholder="Name" [(ngModel)]="channel.channelName" />
+        </div>
+        <div></div>
+    </div>
+    <div class="gpio-channel-row">
+        <div class="enabled">
+            <mat-checkbox [(ngModel)]="channel.enabled">Enabled</mat-checkbox>
+        </div>
+        <div class="default-low">
+            <mat-checkbox [(ngModel)]="channel.defaultLow">Default Low?</mat-checkbox>
+        </div>
+    </div>
+</div>

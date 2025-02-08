@@ -22,7 +22,7 @@
             </li>
         </ul>
     </mat-expansion-panel>
-    <mat-expansion-panel>
+    <mat-expansion-panel [expanded]="i2cPanelOpenState" (closed)="i2cPanelOpenState = false">
         <mat-expansion-panel-header>
             <mat-panel-title>I2C configuration</mat-panel-title>
             <mat-panel-description>
@@ -40,8 +40,10 @@
             <li *ngFor="let module of location.i2cModules">
                 <app-i2c-module 
                     (removeModuleEvent)="removeModule($event)" 
+                    (i2cAddressChangedEvent)="i2cAddressChanged($event)"
+                    [updateTrigger]="i2cUpdateTrigger"
                     [module]="module" 
-                    [isMaster]="isMaster"/>
+                    />
             </li> 
         </ul>
     </mat-expansion-panel>
@@ -51,16 +53,7 @@
         </mat-expansion-panel-header>
         <ul *ngIf="(location?.gpioModule)" class="servo-list">
             <li *ngFor="let channel of location.gpioModule.channels">
-                <div class="gpio-channel">
-                    <div class="label">Channel {{channel.id}}</div>
-                    <div class="input"><input matInput placeholder="Name" [(ngModel)]="channel.channelName" /></div>
-                    <div class="enabled">
-                        <mat-checkbox [(ngModel)]="channel.enabled">Enabled</mat-checkbox>
-                    </div>
-                    <div class="enabled">
-                        <mat-checkbox [(ngModel)]="channel.defaultLow">Default Low?</mat-checkbox>
-                    </div>
-                </div>
+                <app-gpio-channel [channel]="channel"></app-gpio-channel>
             </li>
         </ul>
     </mat-expansion-panel>
