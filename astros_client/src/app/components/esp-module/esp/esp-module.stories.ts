@@ -37,7 +37,7 @@ export const Default: Story = {
 };
 
 function getControllerLocation(): ControllerLocation {
-  const loc = new ControllerLocation('12345', 'core', 'Test Location', 'ESP', 'fingerptint');
+  const loc = new ControllerLocation('12345', 'core', 'Test Location', 'fingerptint');
 
   return loc;
 }

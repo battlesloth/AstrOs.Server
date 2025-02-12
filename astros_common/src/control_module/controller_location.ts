@@ -5,7 +5,6 @@ import { UartModule } from "./uart/uart_module";
 
 export class ControllerLocation {
   id: string;
-  locationId: string;
   locationName: string;
   description: string;
   configFingerprint: string;
@@ -19,13 +18,11 @@ export class ControllerLocation {
 
   constructor(
     id: string,
-    locationId: string,
     locationName: string,
     description: string,
     configFingerprint: string,
   ) {
     this.id = id;
-    this.locationId = locationId;
     this.locationName = locationName;
     this.description = description;
     this.configFingerprint = configFingerprint;

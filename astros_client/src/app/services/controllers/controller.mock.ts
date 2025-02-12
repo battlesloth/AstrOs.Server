@@ -45,9 +45,9 @@ export class ControllerServiceMock {
 
   generateLocationCollection() {
     const locations = new AstrOsLocationCollection(
-      new ControllerLocation('1234', AstrOsConstants.CORE, 'Test Location', 'ESP', 'fingerprint'),
-      new ControllerLocation('5678', AstrOsConstants.DOME, 'Test Location 2', 'ESP', 'fingerprint'),
-      new ControllerLocation('9010', AstrOsConstants.BODY, 'Test Location 3', 'ESP', 'fingerprint'),
+      new ControllerLocation('1234', AstrOsConstants.CORE, 'Test Location', 'fingerprint'),
+      new ControllerLocation('5678', AstrOsConstants.DOME, 'Test Location 2', 'fingerprint'),
+      new ControllerLocation('9010', AstrOsConstants.BODY, 'Test Location 3', 'fingerprint'),
     );
 
     locations.bodyModule!.gpioModule = this.generateGpioModule();

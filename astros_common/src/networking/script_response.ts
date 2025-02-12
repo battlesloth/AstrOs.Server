@@ -3,13 +3,13 @@ import { TransmissionStatus, TransmissionType } from "../astros_enums";
 
 export class ScriptResponse extends BaseResponse {
   scriptId: string;
-  locationId: number;
+  locationId: string;
   status: TransmissionStatus;
   date: Date;
 
   constructor(
     scriptId: string,
-    locationId: number,
+    locationId: string,
     status: TransmissionStatus,
     date: Date,
   ) {

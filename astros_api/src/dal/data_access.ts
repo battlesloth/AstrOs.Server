@@ -20,6 +20,7 @@ import { ControllerLocationTable } from "./tables/controller_tables/controller_l
 import { GpioChannelsTable } from "./tables/controller_tables/gpio_channels_table";
 import { KangarooX2Table } from "./tables/uart_tables/kangaroo_x2_table";
 import { MaestroBoardsTable } from "./tables/uart_tables/maestro_boards_table";
+import { MaestroChannelTable } from "./tables/uart_tables/maestro_channels_table";
 
 export class DataAccess {
   appdataPath: string;
@@ -163,7 +164,7 @@ export class DataAccess {
 
     await this.createTable(MaestroBoardsTable.table, MaestroBoardsTable.create);
 
-    await this.createTable(MaestroBoardsTable.table, MaestroBoardsTable.create);
+    await this.createTable(MaestroChannelTable.table, MaestroChannelTable.create);
 
     await this.createTable(I2cModuleTable.table, I2cModuleTable.create);
 
@@ -243,7 +244,6 @@ export class DataAccess {
 
       await this.get(LocationsTable.insert, [
         id,
-        loc,
         loc,
         nameMap.get(loc),
         "",

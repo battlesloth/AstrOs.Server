@@ -24,11 +24,13 @@ import { KangarooX2Table } from "../tables/uart_tables/kangaroo_x2_table";
 
 interface UartMods {
   id: string;
+  name: string;
   type: number;
 }
 
 interface I2cMods {
   id: string;
+  name: string;
   type: number;
 }
 
@@ -48,7 +50,6 @@ export class LocationsRepository {
         for (const c of val) {
           const location = new ControllerLocation(
             c.id,
-            c.locationId,
             c.name,
             c.description,
             c.configFingerprint,
@@ -75,7 +76,6 @@ export class LocationsRepository {
         if (val.length > 0) {
           location = new ControllerLocation(
             val[0].id,
-            val[0].locationId,
             val[0].locationName,
             val[0].locationDescription,
             val[0].configFingerprint,
@@ -90,8 +90,8 @@ export class LocationsRepository {
     return location;
   }
 
-  public async getLocationIdByController(mac: string): Promise<number> {
-    let locationId = -1;
+  public async getLocationIdByController(mac: string): Promise<string> {
+    let locationId = "";
 
     await this.dao
       .get(ControllerLocationTable.selectLocationIdByControllerAddress, [mac])
@@ -115,7 +115,6 @@ export class LocationsRepository {
       .then((val: any) => {
         for (const c of val) {
           const location = new ControllerLocation(
-            c.locationDbId,
             c.locationId,
             c.locationName,
             c.locationDescription,
@@ -150,13 +149,13 @@ export class LocationsRepository {
   ): Promise<ControllerLocation> {
     // load uart modules
     await this.dao
-      .get(UartModuleTable.selectAllForLocation, [location.locationId])
+      .get(UartModuleTable.selectAllForLocation, [location.id])
       .then((val: any) => {
         val.forEach((uart: any) => {
           const module = new UartModule(
             uart.id,
-            uart.moduleName,
-            location.locationId,
+            uart.name,
+            uart.locationId,
             uart.uartType,
             uart.uartChannel,
             uart.baudRate,
@@ -188,12 +187,12 @@ export class LocationsRepository {
 
     // load i2c modules
     await this.dao
-      .get(I2cModuleTable.selectAllForLocation, [location.locationId])
+      .get(I2cModuleTable.selectAllForLocation, [location.id])
       .then((val: any) => {
         val.forEach((i2c: any) => {
           const module = new I2cModule(
             i2c.id,
-            i2c.moduleName,
+            i2c.name,
             i2c.locationId,
             i2c.i2cType,
             i2c.i2cAddress,
@@ -224,6 +223,9 @@ export class LocationsRepository {
   }
 
   public async updateLocation(location: ControllerLocation): Promise<boolean> {
+
+    logger.info(`Updating location ${location.id}, ${location.locationName}`);
+
     await this.dao
       .run(LocationsTable.updateFingerprint, [
         // TODO: only wipe fingerprint if there are changes to uart/servo/i2c
@@ -249,6 +251,9 @@ export class LocationsRepository {
     );
 
     for (const uart of location.uartModules) {
+
+      logger.info(`Updating uart module ${uart.name}, id: ${uart.id}, type: ${uart.uartType}`);
+
       switch (uart.uartType) {
         case UartType.kangaroo:
           await this.insertKangarooModule(
@@ -269,6 +274,7 @@ export class LocationsRepository {
           uart.id,
           uart.name,
           uart.locationId,
+          uart.uartType.toString(),
           uart.uartChannel.toString(),
           uart.baudRate.toString(),
         ])
@@ -284,6 +290,9 @@ export class LocationsRepository {
     );
 
     for (const i2c of location.i2cModules) {
+
+      logger.info(`Updating i2c module ${i2c.name}, id: ${i2c.id}, type: ${i2c.type}`);
+
       switch (i2c.type) {
         default:
           break;
@@ -351,13 +360,13 @@ export class LocationsRepository {
   }
 
   public async updateLocationFingerprint(
-    locationId: number,
+    locationId: string,
     fingerprint: string,
   ): Promise<boolean> {
     await this.dao
       .run(LocationsTable.updateFingerprint, [
         fingerprint,
-        locationId.toString(),
+        locationId,
       ])
       .catch((err: any) => {
         logger.error(err);
@@ -374,15 +383,15 @@ export class LocationsRepository {
   ) {
     const uartMods = new Array<UartMods>();
 
-    this.dao
-      .get(UartModuleTable.selectAllForLocation, [locationId.toString()])
+    await this.dao
+      .get(UartModuleTable.selectAllForLocation, [locationId])
       .then((val: any) => {
         for (const m of val) {
-          uartMods.push({ id: m.id, type: m.uartType });
+          uartMods.push({ id: m.id, name: m.name, type: m.uartType });
         }
       })
       .catch((err: any) => {
-        logger.error(err);
+        logger.error(JSON.stringify(err));
         throw "error";
       });
 
@@ -390,6 +399,8 @@ export class LocationsRepository {
       if (currentMods.includes(uartMod.id)) {
         continue;
       }
+
+      logger.info(`Removing stale uart module ${uartMod.name}, id: ${uartMod.id}, type: ${uartMod.type}`);
 
       switch (uartMod.type) {
         case UartType.kangaroo:
@@ -417,11 +428,11 @@ export class LocationsRepository {
   ) {
     const i2cMods = new Array<I2cMods>();
 
-    this.dao
+    await this.dao
       .get(I2cModuleTable.selectAllForLocation, [locationId])
       .then((val: any) => {
         for (const m of val) {
-          i2cMods.push({ id: m.id, type: m.i2cType });
+          i2cMods.push({ id: m.id, name: m.name, type: m.i2cType });
         }
       })
       .catch((err: any) => {
@@ -433,6 +444,8 @@ export class LocationsRepository {
       if (currentMods.includes(i2cMod.id)) {
         continue;
       }
+
+      logger.info(`Removing stale i2c module ${i2cMod.name}, id: ${i2cMod.id}, type: ${i2cMod.type}`);
 
       switch (i2cMod.type) {
         default:

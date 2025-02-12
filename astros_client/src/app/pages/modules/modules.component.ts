@@ -311,7 +311,7 @@ export class ModulesComponent implements AfterViewInit {
         this.removeI2CModule(response.locationId, response.id);
         break;
       case ModuleType.gpio:
-        this.removeGPIOchannel(response.locationId, response.id);
+        //this.removeGPIOchannel(response.locationId, response.id);
         break;
     }
 
@@ -332,14 +332,18 @@ export class ModulesComponent implements AfterViewInit {
         this.addI2CModule(response.locationId, response.moduleSubType);
         break;
       case ModuleType.gpio:
-        this.addGPIOchannel(response.locationId, response.moduleSubType);
+        //this.addGPIOchannel(response.locationId, response.moduleSubType);
         break;
     }
   }
 
   //#region Serial Modules
   addUartModule(location: string, subType: ModuleSubType) {
-    const controller = this.getControllerLocation(location);
+    const controller = this.getControllerLocationById(location);
+
+    if (!controller) {
+      return;
+    }
 
     const defaultChannel = location === AstrOsConstants.BODY ? 2 : 1;
     const uartType = this.subtypeToUartType(subType);
@@ -410,7 +414,11 @@ export class ModulesComponent implements AfterViewInit {
   }
 
   removeUartModule(location: string, moduleId: string) {
-    const controller = this.getControllerLocation(location);
+    const controller = this.getControllerLocationById(location);
+
+    if (!controller) {
+      return;
+    }
 
     controller.uartModules = controller.uartModules
       .filter((module: UartModule) => module.id !== moduleId)
@@ -422,7 +430,12 @@ export class ModulesComponent implements AfterViewInit {
   //#region I2C Modules
 
   addI2CModule(location: string, subType: ModuleSubType) {
-    const controller = this.getControllerLocation(location);
+    const controller = this.getControllerLocationById(location);
+
+    if (!controller) {
+      return;
+    }
+
     const i2cType = this.subtypeToI2cType(subType);
     const nextAddress = this.getNextI2CAddress(controller.i2cModules);
 
@@ -452,7 +465,11 @@ export class ModulesComponent implements AfterViewInit {
   }
 
   removeI2CModule(location: string, moduleId: string) {
-    const controller = this.getControllerLocation(location);
+    const controller = this.getControllerLocationById(location);
+
+    if (!controller) {
+      return;
+    }
 
     controller.i2cModules = controller.i2cModules
       .filter((module: I2cModule) => module.id !== moduleId)
@@ -461,17 +478,21 @@ export class ModulesComponent implements AfterViewInit {
 
   //#endregion
 
+  /*
   addGPIOchannel(location: string, gpioType: ModuleSubType) {}
 
   removeGPIOchannel(location: string, channelId: string) {
-    const controller = this.getControllerLocation(location);
+    const controller = this.getControllerLocationById(location);
 
-    /*controller.gpioChannels = controller.gpioChannels.filter(
+    if (!controller) {
+      return;
+    }
+    
+    controller.gpioChannels = controller.gpioChannels.filter(
       (channel: string) => channel !== channelId,
     );
-    */
   }
-
+  */
   //#endregion
 
   //#region Controller Selection
@@ -637,7 +658,21 @@ export class ModulesComponent implements AfterViewInit {
     }
   }
 
-  private getControllerLocation(locationId: string): ControllerLocation {
+
+  private getControllerLocationById(id: string): ControllerLocation | null {
+    if (this.coreLocation.id === id) {
+      return this.coreLocation;
+    } else if (this.domeLocation.id === id) {
+      return this.domeLocation;
+    } else if (this.bodyLocation.id === id) {
+      return this.bodyLocation;
+    } else {
+      return null;
+    }
+  }
+
+
+  private getControllerLocationByLocationId(locationId: string): ControllerLocation {
     switch (locationId) {
       case AstrOsConstants.BODY:
         return this.bodyLocation;

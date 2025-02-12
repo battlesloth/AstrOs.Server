@@ -8,7 +8,7 @@ export class ScriptsDeploymentTable {
   public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
     ${this.id} NUMBER PRIMARY KEY,
     ${this.scriptId} TEXT,
-    ${this.locationId} NUMBER,
+    ${this.locationId} TEXT,
     ${this.lastDeployed} TEXT,
     UNIQUE(${this.scriptId}, ${this.locationId}) ON CONFLICT REPLACE)`;
 

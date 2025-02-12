@@ -1,34 +1,29 @@
 export class LocationsTable {
   public static readonly table = "locations";
   public static readonly id = "id";
-  public static readonly locationId = "locationId";
   public static readonly locationName = "name";
   public static readonly description = "description";
   public static readonly configFingerprint = "configFingerprint";
 
   public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
     ${this.id} TEXT PRIMARY KEY,
-    ${this.locationId} TEXT,
-    ${this.locationName} TEXT,
+    ${this.locationName} TEXT UNIQUE,
     ${this.description} TEXT,
     ${this.configFingerprint} TEXT)`;
 
   public static readonly insert = `INSERT INTO ${this.table} (
     ${this.id}, 
-    ${this.locationId},
     ${this.locationName}, 
     ${this.description},
     ${this.configFingerprint})
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?)
     ON CONFLICT(${this.id}) DO UPDATE SET
-    ${this.locationId} = excluded.${this.locationId},
     ${this.locationName} = excluded.${this.locationName},
     ${this.description} = excluded.${this.description},
     ${this.configFingerprint} = excluded.${this.configFingerprint}`;
 
   public static readonly selectByName = `SELECT 
     ${this.id}, 
-    ${this.locationId},
     ${this.locationName}, 
     ${this.description},
     ${this.configFingerprint}
@@ -37,25 +32,14 @@ export class LocationsTable {
 
   public static readonly selectById = `SELECT
     ${this.id},
-    ${this.locationId},
     ${this.locationName},
     ${this.description},
     ${this.configFingerprint}
     FROM ${this.table}
     WHERE ${this.id} = ?`;
 
-  public static readonly selectByLocationId = `SELECT
-    ${this.id},
-    ${this.locationId},
-    ${this.locationName},
-    ${this.description},
-    ${this.configFingerprint}
-    FROM ${this.table}
-    WHERE ${this.locationId} = ?`;
-
   public static readonly selectAll = `SELECT
     ${this.id},
-    ${this.locationId},
     ${this.locationName},
     ${this.description},
     ${this.configFingerprint}

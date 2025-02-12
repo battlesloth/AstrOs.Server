@@ -1,5 +1,5 @@
 <div class="i2c-settings">
-    <select *ngIf="module" [(ngModel)]="i2cAddress" (ngModelChange)="onI2CAddressChange($event)">
+    <select *ngIf="module" [(ngModel)]="i2cAddress" (ngModelChange)="onI2cAddressChange($event)">
         <option *ngFor="let addr of addresses" [value]="addr">Address {{addr}}</option>
     </select>
 </div>

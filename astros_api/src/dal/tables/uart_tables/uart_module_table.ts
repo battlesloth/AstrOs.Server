@@ -17,7 +17,7 @@ export class UartModuleTable {
 
   public static readonly insert = `INSERT INTO ${this.table} (
     ${this.id}, 
-    ${this.moduleName}
+    ${this.moduleName},
     ${this.locationId}, 
     ${this.uartType}, 
     ${this.uartChannel}, 

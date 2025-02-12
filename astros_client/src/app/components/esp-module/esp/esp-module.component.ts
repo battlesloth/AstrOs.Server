@@ -37,7 +37,6 @@ import { GpioChannelComponent } from '../gpio/gpio-channel/gpio-channel.componen
     FormsModule,
     MatExpansionPanelDescription,
     NgFor,
-    MatCheckbox,
     UartModuleComponent,
     I2cModuleComponent,
     GpioChannelComponent,
@@ -78,7 +77,7 @@ export class EspModuleComponent {
     }
 
     this.addModuleEvent.emit({
-      locationId: this.location.locationId,
+      locationId: this.location.id,
       module: ModuleType.uart,
     });
   }
@@ -92,14 +91,14 @@ export class EspModuleComponent {
     }
 
     this.addModuleEvent.emit({
-      locationId: this.location.locationId,
+      locationId: this.location.id,
       module: ModuleType.i2c,
     });
   }
 
   removeModule(evt: RemoveModuleEvent) {
     this.removeModuleEvent.emit({
-      locationId: this.location.locationId,
+      locationId: this.location.id,
       id: evt.id,
       module: evt.module,
     });
@@ -133,7 +132,7 @@ export class EspModuleComponent {
     channelId: string,
   ) {
     this.openServoTestModal.emit({
-      locationId: this.location.locationId,
+      locationId: this.location.id,
       moduleType: module,
       moduleSubType: subType,
       channelId: channelId,

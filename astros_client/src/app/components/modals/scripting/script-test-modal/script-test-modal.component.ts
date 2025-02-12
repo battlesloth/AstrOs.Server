@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import {
+  AstrOsConstants,
   ScriptResponse,
   TransmissionStatus,
   TransmissionType,
@@ -144,15 +145,15 @@ export class ScriptTestModalComponent
 
   statusUpdate(msg: ScriptResponse) {
     switch (msg.locationId) {
-      case 1:
+      case AstrOsConstants.BODY:
         this.bodyUpload = msg.status;
         this.setCaption(this.bodyCaption, msg.status);
         break;
-      case 2:
+      case AstrOsConstants.CORE:
         this.coreUpload = msg.status;
         this.setCaption(this.coreCaption, msg.status);
         break;
-      case 3:
+      case AstrOsConstants.DOME:
         this.domeUpload = msg.status;
         this.setCaption(this.domeCaption, msg.status);
         break;

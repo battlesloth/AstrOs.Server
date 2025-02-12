@@ -10,7 +10,7 @@ export class ScriptChannelsTable {
   public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
     ${this.id} TEXT PRIMARY KEY,
     ${this.scriptId} TEXT,
-    ${this.locationId} INTEGER,
+    ${this.locationId} TEXT,
     ${this.type} INTEGER,
     ${this.subType} INTEGER,
     ${this.channelNumber} INTEGER)`;

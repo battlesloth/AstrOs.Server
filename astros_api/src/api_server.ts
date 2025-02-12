@@ -533,7 +533,7 @@ class ApiServer {
         val.controller.address,
       );
 
-      if (locationId < 1) {
+      if (!locationId) {
         logger.error(
           `Location not found for controller: ${val.controller.name}`,
         );

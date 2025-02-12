@@ -18,6 +18,7 @@ import {
   TransmissionType,
   UploadStatus,
   Script,
+  AstrOsConstants,
 } from 'astros-common';
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
@@ -58,11 +59,12 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
 
   scripts: Script[];
 
-  locationMap = new Map<number, string>([
-    [1, 'body'],
-    [2, 'core'],
-    [3, 'dome'],
-  ]);
+  locations =
+  [
+    AstrOsConstants.BODY,
+    AstrOsConstants.CORE,
+    AstrOsConstants.DOME
+  ]
 
   constructor(
     private router: Router,
@@ -109,20 +111,19 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     }
 
     for (const script of this.scripts) {
-      this.updateUploadStatusElement('body', 1, script.id);
-      this.updateUploadStatusElement('core', 2, script.id);
-      this.updateUploadStatusElement('dome', 3, script.id);
+      this.updateUploadStatusElement(AstrOsConstants.BODY, script.id);
+      this.updateUploadStatusElement(AstrOsConstants.CORE, script.id);
+      this.updateUploadStatusElement(AstrOsConstants.DOME, script.id);
     }
 
     this.initialStatusSet = true;
   }
 
   updateUploadStatusElement(
-    element: string,
-    locationId: number,
+    locationId: string,
     scriptId: string,
   ): void {
-    const el = document.getElementById(`${scriptId}_${element}`);
+    const el = document.getElementById(`${scriptId}_${locationId}`);
     if (el === null) {
       return;
     }
@@ -132,7 +133,7 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     el.classList.remove('uploading');
     el.classList.add(status.s);
 
-    const toolTip = document.getElementById(`${scriptId}_${element}_tooltip`);
+    const toolTip = document.getElementById(`${scriptId}_${locationId}_tooltip`);
     if (toolTip === null) {
       return;
     }
@@ -146,15 +147,15 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
       return;
     }
 
-    for (const location of this.locationMap.entries()) {
+    for (const location of this.locations) {
       if (
         script.deploymentStatusKvp
           .map((s) => {
             return s.key;
           })
-          .indexOf(location[0].toString()) > -1
+          .indexOf(location) > -1
       ) {
-        const el = document.getElementById(`${scriptId}_${location[1]}`);
+        const el = document.getElementById(`${scriptId}_${location}`);
         if (el === null) {
           continue;
         }
@@ -326,13 +327,12 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     }
 
     this.updateUploadStatusElement(
-      this.locationMap.get(msg.locationId) as string,
       msg.locationId,
       msg.scriptId,
     );
   }
 
-  getUploadStatus(id: string, locationId: number): { s: string; d: string } {
+  getUploadStatus(id: string, locationId: string): { s: string; d: string } {
     let dateString = 'Not Uploaded';
 
     const script = this.getScript(id);
@@ -387,7 +387,7 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     }
   }
 
-  setUploadDate(id: string, controllerId: number, date: Date): void {
+  setUploadDate(id: string, controllerId: string, date: Date): void {
     const script = this.getScript(id);
 
     if (!script) {

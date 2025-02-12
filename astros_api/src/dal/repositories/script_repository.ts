@@ -67,7 +67,7 @@ export class ScriptRepository {
         .get(ScriptsDeploymentTable.selectByScript, [scr.id])
         .then((val: any) => {
           val.forEach((dep: any) => {
-            const status = new DeploymentStatus(dep.locationId.toString(), {
+            const status = new DeploymentStatus(dep.locationId, {
               date: new Date(Date.parse(dep.lastDeployed)),
               value: UploadStatus.uploaded,
             });
@@ -246,7 +246,7 @@ export class ScriptRepository {
       .then(async (val: any) => {
         module = new UartModule(
           val[0].id,
-          val[0].moduleName,
+          val[0].name,
           val[0].locationId,
           val[0].uartType,
           val[0].uartChannel,
@@ -295,7 +295,7 @@ export class ScriptRepository {
       .then(async (val: any) => {
         module = new UartModule(
           val[0].id,
-          val[0].moduleName,
+          val[0].name,
           val[0].locationId,
           val[0].uartType,
           val[0].uartChannel,
@@ -339,7 +339,7 @@ export class ScriptRepository {
       .then((val: any) => {
         result = new UartChannel(
           0,
-          val[0].moduleName,
+          val[0].name,
           true,
           val[0].uartType,
           moduleId,
@@ -402,7 +402,7 @@ export class ScriptRepository {
 
   async updateScriptControllerUploaded(
     scriptId: string,
-    locationId: number,
+    locationId: string,
     dateTime: Date,
   ): Promise<boolean> {
     let success = true;
@@ -410,7 +410,7 @@ export class ScriptRepository {
     await this.dao
       .run(ScriptsDeploymentTable.insert, [
         scriptId,
-        locationId.toString(),
+        locationId,
         dateTime.toISOString(),
       ])
       .catch((err: any) => {
@@ -425,14 +425,14 @@ export class ScriptRepository {
 
   async getLastScriptUploadedDate(
     scriptId: string,
-    locationId: number,
+    locationId: string,
   ): Promise<Date> {
     let result = new Date("1970-01-01T00:00:00.000Z");
 
     await this.dao
       .get(ScriptsDeploymentTable.getDateByScriptAndController, [
         scriptId,
-        locationId.toString(),
+        locationId,
       ])
       .then((val: any) => {
         if (val.length > 0) {
@@ -489,7 +489,7 @@ export class ScriptRepository {
           .run(ScriptChannelsTable.insert, [
             ch.id,
             script.id,
-            ch.locationId.toString(),
+            ch.locationId,
             ch.type.toString(),
             ch.subType.toString(),
             ch.channelNumber.toString(),
