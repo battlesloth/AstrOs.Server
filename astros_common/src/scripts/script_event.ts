@@ -1,22 +1,22 @@
-import { ChannelSubType, ChannelType } from "../astros_enums";
+import { ModuleType, ModuleSubType } from "../astros_enums";
 
 export class ScriptEvent {
   scriptChannel: string;
-  channelType: ChannelType;
-  channelSubType: ChannelSubType;
+  moduleType: ModuleType;
+  moduleSubType: ModuleSubType;
   time: number;
   dataJson: string;
 
   constructor(
     scriptChannel: string,
-    channelType: ChannelType,
-    channleSubType: ChannelSubType,
+    moduleType: ModuleType,
+    moduleSubType: ModuleSubType,
     time: number,
     dataJson: string,
   ) {
     this.scriptChannel = scriptChannel;
-    this.channelType = channelType;
-    this.channelSubType = channleSubType;
+    this.moduleType = moduleType;
+    this.moduleSubType = moduleSubType;
     this.time = time;
     this.dataJson = dataJson;
   }

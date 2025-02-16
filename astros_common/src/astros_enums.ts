@@ -1,3 +1,13 @@
+export const enum ScriptChannelType {
+  NONE,
+  SERVO,
+  GPIO,
+  AUDIO,
+  GENERIC_I2C,
+  GENERIC_UART,
+  KANGAROO
+}
+
 export const enum ModuleType {
   none = 0,
   uart = 1,
@@ -8,47 +18,54 @@ export const enum ModuleType {
 export const enum ModuleSubType {
   none = 0,
   // serial subtypes
-  genericSerial = 1,
-  kangaroo = 2,
-  humanCyborgRelationsSerial = 3,
-  maestro = 4,
+  genericSerial = 101,
+  kangaroo = 102,
+  humanCyborgRelationsSerial = 103,
+  maestro = 104,
 
   // i2c subtypes
-  genericI2C = 101,
-  humanCyborgRelationsI2C = 102,
-  pwmBoard = 103,
+  genericI2C = 201,
+  humanCyborgRelationsI2C = 202,
+  pwmBoard = 203,
+
+  // gpio
+  genericGpio = 301
 }
 
-export const enum ChannelType {
-  none = 0,
-  uart = 1,
-  i2c = 2,
-  pwm = 3,
-  audio = 4,
-  gpio = 5,
-}
+export class ModuleChannelTypes {
+  static readonly Unknown = "";
+  static readonly BaseChannel = "BaseChannel";
+  static readonly GpioChannel = "GpioChannel";
+  static readonly I2cChannel = "I2cChannel";
+  static readonly PwmChannel = "PwmChannel";
+  static readonly UartChannel = "UartChannel";
+  static readonly KangarooX2Channel = "KangarooX2Channel";
+  static readonly MaestroChannel = "MaestroChannel";
 
-export const enum ChannelSubType {
-  none = 0,
-  genericSerial = 1,
-  kangaroo = 2,
-  humanCyborgRelations = 3,
-  maestro = 4,
-}
+  static fromSubType(subtype: ModuleSubType) {
 
-export const enum UartType {
-  none = 0,
-  genericSerial = 1,
-  kangaroo = 2,
-  humanCyborgRelations = 3,
-  maestro = 4,
-}
-
-export const enum I2cType {
-  none = 0,
-  genericI2C = 1,
-  humanCyborgRelations = 2,
-  pwmBoard = 3,
+    switch (subtype) {
+      // serial
+      case ModuleSubType.genericSerial:
+      case ModuleSubType.humanCyborgRelationsSerial:
+        return ModuleChannelTypes.UartChannel;
+      case ModuleSubType.kangaroo:
+        return ModuleChannelTypes.KangarooX2Channel;
+      case ModuleSubType.maestro:
+        return ModuleChannelTypes.MaestroChannel;
+      // i2c
+      case ModuleSubType.humanCyborgRelationsI2C:
+      case ModuleSubType.genericI2C:
+        return ModuleChannelTypes.I2cChannel;
+      case ModuleSubType.pwmBoard:
+        return ModuleChannelTypes.PwmChannel;
+      // gpio
+      case ModuleSubType.genericGpio:
+        return ModuleChannelTypes.GpioChannel;
+      default:
+        return ModuleChannelTypes.Unknown;
+    }
+  }
 }
 
 export const enum UploadStatus {

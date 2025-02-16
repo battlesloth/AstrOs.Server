@@ -9,10 +9,10 @@ import {
 } from '@angular/core';
 import { faTrash, faEdit, faPlay } from '@fortawesome/free-solid-svg-icons';
 import {
-  UartType,
   ScriptChannel,
   AstrOsConstants,
-  ChannelType,
+  ModuleType,
+  ModuleSubType
 } from 'astros-common';
 import { NgIf } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
@@ -41,9 +41,9 @@ export class ScriptRowComponent {
   set channel(channel: ScriptChannel) {
     this._channel = channel;
     this.locationName = this.getLocationName(channel.locationId);
-    if (channel.type === ChannelType.uart) {
-      const ch = channel.channel as UartChannel;
-      this.uartType = this.serialName(ch.uartType);
+    if (channel.moduleChannel.moduleType === ModuleType.uart) {
+      const ch = channel.moduleChannel as UartChannel;
+      this.uartType = this.serialName(ch.moduleSubType);
     }
   }
   get channel(): ScriptChannel {
@@ -90,15 +90,15 @@ export class ScriptRowComponent {
     }
   }
 
-  serialName(type: UartType): string {
+  serialName(type: ModuleSubType): string {
     switch (type) {
-      case UartType.none:
+      case ModuleSubType.none:
         return 'None';
-      case UartType.genericSerial:
+      case ModuleSubType.genericSerial:
         return 'Generic Serial';
-      case UartType.kangaroo:
+      case ModuleSubType.kangaroo:
         return 'Kangaroo X2';
-      case UartType.humanCyborgRelations:
+      case ModuleSubType.humanCyborgRelationsSerial:
         return 'Human Cyborg Relations';
       default:
         return 'None';

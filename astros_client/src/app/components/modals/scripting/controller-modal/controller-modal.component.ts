@@ -1,10 +1,13 @@
 import { Component, OnInit } from '@angular/core';
-import { ChannelType } from 'astros-common';
-import { ChannelValue, LocationDetails } from 'src/app/models/script-resources';
+import { ScriptChannelType } from 'astros-common';
 import { ModalBaseComponent } from '../../modal-base/modal-base.component';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 import { FormsModule } from '@angular/forms';
 import { NgFor, NgIf, KeyValuePipe } from '@angular/common';
+import { 
+  LocationDetails, 
+  ChannelDetails 
+} from '@src/models/scripting';
 
 export class ControllerModalResources {
   public static controllers = 'controllers';
@@ -18,8 +21,8 @@ export class ControllerModalResources {
 
 export interface ControllerModalResponse {
   controller: string;
-  module: ChannelType;
-  channels: number[];
+  scriptChannelType: ScriptChannelType;
+  channels: string[];
 }
 
 @Component({
@@ -37,12 +40,12 @@ export class ControllerModalComponent
   controllers!: Map<number, LocationDetails>;
   selectedController = 0;
 
-  private availableModules!: Map<number, Map<ChannelType, string>>;
-  modules: Map<ChannelType, string>;
-  selectedModule: ChannelType = ChannelType.none;
+  private availableModules!: Map<number, Map<ScriptChannelType, string>>;
+  modules: Map<ScriptChannelType, string>;
+  selectedModule: ScriptChannelType = ScriptChannelType.NONE;
 
-  private availableChannels!: Map<number, Map<ChannelType, ChannelValue[]>>;
-  channels: ChannelValue[];
+  private availableChannels!: Map<number, Map<ScriptChannelType, ChannelDetails[]>>;
+  channels: ChannelDetails[];
   selectedChannel = -1;
   selectedChannels: unknown[] = [];
 
@@ -51,8 +54,8 @@ export class ControllerModalComponent
 
     this.errorMessage = '';
 
-    this.modules = new Map<ChannelType, string>();
-    this.channels = new Array<ChannelValue>();
+    this.modules = new Map<ScriptChannelType, string>();
+    this.channels = new Array<ChannelDetails>();
   }
 
   ngOnInit(): void {
@@ -61,10 +64,10 @@ export class ControllerModalComponent
     ) as Map<number, LocationDetails>;
     this.availableModules = this.resources.get(
       ControllerModalResources.modules,
-    ) as Map<number, Map<ChannelType, string>>;
+    ) as Map<number, Map<ScriptChannelType, string>>;
     this.availableChannels = this.resources.get(
       ControllerModalResources.channels,
-    ) as Map<number, Map<ChannelType, ChannelValue[]>>;
+    ) as Map<number, Map<ScriptChannelType, ChannelDetails[]>>;
   }
 
   modalChange($event: Event) {
@@ -79,14 +82,14 @@ export class ControllerModalComponent
   addChannel() {
     if (
       +this.selectedController !== 4 &&
-      +this.selectedModule === ChannelType.none
+      +this.selectedModule === ScriptChannelType.NONE
     ) {
       this.errorMessage = 'Module Selection Required';
       return;
     }
 
     if (
-      +this.selectedModule !== ChannelType.none &&
+      +this.selectedModule !== ScriptChannelType.NONE &&
       +this.selectedChannels.length < 1
     ) {
       this.errorMessage = 'Channel Selection Required';
@@ -99,7 +102,7 @@ export class ControllerModalComponent
         controller: +this.selectedController,
         module:
           +this.selectedController === 4
-            ? ChannelType.audio
+            ? ScriptChannelType.AUDIO
             : +this.selectedModule,
         channels: this.selectedChannels,
       },
@@ -120,7 +123,7 @@ export class ControllerModalComponent
 
   private clearOptions() {
     this.selectedController = 0;
-    this.selectedModule = ChannelType.none;
+    this.selectedModule = ScriptChannelType.NONE;
     this.selectedChannel = -1;
     document
       .getElementById('module-select')
@@ -132,7 +135,7 @@ export class ControllerModalComponent
 
   private setModules(controllerId: number) {
     if (controllerId === 4) {
-      this.selectedModule = ChannelType.none;
+      this.selectedModule = ScriptChannelType.NONE;
       this.selectedChannel = -1;
       document
         .getElementById('module-select')
@@ -151,8 +154,8 @@ export class ControllerModalComponent
     }
   }
 
-  private setChannels(channelType: ChannelType) {
-    if (channelType === ChannelType.none) {
+  private setChannels(channelType: ScriptChannelType) {
+    if (channelType === ScriptChannelType.NONE) {
       this.selectedChannel = -1;
       document
         .getElementById('channel-select')

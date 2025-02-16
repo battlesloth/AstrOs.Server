@@ -1,5 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { ChannelSubType, ChannelType, KangarooAction } from 'astros-common';
+import { 
+  KangarooAction,
+  ScriptChannelType
+ } from 'astros-common';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 import { NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -7,8 +10,7 @@ import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
 export class ChannelTestModalResources {
   public static controller = 'controller';
-  public static channelType = 'channelType';
-  public static channelSubType = 'channelSubType';
+  public static scriptChannelType = 'scriptChannelType'
   public static channelId = 'channelId';
 
   public static channelTest = 'channelTest_test';
@@ -16,7 +18,7 @@ export class ChannelTestModalResources {
 
 export interface ChannelTestModalResponse {
   controllerId: number;
-  commandType: ChannelType;
+  commandType: ScriptChannelType;
   command: unknown;
 }
 
@@ -36,8 +38,7 @@ export class ChannelTestModalComponent
   controllerId = 0;
   channelId = 0;
 
-  channelType: ChannelType = ChannelType.none;
-  channelSubType: ChannelSubType = ChannelSubType.none;
+  scriptChannelType: ScriptChannelType = ScriptChannelType.NONE;
 
   speed = 1;
   position = 0;
@@ -61,12 +62,9 @@ export class ChannelTestModalComponent
     this.controllerId = this.resources.get(
       ChannelTestModalResources.controller,
     ) as number;
-    this.channelType = this.resources.get(
-      ChannelTestModalResources.channelType,
-    ) as ChannelType;
-    this.channelSubType = this.resources.get(
-      ChannelTestModalResources.channelSubType,
-    ) as ChannelSubType;
+    this.scriptChannelType = this.resources.get(
+      ChannelTestModalResources.scriptChannelType,
+    ) as ScriptChannelType;
     this.channelId = this.resources.get(
       ChannelTestModalResources.channelId,
     ) as number;
@@ -75,25 +73,23 @@ export class ChannelTestModalComponent
   runClicked() {
     const evt = new ModalCallbackEvent(ChannelTestModalResources.channelTest, {
       controllerId: this.controllerId,
-      commandType: this.channelType,
+      commandType: this.scriptChannelType,
       command: this.getCommand(),
     });
     this.modalCallback.emit(evt);
   }
 
   getCommand(): unknown {
-    switch (this.channelType) {
-      case ChannelType.i2c:
+    switch (this.scriptChannelType) {
+      case ScriptChannelType.GENERIC_I2C:
         return { id: this.channelId, val: this.value };
-      //case ChannelType.servo:
-      //  return { id: this.channelId, position: this.position, speed: this.speed };
-      case ChannelType.uart:
-        if (this.channelSubType === ChannelSubType.kangaroo) {
-          return { val: this.getKangarooCommand() };
-        } else {
-          return { val: this.value };
-        }
-      case ChannelType.gpio:
+      case ScriptChannelType.SERVO:
+        return { id: this.channelId, position: this.position, speed: this.speed };
+      case ScriptChannelType.GENERIC_UART:
+        return { val: this.value };
+      case ScriptChannelType.KANGAROO:
+        return { val: this.getKangarooCommand() };
+      case ScriptChannelType.GPIO:
         return { id: this.channelId, val: this.gpioLevel };
     }
     return {};

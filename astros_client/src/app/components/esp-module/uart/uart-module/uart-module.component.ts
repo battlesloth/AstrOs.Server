@@ -15,7 +15,11 @@ import {
   MatExpansionPanelHeader,
   MatExpansionPanelTitle,
 } from '@angular/material/expansion';
-import { ModuleType, UartModule, UartType } from 'astros-common';
+import { 
+  ModuleType,
+  ModuleSubType, 
+  UartModule
+} from 'astros-common';
 import { GenericSerialModuleComponent } from '../uart-submodules/generic-serial-module/generic-serial-module.component';
 import { KangarooModuleComponent } from '../uart-submodules/kangaroo-module/kangaroo-module.component';
 import { MaestroModuleComponent } from '../uart-submodules/maestro-module/maestro-module.component';
@@ -64,14 +68,14 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
   }
 
   ngAfterContentInit(): void {
-    switch (this.module.uartType) {
-      case UartType.genericSerial:
+    switch (this.module.moduleSubType) {
+      case ModuleSubType.genericSerial:
         this.subtypeName = 'Generic Serial';
         break;
-      case UartType.kangaroo:
+      case ModuleSubType.kangaroo:
         this.subtypeName = 'Kangaroo X2';
         break;
-      case UartType.maestro:
+      case ModuleSubType.maestro:
         this.subtypeName = 'Pololu Maestro';
         break;
       default:
@@ -84,19 +88,19 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
 
     let component!: ComponentRef<BaseUartSubModuleComponent>;
 
-    switch (this.module.uartType) {
-      case UartType.humanCyborgRelations:
-      case UartType.genericSerial:
+    switch (this.module.moduleSubType) {
+      case ModuleSubType.humanCyborgRelationsSerial:
+      case ModuleSubType.genericSerial:
         component = this.uartContainer.createComponent(
           GenericSerialModuleComponent,
         ) as ComponentRef<GenericSerialModuleComponent>;
         break;
-      case UartType.kangaroo:
+      case ModuleSubType.kangaroo:
         component = this.uartContainer.createComponent(
           KangarooModuleComponent,
         ) as ComponentRef<KangarooModuleComponent>;
         break;
-      case UartType.maestro:
+      case ModuleSubType.maestro:
         component = this.uartContainer.createComponent(
           MaestroModuleComponent,
         ) as ComponentRef<MaestroModuleComponent>;

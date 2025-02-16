@@ -12,8 +12,8 @@ import {
   MaestroBoard,
   MaestroChannel,
   MaestroModule,
-  UartModule,
-  UartType,
+  ModuleSubType,
+  UartModule
 } from "astros-common";
 import { UartModuleTable } from "../tables/uart_tables/uart_module_table";
 import { I2cModuleTable } from "../tables/i2c_tables/i2c_module_table";
@@ -169,14 +169,14 @@ export class LocationsRepository {
       });
 
     for (const uart of location.uartModules) {
-      switch (uart.uartType) {
-        case UartType.humanCyborgRelations:
+      switch (uart.moduleSubType) {
+        case ModuleSubType.humanCyborgRelationsSerial:
           uart.subModule = new HumanCyborgRelationsModule();
           break;
-        case UartType.kangaroo:
+        case ModuleSubType.kangaroo:
           uart.subModule = await this.loadKangarooModule(uart.id);
           break;
-        case UartType.maestro:
+        case ModuleSubType.maestro:
           uart.subModule = await this.loadMaestroModule(uart);
           break;
         default:
@@ -211,7 +211,9 @@ export class LocationsRepository {
       .then((val: any) => {
         val.forEach((ch: any) => {
           location.gpioModule.channels[ch.channelId] = new GpioChannel(
-            ch.channelId,
+            ch.id,
+            location.id,
+            ch.channelNumber,
             ch.channelName,
             ch.defaultLow,
             ch.enabled,
@@ -252,16 +254,16 @@ export class LocationsRepository {
 
     for (const uart of location.uartModules) {
 
-      logger.info(`Updating uart module ${uart.name}, id: ${uart.id}, type: ${uart.uartType}`);
+      logger.info(`Updating uart module ${uart.name}, id: ${uart.id}, type: ${uart.moduleSubType}`);
 
-      switch (uart.uartType) {
-        case UartType.kangaroo:
+      switch (uart.moduleSubType) {
+        case ModuleSubType.kangaroo:
           await this.insertKangarooModule(
             uart.id,
             uart.subModule as KangarooX2,
           );
           break;
-        case UartType.maestro:
+        case ModuleSubType.maestro:
           await this.insertMaestroModule(
             uart.id,
             uart.subModule as MaestroModule,
@@ -274,7 +276,7 @@ export class LocationsRepository {
           uart.id,
           uart.name,
           uart.locationId,
-          uart.uartType.toString(),
+          uart.moduleSubType.toString(),
           uart.uartChannel.toString(),
           uart.baudRate.toString(),
         ])
@@ -291,9 +293,9 @@ export class LocationsRepository {
 
     for (const i2c of location.i2cModules) {
 
-      logger.info(`Updating i2c module ${i2c.name}, id: ${i2c.id}, type: ${i2c.type}`);
+      logger.info(`Updating i2c module ${i2c.name}, id: ${i2c.id}, type: ${i2c.moduleSubType}`);
 
-      switch (i2c.type) {
+      switch (i2c.moduleSubType) {
         default:
           break;
       }
@@ -303,7 +305,7 @@ export class LocationsRepository {
           i2c.id,
           i2c.name,
           i2c.locationId,
-          i2c.type.toString(),
+          i2c.moduleSubType.toString(),
           i2c.i2cAddress.toString(),
         ])
         .catch((err: any) => {
@@ -403,10 +405,10 @@ export class LocationsRepository {
       logger.info(`Removing stale uart module ${uartMod.name}, id: ${uartMod.id}, type: ${uartMod.type}`);
 
       switch (uartMod.type) {
-        case UartType.kangaroo:
+        case ModuleSubType.kangaroo:
           await this.deleteKangarooModule(uartMod.id);
           break;
-        case UartType.maestro:
+        case ModuleSubType.maestro:
           await this.deleteMaestroModule(uartMod.id);
           break;
         default:
@@ -531,8 +533,9 @@ export class LocationsRepository {
       for (const channel of board.channels) {
         await this.dao
           .run(MaestroChannelTable.insert, [
-            channel.id.toString(),
+            channel.id,
             board.id,
+            channel.channelNumber.toString(),
             channel.channelName,
             channel.enabled ? "1" : "0",
             channel.isServo ? "1" : "0",
@@ -556,7 +559,13 @@ export class LocationsRepository {
       .get(MaestroBoardsTable.selectAllForParent, [uartMod.id])
       .then((val: any) => {
         for (const b of val) {
-          const board = new MaestroBoard(b.id, b.boardId, b.boardName, b.channelCount);
+          const board = new MaestroBoard(
+            b.id,
+            b.parentId, 
+            b.boardId,
+            b.boardName, 
+            b.channelCount
+          );
           module.boards.push(board);
         }
       })
@@ -572,16 +581,18 @@ export class LocationsRepository {
           for (const c of val) {
             const ch = new MaestroChannel(
               c.id,
+              board.parentId,
               c.channelName,
               c.enabled,
+              uartMod.uartChannel,
+              uartMod.baudRate,
               board.id,
+              c.channelNumber,
               c.isServo,
               c.minPos,
               c.maxPos,
               c.homePos,
               c.inverted,
-              uartMod.uartChannel,
-              uartMod.baudRate,
             );
 
             board.channels.push(ch);

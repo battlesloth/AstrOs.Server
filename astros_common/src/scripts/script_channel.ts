@@ -1,5 +1,5 @@
-import { ChannelSubType, ChannelType } from "../astros_enums";
-import { ModuleChannelType } from "../control_module/base_channel";
+import { ScriptChannelType } from "../astros_enums";
+import { ModuleChannelType} from "../control_module/base_channel";
 import { ScriptEvent } from "./script_event";
 
 export interface EventKVP {
@@ -9,34 +9,34 @@ export interface EventKVP {
 
 export class ScriptChannel {
   id: string;
-  scriptId: string;
+  channelId: string;
   locationId: string;
-  type: ChannelType;
-  subType: ChannelSubType;
-
-  channel: ModuleChannelType;
-  channelNumber: number;
+  scriptId: string;
+  channelType: ScriptChannelType;
+  moduleChannelType: string;
+  moduleChannel: ModuleChannelType;
   maxDuration: number;
+  
   events: Map<number, ScriptEvent>;
   eventsKvpArray: Array<EventKVP>;
 
   constructor(
     id: string,
-    scriptId: string,
+    channelId: string,
     locationId: string,
-    type: ChannelType,
-    subType: ChannelSubType,
-    channelNumber: number,
-    channel: ModuleChannelType,
+    scriptId: string,
+    channelType: ScriptChannelType,
+    moduleChannelType: string,
+    moduleChannel: ModuleChannelType,
     maxDuration: number,
   ) {
     this.id = id;
-    this.scriptId = scriptId;
+    this.channelId = channelId;
     this.locationId = locationId;
-    this.type = type;
-    this.subType = subType;
-    this.channelNumber = channelNumber;
-    this.channel = channel;
+    this.scriptId = scriptId;
+    this.channelType = channelType;
+    this.moduleChannelType = moduleChannelType;
+    this.moduleChannel = moduleChannel;
     this.maxDuration = maxDuration;
 
     this.events = new Map<number, ScriptEvent>();

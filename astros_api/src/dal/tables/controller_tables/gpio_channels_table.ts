@@ -8,7 +8,7 @@ export class GpioChannelsTable {
   public static readonly enabled = "enabled";
 
   public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
-    ${this.id} INTEGER PRIMARY KEY AUTOINCREMENT,
+    ${this.id} TEXT PRIMARY KEY,
     ${this.locationId} TEXT,
     ${this.channelId} INTEGER,
     ${this.channelName} TEXT,
@@ -18,6 +18,7 @@ export class GpioChannelsTable {
 
   public static readonly insert = `INSERT INTO ${this.table}
     (
+        ${this.id},
         ${this.locationId}, 
         ${this.channelId}, 
         ${this.channelName}, 
@@ -26,20 +27,34 @@ export class GpioChannelsTable {
     )
     VALUES (?, ?, ?, ?, ?)`;
 
-  public static readonly selectAll = `SELECT ${this.channelId},
+  public static readonly selectAll = `SELECT 
+        ${this.id},
+        ${this.channelId},
         ${this.channelName},
         ${this.defaultLow},
         ${this.enabled}
     FROM ${this.table}
     WHERE ${this.locationId} = ?`;
 
-  public static readonly select = `SELECT ${this.channelId}, 
+  public static readonly select = `SELECT 
+        ${this.id},
+        ${this.channelId}, 
         ${this.channelName},
         ${this.defaultLow},
         ${this.enabled}
     FROM ${this.table}
     WHERE ${this.channelId} = ?
     AND ${this.locationId} = ?`;
+
+  public static readonly selectById = `SELECT 
+    ${this.id},
+    ${this.locationId},
+    ${this.channelId}, 
+    ${this.channelName},
+    ${this.defaultLow},
+    ${this.enabled}
+    FROM ${this.table}
+    WHERE ${this.id} = ?`;
 
   public static readonly update = `UPDATE ${this.table}
     SET ${this.channelName} = ?,

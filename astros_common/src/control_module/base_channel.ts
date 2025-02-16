@@ -1,4 +1,4 @@
-import { ChannelSubType } from "../index";
+import { ModuleSubType, ModuleType } from "../astros_enums";
 import { GpioChannel } from "./gpio/gpio_channel";
 import { I2cChannel } from "./i2c/i2c_channel";
 import { PwmChannel } from "./pca9685/pwm_channel";
@@ -16,16 +16,21 @@ export type ModuleChannelType =
   | MaestroChannel;
 
 export class BaseChannel {
-  id: number;
+  id: string;
+  parentId: string;
   channelName: string;
   enabled: boolean;
 
-  subType: ChannelSubType;
+  moduleType: ModuleType;
+  moduleSubType: ModuleSubType;
+  
   constructor(
-    id: number,
+    id: string,
+    parentId: string,
     channelName: string,
+    moduleType: ModuleType,
+    moduleSubType: ModuleSubType,
     enabled: boolean,
-    subType: ChannelSubType = ChannelSubType.none,
   ) {
     if (channelName === null) {
       this.channelName = "unnamed";
@@ -33,7 +38,9 @@ export class BaseChannel {
       this.channelName = channelName;
     }
     this.id = id;
+    this.parentId = parentId;
+    this.moduleType = moduleType;
+    this.moduleSubType = moduleSubType;
     this.enabled = enabled;
-    this.subType = subType;
   }
 }

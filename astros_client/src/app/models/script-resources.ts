@@ -1,4 +1,4 @@
-import {
+/*import {
   ChannelType,
   I2cChannel,
   Script,
@@ -99,14 +99,14 @@ export class ScriptResources {
   getAvailableModules(): Map<number, Map<ChannelType, string>> {
     const result = new Map<number, Map<ChannelType, string>>();
 
-    /*for (const ctrl of this.locations.keys()) {
+    for (const ctrl of this.locations.keys()) {
       if (ctrl === 4 || ctrl === 0) {
         continue;
       }
 
       result.set(ctrl, this.setModuleValues(ctrl));
     }
-  */
+  
     return result;
   }
 
@@ -114,7 +114,7 @@ export class ScriptResources {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = new Map<number, Map<ChannelType, any>>();
 
-    /*
+    
     for (const ctrl of this.locations.keys()) {
       if (ctrl === 4 || ctrl === 0) {
         continue;
@@ -128,7 +128,7 @@ export class ScriptResources {
 
       result.set(ctrl, vals);
     }
-    */
+    
     return result;
   }
 
@@ -147,11 +147,11 @@ export class ScriptResources {
     type: ChannelType,
     id: number,
   ): ModuleChannelType | undefined {
-    /*if (controller === 4) {
+    if (controller === 4) {
       this.locations.delete(4);
       return undefined;
     }
-    */
+    
     switch (type) {
       case ChannelType.uart:
         return this.provisionChannel(this.uartChannels, controller, id);
@@ -203,3 +203,4 @@ export class ScriptResources {
     }
   }
 }
+*/

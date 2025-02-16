@@ -15,16 +15,16 @@ import {
 } from '@angular/material/menu';
 import { ActivatedRoute } from '@angular/router';
 import { Guid } from 'guid-typescript';
-import { ScriptResources } from 'src/app/models/script-resources';
 import {
-  ChannelSubType,
-  ChannelType,
-  AstrOsLocationCollection,
   Script,
   ScriptChannel,
   ScriptEvent,
-  ControllerLocation,
   BaseChannel,
+  ModuleType,
+  ModuleSubType,
+  ScriptChannelType,
+  ModuleChannelType,
+  ModuleChannelTypes,
 } from 'astros-common';
 import EventMarkerHelper from './helper/event-marker-helper';
 import { FormsModule } from '@angular/forms';
@@ -66,6 +66,7 @@ import {
   ModalComponent,
 } from '@src/components/modals';
 import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-callback-event';
+import { ScriptResourcesService } from '@src/services/script-resources/script-resources.service';
 
 export interface Item {
   timeline: string;
@@ -119,8 +120,6 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   timeLineArray: number[];
   menuTopLeft = { x: 0, y: 0 };
 
-  scriptResources!: ScriptResources;
-
   components: unknown[];
 
   constructor(
@@ -130,6 +129,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     private renderer: Renderer2,
     private controllerService: ControllerService,
     private scriptService: ScriptsService,
+    private scriptResources: ScriptResourcesService
   ) {
     this.scriptId = this.route.snapshot.paramMap.get('id') ?? '0';
 
@@ -157,22 +157,6 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   ngOnInit(): void {
-    const csObserver = {
-      next: (result: AstrOsLocationCollection) => {
-        const modules = new Array<ControllerLocation>();
-
-        if (result.domeModule) modules.push(result.domeModule);
-        if (result.coreModule) modules.push(result.coreModule);
-        if (result.bodyModule) modules.push(result.bodyModule);
-
-        this.scriptResources = new ScriptResources(modules);
-        this.resourcesLoaded = true;
-      },
-      error: (err: unknown) => console.error(err),
-    };
-
-    this.controllerService.getLoadedLocations().subscribe(csObserver);
-
     if (this.scriptId === '0') {
       this.scriptId = this.generateScriptId(5);
       console.log(`new script id:${this.scriptId}`);
@@ -314,7 +298,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   sendChannelTest(
     controllerId: number,
-    commandType: ChannelType,
+    commandType: ScriptChannelType,
     command: unknown,
   ) {
     const observer = {
@@ -362,15 +346,15 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       ControllerModalResources.controllers,
       this.scriptResources.locations,
     );
-    modalResources.set(
+    /*modalResources.set(
       ControllerModalResources.modules,
       this.scriptResources.getAvailableModules(),
     );
     modalResources.set(
       ControllerModalResources.channels,
-      this.scriptResources.getAvailableChannels(),
+      this.scriptResources.getChannelDetailsList(),
     );
-
+    */
     const component = this.container.createComponent(ControllerModalComponent);
 
     component.instance.resources = modalResources;
@@ -414,7 +398,13 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       const ch = this.scriptChannels[chIdx];
 
-      const event = new ScriptEvent(ch.id, ch.type, ch.subType, time, '');
+      const event = new ScriptEvent(
+        ch.id,
+        ch.moduleChannel.moduleType,
+        ch.moduleChannel.moduleSubType,
+        time,
+        ''
+      );
 
       this.createEventModal(event, false);
     }
@@ -451,17 +441,17 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     let component!: ComponentRef<ScripterModal>;
 
-    switch (event.channelType) {
-      case ChannelType.uart:
-        switch (event.channelSubType) {
-          case ChannelSubType.genericSerial:
+    switch (event.moduleType) {
+      case ModuleType.uart:
+        switch (event.moduleSubType) {
+          case ModuleSubType.genericSerial:
             component = this.container.createComponent(UartEventModalComponent);
             modalResources.set(
               UartEventModalResources.channelId,
               this.getUartChannelFromChannel(event.scriptChannel),
             );
             break;
-          case ChannelSubType.kangaroo:
+          case ModuleSubType.kangaroo:
             component = this.container.createComponent(
               KangarooEventModalComponent,
             );
@@ -474,7 +464,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
               this.getKangarooControllerFromChannel(event.scriptChannel),
             );
             break;
-          case ChannelSubType.humanCyborgRelations:
+          case ModuleSubType.humanCyborgRelationsSerial:
             component = this.container.createComponent(
               HumanCyborgModalComponent,
             );
@@ -485,21 +475,14 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
             break;
         }
         break;
-      case ChannelType.i2c:
+      case ModuleType.i2c:
         component = this.container.createComponent(I2cEventModalComponent);
         modalResources.set(
           I2cEventModalResources.i2cId,
           this.getIdFromChannel(event.scriptChannel),
         );
         break;
-      /* case ChannelType.servo:
-         component = this.container.createComponent(ServoEventModalComponent);
-         modalResources.set(ModalResources.servoId, this.getIdFromChannel(event.scriptChannel))
-         break; */
-      case ChannelType.audio:
-        component = this.container.createComponent(AudioEventModalComponent);
-        break;
-      case ChannelType.gpio:
+      case ModuleType.gpio:
         component = this.container.createComponent(GpioEventModalComponent);
         modalResources.set(
           GpioEventModalResources.gpioId,
@@ -545,7 +528,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     }*/
   }
 
-  getIdFromChannel(channelId: string): number | null {
+  getIdFromChannel(channelId: string): string | null {
     const chIdx = this.scriptChannels
       .map((ch) => {
         return ch.id;
@@ -553,7 +536,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       .indexOf(channelId);
 
     if (chIdx > -1) {
-      const servo = this.scriptChannels[chIdx].channel as BaseChannel;
+      const servo = this.scriptChannels[chIdx].moduleChannel as BaseChannel;
       return servo.id;
     }
 
@@ -566,7 +549,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     switch (evt.type) {
       case ControllerModalResources.addChannelEvent: {
         const value = evt.value as ControllerModalResponse;
-        this.addChannel(value.controller, value.module, value.channels);
+        this.addChannel(value.controller, value.scriptChannelType, value.channels);
         break;
       }
       case ConfirmModalResources.confirmEvent:
@@ -664,11 +647,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       this.scriptChannels.splice(chIdx, 1);
 
-      this.scriptResources.removeChannel(
-        channel.locationId,
-        channel.type,
-        channel.channel?.id,
-      );
+      this.scriptResources.setChannelAvailablity(channel.channelId, channel.channelType, true);
 
       this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
     }
@@ -682,15 +661,15 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       .indexOf(msg);
 
     if (chIdx !== undefined && chIdx > -1) {
+
       const ch = this.scriptChannels[chIdx];
 
       this.container.clear();
 
       const modalResources = new Map<string, unknown>();
 
-      modalResources.set(ChannelTestModalResources.channelType, ch.type);
-      modalResources.set(ChannelTestModalResources.channelSubType, ch.subType);
-      modalResources.set(ChannelTestModalResources.channelId, ch.channelNumber);
+      modalResources.set(ChannelTestModalResources.scriptChannelType, ch.channelType);
+      modalResources.set(ChannelTestModalResources.channelId, ch.channelId);
       modalResources.set(ChannelTestModalResources.controller, ch.locationId);
 
       const component = this.container.createComponent(
@@ -711,8 +690,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   private addChannel(
     locationId: string,
-    channelType: ChannelType,
-    channels: number[],
+    channelType: ScriptChannelType,
+    channels: string[],
   ): void {
     let name = this.scriptResources.locations.get(locationId)?.name;
 
@@ -720,14 +699,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       name = '';
     }
 
-    if (channelType === ChannelType.audio) {
-      const chValue = this.scriptResources.addChannel(
-        locationId,
-        channelType,
-        0,
-      );
+    channels.forEach((channel) => {
+      this.scriptResources.setChannelAvailablity(channel, channelType, false); 
 
-      const subType = 0;
+      const chValue = this.scriptResources.getScriptChannelResource(channel, channelType);
 
       if (chValue === undefined) {
         return;
@@ -735,47 +710,18 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       const ch = new ScriptChannel(
         Guid.create().toString(),
-        this.scriptId,
+        chValue.channelId,
         locationId,
+        this.script.id,
         channelType,
-        subType,
-        0,
-        chValue,
+        ModuleChannelTypes.fromSubType(chValue.channel.moduleSubType),
+        chValue.channel,
         this.segments,
       );
 
       this.scriptChannels.push(ch);
-    } else {
-      channels.forEach((channel) => {
-        const chValue = this.scriptResources.addChannel(
-          locationId,
-          channelType,
-          +channel,
-        );
+    });
 
-        if (chValue === undefined) {
-          return;
-        }
-        let subType = ChannelSubType.none;
-
-        if (channelType === ChannelType.uart) {
-          subType = chValue.subType;
-        }
-
-        const ch = new ScriptChannel(
-          Guid.create().toString(),
-          this.scriptId,
-          locationId,
-          channelType,
-          subType,
-          channel,
-          chValue,
-          this.segments,
-        );
-
-        this.scriptChannels.push(ch);
-      });
-    }
 
     this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
   }
@@ -874,14 +820,14 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       return val;
     }
 
-    val = a.type - b.type;
+    val = a.channelType - b.channelType;
 
     if (val !== 0) {
       return val;
     }
 
-    return a.channel.channelName < b.channel.channelName ? -1 : 1;
-  }
+    return a.moduleChannel.channelName < b.moduleChannel.channelName ? -1 : 1;
+  } 
 
   private generateScriptId(length: number): string {
     let result = `s${Math.floor(Date.now() / 1000)}`;

@@ -1,6 +1,6 @@
 import {
-  ChannelSubType,
-  ChannelType,
+  ModuleType,
+  ModuleSubType,
   GenericSerialEvent,
   GpioEvent,
   HumanCyborgRelationsEvent,
@@ -12,17 +12,13 @@ import {
 
 export default class EventMarkerHelper {
   static generateText(event: ScriptEvent): string[] {
-    switch (event.channelType) {
-      case ChannelType.audio:
-        return this.generateBasicResponse('Audio Track');
-      //case ChannelType.servo:
-      //    return this.servoText(event.dataJson);
-      case ChannelType.i2c:
+    switch (event.moduleType) {
+      case ModuleType.i2c:
         return this.i2cText(event.dataJson);
-      case ChannelType.gpio:
+      case ModuleType.gpio:
         return this.gpioText(event.dataJson);
-      case ChannelType.uart:
-        return this.uartText(event.channelSubType, event.dataJson);
+      case ModuleType.uart:
+        return this.uartText(event.moduleSubType, event.dataJson);
       default:
         return this.generateBasicResponse('error');
     }
@@ -61,13 +57,13 @@ export default class EventMarkerHelper {
     return result;
   }
 
-  private static uartText(subType: ChannelSubType, json: string): string[] {
+  private static uartText(subType: ModuleSubType, json: string): string[] {
     switch (subType) {
-      case ChannelSubType.genericSerial:
+      case ModuleSubType.genericSerial:
         return this.genericUart(json);
-      case ChannelSubType.kangaroo:
+      case ModuleSubType.kangaroo:
         return this.kangaroo(json);
-      case ChannelSubType.humanCyborgRelations:
+      case ModuleSubType.humanCyborgRelationsSerial:
         return this.humanCyborg(json);
       default:
         return this.generateBasicResponse('error');

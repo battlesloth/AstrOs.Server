@@ -29,7 +29,7 @@ export class ControllerLocation {
 
     this.controller = new ControlModule(0, "", "");
 
-    this.gpioModule = new GpioModule();
+    this.gpioModule = new GpioModule(id);
 
     this.i2cModules = new Array<I2cModule>();
     this.uartModules = new Array<UartModule>();

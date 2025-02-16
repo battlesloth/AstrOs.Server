@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
-import { ChannelType, AstrOsLocationCollection } from 'astros-common';
+import { AstrOsLocationCollection, ModuleType, ScriptChannelType } from 'astros-common';
 
 @Injectable({
   providedIn: 'root',
@@ -82,7 +82,7 @@ export class ControllerService {
 
   sendControllerCommand(
     controllerId: number,
-    channelType: ChannelType,
+    moduleType: ScriptChannelType,
     command: unknown,
   ): Observable<unknown> {
     return this.http
@@ -90,7 +90,7 @@ export class ControllerService {
         '/api/directcommand',
         {
           controller: controllerId,
-          commandType: channelType,
+          commandType: moduleType,
           command: command,
         },
         {

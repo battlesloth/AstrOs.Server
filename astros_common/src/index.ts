@@ -3,7 +3,11 @@ export { ControllerLocation } from "./control_module/controller_location";
 export { ControlModule } from "./control_module/control_module";
 export { AstrOsLocationCollection } from "./astros_location_collection";
 export { ControlModuleStatus } from "./control_module/control_module_status";
-export { BaseChannel } from "./control_module/base_channel";
+export { BaseModule, } from "./control_module/base_module";
+export { 
+  BaseChannel,
+  ModuleChannelType
+ } from "./control_module/base_channel";
 export { I2cChannel } from "./control_module/i2c/i2c_channel";
 export { I2cModule } from "./control_module/i2c/i2c_module";
 export { KangarooX2 } from "./control_module/uart/sub_modules/kangarooX2/kangaroo_x2";
@@ -19,6 +23,7 @@ export { GpioChannel } from "./control_module/gpio/gpio_channel";
 export { GpioModule } from "./control_module/gpio/gpio_module";
 export { Script } from "./scripts/script";
 export { ScriptChannel } from "./scripts/script_channel";
+export { ScriptChannelResource } from "./scripts/script_channel_resource";
 export { ScriptEvent } from "./scripts/script_event";
 export { KangarooAction, KangarooEvent } from "./scripts/events/kangaroo_event";
 export {
@@ -40,12 +45,10 @@ export { Kvp } from "./kvp";
 export { DeploymentStatus } from "./scripts/deploymentStatus";
 export { AstrOsConstants } from "./astros_constants";
 export {
+  ScriptChannelType,
   ModuleType,
   ModuleSubType,
-  ChannelType,
-  ChannelSubType,
-  UartType,
-  I2cType,
+  ModuleChannelTypes,
   UploadStatus,
   ControllerStatus,
   TransmissionType,

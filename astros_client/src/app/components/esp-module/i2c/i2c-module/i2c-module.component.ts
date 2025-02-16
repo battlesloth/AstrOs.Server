@@ -18,7 +18,11 @@ import {
 } from '@angular/material/expansion';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
-import { I2cModule, I2cType, ModuleType } from 'astros-common';
+import { 
+  I2cModule, 
+  ModuleType, 
+  ModuleSubType 
+} from 'astros-common';
 import { RemoveModuleEvent } from '../../utility/module-events';
 import { GenericI2cModuleComponent } from '../i2c-submodules/generic-i2c-module/generic-i2c-module.component';
 import { Pca9685ModuleComponent } from '../i2c-submodules/pca9685-module/pca9685-module.component';
@@ -75,14 +79,14 @@ export class I2cModuleComponent implements AfterViewInit, AfterContentInit {
   }
 
   ngAfterContentInit(): void {
-    switch (this.module.type) {
-      case I2cType.genericI2C:
+    switch (this.module.moduleSubType) {
+      case ModuleSubType.genericI2C:
         this.subtypeName = 'Generic I2C';
         break;
-      case I2cType.humanCyborgRelations:
+      case ModuleSubType.humanCyborgRelationsI2C:
         this.subtypeName = 'Human Cyborg Relations';
         break;
-      case I2cType.pwmBoard:
+      case ModuleSubType.pwmBoard:
         this.subtypeName = 'PCA9685 PWM Board';
         break;
       default:
@@ -95,15 +99,15 @@ export class I2cModuleComponent implements AfterViewInit, AfterContentInit {
 
     let component!: ComponentRef<BaseI2cSubModuleComponent>;
 
-    switch (this.module.type) {
-      case I2cType.genericI2C:
+    switch (this.module.moduleSubType) {
+      case ModuleSubType.genericI2C:
 
         component = this.i2cContainer.createComponent(
           GenericI2cModuleComponent,
         ) as ComponentRef<GenericI2cModuleComponent>;
         break;
-      case I2cType.humanCyborgRelations:
-      case I2cType.pwmBoard:
+      case ModuleSubType.humanCyborgRelationsI2C:
+      case ModuleSubType.pwmBoard:
         component = this.i2cContainer.createComponent(
           Pca9685ModuleComponent
         ) as ComponentRef<Pca9685ModuleComponent>;

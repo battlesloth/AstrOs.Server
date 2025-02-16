@@ -1,7 +1,6 @@
 import {
   MaestroEvent,
   I2cEvent,
-  ChannelSubType,
   HumanCyborgRelationsEvent,
   HumanCyborgRelationsModule,
   KangarooAction,
@@ -11,7 +10,8 @@ import {
   ScriptEvent,
   GenericSerialEvent,
   GpioEvent,
-  ChannelType,
+  ModuleType,
+  ModuleSubType,
 } from "astros-common";
 
 import { logger } from "./logger";
@@ -54,15 +54,13 @@ export class ScriptConverter {
     let script = "";
 
     switch (command.channelType) {
-      case ChannelType.uart:
+      case ModuleType.uart:
         script = this.convertUartEvent(command.event, 0);
         break;
-      case ChannelType.i2c:
+      case ModuleType.i2c:
         script = this.convertI2cEvent(command.event, 0);
         break;
-      case ChannelType.audio:
-        break;
-      case ChannelType.gpio:
+      case ModuleType.gpio:
         script = this.convertGpioEvent(command.event, 0);
         break;
     }
@@ -123,16 +121,14 @@ export class ScriptConverter {
         const timeToSend = j === 0 ? timeTill : 0;
 
         const event = events[j];
-        switch (event.channelType) {
-          case ChannelType.uart:
+        switch (event.moduleType) {
+          case ModuleType.uart:
             script = this.convertUartEvent(event, timeToSend) + script;
             break;
-          case ChannelType.i2c:
+          case ModuleType.i2c:
             script = this.convertI2cEvent(event, timeToSend) + script;
             break;
-          case ChannelType.audio:
-            break;
-          case ChannelType.gpio:
+          case ModuleType.gpio:
             script = this.convertGpioEvent(event, timeToSend) + script;
             break;
         }
@@ -145,14 +141,14 @@ export class ScriptConverter {
   }
 
   convertUartEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
-    switch (evt.channelSubType) {
-      case ChannelSubType.genericSerial:
+    switch (evt.moduleSubType) {
+      case ModuleSubType.genericSerial:
         return this.convertGenericSerialEvent(evt, timeTillNextEvent);
-      case ChannelSubType.humanCyborgRelations:
+      case ModuleSubType.humanCyborgRelationsSerial:
         return this.convertHcrEvent(evt, timeTillNextEvent);
-      case ChannelSubType.kangaroo:
+      case ModuleSubType.kangaroo:
         return this.convertKangarooEvent(evt, timeTillNextEvent);
-      case ChannelSubType.maestro:
+      case ModuleSubType.maestro:
         return this.convertMaestroEvent(evt, timeTillNextEvent);
       default:
         logger.warn("ScriptConverter: invalid subtype");

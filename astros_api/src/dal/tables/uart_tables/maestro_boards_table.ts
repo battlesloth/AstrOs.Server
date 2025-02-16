@@ -1,3 +1,5 @@
+import { UartModuleTable } from "./uart_module_table";
+
 export class MaestroBoardsTable {
   public static readonly table = "maestro_boards";
   public static readonly id = "id";
@@ -37,6 +39,15 @@ export class MaestroBoardsTable {
   public static readonly selectIdsForParent = `SELECT ${this.id}
         FROM ${this.table}
         WHERE ${this.parentId} = ?`;
+
+      public static readonly getUartModuleForBoard = `SELECT
+        u.${UartModuleTable.id} as id,
+        u.${UartModuleTable.baudRate} as baudRate,
+        u.${UartModuleTable.uartChannel} as uartChannel
+        FROM ${UartModuleTable.table} u
+        JOIN ${this.table} m ON m.${this.parentId} = u.${UartModuleTable.id}
+        WHERE m.${this.id} = ?`;
+
 
   public static readonly deleteByParent = `DELETE FROM ${this.table} WHERE ${this.parentId} = ?`;
 }

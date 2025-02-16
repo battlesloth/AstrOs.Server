@@ -18,14 +18,12 @@ import {
   AstrOsLocationCollection,
   ControllerLocation,
   ModuleType,
-  UartType,
   ModuleSubType,
   UartModule,
   HumanCyborgRelationsModule,
   KangarooX2,
   MaestroModule,
   I2cModule,
-  I2cType,
   AstrOsConstants,
   MaestroBoard,
   MaestroChannel,
@@ -346,30 +344,29 @@ export class ModulesComponent implements AfterViewInit {
     }
 
     const defaultChannel = location === AstrOsConstants.BODY ? 2 : 1;
-    const uartType = this.subtypeToUartType(subType);
 
     const module = new UartModule(
       crypto.randomUUID(),
       'New Serial Module',
       location,
-      uartType,
+      subType,
       defaultChannel,
       9600,
     );
 
-    switch (uartType) {
-      case UartType.humanCyborgRelations:
+    switch (subType) {
+      case ModuleSubType.humanCyborgRelationsSerial:
         module.subModule = new HumanCyborgRelationsModule();
         break;
-      case UartType.kangaroo:
+      case ModuleSubType.kangaroo:
         module.subModule = new KangarooX2(
           crypto.randomUUID(),
           'Channel 1',
           'Channel 2',
         );
         break;
-      case UartType.maestro:
-        module.subModule = this.generateMaestroModule();
+      case ModuleSubType.maestro:
+        module.subModule = this.generateMaestroModule(module.id, module.uartChannel, module.baudRate);
         break;
     }
 
@@ -377,13 +374,16 @@ export class ModulesComponent implements AfterViewInit {
   }
 
 
-  generateMaestroModule() {
+  generateMaestroModule(moduleId: string, uartChannel: number, baud: number) {
 
     const subModule = new MaestroModule();
 
+    const boardId = crypto.randomUUID();
+
     subModule.boards = [
       new MaestroBoard(
-        crypto.randomUUID(),
+        boardId,
+        moduleId,
         0,
         'Board 1',
         24
@@ -395,17 +395,19 @@ export class ModulesComponent implements AfterViewInit {
       const idx = i + 1;
       subModule.boards[0].channels.push(
         new MaestroChannel(
-          idx,
-          `Channel ${i + idx}`,
+          crypto.randomUUID(),
+          moduleId,
+         `Channel ${i + idx}`, 
           false,
+          uartChannel,
+          baud,
           subModule.boards[0].id,
-          true,
+          idx,
+          false,
           500,
           2500,
           1250,
-          false,
-          0,
-          0,
+          false
         )
       );
     }
@@ -434,9 +436,8 @@ export class ModulesComponent implements AfterViewInit {
 
     if (!controller) {
       return;
-    }
+    } 
 
-    const i2cType = this.subtypeToI2cType(subType);
     const nextAddress = this.getNextI2CAddress(controller.i2cModules);
 
     if (nextAddress === -1) {
@@ -449,15 +450,15 @@ export class ModulesComponent implements AfterViewInit {
       'New I2C Module',
       location,
       nextAddress,
-      i2cType,
+      subType,
     );
 
-    switch (i2cType) {
-      case I2cType.genericI2C:
+    switch (subType) {
+      case ModuleSubType.genericI2C:
         break;
-      case I2cType.humanCyborgRelations:
+      case ModuleSubType.humanCyborgRelationsI2C:
         break;
-      case I2cType.pwmBoard:
+      case ModuleSubType.pwmBoard:
         break;
     }
 
@@ -682,32 +683,6 @@ export class ModulesComponent implements AfterViewInit {
         return this.domeLocation;
     }
     return this.bodyLocation;
-  }
-
-  private subtypeToUartType(subtype: ModuleSubType): UartType {
-    switch (subtype) {
-      case ModuleSubType.genericSerial:
-        return UartType.genericSerial;
-      case ModuleSubType.humanCyborgRelationsSerial:
-        return UartType.humanCyborgRelations;
-      case ModuleSubType.kangaroo:
-        return UartType.kangaroo;
-      case ModuleSubType.maestro:
-        return UartType.maestro;
-    }
-    return UartType.genericSerial;
-  }
-
-  private subtypeToI2cType(subtype: ModuleSubType): I2cType {
-    switch (subtype) {
-      case ModuleSubType.genericI2C:
-        return I2cType.genericI2C;
-      case ModuleSubType.humanCyborgRelationsI2C:
-        return I2cType.humanCyborgRelations;
-      case ModuleSubType.pwmBoard:
-        return I2cType.pwmBoard;
-    }
-    return I2cType.genericI2C;
   }
 
   private getNextI2CAddress(modules: I2cModule[]): number {

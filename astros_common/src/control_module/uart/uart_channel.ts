@@ -1,24 +1,20 @@
-import { UartType } from "../../astros_enums";
+import { ModuleSubType, ModuleType } from "../../astros_enums";
 import { BaseChannel } from "../base_channel";
 
 export class UartChannel extends BaseChannel {
-  uartType: UartType;
-  parentModuleId: string;
   uartChannel: number;
   baudRate: number;
 
   constructor(
-    id: number,
+    id: string,
+    parentId: string,
     name: string,
+    subType: ModuleSubType,
     enabled: boolean,
-    uartType: UartType,
-    parentModuleId: string,
     uartChannel: number,
     baudRate: number,
   ) {
-    super(id, name, enabled);
-    this.uartType = uartType;
-    this.parentModuleId = parentModuleId;
+    super(id, parentId, name, ModuleType.uart, subType, enabled);
     this.uartChannel = uartChannel;
     this.baudRate = baudRate;
   }
