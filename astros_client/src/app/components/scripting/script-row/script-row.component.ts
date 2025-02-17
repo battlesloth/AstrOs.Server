@@ -3,7 +3,7 @@ import {
   Component,
   Input,
   Output,
-  Renderer2,
+  //Renderer2,
   ViewChild,
   ElementRef,
 } from '@angular/core';
@@ -57,7 +57,7 @@ export class ScriptRowComponent {
   timeLineArray: number[];
   private segments = 3000;
 
-  constructor(private renderer: Renderer2) {
+  constructor(){//private renderer: Renderer2) {
     this.timeLineArray = Array.from({ length: this.segments }, (_, i) => i + 1);
   }
 

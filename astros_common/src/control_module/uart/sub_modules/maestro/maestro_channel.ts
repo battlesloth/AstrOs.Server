@@ -2,7 +2,6 @@ import { ModuleSubType } from "../../../../astros_enums";
 import { UartChannel } from "../../uart_channel";
 
 export class MaestroChannel extends UartChannel {
-  boardId: string;
   channelNumber: number;
   // servo or GPIO
   isServo: boolean;
@@ -17,9 +16,6 @@ export class MaestroChannel extends UartChannel {
     parentId: string,
     channelName: string,
     enabled: boolean,
-    uartChannel: number,
-    baudRate: number,
-    boardId: string,
     channelNumber: number,
     isServo: boolean,
     minPos: number,
@@ -33,11 +29,8 @@ export class MaestroChannel extends UartChannel {
       channelName,
       ModuleSubType.maestro,
       enabled,
-      uartChannel,
-      baudRate,
     );
 
-    this.boardId = boardId;
     this.channelNumber = channelNumber;
     this.isServo = isServo;
     this.minPos = minPos;

@@ -54,8 +54,6 @@ export class UartModule extends BaseModule {
       this.name,
       this.moduleSubType,
       true,
-      this.uartChannel,
-      this.baudRate
     );
 
     return [
@@ -77,8 +75,6 @@ export class UartModule extends BaseModule {
       this.id,
       this.id,
       this.name,
-      this.uartChannel,
-      this.baudRate,
       mod.ch1Name,
       mod.ch2Name
     );
@@ -101,19 +97,21 @@ export class UartModule extends BaseModule {
 
     const mod = this.subModule as MaestroModule;
 
-    for (const ch of mod.boards[0].channels) {
-      if (!ch.enabled) continue;
+    for (const board of mod.boards) {
+      for (const ch of board.channels) {
+        if (!ch.enabled) continue;
 
-      resources.push(
-        new ScriptChannelResource(
-          ch.id,
-          ch.isServo ? ScriptChannelType.SERVO : ScriptChannelType.GPIO,
-          ch.channelName,
-          this.id,
-          this.locationId,
-          ch
-        )
-      );
+        resources.push(
+          new ScriptChannelResource(
+            ch.id,
+            ch.isServo ? ScriptChannelType.SERVO : ScriptChannelType.GPIO,
+            ch.channelName,
+            this.id,
+            this.locationId,
+            ch
+          )
+        );
+      }
     }
 
     return resources;
@@ -126,8 +124,6 @@ export class UartModule extends BaseModule {
       this.name,
       this.moduleSubType,
       true,
-      this.uartChannel,
-      this.baudRate
     );
 
     return [

@@ -396,12 +396,9 @@ export class ModulesComponent implements AfterViewInit {
       subModule.boards[0].channels.push(
         new MaestroChannel(
           crypto.randomUUID(),
-          moduleId,
+          subModule.boards[0].id,
          `Channel ${i + idx}`, 
           false,
-          uartChannel,
-          baud,
-          subModule.boards[0].id,
           idx,
           false,
           500,

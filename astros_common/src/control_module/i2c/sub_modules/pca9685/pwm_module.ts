@@ -12,4 +12,5 @@ export class PwmModule {
     this.address = address;
     this.channels = new Array<PwmChannel>();
   }
+
 }

@@ -1,6 +1,7 @@
 import { Meta, moduleMetadata, StoryObj } from '@storybook/angular';
 import { MaestroChannelComponent } from './maestro-channel.component';
 import { MaestroChannel } from 'astros-common';
+import { v4 as uuid} from 'uuid'
 
 const meta: Meta<MaestroChannelComponent> = {
   title: 'Modules/Uart/Submodules/MaestroChannel',
@@ -19,17 +20,16 @@ type Story = StoryObj<MaestroChannelComponent>;
 export const Default: Story = {
   args: {
     channel: new MaestroChannel(
-      1,
-      'Test',
+      uuid(),
+      uuid(),
+      'Channel 1',
       true,
-      '1234',
+      1, 
       true,
       0,
       0,
       0,
       false,
-      1,
-      9600
     )
   },
 };
@@ -37,17 +37,16 @@ export const Default: Story = {
 export const Values: Story = {
   args: {
     channel: new MaestroChannel(
-      1,
-      'Servo',
+      uuid(),
+      uuid(),
+      'Channel 1',
       true,
-      '1234',
+      1, 
       true,
       500,
       2500,
       1250,
-      true,
-      1,
-      9600
+      true
     )
   },
 };
@@ -55,17 +54,16 @@ export const Values: Story = {
 export const Output: Story = {
   args: {
     channel: new MaestroChannel(
-      1,
+      uuid(),
+      uuid(),
       'Output',
       true,
-      '1234',
+      1, 
       false,
       0,
       0,
       0,
       false,
-      1,
-      9600
     )
   },
 };
@@ -73,35 +71,33 @@ export const Output: Story = {
 export const OutputDefaultHigh: Story = {
   args: {
     channel: new MaestroChannel(
-      1,
+      uuid(),
+      uuid(),
       'Output',
       true,
-      '1234',
+      1,
       false,
       0,
       0,
       0,
-      true,
-      1,
-      9600
-    )
+      true
+     )
   },
 };
 
 export const Disabled: Story = {
   args: {
     channel: new MaestroChannel(
-      1,
-      'Test',
+      uuid(),
+      uuid(),
+      'Channel 1',
       false,
-      '1234',
+      1, 
       true,
       0,
       0,
       0,
       false,
-      1,
-      9600
     )
   },
 };

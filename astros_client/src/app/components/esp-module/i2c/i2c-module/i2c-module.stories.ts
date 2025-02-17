@@ -8,7 +8,8 @@ import { I2cModuleComponent } from './i2c-module.component';
 import { MatExpansionPanel } from '@angular/material/expansion';
 import { importProvidersFrom } from '@angular/core';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { I2cModule, I2cType } from 'astros-common';
+import { I2cModule, ModuleSubType } from 'astros-common';
+import { v4 as uuid } from 'uuid';
 
 const meta: Meta<I2cModuleComponent> = {
   title: 'Modules/I2c/I2cModule',
@@ -30,40 +31,40 @@ type Story = StoryObj<I2cModuleComponent>;
 
 export const GenericI2c: Story = {
   args: {
-    module: getI2cModule(I2cType.genericI2C, 1),
+    module: getI2cModule(ModuleSubType.genericI2C, 1),
   },
 };
 
 export const HumanCyborgRelations: Story = {
   args: {
-    module: getI2cModule(I2cType.humanCyborgRelations, 2),
+    module: getI2cModule(ModuleSubType.humanCyborgRelationsI2C, 2),
   },
 };
 
 export const PwmBoard: Story = {
   args: {
-    module: getI2cModule(I2cType.pwmBoard, 3),
+    module: getI2cModule(ModuleSubType.pwmBoard, 3),
   },
 };
 
-function getI2cModule(type: I2cType, address: number): I2cModule {
+function getI2cModule(type: ModuleSubType, address: number): I2cModule {
 
   const module = new I2cModule(
-    '1234',
+    uuid(),
     'I2c Module',
-    'test',
+    uuid(),
     address,
     type,
   );
 
   switch (type) {
-    case I2cType.genericI2C:
+    case ModuleSubType.genericI2C:
       module.name = 'Generic I2C Module';
       break;
-    case I2cType.humanCyborgRelations:
+    case ModuleSubType.humanCyborgRelationsI2C:
       module.name = 'Human Cyborg Relations Module';
       break;
-    case I2cType.pwmBoard:
+    case ModuleSubType.pwmBoard:
       module.name = 'PWM Board Module';
       break;
   }

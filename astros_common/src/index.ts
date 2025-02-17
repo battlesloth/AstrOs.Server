@@ -16,9 +16,10 @@ export { HumanCyborgRelationsModule } from "./control_module/uart/sub_modules/hu
 export { MaestroModule } from "./control_module/uart/sub_modules/maestro/maestro_module";
 export { MaestroBoard } from "./control_module/uart/sub_modules/maestro/maestro_board";
 export { MaestroChannel } from "./control_module/uart/sub_modules/maestro/maestro_channel";
-export { PwmModule } from "./control_module/pca9685/pwm_module";
-export { PwmChannel } from "./control_module/pca9685/pwm_channel";
+export { PwmModule } from "./control_module/i2c/sub_modules/pca9685/pwm_module";
+export { PwmChannel } from "./control_module/i2c/sub_modules/pca9685/pwm_channel";
 export { UartModule } from "./control_module/uart/uart_module";
+export { UartChannel } from "./control_module/uart/uart_channel";
 export { GpioChannel } from "./control_module/gpio/gpio_channel";
 export { GpioModule } from "./control_module/gpio/gpio_module";
 export { Script } from "./scripts/script";

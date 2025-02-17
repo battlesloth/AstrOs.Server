@@ -9,8 +9,6 @@ export class KangarooX2Channel extends UartChannel {
     id: string,
     parentId: string,
     name: string,
-    uartChannel: number,
-    baudRate: number,
     ch1Name: string,
     ch2Name: string,
   ) {
@@ -20,8 +18,6 @@ export class KangarooX2Channel extends UartChannel {
       name,
       ModuleSubType.kangaroo,
       true,
-      uartChannel,
-      baudRate,
     );
 
     this.ch1Name = ch1Name;

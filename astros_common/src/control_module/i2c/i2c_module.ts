@@ -36,7 +36,7 @@ export class I2cModule extends BaseModule{
           this.name,
           this.id,
           this.locationId,
-          new I2cChannel(this.id, this.locationId, this.name, true, this.i2cAddress)
+          new I2cChannel(this.id, this.locationId, this.name, true)
         ));
         break;
     }

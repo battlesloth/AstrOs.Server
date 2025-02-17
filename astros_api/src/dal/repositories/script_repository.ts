@@ -210,12 +210,9 @@ export class ScriptRepository {
         const ch = val[0];
         result = new MaestroChannel(
           ch.id,
-          '',
+          ch.boardId,
           ch.channelName,
           ch.enabled,
-          -1,
-          -1,
-          ch.boardId,
           ch.channelNumber,
           ch.isServo,
           ch.minPos,
@@ -233,19 +230,6 @@ export class ScriptRepository {
       throw `Error getting Maestro channel ${channelId}`;
     }
 
-    await this.dao
-      .get(MaestroBoardsTable.getUartModuleForBoard, [result.boardId])
-      .then((val: any) => {
-        const mod = val[0];
-        result!.parentId = mod.id;
-        result!.baudRate = mod.baudRate;
-        result!.uartChannel = mod.uartChannel;
-      })
-      .catch((err) => {
-        logger.error(err);
-        throw "error";
-      });
-
     return result;
   }
 
@@ -260,8 +244,6 @@ export class ScriptRepository {
           ch.id,
           ch.parentId,
           '',
-          -1,
-          -1,
           ch.ch1Name,
           ch.ch2Name,
         );
@@ -274,19 +256,6 @@ export class ScriptRepository {
     if (result === undefined) {
       throw `Error getting KangarooX2 channel ${channelId}`;
     }
-
-    await this.dao
-      .get(UartModuleTable.select, [result.parentId])
-      .then(async (val: any) => {
-        const mod = val[0];
-        result!.channelName = mod.name;
-        result!.uartChannel = mod.uartChannel;
-        result!.baudRate = mod.baudRate;
-      })
-      .catch((err) => {
-        logger.error(err);
-        throw "error";
-      });
 
     return result;
   }
@@ -303,8 +272,6 @@ export class ScriptRepository {
           val[0].name,
           val[0].uartType,
           true,
-          val[0].uartChannel,
-          val[0].baudRate,
         );
       })
       .catch((err) => {
@@ -335,7 +302,6 @@ export class ScriptRepository {
           val[0].id,
           val[0].name,
           true,
-          val[0].i2cAddress,
         );
       })
       .catch((err) => {

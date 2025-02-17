@@ -1,6 +1,7 @@
 import { Meta, moduleMetadata, StoryObj } from "@storybook/angular";
-import { I2cModule, I2cType } from "astros-common";
+import { I2cModule, ModuleSubType } from "astros-common";
 import { GenericI2cModuleComponent } from "./generic-i2c-module.component";
+import { v4 as uuid } from "uuid";
 
 const meta: Meta<GenericI2cModuleComponent> = {
     title: 'Modules/I2c/Submodules/GenericI2C',
@@ -25,10 +26,10 @@ export const Default: Story = {
 
 function getModule(i2cAddress: number) {
     const module = new I2cModule(
-        '1234',
+        uuid(),
         'PCA9685',
-        'core',
-        I2cType.genericI2C,
+        uuid(),
+        ModuleSubType.genericI2C,
         i2cAddress,
     );
     return module;

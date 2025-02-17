@@ -1,7 +1,7 @@
 import { ModuleSubType, ModuleType } from "../astros_enums";
 import { GpioChannel } from "./gpio/gpio_channel";
 import { I2cChannel } from "./i2c/i2c_channel";
-import { PwmChannel } from "./pca9685/pwm_channel";
+import { PwmChannel } from "./i2c/sub_modules/pca9685/pwm_channel";
 import { KangarooX2Channel } from "./uart/sub_modules/kangarooX2/kangaroo_x2_channel";
 import { MaestroChannel } from "./uart/sub_modules/maestro/maestro_channel";
 import { UartChannel } from "./uart/uart_channel";

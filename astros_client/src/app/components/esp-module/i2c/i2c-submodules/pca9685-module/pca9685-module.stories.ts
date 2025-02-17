@@ -1,6 +1,7 @@
 import { Meta, moduleMetadata, StoryObj } from "@storybook/angular";
 import { Pca9685ModuleComponent } from "./pca9685-module.component";
-import { I2cModule, I2cType } from "astros-common";
+import { I2cModule, ModuleSubType, } from "astros-common";
+import { v4 as uuid } from "uuid";
 
 const meta: Meta<Pca9685ModuleComponent> = {
     title: 'Modules/I2c/Submodules/Pca9685',
@@ -25,10 +26,10 @@ export const Default: Story = {
 
 function getModule(i2cAddress: number): any {
     new I2cModule(
-        '1234',
+        uuid(),
         'PCA9685',
-        'core',
-        I2cType.pwmBoard,
+        uuid(),
+        ModuleSubType.pwmBoard,
         i2cAddress,
     );
 }

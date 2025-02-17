@@ -1,5 +1,5 @@
-import { ModuleSubType, ModuleType } from "../../astros_enums";
-import { BaseChannel } from "../base_channel";
+import { ModuleSubType, ModuleType } from "../../../../astros_enums";
+import { BaseChannel } from "../../../base_channel";
 
 export class PwmChannel extends BaseChannel {
   channelId: number;

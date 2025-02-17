@@ -58,10 +58,10 @@ export class ControllerServiceMock {
   }
 
   generateGpioModule() {
-    const module = new GpioModule();
+    const module = new GpioModule('1234');
 
     for (let i = 0; i < 10; i++) {
-      module.channels.push(new GpioChannel(i, `Channel ${i}`, false, false));
+      module.channels.push(new GpioChannel(`1234${i}`, module.id, i, false, `Channel ${i}`, false));
     }
     return module;
   }

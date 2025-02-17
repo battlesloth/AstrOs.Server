@@ -10,6 +10,7 @@ import { MatExpansionPanel } from '@angular/material/expansion';
 import { EspModuleComponent } from './esp-module.component';
 import { ControllerLocation } from 'astros-common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
+import { v4 as uuid } from 'uuid';
 
 const meta: Meta<EspModuleComponent> = {
   title: 'Modules/EspModule',
@@ -37,7 +38,7 @@ export const Default: Story = {
 };
 
 function getControllerLocation(): ControllerLocation {
-  const loc = new ControllerLocation('12345', 'core', 'Test Location', 'fingerptint');
+  const loc = new ControllerLocation(uuid(), 'core', 'Test Location', 'fingerptint');
 
   return loc;
 }

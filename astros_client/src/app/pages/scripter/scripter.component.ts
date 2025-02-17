@@ -29,7 +29,7 @@ import {
 import EventMarkerHelper from './helper/event-marker-helper';
 import { FormsModule } from '@angular/forms';
 import { NgFor } from '@angular/common';
-import { ScriptRowComponent } from './script-row/script-row.component';
+import { ScriptRowComponent } from '../../components/scripting/script-row/script-row.component';
 import {
   AudioEventModalComponent,
   ChannelTestModalComponent,

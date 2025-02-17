@@ -581,12 +581,9 @@ export class LocationsRepository {
           for (const c of val) {
             const ch = new MaestroChannel(
               c.id,
-              board.parentId,
+              board.id,
               c.channelName,
               c.enabled,
-              uartMod.uartChannel,
-              uartMod.baudRate,
-              board.id,
               c.channelNumber,
               c.isServo,
               c.minPos,

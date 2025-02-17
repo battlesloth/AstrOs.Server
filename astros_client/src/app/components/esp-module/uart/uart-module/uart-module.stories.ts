@@ -13,9 +13,10 @@ import {
   MaestroBoard,
   MaestroChannel,
   MaestroModule,
-  UartModule,
-  UartType,
+  ModuleSubType,
+  UartModule
 } from 'astros-common';
+import { v4 as uuid } from 'uuid';
 
 const meta: Meta<UartModuleComponent> = {
   title: 'Modules/Uart/UartModule',
@@ -37,74 +38,74 @@ type Story = StoryObj<UartModuleComponent>;
 
 export const GenericSerial: Story = {
   args: {
-    module: getSerialModule(UartType.genericSerial, 1, 9600),
+    module: getSerialModule(ModuleSubType.genericSerial, 1, 9600),
   },
 };
 
 export const KangarooX2: Story = {
   args: {
-    module: getSerialModule(UartType.kangaroo, 2, 115200),
+    module: getSerialModule(ModuleSubType.kangaroo, 2, 115200),
   },
 };
 
 export const Maestro: Story = {
   args: {
-    module: getSerialModule(UartType.maestro, 1, 57600),
+    module: getSerialModule(ModuleSubType.maestro, 1, 57600),
   },
 };
 
 export const HumanCyborgRelations: Story = {
   args: {
-    module: getSerialModule(UartType.humanCyborgRelations, 1, 9600),
+    module: getSerialModule(ModuleSubType.humanCyborgRelationsSerial, 1, 9600),
   },
 };
 
 export const MasterModule: Story = {
   args: {
-    module: getSerialModule(UartType.genericSerial, 2, 9600),
+    module: getSerialModule(ModuleSubType.genericSerial, 2, 9600),
     isMaster: true,
   },
 };
 
 function getSerialModule(
-  type: UartType,
+  type: ModuleSubType,
   ch: number,
   baudRate: number,
 ): UartModule {
   const module = new UartModule(
-    '1234',
+    uuid(),
     'Generic Serial',
-    'test',
+    uuid(),
     type,
     ch,
     baudRate,
   );
 
   switch (type) {
-    case UartType.genericSerial:
+    case ModuleSubType.genericSerial:
       module.name = 'Generic Serial';
       break;
-    case UartType.kangaroo: {
+    case ModuleSubType.kangaroo: {
       module.name = 'Kangaroo X2';
       module.subModule = new KX2('', 'Lifter', 'Spinner');
       break;
     }
-    case UartType.maestro: {
+    case ModuleSubType.maestro: {
       module.name = 'Maestro';
       const subModule = new MaestroModule();
-      subModule.boards = [getMaestroBoard(24)];
+      subModule.boards = [getMaestroBoard(module.id, 24)];
       module.subModule = subModule;
       break;
     }
-    case UartType.humanCyborgRelations:
+    case ModuleSubType.humanCyborgRelationsSerial:
       module.name = 'Human Cyborg Relations';
       break;
   }
   return module;
 }
 
-function getMaestroBoard(channelCount: number): MaestroBoard {
-  const board = new MaestroBoard('1234', 0, '', channelCount);
+function getMaestroBoard(parentId: string, channelCount: number): MaestroBoard {
+  const board = new MaestroBoard(uuid(), parentId, 0, '', channelCount);
   
   for (let i = 0; i < 24; i++) {
     
@@ -113,30 +114,29 @@ function getMaestroBoard(channelCount: number): MaestroBoard {
     const servo = (idx % 2 ===0 && idx % 3 !== 0);
     
     board.channels.push(
-      getMaestroChannel(idx, `Channel ${i + idx}`, enabled, '1234', servo),
+      getMaestroChannel(board.id, idx, `Channel ${i + idx}`, enabled, servo),
     );
   }
   return board;
 }
 
 function getMaestroChannel(
+  parentId: string,
   channel: number,
   name: string,
   enabled: boolean,
-  boardId: string,
   servo: boolean,
 ): MaestroChannel {
   return new MaestroChannel(
-    channel,
+    uuid(),
+    parentId,
     name,
     enabled,
-    boardId,
+    channel,
     servo,
     500,
     2500,
     1250,
     false,
-    0,
-    0,
   );
 }
