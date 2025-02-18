@@ -9,10 +9,9 @@ export interface EventKVP {
 
 export class ScriptChannel {
   id: string;
-  channelId: string;
-  locationId: string;
   scriptId: string;
   channelType: ScriptChannelType;
+  moduleChannelId: string;
   moduleChannelType: string;
   moduleChannel: ModuleChannelType;
   maxDuration: number;
@@ -22,19 +21,18 @@ export class ScriptChannel {
 
   constructor(
     id: string,
-    channelId: string,
-    locationId: string,
     scriptId: string,
     channelType: ScriptChannelType,
+    moduleChannelId: string,
     moduleChannelType: string,
     moduleChannel: ModuleChannelType,
     maxDuration: number,
   ) {
     this.id = id;
-    this.channelId = channelId;
-    this.locationId = locationId;
+    
     this.scriptId = scriptId;
     this.channelType = channelType;
+    this.moduleChannelId = moduleChannelId;
     this.moduleChannelType = moduleChannelType;
     this.moduleChannel = moduleChannel;
     this.maxDuration = maxDuration;

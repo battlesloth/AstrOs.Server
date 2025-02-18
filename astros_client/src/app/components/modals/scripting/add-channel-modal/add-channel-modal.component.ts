@@ -9,7 +9,7 @@ import {
   ChannelDetails 
 } from '@src/models/scripting';
 
-export class ControllerModalResources {
+export class AddChannelModalResources {
   public static controllers = 'controllers';
   public static modules = 'modules';
   public static channels = 'channels';
@@ -19,19 +19,19 @@ export class ControllerModalResources {
   public static closeEvent = 'controller_close';
 }
 
-export interface ControllerModalResponse {
+export interface AddChannelModalResponse {
   controller: string;
   scriptChannelType: ScriptChannelType;
   channels: string[];
 }
 
 @Component({
-  selector: 'app-controller-modal',
-  templateUrl: './controller-modal.component.html',
-  styleUrls: ['./controller-modal.component.scss'],
+  selector: 'app-add-channel-modal',
+  templateUrl: './add-channel-modal.component.html',
+  styleUrls: ['./add-channel-modal.component.scss'],
   imports: [FormsModule, NgFor, NgIf, KeyValuePipe],
 })
-export class ControllerModalComponent
+export class AddChannelModalComponent
   extends ModalBaseComponent
   implements OnInit
 {
@@ -60,13 +60,13 @@ export class ControllerModalComponent
 
   ngOnInit(): void {
     this.controllers = this.resources.get(
-      ControllerModalResources.controllers,
+      AddChannelModalResources.controllers,
     ) as Map<number, LocationDetails>;
     this.availableModules = this.resources.get(
-      ControllerModalResources.modules,
+      AddChannelModalResources.modules,
     ) as Map<number, Map<ScriptChannelType, string>>;
     this.availableChannels = this.resources.get(
-      ControllerModalResources.channels,
+      AddChannelModalResources.channels,
     ) as Map<number, Map<ScriptChannelType, ChannelDetails[]>>;
   }
 
@@ -97,7 +97,7 @@ export class ControllerModalComponent
     }
 
     const evt = new ModalCallbackEvent(
-      ControllerModalResources.addChannelEvent,
+      AddChannelModalResources.addChannelEvent,
       {
         controller: +this.selectedController,
         module:
@@ -115,7 +115,7 @@ export class ControllerModalComponent
   closeModal() {
     this.clearOptions();
     const evt = new ModalCallbackEvent(
-      ControllerModalResources.closeEvent,
+      AddChannelModalResources.closeEvent,
       null,
     );
     this.modalCallback.emit(evt);

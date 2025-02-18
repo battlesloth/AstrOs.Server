@@ -127,10 +127,9 @@ export class ScriptRepository {
         val.forEach((ch: any) => {
           const channel = new ScriptChannel(
             ch.id,
-            ch.channelId,
-            ch.locationId,
             ch.scriptId,
             ch.channelType,
+            ch.moduleChannelId,
             ch.moduleChannelType,
             new BaseChannel("", "", "", ModuleType.none, ModuleSubType.none, false),
             0,
@@ -180,19 +179,19 @@ export class ScriptRepository {
   ): Promise<ScriptChannel> {
     switch (channel.moduleChannelType) {
       case ModuleChannelTypes.GpioChannel:
-        channel.moduleChannel = await this.getGpioChannel(channel.channelId);
+        channel.moduleChannel = await this.getGpioChannel(channel.moduleChannelId);
         break;
       case ModuleChannelTypes.MaestroChannel:
-        channel.moduleChannel = await this.getMaestroChannel(channel.channelId);
+        channel.moduleChannel = await this.getMaestroChannel(channel.moduleChannelId);
         break;
       case ModuleChannelTypes.KangarooX2Channel:
-        channel.moduleChannel = await this.getKangarooChannel(channel.channelId);
+        channel.moduleChannel = await this.getKangarooChannel(channel.moduleChannelId);
         break;
       case ModuleChannelTypes.UartChannel:
-        channel.moduleChannel = await this.getGenericSerialChannel(channel.channelId);
+        channel.moduleChannel = await this.getGenericSerialChannel(channel.moduleChannelId);
         break;
       case ModuleChannelTypes.I2cChannel:
-        channel.moduleChannel = await this.getGenericI2cChannel(channel.channelId);
+        channel.moduleChannel = await this.getGenericI2cChannel(channel.moduleChannelId);
         break;
     }
 
@@ -435,10 +434,9 @@ export class ScriptRepository {
         await this.dao
           .run(ScriptChannelsTable.insert, [
             ch.id,
-            ch.channelId,
-            ch.locationId,
             script.id,
             ch.channelType.toString(),
+            ch.moduleChannelId,
             ch.moduleChannelType
           ])
           .then((val: any) => {

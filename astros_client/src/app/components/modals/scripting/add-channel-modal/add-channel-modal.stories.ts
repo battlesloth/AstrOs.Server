@@ -4,12 +4,12 @@ import {
   Meta,
   StoryObj,
 } from '@storybook/angular';
-import { ControllerModalComponent } from './controller-modal.component';
+import { AddChannelModalComponent } from './add-channel-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
 
-const meta: Meta<ControllerModalComponent> = {
-  title: 'Modals/Scripting/ControllerModal',
-  component: ControllerModalComponent,
+const meta: Meta<AddChannelModalComponent> = {
+  title: 'Modals/Scripting/AddChannelModal',
+  component: AddChannelModalComponent,
   tags: ['autodocs'],
   decorators: [
     moduleMetadata({
@@ -21,7 +21,7 @@ const meta: Meta<ControllerModalComponent> = {
 
 export default meta;
 
-type Story = StoryObj<ControllerModalComponent>;
+type Story = StoryObj<AddChannelModalComponent>;
 
 export const Default: Story = {
   args: {},

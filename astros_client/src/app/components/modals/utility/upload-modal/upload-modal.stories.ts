@@ -7,7 +7,7 @@ import {
 import { ModalComponent } from '../../modal-base/modal.component';
 import { UploadModalComponent } from './upload-modal.component';
 import { HttpClient } from '@angular/common/http';
-import { HttpClientMock } from '@src/mocks';
+import { HttpClientMock } from '@src/__mocks__';
 
 const meta: Meta<UploadModalComponent> = {
   title: 'Modals/Utility/UploadModal',

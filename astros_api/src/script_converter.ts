@@ -78,6 +78,7 @@ export class ScriptConverter {
       // convert from 10ths of a second to ms
       evt.time = evt.time * 100;
 
+      /*
       if (map.has(channel.locationId)) {
         if (map.get(channel.locationId)?.has(evt.time)) {
           map.get(channel.locationId)?.get(evt.time)?.push(evt);
@@ -90,6 +91,7 @@ export class ScriptConverter {
         map.get(channel.locationId)?.set(evt.time, new Array<ScriptEvent>());
         map.get(channel.locationId)?.get(evt.time)?.push(evt);
       }
+      */
     }
   }
 

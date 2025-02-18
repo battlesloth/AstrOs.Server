@@ -6,9 +6,11 @@ import {
 } from "@storybook/angular";
 import { ScriptRowComponent } from "./script-row.component";
 import { FontAwesomeModule } from "@fortawesome/angular-fontawesome";
-import { ModuleChannelTypes, ModuleSubType, ScriptChannel, ScriptChannelType } from "astros-common";
-import { v4 as uuid_v4 } from "uuid";
+import { GpioChannel, I2cChannel, KangarooX2Channel, MaestroChannel, ModuleChannelType, ModuleChannelTypes, ModuleSubType, ScriptChannel, ScriptChannelType } from "astros-common";
+import { v4 as uuid } from "uuid";
 import { UartChannel } from "astros-common";
+import { NgFor, NgIf } from "@angular/common";
+import { FormsModule } from "@angular/forms";
 
 
 const meta: Meta<ScriptRowComponent> = {
@@ -18,7 +20,10 @@ const meta: Meta<ScriptRowComponent> = {
     decorators: [
         moduleMetadata({
             imports: [
-                FontAwesomeModule
+                FontAwesomeModule,
+                FormsModule,
+                NgIf,
+                NgFor
             ],
         }),
         applicationConfig({
@@ -33,26 +38,156 @@ export default meta;
 type Story = StoryObj<ScriptRowComponent>;
 
 export const Default: Story = {
-    args: {
-        channel: getMockChannel()
-    }
+    args: generateArgs(ModuleSubType.genericSerial)
 };
 
-function getMockChannel(): ScriptChannel {
-    return new ScriptChannel(
-        uuid_v4(),
-        uuid_v4(),
-        uuid_v4(),
-        uuid_v4(),
-        ScriptChannelType.GENERIC_UART,
-        ModuleChannelTypes.UartChannel,
-        new UartChannel(
-            uuid_v4(),
-            uuid_v4(),
-            'Test Channel',
-            ModuleSubType.genericSerial,
-            true,
-        ),
+export const MaestroServo: Story = {
+    args: generateArgs(ModuleSubType.maestro, true)
+
+};
+
+export const MaestroGpio: Story = {
+    args: generateArgs(ModuleSubType.maestro)
+
+};
+
+export const Kangaroo: Story = {
+    args: generateArgs(ModuleSubType.kangaroo)
+
+};
+
+export const HumanCyborgRelations: Story = {
+    args: generateArgs(ModuleSubType.humanCyborgRelationsSerial)
+};
+
+export const GenericI2c: Story = {
+    args: generateArgs(ModuleSubType.genericI2C)
+};
+
+export const Gpio: Story = {
+    args: generateArgs(ModuleSubType.genericGpio)
+};
+
+function generateArgs(chType: ModuleSubType, isServo: boolean = false): { channel: ScriptChannel, availableChannels: ModuleChannelType[] } {
+
+    let availableChannels: ModuleChannelType[] = [];
+    let scriptChannelType: ScriptChannelType;
+
+    switch (chType) {
+        case ModuleSubType.genericSerial: {
+            for (let i = 0; i < 10; i++) {
+                const channel = getGenericSerialChannel(i);
+                availableChannels.push(channel);
+            }
+            scriptChannelType = ScriptChannelType.GENERIC_UART;
+            break;
+        }
+        case ModuleSubType.kangaroo: {
+            for (let i = 0; i < 10; i++) {
+                const channel = getKangarooChannel(i);
+                availableChannels.push(channel);
+            }
+            scriptChannelType = ScriptChannelType.KANGAROO;
+            break;
+        }
+        case ModuleSubType.humanCyborgRelationsSerial: {
+            for (let i = 0; i < 10; i++) {
+                const channel = getHumanCyborgRelationsChannel(i);
+                availableChannels.push(channel);
+            }
+            scriptChannelType = ScriptChannelType.AUDIO;
+            break;
+        }
+        case ModuleSubType.maestro: {
+            if (isServo) {
+                for (let i = 0; i < 10; i++) {
+                    const channel = getMaestroChannelServo(i);
+                    availableChannels.push(channel);
+                }
+                scriptChannelType = ScriptChannelType.SERVO;
+            } else {
+                for (let i = 0; i < 5; i++) {
+                    const channel = getMaestroChannelOutput(i);
+                    availableChannels.push(channel);
+                }
+                for (let i = 5; i < 10; i++) {
+                    const channel = getGpioChannel(i);
+                    availableChannels.push(channel);
+                }
+                scriptChannelType = ScriptChannelType.GPIO;
+            }
+            ;
+            break;
+        }
+        case ModuleSubType.genericI2C: {
+            for (let i = 0; i < 10; i++) {
+                const channel = getGenericI2cChannel(i);
+                availableChannels.push(channel);
+            }
+            scriptChannelType = ScriptChannelType.GENERIC_I2C;
+            break;
+        }
+        case ModuleSubType.genericGpio: {
+            for (let i = 0; i < 5; i++) {
+                const channel = getGpioChannel(i);
+                availableChannels.push(channel);
+            }
+            for (let i = 5; i < 10; i++) {
+                const channel = getMaestroChannelOutput(i);
+                availableChannels.push(channel);
+            }
+            scriptChannelType = ScriptChannelType.GPIO;
+            break;
+        }
+        default: {
+            for (let i = 0; i < 10; i++) {
+                const channel = getGenericSerialChannel(i);
+                availableChannels.push(channel);
+            }
+            scriptChannelType = ScriptChannelType.GENERIC_UART;
+            break;
+        }
+    }
+
+    const channelId = uuid();
+
+    const scriptCh = new ScriptChannel(
+        channelId,
+        uuid(),
+        scriptChannelType,
+        availableChannels[4].id,
+        ModuleChannelTypes.fromSubType(availableChannels[4].moduleSubType),
+        availableChannels[4],
         300
     );
+
+    return { channel: scriptCh, availableChannels: availableChannels };
+}
+
+function getGenericSerialChannel(idx: number): UartChannel {
+    return new UartChannel(uuid(), uuid(), `Uart ${idx}`, ModuleSubType.genericSerial, true);
+}
+
+function getKangarooChannel(idx: number): KangarooX2Channel {
+    return new KangarooX2Channel(uuid(), uuid(), `Kangaroo ${idx}`, 'Channel 1', 'Channel 2');
+}
+
+function getHumanCyborgRelationsChannel(idx: number): UartChannel {
+    return new UartChannel(uuid(), uuid(), `HCR ${idx}`, ModuleSubType.humanCyborgRelationsSerial, true);
+}
+
+function getMaestroChannelServo(idx: number): MaestroChannel {
+    return new MaestroChannel(uuid(), uuid(), `Maestro Servo ${idx}`, true, 1, true, 500, 2500, 1250, true);
+}
+
+function getMaestroChannelOutput(idx: number): MaestroChannel {
+    return new MaestroChannel(uuid(), uuid(), `Maestro GPIO ${idx}`, true, 1, false, 0, 0, 0, false);
+}
+
+function getGenericI2cChannel(idx: number): I2cChannel {
+    return new I2cChannel(uuid(), uuid(), `Generic I2C ${idx}`, true);
+}
+
+function getGpioChannel(idx: number): GpioChannel {
+    return new GpioChannel(uuid(), uuid(), idx, true, `GPIO  ${idx}`, true);
 }

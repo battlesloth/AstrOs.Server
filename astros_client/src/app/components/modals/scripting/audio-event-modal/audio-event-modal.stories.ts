@@ -7,7 +7,7 @@ import {
 import { AudioEventModalComponent } from './audio-event-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
 import { AudioService } from '@src/services';
-import { AudioServiceMock } from '@src/services/audio/audio.mock';
+import { AudioServiceMock } from '@src/__mocks__/services/audio.service.mock';
 
 const meta: Meta<AudioEventModalComponent> = {
   title: 'Modals/Scripting/AudioEventModal',

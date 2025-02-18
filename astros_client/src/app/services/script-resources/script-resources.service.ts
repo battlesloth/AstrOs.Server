@@ -104,7 +104,7 @@ export class ScriptResourcesService {
 
     applyScript(script: Script){
         for (const ch of script.scriptChannels){
-            this.setChannelAvailablity(ch.channelId, ch.channelType, false);
+            this.setChannelAvailablity(ch.moduleChannelId, ch.channelType, false);
         }
     }
 

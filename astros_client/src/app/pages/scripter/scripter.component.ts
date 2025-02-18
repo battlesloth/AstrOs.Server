@@ -29,15 +29,15 @@ import {
 import EventMarkerHelper from './helper/event-marker-helper';
 import { FormsModule } from '@angular/forms';
 import { NgFor } from '@angular/common';
-import { ScriptRowComponent } from '../../components/scripting/script-row/script-row.component';
+import { ScriptRowComponent } from '@src/components/scripting';
 import {
   AudioEventModalComponent,
   ChannelTestModalComponent,
   ChannelTestModalResources,
   ChannelTestModalResponse,
-  ControllerModalComponent,
-  ControllerModalResources,
-  ControllerModalResponse,
+  AddChannelModalComponent,
+  AddChannelModalResources,
+  AddChannelModalResponse,
   GpioEventModalComponent,
   GpioEventModalResources,
   HcrModalResources,
@@ -65,7 +65,7 @@ import {
   ConfirmModalResources,
   ModalComponent,
 } from '@src/components/modals';
-import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-callback-event';
+import { ModalCallbackEvent } from '@src/components/modals/modal-base/modal-callback-event';
 import { ScriptResourcesService } from '@src/services/script-resources/script-resources.service';
 
 export interface Item {
@@ -343,7 +343,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     const modalResources = new Map<string, unknown>();
 
     modalResources.set(
-      ControllerModalResources.controllers,
+      AddChannelModalResources.controllers,
       this.scriptResources.locations,
     );
     /*modalResources.set(
@@ -355,7 +355,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       this.scriptResources.getChannelDetailsList(),
     );
     */
-    const component = this.container.createComponent(ControllerModalComponent);
+    const component = this.container.createComponent(AddChannelModalComponent);
 
     component.instance.resources = modalResources;
     component.instance.modalCallback.subscribe((evt: ModalCallbackEvent) => {
@@ -547,8 +547,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   modalCallback(evt: ModalCallbackEvent) {
     switch (evt.type) {
-      case ControllerModalResources.addChannelEvent: {
-        const value = evt.value as ControllerModalResponse;
+      case AddChannelModalResources.addChannelEvent: {
+        const value = evt.value as AddChannelModalResponse;
         this.addChannel(value.controller, value.scriptChannelType, value.channels);
         break;
       }
@@ -647,7 +647,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       this.scriptChannels.splice(chIdx, 1);
 
-      this.scriptResources.setChannelAvailablity(channel.channelId, channel.channelType, true);
+      this.scriptResources.setChannelAvailablity(channel.moduleChannelId, channel.channelType, true);
 
       this.scriptChannels.sort((a, b) => this.channelCompare(a, b));
     }
@@ -669,8 +669,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       const modalResources = new Map<string, unknown>();
 
       modalResources.set(ChannelTestModalResources.scriptChannelType, ch.channelType);
-      modalResources.set(ChannelTestModalResources.channelId, ch.channelId);
-      modalResources.set(ChannelTestModalResources.controller, ch.locationId);
+      //modalResources.set(ChannelTestModalResources.channelId, ch.channelId);
+      //modalResources.set(ChannelTestModalResources.controller, ch.locationId);
 
       const component = this.container.createComponent(
         ChannelTestModalComponent,
@@ -710,10 +710,9 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       const ch = new ScriptChannel(
         Guid.create().toString(),
-        chValue.channelId,
-        locationId,
         this.script.id,
         channelType,
+        chValue.channelId,
         ModuleChannelTypes.fromSubType(chValue.channel.moduleSubType),
         chValue.channel,
         this.segments,
@@ -814,7 +813,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   private channelCompare(a: ScriptChannel, b: ScriptChannel) {
-    let val = a.locationId.localeCompare(b.locationId);
+   /* let val = a.locationId.localeCompare(b.locationId);
 
     if (val !== 0) {
       return val;
@@ -825,7 +824,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     if (val !== 0) {
       return val;
     }
-
+*/
     return a.moduleChannel.channelName < b.moduleChannel.channelName ? -1 : 1;
   } 
 

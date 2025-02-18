@@ -1,11 +1,9 @@
 <div class="script-row-container">
     <div class="module-container">
-        <div class="title">{{channel.moduleChannel.channelName}}</div>
-        <div>{{locationName}}</div>
-        <div *ngIf="channel.channelType === 5 || channel.channelType === 6">{{uartType}}</div>
-        <div *ngIf="channel.channelType === 4 && channel.moduleChannel.id"><span>I2C Channel: </span>{{channel.moduleChannel.id}} </div>
-        <div *ngIf="channel.channelType === 1 && channel.moduleChannel.id"><span>Servo Channel: </span>{{channel.moduleChannel.id}} </div>
-        <div *ngIf="channel.channelType === 2 && channel.moduleChannel.id"><span>GPIO: </span>{{channel.moduleChannel.id}}</div>
+        <select *ngIf="channel && availableChannels" [(ngModel)]="moduleChannelId" (ngModelChange)="onModuleChannelChange($event)">
+            <option *ngFor="let ch of availableChannels" [ngValue]="ch.id">{{ch.channelName}}</option>
+        </select>
+        <div *ngIf="channel" class="subtitle">{{channelType}}</div>
         <div class="spacer"></div>
         <div class="button-bar">
             <button title="Test" (click)="test()"><fa-icon [icon]="faPlay"></fa-icon></button>

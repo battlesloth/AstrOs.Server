@@ -7,7 +7,7 @@ import {
 import { ScriptTestModalComponent } from './script-test-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
 import { ScriptsService } from '@src/services';
-import { ScriptsServiceMock } from '@src/services/scripts/scripts.mock';
+import { ScriptsServiceMock } from '@src/__mocks__/services/scripts.service.mock';
 
 const meta: Meta<ScriptTestModalComponent> = {
   title: 'Modals/Scripting/ScriptTestModal',

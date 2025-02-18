@@ -1,6 +1,5 @@
 import { Injectable } from "@angular/core";
 import { AstrOsConstants, AstrOsLocationCollection, ControllerLocation, GpioChannel, GpioModule } from "astros-common";
-//mport {  ChannelType } from "astros-common";
 import { Observable, of } from "rxjs";
 
 @Injectable({

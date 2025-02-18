@@ -8,8 +8,8 @@ import { ModulesComponent } from './modules.component';
 import { importProvidersFrom } from '@angular/core';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { ControllerService, WebsocketService } from '@src/services';
-import { ControllerServiceMock } from '@src/services/controllers/controller.mock';
-import { WebsocketMockControllersSuccess } from '@src/services/websocket/websocket.mock';
+import { ControllerServiceMock } from '@src/__mocks__/services/controller.service.mock';
+import { WebsocketMockControllersSuccess } from '@src/__mocks__/services/websocket.serivce.mock';
 
 const meta: Meta<ModulesComponent> = {
   title: 'Pages/Modules',

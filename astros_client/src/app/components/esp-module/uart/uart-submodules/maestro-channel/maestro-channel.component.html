@@ -1,6 +1,6 @@
 <div class="maestro-channel">
     <div class="label-row">
-        <div *ngIf="channel" class="label">Channel {{channel.id}}</div>
+        <div *ngIf="channel" class="label">Channel {{channel.channelNumber}}</div>
         <div class="type-select">
             <select [(ngModel)]="type" (ngModelChange)="onTypeChanged($event)">
                 <option value="0">Disabled</option>

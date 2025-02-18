@@ -20,14 +20,14 @@
     text-align: center;
     z-index: 200;
 
-
-    .title {
-        font-size: x-large;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        margin: 4px 8px;
-        padding: 0px 0px 4px 0px;
+    select {
+        width: 140px;
+        height: 30px;
+        font-size: medium;
+        margin-top: 4px;
+        margin-left: 4px;
+        margin-left: 4px;
+        margin-bottom: 10px;
     }
 
     .spacer{

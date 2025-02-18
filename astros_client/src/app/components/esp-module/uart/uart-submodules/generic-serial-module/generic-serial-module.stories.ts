@@ -1,6 +1,6 @@
 import { Meta, moduleMetadata, StoryObj } from '@storybook/angular';
 import { GenericSerialModuleComponent } from './generic-serial-module.component';
-import { UartModule, UartType } from 'astros-common';
+import { ModuleSubType, UartModule } from 'astros-common';
 
 const meta: Meta<GenericSerialModuleComponent> = {
   title: 'Modules/Uart/Submodules/GenericSerialModule',
@@ -48,7 +48,7 @@ function getSerialModule(ch: number, baudRate: number): UartModule {
     '1234',
     'Generic Serial',
     'core',
-    UartType.genericSerial,
+    ModuleSubType.genericSerial,
     ch,
     baudRate,
   );
