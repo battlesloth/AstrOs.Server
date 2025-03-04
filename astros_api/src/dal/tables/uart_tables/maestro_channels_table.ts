@@ -1,17 +1,17 @@
 export class MaestroChannelTable {
-      public static readonly table = "maestro_channels";
-      public static readonly id = "id";
-      public static readonly boardId = "boardId";
-      public static readonly channelNumber = "channelNumber";
-      public static readonly channelName = "name";
-      public static readonly enabled = "enable";
-      public static readonly isServo = "isServo";
-      public static readonly minPos = "minPos";
-      public static readonly maxPos = "maxPos";
-      public static readonly homePos = "homePos";
-      public static readonly inverted = "inverted";
+  public static readonly table = "maestro_channels";
+  public static readonly id = "id";
+  public static readonly boardId = "boardId";
+  public static readonly channelNumber = "channelNumber";
+  public static readonly channelName = "name";
+  public static readonly enabled = "enable";
+  public static readonly isServo = "isServo";
+  public static readonly minPos = "minPos";
+  public static readonly maxPos = "maxPos";
+  public static readonly homePos = "homePos";
+  public static readonly inverted = "inverted";
 
-      public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
+  public static readonly create = `CREATE TABLE IF NOT EXISTS ${this.table} (
         ${this.id} TEXT PRIMARY KEY,
         ${this.boardId} TEXT,
         ${this.channelNumber} INTEGER,
@@ -24,7 +24,7 @@ export class MaestroChannelTable {
         ${this.inverted} INTEGER DEFAULT 0 NOT NULL,
         UNIQUE(${this.boardId}, ${this.channelNumber}))`;
 
-      public static readonly insert = `INSERT INTO ${this.table} (
+  public static readonly insert = `INSERT INTO ${this.table} (
         ${this.id}
         ${this.boardId}, 
         ${this.channelNumber}, 
@@ -48,7 +48,7 @@ export class MaestroChannelTable {
         ${this.inverted} = excluded.${this.inverted}
         `;
 
-      public static readonly selectAllForBoard = `SELECT 
+  public static readonly selectAllForBoard = `SELECT 
         ${this.id},
         ${this.channelNumber},
         ${this.channelName},
@@ -61,7 +61,7 @@ export class MaestroChannelTable {
         FROM ${this.table}
         WHERE ${this.boardId} = ?`;
 
-      public static readonly select = `SELECT
+  public static readonly select = `SELECT
         ${this.id},
         ${this.boardId},
         ${this.channelNumber},
@@ -76,5 +76,5 @@ export class MaestroChannelTable {
         WHERE ${this.id} = ?
         AND ${this.boardId} = ?`;
 
-      public static readonly deleteByBoardId = `DELETE FROM ${this.table} WHERE ${this.boardId} = ?`;
+  public static readonly deleteByBoardId = `DELETE FROM ${this.table} WHERE ${this.boardId} = ?`;
 }

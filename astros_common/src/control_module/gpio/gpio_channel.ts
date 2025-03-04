@@ -11,15 +11,15 @@ export class GpioChannel extends BaseChannel {
     channelid: number,
     enabled: boolean,
     channelName: string,
-    defaultLow: boolean,    
+    defaultLow: boolean,
   ) {
     super(
-      id, 
+      id,
       parentId,
       channelName,
       ModuleType.gpio,
-      ModuleSubType.genericGpio, 
-      enabled
+      ModuleSubType.genericGpio,
+      enabled,
     );
     this.channelId = channelid;
     this.defaultLow = defaultLow;

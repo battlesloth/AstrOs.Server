@@ -2,7 +2,7 @@ import {
   applicationConfig,
   Meta,
   StoryObj,
-  moduleMetadata
+  moduleMetadata,
 } from '@storybook/angular';
 import { importProvidersFrom } from '@angular/core';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -38,7 +38,12 @@ export const Default: Story = {
 };
 
 function getControllerLocation(): ControllerLocation {
-  const loc = new ControllerLocation(uuid(), 'core', 'Test Location', 'fingerptint');
+  const loc = new ControllerLocation(
+    uuid(),
+    'core',
+    'Test Location',
+    'fingerptint',
+  );
 
   return loc;
 }

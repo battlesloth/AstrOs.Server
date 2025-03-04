@@ -40,14 +40,13 @@ export class MaestroBoardsTable {
         FROM ${this.table}
         WHERE ${this.parentId} = ?`;
 
-      public static readonly getUartModuleForBoard = `SELECT
+  public static readonly getUartModuleForBoard = `SELECT
         u.${UartModuleTable.id} as id,
         u.${UartModuleTable.baudRate} as baudRate,
         u.${UartModuleTable.uartChannel} as uartChannel
         FROM ${UartModuleTable.table} u
         JOIN ${this.table} m ON m.${this.parentId} = u.${UartModuleTable.id}
         WHERE m.${this.id} = ?`;
-
 
   public static readonly deleteByParent = `DELETE FROM ${this.table} WHERE ${this.parentId} = ?`;
 }

@@ -25,7 +25,7 @@ export class GpioEventModalComponent
   extends BaseEventModalComponent
   implements OnInit
 {
-  channelId!: number;
+  channelId!: string;
   state = 0;
 
   constructor() {
@@ -54,12 +54,11 @@ export class GpioEventModalComponent
 
     this.channelId = this.resources.get(
       GpioEventModalResources.gpioId,
-    ) as number;
+    ) as string;
 
-    if (this.scriptEvent.dataJson != '') {
-      const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.state = payload.setHigh ? 1 : 0;
-    }
+    const temp = this.scriptEvent.event as GpioEvent;
+
+    this.state = temp.setHigh ? 1 : 0;
 
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;
@@ -77,12 +76,7 @@ export class GpioEventModalComponent
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const data = new GpioEvent(
-      +this.channelId,
-      +this.state === 1 ? true : false,
-    );
-
-    this.scriptEvent.dataJson = JSON.stringify(data);
+    this.scriptEvent.event = new GpioEvent(+this.state === 1 ? true : false);
 
     const evt = new ModalCallbackEvent(this.callbackType, {
       scriptEvent: this.scriptEvent,

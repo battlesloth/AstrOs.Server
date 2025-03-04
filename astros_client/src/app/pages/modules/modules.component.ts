@@ -366,46 +366,35 @@ export class ModulesComponent implements AfterViewInit {
         );
         break;
       case ModuleSubType.maestro:
-        module.subModule = this.generateMaestroModule(module.id, module.uartChannel, module.baudRate);
+        module.subModule = this.generateMaestroModule(module.id);
         break;
     }
 
     controller.uartModules.push(module);
   }
 
-
-  generateMaestroModule(moduleId: string, uartChannel: number, baud: number) {
-
+  generateMaestroModule(moduleId: string) {
     const subModule = new MaestroModule();
 
     const boardId = crypto.randomUUID();
 
-    subModule.boards = [
-      new MaestroBoard(
-        boardId,
-        moduleId,
-        0,
-        'Board 1',
-        24
-      )
-    ]
+    subModule.boards = [new MaestroBoard(boardId, moduleId, 0, 'Board 1', 24)];
 
     for (let i = 0; i < 24; i++) {
-     
       const idx = i + 1;
       subModule.boards[0].channels.push(
         new MaestroChannel(
           crypto.randomUUID(),
           subModule.boards[0].id,
-         `Channel ${i + idx}`, 
+          `Channel ${i + idx}`,
           false,
           idx,
           false,
           500,
           2500,
           1250,
-          false
-        )
+          false,
+        ),
       );
     }
 
@@ -433,7 +422,7 @@ export class ModulesComponent implements AfterViewInit {
 
     if (!controller) {
       return;
-    } 
+    }
 
     const nextAddress = this.getNextI2CAddress(controller.i2cModules);
 
@@ -656,7 +645,6 @@ export class ModulesComponent implements AfterViewInit {
     }
   }
 
-
   private getControllerLocationById(id: string): ControllerLocation | null {
     if (this.coreLocation.id === id) {
       return this.coreLocation;
@@ -669,8 +657,9 @@ export class ModulesComponent implements AfterViewInit {
     }
   }
 
-
-  private getControllerLocationByLocationId(locationId: string): ControllerLocation {
+  private getControllerLocationByLocationId(
+    locationId: string,
+  ): ControllerLocation {
     switch (locationId) {
       case AstrOsConstants.BODY:
         return this.bodyLocation;

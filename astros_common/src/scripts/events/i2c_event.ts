@@ -1,9 +1,7 @@
 export class I2cEvent {
-  channelId: number;
   message: string;
 
-  constructor(channelId: number, message: string) {
-    this.channelId = channelId;
+  constructor(message: string) {
     this.message = message;
   }
 }

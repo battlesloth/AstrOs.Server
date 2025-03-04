@@ -60,10 +60,7 @@ export class AudioEventModalComponent
       ScriptEventModalResources.scriptEvent,
     ) as ScriptEvent;
 
-    if (this.scriptEvent.dataJson != '') {
-      const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.selectedFile = payload.value;
-    }
+    this.selectedFile = 'not implemented';
 
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;
@@ -76,7 +73,6 @@ export class AudioEventModalComponent
     }
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
-    this.scriptEvent.dataJson = JSON.stringify({ value: this.selectedFile });
 
     const evt = new ModalCallbackEvent(this.callbackType, {
       id: this.callbackType,

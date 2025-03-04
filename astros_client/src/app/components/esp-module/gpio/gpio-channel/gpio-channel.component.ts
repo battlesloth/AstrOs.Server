@@ -5,12 +5,9 @@ import { GpioChannel } from 'astros-common';
 
 @Component({
   selector: 'app-gpio-channel',
-  imports: [
-    FormsModule,
-    MatCheckboxModule
-  ],
+  imports: [FormsModule, MatCheckboxModule],
   templateUrl: './gpio-channel.component.html',
-  styleUrl: './gpio-channel.component.scss'
+  styleUrl: './gpio-channel.component.scss',
 })
 export class GpioChannelComponent {
   @Input()

@@ -26,17 +26,9 @@ export class HcrCommand {
 }
 
 export class HumanCyborgRelationsEvent {
-  uartChannel: number;
-  baudRate: number;
   commands: Array<HcrCommand>;
 
-  constructor(
-    uartChannel: number,
-    baudRate: number,
-    commands: Array<HcrCommand>,
-  ) {
-    this.uartChannel = uartChannel;
-    this.baudRate = baudRate;
+  constructor(commands: Array<HcrCommand>) {
     this.commands = commands;
   }
 }

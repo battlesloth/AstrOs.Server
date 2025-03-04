@@ -1,6 +1,6 @@
 import { Meta, moduleMetadata, StoryObj } from '@storybook/angular';
 import { KangarooModuleComponent } from './kangaroo-module.component';
-import {  KangarooX2 as KX2, ModuleSubType, UartModule } from 'astros-common';
+import { KangarooX2 as KX2, ModuleSubType, UartModule } from 'astros-common';
 
 const meta: Meta<KangarooModuleComponent> = {
   title: 'Modules/Uart/Submodules/KangarooModule',
@@ -31,7 +31,6 @@ function getSerialModule(ch: number, baudRate: number): UartModule {
     ModuleSubType.kangaroo,
     ch,
     baudRate,
-
   );
 
   module.subModule = new KX2('', 'Lifter', 'Spinner');

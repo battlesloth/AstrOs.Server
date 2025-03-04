@@ -1,5 +1,5 @@
 import { ScriptChannelType } from "../astros_enums";
-import { ModuleChannelType} from "../control_module/base_channel";
+import { ModuleChannelType } from "../control_module/base_channel";
 import { ScriptEvent } from "./script_event";
 
 export interface EventKVP {
@@ -15,7 +15,7 @@ export class ScriptChannel {
   moduleChannelType: string;
   moduleChannel: ModuleChannelType;
   maxDuration: number;
-  
+
   events: Map<number, ScriptEvent>;
   eventsKvpArray: Array<EventKVP>;
 
@@ -29,7 +29,7 @@ export class ScriptChannel {
     maxDuration: number,
   ) {
     this.id = id;
-    
+
     this.scriptId = scriptId;
     this.channelType = channelType;
     this.moduleChannelId = moduleChannelId;

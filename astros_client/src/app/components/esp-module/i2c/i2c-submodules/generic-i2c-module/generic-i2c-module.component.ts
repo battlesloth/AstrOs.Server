@@ -5,21 +5,17 @@ import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-generic-i2c-module',
-  imports: [
-    FormsModule,
-    NgIf,
-    NgFor
-  ],
+  imports: [FormsModule, NgIf, NgFor],
   templateUrl: './generic-i2c-module.component.html',
   styleUrls: [
     '../base-i2c-sub-module/base-i2c-sub-module.component.scss',
-    './generic-i2c-module.component.scss'
-  ]
+    './generic-i2c-module.component.scss',
+  ],
 })
 export class GenericI2cModuleComponent
   extends BaseI2cSubModuleComponent
-  implements OnInit {
-
+  implements OnInit
+{
   ngOnInit(): void {
     if (this.module) {
       this.i2cAddress = this.module.i2cAddress.toString();

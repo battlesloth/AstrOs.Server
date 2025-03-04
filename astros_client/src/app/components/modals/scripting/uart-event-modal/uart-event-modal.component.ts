@@ -63,10 +63,8 @@ export class UartEventModalComponent
       UartEventModalResources.scriptEvent,
     ) as ScriptEvent;
 
-    if (this.scriptEvent.dataJson != '') {
-      const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.eventValue = payload.value;
-    }
+    const temp = this.scriptEvent.event as GenericSerialEvent;
+    this.eventValue = temp.value;
 
     this.originalEventTime = this.scriptEvent.time;
     this.eventTime = this.scriptEvent.time;
@@ -79,9 +77,7 @@ export class UartEventModalComponent
     }
 
     this.scriptEvent.time = +this.eventTime;
-    this.scriptEvent.dataJson = JSON.stringify(
-      new GenericSerialEvent(this.uartChannel, this.baudRate, this.eventValue),
-    );
+    this.scriptEvent.event = new GenericSerialEvent(this.eventValue);
 
     const evt = new ModalCallbackEvent(this.callbackType, {
       scriptEvent: this.scriptEvent,

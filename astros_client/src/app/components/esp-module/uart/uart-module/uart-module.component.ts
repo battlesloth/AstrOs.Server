@@ -15,11 +15,7 @@ import {
   MatExpansionPanelHeader,
   MatExpansionPanelTitle,
 } from '@angular/material/expansion';
-import { 
-  ModuleType,
-  ModuleSubType, 
-  UartModule
-} from 'astros-common';
+import { ModuleType, ModuleSubType, UartModule } from 'astros-common';
 import { GenericSerialModuleComponent } from '../uart-submodules/generic-serial-module/generic-serial-module.component';
 import { KangarooModuleComponent } from '../uart-submodules/kangaroo-module/kangaroo-module.component';
 import { MaestroModuleComponent } from '../uart-submodules/maestro-module/maestro-module.component';

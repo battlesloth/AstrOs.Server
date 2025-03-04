@@ -3,33 +3,32 @@ import { ScriptChannelType } from 'astros-common';
 import { ModalBaseComponent } from '../../modal-base/modal-base.component';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 import { FormsModule } from '@angular/forms';
-import { NgFor, NgIf, KeyValuePipe } from '@angular/common';
-import { 
-  LocationDetails, 
-  ChannelDetails 
-} from '@src/models/scripting';
+import { NgFor, NgIf } from '@angular/common';
+import { LocationDetails, ChannelDetails } from '@src/models/scripting';
 
 export class AddChannelModalResources {
   public static controllers = 'controllers';
   public static modules = 'modules';
   public static channels = 'channels';
 
-  public static addChannelEvent = 'controller_addChannel';
-  public static removeChannelEvent = 'controller_removeChannel';
+  public static addChannelEvent = 'addChannelModal_addChannel';
   public static closeEvent = 'controller_close';
 }
 
+interface scriptChannelType {
+  id: ScriptChannelType;
+  name: string;
+}
+
 export interface AddChannelModalResponse {
-  controller: string;
-  scriptChannelType: ScriptChannelType;
-  channels: string[];
+  channels: Map<ScriptChannelType, string[]>;
 }
 
 @Component({
   selector: 'app-add-channel-modal',
   templateUrl: './add-channel-modal.component.html',
   styleUrls: ['./add-channel-modal.component.scss'],
-  imports: [FormsModule, NgFor, NgIf, KeyValuePipe],
+  imports: [FormsModule, NgFor, NgIf],
 })
 export class AddChannelModalComponent
   extends ModalBaseComponent
@@ -37,14 +36,21 @@ export class AddChannelModalComponent
 {
   errorMessage: string;
 
-  controllers!: Map<number, LocationDetails>;
-  selectedController = 0;
+  controllers!: LocationDetails[];
+  selectedController = '_any_';
 
-  private availableModules!: Map<number, Map<ScriptChannelType, string>>;
-  modules: Map<ScriptChannelType, string>;
-  selectedModule: ScriptChannelType = ScriptChannelType.NONE;
+  channelTypes: scriptChannelType[] = [
+    { id: ScriptChannelType.NONE, name: 'Any Channel Type' },
+    { id: ScriptChannelType.AUDIO, name: 'Audio Channels' },
+    { id: ScriptChannelType.GPIO, name: 'GPIO Channels' },
+    { id: ScriptChannelType.GENERIC_I2C, name: 'I2C Channels' },
+    { id: ScriptChannelType.KANGAROO, name: 'KangarooX2 Channels' },
+    { id: ScriptChannelType.GENERIC_UART, name: 'Serial Channels' },
+    { id: ScriptChannelType.SERVO, name: 'Servo Channels' },
+  ];
+  selectedChannelType: ScriptChannelType = ScriptChannelType.NONE;
 
-  private availableChannels!: Map<number, Map<ScriptChannelType, ChannelDetails[]>>;
+  private availableChannels!: Map<ScriptChannelType, ChannelDetails[]>;
   channels: ChannelDetails[];
   selectedChannel = -1;
   selectedChannels: unknown[] = [];
@@ -53,58 +59,70 @@ export class AddChannelModalComponent
     super();
 
     this.errorMessage = '';
-
-    this.modules = new Map<ScriptChannelType, string>();
     this.channels = new Array<ChannelDetails>();
   }
 
   ngOnInit(): void {
     this.controllers = this.resources.get(
       AddChannelModalResources.controllers,
-    ) as Map<number, LocationDetails>;
-    this.availableModules = this.resources.get(
-      AddChannelModalResources.modules,
-    ) as Map<number, Map<ScriptChannelType, string>>;
+    ) as LocationDetails[];
+
+    this.controllers.unshift({ id: '_any_', name: 'Any Controller' });
+
     this.availableChannels = this.resources.get(
       AddChannelModalResources.channels,
-    ) as Map<number, Map<ScriptChannelType, ChannelDetails[]>>;
+    ) as Map<ScriptChannelType, ChannelDetails[]>;
+
+    this.fliterAvailableChannels();
   }
 
-  modalChange($event: Event) {
-    // convert from string value to number for enum
-    if (($event.target as HTMLInputElement).id === 'controller-select') {
-      this.setModules(+($event.target as HTMLInputElement).value);
-    } else if (($event.target as HTMLInputElement).id === 'module-select') {
-      this.setChannels(+($event.target as HTMLInputElement).value);
+  modalChanged(_: Event) {
+    this.fliterAvailableChannels();
+  }
+
+  fliterAvailableChannels() {
+    this.channels = [];
+
+    if (this.selectedChannelType !== ScriptChannelType.NONE) {
+      const temp = this.availableChannels.get(+this.selectedChannelType);
+
+      if (temp) {
+        this.channels = [...temp];
+      }
+    } else {
+      for (const val of this.availableChannels.values()) {
+        this.channels = [...this.channels, ...val];
+      }
     }
+
+    if (this.selectedController !== '_any_') {
+      this.channels = this.channels.filter(
+        (x) => x.locationId === this.selectedController,
+      );
+    }
+
+    this.channels = this.channels.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   addChannel() {
-    if (
-      +this.selectedController !== 4 &&
-      +this.selectedModule === ScriptChannelType.NONE
-    ) {
-      this.errorMessage = 'Module Selection Required';
-      return;
-    }
+    const toAdd = new Map<ScriptChannelType, string[]>();
 
-    if (
-      +this.selectedModule !== ScriptChannelType.NONE &&
-      +this.selectedChannels.length < 1
-    ) {
-      this.errorMessage = 'Channel Selection Required';
-      return;
+    for (const channel of this.selectedChannels) {
+      const channelDetails = this.channels.find((x) => x.id === channel);
+
+      if (channelDetails) {
+        if (!toAdd.has(channelDetails.scriptChannelType)) {
+          toAdd.set(channelDetails.scriptChannelType, []);
+        }
+
+        toAdd.get(channelDetails.scriptChannelType)?.push(channelDetails.id);
+      }
     }
 
     const evt = new ModalCallbackEvent(
       AddChannelModalResources.addChannelEvent,
       {
-        controller: +this.selectedController,
-        module:
-          +this.selectedController === 4
-            ? ScriptChannelType.AUDIO
-            : +this.selectedModule,
-        channels: this.selectedChannels,
+        channels: toAdd,
       },
     );
 
@@ -122,52 +140,8 @@ export class AddChannelModalComponent
   }
 
   private clearOptions() {
-    this.selectedController = 0;
-    this.selectedModule = ScriptChannelType.NONE;
+    this.selectedController = '_any_';
+    this.selectedChannelType = ScriptChannelType.NONE;
     this.selectedChannel = -1;
-    document
-      .getElementById('module-select')
-      ?.setAttribute('disabled', 'disabled');
-    document
-      .getElementById('channel-select')
-      ?.setAttribute('disabled', 'disabled');
-  }
-
-  private setModules(controllerId: number) {
-    if (controllerId === 4) {
-      this.selectedModule = ScriptChannelType.NONE;
-      this.selectedChannel = -1;
-      document
-        .getElementById('module-select')
-        ?.setAttribute('disabled', 'disabled');
-      document
-        .getElementById('channel-select')
-        ?.setAttribute('disabled', 'disabled');
-    } else {
-      const mods = this.availableModules.get(+this.selectedController);
-      if (mods) {
-        this.modules = mods;
-        document.getElementById('module-select')?.removeAttribute('disabled');
-        //this.selectedModule = ChannelType.none;
-        this.setChannels(this.selectedModule);
-      }
-    }
-  }
-
-  private setChannels(channelType: ScriptChannelType) {
-    if (channelType === ScriptChannelType.NONE) {
-      this.selectedChannel = -1;
-      document
-        .getElementById('channel-select')
-        ?.setAttribute('disabled', 'disabled');
-    } else {
-      const chs = this.availableChannels
-        .get(+this.selectedController)
-        ?.get(+channelType);
-      if (chs) {
-        this.channels = chs;
-        document.getElementById('channel-select')?.removeAttribute('disabled');
-      }
-    }
   }
 }

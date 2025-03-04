@@ -6,16 +6,11 @@ import { MaestroChannel } from 'astros-common';
 
 @Component({
   selector: 'app-maestro-channel',
-  imports: [
-    ServoSettingsComponent,
-    FormsModule,
-    NgIf
-  ],
+  imports: [ServoSettingsComponent, FormsModule, NgIf],
   templateUrl: './maestro-channel.component.html',
   styleUrl: './maestro-channel.component.scss',
 })
-export class MaestroChannelComponent
- implements AfterContentInit {
+export class MaestroChannelComponent implements AfterContentInit {
   @Input() channel!: MaestroChannel;
 
   type = '0';

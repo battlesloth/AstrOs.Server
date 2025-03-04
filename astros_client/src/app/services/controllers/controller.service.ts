@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
-import { AstrOsLocationCollection, ModuleType, ScriptChannelType } from 'astros-common';
+import { AstrOsLocationCollection, ScriptChannelType } from 'astros-common';
 
 @Injectable({
   providedIn: 'root',

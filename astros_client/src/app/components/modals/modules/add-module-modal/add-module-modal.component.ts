@@ -36,7 +36,7 @@ export class AddModuleModalComponent
 {
   options: ModuleSubTypeSelection[] = [];
 
-  locationId = "0";
+  locationId = '0';
   moduleType: ModuleType = ModuleType.none;
   selectedSubType: ModuleSubType = ModuleSubType.none;
 

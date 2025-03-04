@@ -23,7 +23,7 @@ export class BaseChannel {
 
   moduleType: ModuleType;
   moduleSubType: ModuleSubType;
-  
+
   constructor(
     id: string,
     parentId: string,

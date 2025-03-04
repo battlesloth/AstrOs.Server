@@ -8,9 +8,8 @@ describe('GenericI2cModuleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GenericI2cModuleComponent]
-    })
-    .compileComponents();
+      imports: [GenericI2cModuleComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(GenericI2cModuleComponent);
     component = fixture.componentInstance;

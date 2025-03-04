@@ -59,12 +59,11 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
 
   scripts: Script[];
 
-  locations =
-  [
+  locations = [
     AstrOsConstants.BODY,
     AstrOsConstants.CORE,
-    AstrOsConstants.DOME
-  ]
+    AstrOsConstants.DOME,
+  ];
 
   constructor(
     private router: Router,
@@ -119,10 +118,7 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     this.initialStatusSet = true;
   }
 
-  updateUploadStatusElement(
-    locationId: string,
-    scriptId: string,
-  ): void {
+  updateUploadStatusElement(locationId: string, scriptId: string): void {
     const el = document.getElementById(`${scriptId}_${locationId}`);
     if (el === null) {
       return;
@@ -133,7 +129,9 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     el.classList.remove('uploading');
     el.classList.add(status.s);
 
-    const toolTip = document.getElementById(`${scriptId}_${locationId}_tooltip`);
+    const toolTip = document.getElementById(
+      `${scriptId}_${locationId}_tooltip`,
+    );
     if (toolTip === null) {
       return;
     }
@@ -326,10 +324,7 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
       this.setUploadDate(msg.scriptId, msg.locationId, msg.date);
     }
 
-    this.updateUploadStatusElement(
-      msg.locationId,
-      msg.scriptId,
-    );
+    this.updateUploadStatusElement(msg.locationId, msg.scriptId);
   }
 
   getUploadStatus(id: string, locationId: string): { s: string; d: string } {

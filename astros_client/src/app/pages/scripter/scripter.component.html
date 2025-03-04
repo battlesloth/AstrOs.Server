@@ -11,7 +11,7 @@
             <button (click)="saveBeforeTest()">Test</button>
         </div>
     </div>
-    <div id="scripter-container" class="scripter-container">
+    <div *ngIf="scriptResources.loaded" id="scripter-container" class="scripter-container">
         <div  class="scripter-body">
             <div class="scripter-header">
                 <div class="scripter-module-header" 
@@ -25,6 +25,8 @@
                 (timelineCallback)="timelineCallback($event)"
                 (removeCallback)="removeCallback($event)"
                 (channelTestCallback)="channelTestCallback($event)"
+                (moduleChannelChanged)="moduleChannelChanged($event)"
+                [availableChannels]="getSelectableChannels(ch.channelType)"
                 [channel]="ch"></app-script-row>
         </div>
 

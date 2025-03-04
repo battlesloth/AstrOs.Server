@@ -111,10 +111,9 @@ export class HumanCyborgModalComponent
       HcrModalResources.scriptEvent,
     ) as ScriptEvent;
 
-    if (this.scriptEvent.dataJson != '') {
-      const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.selectedCommands.push(...payload.commands);
-    }
+    const temp = this.scriptEvent.event as HumanCyborgRelationsEvent;
+
+    this.selectedCommands.push(...temp.commands);
 
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;
@@ -262,13 +261,9 @@ export class HumanCyborgModalComponent
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const data = new HumanCyborgRelationsEvent(
-      this.uartChannel,
-      this.baudRate,
-      this.selectedCommands,
-    );
+    const data = new HumanCyborgRelationsEvent(this.selectedCommands);
 
-    this.scriptEvent.dataJson = JSON.stringify(data);
+    this.scriptEvent.event = data;
 
     const evt = new ModalCallbackEvent(this.callbackType, {
       scriptEvent: this.scriptEvent,

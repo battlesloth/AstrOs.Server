@@ -19,7 +19,14 @@ export class PwmChannel extends BaseChannel {
     homePos: number,
     inverted: boolean,
   ) {
-    super(id, parentId, channelName, ModuleType.i2c, ModuleSubType.pwmBoard, enabled);
+    super(
+      id,
+      parentId,
+      channelName,
+      ModuleType.i2c,
+      ModuleSubType.pwmBoard,
+      enabled,
+    );
     this.channelId = channelId;
     this.minPos = minPos;
     this.maxPos = maxPos;

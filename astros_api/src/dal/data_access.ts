@@ -164,7 +164,10 @@ export class DataAccess {
 
     await this.createTable(MaestroBoardsTable.table, MaestroBoardsTable.create);
 
-    await this.createTable(MaestroChannelTable.table, MaestroChannelTable.create);
+    await this.createTable(
+      MaestroChannelTable.table,
+      MaestroChannelTable.create,
+    );
 
     await this.createTable(I2cModuleTable.table, I2cModuleTable.create);
 

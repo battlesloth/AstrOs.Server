@@ -98,16 +98,14 @@ export class KangarooEventModalComponent
       KangarooEventModalResources.scriptEvent,
     ) as ScriptEvent;
 
-    if (this.scriptEvent.dataJson != '') {
-      const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.ch1Action = payload.ch1Action.toString();
-      this.ch1Speed = payload.ch1Speed;
-      this.ch1Position = payload.ch1Position;
+    const temp = this.scriptEvent.event as KangarooEvent;
+    this.ch1Action = temp.ch1Action.toString();
+    this.ch1Speed = temp.ch1Speed;
+    this.ch1Position = temp.ch1Position;
 
-      this.ch2Action = payload.ch2Action.toString();
-      this.ch2Speed = payload.ch2Speed;
-      this.ch2Position = payload.ch2Position;
-    }
+    this.ch2Action = temp.ch2Action.toString();
+    this.ch2Speed = temp.ch2Speed;
+    this.ch2Position = temp.ch2Position;
 
     this.ch1SpdDisabled =
       +this.ch1Action !== KangarooAction.speed &&
@@ -156,8 +154,6 @@ export class KangarooEventModalComponent
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
     const data = new KangarooEvent(
-      this.uartChannel,
-      this.baudRate,
       +this.ch1Action,
       this.ch1Speed ?? 0,
       this.ch1Position ?? 0,
@@ -166,7 +162,7 @@ export class KangarooEventModalComponent
       this.ch2Position ?? 0,
     );
 
-    this.scriptEvent.dataJson = JSON.stringify(data);
+    this.scriptEvent.event = data;
 
     const evt = new ModalCallbackEvent(this.callbackType, {
       scriptEvent: this.scriptEvent,

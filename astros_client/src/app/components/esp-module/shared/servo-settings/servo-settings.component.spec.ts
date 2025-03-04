@@ -8,9 +8,8 @@ describe('ServoSettingsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ServoSettingsComponent]
-    })
-    .compileComponents();
+      imports: [ServoSettingsComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(ServoSettingsComponent);
     component = fixture.componentInstance;

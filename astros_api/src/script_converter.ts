@@ -165,15 +165,15 @@ export class ScriptConverter {
     evt: ScriptEvent,
     timeTillNextEvent: number,
   ): string {
-    const serial = JSON.parse(evt.dataJson) as GenericSerialEvent;
+    const serial = evt.event as GenericSerialEvent;
 
-    return `${CommandType.genericSerial}|${timeTillNextEvent}|${serial.uartChannel}|${serial.value};`;
+    return `${CommandType.genericSerial}|${timeTillNextEvent}|fixeme|${serial.value};`;
   }
 
   // |___|_________|___________|___________;
   //  evt time_till serial ch   msg
   convertHcrEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
-    const hcr = JSON.parse(evt.dataJson) as HumanCyborgRelationsEvent;
+    const hcr = evt.event as HumanCyborgRelationsEvent;
 
     let val = "<";
 
@@ -198,7 +198,7 @@ export class ScriptConverter {
 
     val += ">";
 
-    return `${CommandType.genericSerial}|${timeTillNextEvent}|${hcr.uartChannel}|${val};`;
+    return `${CommandType.genericSerial}|${timeTillNextEvent}|fixme|${val};`;
   }
 
   // |___|_________|__________|___|____|____|____;
@@ -206,13 +206,13 @@ export class ScriptConverter {
   convertKangarooEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
     let command = "";
 
-    const kangaroo = JSON.parse(evt.dataJson) as KangarooEvent;
+    const kangaroo = evt.event as KangarooEvent;
 
     if (kangaroo.ch1Action != KangarooAction.none) {
       const evtTime =
         kangaroo.ch2Action === KangarooAction.none ? timeTillNextEvent : 0;
 
-      command = `${CommandType.kangaroo}|${evtTime}|${kangaroo.uartChannel}|${1}|${kangaroo.ch1Action}|${kangaroo.ch1Speed}|${kangaroo.ch1Position};`;
+      command = `${CommandType.kangaroo}|${evtTime}|fixme|${1}|${kangaroo.ch1Action}|${kangaroo.ch1Speed}|${kangaroo.ch1Position};`;
       //this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position,
       // if the ch2 action is none, use timeTill. Otherwise we have 2 actions for the
       // same time period, so don't delay untill after second action is done.
@@ -220,7 +220,7 @@ export class ScriptConverter {
     if (kangaroo.ch2Action != KangarooAction.none) {
       command =
         command +
-        `${CommandType.kangaroo}|${timeTillNextEvent}|${kangaroo.uartChannel}|${2}|${kangaroo.ch2Action}|${kangaroo.ch2Speed}|${kangaroo.ch2Position};`;
+        `${CommandType.kangaroo}|${timeTillNextEvent}|fixme|${2}|${kangaroo.ch2Action}|${kangaroo.ch2Speed}|${kangaroo.ch2Position};`;
       //this.convertChannelEvent(2, evt.ch2Action, evt.ch2Speed, evt.ch2Position, timeTill);
     }
 
@@ -230,24 +230,24 @@ export class ScriptConverter {
   // |___|_________|___|____|____;
   //  evt time_till ch  spd  pos
   convertMaestroEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
-    const servo = JSON.parse(evt.dataJson) as MaestroEvent;
+    const servo = evt.event as MaestroEvent;
 
-    return `${CommandType.servo}|${timeTillNextEvent}|${servo.channelId}|${servo.position}|${servo.speed}|${servo.acceleration};`;
+    return `${CommandType.servo}|${timeTillNextEvent}|fixme|${servo.position}|${servo.speed}|${servo.acceleration};`;
   }
 
   // |___|_________|___|________;
   //  evt time_till ch   msg
   convertI2cEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
-    const i2c = JSON.parse(evt.dataJson) as I2cEvent;
+    const i2c = evt.event as I2cEvent;
 
-    return `${CommandType.i2c}|${timeTillNextEvent}|${i2c.channelId}|${i2c.message};`;
+    return `${CommandType.i2c}|${timeTillNextEvent}|fixme|${i2c.message};`;
   }
 
   // |___|_________|___|____;
   //  evt time_till ch  val
   convertGpioEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
-    const gpio = JSON.parse(evt.dataJson) as GpioEvent;
+    const gpio = evt.event as GpioEvent;
 
-    return `${CommandType.gpio}|${timeTillNextEvent}|${gpio.channelId}|${gpio.setHigh ? 1 : 0};`;
+    return `${CommandType.gpio}|${timeTillNextEvent}|fixme|${gpio.setHigh ? 1 : 0};`;
   }
 }

@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ScriptEvent } from 'astros-common';
+import { MaestroEvent, ModuleSubType, ScriptEvent } from 'astros-common';
 import {
   BaseEventModalComponent,
   ScriptEventModalResources,
@@ -26,7 +26,6 @@ export class ServoEventModalComponent
   extends BaseEventModalComponent
   implements OnInit
 {
-  channelId!: number;
   speed: number;
   position: number;
   acceleration: number;
@@ -57,17 +56,11 @@ export class ServoEventModalComponent
       ServoEventModalResources.scriptEvent,
     ) as ScriptEvent;
 
-    this.channelId = this.resources.get(
-      ServoEventModalResources.servoId,
-    ) as number;
-
-    if (this.scriptEvent.dataJson != '') {
-      console.log(this.scriptEvent.dataJson);
-      const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.channelId = payload.channelId;
-      this.position = payload.position;
-      this.speed = payload.speed;
-      this.acceleration = payload.acceleration;
+    if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+      const temp = this.scriptEvent.event as MaestroEvent;
+      this.position = temp.position;
+      this.speed = temp.speed;
+      this.acceleration = temp.acceleration;
     }
 
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
@@ -82,8 +75,13 @@ export class ServoEventModalComponent
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    //const data = new ServoEvent(+this.channelId, +this.position, +this.speed, +this.acceleration);
-    //this.scriptEvent.dataJson = JSON.stringify(data);
+    const data = new MaestroEvent(
+      true,
+      this.position,
+      this.speed,
+      this.acceleration,
+    );
+    this.scriptEvent.event = data;
 
     const evt = new ModalCallbackEvent(this.callbackType, {
       scriptEvent: this.scriptEvent,

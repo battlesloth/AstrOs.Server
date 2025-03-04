@@ -5,7 +5,7 @@ import {
   MaestroChannel,
   MaestroModule,
   ModuleSubType,
-  UartModule
+  UartModule,
 } from 'astros-common';
 import { v4 as uuid } from 'uuid';
 
@@ -47,7 +47,11 @@ export const With6Channels: Story = {
   },
 };
 
-function getSerialModule(ch: number, baudRate: number, channelCount: number): UartModule {
+function getSerialModule(
+  ch: number,
+  baudRate: number,
+  channelCount: number,
+): UartModule {
   const module = new UartModule(
     '1234',
     'Maestro',
@@ -61,19 +65,18 @@ function getSerialModule(ch: number, baudRate: number, channelCount: number): Ua
   subModule.boards[0] = getMaestroBoard(module.id, channelCount);
   module.subModule = subModule;
 
-  console.log('sub',subModule)
+  console.log('sub', subModule);
   return module;
 }
 
 function getMaestroBoard(parentId: string, channelCount: number): MaestroBoard {
   const board = new MaestroBoard('1234', parentId, 0, '', channelCount);
-  
+
   for (let i = 0; i < 24; i++) {
-    
     const idx = i + 1;
     const enabled = idx % 3 !== 0;
-    const servo = (idx % 2 ===0 && idx % 3 !== 0);
-    
+    const servo = idx % 2 === 0 && idx % 3 !== 0;
+
     board.channels.push(
       getMaestroChannel(board.id, idx, `Channel ${i + idx}`, enabled, servo),
     );

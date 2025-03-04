@@ -2,23 +2,18 @@
     <h1>Select Channel</h1>
     <div class="modal-body">
         <select id="controller-select" title="Contoller" [(ngModel)]="selectedController"
-            (change)="modalChange($event)">
-            <option value="0" disabled selected>Select Contoller</option>
-            <option *ngFor="let kv of controllers | keyvalue" value="{{kv.key}}">{{kv.value.name}}
+            (change)="modalChanged($event)">
+            <option *ngFor="let c of controllers" value="{{c.id}}">{{c.name}}
             </option>
         </select>
-        <select id="module-select" title="Module" disabled [(ngModel)]="selectedModule"
-            (change)="modalChange($event)">
-            <option value="0" disabled selected>Select Module</option>
-            <option *ngFor="let kv of modules | keyvalue" value="{{kv.key}}">{{kv.value}}</option>
+        <select id="module-select" title="Channel Type" [(ngModel)]="selectedChannelType"
+            (change)="modalChanged($event)">
+            <option *ngFor="let ch of channelTypes" value="{{ch.id}}">{{ch.name}}</option>
         </select>
         <select id="channel-select" 
-            title="Channel" 
-            disabled 
-            
+            title="Channel"         
             [(ngModel)]="selectedChannels"
-            [multiple]="true"
-            (change)="modalChange($event)">
+            [multiple]="true">
             <option value="-1" disabled selected>Select Channel</option>
             <ng-container *ngFor="let ch of channels">
                 <option *ngIf="ch.available" value="{{ch.id}}">{{ch.name}}</option>

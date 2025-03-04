@@ -1,7 +1,7 @@
 import { Meta, moduleMetadata, StoryObj } from '@storybook/angular';
 import { MaestroChannelComponent } from './maestro-channel.component';
 import { MaestroChannel } from 'astros-common';
-import { v4 as uuid} from 'uuid'
+import { v4 as uuid } from 'uuid';
 
 const meta: Meta<MaestroChannelComponent> = {
   title: 'Modules/Uart/Submodules/MaestroChannel',
@@ -24,13 +24,13 @@ export const Default: Story = {
       uuid(),
       'Channel 1',
       true,
-      1, 
+      1,
       true,
       0,
       0,
       0,
       false,
-    )
+    ),
   },
 };
 
@@ -41,13 +41,13 @@ export const Values: Story = {
       uuid(),
       'Channel 1',
       true,
-      1, 
+      1,
       true,
       500,
       2500,
       1250,
-      true
-    )
+      true,
+    ),
   },
 };
 
@@ -58,13 +58,13 @@ export const Output: Story = {
       uuid(),
       'Output',
       true,
-      1, 
+      1,
       false,
       0,
       0,
       0,
       false,
-    )
+    ),
   },
 };
 
@@ -80,8 +80,8 @@ export const OutputDefaultHigh: Story = {
       0,
       0,
       0,
-      true
-     )
+      true,
+    ),
   },
 };
 
@@ -92,12 +92,12 @@ export const Disabled: Story = {
       uuid(),
       'Channel 1',
       false,
-      1, 
+      1,
       true,
       0,
       0,
       0,
       false,
-    )
+    ),
   },
 };

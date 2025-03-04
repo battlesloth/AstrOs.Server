@@ -23,13 +23,7 @@ export class MaestroChannel extends UartChannel {
     homePos: number,
     inverted: boolean,
   ) {
-    super(
-      id,
-      parentId,
-      channelName,
-      ModuleSubType.maestro,
-      enabled,
-    );
+    super(id, parentId, channelName, ModuleSubType.maestro, enabled);
 
     this.channelNumber = channelNumber;
     this.isServo = isServo;

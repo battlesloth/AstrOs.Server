@@ -42,7 +42,6 @@ export const BaudRate115200: Story = {
   },
 };
 
-
 function getSerialModule(ch: number, baudRate: number): UartModule {
   const module = new UartModule(
     '1234',

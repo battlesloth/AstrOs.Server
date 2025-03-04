@@ -1,8 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { 
-  KangarooAction,
-  ScriptChannelType
- } from 'astros-common';
+import { KangarooAction, ScriptChannelType } from 'astros-common';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
 import { NgIf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -10,7 +7,7 @@ import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
 export class ChannelTestModalResources {
   public static controller = 'controller';
-  public static scriptChannelType = 'scriptChannelType'
+  public static scriptChannelType = 'scriptChannelType';
   public static channelId = 'channelId';
 
   public static channelTest = 'channelTest_test';
@@ -84,7 +81,11 @@ export class ChannelTestModalComponent
       case ScriptChannelType.GENERIC_I2C:
         return { id: this.channelId, val: this.value };
       case ScriptChannelType.SERVO:
-        return { id: this.channelId, position: this.position, speed: this.speed };
+        return {
+          id: this.channelId,
+          position: this.position,
+          speed: this.speed,
+        };
       case ScriptChannelType.GENERIC_UART:
         return { val: this.value };
       case ScriptChannelType.KANGAROO:

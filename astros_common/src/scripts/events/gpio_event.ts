@@ -1,9 +1,7 @@
 export class GpioEvent {
-  channelId: number;
   setHigh: boolean;
 
-  constructor(channelId: number, setHigh: boolean) {
-    this.channelId = channelId;
+  constructor(setHigh: boolean) {
     this.setHigh = setHigh;
   }
 }

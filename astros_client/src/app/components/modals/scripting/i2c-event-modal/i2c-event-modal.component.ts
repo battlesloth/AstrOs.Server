@@ -56,10 +56,9 @@ export class I2cEventModalComponent
 
     this.channelId = this.resources.get(I2cEventModalResources.i2cId) as number;
 
-    if (this.scriptEvent.dataJson != '') {
-      const payload = JSON.parse(this.scriptEvent.dataJson);
-      this.message = payload.message;
-    }
+    const temp = this.scriptEvent.event as I2cEvent;
+
+    this.message = temp.message;
 
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;
@@ -73,9 +72,7 @@ export class I2cEventModalComponent
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const data = new I2cEvent(+this.channelId, this.message);
-
-    this.scriptEvent.dataJson = JSON.stringify(data);
+    this.scriptEvent.event = new I2cEvent(this.message);
 
     const evt = new ModalCallbackEvent(this.callbackType, {
       scriptEvent: this.scriptEvent,

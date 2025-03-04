@@ -16,8 +16,6 @@ export class RemoteConfigController {
 
       const scripts = await repo.getConfig("astrOsScreen");
 
-      console.log(scripts);
-
       const val = JSON.parse(scripts.value) as Array<M5Page>;
 
       const response = new M5ScriptList();

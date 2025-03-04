@@ -20,7 +20,7 @@ export class MaestroModuleComponent
 {
   subModule!: MaestroModule;
 
-  channelCount = "24";
+  channelCount = '24';
   listSize = 24;
 
   availableChannels = Array.from({ length: 24 }, (_, i) => i + 1);
@@ -33,11 +33,11 @@ export class MaestroModuleComponent
       this.channelCount = this.subModule.boards[0].channelCount.toString();
     }
   }
-  
+
   onChannelCountChange(val: string): void {
     this.listSize = parseInt(val);
     for (let i = 23; i > this.listSize; i--) {
       this.subModule.boards[0].channels[i].enabled = false;
-    } 
+    }
   }
 }

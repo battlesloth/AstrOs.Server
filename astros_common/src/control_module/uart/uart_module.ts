@@ -1,4 +1,8 @@
-import { ModuleSubType, ModuleType, ScriptChannelType } from "../../astros_enums";
+import {
+  ModuleSubType,
+  ModuleType,
+  ScriptChannelType,
+} from "../../astros_enums";
 import { ScriptChannelResource } from "../../scripts/script_channel_resource";
 import { BaseModule } from "../base_module";
 import { KangarooX2 } from "./sub_modules/kangarooX2/kangaroo_x2";
@@ -47,7 +51,6 @@ export class UartModule extends BaseModule {
   }
 
   generateGenericSerialResources(): ScriptChannelResource[] {
-
     const ch = new UartChannel(
       this.id,
       this.id,
@@ -63,7 +66,7 @@ export class UartModule extends BaseModule {
         this.name,
         this.id,
         this.locationId,
-        ch
+        ch,
       ),
     ];
   }
@@ -76,7 +79,7 @@ export class UartModule extends BaseModule {
       this.id,
       this.name,
       mod.ch1Name,
-      mod.ch2Name
+      mod.ch2Name,
     );
 
     return [
@@ -86,13 +89,12 @@ export class UartModule extends BaseModule {
         this.name,
         this.id,
         this.locationId,
-        ch
+        ch,
       ),
     ];
   }
 
   generateMaestroResources(): ScriptChannelResource[] {
-
     const resources: ScriptChannelResource[] = [];
 
     const mod = this.subModule as MaestroModule;
@@ -108,8 +110,8 @@ export class UartModule extends BaseModule {
             ch.channelName,
             this.id,
             this.locationId,
-            ch
-          )
+            ch,
+          ),
         );
       }
     }
@@ -133,8 +135,8 @@ export class UartModule extends BaseModule {
         this.name,
         this.id,
         this.locationId,
-        ch
-      )
+        ch,
+      ),
     ];
   }
 }

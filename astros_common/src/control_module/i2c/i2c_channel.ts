@@ -4,8 +4,8 @@ import { BaseChannel } from "../base_channel";
 export class I2cChannel extends BaseChannel {
   constructor(
     id: string,
-    parentId: string, 
-    channelName: string,  
+    parentId: string,
+    channelName: string,
     enabled: boolean,
   ) {
     super(
@@ -13,7 +13,8 @@ export class I2cChannel extends BaseChannel {
       parentId,
       channelName,
       ModuleType.i2c,
-      ModuleSubType.genericI2C, 
-      enabled);
+      ModuleSubType.genericI2C,
+      enabled,
+    );
   }
 }

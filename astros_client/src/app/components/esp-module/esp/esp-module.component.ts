@@ -6,17 +6,16 @@ import {
   MatExpansionPanelTitle,
   MatExpansionPanelDescription,
 } from '@angular/material/expansion';
-import { MatCheckbox } from '@angular/material/checkbox';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ControllerLocation, ModuleSubType, ModuleType } from 'astros-common';
 import { UartModuleComponent } from '../uart/uart-module/uart-module.component';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
-import { 
+import {
   I2cModuleComponent,
   AddressChangeEvent,
- } from '../i2c/i2c-module/i2c-module.component';
+} from '../i2c/i2c-module/i2c-module.component';
 import {
   AddModuleEvent,
   RemoveModuleEvent,
@@ -85,7 +84,6 @@ export class EspModuleComponent {
   addI2cModule(evt: Event) {
     evt.stopPropagation();
 
-
     if (!this.i2cPanelOpenState) {
       this.i2cPanelOpenState = true;
     }
@@ -106,25 +104,20 @@ export class EspModuleComponent {
 
   i2cAddressChanged(evt: AddressChangeEvent) {
     // if the new address in use, swap it to the old address
-      const m1 = this.location.i2cModules.find(
-        (m) => m.i2cAddress === evt.new
-      );
+    const m1 = this.location.i2cModules.find((m) => m.i2cAddress === evt.new);
 
-      if (m1) {
-        m1.i2cAddress = evt.old;
-      }
+    if (m1) {
+      m1.i2cAddress = evt.old;
+    }
 
-      const m2 = this.location.i2cModules.find(
-        (m) => m.i2cAddress === evt.old
-      );
+    const m2 = this.location.i2cModules.find((m) => m.i2cAddress === evt.old);
 
-      if (m2) {
-        m2.i2cAddress = evt.new;
-      }
+    if (m2) {
+      m2.i2cAddress = evt.new;
+    }
 
-      this.i2cUpdateTrigger++;
+    this.i2cUpdateTrigger++;
   }
-
 
   testServoModal(
     module: ModuleType,

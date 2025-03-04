@@ -13,7 +13,7 @@ import {
   MaestroChannel,
   MaestroModule,
   ModuleSubType,
-  UartModule
+  UartModule,
 } from "astros-common";
 import { UartModuleTable } from "../tables/uart_tables/uart_module_table";
 import { I2cModuleTable } from "../tables/i2c_tables/i2c_module_table";
@@ -225,7 +225,6 @@ export class LocationsRepository {
   }
 
   public async updateLocation(location: ControllerLocation): Promise<boolean> {
-
     logger.info(`Updating location ${location.id}, ${location.locationName}`);
 
     await this.dao
@@ -253,8 +252,9 @@ export class LocationsRepository {
     );
 
     for (const uart of location.uartModules) {
-
-      logger.info(`Updating uart module ${uart.name}, id: ${uart.id}, type: ${uart.moduleSubType}`);
+      logger.info(
+        `Updating uart module ${uart.name}, id: ${uart.id}, type: ${uart.moduleSubType}`,
+      );
 
       switch (uart.moduleSubType) {
         case ModuleSubType.kangaroo:
@@ -292,8 +292,9 @@ export class LocationsRepository {
     );
 
     for (const i2c of location.i2cModules) {
-
-      logger.info(`Updating i2c module ${i2c.name}, id: ${i2c.id}, type: ${i2c.moduleSubType}`);
+      logger.info(
+        `Updating i2c module ${i2c.name}, id: ${i2c.id}, type: ${i2c.moduleSubType}`,
+      );
 
       switch (i2c.moduleSubType) {
         default:
@@ -366,10 +367,7 @@ export class LocationsRepository {
     fingerprint: string,
   ): Promise<boolean> {
     await this.dao
-      .run(LocationsTable.updateFingerprint, [
-        fingerprint,
-        locationId,
-      ])
+      .run(LocationsTable.updateFingerprint, [fingerprint, locationId])
       .catch((err: any) => {
         logger.error(err);
         throw "error";
@@ -402,7 +400,9 @@ export class LocationsRepository {
         continue;
       }
 
-      logger.info(`Removing stale uart module ${uartMod.name}, id: ${uartMod.id}, type: ${uartMod.type}`);
+      logger.info(
+        `Removing stale uart module ${uartMod.name}, id: ${uartMod.id}, type: ${uartMod.type}`,
+      );
 
       switch (uartMod.type) {
         case ModuleSubType.kangaroo:
@@ -447,7 +447,9 @@ export class LocationsRepository {
         continue;
       }
 
-      logger.info(`Removing stale i2c module ${i2cMod.name}, id: ${i2cMod.id}, type: ${i2cMod.type}`);
+      logger.info(
+        `Removing stale i2c module ${i2cMod.name}, id: ${i2cMod.id}, type: ${i2cMod.type}`,
+      );
 
       switch (i2cMod.type) {
         default:
@@ -561,10 +563,10 @@ export class LocationsRepository {
         for (const b of val) {
           const board = new MaestroBoard(
             b.id,
-            b.parentId, 
+            b.parentId,
             b.boardId,
-            b.boardName, 
-            b.channelCount
+            b.boardName,
+            b.channelCount,
           );
           module.boards.push(board);
         }

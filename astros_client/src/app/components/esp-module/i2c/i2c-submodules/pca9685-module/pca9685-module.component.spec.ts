@@ -8,9 +8,8 @@ describe('Pca9685ModuleComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [Pca9685ModuleComponent]
-    })
-    .compileComponents();
+      imports: [Pca9685ModuleComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(Pca9685ModuleComponent);
     component = fixture.componentInstance;

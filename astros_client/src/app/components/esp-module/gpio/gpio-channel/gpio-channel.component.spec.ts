@@ -8,9 +8,8 @@ describe('GpioChannelComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [GpioChannelComponent]
-    })
-    .compileComponents();
+      imports: [GpioChannelComponent],
+    }).compileComponents();
 
     fixture = TestBed.createComponent(GpioChannelComponent);
     component = fixture.componentInstance;

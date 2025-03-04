@@ -12,13 +12,7 @@ export class KangarooX2Channel extends UartChannel {
     ch1Name: string,
     ch2Name: string,
   ) {
-    super(
-      id,
-      parentId,
-      name,
-      ModuleSubType.kangaroo,
-      true,
-    );
+    super(id, parentId, name, ModuleSubType.kangaroo, true);
 
     this.ch1Name = ch1Name;
     this.ch2Name = ch2Name;

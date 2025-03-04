@@ -5,7 +5,7 @@ export const enum ScriptChannelType {
   AUDIO,
   GENERIC_I2C,
   GENERIC_UART,
-  KANGAROO
+  KANGAROO,
 }
 
 export const enum ModuleType {
@@ -29,7 +29,7 @@ export const enum ModuleSubType {
   pwmBoard = 203,
 
   // gpio
-  genericGpio = 301
+  genericGpio = 301,
 }
 
 export class ModuleChannelTypes {
@@ -43,7 +43,6 @@ export class ModuleChannelTypes {
   static readonly MaestroChannel = "MaestroChannel";
 
   static fromSubType(subtype: ModuleSubType) {
-
     switch (subtype) {
       // serial
       case ModuleSubType.genericSerial:
