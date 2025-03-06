@@ -20,6 +20,11 @@ export interface ModuleChannelChangedEvent {
   newModuleChannelId: string;
 }
 
+export interface TimeLineEvent {
+  event: MouseEvent;
+  id: string;
+}
+
 @Component({
   selector: 'app-script-row',
   templateUrl: './script-row.component.html',
@@ -28,7 +33,7 @@ export interface ModuleChannelChangedEvent {
 })
 export class ScriptRowComponent implements OnChanges {
   @Output()
-  timelineCallback = new EventEmitter<unknown>();
+  timelineCallback = new EventEmitter<TimeLineEvent>();
 
   @Output()
   removeCallback = new EventEmitter<string>();

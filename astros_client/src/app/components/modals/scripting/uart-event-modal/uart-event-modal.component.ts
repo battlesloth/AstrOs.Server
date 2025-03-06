@@ -8,12 +8,6 @@ import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
-export class UartEventModalResources {
-  public static channelId = 'channelId';
-  public static baudRate = 'baudRate';
-  public static scriptEvent = 'scriptEvent';
-}
-
 @Component({
   selector: 'app-uart-event-modal',
   templateUrl: './uart-event-modal.component.html',
@@ -27,8 +21,6 @@ export class UartEventModalComponent
   extends BaseEventModalComponent
   implements OnInit
 {
-  uartChannel!: number;
-  baudRate!: number;
   eventValue: string;
 
   constructor() {
@@ -52,22 +44,18 @@ export class UartEventModalComponent
       element?.classList.remove('hidden');
     }
 
-    this.uartChannel = this.resources.get(
-      UartEventModalResources.channelId,
-    ) as number;
-    this.baudRate = this.resources.get(
-      UartEventModalResources.baudRate,
-    ) as number;
 
     this.scriptEvent = this.resources.get(
-      UartEventModalResources.scriptEvent,
+      ScriptEventModalResources.scriptEvent,
     ) as ScriptEvent;
 
-    const temp = this.scriptEvent.event as GenericSerialEvent;
-    this.eventValue = temp.value;
+    if (this.scriptEvent.event !== undefined) {
+      const temp = this.scriptEvent.event as GenericSerialEvent;
+      this.eventValue = temp.value;
+    }
 
-    this.originalEventTime = this.scriptEvent.time;
-    this.eventTime = this.scriptEvent.time;
+    this.originalEventTime = this.scriptEvent.time / this.timeFactor;
+    this.eventTime = this.scriptEvent.time / this.timeFactor;
   }
 
   addEvent() {

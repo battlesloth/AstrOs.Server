@@ -24,7 +24,7 @@ const config: StorybookConfig & StorybookConfigVite = {
           "@angular/compiler",
           "@storybook/blocks",
           "tslib",
-          "astros-common",
+
         ],
       },
       build: {

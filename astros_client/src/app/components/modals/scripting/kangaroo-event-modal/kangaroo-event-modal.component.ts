@@ -14,10 +14,7 @@ import { DecimalPipe } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
 export class KangarooEventModalResources {
-  public static channelId = 'channelId';
-  public static baudRate = 'baudRate';
-  public static kangaroo = 'kangaroo';
-  public static scriptEvent = 'scriptEvent';
+  static kangaroo = 'kangaroo';
 }
 
 @Component({
@@ -31,10 +28,8 @@ export class KangarooEventModalResources {
 })
 export class KangarooEventModalComponent
   extends BaseEventModalComponent
-  implements OnInit
-{
-  uartChannel!: number;
-  baudRate!: number;
+  implements OnInit {
+
   kangaroo!: KangarooX2;
 
   channel1: string;
@@ -84,28 +79,25 @@ export class KangarooEventModalComponent
       element?.classList.remove('hidden');
     }
 
-    this.uartChannel = this.resources.get(
-      KangarooEventModalResources.channelId,
-    ) as number;
-    this.baudRate = this.resources.get(
-      KangarooEventModalResources.baudRate,
-    ) as number;
     this.kangaroo = this.resources.get(
       KangarooEventModalResources.kangaroo,
     ) as KangarooX2;
 
     this.scriptEvent = this.resources.get(
-      KangarooEventModalResources.scriptEvent,
+      ScriptEventModalResources.scriptEvent,
     ) as ScriptEvent;
 
     const temp = this.scriptEvent.event as KangarooEvent;
-    this.ch1Action = temp.ch1Action.toString();
-    this.ch1Speed = temp.ch1Speed;
-    this.ch1Position = temp.ch1Position;
 
-    this.ch2Action = temp.ch2Action.toString();
-    this.ch2Speed = temp.ch2Speed;
-    this.ch2Position = temp.ch2Position;
+    if (temp !== undefined) {
+      this.ch1Action = temp.ch1Action.toString();
+      this.ch1Speed = temp.ch1Speed;
+      this.ch1Position = temp.ch1Position;
+
+      this.ch2Action = temp.ch2Action.toString();
+      this.ch2Speed = temp.ch2Speed;
+      this.ch2Position = temp.ch2Position;
+    }
 
     this.ch1SpdDisabled =
       +this.ch1Action !== KangarooAction.speed &&

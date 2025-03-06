@@ -26,10 +26,11 @@ import {
 } from 'astros-common';
 import EventMarkerHelper from './helper/event-marker-helper';
 import { FormsModule } from '@angular/forms';
-import { NgFor, NgIf } from '@angular/common';
+import { NgFor, NgIf, Time } from '@angular/common';
 import {
   ModuleChannelChangedEvent,
   ScriptRowComponent,
+  TimeLineEvent,
 } from '@src/components/scripting';
 import {
   AudioEventModalComponent,
@@ -40,11 +41,8 @@ import {
   AddChannelModalResources,
   AddChannelModalResponse,
   GpioEventModalComponent,
-  GpioEventModalResources,
-  HcrModalResources,
   HumanCyborgModalComponent,
   I2cEventModalComponent,
-  I2cEventModalResources,
   KangarooEventModalComponent,
   KangarooEventModalResources,
   ScriptEventModalResources,
@@ -52,7 +50,6 @@ import {
   ScriptTestModalComponent,
   ScriptTestModalResources,
   UartEventModalComponent,
-  UartEventModalResources,
 } from '@src/components/modals/scripting';
 import {
   ControllerService,
@@ -70,7 +67,7 @@ import { ModalCallbackEvent } from '@src/components/modals/modal-base/modal-call
 import { ScriptResourcesService } from '@src/services/script-resources/script-resources.service';
 import { ChannelDetails } from '@src/models/scripting';
 
-export interface Item {
+export interface MenuItemDetails {
   timeline: string;
   xPos: number;
 }
@@ -371,10 +368,14 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   //#region event modal
 
-  openNewEventModal(evt: unknown) {
+  openNewEventModal(event: unknown) {
+
+    const evt = event as MenuItemDetails;
+    console.log(evt);
+
+
     let time = 0;
 
-    if (evt && typeof evt === 'object' && 'timeline' in evt && 'xPos' in evt) {
       const line = document.getElementById(`script-row-${evt.timeline}`);
       const scrollContainer = document.getElementById('scripter-container');
 
@@ -403,16 +404,16 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
       const ch = this.scriptChannels[chIdx];
 
-      const event = new ScriptEvent(
+      const scriptEvent = new ScriptEvent(
         ch.id,
         ch.moduleChannel.moduleType,
         ch.moduleChannel.moduleSubType,
         time,
-        undefined,
+        undefined
       );
 
-      this.createEventModal(event, false);
-    }
+      this.createEventModal(scriptEvent, false);
+    
   }
 
   openEditEventModal(channelId: string, time: number) {
@@ -450,20 +451,12 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       case ModuleType.uart:
         switch (event.moduleSubType) {
           case ModuleSubType.genericSerial: {
-            component = this.container.createComponent(UartEventModalComponent);
-            modalResources.set(
-              UartEventModalResources.channelId,
-              event.scriptChannel,
-            );
+            component = this.container.createComponent(UartEventModalComponent);    
             break;
           }
           case ModuleSubType.kangaroo: {
             component = this.container.createComponent(
               KangarooEventModalComponent,
-            );
-            modalResources.set(
-              KangarooEventModalResources.channelId,
-              event.scriptChannel,
             );
             modalResources.set(
               KangarooEventModalResources.kangaroo,
@@ -475,22 +468,16 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
             component = this.container.createComponent(
               HumanCyborgModalComponent,
             );
-            modalResources.set(
-              HcrModalResources.channelId,
-              event.scriptChannel,
-            );
             break;
           }
         }
         break;
       case ModuleType.i2c: {
         component = this.container.createComponent(I2cEventModalComponent);
-        modalResources.set(I2cEventModalResources.i2cId, event.scriptChannel);
         break;
       }
       case ModuleType.gpio: {
         component = this.container.createComponent(GpioEventModalComponent);
-        modalResources.set(GpioEventModalResources.gpioId, event.scriptChannel);
         break;
       }
     }
@@ -517,7 +504,8 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         this.handleConfirmModalEvent(evt.value as ConfirmModalEvent);
         break;
       case ScriptEventModalResources.addEvent: {
-        this.addEvent(evt.value as ScriptEvent);
+        const value = evt.value as ScriptEventModalResponse;
+        this.addEvent(value.scriptEvent);
         break;
       }
       case ScriptEventModalResources.editEvent: {
@@ -555,9 +543,10 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     }
   }
 
-  //#region script row call backs
+  //#region script row callbacks
+
   /* eslint-disable  @typescript-eslint/no-explicit-any */
-  timelineCallback(msg: any) {
+  timelineCallback(msg: TimeLineEvent) {
     /* eslint-enable  @typescript-eslint/no-explicit-any */
     msg.event.preventDefault();
 

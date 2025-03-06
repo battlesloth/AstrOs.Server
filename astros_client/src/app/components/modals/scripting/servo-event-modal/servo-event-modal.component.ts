@@ -8,10 +8,6 @@ import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
-export class ServoEventModalResources {
-  public static servoId = 'servoId';
-  public static scriptEvent = 'scriptEvent';
-}
 
 @Component({
   selector: 'app-servo-event-modal',
@@ -24,8 +20,7 @@ export class ServoEventModalResources {
 })
 export class ServoEventModalComponent
   extends BaseEventModalComponent
-  implements OnInit
-{
+  implements OnInit {
   speed: number;
   position: number;
   acceleration: number;
@@ -53,10 +48,15 @@ export class ServoEventModalComponent
     }
 
     this.scriptEvent = this.resources.get(
-      ServoEventModalResources.scriptEvent,
+      ScriptEventModalResources.scriptEvent,
     ) as ScriptEvent;
 
-    if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+    if (this.scriptEvent.event === undefined) {
+      this.position = 0;
+      this.speed = 0;
+      this.acceleration = 0;
+    }
+    else if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
       const temp = this.scriptEvent.event as MaestroEvent;
       this.position = temp.position;
       this.speed = temp.speed;
@@ -75,14 +75,17 @@ export class ServoEventModalComponent
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    const data = new MaestroEvent(
-      true,
-      this.position,
-      this.speed,
-      this.acceleration,
-    );
-    this.scriptEvent.event = data;
+    if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+      const data = new MaestroEvent(
+        true,
+        this.position,
+        this.speed,
+        this.acceleration,
+      );
 
+      this.scriptEvent.event = data;
+    }
+    
     const evt = new ModalCallbackEvent(this.callbackType, {
       scriptEvent: this.scriptEvent,
       time: this.originalEventTime * this.timeFactor,

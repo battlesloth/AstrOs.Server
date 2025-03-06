@@ -8,11 +8,6 @@ import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
-export class I2cEventModalResources {
-  public static i2cId = 'i2cId';
-  public static scriptEvent = 'scriptEvent';
-}
-
 @Component({
   selector: 'app-i2c-event-modal',
   templateUrl: './i2c-event-modal.component.html',
@@ -24,8 +19,7 @@ export class I2cEventModalResources {
 })
 export class I2cEventModalComponent
   extends BaseEventModalComponent
-  implements OnInit
-{
+  implements OnInit {
   channelId!: number;
   message: string;
 
@@ -51,14 +45,14 @@ export class I2cEventModalComponent
     }
 
     this.scriptEvent = this.resources.get(
-      I2cEventModalResources.scriptEvent,
+      ScriptEventModalResources.scriptEvent,
     ) as ScriptEvent;
-
-    this.channelId = this.resources.get(I2cEventModalResources.i2cId) as number;
 
     const temp = this.scriptEvent.event as I2cEvent;
 
-    this.message = temp.message;
+    if (temp !== undefined) {
+      this.message = temp.message;
+    }
 
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;

@@ -22,12 +22,6 @@ interface HcrCommandListItem {
   name: string;
 }
 
-export class HcrModalResources {
-  public static channelId = 'channelId';
-  public static baudRate = 'baudRate';
-  public static scriptEvent = 'scriptEvent';
-}
-
 @Component({
   selector: 'app-human-cyborg-modal',
   templateUrl: './human-cyborg-modal.component.html',
@@ -43,8 +37,6 @@ export class HumanCyborgModalComponent
 {
   faRemove = faBan;
 
-  uartChannel!: number;
-  baudRate!: number;
   commandCategory: string;
   command!: string;
   valueA!: string;
@@ -103,18 +95,16 @@ export class HumanCyborgModalComponent
       element?.classList.remove('hidden');
     }
 
-    this.uartChannel = this.resources.get(
-      HcrModalResources.channelId,
-    ) as number;
-    this.baudRate = this.resources.get(HcrModalResources.baudRate) as number;
     this.scriptEvent = this.resources.get(
-      HcrModalResources.scriptEvent,
+      ScriptEventModalResources.scriptEvent,
     ) as ScriptEvent;
 
     const temp = this.scriptEvent.event as HumanCyborgRelationsEvent;
 
-    this.selectedCommands.push(...temp.commands);
-
+    if (temp !== undefined){ 
+      this.selectedCommands.push(...temp.commands);
+    }
+    
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;
   }

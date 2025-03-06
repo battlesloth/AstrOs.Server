@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { GpioEvent, ScriptEvent } from 'astros-common';
+import { GpioEvent, MaestroEvent, ModuleSubType, ScriptEvent } from 'astros-common';
 import {
   BaseEventModalComponent,
   ScriptEventModalResources,
@@ -8,9 +8,6 @@ import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
-export class GpioEventModalResources {
-  public static gpioId = 'gpioId';
-}
 
 @Component({
   selector: 'app-gpio-event-modal',
@@ -25,7 +22,6 @@ export class GpioEventModalComponent
   extends BaseEventModalComponent
   implements OnInit
 {
-  channelId!: string;
   state = 0;
 
   constructor() {
@@ -52,14 +48,18 @@ export class GpioEventModalComponent
       ScriptEventModalResources.scriptEvent,
     ) as ScriptEvent;
 
-    this.channelId = this.resources.get(
-      GpioEventModalResources.gpioId,
-    ) as string;
+    if (this.scriptEvent.event === undefined) {
+      this.state = 0;
+    }
+    else if (this.scriptEvent.moduleSubType === ModuleSubType.genericGpio) {
+      const temp = this.scriptEvent.event as GpioEvent;
+      this.state = temp.setHigh ? 1 : 0;
+    } else if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+      const temp = this.scriptEvent.event as MaestroEvent;
+      this.state = temp.position >= 1500 ? 1 : 0;
+    }
 
-    const temp = this.scriptEvent.event as GpioEvent;
-
-    this.state = temp.setHigh ? 1 : 0;
-
+    
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;
   }
@@ -76,7 +76,16 @@ export class GpioEventModalComponent
 
     this.scriptEvent.time = +this.eventTime * this.timeFactor;
 
-    this.scriptEvent.event = new GpioEvent(+this.state === 1 ? true : false);
+    if (this.scriptEvent.moduleSubType === ModuleSubType.genericGpio) {
+      this.scriptEvent.event = new GpioEvent(+this.state === 1 ? true : false);
+    } else if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+      this.scriptEvent.event = new MaestroEvent(
+        false,
+        +this.state === 1 ? 2500 : 500,
+        0,
+        0,
+      );
+    }
 
     const evt = new ModalCallbackEvent(this.callbackType, {
       scriptEvent: this.scriptEvent,
