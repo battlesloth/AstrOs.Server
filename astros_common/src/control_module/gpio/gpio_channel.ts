@@ -8,7 +8,7 @@ export class GpioChannel extends BaseChannel {
   constructor(
     id: string,
     parentId: string,
-    channelid: number,
+    channelId: number,
     enabled: boolean,
     channelName: string,
     defaultLow: boolean,
@@ -21,7 +21,7 @@ export class GpioChannel extends BaseChannel {
       ModuleSubType.genericGpio,
       enabled,
     );
-    this.channelId = channelid;
+    this.channelId = channelId;
     this.defaultLow = defaultLow;
   }
 }

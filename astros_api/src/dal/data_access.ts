@@ -21,6 +21,7 @@ import { GpioChannelsTable } from "./tables/controller_tables/gpio_channels_tabl
 import { KangarooX2Table } from "./tables/uart_tables/kangaroo_x2_table";
 import { MaestroBoardsTable } from "./tables/uart_tables/maestro_boards_table";
 import { MaestroChannelTable } from "./tables/uart_tables/maestro_channels_table";
+import { v4 as uuid } from "uuid";
 
 export class DataAccess {
   appdataPath: string;
@@ -257,6 +258,7 @@ export class DataAccess {
 
       for (let i = 0; i < 10; i++) {
         await this.run(GpioChannelsTable.insert, [
+          uuid(),
           id,
           i.toString(),
           "unassigned",

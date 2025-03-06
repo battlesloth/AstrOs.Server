@@ -213,10 +213,10 @@ export class LocationsRepository {
           location.gpioModule.channels[ch.channelId] = new GpioChannel(
             ch.id,
             location.id,
-            ch.channelNumber,
-            ch.channelName,
-            ch.defaultLow,
+            ch.channelId,
             ch.enabled,
+            ch.channelName,
+            ch.defaultLow
           );
         });
       });

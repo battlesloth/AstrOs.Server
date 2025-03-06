@@ -25,7 +25,7 @@ export class GpioChannelsTable {
         ${this.defaultLow},
         ${this.enabled}
     )
-    VALUES (?, ?, ?, ?, ?)`;
+    VALUES (?, ?, ?, ?, ?, ?)`;
 
   public static readonly selectAll = `SELECT 
         ${this.id},
