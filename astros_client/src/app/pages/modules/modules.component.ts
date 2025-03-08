@@ -343,7 +343,7 @@ export class ModulesComponent implements AfterViewInit {
       return;
     }
 
-    const defaultChannel = location === AstrOsConstants.BODY ? 2 : 1;
+    const defaultChannel = controller.locationName === AstrOsConstants.BODY ? 2 : 1;
 
     const module = new UartModule(
       crypto.randomUUID(),
@@ -386,7 +386,7 @@ export class ModulesComponent implements AfterViewInit {
         new MaestroChannel(
           crypto.randomUUID(),
           subModule.boards[0].id,
-          `Channel ${i + idx}`,
+          `Channel ${idx}`,
           false,
           idx,
           false,

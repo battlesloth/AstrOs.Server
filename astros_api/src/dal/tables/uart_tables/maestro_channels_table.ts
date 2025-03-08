@@ -35,7 +35,7 @@ export class MaestroChannelTable {
         ${this.maxPos}, 
         ${this.homePos}, 
         ${this.inverted})
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(${this.id}) DO UPDATE SET
         ${this.boardId} = excluded.${this.boardId},
         ${this.channelNumber} = excluded.${this.channelNumber},

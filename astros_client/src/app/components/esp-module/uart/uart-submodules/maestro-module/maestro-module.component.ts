@@ -39,5 +39,6 @@ export class MaestroModuleComponent
     for (let i = 23; i > this.listSize; i--) {
       this.subModule.boards[0].channels[i].enabled = false;
     }
+    this.subModule.boards[0].channelCount = this.listSize;
   }
 }

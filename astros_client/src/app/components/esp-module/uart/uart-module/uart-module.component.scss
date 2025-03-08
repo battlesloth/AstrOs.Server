@@ -11,18 +11,20 @@
     width: -webkit-fill-available;
     margin-right: 30px;
 
+
     .header-spacer {
         flex-grow: 1;
     }
 
-    .subtype-name {
-        font-size: medium;
-        margin-right: 10px;
-        color: darkgray;
+    #subtype-name {
+            font-size: medium;
+            margin: 14px 10px 0 0;
+            color: darkgray;
     }
- 
+
     .header-button {
         margin: 10px;
+
         button {
             height: 30px;
             font-size: small;
@@ -30,4 +32,3 @@
         }
     }
 }
-

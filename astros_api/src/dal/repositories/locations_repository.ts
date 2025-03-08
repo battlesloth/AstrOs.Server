@@ -194,8 +194,8 @@ export class LocationsRepository {
             i2c.id,
             i2c.name,
             i2c.locationId,
-            i2c.i2cType,
             i2c.i2cAddress,
+            i2c.i2cType,
           );
           location.i2cModules.push(module);
         });
