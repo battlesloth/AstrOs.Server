@@ -32,6 +32,7 @@ module.exports = {
       },
       mode: 'production',
       externals: {
+        express: 'commonjs express',
         sqlite3: 'commonjs sqlite3',
         serialport: 'serialport',
         bufferutil: "bufferutil",
