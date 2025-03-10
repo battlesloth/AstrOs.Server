@@ -1,7 +1,7 @@
-import { DataAccess } from "../../dal/data_access";
-import { UsersTable } from "../../dal/tables/users_table";
-import { logger } from "../../logger";
-import { User } from "../../models/users";
+import { DataAccess } from "../../dal/data_access.js";
+import { UsersTable } from "../../dal/tables/users_table.js";
+import { logger } from "../../logger.js";
+import { User } from "../../models/users.js";
 
 export class UserRepository {
   dao: DataAccess;

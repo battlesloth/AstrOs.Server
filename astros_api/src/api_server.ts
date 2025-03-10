@@ -19,17 +19,17 @@ import { Worker } from "worker_threads";
 
 import { pinoHttp } from "pino-http";
 
-import { DataAccess } from "./dal/data_access";
-import { UserRepository } from "./dal/repositories/user_repository";
-import { LocationsController } from "./controllers/locations_controller";
-import { AuthContoller } from "./controllers/authentication_controller";
-import { ScriptsController } from "./controllers/scripts_controller";
-import { AudioController } from "./controllers/audio_controller";
-import { FileController } from "./controllers/file_controller";
-import { ScriptUpload } from "./models/scripts/script_upload";
-import { ScriptRepository } from "./dal/repositories/script_repository";
+import { DataAccess } from "./dal/data_access.js";
+import { UserRepository } from "./dal/repositories/user_repository.js";
+import { LocationsController } from "./controllers/locations_controller.js";
+import { AuthContoller } from "./controllers/authentication_controller.js";
+import { ScriptsController } from "./controllers/scripts_controller.js";
+import { AudioController } from "./controllers/audio_controller.js";
+import { FileController } from "./controllers/file_controller.js";
+import { ScriptUpload } from "./models/scripts/script_upload.js";
+import { ScriptRepository } from "./dal/repositories/script_repository.js";
 
-import { ScriptConverter } from "./script_converter";
+import { ScriptConverter } from "./script_converter.js";
 import {
   Script,
   StatusResponse,
@@ -39,26 +39,35 @@ import {
   ScriptResponse,
   TransmissionStatus,
 } from "astros-common";
-import { ControllerRepository } from "./dal/repositories/controller_repository";
-import { ConfigSync } from "./models/config/config_sync";
-import { ScriptRun } from "./models/scripts/script_run";
-import { logger } from "./logger";
-import { RemoteConfigController } from "./controllers/remote_config_controller";
-import { SettingsController } from "./controllers/settings_controller";
-import { ApiKeyValidator } from "./api_key_validator";
-import { SerialMessageType } from "./serial/serial_message";
+import { ControllerRepository } from "./dal/repositories/controller_repository.js";
+import { ConfigSync } from "./models/config/config_sync.js";
+import { ScriptRun } from "./models/scripts/script_run.js";
+import { logger } from "./logger.js";
+import { RemoteConfigController } from "./controllers/remote_config_controller.js";
+import { SettingsController } from "./controllers/settings_controller.js";
+import { ApiKeyValidator } from "./api_key_validator.js";
+import { SerialMessageType } from "./serial/serial_message.js";
 import {
   ConfigSyncResponse,
   ISerialWorkerResponse,
   PollRepsonse,
   RegistrationResponse,
   SerialWorkerResponseType,
-} from "./serial/serial_worker_response";
-import { LocationsRepository } from "./dal/repositories/locations_repository";
-import { ServoTest } from "./models/servo_test";
+} from "./serial/serial_worker_response.js";
+import { LocationsRepository } from "./dal/repositories/locations_repository.js";
+import { ServoTest } from "./models/servo_test.js";
 
-const { SerialPort } = eval("require('serialport')");
-const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+
+const __dirname = path.dirname(__filename);
+
+import { SerialPort } from "serialport";
+import { DelimiterParser } from "@serialport/parser-delimiter";
+
+//const { SerialPort } = eval("require('serialport')");
+//const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
 
 interface IWebSocketMessage {
   msgType: string;

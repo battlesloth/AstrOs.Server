@@ -1,6 +1,9 @@
-import { logger } from ".././logger";
-import { SerialMessageType, SerialMsgValidationResult } from "./serial_message";
-import { MessageHelper } from "./message_helper";
+import { logger } from ".././logger.js";
+import {
+  SerialMessageType,
+  SerialMsgValidationResult,
+} from "./serial_message.js";
+import { MessageHelper } from "./message_helper.js";
 import {
   ConfigSyncResponse,
   PollRepsonse,
@@ -8,7 +11,7 @@ import {
   ScriptDeployResponse,
   ScriptRunResponse,
   SerialWorkerResponseType,
-} from "./serial_worker_response";
+} from "./serial_worker_response.js";
 import { ControlModule } from "astros-common";
 
 //|--type--|--validation--|---msg Id---|---------------payload-------------|

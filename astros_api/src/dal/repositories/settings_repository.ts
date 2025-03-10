@@ -1,6 +1,6 @@
-import { DataAccess } from "../data_access";
-import { logger } from "../../logger";
-import { SettingsTable } from "../tables/settings_table";
+import { DataAccess } from "../data_access.js";
+import { logger } from "../../logger.js";
+import { SettingsTable } from "../tables/settings_table.js";
 
 export class SettingsRepository {
   dao: DataAccess;

@@ -2,9 +2,9 @@
 //|--int---RS---string----RS--string---GS--val--US--val--RS--val--US--val--|
 
 import { ConfigSync } from "src/models/config/config_sync";
-import { logger } from "../logger";
-import { MessageHelper } from "./message_helper";
-import { SerialMessageType } from "./serial_message";
+import { logger } from "../logger.js";
+import { MessageHelper } from "./message_helper.js";
+import { SerialMessageType } from "./serial_message.js";
 import { ScriptUpload } from "src/models/scripts/script_upload";
 import { ScriptRun } from "src/models/scripts/script_run";
 import { ServoTest } from "src/models/servo_test";

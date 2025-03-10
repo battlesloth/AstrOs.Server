@@ -1,32 +1,32 @@
 import appdata from "appdata-path";
-import { Database } from "sqlite3";
+import Database from "sqlite3";
 import fs from "fs";
 import crypto from "crypto";
-import { SettingsTable } from "./tables/settings_table";
-import { UsersTable } from "./tables/users_table";
-import { ControllersTable } from "./tables/controller_tables/controllers_table";
-import { I2cModuleTable } from "./tables/i2c_tables/i2c_module_table";
+import { SettingsTable } from "./tables/settings_table.js";
+import { UsersTable } from "./tables/users_table.js";
+import { ControllersTable } from "./tables/controller_tables/controllers_table.js";
+import { I2cModuleTable } from "./tables/i2c_tables/i2c_module_table.js";
 import { M5Page, AstrOsConstants } from "astros-common";
-import { ScriptsTable } from "./tables/script_tables/scripts_table";
-import { ScriptEventsTable } from "./tables/script_tables/script_events_table";
-import { ScriptChannelsTable } from "./tables/script_tables/script_channels_table";
-import { AudioFilesTable } from "./tables/audio_files_table";
-import { UartModuleTable } from "./tables/uart_tables/uart_module_table";
-import { logger } from "../logger";
-import { RemoteConfigTable } from "./tables/remote_config_table";
-import { ScriptsDeploymentTable } from "./tables/script_tables/scripts_deployment_table";
-import { LocationsTable } from "./tables/controller_tables/locations_table";
-import { ControllerLocationTable } from "./tables/controller_tables/controller_location_table";
-import { GpioChannelsTable } from "./tables/controller_tables/gpio_channels_table";
-import { KangarooX2Table } from "./tables/uart_tables/kangaroo_x2_table";
-import { MaestroBoardsTable } from "./tables/uart_tables/maestro_boards_table";
-import { MaestroChannelTable } from "./tables/uart_tables/maestro_channels_table";
+import { ScriptsTable } from "./tables/script_tables/scripts_table.js";
+import { ScriptEventsTable } from "./tables/script_tables/script_events_table.js";
+import { ScriptChannelsTable } from "./tables/script_tables/script_channels_table.js";
+import { AudioFilesTable } from "./tables/audio_files_table.js";
+import { UartModuleTable } from "./tables/uart_tables/uart_module_table.js";
+import { logger } from "../logger.js";
+import { RemoteConfigTable } from "./tables/remote_config_table.js";
+import { ScriptsDeploymentTable } from "./tables/script_tables/scripts_deployment_table.js";
+import { LocationsTable } from "./tables/controller_tables/locations_table.js";
+import { ControllerLocationTable } from "./tables/controller_tables/controller_location_table.js";
+import { GpioChannelsTable } from "./tables/controller_tables/gpio_channels_table.js";
+import { KangarooX2Table } from "./tables/uart_tables/kangaroo_x2_table.js";
+import { MaestroBoardsTable } from "./tables/uart_tables/maestro_boards_table.js";
+import { MaestroChannelTable } from "./tables/uart_tables/maestro_channels_table.js";
 import { v4 as uuid } from "uuid";
 
 export class DataAccess {
   appdataPath: string;
   databaseFile: string;
-  database!: Database;
+  database!: Database.Database;
 
   constructor() {
     this.appdataPath = appdata("astrosserver");
@@ -42,7 +42,7 @@ export class DataAccess {
   }
 
   public async connect(): Promise<void> {
-    this.database = new Database(
+    this.database = new Database.Database(
       `${this.appdataPath}${this.databaseFile}`,
       this.errorHandler,
     );

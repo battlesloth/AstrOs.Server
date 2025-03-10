@@ -3,10 +3,12 @@ module.exports ={
     parser: '@typescript-eslint/parser',
     plugins: [
       '@typescript-eslint',
+      'require-extensions'
     ],
     extends: [
       'eslint:recommended',
       'plugin:@typescript-eslint/recommended',
+      'plugin:require-extensions/recommended'
     ],
     //"defaultSeverity": "error",
     //"extends": [

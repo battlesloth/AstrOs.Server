@@ -1,6 +1,6 @@
-import { DataAccess } from "../dal/data_access";
-import { ScriptRepository } from "../dal/repositories/script_repository";
-import { logger } from "../logger";
+import { DataAccess } from "../dal/data_access.js";
+import { ScriptRepository } from "../dal/repositories/script_repository.js";
+import { logger } from "../logger.js";
 
 export class ScriptsController {
   public static getRoute = "/scripts/";

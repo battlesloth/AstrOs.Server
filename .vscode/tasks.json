@@ -61,7 +61,7 @@
             "label": "lint and build",
             "type": "shell",
             "command": "npm",
-            "args": ["run","build"],
+            "args": ["run","build:tsc"],
             "options": {
                 "cwd": "${workspaceFolder}/astros_api"
             }

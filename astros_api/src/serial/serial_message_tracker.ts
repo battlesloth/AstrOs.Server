@@ -1,4 +1,4 @@
-import { SerialMessageType } from "./serial_message";
+import { SerialMessageType } from "./serial_message.js";
 
 export class SerialMessageTracker {
   id: string;

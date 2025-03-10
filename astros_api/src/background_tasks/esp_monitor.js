@@ -1,6 +1,6 @@
 import { parentPort } from "worker_threads";
 import superagent  from 'superagent';
-import { logger } from "../logger";
+import { logger } from "../logger.js";
 
 
 

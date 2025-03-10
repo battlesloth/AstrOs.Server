@@ -1,17 +1,17 @@
 import { v4 } from "uuid";
-import { logger } from "../logger";
-import { MessageGenerator } from "./message_generator";
-import { MessageHandler } from "./message_handler";
-import { SerialMessageType } from "./serial_message";
+import { logger } from "../logger.js";
+import { MessageGenerator } from "./message_generator.js";
+import { MessageHandler } from "./message_handler.js";
+import { SerialMessageType } from "./serial_message.js";
 import {
   ConfigSyncResponse,
   ISerialWorkerResponse,
   RegistrationResponse,
   ScriptDeployResponse,
   SerialWorkerResponseType,
-} from "./serial_worker_response";
-import { SerialMessageTracker } from "./serial_message_tracker";
-import { MessageHelper } from "./message_helper";
+} from "./serial_worker_response.js";
+import { SerialMessageTracker } from "./serial_message_tracker.js";
+import { MessageHelper } from "./message_helper.js";
 import { ControlModule } from "astros-common";
 
 export class SerialMessageService {

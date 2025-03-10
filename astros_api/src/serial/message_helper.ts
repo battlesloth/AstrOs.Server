@@ -1,4 +1,4 @@
-import { SerialMessageType, SerialMsgConst } from "./serial_message";
+import { SerialMessageType, SerialMsgConst } from "./serial_message.js";
 
 export class MessageHelper {
   public static readonly GS = "\u001d";

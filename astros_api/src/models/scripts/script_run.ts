@@ -1,5 +1,5 @@
 import { ControllerLocation, TransmissionType } from "astros-common";
-import { ScriptConfig } from "./script_config";
+import { ScriptConfig } from "./script_config.js";
 
 export class ScriptRun {
   type: TransmissionType = TransmissionType.run;

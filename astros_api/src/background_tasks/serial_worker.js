@@ -1,7 +1,7 @@
 import { parentPort } from "worker_threads";
-import { logger } from "../logger";
-import { SerialMessageService } from "../serial/serial_message_service";
-import { SerialMessageType } from "../serial/serial_message";
+import { logger } from "../logger.js";
+import { SerialMessageService } from "../serial/serial_message_service.js";
+import { SerialMessageType } from "../serial/serial_message.js";
 
 const msgService = new SerialMessageService(messageTimeoutCallBack);
 

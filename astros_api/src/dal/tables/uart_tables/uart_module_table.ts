@@ -1,7 +1,7 @@
 export class UartModuleTable {
   public static readonly table = "uart_modules";
   public static readonly id = "id";
-  public static readonly moduleName = "name";
+  public static readonly moduleName = "moduleName";
   public static readonly locationId = "locationId";
   public static readonly uartType = "uartType";
   public static readonly uartChannel = "uartChannel";

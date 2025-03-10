@@ -1,7 +1,7 @@
-import { SettingsRepository } from "../dal/repositories/settings_repository";
-import { DataAccess } from "../dal/data_access";
-import { logger } from "../logger";
-import { ControllerRepository } from "../dal/repositories/controller_repository";
+import { SettingsRepository } from "../dal/repositories/settings_repository.js";
+import { DataAccess } from "../dal/data_access.js";
+import { logger } from "../logger.js";
+import { ControllerRepository } from "../dal/repositories/controller_repository.js";
 
 export class SettingsController {
   public static getRoute = "/settings/";

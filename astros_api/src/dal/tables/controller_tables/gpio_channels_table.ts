@@ -60,6 +60,6 @@ export class GpioChannelsTable {
     SET ${this.channelName} = ?,
         ${this.defaultLow} = ?,
         ${this.enabled} = ?
-    WHERE ${this.channelId}  = ?
+    WHERE ${this.id}  = ?
     AND ${this.locationId} = ?`;
 }

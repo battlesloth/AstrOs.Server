@@ -14,7 +14,7 @@ import {
   ModuleSubType,
 } from "astros-common";
 
-import { logger } from "./logger";
+import { logger } from "./logger.js";
 
 export enum CommandType {
   none,

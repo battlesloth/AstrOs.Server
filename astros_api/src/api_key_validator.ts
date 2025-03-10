@@ -1,7 +1,7 @@
 import { RequestHandler } from "express";
-import { DataAccess } from "./dal/data_access";
-import { SettingsRepository } from "./dal/repositories/settings_repository";
-import { logger } from "./logger";
+import { DataAccess } from "./dal/data_access.js";
+import { SettingsRepository } from "./dal/repositories/settings_repository.js";
+import { logger } from "./logger.js";
 
 export function ApiKeyValidator(): RequestHandler {
   return async (req, res, next) => {

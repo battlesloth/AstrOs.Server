@@ -1,7 +1,7 @@
 export class I2cModuleTable {
   public static readonly table = "i2c_modules";
   public static readonly id = "id";
-  public static readonly moduleName = "name";
+  public static readonly moduleName = "moduleName";
   public static readonly locationId = "locationId";
   public static readonly i2cAddress = "i2cAddress";
   public static readonly i2cType = "i2cType";

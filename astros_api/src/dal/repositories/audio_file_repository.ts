@@ -1,7 +1,7 @@
 import { AudioFile } from "astros-common";
-import { logger } from "../../logger";
-import { DataAccess } from "../data_access";
-import { AudioFilesTable } from "../tables/audio_files_table";
+import { logger } from "../../logger.js";
+import { DataAccess } from "../data_access.js";
+import { AudioFilesTable } from "../tables/audio_files_table.js";
 
 export class AudioFileRepository {
   dao: DataAccess;

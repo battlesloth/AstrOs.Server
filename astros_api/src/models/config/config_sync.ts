@@ -1,5 +1,5 @@
 import { ControllerLocation, TransmissionType } from "astros-common";
-import { ControllerConfig } from "./controller_config";
+import { ControllerConfig } from "./controller_config.js";
 
 export class ConfigSync {
   type: TransmissionType = TransmissionType.sync;

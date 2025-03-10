@@ -1,8 +1,8 @@
 import { expect, describe, it } from "@jest/globals";
-import { MessageGenerator } from "../src/serial/message_generator";
-import { MessageHelper } from "../src/serial/message_helper";
-import { SerialMessageType } from "../src/serial/serial_message";
-import { ConfigSync } from "../src/models/config/config_sync";
+import { MessageGenerator } from '../src/serial/message_generator.js';
+import { MessageHelper } from '../src/serial/message_helper.js';
+import { SerialMessageType } from '../src/serial/serial_message.js';
+import { ConfigSync } from '../src/models/config/config_sync.js';
 import { ControlModule, ControllerLocation, ServoChannel } from "astros-common";
 
 

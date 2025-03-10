@@ -1,7 +1,7 @@
 import { M5Page } from "astros-common";
-import { DataAccess } from "../../dal/data_access";
-import { logger } from "../../logger";
-import { RemoteConfigTable } from "../tables/remote_config_table";
+import { DataAccess } from "../../dal/data_access.js";
+import { logger } from "../../logger.js";
+import { RemoteConfigTable } from "../tables/remote_config_table.js";
 
 export class RemoteConfigRepository {
   dao: DataAccess;

@@ -1,7 +1,7 @@
-import { DataAccess } from "../../dal/data_access";
-import { ScriptsTable } from "../../dal/tables/script_tables/scripts_table";
-import { ScriptChannelsTable } from "../../dal/tables/script_tables/script_channels_table";
-import { ScriptEventsTable } from "../../dal/tables/script_tables/script_events_table";
+import { DataAccess } from "../../dal/data_access.js";
+import { ScriptsTable } from "../../dal/tables/script_tables/scripts_table.js";
+import { ScriptChannelsTable } from "../../dal/tables/script_tables/script_channels_table.js";
+import { ScriptEventsTable } from "../../dal/tables/script_tables/script_events_table.js";
 import {
   Script,
   ScriptChannel,
@@ -16,18 +16,20 @@ import {
   I2cChannel,
   ModuleType,
   ModuleSubType,
+  moduleSubTypeToScriptEventTypes,
+  UartChannel
 } from "astros-common";
-import { I2cModuleTable } from "../tables/i2c_tables/i2c_module_table";
-import { UartModuleTable } from "../tables/uart_tables/uart_module_table";
-import { logger } from "../../logger";
+import { I2cModuleTable } from "../tables/i2c_tables/i2c_module_table.js";
+import { UartModuleTable } from "../tables/uart_tables/uart_module_table.js";
+import { logger } from "../../logger.js";
 import { Guid } from "guid-typescript";
-import { ScriptsDeploymentTable } from "../tables/script_tables/scripts_deployment_table";
-import { GpioChannelsTable } from "../tables/controller_tables/gpio_channels_table";
-import { UartChannel } from "astros-common/dist/control_module/uart/uart_channel";
-import { MaestroChannelTable } from "../tables/uart_tables/maestro_channels_table";
-import { KangarooX2Table } from "../tables/uart_tables/kangaroo_x2_table";
-import { MaestroBoardsTable } from "../tables/uart_tables/maestro_boards_table";
-import { moduleSubTypeToScriptEventTypes } from "astros-common/dist/scripts/script_event";
+import { ScriptsDeploymentTable } from "../tables/script_tables/scripts_deployment_table.js";
+import { GpioChannelsTable } from "../tables/controller_tables/gpio_channels_table.js";
+
+import { MaestroChannelTable } from "../tables/uart_tables/maestro_channels_table.js";
+import { KangarooX2Table } from "../tables/uart_tables/kangaroo_x2_table.js";
+import { MaestroBoardsTable } from "../tables/uart_tables/maestro_boards_table.js";
+
 
 export class ScriptRepository {
   private characters =
@@ -298,7 +300,7 @@ export class ScriptRepository {
         result = new UartChannel(
           val[0].id,
           val[0].id,
-          val[0].name,
+          val[0].moduleName,
           val[0].uartType,
           true,
         );
@@ -325,7 +327,7 @@ export class ScriptRepository {
     this.dao
       .get(I2cModuleTable.select, [moduleId])
       .then((val: any) => {
-        result = new I2cChannel(val[0].id, val[0].id, val[0].name, true);
+        result = new I2cChannel(val[0].id, val[0].id, val[0].moduleName, true);
       })
       .catch((err) => {
         logger.error(err);

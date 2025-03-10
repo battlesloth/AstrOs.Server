@@ -1,5 +1,5 @@
-import { ControllersTable } from "./controllers_table";
-import { LocationsTable } from "./locations_table";
+import { ControllersTable } from "./controllers_table.js";
+import { LocationsTable } from "./locations_table.js";
 
 export class ControllerLocationTable {
   public static readonly table = "controller_location";

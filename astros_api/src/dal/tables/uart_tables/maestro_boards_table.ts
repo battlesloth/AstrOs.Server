@@ -1,4 +1,4 @@
-import { UartModuleTable } from "./uart_module_table";
+import { UartModuleTable } from "./uart_module_table.js";
 
 export class MaestroBoardsTable {
   public static readonly table = "maestro_boards";

@@ -3,8 +3,8 @@ export class MaestroChannelTable {
   public static readonly id = "id";
   public static readonly boardId = "boardId";
   public static readonly channelNumber = "channelNumber";
-  public static readonly channelName = "name";
-  public static readonly enabled = "enable";
+  public static readonly channelName = "channelName";
+  public static readonly enabled = "enabled";
   public static readonly isServo = "isServo";
   public static readonly minPos = "minPos";
   public static readonly maxPos = "maxPos";
@@ -25,7 +25,7 @@ export class MaestroChannelTable {
         UNIQUE(${this.boardId}, ${this.channelNumber}))`;
 
   public static readonly insert = `INSERT INTO ${this.table} (
-        ${this.id}
+        ${this.id},
         ${this.boardId}, 
         ${this.channelNumber}, 
         ${this.channelName}, 

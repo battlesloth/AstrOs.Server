@@ -1,7 +1,7 @@
 import { M5Page, M5ScriptList, M5Button } from "astros-common";
-import { DataAccess } from "../dal/data_access";
-import { RemoteConfigRepository } from "../dal/repositories/remote_config_repository";
-import { logger } from "../logger";
+import { DataAccess } from "../dal/data_access.js";
+import { RemoteConfigRepository } from "../dal/repositories/remote_config_repository.js";
+import { logger } from "../logger.js";
 
 export class RemoteConfigController {
   public static getRoute = "/remoteConfig/";

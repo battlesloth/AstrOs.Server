@@ -1,7 +1,7 @@
 import passport from "passport";
 import jsonwebtoken from "jsonwebtoken";
-import { logger } from "../logger";
-import { User } from "../models/users";
+import { logger } from "../logger.js";
+import { User } from "../models/users.js";
 
 export class AuthContoller {
   public static route = "/login";

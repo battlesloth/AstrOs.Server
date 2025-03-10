@@ -1,7 +1,7 @@
-import { logger } from "../../logger";
-import { DataAccess } from "../data_access";
-import { LocationsTable } from "../tables/controller_tables/locations_table";
-import { ControllerLocationTable } from "../tables/controller_tables/controller_location_table";
+import { logger } from "../../logger.js";
+import { DataAccess } from "../data_access.js";
+import { LocationsTable } from "../tables/controller_tables/locations_table.js";
+import { ControllerLocationTable } from "../tables/controller_tables/controller_location_table.js";
 import {
   ControlModule,
   ControllerLocation,
@@ -15,12 +15,12 @@ import {
   ModuleSubType,
   UartModule,
 } from "astros-common";
-import { UartModuleTable } from "../tables/uart_tables/uart_module_table";
-import { I2cModuleTable } from "../tables/i2c_tables/i2c_module_table";
-import { GpioChannelsTable } from "../tables/controller_tables/gpio_channels_table";
-import { MaestroBoardsTable } from "../tables/uart_tables/maestro_boards_table";
-import { MaestroChannelTable } from "../tables/uart_tables/maestro_channels_table";
-import { KangarooX2Table } from "../tables/uart_tables/kangaroo_x2_table";
+import { UartModuleTable } from "../tables/uart_tables/uart_module_table.js";
+import { I2cModuleTable } from "../tables/i2c_tables/i2c_module_table.js";
+import { GpioChannelsTable } from "../tables/controller_tables/gpio_channels_table.js";
+import { MaestroBoardsTable } from "../tables/uart_tables/maestro_boards_table.js";
+import { MaestroChannelTable } from "../tables/uart_tables/maestro_channels_table.js";
+import { KangarooX2Table } from "../tables/uart_tables/kangaroo_x2_table.js";
 
 interface UartMods {
   id: string;
@@ -154,7 +154,7 @@ export class LocationsRepository {
         val.forEach((uart: any) => {
           const module = new UartModule(
             uart.id,
-            uart.name,
+            uart.moduleName,
             uart.locationId,
             uart.uartType,
             uart.uartChannel,
@@ -192,7 +192,7 @@ export class LocationsRepository {
         val.forEach((i2c: any) => {
           const module = new I2cModule(
             i2c.id,
-            i2c.name,
+            i2c.moduleName,
             i2c.locationId,
             i2c.i2cAddress,
             i2c.i2cType,
@@ -216,7 +216,7 @@ export class LocationsRepository {
             ch.channelId,
             ch.enabled,
             ch.channelName,
-            ch.defaultLow
+            ch.defaultLow,
           );
         });
       });
@@ -387,7 +387,7 @@ export class LocationsRepository {
       .get(UartModuleTable.selectAllForLocation, [locationId])
       .then((val: any) => {
         for (const m of val) {
-          uartMods.push({ id: m.id, name: m.name, type: m.uartType });
+          uartMods.push({ id: m.id, name: m.moduleName, type: m.uartType });
         }
       })
       .catch((err: any) => {
@@ -585,13 +585,13 @@ export class LocationsRepository {
               c.id,
               board.id,
               c.channelName,
-              c.enabled,
+              c.enabled > 0,
               c.channelNumber,
-              c.isServo,
+              c.isServo > 0,
               c.minPos,
               c.maxPos,
               c.homePos,
-              c.inverted,
+              c.inverted > 0,
             );
 
             board.channels.push(ch);

@@ -5,10 +5,10 @@ import {
     Script, ScriptChannel, ScriptEvent, ServoEvent, ChannelSubType, ServoChannel,
     UartChannel, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, HcrCommand, HcrCommandCategory,
     GpioEvent,
-    GpioChannel
+    GpioChannel,
 } from "astros-common";
-import { UartType } from "astros-common/dist/astros_enums";
-import { ScriptConverter, CommandType } from "../src/script_converter";
+
+import { ScriptConverter, CommandType } from '../src/script_converter.js';
 
 
 const generateKangarooEvent = (time: number, ch1Action: KangarooAction, ch1Speed: number, ch1Position: number,
