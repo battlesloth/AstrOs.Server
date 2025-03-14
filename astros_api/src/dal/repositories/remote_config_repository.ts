@@ -1,43 +1,32 @@
-import { M5Page } from "astros-common";
-import { DataAccess } from "../../dal/data_access.js";
 import { logger } from "../../logger.js";
-import { RemoteConfigTable } from "../tables/remote_config_table.js";
+import { db } from "../database.js";
 
 export class RemoteConfigRepository {
-  dao: DataAccess;
-
-  constructor(dao: DataAccess) {
-    this.dao = dao;
-    this.dao.connect();
-  }
-
   async getConfig(type: string) {
-    const result = await this.dao
-      .get(RemoteConfigTable.select, [type])
-      .then((val: any) => {
-        return val[0];
-      })
+    const result = await db
+      .selectFrom("remote_config")
+      .selectAll()
+      .where("type", "=", type)
+      .executeTakeFirstOrThrow()
       .catch((err) => {
         logger.error(err);
-        return new Array<M5Page>();
+        throw err;
       });
 
-    return result;
+    return result.value;
   }
 
   async saveConfig(type: string, json: string): Promise<boolean> {
-    await this.dao
-      .get(RemoteConfigTable.insert, [type, json])
-      .then((val: any) => {
-        if (val) {
-          logger.info(val);
-        }
-      })
+    const data = await db
+      .updateTable("remote_config")
+      .set("value", json)
+      .where("type", "=", type)
+      .executeTakeFirstOrThrow()
       .catch((err) => {
         logger.error(err);
-        return false;
+        throw err;
       });
 
-    return true;
+    return data.numUpdatedRows > 0;
   }
 }

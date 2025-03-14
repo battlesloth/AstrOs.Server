@@ -1,5 +1,4 @@
 import { RequestHandler } from "express";
-import { DataAccess } from "./dal/data_access.js";
 import { SettingsRepository } from "./dal/repositories/settings_repository.js";
 import { logger } from "./logger.js";
 
@@ -7,8 +6,7 @@ export function ApiKeyValidator(): RequestHandler {
   return async (req, res, next) => {
     logger.info("Validating API key", req);
 
-    const dao = new DataAccess();
-    const settings = new SettingsRepository(dao);
+    const settings = new SettingsRepository();
 
     const token = await settings.getSetting("apikey");
 

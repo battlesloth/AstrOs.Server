@@ -158,7 +158,7 @@ export class ModulesComponent implements AfterViewInit {
 
     // always filter out the master controller since it's always the body module
     this.possibleControllers = response.controllers.filter(
-      (controller: ControlModule) => controller.id !== 1,
+      (controller: ControlModule) => controller.address !== "00:00:00:00:00:00",
     );
 
     this.availableCoreControllers = this.possibleControllers.filter(
@@ -343,7 +343,8 @@ export class ModulesComponent implements AfterViewInit {
       return;
     }
 
-    const defaultChannel = controller.locationName === AstrOsConstants.BODY ? 2 : 1;
+    const defaultChannel =
+      controller.locationName === AstrOsConstants.BODY ? 2 : 1;
 
     const module = new UartModule(
       crypto.randomUUID(),
@@ -516,6 +517,8 @@ export class ModulesComponent implements AfterViewInit {
         this.snackBar.okToast('Module settings save failed!');
       },
     };
+
+    console.log(JSON.stringify(this.bodyLocation));
 
     this.controllerService
       .saveLocations(

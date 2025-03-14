@@ -204,14 +204,14 @@ export class SerialMessageService {
       case SerialMessageType.DEPLOY_CONFIG:
         for (const controller of failed) {
           const csr = new ConfigSyncResponse(false);
-          csr.controller = new ControlModule(0, "", controller);
+          csr.controller = new ControlModule("", "", controller);
           result.push(csr);
         }
         break;
       case SerialMessageType.DEPLOY_SCRIPT:
         for (const controller of failed) {
           const sdr = new ScriptDeployResponse(false, tracker.metaData);
-          sdr.controller = new ControlModule(0, "", controller);
+          sdr.controller = new ControlModule("", "", controller);
           result.push(sdr);
         }
         break;

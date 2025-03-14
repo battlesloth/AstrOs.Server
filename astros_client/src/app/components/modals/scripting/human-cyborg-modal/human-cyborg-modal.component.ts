@@ -101,10 +101,10 @@ export class HumanCyborgModalComponent
 
     const temp = this.scriptEvent.event as HumanCyborgRelationsEvent;
 
-    if (temp !== undefined){ 
+    if (temp !== undefined) {
       this.selectedCommands.push(...temp.commands);
     }
-    
+
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;
   }

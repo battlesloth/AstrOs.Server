@@ -1,40 +1,34 @@
-import { DataAccess } from "../data_access.js";
+import { db } from "../database.js";
 import { logger } from "../../logger.js";
-import { SettingsTable } from "../tables/settings_table.js";
 
 export class SettingsRepository {
-  dao: DataAccess;
-
-  constructor(dao: DataAccess) {
-    this.dao = dao;
-    this.dao.connect();
-  }
-
   async getSetting(type: string): Promise<string> {
-    const result = await this.dao
-      .get(SettingsTable.select, [type])
-      .then((val: any) => {
-        return val[0].value;
-      })
+    await db
+      .selectFrom("settings")
+      .selectAll()
+      .where("key", "=", type)
+      .executeTakeFirstOrThrow()
       .catch((err) => {
         logger.error(err);
-        return "";
+        throw err;
       });
 
-    return result;
+    return "error";
   }
 
   async saveSetting(key: string, value: string): Promise<boolean> {
-    await this.dao
-      .get(SettingsTable.insert, [key, value])
-      .then((val: any) => {
-        if (val) {
-          logger.info(val);
-        }
-      })
+    await db
+      .insertInto("settings")
+      .values({ key, value })
+      .onConflict((c) =>
+        c.columns(["key"]).doUpdateSet((eb) => ({
+          value: eb.ref("excluded.value"),
+        })),
+      )
+      .execute()
       .catch((err) => {
         logger.error(err);
-        return false;
+        throw err;
       });
 
     return true;

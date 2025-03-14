@@ -8,7 +8,6 @@ import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
-
 @Component({
   selector: 'app-servo-event-modal',
   templateUrl: './servo-event-modal.component.html',
@@ -20,7 +19,8 @@ import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 })
 export class ServoEventModalComponent
   extends BaseEventModalComponent
-  implements OnInit {
+  implements OnInit
+{
   speed: number;
   position: number;
   acceleration: number;
@@ -55,8 +55,7 @@ export class ServoEventModalComponent
       this.position = 0;
       this.speed = 0;
       this.acceleration = 0;
-    }
-    else if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+    } else if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
       const temp = this.scriptEvent.event as MaestroEvent;
       this.position = temp.position;
       this.speed = temp.speed;
@@ -85,7 +84,7 @@ export class ServoEventModalComponent
 
       this.scriptEvent.event = data;
     }
-    
+
     const evt = new ModalCallbackEvent(this.callbackType, {
       scriptEvent: this.scriptEvent,
       time: this.originalEventTime * this.timeFactor,

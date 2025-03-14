@@ -4,11 +4,14 @@ import {
   Meta,
   StoryObj,
 } from '@storybook/angular';
-import { KangarooEventModalComponent, KangarooEventModalResources } from './kangaroo-event-modal.component';
+import {
+  KangarooEventModalComponent,
+  KangarooEventModalResources,
+} from './kangaroo-event-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
-import { 
+import {
   KangarooAction,
-  KangarooEvent, 
+  KangarooEvent,
   KangarooX2,
   ModuleSubType,
   ModuleType,
@@ -16,7 +19,6 @@ import {
 } from 'astros-common';
 import { v4 as uuid } from 'uuid';
 import { ScriptEventModalResources } from '../base-event-modal/base-event-modal.component';
-import { get } from 'http';
 
 const meta: Meta<KangarooEventModalComponent> = {
   title: 'Modals/Scripting/KangarooEventModal',
@@ -52,22 +54,18 @@ export const UndefinedEvent = {
   },
 };
 
-function getKangarooModule(){
- return new KangarooX2(
-  uuid(),
-  "Lifter",
-  "Spinner"
- ); 
+function getKangarooModule() {
+  return new KangarooX2(uuid(), 'Lifter', 'Spinner');
 }
 
-function getKangarooEvent(undefinedEvt: boolean = false): ScriptEvent {
+function getKangarooEvent(undefinedEvt = false): ScriptEvent {
   const evt = new KangarooEvent(
     KangarooAction.position,
     100,
     200,
     KangarooAction.start,
     0,
-    0
+    0,
   );
 
   return new ScriptEvent(
@@ -75,6 +73,6 @@ function getKangarooEvent(undefinedEvt: boolean = false): ScriptEvent {
     ModuleType.uart,
     ModuleSubType.kangaroo,
     5000,
-    undefinedEvt ? undefined : evt
+    undefinedEvt ? undefined : evt,
   );
 }

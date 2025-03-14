@@ -26,7 +26,7 @@ import {
 } from 'astros-common';
 import EventMarkerHelper from './helper/event-marker-helper';
 import { FormsModule } from '@angular/forms';
-import { NgFor, NgIf, Time } from '@angular/common';
+import { NgFor, NgIf } from '@angular/common';
 import {
   ModuleChannelChangedEvent,
   ScriptRowComponent,
@@ -369,51 +369,48 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   //#region event modal
 
   openNewEventModal(event: unknown) {
-
     const evt = event as MenuItemDetails;
     console.log(evt);
 
-
     let time = 0;
 
-      const line = document.getElementById(`script-row-${evt.timeline}`);
-      const scrollContainer = document.getElementById('scripter-container');
+    const line = document.getElementById(`script-row-${evt.timeline}`);
+    const scrollContainer = document.getElementById('scripter-container');
 
-      if (line != null && scrollContainer != null) {
-        const clickPos =
-          (evt.xPos as number) + scrollContainer.scrollLeft - line.offsetLeft;
+    if (line != null && scrollContainer != null) {
+      const clickPos =
+        (evt.xPos as number) + scrollContainer.scrollLeft - line.offsetLeft;
 
-        time = Math.floor(clickPos / this.segmentWidth);
+      time = Math.floor(clickPos / this.segmentWidth);
 
-        const left = time * this.segmentWidth;
+      const left = time * this.segmentWidth;
 
-        if (Math.floor(clickPos) - left >= 30) {
-          time += 1;
-        }
-      } else {
-        this.snackBar.okToast('Could not determine event time!');
-        console.log('could not determine event time');
-        return;
+      if (Math.floor(clickPos) - left >= 30) {
+        time += 1;
       }
+    } else {
+      this.snackBar.okToast('Could not determine event time!');
+      console.log('could not determine event time');
+      return;
+    }
 
-      const chIdx = this.scriptChannels
-        .map((ch) => {
-          return ch.id;
-        })
-        .indexOf(evt.timeline as string);
+    const chIdx = this.scriptChannels
+      .map((ch) => {
+        return ch.id;
+      })
+      .indexOf(evt.timeline as string);
 
-      const ch = this.scriptChannels[chIdx];
+    const ch = this.scriptChannels[chIdx];
 
-      const scriptEvent = new ScriptEvent(
-        ch.id,
-        ch.moduleChannel.moduleType,
-        ch.moduleChannel.moduleSubType,
-        time,
-        undefined
-      );
+    const scriptEvent = new ScriptEvent(
+      ch.id,
+      ch.moduleChannel.moduleType,
+      ch.moduleChannel.moduleSubType,
+      time,
+      undefined,
+    );
 
-      this.createEventModal(scriptEvent, false);
-    
+    this.createEventModal(scriptEvent, false);
   }
 
   openEditEventModal(channelId: string, time: number) {
@@ -451,7 +448,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       case ModuleType.uart:
         switch (event.moduleSubType) {
           case ModuleSubType.genericSerial: {
-            component = this.container.createComponent(UartEventModalComponent);    
+            component = this.container.createComponent(UartEventModalComponent);
             break;
           }
           case ModuleSubType.kangaroo: {
@@ -545,9 +542,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
   //#region script row callbacks
 
-  /* eslint-disable  @typescript-eslint/no-explicit-any */
   timelineCallback(msg: TimeLineEvent) {
-    /* eslint-enable  @typescript-eslint/no-explicit-any */
     msg.event.preventDefault();
 
     this.menuTopLeft.x = msg.event.clientX;

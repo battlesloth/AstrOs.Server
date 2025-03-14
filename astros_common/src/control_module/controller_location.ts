@@ -27,7 +27,7 @@ export class ControllerLocation {
     this.description = description;
     this.configFingerprint = configFingerprint;
 
-    this.controller = new ControlModule(0, "", "");
+    this.controller = new ControlModule("", "", "");
 
     this.gpioModule = new GpioModule(id);
 

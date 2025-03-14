@@ -11,7 +11,7 @@ import {
   GenericSerialEvent,
   ModuleSubType,
   ModuleType,
-  ScriptEvent
+  ScriptEvent,
 } from 'astros-common';
 import { v4 as uuid } from 'uuid';
 
@@ -34,7 +34,7 @@ type Story = StoryObj<UartEventModalComponent>;
 export const Default: Story = {
   args: {
     resources: new Map([
-      [ScriptEventModalResources.scriptEvent, getScriptEvent()]
+      [ScriptEventModalResources.scriptEvent, getScriptEvent()],
     ]),
   },
 };
@@ -47,14 +47,14 @@ export const UndefinedEvent = {
   },
 };
 
-function getScriptEvent(undefinedEvt: boolean = false): ScriptEvent {
-  const uartEvent = new GenericSerialEvent("test message");
+function getScriptEvent(undefinedEvt = false): ScriptEvent {
+  const uartEvent = new GenericSerialEvent('test message');
 
   return new ScriptEvent(
     uuid(),
     ModuleType.uart,
     ModuleSubType.genericSerial,
     4000,
-    undefinedEvt ? undefined : uartEvent
-  )
+    undefinedEvt ? undefined : uartEvent,
+  );
 }

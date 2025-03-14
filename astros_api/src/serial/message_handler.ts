@@ -66,7 +66,7 @@ export class MessageHandler {
       return response;
     }
 
-    const module = new ControlModule(0, parts[1], parts[0]);
+    const module = new ControlModule("", parts[1], parts[0]);
     module.fingerprint = parts[2];
     response.controller = module;
 
@@ -86,7 +86,7 @@ export class MessageHandler {
         continue;
       }
 
-      const module = new ControlModule(0, units[1], units[0]);
+      const module = new ControlModule("", units[1], units[0]);
 
       response.registrations.push(module);
     }
@@ -105,7 +105,7 @@ export class MessageHandler {
       return response;
     }
 
-    const module = new ControlModule(0, parts[1], parts[0]);
+    const module = new ControlModule("", parts[1], parts[0]);
     module.fingerprint = parts[2];
     response.controller = module;
 
@@ -131,7 +131,7 @@ export class MessageHandler {
 
     const response = new ScriptDeployResponse(success, parts[2]);
 
-    const module = new ControlModule(0, parts[1], parts[0]);
+    const module = new ControlModule("", parts[1], parts[0]);
     response.controller = module;
 
     return response;
@@ -156,7 +156,7 @@ export class MessageHandler {
 
     const response = new ScriptRunResponse(success, parts[2]);
 
-    const module = new ControlModule(0, parts[1], parts[0]);
+    const module = new ControlModule("", parts[1], parts[0]);
     response.controller = module;
 
     return response;

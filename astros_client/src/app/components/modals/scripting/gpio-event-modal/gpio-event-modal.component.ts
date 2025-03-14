@@ -1,5 +1,10 @@
 import { Component, OnInit } from '@angular/core';
-import { GpioEvent, MaestroEvent, ModuleSubType, ScriptEvent } from 'astros-common';
+import {
+  GpioEvent,
+  MaestroEvent,
+  ModuleSubType,
+  ScriptEvent,
+} from 'astros-common';
 import {
   BaseEventModalComponent,
   ScriptEventModalResources,
@@ -7,7 +12,6 @@ import {
 import { FormsModule } from '@angular/forms';
 import { DecimalPipe } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
-
 
 @Component({
   selector: 'app-gpio-event-modal',
@@ -50,8 +54,7 @@ export class GpioEventModalComponent
 
     if (this.scriptEvent.event === undefined) {
       this.state = 0;
-    }
-    else if (this.scriptEvent.moduleSubType === ModuleSubType.genericGpio) {
+    } else if (this.scriptEvent.moduleSubType === ModuleSubType.genericGpio) {
       const temp = this.scriptEvent.event as GpioEvent;
       this.state = temp.setHigh ? 1 : 0;
     } else if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
@@ -59,7 +62,6 @@ export class GpioEventModalComponent
       this.state = temp.position >= 1500 ? 1 : 0;
     }
 
-    
     this.originalEventTime = this.scriptEvent.time / this.timeFactor;
     this.eventTime = this.scriptEvent.time / this.timeFactor;
   }

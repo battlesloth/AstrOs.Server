@@ -7,7 +7,15 @@ import {
 import { HumanCyborgModalComponent } from './human-cyborg-modal.component';
 import { ModalComponent } from '../../modal-base/modal.component';
 import { ScriptEventModalResources } from '../base-event-modal/base-event-modal.component';
-import { HcrCommand, HcrCommandCategory, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, ModuleSubType, ModuleType, ScriptEvent } from 'astros-common';
+import {
+  HcrCommand,
+  HcrCommandCategory,
+  HumanCyborgRelationsCmd,
+  HumanCyborgRelationsEvent,
+  ModuleSubType,
+  ModuleType,
+  ScriptEvent,
+} from 'astros-common';
 import { v4 as uuid } from 'uuid';
 
 const meta: Meta<HumanCyborgModalComponent> = {
@@ -37,41 +45,36 @@ export const Default: Story = {
 export const UndefinedEvent = {
   args: {
     resources: new Map([
-      [ScriptEventModalResources.scriptEvent, 
-       getScriptEvent(true)], 
-      ],
-    ),
+      [ScriptEventModalResources.scriptEvent, getScriptEvent(true)],
+    ]),
   },
-} 
+};
 
-function getScriptEvent(undefinedEvt: boolean = false): ScriptEvent {
+function getScriptEvent(undefinedEvt = false): ScriptEvent {
   return new ScriptEvent(
     uuid(),
     ModuleType.uart,
     ModuleSubType.humanCyborgRelationsSerial,
     3000,
-    undefinedEvt ? undefined : getHcrEvents()
+    undefinedEvt ? undefined : getHcrEvents(),
   );
 }
 
 function getHcrEvents(): HumanCyborgRelationsEvent {
-  
-    return new HumanCyborgRelationsEvent(
-      [
-        new HcrCommand(
-          uuid(),
-          HcrCommandCategory.stimuli,
-          HumanCyborgRelationsCmd.mildHappy,
-          0,
-          0
-        ),
-        new HcrCommand(
-          uuid(),
-          HcrCommandCategory.stop,
-          HumanCyborgRelationsCmd.panicStop,
-          0,
-          0
-        ),
-      ]
-    );
+  return new HumanCyborgRelationsEvent([
+    new HcrCommand(
+      uuid(),
+      HcrCommandCategory.stimuli,
+      HumanCyborgRelationsCmd.mildHappy,
+      0,
+      0,
+    ),
+    new HcrCommand(
+      uuid(),
+      HcrCommandCategory.stop,
+      HumanCyborgRelationsCmd.panicStop,
+      0,
+      0,
+    ),
+  ]);
 }

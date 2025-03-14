@@ -1,7 +1,7 @@
 import { ControlModule } from "astros-common";
 
 export class ScriptConfig {
-  id: number;
+  id: string;
   name: string;
   address: string;
   script: string;

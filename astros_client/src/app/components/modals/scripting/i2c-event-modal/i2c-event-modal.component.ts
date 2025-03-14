@@ -19,7 +19,8 @@ import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 })
 export class I2cEventModalComponent
   extends BaseEventModalComponent
-  implements OnInit {
+  implements OnInit
+{
   channelId!: number;
   message: string;
 

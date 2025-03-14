@@ -44,7 +44,6 @@ export class UartEventModalComponent
       element?.classList.remove('hidden');
     }
 
-
     this.scriptEvent = this.resources.get(
       ScriptEventModalResources.scriptEvent,
     ) as ScriptEvent;

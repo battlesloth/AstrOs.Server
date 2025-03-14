@@ -1,7 +1,7 @@
 import { ControllerLocation } from "astros-common";
 
 export class ControllerConfig {
-  id: number;
+  id: string;
   location: string;
   name: string;
   address: string;

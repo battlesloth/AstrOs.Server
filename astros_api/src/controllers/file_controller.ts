@@ -1,5 +1,4 @@
 import appdata from "appdata-path";
-import { DataAccess } from "../dal/data_access.js";
 import { AudioFileRepository } from "../dal/repositories/audio_file_repository.js";
 import { v4 as uuid_v4 } from "uuid";
 import { UploadedFile } from "express-fileupload";
@@ -42,8 +41,7 @@ export class FileController {
         }
       });
 
-      const dao = new DataAccess();
-      const repo = new AudioFileRepository(dao);
+      const repo = new AudioFileRepository();
 
       await repo.insertFile(filename, file.name);
 
@@ -55,8 +53,7 @@ export class FileController {
   }
 
   public static async UpdateFileDurations() {
-    const dao = new DataAccess();
-    const repo = new AudioFileRepository(dao);
+    const repo = new AudioFileRepository();
 
     const files = await repo.filesNeedingDuration();
 

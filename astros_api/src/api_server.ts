@@ -19,7 +19,6 @@ import { Worker } from "worker_threads";
 
 import { pinoHttp } from "pino-http";
 
-import { DataAccess } from "./dal/data_access.js";
 import { UserRepository } from "./dal/repositories/user_repository.js";
 import { LocationsController } from "./controllers/locations_controller.js";
 import { AuthContoller } from "./controllers/authentication_controller.js";
@@ -57,7 +56,9 @@ import {
 import { LocationsRepository } from "./dal/repositories/locations_repository.js";
 import { ServoTest } from "./models/servo_test.js";
 
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from "url";
+
+import { db, migrateToLatest } from "./dal/database.js";
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -75,7 +76,7 @@ interface IWebSocketMessage {
 }
 
 interface IServoTestData {
-  controllerId: number;
+  controllerId: string;
   servoId: number;
   value: number;
 }
@@ -148,8 +149,7 @@ class ApiServer {
           usernameField: "username",
         },
         async (username: string, password: string, done) => {
-          const dao = new DataAccess();
-          const repository = new UserRepository(dao);
+          const repository = new UserRepository();
 
           const user = await repository.getByUsername(username);
 
@@ -173,8 +173,15 @@ class ApiServer {
   }
 
   private async configApi(): Promise<void> {
-    const da = new DataAccess();
-    await da.setup();
+    try {
+      migrateToLatest(db);
+    } catch (error) {
+      logger.error("Error migrating database", error);
+      process.exit(1);
+    }
+
+    //const da = new DataAccess();
+    //await da.setup();
 
     const loggerMiddleware = pinoHttp({
       logger: logger,
@@ -473,8 +480,7 @@ class ApiServer {
     try {
       const val = msg as RegistrationResponse;
 
-      const dao = new DataAccess();
-      const controllerRepo = new ControllerRepository(dao);
+      const controllerRepo = new ControllerRepository();
 
       await controllerRepo.insertControllers(val.registrations);
 
@@ -491,9 +497,8 @@ class ApiServer {
     try {
       const val = msg as PollRepsonse;
 
-      const dao = new DataAccess();
-      const controlerRepo = new ControllerRepository(dao);
-      const locationRepo = new LocationsRepository(dao);
+      const controlerRepo = new ControllerRepository();
+      const locationRepo = new LocationsRepository();
 
       const controller = await controlerRepo.getControllerByAddress(
         val.controller.address,
@@ -534,9 +539,7 @@ class ApiServer {
     try {
       const val = msg as ConfigSyncResponse;
 
-      const dao = new DataAccess();
-
-      const locationRepo = new LocationsRepository(dao);
+      const locationRepo = new LocationsRepository();
 
       const locationId = await locationRepo.getLocationIdByController(
         val.controller.address,
@@ -562,10 +565,8 @@ class ApiServer {
     try {
       const val = msg as ConfigSyncResponse;
 
-      const dao = new DataAccess();
-      const locationRepo = new LocationsRepository(dao);
-      0;
-      const scriptRepo = new ScriptRepository(dao);
+      const locationRepo = new LocationsRepository();
+      const scriptRepo = new ScriptRepository();
 
       const locId = await locationRepo.getLocationIdByController(
         val.controller.address,
@@ -630,8 +631,7 @@ class ApiServer {
     try {
       logger.info("syncing controller config");
 
-      const dao = new DataAccess();
-      const repo = new LocationsRepository(dao);
+      const repo = new LocationsRepository();
 
       const locations = await repo.loadLocations();
 
@@ -674,9 +674,8 @@ class ApiServer {
 
       const id = req.query.id;
 
-      const dao = new DataAccess();
-      const scriptRepo = new ScriptRepository(dao);
-      const locationsRepo = new LocationsRepository(dao);
+      const scriptRepo = new ScriptRepository();
+      const locationsRepo = new LocationsRepository();
 
       const script = (await scriptRepo.getScript(id)) as Script;
 
@@ -719,8 +718,7 @@ class ApiServer {
 
       const id = req.query.id;
 
-      const dao = new DataAccess();
-      const ctlRepo = new LocationsRepository(dao);
+      const ctlRepo = new LocationsRepository();
 
       const locations = await ctlRepo.loadLocations();
 
@@ -753,8 +751,7 @@ class ApiServer {
     try {
       logger.info("sending direct command");
 
-      const dao = new DataAccess();
-      const repo = new ControllerRepository(dao);
+      const repo = new ControllerRepository();
 
       const controller = await repo.getControllerById(req.body.controller);
 
@@ -786,8 +783,7 @@ class ApiServer {
       // this will hammer logs
       //logger.debug(`sending servo command: ${data.controllerId}:${data.servoId}:${data.value}`);
 
-      const dao = new DataAccess();
-      const repo = new ControllerRepository(dao);
+      const repo = new ControllerRepository();
 
       const controller = await repo.getControllerById(data.controllerId);
 

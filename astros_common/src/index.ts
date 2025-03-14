@@ -22,11 +22,11 @@ export { GpioModule } from "./control_module/gpio/gpio_module";
 export { Script } from "./scripts/script";
 export { ScriptChannel } from "./scripts/script_channel";
 export { ScriptChannelResource } from "./scripts/script_channel_resource";
-export { 
-  ScriptEvent, 
+export {
+  ScriptEvent,
   ScriptEventTypes,
-  moduleSubTypeToScriptEventTypes
- } from "./scripts/script_event";
+  moduleSubTypeToScriptEventTypes,
+} from "./scripts/script_event";
 export { KangarooAction, KangarooEvent } from "./scripts/events/kangaroo_event";
 export {
   HumanCyborgRelationsEvent,

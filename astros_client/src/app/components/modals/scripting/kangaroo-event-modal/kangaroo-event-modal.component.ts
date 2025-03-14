@@ -28,8 +28,8 @@ export class KangarooEventModalResources {
 })
 export class KangarooEventModalComponent
   extends BaseEventModalComponent
-  implements OnInit {
-
+  implements OnInit
+{
   kangaroo!: KangarooX2;
 
   channel1: string;

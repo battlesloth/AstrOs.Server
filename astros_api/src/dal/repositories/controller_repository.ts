@@ -1,126 +1,119 @@
-import { DataAccess } from "../../dal/data_access.js";
+import { db, inserted } from "../../dal/database.js";
 import { ControlModule } from "astros-common";
-import { ControllersTable } from "../tables/controller_tables/controllers_table.js";
 import { logger } from "../../logger.js";
+import { v4 as uuid } from "uuid";
 
 export class ControllerRepository {
-  dao: DataAccess;
+  public async insertControllers(
+    controllers: ControlModule[],
+  ): Promise<boolean> {
+    const wasInserted: boolean[] = [];
 
-  constructor(dao: DataAccess) {
-    this.dao = dao;
-    this.dao.connect();
-  }
-
-  public async insertControllers(controllers: any) {
     for (let i = 0; i < controllers.length; i++) {
-      await this.dao
-        .run(ControllersTable.insert, [
-          controllers[i].name,
-          controllers[i].address,
-        ])
-        .catch((err: any) => {
+      const result = await db
+        .insertInto("controllers")
+        .values({
+          id: uuid(),
+          name: controllers[i].name,
+          description: "",
+          address: controllers[i].address,
+        })
+        .executeTakeFirst()
+        .catch((err) => {
           logger.error(err);
-          throw "error";
+          throw err;
         });
+
+      if (inserted(result)) {
+        wasInserted.push(true);
+      }
     }
+
+    return wasInserted.length === controllers.length;
   }
 
-  public async insertController(controller: ControlModule): Promise<number> {
-    let id = -1;
+  public async insertController(controller: ControlModule): Promise<string> {
+    const id = uuid();
 
-    await this.dao
-      .get(ControllersTable.insert, [controller.name, controller.address])
-      .then((val: any) => {
-        id = val[0].id;
+    const result = await db
+      .insertInto("controllers")
+      .values({
+        id: id,
+        name: controller.name,
+        description: "",
+        address: controller.address,
       })
-      .catch((err: any) => {
+      .executeTakeFirst()
+      .catch((err) => {
         logger.error(err);
-        throw "error";
+        throw err;
       });
 
-    return id;
+    return inserted(result) ? id : "";
   }
 
   public async updateController(controller: ControlModule): Promise<boolean> {
-    await this.dao
-      .run(ControllersTable.update, [
-        controller.name,
-        controller.address,
-        controller.id.toString(),
-      ])
-      .catch((err: any) => {
+    const result = await db
+      .updateTable("controllers")
+      .set({
+        name: controller.name,
+        address: controller.address,
+      })
+      .where("id", "=", controller.id)
+      .executeTakeFirst()
+      .catch((err) => {
         logger.error(err);
-        throw "error";
+        throw err;
       });
 
-    return true;
+    return result.numUpdatedRows > 0;
   }
 
   public async getControllers(): Promise<Array<ControlModule>> {
     const result = new Array<ControlModule>();
-    await this.dao
-      .get(ControllersTable.selectAll, [])
-      .then((val: any) => {
-        for (const c of val) {
-          const control = new ControlModule(
-            c.id,
-            c.controllerName,
-            c.controllerAddress,
-          );
-          result.push(control);
-        }
-      })
-      .catch((err: any) => {
+
+    const data = await db
+      .selectFrom("controllers")
+      .selectAll()
+      .execute()
+      .catch((err) => {
         logger.error(err);
-        throw "error";
+        throw err;
       });
+
+    for (const c of data) {
+      const control = new ControlModule(c.id, c.name, c.address);
+      result.push(control);
+    }
 
     return result;
   }
 
-  public async getControllerById(id: number): Promise<ControlModule | null> {
-    let control = null;
-
-    await this.dao
-      .get(ControllersTable.select, [id.toString()])
-      .then((val: any) => {
-        if (val.length > 0) {
-          control = new ControlModule(
-            id,
-            val[0].controllerName,
-            val[0].controllerAddress,
-          );
-        }
-      })
-      .catch((err: any) => {
+  public async getControllerById(id: string): Promise<ControlModule> {
+    const data = await db
+      .selectFrom("controllers")
+      .selectAll()
+      .where("id", "=", id)
+      .executeTakeFirstOrThrow()
+      .catch((err) => {
         logger.error(err);
-        throw "error";
+        throw err;
       });
 
-    return control;
+    return new ControlModule(data.id, data.name, data.address);
   }
 
-  public async getControllerByAddress(
-    address: string,
-  ): Promise<ControlModule | null> {
-    let control = null;
-
-    await this.dao
-      .get(ControllersTable.selectByAddress, [address])
-      .then((val: any) => {
-        if (val.length > 0) {
-          control = new ControlModule(
-            val[0].id,
-            val[0].controllerName,
-            val[0].controllerAddress,
-          );
-        }
-      })
-      .catch((err: any) => {
+  public async getControllerByAddress(address: string): Promise<ControlModule> {
+    const data = await db
+      .selectFrom("controllers")
+      .selectAll()
+      .where("address", "=", address)
+      .executeTakeFirstOrThrow()
+      .catch((err) => {
         logger.error(err);
-        throw "error";
+        throw err;
       });
 
-    return control;
+    return new ControlModule(data.id, data.name, data.address);
   }
 }

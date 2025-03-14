@@ -2,13 +2,13 @@ import { BaseResponse } from "./base_response";
 import { TransmissionType } from "../astros_enums";
 
 export class StatusResponse extends BaseResponse {
-  controllerId: number;
+  controllerId: string;
   controllerLocation: string;
   up: boolean;
   synced: boolean;
 
   constructor(
-    controllerId: number,
+    controllerId: string,
     controllerLocation: string,
     up: boolean,
     synced: boolean,

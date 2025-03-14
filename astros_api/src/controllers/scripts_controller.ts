@@ -1,4 +1,3 @@
-import { DataAccess } from "../dal/data_access.js";
 import { ScriptRepository } from "../dal/repositories/script_repository.js";
 import { logger } from "../logger.js";
 
@@ -13,8 +12,7 @@ export class ScriptsController {
 
   public static async getAllScripts(req: any, res: any, next: any) {
     try {
-      const dao = new DataAccess();
-      const repo = new ScriptRepository(dao);
+      const repo = new ScriptRepository();
 
       const scripts = await repo.getScripts();
 
@@ -32,8 +30,7 @@ export class ScriptsController {
 
   public static async getScript(req: any, res: any, next: any) {
     try {
-      const dao = new DataAccess();
-      const repo = new ScriptRepository(dao);
+      const repo = new ScriptRepository();
 
       const scripts = await repo.getScript(req.query.id);
 
@@ -51,8 +48,7 @@ export class ScriptsController {
 
   public static async saveScript(req: any, res: any, next: any) {
     try {
-      const dao = new DataAccess();
-      const repo = new ScriptRepository(dao);
+      const repo = new ScriptRepository();
 
       if (await repo.saveScript(req.body)) {
         res.status(200);
@@ -75,8 +71,7 @@ export class ScriptsController {
 
   public static async deleteScript(req: any, res: any, next: any) {
     try {
-      const dao = new DataAccess();
-      const repo = new ScriptRepository(dao);
+      const repo = new ScriptRepository();
 
       await repo.deleteScript(req.query.id);
 
@@ -94,8 +89,7 @@ export class ScriptsController {
 
   public static async copyScript(req: any, res: any, next: any) {
     try {
-      const dao = new DataAccess();
-      const repo = new ScriptRepository(dao);
+      const repo = new ScriptRepository();
 
       const scripts = await repo.copyScript(req.query.id);
 

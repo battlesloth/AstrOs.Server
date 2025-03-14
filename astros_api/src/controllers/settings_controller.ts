@@ -1,5 +1,4 @@
 import { SettingsRepository } from "../dal/repositories/settings_repository.js";
-import { DataAccess } from "../dal/data_access.js";
 import { logger } from "../logger.js";
 import { ControllerRepository } from "../dal/repositories/controller_repository.js";
 
@@ -11,8 +10,7 @@ export class SettingsController {
 
   public static async getSetting(req: any, res: any, next: any) {
     try {
-      const dao = new DataAccess();
-      const repo = new SettingsRepository(dao);
+      const repo = new SettingsRepository();
 
       const setting = await repo.getSetting(req.query.key);
 
@@ -30,8 +28,7 @@ export class SettingsController {
 
   public static async saveSetting(req: any, res: any, next: any) {
     try {
-      const dao = new DataAccess();
-      const repo = new SettingsRepository(dao);
+      const repo = new SettingsRepository();
 
       if (await repo.saveSetting(req.body.key, req.body.value)) {
         res.status(200);
@@ -54,8 +51,7 @@ export class SettingsController {
 
   public static async getControllers(req: any, res: any, next: any) {
     try {
-      const dao = new DataAccess();
-      const repo = new ControllerRepository(dao);
+      const repo = new ControllerRepository();
 
       const controllers = await repo.getControllers();
 
