@@ -3,6 +3,7 @@ import { AudioFileRepository } from "../dal/repositories/audio_file_repository.j
 import { v4 as uuid_v4 } from "uuid";
 import { UploadedFile } from "express-fileupload";
 import { logger } from "../logger.js";
+import { db } from "src/dal/database.js";
 
 // https://github.com/expressjs/multer/blob/master/StorageEngine.md
 export class FileController {
@@ -41,7 +42,7 @@ export class FileController {
         }
       });
 
-      const repo = new AudioFileRepository();
+      const repo = new AudioFileRepository(db);
 
       await repo.insertFile(filename, file.name);
 
@@ -53,7 +54,7 @@ export class FileController {
   }
 
   public static async UpdateFileDurations() {
-    const repo = new AudioFileRepository();
+    const repo = new AudioFileRepository(db);
 
     const files = await repo.filesNeedingDuration();
 

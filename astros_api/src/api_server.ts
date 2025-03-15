@@ -149,7 +149,7 @@ class ApiServer {
           usernameField: "username",
         },
         async (username: string, password: string, done) => {
-          const repository = new UserRepository();
+          const repository = new UserRepository(db);
 
           const user = await repository.getByUsername(username);
 
@@ -480,7 +480,7 @@ class ApiServer {
     try {
       const val = msg as RegistrationResponse;
 
-      const controllerRepo = new ControllerRepository();
+      const controllerRepo = new ControllerRepository(db);
 
       await controllerRepo.insertControllers(val.registrations);
 
@@ -497,8 +497,8 @@ class ApiServer {
     try {
       const val = msg as PollRepsonse;
 
-      const controlerRepo = new ControllerRepository();
-      const locationRepo = new LocationsRepository();
+      const controlerRepo = new ControllerRepository(db);
+      const locationRepo = new LocationsRepository(db);
 
       const controller = await controlerRepo.getControllerByAddress(
         val.controller.address,
@@ -539,7 +539,7 @@ class ApiServer {
     try {
       const val = msg as ConfigSyncResponse;
 
-      const locationRepo = new LocationsRepository();
+      const locationRepo = new LocationsRepository(db);
 
       const locationId = await locationRepo.getLocationIdByController(
         val.controller.address,
@@ -565,8 +565,8 @@ class ApiServer {
     try {
       const val = msg as ConfigSyncResponse;
 
-      const locationRepo = new LocationsRepository();
-      const scriptRepo = new ScriptRepository();
+      const locationRepo = new LocationsRepository(db);
+      const scriptRepo = new ScriptRepository(db);
 
       const locId = await locationRepo.getLocationIdByController(
         val.controller.address,
@@ -631,7 +631,7 @@ class ApiServer {
     try {
       logger.info("syncing controller config");
 
-      const repo = new LocationsRepository();
+      const repo = new LocationsRepository(db);
 
       const locations = await repo.loadLocations();
 
@@ -674,8 +674,8 @@ class ApiServer {
 
       const id = req.query.id;
 
-      const scriptRepo = new ScriptRepository();
-      const locationsRepo = new LocationsRepository();
+      const scriptRepo = new ScriptRepository(db);
+      const locationsRepo = new LocationsRepository(db);
 
       const script = (await scriptRepo.getScript(id)) as Script;
 
@@ -718,7 +718,7 @@ class ApiServer {
 
       const id = req.query.id;
 
-      const ctlRepo = new LocationsRepository();
+      const ctlRepo = new LocationsRepository(db);
 
       const locations = await ctlRepo.loadLocations();
 
@@ -751,7 +751,7 @@ class ApiServer {
     try {
       logger.info("sending direct command");
 
-      const repo = new ControllerRepository();
+      const repo = new ControllerRepository(db);
 
       const controller = await repo.getControllerById(req.body.controller);
 
@@ -783,7 +783,7 @@ class ApiServer {
       // this will hammer logs
       //logger.debug(`sending servo command: ${data.controllerId}:${data.servoId}:${data.value}`);
 
-      const repo = new ControllerRepository();
+      const repo = new ControllerRepository(db);
 
       const controller = await repo.getControllerById(data.controllerId);
 

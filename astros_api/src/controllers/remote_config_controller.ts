@@ -1,6 +1,7 @@
 import { M5Page, M5ScriptList, M5Button } from "astros-common";
 import { RemoteConfigRepository } from "../dal/repositories/remote_config_repository.js";
 import { logger } from "../logger.js";
+import { db } from "src/dal/database.js";
 
 export class RemoteConfigController {
   public static getRoute = "/remoteConfig/";
@@ -10,7 +11,7 @@ export class RemoteConfigController {
     logger.info("Syncing remote config to device");
 
     try {
-      const repo = new RemoteConfigRepository();
+      const repo = new RemoteConfigRepository(db);
 
       const scripts = await repo.getConfig("astrOsScreen");
 
@@ -45,7 +46,7 @@ export class RemoteConfigController {
 
   public static async getRemoteConfig(req: any, res: any, next: any) {
     try {
-      const repo = new RemoteConfigRepository();
+      const repo = new RemoteConfigRepository(db);
 
       const scripts = await repo.getConfig("astrOsScreen");
 
@@ -63,7 +64,7 @@ export class RemoteConfigController {
 
   public static async saveRemoteConfig(req: any, res: any, next: any) {
     try {
-      const repo = new RemoteConfigRepository();
+      const repo = new RemoteConfigRepository(db);
 
       if (await repo.saveConfig("astrOsScreen", req.body.config)) {
         res.status(200);

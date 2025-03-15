@@ -1,16 +1,23 @@
-import { db, inserted } from "../../dal/database.js";
+import { inserted } from "../../dal/database.js";
 import { ControlModule } from "astros-common";
 import { logger } from "../../logger.js";
 import { v4 as uuid } from "uuid";
+import { Kysely } from "kysely";
+import { Database } from "../types.js";
 
 export class ControllerRepository {
+
+    constructor(
+      private readonly db: Kysely<Database>
+    ) {}
+    
   public async insertControllers(
     controllers: ControlModule[],
   ): Promise<boolean> {
     const wasInserted: boolean[] = [];
 
     for (let i = 0; i < controllers.length; i++) {
-      const result = await db
+      const result = await this.db
         .insertInto("controllers")
         .values({
           id: uuid(),
@@ -35,7 +42,7 @@ export class ControllerRepository {
   public async insertController(controller: ControlModule): Promise<string> {
     const id = uuid();
 
-    const result = await db
+    const result = await this.db
       .insertInto("controllers")
       .values({
         id: id,
@@ -53,7 +60,7 @@ export class ControllerRepository {
   }
 
   public async updateController(controller: ControlModule): Promise<boolean> {
-    const result = await db
+    const result = await this.db
       .updateTable("controllers")
       .set({
         name: controller.name,
@@ -72,7 +79,7 @@ export class ControllerRepository {
   public async getControllers(): Promise<Array<ControlModule>> {
     const result = new Array<ControlModule>();
 
-    const data = await db
+    const data = await this.db
       .selectFrom("controllers")
       .selectAll()
       .execute()
@@ -90,7 +97,7 @@ export class ControllerRepository {
   }
 
   public async getControllerById(id: string): Promise<ControlModule> {
-    const data = await db
+    const data = await this.db
       .selectFrom("controllers")
       .selectAll()
       .where("id", "=", id)
@@ -104,7 +111,7 @@ export class ControllerRepository {
   }
 
   public async getControllerByAddress(address: string): Promise<ControlModule> {
-    const data = await db
+    const data = await this.db
       .selectFrom("controllers")
       .selectAll()
       .where("address", "=", address)

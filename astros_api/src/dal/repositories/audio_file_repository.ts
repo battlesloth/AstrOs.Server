@@ -1,12 +1,19 @@
 import { AudioFile } from "astros-common";
 import { logger } from "../../logger.js";
-import { db, inserted } from "../database.js";
+import { inserted } from "../database.js";
+import { Kysely } from "kysely";
+import { Database } from "../types.js";
 
 export class AudioFileRepository {
+
+  constructor(
+    private readonly db: Kysely<Database>
+  ) {}
+
   async getAudioFiles(): Promise<Array<AudioFile>> {
     const result = new Array<AudioFile>();
 
-    const data = await db
+    const data = await this.db
       .selectFrom("audio_files")
       .selectAll()
       .execute()
@@ -29,7 +36,7 @@ export class AudioFileRepository {
   }
 
   async insertFile(id: string, fileName: string): Promise<boolean> {
-    const data = await db
+    const data = await this.db
       .insertInto("audio_files")
       .values({
         id: id,
@@ -49,7 +56,7 @@ export class AudioFileRepository {
   async filesNeedingDuration() {
     const result = new Array<string>();
 
-    const data = await db
+    const data = await this.db
       .selectFrom("audio_files")
       .select("id")
       .where("duration", "=", 0)
@@ -67,7 +74,7 @@ export class AudioFileRepository {
   }
 
   async updateFileDuration(id: string, duration: number) {
-    const result = await db
+    const result = await this.db
       .updateTable("audio_files")
       .set({ duration: duration })
       .where("id", "=", id)
@@ -81,7 +88,7 @@ export class AudioFileRepository {
   }
 
   async deleteFile(id: string): Promise<boolean> {
-    const result = await db
+    const result = await this.db
       .deleteFrom("audio_files")
       .where("id", "=", id)
       .executeTakeFirst()

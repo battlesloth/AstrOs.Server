@@ -1,6 +1,6 @@
-import { Transaction } from "kysely";
+import { Kysely, Transaction } from "kysely";
 import { logger } from "../../logger.js";
-import { db, inserted } from "../database.js";
+import { inserted } from "../database.js";
 import { Database } from "../types.js";
 import {
   ControlModule,
@@ -23,10 +23,15 @@ import {
 
 
 export class LocationsRepository {
+
+    constructor(
+      private readonly db: Kysely<Database>
+    ) {}
+
   public async getLocations(): Promise<Array<ControllerLocation>> {
     const result = new Array<ControllerLocation>();
 
-    const data = await db
+    const data = await this.db
       .selectFrom("locations")
       .leftJoin("controller_locations as cl", "cl.location_id", "locations.id")
       .leftJoin("controllers as c", "c.id", "cl.controller_id")
@@ -68,7 +73,7 @@ export class LocationsRepository {
   public async getLocationByController(
     id: string,
   ): Promise<ControllerLocation> {
-    const data = await db
+    const data = await this.db
       .selectFrom("locations")
       .leftJoin("controller_locations as cl", "cl.location_id", "locations.id")
       .leftJoin("controllers as c", "c.id", "cl.controller_id")
@@ -105,7 +110,7 @@ export class LocationsRepository {
   }
 
   public async getLocationIdByController(mac: string): Promise<string> {
-    const data = await db
+    const data = await this.db
       .selectFrom("controller_locations")
       .select("location_id")
       .where("controller_id", "=", mac)
@@ -132,11 +137,11 @@ export class LocationsRepository {
     location: ControllerLocation,
   ): Promise<ControllerLocation> {
 
-    location.uartModules = await getUartModules(db, location.id);
+    location.uartModules = await getUartModules(this.db, location.id);
 
-    location.i2cModules = await getI2cModules(db, location.id);
+    location.i2cModules = await getI2cModules(this.db, location.id);
 
-    location.gpioModule = await getGpioModule(db, location.id);
+    location.gpioModule = await getGpioModule(this.db, location.id);
 
     return location;
   }
@@ -148,7 +153,7 @@ export class LocationsRepository {
 
     // TODO: only wipe fingerprint if there are changes to uart/servo/i2c
 
-    await db.transaction().execute(async (trx) => {
+    await this.db.transaction().execute(async (trx) => {
 
       await trx
         .updateTable("locations")
@@ -253,7 +258,7 @@ export class LocationsRepository {
     locationId: string,
     fingerprint: string,
   ): Promise<boolean> {
-    const result = await db
+    const result = await this.db
       .updateTable("locations")
       .set({
         config_fingerprint: fingerprint,

@@ -1,3 +1,4 @@
+import { db } from "src/dal/database.js";
 import { ScriptRepository } from "../dal/repositories/script_repository.js";
 import { logger } from "../logger.js";
 
@@ -12,7 +13,7 @@ export class ScriptsController {
 
   public static async getAllScripts(req: any, res: any, next: any) {
     try {
-      const repo = new ScriptRepository();
+      const repo = new ScriptRepository(db);
 
       const scripts = await repo.getScripts();
 
@@ -30,7 +31,7 @@ export class ScriptsController {
 
   public static async getScript(req: any, res: any, next: any) {
     try {
-      const repo = new ScriptRepository();
+      const repo = new ScriptRepository(db);
 
       const scripts = await repo.getScript(req.query.id);
 
@@ -48,7 +49,7 @@ export class ScriptsController {
 
   public static async saveScript(req: any, res: any, next: any) {
     try {
-      const repo = new ScriptRepository();
+      const repo = new ScriptRepository(db);
 
       if (await repo.saveScript(req.body)) {
         res.status(200);
@@ -71,7 +72,7 @@ export class ScriptsController {
 
   public static async deleteScript(req: any, res: any, next: any) {
     try {
-      const repo = new ScriptRepository();
+      const repo = new ScriptRepository(db);
 
       await repo.deleteScript(req.query.id);
 
@@ -89,7 +90,7 @@ export class ScriptsController {
 
   public static async copyScript(req: any, res: any, next: any) {
     try {
-      const repo = new ScriptRepository();
+      const repo = new ScriptRepository(db);
 
       const scripts = await repo.copyScript(req.query.id);
 

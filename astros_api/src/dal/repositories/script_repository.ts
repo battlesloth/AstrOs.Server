@@ -1,4 +1,3 @@
-import { db } from "../database.js";
 import {
   Script,
   ScriptChannel,
@@ -18,18 +17,23 @@ import {
 } from "astros-common";
 import { logger } from "../../logger.js";
 import { Guid } from "guid-typescript";
-import { ScriptsTable } from "../types.js";
+import { Database, ScriptsTable } from "../types.js";
+import { Kysely } from "kysely";
 
 export class ScriptRepository {
   private characters =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
+      constructor(
+        private readonly db: Kysely<Database>
+      ) {}
+      
   /// <summary>
   /// Get all scripts
   /// </summary>
   /// <returns>All scripts</returns>
   async getScripts(): Promise<Array<Script>> {
-    const scripts = await db
+    const scripts = await this.db
       .selectFrom("scripts")
       .selectAll()
       .where("enabled", "=", 1)
@@ -53,7 +57,7 @@ export class ScriptRepository {
     });
 
     for (const scr of result) {
-      const deployments = await db
+      const deployments = await this.db
         .selectFrom("script_deployments")
         .selectAll()
         .where("script_id", "=", scr.id)
@@ -81,7 +85,7 @@ export class ScriptRepository {
   /// <param name="id">The id of the script to get</param>
   /// <returns>The script</returns>
   async getScript(id: string): Promise<Script> {
-    const script = await db
+    const script = await this.db
       .selectFrom("scripts")
       .selectAll()
       .where("id", "=", id)
@@ -98,7 +102,7 @@ export class ScriptRepository {
       new Date(script.last_modified),
     );
 
-    const deployments = await db
+    const deployments = await this.db
       .selectFrom("script_deployments")
       .selectAll()
       .where("script_id", "=", id)
@@ -117,7 +121,7 @@ export class ScriptRepository {
       result.deploymentStatusKvp.push(status);
     }
 
-    const channels = await db
+    const channels = await this.db
       .selectFrom("script_channels")
       .selectAll()
       .where("script_id", "=", id)
@@ -140,7 +144,7 @@ export class ScriptRepository {
 
       await this.configScriptChannel(channel);
 
-      const events = await db
+      const events = await this.db
         .selectFrom("script_events")
         .selectAll()
         .where("script_id", "=", id)
@@ -216,7 +220,7 @@ export class ScriptRepository {
   //#region UART channels
 
   private async getMaestroChannel(channelId: string): Promise<MaestroChannel> {
-    const channel = await db
+    const channel = await this.db
       .selectFrom("maestro_channels")
       .selectAll()
       .where("id", "=", channelId)
@@ -243,7 +247,7 @@ export class ScriptRepository {
   private async getKangarooChannel(
     channelId: string,
   ): Promise<KangarooX2Channel> {
-    const channel = await db
+    const channel = await this.db
       .selectFrom("kangaroo_x2")
       .selectAll()
       .where("id", "=", channelId)
@@ -265,7 +269,7 @@ export class ScriptRepository {
   private async getGenericSerialChannel(
     moduleId: string,
   ): Promise<UartChannel> {
-    const channel = await db
+    const channel = await this.db
       .selectFrom("uart_modules")
       .selectAll()
       .where("id", "=", moduleId)
@@ -289,7 +293,7 @@ export class ScriptRepository {
   //#region I2C channels
 
   private async getGenericI2cChannel(moduleId: string): Promise<I2cChannel> {
-    const channel = await db
+    const channel = await this.db
       .selectFrom("i2c_modules")
       .selectAll()
       .where("id", "=", moduleId)
@@ -305,7 +309,7 @@ export class ScriptRepository {
 
   //#region GPIO channels
   private async getGpioChannel(channelId: string): Promise<GpioChannel> {
-    const channel = await db
+    const channel = await this.db
       .selectFrom("gpio_channels")
       .selectAll()
       .where("id", "=", channelId)
@@ -332,7 +336,7 @@ export class ScriptRepository {
     locationId: string,
     dateTime: Date,
   ): Promise<boolean> {
-    await db
+    await this.db
       .insertInto("script_deployments")
       .values({
         script_id: scriptId,
@@ -359,7 +363,7 @@ export class ScriptRepository {
   ): Promise<Date> {
     let result = new Date("1970-01-01T00:00:00.000Z");
 
-    const deployment = await db
+    const deployment = await this.db
       .selectFrom("script_deployments")
       .select("last_deployed")
       .where("script_id", "=", scriptId)
@@ -378,7 +382,7 @@ export class ScriptRepository {
   }
 
   async saveScript(script: Script): Promise<boolean> {
-    await db.transaction().execute(async (tx) => {
+    await this.db.transaction().execute(async (tx) => {
       await tx
         .insertInto("scripts")
         .values({
@@ -462,7 +466,7 @@ export class ScriptRepository {
   }
 
   async deleteScript(id: string): Promise<boolean> {
-    db.updateTable("scripts")
+    this.db.updateTable("scripts")
       .set("enabled", 0)
       .where("id", "=", id)
       .executeTakeFirstOrThrow()

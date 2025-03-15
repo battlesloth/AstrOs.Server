@@ -1,6 +1,7 @@
 import { AstrOsConstants, AstrOsLocationCollection } from "astros-common";
 import { logger } from "../logger.js";
 import { LocationsRepository } from "../dal/repositories/locations_repository.js";
+import { db } from "src/dal/database.js";
 
 export class LocationsController {
   public static route = "/locations/";
@@ -10,7 +11,7 @@ export class LocationsController {
 
   public static async getLocations(req: any, res: any, next: any) {
     try {
-      const repo = new LocationsRepository();
+      const repo = new LocationsRepository(db);
 
       const response = new AstrOsLocationCollection();
 
@@ -47,7 +48,7 @@ export class LocationsController {
 
   public static async saveLocations(req: any, res: any, next: any) {
     try {
-      const repo = new LocationsRepository();
+      const repo = new LocationsRepository(db);
 
       const modules = req.body as AstrOsLocationCollection;
 
@@ -86,7 +87,7 @@ export class LocationsController {
 
   public static async loadLocations(req: any, res: any, next: any) {
     try {
-      const repo = new LocationsRepository();
+      const repo = new LocationsRepository(db);
 
       const locations = await repo.loadLocations();
 

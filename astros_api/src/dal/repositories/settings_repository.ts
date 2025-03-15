@@ -1,9 +1,15 @@
-import { db } from "../database.js";
+import { Kysely } from "kysely";
+import { Database } from "../types.js";
 import { logger } from "../../logger.js";
 
 export class SettingsRepository {
+
+    constructor(
+      private readonly db: Kysely<Database>
+    ) {}
+    
   async getSetting(type: string): Promise<string> {
-    await db
+    await this.db
       .selectFrom("settings")
       .selectAll()
       .where("key", "=", type)
@@ -17,7 +23,7 @@ export class SettingsRepository {
   }
 
   async saveSetting(key: string, value: string): Promise<boolean> {
-    await db
+    await this.db
       .insertInto("settings")
       .values({ key, value })
       .onConflict((c) =>

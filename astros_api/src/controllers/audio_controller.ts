@@ -2,6 +2,7 @@ import { AudioFileRepository } from "../dal/repositories/audio_file_repository.j
 import { unlink } from "fs";
 import appdata from "appdata-path";
 import { logger } from "../logger.js";
+import { db } from "src/dal/database.js";
 
 export class AudioController {
   public static getAll = "/audio/all";
@@ -9,7 +10,7 @@ export class AudioController {
 
   public static async getAllAudioFiles(req: any, res: any, next: any) {
     try {
-      const repo = new AudioFileRepository();
+      const repo = new AudioFileRepository(db);
 
       const files = await repo.getAudioFiles();
 
@@ -27,7 +28,7 @@ export class AudioController {
 
   public static async deleteAudioFile(req: any, res: any, next: any) {
     try {
-      const repo = new AudioFileRepository();
+      const repo = new AudioFileRepository(db);
 
       const result = await repo.deleteFile(req.query.id);
 

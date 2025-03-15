@@ -1,6 +1,7 @@
 import { SettingsRepository } from "../dal/repositories/settings_repository.js";
 import { logger } from "../logger.js";
 import { ControllerRepository } from "../dal/repositories/controller_repository.js";
+import { db } from "src/dal/database.js";
 
 export class SettingsController {
   public static getRoute = "/settings/";
@@ -10,7 +11,7 @@ export class SettingsController {
 
   public static async getSetting(req: any, res: any, next: any) {
     try {
-      const repo = new SettingsRepository();
+      const repo = new SettingsRepository(db);
 
       const setting = await repo.getSetting(req.query.key);
 
@@ -28,7 +29,7 @@ export class SettingsController {
 
   public static async saveSetting(req: any, res: any, next: any) {
     try {
-      const repo = new SettingsRepository();
+      const repo = new SettingsRepository(db);
 
       if (await repo.saveSetting(req.body.key, req.body.value)) {
         res.status(200);
@@ -51,7 +52,7 @@ export class SettingsController {
 
   public static async getControllers(req: any, res: any, next: any) {
     try {
-      const repo = new ControllerRepository();
+      const repo = new ControllerRepository(db);
 
       const controllers = await repo.getControllers();
 

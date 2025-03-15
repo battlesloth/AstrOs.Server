@@ -1,9 +1,15 @@
 import { logger } from "../../logger.js";
-import { db } from "../database.js";
+import { Kysely } from "kysely";
+import { Database } from "../types.js";
 
 export class RemoteConfigRepository {
+
+    constructor(
+      private readonly db: Kysely<Database>
+    ) {}
+
   async getConfig(type: string) {
-    const result = await db
+    const result = await this.db
       .selectFrom("remote_config")
       .selectAll()
       .where("type", "=", type)
@@ -17,7 +23,7 @@ export class RemoteConfigRepository {
   }
 
   async saveConfig(type: string, json: string): Promise<boolean> {
-    const data = await db
+    const data = await this.db
       .updateTable("remote_config")
       .set("value", json)
       .where("type", "=", type)

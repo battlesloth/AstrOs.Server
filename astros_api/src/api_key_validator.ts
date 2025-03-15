@@ -1,12 +1,13 @@
 import { RequestHandler } from "express";
 import { SettingsRepository } from "./dal/repositories/settings_repository.js";
 import { logger } from "./logger.js";
+import { db } from "./dal/database.js";
 
 export function ApiKeyValidator(): RequestHandler {
   return async (req, res, next) => {
     logger.info("Validating API key", req);
 
-    const settings = new SettingsRepository();
+    const settings = new SettingsRepository(db);
 
     const token = await settings.getSetting("apikey");
 
