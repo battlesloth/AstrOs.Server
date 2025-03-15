@@ -28,7 +28,8 @@
     },
     "typeAcquisition": { "include": ["jest"] },
     "exclude": [ 
-        "./jest.config.js",
+        "./vitest.config.ts",
+        "./vitest.config.js",
         "./webpack.config.js",
         "dist",
         "**/*.test.ts",

@@ -1,4 +1,4 @@
-export const enum ScriptChannelType {
+export enum ScriptChannelType {
   NONE,
   SERVO,
   GPIO,
@@ -8,14 +8,14 @@ export const enum ScriptChannelType {
   KANGAROO,
 }
 
-export const enum ModuleType {
+export enum ModuleType {
   none = 0,
   uart = 1,
   i2c = 2,
   gpio = 3,
 }
 
-export const enum ModuleSubType {
+export enum ModuleSubType {
   none = 0,
   // serial subtypes
   genericSerial = 101,
@@ -67,19 +67,19 @@ export class ModuleChannelTypes {
   }
 }
 
-export const enum UploadStatus {
+export enum UploadStatus {
   notUploaded,
   uploading,
   uploaded,
 }
 
-export const enum ControllerStatus {
+export enum ControllerStatus {
   up,
   needsSynced,
   down,
 }
 
-export const enum TransmissionType {
+export enum TransmissionType {
   script,
   sync,
   status,
@@ -91,20 +91,20 @@ export const enum TransmissionType {
   servoTest,
 }
 
-export const enum TransmissionStatus {
+export enum TransmissionStatus {
   unknown,
   sending,
   success,
   failed,
 }
 
-export const enum DirectCommnandType {
+export enum DirectCommnandType {
   servo,
   i2c,
   uart,
 }
 
-export const enum HumanCyborgRelationsCmd {
+export enum HumanCyborgRelationsCmd {
   mildHappy = 1,
   extremeHappy = 2,
   mildSad = 3,
@@ -142,7 +142,7 @@ export const enum HumanCyborgRelationsCmd {
   setScaredLevel = 35,
 }
 
-export const enum HcrCommandCategory {
+export enum HcrCommandCategory {
   none,
   stimuli,
   muse,

@@ -1,8 +1,8 @@
-import { expect, describe, it } from "@jest/globals";
-import { MessageHandler } from '../src/serial/message_handler.js';
-import { MessageHelper } from '../src/serial/message_helper.js';
-import { SerialMessageType } from '../src/serial/serial_message.js';
-import { SerialWorkerResponseType } from '../src/serial/serial_worker_response.js';
+import { expect, describe, it } from "vitest";
+import { MessageHandler } from './message_handler.js';
+import { MessageHelper } from './message_helper.js';
+import { SerialMessageType } from './serial_message.js';
+import { SerialWorkerResponseType } from './serial_worker_response.js';
 
 const RS = MessageHelper.RS;
 const GS = MessageHelper.GS;
