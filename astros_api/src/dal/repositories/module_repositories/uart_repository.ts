@@ -7,11 +7,13 @@ import { logger } from '../../../logger.js';
 import {
     HumanCyborgRelationsModule,
     KangarooX2,
+    KangarooX2Channel,
     MaestroBoard,
     MaestroChannel,
     MaestroModule,
     ModuleSubType,
     UartModule,
+    UartChannel
 } from 'astros-common';
 
 //#region Uart Modules
@@ -165,6 +167,34 @@ export async function removeStaleUartModules(
     }
 }
 //#endregion
+
+//#region Generic Uart
+
+export async function readUartChannel(
+    db: Kysely<Database>,
+    id: string,
+): Promise<UartChannel> {
+    const channel = await db
+    .selectFrom("uart_modules")
+    .selectAll()
+    .where("id", "=", id)
+    .executeTakeFirstOrThrow()
+    .catch((err) => {
+      logger.error(err);
+      throw err;
+    });
+
+  return new UartChannel(
+    channel.id,
+    channel.id,
+    channel.name,
+    channel.uart_type,
+    true,
+  );
+}
+
+//#endregion
+
 //#region KangarooX2 
 
 async function upsertKangarooModule(
@@ -223,6 +253,28 @@ async function deleteKangarooModule(
         });
 }
 
+export async function readKangarooChannel(
+    db: Kysely<Database>,
+    id: string,
+): Promise<KangarooX2Channel> {
+    const channel = await db
+      .selectFrom("kangaroo_x2")
+      .selectAll()
+      .where("id", "=", id)
+      .executeTakeFirstOrThrow()
+      .catch((err) => {
+        logger.error(err);
+        throw err;
+      });
+
+    return new KangarooX2Channel(
+      channel.id,
+      channel.parent_id,
+      "",
+      channel.ch1_name,
+      channel.ch2_name,
+    );
+}
 //#endregion
 
 //#region Maestro
@@ -385,6 +437,35 @@ async function deleteMaestroModule(
             logger.error(err);
             throw err;
         });
+}
+
+export async function readMaestroChannel(
+    db: Kysely<Database>,
+    id: string,
+): Promise<MaestroChannel> {
+
+    const channel = await db
+        .selectFrom("maestro_channels")
+        .selectAll()
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow()
+        .catch((err) => {
+            logger.error(err);
+            throw err;
+        });
+
+    return new MaestroChannel(
+        channel.id,
+        channel.board_id,
+        channel.name,
+        channel.enabled > 0,
+        channel.channel_number,
+        channel.is_servo > 0,
+        channel.min_pos,
+        channel.max_pos,
+        channel.home_pos,
+        channel.inverted > 0,
+    );
 }
 
 //#endregion

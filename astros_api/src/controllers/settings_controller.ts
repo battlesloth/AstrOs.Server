@@ -1,7 +1,7 @@
 import { SettingsRepository } from "../dal/repositories/settings_repository.js";
 import { logger } from "../logger.js";
 import { ControllerRepository } from "../dal/repositories/controller_repository.js";
-import { db } from "src/dal/database.js";
+import { db } from "../dal/database.js";
 
 export class SettingsController {
   public static getRoute = "/settings/";

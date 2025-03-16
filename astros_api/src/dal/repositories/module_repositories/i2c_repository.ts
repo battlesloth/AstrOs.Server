@@ -4,6 +4,7 @@ import { logger } from '../../../logger.js';
 import {
     I2cModule
 } from 'astros-common';
+import { I2cChannel } from 'astros-common';
 
 
 //#region I2C Modules
@@ -14,37 +15,37 @@ export async function upsertI2cModules(
 ) {
     for (const i2c of modules) {
         logger.info(
-          `Updating i2c module ${i2c.name}, id: ${i2c.id}, type: ${i2c.moduleSubType}`,
+            `Updating i2c module ${i2c.name}, id: ${i2c.id}, type: ${i2c.moduleSubType}`,
         );
 
         switch (i2c.moduleSubType) {
-          default:
-            break;
+            default:
+                break;
         }
 
         await trx
-          .insertInto("i2c_modules")
-          .values({
-            id: i2c.id,
-            name: i2c.name,
-            location_id: i2c.locationId,
-            i2c_address: i2c.i2cAddress,
-            i2c_type: i2c.moduleSubType,
-          })
-          .onConflict((c) =>
-            c.column("id").doUpdateSet((eb) => ({
-              name: eb.ref("excluded.name"),
-              location_id: eb.ref("excluded.location_id"),
-              i2c_address: eb.ref("excluded.i2c_address"),
-              i2c_type: eb.ref("excluded.i2c_type"),
-            })),
-          )
-          .executeTakeFirstOrThrow()
-          .catch((err) => {
-            logger.error(err);
-            throw err;
-          });
-      }
+            .insertInto("i2c_modules")
+            .values({
+                id: i2c.id,
+                name: i2c.name,
+                location_id: i2c.locationId,
+                i2c_address: i2c.i2cAddress,
+                i2c_type: i2c.moduleSubType,
+            })
+            .onConflict((c) =>
+                c.column("id").doUpdateSet((eb) => ({
+                    name: eb.ref("excluded.name"),
+                    location_id: eb.ref("excluded.location_id"),
+                    i2c_address: eb.ref("excluded.i2c_address"),
+                    i2c_type: eb.ref("excluded.i2c_type"),
+                })),
+            )
+            .executeTakeFirstOrThrow()
+            .catch((err) => {
+                logger.error(err);
+                throw err;
+            });
+    }
 }
 
 
@@ -120,4 +121,23 @@ export async function removeStaleI2CModules(
             });
     }
 }
+
+export async function readI2cChannel(
+    db: Kysely<Database>,
+    id: string,
+): Promise<I2cChannel> {
+
+    const channel = await db
+        .selectFrom("i2c_modules")
+        .selectAll()
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow()
+        .catch((err) => {
+            logger.error(err);
+            throw err;
+        });
+
+    return new I2cChannel(channel.id, channel.id, channel.name, true);
+}
+
 //#endregion

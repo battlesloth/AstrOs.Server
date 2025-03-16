@@ -2,7 +2,7 @@ import { AudioFileRepository } from "../dal/repositories/audio_file_repository.j
 import { unlink } from "fs";
 import appdata from "appdata-path";
 import { logger } from "../logger.js";
-import { db } from "src/dal/database.js";
+import { db } from "../dal/database.js";
 
 export class AudioController {
   public static getAll = "/audio/all";

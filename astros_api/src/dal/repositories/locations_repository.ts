@@ -155,14 +155,16 @@ export class LocationsRepository {
 
     await this.db.transaction().execute(async (trx) => {
 
+      logger.info('here 1');
       await trx
         .updateTable("locations")
         .set({
           config_fingerprint: "outofdate",
         })
         .where("id", "=", location.id)
-        .executeTakeFirstOrThrow()
+        .execute()
         .catch((err) => {
+          logger.info('here 1.1');
           logger.error(err);
           throw err;
         });
@@ -175,6 +177,8 @@ export class LocationsRepository {
         );
       }
 
+      logger.info('here 2');
+
       await removeStaleUartModules(
         trx,
         location.id,
@@ -182,6 +186,8 @@ export class LocationsRepository {
       );
 
       await upsertUartModules(trx, location.uartModules);
+
+      logger.info('here 3');
 
       await removeStaleI2CModules(
         trx,
@@ -191,7 +197,9 @@ export class LocationsRepository {
 
       await upsertI2cModules(trx, location.i2cModules);
 
+      logger.info('here 4');
       await upsertGpioModule(trx, location.gpioModule);
+      logger.info('here 5');
     });
 
     logger.info(`Updated location ${location.id}`);

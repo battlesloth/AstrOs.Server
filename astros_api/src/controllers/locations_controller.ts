@@ -1,7 +1,7 @@
 import { AstrOsConstants, AstrOsLocationCollection } from "astros-common";
 import { logger } from "../logger.js";
 import { LocationsRepository } from "../dal/repositories/locations_repository.js";
-import { db } from "src/dal/database.js";
+import { db } from "../dal/database.js";
 
 export class LocationsController {
   public static route = "/locations/";

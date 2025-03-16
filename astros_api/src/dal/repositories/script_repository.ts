@@ -4,34 +4,108 @@ import {
   ScriptEvent,
   UploadStatus,
   DeploymentStatus,
-  GpioChannel,
-  MaestroChannel,
-  KangarooX2Channel,
   BaseChannel,
   ModuleChannelTypes,
-  I2cChannel,
   ModuleType,
   ModuleSubType,
-  moduleSubTypeToScriptEventTypes,
-  UartChannel,
+  moduleSubTypeToScriptEventTypes
 } from "astros-common";
 import { logger } from "../../logger.js";
 import { Guid } from "guid-typescript";
 import { Database, ScriptsTable } from "../types.js";
-import { Kysely } from "kysely";
+import { Kysely, Transaction } from "kysely";
+import { readGpioChannel } from "./module_repositories/gpio_repository.js";
+import { 
+  readKangarooChannel, 
+  readMaestroChannel, 
+  readUartChannel 
+} from "./module_repositories/uart_repository.js";
+import { readI2cChannel } from "./module_repositories/i2c_repository.js";
 
 export class ScriptRepository {
   private characters =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-      constructor(
-        private readonly db: Kysely<Database>
-      ) {}
-      
-  /// <summary>
-  /// Get all scripts
-  /// </summary>
-  /// <returns>All scripts</returns>
+  constructor(
+    private readonly db: Kysely<Database>
+  ) { }
+
+
+  //#region Script Create
+
+  async upsertScript(script: Script): Promise<boolean> {
+    await this.db.transaction().execute(async (tx) => {
+      await tx
+        .insertInto("scripts")
+        .values({
+          id: script.id,
+          name: script.scriptName,
+          description: script.description,
+          last_modified: new Date(script.lastSaved).getTime(),
+          enabled: 1,
+        })
+        .onConflict((c) =>
+          c.columns(["id"]).doUpdateSet((eb) => ({
+            name: eb.ref("excluded.name"),
+            description: eb.ref("excluded.description"),
+            last_modified: Date.now(),
+            enabled: 1,
+          })),
+        )
+        .execute()
+        .catch((err) => {
+          logger.error(err);
+          throw err;
+        });
+
+      await this.deleteScriptEvents(tx, script.id);
+
+      await this.deleteScriptChannels(tx, script.id);
+
+      for (const ch of script.scriptChannels) {
+        await this.saveScriptChannel(tx, script, ch);
+      }
+    });
+
+    return true;
+  }
+
+  //#endregion
+  //#region Script Copy
+
+  async copyScript(id: string): Promise<Script> {
+    let result = Script.prototype;
+
+    const script = await this.getScript(id);
+
+    script.id = this.generateScriptId(5);
+    script.scriptName = script.scriptName + " - copy";
+    for (const ch of script.scriptChannels) {
+      ch.id = Guid.create().toString();
+      for (const kvp of ch.eventsKvpArray) {
+        kvp.value.scriptChannel = ch.id;
+      }
+    }
+    script.deploymentStatusKvp = new Array<DeploymentStatus>();
+    script.lastSaved = new Date();
+
+    await this.upsertScript(script).catch((err: any) => {
+      logger.error(`Exception saving copy script for ${id} => ${err}`);
+    });
+
+    result = new Script(
+      script.id,
+      script.scriptName,
+      script.description,
+      new Date(script.lastSaved),
+    );
+
+    return result;
+  }
+
+  //#endregion
+  //#region Script Read
+
   async getScripts(): Promise<Array<Script>> {
     const scripts = await this.db
       .selectFrom("scripts")
@@ -121,10 +195,70 @@ export class ScriptRepository {
       result.deploymentStatusKvp.push(status);
     }
 
+    result.scriptChannels = await this.readScriptChannels(id);
+
+    return result;
+  }
+
+  //#endregion
+  //#region Script Delete
+
+  async deleteScript(id: string): Promise<boolean> {
+    this.db.updateTable("scripts")
+      .set("enabled", 0)
+      .where("id", "=", id)
+      .executeTakeFirstOrThrow()
+      .catch((err) => {
+        logger.error(err);
+        throw err;
+      });
+
+    return true;
+  }
+
+  //#endregion
+
+  //#region Channels Create
+
+  private async saveScriptChannel(
+    tx: Transaction<Database>,
+    script: Script,
+    ch: ScriptChannel,
+  ) {
+    await tx
+      .insertInto("script_channels")
+      .values({
+        id: ch.id,
+        script_id: script.id,
+        channel_type: ch.channelType,
+        module_channel_id: ch.moduleChannelId,
+        module_channel_type: ch.moduleChannelType,
+      })
+      .execute()
+      .catch((err) => {
+        logger.error(err);
+        throw err;
+      });
+
+    for (const kvp of ch.eventsKvpArray) {
+      const evt = kvp.value;
+      await this.saveScriptEvent(tx, script.id, ch.id, evt);
+    }
+  }
+
+  //#endregion
+
+  //#region Channels Read
+
+
+  private async readScriptChannels(scriptId: string): Promise<Array<ScriptChannel>> {
+
+    const result = new Array<ScriptChannel>();
+
     const channels = await this.db
       .selectFrom("script_channels")
       .selectAll()
-      .where("script_id", "=", id)
+      .where("script_id", "=", scriptId)
       .execute()
       .catch((err) => {
         logger.error(err);
@@ -144,40 +278,9 @@ export class ScriptRepository {
 
       await this.configScriptChannel(channel);
 
-      const events = await this.db
-        .selectFrom("script_events")
-        .selectAll()
-        .where("script_id", "=", id)
-        .where("script_channel_id", "=", ch.id)
-        .execute()
-        .catch((err) => {
-          logger.error(err);
-          throw err;
-        });
+      channel.eventsKvpArray = await this.readScriptEvents(scriptId, ch.id);
 
-      for (const evt of events) {
-        const subtype =
-          evt.module_sub_type !== null
-            ? evt.module_sub_type
-            : ModuleSubType.none;
-
-        const scriptEventType = moduleSubTypeToScriptEventTypes(
-          subtype,
-          evt.data,
-        );
-
-        const event = new ScriptEvent(
-          evt.script_channel_id,
-          evt.module_type,
-          subtype,
-          evt.time,
-          scriptEventType,
-        );
-
-        channel.eventsKvpArray.push({ key: event.time, value: event });
-      }
-
-      result.scriptChannels.push(channel);
+      result.push(channel);
     }
 
     return result;
@@ -188,27 +291,32 @@ export class ScriptRepository {
   ): Promise<ScriptChannel> {
     switch (channel.moduleChannelType) {
       case ModuleChannelTypes.GpioChannel:
-        channel.moduleChannel = await this.getGpioChannel(
+        channel.moduleChannel = await readGpioChannel(
+          this.db,
           channel.moduleChannelId,
         );
         break;
       case ModuleChannelTypes.MaestroChannel:
-        channel.moduleChannel = await this.getMaestroChannel(
+        channel.moduleChannel = await readMaestroChannel(
+          this.db,
           channel.moduleChannelId,
         );
         break;
       case ModuleChannelTypes.KangarooX2Channel:
-        channel.moduleChannel = await this.getKangarooChannel(
+        channel.moduleChannel = await readKangarooChannel(
+          this.db,
           channel.moduleChannelId,
         );
         break;
       case ModuleChannelTypes.UartChannel:
-        channel.moduleChannel = await this.getGenericSerialChannel(
+        channel.moduleChannel = await readUartChannel(
+          this.db,
           channel.moduleChannelId,
         );
         break;
       case ModuleChannelTypes.I2cChannel:
-        channel.moduleChannel = await this.getGenericI2cChannel(
+        channel.moduleChannel = await readI2cChannel(
+          this.db,
           channel.moduleChannelId,
         );
         break;
@@ -217,120 +325,114 @@ export class ScriptRepository {
     return channel;
   }
 
-  //#region UART channels
+  //#endregion
 
-  private async getMaestroChannel(channelId: string): Promise<MaestroChannel> {
-    const channel = await this.db
-      .selectFrom("maestro_channels")
-      .selectAll()
-      .where("id", "=", channelId)
-      .executeTakeFirstOrThrow()
+  //#region Channels Delete
+
+  private async deleteScriptChannels(trx: Transaction<Database>, scriptId: string) {
+    await trx
+      .deleteFrom("script_channels")
+      .where("script_id", "=", scriptId)
+      .execute()
       .catch((err) => {
         logger.error(err);
         throw err;
       });
-
-    return new MaestroChannel(
-      channel.id,
-      channel.board_id,
-      channel.name,
-      channel.enabled === 1,
-      channel.channel_number,
-      channel.is_servo === 1,
-      channel.min_pos,
-      channel.max_pos,
-      channel.home_pos,
-      channel.inverted === 1,
-    );
   }
 
-  private async getKangarooChannel(
+  //#endregion
+
+  //#region Events Create
+
+  private async saveScriptEvent(
+    tx: Transaction<Database>,
+    scriptId: string,
     channelId: string,
-  ): Promise<KangarooX2Channel> {
-    const channel = await this.db
-      .selectFrom("kangaroo_x2")
-      .selectAll()
-      .where("id", "=", channelId)
-      .executeTakeFirstOrThrow()
+    evt: ScriptEvent,
+  ) {
+    await tx
+      .insertInto("script_events")
+      .values({
+        script_id: scriptId,
+        script_channel_id: channelId,
+        module_type: evt.moduleType,
+        module_sub_type: evt.moduleSubType,
+        time: evt.time,
+        data: JSON.stringify(evt.event),
+      })
+      .execute()
       .catch((err) => {
         logger.error(err);
         throw err;
       });
-
-    return new KangarooX2Channel(
-      channel.id,
-      channel.parent_id,
-      "",
-      channel.ch1_name,
-      channel.ch2_name,
-    );
-  }
-
-  private async getGenericSerialChannel(
-    moduleId: string,
-  ): Promise<UartChannel> {
-    const channel = await this.db
-      .selectFrom("uart_modules")
-      .selectAll()
-      .where("id", "=", moduleId)
-      .executeTakeFirstOrThrow()
-      .catch((err) => {
-        logger.error(err);
-        throw err;
-      });
-
-    return new UartChannel(
-      channel.id,
-      channel.id,
-      channel.name,
-      channel.uart_type,
-      true,
-    );
   }
 
   //#endregion
 
-  //#region I2C channels
+  //#region Events Read
 
-  private async getGenericI2cChannel(moduleId: string): Promise<I2cChannel> {
-    const channel = await this.db
-      .selectFrom("i2c_modules")
+  private async readScriptEvents(
+    scriptId: string, 
+    channelId: string
+  ): Promise<Array<{ key: number; value: ScriptEvent }>> {
+
+    const result = new Array<{ key: number; value: ScriptEvent }>();
+
+    const events = await this.db
+      .selectFrom("script_events")
       .selectAll()
-      .where("id", "=", moduleId)
-      .executeTakeFirstOrThrow()
+      .where("script_id", "=", scriptId)
+      .where("script_channel_id", "=", channelId)
+      .execute()
       .catch((err) => {
         logger.error(err);
         throw err;
       });
 
-    return new I2cChannel(channel.id, channel.id, channel.name, true);
-  }
-  //  #endregion
+    for (const evt of events) {
+      const subtype =
+        evt.module_sub_type !== null
+          ? evt.module_sub_type
+          : ModuleSubType.none;
 
-  //#region GPIO channels
-  private async getGpioChannel(channelId: string): Promise<GpioChannel> {
-    const channel = await this.db
-      .selectFrom("gpio_channels")
-      .selectAll()
-      .where("id", "=", channelId)
-      .executeTakeFirstOrThrow()
-      .catch((err) => {
-        logger.error(err);
-        throw err;
-      });
+      const scriptEventType = moduleSubTypeToScriptEventTypes(
+        subtype,
+        evt.data,
+      );
 
-    return new GpioChannel(
-      channel.id,
-      channel.location_id,
-      channel.channel_number,
-      channel.enabled === 1,
-      channel.name,
-      channel.default_low === 1,
-    );
+      const event = new ScriptEvent(
+        evt.script_channel_id,
+        evt.module_type,
+        subtype,
+        evt.time,
+        scriptEventType,
+      );
+
+      result.push({ key: event.time, value: event });
+    }
+
+    return result;
   }
+
   //#endregion
 
-  //#region Utility
+  //#region Events Delete
+
+  private async deleteScriptEvents(trx: Transaction<Database>, scriptId: string) {
+    await trx
+      .deleteFrom("script_events")
+      .where("script_id", "=", scriptId)
+      .execute()
+      .catch((err) => {
+        logger.error(err);
+        throw err;
+      });
+  }
+
+  //#endregion
+
+
+  //#region Script Uploads
   async updateScriptControllerUploaded(
     scriptId: string,
     locationId: string,
@@ -381,132 +483,9 @@ export class ScriptRepository {
     return result;
   }
 
-  async saveScript(script: Script): Promise<boolean> {
-    await this.db.transaction().execute(async (tx) => {
-      await tx
-        .insertInto("scripts")
-        .values({
-          id: script.id,
-          name: script.scriptName,
-          description: script.description,
-          last_modified: new Date(script.lastSaved).getTime(),
-          enabled: 1,
-        })
-        .onConflict((c) =>
-          c.columns(["id"]).doUpdateSet((eb) => ({
-            name: eb.ref("excluded.name"),
-            description: eb.ref("excluded.description"),
-            last_modified: Date.now(),
-            enabled: 1,
-          })),
-        )
-        .execute()
-        .catch((err) => {
-          logger.error(err);
-          throw err;
-        });
+  //#endregion
 
-      await tx
-        .deleteFrom("script_events")
-        .where("script_id", "=", script.id)
-        .execute()
-        .catch((err) => {
-          logger.error(err);
-          throw err;
-        });
-
-      await tx
-        .deleteFrom("script_channels")
-        .where("script_id", "=", script.id)
-        .execute()
-        .catch((err) => {
-          logger.error(err);
-          throw err;
-        });
-
-      for (const ch of script.scriptChannels) {
-        await tx
-          .insertInto("script_channels")
-          .values({
-            id: ch.id,
-            script_id: script.id,
-            channel_type: ch.channelType,
-            module_channel_id: ch.moduleChannelId,
-            module_channel_type: ch.moduleChannelType,
-          })
-          .execute()
-          .catch((err) => {
-            logger.error(err);
-            throw err;
-          });
-
-        for (const kvp of ch.eventsKvpArray) {
-          const evt = kvp.value;
-
-          await tx
-            .insertInto("script_events")
-            .values({
-              script_id: script.id,
-              script_channel_id: evt.scriptChannel,
-              module_type: evt.moduleType,
-              module_sub_type: evt.moduleSubType,
-              time: evt.time,
-              data: JSON.stringify(evt.event),
-            })
-            .execute()
-            .catch((err) => {
-              logger.error(err);
-              throw err;
-            });
-        }
-      }
-    });
-
-    return true;
-  }
-
-  async deleteScript(id: string): Promise<boolean> {
-    this.db.updateTable("scripts")
-      .set("enabled", 0)
-      .where("id", "=", id)
-      .executeTakeFirstOrThrow()
-      .catch((err) => {
-        logger.error(err);
-        throw err;
-      });
-
-    return true;
-  }
-
-  async copyScript(id: string): Promise<Script> {
-    let result = Script.prototype;
-
-    const script = await this.getScript(id);
-
-    script.id = this.generateScriptId(5);
-    script.scriptName = script.scriptName + " - copy";
-    for (const ch of script.scriptChannels) {
-      ch.id = Guid.create().toString();
-      for (const kvp of ch.eventsKvpArray) {
-        kvp.value.scriptChannel = ch.id;
-      }
-    }
-    script.deploymentStatusKvp = new Array<DeploymentStatus>();
-    script.lastSaved = new Date();
-
-    await this.saveScript(script).catch((err: any) => {
-      logger.error(`Exception saving copy script for ${id} => ${err}`);
-    });
-
-    result = new Script(
-      script.id,
-      script.scriptName,
-      script.description,
-      new Date(script.lastSaved),
-    );
-
-    return result;
-  }
+  //#region Utility
 
   private generateScriptId(length: number): string {
     let result = `s${Math.floor(Date.now() / 1000)}`;

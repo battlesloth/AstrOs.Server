@@ -70,3 +70,24 @@ export async function upsertGpioModule(
             });
     }
 }
+
+export async function readGpioChannel(db: Kysely<Database>, id: string): Promise<GpioChannel> {
+    const ch = await db.selectFrom("gpio_channels")
+        .selectAll()   
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow()
+        .catch((err) => {
+            logger.error(err);
+            throw err;
+        });
+    
+
+    return new GpioChannel(
+        ch.id,
+        ch.location_id,
+        ch.channel_number,
+        ch.enabled > 0,
+        ch.name,
+        ch.default_low > 0,
+    );
+}

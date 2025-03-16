@@ -1,4 +1,4 @@
-import { db } from "src/dal/database.js";
+import { db } from "../dal/database.js";
 import { ScriptRepository } from "../dal/repositories/script_repository.js";
 import { logger } from "../logger.js";
 
@@ -51,7 +51,7 @@ export class ScriptsController {
     try {
       const repo = new ScriptRepository(db);
 
-      if (await repo.saveScript(req.body)) {
+      if (await repo.upsertScript(req.body)) {
         res.status(200);
         res.json({ message: "success" });
       } else {
