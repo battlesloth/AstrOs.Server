@@ -28,115 +28,115 @@ export class UartModule extends BaseModule {
     this.baudRate = baudRate;
     this.subModule = {};
   }
+}
 
-  override getScriptResources(): ScriptChannelResource[] {
-    let resources: ScriptChannelResource[] = [];
+export function getUartScriptResources(m: UartModule): ScriptChannelResource[] {
+  let resources: ScriptChannelResource[] = [];
 
-    switch (this.moduleSubType) {
-      case ModuleSubType.genericSerial:
-        resources = this.generateGenericSerialResources();
-        break;
-      case ModuleSubType.kangaroo:
-        resources = this.generateKangarooResources();
-        break;
-      case ModuleSubType.maestro:
-        resources = this.generateMaestroResources();
-        break;
-      case ModuleSubType.humanCyborgRelationsSerial:
-        resources = this.generateHCRResources();
-        break;
+  switch (m.moduleSubType) {
+    case ModuleSubType.genericSerial:
+      resources = generateGenericSerialResources(m);
+      break;
+    case ModuleSubType.kangaroo:
+      resources = generateKangarooResources(m);
+      break;
+    case ModuleSubType.maestro:
+      resources = generateMaestroResources(m);
+      break;
+    case ModuleSubType.humanCyborgRelationsSerial:
+      resources = generateHCRResources(m);
+      break;
+  }
+
+  return resources;
+}
+
+function generateGenericSerialResources(m: UartModule): ScriptChannelResource[] {
+  const ch = new UartChannel(
+    m.id,
+    m.id,
+    m.name,
+    m.moduleSubType,
+    true,
+  );
+
+  return [
+    new ScriptChannelResource(
+      m.id,
+      ScriptChannelType.GENERIC_UART,
+      m.name,
+      m.id,
+      m.locationId,
+      ch,
+    ),
+  ];
+}
+
+function generateKangarooResources(m: UartModule): ScriptChannelResource[] {
+  const mod = m.subModule as KangarooX2;
+
+  const ch = new KangarooX2Channel(
+    m.id,
+    m.id,
+    m.name,
+    mod.ch1Name,
+    mod.ch2Name,
+  );
+
+  return [
+    new ScriptChannelResource(
+      m.id,
+      ScriptChannelType.KANGAROO,
+      m.name,
+      m.id,
+      m.locationId,
+      ch,
+    ),
+  ];
+}
+
+function generateMaestroResources(m: UartModule): ScriptChannelResource[] {
+  const resources: ScriptChannelResource[] = [];
+
+  const mod = m.subModule as MaestroModule;
+
+  for (const board of mod.boards) {
+    for (const ch of board.channels) {
+      if (!ch.enabled) continue;
+
+      resources.push(
+        new ScriptChannelResource(
+          ch.id,
+          ch.isServo ? ScriptChannelType.SERVO : ScriptChannelType.GPIO,
+          ch.channelName,
+          m.id,
+          m.locationId,
+          ch,
+        ),
+      );
     }
-
-    return resources;
   }
 
-  generateGenericSerialResources(): ScriptChannelResource[] {
-    const ch = new UartChannel(
-      this.id,
-      this.id,
-      this.name,
-      this.moduleSubType,
-      true,
-    );
+  return resources;
+}
 
-    return [
-      new ScriptChannelResource(
-        this.id,
-        ScriptChannelType.GENERIC_UART,
-        this.name,
-        this.id,
-        this.locationId,
-        ch,
-      ),
-    ];
-  }
+function generateHCRResources(m: UartModule): ScriptChannelResource[] {
+  const ch = new UartChannel(
+    m.id,
+    m.id,
+    m.name,
+    m.moduleSubType,
+    true,
+  );
 
-  generateKangarooResources(): ScriptChannelResource[] {
-    const mod = this.subModule as KangarooX2;
-
-    const ch = new KangarooX2Channel(
-      this.id,
-      this.id,
-      this.name,
-      mod.ch1Name,
-      mod.ch2Name,
-    );
-
-    return [
-      new ScriptChannelResource(
-        this.id,
-        ScriptChannelType.KANGAROO,
-        this.name,
-        this.id,
-        this.locationId,
-        ch,
-      ),
-    ];
-  }
-
-  generateMaestroResources(): ScriptChannelResource[] {
-    const resources: ScriptChannelResource[] = [];
-
-    const mod = this.subModule as MaestroModule;
-
-    for (const board of mod.boards) {
-      for (const ch of board.channels) {
-        if (!ch.enabled) continue;
-
-        resources.push(
-          new ScriptChannelResource(
-            ch.id,
-            ch.isServo ? ScriptChannelType.SERVO : ScriptChannelType.GPIO,
-            ch.channelName,
-            this.id,
-            this.locationId,
-            ch,
-          ),
-        );
-      }
-    }
-
-    return resources;
-  }
-
-  generateHCRResources(): ScriptChannelResource[] {
-    const ch = new UartChannel(
-      this.id,
-      this.id,
-      this.name,
-      this.moduleSubType,
-      true,
-    );
-
-    return [
-      new ScriptChannelResource(
-        this.id,
-        ScriptChannelType.AUDIO,
-        this.name,
-        this.id,
-        this.locationId,
-        ch,
-      ),
-    ];
-  }
+  return [
+    new ScriptChannelResource(
+      m.id,
+      ScriptChannelType.AUDIO,
+      m.name,
+      m.id,
+      m.locationId,
+      ch,
+    ),
+  ];
 }

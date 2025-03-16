@@ -307,6 +307,9 @@ async function upsertMaestroModule(
             });
 
         for (const channel of board.channels) {
+
+            console.log("Upserting maestro channel", channel);
+            
             await trx
                 .insertInto("maestro_channels")
                 .values({

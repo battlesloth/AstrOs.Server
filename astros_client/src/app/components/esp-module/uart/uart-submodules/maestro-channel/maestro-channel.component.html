@@ -14,8 +14,13 @@
         </div>
     </div>
     <div *ngIf="channel" class="servo-settings">
-        <app-servo-settings  [enabled]="channel.enabled" [name]="channel.channelName"
-            [isServo]="channel.isServo" [invert]="channel.inverted" [minPulse]="channel.minPos"
-            [maxPulse]="channel.maxPos" [homePosition]="channel.homePos" />
+        <app-servo-settings  
+            [enabled]="channel.enabled" 
+            [(name)]="channel.channelName"
+            [isServo]="channel.isServo" 
+            [(invert)]="channel.inverted" 
+            [(minPulse)]="channel.minPos"
+            [(maxPulse)]="channel.maxPos" 
+            [(homePosition)]="channel.homePos" />
     </div>
 </div>

@@ -83,15 +83,22 @@ export class AddChannelModalComponent
   fliterAvailableChannels() {
     this.channels = [];
 
-    if (this.selectedChannelType !== ScriptChannelType.NONE) {
-      const temp = this.availableChannels.get(+this.selectedChannelType);
+    const type = +this.selectedChannelType as ScriptChannelType;
+
+    if (type !== ScriptChannelType.NONE) {
+      const temp = this.availableChannels.get(type);
 
       if (temp) {
         this.channels = [...temp];
       }
     } else {
+
+      console.log('here');
       for (const val of this.availableChannels.values()) {
-        this.channels = [...this.channels, ...val];
+
+        console.log(this.channels);
+
+        this.channels.push(...val);
       }
     }
 

@@ -1,31 +1,31 @@
 <div *ngIf="enabled" class="servo-channel">
     <div class="servo-channel-row">
         <div class="name">
-            <input matInput placeholder="Name" [(ngModel)]="name" />
+            <input matInput placeholder="Name" [(ngModel)]="name" (ngModelChange)="onNameChange()"/>
         </div>
         <div class="type">
-            <mat-checkbox [(ngModel)]="invert" labelPosition="before">{{typeLabel}}</mat-checkbox>
+            <mat-checkbox [(ngModel)]="invert" labelPosition="before" (ngModelChange)="onInvertChange()">{{typeLabel}} </mat-checkbox>
         </div>
     </div>
     <div *ngIf="isServo" class="servo-channel-row">
         <div class="ms-value">
             <div class="label-ms">Min μS</div>
             <div class="limit">
-                <input matInput placeholder="500" [(ngModel)]="minPulse" />
+                <input matInput placeholder="500" [(ngModel)]="minPulse" (ngModelChange)="onMinPulseChange()" />
             </div>
         </div>
         <div class="spacer"></div>
         <div class="ms-value">
             <div class="label-ms">Max μS</div>
             <div class="limit">
-                <input matInput placeholder="2500" [(ngModel)]="maxPulse" />
+                <input matInput placeholder="2500" [(ngModel)]="maxPulse" (ngModelChange)="onMaxPulseChange()"/>
             </div>
         </div>
         <div class="spacer"></div>
         <div class="ms-value">
             <div class="label-ms">Home μS</div>
             <div class="limit">
-                <input matInput placeholder="500" [(ngModel)]="homePosition" />
+                <input matInput placeholder="500" [(ngModel)]="homePosition" (ngModelChange)="onHomeChange()"/>
             </div>
         </div>
     </div>

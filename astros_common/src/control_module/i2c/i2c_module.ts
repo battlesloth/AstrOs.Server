@@ -22,25 +22,27 @@ export class I2cModule extends BaseModule {
     this.i2cAddress = i2cAddress;
     this.subModule = {};
   }
+}
 
-  override getScriptResources() {
-    const resources: ScriptChannelResource[] = [];
+export function getI2cScriptResources(
+  m: I2cModule
+): ScriptChannelResource[] {
+  const resources: ScriptChannelResource[] = [];
 
-    switch (this.moduleSubType) {
-      case ModuleSubType.genericI2C:
-        resources.push(
-          new ScriptChannelResource(
-            this.id,
-            ScriptChannelType.GENERIC_I2C,
-            this.name,
-            this.id,
-            this.locationId,
-            new I2cChannel(this.id, this.locationId, this.name, true),
-          ),
-        );
-        break;
-    }
-
-    return resources;
+  switch (m.moduleSubType) {
+    case ModuleSubType.genericI2C:
+      resources.push(
+        new ScriptChannelResource(
+          m.id,
+          ScriptChannelType.GENERIC_I2C,
+          m.name,
+          m.id,
+          m.locationId,
+          new I2cChannel(m.id, m.locationId, m.name, true),
+        ),
+      );
+      break;
   }
+
+  return resources;
 }

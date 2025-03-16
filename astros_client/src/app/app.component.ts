@@ -34,7 +34,7 @@ export class AppComponent implements OnInit {
   ) {
     if (auth.isLoggedIn()) {
       //router.navigate(['status']);
-      router.navigate(['modules']);
+      router.navigate(['scripts']);
     }
   }
 

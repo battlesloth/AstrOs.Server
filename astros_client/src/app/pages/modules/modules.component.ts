@@ -289,7 +289,6 @@ export class ModulesComponent implements AfterViewInit {
   }
 
   removeModuleCallback(evt: ModalCallbackEvent) {
-    console.log('evt', evt);
     if (evt.type === ConfirmModalResources.closeEvent) {
       this.modalService.close('modules-modal');
       this.container.clear();
@@ -518,8 +517,6 @@ export class ModulesComponent implements AfterViewInit {
       },
     };
 
-    console.log(JSON.stringify(this.bodyLocation));
-
     this.controllerService
       .saveLocations(
         new AstrOsLocationCollection(
@@ -615,7 +612,6 @@ export class ModulesComponent implements AfterViewInit {
   //#region Helper Functions
 
   private parseModules(locations: AstrOsLocationCollection) {
-    console.log(locations);
     try {
       this.coreLocation = locations.coreModule ?? this.coreLocation;
       this.domeLocation = locations.domeModule ?? this.domeLocation;

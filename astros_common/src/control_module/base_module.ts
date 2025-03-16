@@ -1,5 +1,4 @@
 import { ModuleSubType, ModuleType } from "../astros_enums";
-import { ScriptChannelResource } from "../scripts/script_channel_resource";
 
 export abstract class BaseModule {
   id: string;
@@ -21,6 +20,4 @@ export abstract class BaseModule {
     this.moduleType = moduleType;
     this.moduleSubType = moduleSubType;
   }
-
-  abstract getScriptResources(): ScriptChannelResource[];
 }

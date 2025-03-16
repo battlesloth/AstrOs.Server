@@ -20,25 +20,26 @@ export class GpioModule extends BaseModule {
     );
     this.channels = new Array<GpioChannel>();
   }
+}
 
-  override getScriptResources() {
-    const resources: ScriptChannelResource[] = [];
 
-    for (const ch of this.channels) {
-      if (!ch.enabled) continue;
+export function getGpioScriptResources(m: GpioModule): ScriptChannelResource[] {
+  const resources: ScriptChannelResource[] = [];
 
-      resources.push(
-        new ScriptChannelResource(
-          ch.id,
-          ScriptChannelType.GPIO,
-          ch.channelName,
-          this.id,
-          this.locationId,
-          ch,
-        ),
-      );
-    }
+  for (const ch of m.channels) {
+    if (!ch.enabled) continue;
 
-    return resources;
+    resources.push(
+      new ScriptChannelResource(
+        ch.id,
+        ScriptChannelType.GPIO,
+        ch.channelName,
+        m.id,
+        m.locationId,
+        ch,
+      ),
+    );
   }
+
+  return resources;
 }

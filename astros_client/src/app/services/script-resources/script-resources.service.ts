@@ -2,9 +2,15 @@ import { Injectable } from '@angular/core';
 import { ControllerService } from '../controllers/controller.service';
 import {
   ControllerLocation,
+  getGpioScriptResources,
+  getI2cScriptResources,
+  getUartScriptResources,
+  GpioModule,
+  I2cModule,
   Script,
   ScriptChannelResource,
   ScriptChannelType,
+  UartModule,
 } from 'astros-common';
 import { LocationDetails, ChannelDetails } from '@src/models/scripting';
 
@@ -209,14 +215,14 @@ export class ScriptResourcesService {
     const locationResources: ScriptChannelResource[] = [];
 
     for (const module of location.i2cModules) {
-      locationResources.push(...module.getScriptResources());
+      locationResources.push(...getI2cScriptResources(module));
     }
 
     for (const module of location.uartModules) {
-      locationResources.push(...module.getScriptResources());
+      locationResources.push(...getUartScriptResources(module));
     }
 
-    locationResources.push(...location.gpioModule.getScriptResources());
+    locationResources.push(...getGpioScriptResources(location.gpioModule));
 
     this.addChannelResources(locationResources);
   }
