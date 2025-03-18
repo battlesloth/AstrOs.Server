@@ -64,6 +64,7 @@ import {
   ServoTestMessage,
   AddModuleModalResponse,
 } from '@src/components/modals/modules';
+import { ActivatedRoute } from '@angular/router';
 
 interface Caption {
   str: string;
@@ -90,6 +91,8 @@ interface Caption {
 export class ModulesComponent implements AfterViewInit {
   @ViewChild('modalContainer', { read: ViewContainerRef })
   container!: ViewContainerRef;
+
+  skipControllers = false;
 
   bodyTestId = 'body';
   coreTestId = 'core';
@@ -129,7 +132,10 @@ export class ModulesComponent implements AfterViewInit {
     private modalService: ModalService,
     private renderer: Renderer2,
     private status: StatusService,
-  ) {}
+    private route: ActivatedRoute
+  ) {
+    this.skipControllers = this.route.snapshot.paramMap.get('action') === 'skip-controllers';
+  }
 
   ngAfterViewInit(): void {
     this.openControllerSyncModal();
@@ -141,6 +147,10 @@ export class ModulesComponent implements AfterViewInit {
     this.container.clear();
 
     const modalResources = new Map<string, unknown>();
+
+    if (this.skipControllers) {
+      modalResources.set(LoadingModalResources.skipControllerLoading, true);
+    }
 
     const component = this.container.createComponent(LoadingModalComponent);
 

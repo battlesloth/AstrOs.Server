@@ -21,7 +21,8 @@
                 <app-uart-module 
                     (removeModuleEvent)="removeModule($event)" 
                     [module]="module" 
-                    [isMaster]="isMaster"/>
+                    [isMaster]="isMaster"
+                    [parentTestId]="testIdParent"/>
             </li>
         </ul>
     </mat-expansion-panel>

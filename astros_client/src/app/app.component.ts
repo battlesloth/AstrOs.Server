@@ -11,12 +11,17 @@ import { AuthenticationService } from './services/auth/authentication.service';
 import { SnackbarService } from './services/snackbar/snackbar.service';
 import { WebsocketService } from './services/websocket/websocket.service';
 import { NgIf } from '@angular/common';
+import { AppRoutingModule } from './app-routing.module';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
-  imports: [RouterLink, NgIf, RouterOutlet],
+  imports: [
+    RouterLink, 
+    NgIf, 
+    RouterOutlet
+  ],
 })
 export class AppComponent implements OnInit {
   title = 'AstOs';
@@ -28,15 +33,15 @@ export class AppComponent implements OnInit {
   constructor(
     public auth: AuthenticationService,
     private renderer: Renderer2,
-    private router: Router,
+    //private router: Router,
     private snackbar: SnackbarService,
     private socket: WebsocketService,
   ) {
-    if (auth.isLoggedIn()) {
+    //if (auth.isLoggedIn()) {
       //router.navigate(['status']);
       //router.navigate(['scripts']);
-      router.navigate(['modules']);
-    }
+     // router.navigate(['modules']);
+    //}
   }
 
   ngOnInit(): void {

@@ -48,6 +48,9 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
   @Input()
   module!: UartModule;
 
+  @Input()
+  parentTestId!: string;
+
   @Output()
   removeModuleEvent = new EventEmitter<RemoveModuleEvent>();
 

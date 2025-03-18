@@ -12,6 +12,7 @@ import { ModalCallbackEvent } from '../..//modal-base/modal-callback-event';
 import { ModalBaseComponent } from '../../modal-base/modal-base.component';
 
 export class LoadingModalResources {
+  public static skipControllerLoading = 'loading_skipControllerLoading';
   public static closeEvent = 'loading_closeEvent';
 }
 
@@ -50,6 +51,39 @@ export class LoadingModalComponent
   }
 
   ngOnInit(): void {
+
+    if (this.resources.has(LoadingModalResources.skipControllerLoading)) {
+      this.message = 'Skipping controller loading...';
+      this.controllers = {
+        type: TransmissionType.controllers,
+        success: false,
+        controllers: [
+          new ControlModule('test', 'master', '00:00:00:00:00:00')
+        ],
+        message: 'Skipping controller loading',
+       };
+      this.controllersLoaded = true;
+    } else {
+      const observer = {
+        next: (_: unknown) => {
+          console.log('Synced controllers');
+        },
+        error: (err: unknown) => console.error(err),
+      };
+  
+      this.controllerService.syncControllers().subscribe(observer);
+  
+      this.subscription = this.socket.messages.subscribe((msg: unknown) => {
+        console.log('Received message', msg);
+        if (msg && typeof msg === 'object' && 'type' in msg)
+          if (msg.type === this.controllersMsg) {
+            this.controllers = msg as ControllersResponse;
+            this.controllersLoaded = true;
+            this.checkLoadedState();
+          }
+      });
+    } 
+
     const locationsObserver = {
       next: (result: AstrOsLocationCollection) => {
         console.log('Loaded locations');
@@ -61,25 +95,6 @@ export class LoadingModalComponent
     };
 
     this.controllerService.getLoadedLocations().subscribe(locationsObserver);
-
-    const observer = {
-      next: (_: unknown) => {
-        console.log('Synced controllers');
-      },
-      error: (err: unknown) => console.error(err),
-    };
-
-    this.controllerService.syncControllers().subscribe(observer);
-
-    this.subscription = this.socket.messages.subscribe((msg: unknown) => {
-      console.log('Received message', msg);
-      if (msg && typeof msg === 'object' && 'type' in msg)
-        if (msg.type === this.controllersMsg) {
-          this.controllers = msg as ControllersResponse;
-          this.controllersLoaded = true;
-          this.checkLoadedState();
-        }
-    });
   }
 
   checkLoadedState() {

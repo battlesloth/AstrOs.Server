@@ -9,10 +9,20 @@ import { ScripterComponent } from './pages/scripter/scripter.component';
 import { ScriptsComponent } from './pages/scripts/scripts.component';
 import { SettingsComponent } from './pages/settings/settings.component';
 import { StatusComponent } from './pages/status/status.component';
+import { LocationStrategy, PathLocationStrategy } from '@angular/common';
 
 const routes: Routes = [
-  { path: '', component: LoginComponent, title: 'AstrOs' },
-  { path: 'login', component: LoginComponent, title: 'AstrOs' },
+  { 
+    path: '',
+    component: StatusComponent,
+    canActivate: [AuthGuard],
+    title: 'AstrOs - Status',
+  },
+  { 
+    path: 'login', 
+    component: LoginComponent, 
+    title: 'AstrOs' 
+  },
   {
     path: 'status',
     component: StatusComponent,
@@ -27,6 +37,12 @@ const routes: Routes = [
   },
   {
     path: 'modules',
+    component: ModulesComponent,
+    canActivate: [AuthGuard],
+    title: 'AstrOs - Modules',
+  },
+  {
+    path: 'modules/:action',
     component: ModulesComponent,
     canActivate: [AuthGuard],
     title: 'AstrOs - Modules',
@@ -60,5 +76,6 @@ const routes: Routes = [
 @NgModule({
   imports: [RouterModule.forRoot(routes)],
   exports: [RouterModule],
+  providers: [{provide: LocationStrategy, useClass: PathLocationStrategy}]
 })
 export class AppRoutingModule {}
