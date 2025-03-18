@@ -199,6 +199,10 @@ class ApiServer {
     this.app.use(passport.initialize());
     this.app.use("/api", this.router);
 
+    this.app.get("/index.html", (req, res) => {
+      res.send("Hello World!");
+    });
+
     this.app.use((req: any, res: any, next: any) => {
       res.status(404).json({
         message: "Endpoint not found",
@@ -235,6 +239,7 @@ class ApiServer {
             logger.error('res:', res);
         });
 */
+
     this.router.post(AuthContoller.route, AuthContoller.login);
     this.router.post(AuthContoller.reauthRoute, AuthContoller.reauth);
 

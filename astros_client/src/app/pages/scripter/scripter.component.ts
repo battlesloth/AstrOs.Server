@@ -23,6 +23,7 @@ import {
   ModuleSubType,
   ScriptChannelType,
   ModuleChannelTypes,
+  MaestroChannel,
 } from 'astros-common';
 import EventMarkerHelper from './helper/event-marker-helper';
 import { FormsModule } from '@angular/forms';
@@ -50,6 +51,7 @@ import {
   ScriptTestModalComponent,
   ScriptTestModalResources,
   UartEventModalComponent,
+  ServoEventModalComponent,
 } from '@src/components/modals/scripting';
 import {
   ControllerService,
@@ -78,7 +80,8 @@ type ScripterModal =
   | I2cEventModalComponent
   | AudioEventModalComponent
   | GpioEventModalComponent
-  | HumanCyborgModalComponent;
+  | HumanCyborgModalComponent
+  | ServoEventModalComponent;
 
 @Component({
   selector: 'app-scripter',
@@ -466,6 +469,20 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
               HumanCyborgModalComponent,
             );
             break;
+          }
+          case ModuleSubType.maestro: {
+            const scriptChannel = this.getScriptChannel(event.scriptChannel);
+            if (!scriptChannel) {
+              console.log(`could not find channel for event: ${JSON.stringify(event)}`);
+              this.snackBar.okToast('Error: Could not find channel for event!');
+              return;
+            }
+            const mch = scriptChannel.moduleChannel as MaestroChannel;
+            if (mch.isServo) {
+              component = this.container.createComponent(ServoEventModalComponent);
+            } else {
+              component = this.container.createComponent(GpioEventModalComponent);
+            }
           }
         }
         break;
@@ -859,6 +876,11 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   //#endregion
 
   //#region utility methods
+
+  private getScriptChannel(channelId: string): ScriptChannel | undefined {
+    return this.scriptChannels.find((ch) => ch.id === channelId);
+  }
+
   private generateScriptId(length: number): string {
     let result = `s${Math.floor(Date.now() / 1000)}`;
     const charactersLength = this.characters.length;

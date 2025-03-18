@@ -65,11 +65,11 @@ export const migration_0: Migration = {
     await db.schema
       .createTable("script_events")
       .addColumn("script_id", "text", (col) => col.notNull())
-      .addColumn("channel_id", "text", (col) => col.notNull())
+      .addColumn("script_channel_id", "text", (col) => col.notNull())
       .addColumn("module_type", "integer", (col) => col.notNull())
       .addColumn("module_sub_type", "integer", (col) => col.notNull())
       .addColumn("time", "integer", (col) => col.notNull())
-      .addColumn("data_json", "text", (col) => col.notNull())
+      .addColumn("data", "text", (col) => col.notNull())
       .execute();
 
     await db.schema
