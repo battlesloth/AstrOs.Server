@@ -3,11 +3,8 @@ import { Database } from "../types.js";
 import { logger } from "../../logger.js";
 
 export class SettingsRepository {
+  constructor(private readonly db: Kysely<Database>) {}
 
-    constructor(
-      private readonly db: Kysely<Database>
-    ) {}
-    
   async getSetting(type: string): Promise<string> {
     await this.db
       .selectFrom("settings")

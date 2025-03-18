@@ -4,10 +4,7 @@ import { User } from "../../models/users.js";
 import { Database } from "../types.js";
 
 export class UserRepository {
-
-    constructor(
-      private readonly db: Kysely<Database>
-    ) {}
+  constructor(private readonly db: Kysely<Database>) {}
 
   async getByUsername(name: string) {
     const user = await this.db

@@ -2,31 +2,24 @@ import { Kysely, Transaction } from "kysely";
 import { logger } from "../../logger.js";
 import { inserted } from "../database.js";
 import { Database } from "../types.js";
+import { ControlModule, ControllerLocation } from "astros-common";
 import {
-  ControlModule,
-  ControllerLocation,
-} from "astros-common";
-import { 
-  getGpioModule, 
-  upsertGpioModule 
+  getGpioModule,
+  upsertGpioModule,
 } from "./module_repositories/gpio_repository.js";
-import { 
-  getUartModules, 
-  upsertUartModules, 
-  removeStaleUartModules 
+import {
+  getUartModules,
+  upsertUartModules,
+  removeStaleUartModules,
 } from "./module_repositories/uart_repository.js";
-import { 
-  getI2cModules, 
-  removeStaleI2CModules, 
-  upsertI2cModules 
+import {
+  getI2cModules,
+  removeStaleI2CModules,
+  upsertI2cModules,
 } from "./module_repositories/i2c_repository.js";
 
-
 export class LocationsRepository {
-
-    constructor(
-      private readonly db: Kysely<Database>
-    ) {}
+  constructor(private readonly db: Kysely<Database>) {}
 
   public async getLocations(): Promise<Array<ControllerLocation>> {
     const result = new Array<ControllerLocation>();
@@ -136,7 +129,6 @@ export class LocationsRepository {
   public async loadLocationConfiguration(
     location: ControllerLocation,
   ): Promise<ControllerLocation> {
-
     location.uartModules = await getUartModules(this.db, location.id);
 
     location.i2cModules = await getI2cModules(this.db, location.id);
@@ -146,7 +138,6 @@ export class LocationsRepository {
     return location;
   }
 
-
   //#region Update Location
   public async updateLocation(location: ControllerLocation): Promise<boolean> {
     logger.info(`Updating location ${location.id}, ${location.locationName}`);
@@ -154,7 +145,6 @@ export class LocationsRepository {
     // TODO: only wipe fingerprint if there are changes to uart/servo/i2c
 
     await this.db.transaction().execute(async (trx) => {
-
       await trx
         .updateTable("locations")
         .set({
@@ -273,5 +263,5 @@ export class LocationsRepository {
     return result.numUpdatedRows > 0;
   }
 
-  //#endregion 
+  //#endregion
 }

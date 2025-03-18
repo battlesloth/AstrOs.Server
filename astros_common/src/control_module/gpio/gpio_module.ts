@@ -22,7 +22,6 @@ export class GpioModule extends BaseModule {
   }
 }
 
-
 export function getGpioScriptResources(m: GpioModule): ScriptChannelResource[] {
   const resources: ScriptChannelResource[] = [];
 

@@ -282,5 +282,5 @@ function getGenericI2cChannel(idx: number): I2cChannel {
 }
 
 function getGpioChannel(idx: number): GpioChannel {
-  return new GpioChannel(uuid(), uuid(), idx, true, `GPIO  ${idx}`, true);
+  return new GpioChannel(uuid(), uuid(), idx, true, `GPIO  ${idx}`, false);
 }

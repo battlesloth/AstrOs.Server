@@ -21,12 +21,12 @@ export const Default: Story = {
 
 export const DefaultHigh: Story = {
   args: {
-    channel: new GpioChannel(uuid(), uuid(), 0, true, 'Test', false),
+    channel: new GpioChannel(uuid(), uuid(), 0, true, 'Test', true),
   },
 };
 
 export const Disabled: Story = {
   args: {
-    channel: new GpioChannel(uuid(), uuid(), 0, false, 'Test', true),
+    channel: new GpioChannel(uuid(), uuid(), 0, false, 'Test', false),
   },
 };

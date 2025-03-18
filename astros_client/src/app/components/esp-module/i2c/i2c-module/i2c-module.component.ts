@@ -75,7 +75,6 @@ export class I2cModuleComponent implements AfterViewInit, AfterContentInit {
   }
 
   ngAfterContentInit(): void {
-
     switch (this.module.moduleSubType) {
       case ModuleSubType.genericI2C:
         this.subtypeName = 'Generic I2C';
@@ -92,11 +91,10 @@ export class I2cModuleComponent implements AfterViewInit, AfterContentInit {
   }
 
   setModule() {
-
-    if (this.module === undefined || !this.module.moduleSubType === undefined) {
+    if (this.module === undefined || this.module.moduleSubType === undefined) {
       return;
     }
-    
+
     this.i2cContainer?.clear();
 
     let component!: ComponentRef<BaseI2cSubModuleComponent>;

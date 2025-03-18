@@ -8,17 +8,17 @@ import {
   ModuleChannelTypes,
   ModuleType,
   ModuleSubType,
-  moduleSubTypeToScriptEventTypes
+  moduleSubTypeToScriptEventTypes,
 } from "astros-common";
 import { logger } from "../../logger.js";
 import { Guid } from "guid-typescript";
 import { Database, ScriptsTable } from "../types.js";
 import { Kysely, Transaction } from "kysely";
 import { readGpioChannel } from "./module_repositories/gpio_repository.js";
-import { 
-  readKangarooChannel, 
-  readMaestroChannel, 
-  readUartChannel 
+import {
+  readKangarooChannel,
+  readMaestroChannel,
+  readUartChannel,
 } from "./module_repositories/uart_repository.js";
 import { readI2cChannel } from "./module_repositories/i2c_repository.js";
 
@@ -26,10 +26,7 @@ export class ScriptRepository {
   private characters =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-  constructor(
-    private readonly db: Kysely<Database>
-  ) { }
-
+  constructor(private readonly db: Kysely<Database>) {}
 
   //#region Script Create
 
@@ -204,7 +201,8 @@ export class ScriptRepository {
   //#region Script Delete
 
   async deleteScript(id: string): Promise<boolean> {
-    this.db.updateTable("scripts")
+    this.db
+      .updateTable("scripts")
       .set("enabled", 0)
       .where("id", "=", id)
       .executeTakeFirstOrThrow()
@@ -250,9 +248,9 @@ export class ScriptRepository {
 
   //#region Channels Read
 
-
-  private async readScriptChannels(scriptId: string): Promise<Array<ScriptChannel>> {
-
+  private async readScriptChannels(
+    scriptId: string,
+  ): Promise<Array<ScriptChannel>> {
     const result = new Array<ScriptChannel>();
 
     const channels = await this.db
@@ -329,7 +327,10 @@ export class ScriptRepository {
 
   //#region Channels Delete
 
-  private async deleteScriptChannels(trx: Transaction<Database>, scriptId: string) {
+  private async deleteScriptChannels(
+    trx: Transaction<Database>,
+    scriptId: string,
+  ) {
     await trx
       .deleteFrom("script_channels")
       .where("script_id", "=", scriptId)
@@ -372,10 +373,9 @@ export class ScriptRepository {
   //#region Events Read
 
   private async readScriptEvents(
-    scriptId: string, 
-    channelId: string
+    scriptId: string,
+    channelId: string,
   ): Promise<Array<{ key: number; value: ScriptEvent }>> {
-
     const result = new Array<{ key: number; value: ScriptEvent }>();
 
     const events = await this.db
@@ -391,9 +391,7 @@ export class ScriptRepository {
 
     for (const evt of events) {
       const subtype =
-        evt.module_sub_type !== null
-          ? evt.module_sub_type
-          : ModuleSubType.none;
+        evt.module_sub_type !== null ? evt.module_sub_type : ModuleSubType.none;
 
       const scriptEventType = moduleSubTypeToScriptEventTypes(
         subtype,
@@ -418,7 +416,10 @@ export class ScriptRepository {
 
   //#region Events Delete
 
-  private async deleteScriptEvents(trx: Transaction<Database>, scriptId: string) {
+  private async deleteScriptEvents(
+    trx: Transaction<Database>,
+    scriptId: string,
+  ) {
     await trx
       .deleteFrom("script_events")
       .where("script_id", "=", scriptId)
@@ -430,7 +431,6 @@ export class ScriptRepository {
   }
 
   //#endregion
-
 
   //#region Script Uploads
   async updateScriptControllerUploaded(

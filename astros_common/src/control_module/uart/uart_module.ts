@@ -51,14 +51,10 @@ export function getUartScriptResources(m: UartModule): ScriptChannelResource[] {
   return resources;
 }
 
-function generateGenericSerialResources(m: UartModule): ScriptChannelResource[] {
-  const ch = new UartChannel(
-    m.id,
-    m.id,
-    m.name,
-    m.moduleSubType,
-    true,
-  );
+function generateGenericSerialResources(
+  m: UartModule,
+): ScriptChannelResource[] {
+  const ch = new UartChannel(m.id, m.id, m.name, m.moduleSubType, true);
 
   return [
     new ScriptChannelResource(
@@ -121,13 +117,7 @@ function generateMaestroResources(m: UartModule): ScriptChannelResource[] {
 }
 
 function generateHCRResources(m: UartModule): ScriptChannelResource[] {
-  const ch = new UartChannel(
-    m.id,
-    m.id,
-    m.name,
-    m.moduleSubType,
-    true,
-  );
+  const ch = new UartChannel(m.id, m.id, m.name, m.moduleSubType, true);
 
   return [
     new ScriptChannelResource(

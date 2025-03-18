@@ -6,7 +6,10 @@ export { ControlModuleStatus } from "./control_module/control_module_status";
 export { BaseModule } from "./control_module/base_module";
 export { BaseChannel, ModuleChannelType } from "./control_module/base_channel";
 export { I2cChannel } from "./control_module/i2c/i2c_channel";
-export { I2cModule, getI2cScriptResources } from "./control_module/i2c/i2c_module";
+export {
+  I2cModule,
+  getI2cScriptResources,
+} from "./control_module/i2c/i2c_module";
 export { KangarooX2 } from "./control_module/uart/sub_modules/kangarooX2/kangaroo_x2";
 export { KangarooX2Channel } from "./control_module/uart/sub_modules/kangarooX2/kangaroo_x2_channel";
 export { HumanCyborgRelationsModule } from "./control_module/uart/sub_modules/human_cyborg_relations";
@@ -15,10 +18,16 @@ export { MaestroBoard } from "./control_module/uart/sub_modules/maestro/maestro_
 export { MaestroChannel } from "./control_module/uart/sub_modules/maestro/maestro_channel";
 export { PwmModule } from "./control_module/i2c/sub_modules/pca9685/pwm_module";
 export { PwmChannel } from "./control_module/i2c/sub_modules/pca9685/pwm_channel";
-export { UartModule, getUartScriptResources} from "./control_module/uart/uart_module";
+export {
+  UartModule,
+  getUartScriptResources,
+} from "./control_module/uart/uart_module";
 export { UartChannel } from "./control_module/uart/uart_channel";
 export { GpioChannel } from "./control_module/gpio/gpio_channel";
-export { GpioModule, getGpioScriptResources } from "./control_module/gpio/gpio_module";
+export {
+  GpioModule,
+  getGpioScriptResources,
+} from "./control_module/gpio/gpio_module";
 export { Script } from "./scripts/script";
 export { ScriptChannel } from "./scripts/script_channel";
 export { ScriptChannelResource } from "./scripts/script_channel_resource";

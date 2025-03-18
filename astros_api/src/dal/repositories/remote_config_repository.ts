@@ -3,10 +3,7 @@ import { Kysely } from "kysely";
 import { Database } from "../types.js";
 
 export class RemoteConfigRepository {
-
-    constructor(
-      private readonly db: Kysely<Database>
-    ) {}
+  constructor(private readonly db: Kysely<Database>) {}
 
   async getConfig(type: string) {
     const result = await this.db

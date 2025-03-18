@@ -58,6 +58,9 @@ export class EspModuleComponent {
   @Input()
   location!: ControllerLocation;
 
+  @Input()
+  testIdParent!: string;
+
   addIcon = faPlus;
 
   uartPanelOpenState = false;

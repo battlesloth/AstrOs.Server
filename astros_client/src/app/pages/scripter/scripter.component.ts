@@ -473,15 +473,21 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
           case ModuleSubType.maestro: {
             const scriptChannel = this.getScriptChannel(event.scriptChannel);
             if (!scriptChannel) {
-              console.log(`could not find channel for event: ${JSON.stringify(event)}`);
+              console.log(
+                `could not find channel for event: ${JSON.stringify(event)}`,
+              );
               this.snackBar.okToast('Error: Could not find channel for event!');
               return;
             }
             const mch = scriptChannel.moduleChannel as MaestroChannel;
             if (mch.isServo) {
-              component = this.container.createComponent(ServoEventModalComponent);
+              component = this.container.createComponent(
+                ServoEventModalComponent,
+              );
             } else {
-              component = this.container.createComponent(GpioEventModalComponent);
+              component = this.container.createComponent(
+                GpioEventModalComponent,
+              );
             }
           }
         }

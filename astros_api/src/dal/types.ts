@@ -187,7 +187,7 @@ export interface GpioChannelsTable {
   location_id: string;
   channel_number: number;
   name: string;
-  default_low: number;
+  default_high: number;
   enabled: number;
 }
 

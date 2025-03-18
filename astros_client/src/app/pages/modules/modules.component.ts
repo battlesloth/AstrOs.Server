@@ -91,6 +91,10 @@ export class ModulesComponent implements AfterViewInit {
   @ViewChild('modalContainer', { read: ViewContainerRef })
   container!: ViewContainerRef;
 
+  bodyTestId = 'body';
+  coreTestId = 'core';
+  domeTestId = 'dome';
+
   isLoaded = false;
 
   backgroundClickDisabled = '1';
@@ -158,7 +162,7 @@ export class ModulesComponent implements AfterViewInit {
 
     // always filter out the master controller since it's always the body module
     this.possibleControllers = response.controllers.filter(
-      (controller: ControlModule) => controller.address !== "00:00:00:00:00:00",
+      (controller: ControlModule) => controller.address !== '00:00:00:00:00:00',
     );
 
     this.availableCoreControllers = this.possibleControllers.filter(

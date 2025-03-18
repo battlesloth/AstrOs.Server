@@ -6,11 +6,8 @@ import { Kysely } from "kysely";
 import { Database } from "../types.js";
 
 export class ControllerRepository {
+  constructor(private readonly db: Kysely<Database>) {}
 
-    constructor(
-      private readonly db: Kysely<Database>
-    ) {}
-    
   public async insertControllers(
     controllers: ControlModule[],
   ): Promise<boolean> {

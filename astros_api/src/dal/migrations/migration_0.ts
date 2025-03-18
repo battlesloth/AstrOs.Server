@@ -111,7 +111,7 @@ export const migration_0: Migration = {
       .addColumn("location_id", "text", (col) => col.notNull())
       .addColumn("channel_number", "integer", (col) => col.notNull())
       .addColumn("name", "text", (col) => col.notNull())
-      .addColumn("default_low", "integer", (col) => col.notNull())
+      .addColumn("default_high", "integer", (col) => col.notNull())
       .addColumn("enabled", "integer", (col) => col.notNull())
       .execute();
 
@@ -231,7 +231,7 @@ export const migration_0: Migration = {
           location_id: id,
           channel_number: i,
           name: "unassigned",
-          default_low: 0,
+          default_high: 0,
           enabled: 0,
         };
 

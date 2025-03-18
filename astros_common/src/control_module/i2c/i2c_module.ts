@@ -24,9 +24,7 @@ export class I2cModule extends BaseModule {
   }
 }
 
-export function getI2cScriptResources(
-  m: I2cModule
-): ScriptChannelResource[] {
+export function getI2cScriptResources(m: I2cModule): ScriptChannelResource[] {
   const resources: ScriptChannelResource[] = [];
 
   switch (m.moduleSubType) {

@@ -3,7 +3,7 @@ import { BaseChannel } from "../base_channel";
 
 export class GpioChannel extends BaseChannel {
   channelNumber: number;
-  defaultLow: boolean;
+  defaultHigh: boolean;
 
   constructor(
     id: string,
@@ -11,7 +11,7 @@ export class GpioChannel extends BaseChannel {
     channelNumber: number,
     enabled: boolean,
     channelName: string,
-    defaultLow: boolean,
+    defaultHigh: boolean,
   ) {
     super(
       id,
@@ -22,6 +22,6 @@ export class GpioChannel extends BaseChannel {
       enabled,
     );
     this.channelNumber = channelNumber;
-    this.defaultLow = defaultLow;
+    this.defaultHigh = defaultHigh;
   }
 }

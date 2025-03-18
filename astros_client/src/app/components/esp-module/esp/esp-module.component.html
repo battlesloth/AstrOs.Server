@@ -1,12 +1,15 @@
 <mat-accordion>
     <mat-expansion-panel [expanded]="uartPanelOpenState" (closed)="uartPanelOpenState = false">
-        <mat-expansion-panel-header>
+        <mat-expansion-panel-header [attr.data-testId]="testIdParent + '-serial-header'">
             <mat-panel-title>Serial Modules</mat-panel-title>
             <mat-panel-description>
                 <div class="header-box">
                     <div class="header-spacer"></div>
                     <div class="header-button">
-                        <button (click)="addUartModule($event)">
+                        <button 
+                            [attr.data-testId]="testIdParent + '-add-serial'" 
+                            (click)="addUartModule($event)"
+                            >
                             <fa-icon [icon]="addIcon"/>
                         </button>
                     </div>
@@ -23,13 +26,16 @@
         </ul>
     </mat-expansion-panel>
     <mat-expansion-panel [expanded]="i2cPanelOpenState" (closed)="i2cPanelOpenState = false">
-        <mat-expansion-panel-header>
+        <mat-expansion-panel-header [attr.data-testId]="testIdParent + '-i2c-header'">
             <mat-panel-title>I2C configuration</mat-panel-title>
             <mat-panel-description>
                 <div class="header-box">
                     <div class="header-spacer"></div>
                     <div class="header-button">
-                        <button (click)="addI2cModule($event)">
+                        <button 
+                            [attr.data-testId]="testIdParent + '-add-i2c'" 
+                            (click)="addI2cModule($event)"
+                            >
                             <fa-icon [icon]="addIcon"/>
                         </button>
                     </div>
@@ -48,7 +54,7 @@
         </ul>
     </mat-expansion-panel>
     <mat-expansion-panel>
-        <mat-expansion-panel-header>
+        <mat-expansion-panel-header [attr.data-testId]="testIdParent + '-gpio-header'">
             <mat-panel-title>GPIO configuration</mat-panel-title>
         </mat-expansion-panel-header>
         <ul *ngIf="(location?.gpioModule)" class="servo-list">

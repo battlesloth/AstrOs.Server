@@ -1,11 +1,9 @@
-
 import { expect, describe, it } from "vitest";
 
 describe("Script Converter Tests", () => {
-
-    it("placeholder", () => {
-        expect(true).toBe(true);
-    });
+  it("placeholder", () => {
+    expect(true).toBe(true);
+  });
 });
 
 //import {
@@ -53,7 +51,7 @@ describe("Script Converter Tests", () => {
 //
 //// kangaroo command
 //// |___|_________|__________|___|____|____|____;
-////  evt time_till serial ch  ch  cmd  spd  pos  
+////  evt time_till serial ch  ch  cmd  spd  pos
 //
 //const _uartChannel = 2;
 //const _kChannel = 3;

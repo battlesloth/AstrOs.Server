@@ -5,12 +5,9 @@ import {
   getGpioScriptResources,
   getI2cScriptResources,
   getUartScriptResources,
-  GpioModule,
-  I2cModule,
   Script,
   ScriptChannelResource,
   ScriptChannelType,
-  UartModule,
 } from 'astros-common';
 import { LocationDetails, ChannelDetails } from '@src/models/scripting';
 

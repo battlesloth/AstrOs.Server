@@ -5,10 +5,7 @@ import { Kysely } from "kysely";
 import { Database } from "../types.js";
 
 export class AudioFileRepository {
-
-  constructor(
-    private readonly db: Kysely<Database>
-  ) {}
+  constructor(private readonly db: Kysely<Database>) {}
 
   async getAudioFiles(): Promise<Array<AudioFile>> {
     const result = new Array<AudioFile>();

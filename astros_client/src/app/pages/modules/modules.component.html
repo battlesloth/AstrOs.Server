@@ -15,7 +15,7 @@
         </div>
         <mat-accordion class="module-accordian">
             <mat-expansion-panel>
-                <mat-expansion-panel-header>
+                <mat-expansion-panel-header data-testid="body-module-header">
                     <mat-panel-title>Body Module</mat-panel-title>
                     <div class="warning tooltip" #body>
                         <span class="tooltiptext">{{bodyCaption.str}}</span>
@@ -28,12 +28,17 @@
                             <option value="0" selected>Master Controller</option>
                         </select>
                     </div>
-                    <app-esp-module (addModuleEvent)="addModule($event)" (removeModuleEvent)="removeModule($event)"
-                        (openServoTestModal)="openServoTestModal($event)" [location]="bodyLocation" [isMaster]="true" />
+                    <app-esp-module 
+                        (addModuleEvent)="addModule($event)" 
+                        (removeModuleEvent)="removeModule($event)"
+                        (openServoTestModal)="openServoTestModal($event)" 
+                        [location]="bodyLocation" 
+                        [isMaster]="true"
+                        [testIdParent]="bodyTestId" />
                 </ng-container>
             </mat-expansion-panel>
             <mat-expansion-panel>
-                <mat-expansion-panel-header>
+                <mat-expansion-panel-header data-testid="core-module-header">
                     <mat-panel-title>Core Module</mat-panel-title>
                     <div class="warning tooltip" #core>
                         <span class="tooltiptext">{{coreCaption.str}}</span>
@@ -50,12 +55,16 @@
                             </ng-container>
                         </select>
                     </div>
-                    <app-esp-module (addModuleEvent)="addModule($event)" (removeModuleEvent)="removeModule($event)"
-                        (openServoTestModal)="openServoTestModal($event)" [location]="coreLocation"/>
+                    <app-esp-module 
+                        (addModuleEvent)="addModule($event)" 
+                        (removeModuleEvent)="removeModule($event)"
+                        (openServoTestModal)="openServoTestModal($event)" 
+                        [location]="coreLocation"
+                        [testIdParent]="coreTestId"/>
                 </ng-container>
             </mat-expansion-panel>
             <mat-expansion-panel>
-                <mat-expansion-panel-header>
+                <mat-expansion-panel-header data-testid="dome-module-header">
                     <mat-panel-title>Dome Module</mat-panel-title>
                     <div class="warning tooltip" #dome>
                         <span class="tooltiptext">{{domeCaption.str}}</span>
@@ -72,8 +81,12 @@
                             </ng-container>
                         </select>
                     </div>
-                    <app-esp-module (addModuleEvent)="addModule($event)" (removeModuleEvent)="removeModule($event)"
-                        (openServoTestModal)="openServoTestModal($event)" [location]="domeLocation"/>
+                    <app-esp-module 
+                        (addModuleEvent)="addModule($event)" 
+                        (removeModuleEvent)="removeModule($event)"
+                        (openServoTestModal)="openServoTestModal($event)" 
+                        [location]="domeLocation"
+                        [testIdParent]="domeTestId"/>
                 </ng-container>
             </mat-expansion-panel>
         </mat-accordion>
