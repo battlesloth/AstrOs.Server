@@ -109,6 +109,7 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
     }
 
     if (component) {
+      component.instance.parentTestId = this.parentTestId;
       component.instance.module = this.module;
       component.instance.isMaster = this.isMaster;
     }

@@ -3,6 +3,7 @@
         <mat-panel-title>
             <div class="header-name">
                 <input 
+                    [attr.data-testId]="parentTestId + '-serial-' + module.moduleSubType +'-name'"
                     matInput 
                     placeholder="Name" 
                     [(ngModel)]="module.name"

@@ -59,7 +59,7 @@ export class EspModuleComponent {
   location!: ControllerLocation;
 
   @Input()
-  testIdParent!: string;
+  parentTestId!: string;
 
   addIcon = faPlus;
 

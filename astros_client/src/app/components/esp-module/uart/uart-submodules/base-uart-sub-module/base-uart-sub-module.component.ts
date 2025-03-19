@@ -13,6 +13,9 @@ export abstract class BaseUartSubModuleComponent {
   @Input()
   module!: UartModule;
 
+  @Input()
+  parentTestId!: string;
+
   uartChannel!: string;
   baudRate!: string;
 

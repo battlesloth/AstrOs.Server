@@ -12,4 +12,7 @@ import { GpioChannel } from 'astros-common';
 export class GpioChannelComponent {
   @Input()
   channel!: GpioChannel;
+
+  @Input()
+  parentTestId!: string;
 }

@@ -17,6 +17,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
   styleUrl: './servo-settings.component.scss',
 })
 export class ServoSettingsComponent implements OnChanges {
+  @Input() testId!: string;
+
   @Input() enabled = false;
 
   @Input() name = '';

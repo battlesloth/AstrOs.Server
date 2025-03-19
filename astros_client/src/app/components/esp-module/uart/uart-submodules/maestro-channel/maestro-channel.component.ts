@@ -11,7 +11,11 @@ import { MaestroChannel } from 'astros-common';
   styleUrl: './maestro-channel.component.scss',
 })
 export class MaestroChannelComponent implements AfterContentInit {
-  @Input() channel!: MaestroChannel;
+  @Input() 
+  channel!: MaestroChannel;
+
+  @Input() 
+  parentTestId!: string;
 
   type = '0';
 

@@ -49,6 +49,9 @@ export class I2cModuleComponent implements AfterViewInit, AfterContentInit {
   @Input()
   module!: I2cModule;
 
+  @Input()
+  parentTestId!: string;
+
   // here to trigger change detection for object property changes
   @Input()
   set updateTrigger(val: number) {
@@ -116,6 +119,7 @@ export class I2cModuleComponent implements AfterViewInit, AfterContentInit {
     }
 
     if (component) {
+      component.instance.parentTestId = this.parentTestId;
       component.instance.module = this.module;
       component.instance.i2cAddressChangedEvent.subscribe((val: string) => {
         console.log('I2C Address Changed: ', val);

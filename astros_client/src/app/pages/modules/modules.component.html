@@ -34,7 +34,7 @@
                         (openServoTestModal)="openServoTestModal($event)" 
                         [location]="bodyLocation" 
                         [isMaster]="true"
-                        [testIdParent]="bodyTestId" />
+                        [parentTestId]="bodyTestId" />
                 </ng-container>
             </mat-expansion-panel>
             <mat-expansion-panel>
@@ -60,7 +60,7 @@
                         (removeModuleEvent)="removeModule($event)"
                         (openServoTestModal)="openServoTestModal($event)" 
                         [location]="coreLocation"
-                        [testIdParent]="coreTestId"/>
+                        [parentTestId]="coreTestId"/>
                 </ng-container>
             </mat-expansion-panel>
             <mat-expansion-panel>
@@ -86,7 +86,7 @@
                         (removeModuleEvent)="removeModule($event)"
                         (openServoTestModal)="openServoTestModal($event)" 
                         [location]="domeLocation"
-                        [testIdParent]="domeTestId"/>
+                        [parentTestId]="domeTestId"/>
                 </ng-container>
             </mat-expansion-panel>
         </mat-accordion>

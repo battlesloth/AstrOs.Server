@@ -3,7 +3,7 @@
         <div class="label">Channel {{channel.channelNumber}}</div>
         <div class="name">
             <input 
-                data-testId="'gpio-ch-' + channel.channelNumber + '-name" 
+                [attr.data-testId]="parentTestId + '-gpio-ch-' + channel.channelNumber + '-name'" 
                 placeholder="Name" 
                 [(ngModel)]="channel.channelName" 
                 />
@@ -13,13 +13,13 @@
     <div class="gpio-channel-row">
         <div class="enabled">
             <mat-checkbox
-                [attr.data-testId]="'gpio-ch-' + channel.channelNumber + '-enabled'"
+                [attr.data-testId]="parentTestId + '-gpio-ch-' + channel.channelNumber + '-enabled'"
                 [(ngModel)]="channel.enabled"
                 >Enabled</mat-checkbox>
         </div>
         <div class="default-low">
             <mat-checkbox 
-                [attr.data-testId]="'gpio-ch-' + channel.channelNumber + '-default-high'"
+                [attr.data-testId]="parentTestId + '-gpio-ch-' + channel.channelNumber + '-default-high'"
                 [(ngModel)]="channel.defaultHigh"
             >Default High?</mat-checkbox>
         </div>

@@ -19,6 +19,9 @@ export abstract class BaseI2cSubModuleComponent implements OnChanges {
   @Output()
   i2cAddressChangedEvent = new EventEmitter<string>();
 
+  @Input()
+  parentTestId!: string;
+
   i2cAddress!: string;
   addresses = Array.from(Array(128).keys()).map((val) => val.toString());
 

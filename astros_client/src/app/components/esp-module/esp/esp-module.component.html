@@ -1,13 +1,13 @@
 <mat-accordion>
     <mat-expansion-panel [expanded]="uartPanelOpenState" (closed)="uartPanelOpenState = false">
-        <mat-expansion-panel-header [attr.data-testId]="testIdParent + '-serial-header'">
+        <mat-expansion-panel-header [attr.data-testId]="parentTestId + '-serial-header'">
             <mat-panel-title>Serial Modules</mat-panel-title>
             <mat-panel-description>
                 <div class="header-box">
                     <div class="header-spacer"></div>
                     <div class="header-button">
                         <button 
-                            [attr.data-testId]="testIdParent + '-add-serial'" 
+                            [attr.data-testId]="parentTestId + '-add-serial'" 
                             (click)="addUartModule($event)"
                             >
                             <fa-icon [icon]="addIcon"/>
@@ -22,19 +22,19 @@
                     (removeModuleEvent)="removeModule($event)" 
                     [module]="module" 
                     [isMaster]="isMaster"
-                    [parentTestId]="testIdParent"/>
+                    [parentTestId]="parentTestId"/>
             </li>
         </ul>
     </mat-expansion-panel>
     <mat-expansion-panel [expanded]="i2cPanelOpenState" (closed)="i2cPanelOpenState = false">
-        <mat-expansion-panel-header [attr.data-testId]="testIdParent + '-i2c-header'">
+        <mat-expansion-panel-header [attr.data-testId]="parentTestId + '-i2c-header'">
             <mat-panel-title>I2C configuration</mat-panel-title>
             <mat-panel-description>
                 <div class="header-box">
                     <div class="header-spacer"></div>
                     <div class="header-button">
                         <button 
-                            [attr.data-testId]="testIdParent + '-add-i2c'" 
+                            [attr.data-testId]="parentTestId + '-add-i2c'" 
                             (click)="addI2cModule($event)"
                             >
                             <fa-icon [icon]="addIcon"/>
@@ -50,17 +50,21 @@
                     (i2cAddressChangedEvent)="i2cAddressChanged($event)"
                     [updateTrigger]="i2cUpdateTrigger"
                     [module]="module" 
+                    [parentTestId]="parentTestId"
                     />
             </li> 
         </ul>
     </mat-expansion-panel>
     <mat-expansion-panel>
-        <mat-expansion-panel-header [attr.data-testId]="testIdParent + '-gpio-header'">
+        <mat-expansion-panel-header [attr.data-testId]="parentTestId + '-gpio-header'">
             <mat-panel-title>GPIO configuration</mat-panel-title>
         </mat-expansion-panel-header>
         <ul *ngIf="(location?.gpioModule)" class="servo-list">
             <li *ngFor="let channel of location.gpioModule.channels">
-                <app-gpio-channel [channel]="channel"></app-gpio-channel>
+                <app-gpio-channel 
+                    [channel]="channel"
+                    [parentTestId]="parentTestId">
+                </app-gpio-channel>
             </li>
         </ul>
     </mat-expansion-panel>
