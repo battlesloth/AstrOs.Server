@@ -30,7 +30,6 @@ export class MaestroChannelComponent implements AfterContentInit {
   }
 
   onTypeChanged(evt: string): void {
-    console.log(evt);
     switch (evt) {
       case '0':
         this.channel.enabled = false;

@@ -54,7 +54,7 @@ export async function upsertGpioModule(
           location_id: eb.ref("excluded.location_id"),
           channel_number: eb.ref("excluded.channel_number"),
           name: eb.ref("excluded.name"),
-          default_low: eb.ref("excluded.default_high"),
+          default_high: eb.ref("excluded.default_high"),
           enabled: eb.ref("excluded.enabled"),
         })),
       )

@@ -24,6 +24,7 @@ import { BaseUartSubModuleComponent } from '../uart-submodules/base-uart-sub-mod
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
 import { RemoveModuleEvent } from '../../utility/module-events';
+import { HcrSerialModuleComponent } from '../uart-submodules/hcr-serial-module/hcr-serial-module.component';
 
 @Component({
   selector: 'app-uart-module',
@@ -74,6 +75,9 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
       case ModuleSubType.kangaroo:
         this.subtypeName = 'Kangaroo X2';
         break;
+      case ModuleSubType.humanCyborgRelationsSerial:
+        this.subtypeName = 'HCR';
+        break
       case ModuleSubType.maestro:
         this.subtypeName = 'Pololu Maestro';
         break;
@@ -89,6 +93,10 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
 
     switch (this.module.moduleSubType) {
       case ModuleSubType.humanCyborgRelationsSerial:
+        component = this.uartContainer.createComponent(
+          HcrSerialModuleComponent,
+        ) as ComponentRef<HcrSerialModuleComponent>;
+        break;
       case ModuleSubType.genericSerial:
         component = this.uartContainer.createComponent(
           GenericSerialModuleComponent,

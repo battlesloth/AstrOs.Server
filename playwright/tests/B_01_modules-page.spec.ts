@@ -27,7 +27,7 @@ test.describe('Modules Page - Body', () => {
     test('Add Human Cyborg Relations Module to Body', async ({ page }) => {
         await addSerialModule(page, 'body', '103');
 
-        await validateGenericSerialModule(page, 'body', '103', '2');
+        await validateHcrSerialModule(page, 'body', '103', '2');
     });
 
     test('Add Maestro Module to Body', async ({ page }) => {
@@ -91,7 +91,7 @@ test.describe('Modules Page - Core', () => {
     test('Add Human Cyborg Relations Module to Core', async ({ page }) => {
         await addSerialModule(page, 'core', '103');
 
-        await validateGenericSerialModule(page, 'core', '103', '1');
+        await validateHcrSerialModule(page, 'core', '103', '1');
     });
 
     test('Add Maestro Module to Core', async ({ page }) => {
@@ -139,7 +139,7 @@ test.describe('Modules Page - Dome', () => {
         await page.goto('/modules/skip-controllers');
         await page.getByRole('button', { name: 'Close' }).click();
     });
-    
+
     test('Add Generic Serial Module to Dome', async ({ page }) => {
         await addSerialModule(page, 'dome', '101');
 
@@ -155,7 +155,7 @@ test.describe('Modules Page - Dome', () => {
     test('Add Human Cyborg Relations Module to Dome', async ({ page }) => {
         await addSerialModule(page, 'dome', '103');
 
-        await validateGenericSerialModule(page, 'dome', '103', '1');
+        await validateHcrSerialModule(page, 'dome', '103', '1');
     });
 
     test('Add Maestro Module to Dome', async ({ page }) => {
@@ -217,6 +217,12 @@ async function validateKangarooModule(page, location, moduleId, uartChannel) {
     await expect(page.getByTestId(`${location}-kangaroo-baud`)).toHaveValue('9600');
     await expect(page.getByTestId(`${location}-kangaroo-ch1Name`)).toHaveValue('Channel 1');
     await expect(page.getByTestId(`${location}-kangaroo-ch2Name`)).toHaveValue('Channel 2');
+}
+
+async function validateHcrSerialModule(page, location, moduleId, uartChannel) {
+    await expect(page.getByTestId(`${location}-hcr-serial-baud`)).toHaveValue('9600');
+    await expect(page.getByTestId(`${location}-hcr-serial-uart-channel`)).toHaveValue(uartChannel);
+    await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue('New Serial Module');
 }
 
 async function validateMaestroModule(page, location, moduleId, uartChannel) {
