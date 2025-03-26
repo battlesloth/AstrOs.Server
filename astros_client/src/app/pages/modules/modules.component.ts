@@ -118,6 +118,9 @@ export class ModulesComponent implements AfterViewInit {
   domeLocation!: ControllerLocation;
   bodyLocation!: ControllerLocation;
 
+  coreControllerId = '';
+  domeControllerId = '';
+
   coreCaption: Caption = { str: 'Module Down' };
   domeCaption: Caption = { str: 'Module Down' };
   bodyCaption: Caption = { str: 'Module Down' };
@@ -132,9 +135,10 @@ export class ModulesComponent implements AfterViewInit {
     private modalService: ModalService,
     private renderer: Renderer2,
     private status: StatusService,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
   ) {
-    this.skipControllers = this.route.snapshot.paramMap.get('action') === 'skip-controllers';
+    this.skipControllers =
+      this.route.snapshot.paramMap.get('action') === 'skip-controllers';
   }
 
   ngAfterViewInit(): void {
@@ -209,6 +213,8 @@ export class ModulesComponent implements AfterViewInit {
     this.status.bodyStateObserver.subscribe((value) =>
       this.handleStatus(value, this.bodyEl, this.bodyCaption),
     );
+
+    console.log('core controller:', this.coreLocation.controller.id);
 
     this.isLoaded = true;
 
@@ -479,34 +485,34 @@ export class ModulesComponent implements AfterViewInit {
 
   //#endregion
 
-  /*
-  addGPIOchannel(location: string, gpioType: ModuleSubType) {}
-
-  removeGPIOchannel(location: string, channelId: string) {
-    const controller = this.getControllerLocationById(location);
-
-    if (!controller) {
-      return;
-    }
-    
-    controller.gpioChannels = controller.gpioChannels.filter(
-      (channel: string) => channel !== channelId,
-    );
-  }
-  */
-  //#endregion
-
   //#region Controller Selection
 
-  controllerSelectChanged(_: unknown) {
-    this.availableCoreControllers = this.possibleControllers.filter(
-      (controller: ControlModule) =>
-        controller.id !== this.domeLocation.controller?.id,
-    );
-    this.availableDomeControllers = this.possibleControllers.filter(
-      (controller: ControlModule) =>
-        controller.id !== this.coreLocation.controller?.id,
-    );
+  controllerSelectChanged(location: string) {
+    if (location === AstrOsConstants.CORE) {
+      const idx = this.possibleControllers.findIndex(
+        (controller: ControlModule) => controller.id === this.coreControllerId,
+      );
+      if (idx !== -1) {
+        this.coreLocation.controller = this.availableCoreControllers[idx];
+
+        this.availableDomeControllers = this.possibleControllers.filter(
+          (controller: ControlModule) =>
+            controller.id !== this.availableCoreControllers[idx].id,
+        );
+      }
+    } else if (location === AstrOsConstants.DOME) {
+      const idx = this.possibleControllers.findIndex(
+        (controller: ControlModule) => controller.id === this.domeControllerId,
+      );
+      if (idx !== -1) {
+        this.domeLocation.controller = this.availableDomeControllers[idx];
+
+        this.availableCoreControllers = this.possibleControllers.filter(
+          (controller: ControlModule) =>
+            controller.id !== this.availableCoreControllers[idx].id,
+        );
+      }
+    }
   }
 
   //#endregion
@@ -628,7 +634,9 @@ export class ModulesComponent implements AfterViewInit {
   private parseModules(locations: AstrOsLocationCollection) {
     try {
       this.coreLocation = locations.coreModule ?? this.coreLocation;
+      this.coreControllerId = this.coreLocation.controller?.id;
       this.domeLocation = locations.domeModule ?? this.domeLocation;
+      this.domeControllerId = this.domeLocation.controller.id;
       this.bodyLocation = locations.bodyModule ?? this.bodyLocation;
     } catch (err) {
       console.error(err);

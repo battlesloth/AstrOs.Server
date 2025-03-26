@@ -143,6 +143,8 @@ describe("I2cRepository", () => {
 
     const modId = uuid();
 
+    const subModuleId = uuid();
+
     const module = new UartModule(
       modId,
       "Uart Module",
@@ -152,7 +154,7 @@ describe("I2cRepository", () => {
       9600,
     );
 
-    const subModule = new KangarooX2(modId, "channel 1", "channel 2");
+    const subModule = new KangarooX2(subModuleId, "channel 1", "channel 2");
 
     module.subModule = subModule;
 

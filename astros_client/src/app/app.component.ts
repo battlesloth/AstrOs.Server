@@ -5,23 +5,18 @@ import {
   Renderer2,
   ViewChild,
 } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import { TransmissionType } from 'astros-common';
 import { AuthenticationService } from './services/auth/authentication.service';
 import { SnackbarService } from './services/snackbar/snackbar.service';
 import { WebsocketService } from './services/websocket/websocket.service';
 import { NgIf } from '@angular/common';
-import { AppRoutingModule } from './app-routing.module';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
-  imports: [
-    RouterLink, 
-    NgIf, 
-    RouterOutlet
-  ],
+  imports: [RouterLink, NgIf, RouterOutlet],
 })
 export class AppComponent implements OnInit {
   title = 'AstOs';
@@ -38,9 +33,9 @@ export class AppComponent implements OnInit {
     private socket: WebsocketService,
   ) {
     //if (auth.isLoggedIn()) {
-      //router.navigate(['status']);
-      //router.navigate(['scripts']);
-     // router.navigate(['modules']);
+    //router.navigate(['status']);
+    //router.navigate(['scripts']);
+    // router.navigate(['modules']);
     //}
   }
 

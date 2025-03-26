@@ -35,6 +35,7 @@ const MockCoreIds = {
     SERIAL_MODULE_ID: '4ec68355-92b7-41b3-9164-6c92e9a47135',
 
     KANGAROO_MODULE_ID: 'c2f093f2-bffd-4b1f-9b2b-91d0ba9f57c4',
+    KANGAROO_CHANNEL_ID: '2a5d0e43-f147-49fb-b1e8-ef03f5fb2c71',
 
     MAESTRO_MODULE_ID: '651eeb8e-97a0-4ab8-a66b-d138d9597350',
 
@@ -74,6 +75,7 @@ const MockDomeIds = {
     SERIAL_MODULE_ID: 'd121a677-9bf6-4ea7-bc23-00d674abe004',
 
     KANGAROO_MODULE_ID: '86ceff06-9eef-4afe-9f8f-73851c99d01a',
+    KANGAROO_CHANNEL_ID: '256c8a3cb-6123-42f2-a960-e157ac082eea',
 
     MAESTRO_MODULE_ID: '98224bd1-444c-4b96-b280-9d6e7180510b',
 
@@ -110,6 +112,7 @@ const MockBodyIds = {
     SERIAL_MODULE_ID: '5b0f46e5-fec2-4b46-b8fa-21f53442fc6f',
 
     KANGAROO_MODULE_ID: 'f692491c-7a90-45da-9371-f7516ff7be15',
+    KANGAROO_CHANNEL_ID: '1789aedb-6ad0-4fb9-b4cf-8088ea808f81',
 
     MAESTRO_MODULE_ID: '87c7e15c-6c75-4a4b-8f86-f504dc2cdbc2',
 
@@ -217,7 +220,7 @@ function generateKangarooModule(ids: MockId) {
     );
 
     module.subModule = new KangarooX2(
-        ids.KANGAROO_MODULE_ID,
+        ids.KANGAROO_CHANNEL_ID,
         'Channel 1',
         'Channel 2'
     );

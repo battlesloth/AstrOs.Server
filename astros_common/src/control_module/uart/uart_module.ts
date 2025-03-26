@@ -72,7 +72,7 @@ function generateKangarooResources(m: UartModule): ScriptChannelResource[] {
   const mod = m.subModule as KangarooX2;
 
   const ch = new KangarooX2Channel(
-    m.id,
+    mod.id,
     m.id,
     m.name,
     mod.ch1Name,
@@ -81,7 +81,7 @@ function generateKangarooResources(m: UartModule): ScriptChannelResource[] {
 
   return [
     new ScriptChannelResource(
-      m.id,
+      mod.id,
       ScriptChannelType.KANGAROO,
       m.name,
       m.id,

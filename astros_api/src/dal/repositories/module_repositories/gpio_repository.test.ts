@@ -52,11 +52,11 @@ describe("GpioRepository", () => {
     const module = await getGpioModule(db, locationId.id);
 
     expect(module.channels[0].channelName).toBe("unassigned");
-    expect(module.channels[0].defaultLow).toBe(false);
+    expect(module.channels[0].defaultHigh).toBe(false);
     expect(module.channels[0].enabled).toBe(false);
 
     module.channels[0].channelName = "new name";
-    module.channels[0].defaultLow = true;
+    module.channels[0].defaultHigh = true;
     module.channels[0].enabled = true;
 
     await upsertGpioModule(db, module);
@@ -67,7 +67,7 @@ describe("GpioRepository", () => {
     expect(updatedModule.locationId).toBe(locationId.id);
     expect(updatedModule.channels.length).toBe(10);
     expect(updatedModule.channels[0].channelName).toBe("new name");
-    expect(updatedModule.channels[0].defaultLow).toBe(true);
+    expect(updatedModule.channels[0].defaultHigh).toBe(true);
     expect(updatedModule.channels[0].enabled).toBe(true);
   });
 });

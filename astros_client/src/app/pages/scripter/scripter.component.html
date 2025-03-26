@@ -1,4 +1,4 @@
-<div class="container">
+<div *ngIf="script" class="container">
     <div class="script-title">
         <div class="script-name">
             <input matInput placeholder="Name" [ngModel]="script.scriptName" (ngModelChange)="script.scriptName=$event" />

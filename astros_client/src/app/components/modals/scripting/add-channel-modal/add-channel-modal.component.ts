@@ -92,10 +92,7 @@ export class AddChannelModalComponent
         this.channels = [...temp];
       }
     } else {
-      console.log('here');
       for (const val of this.availableChannels.values()) {
-        console.log(this.channels);
-
         this.channels.push(...val);
       }
     }

@@ -77,7 +77,7 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
         break;
       case ModuleSubType.humanCyborgRelationsSerial:
         this.subtypeName = 'HCR';
-        break
+        break;
       case ModuleSubType.maestro:
         this.subtypeName = 'Pololu Maestro';
         break;

@@ -63,7 +63,7 @@ export class UartEventModalComponent
       return;
     }
 
-    this.scriptEvent.time = +this.eventTime;
+    this.scriptEvent.time = +this.eventTime * this.timeFactor;
     this.scriptEvent.event = new GenericSerialEvent(this.eventValue);
 
     const evt = new ModalCallbackEvent(this.callbackType, {

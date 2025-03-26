@@ -52,7 +52,7 @@ export class LocationsRepository {
       );
 
       location.controller = new ControlModule(
-        c.ctrl_id ?? "",
+        c.ctrl_id ?? "0",
         c.ctrl_name ?? "",
         c.ctrl_address ?? "",
       );
@@ -94,7 +94,7 @@ export class LocationsRepository {
     );
 
     location.controller = new ControlModule(
-      data.ctrl_id ?? "",
+      data.ctrl_id ?? "0",
       data.ctrl_name ?? "",
       data.ctrl_address ?? "",
     );
