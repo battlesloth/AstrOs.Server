@@ -198,7 +198,17 @@ export type GpioChannelUpdate = Updateable<GpioChannelsTable>;
 //#endregion
 //#region I2C Modules
 
+// idx is the primary key for modules,
+// but why an index? Why not just use the id?
+// We don't want to have to send UUIDs over the wire
+// for every script event as that will blow up the message size
+// so we use the index to reference the module in the script.
+// Why not just use the index as the id?
+// Becuase it's easier to catch errors in the web code if the id 
+// is a UUID since collisions are nearly impossible.
+
 export interface I2CModulesTable {
+  idx: Generated<number>;
   id: string;
   location_id: string;
   name: string;
@@ -214,6 +224,7 @@ export type I2CModuleUpdate = Updateable<I2CModulesTable>;
 //#region UART Modules
 
 export interface UartModulesTable {
+  idx: Generated<number>;
   id: string;
   location_id: string;
   name: string;

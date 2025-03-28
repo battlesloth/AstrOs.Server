@@ -115,9 +115,18 @@ export const migration_0: Migration = {
       .addColumn("enabled", "integer", (col) => col.notNull())
       .execute();
 
+    // idx is the primary key for modules,
+    // but why an index? Why not just use the id?
+    // We don't want to have to send UUIDs over the wire
+    // for every script event as that will blow up the message size
+    // so we use the index to reference the module in the script.
+    // Why not just use the index as the id?
+    // Becuase it's easier to catch errors in the web code if the id 
+    // is a UUID since collisions are nearly impossible.
     await db.schema
       .createTable("i2c_modules")
-      .addColumn("id", "text", (col) => col.primaryKey())
+      .addColumn("idx", "integer", (col) => col.primaryKey().autoIncrement())
+      .addColumn("id", "text", (col) => col.notNull().unique())
       .addColumn("location_id", "text", (col) => col.notNull())
       .addColumn("name", "text", (col) => col.notNull())
       .addColumn("i2c_address", "integer", (col) => col.notNull())
@@ -126,7 +135,8 @@ export const migration_0: Migration = {
 
     await db.schema
       .createTable("uart_modules")
-      .addColumn("id", "text", (col) => col.primaryKey())
+      .addColumn("idx", "integer", (col) => col.primaryKey().autoIncrement())
+      .addColumn("id", "text", (col) => col.notNull().unique())
       .addColumn("location_id", "text", (col) => col.notNull())
       .addColumn("name", "text", (col) => col.notNull())
       .addColumn("uart_type", "integer", (col) => col.notNull())

@@ -366,6 +366,7 @@ export class ModulesComponent implements AfterViewInit {
       controller.locationName === AstrOsConstants.BODY ? 2 : 1;
 
     const module = new UartModule(
+      0,
       crypto.randomUUID(),
       'New Serial Module',
       location,
@@ -452,6 +453,7 @@ export class ModulesComponent implements AfterViewInit {
     }
 
     const module = new I2cModule(
+      0,
       crypto.randomUUID(),
       'New I2C Module',
       location,

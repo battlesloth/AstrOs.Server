@@ -8,7 +8,7 @@ test.describe('Modules Page - Body', () => {
         await page.getByRole('button', { name: 'Sign in!' }).click();
         await page.locator('.navbutton').click();
         await page.goto('/modules/skip-controllers');
-        await page.getByRole('button', { name: 'Close' }).click();
+        await page.getByTestId(`loading-modal-close`).click();
     });
 
     // Body tests

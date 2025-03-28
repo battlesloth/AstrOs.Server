@@ -12,6 +12,7 @@ export class GpioModule extends BaseModule {
 
   constructor(locationId: string) {
     super(
+      0,
       locationId,
       "",
       locationId,

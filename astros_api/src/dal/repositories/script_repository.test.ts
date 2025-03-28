@@ -4,24 +4,8 @@ import { Kysely, SqliteDialect } from "kysely";
 import { Database } from "../types.js";
 import { migrateToLatest } from "../database.js";
 import { ScriptRepository } from "./script_repository.js";
-import { LocationsRepository } from "./locations_repository.js";
 import {
-  ControllerLocation,
-  GpioChannel,
-  I2cChannel,
-  I2cModule,
-  KangarooX2,
-  KangarooX2Channel,
-  MaestroBoard,
-  MaestroChannel,
-  MaestroModule,
-  ModuleChannelTypes,
-  ModuleSubType,
   Script,
-  ScriptChannel,
-  ScriptChannelType,
-  UartChannel,
-  UartModule,
 } from "astros-common";
 
 import { v4 as uuid } from "uuid";

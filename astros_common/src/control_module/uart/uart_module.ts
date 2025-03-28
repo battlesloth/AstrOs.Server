@@ -16,6 +16,7 @@ export class UartModule extends BaseModule {
   subModule: unknown;
 
   constructor(
+    idx: number,
     id: string,
     name: string,
     locationId: string,
@@ -23,7 +24,7 @@ export class UartModule extends BaseModule {
     uartChannel: number,
     baudRate: number,
   ) {
-    super(id, name, locationId, ModuleType.uart, subType);
+    super(idx, id, name, locationId, ModuleType.uart, subType);
     this.uartChannel = uartChannel;
     this.baudRate = baudRate;
     this.subModule = {};

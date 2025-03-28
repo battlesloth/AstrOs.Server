@@ -34,6 +34,7 @@ export async function getUartModules(
   uartData.map((m: UartModuleRow) => {
     modules.push(
       new UartModule(
+        m.idx,
         m.id,
         m.name,
         m.location_id,

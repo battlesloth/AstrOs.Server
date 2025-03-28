@@ -51,6 +51,7 @@ describe("I2cRepository", () => {
     const modId = uuid();
 
     const module = new I2cModule(
+      0,
       modId,
       "I2C Module",
       locationId.id,
@@ -84,6 +85,7 @@ describe("I2cRepository", () => {
     const modId = uuid();
 
     const module = new I2cModule(
+      0,
       modId,
       "I2C Module",
       locationId.id,

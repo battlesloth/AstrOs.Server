@@ -12,13 +12,14 @@ export class I2cModule extends BaseModule {
   subModule: unknown;
 
   constructor(
+    idx: number,
     id: string,
     name: string,
     locationId: string,
     i2cAddress: number,
     subType: ModuleSubType,
   ) {
-    super(id, name, locationId, ModuleType.i2c, subType);
+    super(idx, id, name, locationId, ModuleType.i2c, subType);
     this.i2cAddress = i2cAddress;
     this.subModule = {};
   }

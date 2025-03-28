@@ -57,6 +57,7 @@ describe("I2cRepository", () => {
     const modId = uuid();
 
     const module = new UartModule(
+      0,
       modId,
       "Uart Module",
       locationId.id,
@@ -91,6 +92,7 @@ describe("I2cRepository", () => {
     const modId = uuid();
 
     const module = new UartModule(
+      0,
       modId,
       "Uart Module",
       locationId.id,
@@ -146,6 +148,7 @@ describe("I2cRepository", () => {
     const subModuleId = uuid();
 
     const module = new UartModule(
+      0,
       modId,
       "Uart Module",
       locationId.id,

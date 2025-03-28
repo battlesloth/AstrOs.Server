@@ -18,7 +18,7 @@ import { logger } from "./logger.js";
 
 export enum CommandType {
   none,
-  servo,
+  maestro,
   i2c,
   genericSerial,
   kangaroo,
@@ -159,19 +159,19 @@ export class ScriptConverter {
     return "";
   }
 
-  // |___|_________|___________|___________;
-  //  evt time_till serial ch   msg
+  // |___|_________|___________|___________|___________;
+  //  evt time_till serial ch   baud rate   msg
   convertGenericSerialEvent(
     evt: ScriptEvent,
     timeTillNextEvent: number,
   ): string {
     const serial = evt.event as GenericSerialEvent;
 
-    return `${CommandType.genericSerial}|${timeTillNextEvent}|fixeme|${serial.value};`;
+    return `${CommandType.genericSerial}|${timeTillNextEvent}|fixme|fixme|${serial.value};`;
   }
 
-  // |___|_________|___________|___________;
-  //  evt time_till serial ch   msg
+  // |___|_________|___________|___________|___________;
+  //  evt time_till serial ch   baud rate   msg
   convertHcrEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
     const hcr = evt.event as HumanCyborgRelationsEvent;
 
@@ -198,11 +198,11 @@ export class ScriptConverter {
 
     val += ">";
 
-    return `${CommandType.genericSerial}|${timeTillNextEvent}|fixme|${val};`;
+    return `${CommandType.genericSerial}|${timeTillNextEvent}|fixme|fixme|${val};`;
   }
 
-  // |___|_________|__________|___|____|____|____;
-  //  evt time_till serial ch  ch  cmd  spd  pos
+  // |___|_________|__________|__________|___|____|____|____;
+  //  evt time_till serial ch  baud rate  ch  cmd  spd  pos
   convertKangarooEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
     let command = "";
 
@@ -212,7 +212,7 @@ export class ScriptConverter {
       const evtTime =
         kangaroo.ch2Action === KangarooAction.none ? timeTillNextEvent : 0;
 
-      command = `${CommandType.kangaroo}|${evtTime}|fixme|${1}|${kangaroo.ch1Action}|${kangaroo.ch1Speed}|${kangaroo.ch1Position};`;
+      command = `${CommandType.kangaroo}|${evtTime}|fixme|fixme|${1}|${kangaroo.ch1Action}|${kangaroo.ch1Speed}|${kangaroo.ch1Position};`;
       //this.convertChannelEvent(1, evt.ch1Action, evt.ch1Speed, evt.ch1Position,
       // if the ch2 action is none, use timeTill. Otherwise we have 2 actions for the
       // same time period, so don't delay untill after second action is done.
@@ -220,19 +220,19 @@ export class ScriptConverter {
     if (kangaroo.ch2Action != KangarooAction.none) {
       command =
         command +
-        `${CommandType.kangaroo}|${timeTillNextEvent}|fixme|${2}|${kangaroo.ch2Action}|${kangaroo.ch2Speed}|${kangaroo.ch2Position};`;
+        `${CommandType.kangaroo}|${timeTillNextEvent}|fixme|fixme|${2}|${kangaroo.ch2Action}|${kangaroo.ch2Speed}|${kangaroo.ch2Position};`;
       //this.convertChannelEvent(2, evt.ch2Action, evt.ch2Speed, evt.ch2Position, timeTill);
     }
 
     return command;
   }
 
-  // |___|_________|___|____|____;
-  //  evt time_till ch  spd  pos
+  // |___|_________|_____|___|_____|____|____;
+  //  evt time_till ctrl  ch  pos  speed accel
   convertMaestroEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
     const servo = evt.event as MaestroEvent;
 
-    return `${CommandType.servo}|${timeTillNextEvent}|fixme|${servo.position}|${servo.speed}|${servo.acceleration};`;
+    return `${CommandType.maestro}|${timeTillNextEvent}|fixme|fixme|${servo.position}|${servo.speed}|${servo.acceleration};`;
   }
 
   // |___|_________|___|________;
