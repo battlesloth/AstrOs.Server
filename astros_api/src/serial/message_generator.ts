@@ -10,14 +10,13 @@ import { ScriptRun } from "src/models/scripts/script_run";
 import { ServoTest } from "src/models/servo_test";
 import { MaestroModule } from "astros-common";
 
-
 export enum EspModuleType {
   NONE = 0,
   MAESTRO = 1,
   I2C = 2,
   GENERIC_SERIAL = 3,
   KANGAROO = 4,
-  GPIO = 5
+  GPIO = 5,
 }
 
 export class MessageGenerator {

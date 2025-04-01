@@ -1,9 +1,4 @@
-import {
-  describe,
-  expect,
-  it,
-  beforeEach
-} from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import { mock, mockReset } from "vitest-mock-extended";
 import { ScriptConverter } from "../src/script_converter.js";
 import { ScriptRepository } from "./dal/repositories/script_repository.js";
@@ -22,7 +17,7 @@ import {
   ScriptChannelType,
   ScriptEvent,
   UartChannel,
-  UartModule
+  UartModule,
 } from "astros-common";
 import { v4 as uuid } from "uuid";
 
@@ -49,22 +44,23 @@ const bodyMaestroModId = "9650ae5b-5e8a-4f9a-9d9f-57ed1a644b1d";
 const bodyI2cModId = "f2261640-a8ed-4f89-bc07-1c74d4a4296e";
 
 describe("Script Converter Tests", () => {
-
   const mockRepo = mock<ScriptRepository>();
-  
+
   beforeEach(() => {
     mockReset(mockRepo);
     mockRepo.getModules.calledWith().mockResolvedValue(getModules());
-    mockRepo.getLocationIds.calledWith().mockResolvedValue([coreLocId, domeLocId, bodyLocId]);
+    mockRepo.getLocationIds
+      .calledWith()
+      .mockResolvedValue([coreLocId, domeLocId, bodyLocId]);
   });
 
   it("basic serial script", async () => {
-
     const scriptId = "coreGenericSerial";
 
-    mockRepo.getScript.calledWith(scriptId)
+    mockRepo.getScript
+      .calledWith(scriptId)
       .mockResolvedValue(coreGenericSerialScript());
-    
+
     const converter = new ScriptConverter(mockRepo);
 
     const script = await converter.convertScript(scriptId);
@@ -77,7 +73,7 @@ describe("Script Converter Tests", () => {
 
     expect(coreScript).toBeDefined();
 
-    const coreSegs = coreScript?.split(';');
+    const coreSegs = coreScript?.split(";");
 
     expect(coreSegs?.length).toBe(3);
     expect(coreSegs?.[0]).toBe("3|1000|1|9600|test 0");
@@ -93,12 +89,12 @@ describe("Script Converter Tests", () => {
   });
 
   it("two channels on one location", async () => {
-
     const scriptId = "domeTwoChannelScript";
 
-    mockRepo.getScript.calledWith(scriptId)
+    mockRepo.getScript
+      .calledWith(scriptId)
       .mockResolvedValue(domeTwoChannelScript());
-    
+
     const converter = new ScriptConverter(mockRepo);
 
     const script = await converter.convertScript(scriptId);
@@ -111,7 +107,7 @@ describe("Script Converter Tests", () => {
 
     expect(domeScript).toBeDefined();
 
-    const domeSegs = domeScript?.split(';');
+    const domeSegs = domeScript?.split(";");
 
     expect(domeSegs?.length).toBe(6);
     expect(domeSegs?.[0]).toBe("3|1000|2|9602|UART 0");
@@ -130,12 +126,16 @@ describe("Script Converter Tests", () => {
   });
 });
 
-
 function coreGenericSerialScript(): Script {
-
   const script = new Script("coreGenericSerial", "test", "test", new Date());
 
-  const uartChannel = new UartChannel(uuid(), coreGenSerialModId, "", ModuleSubType.genericSerial, true);
+  const uartChannel = new UartChannel(
+    uuid(),
+    coreGenSerialModId,
+    "",
+    ModuleSubType.genericSerial,
+    true,
+  );
 
   const scriptCh = new ScriptChannel(
     uuid(),
@@ -145,24 +145,36 @@ function coreGenericSerialScript(): Script {
     uartChannel.id,
     ModuleChannelTypes.UartChannel,
     uartChannel,
-    3000);
+    3000,
+  );
 
   for (let i = 0; i < 3; i++) {
     const evt = new GenericSerialEvent(`test ${i}`);
-    const sevt = new ScriptEvent(scriptCh.id, ModuleType.uart, ModuleSubType.genericSerial, i * 10, evt);
-    scriptCh.eventsKvpArray.push({key: i * 1000, value: sevt});
+    const sevt = new ScriptEvent(
+      scriptCh.id,
+      ModuleType.uart,
+      ModuleSubType.genericSerial,
+      i * 10,
+      evt,
+    );
+    scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
   }
   script.scriptChannels.push(scriptCh);
-  
+
   return script;
 }
 
-
 function domeTwoChannelScript(): Script {
   const script = new Script("domeTwoChannelScript", "test", "test", new Date());
-  const uartChannel = new UartChannel(uuid(), domeGenSerialModId, "", ModuleSubType.genericSerial, true);
+  const uartChannel = new UartChannel(
+    uuid(),
+    domeGenSerialModId,
+    "",
+    ModuleSubType.genericSerial,
+    true,
+  );
   const i2cChannel = new I2cChannel(uuid(), domeI2cModId, "", true);
-   
+
   const scriptCh1 = new ScriptChannel(
     uuid(),
     script.id,
@@ -171,9 +183,10 @@ function domeTwoChannelScript(): Script {
     uartChannel.id,
     ModuleChannelTypes.UartChannel,
     uartChannel,
-    3000);
-  
-    const scriptCh2 = new ScriptChannel(
+    3000,
+  );
+
+  const scriptCh2 = new ScriptChannel(
     uuid(),
     script.id,
     ScriptChannelType.GENERIC_I2C,
@@ -181,18 +194,30 @@ function domeTwoChannelScript(): Script {
     i2cChannel.id,
     ModuleChannelTypes.I2cChannel,
     i2cChannel,
-    3000);
-  
+    3000,
+  );
+
   for (let i = 0; i < 6; i++) {
     if (i % 2 === 0) {
       const evt = new GenericSerialEvent(`UART ${i}`);
-      const sevt = new ScriptEvent(scriptCh1.id, ModuleType.uart, ModuleSubType.genericSerial, i * 10, evt);
-      scriptCh1.eventsKvpArray.push({key: i * 1000, value: sevt});
-    }
-    else {
+      const sevt = new ScriptEvent(
+        scriptCh1.id,
+        ModuleType.uart,
+        ModuleSubType.genericSerial,
+        i * 10,
+        evt,
+      );
+      scriptCh1.eventsKvpArray.push({ key: i * 1000, value: sevt });
+    } else {
       const evt = new I2cEvent(`I2C ${i}`);
-      const sevt = new ScriptEvent(scriptCh2.id, ModuleType.i2c, ModuleSubType.genericI2C, i * 10, evt);
-      scriptCh2.eventsKvpArray.push({key: i * 1000, value: sevt});
+      const sevt = new ScriptEvent(
+        scriptCh2.id,
+        ModuleType.i2c,
+        ModuleSubType.genericI2C,
+        i * 10,
+        evt,
+      );
+      scriptCh2.eventsKvpArray.push({ key: i * 1000, value: sevt });
     }
   }
   script.scriptChannels.push(scriptCh1);
@@ -202,31 +227,192 @@ function domeTwoChannelScript(): Script {
 }
 
 function getModules() {
-
   const map = new Map<string, ModuleClassType>();
 
   // core
-  map.set(coreGenSerialModId, new UartModule(0, coreGenSerialModId, "Core Gen Serial", coreLocId, ModuleSubType.genericSerial, 1, 9600));
-  map.set(coreKangarooModId, new UartModule(0, coreKangarooModId, "Core Kangaroo", coreLocId, ModuleSubType.kangaroo, 1, 19600));
-  map.set(coreHCRModId, new UartModule(0, coreHCRModId, "Core HCR", coreLocId, ModuleSubType.humanCyborgRelationsSerial, 1, 38400));
-  map.set(coreMaestroModId, new UartModule(3, coreMaestroModId, "Core Maestro", coreLocId, ModuleSubType.maestro, 1, 57600)); 
-  map.set(coreI2cModId, new I2cModule(0, coreI2cModId, "Core I2C", coreLocId, 27, ModuleSubType.genericI2C));
+  map.set(
+    coreGenSerialModId,
+    new UartModule(
+      0,
+      coreGenSerialModId,
+      "Core Gen Serial",
+      coreLocId,
+      ModuleSubType.genericSerial,
+      1,
+      9600,
+    ),
+  );
+  map.set(
+    coreKangarooModId,
+    new UartModule(
+      0,
+      coreKangarooModId,
+      "Core Kangaroo",
+      coreLocId,
+      ModuleSubType.kangaroo,
+      1,
+      19600,
+    ),
+  );
+  map.set(
+    coreHCRModId,
+    new UartModule(
+      0,
+      coreHCRModId,
+      "Core HCR",
+      coreLocId,
+      ModuleSubType.humanCyborgRelationsSerial,
+      1,
+      38400,
+    ),
+  );
+  map.set(
+    coreMaestroModId,
+    new UartModule(
+      3,
+      coreMaestroModId,
+      "Core Maestro",
+      coreLocId,
+      ModuleSubType.maestro,
+      1,
+      57600,
+    ),
+  );
+  map.set(
+    coreI2cModId,
+    new I2cModule(
+      0,
+      coreI2cModId,
+      "Core I2C",
+      coreLocId,
+      27,
+      ModuleSubType.genericI2C,
+    ),
+  );
   map.set(coreLocId, new GpioModule(coreLocId));
 
   // dome
-  map.set(domeGenSerialModId, new UartModule(0, domeGenSerialModId, "Dome Gen Serial", domeLocId, ModuleSubType.genericSerial, 2, 9602));
-  map.set(domeKangarooModId, new UartModule(0, domeKangarooModId, "Dome Kangaroo", domeLocId, ModuleSubType.kangaroo, 2, 19602));
-  map.set(domeHCRModId, new UartModule(0, domeHCRModId, "Dome HCR", domeLocId, ModuleSubType.humanCyborgRelationsSerial, 2, 38402));
-  map.set(domeMaestroModId, new UartModule(3, domeMaestroModId, "Dome Maestro", domeLocId, ModuleSubType.maestro, 2, 57602));
-  map.set(domeI2cModId, new I2cModule(0, domeI2cModId, "Dome I2C", domeLocId, 37, ModuleSubType.genericI2C));
+  map.set(
+    domeGenSerialModId,
+    new UartModule(
+      0,
+      domeGenSerialModId,
+      "Dome Gen Serial",
+      domeLocId,
+      ModuleSubType.genericSerial,
+      2,
+      9602,
+    ),
+  );
+  map.set(
+    domeKangarooModId,
+    new UartModule(
+      0,
+      domeKangarooModId,
+      "Dome Kangaroo",
+      domeLocId,
+      ModuleSubType.kangaroo,
+      2,
+      19602,
+    ),
+  );
+  map.set(
+    domeHCRModId,
+    new UartModule(
+      0,
+      domeHCRModId,
+      "Dome HCR",
+      domeLocId,
+      ModuleSubType.humanCyborgRelationsSerial,
+      2,
+      38402,
+    ),
+  );
+  map.set(
+    domeMaestroModId,
+    new UartModule(
+      3,
+      domeMaestroModId,
+      "Dome Maestro",
+      domeLocId,
+      ModuleSubType.maestro,
+      2,
+      57602,
+    ),
+  );
+  map.set(
+    domeI2cModId,
+    new I2cModule(
+      0,
+      domeI2cModId,
+      "Dome I2C",
+      domeLocId,
+      37,
+      ModuleSubType.genericI2C,
+    ),
+  );
   map.set(domeLocId, new GpioModule(domeLocId));
 
   // body
-  map.set(bodyGenSerialModId, new UartModule(0, bodyGenSerialModId, "Body Gen Serial", bodyLocId, ModuleSubType.genericSerial, 3, 9603));
-  map.set(bodyKangarooModId, new UartModule(0, bodyKangarooModId, "Body Kangaroo", bodyLocId, ModuleSubType.kangaroo, 3, 19603));
-  map.set(bodyHCRModId, new UartModule(0, bodyHCRModId, "Body HCR", bodyLocId, ModuleSubType.humanCyborgRelationsSerial, 3, 38403));
-  map.set(bodyMaestroModId, new UartModule(3, bodyMaestroModId, "Body Maestro", bodyLocId, ModuleSubType.maestro, 3, 57603));
-  map.set(bodyI2cModId, new I2cModule(0, bodyI2cModId, "Body I2C", bodyLocId, 47, ModuleSubType.genericI2C));
+  map.set(
+    bodyGenSerialModId,
+    new UartModule(
+      0,
+      bodyGenSerialModId,
+      "Body Gen Serial",
+      bodyLocId,
+      ModuleSubType.genericSerial,
+      3,
+      9603,
+    ),
+  );
+  map.set(
+    bodyKangarooModId,
+    new UartModule(
+      0,
+      bodyKangarooModId,
+      "Body Kangaroo",
+      bodyLocId,
+      ModuleSubType.kangaroo,
+      3,
+      19603,
+    ),
+  );
+  map.set(
+    bodyHCRModId,
+    new UartModule(
+      0,
+      bodyHCRModId,
+      "Body HCR",
+      bodyLocId,
+      ModuleSubType.humanCyborgRelationsSerial,
+      3,
+      38403,
+    ),
+  );
+  map.set(
+    bodyMaestroModId,
+    new UartModule(
+      3,
+      bodyMaestroModId,
+      "Body Maestro",
+      bodyLocId,
+      ModuleSubType.maestro,
+      3,
+      57603,
+    ),
+  );
+  map.set(
+    bodyI2cModId,
+    new I2cModule(
+      0,
+      bodyI2cModId,
+      "Body I2C",
+      bodyLocId,
+      47,
+      ModuleSubType.genericI2C,
+    ),
+  );
   map.set(bodyLocId, new GpioModule(bodyLocId));
 
   return map;

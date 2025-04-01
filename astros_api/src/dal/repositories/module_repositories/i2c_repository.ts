@@ -64,7 +64,14 @@ export async function getI2cModules(
 
   i2cData.map((m: I2CModuleRow) => {
     modules.push(
-      new I2cModule(m.idx, m.id, m.name, m.location_id, m.i2c_address, m.i2c_type),
+      new I2cModule(
+        m.idx,
+        m.id,
+        m.name,
+        m.location_id,
+        m.i2c_address,
+        m.i2c_type,
+      ),
     );
   });
 

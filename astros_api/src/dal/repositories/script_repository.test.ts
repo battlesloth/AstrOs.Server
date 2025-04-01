@@ -4,9 +4,7 @@ import { Kysely, SqliteDialect } from "kysely";
 import { Database } from "../types.js";
 import { migrateToLatest } from "../database.js";
 import { ScriptRepository } from "./script_repository.js";
-import {
-  Script,
-} from "astros-common";
+import { Script } from "astros-common";
 
 import { v4 as uuid } from "uuid";
 
@@ -116,5 +114,4 @@ describe("Script Repository", () => {
 
     expect(updatedScripts.length).toBe(0);
   });
-
 });

@@ -11,10 +11,9 @@ import {
   MaestroChannel,
   MaestroModule,
   ModuleSubType,
-  UartModule
+  UartModule,
 } from "astros-common";
 import { v4 as uuid } from "uuid";
-
 
 const RS = MessageHelper.RS;
 const GS = MessageHelper.GS;
@@ -72,15 +71,14 @@ describe("Message Generator Tests", () => {
 
     expect(message.msg).toBe(
       `5${RS}DEPLOY_CONFIG${RS}123${GS}` +
-      `${addr1}${US}${ctrlName1}${US}5@1|0|1|0;1@${idx1}:1:9600@1:1:1:800:2000:1400:0|2:1:0:500:2500:1500:1` +
-      RS +
-      `${addr2}${US}${ctrlName2}${US}5@1|0|1|0;1@${idx2}:1:9600@1:1:1:800:2000:1400:0|2:1:0:500:2500:1500:1` +
-      RS +
-      `${addr3}${US}${ctrlName3}${US}5@1|0|1|0;1@${idx3}:1:9600@1:1:1:800:2000:1400:0|2:1:0:500:2500:1500:1\n`
+        `${addr1}${US}${ctrlName1}${US}5@1|0|1|0;1@${idx1}:1:9600@1:1:1:800:2000:1400:0|2:1:0:500:2500:1500:1` +
+        RS +
+        `${addr2}${US}${ctrlName2}${US}5@1|0|1|0;1@${idx2}:1:9600@1:1:1:800:2000:1400:0|2:1:0:500:2500:1500:1` +
+        RS +
+        `${addr3}${US}${ctrlName3}${US}5@1|0|1|0;1@${idx3}:1:9600@1:1:1:800:2000:1400:0|2:1:0:500:2500:1500:1\n`,
     );
   });
 });
-
 
 function generateControllerLocations(
   addr1: string,
@@ -91,9 +89,8 @@ function generateControllerLocations(
   idx2: number,
   addr3: string,
   name3: string,
-  idx3: number
+  idx3: number,
 ): ControllerLocation[] {
-
   const locations: ControllerLocation[] = [];
 
   locations.push(generateControllerLocation(name1, addr1, idx1));
@@ -106,9 +103,8 @@ function generateControllerLocations(
 function generateControllerLocation(
   name: string,
   address: string,
-  maestroIdx: number
+  maestroIdx: number,
 ): ControllerLocation {
-
   const location = new ControllerLocation(uuid(), name, "", "");
 
   location.controller = new ControlModule(uuid(), name, address);
@@ -119,9 +115,7 @@ function generateControllerLocation(
     );
   }
 
-  location.uartModules.push(
-    generateMaestroModule(maestroIdx, name, address),
-  );
+  location.uartModules.push(generateMaestroModule(maestroIdx, name, address));
 
   return location;
 }
@@ -131,7 +125,6 @@ function generateMaestroModule(
   name: string,
   location: string,
 ): UartModule {
-
   const module = new UartModule(
     idx,
     uuid(),
@@ -143,24 +136,14 @@ function generateMaestroModule(
   );
 
   const subModule = new MaestroModule();
-  subModule.boards.push(
-    generateMaestroBoard(module.id),
-  );
+  subModule.boards.push(generateMaestroBoard(module.id));
 
   module.subModule = subModule;
   return module;
 }
 
-function generateMaestroBoard(
-  parentId: string,
-): MaestroBoard {
-  const board = new MaestroBoard(
-    uuid(),
-    parentId,
-    0,
-    "board",
-    24
-  );
+function generateMaestroBoard(parentId: string): MaestroBoard {
+  const board = new MaestroBoard(uuid(), parentId, 0, "board", 24);
 
   board.channels.push(
     new MaestroChannel(
@@ -173,8 +156,8 @@ function generateMaestroBoard(
       800,
       2000,
       1400,
-      false
-    )
+      false,
+    ),
   );
 
   board.channels.push(
@@ -188,8 +171,8 @@ function generateMaestroBoard(
       500,
       2500,
       1500,
-      true
-    )
+      true,
+    ),
   );
 
   return board;

@@ -1,4 +1,9 @@
-import { ControllerLocation, GpioChannel, ModuleSubType, UartModule } from "astros-common";
+import {
+  ControllerLocation,
+  GpioChannel,
+  ModuleSubType,
+  UartModule,
+} from "astros-common";
 
 export class ControllerConfig {
   id: string;
@@ -16,6 +21,8 @@ export class ControllerConfig {
     this.address = location.controller?.address ?? "";
 
     this.gpioChannels = location.gpioModule?.channels ?? [];
-    this.maestroModules = location.uartModules.filter(mod => mod.moduleSubType === ModuleSubType.maestro);
+    this.maestroModules = location.uartModules.filter(
+      (mod) => mod.moduleSubType === ModuleSubType.maestro,
+    );
   }
 }

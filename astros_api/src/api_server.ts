@@ -30,7 +30,6 @@ import { ScriptRepository } from "./dal/repositories/script_repository.js";
 
 import { ScriptConverter } from "./script_converter.js";
 import {
-  Script,
   StatusResponse,
   ControllersResponse,
   TransmissionType,

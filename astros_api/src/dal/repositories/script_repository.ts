@@ -10,20 +10,25 @@ import {
   ModuleSubType,
   moduleSubTypeToScriptEventTypes,
   ModuleClassType,
-  GpioModule,
 } from "astros-common";
 import { logger } from "../../logger.js";
 import { Guid } from "guid-typescript";
 import { Database, ScriptsTable } from "../types.js";
 import { Kysely, Transaction } from "kysely";
-import { getGpioModule, readGpioChannel } from "./module_repositories/gpio_repository.js";
+import {
+  getGpioModule,
+  readGpioChannel,
+} from "./module_repositories/gpio_repository.js";
 import {
   getUartModules,
   readKangarooChannel,
   readMaestroChannel,
   readUartChannel,
 } from "./module_repositories/uart_repository.js";
-import { getI2cModules, readI2cChannel } from "./module_repositories/i2c_repository.js";
+import {
+  getI2cModules,
+  readI2cChannel,
+} from "./module_repositories/i2c_repository.js";
 
 export class ScriptRepository {
   private characters =
@@ -493,7 +498,6 @@ export class ScriptRepository {
   //#region Utility
 
   public async getModules(): Promise<Map<string, ModuleClassType>> {
-  
     const result = new Map<string, ModuleClassType>();
 
     const locations = await this.db
@@ -508,12 +512,12 @@ export class ScriptRepository {
     for (const loc of locations) {
       const gpioModules = await getGpioModule(this.db, loc.id);
       result.set(loc.id, gpioModules);
-      
+
       const uartModules = await getUartModules(this.db, loc.id);
       for (const uart of uartModules) {
         result.set(uart.id, uart);
       }
-      
+
       const i2cModules = await getI2cModules(this.db, loc.id);
       for (const i2c of i2cModules) {
         result.set(i2c.id, i2c);

@@ -205,7 +205,7 @@ export type GpioChannelUpdate = Updateable<GpioChannelsTable>;
 // for every script event as that will blow up the message size
 // so we use the index to reference the module in the script.
 // Why not just use the index as the id?
-// Becuase it's easier to catch errors in the web code if the id 
+// Becuase it's easier to catch errors in the web code if the id
 // is a UUID since collisions are nearly impossible.
 
 export interface I2CModulesTable {

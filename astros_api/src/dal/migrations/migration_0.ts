@@ -10,7 +10,6 @@ import {
 import { v4 as uuid } from "uuid";
 import * as crypto from "crypto";
 import { AstrOsConstants } from "astros-common";
-import { text } from "stream/consumers";
 
 export const migration_0: Migration = {
   up: async (db: Kysely<any>): Promise<void> => {
@@ -123,7 +122,7 @@ export const migration_0: Migration = {
     // for every script event as that will blow up the message size
     // so we use the index to reference the module in the script.
     // Why not just use the index as the id?
-    // Becuase it's easier to catch errors in the web code if the id 
+    // Becuase it's easier to catch errors in the web code if the id
     // is a UUID since collisions are nearly impossible.
     await db.schema
       .createTable("i2c_modules")
