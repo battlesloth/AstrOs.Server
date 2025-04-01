@@ -11,6 +11,7 @@ export class ScriptChannel {
   id: string;
   scriptId: string;
   channelType: ScriptChannelType;
+  parentModuleId: string;
   moduleChannelId: string;
   moduleChannelType: string;
   moduleChannel: ModuleChannelType;
@@ -23,6 +24,7 @@ export class ScriptChannel {
     id: string,
     scriptId: string,
     channelType: ScriptChannelType,
+    parentModuleId: string,
     moduleChannelId: string,
     moduleChannelType: string,
     moduleChannel: ModuleChannelType,
@@ -32,6 +34,7 @@ export class ScriptChannel {
 
     this.scriptId = scriptId;
     this.channelType = channelType;
+    this.parentModuleId = parentModuleId;
     this.moduleChannelId = moduleChannelId;
     this.moduleChannelType = moduleChannelType;
     this.moduleChannel = moduleChannel;

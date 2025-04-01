@@ -682,11 +682,9 @@ class ApiServer {
       const scriptRepo = new ScriptRepository(db);
       const locationsRepo = new LocationsRepository(db);
 
-      const script = (await scriptRepo.getScript(id)) as Script;
+      const cvtr = new ScriptConverter(scriptRepo);
 
-      const cvtr = new ScriptConverter();
-
-      const messages = cvtr.convertScript(script);
+      const messages = await cvtr.convertScript(id);
 
       if (messages.size < 1) {
         logger.warn(`No locations script values returned for ${id}`);
@@ -757,14 +755,12 @@ class ApiServer {
       logger.info("sending direct command");
 
       const repo = new ControllerRepository(db);
-
       const controller = await repo.getControllerById(req.body.controller);
 
       logger.debug(`controller: ${JSON.stringify(controller)}`);
       logger.debug(`req: ${JSON.stringify(req.body)}`);
 
-      const cvtr = new ScriptConverter();
-      const cmd = cvtr.convertCommand(req.body);
+      const cmd = ScriptConverter.convertCommand(req.body);
 
       this.serialWorker.postMessage({
         type: SerialMessageType.RUN_COMMAND,

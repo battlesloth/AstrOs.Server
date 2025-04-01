@@ -698,6 +698,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       return;
     }
 
+    channel.parentModuleId = chValue.parentModuleId;
     channel.moduleChannelId = event.newModuleChannelId;
     channel.moduleChannel = chValue?.channel;
     this.scriptResources.setChannelAvailablity(
@@ -717,6 +718,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
         console.log(`no channel found for ${event.oldModuleChannelId}`);
         return;
       }
+      swapChannel.parentModuleId = oldChValue?.parentModuleId;
       swapChannel.moduleChannelId = event.oldModuleChannelId;
       swapChannel.moduleChannel = oldChValue?.channel;
       this.scriptResources.setChannelAvailablity(
@@ -757,6 +759,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
           Guid.create().toString(),
           this.script.id,
           k,
+          chValue.parentModuleId,
           chValue.channelId,
           ModuleChannelTypes.fromSubType(chValue.channel.moduleSubType),
           chValue.channel,

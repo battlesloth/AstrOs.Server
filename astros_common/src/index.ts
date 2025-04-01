@@ -3,7 +3,10 @@ export { ControllerLocation } from "./control_module/controller_location";
 export { ControlModule } from "./control_module/control_module";
 export { AstrOsLocationCollection } from "./astros_location_collection";
 export { ControlModuleStatus } from "./control_module/control_module_status";
-export { BaseModule } from "./control_module/base_module";
+export { 
+  BaseModule, 
+  ModuleClassType 
+} from "./control_module/base_module";
 export { BaseChannel, ModuleChannelType } from "./control_module/base_channel";
 export { I2cChannel } from "./control_module/i2c/i2c_channel";
 export {

@@ -8,6 +8,17 @@ import { SerialMessageType } from "./serial_message.js";
 import { ScriptUpload } from "src/models/scripts/script_upload";
 import { ScriptRun } from "src/models/scripts/script_run";
 import { ServoTest } from "src/models/servo_test";
+import { MaestroModule } from "astros-common";
+
+
+export enum EspModuleType {
+  NONE = 0,
+  MAESTRO = 1,
+  I2C = 2,
+  GENERIC_SERIAL = 3,
+  KANGAROO = 4,
+  GPIO = 5
+}
 
 export class MessageGenerator {
   GS = MessageHelper.GS;
@@ -76,36 +87,66 @@ export class MessageGenerator {
         `Generating deploy config message: ${JSON.stringify(config)}`,
       );
 
-      const servoConfigs = [];
+      const configs = [];
 
-      /*for (const ch of config.servoChannels) {
-                servoConfigs.push(ch.id);
-                servoConfigs.push(":");
-                servoConfigs.push(ch.set);
-                servoConfigs.push(":");
-                servoConfigs.push(ch.minPos);
-                servoConfigs.push(":");
-                servoConfigs.push(ch.maxPos);
-                servoConfigs.push(":");
-                servoConfigs.push(ch.homePos);
-                servoConfigs.push(":");
-                servoConfigs.push(ch.inverted);
-                servoConfigs.push("|");
-            }
+      configs.push(EspModuleType.GPIO);
+      configs.push("@");
 
-            if (servoConfigs.length > 0) {
-                servoConfigs.pop();
-            }
+      // add onbaoard GPIO config
+      for (const ch of config.gpioChannels) {
+        if (ch.enabled) {
+          configs.push(ch.defaultHigh ? "1" : "0");
+        } else {
+          configs.push(false);
+        }
+        configs.push("|");
+      }
 
-            result.push(config.address);
-            result.push(this.US);
-            result.push(config.name);
-            result.push(this.US);
-            result.push(config.servoChannels.length.toString());
-            result.push(this.US);
-            result.push(servoConfigs.join(""));
-            result.push(this.RS);
-            */
+      // remove trailing pipe
+      configs.pop();
+      configs.push(";");
+
+      for (const ch of config.maestroModules) {
+        configs.push(EspModuleType.MAESTRO);
+        configs.push("@");
+        configs.push(ch.idx);
+        configs.push(":");
+        configs.push(ch.uartChannel);
+        configs.push(":");
+        configs.push(ch.baudRate);
+        configs.push("@");
+
+        const subModule = ch.subModule as MaestroModule;
+
+        const channels = subModule.boards[0].channels;
+
+        for (const ch of channels) {
+          configs.push(ch.channelNumber);
+          configs.push(":");
+          configs.push(ch.enabled ? "1" : "0");
+          configs.push(":");
+          configs.push(ch.isServo ? "1" : "0");
+          configs.push(":");
+          configs.push(ch.minPos);
+          configs.push(":");
+          configs.push(ch.maxPos);
+          configs.push(":");
+          configs.push(ch.homePos);
+          configs.push(":");
+          configs.push(ch.inverted ? "1" : "0");
+          configs.push("|");
+        }
+
+        // remove trailing pipe
+        configs.pop();
+      }
+
+      result.push(config.address);
+      result.push(this.US);
+      result.push(config.name);
+      result.push(this.US);
+      result.push(configs.join(""));
+      result.push(this.RS);
     }
 
     if (result.length > 0) {

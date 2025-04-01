@@ -1,11 +1,236 @@
-import { expect, describe, it } from "vitest";
+import {
+  describe,
+  expect,
+  it,
+  beforeEach
+} from "vitest";
+import { mock, mockReset } from "vitest-mock-extended";
+import { ScriptConverter } from "../src/script_converter.js";
+import { ScriptRepository } from "./dal/repositories/script_repository.js";
+import {
+  GenericSerialEvent,
+  GpioModule,
+  I2cChannel,
+  I2cEvent,
+  I2cModule,
+  ModuleChannelTypes,
+  ModuleClassType,
+  ModuleSubType,
+  ModuleType,
+  Script,
+  ScriptChannel,
+  ScriptChannelType,
+  ScriptEvent,
+  UartChannel,
+  UartModule
+} from "astros-common";
+import { v4 as uuid } from "uuid";
+
+const coreLocId = "07e5047a-32b3-4c6a-95c1-a97bebe1b0bd";
+const domeLocId = "e7c35d30-c371-49ac-8553-ec31d7d2f264";
+const bodyLocId = "361c5f59-e5ec-4d34-8eae-af4578eebd98";
+
+const coreGenSerialModId = "1f76c970-2d4a-486e-8b8d-af5e13dac8dd";
+const coreKangarooModId = "c6e4e295-1b62-43cf-b430-e2ff0fc91740";
+const coreHCRModId = "ef9ffa30-7486-4aac-80d2-a3096163665b";
+const coreMaestroModId = "29521c55-2603-4a70-bb1f-a47a8c938417";
+const coreI2cModId = "f903d2fd-eb59-48de-aeac-55b72d06d1a3";
+
+const domeGenSerialModId = "4af17fad-7cca-4d25-a140-667e4ade4ccd";
+const domeKangarooModId = "c4bd126f-7947-4e1c-b501-6788d11c8d65";
+const domeHCRModId = "478bab9f-260e-45be-9616-83b3e16764d1";
+const domeMaestroModId = "c195f295-0020-459a-9cde-d2f2a2fd4fd6";
+const domeI2cModId = "7a518233-0094-4189-a7a8-65b684ee540e";
+
+const bodyGenSerialModId = "b7e7cb15-8ece-46f9-a37f-5e6643d2c7dd";
+const bodyKangarooModId = "6441276f-5cf8-48fc-9d25-6aafde236a7e";
+const bodyHCRModId = "2695ea93-e9ca-4b2e-ab26-7bb9acf300c0";
+const bodyMaestroModId = "9650ae5b-5e8a-4f9a-9d9f-57ed1a644b1d";
+const bodyI2cModId = "f2261640-a8ed-4f89-bc07-1c74d4a4296e";
 
 describe("Script Converter Tests", () => {
-  it("placeholder", () => {
-    expect(true).toBe(true);
+
+  const mockRepo = mock<ScriptRepository>();
+  
+  beforeEach(() => {
+    mockReset(mockRepo);
+    mockRepo.getModules.calledWith().mockResolvedValue(getModules());
+    mockRepo.getLocationIds.calledWith().mockResolvedValue([coreLocId, domeLocId, bodyLocId]);
+  });
+
+  it("basic serial script", async () => {
+
+    const scriptId = "coreGenericSerial";
+
+    mockRepo.getScript.calledWith(scriptId)
+      .mockResolvedValue(coreGenericSerialScript());
+    
+    const converter = new ScriptConverter(mockRepo);
+
+    const script = await converter.convertScript(scriptId);
+
+    expect(script).toBeDefined();
+
+    const coreScript = script?.get(coreLocId);
+    const domeScript = script?.get(domeLocId);
+    const bodyScript = script?.get(bodyLocId);
+
+    expect(coreScript).toBeDefined();
+
+    const coreSegs = coreScript?.split(';');
+
+    expect(coreSegs?.length).toBe(3);
+    expect(coreSegs?.[0]).toBe("3|1000|1|9600|test 0");
+    expect(coreSegs?.[1]).toBe("3|1000|1|9600|test 1");
+    expect(coreSegs?.[2]).toBe("3|0|1|9600|test 2");
+
+    // buffer events on dome and body
+    expect(domeScript).toBeDefined();
+    expect(bodyScript).toBeDefined();
+
+    expect(domeScript).toBe("0|2000|0;0|0|0");
+    expect(bodyScript).toBe("0|2000|0;0|0|0");
+  });
+
+  it("two channels on one location", async () => {
+
+    const scriptId = "domeTwoChannelScript";
+
+    mockRepo.getScript.calledWith(scriptId)
+      .mockResolvedValue(domeTwoChannelScript());
+    
+    const converter = new ScriptConverter(mockRepo);
+
+    const script = await converter.convertScript(scriptId);
+
+    expect(script).toBeDefined();
+
+    const coreScript = script?.get(coreLocId);
+    const domeScript = script?.get(domeLocId);
+    const bodyScript = script?.get(bodyLocId);
+
+    expect(domeScript).toBeDefined();
+
+    const domeSegs = domeScript?.split(';');
+
+    expect(domeSegs?.length).toBe(6);
+    expect(domeSegs?.[0]).toBe("3|1000|2|9602|UART 0");
+    expect(domeSegs?.[1]).toBe("2|1000|37|I2C 1");
+    expect(domeSegs?.[2]).toBe("3|1000|2|9602|UART 2");
+    expect(domeSegs?.[3]).toBe("2|1000|37|I2C 3");
+    expect(domeSegs?.[4]).toBe("3|1000|2|9602|UART 4");
+    expect(domeSegs?.[5]).toBe("2|0|37|I2C 5");
+
+    // buffer events on dome and body
+    expect(coreScript).toBeDefined();
+    expect(bodyScript).toBeDefined();
+
+    expect(coreScript).toBe("0|5000|0;0|0|0");
+    expect(bodyScript).toBe("0|5000|0;0|0|0");
   });
 });
 
+
+function coreGenericSerialScript(): Script {
+
+  const script = new Script("coreGenericSerial", "test", "test", new Date());
+
+  const uartChannel = new UartChannel(uuid(), coreGenSerialModId, "", ModuleSubType.genericSerial, true);
+
+  const scriptCh = new ScriptChannel(
+    uuid(),
+    script.id,
+    ScriptChannelType.GENERIC_UART,
+    coreGenSerialModId,
+    uartChannel.id,
+    ModuleChannelTypes.UartChannel,
+    uartChannel,
+    3000);
+
+  for (let i = 0; i < 3; i++) {
+    const evt = new GenericSerialEvent(`test ${i}`);
+    const sevt = new ScriptEvent(scriptCh.id, ModuleType.uart, ModuleSubType.genericSerial, i * 10, evt);
+    scriptCh.eventsKvpArray.push({key: i * 1000, value: sevt});
+  }
+  script.scriptChannels.push(scriptCh);
+  
+  return script;
+}
+
+
+function domeTwoChannelScript(): Script {
+  const script = new Script("domeTwoChannelScript", "test", "test", new Date());
+  const uartChannel = new UartChannel(uuid(), domeGenSerialModId, "", ModuleSubType.genericSerial, true);
+  const i2cChannel = new I2cChannel(uuid(), domeI2cModId, "", true);
+   
+  const scriptCh1 = new ScriptChannel(
+    uuid(),
+    script.id,
+    ScriptChannelType.GENERIC_UART,
+    domeGenSerialModId,
+    uartChannel.id,
+    ModuleChannelTypes.UartChannel,
+    uartChannel,
+    3000);
+  
+    const scriptCh2 = new ScriptChannel(
+    uuid(),
+    script.id,
+    ScriptChannelType.GENERIC_I2C,
+    domeI2cModId,
+    i2cChannel.id,
+    ModuleChannelTypes.I2cChannel,
+    i2cChannel,
+    3000);
+  
+  for (let i = 0; i < 6; i++) {
+    if (i % 2 === 0) {
+      const evt = new GenericSerialEvent(`UART ${i}`);
+      const sevt = new ScriptEvent(scriptCh1.id, ModuleType.uart, ModuleSubType.genericSerial, i * 10, evt);
+      scriptCh1.eventsKvpArray.push({key: i * 1000, value: sevt});
+    }
+    else {
+      const evt = new I2cEvent(`I2C ${i}`);
+      const sevt = new ScriptEvent(scriptCh2.id, ModuleType.i2c, ModuleSubType.genericI2C, i * 10, evt);
+      scriptCh2.eventsKvpArray.push({key: i * 1000, value: sevt});
+    }
+  }
+  script.scriptChannels.push(scriptCh1);
+  script.scriptChannels.push(scriptCh2);
+
+  return script;
+}
+
+function getModules() {
+
+  const map = new Map<string, ModuleClassType>();
+
+  // core
+  map.set(coreGenSerialModId, new UartModule(0, coreGenSerialModId, "Core Gen Serial", coreLocId, ModuleSubType.genericSerial, 1, 9600));
+  map.set(coreKangarooModId, new UartModule(0, coreKangarooModId, "Core Kangaroo", coreLocId, ModuleSubType.kangaroo, 1, 19600));
+  map.set(coreHCRModId, new UartModule(0, coreHCRModId, "Core HCR", coreLocId, ModuleSubType.humanCyborgRelationsSerial, 1, 38400));
+  map.set(coreMaestroModId, new UartModule(3, coreMaestroModId, "Core Maestro", coreLocId, ModuleSubType.maestro, 1, 57600)); 
+  map.set(coreI2cModId, new I2cModule(0, coreI2cModId, "Core I2C", coreLocId, 27, ModuleSubType.genericI2C));
+  map.set(coreLocId, new GpioModule(coreLocId));
+
+  // dome
+  map.set(domeGenSerialModId, new UartModule(0, domeGenSerialModId, "Dome Gen Serial", domeLocId, ModuleSubType.genericSerial, 2, 9602));
+  map.set(domeKangarooModId, new UartModule(0, domeKangarooModId, "Dome Kangaroo", domeLocId, ModuleSubType.kangaroo, 2, 19602));
+  map.set(domeHCRModId, new UartModule(0, domeHCRModId, "Dome HCR", domeLocId, ModuleSubType.humanCyborgRelationsSerial, 2, 38402));
+  map.set(domeMaestroModId, new UartModule(3, domeMaestroModId, "Dome Maestro", domeLocId, ModuleSubType.maestro, 2, 57602));
+  map.set(domeI2cModId, new I2cModule(0, domeI2cModId, "Dome I2C", domeLocId, 37, ModuleSubType.genericI2C));
+  map.set(domeLocId, new GpioModule(domeLocId));
+
+  // body
+  map.set(bodyGenSerialModId, new UartModule(0, bodyGenSerialModId, "Body Gen Serial", bodyLocId, ModuleSubType.genericSerial, 3, 9603));
+  map.set(bodyKangarooModId, new UartModule(0, bodyKangarooModId, "Body Kangaroo", bodyLocId, ModuleSubType.kangaroo, 3, 19603));
+  map.set(bodyHCRModId, new UartModule(0, bodyHCRModId, "Body HCR", bodyLocId, ModuleSubType.humanCyborgRelationsSerial, 3, 38403));
+  map.set(bodyMaestroModId, new UartModule(3, bodyMaestroModId, "Body Maestro", bodyLocId, ModuleSubType.maestro, 3, 57603));
+  map.set(bodyI2cModId, new I2cModule(0, bodyI2cModId, "Body I2C", bodyLocId, 47, ModuleSubType.genericI2C));
+  map.set(bodyLocId, new GpioModule(bodyLocId));
+
+  return map;
+}
 //import {
 //    ChannelType, KangarooController, KangarooAction, KangarooEvent,
 //    Script, ScriptChannel, ScriptEvent, ServoEvent, ChannelSubType, ServoChannel,

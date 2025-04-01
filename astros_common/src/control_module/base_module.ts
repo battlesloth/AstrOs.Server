@@ -1,4 +1,14 @@
 import { ModuleSubType, ModuleType } from "../astros_enums";
+import { GpioModule } from "./gpio/gpio_module";
+import { I2cModule } from "./i2c/i2c_module";
+import { UartModule } from "./uart/uart_module";
+
+export type ModuleClassType =
+  | BaseModule
+  | UartModule
+  | I2cModule
+  | GpioModule
+
 
 export abstract class BaseModule {
   // idx is the primary key for the module,

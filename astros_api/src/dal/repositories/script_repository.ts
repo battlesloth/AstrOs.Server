@@ -9,18 +9,21 @@ import {
   ModuleType,
   ModuleSubType,
   moduleSubTypeToScriptEventTypes,
+  ModuleClassType,
+  GpioModule,
 } from "astros-common";
 import { logger } from "../../logger.js";
 import { Guid } from "guid-typescript";
 import { Database, ScriptsTable } from "../types.js";
 import { Kysely, Transaction } from "kysely";
-import { readGpioChannel } from "./module_repositories/gpio_repository.js";
+import { getGpioModule, readGpioChannel } from "./module_repositories/gpio_repository.js";
 import {
+  getUartModules,
   readKangarooChannel,
   readMaestroChannel,
   readUartChannel,
 } from "./module_repositories/uart_repository.js";
-import { readI2cChannel } from "./module_repositories/i2c_repository.js";
+import { getI2cModules, readI2cChannel } from "./module_repositories/i2c_repository.js";
 
 export class ScriptRepository {
   private characters =
@@ -229,6 +232,7 @@ export class ScriptRepository {
         id: ch.id,
         script_id: script.id,
         channel_type: ch.channelType,
+        parent_module_id: ch.parentModuleId,
         module_channel_id: ch.moduleChannelId,
         module_channel_type: ch.moduleChannelType,
       })
@@ -268,6 +272,7 @@ export class ScriptRepository {
         ch.id,
         ch.script_id,
         ch.channel_type,
+        ch.parent_module_id,
         ch.module_channel_id,
         ch.module_channel_type,
         new BaseChannel("", "", "", ModuleType.none, ModuleSubType.none, false),
@@ -486,6 +491,50 @@ export class ScriptRepository {
   //#endregion
 
   //#region Utility
+
+  public async getModules(): Promise<Map<string, ModuleClassType>> {
+  
+    const result = new Map<string, ModuleClassType>();
+
+    const locations = await this.db
+      .selectFrom("locations")
+      .selectAll()
+      .execute()
+      .catch((err) => {
+        logger.error(err);
+        throw err;
+      });
+
+    for (const loc of locations) {
+      const gpioModules = await getGpioModule(this.db, loc.id);
+      result.set(loc.id, gpioModules);
+      
+      const uartModules = await getUartModules(this.db, loc.id);
+      for (const uart of uartModules) {
+        result.set(uart.id, uart);
+      }
+      
+      const i2cModules = await getI2cModules(this.db, loc.id);
+      for (const i2c of i2cModules) {
+        result.set(i2c.id, i2c);
+      }
+    }
+
+    return result;
+  }
+
+  public async getLocationIds(): Promise<Array<string>> {
+    const locations = await this.db
+      .selectFrom("locations")
+      .select("id")
+      .execute()
+      .catch((err) => {
+        logger.error(err);
+        throw err;
+      });
+
+    return locations.map((loc) => loc.id);
+  }
 
   private generateScriptId(length: number): string {
     let result = `s${Math.floor(Date.now() / 1000)}`;

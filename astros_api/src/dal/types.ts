@@ -102,6 +102,7 @@ export interface ScriptChannelsTable {
   id: string;
   script_id: string;
   channel_type: number;
+  parent_module_id: string;
   module_channel_id: string;
   module_channel_type: string;
 }

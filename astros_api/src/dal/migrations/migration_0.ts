@@ -10,6 +10,7 @@ import {
 import { v4 as uuid } from "uuid";
 import * as crypto from "crypto";
 import { AstrOsConstants } from "astros-common";
+import { text } from "stream/consumers";
 
 export const migration_0: Migration = {
   up: async (db: Kysely<any>): Promise<void> => {
@@ -58,6 +59,7 @@ export const migration_0: Migration = {
       .addColumn("id", "text", (col) => col.primaryKey())
       .addColumn("script_id", "text", (col) => col.notNull())
       .addColumn("channel_type", "integer", (col) => col.notNull())
+      .addColumn("parent_module_id", "text", (col) => col.notNull())
       .addColumn("module_channel_id", "text", (col) => col.notNull())
       .addColumn("module_channel_type", "text", (col) => col.notNull())
       .execute();
