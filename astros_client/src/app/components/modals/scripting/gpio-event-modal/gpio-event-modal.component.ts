@@ -82,6 +82,8 @@ export class GpioEventModalComponent
       this.scriptEvent.event = new GpioEvent(+this.state === 1 ? true : false);
     } else if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
       this.scriptEvent.event = new MaestroEvent(
+        // channel will be set when persisting the event to the DB
+        -1,
         false,
         +this.state === 1 ? 2500 : 500,
         0,

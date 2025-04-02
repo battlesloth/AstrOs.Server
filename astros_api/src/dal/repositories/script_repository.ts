@@ -10,6 +10,8 @@ import {
   ModuleSubType,
   moduleSubTypeToScriptEventTypes,
   ModuleClassType,
+  MaestroEvent,
+  MaestroChannel,
 } from "astros-common";
 import { logger } from "../../logger.js";
 import { Guid } from "guid-typescript";
@@ -249,6 +251,17 @@ export class ScriptRepository {
 
     for (const kvp of ch.eventsKvpArray) {
       const evt = kvp.value;
+
+      // set the channel number for Maestro events
+      // we do this here because the channel can be changed in the UI
+      // and it's simpler to do it here than in the UI
+      if (ch.moduleChannelType === ModuleChannelTypes.MaestroChannel) {
+        const e = evt.event as MaestroEvent;
+        const c = ch.moduleChannel as MaestroChannel;
+        e.channel = c.channelNumber;
+        evt.event = e;
+      }
+
       await this.saveScriptEvent(tx, script.id, ch.id, evt);
     }
   }

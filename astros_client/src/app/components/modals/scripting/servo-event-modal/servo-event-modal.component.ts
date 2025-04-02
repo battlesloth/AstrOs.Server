@@ -76,6 +76,8 @@ export class ServoEventModalComponent
 
     if (this.scriptEvent.moduleSubType === ModuleSubType.maestro) {
       const data = new MaestroEvent(
+        // channel will be set when persisting the event to the DB
+        -1,
         true,
         this.position,
         this.speed,

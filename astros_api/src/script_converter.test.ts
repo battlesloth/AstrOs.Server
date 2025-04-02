@@ -1,13 +1,25 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { mock, mockReset } from "vitest-mock-extended";
-import { ScriptConverter } from "../src/script_converter.js";
+import {
+  ScriptConverter,
+  ISingleCommand,
+  CommandType,
+} from "../src/script_converter.js";
 import { ScriptRepository } from "./dal/repositories/script_repository.js";
 import {
   GenericSerialEvent,
+  GpioEvent,
   GpioModule,
+  HcrCommand,
+  HcrCommandCategory,
+  HumanCyborgRelationsCmd,
+  HumanCyborgRelationsEvent,
   I2cChannel,
   I2cEvent,
   I2cModule,
+  KangarooAction,
+  KangarooEvent,
+  MaestroEvent,
   ModuleChannelTypes,
   ModuleClassType,
   ModuleSubType,
@@ -43,6 +55,7 @@ const bodyHCRModId = "2695ea93-e9ca-4b2e-ab26-7bb9acf300c0";
 const bodyMaestroModId = "9650ae5b-5e8a-4f9a-9d9f-57ed1a644b1d";
 const bodyI2cModId = "f2261640-a8ed-4f89-bc07-1c74d4a4296e";
 
+// region Script Conversion
 describe("Script Converter Tests", () => {
   const mockRepo = mock<ScriptRepository>();
 
@@ -59,7 +72,7 @@ describe("Script Converter Tests", () => {
 
     mockRepo.getScript
       .calledWith(scriptId)
-      .mockResolvedValue(coreGenericSerialScript());
+      .mockResolvedValue(generateScript(scriptId));
 
     const converter = new ScriptConverter(mockRepo);
 
@@ -93,7 +106,7 @@ describe("Script Converter Tests", () => {
 
     mockRepo.getScript
       .calledWith(scriptId)
-      .mockResolvedValue(domeTwoChannelScript());
+      .mockResolvedValue(generateScript(scriptId));
 
     const converter = new ScriptConverter(mockRepo);
 
@@ -117,18 +130,282 @@ describe("Script Converter Tests", () => {
     expect(domeSegs?.[4]).toBe("3|1000|2|9602|UART 4");
     expect(domeSegs?.[5]).toBe("2|0|37|I2C 5");
 
-    // buffer events on dome and body
+    // buffer events on core and body
     expect(coreScript).toBeDefined();
     expect(bodyScript).toBeDefined();
 
     expect(coreScript).toBe("0|5000|0;0|0|0");
     expect(bodyScript).toBe("0|5000|0;0|0|0");
   });
+
+  it("dome and core scipt", async () => {
+    const scriptId = "domeAndCoreScript";
+
+    mockRepo.getScript
+      .calledWith(scriptId)
+      .mockResolvedValue(generateScript(scriptId));
+
+    const converter = new ScriptConverter(mockRepo);
+
+    const script = await converter.convertScript(scriptId);
+
+    expect(script).toBeDefined();
+
+    const coreScript = script?.get(coreLocId);
+    const domeScript = script?.get(domeLocId);
+    const bodyScript = script?.get(bodyLocId);
+
+    expect(domeScript).toBeDefined();
+
+    const domeSegs = domeScript?.split(";");
+
+    expect(domeSegs?.length).toBe(6);
+    expect(domeSegs?.[0]).toBe("3|1000|2|9602|UART 0");
+    expect(domeSegs?.[1]).toBe("2|1000|37|I2C 1");
+    expect(domeSegs?.[2]).toBe("3|1000|2|9602|UART 2");
+    expect(domeSegs?.[3]).toBe("2|1000|37|I2C 3");
+    expect(domeSegs?.[4]).toBe("3|1000|2|9602|UART 4");
+    expect(domeSegs?.[5]).toBe("2|0|37|I2C 5");
+
+    expect(coreScript).toBeDefined();
+
+    const coreSegs = coreScript?.split(";");
+
+    expect(coreSegs?.length).toBe(4);
+    expect(coreSegs?.[0]).toBe("3|1000|1|9600|test 0");
+    expect(coreSegs?.[1]).toBe("3|1000|1|9600|test 1");
+    expect(coreSegs?.[2]).toBe("3|3000|1|9600|test 2");
+    expect(coreSegs?.[3]).toBe("0|0|0");
+
+    // buffer events on body
+    expect(bodyScript).toBeDefined();
+
+    expect(bodyScript).toBe("0|5000|0;0|0|0");
+  });
 });
 
-function coreGenericSerialScript(): Script {
-  const script = new Script("coreGenericSerial", "test", "test", new Date());
+//#endregion
+//#region Commands
 
+describe("script commands", () => {
+  it("should create generic serial command", () => {
+    const event = new GenericSerialEvent("test val");
+    const cmd = {
+      moduleSubType: ModuleSubType.genericSerial,
+      event: event,
+      channel: 1,
+      baud: 9600,
+    } as ISingleCommand;
+
+    const result = ScriptConverter.convertCommand(cmd);
+
+    expect(result).toBeDefined();
+
+    const parts = result.split("|");
+
+    expect(parts.length).toBe(5);
+    expect(parts[0]).toBe(CommandType.genericSerial.toString());
+    expect(parts[1]).toBe("0");
+    expect(parts[2]).toBe(cmd.channel.toString());
+    expect(parts[3]).toBe(cmd.baud.toString());
+    expect(parts[4]).toBe(event.value);
+  });
+
+  it("should create HCR command", () => {
+    const commands = Array<HcrCommand>(3);
+    commands[0] = new HcrCommand(
+      uuid(),
+      HcrCommandCategory.sdWav,
+      HumanCyborgRelationsCmd.playWavOnA,
+      5,
+      0,
+    );
+
+    commands[1] = new HcrCommand(
+      uuid(),
+      HcrCommandCategory.stimuli,
+      HumanCyborgRelationsCmd.extremeHappy,
+      0,
+      0,
+    );
+
+    commands[2] = new HcrCommand(
+      uuid(),
+      HcrCommandCategory.volume,
+      HumanCyborgRelationsCmd.vocalizerVolume,
+      8,
+      0,
+    );
+
+    const event = new HumanCyborgRelationsEvent(commands);
+    const cmd = {
+      moduleSubType: ModuleSubType.humanCyborgRelationsSerial,
+      event: event,
+      channel: 2,
+      baud: 115200,
+    } as ISingleCommand;
+
+    const result = ScriptConverter.convertCommand(cmd);
+
+    expect(result).toBeDefined();
+
+    const parts = result.split("|");
+
+    expect(parts.length).toBe(5);
+    expect(parts[0]).toBe(CommandType.genericSerial.toString());
+    expect(parts[1]).toBe("0");
+    expect(parts[2]).toBe(cmd.channel.toString());
+    expect(parts[3]).toBe(cmd.baud.toString());
+    expect(parts[4]).toBe("<CA5,SH1,PVV8>");
+  });
+
+  it("should create Kangaroo X2 command", () => {
+    const event = new KangarooEvent(
+      KangarooAction.start,
+      0,
+      0,
+      KangarooAction.position,
+      5,
+      10,
+    );
+
+    const cmd = {
+      moduleSubType: ModuleSubType.kangaroo,
+      event: event,
+      channel: 1,
+      baud: 9600,
+    } as ISingleCommand;
+
+    const result = ScriptConverter.convertCommand(cmd);
+
+    expect(result).toBeDefined();
+
+    const cmds = result.split(";");
+
+    expect(cmds.length).toBe(2);
+
+    const cmd1Parts = cmds[0].split("|");
+
+    expect(cmd1Parts.length).toBe(8);
+    expect(cmd1Parts[0]).toBe(CommandType.kangaroo.toString());
+    expect(cmd1Parts[1]).toBe("0");
+    expect(cmd1Parts[2]).toBe(cmd.channel.toString());
+    expect(cmd1Parts[3]).toBe(cmd.baud.toString());
+    expect(cmd1Parts[4]).toBe("1");
+    expect(cmd1Parts[5]).toBe(KangarooAction.start.toString());
+    expect(cmd1Parts[6]).toBe("0");
+    expect(cmd1Parts[7]).toBe("0");
+
+    const cmd2Parts = cmds[1].split("|");
+
+    expect(cmd2Parts.length).toBe(8);
+    expect(cmd2Parts[0]).toBe(CommandType.kangaroo.toString());
+    expect(cmd2Parts[1]).toBe("0");
+    expect(cmd2Parts[2]).toBe(cmd.channel.toString());
+    expect(cmd2Parts[3]).toBe(cmd.baud.toString());
+    expect(cmd2Parts[4]).toBe("2");
+    expect(cmd2Parts[5]).toBe(KangarooAction.position.toString());
+    expect(cmd2Parts[6]).toBe("5");
+    expect(cmd2Parts[7]).toBe("10");
+  });
+
+  it("should create Maestro command", () => {
+    const event = new MaestroEvent(5, false, 1000, 5, 10);
+    const cmd = {
+      moduleSubType: ModuleSubType.maestro,
+      event: event,
+      channel: 4,
+      baud: 0,
+    } as ISingleCommand;
+
+    const result = ScriptConverter.convertCommand(cmd);
+
+    expect(result).toBeDefined();
+
+    const parts = result.split("|");
+
+    expect(parts.length).toBe(7);
+    expect(parts[0]).toBe(CommandType.maestro.toString());
+    expect(parts[1]).toBe("0");
+    expect(parts[2]).toBe(cmd.channel.toString());
+    expect(parts[3]).toBe(event.channel.toString());
+    expect(parts[4]).toBe(event.position.toString());
+    expect(parts[5]).toBe(event.speed.toString());
+    expect(parts[6]).toBe(event.acceleration.toString());
+  });
+
+  it("should create generic I2C command", () => {
+    const event = new I2cEvent("test val");
+    const cmd = {
+      moduleSubType: ModuleSubType.genericI2C,
+      event: event,
+      channel: 27,
+      baud: 0,
+    } as ISingleCommand;
+
+    const result = ScriptConverter.convertCommand(cmd);
+
+    expect(result).toBeDefined();
+
+    const parts = result.split("|");
+
+    expect(parts.length).toBe(4);
+    expect(parts[0]).toBe(CommandType.i2c.toString());
+    expect(parts[1]).toBe("0");
+    expect(parts[2]).toBe(cmd.channel.toString());
+    expect(parts[3]).toBe(event.message);
+  });
+
+  it("should create generic GPIO command", () => {
+    const event = new GpioEvent(true);
+    const cmd = {
+      moduleSubType: ModuleSubType.genericGpio,
+      event: event,
+      channel: 5,
+      baud: 0,
+    } as ISingleCommand;
+
+    const result = ScriptConverter.convertCommand(cmd);
+
+    expect(result).toBeDefined();
+
+    const parts = result.split("|");
+
+    expect(parts.length).toBe(4);
+    expect(parts[0]).toBe(CommandType.gpio.toString());
+    expect(parts[1]).toBe("0");
+    expect(parts[2]).toBe(cmd.channel.toString());
+    expect(parts[3]).toBe("1");
+  });
+});
+
+//#region Helpers
+
+function generateScript(id: string): Script {
+  const script = new Script(id, "test", "test", new Date());
+
+  switch (id) {
+    case "coreGenericSerial": {
+      script.scriptChannels.push(coreGenericSeriaScriptCh(id));
+      return script;
+    }
+    case "domeTwoChannelScript": {
+      script.scriptChannels.push(domeGenericSerialScriptCh(id));
+      script.scriptChannels.push(domeI2cScriptCh(id));
+      return script;
+    }
+    case "domeAndCoreScript": {
+      script.scriptChannels.push(coreGenericSeriaScriptCh(id));
+      script.scriptChannels.push(domeGenericSerialScriptCh(id));
+      script.scriptChannels.push(domeI2cScriptCh(id));
+      return script;
+    }
+    default:
+      return script;
+  }
+}
+
+function coreGenericSeriaScriptCh(scriptId: string): ScriptChannel {
   const uartChannel = new UartChannel(
     uuid(),
     coreGenSerialModId,
@@ -139,7 +416,7 @@ function coreGenericSerialScript(): Script {
 
   const scriptCh = new ScriptChannel(
     uuid(),
-    script.id,
+    scriptId,
     ScriptChannelType.GENERIC_UART,
     coreGenSerialModId,
     uartChannel.id,
@@ -159,13 +436,11 @@ function coreGenericSerialScript(): Script {
     );
     scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
   }
-  script.scriptChannels.push(scriptCh);
 
-  return script;
+  return scriptCh;
 }
 
-function domeTwoChannelScript(): Script {
-  const script = new Script("domeTwoChannelScript", "test", "test", new Date());
+function domeGenericSerialScriptCh(scriptId: string): ScriptChannel {
   const uartChannel = new UartChannel(
     uuid(),
     domeGenSerialModId,
@@ -173,11 +448,10 @@ function domeTwoChannelScript(): Script {
     ModuleSubType.genericSerial,
     true,
   );
-  const i2cChannel = new I2cChannel(uuid(), domeI2cModId, "", true);
 
-  const scriptCh1 = new ScriptChannel(
+  const scriptCh = new ScriptChannel(
     uuid(),
-    script.id,
+    scriptId,
     ScriptChannelType.GENERIC_UART,
     domeGenSerialModId,
     uartChannel.id,
@@ -186,9 +460,29 @@ function domeTwoChannelScript(): Script {
     3000,
   );
 
-  const scriptCh2 = new ScriptChannel(
+  for (let i = 0; i < 6; i++) {
+    if (i % 2 === 0) {
+      const evt = new GenericSerialEvent(`UART ${i}`);
+      const sevt = new ScriptEvent(
+        scriptCh.id,
+        ModuleType.uart,
+        ModuleSubType.genericSerial,
+        i * 10,
+        evt,
+      );
+      scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
+    }
+  }
+
+  return scriptCh;
+}
+
+function domeI2cScriptCh(scriptId: string): ScriptChannel {
+  const i2cChannel = new I2cChannel(uuid(), domeI2cModId, "", true);
+
+  const scriptCh = new ScriptChannel(
     uuid(),
-    script.id,
+    scriptId,
     ScriptChannelType.GENERIC_I2C,
     domeI2cModId,
     i2cChannel.id,
@@ -198,32 +492,20 @@ function domeTwoChannelScript(): Script {
   );
 
   for (let i = 0; i < 6; i++) {
-    if (i % 2 === 0) {
-      const evt = new GenericSerialEvent(`UART ${i}`);
-      const sevt = new ScriptEvent(
-        scriptCh1.id,
-        ModuleType.uart,
-        ModuleSubType.genericSerial,
-        i * 10,
-        evt,
-      );
-      scriptCh1.eventsKvpArray.push({ key: i * 1000, value: sevt });
-    } else {
+    if (i % 2 !== 0) {
       const evt = new I2cEvent(`I2C ${i}`);
       const sevt = new ScriptEvent(
-        scriptCh2.id,
+        scriptCh.id,
         ModuleType.i2c,
         ModuleSubType.genericI2C,
         i * 10,
         evt,
       );
-      scriptCh2.eventsKvpArray.push({ key: i * 1000, value: sevt });
+      scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
     }
   }
-  script.scriptChannels.push(scriptCh1);
-  script.scriptChannels.push(scriptCh2);
 
-  return script;
+  return scriptCh;
 }
 
 function getModules() {
@@ -417,455 +699,3 @@ function getModules() {
 
   return map;
 }
-//import {
-//    ChannelType, KangarooController, KangarooAction, KangarooEvent,
-//    Script, ScriptChannel, ScriptEvent, ServoEvent, ChannelSubType, ServoChannel,
-//    UartChannel, HumanCyborgRelationsCmd, HumanCyborgRelationsEvent, HcrCommand, HcrCommandCategory,
-//    GpioEvent,
-//    GpioChannel,
-//} from "astros-common";
-//
-//import { ScriptConverter, CommandType } from '../src/script_converter.js';
-//
-//
-//const generateKangarooEvent = (time: number, ch1Action: KangarooAction, ch1Speed: number, ch1Position: number,
-//    ch2Action: KangarooAction, ch2Speed: number, ch2Position: number) => {
-//
-//    const data = new KangarooEvent(1, ch1Action, ch1Speed, ch1Position, ch2Action, ch2Speed, ch2Position)
-//
-//    return { key: time, value: new ScriptEvent("", ChannelType.uart, ChannelSubType.kangaroo, time, JSON.stringify(data)) };
-//};
-//
-//const generateServoEvent = (time: number, channel: number, position: number, speed: number, acceleration: number) => {
-//
-//    const data = new ServoEvent(channel, position, speed, acceleration);
-//
-//    return { key: time, value: new ScriptEvent("", ChannelType.servo, ChannelSubType.none, time, JSON.stringify(data)) };
-//};
-//
-//const generateHcrEvent = (time: number, channel: number, commands: HcrCommand[]) => {
-//
-//    const data = new HumanCyborgRelationsEvent(channel, commands);
-//
-//    return { key: time, value: new ScriptEvent("", ChannelType.uart, ChannelSubType.humanCyborgRelations, time, JSON.stringify(data)) };
-//};
-//
-//const generateGpioEvent = (time: number, channel: number, state: boolean) => {
-//
-//    const data = new GpioEvent(channel, state);
-//
-//    return { key: time, value: new ScriptEvent("", ChannelType.gpio, ChannelSubType.none, time, JSON.stringify(data)) };
-//};
-//
-//const _type = 0;
-//const _time = 1;
-//
-//// kangaroo command
-//// |___|_________|__________|___|____|____|____;
-////  evt time_till serial ch  ch  cmd  spd  pos
-//
-//const _uartChannel = 2;
-//const _kChannel = 3;
-//const _kCommand = 4;
-//const _kSpd = 5;
-//const _kPos = 6;
-//
-//// hcr command
-//// |___|_________|__________|___;
-////  evt time_till serial ch  val
-//const _val = 3;
-//
-//// servo command
-//// |___|_________|__________|____|____|____;
-////  evt time_till servo ch   pos  spd  acc
-//const _servoChannel = 2;
-//const _servoPosition = 3;
-//const _servoSpeed = 4;
-//const _servoAcc = 5;
-//
-//// gpio command
-//// |___|_________|__________|____;
-////  evt time_till gpio ch   state
-//const _gpioChannel = 2;
-//const _gpioState = 3;
-//
-//describe("Script Converter Tests", () => {
-//    it("kanagroo test", () => {
-//        const script = new Script("1234", "test1",
-//            "desc1", new Date());
-//
-//        const controllerId = 1;
-//
-//        const kanagrooCh = new UartChannel(1, UartType.kangaroo, "Periscope", new KangarooController({ channelOneName: "ch1 test", channelTwoName: "ch2 test" }));
-//
-//        const channelOne = new ScriptChannel("ABCD", "ABCD", controllerId, ChannelType.servo, ChannelSubType.none, 0, kanagrooCh, 3000);
-//
-//        channelOne.eventsKvpArray.push(generateKangarooEvent(0, KangarooAction.start, 0, 0, KangarooAction.start, 0, 0,));
-//
-//        channelOne.eventsKvpArray.push(generateKangarooEvent(10, KangarooAction.home, 0, 0, KangarooAction.home, 0, 0));
-//
-//        channelOne.eventsKvpArray.push(generateKangarooEvent(20, KangarooAction.position, 100, 1000, KangarooAction.speed, 200, 0));
-//
-//        channelOne.eventsKvpArray.push(generateKangarooEvent(30, KangarooAction.none, 0, 0, KangarooAction.position, 300, 500));
-//
-//        channelOne.eventsKvpArray.push(generateKangarooEvent(40, KangarooAction.speed, 400, 0, KangarooAction.none, 0, 0));
-//
-//
-//        script.scriptChannels = new Array<ScriptChannel>(channelOne);
-//
-//        const cvtr = new ScriptConverter();
-//
-//        const result = cvtr.convertScript(script);
-//
-//        expect(result?.size).toBe(1);
-//        expect(result?.get(controllerId)?.length).toBeGreaterThan(0);
-//
-//        const ctlId = result?.get(controllerId);
-//
-//        const evts = Array<Array<string>>();
-//
-//        const segs = ctlId?.slice(0, -1).split(';');
-//
-//        segs?.forEach(e => {
-//            evts.push(e.split('|'));
-//        });
-//
-//        expect(evts.length).toBe(8);
-//
-//        let evt = 0;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.kangaroo);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kCommand])).toBe(KangarooAction.start);
-//        expect(parseInt(evts[evt][_kSpd])).toBe(0);
-//        expect(parseInt(evts[evt][_kPos])).toBe(0);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.kangaroo);
-//        expect(parseInt(evts[evt][_time])).toBe(1000);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kChannel])).toBe(2);
-//        expect(parseInt(evts[evt][_kCommand])).toBe(KangarooAction.start);
-//        expect(parseInt(evts[evt][_kSpd])).toBe(0);
-//        expect(parseInt(evts[evt][_kPos])).toBe(0);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.kangaroo);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kCommand])).toBe(KangarooAction.home);
-//        expect(parseInt(evts[evt][_kSpd])).toBe(0);
-//        expect(parseInt(evts[evt][_kPos])).toBe(0);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.kangaroo);
-//        expect(parseInt(evts[evt][_time])).toBe(1000);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kChannel])).toBe(2);
-//        expect(parseInt(evts[evt][_kCommand])).toBe(KangarooAction.home);
-//        expect(parseInt(evts[evt][_kSpd])).toBe(0);
-//        expect(parseInt(evts[evt][_kPos])).toBe(0);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.kangaroo);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kCommand])).toBe(KangarooAction.position);
-//        expect(parseInt(evts[evt][_kSpd])).toBe(100);
-//        expect(parseInt(evts[evt][_kPos])).toBe(1000);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.kangaroo);
-//        expect(parseInt(evts[evt][_time])).toBe(1000);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kChannel])).toBe(2);
-//        expect(parseInt(evts[evt][_kCommand])).toBe(KangarooAction.speed);
-//        expect(parseInt(evts[evt][_kSpd])).toBe(200);
-//        expect(parseInt(evts[evt][_kPos])).toBe(0);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.kangaroo);
-//        expect(parseInt(evts[evt][_time])).toBe(1000);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kChannel])).toBe(2);
-//        expect(parseInt(evts[evt][_kCommand])).toBe(KangarooAction.position);
-//        expect(parseInt(evts[evt][_kSpd])).toBe(300);
-//        expect(parseInt(evts[evt][_kPos])).toBe(500);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.kangaroo);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kChannel])).toBe(1);
-//        expect(parseInt(evts[evt][_kCommand])).toBe(KangarooAction.speed);
-//        expect(parseInt(evts[evt][_kSpd])).toBe(400);
-//        expect(parseInt(evts[evt][_kPos])).toBe(0);
-//
-//    });
-//    it("human cyborg relations test", () => {
-//
-//        const script = new Script("1234", "test1",
-//            "desc1", new Date());
-//
-//        const controllerId = 2;
-//
-//        const hcrChannel = new UartChannel(UartType.humanCyborgRelations, 2, "", {});
-//
-//        const channelOne = new ScriptChannel("ABCD", "ABCD", controllerId, ChannelType.uart, ChannelSubType.humanCyborgRelations, 0, hcrChannel, 3000);
-//
-//        const cmds = new Array<HcrCommand>()
-//
-//
-//        cmds.push(
-//            new HcrCommand("1", HcrCommandCategory.stimuli, HumanCyborgRelationsCmd.extremeAngry, 0, 0),
-//        );
-//
-//        channelOne.eventsKvpArray.push(generateHcrEvent(5, 2, cmds));
-//
-//        cmds.splice(0);
-//
-//        cmds.push(
-//            new HcrCommand("1", HcrCommandCategory.volume, HumanCyborgRelationsCmd.vocalizerVolume, 5, 0),
-//            new HcrCommand("1", HcrCommandCategory.volume, HumanCyborgRelationsCmd.wavAVolume, 7, 0),
-//            new HcrCommand("1", HcrCommandCategory.sdWav, HumanCyborgRelationsCmd.playSdRandomOnA, 100, 200)
-//        );
-//
-//        channelOne.eventsKvpArray.push(generateHcrEvent(10, 2, cmds));
-//
-//        script.scriptChannels = new Array<ScriptChannel>(channelOne);
-//
-//        const cvtr = new ScriptConverter();
-//
-//        const result = cvtr.convertScript(script);
-//
-//        expect(result?.size).toBe(1);
-//        expect(result?.get(controllerId)?.length).toBeGreaterThan(0);
-//
-//        const ctlId = result?.get(controllerId);
-//
-//        const evts = Array<Array<string>>();
-//
-//        const segs = ctlId?.slice(0, -1).split(';');
-//
-//        segs?.forEach(e => {
-//            evts.push(e.split('|'));
-//        });
-//
-//        expect(evts.length).toBe(2);
-//
-//        let evt = 0;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.genericSerial);
-//        expect(parseInt(evts[evt][_time])).toBe(500);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(2);
-//        expect(evts[evt][_val]).toBe("<SM1>");
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.genericSerial);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(parseInt(evts[evt][_uartChannel])).toBe(2);
-//        expect(evts[evt][_val]).toBe("<PVV5,PVA7,CA100C200>");
-//
-//    });
-//    it("multi channel test", () => {
-//
-//        const script = new Script("1234", "test1",
-//            "desc1", new Date());
-//
-//        const controllerId = 3;
-//
-//        const servoCh0 = new ServoChannel(0, "ch0", true, 500, 2500, 500, false);
-//        const servoCh10 = new ServoChannel(10, "ch10", true, 500, 2500, 500, false);
-//        const servoCh20 = new ServoChannel(20, "ch20", true, 500, 2500, 500, false);
-//
-//        const channelOne = new ScriptChannel("one", "ABCD", controllerId, ChannelType.servo, ChannelSubType.none, 0, servoCh0, 3000);
-//        const channelTen = new ScriptChannel("two", "ABCD", controllerId, ChannelType.servo, ChannelSubType.none, 0, servoCh10, 3000);
-//        const channelTwenty = new ScriptChannel("three", "ABCD", controllerId, ChannelType.servo, ChannelSubType.none, 0, servoCh20, 3000);
-//
-//
-//        // move to 50, speed 1, at same time, then delay 1 second
-//        channelOne.eventsKvpArray.push(generateServoEvent(0, 0, 50, 1, 0));
-//        channelTen.eventsKvpArray.push(generateServoEvent(0, 10, 50, 1, 0));
-//        channelTwenty.eventsKvpArray.push(generateServoEvent(0, 20, 50, 1, 0));
-//
-//        // move to 100, speed 3, with a 1 second delay
-//        channelOne.eventsKvpArray.push(generateServoEvent(10, 0, 100, 3, 1));
-//        channelTen.eventsKvpArray.push(generateServoEvent(20, 10, 100, 3, 1));
-//        channelTwenty.eventsKvpArray.push(generateServoEvent(30, 20, 100, 3, 1));
-//
-//        // move to 0 speed 5, at the same time
-//        channelOne.eventsKvpArray.push(generateServoEvent(40, 0, 0, 5, 255));
-//        channelTen.eventsKvpArray.push(generateServoEvent(40, 10, 0, 5, 255));
-//        channelTwenty.eventsKvpArray.push(generateServoEvent(40, 20, 0, 5, 255));
-//
-//        script.scriptChannels = new Array<ScriptChannel>(channelOne, channelTen, channelTwenty);
-//
-//        const cvtr = new ScriptConverter();
-//
-//        const result = cvtr.convertScript(script);
-//
-//        expect(result?.size).toBe(1);
-//        expect(result?.get(controllerId)?.length).toBeGreaterThan(0);
-//
-//        const ctlVal = result?.get(controllerId);
-//
-//        const evts = Array<Array<string>>();
-//
-//        const segs = ctlVal?.slice(0, -1).split(';');
-//
-//        segs?.forEach(e => {
-//            evts.push(e.split('|'));
-//        });
-//
-//
-//        const channels = new Array<string>('0', '10', '20');
-//
-//        //expect(coreVal).toBe('1|0|0|50|1;1|0|10|50|1;1|1000|20|50|1;1|1000|0|100|3;1|1000|10|100|3;1|1000|20|100|3;1|0|0|0|5;1|0|10|0|5;1|0|20|0|5;');
-//
-//        expect(evts.length).toBe(9);
-//
-//        let evt = 0;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
-//        expect(parseInt(evts[evt][_servoPosition])).toBe(50);
-//        expect(parseInt(evts[evt][_servoSpeed])).toBe(1);
-//        expect(parseInt(evts[evt][_servoAcc])).toBe(0);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
-//        expect(parseInt(evts[evt][_servoPosition])).toBe(50);
-//        expect(parseInt(evts[evt][_servoSpeed])).toBe(1);
-//        expect(parseInt(evts[evt][_servoAcc])).toBe(0)
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
-//        expect(parseInt(evts[evt][_time])).toBe(1000);
-//        expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
-//        expect(parseInt(evts[evt][_servoPosition])).toBe(50);
-//        expect(parseInt(evts[evt][_servoSpeed])).toBe(1);
-//        expect(parseInt(evts[evt][_servoAcc])).toBe(0)
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
-//        expect(parseInt(evts[evt][_time])).toBe(1000);
-//        expect(parseInt(evts[evt][_servoChannel])).toBe(0);
-//        expect(parseInt(evts[evt][_servoPosition])).toBe(100);
-//        expect(parseInt(evts[evt][_servoSpeed])).toBe(3);
-//        expect(parseInt(evts[evt][_servoAcc])).toBe(1);
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
-//        expect(parseInt(evts[evt][_time])).toBe(1000);
-//        expect(parseInt(evts[evt][_servoChannel])).toBe(10);
-//        expect(parseInt(evts[evt][_servoPosition])).toBe(100);
-//        expect(parseInt(evts[evt][_servoSpeed])).toBe(3);
-//        expect(parseInt(evts[evt][_servoAcc])).toBe(1);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
-//        expect(parseInt(evts[evt][_time])).toBe(1000);
-//        expect(parseInt(evts[evt][_servoChannel])).toBe(20);
-//        expect(parseInt(evts[evt][_servoPosition])).toBe(100);
-//        expect(parseInt(evts[evt][_servoSpeed])).toBe(3);
-//        expect(parseInt(evts[evt][_servoAcc])).toBe(1);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
-//        expect(parseInt(evts[evt][_servoPosition])).toBe(0);
-//        expect(parseInt(evts[evt][_servoSpeed])).toBe(5);
-//        expect(parseInt(evts[evt][_servoAcc])).toBe(255);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
-//        expect(parseInt(evts[evt][_servoPosition])).toBe(0);
-//        expect(parseInt(evts[evt][_servoSpeed])).toBe(5);
-//        expect(parseInt(evts[evt][_servoAcc])).toBe(255);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.servo);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(channels.findIndex(x => x === evts[evt][_servoChannel])).toBeGreaterThan(-1);
-//        expect(parseInt(evts[evt][_servoPosition])).toBe(0);
-//        expect(parseInt(evts[evt][_servoSpeed])).toBe(5);
-//        expect(parseInt(evts[evt][_servoAcc])).toBe(255);
-//    });
-//
-//    it("gpio test", () => {
-//        const script = new Script("1234", "test1",
-//            "desc1", new Date());
-//
-//        const controllerId = 3;
-//
-//        const gpioCh = new GpioChannel(5, "gpio5", false, true);
-//
-//        const channelOne = new ScriptChannel("one", "ABCD", controllerId, ChannelType.gpio, ChannelSubType.none, 0, gpioCh, 3000);
-//
-//
-//        channelOne.eventsKvpArray.push(generateGpioEvent(0, 5, true));
-//
-//        channelOne.eventsKvpArray.push(generateGpioEvent(10, 5, false));
-//
-//        script.scriptChannels = new Array<ScriptChannel>(channelOne);
-//
-//        const cvtr = new ScriptConverter();
-//
-//        const result = cvtr.convertScript(script);
-//
-//        expect(result?.size).toBe(1);
-//        expect(result?.get(controllerId)?.length).toBeGreaterThan(0);
-//
-//        const ctlVal = result?.get(controllerId);
-//
-//        const evts = Array<Array<string>>();
-//
-//        const segs = ctlVal?.slice(0, -1).split(';');
-//
-//        segs?.forEach(e => {
-//            evts.push(e.split('|'));
-//        });
-//
-//        expect(evts.length).toBe(2);
-//
-//        let evt = 0;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.gpio);
-//        expect(parseInt(evts[evt][_time])).toBe(1000);
-//        expect(parseInt(evts[evt][_gpioChannel])).toBe(5);
-//        expect(parseInt(evts[evt][_gpioState])).toBe(1);
-//
-//        evt++;
-//
-//        expect(parseInt(evts[evt][_type])).toBe(CommandType.gpio);
-//        expect(parseInt(evts[evt][_time])).toBe(0);
-//        expect(parseInt(evts[evt][_gpioChannel])).toBe(5);
-//        expect(parseInt(evts[evt][_gpioState])).toBe(0);
-//
-//    });
-//});

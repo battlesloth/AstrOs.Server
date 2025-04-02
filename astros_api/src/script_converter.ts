@@ -25,7 +25,7 @@ interface IUartValues {
   baud: number;
 }
 
-interface ISingleCommand {
+export interface ISingleCommand {
   moduleSubType: ModuleSubType;
   event: ScriptEventTypes;
   channel: number;
@@ -108,6 +108,11 @@ export class ScriptConverter {
       default:
         logger.error(`No module found for test command: ${cmd.moduleSubType}`);
         return "";
+    }
+
+    // remove the last semicolon
+    if (script.endsWith(";")) {
+      script = script.slice(0, -1);
     }
 
     return script;
@@ -376,7 +381,9 @@ export class ScriptConverter {
       logger.error(
         `${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`,
       );
-      return "";
+      throw new Error(
+        `No UART module found for script channel ${evt.scriptChannel}`,
+      );
     }
 
     return ScriptConverter.genericSerialAsString(
@@ -408,7 +415,9 @@ export class ScriptConverter {
       logger.error(
         `${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`,
       );
-      return "";
+      throw new Error(
+        `No UART module found for script channel ${evt.scriptChannel}`,
+      );
     }
 
     return ScriptConverter.hcrAsString(hcr, uart, timeTillNextEvent);
@@ -457,7 +466,9 @@ export class ScriptConverter {
       logger.error(
         `${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`,
       );
-      return "";
+      throw new Error(
+        `No UART module found for script channel ${evt.scriptChannel}`,
+      );
     }
 
     const kangaroo = evt.event as KangarooEvent;
@@ -478,12 +489,12 @@ export class ScriptConverter {
 
       // if the ch2 action is none, use timeTill. Otherwise we have 2 actions for the
       // same time period, so don't delay untill after second action is done.
-      command = `${CommandType.kangaroo}|${evtTime}|${uart.ch}|${uart.baud}|${1}|${evt.ch1Action}|${evt.ch1Speed}|${evt.ch1Position};`;
+      command = `${CommandType.kangaroo}|${evtTime}|${uart.ch}|${uart.baud}|1|${evt.ch1Action}|${evt.ch1Speed}|${evt.ch1Position};`;
     }
     if (evt.ch2Action != KangarooAction.none) {
       command =
         command +
-        `${CommandType.kangaroo}|${timeTillNextEvent}|${uart.ch}|${uart.baud}|${2}|${evt.ch2Action}|${evt.ch2Speed}|${evt.ch2Position};`;
+        `${CommandType.kangaroo}|${timeTillNextEvent}|${uart.ch}|${uart.baud}|2|${evt.ch2Action}|${evt.ch2Speed}|${evt.ch2Position};`;
     }
 
     return command;
@@ -497,12 +508,23 @@ export class ScriptConverter {
   convertMaestroEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
     const maestro = evt.event as MaestroEvent;
 
+    if (maestro.channel < 0) {
+      logger.error(
+        `${this.TAG}: Maestro event channel is invalid (${maestro.channel}) for script channel ${evt.scriptChannel}`,
+      );
+      throw new Error(
+        `Maestro event channel is invalid (${maestro.channel}) for script channel ${evt.scriptChannel}`,
+      );
+    }
+
     const uart = this.getUartValues(evt.scriptChannel);
     if (uart === undefined) {
       logger.error(
         `${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`,
       );
-      return "";
+      throw new Error(
+        `No UART module found for script channel ${evt.scriptChannel}`,
+      );
     }
 
     return ScriptConverter.masetroAsToString(maestro, uart, timeTillNextEvent);
@@ -513,7 +535,7 @@ export class ScriptConverter {
     uart: IUartValues,
     next: number,
   ): string {
-    return `${CommandType.maestro}|${next}|${uart.ch}|${uart.baud}|${evt.position}|${evt.speed}|${evt.acceleration};`;
+    return `${CommandType.maestro}|${next}|${uart.ch}|${evt.channel}|${evt.position}|${evt.speed}|${evt.acceleration};`;
   }
 
   //#endregion
@@ -529,7 +551,9 @@ export class ScriptConverter {
       logger.error(
         `${this.TAG}: No I2C module found for script channel ${evt.scriptChannel}`,
       );
-      return "";
+      throw new Error(
+        `No I2C module found for script channel ${evt.scriptChannel}`,
+      );
     }
 
     return ScriptConverter.i2cAsString(i2c, i2cAddress, timeTillNextEvent);
@@ -558,7 +582,9 @@ export class ScriptConverter {
       logger.error(
         `${this.TAG}: No GPIO channel found for script channel ${evt.scriptChannel}`,
       );
-      return "";
+      throw new Error(
+        `No GPIO channel found for script channel ${evt.scriptChannel}`,
+      );
     }
 
     return ScriptConverter.gpioEvtAsString(
@@ -585,6 +611,9 @@ export class ScriptConverter {
     if (evt.scriptChannel !== "buffer") {
       logger.error(
         `${this.TAG}: Buffer event requested but script channel is incorrect: ${evt.scriptChannel}`,
+      );
+      throw new Error(
+        `Buffer event requested but script channel is incorrect: ${evt.scriptChannel}`,
       );
     }
 
