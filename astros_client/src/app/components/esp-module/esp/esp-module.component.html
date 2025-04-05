@@ -20,6 +20,7 @@
             <li *ngFor="let module of location.uartModules">
                 <app-uart-module 
                     (removeModuleEvent)="removeModule($event)" 
+                    (servoTestEvent)="onServoTestEvent($event)"
                     [module]="module" 
                     [isMaster]="isMaster"
                     [parentTestId]="parentTestId"/>

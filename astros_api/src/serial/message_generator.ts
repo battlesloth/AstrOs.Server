@@ -96,7 +96,7 @@ export class MessageGenerator {
         if (ch.enabled) {
           configs.push(ch.defaultHigh ? "1" : "0");
         } else {
-          configs.push(false);
+          configs.push("0");
         }
         configs.push("|");
       }
@@ -138,13 +138,24 @@ export class MessageGenerator {
 
         // remove trailing pipe
         configs.pop();
+        configs.push(";");
+      }
+
+
+      let cfigString = configs.join("");
+
+      if (cfigString.endsWith(";")) {
+        cfigString = cfigString.slice(0, -1);
+      }
+      if (cfigString.endsWith("|")) {
+        cfigString = cfigString.slice(0, -1);
       }
 
       result.push(config.address);
       result.push(this.US);
       result.push(config.name);
       result.push(this.US);
-      result.push(configs.join(""));
+      result.push(cfigString);
       result.push(this.RS);
     }
 
@@ -300,7 +311,7 @@ export class MessageGenerator {
   generateServoTestCommand(header: string, data: any) {
     const cmd = data as ServoTest;
 
-    if (!cmd.controller.address) {
+    if (!cmd.controllerAddress) {
       return new MessageGeneratorResponse(
         `${header}${MessageHelper.MessageEOL}`,
         [],
@@ -309,16 +320,16 @@ export class MessageGenerator {
 
     const result = [this.GS];
 
-    result.push(cmd.controller.address);
+    result.push(cmd.controllerAddress);
     result.push(this.US);
-    result.push(cmd.controller.name);
+    result.push(cmd.controllerName);
     result.push(this.US);
-    result.push(`${cmd.servoId}:${data.msValue}`);
+    result.push(`${cmd.moduleSubType}:${cmd.moduleIdx}:${cmd.channelNumber}:${data.msValue}`);
     const msg = result.join("");
 
     return new MessageGeneratorResponse(
       `${header}${msg}${MessageHelper.MessageEOL}`,
-      [cmd.controller.address],
+      [cmd.controllerAddress],
     );
   }
 

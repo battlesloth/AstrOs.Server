@@ -1,4 +1,5 @@
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { ServoTestEvent } from '@src/components/esp-module/utility/module-events';
 import { UartModule } from 'astros-common';
 
 @Component({
@@ -15,6 +16,9 @@ export abstract class BaseUartSubModuleComponent {
 
   @Input()
   parentTestId!: string;
+
+  @Output()
+  servoTestEvent = new EventEmitter<ServoTestEvent>();
 
   uartChannel!: string;
   baudRate!: string;

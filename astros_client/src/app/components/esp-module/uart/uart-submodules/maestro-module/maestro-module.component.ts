@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { MaestroModule } from 'astros-common';
 import { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';
 import { FormsModule } from '@angular/forms';
 import { NgFor, NgIf } from '@angular/common';
 import { MaestroChannelComponent } from '../maestro-channel/maestro-channel.component';
+import { ServoTestEvent } from '@src/components/esp-module/utility/module-events';
 
 @Component({
   selector: 'app-maestro-module',
@@ -40,5 +41,10 @@ export class MaestroModuleComponent
       this.subModule.boards[0].channels[i].enabled = false;
     }
     this.subModule.boards[0].channelCount = this.listSize;
+  }
+
+  onServoTestEvent(evt: ServoTestEvent): void {
+    evt.moduleIdx = this.module.idx;
+    this.servoTestEvent.emit(evt);
   }
 }

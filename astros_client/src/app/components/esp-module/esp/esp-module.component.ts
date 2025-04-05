@@ -122,16 +122,9 @@ export class EspModuleComponent {
     this.i2cUpdateTrigger++;
   }
 
-  testServoModal(
-    module: ModuleType,
-    subType: ModuleSubType,
-    channelId: string,
-  ) {
-    this.openServoTestModal.emit({
-      locationId: this.location.id,
-      moduleType: module,
-      moduleSubType: subType,
-      channelId: channelId,
-    });
+  onServoTestEvent(evt: ServoTestEvent) {
+    evt.controllerAddress = this.location.controller.address
+    evt.controllerName = this.location.controller.name;
+    this.openServoTestModal.emit(evt);
   }
 }

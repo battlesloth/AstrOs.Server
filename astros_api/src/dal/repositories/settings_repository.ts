@@ -12,7 +12,7 @@ export class SettingsRepository {
       .where("key", "=", type)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error(err);
+        logger.error("SettingsRepository.getSetting", err);
         throw err;
       });
 
@@ -30,7 +30,7 @@ export class SettingsRepository {
       )
       .execute()
       .catch((err) => {
-        logger.error(err);
+        logger.error("SettingsRepository.saveSetting", err);
         throw err;
       });
 

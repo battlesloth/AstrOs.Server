@@ -3,18 +3,16 @@ import { BaseEventModalComponent } from '../../scripting/base-event-modal/base-e
 import { MatSlider, MatSliderThumb } from '@angular/material/slider';
 import { FormsModule } from '@angular/forms';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
+import { ModuleSubType } from 'astros-common';
 
 export class ServoTestModalResources {
-  public static servoId = 'servoId';
-  public static controllerId = 'controllerId';
-  public static sendServoMove = 'servoTest_servoMove';
+  public static controllerAddress = 'controllerAddress';
+  public static controllerName = 'controllerName';
+  public static moduleSubType = 'moduleSubType';
+  public static moduleIdx = 'moduleIdx';
+  public static channelNumber = 'channelNumber';
+  public static sendServoMove = 'servoTesst_servoMove';
   public static closeEvent = 'servoTest_closeEvent';
-}
-
-export interface ServoTestMessage {
-  controllerId: number;
-  servoId: number;
-  value: number;
 }
 
 @Component({
@@ -27,8 +25,11 @@ export class ServoTestModalComponent
   extends BaseEventModalComponent
   implements OnInit
 {
-  servoId = 0;
-  controllerId = 0;
+  controllerAddress = "";
+  controllerName = "";
+  moduleSubType = ModuleSubType.none;
+  moduleIdx = 0;
+  channelNumber = 0;
   disableSlider = true;
   value = 1500;
 
@@ -37,18 +38,30 @@ export class ServoTestModalComponent
   }
 
   ngOnInit(): void {
-    this.servoId = this.resources.get(
-      ServoTestModalResources.servoId,
+    this.controllerAddress = this.resources.get(
+      ServoTestModalResources.controllerAddress,
+    ) as string;
+    this.controllerName = this.resources.get(
+      ServoTestModalResources.controllerName,
+    ) as string;
+    this.moduleSubType = this.resources.get(
+      ServoTestModalResources.moduleSubType,
+    ) as ModuleSubType;
+    this.moduleIdx = this.resources.get(
+      ServoTestModalResources.moduleIdx,
     ) as number;
-    this.controllerId = this.resources.get(
-      ServoTestModalResources.controllerId,
+    this.channelNumber = this.resources.get(
+      ServoTestModalResources.channelNumber,
     ) as number;
   }
 
   onSliderChange(_: unknown) {
     const evt = new ModalCallbackEvent(ServoTestModalResources.sendServoMove, {
-      controllerId: this.controllerId,
-      servoId: this.servoId,
+      controllerAddress: this.controllerAddress,
+      controllerName: this.controllerName,
+      moduleSubType: this.moduleSubType,
+      moduleIdx: this.moduleIdx,
+      channelNumber: this.channelNumber,
       value: this.value,
     });
     this.modalCallback.emit(evt);

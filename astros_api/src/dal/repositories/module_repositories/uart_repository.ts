@@ -27,7 +27,7 @@ export async function getUartModules(
     .orderBy("name")
     .execute()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.getUartModules", err);
       throw err;
     });
 
@@ -95,7 +95,7 @@ export async function upsertUartModules(
       )
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error(err);
+        logger.error("UartRepository.upsertUartModules", err);
         throw err;
       });
 
@@ -125,7 +125,7 @@ export async function removeStaleUartModules(
     .where("location_id", "=", locationId)
     .execute()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.removeStaleUartModules", err);
       throw err;
     });
 
@@ -154,7 +154,7 @@ export async function removeStaleUartModules(
       .where("id", "=", uartMod.id)
       .execute()
       .catch((err) => {
-        logger.error(err);
+        logger.error("UartRepository.removeStaleUartModules", err);
         throw err;
       });
   }
@@ -173,7 +173,7 @@ export async function readUartChannel(
     .where("id", "=", id)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.readUartChannel", err);
       throw err;
     });
 
@@ -211,7 +211,7 @@ async function upsertKangarooModule(
     )
     .executeTakeFirst()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.upsertKangarooModule", err);
       throw err;
     });
 }
@@ -226,7 +226,7 @@ async function loadKangarooModule(
     .where("parent_id", "=", uartId)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.loadKangarooModule", err);
       throw err;
     });
 
@@ -242,7 +242,7 @@ async function deleteKangarooModule(
     .where("parent_id", "=", parentId)
     .execute()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.deleteKangarooModule", err);
       throw err;
     });
 }
@@ -257,7 +257,7 @@ export async function readKangarooChannel(
     .where("id", "=", id)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.readKangarooChannel", err);
       throw err;
     });
 
@@ -296,7 +296,7 @@ async function upsertMaestroModule(
       )
       .executeTakeFirst()
       .catch((err) => {
-        logger.error(err);
+        logger.error("UartRepository.upsertMaestroModule", err);
         throw err;
       });
 
@@ -332,7 +332,7 @@ async function upsertMaestroModule(
         )
         .executeTakeFirst()
         .catch((err) => {
-          logger.error(err);
+          logger.error("UartRepository.upsertMaestroModule", err);
           throw err;
         });
     }
@@ -352,7 +352,7 @@ async function loadMaestroModule(
     .orderBy("board_id")
     .execute()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.loadMaestroModule", err);
       throw err;
     });
 
@@ -370,7 +370,7 @@ async function loadMaestroModule(
       .orderBy("channel_number")
       .execute()
       .catch((err) => {
-        logger.error(err);
+        logger.error("UartRepository.loadMaestroModule", err);
         throw err;
       });
 
@@ -405,7 +405,7 @@ async function deleteMaestroModule(
     .where("parent_id", "=", parentId)
     .execute()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.deleteMaestroModule", err);
       throw err;
     });
 
@@ -415,7 +415,7 @@ async function deleteMaestroModule(
       .where("board_id", "=", id.id)
       .execute()
       .catch((err) => {
-        logger.error(err);
+        logger.error("UartRepository.deleteMaestroModule", err);
         throw err;
       });
   }
@@ -425,7 +425,7 @@ async function deleteMaestroModule(
     .where("parent_id", "=", parentId)
     .execute()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.deleteMaestroModule", err);
       throw err;
     });
 }
@@ -440,7 +440,7 @@ export async function readMaestroChannel(
     .where("id", "=", id)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error(err);
+      logger.error("UartRepository.readMaestroChannel", err);
       throw err;
     });
 

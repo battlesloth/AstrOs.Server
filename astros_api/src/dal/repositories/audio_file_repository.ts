@@ -15,7 +15,7 @@ export class AudioFileRepository {
       .selectAll()
       .execute()
       .catch((err) => {
-        logger.error(err);
+        logger.error('AudioFileRepository.getAudioFiles', err);
         throw err;
       });
 
@@ -43,7 +43,7 @@ export class AudioFileRepository {
       })
       .executeTakeFirst()
       .catch((err) => {
-        logger.error(err);
+        logger.error('AudioFileRepository.insertFile', err);
         throw err;
       });
 
@@ -59,7 +59,7 @@ export class AudioFileRepository {
       .where("duration", "=", 0)
       .execute()
       .catch((err) => {
-        logger.error(err);
+        logger.error('AudioFileRepository.filesNeedingDuration', err);
         throw err;
       });
 
@@ -77,7 +77,7 @@ export class AudioFileRepository {
       .where("id", "=", id)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error(err);
+        logger.error('AudioFileRepository.updateFileDuration', err);
         throw err;
       });
 
@@ -90,7 +90,7 @@ export class AudioFileRepository {
       .where("id", "=", id)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error(err);
+        logger.error('AudioFileRepository.deleteFile', err);
         throw err;
       });
 

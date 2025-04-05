@@ -1,14 +1,27 @@
-import { ControlModule, TransmissionType } from "astros-common";
+import { ModuleSubType } from "astros-common";
+
 
 export class ServoTest {
-  type: TransmissionType = TransmissionType.servoTest;
-  controller: ControlModule;
-  servoId: number;
+  controllerAddress: string;
+  controllerName: string;
+  moduleSubType: ModuleSubType;
+  moduleIdx: number;
+  channelNumber: number;
   msValue: number;
 
-  constructor(controller: ControlModule, servoId: number, msValue: number) {
-    this.controller = controller;
-    this.servoId = servoId;
+  constructor(
+    controllerAddress: string,
+    controllerName: string,
+    moduleSubType: ModuleSubType,
+    moduleIdx: number,
+    channelNumber: number,
+    msValue: number
+  ) {
+    this.controllerAddress = controllerAddress;
+    this.controllerName = controllerName;
+    this.moduleSubType = moduleSubType;
+    this.moduleIdx = moduleIdx;
+    this.channelNumber = channelNumber;
     this.msValue = msValue;
   }
 }

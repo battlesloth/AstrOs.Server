@@ -39,7 +39,7 @@ export async function upsertI2cModules(
       )
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error(err);
+        logger.error("I2cRepository.upsertI2cModules", err);
         throw err;
       });
   }
@@ -58,7 +58,7 @@ export async function getI2cModules(
     .orderBy("i2c_address")
     .execute()
     .catch((err) => {
-      logger.error(err);
+      logger.error("I2cRepository.getI2cModules", err);
       throw err;
     });
 
@@ -89,7 +89,7 @@ export async function removeStaleI2CModules(
     .where("location_id", "=", locationId)
     .execute()
     .catch((err) => {
-      logger.error(err);
+      logger.error("I2cRepository.removeStaleI2CModules", err);
       throw err;
     });
 
@@ -112,7 +112,7 @@ export async function removeStaleI2CModules(
       .where("id", "=", i2cMod.id)
       .execute()
       .catch((err) => {
-        logger.error(err);
+        logger.error("I2cRepository.removeStaleI2CModules", err);
         throw err;
       });
   }
@@ -128,7 +128,7 @@ export async function readI2cChannel(
     .where("id", "=", id)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error(err);
+      logger.error("I2cRepository.readI2cChannel", err);
       throw err;
     });
 

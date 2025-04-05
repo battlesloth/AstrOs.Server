@@ -61,7 +61,6 @@ import {
   LoadingModalResponse,
   ServoTestModalComponent,
   ServoTestModalResources,
-  ServoTestMessage,
   AddModuleModalResponse,
 } from '@src/components/modals/modules';
 import { ActivatedRoute } from '@angular/router';
@@ -402,14 +401,14 @@ export class ModulesComponent implements AfterViewInit {
     subModule.boards = [new MaestroBoard(boardId, moduleId, 0, 'Board 1', 24)];
 
     for (let i = 0; i < 24; i++) {
-      const idx = i + 1;
+
       subModule.boards[0].channels.push(
         new MaestroChannel(
           crypto.randomUUID(),
           subModule.boards[0].id,
-          `Channel ${idx}`,
+          `Channel ${i}`,
           false,
-          idx,
+          i,
           false,
           500,
           2500,
@@ -579,7 +578,7 @@ export class ModulesComponent implements AfterViewInit {
   //#region Servo Test
 
   openServoTestModal(value: ServoTestEvent) {
-    if (!value.locationId) {
+    if (!value.controllerAddress) {
       this.openAlertModal('Location for this servo is not set.');
       return;
     }
@@ -592,12 +591,24 @@ export class ModulesComponent implements AfterViewInit {
 
     component.instance.resources = modalResources;
     component.instance.resources.set(
-      ServoTestModalResources.controllerId,
-      value.locationId,
+      ServoTestModalResources.controllerAddress,
+      value.controllerAddress,
     );
     component.instance.resources.set(
-      ServoTestModalResources.servoId,
-      value.channelId,
+      ServoTestModalResources.controllerName,
+      value.controllerName,
+    );
+    component.instance.resources.set(
+      ServoTestModalResources.moduleSubType,
+      value.moduleSubType,
+    );
+    component.instance.resources.set(
+      ServoTestModalResources.moduleIdx,
+      value.moduleIdx,
+    );
+    component.instance.resources.set(
+      ServoTestModalResources.channelNumber,
+      value.channelNumber,
     );
 
     component.instance.modalCallback.subscribe((result: ModalCallbackEvent) => {
@@ -610,12 +621,15 @@ export class ModulesComponent implements AfterViewInit {
   servoTestModalCallback(evt: ModalCallbackEvent) {
     switch (evt.type) {
       case ServoTestModalResources.sendServoMove: {
-        const servoTest = evt.value as ServoTestMessage;
+        const servoTest = evt.value as ServoTestEvent;
         this.websocketService.sendMessage({
           msgType: 'SERVO_TEST',
           data: {
-            controllerId: servoTest.controllerId,
-            servoId: servoTest.servoId,
+            controllerAddress: servoTest.controllerAddress,
+            controllerName: servoTest.controllerName,
+            moduleSubType: servoTest.moduleSubType,
+            moduleIdx: servoTest.moduleIdx,
+            channelNumber: servoTest.channelNumber,
             value: servoTest.value,
           },
         });

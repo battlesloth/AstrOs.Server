@@ -12,7 +12,7 @@ export class RemoteConfigRepository {
       .where("type", "=", type)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error(err);
+        logger.error('RemoteConfigRepository.getConfig', err);
         throw err;
       });
 
@@ -26,7 +26,7 @@ export class RemoteConfigRepository {
       .where("type", "=", type)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error(err);
+        logger.error('RemoteConfigRepository.saveConfig', err);
         throw err;
       });
 

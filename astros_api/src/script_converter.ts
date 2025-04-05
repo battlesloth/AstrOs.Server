@@ -21,6 +21,7 @@ import { logger } from "./logger.js";
 import { ScriptRepository } from "./dal/repositories/script_repository.js";
 
 interface IUartValues {
+  idx: number;
   ch: number;
   baud: number;
 }
@@ -74,28 +75,28 @@ export class ScriptConverter {
       case ModuleSubType.genericSerial:
         script = this.genericSerialAsString(
           cmd.event as GenericSerialEvent,
-          { ch: cmd.channel, baud: cmd.baud },
+          { idx: 0, ch: cmd.channel, baud: cmd.baud },
           0,
         );
         break;
       case ModuleSubType.humanCyborgRelationsSerial:
         script = this.hcrAsString(
           cmd.event as HumanCyborgRelationsEvent,
-          { ch: cmd.channel, baud: cmd.baud },
+          { idx: 0, ch: cmd.channel, baud: cmd.baud },
           0,
         );
         break;
       case ModuleSubType.kangaroo:
         script = this.kangarooAsString(
           cmd.event as KangarooEvent,
-          { ch: cmd.channel, baud: cmd.baud },
+          {  idx: 0, ch: cmd.channel, baud: cmd.baud },
           0,
         );
         break;
       case ModuleSubType.maestro:
         script = this.masetroAsToString(
           cmd.event as MaestroEvent,
-          { ch: cmd.channel, baud: cmd.baud },
+          { idx: cmd.channel, ch: 0, baud: cmd.baud },
           0,
         );
         break;
@@ -535,7 +536,7 @@ export class ScriptConverter {
     uart: IUartValues,
     next: number,
   ): string {
-    return `${CommandType.maestro}|${next}|${uart.ch}|${evt.channel}|${evt.position}|${evt.speed}|${evt.acceleration};`;
+    return `${CommandType.maestro}|${next}|${uart.idx}|${evt.channel}|${evt.position}|${evt.speed}|${evt.acceleration};`;
   }
 
   //#endregion
@@ -641,7 +642,7 @@ export class ScriptConverter {
 
     const val = module as UartModule;
 
-    return { ch: val.uartChannel, baud: val.baudRate };
+    return { idx: val.idx, ch: val.uartChannel, baud: val.baudRate };
   }
 
   getI2cChannel(scriptCh: string): number | undefined {

@@ -16,7 +16,7 @@ export async function getGpioModule(
     .orderBy("channel_number")
     .execute()
     .catch((err) => {
-      logger.error(err);
+      logger.error("GpioRepository.getGpioModule", err);
       throw err;
     });
 
@@ -60,7 +60,7 @@ export async function upsertGpioModule(
       )
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error(err);
+        logger.error("GpioRepository.upsertGpioModule", err);
         throw err;
       });
   }
@@ -76,7 +76,7 @@ export async function readGpioChannel(
     .where("id", "=", id)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error(err);
+      logger.error("GpioRepository.readGpioChannel", err);
       throw err;
     });
 

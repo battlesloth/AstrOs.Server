@@ -34,6 +34,7 @@
         <li *ngIf="i < subModule.boards[0].channelCount">
             <div class="servo-list-item">
                 <app-maestro-channel 
+                    (servoTestEvent)="onServoTestEvent($event)"
                     [channel]="channel"
                     [parentTestId]="parentTestId" />
             </div>

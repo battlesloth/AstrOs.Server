@@ -12,8 +12,10 @@ export interface RemoveModuleEvent {
 }
 
 export interface ServoTestEvent {
-  locationId: string;
-  moduleType: ModuleType;
+  controllerAddress: string;
+  controllerName: string;
   moduleSubType: ModuleSubType;
-  channelId: string;
+  moduleIdx: number;
+  channelNumber: number;
+  value: number;
 }

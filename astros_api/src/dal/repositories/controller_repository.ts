@@ -22,9 +22,15 @@ export class ControllerRepository {
           description: "",
           address: controllers[i].address,
         })
+        .onConflict((c) =>
+          c.column("name").doUpdateSet((eb) => ({
+            description: eb.ref("excluded.description"),
+            address: eb.ref("excluded.address"),
+          })),
+        ) 
         .executeTakeFirst()
         .catch((err) => {
-          logger.error(err);
+          logger.error('ControllerRepository.insertControllers', err);
           throw err;
         });
 
@@ -49,7 +55,7 @@ export class ControllerRepository {
       })
       .executeTakeFirst()
       .catch((err) => {
-        logger.error(err);
+        logger.error('ControllerRepository.insertController', err);
         throw err;
       });
 
@@ -66,7 +72,7 @@ export class ControllerRepository {
       .where("id", "=", controller.id)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error(err);
+        logger.error('ControllerRepository.updateController', err);
         throw err;
       });
 
@@ -81,7 +87,7 @@ export class ControllerRepository {
       .selectAll()
       .execute()
       .catch((err) => {
-        logger.error(err);
+        logger.error('ControllerRepository.getControllers', err);
         throw err;
       });
 
@@ -100,7 +106,7 @@ export class ControllerRepository {
       .where("id", "=", id)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error(err);
+        logger.error('ControllerRepository.getControllerById', err);
         throw err;
       });
 
@@ -114,7 +120,7 @@ export class ControllerRepository {
       .where("address", "=", address)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error(err);
+        logger.error('ControllerRepository.getControllerByAddress', err);
         throw err;
       });
 

@@ -36,6 +36,7 @@ import {
   ControllerLocation,
   ScriptResponse,
   TransmissionStatus,
+  ModuleSubType,
 } from "astros-common";
 import { ControllerRepository } from "./dal/repositories/controller_repository.js";
 import { ConfigSync } from "./models/config/config_sync.js";
@@ -75,8 +76,11 @@ interface IWebSocketMessage {
 }
 
 interface IServoTestData {
-  controllerId: string;
-  servoId: number;
+  controllerAddress: string;
+  controllerName: string;
+  moduleSubType: ModuleSubType;
+  moduleIdx: number;
+  channelNumber: number;
   value: number;
 }
 
@@ -545,7 +549,7 @@ class ApiServer {
 
       const locationRepo = new LocationsRepository(db);
 
-      const locationId = await locationRepo.getLocationIdByController(
+      const locationId = await locationRepo.getLocationIdByControllerByMac(
         val.controller.address,
       );
 
@@ -572,7 +576,7 @@ class ApiServer {
       const locationRepo = new LocationsRepository(db);
       const scriptRepo = new ScriptRepository(db);
 
-      const locId = await locationRepo.getLocationIdByController(
+      const locId = await locationRepo.getLocationIdByControllerByMac(
         val.controller.address,
       );
 
@@ -784,15 +788,15 @@ class ApiServer {
       //logger.debug(`sending servo command: ${data.controllerId}:${data.servoId}:${data.value}`);
 
       const repo = new ControllerRepository(db);
-
-      const controller = await repo.getControllerById(data.controllerId);
-
-      if (!controller) {
-        logger.error(`Controller not found for id: ${data.controllerId}`);
-        return;
-      }
-
-      const cmd = new ServoTest(controller, data.servoId, data.value);
+     
+      const cmd = new ServoTest(
+        data.controllerAddress,
+        data.controllerName,
+        data.moduleSubType,
+        data.moduleIdx,
+        data.channelNumber,
+        data.value,
+      );
 
       this.serialWorker.postMessage({
         type: SerialMessageType.SERVO_TEST,

@@ -23,7 +23,7 @@ import { FormsModule } from '@angular/forms';
 import { BaseUartSubModuleComponent } from '../uart-submodules/base-uart-sub-module/base-uart-sub-module.component';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
-import { RemoveModuleEvent } from '../../utility/module-events';
+import { RemoveModuleEvent, ServoTestEvent } from '../../utility/module-events';
 import { HcrSerialModuleComponent } from '../uart-submodules/hcr-serial-module/hcr-serial-module.component';
 
 @Component({
@@ -54,6 +54,9 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
 
   @Output()
   removeModuleEvent = new EventEmitter<RemoveModuleEvent>();
+
+  @Output()
+  servoTestEvent = new EventEmitter<ServoTestEvent>();
 
   subtypeName = '';
   removeIcon = faTimes;
@@ -108,10 +111,15 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
         ) as ComponentRef<KangarooModuleComponent>;
         break;
       case ModuleSubType.maestro:
-        component = this.uartContainer.createComponent(
-          MaestroModuleComponent,
-        ) as ComponentRef<MaestroModuleComponent>;
-        break;
+        {
+          component = this.uartContainer.createComponent(
+            MaestroModuleComponent,
+          ) as ComponentRef<MaestroModuleComponent>;
+
+          component.instance.servoTestEvent.subscribe(
+            (evt: ServoTestEvent) => {this.onServoTestEvent(evt);})
+          break;
+        }
       default:
         break;
     }
@@ -130,5 +138,9 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
       id: this.module.id,
       module: ModuleType.uart,
     });
+  }
+
+  onServoTestEvent(evt: ServoTestEvent): void {
+    this.servoTestEvent.emit(evt);
   }
 }

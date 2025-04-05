@@ -13,7 +13,7 @@ export class UserRepository {
       .where("user", "=", name)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error(err);
+        logger.error("UserRepository.getByUsername", err);
         throw err;
       });
 
