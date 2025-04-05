@@ -141,7 +141,6 @@ export class MessageGenerator {
         configs.push(";");
       }
 
-
       let cfigString = configs.join("");
 
       if (cfigString.endsWith(";")) {
@@ -324,7 +323,9 @@ export class MessageGenerator {
     result.push(this.US);
     result.push(cmd.controllerName);
     result.push(this.US);
-    result.push(`${cmd.moduleSubType}:${cmd.moduleIdx}:${cmd.channelNumber}:${data.msValue}`);
+    result.push(
+      `${cmd.moduleSubType}:${cmd.moduleIdx}:${cmd.channelNumber}:${data.msValue}`,
+    );
     const msg = result.join("");
 
     return new MessageGeneratorResponse(

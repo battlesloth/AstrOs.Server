@@ -787,8 +787,6 @@ class ApiServer {
       // this will hammer logs
       //logger.debug(`sending servo command: ${data.controllerId}:${data.servoId}:${data.value}`);
 
-      const repo = new ControllerRepository(db);
-     
       const cmd = new ServoTest(
         data.controllerAddress,
         data.controllerName,

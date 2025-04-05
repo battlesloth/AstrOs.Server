@@ -61,7 +61,7 @@ export class ScriptRepository {
         )
         .execute()
         .catch((err) => {
-          logger.error('ScriptRepository.upsertScript', err);
+          logger.error("ScriptRepository.upsertScript", err);
           throw err;
         });
 
@@ -120,7 +120,7 @@ export class ScriptRepository {
       .where("enabled", "=", 1)
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.getScripts', err);
+        logger.error("ScriptRepository.getScripts", err);
         throw err;
       });
 
@@ -144,7 +144,7 @@ export class ScriptRepository {
         .where("script_id", "=", scr.id)
         .execute()
         .catch((err) => {
-          logger.error('ScriptRepository.getScripts.deployments', err);
+          logger.error("ScriptRepository.getScripts.deployments", err);
           throw err;
         });
 
@@ -172,7 +172,7 @@ export class ScriptRepository {
       .where("id", "=", id)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error('ScriptRepository.getScript', err);
+        logger.error("ScriptRepository.getScript", err);
         throw err;
       });
 
@@ -189,7 +189,7 @@ export class ScriptRepository {
       .where("script_id", "=", id)
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.getScript.deployments', err);
+        logger.error("ScriptRepository.getScript.deployments", err);
         throw err;
       });
 
@@ -217,7 +217,7 @@ export class ScriptRepository {
       .where("id", "=", id)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error('ScriptRepository.deleteScript', err);
+        logger.error("ScriptRepository.deleteScript", err);
         throw err;
       });
 
@@ -245,7 +245,7 @@ export class ScriptRepository {
       })
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.saveScriptChannel', err);
+        logger.error("ScriptRepository.saveScriptChannel", err);
         throw err;
       });
 
@@ -281,7 +281,7 @@ export class ScriptRepository {
       .where("script_id", "=", scriptId)
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.readScriptChannels', err);
+        logger.error("ScriptRepository.readScriptChannels", err);
         throw err;
       });
 
@@ -359,7 +359,7 @@ export class ScriptRepository {
       .where("script_id", "=", scriptId)
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.deleteScriptChannels', err);
+        logger.error("ScriptRepository.deleteScriptChannels", err);
         throw err;
       });
   }
@@ -386,7 +386,7 @@ export class ScriptRepository {
       })
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.saveScriptEvent', err);
+        logger.error("ScriptRepository.saveScriptEvent", err);
         throw err;
       });
   }
@@ -408,7 +408,7 @@ export class ScriptRepository {
       .where("script_channel_id", "=", channelId)
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.readScriptEvents', err);
+        logger.error("ScriptRepository.readScriptEvents", err);
         throw err;
       });
 
@@ -448,7 +448,7 @@ export class ScriptRepository {
       .where("script_id", "=", scriptId)
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.deleteScriptEvents', err);
+        logger.error("ScriptRepository.deleteScriptEvents", err);
         throw err;
       });
   }
@@ -475,7 +475,7 @@ export class ScriptRepository {
       )
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error('ScriptRepository.updateScriptControllerUploaded', err);
+        logger.error("ScriptRepository.updateScriptControllerUploaded", err);
         throw err;
       });
 
@@ -495,7 +495,7 @@ export class ScriptRepository {
       .where("location_id", "=", locationId)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error('ScriptRepository.getLastScriptUploadedDate', err);
+        logger.error("ScriptRepository.getLastScriptUploadedDate", err);
         throw err;
       });
 
@@ -518,7 +518,7 @@ export class ScriptRepository {
       .selectAll()
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.getModules.locations', err);
+        logger.error("ScriptRepository.getModules.locations", err);
         throw err;
       });
 
@@ -546,7 +546,7 @@ export class ScriptRepository {
       .select("id")
       .execute()
       .catch((err) => {
-        logger.error('ScriptRepository.getLocationIds', err);
+        logger.error("ScriptRepository.getLocationIds", err);
         throw err;
       });
 

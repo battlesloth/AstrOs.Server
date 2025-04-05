@@ -7,7 +7,7 @@ import {
   MatExpansionPanelDescription,
 } from '@angular/material/expansion';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { ControllerLocation, ModuleSubType, ModuleType } from 'astros-common';
+import { ControllerLocation, ModuleType } from 'astros-common';
 import { UartModuleComponent } from '../uart/uart-module/uart-module.component';
 import { NgIf, NgFor } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -123,7 +123,7 @@ export class EspModuleComponent {
   }
 
   onServoTestEvent(evt: ServoTestEvent) {
-    evt.controllerAddress = this.location.controller.address
+    evt.controllerAddress = this.location.controller.address;
     evt.controllerName = this.location.controller.name;
     this.openServoTestModal.emit(evt);
   }

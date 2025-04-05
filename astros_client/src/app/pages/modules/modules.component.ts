@@ -401,7 +401,6 @@ export class ModulesComponent implements AfterViewInit {
     subModule.boards = [new MaestroBoard(boardId, moduleId, 0, 'Board 1', 24)];
 
     for (let i = 0; i < 24; i++) {
-
       subModule.boards[0].channels.push(
         new MaestroChannel(
           crypto.randomUUID(),

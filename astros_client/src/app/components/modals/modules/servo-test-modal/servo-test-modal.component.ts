@@ -25,8 +25,8 @@ export class ServoTestModalComponent
   extends BaseEventModalComponent
   implements OnInit
 {
-  controllerAddress = "";
-  controllerName = "";
+  controllerAddress = '';
+  controllerName = '';
   moduleSubType = ModuleSubType.none;
   moduleIdx = 0;
   channelNumber = 0;

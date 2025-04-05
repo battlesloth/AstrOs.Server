@@ -11,7 +11,7 @@
             <div>
                 <label for="value">Position (0 to 100%, -1 for Home)</label>
                 <input name="value" matInput placeholder="Value" [(ngModel)]="position" type="number" min="-1" max="100"
-                (keypress)="(($event.charCode >= 48 && $event.charCode < 58) || $event.charCode == 45)" 
+                (keypress)="(($event.charCode >= 48 && $event.charCode < 58) || $event.charCode === 45)" 
                 (change)= "position < -1 ? position = -1 : position; position > 100 ? position = 100 : position;" />
             </div>
             <div>

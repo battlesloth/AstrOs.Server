@@ -89,7 +89,7 @@ export class ScriptConverter {
       case ModuleSubType.kangaroo:
         script = this.kangarooAsString(
           cmd.event as KangarooEvent,
-          {  idx: 0, ch: cmd.channel, baud: cmd.baud },
+          { idx: 0, ch: cmd.channel, baud: cmd.baud },
           0,
         );
         break;

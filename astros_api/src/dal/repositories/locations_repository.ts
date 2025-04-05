@@ -39,7 +39,7 @@ export class LocationsRepository {
       ])
       .execute()
       .catch((err) => {
-        logger.error('LocationsRepository.getLocations', err);
+        logger.error("LocationsRepository.getLocations", err);
         throw err;
       });
 
@@ -82,7 +82,7 @@ export class LocationsRepository {
       .where("c.id", "=", id)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error('LocationsRepository.getLocationByController', err);
+        logger.error("LocationsRepository.getLocationByController", err);
         throw err;
       });
 
@@ -106,11 +106,15 @@ export class LocationsRepository {
     const data = await this.db
       .selectFrom("controller_locations")
       .select("location_id")
-      .innerJoin("controllers", "controllers.id", "controller_locations.controller_id")
+      .innerJoin(
+        "controllers",
+        "controllers.id",
+        "controller_locations.controller_id",
+      )
       .where("controllers.address", "=", mac)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error('LocationsRepository.getLocationIdByControllerMac', err);
+        logger.error("LocationsRepository.getLocationIdByControllerMac", err);
         throw err;
       });
 
@@ -154,7 +158,7 @@ export class LocationsRepository {
         .where("id", "=", location.id)
         .executeTakeFirstOrThrow()
         .catch((err) => {
-          logger.error('LocationsRepository.updateLocation', err);
+          logger.error("LocationsRepository.updateLocation", err);
           throw err;
         });
 
@@ -203,7 +207,7 @@ export class LocationsRepository {
       .where("location_id", "=", locationId)
       .execute()
       .catch((err) => {
-        logger.error('LocationsRepository.setLocationController', err);
+        logger.error("LocationsRepository.setLocationController", err);
         throw err;
       });
 
@@ -215,7 +219,7 @@ export class LocationsRepository {
       })
       .executeTakeFirst()
       .catch((err) => {
-        logger.error('LocationsRepository.setLocationController', err);
+        logger.error("LocationsRepository.setLocationController", err);
         throw err;
       });
 
@@ -238,7 +242,7 @@ export class LocationsRepository {
       .where("id", "=", locationId)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error('LocationsRepository.updateLocationFingerprintTrx', err);
+        logger.error("LocationsRepository.updateLocationFingerprintTrx", err);
         throw err;
       });
 
@@ -257,7 +261,7 @@ export class LocationsRepository {
       .where("id", "=", locationId)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error('LocationsRepository.updateLocationFingerprint', err);
+        logger.error("LocationsRepository.updateLocationFingerprint", err);
         throw err;
       });
 

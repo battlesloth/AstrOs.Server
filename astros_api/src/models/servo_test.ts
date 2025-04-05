@@ -1,6 +1,5 @@
 import { ModuleSubType } from "astros-common";
 
-
 export class ServoTest {
   controllerAddress: string;
   controllerName: string;
@@ -15,7 +14,7 @@ export class ServoTest {
     moduleSubType: ModuleSubType,
     moduleIdx: number,
     channelNumber: number,
-    msValue: number
+    msValue: number,
   ) {
     this.controllerAddress = controllerAddress;
     this.controllerName = controllerName;

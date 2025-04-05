@@ -1,5 +1,11 @@
 import { NgIf } from '@angular/common';
-import { AfterContentInit, Component, EventEmitter, Input, Output } from '@angular/core';
+import {
+  AfterContentInit,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ServoSettingsComponent } from '@src/components/esp-module/shared/servo-settings/servo-settings.component';
 import { MaestroChannel, ModuleSubType } from 'astros-common';
@@ -17,7 +23,6 @@ export class MaestroChannelComponent implements AfterContentInit {
 
   @Input()
   parentTestId!: string;
-
 
   @Output()
   servoTestEvent = new EventEmitter<ServoTestEvent>();
@@ -52,8 +57,8 @@ export class MaestroChannelComponent implements AfterContentInit {
 
   testServoModal(): void {
     this.servoTestEvent.emit({
-      controllerAddress: "",
-      controllerName: "",
+      controllerAddress: '',
+      controllerName: '',
       moduleIdx: -1,
       moduleSubType: ModuleSubType.maestro,
       channelNumber: this.channel.channelNumber,

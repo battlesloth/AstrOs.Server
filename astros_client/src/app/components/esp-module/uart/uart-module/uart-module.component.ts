@@ -110,16 +110,16 @@ export class UartModuleComponent implements AfterViewInit, AfterContentInit {
           KangarooModuleComponent,
         ) as ComponentRef<KangarooModuleComponent>;
         break;
-      case ModuleSubType.maestro:
-        {
-          component = this.uartContainer.createComponent(
-            MaestroModuleComponent,
-          ) as ComponentRef<MaestroModuleComponent>;
+      case ModuleSubType.maestro: {
+        component = this.uartContainer.createComponent(
+          MaestroModuleComponent,
+        ) as ComponentRef<MaestroModuleComponent>;
 
-          component.instance.servoTestEvent.subscribe(
-            (evt: ServoTestEvent) => {this.onServoTestEvent(evt);})
-          break;
-        }
+        component.instance.servoTestEvent.subscribe((evt: ServoTestEvent) => {
+          this.onServoTestEvent(evt);
+        });
+        break;
+      }
       default:
         break;
     }
