@@ -1,7 +1,7 @@
 @use '@angular/material' as mat;
 
 /* You can add global styles to this file, and also import other style files */
-@use "./src/assets/styles/variables" as v;
+@use "./src/assets/styles/_variables.scss" as v;
 @use "../node_modules/@angular/material/prebuilt-themes/purple-green.css";
 
 @font-face {

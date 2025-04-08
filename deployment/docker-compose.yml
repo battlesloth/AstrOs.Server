@@ -18,7 +18,7 @@ services:
     networks:
       - astronet
     devices:
-      - "COM4:/dev/ttyS0"
+      - "/dev/ttyAMA0:/dev/ttyS0"
 
 networks:
   astronet:

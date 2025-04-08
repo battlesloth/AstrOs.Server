@@ -3,7 +3,7 @@ import { HcrSerialModuleComponent } from './hcr-serial-module.component';
 import { ModuleSubType, UartModule } from 'astros-common';
 
 const meta: Meta<HcrSerialModuleComponent> = {
-  title: 'Modules/Uart/Submodules/GenericSerialModule',
+  title: 'Modules/Uart/Submodules/HcrSerialModule',
   component: HcrSerialModuleComponent,
   tags: ['autodocs'],
   decorators: [
@@ -44,6 +44,7 @@ export const BaudRate115200: Story = {
 
 function getSerialModule(ch: number, baudRate: number): UartModule {
   const module = new UartModule(
+    0,
     '1234',
     'Generic Serial',
     'core',

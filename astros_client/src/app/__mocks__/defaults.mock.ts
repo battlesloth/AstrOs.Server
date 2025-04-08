@@ -184,6 +184,7 @@ function generateI2cModule(ids: MockId) {
     
     for (let i = 0; i < ids.I2C_MODULE_IDS.length; i++) {
         const module = new I2cModule(
+            99,
             ids.I2C_MODULE_IDS[i], 
             `I2C CH ${i}`, 
             ids.ID,
@@ -198,6 +199,7 @@ function generateI2cModule(ids: MockId) {
 
 function generateSerialModule(ids: MockId) {
     const module = new UartModule(
+        11,
         ids.SERIAL_MODULE_ID,
         'Serial Channel',
         ids.ID,
@@ -211,6 +213,7 @@ function generateSerialModule(ids: MockId) {
 
 function generateKangarooModule(ids: MockId) {
     const module = new UartModule(
+        22,
         ids.KANGAROO_MODULE_ID,
         'Kangaroo Channel',
         ids.ID,
@@ -231,6 +234,7 @@ function generateKangarooModule(ids: MockId) {
 
 function generateMaestroModule(ids: MockId) {
     const module = new UartModule(
+        33,
         ids.MAESTRO_MODULE_ID,
         'Maestro Channel',
         ids.ID,

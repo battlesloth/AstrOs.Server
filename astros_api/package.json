@@ -2,6 +2,7 @@
   "name": "astrosserver",
   "version": "0.1.0",
   "type": "module",
+  "main": "api_server.js",
   "private": true,
   "scripts": {
     "prebuild": "eslint . --ext .js,.jsx,.ts,.tsx",

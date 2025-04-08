@@ -10,7 +10,7 @@ import {
   ScriptEvent,
   MaestroEvent,
 } from 'astros-common';
-import { ScriptEventTypes } from 'astros-common/dist/scripts/script_event';
+import { ScriptEventTypes } from 'astros-common';
 
 export default class EventMarkerHelper {
   static generateText(event: ScriptEvent): string[] {

@@ -1,7 +1,7 @@
 import { AfterContentInit, Component } from '@angular/core';
 import { ModalBaseComponent } from '../../modal-base/modal-base.component';
-import { ModuleType } from 'astros-common/dist/astros_enums';
-import { ModuleSubType } from 'astros-common/dist/astros_enums';
+import { ModuleType } from 'astros-common';
+import { ModuleSubType } from 'astros-common';
 import { NgForOf } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 import { FormsModule } from '@angular/forms';

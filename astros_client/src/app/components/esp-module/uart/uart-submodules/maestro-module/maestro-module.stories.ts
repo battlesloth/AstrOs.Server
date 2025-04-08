@@ -53,6 +53,7 @@ function getSerialModule(
   channelCount: number,
 ): UartModule {
   const module = new UartModule(
+    11,
     '1234',
     'Maestro',
     'core',

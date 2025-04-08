@@ -48,7 +48,7 @@ export const PwmBoard: Story = {
 };
 
 function getI2cModule(type: ModuleSubType, address: number): I2cModule {
-  const module = new I2cModule(uuid(), 'I2c Module', uuid(), address, type);
+  const module = new I2cModule(22, uuid(), 'I2c Module', uuid(), address, type);
 
   switch (type) {
     case ModuleSubType.genericI2C:

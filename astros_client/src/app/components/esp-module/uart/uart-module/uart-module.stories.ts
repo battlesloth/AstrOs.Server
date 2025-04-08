@@ -73,6 +73,7 @@ function getSerialModule(
   baudRate: number,
 ): UartModule {
   const module = new UartModule(
+    11,
     uuid(),
     'Generic Serial',
     uuid(),
