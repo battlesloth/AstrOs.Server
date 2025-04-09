@@ -164,7 +164,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       console.log(`new script id:${this.scriptId}`);
       this.script = new Script(
         this.scriptId,
-        '',
+        'New Script',
         '',
         new Date(Date.parse('1970-01-01 00:00:00.000')),
       );
