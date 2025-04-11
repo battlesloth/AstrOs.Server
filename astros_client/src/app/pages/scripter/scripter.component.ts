@@ -2,6 +2,7 @@ import {
   AfterViewChecked,
   Component,
   ComponentRef,
+  ElementRef,
   OnInit,
   Renderer2,
   ViewChild,
@@ -68,6 +69,9 @@ import {
 import { ModalCallbackEvent } from '@src/components/modals/modal-base/modal-callback-event';
 import { ScriptResourcesService } from '@src/services/script-resources/script-resources.service';
 import { ChannelDetails } from '@src/models/scripting';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { ScrollingModule } from '@angular/cdk/scrolling'
+import { DragDropModule } from '@angular/cdk/drag-drop';
 
 export interface MenuItemDetails {
   timeline: string;
@@ -97,13 +101,25 @@ type ScripterModal =
     MatMenuContent,
     MatMenuItem,
     ModalComponent,
+    MatProgressSpinnerModule,
+    ScrollingModule,
+    DragDropModule,
   ],
 })
 export class ScripterComponent implements OnInit, AfterViewChecked {
-  @ViewChild(MatMenuTrigger) menuTrigger!: MatMenuTrigger;
+  @ViewChild(MatMenuTrigger) 
+  menuTrigger!: MatMenuTrigger;
 
   @ViewChild('modalContainer', { read: ViewContainerRef })
   container!: ViewContainerRef;
+
+  @ViewChild('scripterContainer')
+  scripterContainer!: ElementRef;
+  isDragging = false;
+  dragStartX = 0;
+  scrollLeft = 0;
+  dragStartY = 0;
+  scrollTop = 0;
 
   private segmentWidth = 60;
   private segments = 3000;
@@ -159,6 +175,9 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   ngOnInit(): void {
+
+    this.scriptResources.loadResources();
+
     if (this.scriptId === '0') {
       this.scriptId = this.generateScriptId(5);
       console.log(`new script id:${this.scriptId}`);
@@ -880,6 +899,37 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
      }
  */
     return a.moduleChannel.channelName < b.moduleChannel.channelName ? -1 : 1;
+  }
+
+  //#endregion
+
+  //#region Drag scroll
+
+  startDrag(event: MouseEvent) {
+    event.preventDefault();
+    this.isDragging = true;
+    this.renderer.setStyle(this.scripterContainer.nativeElement, 'cursor', 'grabbing');
+    this.dragStartX = event.pageX - this.scripterContainer.nativeElement.offsetLeft;
+    this.scrollLeft = this.scripterContainer.nativeElement.scrollLeft;
+    this.dragStartY = event.pageY - this.scripterContainer.nativeElement.offsetTop;
+    this.scrollTop = this.scripterContainer.nativeElement.scrollTop;  
+  }
+
+  drag(event: MouseEvent) {
+    if (!this.isDragging) return;
+    event.preventDefault();
+    const x = event.pageX - this.scripterContainer.nativeElement.offsetLeft;
+    const walkX = (x - this.dragStartX);
+    this.scripterContainer.nativeElement.scrollLeft = this.scrollLeft - walkX;
+
+    const y = event.pageY - this.scripterContainer.nativeElement.offsetTop;
+    const walkY = (y - this.dragStartY);
+    this.scripterContainer.nativeElement.scrollTop = this.scrollTop - walkY;
+  }
+
+  endDrag() {
+    this.isDragging = false;
+    this.renderer.setStyle(this.scripterContainer.nativeElement, 'cursor', 'auto');
   }
 
   //#endregion

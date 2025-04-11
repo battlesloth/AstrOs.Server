@@ -44,8 +44,6 @@ export class ScriptResourcesService {
     this.gpioChannels = new Map<string, ScriptChannelResource>();
     this.kangarooChannels = new Map<string, ScriptChannelResource>();
     this.audioChannels = new Map<string, ScriptChannelResource>();
-
-    this.loadResources();
   }
 
   getLocationDetailsList(): LocationDetails[] {
@@ -188,6 +186,16 @@ export class ScriptResourcesService {
   //#region Load Resources
 
   public loadResources(): void {
+
+    this.locations.clear();
+
+    this.genericI2cChannels.clear();
+    this.genericSerialChannels.clear();
+    this.servoChannels.clear();
+    this.gpioChannels.clear();
+    this.kangarooChannels.clear();
+    this.audioChannels.clear();
+
     this.controllerService.getLoadedLocations().subscribe((locations) => {
       if (locations.bodyModule) {
         this.addLocationResources(locations.bodyModule);

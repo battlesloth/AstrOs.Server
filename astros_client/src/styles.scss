@@ -16,6 +16,10 @@
 :root {
     font-size: 62.5%;
 
+    @include mat.progress-spinner-overrides((
+        active-indicator-color: v.$dark-blue,
+      ));
+
     @include mat.slider-overrides((
         handle-color: v.$dark-blue,
         focus-handle-color: v.$dark-blue,
@@ -68,7 +72,19 @@ body {
 }
 
 
-
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    background-color: v.$color-dark;
+    color: white;
+    font-family: v.$swfont;
+    font-size: x-large;
+    border-radius: 20px;
+  }
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
