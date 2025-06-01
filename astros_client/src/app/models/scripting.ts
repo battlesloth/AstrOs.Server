@@ -3,6 +3,7 @@ import { ScriptChannelType } from 'astros-common';
 export interface LocationDetails {
   id: string;
   name: string;
+  assigned: boolean;
 }
 
 export interface ChannelDetails {

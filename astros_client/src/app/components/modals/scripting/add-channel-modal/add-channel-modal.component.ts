@@ -67,7 +67,7 @@ export class AddChannelModalComponent
       AddChannelModalResources.controllers,
     ) as LocationDetails[];
 
-    this.controllers.unshift({ id: '_any_', name: 'Any Controller' });
+    this.controllers.unshift({ id: '_any_', name: 'Any Controller', assigned: true });
 
     this.availableChannels = this.resources.get(
       AddChannelModalResources.channels,

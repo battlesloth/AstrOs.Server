@@ -13,6 +13,11 @@ interface Caption {
   str: string;
 }
 
+export interface DeploymentLocation {
+  id: string;
+  name: string;
+}
+
 export class ScriptTestModalResources {
   public static scriptId = 'scriptId';
   public static locations = 'locations';
@@ -33,6 +38,8 @@ export class ScriptTestModalComponent
 {
   uploadInProgress = true;
   runDisabled = true;
+
+  deploymentLocations: DeploymentLocation[] = [];
 
   coreUpload: TransmissionStatus = TransmissionStatus.sending;
   domeUpload: TransmissionStatus = TransmissionStatus.sending;
@@ -66,23 +73,23 @@ export class ScriptTestModalComponent
     this.scriptId = this.resources.get(
       ScriptTestModalResources.scriptId,
     ) as string;
-    const locations = this.resources.get(
+    this.deploymentLocations = this.resources.get(
       ScriptTestModalResources.locations,
-    ) as number[];
+    ) as DeploymentLocation[];
 
     let hasBody = false;
     let hasCore = false;
     let hasDome = false;
 
-    locations.forEach((location: number) => {
-      switch (location) {
-        case 1:
+    this.deploymentLocations.forEach((location: DeploymentLocation) => {
+      switch (location.name) {
+        case AstrOsConstants.BODY:
           hasBody = true;
           break;
-        case 2:
+        case AstrOsConstants.CORE:
           hasCore = true;
           break;
-        case 3:
+        case AstrOsConstants.DOME:
           hasDome = true;
           break;
       }
@@ -144,7 +151,19 @@ export class ScriptTestModalComponent
   }
 
   statusUpdate(msg: ScriptResponse) {
-    switch (msg.locationId) {
+
+    console.log('message',msg);
+
+    const location = this.deploymentLocations.find(
+      (loc) => loc.id === msg.locationId,
+    );
+    
+    if (!location) {
+      console.warn(`Location with ID ${msg.locationId} not found.`);
+      return;
+    }
+
+    switch (location.name) {
       case AstrOsConstants.BODY:
         this.bodyUpload = msg.status;
         this.setCaption(this.bodyCaption, msg.status);

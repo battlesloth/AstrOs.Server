@@ -212,9 +212,13 @@ export class ScriptResourcesService {
   }
 
   private addLocationResources(location: ControllerLocation): void {
+
+    const assigned = location.controller?.address ? true : false;
+    
     this.locations.set(location.id, {
       id: location.id,
       name: location.locationName,
+      assigned: assigned,
     });
 
     const locationResources: ScriptChannelResource[] = [];

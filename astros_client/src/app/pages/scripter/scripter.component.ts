@@ -53,6 +53,7 @@ import {
   ScriptTestModalResources,
   UartEventModalComponent,
   ServoEventModalComponent,
+  DeploymentLocation
 } from '@src/components/modals/scripting';
 import {
   ControllerService,
@@ -107,7 +108,7 @@ type ScripterModal =
   ],
 })
 export class ScripterComponent implements OnInit, AfterViewChecked {
-  @ViewChild(MatMenuTrigger) 
+  @ViewChild(MatMenuTrigger)
   menuTrigger!: MatMenuTrigger;
 
   @ViewChild('modalContainer', { read: ViewContainerRef })
@@ -262,10 +263,17 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
 
     modalResources.set(ScriptTestModalResources.scriptId, this.scriptId);
 
-    const locations = new Array<string>();
+    const locations = new Array<DeploymentLocation>();
 
-    this.script.deploymentStatusKvp.forEach((kvp) => {
-      locations.push(kvp.key);
+    const locationDetails = this.scriptResources.getLocationDetailsList();
+
+    locationDetails.forEach((detail) => {
+      if (detail.assigned) {
+        locations.push({
+          id: detail.id,
+          name: detail.name.toLocaleLowerCase()
+        });
+      }
     });
 
     modalResources.set(ScriptTestModalResources.locations, locations);
@@ -912,7 +920,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     this.dragStartX = event.pageX - this.scripterContainer.nativeElement.offsetLeft;
     this.scrollLeft = this.scripterContainer.nativeElement.scrollLeft;
     this.dragStartY = event.pageY - this.scripterContainer.nativeElement.offsetTop;
-    this.scrollTop = this.scripterContainer.nativeElement.scrollTop;  
+    this.scrollTop = this.scripterContainer.nativeElement.scrollTop;
   }
 
   drag(event: MouseEvent) {
