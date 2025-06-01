@@ -1,0 +1,42 @@
+<div class="event-modal">
+    <h1>Servo Event</h1>
+    <div class="modal-body">
+        <div class="spacer"></div>
+        <div class="content">
+            <div>
+                <label for="time">Event Time (seconds)</label>
+                <input name="time" matInput placeholder="Time" type="number" step="0.1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/" 
+                [ngModel]="eventTime | number : '1.0-1'" (ngModelChange)="eventTime = $event" />
+            </div>
+            <div>
+                <label for="value">Position (0 to 100%, -1 for Home)</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="position" type="number" min="-1" max="100"
+                (keypress)="(($event.charCode >= 48 && $event.charCode < 58) || $event.charCode === 45)" 
+                (change)= "position < -1 ? position = -1 : position; position > 100 ? position = 100 : position;" />
+            </div>
+            <div>
+                <label for="value">Speed (0 to 255, 0 is unlimited)</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="speed" type="number" min="0" max="255"
+                (keypress)="($event.charCode >= 48 && $event.charCode < 58)" 
+                (change)= "speed < 0 ? speed = 0 : speed; speed > 255 ? speed = 255 : speed;"/>
+            </div>
+            <div>
+                <label for="value">Accel. (0 to 255, 0 is unlimited)</label>
+                <input name="value" matInput placeholder="Value" [(ngModel)]="acceleration" type="number" min="0" max="255"
+                (keypress)="($event.charCode >= 48 && $event.charCode < 58)" 
+                (change)= "acceleration < 0 ? acceleration = 0 : acceleration; acceleration > 255 ? acceleration = 255 : acceleration;"/>
+            </div>
+            <div class="error">{{errorMessage}}</div>
+        </div>
+        <div class="spacer"></div>
+    </div>
+    <div class="modal-buttons">
+        <div class="button-spacer"></div>
+        <div class="button-grouper">
+            <button (click)="addEvent();">Save</button>
+            <button id="remove_button" class="hidden" (click)="removeEvent();">Remove</button>
+            <button (click)="closeModal();">Close</button>
+        </div>
+        <div class="button-spacer"></div>
+    </div>
+</div>

@@ -3,7 +3,7 @@
     "exclude": [
       "./dist/**/*",
       "./dist_webpack/**/*",
-      "./jest.config.js",
+      "**/vitest.config.ts",
       "**/*.test.ts",
       "**/*.mock.ts",
       "**/webpack.config.js"

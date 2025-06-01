@@ -1,8 +1,8 @@
 @use '@angular/material' as mat;
 
 /* You can add global styles to this file, and also import other style files */
-@import "./src/assets/styles/variables";
-@import "../node_modules/@angular/material/prebuilt-themes/purple-green.css";
+@use "./src/assets/styles/_variables.scss" as v;
+@use "../node_modules/@angular/material/prebuilt-themes/purple-green.css";
 
 @font-face {
     src: url('./assets/fonts/DISTGRG_-webfont.woff') format('woff');
@@ -16,20 +16,37 @@
 :root {
     font-size: 62.5%;
 
-    @include mat.slider-overrides((
-        handle-color: $dark-blue,
-        focus-handle-color: $dark-blue,
-        hover-handle-color: $dark-blue-tint,
-        active-track-color: $dark-blue,
-        inactive-track-color: $dark-blue,
-        with-overlap-handle-outline-color: $dark-blue,
-        ripple-color: $dark-blue,
-        hover-state-layer-color:$dark-blue-tint,
-        focus-state-layer-color:$dark-blue-tint,
-        disabled-active-track-color: $light-blue,
-        disabled-handle-color: $light-blue,
-        disabled-inactive-track-color: $light-blue
+    @include mat.progress-spinner-overrides((
+        active-indicator-color: v.$dark-blue,
       ));
+
+    @include mat.slider-overrides((
+        handle-color: v.$dark-blue,
+        focus-handle-color: v.$dark-blue,
+        hover-handle-color: v.$dark-blue-tint,
+        active-track-color: v.$dark-blue,
+        inactive-track-color: v.$dark-blue,
+        with-overlap-handle-outline-color: v.$dark-blue,
+        ripple-color: v.$dark-blue,
+        hover-state-layer-color: v.$dark-blue-tint,
+        focus-state-layer-color: v.$dark-blue-tint,
+        disabled-active-track-color: v.$light-blue,
+        disabled-handle-color: v.$light-blue,
+        disabled-inactive-track-color: v.$light-blue
+      ));
+
+      @include mat.checkbox-overrides((
+        label-text-color: black,
+        label-text-size: medium,
+        selected-checkmark-color: v.$color-pale,
+        selected-pressed-icon-color: v.$light-blue,
+        selected-focus-icon-color: v.$light-blue,
+        selected-hover-icon-color: v.$light-blue,
+        selected-icon-color: v.$light-blue,
+        selected-focus-state-layer-color: v.$light-blue,
+        selected-hover-state-layer-color: v.$light-blue,
+        unselected-pressed-state-layer-color: v.$light-blue
+    ))
 }
 
 body {
@@ -39,13 +56,13 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 1.6rem;
 
-    background-color: $color-pale;
+    background-color: v.$color-pale;
 
     button {
         font-size: x-large;
         padding: 10px 20px;
-        background: $color-dark;
-        color: $color-pale;
+        background: v.$color-dark;
+        color: v.$color-pale;
         
     }
 }
@@ -55,7 +72,19 @@ body {
 }
 
 
-
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    background-color: v.$color-dark;
+    color: white;
+    font-family: v.$swfont;
+    font-size: x-large;
+    border-radius: 20px;
+  }
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }

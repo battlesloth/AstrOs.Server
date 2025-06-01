@@ -8,9 +8,8 @@ describe('RemoteConfigComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      declarations: [ RemoteConfigComponent ]
-    })
-    .compileComponents();
+      imports: [RemoteConfigComponent],
+    }).compileComponents();
   });
 
   beforeEach(() => {

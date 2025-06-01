@@ -1,4 +1,4 @@
-@import '../../../assets/styles/variables';
+@use '../../../assets/styles/variables' as v;
 
 .container {
   display: flex;
@@ -6,7 +6,6 @@
   height: 84%;
   margin: 0 auto;
   padding: 20px;
-
 }
 
 .script-title {
@@ -24,8 +23,8 @@
 
     button{
         font-size: x-large;
-        font-family: $swfont;
-        background-color: $dark-blue;
+        font-family: v.$swfont;
+        background-color: v.$dark-blue;
     }
   }
 
@@ -40,7 +39,7 @@
 
 }
 .scripter-container {
-  background-color: $color-dark;
+  background-color: v.$color-dark;
   flex-grow: 1;
   display: flex;
   border: 2px solid black;
@@ -76,15 +75,15 @@ flex-direction: column;
   position: sticky;
   left: 0px;
   top: 0px;
-  background-color: $color-medium;
-  font-family: $swfont;
+  background-color: v.$color-medium;
+  font-family: v.$swfont;
   font-size: x-large;
   color: white;
   text-shadow:
-  -2px -2px 0 $dark-blue,
-  2px -2px 0 $dark-blue,
-  -2px 2px 0 $dark-blue,
-  2px 2px 0 $dark-blue;
+  -2px -2px 0 v.$dark-blue,
+  2px -2px 0 v.$dark-blue,
+  -2px 2px 0 v.$dark-blue,
+  2px 2px 0 v.$dark-blue;
   border-bottom: 2px solid black;
   border-right: 2px solid black;
   height: 40px;
@@ -95,7 +94,7 @@ flex-direction: column;
 
 .timeline-spacer {
   width: 29px;
-  background-color: $color-pale;
+  background-color: v.$color-pale;
   border-bottom: 2px solid black;
 }
 
@@ -111,7 +110,7 @@ flex-direction: column;
   text-align: center;
   height: 40px;
   line-height: 40px;
-  background-color: $color-pale;
+  background-color: v.$color-pale;
   font-weight: 500;  
   color: black;
   
@@ -147,7 +146,7 @@ flex-direction: column;
   padding-top: 2px;
   top: 0px;
   z-index: 100;
-  background-color: $light-blue;
+  background-color: v.$light-blue;
   border: 2px solid black;
   border-radius: 15%;
   cursor: pointer;

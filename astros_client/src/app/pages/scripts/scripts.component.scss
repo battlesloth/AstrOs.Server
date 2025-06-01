@@ -1,4 +1,4 @@
-@import "../../../assets/styles/variables";
+@use "../../../assets/styles/variables" as v;
 
 .script-container {
     display: flex;
@@ -24,7 +24,7 @@
             .title {
                 width: 200px;
                 font-size: xx-large;
-                font-family: $swfont;
+                font-family: v.$swfont;
             }
 
 
@@ -33,8 +33,8 @@
 
                 button {
                     font-size: x-large;
-                    font-family: $swfont;
-                    background-color: $dark-blue;
+                    font-family: v.$swfont;
+                    background-color: v.$dark-blue;
                 }
             }
         }

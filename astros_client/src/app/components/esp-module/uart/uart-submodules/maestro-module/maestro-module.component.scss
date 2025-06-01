@@ -1,0 +1,25 @@
+@use '@angular/material' as mat;
+@use "../../../../../../assets/styles/variables" as v;
+
+.uart-settings {
+ padding-bottom: 10px;
+}
+
+
+.servo-list {
+
+    padding-left: 0px;
+    li {
+        background: v.$color-list-light-grey; ;
+        list-style: none;
+        border-bottom: 2px solid #e0e0e0;
+
+        .servo-list-item{
+            margin-left: 10px;
+        }
+ 
+    }
+    li:nth-child(odd) {
+        background: v.$color-list-med-grey; 
+    }
+}

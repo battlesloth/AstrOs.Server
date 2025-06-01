@@ -1,0 +1,47 @@
+.maestro-channel {
+    display: flex;
+    flex-direction: column;
+    padding-top: 10px;
+
+    .label-row {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding-bottom: 10px;
+
+        .spacer {
+            flex-grow: 1;
+        }
+
+        .label {
+            color: white;
+            font-size: large;
+            width: 100px;
+        }
+
+        .type-select {
+            margin-right: 18px;
+
+            select{ 
+                width: 200px;
+                height: 30px;
+                font-size: large;
+            }
+        }
+
+        .test-button {
+            button {
+                height: 30px;
+                width: 90px;
+                font-size: large;
+                padding: 5px 0px;
+                margin-right: 10px;
+            }
+        }
+    }
+
+    .servo-settings{
+        color: white;
+        padding-bottom: 10px;
+    }
+}

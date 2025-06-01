@@ -4,82 +4,100 @@ import { catchError, Observable, of, tap } from 'rxjs';
 import { Script } from 'astros-common';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ScriptsService {
-
-  private token: string
+  private token: string;
 
   constructor(private http: HttpClient) {
     this.token = '';
   }
 
-  public getAllScripts(): Observable<any> {
-    return this.http.get<Script[]>(`/api/scripts/all`, {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
-      .pipe(tap(_ => console.log(`loaded scripts`)),
-        catchError(this.handleError<Script[]>('getAllScript'))
+  public getAllScripts(): Observable<Script[]> {
+    return this.http
+      .get<Script[]>(`/api/scripts/all`, {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
+      .pipe(
+        tap((_) => console.log(`loaded scripts`)),
+        catchError(this.handleError<Script[]>('getAllScript')),
       );
   }
 
   public getScript(id: string): Observable<Script> {
-    return this.http.get<Script>(`/api/scripts?id=${id}`, {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
-      .pipe(tap(_ => console.log(`loaded script ${id}`)),
-        catchError(this.handleError<Script>('getScript'))
+    return this.http
+      .get<Script>(`/api/scripts?id=${id}`, {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
+      .pipe(
+        tap((_) => console.log(`loaded script ${id}`)),
+        catchError(this.handleError<Script>('getScript')),
       );
   }
-
 
   public copyScript(id: string): Observable<Script> {
-    return this.http.get<Script>(`/api/scripts/copy?id=${id}`, {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
-      .pipe(tap(_ => console.log(`loaded script ${id}`)),
-        catchError(this.handleError<Script>('copyScript'))
-      );
-  }
-  
-  public saveScript(script: Script): Observable<any> {
-    return this.http.put<any>('/api/scripts', script, {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
+    return this.http
+      .get<Script>(`/api/scripts/copy?id=${id}`, {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
       .pipe(
-        tap(_ => console.log(`saveScript result: ${_.message}`)),
-        catchError(this.handleError<any>('saveScript'))
+        tap((_) => console.log(`loaded script ${id}`)),
+        catchError(this.handleError<Script>('copyScript')),
       );
   }
 
-  public deleteScript(id: string): Observable<any> {
-    return this.http.delete<any>(`/api/scripts?id=${id}`, {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
+  public saveScript(script: Script): Observable<unknown> {
+    return this.http
+      .put<unknown>('/api/scripts', script, {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
       .pipe(
-        tap(_ => console.log(`deleteScript result: ${_.message}`)),
-        catchError(this.handleError<any>('deleteScript'))
+        tap((val) => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`saveScript result: ${val.message}`);
+        }),
+        catchError(this.handleError<unknown>('saveScript')),
       );
   }
 
-  public uploadScript(id: string): Observable<any> {
-    return this.http.get<any>(`/api/scripts/upload?id=${id}`, {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
+  public deleteScript(id: string): Observable<unknown> {
+    return this.http
+      .delete<unknown>(`/api/scripts?id=${id}`, {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
       .pipe(
-        tap(_ => console.log(`uploadScript result: ${_.message}`)),
-        //catchError(this.handleError<any>('uploadScript'))
-        
+        tap((val) => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`deleteScript result: ${val.message}`);
+        }),
+        catchError(this.handleError<unknown>('deleteScript')),
       );
   }
 
-  public runScript(id: string): Observable<any> {
-    return this.http.get<any>(`/api/scripts/run?id=${id}`, {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
+  public uploadScript(id: string): Observable<unknown> {
+    return this.http
+      .get<unknown>(`/api/scripts/upload?id=${id}`, {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
       .pipe(
-        tap(_ => console.log(`runScript result: ${_.message}`)),
-        catchError(this.handleError<any>('runScript'))
+        tap((val) => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`uploadScript result: ${val.message}`);
+        }),
+      );
+  }
+
+  public runScript(id: string): Observable<unknown> {
+    return this.http
+      .get<unknown>(`/api/scripts/run?id=${id}`, {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
+      .pipe(
+        tap((val) => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`runScript result: ${val.message}`);
+        }),
+        catchError(this.handleError<unknown>('runScript')),
       );
   }
 
@@ -91,9 +109,9 @@ export class ScriptsService {
   }
 
   private handleError<T>(operation = 'operation', result?: T) {
-    return (error: any): Observable<T> => {
-      console.error(error);
+    return (error: unknown): Observable<T> => {
+      console.error(operation, error);
       return of(result as T);
-    }
+    };
   }
 }

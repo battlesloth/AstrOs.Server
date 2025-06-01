@@ -1,97 +1,99 @@
 import { AudioFile } from "astros-common";
-import { logger } from "../../logger";
-import { DataAccess } from "../data_access";
-import { AudioFilesTable } from "../tables/audio_files_table";
+import { logger } from "../../logger.js";
+import { inserted } from "../database.js";
+import { Kysely } from "kysely";
+import { Database } from "../types.js";
 
 export class AudioFileRepository {
+  constructor(private readonly db: Kysely<Database>) {}
 
-    dao: DataAccess;
+  async getAudioFiles(): Promise<Array<AudioFile>> {
+    const result = new Array<AudioFile>();
 
-    constructor(dao: DataAccess) {
-        this.dao = dao;
-        this.dao.connect();
+    const data = await this.db
+      .selectFrom("audio_files")
+      .selectAll()
+      .execute()
+      .catch((err) => {
+        logger.error("AudioFileRepository.getAudioFiles", err);
+        throw err;
+      });
+
+    for (const af of data) {
+      const file = new AudioFile(
+        af.id,
+        af.file_name,
+        af.description,
+        af.duration,
+      );
+      result.push(file);
     }
 
-    async getAudioFiles(): Promise<Array<AudioFile>> {
+    return result;
+  }
 
-        const result = new Array<AudioFile>();
-        await this.dao.get(AudioFilesTable.selectAll)
-            .then((val: any) => {
-                val.forEach((af: any) => {
-                    const file = new AudioFile(af.id, af.fileName, af.description, af.duration);
-                    result.push(file);
-                });
-            })
-            .catch((err) => {
-                logger.error(err);
-                return result;
-            });
+  async insertFile(id: string, fileName: string): Promise<boolean> {
+    const data = await this.db
+      .insertInto("audio_files")
+      .values({
+        id: id,
+        file_name: fileName,
+        description: "",
+        duration: 0,
+      })
+      .executeTakeFirst()
+      .catch((err) => {
+        logger.error("AudioFileRepository.insertFile", err);
+        throw err;
+      });
 
-        return result;
+    return inserted(data);
+  }
+
+  async filesNeedingDuration() {
+    const result = new Array<string>();
+
+    const data = await this.db
+      .selectFrom("audio_files")
+      .select("id")
+      .where("duration", "=", 0)
+      .execute()
+      .catch((err) => {
+        logger.error("AudioFileRepository.filesNeedingDuration", err);
+        throw err;
+      });
+
+    for (const af of data) {
+      result.push(af.id);
     }
 
-    async insertFile(id: string, fileName: string): Promise<boolean> {
+    return result;
+  }
 
-        let result = false;
+  async updateFileDuration(id: string, duration: number) {
+    const result = await this.db
+      .updateTable("audio_files")
+      .set({ duration: duration })
+      .where("id", "=", id)
+      .executeTakeFirst()
+      .catch((err) => {
+        logger.error("AudioFileRepository.updateFileDuration", err);
+        throw err;
+      });
 
-        await this.dao.run(AudioFilesTable.insert,
-            [id, fileName, '', '0'])
-            .then((_: any) => {
-                result = true;
-            })
-            .catch((err) => {
-                logger.error(err);
-                result = false;
-            })
+    return result.numUpdatedRows > 0;
+  }
 
-        return result;
-    }
+  async deleteFile(id: string): Promise<boolean> {
+    const result = await this.db
+      .deleteFrom("audio_files")
+      .where("id", "=", id)
+      .executeTakeFirst()
+      .catch((err) => {
+        logger.error("AudioFileRepository.deleteFile", err);
+        throw err;
+      });
 
-    async filesNeedingDuration() {
-        const result = new Array<string>();
-
-        await this.dao.get(AudioFilesTable.selectZeroDuration)
-            .then((val: any) => {
-                val.forEach((af: any) => {
-                    result.push(af.id);
-                });
-            })
-            .catch((err) => {
-                logger.error(err);
-                return result;
-            });
-
-        return result;
-    }
-
-    async updateFileDuration(id: string, duration: number) {
-        let result = false;
-
-        await this.dao.run(AudioFilesTable.updateDuration, [duration.toString(), id])
-            .then((_: any) => {
-                result = true;
-            })
-            .catch((err) => {
-                logger.error(err);
-                result = false;
-            })
-
-        return result;
-    }
-
-    async deleteFile(id: string): Promise<boolean> {
-
-        let result = false;
-
-        await this.dao.run(AudioFilesTable.delete, [id])
-            .then((_: any) => {
-                result = true;
-            })
-            .catch((err) => {
-                logger.error(err);
-                result = false;
-            })
-
-        return result;
-    }
+    return result.numDeletedRows > 0;
+  }
 }

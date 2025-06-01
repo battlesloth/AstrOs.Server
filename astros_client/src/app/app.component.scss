@@ -1,13 +1,13 @@
- @import "../assets/styles/variables";
+ @use "../assets/styles/variables" as v;
 
  .container {
-     background-color: $color-dark;
-     color: $color-pale;
+     background-color: v.$color-dark;
+     color: v.$color-pale;
      text-shadow:
-         -3px -3px 0 $dark-blue,
-         3px -3px 0 $dark-blue,
-         -3px 3px 0 $dark-blue,
-         3px 3px 0 $dark-blue;
+         -3px -3px 0 v.$dark-blue,
+         3px -3px 0 v.$dark-blue,
+         -3px 3px 0 v.$dark-blue,
+         3px 3px 0 v.$dark-blue;
 
 
 
@@ -23,7 +23,7 @@
      flex-direction: row;
      text-align: center;
      font-size: 36px;
-     font-family: $swfont;
+     font-family: v.$swfont;
 
      .capital {
          font-size: 50px;
@@ -48,7 +48,7 @@
      z-index: 1000;
      top: 0;
      left: 0;
-     background-color: $dark-blue;
+     background-color: v.$dark-blue;
      overflow-x: hidden;
      transition: 0.5s;
      padding-top: 4px;
@@ -56,15 +56,15 @@
      a {
          margin: 30px 40px 30px 20px;
          text-decoration: none;
-         font-family: $swfont;
+         font-family: v.$swfont;
          font-size: 28px;
-         color: $color-pale;
+         color: v.$color-pale;
          display: block;
          transition: 0.3s;
      }
 
      a:hover {
-         color: $light-blue;
+         color: v.$light-blue;
      }
 
  }

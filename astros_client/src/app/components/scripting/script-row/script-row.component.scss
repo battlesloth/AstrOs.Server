@@ -1,0 +1,91 @@
+@use '../../../../assets/styles/variables' as v;
+
+.script-row-container{
+    display: flex;
+    flex-direction: row;
+}
+
+.module-container {
+    display: flex;
+    flex-direction: column;
+    position: -webkit-sticky;
+    position: sticky;
+    left: 0px;
+    background-color: v.$light-blue;
+    color: white;
+    border-bottom: 2px solid black;
+    border-right: 2px solid black;
+    height: 100px;
+    width: 200px;
+    text-align: center;
+    z-index: 200;
+
+    select {
+        width: 140px;
+        height: 30px;
+        font-size: medium;
+        margin-top: 4px;
+        margin-left: 4px;
+        margin-left: 4px;
+        margin-bottom: 10px;
+    }
+
+    .spacer{
+        flex-grow: 1;
+    }
+
+    .button-bar{
+        text-align: right;
+        padding: 0px 0px 4px 0px;
+        button {
+            font-size: large;
+            padding: 0;
+            margin: 0px 12px 0px 0px;
+            border: none;
+            background-color: transparent;
+            color: white;
+            cursor: pointer;
+        }
+    }
+}
+
+.timeline-container{
+    background-color: rgb(218, 218, 218);
+    border-right: 2px solid black;
+    border-bottom: 2px solid black;
+    display: flex;
+    flex-direction: row;
+    position: relative;
+    width: 180030px;
+
+    --ruler-unit: 1px;
+  /* Tall ticks */
+  --ruler-bdw: 2px;
+  --ruler-c:  rgb(109, 109, 109);
+  --ruler-h: 100px;
+  --ruler-space: 60;
+  background-image:
+  linear-gradient(90deg, var(--ruler-c) 0 var(--ruler-bdw), transparent 0);
+  background-repeat: repeat-x;
+  background-size:
+  calc(var(--ruler-unit) * var(--ruler-space)) var(--ruler-h);
+  background-position: -1px 0px;
+}
+
+.scripter-timeline-marker {
+    text-align: center;
+    color: white;
+    position: absolute;
+    height: 60px;
+    width: 60px;
+    vertical-align: middle;
+    line-height: 60px;
+    margin-top: 15px;
+    top: 0px;
+    z-index: 100;
+    background-color: rgb(43, 74, 133);
+    border: 2px solid black;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+

@@ -1,11 +1,27 @@
+import { ModuleSubType, ModuleType } from "../../astros_enums";
 import { BaseChannel } from "../base_channel";
 
 export class GpioChannel extends BaseChannel {
+  channelNumber: number;
+  defaultHigh: boolean;
 
-    defaultLow: boolean;
-
-    constructor(id: number, channelName: string, defaultLow: boolean, enabled: boolean) {
-        super(id, channelName, enabled);
-        this.defaultLow = defaultLow;
-    }
+  constructor(
+    id: string,
+    parentId: string,
+    channelNumber: number,
+    enabled: boolean,
+    channelName: string,
+    defaultHigh: boolean,
+  ) {
+    super(
+      id,
+      parentId,
+      channelName,
+      ModuleType.gpio,
+      ModuleSubType.genericGpio,
+      enabled,
+    );
+    this.channelNumber = channelNumber;
+    this.defaultHigh = defaultHigh;
+  }
 }

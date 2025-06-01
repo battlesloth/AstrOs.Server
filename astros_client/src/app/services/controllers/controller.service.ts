@@ -2,14 +2,12 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { catchError, tap } from 'rxjs/operators';
-import { ChannelType, AstrOsLocationCollection } from 'astros-common';
-
+import { AstrOsLocationCollection, ScriptChannelType } from 'astros-common';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ControllerService {
-
   private token: string;
 
   constructor(private http: HttpClient) {
@@ -17,63 +15,94 @@ export class ControllerService {
   }
 
   public getLocations(): Observable<AstrOsLocationCollection> {
-
-    return this.http.get<AstrOsLocationCollection>('/api/locations', {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
-      .pipe(tap(_ => console.log('got locations')),
-        catchError(this.handleError<AstrOsLocationCollection>('getLocations'))
+    return this.http
+      .get<AstrOsLocationCollection>('/api/locations', {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
+      .pipe(
+        tap((_) => console.log('got locations')),
+        catchError(this.handleError<AstrOsLocationCollection>('getLocations')),
       );
   }
 
   public getLoadedLocations(): Observable<AstrOsLocationCollection> {
-
-    return this.http.get<AstrOsLocationCollection>('/api/locations/load', {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
-      .pipe(tap(_ => console.log('loaded locations')),
-        catchError(this.handleError<AstrOsLocationCollection>('getLocations'))
-      );
-  }
-
-  public saveLocations(controllers: AstrOsLocationCollection): Observable<any> {
-    return this.http.put<any>('/api/locations', controllers, {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
-      .pipe(
-        tap(_ => console.log(`saveLocations result: ${_.message}`)),
-        catchError(this.handleError<any>('saveLocations'))
-      );
-  }
-
-  public syncControllers(): Observable<any> {
-    return this.http.get<any>('/api/locations/synccontrollers', {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
-      .pipe(
-        tap(_ => console.log(`syncControllers result: ${_.message}`)),
-        catchError(this.handleError<any>('syncLocations'))
-      );
-  }
-
-  public syncLocationConfig(): Observable<any> {
-    return this.http.get<any>('/api/locations/syncconfig', {
-      headers: { Authorization: `Bearer ${this.getToken()}` }
-    })
-      .pipe(
-        tap(_ => console.log(`syncLocationConfig result: ${_.message}`)),
-        catchError(this.handleError<any>('syncLocations'))
-      );
-  }
-
-  sendControllerCommand(controllerId: number, channelType: ChannelType, command: any): Observable<any> {
-    return this.http.post<any>('/api/directcommand', { controller: controllerId, commandType: channelType, command: command },
-      {
-        headers: { Authorization: `Bearer ${this.getToken()}` }
+    return this.http
+      .get<AstrOsLocationCollection>('/api/locations/load', {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
       })
       .pipe(
-        tap(_ => console.log(`direct command result: ${_.message}`)),
-        catchError(this.handleError<any>('sendControllerCommand'))
+        tap((_) => console.log('loaded locations')),
+        catchError(this.handleError<AstrOsLocationCollection>('getLocations')),
+      );
+  }
+
+  public saveLocations(
+    controllers: AstrOsLocationCollection,
+  ): Observable<unknown> {
+    return this.http
+      .put<unknown>('/api/locations', controllers, {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
+      .pipe(
+        tap((val) => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`saveLocations result: ${val.message}`);
+        }),
+        catchError(this.handleError<unknown>('saveLocations')),
+      );
+  }
+
+  public syncControllers(): Observable<unknown> {
+    return this.http
+      .get<unknown>('/api/locations/synccontrollers', {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
+      .pipe(
+        tap((val) => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`syncControllers result: ${val.message}`);
+        }),
+        catchError(this.handleError<unknown>('syncLocations')),
+      );
+  }
+
+  public syncLocationConfig(): Observable<unknown> {
+    return this.http
+      .get<unknown>('/api/locations/syncconfig', {
+        headers: { Authorization: `Bearer ${this.getToken()}` },
+      })
+      .pipe(
+        tap((val) => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`syncLocationConfig result: ${val.message}`);
+        }),
+        catchError(this.handleError<unknown>('syncLocations')),
+      );
+  }
+
+  sendControllerCommand(
+    controllerId: number,
+    moduleType: ScriptChannelType,
+    command: unknown,
+  ): Observable<unknown> {
+    return this.http
+      .post<unknown>(
+        '/api/directcommand',
+        {
+          controller: controllerId,
+          commandType: moduleType,
+          command: command,
+        },
+        {
+          headers: { Authorization: `Bearer ${this.getToken()}` },
+        },
+      )
+      .pipe(
+        tap((val) => {
+          if (val && typeof val === 'object' && 'message' in val)
+            console.log(`direct command result: ${val.message}`);
+        }),
+        catchError(this.handleError<unknown>('sendControllerCommand')),
       );
   }
 
@@ -85,10 +114,10 @@ export class ControllerService {
   }
 
   private handleError<T>(operation = 'operation', result?: T) {
-    return (error: any): Observable<T> => {
-      console.error(error);
+    return (error: unknown): Observable<T> => {
+      console.error(operation, error);
 
       return of(result as T);
-    }
+    };
   }
 }

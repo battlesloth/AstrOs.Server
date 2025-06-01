@@ -1,43 +1,35 @@
-import { M5Page } from "astros-common";
-import { DataAccess } from "../../dal/data_access";
-import { logger } from "../../logger";
-import { RemoteConfigTable } from "../tables/remote_config_table";
+import { logger } from "../../logger.js";
+import { Kysely } from "kysely";
+import { Database } from "../types.js";
 
 export class RemoteConfigRepository {
+  constructor(private readonly db: Kysely<Database>) {}
 
-    dao: DataAccess;
+  async getConfig(type: string) {
+    const result = await this.db
+      .selectFrom("remote_config")
+      .selectAll()
+      .where("type", "=", type)
+      .executeTakeFirstOrThrow()
+      .catch((err) => {
+        logger.error("RemoteConfigRepository.getConfig", err);
+        throw err;
+      });
 
-    constructor(dao: DataAccess) {
-        this.dao = dao;
-        this.dao.connect();
-    }
+    return result.value;
+  }
 
-    async getConfig(type: string) {
+  async saveConfig(type: string, json: string): Promise<boolean> {
+    const data = await this.db
+      .updateTable("remote_config")
+      .set("value", json)
+      .where("type", "=", type)
+      .executeTakeFirstOrThrow()
+      .catch((err) => {
+        logger.error("RemoteConfigRepository.saveConfig", err);
+        throw err;
+      });
 
-        const result = await this.dao.get(RemoteConfigTable.select, [type])
-        .then((val: any) => {
-            return val[0];
-        })
-        .catch((err) => {
-            logger.error(err);
-            return new Array<M5Page>();
-        });
-
-        return result;
-    }
-
-    async saveConfig(type: string, json: string) : Promise<boolean> {
-
-        await this.dao.get(RemoteConfigTable.insert, [type, json])
-        .then((val: any) => {
-            if (val) { logger.info(val); }
-        })
-        .catch((err) => {
-            logger.error(err);
-            return false;
-        });
-
-        return true;
-    }
-    
+    return data.numUpdatedRows > 0;
+  }
 }

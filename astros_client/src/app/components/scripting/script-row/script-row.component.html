@@ -1,0 +1,16 @@
+<div class="script-row-container">
+    <div class="module-container">
+        <select *ngIf="channel && availableChannels" [(ngModel)]="moduleChannelId" (ngModelChange)="onModuleChannelChange($event)">
+            <option *ngFor="let ch of availableChannels" [ngValue]="ch.id">{{ch.name}}</option>
+        </select>
+        <div *ngIf="channel" class="subtitle">{{channelType}}</div>
+        <div class="spacer"></div>
+        <div class="button-bar">
+            <button title="Test" (click)="test()"><fa-icon [icon]="faPlay"></fa-icon></button>
+            <button title="Remove" (click)="remove()"><fa-icon [icon]="faTrash"></fa-icon></button>
+        </div>
+    </div>
+    <div id="script-row-{{channel.id}}" class="timeline-container" (contextmenu)="onTimelineRightClick($event)"
+        #timeline>
+    </div>
+    <div>

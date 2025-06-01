@@ -1,6 +1,6 @@
 {
     "name": "astros-common",
-    "version": "1.0.4",
+    "version": "1.0.6",
     "description": "models for AstrOs Server project",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
@@ -9,12 +9,15 @@
     ],
     "scripts": {
         "prebuild": "eslint . --ext .js,.jsx,.ts,.tsx",
-        "build": "tsc"
+        "build": "tsc",
+        "prettier:check": "prettier --check \"src/**/*.ts\"",
+        "prettier:write": "prettier --write \"src/**/*.ts\""
     },
     "devDependencies": {
         "@typescript-eslint/eslint-plugin": "^5.10.1",
         "@typescript-eslint/parser": "^5.10.1",
         "eslint": "^8.7.0",
+        "prettier": "^3.4.2",
         "typescript": "~5.1.6"
     }
 }

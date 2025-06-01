@@ -71,7 +71,7 @@
             "type": "shell",
             "command": "",
             "windows":{
-                "command": "Copy-Item -Path ${workspaceFolder}/.env -Destination ${workspaceFolder}/astros_api/dist/.env "  
+                "command": "Copy-Item -Path ${workspaceFolder}/astros_api/src/.env -Destination ${workspaceFolder}/astros_api/dist/.env "  
             },
             "options": {
                 "shell": {

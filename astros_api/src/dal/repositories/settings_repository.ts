@@ -1,43 +1,39 @@
-import { DataAccess } from "../data_access";
-import { logger } from "../../logger";
-import { SettingsTable } from "../tables/settings_table";
+import { Kysely } from "kysely";
+import { Database } from "../types.js";
+import { logger } from "../../logger.js";
 
 export class SettingsRepository {
+  constructor(private readonly db: Kysely<Database>) {}
 
-    dao: DataAccess;
+  async getSetting(type: string): Promise<string> {
+    await this.db
+      .selectFrom("settings")
+      .selectAll()
+      .where("key", "=", type)
+      .executeTakeFirstOrThrow()
+      .catch((err) => {
+        logger.error("SettingsRepository.getSetting", err);
+        throw err;
+      });
 
-    constructor(dao: DataAccess) {
-        this.dao = dao;
-        this.dao.connect();
-    }
+    return "error";
+  }
 
-    async getSetting(type: string) : Promise<string> {
+  async saveSetting(key: string, value: string): Promise<boolean> {
+    await this.db
+      .insertInto("settings")
+      .values({ key, value })
+      .onConflict((c) =>
+        c.columns(["key"]).doUpdateSet((eb) => ({
+          value: eb.ref("excluded.value"),
+        })),
+      )
+      .execute()
+      .catch((err) => {
+        logger.error("SettingsRepository.saveSetting", err);
+        throw err;
+      });
 
-        const result = await this.dao.get(SettingsTable.select, [type])
-        .then((val: any) => {
-            return val[0].value;
-        })
-        .catch((err) => {
-            logger.error(err);
-            return '';
-        });
-
-        return result;
-    }
-
-    async saveSetting(key: string, value: string) : Promise<boolean> {
-
-        await this.dao.get(SettingsTable.insert, [key, value])
-        .then((val: any) => {
-            if (val) { logger.info(val); }
-        })
-        .catch((err) => {
-            logger.error(err);
-            return false;
-        });
-
-        return true;
-    }
-
-    
+    return true;
+  }
 }

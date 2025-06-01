@@ -1,0 +1,139 @@
+@use "./src/assets/styles/variables" as v;
+
+.header-box {
+    display: flex;
+    flex-direction: row;
+    width: -webkit-fill-available;
+    margin-right: 30px;
+
+    .header-spacer {
+        flex-grow: 1;
+    }
+
+ 
+    .header-button {
+        button {
+            height: 30px;
+            font-size: small;
+            padding: 5px 10px;
+        }
+    }
+}
+
+.uart-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+
+    li {
+        padding-bottom: 10px;
+    }
+}
+
+.uart-module {
+
+
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+
+    .type {
+        width: 200px;
+        margin-right: 20px;
+
+        select {
+            padding-top: 4px;
+            width: 100%;
+            max-width: 300px;
+            font-size: large;
+            display: block;
+        }
+    }
+
+    .input {
+        flex-grow: 1;
+        margin: 0px;
+        max-width: 400px;
+
+        input {
+            padding: 2px;
+            font-size: large;
+            width: 100%;
+        }
+    }
+
+}
+
+.servo-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+
+    li {
+        border: 2px solid v.$color-dark;
+        padding: 10px;
+    }
+
+   
+}
+
+.i2c-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+
+    li {
+        border: 2px solid v.$color-dark;
+        padding: 10px;
+    }
+
+    .i2c-channel {
+
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+
+        .label {
+            font-size: large;
+            width: 120px;
+        }
+
+        .input {
+            flex-grow: 1;
+            max-width: 400px;
+
+            input {
+                font-size: large;
+                width: 100%;
+            }
+        }
+
+        .enabled {
+            width: 120px;
+            text-align: center;
+            margin: 0px;
+            margin-right: 20px;
+
+        }
+
+    }
+}
+
+.gpio-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+
+    li {
+        border: 2px solid v.$color-dark;
+        padding: 10px;
+    }
+}

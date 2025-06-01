@@ -1,0 +1,14 @@
+.uart-settings {
+  display: flex;
+  flex-direction: row;
+
+  select {
+      width: 100px;
+      height: 30px;
+      font-size: medium;
+  }
+
+  .uart-settings-spacer {
+      width: 20px;
+  }
+}

@@ -36,7 +36,7 @@
             "url": "http://localhost:4200",
             "webRoot": "${workspaceFolder}/astros_client",
             "userDataDir": "${workspaceRoot}/.vscode/edge"
-        }
+        },
     ],
     "compounds": [
         {

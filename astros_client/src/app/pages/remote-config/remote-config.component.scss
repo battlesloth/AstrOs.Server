@@ -1,4 +1,4 @@
-@import '../../../assets/styles/variables';
+@use '../../../assets/styles/variables' as v;
 
 .remote-title {
     display: flex;
@@ -8,7 +8,7 @@
   
     .remote-name{
         font-size: xx-large;
-        font-family: $swfont;
+        font-family: v.$swfont;
         margin: auto;
     }
 
@@ -20,8 +20,8 @@
   
       button{
           font-size: x-large;
-          font-family: $swfont;
-          background-color: $dark-blue;
+          font-family: v.$swfont;
+          background-color: v.$dark-blue;
       }
     }
 }

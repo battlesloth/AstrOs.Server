@@ -1,23 +1,28 @@
-import { ControllerLocation } from "astros-common";
-import { ServoConfig } from "./servo_config";
+import {
+  ControllerLocation,
+  GpioChannel,
+  ModuleSubType,
+  UartModule,
+} from "astros-common";
 
 export class ControllerConfig {
-    id: number;
-    location: string;
-    name: string;
-    address: string;
-    servoChannels: Array<ServoConfig>;
+  id: string;
+  location: string;
+  name: string;
+  address: string;
 
-    constructor(location: ControllerLocation) {
-        this.id = location.controller?.id ?? -1;
-        this.location = location.locationName;
-        this.name = location.controller?.name ?? "";
-        this.address = location.controller?.address ?? "";
+  gpioChannels: Array<GpioChannel>;
+  maestroModules: Array<UartModule>;
 
-        this.servoChannels = new Array<ServoConfig>();
+  constructor(location: ControllerLocation) {
+    this.id = location.controller?.id ?? -1;
+    this.location = location.locationName;
+    this.name = location.controller?.name ?? "";
+    this.address = location.controller?.address ?? "";
 
-        location.servoModule.channels.forEach(ch => {
-            this.servoChannels.push(new ServoConfig(ch.id, ch.minPos, ch.maxPos, ch.enabled, ch.inverted));
-        })
-    }
+    this.gpioChannels = location.gpioModule?.channels ?? [];
+    this.maestroModules = location.uartModules.filter(
+      (mod) => mod.moduleSubType === ModuleSubType.maestro,
+    );
+  }
 }

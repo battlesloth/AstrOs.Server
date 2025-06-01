@@ -1,35 +1,46 @@
-import { Component, ElementRef, OnInit, Renderer2, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import {
+  Component,
+  ElementRef,
+  OnInit,
+  Renderer2,
+  ViewChild,
+} from '@angular/core';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import { TransmissionType } from 'astros-common';
 import { AuthenticationService } from './services/auth/authentication.service';
 import { SnackbarService } from './services/snackbar/snackbar.service';
 import { WebsocketService } from './services/websocket/websocket.service';
+import { NgIf } from '@angular/common';
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+  styleUrls: ['./app.component.scss'],
+  imports: [RouterLink, NgIf, RouterOutlet],
 })
 export class AppComponent implements OnInit {
-
-  title = "AstOs"
-  private menuOpen: boolean = false;
+  title = 'AstOs';
+  private menuOpen = false;
 
   @ViewChild('sideNav', { static: false }) sideNav!: ElementRef;
   @ViewChild('clickDetector', { static: false }) clickDetector!: ElementRef;
 
-  constructor(public auth: AuthenticationService,
+  constructor(
+    public auth: AuthenticationService,
     private renderer: Renderer2,
-    private router: Router,
+    //private router: Router,
     private snackbar: SnackbarService,
-    private socket: WebsocketService) {
-    if (auth.isLoggedIn()) {
-      router.navigate(['status']);
-    }
+    private socket: WebsocketService,
+  ) {
+    //if (auth.isLoggedIn()) {
+    //router.navigate(['status']);
+    //router.navigate(['scripts']);
+    // router.navigate(['modules']);
+    //}
   }
 
   ngOnInit(): void {
-    this.socket.messages.subscribe((msg: any) => {
+    this.socket.messages.subscribe((msg: unknown) => {
       this.handleSocketMessage(msg);
     });
   }
@@ -49,7 +60,18 @@ export class AppComponent implements OnInit {
   closeMenu() {
     this.renderer.setStyle(this.sideNav.nativeElement, 'width', '0px');
     this.renderer.setStyle(this.clickDetector.nativeElement, 'width', '0px');
-    this.menuOpen = false
+    this.menuOpen = false;
+  }
+
+  containerKeyPressed(event: KeyboardEvent) {
+    if (
+      event.key === 'Escape' ||
+      event.key === 'Esc' ||
+      event.key === 'Enter' ||
+      event.key === 'Space'
+    ) {
+      this.closeMenu();
+    }
   }
 
   containerClicked() {
@@ -58,11 +80,13 @@ export class AppComponent implements OnInit {
     }
   }
 
-  private handleSocketMessage(msg: any) {
-    switch (msg.type) {
-      case TransmissionType.sync:
-        this.snackbar.okToast(msg.message);
-        break;
+  private handleSocketMessage(msg: unknown) {
+    if (msg && typeof msg === 'object' && 'type' in msg && 'message' in msg) {
+      switch (msg.type) {
+        case TransmissionType.sync:
+          this.snackbar.okToast(msg.message as string);
+          break;
+      }
     }
   }
 }

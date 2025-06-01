@@ -1,0 +1,44 @@
+<div class="uart-settings">
+    <select
+        [attr.data-testId]="parentTestId + '-kangaroo-uart-channel'" 
+        [(ngModel)]="uartChannel" 
+        (ngModelChange)="onChannelChange($event)"
+        >
+        <option *ngIf="!isMaster" value="1">Channel 1</option>
+        <option value="2">Channel 2</option>
+    </select>
+    <div class="uart-settings-spacer"></div>
+    <select
+        [attr.data-testId]="parentTestId + '-kangaroo-baud'" 
+        [(ngModel)]="baudRate" 
+        (ngModelChange)="onBaudRateChange($event)"
+        >
+        <option value="9600">9600</option>
+        <option value="19200">19200</option>
+        <option value="38400">38400</option>
+        <option value="57600">57600</option>
+        <option value="115200">115200</option>
+    </select>
+</div>
+<div class="kangaroo">
+    <div >
+        <label class="kangaroo-label" for="ch1Name">Channel 1</label>
+        <input 
+            *ngIf="(subModule)"
+            [attr.data-testId]="parentTestId + '-kangaroo-ch1Name'" 
+            class="kangaroo-input" 
+            name="ch1Name" 
+            placeholder="Channel 1"  
+            [(ngModel)]="subModule.ch1Name" />
+    </div>
+    <div >
+        <label class="kangaroo-label" for="ch2Name">Channel 2</label>
+        <input
+            *ngIf="(subModule)" 
+            [attr.data-testId]="parentTestId + '-kangaroo-ch2Name'" 
+            class="kangaroo-input" 
+            name="ch2Name" 
+            placeholder="Channel 2"  
+            [(ngModel)]="subModule.ch2Name" />
+    </div>
+</div>

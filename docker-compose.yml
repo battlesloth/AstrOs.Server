@@ -1,12 +1,11 @@
-version: "3.8"
-
 services:
   web:
+    platform: linux/arm64
     build:
       context: .
       dockerfile: ./astros_client/Dockerfile
       tags:
-        - dirtknap/astros-web:1.1.0
+        - dirtknap/astros-web:1.2.4
         - dirtknap/astros-web:latest
     ports:
       - 8080:80
@@ -15,16 +14,19 @@ services:
       - astronet
   api:
     hostname: astros-api
+    platform: linux/arm64
     build:
       context: .
       dockerfile: ./astros_api/Dockerfile
       tags:
-        - dirtknap/astros-api:1.1.0
+        - dirtknap/astros-api:1.2.4
         - dirtknap/astros-api:latest
     volumes:
       - C:/Test:/root/.config/astrosserver
     networks:
       - astronet
+    devices:
+      - "/dev/ttyUSB0:/dev/ttyS0"
 
 networks:
   astronet:
