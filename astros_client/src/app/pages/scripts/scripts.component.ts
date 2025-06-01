@@ -336,21 +336,18 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
       return { s: 'notuploaded', d: dateString };
     }
 
-    const sidx = script.deploymentStatusKvp
-      .map((s) => {
-        return s.key;
-      })
-      .indexOf(locationId.toString());
+    const status = script.deploymentStatusKvp.find((s) => {
+      return s.value.locationName === locationId;
+    });
 
-    if (sidx < 0) {
+    if (!status) {
       return { s: 'notuploaded', d: dateString };
     }
 
-    const kvp = script.deploymentStatusKvp[sidx];
-    let uploadStatus = kvp.value.value;
+    let uploadStatus = status.value.value;
 
-    if (kvp.value.date) {
-      const uploaddate = new Date(kvp.value.date);
+    if (status.value.date) {
+      const uploaddate = new Date(status.value.date);
       const scriptdate = new Date(script.lastSaved);
       if (uploaddate < scriptdate) {
         uploadStatus = UploadStatus.notUploaded;

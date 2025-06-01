@@ -53,7 +53,7 @@ import {
   ScriptTestModalResources,
   UartEventModalComponent,
   ServoEventModalComponent,
-  DeploymentLocation
+  DeploymentLocation,
 } from '@src/components/modals/scripting';
 import {
   ControllerService,
@@ -71,7 +71,7 @@ import { ModalCallbackEvent } from '@src/components/modals/modal-base/modal-call
 import { ScriptResourcesService } from '@src/services/script-resources/script-resources.service';
 import { ChannelDetails } from '@src/models/scripting';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { ScrollingModule } from '@angular/cdk/scrolling'
+import { ScrollingModule } from '@angular/cdk/scrolling';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 
 export interface MenuItemDetails {
@@ -176,7 +176,6 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   }
 
   ngOnInit(): void {
-
     this.scriptResources.loadResources();
 
     if (this.scriptId === '0') {
@@ -271,7 +270,7 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
       if (detail.assigned) {
         locations.push({
           id: detail.id,
-          name: detail.name.toLocaleLowerCase()
+          name: detail.name.toLocaleLowerCase(),
         });
       }
     });
@@ -916,10 +915,16 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
   startDrag(event: MouseEvent) {
     event.preventDefault();
     this.isDragging = true;
-    this.renderer.setStyle(this.scripterContainer.nativeElement, 'cursor', 'grabbing');
-    this.dragStartX = event.pageX - this.scripterContainer.nativeElement.offsetLeft;
+    this.renderer.setStyle(
+      this.scripterContainer.nativeElement,
+      'cursor',
+      'grabbing',
+    );
+    this.dragStartX =
+      event.pageX - this.scripterContainer.nativeElement.offsetLeft;
     this.scrollLeft = this.scripterContainer.nativeElement.scrollLeft;
-    this.dragStartY = event.pageY - this.scripterContainer.nativeElement.offsetTop;
+    this.dragStartY =
+      event.pageY - this.scripterContainer.nativeElement.offsetTop;
     this.scrollTop = this.scripterContainer.nativeElement.scrollTop;
   }
 
@@ -927,17 +932,21 @@ export class ScripterComponent implements OnInit, AfterViewChecked {
     if (!this.isDragging) return;
     event.preventDefault();
     const x = event.pageX - this.scripterContainer.nativeElement.offsetLeft;
-    const walkX = (x - this.dragStartX);
+    const walkX = x - this.dragStartX;
     this.scripterContainer.nativeElement.scrollLeft = this.scrollLeft - walkX;
 
     const y = event.pageY - this.scripterContainer.nativeElement.offsetTop;
-    const walkY = (y - this.dragStartY);
+    const walkY = y - this.dragStartY;
     this.scripterContainer.nativeElement.scrollTop = this.scrollTop - walkY;
   }
 
   endDrag() {
     this.isDragging = false;
-    this.renderer.setStyle(this.scripterContainer.nativeElement, 'cursor', 'auto');
+    this.renderer.setStyle(
+      this.scripterContainer.nativeElement,
+      'cursor',
+      'auto',
+    );
   }
 
   //#endregion

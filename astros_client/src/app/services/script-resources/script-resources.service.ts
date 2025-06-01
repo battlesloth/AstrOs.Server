@@ -186,7 +186,6 @@ export class ScriptResourcesService {
   //#region Load Resources
 
   public loadResources(): void {
-
     this.locations.clear();
 
     this.genericI2cChannels.clear();
@@ -212,9 +211,8 @@ export class ScriptResourcesService {
   }
 
   private addLocationResources(location: ControllerLocation): void {
-
     const assigned = location.controller?.address ? true : false;
-    
+
     this.locations.set(location.id, {
       id: location.id,
       name: location.locationName,

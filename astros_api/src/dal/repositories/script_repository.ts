@@ -141,6 +141,8 @@ export class ScriptRepository {
       const deployments = await this.db
         .selectFrom("script_deployments")
         .selectAll()
+        .leftJoin("locations", "locations.id", "script_deployments.location_id")
+        .select(["locations.name as location_name"])
         .where("script_id", "=", scr.id)
         .execute()
         .catch((err) => {
@@ -152,6 +154,7 @@ export class ScriptRepository {
         const status = new DeploymentStatus(dep.location_id, {
           date: new Date(dep.last_deployed),
           value: UploadStatus.uploaded,
+          locationName: dep.location_name || "",
         });
         scr.deploymentStatusKvp.push(status);
       }
@@ -186,6 +189,8 @@ export class ScriptRepository {
     const deployments = await this.db
       .selectFrom("script_deployments")
       .selectAll()
+      .leftJoin("locations", "locations.id", "script_deployments.location_id")
+      .select(["locations.name as location_name"])
       .where("script_id", "=", id)
       .execute()
       .catch((err) => {
@@ -197,6 +202,7 @@ export class ScriptRepository {
       const status = new DeploymentStatus(dep.location_id, {
         date: new Date(dep.last_deployed),
         value: UploadStatus.uploaded,
+        locationName: dep.location_name || "",
       });
 
       result.deploymentStatusKvp.push(status);

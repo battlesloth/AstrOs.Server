@@ -151,13 +151,12 @@ export class ScriptTestModalComponent
   }
 
   statusUpdate(msg: ScriptResponse) {
-
-    console.log('message',msg);
+    console.log('message', msg);
 
     const location = this.deploymentLocations.find(
       (loc) => loc.id === msg.locationId,
     );
-    
+
     if (!location) {
       console.warn(`Location with ID ${msg.locationId} not found.`);
       return;
