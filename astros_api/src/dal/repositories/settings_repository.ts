@@ -6,7 +6,7 @@ export class SettingsRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
   async getSetting(type: string): Promise<string> {
-    await this.db
+    const val = await this.db
       .selectFrom("settings")
       .selectAll()
       .where("key", "=", type)
@@ -16,7 +16,7 @@ export class SettingsRepository {
         throw err;
       });
 
-    return "error";
+    return val.value;
   }
 
   async saveSetting(key: string, value: string): Promise<boolean> {

@@ -33,6 +33,17 @@ export class M5PaperConfigComponent implements OnInit {
   currentPage: M5Page;
   currentIndex = 0;
 
+  currentButton1Script = '0';
+  currentButton2Script = '0';
+  currentButton3Script = '0';
+  currentButton4Script = '0';
+  currentButton5Script = '0';
+  currentButton6Script = '0';
+  currentButton7Script = '0';
+  currentButton8Script = '0';
+  currentButton9Script = '0';
+
+
   constructor(
     private scriptService: ScriptsService,
     private remoteService: RemotesService,
@@ -64,17 +75,20 @@ export class M5PaperConfigComponent implements OnInit {
 
     const configObserver = {
       next: (result: unknown) => {
-        if (result && typeof result === 'object' && 'value' in result) {
-          const config = JSON.parse(result.value as string) as M5Page[];
+
+        if (result && typeof result === 'string' && result.length > 0) {
+          const config = JSON.parse(result as string) as M5Page[];
 
           if (config.length != 0) {
             this.m5Config = config;
             this.currentPage = this.m5Config[0];
+            this.setButtonScripts();
           }
         } else {
           this.m5Config = new Array<M5Page>();
           this.m5Config.push(new M5Page());
           this.currentPage = this.m5Config[0];
+          this.setButtonScripts();
         }
       },
     };
@@ -140,6 +154,7 @@ export class M5PaperConfigComponent implements OnInit {
 
     this.currentPage = this.m5Config[this.currentIndex];
     this.pageNumber = this.currentIndex + 1;
+    this.setButtonScripts(); 
   }
 
   pageBackward() {
@@ -151,5 +166,18 @@ export class M5PaperConfigComponent implements OnInit {
 
     this.currentPage = this.m5Config[this.currentIndex];
     this.pageNumber = this.currentIndex + 1;
+    this.setButtonScripts();
+  }
+
+  setButtonScripts() {
+    this.currentButton1Script = this.currentPage.button1.id;
+    this.currentButton2Script = this.currentPage.button2.id;
+    this.currentButton3Script = this.currentPage.button3.id;
+    this.currentButton4Script = this.currentPage.button4.id;
+    this.currentButton5Script = this.currentPage.button5.id;
+    this.currentButton6Script = this.currentPage.button6.id;
+    this.currentButton7Script = this.currentPage.button7.id;
+    this.currentButton8Script = this.currentPage.button8.id;
+    this.currentButton9Script = this.currentPage.button9.id;
   }
 }

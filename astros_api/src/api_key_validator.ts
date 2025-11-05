@@ -9,7 +9,15 @@ export function ApiKeyValidator(): RequestHandler {
 
     const settings = new SettingsRepository(db);
 
-    const token = await settings.getSetting("apikey");
+    let token: string | null = null;
+
+    try {
+      token = await settings.getSetting("apikey");
+    } catch (error) {
+      logger.error("Error retrieving API key from settings", error);
+      res.sendStatus(500);
+      return;
+    }
 
     if (req.headers["x-token"] === undefined) {
       logger.warn("API key missing");
