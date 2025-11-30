@@ -1,65 +1,71 @@
-<div *ngIf="script" class="container">
-    <div *ngIf="!scriptResources.loaded" class="loading-container">
+@if (script) {
+  <div class="container">
+    @if (!scriptResources.loaded) {
+      <div class="loading-container">
         <mat-spinner></mat-spinner>
         <br />
         <div class="loading-text">Loading...</div>
-    </div>
-    <div *ngIf="scriptResources.loaded" class="scripter-content">
+      </div>
+    }
+    @if (scriptResources.loaded) {
+      <div class="scripter-content">
         <div class="script-title">
-            <div class="script-name">
-                <input matInput placeholder="Name" [ngModel]="script.scriptName"
-                    (ngModelChange)="script.scriptName=$event" />
+          <div class="script-name">
+            <input matInput placeholder="Name" [ngModel]="script.scriptName"
+              (ngModelChange)="script.scriptName=$event" />
             </div>
             <div class="script-description">
-                <input matInput placeholder="Description" [ngModel]="script.description"
-                    (ngModelChange)="script.description=$event" />
-            </div>
-            <div class="button-box">
+              <input matInput placeholder="Description" [ngModel]="script.description"
+                (ngModelChange)="script.description=$event" />
+              </div>
+              <div class="button-box">
                 <button (click)="saveScript()">Save</button>
                 <button (click)="saveBeforeTest()">Test</button>
+              </div>
             </div>
-        </div>
-        <div *ngIf="scriptResources.loaded" 
-            id="scripter-container" 
-            class="scripter-container"
-            (mousedown)="startDrag($event)"
-            (mousemove)="drag($event)"
-            (mouseup)="endDrag()"
-            (mouseleave)="endDrag()" 
-            #scripterContainer>
-            <div class="scripter-body">
-                <div class="scripter-header">
+            @if (scriptResources.loaded) {
+              <div
+                id="scripter-container"
+                class="scripter-container"
+                (mousedown)="startDrag($event)"
+                (mousemove)="drag($event)"
+                (mouseup)="endDrag()"
+                (mouseleave)="endDrag()"
+                #scripterContainer>
+                <div class="scripter-body">
+                  <div class="scripter-header">
                     <div class="scripter-module-header" (click)="openChannelAddModal()"
-                        (keypress)="openChannelAddModalKbd($event)" tabindex="0">Add Channel</div>
+                    (keypress)="openChannelAddModalKbd($event)" tabindex="0">Add Channel</div>
                     <div class=" timeline-spacer"></div>
-                    <div *ngFor="let item of timeLineArray;" class="timeline-gradient timeline-header">
-                        {{item.toFixed(1)}}</div>
-                </div>
-                <app-script-row *ngFor="let ch of scriptChannels" id="timeline-{{ch.id}}"
-                    (timelineCallback)="timelineCallback($event)" (removeCallback)="removeCallback($event)"
-                    (channelTestCallback)="channelTestCallback($event)"
-                    (moduleChannelChanged)="moduleChannelChanged($event)"
+                    @for (item of timeLineArray; track item) {
+                      <div class="timeline-gradient timeline-header">
+                      {{item.toFixed(1)}}</div>
+                    }
+                  </div>
+                  @for (ch of scriptChannels; track ch) {
+                    <app-script-row id="timeline-{{ch.id}}"
+                      (timelineCallback)="timelineCallback($event)" (removeCallback)="removeCallback($event)"
+                      (channelTestCallback)="channelTestCallback($event)"
+                      (moduleChannelChanged)="moduleChannelChanged($event)"
                     [availableChannels]="getSelectableChannels(ch.channelType)" [channel]="ch"></app-script-row>
-            </div>
-
-
-
-            <!-- an hidden div is created to set the position of appearance of the menu-->
-            <div style="visibility: hidden; position: fixed;" [style.left.px]="menuTopLeft.x"
+                  }
+                </div>
+                <!-- an hidden div is created to set the position of appearance of the menu-->
+                <div style="visibility: hidden; position: fixed;" [style.left.px]="menuTopLeft.x"
                 [style.top.px]="menuTopLeft.y" [matMenuTriggerFor]="rightMenu"></div>
-
-
-
-            <!-- standard material menu -->
-            <mat-menu #rightMenu="matMenu">
-                <ng-template matMenuContent let-item="item">
+                <!-- standard material menu -->
+                <mat-menu #rightMenu="matMenu">
+                  <ng-template matMenuContent let-item="item">
                     <button (click)="openNewEventModal(item)" mat-menu-item>Add Event</button>
-                </ng-template>
-            </mat-menu>
-        </div>
-    </div>
-</div>
+                  </ng-template>
+                </mat-menu>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
 
-<app-astros-modal id="scripter-modal" disableBackgroundClick="{{backgroundClickDisabled}}" style="display: none;">
-    <ng-template #modalContainer></ng-template>
-</app-astros-modal>
+    <app-astros-modal id="scripter-modal" disableBackgroundClick="{{backgroundClickDisabled}}" style="display: none;">
+      <ng-template #modalContainer></ng-template>
+    </app-astros-modal>

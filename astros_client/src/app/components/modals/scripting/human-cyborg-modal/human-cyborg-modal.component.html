@@ -1,69 +1,73 @@
 <div class="event-modal">
-    <h1>Human Cyborg Relations Event</h1>
-    <div class="modal-body">
-        <div class="spacer"></div>
-        <div class="content">
-            <div>
-                <label for="time">Event Time (seconds)</label>
-                <input name="time" matInput placeholder="Time" type="number" step="0.1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/" 
-                [ngModel]="eventTime | number : '1.0-1'" (ngModelChange)="eventTime = $event" />
-            </div>
-            <div class="hcr-listbox-container">
-                <ul class="hcr-listbox">
-                    <li *ngFor="let command of selectedCommands">
-                        <div class="hcr-list-item">
-                            <div class="hcr-cmd-label">{{formatSelectedCommand(command)}}</div>
-                            <div>
-                                <button class="hcr-remove-cmd" title="remove" (click)="removeCommand(command.id)"><fa-icon [icon]="faRemove"></fa-icon></button>
-                            </div>
-                        </div>
-                    </li>
-                </ul>
-            </div>
-            <hr/>
-            <div>
-                <label class="hcr-primary-label" htmlFor="commandCategory">Command Category</label>
-                <select id="commandCategory" title="Command Category" [(ngModel)]="commandCategory" (change)="categoryChange($event)">
-                    <option value="1">Stimuli</option>
-                    <option value="2">Muse</option>
-                    <option value="3">SD Wav</option>
-                    <option value="4">Stop</option>
-                    <option value="5">Volume</option>
-                    <option value="6">Override</option>
-                </select>
-            </div>
-            <div>
-                <label class="hcr-primary-label" htmlFor="command">Command</label>
-                <select id="command" title="Command" [(ngModel)]="command" (change)="commandChange($event)">
-                    <option [ngValue]="null" disabled>Select Command</option>
-                    <option *ngFor="let command of commands" [ngValue]="command.id">{{command.name}}</option>
-                </select>
-            </div>
-            <div>
-                <label for="valueA">Value A</label>
-                <input id="value-a" name="valueA" matInput placeholder="Value A" type="number" step="1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/" 
-                [ngModel]="valueA | number : '1.0-1'" (ngModelChange)="valueA = $event" disabled/>
-            </div>
-            <div>
-                <label for="valueB">Value B</label>
-                <input id="value-b" name="valueB" matInput placeholder="Value B" type="number" step="1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/" 
-                [ngModel]="valueB | number : '1.0-1'" (ngModelChange)="valueB = $event" disabled/>
+  <h1>Human Cyborg Relations Event</h1>
+  <div class="modal-body">
+    <div class="spacer"></div>
+    <div class="content">
+      <div>
+        <label for="time">Event Time (seconds)</label>
+        <input name="time" matInput placeholder="Time" type="number" step="0.1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/"
+          [ngModel]="eventTime | number : '1.0-1'" (ngModelChange)="eventTime = $event" />
+        </div>
+        <div class="hcr-listbox-container">
+          <ul class="hcr-listbox">
+            @for (command of selectedCommands; track command) {
+              <li>
+                <div class="hcr-list-item">
+                  <div class="hcr-cmd-label">{{formatSelectedCommand(command)}}</div>
+                  <div>
+                    <button class="hcr-remove-cmd" title="remove" (click)="removeCommand(command.id)"><fa-icon [icon]="faRemove"></fa-icon></button>
+                  </div>
+                </div>
+              </li>
+            }
+          </ul>
+        </div>
+        <hr/>
+        <div>
+          <label class="hcr-primary-label" htmlFor="commandCategory">Command Category</label>
+          <select id="commandCategory" title="Command Category" [(ngModel)]="commandCategory" (change)="categoryChange($event)">
+            <option value="1">Stimuli</option>
+            <option value="2">Muse</option>
+            <option value="3">SD Wav</option>
+            <option value="4">Stop</option>
+            <option value="5">Volume</option>
+            <option value="6">Override</option>
+          </select>
+        </div>
+        <div>
+          <label class="hcr-primary-label" htmlFor="command">Command</label>
+          <select id="command" title="Command" [(ngModel)]="command" (change)="commandChange($event)">
+            <option [ngValue]="null" disabled>Select Command</option>
+            @for (command of commands; track command) {
+              <option [ngValue]="command.id">{{command.name}}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label for="valueA">Value A</label>
+          <input id="value-a" name="valueA" matInput placeholder="Value A" type="number" step="1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/"
+            [ngModel]="valueA | number : '1.0-1'" (ngModelChange)="valueA = $event" disabled/>
+          </div>
+          <div>
+            <label for="valueB">Value B</label>
+            <input id="value-b" name="valueB" matInput placeholder="Value B" type="number" step="1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/"
+              [ngModel]="valueB | number : '1.0-1'" (ngModelChange)="valueB = $event" disabled/>
             </div>
             <div class="hcr-button-container">
-                <button class="hcr-button" (click)="addCommand()">Add</button>
+              <button class="hcr-button" (click)="addCommand()">Add</button>
             </div>
             <div class="error">{{errorMessage}}</div>
-        </div>
-        <div class="spacer"></div>
+          </div>
+          <div class="spacer"></div>
 
-    </div>
-    <div class="modal-buttons">
-        <div class="button-spacer"></div>
-        <div class="button-grouper">
+        </div>
+        <div class="modal-buttons">
+          <div class="button-spacer"></div>
+          <div class="button-grouper">
             <button (click)="addEvent();">Save</button>
             <button id="remove_button" class="hidden" (click)="removeEvent();">Remove</button>
             <button (click)="closeModal();">Close</button>
+          </div>
+          <div class="button-spacer"></div>
         </div>
-        <div class="button-spacer"></div>
-    </div>
-</div>
+      </div>

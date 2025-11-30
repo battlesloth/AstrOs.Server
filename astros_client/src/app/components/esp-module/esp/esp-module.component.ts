@@ -9,7 +9,7 @@ import {
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ControllerLocation, ModuleType } from 'astros-common';
 import { UartModuleComponent } from '../uart/uart-module/uart-module.component';
-import { NgIf, NgFor } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 import {
@@ -32,15 +32,13 @@ import { GpioChannelComponent } from '../gpio/gpio-channel/gpio-channel.componen
     MatExpansionPanel,
     MatExpansionPanelHeader,
     MatExpansionPanelTitle,
-    NgIf,
     FormsModule,
     MatExpansionPanelDescription,
-    NgFor,
     UartModuleComponent,
     I2cModuleComponent,
     GpioChannelComponent,
-    FontAwesomeModule,
-  ],
+    FontAwesomeModule
+],
 })
 export class EspModuleComponent {
   @Output()

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { KangarooAction, ScriptChannelType } from 'astros-common';
 import { BaseEventModalComponent } from '../base-event-modal/base-event-modal.component';
-import { NgIf } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
@@ -26,7 +26,7 @@ export interface ChannelTestModalResponse {
     '../base-event-modal/base-event-modal.component.scss',
     './channel-test-modal.component.scss',
   ],
-  imports: [NgIf, FormsModule],
+  imports: [FormsModule],
 })
 export class ChannelTestModalComponent
   extends BaseEventModalComponent

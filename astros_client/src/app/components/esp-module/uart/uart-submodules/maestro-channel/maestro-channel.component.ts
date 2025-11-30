@@ -1,4 +1,4 @@
-import { NgIf } from '@angular/common';
+
 import {
   AfterContentInit,
   Component,
@@ -13,7 +13,7 @@ import { ServoTestEvent } from '../../../utility/module-events';
 
 @Component({
   selector: 'app-maestro-channel',
-  imports: [ServoSettingsComponent, FormsModule, NgIf],
+  imports: [ServoSettingsComponent, FormsModule],
   templateUrl: './maestro-channel.component.html',
   styleUrl: './maestro-channel.component.scss',
 })

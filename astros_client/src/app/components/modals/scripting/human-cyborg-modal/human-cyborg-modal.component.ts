@@ -13,7 +13,7 @@ import {
 } from 'astros-common';
 import { faBan } from '@fortawesome/free-solid-svg-icons';
 import { FormsModule } from '@angular/forms';
-import { NgFor, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
@@ -29,7 +29,7 @@ interface HcrCommandListItem {
     '../base-event-modal/base-event-modal.component.scss',
     './human-cyborg-modal.component.scss',
   ],
-  imports: [FormsModule, NgFor, FontAwesomeModule, DecimalPipe],
+  imports: [FormsModule, FontAwesomeModule, DecimalPipe],
 })
 export class HumanCyborgModalComponent
   extends BaseEventModalComponent

@@ -3,7 +3,7 @@ import { ScriptChannelType } from 'astros-common';
 import { ModalBaseComponent } from '../../modal-base/modal-base.component';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 import { FormsModule } from '@angular/forms';
-import { NgFor, NgIf } from '@angular/common';
+
 import { LocationDetails, ChannelDetails } from '@src/models/scripting';
 
 export class AddChannelModalResources {
@@ -28,7 +28,7 @@ export interface AddChannelModalResponse {
   selector: 'app-add-channel-modal',
   templateUrl: './add-channel-modal.component.html',
   styleUrls: ['./add-channel-modal.component.scss'],
-  imports: [FormsModule, NgFor, NgIf],
+  imports: [FormsModule],
 })
 export class AddChannelModalComponent
   extends ModalBaseComponent

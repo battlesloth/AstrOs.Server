@@ -1,55 +1,59 @@
-<div *ngIf="enabled" class="servo-channel">
+@if (enabled) {
+  <div class="servo-channel">
     <div class="servo-channel-row">
-        <div class="name">
-            <input
-             [attr.data-testId]="testId + '-name'"
-             matInput placeholder="Name" 
-             [(ngModel)]="name" 
-             (ngModelChange)="onNameChange()"/>
+      <div class="name">
+        <input
+          [attr.data-testId]="testId + '-name'"
+          matInput placeholder="Name"
+          [(ngModel)]="name"
+          (ngModelChange)="onNameChange()"/>
         </div>
         <div class="type">
-            <mat-checkbox 
-                [attr.data-testId]="testId + '-invert-cbx'"
-                [(ngModel)]="invert" 
-                labelPosition="before" 
-                (ngModelChange)="onInvertChange()">{{typeLabel}}</mat-checkbox>
+          <mat-checkbox
+            [attr.data-testId]="testId + '-invert-cbx'"
+            [(ngModel)]="invert"
+            labelPosition="before"
+          (ngModelChange)="onInvertChange()">{{typeLabel}}</mat-checkbox>
         </div>
-    </div>
-    <div *ngIf="isServo" class="servo-channel-row">
-        <div class="ms-value">
+      </div>
+      @if (isServo) {
+        <div class="servo-channel-row">
+          <div class="ms-value">
             <div class="label-ms">Min μS</div>
             <div class="limit">
-                <input
-                    [attr.data-testId]="testId + '-minPulse'" 
-                    matInput 
-                    placeholder="500" 
-                    [(ngModel)]="minPulse" 
-                    (ngModelChange)="onMinPulseChange()" />
+              <input
+                [attr.data-testId]="testId + '-minPulse'"
+                matInput
+                placeholder="500"
+                [(ngModel)]="minPulse"
+                (ngModelChange)="onMinPulseChange()" />
+              </div>
             </div>
-        </div>
-        <div class="spacer"></div>
-        <div class="ms-value">
-            <div class="label-ms">Max μS</div>
-            <div class="limit">
+            <div class="spacer"></div>
+            <div class="ms-value">
+              <div class="label-ms">Max μS</div>
+              <div class="limit">
                 <input
-                    [attr.data-testId]="testId + '-maxPulse'" 
-                    matInput 
-                    placeholder="2500" 
-                    [(ngModel)]="maxPulse" 
-                    (ngModelChange)="onMaxPulseChange()"/>
-            </div>
-        </div>
-        <div class="spacer"></div>
-        <div class="ms-value">
-            <div class="label-ms">Home μS</div>
-            <div class="limit">
-                <input
-                    [attr.data-testId]="testId + '-homePosition'" 
-                    matInput 
-                    placeholder="500" 
-                    [(ngModel)]="homePosition" 
+                  [attr.data-testId]="testId + '-maxPulse'"
+                  matInput
+                  placeholder="2500"
+                  [(ngModel)]="maxPulse"
+                  (ngModelChange)="onMaxPulseChange()"/>
+                </div>
+              </div>
+              <div class="spacer"></div>
+              <div class="ms-value">
+                <div class="label-ms">Home μS</div>
+                <div class="limit">
+                  <input
+                    [attr.data-testId]="testId + '-homePosition'"
+                    matInput
+                    placeholder="500"
+                    [(ngModel)]="homePosition"
                     (ngModelChange)="onHomeChange()"/>
-            </div>
-        </div>
-    </div>
-</div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }

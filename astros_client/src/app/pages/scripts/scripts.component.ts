@@ -23,7 +23,7 @@ import {
 import { ScriptsService } from 'src/app/services/scripts/scripts.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
 import { WebsocketService } from 'src/app/services/websocket/websocket.service';
-import { NgFor } from '@angular/common';
+
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
   ModalComponent,
@@ -42,7 +42,7 @@ interface DeleteConfirmEvent {
   selector: 'app-scripts',
   templateUrl: './scripts.component.html',
   styleUrls: ['./scripts.component.scss'],
-  imports: [NgFor, RouterLink, FontAwesomeModule, ModalComponent],
+  imports: [RouterLink, FontAwesomeModule, ModalComponent],
 })
 export class ScriptsComponent implements OnInit, AfterViewChecked {
   @ViewChild('modalContainer', { read: ViewContainerRef })

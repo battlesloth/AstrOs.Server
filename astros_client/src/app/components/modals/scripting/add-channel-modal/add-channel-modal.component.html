@@ -1,32 +1,38 @@
 <div class="channel-modal">
-    <h1>Select Channel</h1>
-    <div class="modal-body">
-        <select id="controller-select" title="Contoller" [(ngModel)]="selectedController"
-            (change)="modalChanged($event)">
-            <option *ngFor="let c of controllers" value="{{c.id}}">{{c.name}}
-            </option>
-        </select>
-        <select id="module-select" title="Channel Type" [(ngModel)]="selectedChannelType"
-            (change)="modalChanged($event)">
-            <option *ngFor="let ch of channelTypes" value="{{ch.id}}">{{ch.name}}</option>
-        </select>
-        <select id="channel-select" 
-            title="Channel"         
-            [(ngModel)]="selectedChannels"
-            [multiple]="true">
-            <option value="-1" disabled selected>Select Channel</option>
-            <ng-container *ngFor="let ch of channels">
-                <option *ngIf="ch.available" value="{{ch.id}}">{{ch.name}}</option>
-            </ng-container>
-        </select>
-        <div class="error">{{errorMessage}}</div>
+  <h1>Select Channel</h1>
+  <div class="modal-body">
+    <select id="controller-select" title="Contoller" [(ngModel)]="selectedController"
+      (change)="modalChanged($event)">
+      @for (c of controllers; track c) {
+        <option value="{{c.id}}">{{c.name}}
+        </option>
+      }
+    </select>
+    <select id="module-select" title="Channel Type" [(ngModel)]="selectedChannelType"
+      (change)="modalChanged($event)">
+      @for (ch of channelTypes; track ch) {
+        <option value="{{ch.id}}">{{ch.name}}</option>
+      }
+    </select>
+    <select id="channel-select"
+      title="Channel"
+      [(ngModel)]="selectedChannels"
+      [multiple]="true">
+      <option value="-1" disabled selected>Select Channel</option>
+      @for (ch of channels; track ch) {
+        @if (ch.available) {
+          <option value="{{ch.id}}">{{ch.name}}</option>
+        }
+      }
+    </select>
+    <div class="error">{{errorMessage}}</div>
+  </div>
+  <div class="modal-buttons">
+    <div class="button-spacer"></div>
+    <div class="button-grouper">
+      <button (click)="addChannel();">Add</button>
+      <button (click)="closeModal();">Close</button>
     </div>
-    <div class="modal-buttons">
-        <div class="button-spacer"></div>
-        <div class="button-grouper">
-            <button (click)="addChannel();">Add</button>
-            <button (click)="closeModal();">Close</button>
-        </div>
-        <div class="button-spacer"></div>
-    </div>
+    <div class="button-spacer"></div>
+  </div>
 </div>

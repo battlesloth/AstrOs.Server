@@ -1,4 +1,4 @@
-import { NgIf } from '@angular/common';
+
 import {
   Component,
   EventEmitter,
@@ -12,7 +12,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 
 @Component({
   selector: 'app-servo-settings',
-  imports: [MatCheckboxModule, FormsModule, NgIf],
+  imports: [MatCheckboxModule, FormsModule],
   templateUrl: './servo-settings.component.html',
   styleUrl: './servo-settings.component.scss',
 })

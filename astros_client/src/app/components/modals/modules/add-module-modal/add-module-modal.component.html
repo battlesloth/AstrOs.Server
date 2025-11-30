@@ -1,22 +1,24 @@
 <div class="add-module-modal">
-    <h1>Add Module</h1>
-    <div class="modal-body">
-        <select data-testId="modal-module-select" 
-            id="module-select" 
-            title="Module" 
-            [(ngModel)]="selectedSubType" 
-            (change)="modalChange($event)"
-            >
-            <option value="0" disabled selected>Select Module Type</option>
-            <option *ngFor="let o of options" value="{{o.id}}">{{o.value}}</option>
-        </select>
-        </div> 
-        <div class="modal-buttons">
-            <div class="button-spacer"></div>
-            <div class="button-grouper">
-                <button data-testId="modal-add-module" (click)="addModule();">Add</button>
-                <button data-testId="modal-close" (click)="closeModal();">Close</button>
-            </div>
-            <div class="button-spacer"></div>
-        </div>
+  <h1>Add Module</h1>
+  <div class="modal-body">
+    <select data-testId="modal-module-select"
+      id="module-select"
+      title="Module"
+      [(ngModel)]="selectedSubType"
+      (change)="modalChange($event)"
+      >
+      <option value="0" disabled selected>Select Module Type</option>
+      @for (o of options; track o) {
+        <option value="{{o.id}}">{{o.value}}</option>
+      }
+    </select>
+  </div>
+  <div class="modal-buttons">
+    <div class="button-spacer"></div>
+    <div class="button-grouper">
+      <button data-testId="modal-add-module" (click)="addModule();">Add</button>
+      <button data-testId="modal-close" (click)="closeModal();">Close</button>
+    </div>
+    <div class="button-spacer"></div>
+  </div>
 </div>

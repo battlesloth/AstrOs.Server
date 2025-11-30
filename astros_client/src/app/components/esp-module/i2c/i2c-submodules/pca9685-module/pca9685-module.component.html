@@ -1,11 +1,14 @@
 <div class="i2c-settings">
-    <select 
-        *ngIf="module" 
-        [(ngModel)]="i2cAddress" 
-        (ngModelChange)="onI2cAddressChange($event)">
-        <option *ngFor="let addr of addresses" [value]="addr">Address {{addr}}</option>
+  @if (module) {
+    <select
+      [(ngModel)]="i2cAddress"
+      (ngModelChange)="onI2cAddressChange($event)">
+      @for (addr of addresses; track addr) {
+        <option [value]="addr">Address {{addr}}</option>
+      }
     </select>
+  }
 </div>
-<div> 
-    <h3>Not Yet Implemented</h3>
+<div>
+  <h3>Not Yet Implemented</h3>
 </div>

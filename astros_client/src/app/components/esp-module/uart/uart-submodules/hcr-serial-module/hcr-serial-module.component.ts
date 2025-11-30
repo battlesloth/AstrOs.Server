@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';
 import { FormsModule } from '@angular/forms';
-import { NgIf } from '@angular/common';
+
 
 @Component({
   selector: 'app-hcr-serial-module',
@@ -10,7 +10,7 @@ import { NgIf } from '@angular/common';
     '../base-uart-sub-module/base-uart-sub-module.component.scss',
     './hcr-serial-module.component.scss',
   ],
-  imports: [NgIf, FormsModule],
+  imports: [FormsModule],
 })
 export class HcrSerialModuleComponent
   extends BaseUartSubModuleComponent
