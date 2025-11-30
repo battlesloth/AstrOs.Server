@@ -37,6 +37,7 @@
     "astros-common": "file:../astros_common",
     "crypto-randomuuid": "^1.0.0",
     "guid-typescript": "^1.0.9",
+    "pixi.js": "^8.14.3",
     "rxjs": "~7.4.0",
     "tslib": "^2.3.0",
     "ws": "^8.2.3",

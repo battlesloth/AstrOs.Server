@@ -10,6 +10,7 @@ import { ScriptsComponent } from './pages/scripts/scripts.component';
 import { SettingsComponent } from './pages/settings/settings.component';
 import { StatusComponent } from './pages/status/status.component';
 import { LocationStrategy, PathLocationStrategy } from '@angular/common';
+import { PixiComponent } from './pages/pixi/pixi.component';
 
 const routes: Routes = [
   {
@@ -71,6 +72,12 @@ const routes: Routes = [
     canActivate: [AuthGuard],
     title: 'AstrOs - Utility',
   },
+  {
+    path: 'pixi',
+    component: PixiComponent,
+    canActivate: [AuthGuard],
+    title: 'AstrOs - PixiJS Test',
+  }
 ];
 
 @NgModule({
