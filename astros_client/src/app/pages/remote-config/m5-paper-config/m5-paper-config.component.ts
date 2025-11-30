@@ -69,10 +69,15 @@ export class M5PaperConfigComponent implements OnInit {
         for (const s of scriptList) {
           this.scripts.push({ id: s.id, name: s.scriptName });
         }
+        this.loadConfig();
       },
       error: (err: unknown) => console.error(err),
     };
 
+    this.scriptService.getAllScripts().subscribe(scriptObserver);
+  }
+
+  loadConfig() {
     const configObserver = {
       next: (result: unknown) => {
 
@@ -93,18 +98,29 @@ export class M5PaperConfigComponent implements OnInit {
       },
     };
 
-    this.scriptService.getAllScripts().subscribe(scriptObserver);
     this.remoteService.getRemoteConfig().subscribe(configObserver);
   }
 
-  selectionChange(button: number, id: string) {
-    const sIdx = this.scripts
-      .map((s) => {
-        return s.id;
-      })
-      .indexOf(id);
+  selectionChange(button: number, newId: string) {
 
-    const scriptName = this.scripts[sIdx].name;
+    let id = newId;
+    let scriptName = 'None';
+
+    if (id !== '0') {
+      const sIdx = this.scripts
+        .map((s) => {
+          return s.id;
+        })
+        .indexOf(id);
+      if (sIdx === -1) {
+        console.error(`Script ID ${id} not found in scripts list.`);
+        id = '0';
+        scriptName = 'None';
+
+      } else {
+        scriptName = this.scripts[sIdx].name;
+      }
+    }
 
     switch (button) {
       case 1:
@@ -154,7 +170,7 @@ export class M5PaperConfigComponent implements OnInit {
 
     this.currentPage = this.m5Config[this.currentIndex];
     this.pageNumber = this.currentIndex + 1;
-    this.setButtonScripts(); 
+    this.setButtonScripts();
   }
 
   pageBackward() {
@@ -170,14 +186,14 @@ export class M5PaperConfigComponent implements OnInit {
   }
 
   setButtonScripts() {
-    this.currentButton1Script = this.currentPage.button1.id;
-    this.currentButton2Script = this.currentPage.button2.id;
-    this.currentButton3Script = this.currentPage.button3.id;
-    this.currentButton4Script = this.currentPage.button4.id;
-    this.currentButton5Script = this.currentPage.button5.id;
-    this.currentButton6Script = this.currentPage.button6.id;
-    this.currentButton7Script = this.currentPage.button7.id;
-    this.currentButton8Script = this.currentPage.button8.id;
-    this.currentButton9Script = this.currentPage.button9.id;
+    this.currentButton1Script = this.currentPage.button1?.id || '0';
+    this.currentButton2Script = this.currentPage.button2?.id || '0';
+    this.currentButton3Script = this.currentPage.button3?.id || '0';
+    this.currentButton4Script = this.currentPage.button4?.id || '0';
+    this.currentButton5Script = this.currentPage.button5?.id || '0';
+    this.currentButton6Script = this.currentPage.button6?.id || '0';
+    this.currentButton7Script = this.currentPage.button7?.id || '0';
+    this.currentButton8Script = this.currentPage.button8?.id || '0';
+    this.currentButton9Script = this.currentPage.button9?.id || '0';
   }
 }

@@ -10,26 +10,30 @@ export class RemoteConfigRepository {
       .selectFrom("remote_config")
       .selectAll()
       .where("type", "=", type)
-      .executeTakeFirstOrThrow()
+      .executeTakeFirst()
       .catch((err) => {
         logger.error("RemoteConfigRepository.getConfig", err);
         throw err;
       });
 
-    return result.value;
+    return result;
   }
 
   async saveConfig(type: string, json: string): Promise<boolean> {
-    const data = await this.db
-      .updateTable("remote_config")
-      .set("value", json)
-      .where("type", "=", type)
-      .executeTakeFirstOrThrow()
+    await this.db
+      .insertInto("remote_config")
+      .values({ type, value: json })
+      .onConflict((c) =>
+        c.column("type").doUpdateSet({
+          value: json,
+        })
+      )
+      .execute()
       .catch((err) => {
         logger.error("RemoteConfigRepository.saveConfig", err);
         throw err;
       });
 
-    return data.numUpdatedRows > 0;
+    return true;
   }
 }

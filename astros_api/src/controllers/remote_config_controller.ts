@@ -15,7 +15,13 @@ export class RemoteConfigController {
 
       const scripts = await repo.getConfig("astrOsScreen");
 
-      const val = JSON.parse(scripts) as Array<M5Page>;
+      const val = JSON.parse(scripts?.value || "[]") as Array<M5Page>;
+
+      if (!val || val.length === 0) {
+        res.status(200);
+        res.json(new M5ScriptList());
+        return;
+      }
 
       const response = new M5ScriptList();
       val.forEach((x) => {
@@ -51,7 +57,7 @@ export class RemoteConfigController {
       const scripts = await repo.getConfig("astrOsScreen");
 
       res.status(200);
-      res.json(scripts || { value: "[]" });
+      res.json(scripts?.value || { value: "[]" });
     } catch (error) {
       logger.error(error);
 
