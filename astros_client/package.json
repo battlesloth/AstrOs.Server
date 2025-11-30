@@ -12,7 +12,7 @@
     "build-storybook": "ng run client:build-storybook",
     "lint": "ng lint",
     "lint:fix": "ng lint --fix",
-    "prettier:check": "prettier --check \"src/**/*.ts\"",
+    "prettnpmier:check": "prettier --check \"src/**/*.ts\"",
     "prettier:write": "prettier --write \"src/**/*.ts\""
   },
   "private": true,
