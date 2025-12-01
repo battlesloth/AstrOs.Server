@@ -56,8 +56,8 @@
     "@storybook/builder-vite": "^10.1.2",
     "@types/jasmine": "~3.10.0",
     "@types/node": "^22.10.5",
-    "angular-eslint": "19.0.2",
-    "eslint": "^9.16.0",
+    "angular-eslint": "20.7.0",
+    "eslint": "^9.28.0",
     "eslint-plugin-storybook": "10.1.2",
     "jasmine-core": "~3.10.0",
     "jest-mock-extended": "^4.0.0-beta1",
@@ -69,7 +69,7 @@
     "prettier": "^3.4.2",
     "storybook": "^10.1.2",
     "typescript": "^5.9.3",
-    "typescript-eslint": "8.18.0",
+    "typescript-eslint": "^8.33.1",
     "vite-tsconfig-paths": "^5.1.4"
   }
 }
