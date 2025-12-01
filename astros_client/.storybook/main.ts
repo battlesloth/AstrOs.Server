@@ -22,7 +22,7 @@ const config: StorybookConfig & StorybookConfigVite = {
           "@storybook/angular",
           "@storybook/angular/dist/client",
           "@angular/compiler",
-          "@storybook/blocks",
+          "@storybook/addon-docs/blocks",
           "tslib",
 
         ],
@@ -39,12 +39,7 @@ const config: StorybookConfig & StorybookConfigVite = {
     });
   },
   stories: ["../src/**/*.mdx", "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
-  addons: [
-    //"@storybook/addon-onboarding",
-    "@storybook/addon-essentials",
-    //"@chromatic-com/storybook",
-    "@storybook/addon-interactions",
-  ],
+  addons: ["@storybook/addon-docs"],
   framework: {
     name: "@storybook/angular",
     options: {},
