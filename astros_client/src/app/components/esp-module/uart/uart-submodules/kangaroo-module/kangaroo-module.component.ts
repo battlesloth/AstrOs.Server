@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { KangarooX2 } from 'astros-common';
 import { FormsModule } from '@angular/forms';
 import { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';
-import { NgIf } from '@angular/common';
+
 
 @Component({
   selector: 'app-kangaroo-module',
@@ -11,7 +11,7 @@ import { NgIf } from '@angular/common';
     '../base-uart-sub-module/base-uart-sub-module.component.scss',
     './kangaroo-module.component.scss',
   ],
-  imports: [NgIf, FormsModule],
+  imports: [FormsModule],
 })
 export class KangarooModuleComponent
   extends BaseUartSubModuleComponent

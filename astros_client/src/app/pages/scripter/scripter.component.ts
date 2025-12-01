@@ -28,7 +28,7 @@ import {
 } from 'astros-common';
 import EventMarkerHelper from './helper/event-marker-helper';
 import { FormsModule } from '@angular/forms';
-import { NgFor, NgIf } from '@angular/common';
+
 import {
   ModuleChannelChangedEvent,
   ScriptRowComponent,
@@ -94,8 +94,6 @@ type ScripterModal =
   styleUrls: ['./scripter.component.scss'],
   imports: [
     FormsModule,
-    NgFor,
-    NgIf,
     ScriptRowComponent,
     MatMenuTrigger,
     MatMenu,
@@ -104,8 +102,8 @@ type ScripterModal =
     ModalComponent,
     MatProgressSpinnerModule,
     ScrollingModule,
-    DragDropModule,
-  ],
+    DragDropModule
+],
 })
 export class ScripterComponent implements OnInit, AfterViewChecked {
   @ViewChild(MatMenuTrigger)

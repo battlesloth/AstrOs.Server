@@ -2,7 +2,7 @@ import { AfterContentInit, Component } from '@angular/core';
 import { ModalBaseComponent } from '../../modal-base/modal-base.component';
 import { ModuleType } from 'astros-common';
 import { ModuleSubType } from 'astros-common';
-import { NgForOf } from '@angular/common';
+
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 import { FormsModule } from '@angular/forms';
 
@@ -26,7 +26,7 @@ export interface ModuleSubTypeSelection {
 
 @Component({
   selector: 'app-add-module-modal',
-  imports: [NgForOf, FormsModule],
+  imports: [FormsModule],
   templateUrl: './add-module-modal.component.html',
   styleUrl: './add-module-modal.component.scss',
 })

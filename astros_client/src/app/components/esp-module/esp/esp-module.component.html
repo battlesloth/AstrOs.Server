@@ -1,72 +1,84 @@
 <mat-accordion>
-    <mat-expansion-panel [expanded]="uartPanelOpenState" (closed)="uartPanelOpenState = false">
-        <mat-expansion-panel-header [attr.data-testId]="parentTestId + '-serial-header'">
-            <mat-panel-title>Serial Modules</mat-panel-title>
-            <mat-panel-description>
-                <div class="header-box">
-                    <div class="header-spacer"></div>
-                    <div class="header-button">
-                        <button 
-                            [attr.data-testId]="parentTestId + '-add-serial'" 
-                            (click)="addUartModule($event)"
-                            >
-                            <fa-icon [icon]="addIcon"/>
-                        </button>
-                    </div>
-                </div>
-            </mat-panel-description>
-        </mat-expansion-panel-header>
-        <ul *ngIf="(location?.uartModules)" class="uart-list">
-            <li *ngFor="let module of location.uartModules">
-                <app-uart-module 
-                    (removeModuleEvent)="removeModule($event)" 
-                    (servoTestEvent)="onServoTestEvent($event)"
-                    [module]="module" 
-                    [isMaster]="isMaster"
-                    [parentTestId]="parentTestId"/>
+  <mat-expansion-panel [expanded]="uartPanelOpenState" (closed)="uartPanelOpenState = false">
+    <mat-expansion-panel-header [attr.data-testId]="parentTestId + '-serial-header'">
+      <mat-panel-title>Serial Modules</mat-panel-title>
+      <mat-panel-description>
+        <div class="header-box">
+          <div class="header-spacer"></div>
+          <div class="header-button">
+            <button
+              [attr.data-testId]="parentTestId + '-add-serial'"
+              (click)="addUartModule($event)"
+              >
+              <fa-icon [icon]="addIcon"/>
+            </button>
+          </div>
+        </div>
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+    @if ((location?.uartModules)) {
+      <ul class="uart-list">
+        @for (module of location.uartModules; track module) {
+          <li>
+            <app-uart-module
+              (removeModuleEvent)="removeModule($event)"
+              (servoTestEvent)="onServoTestEvent($event)"
+              [module]="module"
+              [isMaster]="isMaster"
+              [parentTestId]="parentTestId"/>
             </li>
+          }
         </ul>
+      }
     </mat-expansion-panel>
     <mat-expansion-panel [expanded]="i2cPanelOpenState" (closed)="i2cPanelOpenState = false">
-        <mat-expansion-panel-header [attr.data-testId]="parentTestId + '-i2c-header'">
-            <mat-panel-title>I2C configuration</mat-panel-title>
-            <mat-panel-description>
-                <div class="header-box">
-                    <div class="header-spacer"></div>
-                    <div class="header-button">
-                        <button 
-                            [attr.data-testId]="parentTestId + '-add-i2c'" 
-                            (click)="addI2cModule($event)"
-                            >
-                            <fa-icon [icon]="addIcon"/>
-                        </button>
-                    </div>
-                </div>
-            </mat-panel-description>
-        </mat-expansion-panel-header>
-        <ul *ngIf="(location?.i2cModules)" class="i2c-list">
-            <li *ngFor="let module of location.i2cModules">
-                <app-i2c-module 
-                    (removeModuleEvent)="removeModule($event)" 
-                    (i2cAddressChangedEvent)="i2cAddressChanged($event)"
-                    [updateTrigger]="i2cUpdateTrigger"
-                    [module]="module" 
-                    [parentTestId]="parentTestId"
-                    />
-            </li> 
-        </ul>
-    </mat-expansion-panel>
-    <mat-expansion-panel>
+      <mat-expansion-panel-header [attr.data-testId]="parentTestId + '-i2c-header'">
+        <mat-panel-title>I2C configuration</mat-panel-title>
+        <mat-panel-description>
+          <div class="header-box">
+            <div class="header-spacer"></div>
+            <div class="header-button">
+              <button
+                [attr.data-testId]="parentTestId + '-add-i2c'"
+                (click)="addI2cModule($event)"
+                >
+                <fa-icon [icon]="addIcon"/>
+              </button>
+            </div>
+          </div>
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      @if ((location?.i2cModules)) {
+        <ul class="i2c-list">
+          @for (module of location.i2cModules; track module) {
+            <li>
+              <app-i2c-module
+                (removeModuleEvent)="removeModule($event)"
+                (i2cAddressChangedEvent)="i2cAddressChanged($event)"
+                [updateTrigger]="i2cUpdateTrigger"
+                [module]="module"
+                [parentTestId]="parentTestId"
+                />
+              </li>
+            }
+          </ul>
+        }
+      </mat-expansion-panel>
+      <mat-expansion-panel>
         <mat-expansion-panel-header [attr.data-testId]="parentTestId + '-gpio-header'">
-            <mat-panel-title>GPIO configuration</mat-panel-title>
+          <mat-panel-title>GPIO configuration</mat-panel-title>
         </mat-expansion-panel-header>
-        <ul *ngIf="(location?.gpioModule)" class="servo-list">
-            <li *ngFor="let channel of location.gpioModule.channels">
-                <app-gpio-channel 
-                    [channel]="channel"
-                    [parentTestId]="parentTestId">
+        @if ((location?.gpioModule)) {
+          <ul class="servo-list">
+            @for (channel of location.gpioModule.channels; track channel) {
+              <li>
+                <app-gpio-channel
+                  [channel]="channel"
+                  [parentTestId]="parentTestId">
                 </app-gpio-channel>
-            </li>
-        </ul>
-    </mat-expansion-panel>
-</mat-accordion>
+              </li>
+            }
+          </ul>
+        }
+      </mat-expansion-panel>
+    </mat-accordion>

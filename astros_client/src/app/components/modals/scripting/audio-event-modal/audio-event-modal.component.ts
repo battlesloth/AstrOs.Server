@@ -6,7 +6,7 @@ import {
   ScriptEventModalResources,
 } from '../base-event-modal/base-event-modal.component';
 import { FormsModule } from '@angular/forms';
-import { NgFor, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
 
 export class AudioEventModalResources {
@@ -21,7 +21,7 @@ export class AudioEventModalResources {
     '../base-event-modal/base-event-modal.component.scss',
     './audio-event-modal.component.scss',
   ],
-  imports: [FormsModule, NgFor, DecimalPipe],
+  imports: [FormsModule, DecimalPipe],
 })
 export class AudioEventModalComponent
   extends BaseEventModalComponent

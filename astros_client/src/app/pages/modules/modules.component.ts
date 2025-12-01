@@ -38,7 +38,7 @@ import {
 } from '@src/components/modals';
 import { ModalCallbackEvent } from '../../components/modals/modal-base/modal-callback-event';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { NgIf, NgFor } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import {
   AddModuleEvent,
@@ -80,12 +80,10 @@ interface Caption {
     MatExpansionPanelHeader,
     MatExpansionPanelTitle,
     FontAwesomeModule,
-    NgIf,
     FormsModule,
     EspModuleComponent,
-    NgFor,
-    ModalComponent,
-  ],
+    ModalComponent
+],
 })
 export class ModulesComponent implements AfterViewInit {
   @ViewChild('modalContainer', { read: ViewContainerRef })

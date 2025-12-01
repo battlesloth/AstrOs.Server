@@ -10,13 +10,13 @@ import { TransmissionType } from 'astros-common';
 import { AuthenticationService } from './services/auth/authentication.service';
 import { SnackbarService } from './services/snackbar/snackbar.service';
 import { WebsocketService } from './services/websocket/websocket.service';
-import { NgIf } from '@angular/common';
+
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss'],
-  imports: [RouterLink, NgIf, RouterOutlet],
+  imports: [RouterLink, RouterOutlet],
 })
 export class AppComponent implements OnInit {
   title = 'AstOs';

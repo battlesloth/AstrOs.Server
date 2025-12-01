@@ -1,75 +1,85 @@
 <div class="event-modal">
-    <h1>Channel Test</h1>
-    <div class="modal-body">
-        <div class="spacer"></div>
-        <div class="content">
+  <h1>Channel Test</h1>
+  <div class="modal-body">
+    <div class="spacer"></div>
+    <div class="content">
 
 
-            <div *ngIf="scriptChannelType === 1">
-                <div>
-                    <label for="position">Position</label>
-                    <input name="position" matInput placeholder="Position" [(ngModel)]="position" type="number" min="0"
-                        max="100" (keypress)="($event.charCode >= 48 && $event.charCode < 58)"
-                        (change)="position < 0 ? position = 0 : position; position > 100 ? position = 100 : position;" />
-                </div>
-                <div>
-                    <label for="speed">Speed</label>
-                    <input name="speed" matInput placeholder="Speed" [(ngModel)]="speed" type="number" min="0" max="100"
-                        (keypress)="($event.charCode >= 48 && $event.charCode < 58)"
-                        (change)="speed < 0 ? speed = 0 : speed; speed > 10 ? speed = 10 : speed;" />
-                </div>
+      @if (scriptChannelType === 1) {
+        <div>
+          <div>
+            <label for="position">Position</label>
+            <input name="position" matInput placeholder="Position" [(ngModel)]="position" type="number" min="0"
+              max="100" (keypress)="($event.charCode >= 48 && $event.charCode < 58)"
+              (change)="position < 0 ? position = 0 : position; position > 100 ? position = 100 : position;" />
             </div>
-            <div *ngIf="scriptChannelType === 2">
-                <label for="value">GPIO Command</label>
-                <select id="gpiolevel" title="GPIO Level" [(ngModel)]="gpioLevel" (change)="selectChange($event)">
-                    <option value="0">Low</option>
-                    <option value="1">High</option>
+            <div>
+              <label for="speed">Speed</label>
+              <input name="speed" matInput placeholder="Speed" [(ngModel)]="speed" type="number" min="0" max="100"
+                (keypress)="($event.charCode >= 48 && $event.charCode < 58)"
+                (change)="speed < 0 ? speed = 0 : speed; speed > 10 ? speed = 10 : speed;" />
+              </div>
+            </div>
+          }
+          @if (scriptChannelType === 2) {
+            <div>
+              <label for="value">GPIO Command</label>
+              <select id="gpiolevel" title="GPIO Level" [(ngModel)]="gpioLevel" (change)="selectChange($event)">
+                <option value="0">Low</option>
+                <option value="1">High</option>
+              </select>
+            </div>
+          }
+          @if (scriptChannelType === 4) {
+            <div>
+              <label for="value">I2C Command</label>
+              <input name="value" matInput placeholder="Value" [(ngModel)]="value" />
+            </div>
+          }
+          @if (scriptChannelType === 5) {
+            <div>
+              <label for="value">Serial Command</label>
+              <input name="value" matInput placeholder="Value" [(ngModel)]="value" />
+            </div>
+          }
+          @if (scriptChannelType === 6) {
+            <div>
+              <div>
+                <label class="kangaroo-channel-label" for="chselect">Kangaroo Channel</label>
+                <select id="chselect" title="kangaroo channel" [(ngModel)]="kangarooCh"
+                  (change)="selectChange($event)">
+                  <option value="1">Channel 1</option>
+                  <option value="2">Channel 2</option>
                 </select>
-            </div>
-            <div *ngIf="scriptChannelType === 4">
-                <label for="value">I2C Command</label>
-                <input name="value" matInput placeholder="Value" [(ngModel)]="value" />
-            </div>
-            <div *ngIf="scriptChannelType === 5">
-                <label for="value">Serial Command</label>
-                <input name="value" matInput placeholder="Value" [(ngModel)]="value" />
-            </div>
-            <div *ngIf="scriptChannelType === 6">
-                <div>
-                    <label class="kangaroo-channel-label" for="chselect">Kangaroo Channel</label>
-                    <select id="chselect" title="kangaroo channel" [(ngModel)]="kangarooCh"
-                        (change)="selectChange($event)">
-                        <option value="1">Channel 1</option>
-                        <option value="2">Channel 2</option>
-                    </select>
+              </div>
+              <div>
+                <label class="kangaroo-channel-label" for="command">Command</label>
+                <select id="cmdselect" title="command" [(ngModel)]="kangarooAction" (change)="selectChange($event)">
+                  <option value="1">Start</option>
+                  <option value="2">Home</option>
+                  <option value="3">Speed</option>
+                  <option value="4">Position</option>
+                </select>
+              </div>
+              <div>
+                <label class="kangaroo-speed-label" for="chspd">Speed</label>
+                <input class="kangaroo-input" name="chspd" matInput placeholder="Speed" [disabled]="spdDisabled"
+                  [(ngModel)]="kangarooSpd" type="number" />
+                  <label class="kangaroo-position-label" for="chpos">Position</label>
+                  <input class="kangaroo-input" name="chpos" matInput placeholder="Position" [disabled]="posDisabled"
+                    [(ngModel)]="kangarooPos" type="number" />
+                  </div>
                 </div>
-                <div>
-                    <label class="kangaroo-channel-label" for="command">Command</label>
-                    <select id="cmdselect" title="command" [(ngModel)]="kangarooAction" (change)="selectChange($event)">
-                        <option value="1">Start</option>
-                        <option value="2">Home</option>
-                        <option value="3">Speed</option>
-                        <option value="4">Position</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="kangaroo-speed-label" for="chspd">Speed</label>
-                    <input class="kangaroo-input" name="chspd" matInput placeholder="Speed" [disabled]="spdDisabled"
-                        [(ngModel)]="kangarooSpd" type="number" />
-                    <label class="kangaroo-position-label" for="chpos">Position</label>
-                    <input class="kangaroo-input" name="chpos" matInput placeholder="Position" [disabled]="posDisabled"
-                        [(ngModel)]="kangarooPos" type="number" />
-                </div>
+              }
             </div>
+            <div class="spacer"></div>
+          </div>
+          <div class="modal-buttons">
+            <div class="button-spacer"></div>
+            <div class="button-grouper">
+              <button (click)="runClicked();">Send</button>
+              <button (click)="closeModal();">Cancel</button>
+            </div>
+            <div class="button-spacer"></div>
+          </div>
         </div>
-        <div class="spacer"></div>
-    </div>
-    <div class="modal-buttons">
-        <div class="button-spacer"></div>
-        <div class="button-grouper">
-            <button (click)="runClicked();">Send</button>
-            <button (click)="closeModal();">Cancel</button>
-        </div>
-        <div class="button-spacer"></div>
-    </div>
-</div>

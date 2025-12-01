@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { MaestroModule } from 'astros-common';
 import { BaseUartSubModuleComponent } from '../base-uart-sub-module/base-uart-sub-module.component';
 import { FormsModule } from '@angular/forms';
-import { NgFor, NgIf } from '@angular/common';
+
 import { MaestroChannelComponent } from '../maestro-channel/maestro-channel.component';
 import { ServoTestEvent } from '@src/components/esp-module/utility/module-events';
 
@@ -13,7 +13,7 @@ import { ServoTestEvent } from '@src/components/esp-module/utility/module-events
     '../base-uart-sub-module/base-uart-sub-module.component.scss',
     './maestro-module.component.scss',
   ],
-  imports: [NgIf, NgFor, FormsModule, MaestroChannelComponent],
+  imports: [FormsModule, MaestroChannelComponent],
 })
 export class MaestroModuleComponent
   extends BaseUartSubModuleComponent

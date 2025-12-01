@@ -1,11 +1,11 @@
 import { Component, OnInit } from '@angular/core';
 import { BaseI2cSubModuleComponent } from '../base-i2c-sub-module/base-i2c-sub-module.component';
-import { NgFor, NgIf } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-generic-i2c-module',
-  imports: [FormsModule, NgIf, NgFor],
+  imports: [FormsModule],
   templateUrl: './generic-i2c-module.component.html',
   styleUrls: [
     '../base-i2c-sub-module/base-i2c-sub-module.component.scss',

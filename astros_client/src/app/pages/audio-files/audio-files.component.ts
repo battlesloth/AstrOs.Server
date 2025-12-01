@@ -3,7 +3,7 @@ import { faPlay, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { AudioFile } from 'astros-common';
 import { AudioService } from 'src/app/services/audio/audio.service';
 import { SnackbarService } from 'src/app/services/snackbar/snackbar.service';
-import { NgFor, DatePipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
 import {
   ModalComponent,
@@ -26,7 +26,7 @@ interface DeleteConfirmEvent {
   selector: 'app-audio-files',
   templateUrl: './audio-files.component.html',
   styleUrls: ['./audio-files.component.scss'],
-  imports: [NgFor, FontAwesomeModule, ModalComponent, DatePipe],
+  imports: [FontAwesomeModule, ModalComponent, DatePipe],
 })
 export class AudioFilesComponent implements OnInit {
   @ViewChild('modalContainer', { read: ViewContainerRef })

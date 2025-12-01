@@ -10,7 +10,7 @@ import {
 import { faTrash, faEdit, faPlay } from '@fortawesome/free-solid-svg-icons';
 import { ScriptChannel, ModuleSubType, MaestroChannel } from 'astros-common';
 import { FontAwesomeModule } from '@fortawesome/angular-fontawesome';
-import { NgFor, NgIf } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { ChannelDetails } from '@src/models/scripting';
 
@@ -29,7 +29,7 @@ export interface TimeLineEvent {
   selector: 'app-script-row',
   templateUrl: './script-row.component.html',
   styleUrls: ['./script-row.component.scss'],
-  imports: [NgIf, NgFor, FormsModule, FontAwesomeModule],
+  imports: [FormsModule, FontAwesomeModule],
 })
 export class ScriptRowComponent implements OnChanges {
   @Output()

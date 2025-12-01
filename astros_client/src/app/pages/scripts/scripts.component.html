@@ -1,51 +1,53 @@
 <div class="script-container">
-    <div class="spacer"></div>
-    <div class="script-body">
-        <div class="button-bar">
-            <div class="title">
-                Scripts
-            </div>
-            <div class="spacer"></div>
-            <div class="button-box">
-                <button (click)="newScript()" class="new-script">New</button>
-            </div>
-        </div>
-        <div class="script-list-container">
-            <ul class="script-list">
-                <li *ngFor="let script of scripts">
-                    <div class="script-line">
-                        <div class="click-bar" routerLink="/scripter/{{script.id}}">
-                            <div class="name-section">{{script.scriptName}}</div>
-                            <div class="desc-section">{{script.description}}</div>
-                        </div>
-                        <div [attr.id]="script.id + '_body'"
-                            class="upload-section tooltip">Body <span class="tooltiptext" [attr.id]="script.id + '_body_tooltip'"></span></div>
-                        <div [attr.id]="script.id + '_core'"
-                            class="upload-section tooltip">Core <span class="tooltiptext" [attr.id]="script.id + '_core_tooltip'"></span></div>
-                        <div [attr.id]="script.id + '_dome'"
-                            class="upload-section tooltip">Dome <span class="tooltiptext" [attr.id]="script.id + '_dome_tooltip'"></span></div>
-                        <div class="button-container">
-                            <div class="copy">
-                                <button title="Copy" (click)="copyClicked(script.id)"><fa-icon [icon]="faCopy"></fa-icon></button>
-                            </div>
-                            <div class="upload">
-                                <button title="Upload" (click)="uploadClicked(script.id)"><fa-icon [icon]="faUpload"></fa-icon></button>
-                            </div>
-                            <div class="run">
-                                <button title="Run" (click)="runClicked(script.id)"><fa-icon [icon]="faRun"></fa-icon></button>
-                            </div>
-                            <div class="trash">
-                                <button title="Delete" (click)="removeClicked(script.id)"><fa-icon [icon]="faTrash"></fa-icon></button>
-                            </div>
-                        </div>
-                    </div>
-                </li>
-            </ul>
-        </div>
+  <div class="spacer"></div>
+  <div class="script-body">
+    <div class="button-bar">
+      <div class="title">
+        Scripts
+      </div>
+      <div class="spacer"></div>
+      <div class="button-box">
+        <button (click)="newScript()" class="new-script">New</button>
+      </div>
     </div>
-    <div class="spacer"></div>
-</div>
+    <div class="script-list-container">
+      <ul class="script-list">
+        @for (script of scripts; track script) {
+          <li>
+            <div class="script-line">
+              <div class="click-bar" routerLink="/scripter/{{script.id}}">
+                <div class="name-section">{{script.scriptName}}</div>
+                <div class="desc-section">{{script.description}}</div>
+              </div>
+              <div [attr.id]="script.id + '_body'"
+                class="upload-section tooltip">Body <span class="tooltiptext" [attr.id]="script.id + '_body_tooltip'"></span></div>
+                <div [attr.id]="script.id + '_core'"
+                  class="upload-section tooltip">Core <span class="tooltiptext" [attr.id]="script.id + '_core_tooltip'"></span></div>
+                  <div [attr.id]="script.id + '_dome'"
+                    class="upload-section tooltip">Dome <span class="tooltiptext" [attr.id]="script.id + '_dome_tooltip'"></span></div>
+                    <div class="button-container">
+                      <div class="copy">
+                        <button title="Copy" (click)="copyClicked(script.id)"><fa-icon [icon]="faCopy"></fa-icon></button>
+                      </div>
+                      <div class="upload">
+                        <button title="Upload" (click)="uploadClicked(script.id)"><fa-icon [icon]="faUpload"></fa-icon></button>
+                      </div>
+                      <div class="run">
+                        <button title="Run" (click)="runClicked(script.id)"><fa-icon [icon]="faRun"></fa-icon></button>
+                      </div>
+                      <div class="trash">
+                        <button title="Delete" (click)="removeClicked(script.id)"><fa-icon [icon]="faTrash"></fa-icon></button>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
+        <div class="spacer"></div>
+      </div>
 
-<app-astros-modal id="scripts-modal" disableBackgroundClick="0" style="display: none;">
-    <ng-template #modalContainer></ng-template>
-</app-astros-modal>
+      <app-astros-modal id="scripts-modal" disableBackgroundClick="0" style="display: none;">
+        <ng-template #modalContainer></ng-template>
+      </app-astros-modal>

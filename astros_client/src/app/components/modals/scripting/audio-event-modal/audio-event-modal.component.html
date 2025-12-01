@@ -1,29 +1,31 @@
 <div class="event-modal">
-    <h1>Audio File</h1>
-    <div class="modal-body">
-        <div class="spacer"></div>
-        <div class="content">
-            <div>
-                <label for="time">Event Time (seconds)</label>
-                <input name="time" matInput placeholder="Time" type="number" step="0.1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/" 
-                [ngModel]="eventTime | number : '1.0-1'" (ngModelChange)="eventTime = $event" />
-            </div>
-            <div>
-                <select id="file-select" title="File" [(ngModel)]="selectedFile">
-                    <option value="0" disabled selected>Select Audio</option>
-                    <option *ngFor="let file of audioFiles" value="{{file.id}}">{{file.fileName}}</option>
-                </select>
-            </div>
+  <h1>Audio File</h1>
+  <div class="modal-body">
+    <div class="spacer"></div>
+    <div class="content">
+      <div>
+        <label for="time">Event Time (seconds)</label>
+        <input name="time" matInput placeholder="Time" type="number" step="0.1" ng-pattern="/^[0-9]+(\.[0-9]{1})?$/"
+          [ngModel]="eventTime | number : '1.0-1'" (ngModelChange)="eventTime = $event" />
         </div>
-        <div class="spacer"></div>
+        <div>
+          <select id="file-select" title="File" [(ngModel)]="selectedFile">
+            <option value="0" disabled selected>Select Audio</option>
+            @for (file of audioFiles; track file) {
+              <option value="{{file.id}}">{{file.fileName}}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div class="spacer"></div>
     </div>
     <div class="modal-buttons">
-        <div class="button-spacer"></div>
-        <div class="button-grouper">
-            <button (click)="addEvent();">Save</button>
-            <button id="remove_button" class="hidden" (click)="removeEvent();">Remove</button>
-            <button (click)="closeModal();">Close</button>
-        </div>
-        <div class="button-spacer"></div>
+      <div class="button-spacer"></div>
+      <div class="button-grouper">
+        <button (click)="addEvent();">Save</button>
+        <button id="remove_button" class="hidden" (click)="removeEvent();">Remove</button>
+        <button (click)="closeModal();">Close</button>
+      </div>
+      <div class="button-spacer"></div>
     </div>
-</div>
+  </div>

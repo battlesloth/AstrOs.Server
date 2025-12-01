@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ModalBaseComponent } from '../../modal-base/modal-base.component';
 import { ModalCallbackEvent } from '../../modal-base/modal-callback-event';
-import { NgFor } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 
 interface ResourceController {
@@ -28,7 +28,7 @@ export class FormatModalResources {
   selector: 'app-format-modal',
   templateUrl: './format-modal.component.html',
   styleUrls: ['./format-modal.component.scss'],
-  imports: [NgFor, FormsModule],
+  imports: [FormsModule],
 })
 export class FormatModalComponent extends ModalBaseComponent implements OnInit {
   controllers: Controller[] = [];

@@ -1,87 +1,87 @@
 <div class="container">
-    <div class="page-select">
-        <div class="spacer"></div>
-        <div class="page-back">
-            <button title="Backward" (click)="pageBackward()"><fa-icon [icon]="faBackward"></fa-icon></button>
-        </div>
-        <div class="page-number">Page {{pageNumber}}</div>
-        <div class="page-forward">
-            <button title="Forward" (click)="pageForward()"><fa-icon [icon]="faForward"></fa-icon></button>
-        </div>
-        <div class="spacer"></div>
+  <div class="page-select">
+    <div class="spacer"></div>
+    <div class="page-back">
+      <button title="Backward" (click)="pageBackward()"><fa-icon [icon]="faBackward"></fa-icon></button>
     </div>
-    <div class="page">
-        <div class="col1-row1 button-select">
-            <select #btn1 id="btn1-select" title="Script" [(ngModel)]="currentButton1Script" (change)="selectionChange(1, btn1.value)">
-                <option value="0" selected>None</option>
-                <ng-container *ngFor="let script of scripts">
-                    <option value="{{script.id}}">{{script.name}}</option>
-                </ng-container>
-            </select>
-        </div>
-        <div class="col2-row1 button-select">             
-            <select #btn2 id="btn2-select" title="Script" [(ngModel)]="currentButton2Script" (change)="selectionChange(2, btn2.value)">
-            <option value="0" selected>None</option>
-            <ng-container *ngFor="let script of scripts">
-                <option value="{{script.id}}">{{script.name}}</option>
-            </ng-container>
-        </select>
-        </div>
-        <div class="col3-row1 button-select">            
-            <select #btn3 id="btn3-select" title="Script" [(ngModel)]="currentButton3Script" (change)="selectionChange(3, btn3.value)">
-            <option value="0" selected>None</option>
-            <ng-container *ngFor="let script of scripts">
-                <option value="{{script.id}}">{{script.name}}</option>
-            </ng-container>
-        </select>
-        </div>
-        <div class="col1-row2 button-select">            
-            <select #btn4 id="btn4-select" title="Script" [(ngModel)]="currentButton4Script" (change)="selectionChange(4, btn4.value)">
-            <option value="0" selected>None</option>
-            <ng-container *ngFor="let script of scripts">
-                <option value="{{script.id}}">{{script.name}}</option>
-            </ng-container>
-        </select>
-        </div>
-        <div class="col2-row2 button-select">             
-            <select #btn5 id="btn5-select" title="Script" [(ngModel)]="currentButton5Script" (change)="selectionChange(5, btn5.value)">
-            <option value="0" selected>None</option>
-            <ng-container *ngFor="let script of scripts">
-                <option value="{{script.id}}">{{script.name}}</option>
-            </ng-container>
-        </select>
-        </div>
-        <div class="col3-row2 button-select">             
-            <select #btn6 id="btn6-select" title="Script" [(ngModel)]="currentButton6Script" (change)="selectionChange(6, btn6.value)">
-            <option value="0" selected>None</option>
-            <ng-container *ngFor="let script of scripts">
-                <option value="{{script.id}}">{{script.name}}</option>
-            </ng-container>
-        </select>
-        </div>
-        <div class="col1-row3 button-select">             
-            <select #btn7 id="btn7-select" title="Script" [(ngModel)]="currentButton7Script" (change)="selectionChange(7, btn7.value)">
-            <option value="0" selected>None</option>
-            <ng-container *ngFor="let script of scripts">
-                <option value="{{script.id}}">{{script.name}}</option>
-            </ng-container>
-        </select>
-        </div>
-        <div class="col2-row3 button-select">             
-            <select #btn8 id="btn8-select" title="Script" [(ngModel)]="currentButton8Script"  (change)="selectionChange(8, btn8.value)">
-            <option value="0" selected>None</option>
-            <ng-container *ngFor="let script of scripts">
-                <option value="{{script.id}}">{{script.name}}</option>
-            </ng-container>
-        </select>
-        </div>
-        <div class="col3-row3 button-select">             
-            <select #btn9 id="btn9-select" title="Script" [(ngModel)]="currentButton9Script" (change)="selectionChange(9, btn9.value)">
-            <option value="0" selected>None</option>
-            <ng-container *ngFor="let script of scripts">
-                <option value="{{script.id}}">{{script.name}}</option>
-            </ng-container>
-        </select>
-        </div>
+    <div class="page-number">Page {{pageNumber}}</div>
+    <div class="page-forward">
+      <button title="Forward" (click)="pageForward()"><fa-icon [icon]="faForward"></fa-icon></button>
     </div>
+    <div class="spacer"></div>
+  </div>
+  <div class="page">
+    <div class="col1-row1 button-select">
+      <select #btn1 id="btn1-select" title="Script" [(ngModel)]="currentButton1Script" (change)="selectionChange(1, btn1.value)">
+        <option value="0" selected>None</option>
+        @for (script of scripts; track script) {
+          <option value="{{script.id}}">{{script.name}}</option>
+        }
+      </select>
+    </div>
+    <div class="col2-row1 button-select">
+      <select #btn2 id="btn2-select" title="Script" [(ngModel)]="currentButton2Script" (change)="selectionChange(2, btn2.value)">
+        <option value="0" selected>None</option>
+        @for (script of scripts; track script) {
+          <option value="{{script.id}}">{{script.name}}</option>
+        }
+      </select>
+    </div>
+    <div class="col3-row1 button-select">
+      <select #btn3 id="btn3-select" title="Script" [(ngModel)]="currentButton3Script" (change)="selectionChange(3, btn3.value)">
+        <option value="0" selected>None</option>
+        @for (script of scripts; track script) {
+          <option value="{{script.id}}">{{script.name}}</option>
+        }
+      </select>
+    </div>
+    <div class="col1-row2 button-select">
+      <select #btn4 id="btn4-select" title="Script" [(ngModel)]="currentButton4Script" (change)="selectionChange(4, btn4.value)">
+        <option value="0" selected>None</option>
+        @for (script of scripts; track script) {
+          <option value="{{script.id}}">{{script.name}}</option>
+        }
+      </select>
+    </div>
+    <div class="col2-row2 button-select">
+      <select #btn5 id="btn5-select" title="Script" [(ngModel)]="currentButton5Script" (change)="selectionChange(5, btn5.value)">
+        <option value="0" selected>None</option>
+        @for (script of scripts; track script) {
+          <option value="{{script.id}}">{{script.name}}</option>
+        }
+      </select>
+    </div>
+    <div class="col3-row2 button-select">
+      <select #btn6 id="btn6-select" title="Script" [(ngModel)]="currentButton6Script" (change)="selectionChange(6, btn6.value)">
+        <option value="0" selected>None</option>
+        @for (script of scripts; track script) {
+          <option value="{{script.id}}">{{script.name}}</option>
+        }
+      </select>
+    </div>
+    <div class="col1-row3 button-select">
+      <select #btn7 id="btn7-select" title="Script" [(ngModel)]="currentButton7Script" (change)="selectionChange(7, btn7.value)">
+        <option value="0" selected>None</option>
+        @for (script of scripts; track script) {
+          <option value="{{script.id}}">{{script.name}}</option>
+        }
+      </select>
+    </div>
+    <div class="col2-row3 button-select">
+      <select #btn8 id="btn8-select" title="Script" [(ngModel)]="currentButton8Script"  (change)="selectionChange(8, btn8.value)">
+        <option value="0" selected>None</option>
+        @for (script of scripts; track script) {
+          <option value="{{script.id}}">{{script.name}}</option>
+        }
+      </select>
+    </div>
+    <div class="col3-row3 button-select">
+      <select #btn9 id="btn9-select" title="Script" [(ngModel)]="currentButton9Script" (change)="selectionChange(9, btn9.value)">
+        <option value="0" selected>None</option>
+        @for (script of scripts; track script) {
+          <option value="{{script.id}}">{{script.name}}</option>
+        }
+      </select>
+    </div>
+  </div>
 </div>

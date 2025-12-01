@@ -1,11 +1,11 @@
 import { Component, OnInit } from '@angular/core';
 import { BaseI2cSubModuleComponent } from '../base-i2c-sub-module/base-i2c-sub-module.component';
-import { NgFor, NgIf } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-pca9685-module',
-  imports: [FormsModule, NgIf, NgFor],
+  imports: [FormsModule],
   templateUrl: './pca9685-module.component.html',
   styleUrls: [
     '../base-i2c-sub-module/base-i2c-sub-module.component.scss',

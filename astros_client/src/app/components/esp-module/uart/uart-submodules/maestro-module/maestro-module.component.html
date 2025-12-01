@@ -1,43 +1,49 @@
 <div class="uart-settings">
-    <select
-        [attr.data-testId]="parentTestId + '-maestro-uart-channel'" 
-        [(ngModel)]="uartChannel" 
-        (ngModelChange)="onChannelChange($event)">
-        <option *ngIf="!isMaster" value="1">Channel 1</option>
-        <option value="2">Channel 2</option>
-    </select>
-    <div class="uart-settings-spacer"></div>
-    <select
-        [attr.data-testId]="parentTestId + '-maestro-baud'" 
-        [(ngModel)]="baudRate" 
-        (ngModelChange)="onBaudRateChange($event)">
-        <option value="9600">9600</option>
-        <option value="19200">19200</option>
-        <option value="38400">38400</option>
-        <option value="57600">57600</option>
-        <option value="115200">115200</option>
-    </select>
-    <div class="uart-settings-spacer"></div>
-    <select 
-        [attr.data-testId]="parentTestId + '-maestro-channel-count'"
-        [(ngModel)]="channelCount" 
-        (ngModelChange)="onChannelCountChange($event)">
-        <option value="6">6</option>
-        <option value="12">12</option>
-        <option value="18">18</option>
-        <option value="24">24</option>
-    </select>
+  <select
+    [attr.data-testId]="parentTestId + '-maestro-uart-channel'"
+    [(ngModel)]="uartChannel"
+    (ngModelChange)="onChannelChange($event)">
+    @if (!isMaster) {
+      <option value="1">Channel 1</option>
+    }
+    <option value="2">Channel 2</option>
+  </select>
+  <div class="uart-settings-spacer"></div>
+  <select
+    [attr.data-testId]="parentTestId + '-maestro-baud'"
+    [(ngModel)]="baudRate"
+    (ngModelChange)="onBaudRateChange($event)">
+    <option value="9600">9600</option>
+    <option value="19200">19200</option>
+    <option value="38400">38400</option>
+    <option value="57600">57600</option>
+    <option value="115200">115200</option>
+  </select>
+  <div class="uart-settings-spacer"></div>
+  <select
+    [attr.data-testId]="parentTestId + '-maestro-channel-count'"
+    [(ngModel)]="channelCount"
+    (ngModelChange)="onChannelCountChange($event)">
+    <option value="6">6</option>
+    <option value="12">12</option>
+    <option value="18">18</option>
+    <option value="24">24</option>
+  </select>
 </div>
 <hr />
-<ul *ngIf="subModule && subModule.boards[0]" class="servo-list">
-    <ng-container *ngFor="let channel of subModule.boards[0].channels; let i = index">
-        <li *ngIf="i < subModule.boards[0].channelCount">
-            <div class="servo-list-item">
-                <app-maestro-channel 
-                    (servoTestEvent)="onServoTestEvent($event)"
-                    [channel]="channel"
-                    [parentTestId]="parentTestId" />
+@if (subModule && subModule.boards[0]) {
+  <ul class="servo-list">
+    @for (channel of subModule.boards[0].channels; track channel; let i = $index) {
+      @if (i < subModule.boards[0].channelCount) {
+        <li>
+          <div class="servo-list-item">
+            <app-maestro-channel
+              (servoTestEvent)="onServoTestEvent($event)"
+              [channel]="channel"
+              [parentTestId]="parentTestId" />
             </div>
-        </li>
-    </ng-container>
-</ul>
+          </li>
+        }
+      }
+    </ul>
+  }
