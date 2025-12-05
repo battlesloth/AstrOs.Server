@@ -24,9 +24,13 @@ const addChannelButtonHeight = scrollBarHeight + timelineHeight; // Combined hei
 // UI layer containers
 const mainContainer = ref<Container | null>(null);
 const uiLayer = ref<Container | null>(null);
+const channelListContainer = ref<Container | null>(null);
 const scrollBar = ref<Graphics | null>(null);
 const scrollThumb = ref<Graphics | null>(null);
 const timeline = ref<Container | null>(null);
+
+// Channel list dimensions
+const channelListWidth = 256; // 64 * 4 = 256px
 
 // Timeline constants
 const PIXELS_PER_SECOND = 30;
@@ -45,9 +49,11 @@ let resizeObserver: ResizeObserver | null = null;
 watch(scrollOffset, (newOffset) => {
   if (mainContainer.value && app.value) {
     const canvasWidth = app.value.screen.width;
-    const maxScroll = Math.max(0, TIMELINE_WIDTH - canvasWidth);
+    const scrollbarWidth = canvasWidth - channelListWidth;
+    const maxScroll = Math.max(0, TIMELINE_WIDTH - scrollbarWidth);
     const worldX = maxScroll > 0 ? newOffset * maxScroll : 0;
-    mainContainer.value.x = -worldX;
+    // Offset mainContainer to account for channel list, then apply scroll
+    mainContainer.value.x = channelListWidth - worldX;
     currentWorldX.value = worldX; // Store current world position
   }
 });
@@ -85,11 +91,18 @@ onMounted(async () => {
   uiLayer.value = new Container();
   app.value.stage.addChild(uiLayer.value as any);
 
+  // Create channel list container
+  channelListContainer.value = new Container();
+  uiLayer.value.addChild(channelListContainer.value as any);
+
   // Create scrollbar
   createScrollbar();
 
   // Create timeline
   createTimeline();
+
+  // Create channel list UI
+  createChannelList();
 
   // Use ResizeObserver to watch for container size changes
   resizeObserver = new ResizeObserver((entries) => {
@@ -134,6 +147,7 @@ onUnmounted(() => {
   channels.value = [];
   mainContainer.value = null;
   uiLayer.value = null;
+  channelListContainer.value = null;
   scrollBar.value = null;
   scrollThumb.value = null;
   timeline.value = null;
@@ -144,10 +158,11 @@ function createScrollbar() {
 
   const canvasWidth = app.value.screen.width;
   const canvasHeight = app.value.screen.height;
+  const scrollbarWidth = canvasWidth - channelListWidth;
 
-  // Scrollbar background (horizontal at top)
+  // Scrollbar background (horizontal at top, offset by channel list width)
   scrollBar.value = new Graphics()
-    .rect(0, 0, canvasWidth, scrollBarHeight)
+    .rect(channelListWidth, 0, scrollbarWidth, scrollBarHeight)
     .fill(0x333333);
 
   // Scrollbar thumb (horizontal)
@@ -155,7 +170,7 @@ function createScrollbar() {
     .rect(0, 0, scrollThumbWidth.value, scrollBarHeight)
     .fill(0x888888);
 
-  scrollThumb.value.x = 0;
+  scrollThumb.value.x = channelListWidth;
   scrollThumb.value.y = 0;
   scrollThumb.value.eventMode = 'static';
   scrollThumb.value.cursor = 'pointer';
@@ -213,12 +228,14 @@ function createScrollbar() {
     app.value.stage.on('pointermove', (event) => {
       if (isDraggingThumb.value && scrollThumb.value && app.value) {
         const canvasWidth = app.value.screen.width;
-        const newX = Math.max(0, Math.min(event.global.x, canvasWidth - scrollThumbWidth.value));
+        const scrollbarWidth = canvasWidth - channelListWidth;
+        const localX = event.global.x - channelListWidth;
+        const newX = Math.max(channelListWidth, Math.min(event.global.x, channelListWidth + scrollbarWidth - scrollThumbWidth.value));
         scrollThumb.value.x = newX;
 
         // Calculate scroll offset
-        const scrollPercentage = newX / (canvasWidth - scrollThumbWidth.value);
-        scrollOffset.value = scrollPercentage;
+        const scrollPercentage = localX / (scrollbarWidth - scrollThumbWidth.value);
+        scrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
       }
     });
 
@@ -247,6 +264,7 @@ function createTimeline() {
   if (!app.value || !mainContainer.value) return;
 
   timeline.value = new Container();
+  timeline.value.x = 0; // No offset needed - mainContainer handles positioning
   timeline.value.y = scrollBarHeight; // Position below the scrollbar
 
   const graphics = new Graphics();
@@ -305,17 +323,115 @@ function createTimeline() {
   mainContainer.value.addChild(timeline.value as any);
 }
 
+function createChannelList() {
+  if (!app.value || !channelListContainer.value) return;
+
+  // Clear existing content
+  channelListContainer.value.removeChildren();
+
+  const canvasHeight = app.value.screen.height;
+
+  // Create background for channel list area
+  const background = new Graphics()
+    .rect(0, 0, channelListWidth, canvasHeight)
+    .fill(0x2a2a2a);
+  channelListContainer.value.addChild(background);
+
+  // Create "Add Channel" button at the top
+  const buttonHeight = addChannelButtonHeight;
+  const button = new Graphics()
+    .rect(0, 0, channelListWidth, buttonHeight)
+    .fill(0x4a90e2);
+
+  button.eventMode = 'static';
+  button.cursor = 'pointer';
+
+  // Add hover effect
+  button.on('pointerover', () => {
+    button.clear()
+      .rect(0, 0, channelListWidth, buttonHeight)
+      .fill(0x5aa0f2);
+  });
+
+  button.on('pointerout', () => {
+    button.clear()
+      .rect(0, 0, channelListWidth, buttonHeight)
+      .fill(0x4a90e2);
+  });
+
+  button.on('pointertap', () => {
+    addChannel();
+  });
+
+  const buttonText = new HTMLText({
+    text: 'Add Channel',
+    style: {
+      fontFamily: 'Arial, sans-serif',
+      fontSize: '16px',
+      fill: '#ffffff',
+      fontWeight: 'bold'
+    }
+  });
+
+  // Center the text
+  requestAnimationFrame(() => {
+    if (buttonText.width > 0 && buttonText.height > 0) {
+      buttonText.x = (channelListWidth - buttonText.width) / 2;
+      buttonText.y = (buttonHeight - buttonText.height) / 2;
+    }
+  });
+
+  buttonText.x = channelListWidth / 2 - 40;
+  buttonText.y = buttonHeight / 2 - 8;
+
+  button.addChild(buttonText);
+  channelListContainer.value.addChild(button);
+
+  // Draw channel rows
+  channels.value.forEach((channel, index) => {
+    const yPos = buttonHeight + (index * rowHeight);
+
+    // Alternating background colors
+    const rowColor = index % 2 === 0 ? 0xe5e5e5 : 0xf5f5f5;
+    const row = new Graphics()
+      .rect(0, yPos, channelListWidth, rowHeight)
+      .fill(rowColor);
+
+    // Add border
+    row
+      .rect(0, yPos + rowHeight - 1, channelListWidth, 1)
+      .fill(0xcccccc);
+
+    const rowText = new HTMLText({
+      text: `Row ${index + 1}`,
+      style: {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '14px',
+        fill: '#000000'
+      }
+    });
+
+    rowText.x = 16;
+    rowText.y = yPos + (rowHeight / 2) - 7;
+
+    row.addChild(rowText);
+    channelListContainer.value!.addChild(row);
+  });
+}
+
 function handleGlobalMouseMove(event: MouseEvent) {
   if (isDraggingThumb.value && scrollThumb.value && app.value && pixiContainer.value) {
     const rect = pixiContainer.value.getBoundingClientRect();
     const canvasX = event.clientX - rect.left;
     const canvasWidth = app.value.screen.width;
-    const newX = Math.max(0, Math.min(canvasX, canvasWidth - scrollThumbWidth.value));
+    const scrollbarWidth = canvasWidth - channelListWidth;
+    const localX = canvasX - channelListWidth;
+    const newX = Math.max(channelListWidth, Math.min(canvasX, channelListWidth + scrollbarWidth - scrollThumbWidth.value));
     scrollThumb.value.x = newX;
 
     // Calculate scroll offset
-    const scrollPercentage = newX / (canvasWidth - scrollThumbWidth.value);
-    scrollOffset.value = scrollPercentage;
+    const scrollPercentage = localX / (scrollbarWidth - scrollThumbWidth.value);
+    scrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
   }
 }
 
@@ -339,16 +455,17 @@ function updateScrollbar() {
   if (!app.value || !scrollBar.value || !scrollThumb.value) return;
 
   const canvasWidth = app.value.screen.width;
+  const scrollbarWidth = canvasWidth - channelListWidth;
 
-  // Update scrollbar background to span full width
+  // Update scrollbar background to span width minus channel list
   scrollBar.value.clear()
-    .rect(0, 0, canvasWidth, scrollBarHeight)
+    .rect(channelListWidth, 0, scrollbarWidth, scrollBarHeight)
     .fill(0x333333);
 
   // Keep scroll percentage consistent, but clamp thumb position
   const scrollPercentage = scrollOffset.value;
-  const maxThumbX = canvasWidth - scrollThumbWidth.value;
-  const newThumbX = Math.max(0, Math.min(scrollPercentage * maxThumbX, maxThumbX));
+  const maxThumbX = scrollbarWidth - scrollThumbWidth.value;
+  const newThumbX = Math.max(channelListWidth, Math.min(channelListWidth + (scrollPercentage * maxThumbX), channelListWidth + maxThumbX));
 
   // Update thumb with current width
   if (scrollThumb.value) {
@@ -374,15 +491,16 @@ function handleResize() {
   );
 
   const newCanvasWidth = app.value.screen.width;
+  const scrollbarWidth = newCanvasWidth - channelListWidth;
 
-  // Update the thumb width based on new canvas size
-  const viewportRatio = newCanvasWidth / TIMELINE_WIDTH;
-  const newThumbWidth = Math.max(minScrollThumbWidth, newCanvasWidth * viewportRatio);
+  // Update the thumb width based on new scrollbar size
+  const viewportRatio = scrollbarWidth / TIMELINE_WIDTH;
+  const newThumbWidth = Math.max(minScrollThumbWidth, scrollbarWidth * viewportRatio);
 
   scrollThumbWidth.value = newThumbWidth;
 
   // Calculate new scroll offset based on the stored world position
-  const newMaxScroll = Math.max(0, TIMELINE_WIDTH - newCanvasWidth);
+  const newMaxScroll = Math.max(0, TIMELINE_WIDTH - scrollbarWidth);
 
   // If the viewport is now larger than or equal to the timeline, reset to start
   if (newMaxScroll <= 0) {
@@ -395,12 +513,15 @@ function handleResize() {
     scrollOffset.value = clampedWorldX / newMaxScroll;
     // Manually update the container position since watch might not trigger if scrollOffset doesn't change
     if (mainContainer.value) {
-      mainContainer.value.x = -clampedWorldX;
+      mainContainer.value.x = channelListWidth - clampedWorldX;
     }
   }
 
   // Update scrollbar graphics to match new dimensions
   updateScrollbar();
+
+  // Update channel list graphics to match new dimensions
+  createChannelList();
 }
 
 function addChannel() {
@@ -410,6 +531,9 @@ function addChannel() {
     events: []
   };
   channels.value.push(newChannel);
+
+  // Recreate the channel list UI
+  createChannelList();
 }
 
 </script>
@@ -417,35 +541,9 @@ function addChannel() {
 <template>
   <AstrosLayout>
     <template v-slot:main>
-      <div class="h-full w-full overflow-hidden">
-        <div id="main-container" class="flex flex-col h-full w-full p-4">
-          <div id="header" class="flex flex-row p-4 shrink-0">
-            <p>Last channel clicked: {{ lastChannelClicked }}</p>
-          </div>
-          <div id="scripter"
-            class="flex flex-row w-full flex-1 min-h-0 overflow-x-hidden overflow-y-scroll border border-gray-300">
-            <div id="channels" class="flex flex-col w-64 border-r border-gray-300 shrink-0"
-              :style="{ minHeight: containerHeight + 'px' }">
-              <div id="add-channel" class="sticky top-0 bg-base-100 z-10 border-b border-gray-300 shrink-0"
-                :style="{ height: addChannelButtonHeight + 'px', minHeight: addChannelButtonHeight + 'px', maxHeight: addChannelButtonHeight + 'px' }">
-                <button @click="addChannel" class="btn btn-primary w-full rounded-none h-full min-h-full">Add
-                  Channel</button>
-              </div>
-              <div class="flex flex-col pt-0">
-                <ul class="list-none p-0 m-0">
-                  <li v-for="(channel, index) in channels" :key="index"
-                    :class="index % 2 === 0 ? 'bg-gray-200' : 'bg-gray-100'"
-                    class="flex items-center px-4 border-b border-gray-300"
-                    :style="{ height: rowHeight + 'px', minHeight: rowHeight + 'px', maxHeight: rowHeight + 'px' }">
-                    <span class="text-sm">Row {{ index + 1 }}</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <div id="timeline" class="flex flex-col flex-1 min-w-0">
-              <div ref="pixiContainer" class="flex-1 bg-black" :style="{ minHeight: containerHeight + 'px' }"></div>
-            </div>
-          </div>
+      <div class="h-full w-full overflow-hidden flex flex-col">
+        <div id="scripter" class="flex-1 min-h-0 border border-gray-300 m-4">
+          <div ref="pixiContainer" class="w-full h-full bg-black"></div>
         </div>
       </div>
     </template>
