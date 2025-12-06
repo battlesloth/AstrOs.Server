@@ -171,6 +171,11 @@ onMounted(async () => {
   // Global mouse move and up events for continuous dragging
   window.addEventListener('mousemove', handleGlobalMouseMove);
   window.addEventListener('mouseup', handleGlobalMouseUp);
+
+  // Add wheel event listener for scrolling
+  if (pixiContainer.value) {
+    pixiContainer.value.addEventListener('wheel', handleWheel, { passive: false });
+  }
 });
 
 onUnmounted(() => {
@@ -180,6 +185,10 @@ onUnmounted(() => {
   }
   window.removeEventListener('mousemove', handleGlobalMouseMove);
   window.removeEventListener('mouseup', handleGlobalMouseUp);
+
+  if (pixiContainer.value) {
+    pixiContainer.value.removeEventListener('wheel', handleWheel);
+  }
 
   app.value?.destroy(true, {
     children: true,
@@ -484,18 +493,18 @@ function createChannelList() {
   // Clear existing content
   channelListContainer.value.removeChildren();
 
-  // Re-add the scrollable container
-  channelListScrollableContainer.value = new Container();
-  channelListScrollableContainer.value.y = addChannelButtonHeight;
-  channelListContainer.value.addChild(channelListScrollableContainer.value as any);
-
   const canvasHeight = app.value.screen.height;
 
-  // Create background for channel list area
+  // Create background for channel list area (add first so it's behind everything)
   const background = new Graphics()
     .rect(0, 0, channelListWidth, canvasHeight)
     .fill(0x2a2a2a);
   channelListContainer.value.addChild(background);
+
+  // Re-add the scrollable container (after background)
+  channelListScrollableContainer.value = new Container();
+  channelListScrollableContainer.value.y = addChannelButtonHeight;
+  channelListContainer.value.addChild(channelListScrollableContainer.value as any);
 
   // Create "Add Channel" button at the top (fixed position)
   const buttonHeight = addChannelButtonHeight;
@@ -645,6 +654,43 @@ function handleGlobalMouseUp() {
       verticalScrollThumb.value.y = currentY;
     }
   }
+}
+
+function handleWheel(event: WheelEvent) {
+  event.preventDefault();
+
+  if (!app.value || !verticalScrollThumb.value) return;
+
+  const canvasHeight = app.value.screen.height;
+  const availableHeight = canvasHeight - addChannelButtonHeight;
+  const totalContentHeight = channels.value.length * rowHeight;
+  const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
+
+  // Only scroll if there's content to scroll
+  if (maxScrollY <= 0) return;
+
+  // Adjust scroll speed (pixels per wheel delta)
+  const scrollSpeed = 0.5;
+  const scrollDelta = event.deltaY * scrollSpeed;
+
+  // Calculate new world Y position
+  const newWorldY = Math.max(0, Math.min(currentWorldY.value + scrollDelta, maxScrollY));
+  currentWorldY.value = newWorldY;
+
+  // Update scroll offset
+  verticalScrollOffset.value = newWorldY / maxScrollY;
+
+  // Update thumb position
+  const scrollbarHeight = canvasHeight - addChannelButtonHeight;
+  const thumbPositionInScrollbar = verticalScrollOffset.value * (scrollbarHeight - verticalScrollThumbHeight.value);
+  const newThumbY = addChannelButtonHeight + thumbPositionInScrollbar;
+
+  const currentX = verticalScrollThumb.value.x;
+  verticalScrollThumb.value.clear()
+    .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+    .fill(0x888888);
+  verticalScrollThumb.value.x = currentX;
+  verticalScrollThumb.value.y = newThumbY;
 }
 
 
