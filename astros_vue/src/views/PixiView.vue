@@ -9,6 +9,12 @@ interface Channel {
   events: any[];
 }
 
+interface EventBox {
+  channelId: number;
+  timeInSeconds: number;
+  graphics: Graphics;
+}
+
 
 const app = ref<Application | null>(null);
 const pixiContainer = ref<HTMLDivElement | null>(null);
@@ -31,6 +37,7 @@ const scrollBar = ref<Graphics | null>(null);
 const scrollThumb = ref<Graphics | null>(null);
 const timeline = ref<Container | null>(null);
 const channelRowContainers = ref<Map<number, Container>>(new Map());
+const channelEventBoxes = ref<Map<number, EventBox[]>>(new Map());
 const plusButton = ref<Container | null>(null);
 const minusButton = ref<Container | null>(null);
 
@@ -50,7 +57,8 @@ const channelListWidth = 256; // 64 * 4 = 256px
 // Timeline constants
 const PIXELS_PER_SECOND = 30;
 const TIMELINE_DURATION_SECONDS = 600; // 10 minutes
-const TIMELINE_WIDTH = PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS; // 18000 pixels
+const zoomLevel = ref(0); // 0 = 10s, 1 = 30s, 2 = 1min, 3 = 2min
+const TIMELINE_WIDTH = ref(PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS); // 18000 pixels
 
 // Scrollbar state
 const minScrollThumbWidth = 40; // Minimum thumb width
@@ -65,7 +73,7 @@ watch(scrollOffset, (newOffset) => {
   if (scrollableContentContainer.value && timeline.value && app.value) {
     const canvasWidth = app.value.screen.width;
     const scrollbarWidth = canvasWidth - channelListWidth;
-    const maxScroll = Math.max(0, TIMELINE_WIDTH - scrollbarWidth);
+    const maxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
     const worldX = maxScroll > 0 ? newOffset * maxScroll : 0;
     // Apply horizontal scroll to scrollable content and timeline
     scrollableContentContainer.value.x = channelListWidth - worldX;
@@ -438,32 +446,73 @@ function createTimeline() {
 
   const graphics = new Graphics();
 
+  // Determine major tick interval based on zoom level
+  let majorTickInterval: number;
+  let minorTickInterval: number;
+  let pixelsPerMajorTick: number;
+
+  switch (zoomLevel.value) {
+    case 0: // 10 seconds per major tick (default)
+      majorTickInterval = 10;
+      minorTickInterval = 1;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
+      break;
+    case 1: // 30 seconds per major tick
+      majorTickInterval = 30;
+      minorTickInterval = 5;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels (same spacing)
+      break;
+    case 2: // 1 minute per major tick
+      majorTickInterval = 60;
+      minorTickInterval = 10;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels (same spacing)
+      break;
+    case 3: // 2 minutes per major tick
+      majorTickInterval = 120;
+      minorTickInterval = 20;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels (same spacing)
+      break;
+    default:
+      majorTickInterval = 10;
+      minorTickInterval = 1;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND;
+  }
+
   // Draw the timeline background
   graphics
-    .rect(0, 0, TIMELINE_WIDTH, timelineHeight)
+    .rect(0, 0, TIMELINE_WIDTH.value, timelineHeight)
     .fill(0x1a1a1a);
 
-  // Draw tick marks
-  for (let second = 0; second <= TIMELINE_DURATION_SECONDS; second++) {
-    const x = second * PIXELS_PER_SECOND;
+  // Calculate how many major ticks fit in the timeline
+  const numMajorTicks = Math.floor(TIMELINE_DURATION_SECONDS / majorTickInterval);
 
-    // Every 10 seconds is a major tick, others are minor
-    const isMajorTick = second % 10 === 0;
-    const tickHeight = isMajorTick ? 20 : 10;
-    const tickColor = isMajorTick ? 0xffffff : 0x888888;
-    const tickWidth = isMajorTick ? 2 : 1;
+  // Draw tick marks with consistent pixel spacing
+  for (let tickIndex = 0; tickIndex <= numMajorTicks; tickIndex++) {
+    const x = tickIndex * pixelsPerMajorTick;
 
+    // Major tick
     graphics
-      .rect(x, timelineHeight - tickHeight, tickWidth, tickHeight)
-      .fill(tickColor);
+      .rect(x, timelineHeight - 20, 2, 20)
+      .fill(0xffffff);
+
+    // Draw minor ticks between major ticks
+    if (tickIndex < numMajorTicks) {
+      const minorTicksPerMajor = majorTickInterval / minorTickInterval;
+      for (let minorIndex = 1; minorIndex < minorTicksPerMajor; minorIndex++) {
+        const minorX = x + (minorIndex * pixelsPerMajorTick / minorTicksPerMajor);
+        graphics
+          .rect(minorX, timelineHeight - 10, 1, 10)
+          .fill(0x888888);
+      }
+    }
   }
 
   timeline.value.addChild(graphics);
 
   // Add time labels at major ticks (after graphics so they're on top)
-  // Skip the last marker at 10:00 since it gets cut off
-  for (let second = 10; second < TIMELINE_DURATION_SECONDS; second += 10) {
-    const x = second * PIXELS_PER_SECOND;
+  for (let tickIndex = 1; tickIndex <= numMajorTicks; tickIndex++) {
+    const x = tickIndex * pixelsPerMajorTick;
+    const second = tickIndex * majorTickInterval;
     const minutes = Math.floor(second / 60);
     const seconds = second % 60;
     const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -537,11 +586,10 @@ function createZoomButtons() {
   });
 
   plusButton.value.on('pointertap', () => {
-    console.log('Plus button clicked');
-    // TODO: Implement zoom in functionality
+    zoomIn();
   });
 
-  uiLayer.value.addChild(plusButton.value);
+  uiLayer.value.addChild(plusButton.value as any);
 
   // Minus button
   minusButton.value = new Container();
@@ -577,11 +625,188 @@ function createZoomButtons() {
   });
 
   minusButton.value.on('pointertap', () => {
-    console.log('Minus button clicked');
-    // TODO: Implement zoom out functionality
+    zoomOut();
   });
 
-  uiLayer.value.addChild(minusButton.value);
+  uiLayer.value.addChild(minusButton.value as any);
+}
+
+function zoomOut() {
+  // Don't zoom out if already at maximum zoom out level
+  if (zoomLevel.value >= 3) return;
+
+  // Cycle through zoom levels: 0 (10s) -> 1 (30s) -> 2 (1min) -> 3 (2min)
+  zoomLevel.value = zoomLevel.value + 1;
+
+  // Calculate scale factor based on zoom level
+  // Keep the pixel spacing between major ticks constant, but change what time they represent
+  let scaleMultiplier: number;
+  switch (zoomLevel.value) {
+    case 0: // 10 seconds per major tick (default) - 1x scale
+      scaleMultiplier = 1;
+      break;
+    case 1: // 30 seconds per major tick - 3x scale
+      scaleMultiplier = 3;
+      break;
+    case 2: // 1 minute per major tick - 6x scale
+      scaleMultiplier = 6;
+      break;
+    case 3: // 2 minutes per major tick - 12x scale
+      scaleMultiplier = 12;
+      break;
+    default:
+      scaleMultiplier = 1;
+  }
+
+  // Update timeline width based on scale
+  // Original width divided by scale factor (zooming out makes timeline shorter)
+  const oldTimelineWidth = TIMELINE_WIDTH.value;
+  TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
+
+  // Adjust scroll position proportionally to maintain relative position
+  if (app.value) {
+    const canvasWidth = app.value.screen.width;
+    const scrollbarWidth = canvasWidth - channelListWidth;
+    const oldMaxScroll = Math.max(0, oldTimelineWidth - scrollbarWidth);
+    const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
+
+    // If there was scroll before, maintain the same relative position
+    if (oldMaxScroll > 0 && newMaxScroll > 0) {
+      const scrollPercentage = currentWorldX.value / oldMaxScroll;
+      currentWorldX.value = scrollPercentage * newMaxScroll;
+      scrollOffset.value = scrollPercentage;
+    } else {
+      // Reset scroll if timeline fits in viewport
+      currentWorldX.value = 0;
+      scrollOffset.value = 0;
+    }
+  }
+
+  // Recreate timeline with new scale
+  if (timeline.value && uiLayer.value) {
+    uiLayer.value.removeChild(timeline.value as any);
+    timeline.value = null;
+  }
+  createTimeline();
+
+  // Re-add buttons and channel list so they stay on top of timeline
+  if (plusButton.value && minusButton.value && uiLayer.value) {
+    uiLayer.value.removeChild(plusButton.value as any);
+    uiLayer.value.removeChild(minusButton.value as any);
+    uiLayer.value.addChild(plusButton.value as any);
+    uiLayer.value.addChild(minusButton.value as any);
+  }
+
+  // Re-add channel list container so it stays on top
+  if (channelListContainer.value && uiLayer.value) {
+    uiLayer.value.removeChild(channelListContainer.value as any);
+    uiLayer.value.addChild(channelListContainer.value as any);
+  }
+
+  // Update scrollbar to match new timeline width
+  updateScrollbar();
+
+  // Update the timeline and scrollable content positions based on new scroll values
+  if (scrollableContentContainer.value && timeline.value && app.value) {
+    const canvasWidth = app.value.screen.width;
+    const scrollbarWidth = canvasWidth - channelListWidth;
+    const maxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
+    const worldX = maxScroll > 0 ? scrollOffset.value * maxScroll : 0;
+    scrollableContentContainer.value.x = channelListWidth - worldX;
+    timeline.value.x = channelListWidth - worldX;
+    currentWorldX.value = worldX;
+  }
+
+  // Update all event box positions based on new timeline width
+  updateAllEventBoxPositions();
+}
+
+function zoomIn() {
+  // Don't zoom in if already at maximum zoom in level
+  if (zoomLevel.value <= 0) return;
+
+  // Cycle through zoom levels: 3 (2min) -> 2 (1min) -> 1 (30s) -> 0 (10s)
+  zoomLevel.value = zoomLevel.value - 1;
+
+  // Calculate scale factor based on zoom level
+  let scaleMultiplier: number;
+  switch (zoomLevel.value) {
+    case 0: // 10 seconds per major tick (default) - 1x scale
+      scaleMultiplier = 1;
+      break;
+    case 1: // 30 seconds per major tick - 3x scale
+      scaleMultiplier = 3;
+      break;
+    case 2: // 1 minute per major tick - 6x scale
+      scaleMultiplier = 6;
+      break;
+    case 3: // 2 minutes per major tick - 12x scale
+      scaleMultiplier = 12;
+      break;
+    default:
+      scaleMultiplier = 1;
+  }
+
+  // Update timeline width based on scale
+  const oldTimelineWidth = TIMELINE_WIDTH.value;
+  TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
+
+  // Adjust scroll position proportionally to maintain relative position
+  if (app.value) {
+    const canvasWidth = app.value.screen.width;
+    const scrollbarWidth = canvasWidth - channelListWidth;
+    const oldMaxScroll = Math.max(0, oldTimelineWidth - scrollbarWidth);
+    const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
+
+    // If there was scroll before, maintain the same relative position
+    if (oldMaxScroll > 0 && newMaxScroll > 0) {
+      const scrollPercentage = currentWorldX.value / oldMaxScroll;
+      currentWorldX.value = scrollPercentage * newMaxScroll;
+      scrollOffset.value = scrollPercentage;
+    } else {
+      // Reset scroll if timeline fits in viewport
+      currentWorldX.value = 0;
+      scrollOffset.value = 0;
+    }
+  }
+
+  // Recreate timeline with new scale
+  if (timeline.value && uiLayer.value) {
+    uiLayer.value.removeChild(timeline.value as any);
+    timeline.value = null;
+  }
+  createTimeline();
+
+  // Re-add buttons and channel list so they stay on top of timeline
+  if (plusButton.value && minusButton.value && uiLayer.value) {
+    uiLayer.value.removeChild(plusButton.value as any);
+    uiLayer.value.removeChild(minusButton.value as any);
+    uiLayer.value.addChild(plusButton.value as any);
+    uiLayer.value.addChild(minusButton.value as any);
+  }
+
+  // Re-add channel list container so it stays on top
+  if (channelListContainer.value && uiLayer.value) {
+    uiLayer.value.removeChild(channelListContainer.value as any);
+    uiLayer.value.addChild(channelListContainer.value as any);
+  }
+
+  // Update scrollbar to match new timeline width
+  updateScrollbar();
+
+  // Update the timeline and scrollable content positions based on new scroll values
+  if (scrollableContentContainer.value && timeline.value && app.value) {
+    const canvasWidth = app.value.screen.width;
+    const scrollbarWidth = canvasWidth - channelListWidth;
+    const maxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
+    const worldX = maxScroll > 0 ? scrollOffset.value * maxScroll : 0;
+    scrollableContentContainer.value.x = channelListWidth - worldX;
+    timeline.value.x = channelListWidth - worldX;
+    currentWorldX.value = worldX;
+  }
+
+  // Update all event box positions based on new timeline width
+  updateAllEventBoxPositions();
 }
 
 function createChannelList() {
@@ -834,13 +1059,13 @@ function handleResize() {
   const scrollbarWidth = newCanvasWidth - channelListWidth;
 
   // Update the thumb width based on new scrollbar size
-  const viewportRatio = scrollbarWidth / TIMELINE_WIDTH;
+  const viewportRatio = scrollbarWidth / TIMELINE_WIDTH.value;
   const newThumbWidth = Math.max(minScrollThumbWidth, scrollbarWidth * viewportRatio);
 
   scrollThumbWidth.value = newThumbWidth;
 
   // Calculate new scroll offset based on the stored world position
-  const newMaxScroll = Math.max(0, TIMELINE_WIDTH - scrollbarWidth);
+  const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
 
   // If the viewport is now larger than or equal to the timeline, reset to start
   if (newMaxScroll <= 0) {
@@ -955,12 +1180,12 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
   const rowBg = new Graphics();
   const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
   rowBg
-    .rect(0, 0, TIMELINE_WIDTH, rowHeight)
+    .rect(0, 0, TIMELINE_WIDTH.value, rowHeight)
     .fill(rowColor);
 
   // Add border
   rowBg
-    .rect(0, rowHeight - 1, TIMELINE_WIDTH, 1)
+    .rect(0, rowHeight - 1, TIMELINE_WIDTH.value, 1)
     .fill(0x444444);
 
   rowContainer.addChild(rowBg);
@@ -972,39 +1197,66 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
     // Get the local position within the row container
     const localPos = rowContainer.toLocal(event.global);
 
-    // The X position is already in the correct coordinate space (relative to row)
-    const timePosition = localPos.x;
+    // Calculate the time in seconds based on pixel position
+    const timeInSeconds = (localPos.x / TIMELINE_WIDTH.value) * TIMELINE_DURATION_SECONDS;
 
-    // Create red box at this position
-    addEventBox(rowContainer, timePosition);
+    // Create and store the event box
+    addEventBox(rowContainer, channelId, timeInSeconds);
   });
 
   scrollableContentContainer.value.addChild(rowContainer as any);
 
   // Store the container in the map
   channelRowContainers.value.set(channelId, rowContainer);
-}
 
-function addEventBox(rowContainer: Container, timePosition: number) {
-  // Create a red box
-  const boxWidth = 60; // Width in pixels
-  const boxHeight = rowHeight - 10; // Height with some padding
-  const boxY = 5; // Vertical padding
+  // Update positions of any existing event boxes for this channel
+  updateEventBoxPositions(channelId);
+} function addEventBox(rowContainer: Container, channelId: number, timeInSeconds: number) {
+  const boxWidth = 60;
+  const boxHeight = rowHeight - 10;
+  const boxY = 5;
+
+  // Calculate pixel position from time in seconds
+  const pixelPosition = (timeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
 
   const eventBox = new Graphics();
   eventBox
-    .rect(timePosition, boxY, boxWidth, boxHeight)
-    .fill(0xff0000); // Red color
+    .rect(0, 0, boxWidth, boxHeight)
+    .fill(0xff0000);
 
-  // Add border
   eventBox
-    .rect(timePosition, boxY, boxWidth, boxHeight)
-    .stroke({ width: 2, color: 0xaa0000 }); // Darker red border
+    .rect(0, 0, boxWidth, boxHeight)
+    .stroke({ width: 2, color: 0xaa0000 });
+
+  // Position the box
+  eventBox.x = pixelPosition;
+  eventBox.y = boxY;
 
   rowContainer.addChild(eventBox);
+
+  // Store the event data with graphics reference
+  if (!channelEventBoxes.value.has(channelId)) {
+    channelEventBoxes.value.set(channelId, []);
+  }
+  channelEventBoxes.value.get(channelId)!.push({ channelId, timeInSeconds, graphics: eventBox });
 }
 
-function addChannel() {
+function updateEventBoxPositions(channelId: number) {
+  const events = channelEventBoxes.value.get(channelId) || [];
+
+  // Update positions of all event boxes based on current timeline width
+  events.forEach(event => {
+    const pixelPosition = (event.timeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
+    event.graphics.x = pixelPosition;
+  });
+}
+
+function updateAllEventBoxPositions() {
+  // Update positions for all channels
+  channelEventBoxes.value.forEach((events, channelId) => {
+    updateEventBoxPositions(channelId);
+  });
+} function addChannel() {
   const newChannel: Channel = {
     id: channels.value.length + 1,
     name: `Channel ${channels.value.length + 1}`,
