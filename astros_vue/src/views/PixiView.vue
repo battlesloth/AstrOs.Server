@@ -57,7 +57,8 @@ const channelListWidth = 256; // 64 * 4 = 256px
 // Timeline constants
 const PIXELS_PER_SECOND = 30;
 const TIMELINE_DURATION_SECONDS = 600; // 10 minutes
-const zoomLevel = ref(0); // 0 = 10s, 1 = 30s, 2 = 1min, 3 = 2min
+const zoomLevel = ref(0); // 0=5s, 1=15s, 2=30s, 3=45s, 4=1min, 5=1:15, 6=1:30, 7=1:45, 8=2min
+const zoomScrollAccumulator = ref(0); // Accumulate scroll events for zoom
 const TIMELINE_WIDTH = ref(PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS); // 18000 pixels
 
 // Scrollbar state
@@ -452,28 +453,53 @@ function createTimeline() {
   let pixelsPerMajorTick: number;
 
   switch (zoomLevel.value) {
-    case 0: // 10 seconds per major tick (default)
-      majorTickInterval = 10;
+    case 0: // 5 seconds per major tick
+      majorTickInterval = 5;
       minorTickInterval = 1;
       pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
       break;
-    case 1: // 30 seconds per major tick
+    case 1: // 15 seconds per major tick
+      majorTickInterval = 15;
+      minorTickInterval = 3;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
+      break;
+    case 2: // 30 seconds per major tick
       majorTickInterval = 30;
       minorTickInterval = 5;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels (same spacing)
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
       break;
-    case 2: // 1 minute per major tick
+    case 3: // 45 seconds per major tick
+      majorTickInterval = 45;
+      minorTickInterval = 5;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
+      break;
+    case 4: // 1 minute per major tick
       majorTickInterval = 60;
       minorTickInterval = 10;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels (same spacing)
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
       break;
-    case 3: // 2 minutes per major tick
+    case 5: // 1:15 per major tick
+      majorTickInterval = 75;
+      minorTickInterval = 15;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
+      break;
+    case 6: // 1:30 per major tick
+      majorTickInterval = 90;
+      minorTickInterval = 15;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
+      break;
+    case 7: // 1:45 per major tick
+      majorTickInterval = 105;
+      minorTickInterval = 15;
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
+      break;
+    case 8: // 2:00 per major tick
       majorTickInterval = 120;
       minorTickInterval = 20;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels (same spacing)
+      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
       break;
     default:
-      majorTickInterval = 10;
+      majorTickInterval = 5;
       minorTickInterval = 1;
       pixelsPerMajorTick = 10 * PIXELS_PER_SECOND;
   }
@@ -633,29 +659,44 @@ function createZoomButtons() {
 
 function zoomOut() {
   // Don't zoom out if already at maximum zoom out level
-  if (zoomLevel.value >= 3) return;
+  if (zoomLevel.value >= 8) return;
 
-  // Cycle through zoom levels: 0 (10s) -> 1 (30s) -> 2 (1min) -> 3 (2min)
+  // Cycle through zoom levels
   zoomLevel.value = zoomLevel.value + 1;
 
   // Calculate scale factor based on zoom level
   // Keep the pixel spacing between major ticks constant, but change what time they represent
   let scaleMultiplier: number;
   switch (zoomLevel.value) {
-    case 0: // 10 seconds per major tick (default) - 1x scale
-      scaleMultiplier = 1;
+    case 0: // 5 seconds per major tick
+      scaleMultiplier = 0.5;
       break;
-    case 1: // 30 seconds per major tick - 3x scale
+    case 1: // 15 seconds per major tick
+      scaleMultiplier = 1.5;
+      break;
+    case 2: // 30 seconds per major tick
       scaleMultiplier = 3;
       break;
-    case 2: // 1 minute per major tick - 6x scale
+    case 3: // 45 seconds per major tick
+      scaleMultiplier = 4.5;
+      break;
+    case 4: // 1 minute per major tick
       scaleMultiplier = 6;
       break;
-    case 3: // 2 minutes per major tick - 12x scale
+    case 5: // 1:15 per major tick
+      scaleMultiplier = 7.5;
+      break;
+    case 6: // 1:30 per major tick
+      scaleMultiplier = 9;
+      break;
+    case 7: // 1:45 per major tick
+      scaleMultiplier = 10.5;
+      break;
+    case 8: // 2:00 per major tick
       scaleMultiplier = 12;
       break;
     default:
-      scaleMultiplier = 1;
+      scaleMultiplier = 0.5;
   }
 
   // Update timeline width based on scale
@@ -663,20 +704,26 @@ function zoomOut() {
   const oldTimelineWidth = TIMELINE_WIDTH.value;
   TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
 
-  // Adjust scroll position proportionally to maintain relative position
+  // Calculate the center time point before zoom
   if (app.value) {
     const canvasWidth = app.value.screen.width;
     const scrollbarWidth = canvasWidth - channelListWidth;
-    const oldMaxScroll = Math.max(0, oldTimelineWidth - scrollbarWidth);
+    const viewportCenterX = scrollbarWidth / 2;
+
+    // Calculate the time at the center of the viewport
+    const centerTimeInSeconds = ((currentWorldX.value + viewportCenterX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
+
+    // Calculate where that time should be in the new timeline
+    const newCenterPositionX = (centerTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
+
+    // Calculate new scroll position to keep the center time at the center
+    const newWorldX = newCenterPositionX - viewportCenterX;
     const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
 
-    // If there was scroll before, maintain the same relative position
-    if (oldMaxScroll > 0 && newMaxScroll > 0) {
-      const scrollPercentage = currentWorldX.value / oldMaxScroll;
-      currentWorldX.value = scrollPercentage * newMaxScroll;
-      scrollOffset.value = scrollPercentage;
+    if (newMaxScroll > 0) {
+      currentWorldX.value = Math.max(0, Math.min(newWorldX, newMaxScroll));
+      scrollOffset.value = currentWorldX.value / newMaxScroll;
     } else {
-      // Reset scroll if timeline fits in viewport
       currentWorldX.value = 0;
       scrollOffset.value = 0;
     }
@@ -725,46 +772,67 @@ function zoomIn() {
   // Don't zoom in if already at maximum zoom in level
   if (zoomLevel.value <= 0) return;
 
-  // Cycle through zoom levels: 3 (2min) -> 2 (1min) -> 1 (30s) -> 0 (10s)
+  // Cycle through zoom levels
   zoomLevel.value = zoomLevel.value - 1;
 
   // Calculate scale factor based on zoom level
   let scaleMultiplier: number;
   switch (zoomLevel.value) {
-    case 0: // 10 seconds per major tick (default) - 1x scale
-      scaleMultiplier = 1;
+    case 0: // 5 seconds per major tick
+      scaleMultiplier = 0.5;
       break;
-    case 1: // 30 seconds per major tick - 3x scale
+    case 1: // 15 seconds per major tick
+      scaleMultiplier = 1.5;
+      break;
+    case 2: // 30 seconds per major tick
       scaleMultiplier = 3;
       break;
-    case 2: // 1 minute per major tick - 6x scale
+    case 3: // 45 seconds per major tick
+      scaleMultiplier = 4.5;
+      break;
+    case 4: // 1 minute per major tick
       scaleMultiplier = 6;
       break;
-    case 3: // 2 minutes per major tick - 12x scale
+    case 5: // 1:15 per major tick
+      scaleMultiplier = 7.5;
+      break;
+    case 6: // 1:30 per major tick
+      scaleMultiplier = 9;
+      break;
+    case 7: // 1:45 per major tick
+      scaleMultiplier = 10.5;
+      break;
+    case 8: // 2:00 per major tick
       scaleMultiplier = 12;
       break;
     default:
-      scaleMultiplier = 1;
+      scaleMultiplier = 0.5;
   }
 
   // Update timeline width based on scale
   const oldTimelineWidth = TIMELINE_WIDTH.value;
   TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
 
-  // Adjust scroll position proportionally to maintain relative position
+  // Calculate the center time point before zoom
   if (app.value) {
     const canvasWidth = app.value.screen.width;
     const scrollbarWidth = canvasWidth - channelListWidth;
-    const oldMaxScroll = Math.max(0, oldTimelineWidth - scrollbarWidth);
+    const viewportCenterX = scrollbarWidth / 2;
+
+    // Calculate the time at the center of the viewport
+    const centerTimeInSeconds = ((currentWorldX.value + viewportCenterX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
+
+    // Calculate where that time should be in the new timeline
+    const newCenterPositionX = (centerTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
+
+    // Calculate new scroll position to keep the center time at the center
+    const newWorldX = newCenterPositionX - viewportCenterX;
     const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
 
-    // If there was scroll before, maintain the same relative position
-    if (oldMaxScroll > 0 && newMaxScroll > 0) {
-      const scrollPercentage = currentWorldX.value / oldMaxScroll;
-      currentWorldX.value = scrollPercentage * newMaxScroll;
-      scrollOffset.value = scrollPercentage;
+    if (newMaxScroll > 0) {
+      currentWorldX.value = Math.max(0, Math.min(newWorldX, newMaxScroll));
+      scrollOffset.value = currentWorldX.value / newMaxScroll;
     } else {
-      // Reset scroll if timeline fits in viewport
       currentWorldX.value = 0;
       scrollOffset.value = 0;
     }
@@ -980,6 +1048,28 @@ function handleGlobalMouseUp() {
 
 function handleWheel(event: WheelEvent) {
   event.preventDefault();
+
+  // Check if Ctrl key is held - if so, zoom instead of scroll
+  if (event.ctrlKey) {
+    // Accumulate scroll delta
+    if (event.deltaY < 0) {
+      zoomScrollAccumulator.value--;
+    } else if (event.deltaY > 0) {
+      zoomScrollAccumulator.value++;
+    }
+
+    // Check if we've accumulated 3 scroll events
+    if (zoomScrollAccumulator.value <= -3) {
+      // Scroll up = zoom in
+      zoomIn();
+      zoomScrollAccumulator.value = 0;
+    } else if (zoomScrollAccumulator.value >= 3) {
+      // Scroll down = zoom out
+      zoomOut();
+      zoomScrollAccumulator.value = 0;
+    }
+    return;
+  }
 
   if (!app.value || !verticalScrollThumb.value) return;
 
