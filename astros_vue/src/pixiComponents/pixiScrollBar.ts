@@ -1,9 +1,9 @@
-import { Graphics } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import type { PixiScrollBarOptions } from "./pixiScrollBarOptions";
 import { ScrollBarDirection } from "./pixiScrollBarOptions";
 import { PixiScrollBarThumb } from "./pixiScrollBarThumb";
 
-export class PixiScrollBar extends Graphics {
+export class PixiScrollBar extends Container {
     barWidth: number;
     barHeight: number;
     xOffset: number;
@@ -16,7 +16,9 @@ export class PixiScrollBar extends Graphics {
     thumbFocusColor: number;
     onThumbDragStart: () => void;
 
-    private scrollThumb: PixiScrollBarThumb | null = null;
+    private background: Graphics;
+    private scrollThumb: PixiScrollBarThumb;
+
 
     constructor(options: PixiScrollBarOptions) {
         super();
@@ -33,7 +35,8 @@ export class PixiScrollBar extends Graphics {
         this.thumbFocusColor = options.thumbFocusColor ?? 0xcccccc;
         this.onThumbDragStart = options.onThumbDragStart;
 
-        this.rect(this.xOffset, this.yOffset, this.barWidth, this.barHeight)
+        this.background = new Graphics();
+        this.background.rect(this.xOffset, this.yOffset, this.barWidth, this.barHeight)
             .fill(this.fillColor);
 
         this.scrollThumb = new PixiScrollBarThumb(
@@ -46,6 +49,7 @@ export class PixiScrollBar extends Graphics {
             this.thumbFocusColor
         );
 
+        this.addChild(this.background);
         this.addChild(this.scrollThumb);
     }
 
@@ -65,7 +69,7 @@ export class PixiScrollBar extends Graphics {
             this.yOffset = newPosition;
         }
 
-        this.clear()
+        this.background.clear()
             .rect(this.xOffset, this.yOffset, this.barWidth, this.barHeight)
             .fill(this.fillColor);
 

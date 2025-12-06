@@ -574,10 +574,7 @@ function zoom(direction: 'in' | 'out') {
   }
 
   // Update scrollbar to match new timeline width
-  updateHorizontalScrollbar(); 4
-
-
-
+  updateHorizontalScrollbar();
 
   // Update the timeline and scrollable content positions based on new scroll values
   if (scrollableContentContainer.value && timeline.value && app.value) {
@@ -697,77 +694,65 @@ function createChannelList() {
 }
 
 function handleGlobalMouseMove(event: MouseEvent) {
-  /*if (isDraggingTimeline.value && app.value && pixiContainer.value) {
-    const rect = pixiContainer.value.getBoundingClientRect();
-    const currentX = event.clientX - rect.left;
-    const currentY = event.clientY - rect.top;
- 
-    const deltaX = dragStartX.value - currentX;
-    const deltaY = dragStartY.value - currentY;
- 
+  if (!app.value || !pixiContainer.value) return;
+
+  const rect = pixiContainer.value.getBoundingClientRect();
+  const canvasX = event.clientX - rect.left;
+  const canvasY = event.clientY - rect.top;
+
+  // Handle timeline dragging
+  if (isDraggingTimeline.value) {
+    const deltaX = dragStartX.value - canvasX;
+    const deltaY = dragStartY.value - canvasY;
+
     // Mark as dragged if moved more than threshold
     if (Math.abs(deltaX) > DRAG_THRESHOLD_PIXELS || Math.abs(deltaY) > DRAG_THRESHOLD_PIXELS) {
       hasDragged.value = true;
     }
- 
-    // Update horizontal scroll
-    const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
-    const maxScrollX = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
- 
-    if (maxScrollX > 0) {
+
+    // Update horizontal scroll via scrollbar
+    if (horizontalScrollBar.value) {
+      const canvasWidth = app.value.screen.width;
+      const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
+      const maxScrollX = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
       const newWorldX = Math.max(0, Math.min(dragStartWorldX.value + deltaX, maxScrollX));
       currentWorldX.value = newWorldX;
-      scrollOffset.value = newWorldX / maxScrollX;
+      const newOffset = maxScrollX > 0 ? newWorldX / maxScrollX : 0;
+
+      // Update scrollbar thumb position
+      horizontalScrollBar.value.setDragging(true);
+      const maxThumbX = scrollbarWidth - horizontalScrollBar.value.thumbSize;
+      const thumbX = CHANNEL_LIST_WIDTH + newOffset * maxThumbX;
+      horizontalScrollOffset.value = horizontalScrollBar.value.drag(thumbX);
+      horizontalScrollBar.value.endDrag();
     }
- 
-    // Update vertical scroll
-    const canvasHeight = app.value.screen.height;
-    const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
-    const totalContentHeight = channels.value.length * ROW_HEIGHT;
-    const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
- 
-    if (maxScrollY > 0) {
+
+    // Update vertical scroll via scrollbar
+    if (verticalScrollBar.value) {
+      const canvasHeight = app.value.screen.height;
+      const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+      const totalContentHeight = channels.value.length * ROW_HEIGHT;
+      const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
       const newWorldY = Math.max(0, Math.min(dragStartWorldY.value + deltaY, maxScrollY));
       currentWorldY.value = newWorldY;
-      verticalScrollOffset.value = newWorldY / maxScrollY;
- 
-      // Update vertical thumb position
- 
-      if (app.value && verticalScrollBar.value) {
-        const rect = pixiContainer.value.getBoundingClientRect();
-        const canvasY = event.clientY - rect.top;
-        verticalScrollBar.value?.drag(canvasY);
-      }
-      
-            if (verticalScrollThumb.value) {
-              const scrollbarHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
-              const thumbPositionInScrollbar =
-                verticalScrollOffset.value * (scrollbarHeight - verticalScrollThumbHeight.value);
-              const newThumbY = ADD_CHANNEL_BUTTON_HEIGHT + thumbPositionInScrollbar;
-      
-              verticalScrollThumb.value
-                .clear()
-                .rect(0, 0, VERTICAL_SCROLL_BAR_WIDTH, verticalScrollThumbHeight.value)
-                .fill(0x888888);
-              verticalScrollThumb.value.x = canvasWidth - VERTICAL_SCROLL_BAR_WIDTH;
-              verticalScrollThumb.value.y = newThumbY;
-            }
-              
+      const newOffset = maxScrollY > 0 ? newWorldY / maxScrollY : 0;
+
+      // Update scrollbar thumb position
+      verticalScrollBar.value.setDragging(true);
+      const maxThumbY = availableHeight - verticalScrollBar.value.thumbSize;
+      const thumbY = ADD_CHANNEL_BUTTON_HEIGHT + newOffset * maxThumbY;
+      verticalScrollOffset.value = verticalScrollBar.value.drag(thumbY);
+      verticalScrollBar.value.endDrag();
     }
   }
-*/
 
-  if (app.value && horizontalScrollBar.value?.isDragging() && pixiContainer.value) {
-    const rect = pixiContainer.value.getBoundingClientRect();
-    const canvasX = event.clientX - rect.left;
-    horizontalScrollOffset.value = horizontalScrollBar.value?.drag(canvasX);
+  // Handle scrollbar thumb dragging
+  if (horizontalScrollBar.value?.isDragging()) {
+    horizontalScrollOffset.value = horizontalScrollBar.value.drag(canvasX);
   }
 
-  if (app.value && verticalScrollBar.value?.isDragging() && pixiContainer.value) {
-    const rect = pixiContainer.value.getBoundingClientRect();
-    const canvasY = event.clientY - rect.top;
-    verticalScrollOffset.value = verticalScrollBar.value?.drag(canvasY);
+  if (verticalScrollBar.value?.isDragging()) {
+    verticalScrollOffset.value = verticalScrollBar.value.drag(canvasY);
   }
 }
 
