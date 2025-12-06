@@ -62,24 +62,22 @@ export class PixiScrollBarThumb extends Graphics {
         });
     }
 
-    public resizeY(newThumbHeight: number, newY: number) {
+    public resizeY(newThumbHeight: number, newY: number, newxOffset: number) {
         this.thumbHeight = newThumbHeight;
-        const currentX = this.x;
         this.clear()
             .rect(0, 0, this.thumbWidth, this.thumbHeight)
             .fill(this.thumbFillColor);
-        this.x = currentX;
+        this.x = newxOffset;
         this.y = newY;
     }
 
-    public resizeX(newThumbWidth: number, newX: number) {
+    public resizeX(newThumbWidth: number, newX: number, newYOffset: number) {
         this.thumbWidth = newThumbWidth;
-        const currentY = this.y;
         this.clear()
             .rect(0, 0, this.thumbWidth, this.thumbHeight)
             .fill(this.thumbFillColor);
         this.x = newX;
-        this.y = currentY;
+        this.y = newYOffset;
     }
 
     setDragging(isDragging: boolean) {

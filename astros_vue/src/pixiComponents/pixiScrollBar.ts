@@ -49,30 +49,42 @@ export class PixiScrollBar extends Graphics {
         this.addChild(this.scrollThumb);
     }
 
-    public resize(newBarSize: number, newThumbSize: number, scrollOffset: number) {
-        this.barWidth = newBarSize;
+    public resize(
+        newBarSize: number,
+        newThumbSize: number,
+        newPosition: number,
+        scrollOffset: number
+    ) {
+
+        this.thumbSize = newThumbSize;
+        if (this.direction === ScrollBarDirection.VERTICAL) {
+            this.barHeight = newBarSize;
+            this.xOffset = newPosition;
+        } else {
+            this.barWidth = newBarSize;
+            this.yOffset = newPosition;
+        }
+
         this.clear()
             .rect(this.xOffset, this.yOffset, this.barWidth, this.barHeight)
             .fill(this.fillColor);
-
-        const scrollPercentage = scrollOffset;
 
         if (this.direction === ScrollBarDirection.VERTICAL) {
             const maxThumbY = this.barHeight - this.thumbSize;
             const newThumbY = Math.max(
                 this.yOffset,
-                Math.min(this.yOffset + scrollPercentage * maxThumbY, this.yOffset + maxThumbY),
+                Math.min(this.yOffset + scrollOffset * maxThumbY, this.yOffset + maxThumbY),
             );
 
-            this.scrollThumb?.resizeY(newThumbSize, newThumbY);
+            this.scrollThumb?.resizeY(newThumbSize, newThumbY, this.xOffset);
         } else {
             const maxThumbX = this.barWidth - this.thumbSize;
             const newThumbX = Math.max(
                 this.xOffset,
-                Math.min(this.xOffset + scrollPercentage * maxThumbX, this.xOffset + maxThumbX),
+                Math.min(this.xOffset + scrollOffset * maxThumbX, this.xOffset + maxThumbX),
             );
 
-            this.scrollThumb?.resizeX(newThumbSize, newThumbX);
+            this.scrollThumb?.resizeX(newThumbSize, newThumbX, this.yOffset);
         }
     }
 
@@ -80,22 +92,27 @@ export class PixiScrollBar extends Graphics {
         this.scrollThumb?.setDragging(dragging);
     }
 
+    public isDragging(): boolean {
+        return this.scrollThumb?.isDragging() || false;
+    }
+
     public drag(eventPos: number): number {
 
         if (!this.scrollThumb?.isDragging()) return 0;
 
         if (this.direction === ScrollBarDirection.VERTICAL) {
-            const localY = eventPos - this.yOffset;
+
             const newY = Math.max(
                 this.yOffset,
                 Math.min(eventPos, this.yOffset + this.barHeight - this.thumbSize),
             );
             this.scrollThumb?.dragY(newY);
 
+            const localY = eventPos - this.yOffset;
             return this.scrollToPercentage(localY, this.barHeight);
         }
         else {
-            const localX = eventPos - this.xOffset;
+
             const newX = Math.max(
                 this.xOffset,
                 Math.min(eventPos, this.xOffset + this.barWidth - this.thumbSize),
@@ -103,6 +120,7 @@ export class PixiScrollBar extends Graphics {
 
             this.scrollThumb?.dragX(newX);
 
+            const localX = eventPos - this.xOffset;
             return this.scrollToPercentage(localX, this.barWidth);
         }
     }

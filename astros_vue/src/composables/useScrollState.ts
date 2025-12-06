@@ -1,106 +1,64 @@
 import { ref, computed } from 'vue';
 
-export interface ScrollState {
-  thumbWidth: number;
-  isDragging: boolean;
-  offset: number;
-  currentWorldX: number;
+export interface HorizontalScrollState {
+    offset: number;
+    currentWorldX: number;
 }
 
 export interface VerticalScrollState {
-  thumbHeight: number;
-  isDragging: boolean;
-  offset: number;
-  currentWorldY: number;
+    offset: number;
+    currentWorldY: number;
 }
 
 export function useScrollState() {
-  // Horizontal scroll state
-  const scrollState = ref<ScrollState>({
-    thumbWidth: 60,
-    isDragging: false,
-    offset: 0,
-    currentWorldX: 0,
-  });
+    // Horizontal scroll state
+    const horizontalScrollState = ref<HorizontalScrollState>({
+        offset: 0,
+        currentWorldX: 0,
+    });
 
-  // Vertical scroll state
-  const verticalScrollState = ref<VerticalScrollState>({
-    thumbHeight: 60,
-    isDragging: false,
-    offset: 0,
-    currentWorldY: 0,
-  });
+    // Vertical scroll state
+    const verticalScrollState = ref<VerticalScrollState>({
+        offset: 0,
+        currentWorldY: 0,
+    });
 
-  // Computed refs for backward compatibility - Horizontal
-  const scrollThumbWidth = computed({
-    get: () => scrollState.value.thumbWidth,
-    set: (val) => {
-      scrollState.value.thumbWidth = val;
-    },
-  });
+    const horizontalScrollOffset = computed({
+        get: () => horizontalScrollState.value.offset,
+        set: (val) => {
+            horizontalScrollState.value.offset = val;
+        },
+    });
 
-  const isDraggingThumb = computed({
-    get: () => scrollState.value.isDragging,
-    set: (val) => {
-      scrollState.value.isDragging = val;
-    },
-  });
+    const currentWorldX = computed({
+        get: () => horizontalScrollState.value.currentWorldX,
+        set: (val) => {
+            horizontalScrollState.value.currentWorldX = val;
+        },
+    });
 
-  const scrollOffset = computed({
-    get: () => scrollState.value.offset,
-    set: (val) => {
-      scrollState.value.offset = val;
-    },
-  });
+    const verticalScrollOffset = computed({
+        get: () => verticalScrollState.value.offset,
+        set: (val) => {
+            verticalScrollState.value.offset = val;
+        },
+    });
 
-  const currentWorldX = computed({
-    get: () => scrollState.value.currentWorldX,
-    set: (val) => {
-      scrollState.value.currentWorldX = val;
-    },
-  });
+    const currentWorldY = computed({
+        get: () => verticalScrollState.value.currentWorldY,
+        set: (val) => {
+            verticalScrollState.value.currentWorldY = val;
+        },
+    });
 
-  // Computed refs for backward compatibility - Vertical
-  const verticalScrollThumbHeight = computed({
-    get: () => verticalScrollState.value.thumbHeight,
-    set: (val) => {
-      verticalScrollState.value.thumbHeight = val;
-    },
-  });
-
-  const isDraggingVerticalThumb = computed({
-    get: () => verticalScrollState.value.isDragging,
-    set: (val) => {
-      verticalScrollState.value.isDragging = val;
-    },
-  });
-
-  const verticalScrollOffset = computed({
-    get: () => verticalScrollState.value.offset,
-    set: (val) => {
-      verticalScrollState.value.offset = val;
-    },
-  });
-
-  const currentWorldY = computed({
-    get: () => verticalScrollState.value.currentWorldY,
-    set: (val) => {
-      verticalScrollState.value.currentWorldY = val;
-    },
-  });
-
-  return {
-    scrollState,
-    verticalScrollState,
-    // Horizontal
-    scrollThumbWidth,
-    isDraggingThumb,
-    scrollOffset,
-    currentWorldX,
-    // Vertical
-    verticalScrollThumbHeight,
-    isDraggingVerticalThumb,
-    verticalScrollOffset,
-    currentWorldY,
-  };
+    return {
+        horizontalScrollState,
+        verticalScrollState,
+        // Horizontal
+        horizontalScrollOffset,
+        currentWorldX,
+        // Vertical
+        verticalScrollOffset,
+        currentWorldY,
+    };
 }
