@@ -23,11 +23,24 @@ const addChannelButtonHeight = scrollBarHeight + timelineHeight; // Combined hei
 
 // UI layer containers
 const mainContainer = ref<Container | null>(null);
+const scrollableContentContainer = ref<Container | null>(null);
 const uiLayer = ref<Container | null>(null);
 const channelListContainer = ref<Container | null>(null);
+const channelListScrollableContainer = ref<Container | null>(null);
 const scrollBar = ref<Graphics | null>(null);
 const scrollThumb = ref<Graphics | null>(null);
 const timeline = ref<Container | null>(null);
+const channelRowContainers = ref<Map<number, Container>>(new Map());
+
+// Vertical scrollbar
+const verticalScrollBar = ref<Graphics | null>(null);
+const verticalScrollThumb = ref<Graphics | null>(null);
+const verticalScrollBarWidth = 15;
+const minVerticalScrollThumbHeight = 40;
+const verticalScrollThumbHeight = ref(60);
+const isDraggingVerticalThumb = ref(false);
+const verticalScrollOffset = ref(0);
+const currentWorldY = ref(0);
 
 // Channel list dimensions
 const channelListWidth = 256; // 64 * 4 = 256px
@@ -47,18 +60,35 @@ let resizeObserver: ResizeObserver | null = null;
 
 // Watch scroll offset and update main container position
 watch(scrollOffset, (newOffset) => {
-  if (mainContainer.value && app.value) {
+  if (scrollableContentContainer.value && timeline.value && app.value) {
     const canvasWidth = app.value.screen.width;
     const scrollbarWidth = canvasWidth - channelListWidth;
     const maxScroll = Math.max(0, TIMELINE_WIDTH - scrollbarWidth);
     const worldX = maxScroll > 0 ? newOffset * maxScroll : 0;
-    // Offset mainContainer to account for channel list, then apply scroll
-    mainContainer.value.x = channelListWidth - worldX;
+    // Apply horizontal scroll to scrollable content and timeline
+    scrollableContentContainer.value.x = channelListWidth - worldX;
+    timeline.value.x = channelListWidth - worldX;
     currentWorldX.value = worldX; // Store current world position
   }
 });
 
-const containerHeight = computed(() => {
+// Watch vertical scroll offset and update container Y position
+watch(verticalScrollOffset, (newOffset) => {
+  if (scrollableContentContainer.value && app.value && channelListScrollableContainer.value) {
+    const canvasHeight = app.value.screen.height;
+    const availableHeight = canvasHeight - addChannelButtonHeight;
+    const totalContentHeight = channels.value.length * rowHeight;
+    const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
+    const worldY = maxScrollY > 0 ? newOffset * maxScrollY : 0;
+
+    // Apply vertical scroll only to scrollable content
+    scrollableContentContainer.value.y = addChannelButtonHeight - worldY;
+    currentWorldY.value = worldY;
+
+    // Also scroll the channel list scrollable container
+    channelListScrollableContainer.value.y = addChannelButtonHeight - worldY;
+  }
+}); const containerHeight = computed(() => {
   const spriteCount = channels.value.length;
   return timelineHeight + (spriteCount * rowHeight);
 });
@@ -87,19 +117,33 @@ onMounted(async () => {
   mainContainer.value = new Container();
   app.value.stage.addChild(mainContainer.value as any);
 
+  // Create scrollable content container inside main container
+  scrollableContentContainer.value = new Container();
+  scrollableContentContainer.value.x = channelListWidth;
+  scrollableContentContainer.value.y = addChannelButtonHeight;
+  mainContainer.value.addChild(scrollableContentContainer.value as any);
+
   // Create UI layer (always on top)
   uiLayer.value = new Container();
   app.value.stage.addChild(uiLayer.value as any);
 
-  // Create channel list container
-  channelListContainer.value = new Container();
-  uiLayer.value.addChild(channelListContainer.value as any);
-
   // Create scrollbar
   createScrollbar();
 
-  // Create timeline
+  // Create vertical scrollbar
+  createVerticalScrollbar();
+
+  // Create timeline (add before channel list so it's below)
   createTimeline();
+
+  // Create channel list container (add after timeline so it's on top)
+  channelListContainer.value = new Container();
+  uiLayer.value.addChild(channelListContainer.value as any);
+
+  // Create scrollable container for channel list rows
+  channelListScrollableContainer.value = new Container();
+  channelListScrollableContainer.value.y = addChannelButtonHeight;
+  channelListContainer.value.addChild(channelListScrollableContainer.value as any);
 
   // Create channel list UI
   createChannelList();
@@ -146,11 +190,16 @@ onUnmounted(() => {
   app.value = null;
   channels.value = [];
   mainContainer.value = null;
+  scrollableContentContainer.value = null;
   uiLayer.value = null;
   channelListContainer.value = null;
+  channelListScrollableContainer.value = null;
   scrollBar.value = null;
   scrollThumb.value = null;
   timeline.value = null;
+  verticalScrollBar.value = null;
+  verticalScrollThumb.value = null;
+  channelRowContainers.value.clear();
 });
 
 function createScrollbar() {
@@ -260,11 +309,117 @@ function createScrollbar() {
   uiLayer.value.addChild(scrollThumb.value as any);
 }
 
+function createVerticalScrollbar() {
+  if (!app.value || !uiLayer.value) return;
+
+  const canvasWidth = app.value.screen.width;
+  const canvasHeight = app.value.screen.height;
+  const scrollbarHeight = canvasHeight - addChannelButtonHeight;
+
+  // Vertical scrollbar background (on the right side)
+  verticalScrollBar.value = new Graphics()
+    .rect(canvasWidth - verticalScrollBarWidth, addChannelButtonHeight, verticalScrollBarWidth, scrollbarHeight)
+    .fill(0x333333);
+
+  // Vertical scrollbar thumb
+  verticalScrollThumb.value = new Graphics()
+    .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+    .fill(0x888888);
+
+  verticalScrollThumb.value.x = canvasWidth - verticalScrollBarWidth;
+  verticalScrollThumb.value.y = addChannelButtonHeight;
+  verticalScrollThumb.value.eventMode = 'static';
+  verticalScrollThumb.value.cursor = 'pointer';
+
+  // Add hover effect
+  verticalScrollThumb.value.on('pointerover', () => {
+    if (verticalScrollThumb.value) {
+      const currentX = verticalScrollThumb.value.x;
+      const currentY = verticalScrollThumb.value.y;
+      verticalScrollThumb.value.clear()
+        .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+        .fill(0xaaaaaa);
+      verticalScrollThumb.value.x = currentX;
+      verticalScrollThumb.value.y = currentY;
+    }
+  });
+
+  verticalScrollThumb.value.on('pointerout', () => {
+    if (verticalScrollThumb.value && !isDraggingVerticalThumb.value) {
+      const currentX = verticalScrollThumb.value.x;
+      const currentY = verticalScrollThumb.value.y;
+      verticalScrollThumb.value.clear()
+        .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+        .fill(0x888888);
+      verticalScrollThumb.value.x = currentX;
+      verticalScrollThumb.value.y = currentY;
+    }
+  });
+
+  // Drag functionality
+  verticalScrollThumb.value.on('pointerdown', (event) => {
+    isDraggingVerticalThumb.value = true;
+    if (app.value) {
+      app.value.stage.eventMode = 'static';
+    }
+    event.stopPropagation();
+  });
+
+  if (app.value.stage) {
+    app.value.stage.on('pointerup', () => {
+      if (isDraggingVerticalThumb.value) {
+        isDraggingVerticalThumb.value = false;
+        if (verticalScrollThumb.value) {
+          const currentX = verticalScrollThumb.value.x;
+          const currentY = verticalScrollThumb.value.y;
+          verticalScrollThumb.value.clear()
+            .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+            .fill(0x888888);
+          verticalScrollThumb.value.x = currentX;
+          verticalScrollThumb.value.y = currentY;
+        }
+      }
+    });
+
+    app.value.stage.on('pointermove', (event) => {
+      if (isDraggingVerticalThumb.value && verticalScrollThumb.value && app.value) {
+        const canvasHeight = app.value.screen.height;
+        const scrollbarHeight = canvasHeight - addChannelButtonHeight;
+        const newY = Math.max(addChannelButtonHeight, Math.min(event.global.y, addChannelButtonHeight + scrollbarHeight - verticalScrollThumbHeight.value));
+        verticalScrollThumb.value.y = newY;
+
+        // Calculate scroll offset based on thumb position within scrollbar
+        const thumbPositionInScrollbar = newY - addChannelButtonHeight;
+        const scrollPercentage = thumbPositionInScrollbar / (scrollbarHeight - verticalScrollThumbHeight.value);
+        verticalScrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
+      }
+    });
+
+    app.value.stage.on('pointerupoutside', () => {
+      if (isDraggingVerticalThumb.value) {
+        isDraggingVerticalThumb.value = false;
+        if (verticalScrollThumb.value) {
+          const currentX = verticalScrollThumb.value.x;
+          const currentY = verticalScrollThumb.value.y;
+          verticalScrollThumb.value.clear()
+            .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+            .fill(0x888888);
+          verticalScrollThumb.value.x = currentX;
+          verticalScrollThumb.value.y = currentY;
+        }
+      }
+    });
+  }
+
+  uiLayer.value.addChild(verticalScrollBar.value as any);
+  uiLayer.value.addChild(verticalScrollThumb.value as any);
+}
+
 function createTimeline() {
-  if (!app.value || !mainContainer.value) return;
+  if (!app.value || !uiLayer.value) return;
 
   timeline.value = new Container();
-  timeline.value.x = 0; // No offset needed - mainContainer handles positioning
+  timeline.value.x = channelListWidth; // Start after channel list
   timeline.value.y = scrollBarHeight; // Position below the scrollbar
 
   const graphics = new Graphics();
@@ -320,14 +475,19 @@ function createTimeline() {
     timeline.value.addChild(timeLabel);
   }
 
-  mainContainer.value.addChild(timeline.value as any);
+  uiLayer.value.addChild(timeline.value as any);
 }
 
 function createChannelList() {
-  if (!app.value || !channelListContainer.value) return;
+  if (!app.value || !channelListContainer.value || !channelListScrollableContainer.value) return;
 
   // Clear existing content
   channelListContainer.value.removeChildren();
+
+  // Re-add the scrollable container
+  channelListScrollableContainer.value = new Container();
+  channelListScrollableContainer.value.y = addChannelButtonHeight;
+  channelListContainer.value.addChild(channelListScrollableContainer.value as any);
 
   const canvasHeight = app.value.screen.height;
 
@@ -337,29 +497,32 @@ function createChannelList() {
     .fill(0x2a2a2a);
   channelListContainer.value.addChild(background);
 
-  // Create "Add Channel" button at the top
+  // Create "Add Channel" button at the top (fixed position)
   const buttonHeight = addChannelButtonHeight;
+  const buttonContainer = new Container();
+  buttonContainer.eventMode = 'static';
+  buttonContainer.cursor = 'pointer';
+
   const button = new Graphics()
     .rect(0, 0, channelListWidth, buttonHeight)
     .fill(0x4a90e2);
 
-  button.eventMode = 'static';
-  button.cursor = 'pointer';
+  buttonContainer.addChild(button);
 
   // Add hover effect
-  button.on('pointerover', () => {
+  buttonContainer.on('pointerover', () => {
     button.clear()
       .rect(0, 0, channelListWidth, buttonHeight)
       .fill(0x5aa0f2);
   });
 
-  button.on('pointerout', () => {
+  buttonContainer.on('pointerout', () => {
     button.clear()
       .rect(0, 0, channelListWidth, buttonHeight)
       .fill(0x4a90e2);
   });
 
-  button.on('pointertap', () => {
+  buttonContainer.on('pointertap', () => {
     addChannel();
   });
 
@@ -384,23 +547,30 @@ function createChannelList() {
   buttonText.x = channelListWidth / 2 - 40;
   buttonText.y = buttonHeight / 2 - 8;
 
-  button.addChild(buttonText);
-  channelListContainer.value.addChild(button);
+  buttonContainer.addChild(buttonText);
+  buttonContainer.zIndex = 10; // Ensure it's on top
+  channelListContainer.value.addChild(buttonContainer);
 
-  // Draw channel rows
+  // Draw channel rows in scrollable container
   channels.value.forEach((channel, index) => {
-    const yPos = buttonHeight + (index * rowHeight);
+    const yPos = index * rowHeight;
+
+    // Create container for the row
+    const rowContainer = new Container();
+    rowContainer.y = yPos;
 
     // Alternating background colors
     const rowColor = index % 2 === 0 ? 0xe5e5e5 : 0xf5f5f5;
     const row = new Graphics()
-      .rect(0, yPos, channelListWidth, rowHeight)
+      .rect(0, 0, channelListWidth, rowHeight)
       .fill(rowColor);
 
     // Add border
     row
-      .rect(0, yPos + rowHeight - 1, channelListWidth, 1)
+      .rect(0, rowHeight - 1, channelListWidth, 1)
       .fill(0xcccccc);
+
+    rowContainer.addChild(row);
 
     const rowText = new HTMLText({
       text: `Row ${index + 1}`,
@@ -412,10 +582,10 @@ function createChannelList() {
     });
 
     rowText.x = 16;
-    rowText.y = yPos + (rowHeight / 2) - 7;
+    rowText.y = (rowHeight / 2) - 7;
 
-    row.addChild(rowText);
-    channelListContainer.value!.addChild(row);
+    rowContainer.addChild(rowText);
+    channelListScrollableContainer.value!.addChild(rowContainer);
   });
 }
 
@@ -433,6 +603,20 @@ function handleGlobalMouseMove(event: MouseEvent) {
     const scrollPercentage = localX / (scrollbarWidth - scrollThumbWidth.value);
     scrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
   }
+
+  if (isDraggingVerticalThumb.value && verticalScrollThumb.value && app.value && pixiContainer.value) {
+    const rect = pixiContainer.value.getBoundingClientRect();
+    const canvasY = event.clientY - rect.top;
+    const canvasHeight = app.value.screen.height;
+    const scrollbarHeight = canvasHeight - addChannelButtonHeight;
+    const newY = Math.max(addChannelButtonHeight, Math.min(canvasY, addChannelButtonHeight + scrollbarHeight - verticalScrollThumbHeight.value));
+    verticalScrollThumb.value.y = newY;
+
+    // Calculate scroll offset based on thumb position within scrollbar
+    const thumbPositionInScrollbar = newY - addChannelButtonHeight;
+    const scrollPercentage = thumbPositionInScrollbar / (scrollbarHeight - verticalScrollThumbHeight.value);
+    verticalScrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
+  }
 }
 
 function handleGlobalMouseUp() {
@@ -446,6 +630,19 @@ function handleGlobalMouseUp() {
         .fill(0x888888);
       scrollThumb.value.x = currentX;
       scrollThumb.value.y = currentY;
+    }
+  }
+
+  if (isDraggingVerticalThumb.value) {
+    isDraggingVerticalThumb.value = false;
+    if (verticalScrollThumb.value) {
+      const currentX = verticalScrollThumb.value.x;
+      const currentY = verticalScrollThumb.value.y;
+      verticalScrollThumb.value.clear()
+        .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+        .fill(0x888888);
+      verticalScrollThumb.value.x = currentX;
+      verticalScrollThumb.value.y = currentY;
     }
   }
 }
@@ -512,16 +709,101 @@ function handleResize() {
     currentWorldX.value = clampedWorldX; // Update this FIRST
     scrollOffset.value = clampedWorldX / newMaxScroll;
     // Manually update the container position since watch might not trigger if scrollOffset doesn't change
-    if (mainContainer.value) {
-      mainContainer.value.x = channelListWidth - clampedWorldX;
+    if (scrollableContentContainer.value) {
+      scrollableContentContainer.value.x = channelListWidth - clampedWorldX;
+    }
+    if (timeline.value) {
+      timeline.value.x = channelListWidth - clampedWorldX;
     }
   }
 
   // Update scrollbar graphics to match new dimensions
   updateScrollbar();
 
+  // Update vertical scrollbar graphics to match new dimensions
+  updateVerticalScrollbar();
+
   // Update channel list graphics to match new dimensions
   createChannelList();
+}
+
+function updateVerticalScrollbar() {
+  if (!app.value || !verticalScrollBar.value || !verticalScrollThumb.value) return;
+
+  const canvasWidth = app.value.screen.width;
+  const canvasHeight = app.value.screen.height;
+  const scrollbarHeight = canvasHeight - addChannelButtonHeight;
+  const totalContentHeight = channels.value.length * rowHeight;
+  const availableHeight = scrollbarHeight;
+
+  // Update scrollbar background
+  verticalScrollBar.value.clear()
+    .rect(canvasWidth - verticalScrollBarWidth, addChannelButtonHeight, verticalScrollBarWidth, scrollbarHeight)
+    .fill(0x333333);
+
+  // Calculate thumb height based on content ratio
+  const viewportRatio = availableHeight / totalContentHeight;
+  const newThumbHeight = Math.max(minVerticalScrollThumbHeight, scrollbarHeight * viewportRatio);
+  verticalScrollThumbHeight.value = newThumbHeight;
+
+  // Calculate new scroll offset based on stored world position
+  const newMaxScrollY = Math.max(0, totalContentHeight - availableHeight);
+
+  if (newMaxScrollY <= 0) {
+    verticalScrollOffset.value = 0;
+    currentWorldY.value = 0;
+  } else {
+    const clampedWorldY = Math.min(currentWorldY.value, newMaxScrollY);
+    currentWorldY.value = clampedWorldY;
+    verticalScrollOffset.value = clampedWorldY / newMaxScrollY;
+
+    // Manually update container positions
+    if (scrollableContentContainer.value) {
+      scrollableContentContainer.value.y = addChannelButtonHeight - clampedWorldY;
+    }
+    if (channelListScrollableContainer.value) {
+      channelListScrollableContainer.value.y = addChannelButtonHeight - clampedWorldY;
+    }
+  }  // Keep scroll percentage consistent, but clamp thumb position
+  const scrollPercentage = verticalScrollOffset.value;
+  const maxThumbY = scrollbarHeight - verticalScrollThumbHeight.value;
+  const newThumbY = Math.max(addChannelButtonHeight, Math.min(addChannelButtonHeight + (scrollPercentage * maxThumbY), addChannelButtonHeight + maxThumbY));
+
+  // Update thumb with current height
+  if (verticalScrollThumb.value) {
+    verticalScrollThumb.value.clear()
+      .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+      .fill(0x888888);
+    verticalScrollThumb.value.x = canvasWidth - verticalScrollBarWidth;
+    verticalScrollThumb.value.y = newThumbY;
+  }
+}
+
+function createChannelRowContainer(channelId: number, rowIndex: number) {
+  if (!scrollableContentContainer.value) return;
+
+  // Create a container for this channel row
+  const rowContainer = new Container();
+  rowContainer.x = 0; // Aligned with timeline
+  rowContainer.y = (rowIndex * rowHeight);
+
+  // Draw the row background
+  const rowBg = new Graphics();
+  const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
+  rowBg
+    .rect(0, 0, TIMELINE_WIDTH, rowHeight)
+    .fill(rowColor);
+
+  // Add border
+  rowBg
+    .rect(0, rowHeight - 1, TIMELINE_WIDTH, 1)
+    .fill(0x444444);
+
+  rowContainer.addChild(rowBg);
+  scrollableContentContainer.value.addChild(rowContainer as any);
+
+  // Store the container in the map
+  channelRowContainers.value.set(channelId, rowContainer);
 }
 
 function addChannel() {
@@ -531,6 +813,12 @@ function addChannel() {
     events: []
   };
   channels.value.push(newChannel);
+
+  // Create the corresponding row container under the timeline
+  createChannelRowContainer(newChannel.id, channels.value.length - 1);
+
+  // Update vertical scrollbar to account for new content
+  updateVerticalScrollbar();
 
   // Recreate the channel list UI
   createChannelList();
