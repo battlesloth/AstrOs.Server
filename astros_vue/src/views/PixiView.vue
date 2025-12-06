@@ -31,6 +31,8 @@ const scrollBar = ref<Graphics | null>(null);
 const scrollThumb = ref<Graphics | null>(null);
 const timeline = ref<Container | null>(null);
 const channelRowContainers = ref<Map<number, Container>>(new Map());
+const plusButton = ref<Container | null>(null);
+const minusButton = ref<Container | null>(null);
 
 // Vertical scrollbar
 const verticalScrollBar = ref<Graphics | null>(null);
@@ -135,6 +137,9 @@ onMounted(async () => {
 
   // Create timeline (add before channel list so it's below)
   createTimeline();
+
+  // Create zoom buttons
+  createZoomButtons();
 
   // Create channel list container (add after timeline so it's on top)
   channelListContainer.value = new Container();
@@ -487,6 +492,98 @@ function createTimeline() {
   uiLayer.value.addChild(timeline.value as any);
 }
 
+function createZoomButtons() {
+  if (!app.value || !uiLayer.value) return;
+
+  const canvasWidth = app.value.screen.width;
+  const buttonRadius = 15;
+  const buttonSpacing = 8;
+  const rightMargin = verticalScrollBarWidth + 10;
+  const topMargin = scrollBarHeight + 10;
+
+  // Plus button
+  plusButton.value = new Container();
+  plusButton.value.x = canvasWidth - rightMargin - buttonRadius * 4 - buttonSpacing;
+  plusButton.value.y = topMargin;
+  plusButton.value.eventMode = 'static';
+  plusButton.value.cursor = 'pointer';
+
+  const plusCircle = new Graphics()
+    .circle(buttonRadius, buttonRadius, buttonRadius)
+    .fill(0x4a90e2);
+
+  plusButton.value.addChild(plusCircle);
+
+  // Plus symbol
+  const plusSymbol = new Graphics()
+    .rect(buttonRadius - 6, buttonRadius - 1.5, 12, 3)
+    .fill(0xffffff)
+    .rect(buttonRadius - 1.5, buttonRadius - 6, 3, 12)
+    .fill(0xffffff);
+
+  plusButton.value.addChild(plusSymbol);
+
+  // Plus button hover effect
+  plusButton.value.on('pointerover', () => {
+    plusCircle.clear()
+      .circle(buttonRadius, buttonRadius, buttonRadius)
+      .fill(0x5aa0f2);
+  });
+
+  plusButton.value.on('pointerout', () => {
+    plusCircle.clear()
+      .circle(buttonRadius, buttonRadius, buttonRadius)
+      .fill(0x4a90e2);
+  });
+
+  plusButton.value.on('pointertap', () => {
+    console.log('Plus button clicked');
+    // TODO: Implement zoom in functionality
+  });
+
+  uiLayer.value.addChild(plusButton.value);
+
+  // Minus button
+  minusButton.value = new Container();
+  minusButton.value.x = canvasWidth - rightMargin - buttonRadius * 2;
+  minusButton.value.y = topMargin;
+  minusButton.value.eventMode = 'static';
+  minusButton.value.cursor = 'pointer';
+
+  const minusCircle = new Graphics()
+    .circle(buttonRadius, buttonRadius, buttonRadius)
+    .fill(0x4a90e2);
+
+  minusButton.value.addChild(minusCircle);
+
+  // Minus symbol
+  const minusSymbol = new Graphics()
+    .rect(buttonRadius - 6, buttonRadius - 1.5, 12, 3)
+    .fill(0xffffff);
+
+  minusButton.value.addChild(minusSymbol);
+
+  // Minus button hover effect
+  minusButton.value.on('pointerover', () => {
+    minusCircle.clear()
+      .circle(buttonRadius, buttonRadius, buttonRadius)
+      .fill(0x5aa0f2);
+  });
+
+  minusButton.value.on('pointerout', () => {
+    minusCircle.clear()
+      .circle(buttonRadius, buttonRadius, buttonRadius)
+      .fill(0x4a90e2);
+  });
+
+  minusButton.value.on('pointertap', () => {
+    console.log('Minus button clicked');
+    // TODO: Implement zoom out functionality
+  });
+
+  uiLayer.value.addChild(minusButton.value);
+}
+
 function createChannelList() {
   if (!app.value || !channelListContainer.value || !channelListScrollableContainer.value) return;
 
@@ -769,8 +866,27 @@ function handleResize() {
   // Update vertical scrollbar graphics to match new dimensions
   updateVerticalScrollbar();
 
+  // Update zoom button positions
+  updateZoomButtonPositions();
+
   // Update channel list graphics to match new dimensions
   createChannelList();
+}
+
+function updateZoomButtonPositions() {
+  if (!app.value || !plusButton.value || !minusButton.value) return;
+
+  const canvasWidth = app.value.screen.width;
+  const buttonRadius = 15;
+  const buttonSpacing = 8;
+  const rightMargin = verticalScrollBarWidth + 10;
+  const topMargin = scrollBarHeight + 10;
+
+  plusButton.value.x = canvasWidth - rightMargin - buttonRadius * 4 - buttonSpacing;
+  plusButton.value.y = topMargin;
+
+  minusButton.value.x = canvasWidth - rightMargin - buttonRadius * 2;
+  minusButton.value.y = topMargin;
 }
 
 function updateVerticalScrollbar() {
@@ -826,12 +942,14 @@ function updateVerticalScrollbar() {
 }
 
 function createChannelRowContainer(channelId: number, rowIndex: number) {
-  if (!scrollableContentContainer.value) return;
+  if (!scrollableContentContainer.value || !app.value) return;
 
   // Create a container for this channel row
   const rowContainer = new Container();
   rowContainer.x = 0; // Aligned with timeline
   rowContainer.y = (rowIndex * rowHeight);
+  rowContainer.eventMode = 'static';
+  rowContainer.cursor = 'pointer';
 
   // Draw the row background
   const rowBg = new Graphics();
@@ -846,10 +964,44 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
     .fill(0x444444);
 
   rowContainer.addChild(rowBg);
+
+  // Add click handler to create red box at click position
+  rowContainer.on('pointertap', (event) => {
+    if (!scrollableContentContainer.value || !app.value) return;
+
+    // Get the local position within the row container
+    const localPos = rowContainer.toLocal(event.global);
+
+    // The X position is already in the correct coordinate space (relative to row)
+    const timePosition = localPos.x;
+
+    // Create red box at this position
+    addEventBox(rowContainer, timePosition);
+  });
+
   scrollableContentContainer.value.addChild(rowContainer as any);
 
   // Store the container in the map
   channelRowContainers.value.set(channelId, rowContainer);
+}
+
+function addEventBox(rowContainer: Container, timePosition: number) {
+  // Create a red box
+  const boxWidth = 60; // Width in pixels
+  const boxHeight = rowHeight - 10; // Height with some padding
+  const boxY = 5; // Vertical padding
+
+  const eventBox = new Graphics();
+  eventBox
+    .rect(timePosition, boxY, boxWidth, boxHeight)
+    .fill(0xff0000); // Red color
+
+  // Add border
+  eventBox
+    .rect(timePosition, boxY, boxWidth, boxHeight)
+    .stroke({ width: 2, color: 0xaa0000 }); // Darker red border
+
+  rowContainer.addChild(eventBox);
 }
 
 function addChannel() {
