@@ -68,6 +68,12 @@ const scrollThumbWidth = ref(60); // Dynamic thumb width
 const isDraggingThumb = ref(false);
 const scrollOffset = ref(0);
 const currentWorldX = ref(0); // Track absolute world position
+const isDraggingTimeline = ref(false);
+const dragStartX = ref(0);
+const dragStartY = ref(0);
+const dragStartWorldX = ref(0);
+const dragStartWorldY = ref(0);
+const hasDragged = ref(false);
 let resizeObserver: ResizeObserver | null = null;
 
 // Watch scroll offset and update main container position
@@ -133,6 +139,22 @@ onMounted(async () => {
   scrollableContentContainer.value = new Container();
   scrollableContentContainer.value.x = channelListWidth;
   scrollableContentContainer.value.y = addChannelButtonHeight;
+  scrollableContentContainer.value.eventMode = 'static';
+
+  // Add pointer down handler for drag scrolling (middle mouse button only)
+  scrollableContentContainer.value.on('pointerdown', (event) => {
+    // Only enable drag scrolling with middle mouse button (button 1)
+    if (event.button !== 1) return;
+
+    isDraggingTimeline.value = true;
+    hasDragged.value = false;
+    const globalPos = event.global;
+    dragStartX.value = globalPos.x;
+    dragStartY.value = globalPos.y;
+    dragStartWorldX.value = currentWorldX.value;
+    dragStartWorldY.value = currentWorldY.value;
+  });
+
   mainContainer.value.addChild(scrollableContentContainer.value as any);
 
   // Create UI layer (always on top)
@@ -1092,6 +1114,56 @@ function createChannelList() {
 }
 
 function handleGlobalMouseMove(event: MouseEvent) {
+  if (isDraggingTimeline.value && app.value && pixiContainer.value) {
+    const rect = pixiContainer.value.getBoundingClientRect();
+    const currentX = event.clientX - rect.left;
+    const currentY = event.clientY - rect.top;
+
+    const deltaX = dragStartX.value - currentX;
+    const deltaY = dragStartY.value - currentY;
+
+    // Mark as dragged if moved more than 3 pixels
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+      hasDragged.value = true;
+    }
+
+    // Update horizontal scroll
+    const canvasWidth = app.value.screen.width;
+    const scrollbarWidth = canvasWidth - channelListWidth;
+    const maxScrollX = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
+
+    if (maxScrollX > 0) {
+      const newWorldX = Math.max(0, Math.min(dragStartWorldX.value + deltaX, maxScrollX));
+      currentWorldX.value = newWorldX;
+      scrollOffset.value = newWorldX / maxScrollX;
+    }
+
+    // Update vertical scroll
+    const canvasHeight = app.value.screen.height;
+    const availableHeight = canvasHeight - addChannelButtonHeight;
+    const totalContentHeight = channels.value.length * rowHeight;
+    const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
+
+    if (maxScrollY > 0) {
+      const newWorldY = Math.max(0, Math.min(dragStartWorldY.value + deltaY, maxScrollY));
+      currentWorldY.value = newWorldY;
+      verticalScrollOffset.value = newWorldY / maxScrollY;
+
+      // Update vertical thumb position
+      if (verticalScrollThumb.value) {
+        const scrollbarHeight = canvasHeight - addChannelButtonHeight;
+        const thumbPositionInScrollbar = verticalScrollOffset.value * (scrollbarHeight - verticalScrollThumbHeight.value);
+        const newThumbY = addChannelButtonHeight + thumbPositionInScrollbar;
+
+        verticalScrollThumb.value.clear()
+          .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+          .fill(0x888888);
+        verticalScrollThumb.value.x = canvasWidth - verticalScrollBarWidth;
+        verticalScrollThumb.value.y = newThumbY;
+      }
+    }
+  }
+
   if (isDraggingThumb.value && scrollThumb.value && app.value && pixiContainer.value) {
     const rect = pixiContainer.value.getBoundingClientRect();
     const canvasX = event.clientX - rect.left;
@@ -1122,6 +1194,10 @@ function handleGlobalMouseMove(event: MouseEvent) {
 }
 
 function handleGlobalMouseUp() {
+  if (isDraggingTimeline.value) {
+    isDraggingTimeline.value = false;
+  }
+
   if (isDraggingThumb.value) {
     isDraggingThumb.value = false;
     if (scrollThumb.value) {
@@ -1152,8 +1228,14 @@ function handleGlobalMouseUp() {
 function handleWheel(event: WheelEvent) {
   event.preventDefault();
 
-  // Check if Ctrl key is held - if so, zoom instead of scroll
-  if (event.ctrlKey) {
+  // Check if mouse is over timeline specifically (right of channel list, in the timeline height area)
+  const isOverTimeline = !event.ctrlKey && pixiContainer.value
+    && event.offsetX >= channelListWidth
+    && event.offsetY >= scrollBarHeight
+    && event.offsetY < addChannelButtonHeight;
+
+  // Check if Ctrl key is held OR mouse is over timeline - if so, zoom instead of scroll
+  if (event.ctrlKey || isOverTimeline) {
     // Accumulate scroll delta
     if (event.deltaY < 0) {
       zoomScrollAccumulator.value--;
@@ -1385,6 +1467,12 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
 
   // Add click handler to create red box at click position
   rowContainer.on('pointertap', (event) => {
+    // Only create box with left mouse button
+    if (event.button !== 0) return;
+
+    // Don't create box if user was dragging
+    if (hasDragged.value) return;
+
     if (!scrollableContentContainer.value || !app.value) return;
 
     // Get the local position within the row container
