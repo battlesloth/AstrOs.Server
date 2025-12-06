@@ -3,6 +3,17 @@ import AstrosLayout from '@/components/layout/AstrosLayout.vue'
 import { Application, Container, Graphics, HTMLText } from 'pixi.js';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
+// Import composables
+import { useZoomState, ZOOM_LEVELS, type ZoomLevelConfig } from '@/composables/useZoomState';
+import { useScrollState } from '@/composables/useScrollState';
+import { useDragState } from '@/composables/useDragState';
+import { usePerformanceFlags } from '@/composables/usePerformanceFlags';
+import * as constants from '@/composables/timelineConstants';
+
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
 interface Channel {
   id: number;
   name: string;
@@ -15,66 +26,124 @@ interface EventBox {
   graphics: Graphics;
 }
 
+// ============================================================================
+// APPLICATION REFS
+// ============================================================================
 
 const app = ref<Application | null>(null);
 const pixiContainer = ref<HTMLDivElement | null>(null);
 const channels = ref<Channel[]>([]);
 const lastChannelClicked = ref<string>('None');
 
-// element heights
-const rowHeight = 60;
-const timelineHeight = 50;
-const scrollBarHeight = 15;
-const addChannelButtonHeight = scrollBarHeight + timelineHeight; // Combined height of scrollbar and timeline
+// ============================================================================
+// CONSTANTS (imported from composables)
+// ============================================================================
 
-// UI layer containers
+const {
+  rowHeight,
+  timelineHeight,
+  scrollBarHeight,
+  addChannelButtonHeight,
+  channelListWidth,
+  verticalScrollBarWidth,
+  minVerticalScrollThumbHeight,
+  minScrollThumbWidth,
+  PIXELS_PER_SECOND,
+  TIMELINE_DURATION_SECONDS,
+  PIXELS_PER_MAJOR_TICK,
+  DRAG_THRESHOLD_PIXELS,
+  ZOOM_SCROLL_TICKS_REQUIRED,
+  ZOOM_SNAP_THRESHOLD_START,
+  ZOOM_SNAP_THRESHOLD_END,
+  ZOOM_FOCUS_EDGE_WEIGHT,
+  ZOOM_FOCUS_START_WEIGHT,
+  ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER
+} = constants;
+
+// ============================================================================
+// PIXI CONTAINERS & GRAPHICS REFS
+// ============================================================================
+
 const mainContainer = ref<Container | null>(null);
 const scrollableContentContainer = ref<Container | null>(null);
 const uiLayer = ref<Container | null>(null);
 const channelListContainer = ref<Container | null>(null);
 const channelListScrollableContainer = ref<Container | null>(null);
-const scrollBar = ref<Graphics | null>(null);
-const scrollThumb = ref<Graphics | null>(null);
 const timeline = ref<Container | null>(null);
 const channelRowContainers = ref<Map<number, Container>>(new Map());
 const channelEventBoxes = ref<Map<number, EventBox[]>>(new Map());
+
+// Scrollbar graphics
+const scrollBar = ref<Graphics | null>(null);
+const scrollThumb = ref<Graphics | null>(null);
+const verticalScrollBar = ref<Graphics | null>(null);
+const verticalScrollThumb = ref<Graphics | null>(null);
+
+// UI buttons
 const plusButton = ref<Container | null>(null);
 const minusButton = ref<Container | null>(null);
 
-// Vertical scrollbar
-const verticalScrollBar = ref<Graphics | null>(null);
-const verticalScrollThumb = ref<Graphics | null>(null);
-const verticalScrollBarWidth = 15;
-const minVerticalScrollThumbHeight = 40;
-const verticalScrollThumbHeight = ref(60);
-const isDraggingVerticalThumb = ref(false);
-const verticalScrollOffset = ref(0);
-const currentWorldY = ref(0);
+// ============================================================================
+// STATE (using composables)
+// ============================================================================
 
-// Channel list dimensions
-const channelListWidth = 256; // 64 * 4 = 256px
+const {
+  zoomLevel,
+  zoomScrollAccumulator,
+  TIMELINE_WIDTH,
+  canZoomIn,
+  canZoomOut,
+  currentZoomConfig
+} = useZoomState(PIXELS_PER_SECOND, TIMELINE_DURATION_SECONDS);
 
-// Timeline constants
-const PIXELS_PER_SECOND = 30;
-const TIMELINE_DURATION_SECONDS = 600; // 10 minutes
-const zoomLevel = ref(0); // 0=5s, 1=15s, 2=30s, 3=45s, 4=1min, 5=1:15, 6=1:30, 7=1:45, 8=2min
-const zoomScrollAccumulator = ref(0); // Accumulate scroll events for zoom
-// Initial width at zoom level 0 (scaleMultiplier = 0.5)
-const TIMELINE_WIDTH = ref((PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / 0.5); // 36000 pixels
+const {
+  scrollThumbWidth,
+  isDraggingThumb,
+  scrollOffset,
+  currentWorldX,
+  verticalScrollThumbHeight,
+  isDraggingVerticalThumb,
+  verticalScrollOffset,
+  currentWorldY
+} = useScrollState();
 
-// Scrollbar state
-const minScrollThumbWidth = 40; // Minimum thumb width
-const scrollThumbWidth = ref(60); // Dynamic thumb width
-const isDraggingThumb = ref(false);
-const scrollOffset = ref(0);
-const currentWorldX = ref(0); // Track absolute world position
-const isDraggingTimeline = ref(false);
-const dragStartX = ref(0);
-const dragStartY = ref(0);
-const dragStartWorldX = ref(0);
-const dragStartWorldY = ref(0);
-const hasDragged = ref(false);
+const {
+  isDraggingTimeline,
+  dragStartX,
+  dragStartY,
+  dragStartWorldX,
+  dragStartWorldY,
+  hasDragged
+} = useDragState();
+
+const {
+  eventBoxPositionsDirty,
+  rowBackgroundsDirty,
+  lastTimelineWidth
+} = usePerformanceFlags((PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / ZOOM_LEVELS[0]!.scaleMultiplier);
+
+// Event box drag state
+const isDraggingEventBox = ref(false);
+const draggedEventBox = ref<EventBox | null>(null);
+const eventBoxDragStartX = ref(0);
+const eventBoxStartTime = ref(0);
+const hasEventBoxDragged = ref(false);
+
+// Other
 let resizeObserver: ResizeObserver | null = null;
+
+// ============================================================================
+// WATCHERS
+// ============================================================================
+
+// Watch for timeline width changes to mark event positions dirty
+watch(TIMELINE_WIDTH, (newWidth, oldWidth) => {
+  if (newWidth !== oldWidth) {
+    eventBoxPositionsDirty.value = true;
+    rowBackgroundsDirty.value = true;
+    lastTimelineWidth.value = newWidth;
+  }
+});
 
 // Watch scroll offset and update main container position
 watch(scrollOffset, (newOffset) => {
@@ -106,7 +175,9 @@ watch(verticalScrollOffset, (newOffset) => {
     // Also scroll the channel list scrollable container
     channelListScrollableContainer.value.y = addChannelButtonHeight - worldY;
   }
-}); const containerHeight = computed(() => {
+});
+
+const containerHeight = computed(() => {
   const spriteCount = channels.value.length;
   return timelineHeight + (spriteCount * rowHeight);
 });
@@ -318,6 +389,13 @@ function createScrollbar() {
           scrollThumb.value.y = currentY;
         }
       }
+
+      // Handle event box drag end
+      if (isDraggingEventBox.value && draggedEventBox.value) {
+        isDraggingEventBox.value = false;
+        draggedEventBox.value.graphics.cursor = 'grab';
+        draggedEventBox.value = null;
+      }
     });
 
     app.value.stage.on('pointermove', (event) => {
@@ -331,6 +409,24 @@ function createScrollbar() {
         // Calculate scroll offset
         const scrollPercentage = localX / (scrollbarWidth - scrollThumbWidth.value);
         scrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
+      }
+
+      // Handle event box dragging
+      if (isDraggingEventBox.value && draggedEventBox.value) {
+        const deltaX = event.global.x - eventBoxDragStartX.value;
+
+        // Mark as dragged if moved more than a small threshold
+        if (Math.abs(deltaX) > 2) {
+          hasEventBoxDragged.value = true;
+        }
+
+        const deltaTimeSeconds = (deltaX / TIMELINE_WIDTH.value) * TIMELINE_DURATION_SECONDS;
+        const newTime = Math.max(0, Math.min(TIMELINE_DURATION_SECONDS, eventBoxStartTime.value + deltaTimeSeconds));
+
+        // Update the event box time and position
+        draggedEventBox.value.timeInSeconds = newTime;
+        const pixelPosition = (newTime / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
+        draggedEventBox.value.graphics.x = pixelPosition;
       }
     });
 
@@ -347,6 +443,13 @@ function createScrollbar() {
           scrollThumb.value.x = currentX;
           scrollThumb.value.y = currentY;
         }
+      }
+
+      // Handle event box drag end outside
+      if (isDraggingEventBox.value && draggedEventBox.value) {
+        isDraggingEventBox.value = false;
+        draggedEventBox.value.graphics.cursor = 'grab';
+        draggedEventBox.value = null;
       }
     });
   }
@@ -461,78 +564,14 @@ function createVerticalScrollbar() {
   uiLayer.value.addChild(verticalScrollThumb.value as any);
 }
 
-function createTimeline() {
-  if (!app.value || !uiLayer.value) return;
-
-  timeline.value = new Container();
-  timeline.value.x = channelListWidth; // Start after channel list
-  timeline.value.y = scrollBarHeight; // Position below the scrollbar
-
-  const graphics = new Graphics();
-
-  // Determine major tick interval based on zoom level
-  let majorTickInterval: number;
-  let minorTickInterval: number;
-  let pixelsPerMajorTick: number;
-
-  switch (zoomLevel.value) {
-    case 0: // 5 seconds per major tick
-      majorTickInterval = 5;
-      minorTickInterval = 1;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
-      break;
-    case 1: // 15 seconds per major tick
-      majorTickInterval = 15;
-      minorTickInterval = 3;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
-      break;
-    case 2: // 30 seconds per major tick
-      majorTickInterval = 30;
-      minorTickInterval = 5;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
-      break;
-    case 3: // 45 seconds per major tick
-      majorTickInterval = 45;
-      minorTickInterval = 5;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
-      break;
-    case 4: // 1 minute per major tick
-      majorTickInterval = 60;
-      minorTickInterval = 10;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
-      break;
-    case 5: // 1:15 per major tick
-      majorTickInterval = 75;
-      minorTickInterval = 15;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
-      break;
-    case 6: // 1:30 per major tick
-      majorTickInterval = 90;
-      minorTickInterval = 15;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
-      break;
-    case 7: // 1:45 per major tick
-      majorTickInterval = 105;
-      minorTickInterval = 15;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
-      break;
-    case 8: // 2:00 per major tick
-      majorTickInterval = 120;
-      minorTickInterval = 20;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND; // 300 pixels
-      break;
-    default:
-      majorTickInterval = 5;
-      minorTickInterval = 1;
-      pixelsPerMajorTick = 10 * PIXELS_PER_SECOND;
-  }
-
-  // Draw the timeline background
+function drawTimelineBackground(graphics: Graphics) {
   graphics
     .rect(0, 0, TIMELINE_WIDTH.value, timelineHeight)
     .fill(0x1a1a1a);
+}
 
-  // Calculate how many major ticks fit in the timeline
+function drawTimelineTicks(graphics: Graphics, majorTickInterval: number, minorTickInterval: number) {
+  const pixelsPerMajorTick = PIXELS_PER_MAJOR_TICK;
   const numMajorTicks = Math.floor(TIMELINE_DURATION_SECONDS / majorTickInterval);
 
   // Draw tick marks with consistent pixel spacing
@@ -544,7 +583,7 @@ function createTimeline() {
       .rect(x, timelineHeight - 20, 2, 20)
       .fill(0xffffff);
 
-    // Draw minor ticks between major ticks
+    // Draw minor ticks between this major tick and the next (or end of timeline)
     if (tickIndex < numMajorTicks) {
       const minorTicksPerMajor = majorTickInterval / minorTickInterval;
       for (let minorIndex = 1; minorIndex < minorTicksPerMajor; minorIndex++) {
@@ -556,9 +595,33 @@ function createTimeline() {
     }
   }
 
-  timeline.value.addChild(graphics);
+  // Draw remaining minor ticks after the last major tick to fill timeline to 10 minutes
+  const lastMajorTickTime = numMajorTicks * majorTickInterval;
+  const remainingTime = TIMELINE_DURATION_SECONDS - lastMajorTickTime;
 
-  // Add time labels at major ticks (after graphics so they're on top)
+  if (remainingTime > 0) {
+    const lastMajorTickX = numMajorTicks * pixelsPerMajorTick;
+    const numRemainingMinorTicks = Math.floor(remainingTime / minorTickInterval);
+
+    for (let minorIndex = 1; minorIndex <= numRemainingMinorTicks; minorIndex++) {
+      const minorTime = minorIndex * minorTickInterval;
+      const minorX = lastMajorTickX + (minorTime / majorTickInterval) * pixelsPerMajorTick;
+
+      // Only draw if within timeline bounds
+      if (minorX <= TIMELINE_WIDTH.value) {
+        graphics
+          .rect(minorX, timelineHeight - 10, 1, 10)
+          .fill(0x888888);
+      }
+    }
+  }
+}
+
+function drawTimelineLabels(container: Container, majorTickInterval: number) {
+  const pixelsPerMajorTick = PIXELS_PER_MAJOR_TICK;
+  const numMajorTicks = Math.floor(TIMELINE_DURATION_SECONDS / majorTickInterval);
+
+  // Add time labels at major ticks
   for (let tickIndex = 1; tickIndex <= numMajorTicks; tickIndex++) {
     const x = tickIndex * pixelsPerMajorTick;
     const second = tickIndex * majorTickInterval;
@@ -584,10 +647,79 @@ function createTimeline() {
 
     timeLabel.x = x - 15; // Approximate centering
     timeLabel.y = 2;
-    timeline.value.addChild(timeLabel);
+    container.addChild(timeLabel);
   }
+}
+
+function createTimeline() {
+  if (!app.value || !uiLayer.value) return;
+
+  timeline.value = new Container();
+  timeline.value.x = channelListWidth; // Start after channel list
+  timeline.value.y = scrollBarHeight; // Position below the scrollbar
+
+  const graphics = new Graphics();
+
+  // Get zoom configuration
+  const zoomConfig = ZOOM_LEVELS[zoomLevel.value]!;
+  const majorTickInterval = zoomConfig.majorTickInterval;
+  const minorTickInterval = zoomConfig.minorTickInterval;
+
+  // Draw timeline components
+  drawTimelineBackground(graphics);
+  drawTimelineTicks(graphics, majorTickInterval, minorTickInterval);
+
+  timeline.value.addChild(graphics);
+
+  // Add time labels (after graphics so they're on top)
+  drawTimelineLabels(timeline.value as Container, majorTickInterval);
 
   uiLayer.value.addChild(timeline.value as any);
+}
+
+/**
+ * Creates a circular button with icon and hover effects
+ */
+function createCircularButton(
+  x: number,
+  y: number,
+  radius: number,
+  drawIcon: (g: Graphics, radius: number) => void,
+  onTap: () => void
+): Container {
+  const button = new Container();
+  button.x = x;
+  button.y = y;
+  button.eventMode = 'static';
+  button.cursor = 'pointer';
+
+  const circle = new Graphics()
+    .circle(radius, radius, radius)
+    .fill(0x4a90e2);
+
+  button.addChild(circle);
+
+  // Draw icon
+  const icon = new Graphics();
+  drawIcon(icon, radius);
+  button.addChild(icon);
+
+  // Hover effect
+  button.on('pointerover', () => {
+    circle.clear()
+      .circle(radius, radius, radius)
+      .fill(0x5aa0f2);
+  });
+
+  button.on('pointerout', () => {
+    circle.clear()
+      .circle(radius, radius, radius)
+      .fill(0x4a90e2);
+  });
+
+  button.on('pointertap', onTap);
+
+  return button;
 }
 
 function createZoomButtons() {
@@ -599,133 +731,62 @@ function createZoomButtons() {
   const rightMargin = verticalScrollBarWidth + 10;
   const topMargin = scrollBarHeight + 10;
 
-  // Plus button
-  plusButton.value = new Container();
-  plusButton.value.x = canvasWidth - rightMargin - buttonRadius * 4 - buttonSpacing;
-  plusButton.value.y = topMargin;
-  plusButton.value.eventMode = 'static';
-  plusButton.value.cursor = 'pointer';
+  // Plus button icon
+  const drawPlusIcon = (g: Graphics, radius: number) => {
+    g.rect(radius - 6, radius - 1.5, 12, 3)
+      .fill(0xffffff)
+      .rect(radius - 1.5, radius - 6, 3, 12)
+      .fill(0xffffff);
+  };
 
-  const plusCircle = new Graphics()
-    .circle(buttonRadius, buttonRadius, buttonRadius)
-    .fill(0x4a90e2);
+  // Minus button icon
+  const drawMinusIcon = (g: Graphics, radius: number) => {
+    g.rect(radius - 6, radius - 1.5, 12, 3)
+      .fill(0xffffff);
+  };
 
-  plusButton.value.addChild(plusCircle);
+  // Create buttons (minus on left, plus on right)
+  minusButton.value = createCircularButton(
+    canvasWidth - rightMargin - buttonRadius * 4 - buttonSpacing,
+    topMargin,
+    buttonRadius,
+    drawMinusIcon,
+    () => zoom('out')
+  );
 
-  // Plus symbol
-  const plusSymbol = new Graphics()
-    .rect(buttonRadius - 6, buttonRadius - 1.5, 12, 3)
-    .fill(0xffffff)
-    .rect(buttonRadius - 1.5, buttonRadius - 6, 3, 12)
-    .fill(0xffffff);
-
-  plusButton.value.addChild(plusSymbol);
-
-  // Plus button hover effect
-  plusButton.value.on('pointerover', () => {
-    plusCircle.clear()
-      .circle(buttonRadius, buttonRadius, buttonRadius)
-      .fill(0x5aa0f2);
-  });
-
-  plusButton.value.on('pointerout', () => {
-    plusCircle.clear()
-      .circle(buttonRadius, buttonRadius, buttonRadius)
-      .fill(0x4a90e2);
-  });
-
-  plusButton.value.on('pointertap', () => {
-    zoomIn();
-  });
+  plusButton.value = createCircularButton(
+    canvasWidth - rightMargin - buttonRadius * 2,
+    topMargin,
+    buttonRadius,
+    drawPlusIcon,
+    () => zoom('in')
+  );
 
   uiLayer.value.addChild(plusButton.value as any);
-
-  // Minus button
-  minusButton.value = new Container();
-  minusButton.value.x = canvasWidth - rightMargin - buttonRadius * 2;
-  minusButton.value.y = topMargin;
-  minusButton.value.eventMode = 'static';
-  minusButton.value.cursor = 'pointer';
-
-  const minusCircle = new Graphics()
-    .circle(buttonRadius, buttonRadius, buttonRadius)
-    .fill(0x4a90e2);
-
-  minusButton.value.addChild(minusCircle);
-
-  // Minus symbol
-  const minusSymbol = new Graphics()
-    .rect(buttonRadius - 6, buttonRadius - 1.5, 12, 3)
-    .fill(0xffffff);
-
-  minusButton.value.addChild(minusSymbol);
-
-  // Minus button hover effect
-  minusButton.value.on('pointerover', () => {
-    minusCircle.clear()
-      .circle(buttonRadius, buttonRadius, buttonRadius)
-      .fill(0x5aa0f2);
-  });
-
-  minusButton.value.on('pointerout', () => {
-    minusCircle.clear()
-      .circle(buttonRadius, buttonRadius, buttonRadius)
-      .fill(0x4a90e2);
-  });
-
-  minusButton.value.on('pointertap', () => {
-    zoomOut();
-  });
-
   uiLayer.value.addChild(minusButton.value as any);
 }
 
-function zoomOut() {
-  // Don't zoom out if already at maximum zoom out level
-  if (zoomLevel.value >= 8) return;
+function zoom(direction: 'in' | 'out') {
+  // Check bounds
+  if (direction === 'out' && zoomLevel.value >= ZOOM_LEVELS.length - 1) return;
+  if (direction === 'in' && zoomLevel.value <= 0) return;
 
-  // Cycle through zoom levels
-  zoomLevel.value = zoomLevel.value + 1;
+  // Update zoom level
+  zoomLevel.value = direction === 'out' ? zoomLevel.value + 1 : zoomLevel.value - 1;
 
-  // Calculate scale factor based on zoom level
-  // Keep the pixel spacing between major ticks constant, but change what time they represent
-  let scaleMultiplier: number;
-  switch (zoomLevel.value) {
-    case 0: // 5 seconds per major tick
-      scaleMultiplier = 0.5;
-      break;
-    case 1: // 15 seconds per major tick
-      scaleMultiplier = 1.5;
-      break;
-    case 2: // 30 seconds per major tick
-      scaleMultiplier = 3;
-      break;
-    case 3: // 45 seconds per major tick
-      scaleMultiplier = 4.5;
-      break;
-    case 4: // 1 minute per major tick
-      scaleMultiplier = 6;
-      break;
-    case 5: // 1:15 per major tick
-      scaleMultiplier = 7.5;
-      break;
-    case 6: // 1:30 per major tick
-      scaleMultiplier = 9;
-      break;
-    case 7: // 1:45 per major tick
-      scaleMultiplier = 10.5;
-      break;
-    case 8: // 2:00 per major tick
-      scaleMultiplier = 12;
-      break;
-    default:
-      scaleMultiplier = 0.5;
-  }
+  // Get scale multiplier from configuration
+  const scaleMultiplier = ZOOM_LEVELS[zoomLevel.value]!.scaleMultiplier;
 
   // Update timeline width based on scale
-  // Original width divided by scale factor (zooming out makes timeline shorter)
   const oldTimelineWidth = TIMELINE_WIDTH.value;
   TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
+
+  // Mark event positions as dirty since timeline width changed
+  if (oldTimelineWidth !== TIMELINE_WIDTH.value) {
+    eventBoxPositionsDirty.value = true;
+    rowBackgroundsDirty.value = true;
+    lastTimelineWidth.value = TIMELINE_WIDTH.value;
+  }
 
   // Calculate the focus point before zoom based on scroll position
   if (app.value) {
@@ -746,14 +807,14 @@ function zoomOut() {
       const scrollProgress = currentWorldX.value / oldMaxScroll;
 
       // If at the end (>95%), keep the end visible
-      if (scrollProgress > 0.95) {
+      if (scrollProgress > ZOOM_SNAP_THRESHOLD_END) {
         // Focus on a point near the right edge of viewport
-        focusPointX = scrollbarWidth * 0.8;
+        focusPointX = scrollbarWidth * ZOOM_FOCUS_EDGE_WEIGHT;
       }
       // If at the beginning (<5%), keep the beginning visible
-      else if (scrollProgress < 0.05) {
+      else if (scrollProgress < ZOOM_SNAP_THRESHOLD_START) {
         // Focus on a point near the left edge of viewport
-        focusPointX = scrollbarWidth * 0.2;
+        focusPointX = scrollbarWidth * ZOOM_FOCUS_START_WEIGHT;
       }
       // Otherwise, use a weighted focus point
       else {
@@ -766,7 +827,7 @@ function zoomOut() {
           ? (scrollProgress - 0.5) * 2  // 0 to 1 as we move toward end
           : -(0.5 - scrollProgress) * 2; // -1 to 0 as we move toward start
 
-        focusPointX = scrollbarWidth * (0.5 + edgeBias * 0.3 * (1 - centerWeight));
+        focusPointX = scrollbarWidth * (0.5 + edgeBias * ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER * (1 - centerWeight));
       }
     }
 
@@ -782,172 +843,12 @@ function zoomOut() {
 
     if (newMaxScroll > 0) {
       // If we were at the beginning before (<5%), snap to the beginning after zoom
-      if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll < 0.05) {
+      if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll < ZOOM_SNAP_THRESHOLD_START) {
         currentWorldX.value = 0;
         scrollOffset.value = 0;
       }
       // If we were at the end before (>95%), snap to the end after zoom
-      else if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll > 0.95) {
-        currentWorldX.value = newMaxScroll;
-        scrollOffset.value = 1;
-      } else {
-        currentWorldX.value = Math.max(0, Math.min(newWorldX, newMaxScroll));
-        scrollOffset.value = currentWorldX.value / newMaxScroll;
-      }
-    } else {
-      currentWorldX.value = 0;
-      scrollOffset.value = 0;
-    }
-  }
-
-  // Recreate timeline with new scale
-  if (timeline.value && uiLayer.value) {
-    uiLayer.value.removeChild(timeline.value as any);
-    timeline.value = null;
-  }
-  createTimeline();
-
-  // Re-add buttons and channel list so they stay on top of timeline
-  if (plusButton.value && minusButton.value && uiLayer.value) {
-    uiLayer.value.removeChild(plusButton.value as any);
-    uiLayer.value.removeChild(minusButton.value as any);
-    uiLayer.value.addChild(plusButton.value as any);
-    uiLayer.value.addChild(minusButton.value as any);
-  }
-
-  // Re-add channel list container so it stays on top
-  if (channelListContainer.value && uiLayer.value) {
-    uiLayer.value.removeChild(channelListContainer.value as any);
-    uiLayer.value.addChild(channelListContainer.value as any);
-  }
-
-  // Update scrollbar to match new timeline width
-  updateScrollbar();
-
-  // Update the timeline and scrollable content positions based on new scroll values
-  if (scrollableContentContainer.value && timeline.value && app.value) {
-    const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - channelListWidth;
-    const maxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
-    const worldX = maxScroll > 0 ? scrollOffset.value * maxScroll : 0;
-    scrollableContentContainer.value.x = channelListWidth - worldX;
-    timeline.value.x = channelListWidth - worldX;
-    currentWorldX.value = worldX;
-  }
-
-  // Update all event box positions based on new timeline width
-  updateAllEventBoxPositions();
-
-  // Update all row backgrounds based on new timeline width
-  updateAllRowBackgrounds();
-}
-
-function zoomIn() {
-  // Don't zoom in if already at maximum zoom in level
-  if (zoomLevel.value <= 0) return;
-
-  // Cycle through zoom levels
-  zoomLevel.value = zoomLevel.value - 1;
-
-  // Calculate scale factor based on zoom level
-  let scaleMultiplier: number;
-  switch (zoomLevel.value) {
-    case 0: // 5 seconds per major tick
-      scaleMultiplier = 0.5;
-      break;
-    case 1: // 15 seconds per major tick
-      scaleMultiplier = 1.5;
-      break;
-    case 2: // 30 seconds per major tick
-      scaleMultiplier = 3;
-      break;
-    case 3: // 45 seconds per major tick
-      scaleMultiplier = 4.5;
-      break;
-    case 4: // 1 minute per major tick
-      scaleMultiplier = 6;
-      break;
-    case 5: // 1:15 per major tick
-      scaleMultiplier = 7.5;
-      break;
-    case 6: // 1:30 per major tick
-      scaleMultiplier = 9;
-      break;
-    case 7: // 1:45 per major tick
-      scaleMultiplier = 10.5;
-      break;
-    case 8: // 2:00 per major tick
-      scaleMultiplier = 12;
-      break;
-    default:
-      scaleMultiplier = 0.5;
-  }
-
-  // Update timeline width based on scale
-  const oldTimelineWidth = TIMELINE_WIDTH.value;
-  TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
-
-  // Calculate the focus point before zoom based on scroll position
-  if (app.value) {
-    const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - channelListWidth;
-
-    // Calculate the old max scroll to determine position in timeline
-    const oldMaxScroll = Math.max(0, oldTimelineWidth - scrollbarWidth);
-
-    // Determine the focus point based on current scroll position
-    let focusPointX: number;
-
-    if (oldMaxScroll === 0) {
-      // Timeline fits entirely in viewport, use center
-      focusPointX = scrollbarWidth / 2;
-    } else {
-      // Calculate how far through the timeline we are (0 = start, 1 = end)
-      const scrollProgress = currentWorldX.value / oldMaxScroll;
-
-      // If at the end (>95%), keep the end visible
-      if (scrollProgress > 0.95) {
-        // Focus on a point near the right edge of viewport
-        focusPointX = scrollbarWidth * 0.8;
-      }
-      // If at the beginning (<5%), keep the beginning visible
-      else if (scrollProgress < 0.05) {
-        // Focus on a point near the left edge of viewport
-        focusPointX = scrollbarWidth * 0.2;
-      }
-      // Otherwise, use a weighted focus point
-      else {
-        // Blend between center and edges based on scroll progress
-        // scrollProgress 0.5 (middle) -> use center
-        // scrollProgress > 0.5 (toward end) -> bias right
-        // scrollProgress < 0.5 (toward start) -> bias left
-        const centerWeight = 1 - Math.abs(scrollProgress - 0.5) * 2; // 1 at middle, 0 at edges
-        const edgeBias = scrollProgress > 0.5
-          ? (scrollProgress - 0.5) * 2  // 0 to 1 as we move toward end
-          : -(0.5 - scrollProgress) * 2; // -1 to 0 as we move toward start
-
-        focusPointX = scrollbarWidth * (0.5 + edgeBias * 0.3 * (1 - centerWeight));
-      }
-    }
-
-    // Calculate the time at the focus point
-    const focusTimeInSeconds = ((currentWorldX.value + focusPointX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
-
-    // Calculate where that time should be in the new timeline
-    const newFocusPositionX = (focusTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
-
-    // Calculate new scroll position to keep the focus time at the focus point
-    const newWorldX = newFocusPositionX - focusPointX;
-    const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
-
-    if (newMaxScroll > 0) {
-      // If we were at the beginning before (<5%), snap to the beginning after zoom
-      if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll < 0.05) {
-        currentWorldX.value = 0;
-        scrollOffset.value = 0;
-      }
-      // If we were at the end before (>95%), snap to the end after zoom
-      else if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll > 0.95) {
+      else if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll > ZOOM_SNAP_THRESHOLD_END) {
         currentWorldX.value = newMaxScroll;
         scrollOffset.value = 1;
       } else {
@@ -1122,8 +1023,8 @@ function handleGlobalMouseMove(event: MouseEvent) {
     const deltaX = dragStartX.value - currentX;
     const deltaY = dragStartY.value - currentY;
 
-    // Mark as dragged if moved more than 3 pixels
-    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+    // Mark as dragged if moved more than threshold
+    if (Math.abs(deltaX) > DRAG_THRESHOLD_PIXELS || Math.abs(deltaY) > DRAG_THRESHOLD_PIXELS) {
       hasDragged.value = true;
     }
 
@@ -1243,14 +1144,14 @@ function handleWheel(event: WheelEvent) {
       zoomScrollAccumulator.value++;
     }
 
-    // Check if we've accumulated 3 scroll events
-    if (zoomScrollAccumulator.value <= -3) {
+    // Check if we've accumulated required scroll events
+    if (zoomScrollAccumulator.value <= -ZOOM_SCROLL_TICKS_REQUIRED) {
       // Scroll up = zoom in
-      zoomIn();
+      zoom('in');
       zoomScrollAccumulator.value = 0;
-    } else if (zoomScrollAccumulator.value >= 3) {
+    } else if (zoomScrollAccumulator.value >= ZOOM_SCROLL_TICKS_REQUIRED) {
       // Scroll down = zoom out
-      zoomOut();
+      zoom('out');
       zoomScrollAccumulator.value = 0;
     }
     return;
@@ -1470,8 +1371,11 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
     // Only create box with left mouse button
     if (event.button !== 0) return;
 
-    // Don't create box if user was dragging
-    if (hasDragged.value) return;
+    // Don't create box if user was dragging timeline or event box
+    if (hasDragged.value || hasEventBoxDragged.value) {
+      hasEventBoxDragged.value = false; // Reset flag
+      return;
+    }
 
     if (!scrollableContentContainer.value || !app.value) return;
 
@@ -1513,13 +1417,30 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
   eventBox.x = pixelPosition;
   eventBox.y = boxY;
 
-  rowContainer.addChild(eventBox);
+  // Make event box interactive
+  eventBox.eventMode = 'static';
+  eventBox.cursor = 'grab';
 
   // Store the event data with graphics reference
+  const eventBoxData: EventBox = { channelId, timeInSeconds, graphics: eventBox };
+
   if (!channelEventBoxes.value.has(channelId)) {
     channelEventBoxes.value.set(channelId, []);
   }
-  channelEventBoxes.value.get(channelId)!.push({ channelId, timeInSeconds, graphics: eventBox });
+  channelEventBoxes.value.get(channelId)!.push(eventBoxData);
+
+  // Add drag handlers
+  eventBox.on('pointerdown', (event) => {
+    if (isDraggingTimeline.value) return;
+
+    isDraggingEventBox.value = true;
+    draggedEventBox.value = eventBoxData;
+    eventBoxDragStartX.value = event.global.x;
+    eventBoxStartTime.value = eventBoxData.timeInSeconds;
+    hasEventBoxDragged.value = false; // Reset at start
+    eventBox.cursor = 'grabbing';
+    event.stopPropagation();
+  }); rowContainer.addChild(eventBox);
 }
 
 function updateEventBoxPositions(channelId: number) {
@@ -1533,13 +1454,22 @@ function updateEventBoxPositions(channelId: number) {
 }
 
 function updateAllEventBoxPositions() {
+  // Skip if positions haven't changed
+  if (!eventBoxPositionsDirty.value) return;
+
   // Update positions for all channels
   channelEventBoxes.value.forEach((events, channelId) => {
     updateEventBoxPositions(channelId);
   });
+
+  // Clear dirty flag
+  eventBoxPositionsDirty.value = false;
 }
 
 function updateAllRowBackgrounds() {
+  // Skip if backgrounds haven't changed
+  if (!rowBackgroundsDirty.value) return;
+
   // Update background width for all channel rows
   channelRowContainers.value.forEach((rowContainer, channelId) => {
     // The first child is the background graphics
@@ -1553,6 +1483,9 @@ function updateAllRowBackgrounds() {
       rowBg.rect(0, rowHeight - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
     }
   });
+
+  // Clear dirty flag
+  rowBackgroundsDirty.value = false;
 }
 
 function addChannel() {
