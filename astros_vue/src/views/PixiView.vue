@@ -59,7 +59,8 @@ const PIXELS_PER_SECOND = 30;
 const TIMELINE_DURATION_SECONDS = 600; // 10 minutes
 const zoomLevel = ref(0); // 0=5s, 1=15s, 2=30s, 3=45s, 4=1min, 5=1:15, 6=1:30, 7=1:45, 8=2min
 const zoomScrollAccumulator = ref(0); // Accumulate scroll events for zoom
-const TIMELINE_WIDTH = ref(PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS); // 18000 pixels
+// Initial width at zoom level 0 (scaleMultiplier = 0.5)
+const TIMELINE_WIDTH = ref((PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / 0.5); // 36000 pixels
 
 // Scrollbar state
 const minScrollThumbWidth = 40; // Minimum thumb width
@@ -704,25 +705,73 @@ function zoomOut() {
   const oldTimelineWidth = TIMELINE_WIDTH.value;
   TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
 
-  // Calculate the center time point before zoom
+  // Calculate the focus point before zoom based on scroll position
   if (app.value) {
     const canvasWidth = app.value.screen.width;
     const scrollbarWidth = canvasWidth - channelListWidth;
-    const viewportCenterX = scrollbarWidth / 2;
 
-    // Calculate the time at the center of the viewport
-    const centerTimeInSeconds = ((currentWorldX.value + viewportCenterX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
+    // Calculate the old max scroll to determine position in timeline
+    const oldMaxScroll = Math.max(0, oldTimelineWidth - scrollbarWidth);
+
+    // Determine the focus point based on current scroll position
+    let focusPointX: number;
+
+    if (oldMaxScroll === 0) {
+      // Timeline fits entirely in viewport, use center
+      focusPointX = scrollbarWidth / 2;
+    } else {
+      // Calculate how far through the timeline we are (0 = start, 1 = end)
+      const scrollProgress = currentWorldX.value / oldMaxScroll;
+
+      // If at the end (>95%), keep the end visible
+      if (scrollProgress > 0.95) {
+        // Focus on a point near the right edge of viewport
+        focusPointX = scrollbarWidth * 0.8;
+      }
+      // If at the beginning (<5%), keep the beginning visible
+      else if (scrollProgress < 0.05) {
+        // Focus on a point near the left edge of viewport
+        focusPointX = scrollbarWidth * 0.2;
+      }
+      // Otherwise, use a weighted focus point
+      else {
+        // Blend between center and edges based on scroll progress
+        // scrollProgress 0.5 (middle) -> use center
+        // scrollProgress > 0.5 (toward end) -> bias right
+        // scrollProgress < 0.5 (toward start) -> bias left
+        const centerWeight = 1 - Math.abs(scrollProgress - 0.5) * 2; // 1 at middle, 0 at edges
+        const edgeBias = scrollProgress > 0.5
+          ? (scrollProgress - 0.5) * 2  // 0 to 1 as we move toward end
+          : -(0.5 - scrollProgress) * 2; // -1 to 0 as we move toward start
+
+        focusPointX = scrollbarWidth * (0.5 + edgeBias * 0.3 * (1 - centerWeight));
+      }
+    }
+
+    // Calculate the time at the focus point
+    const focusTimeInSeconds = ((currentWorldX.value + focusPointX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
 
     // Calculate where that time should be in the new timeline
-    const newCenterPositionX = (centerTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
+    const newFocusPositionX = (focusTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
 
-    // Calculate new scroll position to keep the center time at the center
-    const newWorldX = newCenterPositionX - viewportCenterX;
+    // Calculate new scroll position to keep the focus time at the focus point
+    const newWorldX = newFocusPositionX - focusPointX;
     const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
 
     if (newMaxScroll > 0) {
-      currentWorldX.value = Math.max(0, Math.min(newWorldX, newMaxScroll));
-      scrollOffset.value = currentWorldX.value / newMaxScroll;
+      // If we were at the beginning before (<5%), snap to the beginning after zoom
+      if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll < 0.05) {
+        currentWorldX.value = 0;
+        scrollOffset.value = 0;
+      }
+      // If we were at the end before (>95%), snap to the end after zoom
+      else if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll > 0.95) {
+        currentWorldX.value = newMaxScroll;
+        scrollOffset.value = 1;
+      } else {
+        currentWorldX.value = Math.max(0, Math.min(newWorldX, newMaxScroll));
+        scrollOffset.value = currentWorldX.value / newMaxScroll;
+      }
     } else {
       currentWorldX.value = 0;
       scrollOffset.value = 0;
@@ -766,6 +815,9 @@ function zoomOut() {
 
   // Update all event box positions based on new timeline width
   updateAllEventBoxPositions();
+
+  // Update all row backgrounds based on new timeline width
+  updateAllRowBackgrounds();
 }
 
 function zoomIn() {
@@ -813,25 +865,73 @@ function zoomIn() {
   const oldTimelineWidth = TIMELINE_WIDTH.value;
   TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
 
-  // Calculate the center time point before zoom
+  // Calculate the focus point before zoom based on scroll position
   if (app.value) {
     const canvasWidth = app.value.screen.width;
     const scrollbarWidth = canvasWidth - channelListWidth;
-    const viewportCenterX = scrollbarWidth / 2;
 
-    // Calculate the time at the center of the viewport
-    const centerTimeInSeconds = ((currentWorldX.value + viewportCenterX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
+    // Calculate the old max scroll to determine position in timeline
+    const oldMaxScroll = Math.max(0, oldTimelineWidth - scrollbarWidth);
+
+    // Determine the focus point based on current scroll position
+    let focusPointX: number;
+
+    if (oldMaxScroll === 0) {
+      // Timeline fits entirely in viewport, use center
+      focusPointX = scrollbarWidth / 2;
+    } else {
+      // Calculate how far through the timeline we are (0 = start, 1 = end)
+      const scrollProgress = currentWorldX.value / oldMaxScroll;
+
+      // If at the end (>95%), keep the end visible
+      if (scrollProgress > 0.95) {
+        // Focus on a point near the right edge of viewport
+        focusPointX = scrollbarWidth * 0.8;
+      }
+      // If at the beginning (<5%), keep the beginning visible
+      else if (scrollProgress < 0.05) {
+        // Focus on a point near the left edge of viewport
+        focusPointX = scrollbarWidth * 0.2;
+      }
+      // Otherwise, use a weighted focus point
+      else {
+        // Blend between center and edges based on scroll progress
+        // scrollProgress 0.5 (middle) -> use center
+        // scrollProgress > 0.5 (toward end) -> bias right
+        // scrollProgress < 0.5 (toward start) -> bias left
+        const centerWeight = 1 - Math.abs(scrollProgress - 0.5) * 2; // 1 at middle, 0 at edges
+        const edgeBias = scrollProgress > 0.5
+          ? (scrollProgress - 0.5) * 2  // 0 to 1 as we move toward end
+          : -(0.5 - scrollProgress) * 2; // -1 to 0 as we move toward start
+
+        focusPointX = scrollbarWidth * (0.5 + edgeBias * 0.3 * (1 - centerWeight));
+      }
+    }
+
+    // Calculate the time at the focus point
+    const focusTimeInSeconds = ((currentWorldX.value + focusPointX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
 
     // Calculate where that time should be in the new timeline
-    const newCenterPositionX = (centerTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
+    const newFocusPositionX = (focusTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
 
-    // Calculate new scroll position to keep the center time at the center
-    const newWorldX = newCenterPositionX - viewportCenterX;
+    // Calculate new scroll position to keep the focus time at the focus point
+    const newWorldX = newFocusPositionX - focusPointX;
     const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
 
     if (newMaxScroll > 0) {
-      currentWorldX.value = Math.max(0, Math.min(newWorldX, newMaxScroll));
-      scrollOffset.value = currentWorldX.value / newMaxScroll;
+      // If we were at the beginning before (<5%), snap to the beginning after zoom
+      if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll < 0.05) {
+        currentWorldX.value = 0;
+        scrollOffset.value = 0;
+      }
+      // If we were at the end before (>95%), snap to the end after zoom
+      else if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll > 0.95) {
+        currentWorldX.value = newMaxScroll;
+        scrollOffset.value = 1;
+      } else {
+        currentWorldX.value = Math.max(0, Math.min(newWorldX, newMaxScroll));
+        scrollOffset.value = currentWorldX.value / newMaxScroll;
+      }
     } else {
       currentWorldX.value = 0;
       scrollOffset.value = 0;
@@ -875,6 +975,9 @@ function zoomIn() {
 
   // Update all event box positions based on new timeline width
   updateAllEventBoxPositions();
+
+  // Update all row backgrounds based on new timeline width
+  updateAllRowBackgrounds();
 }
 
 function createChannelList() {
@@ -1346,7 +1449,25 @@ function updateAllEventBoxPositions() {
   channelEventBoxes.value.forEach((events, channelId) => {
     updateEventBoxPositions(channelId);
   });
-} function addChannel() {
+}
+
+function updateAllRowBackgrounds() {
+  // Update background width for all channel rows
+  channelRowContainers.value.forEach((rowContainer, channelId) => {
+    // The first child is the background graphics
+    if (rowContainer.children.length > 0) {
+      const rowBg = rowContainer.children[0] as Graphics;
+      const rowIndex = Array.from(channelRowContainers.value.keys()).indexOf(channelId);
+      const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
+
+      rowBg.clear();
+      rowBg.rect(0, 0, TIMELINE_WIDTH.value, rowHeight).fill(rowColor);
+      rowBg.rect(0, rowHeight - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
+    }
+  });
+}
+
+function addChannel() {
   const newChannel: Channel = {
     id: channels.value.length + 1,
     name: `Channel ${channels.value.length + 1}`,
