@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import router from '@/router'
-import { ref, watch } from 'vue'
+import router from '@/router';
+import { ref, watch } from 'vue';
 
 const props = defineProps({
   showSidebar: {
@@ -11,26 +11,24 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-})
+});
 
-const emit = defineEmits(['update:isSidebarOpen'])
+const emit = defineEmits(['update:isSidebarOpen']);
 
-const sidebarOpen = ref(props.isSidebarOpen)
+const sidebarOpen = ref(props.isSidebarOpen);
 
 // Watch for changes in the prop and update local state
 watch(
   () => props.isSidebarOpen,
   (newVal) => {
-    sidebarOpen.value = newVal
+    sidebarOpen.value = newVal;
   },
-)
+);
 
 // Watch for changes in local state and emit to parent
 watch(sidebarOpen, (newVal) => {
-  emit('update:isSidebarOpen', newVal)
-})
-
-
+  emit('update:isSidebarOpen', newVal);
+});
 </script>
 
 <template>
@@ -38,7 +36,7 @@ watch(sidebarOpen, (newVal) => {
     <input id="nav-menu-drawer" type="checkbox" class="drawer-toggle" v-model="sidebarOpen" />
     <div class="drawer-content">
       <div class="navbar bg-base-100 shadow-sm">
-        <div class="flex-none pl-2 flex items-center">   
+        <div class="flex-none pl-2 flex items-center">
           <label
             v-if="props.showSidebar"
             for="nav-menu-drawer"
@@ -68,21 +66,19 @@ watch(sidebarOpen, (newVal) => {
       <label for="nav-menu-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
       <div class="bg-base-200 min-h-full w-80">
         <div class="navbar bg-base-100 sticky top-0 z-20 shadow-sm hidden lg:flex h-2">
-          <div class="pl-2 flex items-center">
-            test
-          </div>
+          <div class="pl-2 flex items-center">test</div>
           <div class="flex-1">
             <a class="text-xl pl-4">AstrOs</a>
           </div>
         </div>
         <ul class="menu w-80 p-4">
-        <li>
-          <p @click="router.push('/status')">Status</p>
-        </li>
-        <li>
-          <p @click="router.push('/pixi')">Pixi</p>
-        </li>
-      </ul>
+          <li>
+            <p @click="router.push('/status')">Status</p>
+          </li>
+          <li>
+            <p @click="router.push('/pixi')">Pixi</p>
+          </li>
+        </ul>
       </div>
     </div>
   </div>

@@ -3,17 +3,16 @@
 // ============================================================================
 
 // Element dimensions
-export const rowHeight = 60;
-export const timelineHeight = 50;
-export const scrollBarHeight = 15;
-export const addChannelButtonHeight = scrollBarHeight + timelineHeight; // Combined height of scrollbar and timeline
-export const channelListWidth = 256; // 64 * 4 = 256px
+export const ROW_HEIGHT = 60;
+export const TIMELINE_HEIGHT = 50;
+export const SCROLL_BAR_HEIGHT = 15;
+export const ADD_CHANNEL_BUTTON_HEIGHT = SCROLL_BAR_HEIGHT + TIMELINE_HEIGHT; // Combined height of scrollbar and timeline
+export const CHANNEL_LIST_WIDTH = 256; // 64 * 4 = 256px
 
 // Scrollbar dimensions
-export const verticalScrollBarWidth = 15;
-export const minVerticalScrollThumbHeight = 40;
-export const minScrollThumbWidth = 40; // Minimum horizontal thumb width
-
+export const VERTICAL_SCROLL_BAR_WIDTH = 15;
+export const MIN_VERTICAL_SCROLL_THUMB_HEIGHT = 40;
+export const MIN_SCROLL_THUMB_WIDTH = 40; // Minimum horizontal thumb width
 // ============================================================================
 // TIMELINE CONSTANTS
 // ============================================================================

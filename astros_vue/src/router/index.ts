@@ -1,5 +1,5 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import StatusView from '../views/StatusView.vue'
+import { createRouter, createWebHistory } from 'vue-router';
+import StatusView from '../views/StatusView.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -7,19 +7,19 @@ const router = createRouter({
     {
       path: '/',
       name: 'home',
-      component: StatusView
+      component: StatusView,
     },
     {
       path: '/status',
       name: 'status',
-      component: () => import('../views/StatusView.vue')
+      component: () => import('../views/StatusView.vue'),
     },
     {
       path: '/pixi',
       name: 'pixi',
-      component: () => import('../views/PixiView.vue')
-    }
+      component: () => import('../views/PixiView.vue'),
+    },
   ],
-})
+});
 
-export default router
+export default router;

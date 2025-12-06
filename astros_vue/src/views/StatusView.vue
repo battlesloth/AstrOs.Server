@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AstrosLayout from '@/components/layout/AstrosLayout.vue'
+import AstrosLayout from '@/components/layout/AstrosLayout.vue';
 </script>
 
 <template>

@@ -1,30 +1,26 @@
 <script setup lang="ts">
-import AstrosLayout from '@/components/layout/AstrosLayout.vue'
+import AstrosLayout from '@/components/layout/AstrosLayout.vue';
 import { Application, Container, Graphics, HTMLText } from 'pixi.js';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 // Import composables
-import { useZoomState, ZOOM_LEVELS, type ZoomLevelConfig } from '@/composables/useZoomState';
+import { useZoomState, ZOOM_LEVELS } from '@/composables/useZoomState';
 import { useScrollState } from '@/composables/useScrollState';
 import { useDragState } from '@/composables/useDragState';
 import { usePerformanceFlags } from '@/composables/usePerformanceFlags';
+import { useEventBoxes } from '@/composables/useEventBoxes';
 import * as constants from '@/composables/timelineConstants';
+import type { Channel } from '@/composables/types';
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-interface Channel {
-  id: number;
-  name: string;
-  events: any[];
-}
-
-interface EventBox {
-  channelId: number;
-  timeInSeconds: number;
-  graphics: Graphics;
-}
+// Import utilities
+import { createCircularButton, drawPlusIcon, drawMinusIcon } from '@/pixiComponents/pixiButtons';
+import {
+  drawTimelineBackground,
+  drawTimelineTicks,
+  drawTimelineLabels,
+} from '@/pixiComponents/timelineRendering';
+import { PixiScrollBar } from '@/pixiComponents/pixiScrollBar';
+import { ScrollBarDirection } from '@/pixiComponents/pixiScrollBarOptions';
 
 // ============================================================================
 // APPLICATION REFS
@@ -40,14 +36,14 @@ const lastChannelClicked = ref<string>('None');
 // ============================================================================
 
 const {
-  rowHeight,
-  timelineHeight,
-  scrollBarHeight,
-  addChannelButtonHeight,
-  channelListWidth,
-  verticalScrollBarWidth,
-  minVerticalScrollThumbHeight,
-  minScrollThumbWidth,
+  ROW_HEIGHT: ROW_HEIGHT,
+  TIMELINE_HEIGHT,
+  SCROLL_BAR_HEIGHT,
+  ADD_CHANNEL_BUTTON_HEIGHT,
+  CHANNEL_LIST_WIDTH,
+  VERTICAL_SCROLL_BAR_WIDTH,
+  MIN_VERTICAL_SCROLL_THUMB_HEIGHT,
+  MIN_SCROLL_THUMB_WIDTH,
   PIXELS_PER_SECOND,
   TIMELINE_DURATION_SECONDS,
   PIXELS_PER_MAJOR_TICK,
@@ -57,7 +53,7 @@ const {
   ZOOM_SNAP_THRESHOLD_END,
   ZOOM_FOCUS_EDGE_WEIGHT,
   ZOOM_FOCUS_START_WEIGHT,
-  ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER
+  ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER,
 } = constants;
 
 // ============================================================================
@@ -71,13 +67,12 @@ const channelListContainer = ref<Container | null>(null);
 const channelListScrollableContainer = ref<Container | null>(null);
 const timeline = ref<Container | null>(null);
 const channelRowContainers = ref<Map<number, Container>>(new Map());
-const channelEventBoxes = ref<Map<number, EventBox[]>>(new Map());
 
 // Scrollbar graphics
-const scrollBar = ref<Graphics | null>(null);
-const scrollThumb = ref<Graphics | null>(null);
-const verticalScrollBar = ref<Graphics | null>(null);
-const verticalScrollThumb = ref<Graphics | null>(null);
+const scrollBar = ref<PixiScrollBar | null>(null);
+//const scrollThumb = ref<Graphics | null>(null);
+const verticalScrollBar = ref<PixiScrollBar | null>(null);
+//const verticalScrollThumb = ref<Graphics | null>(null);
 
 // UI buttons
 const plusButton = ref<Container | null>(null);
@@ -93,7 +88,7 @@ const {
   TIMELINE_WIDTH,
   canZoomIn,
   canZoomOut,
-  currentZoomConfig
+  currentZoomConfig,
 } = useZoomState(PIXELS_PER_SECOND, TIMELINE_DURATION_SECONDS);
 
 const {
@@ -104,30 +99,27 @@ const {
   verticalScrollThumbHeight,
   isDraggingVerticalThumb,
   verticalScrollOffset,
-  currentWorldY
+  currentWorldY,
 } = useScrollState();
 
-const {
-  isDraggingTimeline,
-  dragStartX,
-  dragStartY,
-  dragStartWorldX,
-  dragStartWorldY,
-  hasDragged
-} = useDragState();
+const { isDraggingTimeline, dragStartX, dragStartY, dragStartWorldX, dragStartWorldY, hasDragged } =
+  useDragState();
 
-const {
-  eventBoxPositionsDirty,
-  rowBackgroundsDirty,
-  lastTimelineWidth
-} = usePerformanceFlags((PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / ZOOM_LEVELS[0]!.scaleMultiplier);
+const { eventBoxPositionsDirty, rowBackgroundsDirty, lastTimelineWidth } = usePerformanceFlags(
+  (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / ZOOM_LEVELS[0]!.scaleMultiplier,
+);
 
-// Event box drag state
-const isDraggingEventBox = ref(false);
-const draggedEventBox = ref<EventBox | null>(null);
-const eventBoxDragStartX = ref(0);
-const eventBoxStartTime = ref(0);
-const hasEventBoxDragged = ref(false);
+// Event boxes composable
+const {
+  channelEventBoxes,
+  isDraggingEventBox,
+  hasEventBoxDragged,
+  addEventBox,
+  updateEventBoxPositions,
+  updateAllEventBoxPositions,
+  handleEventBoxDrag,
+  endEventBoxDrag,
+} = useEventBoxes(TIMELINE_WIDTH, TIMELINE_DURATION_SECONDS, ROW_HEIGHT);
 
 // Other
 let resizeObserver: ResizeObserver | null = null;
@@ -149,12 +141,12 @@ watch(TIMELINE_WIDTH, (newWidth, oldWidth) => {
 watch(scrollOffset, (newOffset) => {
   if (scrollableContentContainer.value && timeline.value && app.value) {
     const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - channelListWidth;
+    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
     const maxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
     const worldX = maxScroll > 0 ? newOffset * maxScroll : 0;
     // Apply horizontal scroll to scrollable content and timeline
-    scrollableContentContainer.value.x = channelListWidth - worldX;
-    timeline.value.x = channelListWidth - worldX;
+    scrollableContentContainer.value.x = CHANNEL_LIST_WIDTH - worldX;
+    timeline.value.x = CHANNEL_LIST_WIDTH - worldX;
     currentWorldX.value = worldX; // Store current world position
   }
 });
@@ -163,23 +155,23 @@ watch(scrollOffset, (newOffset) => {
 watch(verticalScrollOffset, (newOffset) => {
   if (scrollableContentContainer.value && app.value && channelListScrollableContainer.value) {
     const canvasHeight = app.value.screen.height;
-    const availableHeight = canvasHeight - addChannelButtonHeight;
-    const totalContentHeight = channels.value.length * rowHeight;
+    const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+    const totalContentHeight = channels.value.length * ROW_HEIGHT;
     const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
     const worldY = maxScrollY > 0 ? newOffset * maxScrollY : 0;
 
     // Apply vertical scroll only to scrollable content
-    scrollableContentContainer.value.y = addChannelButtonHeight - worldY;
+    scrollableContentContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
     currentWorldY.value = worldY;
 
     // Also scroll the channel list scrollable container
-    channelListScrollableContainer.value.y = addChannelButtonHeight - worldY;
+    channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
   }
 });
 
 const containerHeight = computed(() => {
   const spriteCount = channels.value.length;
-  return timelineHeight + (spriteCount * rowHeight);
+  return TIMELINE_HEIGHT + spriteCount * ROW_HEIGHT;
 });
 
 onMounted(async () => {
@@ -191,7 +183,7 @@ onMounted(async () => {
     height: pixiContainer.value.clientHeight || 600,
     backgroundColor: 0x000000,
     antialias: true,
-    resolution: window.devicePixelRatio || 1
+    resolution: window.devicePixelRatio || 1,
   });
   pixiContainer.value.appendChild(app.value.canvas);
 
@@ -208,8 +200,8 @@ onMounted(async () => {
 
   // Create scrollable content container inside main container
   scrollableContentContainer.value = new Container();
-  scrollableContentContainer.value.x = channelListWidth;
-  scrollableContentContainer.value.y = addChannelButtonHeight;
+  scrollableContentContainer.value.x = CHANNEL_LIST_WIDTH;
+  scrollableContentContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT;
   scrollableContentContainer.value.eventMode = 'static';
 
   // Add pointer down handler for drag scrolling (middle mouse button only)
@@ -233,7 +225,7 @@ onMounted(async () => {
   app.value.stage.addChild(uiLayer.value as any);
 
   // Create scrollbar
-  createScrollbar();
+  createHorizontalScrollbar();
 
   // Create vertical scrollbar
   createVerticalScrollbar();
@@ -250,7 +242,7 @@ onMounted(async () => {
 
   // Create scrollable container for channel list rows
   channelListScrollableContainer.value = new Container();
-  channelListScrollableContainer.value.y = addChannelButtonHeight;
+  channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT;
   channelListContainer.value.addChild(channelListScrollableContainer.value as any);
 
   // Create channel list UI
@@ -265,7 +257,7 @@ onMounted(async () => {
         const width = entry?.contentRect.width;
         const height = entry?.contentRect.height;
 
-        if ((width && height) && width > 0 && height > 0) {
+        if (width && height && width > 0 && height > 0) {
           handleResize();
         }
       }
@@ -302,7 +294,7 @@ onUnmounted(() => {
     children: true,
     texture: true,
     textureSource: true,
-    context: true
+    context: true,
   });
   app.value = null;
   channels.value = [];
@@ -312,351 +304,244 @@ onUnmounted(() => {
   channelListContainer.value = null;
   channelListScrollableContainer.value = null;
   scrollBar.value = null;
-  scrollThumb.value = null;
+  //scrollThumb.value = null;
   timeline.value = null;
   verticalScrollBar.value = null;
-  verticalScrollThumb.value = null;
+  //verticalScrollThumb.value = null;
   channelRowContainers.value.clear();
 });
 
-function createScrollbar() {
+function createHorizontalScrollbar() {
   if (!app.value || !uiLayer.value) return;
 
-  const canvasWidth = app.value.screen.width;
-  const canvasHeight = app.value.screen.height;
-  const scrollbarWidth = canvasWidth - channelListWidth;
-
-  // Scrollbar background (horizontal at top, offset by channel list width)
-  scrollBar.value = new Graphics()
-    .rect(channelListWidth, 0, scrollbarWidth, scrollBarHeight)
-    .fill(0x333333);
-
-  // Scrollbar thumb (horizontal)
-  scrollThumb.value = new Graphics()
-    .rect(0, 0, scrollThumbWidth.value, scrollBarHeight)
-    .fill(0x888888);
-
-  scrollThumb.value.x = channelListWidth;
-  scrollThumb.value.y = 0;
-  scrollThumb.value.eventMode = 'static';
-  scrollThumb.value.cursor = 'pointer';
-
-  // Add hover effect
-  scrollThumb.value.on('pointerover', () => {
-    if (scrollThumb.value) {
-      const currentX = scrollThumb.value.x;
-      const currentY = scrollThumb.value.y;
-      scrollThumb.value.clear()
-        .rect(0, 0, scrollThumbWidth.value, scrollBarHeight)
-        .fill(0xaaaaaa);
-      scrollThumb.value.x = currentX;
-      scrollThumb.value.y = currentY;
+  const options = {
+    barWidth: app.value.screen.width - CHANNEL_LIST_WIDTH,
+    barHeight: SCROLL_BAR_HEIGHT,
+    xOffset: CHANNEL_LIST_WIDTH,
+    yOffset: 0,
+    direction: ScrollBarDirection.HORIZONTAL,
+    fillColor: 0x333333,
+    thumbSize: scrollThumbWidth.value,
+    thumbFillColor: 0x888888,
+    thumbFocusColor: 0xcccccc,
+    onThumbDragStart: () => {
+      isDraggingThumb.value = true;
+      if (app.value) {
+        app.value.stage.eventMode = 'static';
+      }
     }
-  });
+  }
 
-  scrollThumb.value.on('pointerout', () => {
-    if (scrollThumb.value && !isDraggingThumb.value) {
-      const currentX = scrollThumb.value.x;
-      const currentY = scrollThumb.value.y;
-      scrollThumb.value.clear()
-        .rect(0, 0, scrollThumbWidth.value, scrollBarHeight)
-        .fill(0x888888);
-      scrollThumb.value.x = currentX;
-      scrollThumb.value.y = currentY;
-    }
-  });
+  scrollBar.value = new PixiScrollBar(options);
+  uiLayer.value.addChild(scrollBar.value as any);
 
-  // Drag functionality
-  scrollThumb.value.on('pointerdown', (event) => {
-    isDraggingThumb.value = true;
-    if (app.value) {
-      app.value.stage.eventMode = 'static';
-    }
-    event.stopPropagation();
-  });
-
+  /*  const canvasWidth = app.value.screen.width;
+    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
+  
+    // Scrollbar background (horizontal at top, offset by channel list width)
+    scrollBar.value = new Graphics()
+      .rect(CHANNEL_LIST_WIDTH, 0, scrollbarWidth, SCROLL_BAR_HEIGHT)
+      .fill(0x333333);
+  
+    // Scrollbar thumb (horizontal)
+    scrollThumb.value = new Graphics()
+      .rect(0, 0, scrollThumbWidth.value, SCROLL_BAR_HEIGHT)
+      .fill(0x888888);
+  
+    scrollThumb.value.x = CHANNEL_LIST_WIDTH;
+    scrollThumb.value.y = 0;
+    scrollThumb.value.eventMode = 'static';
+    scrollThumb.value.cursor = 'pointer';
+  
+    // Add hover effect
+    scrollThumb.value.on('pointerover', () => {
+      if (scrollThumb.value) {
+        const currentX = scrollThumb.value.x;
+        const currentY = scrollThumb.value.y;
+        scrollThumb.value
+          .clear()
+          .rect(0, 0, scrollThumbWidth.value, SCROLL_BAR_HEIGHT)
+          .fill(0xaaaaaa);
+        scrollThumb.value.x = currentX;
+        scrollThumb.value.y = currentY;
+      }
+    });
+  
+    scrollThumb.value.on('pointerout', () => {
+      if (scrollThumb.value && !isDraggingThumb.value) {
+        const currentX = scrollThumb.value.x;
+        const currentY = scrollThumb.value.y;
+        scrollThumb.value
+          .clear()
+          .rect(0, 0, scrollThumbWidth.value, SCROLL_BAR_HEIGHT)
+          .fill(0x888888);
+        scrollThumb.value.x = currentX;
+        scrollThumb.value.y = currentY;
+      }
+    });
+  
+    // Drag functionality
+    scrollThumb.value.on('pointerdown', (event) => {
+      isDraggingThumb.value = true;
+      if (app.value) {
+        app.value.stage.eventMode = 'static';
+      }
+      event.stopPropagation();
+    });
+  */
   if (app.value.stage) {
     app.value.stage.on('pointerup', () => {
-      if (isDraggingThumb.value) {
-        isDraggingThumb.value = false;
-        if (scrollThumb.value) {
-          const currentX = scrollThumb.value.x;
-          const currentY = scrollThumb.value.y;
-          scrollThumb.value.clear()
-            .rect(0, 0, scrollThumbWidth.value, scrollBarHeight)
-            .fill(0x888888);
-          scrollThumb.value.x = currentX;
-          scrollThumb.value.y = currentY;
-        }
-      }
+      scrollBar.value?.endDrag();
 
       // Handle event box drag end
-      if (isDraggingEventBox.value && draggedEventBox.value) {
-        isDraggingEventBox.value = false;
-        draggedEventBox.value.graphics.cursor = 'grab';
-        draggedEventBox.value = null;
-      }
+      endEventBoxDrag();
     });
 
     app.value.stage.on('pointermove', (event) => {
-      if (isDraggingThumb.value && scrollThumb.value && app.value) {
-        const canvasWidth = app.value.screen.width;
-        const scrollbarWidth = canvasWidth - channelListWidth;
-        const localX = event.global.x - channelListWidth;
-        const newX = Math.max(channelListWidth, Math.min(event.global.x, channelListWidth + scrollbarWidth - scrollThumbWidth.value));
-        scrollThumb.value.x = newX;
-
-        // Calculate scroll offset
-        const scrollPercentage = localX / (scrollbarWidth - scrollThumbWidth.value);
-        scrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
+      if (app.value && scrollBar.value) {
+        scrollOffset.value = scrollBar.value.drag(event.global.x);
       }
-
       // Handle event box dragging
-      if (isDraggingEventBox.value && draggedEventBox.value) {
-        const deltaX = event.global.x - eventBoxDragStartX.value;
-
-        // Mark as dragged if moved more than a small threshold
-        if (Math.abs(deltaX) > 2) {
-          hasEventBoxDragged.value = true;
-        }
-
-        const deltaTimeSeconds = (deltaX / TIMELINE_WIDTH.value) * TIMELINE_DURATION_SECONDS;
-        const newTime = Math.max(0, Math.min(TIMELINE_DURATION_SECONDS, eventBoxStartTime.value + deltaTimeSeconds));
-
-        // Update the event box time and position
-        draggedEventBox.value.timeInSeconds = newTime;
-        const pixelPosition = (newTime / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
-        draggedEventBox.value.graphics.x = pixelPosition;
-      }
+      handleEventBoxDrag(event.global.x);
     });
 
     // Global pointer up to catch mouse release anywhere
     app.value.stage.on('pointerupoutside', () => {
-      if (isDraggingThumb.value) {
-        isDraggingThumb.value = false;
-        if (scrollThumb.value) {
-          const currentX = scrollThumb.value.x;
-          const currentY = scrollThumb.value.y;
-          scrollThumb.value.clear()
-            .rect(0, 0, scrollThumbWidth.value, scrollBarHeight)
-            .fill(0x888888);
-          scrollThumb.value.x = currentX;
-          scrollThumb.value.y = currentY;
-        }
-      }
-
+      scrollBar.value?.endDrag();
       // Handle event box drag end outside
-      if (isDraggingEventBox.value && draggedEventBox.value) {
-        isDraggingEventBox.value = false;
-        draggedEventBox.value.graphics.cursor = 'grab';
-        draggedEventBox.value = null;
-      }
+      endEventBoxDrag();
     });
   }
-
-  uiLayer.value.addChild(scrollBar.value as any);
-  uiLayer.value.addChild(scrollThumb.value as any);
+  /*
+    uiLayer.value.addChild(scrollBar.value as any);
+    uiLayer.value.addChild(scrollThumb.value as any);
+  */
 }
 
 function createVerticalScrollbar() {
   if (!app.value || !uiLayer.value) return;
 
-  const canvasWidth = app.value.screen.width;
-  const canvasHeight = app.value.screen.height;
-  const scrollbarHeight = canvasHeight - addChannelButtonHeight;
-
-  // Vertical scrollbar background (on the right side)
-  verticalScrollBar.value = new Graphics()
-    .rect(canvasWidth - verticalScrollBarWidth, addChannelButtonHeight, verticalScrollBarWidth, scrollbarHeight)
-    .fill(0x333333);
-
-  // Vertical scrollbar thumb
-  verticalScrollThumb.value = new Graphics()
-    .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
-    .fill(0x888888);
-
-  verticalScrollThumb.value.x = canvasWidth - verticalScrollBarWidth;
-  verticalScrollThumb.value.y = addChannelButtonHeight;
-  verticalScrollThumb.value.eventMode = 'static';
-  verticalScrollThumb.value.cursor = 'pointer';
-
-  // Add hover effect
-  verticalScrollThumb.value.on('pointerover', () => {
-    if (verticalScrollThumb.value) {
-      const currentX = verticalScrollThumb.value.x;
-      const currentY = verticalScrollThumb.value.y;
-      verticalScrollThumb.value.clear()
-        .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
-        .fill(0xaaaaaa);
-      verticalScrollThumb.value.x = currentX;
-      verticalScrollThumb.value.y = currentY;
-    }
-  });
-
-  verticalScrollThumb.value.on('pointerout', () => {
-    if (verticalScrollThumb.value && !isDraggingVerticalThumb.value) {
-      const currentX = verticalScrollThumb.value.x;
-      const currentY = verticalScrollThumb.value.y;
-      verticalScrollThumb.value.clear()
-        .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
-        .fill(0x888888);
-      verticalScrollThumb.value.x = currentX;
-      verticalScrollThumb.value.y = currentY;
-    }
-  });
-
-  // Drag functionality
-  verticalScrollThumb.value.on('pointerdown', (event) => {
-    isDraggingVerticalThumb.value = true;
-    if (app.value) {
-      app.value.stage.eventMode = 'static';
-    }
-    event.stopPropagation();
-  });
-
-  if (app.value.stage) {
-    app.value.stage.on('pointerup', () => {
-      if (isDraggingVerticalThumb.value) {
-        isDraggingVerticalThumb.value = false;
-        if (verticalScrollThumb.value) {
-          const currentX = verticalScrollThumb.value.x;
-          const currentY = verticalScrollThumb.value.y;
-          verticalScrollThumb.value.clear()
-            .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
-            .fill(0x888888);
-          verticalScrollThumb.value.x = currentX;
-          verticalScrollThumb.value.y = currentY;
-        }
+  const options = {
+    barWidth: VERTICAL_SCROLL_BAR_WIDTH,
+    barHeight: app.value.screen.height - ADD_CHANNEL_BUTTON_HEIGHT,
+    xOffset: app.value.screen.width - VERTICAL_SCROLL_BAR_WIDTH,
+    yOffset: ADD_CHANNEL_BUTTON_HEIGHT,
+    direction: ScrollBarDirection.VERTICAL,
+    fillColor: 0x333333,
+    thumbSize: verticalScrollThumbHeight.value,
+    thumbFillColor: 0x888888,
+    thumbFocusColor: 0xaaaaaa,
+    onThumbDragStart: () => {
+      isDraggingVerticalThumb.value = true;
+      if (app.value) {
+        app.value.stage.eventMode = 'static';
       }
+    }
+  }
+
+  verticalScrollBar.value = new PixiScrollBar(options);
+  /*
+    // Vertical scrollbar background (on the right side)
+    verticalScrollBar.value = new Graphics()
+      .rect(
+        canvasWidth - VERTICAL_SCROLL_BAR_WIDTH,
+        ADD_CHANNEL_BUTTON_HEIGHT,
+        VERTICAL_SCROLL_BAR_WIDTH,
+        scrollbarHeight,
+      )
+      .fill(0x333333);
+  
+    // Vertical scrollbar thumb
+    verticalScrollThumb.value = new Graphics()
+      .rect(0, 0, VERTICAL_SCROLL_BAR_WIDTH, verticalScrollThumbHeight.value)
+      .fill(0x888888);
+  
+    verticalScrollThumb.value.x = canvasWidth - VERTICAL_SCROLL_BAR_WIDTH;
+    verticalScrollThumb.value.y = ADD_CHANNEL_BUTTON_HEIGHT;
+    verticalScrollThumb.value.eventMode = 'static';
+    verticalScrollThumb.value.cursor = 'pointer';
+  
+    // Add hover effect
+    verticalScrollThumb.value.on('pointerover', () => {
+      if (verticalScrollThumb.value) {
+        const currentX = verticalScrollThumb.value.x;
+        const currentY = verticalScrollThumb.value.y;
+        verticalScrollThumb.value
+          .clear()
+          .rect(0, 0, VERTICAL_SCROLL_BAR_WIDTH, verticalScrollThumbHeight.value)
+          .fill(0xaaaaaa);
+        verticalScrollThumb.value.x = currentX;
+        verticalScrollThumb.value.y = currentY;
+      }
+    });
+  
+    verticalScrollThumb.value.on('pointerout', () => {
+      if (verticalScrollThumb.value && !isDraggingVerticalThumb.value) {
+        const currentX = verticalScrollThumb.value.x;
+        const currentY = verticalScrollThumb.value.y;
+        verticalScrollThumb.value
+          .clear()
+          .rect(0, 0, VERTICAL_SCROLL_BAR_WIDTH, verticalScrollThumbHeight.value)
+          .fill(0x888888);
+        verticalScrollThumb.value.x = currentX;
+        verticalScrollThumb.value.y = currentY;
+      }
+    });
+  
+    // Drag functionality
+    verticalScrollThumb.value.on('pointerdown', (event) => {
+      isDraggingVerticalThumb.value = true;
+      if (app.value) {
+        app.value.stage.eventMode = 'static';
+      }
+      event.stopPropagation();
+    });
+*/
+  if (app.value.stage) {
+
+    app.value.stage.on('pointerup', () => {
+      verticalScrollBar.value?.endDrag();
     });
 
     app.value.stage.on('pointermove', (event) => {
-      if (isDraggingVerticalThumb.value && verticalScrollThumb.value && app.value) {
+      if (verticalScrollBar.value) {
+        verticalScrollOffset.value = verticalScrollBar.value?.drag(event.global.y);
+      }
+      /*if (isDraggingVerticalThumb.value && verticalScrollThumb.value && app.value) {
         const canvasHeight = app.value.screen.height;
-        const scrollbarHeight = canvasHeight - addChannelButtonHeight;
-        const newY = Math.max(addChannelButtonHeight, Math.min(event.global.y, addChannelButtonHeight + scrollbarHeight - verticalScrollThumbHeight.value));
+        const scrollbarHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+        const newY = Math.max(
+          ADD_CHANNEL_BUTTON_HEIGHT,
+          Math.min(
+            event.global.y,
+            ADD_CHANNEL_BUTTON_HEIGHT + scrollbarHeight - verticalScrollThumbHeight.value,
+          ),
+        );
         verticalScrollThumb.value.y = newY;
 
         // Calculate scroll offset based on thumb position within scrollbar
-        const thumbPositionInScrollbar = newY - addChannelButtonHeight;
-        const scrollPercentage = thumbPositionInScrollbar / (scrollbarHeight - verticalScrollThumbHeight.value);
+        const thumbPositionInScrollbar = newY - ADD_CHANNEL_BUTTON_HEIGHT;
+        const scrollPercentage =
+          thumbPositionInScrollbar / (scrollbarHeight - verticalScrollThumbHeight.value);
         verticalScrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
-      }
+      }*/
     });
 
     app.value.stage.on('pointerupoutside', () => {
-      if (isDraggingVerticalThumb.value) {
-        isDraggingVerticalThumb.value = false;
-        if (verticalScrollThumb.value) {
-          const currentX = verticalScrollThumb.value.x;
-          const currentY = verticalScrollThumb.value.y;
-          verticalScrollThumb.value.clear()
-            .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
-            .fill(0x888888);
-          verticalScrollThumb.value.x = currentX;
-          verticalScrollThumb.value.y = currentY;
-        }
-      }
+      verticalScrollBar.value?.endDrag();
     });
   }
-
   uiLayer.value.addChild(verticalScrollBar.value as any);
-  uiLayer.value.addChild(verticalScrollThumb.value as any);
-}
+  //uiLayer.value.addChild(verticalScrollThumb.value as any);
 
-function drawTimelineBackground(graphics: Graphics) {
-  graphics
-    .rect(0, 0, TIMELINE_WIDTH.value, timelineHeight)
-    .fill(0x1a1a1a);
-}
-
-function drawTimelineTicks(graphics: Graphics, majorTickInterval: number, minorTickInterval: number) {
-  const pixelsPerMajorTick = PIXELS_PER_MAJOR_TICK;
-  const numMajorTicks = Math.floor(TIMELINE_DURATION_SECONDS / majorTickInterval);
-
-  // Draw tick marks with consistent pixel spacing
-  for (let tickIndex = 0; tickIndex <= numMajorTicks; tickIndex++) {
-    const x = tickIndex * pixelsPerMajorTick;
-
-    // Major tick
-    graphics
-      .rect(x, timelineHeight - 20, 2, 20)
-      .fill(0xffffff);
-
-    // Draw minor ticks between this major tick and the next (or end of timeline)
-    if (tickIndex < numMajorTicks) {
-      const minorTicksPerMajor = majorTickInterval / minorTickInterval;
-      for (let minorIndex = 1; minorIndex < minorTicksPerMajor; minorIndex++) {
-        const minorX = x + (minorIndex * pixelsPerMajorTick / minorTicksPerMajor);
-        graphics
-          .rect(minorX, timelineHeight - 10, 1, 10)
-          .fill(0x888888);
-      }
-    }
-  }
-
-  // Draw remaining minor ticks after the last major tick to fill timeline to 10 minutes
-  const lastMajorTickTime = numMajorTicks * majorTickInterval;
-  const remainingTime = TIMELINE_DURATION_SECONDS - lastMajorTickTime;
-
-  if (remainingTime > 0) {
-    const lastMajorTickX = numMajorTicks * pixelsPerMajorTick;
-    const numRemainingMinorTicks = Math.floor(remainingTime / minorTickInterval);
-
-    for (let minorIndex = 1; minorIndex <= numRemainingMinorTicks; minorIndex++) {
-      const minorTime = minorIndex * minorTickInterval;
-      const minorX = lastMajorTickX + (minorTime / majorTickInterval) * pixelsPerMajorTick;
-
-      // Only draw if within timeline bounds
-      if (minorX <= TIMELINE_WIDTH.value) {
-        graphics
-          .rect(minorX, timelineHeight - 10, 1, 10)
-          .fill(0x888888);
-      }
-    }
-  }
-}
-
-function drawTimelineLabels(container: Container, majorTickInterval: number) {
-  const pixelsPerMajorTick = PIXELS_PER_MAJOR_TICK;
-  const numMajorTicks = Math.floor(TIMELINE_DURATION_SECONDS / majorTickInterval);
-
-  // Add time labels at major ticks
-  for (let tickIndex = 1; tickIndex <= numMajorTicks; tickIndex++) {
-    const x = tickIndex * pixelsPerMajorTick;
-    const second = tickIndex * majorTickInterval;
-    const minutes = Math.floor(second / 60);
-    const seconds = second % 60;
-    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-
-    const timeLabel = new HTMLText({
-      text: timeString,
-      style: {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '12px',
-        fill: '#ffffff'
-      }
-    });
-
-    // Wait for next frame to get accurate width for centering
-    requestAnimationFrame(() => {
-      if (timeLabel.width > 0) {
-        timeLabel.x = x - (timeLabel.width / 2);
-      }
-    });
-
-    timeLabel.x = x - 15; // Approximate centering
-    timeLabel.y = 2;
-    container.addChild(timeLabel);
-  }
 }
 
 function createTimeline() {
   if (!app.value || !uiLayer.value) return;
 
   timeline.value = new Container();
-  timeline.value.x = channelListWidth; // Start after channel list
-  timeline.value.y = scrollBarHeight; // Position below the scrollbar
+  timeline.value.x = CHANNEL_LIST_WIDTH; // Start after channel list
+  timeline.value.y = SCROLL_BAR_HEIGHT; // Position below the scrollbar
 
   const graphics = new Graphics();
 
@@ -665,61 +550,30 @@ function createTimeline() {
   const majorTickInterval = zoomConfig.majorTickInterval;
   const minorTickInterval = zoomConfig.minorTickInterval;
 
-  // Draw timeline components
-  drawTimelineBackground(graphics);
-  drawTimelineTicks(graphics, majorTickInterval, minorTickInterval);
+  // Draw timeline components using utility functions
+  drawTimelineBackground(graphics, TIMELINE_WIDTH.value, TIMELINE_HEIGHT);
+  drawTimelineTicks(
+    graphics,
+    majorTickInterval,
+    minorTickInterval,
+    TIMELINE_HEIGHT,
+    TIMELINE_WIDTH.value,
+    TIMELINE_DURATION_SECONDS,
+    PIXELS_PER_MAJOR_TICK,
+  );
 
   timeline.value.addChild(graphics);
 
   // Add time labels (after graphics so they're on top)
-  drawTimelineLabels(timeline.value as Container, majorTickInterval);
+  drawTimelineLabels(
+    timeline.value as Container,
+    majorTickInterval,
+    TIMELINE_DURATION_SECONDS,
+    PIXELS_PER_MAJOR_TICK,
+    TIMELINE_HEIGHT,
+  );
 
   uiLayer.value.addChild(timeline.value as any);
-}
-
-/**
- * Creates a circular button with icon and hover effects
- */
-function createCircularButton(
-  x: number,
-  y: number,
-  radius: number,
-  drawIcon: (g: Graphics, radius: number) => void,
-  onTap: () => void
-): Container {
-  const button = new Container();
-  button.x = x;
-  button.y = y;
-  button.eventMode = 'static';
-  button.cursor = 'pointer';
-
-  const circle = new Graphics()
-    .circle(radius, radius, radius)
-    .fill(0x4a90e2);
-
-  button.addChild(circle);
-
-  // Draw icon
-  const icon = new Graphics();
-  drawIcon(icon, radius);
-  button.addChild(icon);
-
-  // Hover effect
-  button.on('pointerover', () => {
-    circle.clear()
-      .circle(radius, radius, radius)
-      .fill(0x5aa0f2);
-  });
-
-  button.on('pointerout', () => {
-    circle.clear()
-      .circle(radius, radius, radius)
-      .fill(0x4a90e2);
-  });
-
-  button.on('pointertap', onTap);
-
-  return button;
 }
 
 function createZoomButtons() {
@@ -728,22 +582,8 @@ function createZoomButtons() {
   const canvasWidth = app.value.screen.width;
   const buttonRadius = 15;
   const buttonSpacing = 8;
-  const rightMargin = verticalScrollBarWidth + 10;
-  const topMargin = scrollBarHeight + 10;
-
-  // Plus button icon
-  const drawPlusIcon = (g: Graphics, radius: number) => {
-    g.rect(radius - 6, radius - 1.5, 12, 3)
-      .fill(0xffffff)
-      .rect(radius - 1.5, radius - 6, 3, 12)
-      .fill(0xffffff);
-  };
-
-  // Minus button icon
-  const drawMinusIcon = (g: Graphics, radius: number) => {
-    g.rect(radius - 6, radius - 1.5, 12, 3)
-      .fill(0xffffff);
-  };
+  const rightMargin = VERTICAL_SCROLL_BAR_WIDTH + 10;
+  const topMargin = SCROLL_BAR_HEIGHT + 10;
 
   // Create buttons (minus on left, plus on right)
   minusButton.value = createCircularButton(
@@ -751,7 +591,7 @@ function createZoomButtons() {
     topMargin,
     buttonRadius,
     drawMinusIcon,
-    () => zoom('out')
+    () => zoom('out'),
   );
 
   plusButton.value = createCircularButton(
@@ -759,7 +599,7 @@ function createZoomButtons() {
     topMargin,
     buttonRadius,
     drawPlusIcon,
-    () => zoom('in')
+    () => zoom('in'),
   );
 
   uiLayer.value.addChild(plusButton.value as any);
@@ -791,7 +631,7 @@ function zoom(direction: 'in' | 'out') {
   // Calculate the focus point before zoom based on scroll position
   if (app.value) {
     const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - channelListWidth;
+    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
 
     // Calculate the old max scroll to determine position in timeline
     const oldMaxScroll = Math.max(0, oldTimelineWidth - scrollbarWidth);
@@ -823,19 +663,23 @@ function zoom(direction: 'in' | 'out') {
         // scrollProgress > 0.5 (toward end) -> bias right
         // scrollProgress < 0.5 (toward start) -> bias left
         const centerWeight = 1 - Math.abs(scrollProgress - 0.5) * 2; // 1 at middle, 0 at edges
-        const edgeBias = scrollProgress > 0.5
-          ? (scrollProgress - 0.5) * 2  // 0 to 1 as we move toward end
-          : -(0.5 - scrollProgress) * 2; // -1 to 0 as we move toward start
+        const edgeBias =
+          scrollProgress > 0.5
+            ? (scrollProgress - 0.5) * 2 // 0 to 1 as we move toward end
+            : -(0.5 - scrollProgress) * 2; // -1 to 0 as we move toward start
 
-        focusPointX = scrollbarWidth * (0.5 + edgeBias * ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER * (1 - centerWeight));
+        focusPointX =
+          scrollbarWidth * (0.5 + edgeBias * ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER * (1 - centerWeight));
       }
     }
 
     // Calculate the time at the focus point
-    const focusTimeInSeconds = ((currentWorldX.value + focusPointX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
+    const focusTimeInSeconds =
+      ((currentWorldX.value + focusPointX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
 
     // Calculate where that time should be in the new timeline
-    const newFocusPositionX = (focusTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
+    const newFocusPositionX =
+      (focusTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
 
     // Calculate new scroll position to keep the focus time at the focus point
     const newWorldX = newFocusPositionX - focusPointX;
@@ -888,11 +732,11 @@ function zoom(direction: 'in' | 'out') {
   // Update the timeline and scrollable content positions based on new scroll values
   if (scrollableContentContainer.value && timeline.value && app.value) {
     const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - channelListWidth;
+    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
     const maxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
     const worldX = maxScroll > 0 ? scrollOffset.value * maxScroll : 0;
-    scrollableContentContainer.value.x = channelListWidth - worldX;
-    timeline.value.x = channelListWidth - worldX;
+    scrollableContentContainer.value.x = CHANNEL_LIST_WIDTH - worldX;
+    timeline.value.x = CHANNEL_LIST_WIDTH - worldX;
     currentWorldX.value = worldX;
   }
 
@@ -912,39 +756,31 @@ function createChannelList() {
   const canvasHeight = app.value.screen.height;
 
   // Create background for channel list area (add first so it's behind everything)
-  const background = new Graphics()
-    .rect(0, 0, channelListWidth, canvasHeight)
-    .fill(0x2a2a2a);
+  const background = new Graphics().rect(0, 0, CHANNEL_LIST_WIDTH, canvasHeight).fill(0x2a2a2a);
   channelListContainer.value.addChild(background);
 
   // Re-add the scrollable container (after background)
   channelListScrollableContainer.value = new Container();
-  channelListScrollableContainer.value.y = addChannelButtonHeight;
+  channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT;
   channelListContainer.value.addChild(channelListScrollableContainer.value as any);
 
   // Create "Add Channel" button at the top (fixed position)
-  const buttonHeight = addChannelButtonHeight;
+  const buttonHeight = ADD_CHANNEL_BUTTON_HEIGHT;
   const buttonContainer = new Container();
   buttonContainer.eventMode = 'static';
   buttonContainer.cursor = 'pointer';
 
-  const button = new Graphics()
-    .rect(0, 0, channelListWidth, buttonHeight)
-    .fill(0x4a90e2);
+  const button = new Graphics().rect(0, 0, CHANNEL_LIST_WIDTH, buttonHeight).fill(0x4a90e2);
 
   buttonContainer.addChild(button);
 
   // Add hover effect
   buttonContainer.on('pointerover', () => {
-    button.clear()
-      .rect(0, 0, channelListWidth, buttonHeight)
-      .fill(0x5aa0f2);
+    button.clear().rect(0, 0, CHANNEL_LIST_WIDTH, buttonHeight).fill(0x5aa0f2);
   });
 
   buttonContainer.on('pointerout', () => {
-    button.clear()
-      .rect(0, 0, channelListWidth, buttonHeight)
-      .fill(0x4a90e2);
+    button.clear().rect(0, 0, CHANNEL_LIST_WIDTH, buttonHeight).fill(0x4a90e2);
   });
 
   buttonContainer.on('pointertap', () => {
@@ -957,19 +793,19 @@ function createChannelList() {
       fontFamily: 'Arial, sans-serif',
       fontSize: '16px',
       fill: '#ffffff',
-      fontWeight: 'bold'
-    }
+      fontWeight: 'bold',
+    },
   });
 
   // Center the text
   requestAnimationFrame(() => {
     if (buttonText.width > 0 && buttonText.height > 0) {
-      buttonText.x = (channelListWidth - buttonText.width) / 2;
+      buttonText.x = (CHANNEL_LIST_WIDTH - buttonText.width) / 2;
       buttonText.y = (buttonHeight - buttonText.height) / 2;
     }
   });
 
-  buttonText.x = channelListWidth / 2 - 40;
+  buttonText.x = CHANNEL_LIST_WIDTH / 2 - 40;
   buttonText.y = buttonHeight / 2 - 8;
 
   buttonContainer.addChild(buttonText);
@@ -978,7 +814,7 @@ function createChannelList() {
 
   // Draw channel rows in scrollable container
   channels.value.forEach((channel, index) => {
-    const yPos = index * rowHeight;
+    const yPos = index * ROW_HEIGHT;
 
     // Create container for the row
     const rowContainer = new Container();
@@ -986,14 +822,10 @@ function createChannelList() {
 
     // Alternating background colors
     const rowColor = index % 2 === 0 ? 0xe5e5e5 : 0xf5f5f5;
-    const row = new Graphics()
-      .rect(0, 0, channelListWidth, rowHeight)
-      .fill(rowColor);
+    const row = new Graphics().rect(0, 0, CHANNEL_LIST_WIDTH, ROW_HEIGHT).fill(rowColor);
 
     // Add border
-    row
-      .rect(0, rowHeight - 1, channelListWidth, 1)
-      .fill(0xcccccc);
+    row.rect(0, ROW_HEIGHT - 1, CHANNEL_LIST_WIDTH, 1).fill(0xcccccc);
 
     rowContainer.addChild(row);
 
@@ -1002,12 +834,12 @@ function createChannelList() {
       style: {
         fontFamily: 'Arial, sans-serif',
         fontSize: '14px',
-        fill: '#000000'
-      }
+        fill: '#000000',
+      },
     });
 
     rowText.x = 16;
-    rowText.y = (rowHeight / 2) - 7;
+    rowText.y = ROW_HEIGHT / 2 - 7;
 
     rowContainer.addChild(rowText);
     channelListScrollableContainer.value!.addChild(rowContainer);
@@ -1015,7 +847,7 @@ function createChannelList() {
 }
 
 function handleGlobalMouseMove(event: MouseEvent) {
-  if (isDraggingTimeline.value && app.value && pixiContainer.value) {
+  /*if (isDraggingTimeline.value && app.value && pixiContainer.value) {
     const rect = pixiContainer.value.getBoundingClientRect();
     const currentX = event.clientX - rect.left;
     const currentY = event.clientY - rect.top;
@@ -1030,7 +862,7 @@ function handleGlobalMouseMove(event: MouseEvent) {
 
     // Update horizontal scroll
     const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - channelListWidth;
+    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
     const maxScrollX = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
 
     if (maxScrollX > 0) {
@@ -1041,8 +873,8 @@ function handleGlobalMouseMove(event: MouseEvent) {
 
     // Update vertical scroll
     const canvasHeight = app.value.screen.height;
-    const availableHeight = canvasHeight - addChannelButtonHeight;
-    const totalContentHeight = channels.value.length * rowHeight;
+    const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+    const totalContentHeight = channels.value.length * ROW_HEIGHT;
     const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
 
     if (maxScrollY > 0) {
@@ -1051,47 +883,84 @@ function handleGlobalMouseMove(event: MouseEvent) {
       verticalScrollOffset.value = newWorldY / maxScrollY;
 
       // Update vertical thumb position
-      if (verticalScrollThumb.value) {
-        const scrollbarHeight = canvasHeight - addChannelButtonHeight;
-        const thumbPositionInScrollbar = verticalScrollOffset.value * (scrollbarHeight - verticalScrollThumbHeight.value);
-        const newThumbY = addChannelButtonHeight + thumbPositionInScrollbar;
 
-        verticalScrollThumb.value.clear()
-          .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
-          .fill(0x888888);
-        verticalScrollThumb.value.x = canvasWidth - verticalScrollBarWidth;
-        verticalScrollThumb.value.y = newThumbY;
+      if (app.value && verticalScrollBar.value) {
+        const rect = pixiContainer.value.getBoundingClientRect();
+        const canvasY = event.clientY - rect.top;
+        verticalScrollBar.value?.drag(canvasY);
       }
+      
+            if (verticalScrollThumb.value) {
+              const scrollbarHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+              const thumbPositionInScrollbar =
+                verticalScrollOffset.value * (scrollbarHeight - verticalScrollThumbHeight.value);
+              const newThumbY = ADD_CHANNEL_BUTTON_HEIGHT + thumbPositionInScrollbar;
+      
+              verticalScrollThumb.value
+                .clear()
+                .rect(0, 0, VERTICAL_SCROLL_BAR_WIDTH, verticalScrollThumbHeight.value)
+                .fill(0x888888);
+              verticalScrollThumb.value.x = canvasWidth - VERTICAL_SCROLL_BAR_WIDTH;
+              verticalScrollThumb.value.y = newThumbY;
+            }
+              
     }
   }
+*/
 
-  if (isDraggingThumb.value && scrollThumb.value && app.value && pixiContainer.value) {
+  if (app.value && scrollBar.value && pixiContainer.value) {
+    const rect = pixiContainer.value.getBoundingClientRect();
+    const canvasX = event.clientX - rect.left;
+    scrollOffset.value = scrollBar.value?.drag(canvasX);
+  }
+  /*if (isDraggingThumb.value && scrollThumb.value && app.value && pixiContainer.value) {
     const rect = pixiContainer.value.getBoundingClientRect();
     const canvasX = event.clientX - rect.left;
     const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - channelListWidth;
-    const localX = canvasX - channelListWidth;
-    const newX = Math.max(channelListWidth, Math.min(canvasX, channelListWidth + scrollbarWidth - scrollThumbWidth.value));
+    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
+    const localX = canvasX - CHANNEL_LIST_WIDTH;
+    const newX = Math.max(
+      CHANNEL_LIST_WIDTH,
+      Math.min(canvasX, CHANNEL_LIST_WIDTH + scrollbarWidth - scrollThumbWidth.value),
+    );
     scrollThumb.value.x = newX;
 
     // Calculate scroll offset
     const scrollPercentage = localX / (scrollbarWidth - scrollThumbWidth.value);
     scrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
   }
-
-  if (isDraggingVerticalThumb.value && verticalScrollThumb.value && app.value && pixiContainer.value) {
+*/
+  if (app.value && verticalScrollBar.value && pixiContainer.value) {
     const rect = pixiContainer.value.getBoundingClientRect();
     const canvasY = event.clientY - rect.top;
-    const canvasHeight = app.value.screen.height;
-    const scrollbarHeight = canvasHeight - addChannelButtonHeight;
-    const newY = Math.max(addChannelButtonHeight, Math.min(canvasY, addChannelButtonHeight + scrollbarHeight - verticalScrollThumbHeight.value));
-    verticalScrollThumb.value.y = newY;
-
-    // Calculate scroll offset based on thumb position within scrollbar
-    const thumbPositionInScrollbar = newY - addChannelButtonHeight;
-    const scrollPercentage = thumbPositionInScrollbar / (scrollbarHeight - verticalScrollThumbHeight.value);
-    verticalScrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
+    verticalScrollOffset.value = verticalScrollBar.value?.drag(canvasY);
   }
+  /*
+if (
+isDraggingVerticalThumb.value &&
+verticalScrollThumb.value &&
+app.value &&
+pixiContainer.value
+) {
+const rect = pixiContainer.value.getBoundingClientRect();
+const canvasY = event.clientY - rect.top;
+const canvasHeight = app.value.screen.height;
+const scrollbarHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+const newY = Math.max(
+  ADD_CHANNEL_BUTTON_HEIGHT,
+  Math.min(
+    canvasY,
+    ADD_CHANNEL_BUTTON_HEIGHT + scrollbarHeight - verticalScrollThumbHeight.value,
+  ),
+);
+verticalScrollThumb.value.y = newY;
+
+// Calculate scroll offset based on thumb position within scrollbar
+const thumbPositionInScrollbar = newY - ADD_CHANNEL_BUTTON_HEIGHT;
+const scrollPercentage =
+  thumbPositionInScrollbar / (scrollbarHeight - verticalScrollThumbHeight.value);
+verticalScrollOffset.value = Math.max(0, Math.min(scrollPercentage, 1));
+}*/
 }
 
 function handleGlobalMouseUp() {
@@ -1099,41 +968,49 @@ function handleGlobalMouseUp() {
     isDraggingTimeline.value = false;
   }
 
-  if (isDraggingThumb.value) {
+  scrollBar.value?.endDrag();
+  /*if (isDraggingThumb.value) {
     isDraggingThumb.value = false;
     if (scrollThumb.value) {
       const currentX = scrollThumb.value.x;
       const currentY = scrollThumb.value.y;
-      scrollThumb.value.clear()
-        .rect(0, 0, scrollThumbWidth.value, scrollBarHeight)
+      scrollThumb.value
+        .clear()
+        .rect(0, 0, scrollThumbWidth.value, SCROLL_BAR_HEIGHT)
         .fill(0x888888);
       scrollThumb.value.x = currentX;
       scrollThumb.value.y = currentY;
     }
   }
-
-  if (isDraggingVerticalThumb.value) {
-    isDraggingVerticalThumb.value = false;
-    if (verticalScrollThumb.value) {
-      const currentX = verticalScrollThumb.value.x;
-      const currentY = verticalScrollThumb.value.y;
-      verticalScrollThumb.value.clear()
-        .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
-        .fill(0x888888);
-      verticalScrollThumb.value.x = currentX;
-      verticalScrollThumb.value.y = currentY;
+*/
+  verticalScrollBar.value?.endDrag();
+  /*
+    if (isDraggingVerticalThumb.value) {
+      isDraggingVerticalThumb.value = false;
+      if (verticalScrollThumb.value) {
+        const currentX = verticalScrollThumb.value.x;
+        const currentY = verticalScrollThumb.value.y;
+        verticalScrollThumb.value
+          .clear()
+          .rect(0, 0, VERTICAL_SCROLL_BAR_WIDTH, verticalScrollThumbHeight.value)
+          .fill(0x888888);
+        verticalScrollThumb.value.x = currentX;
+        verticalScrollThumb.value.y = currentY;
+      }
     }
-  }
+      */
 }
 
 function handleWheel(event: WheelEvent) {
   event.preventDefault();
 
   // Check if mouse is over timeline specifically (right of channel list, in the timeline height area)
-  const isOverTimeline = !event.ctrlKey && pixiContainer.value
-    && event.offsetX >= channelListWidth
-    && event.offsetY >= scrollBarHeight
-    && event.offsetY < addChannelButtonHeight;
+  const isOverTimeline =
+    !event.ctrlKey &&
+    pixiContainer.value &&
+    event.offsetX >= CHANNEL_LIST_WIDTH &&
+    event.offsetY >= SCROLL_BAR_HEIGHT &&
+    event.offsetY < ADD_CHANNEL_BUTTON_HEIGHT;
 
   // Check if Ctrl key is held OR mouse is over timeline - if so, zoom instead of scroll
   if (event.ctrlKey || isOverTimeline) {
@@ -1157,11 +1034,11 @@ function handleWheel(event: WheelEvent) {
     return;
   }
 
-  if (!app.value || !verticalScrollThumb.value) return;
+  if (!app.value || !verticalScrollBar.value) return;
 
   const canvasHeight = app.value.screen.height;
-  const availableHeight = canvasHeight - addChannelButtonHeight;
-  const totalContentHeight = channels.value.length * rowHeight;
+  const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+  const totalContentHeight = channels.value.length * ROW_HEIGHT;
   const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
 
   // Only scroll if there's content to scroll
@@ -1175,68 +1052,81 @@ function handleWheel(event: WheelEvent) {
   const newWorldY = Math.max(0, Math.min(currentWorldY.value + scrollDelta, maxScrollY));
   currentWorldY.value = newWorldY;
 
+  verticalScrollOffset.value = newWorldY / maxScrollY;
+  verticalScrollBar.value.setDragging(true);
+  verticalScrollBar.value?.drag(verticalScrollOffset.value * (canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT));
+  verticalScrollBar.value.setDragging(false);
+  /*
   // Update scroll offset
   verticalScrollOffset.value = newWorldY / maxScrollY;
 
   // Update thumb position
-  const scrollbarHeight = canvasHeight - addChannelButtonHeight;
-  const thumbPositionInScrollbar = verticalScrollOffset.value * (scrollbarHeight - verticalScrollThumbHeight.value);
-  const newThumbY = addChannelButtonHeight + thumbPositionInScrollbar;
+  const scrollbarHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+  const thumbPositionInScrollbar =
+    verticalScrollOffset.value * (scrollbarHeight - verticalScrollThumbHeight.value);
+  //  const newThumbY = ADD_CHANNEL_BUTTON_HEIGHT + thumbPositionInScrollbar;
 
+
+  verticalScrollBar.value.setDragging(true);
+  verticalScrollOffset.value = verticalScrollBar.value?.drag(thumbPositionInScrollbar);
+  verticalScrollBar.value.setDragging(false);
+  /*
   const currentX = verticalScrollThumb.value.x;
-  verticalScrollThumb.value.clear()
-    .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+  verticalScrollThumb.value
+    .clear()
+    .rect(0, 0, VERTICAL_SCROLL_BAR_WIDTH, verticalScrollThumbHeight.value)
     .fill(0x888888);
   verticalScrollThumb.value.x = currentX;
   verticalScrollThumb.value.y = newThumbY;
+  */
 }
 
-
 function updateScrollbar() {
-  if (!app.value || !scrollBar.value || !scrollThumb.value) return;
+  if (!app.value || !scrollBar.value) return;
 
   const canvasWidth = app.value.screen.width;
-  const scrollbarWidth = canvasWidth - channelListWidth;
+  const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
 
-  // Update scrollbar background to span width minus channel list
-  scrollBar.value.clear()
-    .rect(channelListWidth, 0, scrollbarWidth, scrollBarHeight)
+  scrollBar.value.resize(scrollbarWidth, scrollThumbWidth.value, scrollOffset.value);
+  /*// Update scrollbar background to span width minus channel list
+  scrollBar.value
+    .clear()
+    .rect(CHANNEL_LIST_WIDTH, 0, scrollbarWidth, SCROLL_BAR_HEIGHT)
     .fill(0x333333);
 
   // Keep scroll percentage consistent, but clamp thumb position
   const scrollPercentage = scrollOffset.value;
   const maxThumbX = scrollbarWidth - scrollThumbWidth.value;
-  const newThumbX = Math.max(channelListWidth, Math.min(channelListWidth + (scrollPercentage * maxThumbX), channelListWidth + maxThumbX));
+  const newThumbX = Math.max(
+    CHANNEL_LIST_WIDTH,
+    Math.min(CHANNEL_LIST_WIDTH + scrollPercentage * maxThumbX, CHANNEL_LIST_WIDTH + maxThumbX),
+  );
 
   // Update thumb with current width
   if (scrollThumb.value) {
-    scrollThumb.value.clear()
-      .rect(0, 0, scrollThumbWidth.value, scrollBarHeight)
-      .fill(0x888888);
+    scrollThumb.value.clear().rect(0, 0, scrollThumbWidth.value, SCROLL_BAR_HEIGHT).fill(0x888888);
     scrollThumb.value.x = newThumbX;
     scrollThumb.value.y = 0;
   }
+    */
 }
 
 function handleResize() {
-  if (!app.value || !pixiContainer.value || !scrollBar.value || !scrollThumb.value) return;
+  if (!app.value || !pixiContainer.value || !scrollBar.value) return;
 
   // Force a reflow to get accurate dimensions
   const containerWidth = pixiContainer.value.getBoundingClientRect().width;
   const containerHeight = pixiContainer.value.getBoundingClientRect().height;
 
   // Resize the canvas using getBoundingClientRect for accuracy
-  app.value.renderer.resize(
-    Math.floor(containerWidth) || 800,
-    Math.floor(containerHeight) || 600
-  );
+  app.value.renderer.resize(Math.floor(containerWidth) || 800, Math.floor(containerHeight) || 600);
 
   const newCanvasWidth = app.value.screen.width;
-  const scrollbarWidth = newCanvasWidth - channelListWidth;
+  const scrollbarWidth = newCanvasWidth - CHANNEL_LIST_WIDTH;
 
   // Update the thumb width based on new scrollbar size
   const viewportRatio = scrollbarWidth / TIMELINE_WIDTH.value;
-  const newThumbWidth = Math.max(minScrollThumbWidth, scrollbarWidth * viewportRatio);
+  const newThumbWidth = Math.max(MIN_SCROLL_THUMB_WIDTH, scrollbarWidth * viewportRatio);
 
   scrollThumbWidth.value = newThumbWidth;
 
@@ -1254,10 +1144,10 @@ function handleResize() {
     scrollOffset.value = clampedWorldX / newMaxScroll;
     // Manually update the container position since watch might not trigger if scrollOffset doesn't change
     if (scrollableContentContainer.value) {
-      scrollableContentContainer.value.x = channelListWidth - clampedWorldX;
+      scrollableContentContainer.value.x = CHANNEL_LIST_WIDTH - clampedWorldX;
     }
     if (timeline.value) {
-      timeline.value.x = channelListWidth - clampedWorldX;
+      timeline.value.x = CHANNEL_LIST_WIDTH - clampedWorldX;
     }
   }
 
@@ -1280,8 +1170,8 @@ function updateZoomButtonPositions() {
   const canvasWidth = app.value.screen.width;
   const buttonRadius = 15;
   const buttonSpacing = 8;
-  const rightMargin = verticalScrollBarWidth + 10;
-  const topMargin = scrollBarHeight + 10;
+  const rightMargin = VERTICAL_SCROLL_BAR_WIDTH + 10;
+  const topMargin = SCROLL_BAR_HEIGHT + 10;
 
   plusButton.value.x = canvasWidth - rightMargin - buttonRadius * 4 - buttonSpacing;
   plusButton.value.y = topMargin;
@@ -1291,22 +1181,37 @@ function updateZoomButtonPositions() {
 }
 
 function updateVerticalScrollbar() {
-  if (!app.value || !verticalScrollBar.value || !verticalScrollThumb.value) return;
 
-  const canvasWidth = app.value.screen.width;
+  if (!app.value || !verticalScrollBar.value) return;
+
   const canvasHeight = app.value.screen.height;
-  const scrollbarHeight = canvasHeight - addChannelButtonHeight;
-  const totalContentHeight = channels.value.length * rowHeight;
+  const scrollbarHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+  const totalContentHeight = channels.value.length * ROW_HEIGHT;
   const availableHeight = scrollbarHeight;
-
-  // Update scrollbar background
-  verticalScrollBar.value.clear()
-    .rect(canvasWidth - verticalScrollBarWidth, addChannelButtonHeight, verticalScrollBarWidth, scrollbarHeight)
-    .fill(0x333333);
 
   // Calculate thumb height based on content ratio
   const viewportRatio = availableHeight / totalContentHeight;
-  const newThumbHeight = Math.max(minVerticalScrollThumbHeight, scrollbarHeight * viewportRatio);
+  const newThumbHeight = Math.max(
+    MIN_VERTICAL_SCROLL_THUMB_HEIGHT,
+    scrollbarHeight * viewportRatio,
+  );
+
+  verticalScrollBar.value.resize(scrollbarHeight, newThumbHeight, verticalScrollOffset.value);
+
+  /*
+
+  // Update scrollbar background
+  verticalScrollBar.value
+    .clear()
+    .rect(
+      canvasWidth - VERTICAL_SCROLL_BAR_WIDTH,
+      ADD_CHANNEL_BUTTON_HEIGHT,
+      VERTICAL_SCROLL_BAR_WIDTH,
+      scrollbarHeight,
+    )
+    .fill(0x333333);
+
+  
   verticalScrollThumbHeight.value = newThumbHeight;
 
   // Calculate new scroll offset based on stored world position
@@ -1322,24 +1227,32 @@ function updateVerticalScrollbar() {
 
     // Manually update container positions
     if (scrollableContentContainer.value) {
-      scrollableContentContainer.value.y = addChannelButtonHeight - clampedWorldY;
+      scrollableContentContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - clampedWorldY;
     }
     if (channelListScrollableContainer.value) {
-      channelListScrollableContainer.value.y = addChannelButtonHeight - clampedWorldY;
+      channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - clampedWorldY;
     }
-  }  // Keep scroll percentage consistent, but clamp thumb position
+  } // Keep scroll percentage consistent, but clamp thumb position
   const scrollPercentage = verticalScrollOffset.value;
   const maxThumbY = scrollbarHeight - verticalScrollThumbHeight.value;
-  const newThumbY = Math.max(addChannelButtonHeight, Math.min(addChannelButtonHeight + (scrollPercentage * maxThumbY), addChannelButtonHeight + maxThumbY));
+  const newThumbY = Math.max(
+    ADD_CHANNEL_BUTTON_HEIGHT,
+    Math.min(
+      ADD_CHANNEL_BUTTON_HEIGHT + scrollPercentage * maxThumbY,
+      ADD_CHANNEL_BUTTON_HEIGHT + maxThumbY,
+    ),
+  );
 
   // Update thumb with current height
   if (verticalScrollThumb.value) {
-    verticalScrollThumb.value.clear()
-      .rect(0, 0, verticalScrollBarWidth, verticalScrollThumbHeight.value)
+    verticalScrollThumb.value
+      .clear()
+      .rect(0, 0, VERTICAL_SCROLL_BAR_WIDTH, verticalScrollThumbHeight.value)
       .fill(0x888888);
-    verticalScrollThumb.value.x = canvasWidth - verticalScrollBarWidth;
+    verticalScrollThumb.value.x = canvasWidth - VERTICAL_SCROLL_BAR_WIDTH;
     verticalScrollThumb.value.y = newThumbY;
   }
+    */
 }
 
 function createChannelRowContainer(channelId: number, rowIndex: number) {
@@ -1348,21 +1261,17 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
   // Create a container for this channel row
   const rowContainer = new Container();
   rowContainer.x = 0; // Aligned with timeline
-  rowContainer.y = (rowIndex * rowHeight);
+  rowContainer.y = rowIndex * ROW_HEIGHT;
   rowContainer.eventMode = 'static';
   rowContainer.cursor = 'pointer';
 
   // Draw the row background
   const rowBg = new Graphics();
   const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
-  rowBg
-    .rect(0, 0, TIMELINE_WIDTH.value, rowHeight)
-    .fill(rowColor);
+  rowBg.rect(0, 0, TIMELINE_WIDTH.value, ROW_HEIGHT).fill(rowColor);
 
   // Add border
-  rowBg
-    .rect(0, rowHeight - 1, TIMELINE_WIDTH.value, 1)
-    .fill(0x444444);
+  rowBg.rect(0, ROW_HEIGHT - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
 
   rowContainer.addChild(rowBg);
 
@@ -1386,7 +1295,7 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
     const timeInSeconds = (localPos.x / TIMELINE_WIDTH.value) * TIMELINE_DURATION_SECONDS;
 
     // Create and store the event box
-    addEventBox(rowContainer, channelId, timeInSeconds);
+    addEventBox(rowContainer, channelId, timeInSeconds, app, isDraggingTimeline);
   });
 
   scrollableContentContainer.value.addChild(rowContainer as any);
@@ -1396,74 +1305,6 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
 
   // Update positions of any existing event boxes for this channel
   updateEventBoxPositions(channelId);
-} function addEventBox(rowContainer: Container, channelId: number, timeInSeconds: number) {
-  const boxWidth = 60;
-  const boxHeight = rowHeight - 10;
-  const boxY = 5;
-
-  // Calculate pixel position from time in seconds
-  const pixelPosition = (timeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
-
-  const eventBox = new Graphics();
-  eventBox
-    .rect(0, 0, boxWidth, boxHeight)
-    .fill(0xff0000);
-
-  eventBox
-    .rect(0, 0, boxWidth, boxHeight)
-    .stroke({ width: 2, color: 0xaa0000 });
-
-  // Position the box
-  eventBox.x = pixelPosition;
-  eventBox.y = boxY;
-
-  // Make event box interactive
-  eventBox.eventMode = 'static';
-  eventBox.cursor = 'grab';
-
-  // Store the event data with graphics reference
-  const eventBoxData: EventBox = { channelId, timeInSeconds, graphics: eventBox };
-
-  if (!channelEventBoxes.value.has(channelId)) {
-    channelEventBoxes.value.set(channelId, []);
-  }
-  channelEventBoxes.value.get(channelId)!.push(eventBoxData);
-
-  // Add drag handlers
-  eventBox.on('pointerdown', (event) => {
-    if (isDraggingTimeline.value) return;
-
-    isDraggingEventBox.value = true;
-    draggedEventBox.value = eventBoxData;
-    eventBoxDragStartX.value = event.global.x;
-    eventBoxStartTime.value = eventBoxData.timeInSeconds;
-    hasEventBoxDragged.value = false; // Reset at start
-    eventBox.cursor = 'grabbing';
-    event.stopPropagation();
-  }); rowContainer.addChild(eventBox);
-}
-
-function updateEventBoxPositions(channelId: number) {
-  const events = channelEventBoxes.value.get(channelId) || [];
-
-  // Update positions of all event boxes based on current timeline width
-  events.forEach(event => {
-    const pixelPosition = (event.timeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
-    event.graphics.x = pixelPosition;
-  });
-}
-
-function updateAllEventBoxPositions() {
-  // Skip if positions haven't changed
-  if (!eventBoxPositionsDirty.value) return;
-
-  // Update positions for all channels
-  channelEventBoxes.value.forEach((events, channelId) => {
-    updateEventBoxPositions(channelId);
-  });
-
-  // Clear dirty flag
-  eventBoxPositionsDirty.value = false;
 }
 
 function updateAllRowBackgrounds() {
@@ -1479,8 +1320,8 @@ function updateAllRowBackgrounds() {
       const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
 
       rowBg.clear();
-      rowBg.rect(0, 0, TIMELINE_WIDTH.value, rowHeight).fill(rowColor);
-      rowBg.rect(0, rowHeight - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
+      rowBg.rect(0, 0, TIMELINE_WIDTH.value, ROW_HEIGHT).fill(rowColor);
+      rowBg.rect(0, ROW_HEIGHT - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
     }
   });
 
@@ -1492,7 +1333,7 @@ function addChannel() {
   const newChannel: Channel = {
     id: channels.value.length + 1,
     name: `Channel ${channels.value.length + 1}`,
-    events: []
+    events: [],
   };
   channels.value.push(newChannel);
 
@@ -1505,7 +1346,6 @@ function addChannel() {
   // Recreate the channel list UI
   createChannelList();
 }
-
 </script>
 
 <template>
