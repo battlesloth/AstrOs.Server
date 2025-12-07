@@ -84,9 +84,6 @@ const {
   zoomLevel,
   zoomScrollAccumulator,
   TIMELINE_WIDTH,
-  canZoomIn,
-  canZoomOut,
-  currentZoomConfig,
 } = useZoomState(PIXELS_PER_SECOND, TIMELINE_DURATION_SECONDS);
 
 const {
@@ -96,8 +93,14 @@ const {
   currentWorldY,
 } = useScrollState();
 
-const { isDraggingTimeline, dragStartX, dragStartY, dragStartWorldX, dragStartWorldY, hasDragged } =
-  useDragState();
+const {
+  isDraggingTimeline,
+  dragStartX,
+  dragStartY,
+  dragStartWorldX,
+  dragStartWorldY,
+  hasDragged
+} = useDragState();
 
 const { eventBoxPositionsDirty, rowBackgroundsDirty, lastTimelineWidth } = usePerformanceFlags(
   (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / ZOOM_LEVELS[0]!.scaleMultiplier,
@@ -142,6 +145,11 @@ watch(horizontalScrollOffset, (newOffset) => {
     scrollableContentContainer.value.x = CHANNEL_LIST_WIDTH - worldX;
     timeline.value.x = CHANNEL_LIST_WIDTH - worldX;
     currentWorldX.value = worldX; // Store current world position
+
+    // Update scrollbar thumb position if not currently being dragged
+    if (horizontalScrollBar.value && !horizontalScrollBar.value.isDragging()) {
+      horizontalScrollBar.value.updateThumbFromOffset(newOffset);
+    }
   }
 });
 
@@ -154,12 +162,19 @@ watch(verticalScrollOffset, (newOffset) => {
     const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
     const worldY = maxScrollY > 0 ? newOffset * maxScrollY : 0;
 
-    // Apply vertical scroll only to scrollable content
-    scrollableContentContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
+    const newY = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
+
+    // Apply vertical scroll to scrollable content
+    scrollableContentContainer.value.y = newY;
     currentWorldY.value = worldY;
 
     // Also scroll the channel list scrollable container
-    channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
+    channelListScrollableContainer.value.y = newY;
+
+    // Update scrollbar thumb position if not currently being dragged
+    if (verticalScrollBar.value && !verticalScrollBar.value.isDragging()) {
+      verticalScrollBar.value.updateThumbFromOffset(newOffset);
+    }
   }
 });
 
@@ -557,6 +572,7 @@ function zoom(direction: 'in' | 'out') {
     uiLayer.value.removeChild(timeline.value as any);
     timeline.value = null;
   }
+
   createTimeline();
 
   // Re-add buttons and channel list so they stay on top of timeline
@@ -700,7 +716,7 @@ function handleGlobalMouseMove(event: MouseEvent) {
   const canvasX = event.clientX - rect.left;
   const canvasY = event.clientY - rect.top;
 
-  // Handle timeline dragging
+  // Handle timeline dragging (grab and drag to scroll)
   if (isDraggingTimeline.value) {
     const deltaX = dragStartX.value - canvasX;
     const deltaY = dragStartY.value - canvasY;
@@ -710,43 +726,26 @@ function handleGlobalMouseMove(event: MouseEvent) {
       hasDragged.value = true;
     }
 
-    // Update horizontal scroll via scrollbar
-    if (horizontalScrollBar.value) {
-      const canvasWidth = app.value.screen.width;
-      const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
-      const maxScrollX = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
+    // Calculate horizontal scroll offset
+    const canvasWidth = app.value.screen.width;
+    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
+    const maxScrollX = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
+    if (maxScrollX > 0) {
       const newWorldX = Math.max(0, Math.min(dragStartWorldX.value + deltaX, maxScrollX));
-      currentWorldX.value = newWorldX;
-      const newOffset = maxScrollX > 0 ? newWorldX / maxScrollX : 0;
-
-      // Update scrollbar thumb position
-      horizontalScrollBar.value.setDragging(true);
-      const maxThumbX = scrollbarWidth - horizontalScrollBar.value.thumbSize;
-      const thumbX = CHANNEL_LIST_WIDTH + newOffset * maxThumbX;
-      horizontalScrollOffset.value = horizontalScrollBar.value.drag(thumbX);
-      horizontalScrollBar.value.endDrag();
+      horizontalScrollOffset.value = newWorldX / maxScrollX;
     }
 
-    // Update vertical scroll via scrollbar
-    if (verticalScrollBar.value) {
-      const canvasHeight = app.value.screen.height;
-      const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
-      const totalContentHeight = channels.value.length * ROW_HEIGHT;
-      const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
+    // Calculate vertical scroll offset
+    const canvasHeight = app.value.screen.height;
+    const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+    const totalContentHeight = channels.value.length * ROW_HEIGHT;
+    const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
+    if (maxScrollY > 0) {
       const newWorldY = Math.max(0, Math.min(dragStartWorldY.value + deltaY, maxScrollY));
-      currentWorldY.value = newWorldY;
-      const newOffset = maxScrollY > 0 ? newWorldY / maxScrollY : 0;
-
-      // Update scrollbar thumb position
-      verticalScrollBar.value.setDragging(true);
-      const maxThumbY = availableHeight - verticalScrollBar.value.thumbSize;
-      const thumbY = ADD_CHANNEL_BUTTON_HEIGHT + newOffset * maxThumbY;
-      verticalScrollOffset.value = verticalScrollBar.value.drag(thumbY);
-      verticalScrollBar.value.endDrag();
+      verticalScrollOffset.value = newWorldY / maxScrollY;
     }
   }
 
-  // Handle scrollbar thumb dragging
   if (horizontalScrollBar.value?.isDragging()) {
     horizontalScrollOffset.value = horizontalScrollBar.value.drag(canvasX);
   }
@@ -759,6 +758,10 @@ function handleGlobalMouseMove(event: MouseEvent) {
 function handleGlobalMouseUp() {
   if (isDraggingTimeline.value) {
     isDraggingTimeline.value = false;
+    // Reset the drag flag after a short delay to allow pointertap to check it first
+    setTimeout(() => {
+      hasDragged.value = false;
+    }, 50);
   }
 
   horizontalScrollBar.value?.endDrag();
@@ -769,7 +772,7 @@ function handleGlobalMouseUp() {
 function handleWheel(event: WheelEvent) {
   event.preventDefault();
 
-  // Check if mouse is over timeline specifically (right of channel list, in the timeline height area)
+  // Check if mouse is over timeline specifically 
   const isOverTimeline =
     !event.ctrlKey &&
     pixiContainer.value &&
@@ -777,7 +780,7 @@ function handleWheel(event: WheelEvent) {
     event.offsetY >= SCROLL_BAR_HEIGHT &&
     event.offsetY < ADD_CHANNEL_BUTTON_HEIGHT;
 
-  // Check if Ctrl key is held OR mouse is over timeline - if so, zoom instead of scroll
+  // Check if Ctrl key is held OR mouse is over timeline
   if (event.ctrlKey || isOverTimeline) {
     // Accumulate scroll delta
     if (event.deltaY < 0) {
@@ -788,11 +791,9 @@ function handleWheel(event: WheelEvent) {
 
     // Check if we've accumulated required scroll events
     if (zoomScrollAccumulator.value <= -ZOOM_SCROLL_TICKS_REQUIRED) {
-      // Scroll up = zoom in
       zoom('in');
       zoomScrollAccumulator.value = 0;
     } else if (zoomScrollAccumulator.value >= ZOOM_SCROLL_TICKS_REQUIRED) {
-      // Scroll down = zoom out
       zoom('out');
       zoomScrollAccumulator.value = 0;
     }
@@ -838,12 +839,6 @@ function handleResize() {
   const newCanvasWidth = app.value.screen.width;
   const scrollbarWidth = newCanvasWidth - CHANNEL_LIST_WIDTH;
 
-  // Update the thumb width based on new scrollbar size
-  //const viewportRatio = scrollbarWidth / TIMELINE_WIDTH.value;
-  //const newThumbWidth = Math.max(MIN_SCROLL_THUMB_WIDTH, scrollbarWidth * viewportRatio);
-
-  //horizontalScrollThumbWidth.value = newThumbWidth;
-
   // Calculate new scroll offset based on the stored world position
   const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
 
@@ -862,6 +857,30 @@ function handleResize() {
     }
     if (timeline.value) {
       timeline.value.x = CHANNEL_LIST_WIDTH - clampedWorldX;
+    }
+  }
+
+  // Handle vertical scroll clamping on resize
+  const canvasHeight = app.value.screen.height;
+  const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+  const totalContentHeight = channels.value.length * ROW_HEIGHT;
+  const newMaxScrollY = Math.max(0, totalContentHeight - availableHeight);
+
+  // If the viewport is now larger than or equal to the content, reset to top
+  if (newMaxScrollY <= 0) {
+    verticalScrollOffset.value = 0;
+    currentWorldY.value = 0;
+  } else {
+    // Clamp the world position to not exceed the new maximum scroll
+    const clampedWorldY = Math.min(currentWorldY.value, newMaxScrollY);
+    currentWorldY.value = clampedWorldY;
+    verticalScrollOffset.value = clampedWorldY / newMaxScrollY;
+    // Manually update the container position since watch might not trigger if scrollOffset doesn't change
+    if (scrollableContentContainer.value) {
+      scrollableContentContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - clampedWorldY;
+    }
+    if (channelListScrollableContainer.value) {
+      channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - clampedWorldY;
     }
   }
 

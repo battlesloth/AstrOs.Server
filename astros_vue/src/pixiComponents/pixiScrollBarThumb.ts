@@ -5,6 +5,8 @@ export class PixiScrollBarThumb extends Graphics {
     private thumbWidth: number;
     private thumbHeight: number;
     private dragging: boolean = false;
+    private dragOffsetX: number = 0;
+    private dragOffsetY: number = 0;
     private onDragStart: () => void;
     private thumbFillColor: number;
     private thumbFocusColor: number;
@@ -56,8 +58,11 @@ export class PixiScrollBarThumb extends Graphics {
             this.y = currentY;
         });
 
-        this.on('pointerdown', () => {
+        this.on('pointerdown', (event) => {
             this.dragging = true;
+            const localPos = this.toLocal(event.global);
+            this.dragOffsetX = localPos.x;
+            this.dragOffsetY = localPos.y;
             this.onDragStart();
         });
     }
@@ -80,6 +85,14 @@ export class PixiScrollBarThumb extends Graphics {
         this.y = newYOffset;
     }
 
+    setPositionY(newY: number) {
+        this.y = newY;
+    }
+
+    setPositionX(newX: number) {
+        this.x = newX;
+    }
+
     setDragging(isDragging: boolean) {
         this.dragging = isDragging;
     }
@@ -98,6 +111,14 @@ export class PixiScrollBarThumb extends Graphics {
         if (this.dragging) {
             this.x = newX;
         }
+    }
+
+    getDragOffsetX(): number {
+        return this.dragOffsetX;
+    }
+
+    getDragOffsetY(): number {
+        return this.dragOffsetY;
     }
 
     endDrag() {

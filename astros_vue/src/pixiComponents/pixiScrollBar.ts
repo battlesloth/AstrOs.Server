@@ -105,32 +105,56 @@ export class PixiScrollBar extends Container {
         if (!this.scrollThumb?.isDragging()) return 0;
 
         if (this.direction === ScrollBarDirection.VERTICAL) {
-
+            // Adjust for the drag offset to maintain click position within thumb
+            const dragOffset = this.scrollThumb.getDragOffsetY();
+            const adjustedPos = eventPos - dragOffset;
+            
             const newY = Math.max(
                 this.yOffset,
-                Math.min(eventPos, this.yOffset + this.barHeight - this.thumbSize),
+                Math.min(adjustedPos, this.yOffset + this.barHeight - this.thumbSize),
             );
             this.scrollThumb?.dragY(newY);
 
-            const localY = eventPos - this.yOffset;
+            const localY = newY - this.yOffset;
             return this.scrollToPercentage(localY, this.barHeight);
         }
         else {
-
+            // Adjust for the drag offset to maintain click position within thumb
+            const dragOffset = this.scrollThumb.getDragOffsetX();
+            const adjustedPos = eventPos - dragOffset;
+            
             const newX = Math.max(
                 this.xOffset,
-                Math.min(eventPos, this.xOffset + this.barWidth - this.thumbSize),
+                Math.min(adjustedPos, this.xOffset + this.barWidth - this.thumbSize),
             );
 
             this.scrollThumb?.dragX(newX);
 
-            const localX = eventPos - this.xOffset;
+            const localX = newX - this.xOffset;
             return this.scrollToPercentage(localX, this.barWidth);
         }
     }
 
     public endDrag() {
         this.scrollThumb?.endDrag();
+    }
+
+    public updateThumbFromOffset(scrollOffset: number) {
+        if (this.direction === ScrollBarDirection.VERTICAL) {
+            const maxThumbY = this.barHeight - this.thumbSize;
+            const newThumbY = Math.max(
+                this.yOffset,
+                Math.min(this.yOffset + scrollOffset * maxThumbY, this.yOffset + maxThumbY),
+            );
+            this.scrollThumb?.setPositionY(newThumbY);
+        } else {
+            const maxThumbX = this.barWidth - this.thumbSize;
+            const newThumbX = Math.max(
+                this.xOffset,
+                Math.min(this.xOffset + scrollOffset * maxThumbX, this.xOffset + maxThumbX),
+            );
+            this.scrollThumb?.setPositionX(newThumbX);
+        }
     }
 
     private scrollToPercentage(localVal: number, barSize: number): number {
