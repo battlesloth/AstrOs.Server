@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AstrosLayout from '@/components/layout/AstrosLayout.vue';
 import { Application, Container, Graphics, HTMLText } from 'pixi.js';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 // Import composables
 import { useZoomState, ZOOM_LEVELS } from '@/composables/useZoomState';
@@ -14,6 +14,14 @@ import type { Channel } from '@/composables/types';
 
 // Import utilities
 import { createCircularButton, drawPlusIcon, drawMinusIcon } from '@/pixiComponents/pixiButtons';
+import {
+  calculateMaxScroll,
+  calculateScrollOffset,
+  calculateWorldPosition,
+  clampWorldPosition,
+  calculateViewportRatio,
+  calculateThumbSize,
+} from '@/utils/scrollCalculations';
 import {
   drawTimelineBackground,
   drawTimelineTicks,
@@ -29,7 +37,6 @@ import { ScrollBarDirection } from '@/pixiComponents/pixiScrollBarOptions';
 const app = ref<Application | null>(null);
 const pixiContainer = ref<HTMLDivElement | null>(null);
 const channels = ref<Channel[]>([]);
-const lastChannelClicked = ref<string>('None');
 
 // ============================================================================
 // CONSTANTS (imported from composables)
@@ -91,6 +98,11 @@ const {
   currentWorldX,
   verticalScrollOffset,
   currentWorldY,
+  updateHorizontalScrollByDelta,
+  updateVerticalScrollByDelta,
+  clampHorizontalScroll,
+  clampVerticalScroll,
+  updateVerticalScrollByWheel,
 } = useScrollState();
 
 const {
@@ -139,12 +151,12 @@ watch(horizontalScrollOffset, (newOffset) => {
   if (scrollableContentContainer.value && timeline.value && app.value) {
     const canvasWidth = app.value.screen.width;
     const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
-    const maxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
-    const worldX = maxScroll > 0 ? newOffset * maxScroll : 0;
-    // Apply horizontal scroll to scrollable content and timeline
-    scrollableContentContainer.value.x = CHANNEL_LIST_WIDTH - worldX;
-    timeline.value.x = CHANNEL_LIST_WIDTH - worldX;
+    const maxScroll = calculateMaxScroll(TIMELINE_WIDTH.value, scrollbarWidth);
+    const worldX = calculateWorldPosition(newOffset, maxScroll);
     currentWorldX.value = worldX; // Store current world position
+
+    // Apply horizontal scroll to scrollable content and timeline
+    updateContainerPositions(worldX, currentWorldY.value);
 
     // Update scrollbar thumb position if not currently being dragged
     if (horizontalScrollBar.value && !horizontalScrollBar.value.isDragging()) {
@@ -159,17 +171,12 @@ watch(verticalScrollOffset, (newOffset) => {
     const canvasHeight = app.value.screen.height;
     const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
     const totalContentHeight = channels.value.length * ROW_HEIGHT;
-    const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
-    const worldY = maxScrollY > 0 ? newOffset * maxScrollY : 0;
-
-    const newY = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
-
-    // Apply vertical scroll to scrollable content
-    scrollableContentContainer.value.y = newY;
+    const maxScrollY = calculateMaxScroll(totalContentHeight, availableHeight);
+    const worldY = calculateWorldPosition(newOffset, maxScrollY);
     currentWorldY.value = worldY;
 
-    // Also scroll the channel list scrollable container
-    channelListScrollableContainer.value.y = newY;
+    // Apply vertical scroll to scrollable content
+    updateContainerPositions(currentWorldX.value, worldY);
 
     // Update scrollbar thumb position if not currently being dragged
     if (verticalScrollBar.value && !verticalScrollBar.value.isDragging()) {
@@ -178,11 +185,9 @@ watch(verticalScrollOffset, (newOffset) => {
   }
 });
 
-/*const containerHeight = computed(() => {
-  const spriteCount = channels.value.length;
-  return TIMELINE_HEIGHT + spriteCount * ROW_HEIGHT;
-});
-*/
+// ============================================================================
+// Mounted / Unmounted
+// ============================================================================
 
 onMounted(async () => {
   if (!pixiContainer.value) return;
@@ -312,12 +317,49 @@ onUnmounted(() => {
   channelRowContainers.value.clear();
 });
 
+function addAppStageListeners() {
+  if (app?.value?.stage) {
+    app.value.stage.on('pointerup', () => {
+      horizontalScrollBar.value?.endDrag();
+      verticalScrollBar.value?.endDrag();
+      // Handle event box drag end
+      endEventBoxDrag();
+    });
+
+    app.value.stage.on('pointermove', (event) => {
+
+      if (horizontalScrollBar?.value?.isDragging()) {
+        horizontalScrollOffset.value = horizontalScrollBar.value.drag(event.global.x);
+      }
+
+      if (verticalScrollBar?.value?.isDragging()) {
+        verticalScrollOffset.value = verticalScrollBar.value.drag(event.global.y);
+      }
+
+      // Handle event box dragging
+      handleEventBoxDrag(event.global.x);
+    });
+
+    // Global pointer up to catch mouse release anywhere
+    app.value.stage.on('pointerupoutside', () => {
+      horizontalScrollBar.value?.endDrag();
+      verticalScrollBar.value?.endDrag();
+      // Handle event box drag end outside
+      endEventBoxDrag();
+    });
+  }
+}
+
+// ============================================================================
+// Create UI Components
+// ============================================================================
+
 function createHorizontalScrollbar() {
   if (!app.value || !uiLayer.value) return;
 
   const barWidth = app.value.screen.width - CHANNEL_LIST_WIDTH;
-  const viewportRatio = barWidth / TIMELINE_WIDTH.value;
-  const thumbSize = Math.max(MIN_SCROLL_THUMB_WIDTH, barWidth * viewportRatio);
+  const viewportRatio = calculateViewportRatio(barWidth, TIMELINE_WIDTH.value);
+  const thumbSize = calculateThumbSize(barWidth, viewportRatio, MIN_SCROLL_THUMB_WIDTH);
 
   const options = {
     barWidth,
@@ -365,39 +407,6 @@ function createVerticalScrollbar() {
   uiLayer.value.addChild(verticalScrollBar.value as any);
 }
 
-function addAppStageListeners() {
-  if (app?.value?.stage) {
-    app.value.stage.on('pointerup', () => {
-      horizontalScrollBar.value?.endDrag();
-      verticalScrollBar.value?.endDrag();
-      // Handle event box drag end
-      endEventBoxDrag();
-    });
-
-    app.value.stage.on('pointermove', (event) => {
-
-      if (horizontalScrollBar?.value?.isDragging()) {
-        horizontalScrollOffset.value = horizontalScrollBar.value.drag(event.global.x);
-      }
-
-      if (verticalScrollBar?.value?.isDragging()) {
-        verticalScrollOffset.value = verticalScrollBar.value.drag(event.global.y);
-      }
-
-      // Handle event box dragging
-      handleEventBoxDrag(event.global.x);
-    });
-
-    // Global pointer up to catch mouse release anywhere
-    app.value.stage.on('pointerupoutside', () => {
-      horizontalScrollBar.value?.endDrag();
-      verticalScrollBar.value?.endDrag();
-      // Handle event box drag end outside
-      endEventBoxDrag();
-    });
-  }
-}
-
 function createTimeline() {
   if (!app.value || !uiLayer.value) return;
 
@@ -442,172 +451,27 @@ function createZoomButtons() {
   if (!app.value || !uiLayer.value) return;
 
   const canvasWidth = app.value.screen.width;
-  const buttonRadius = 15;
-  const buttonSpacing = 8;
-  const rightMargin = VERTICAL_SCROLL_BAR_WIDTH + 10;
-  const topMargin = SCROLL_BAR_HEIGHT + 10;
+  const positions = getZoomButtonPositions(canvasWidth);
 
   // Create buttons (minus on left, plus on right)
   minusButton.value = createCircularButton(
-    canvasWidth - rightMargin - buttonRadius * 4 - buttonSpacing,
-    topMargin,
-    buttonRadius,
+    positions.plus.x,
+    positions.plus.y,
+    positions.radius,
     drawMinusIcon,
     () => zoom('out'),
   );
 
   plusButton.value = createCircularButton(
-    canvasWidth - rightMargin - buttonRadius * 2,
-    topMargin,
-    buttonRadius,
+    positions.minus.x,
+    positions.minus.y,
+    positions.radius,
     drawPlusIcon,
     () => zoom('in'),
   );
 
   uiLayer.value.addChild(plusButton.value as any);
   uiLayer.value.addChild(minusButton.value as any);
-}
-
-function zoom(direction: 'in' | 'out') {
-  // Check bounds
-  if (direction === 'out' && zoomLevel.value >= ZOOM_LEVELS.length - 1) return;
-  if (direction === 'in' && zoomLevel.value <= 0) return;
-
-  // Update zoom level
-  zoomLevel.value = direction === 'out' ? zoomLevel.value + 1 : zoomLevel.value - 1;
-
-  // Get scale multiplier from configuration
-  const scaleMultiplier = ZOOM_LEVELS[zoomLevel.value]!.scaleMultiplier;
-
-  // Update timeline width based on scale
-  const oldTimelineWidth = TIMELINE_WIDTH.value;
-  TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
-
-  // Mark event positions as dirty since timeline width changed
-  if (oldTimelineWidth !== TIMELINE_WIDTH.value) {
-    eventBoxPositionsDirty.value = true;
-    rowBackgroundsDirty.value = true;
-    lastTimelineWidth.value = TIMELINE_WIDTH.value;
-  }
-
-  // Calculate the focus point before zoom based on scroll position
-  if (app.value) {
-    const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
-
-    // Calculate the old max scroll to determine position in timeline
-    const oldMaxScroll = Math.max(0, oldTimelineWidth - scrollbarWidth);
-
-    // Determine the focus point based on current scroll position
-    let focusPointX: number;
-
-    if (oldMaxScroll === 0) {
-      // Timeline fits entirely in viewport, use center
-      focusPointX = scrollbarWidth / 2;
-    } else {
-      // Calculate how far through the timeline we are (0 = start, 1 = end)
-      const scrollProgress = currentWorldX.value / oldMaxScroll;
-
-      // If at the end (>95%), keep the end visible
-      if (scrollProgress > ZOOM_SNAP_THRESHOLD_END) {
-        // Focus on a point near the right edge of viewport
-        focusPointX = scrollbarWidth * ZOOM_FOCUS_EDGE_WEIGHT;
-      }
-      // If at the beginning (<5%), keep the beginning visible
-      else if (scrollProgress < ZOOM_SNAP_THRESHOLD_START) {
-        // Focus on a point near the left edge of viewport
-        focusPointX = scrollbarWidth * ZOOM_FOCUS_START_WEIGHT;
-      }
-      // Otherwise, use a weighted focus point
-      else {
-        // Blend between center and edges based on scroll progress
-        // scrollProgress 0.5 (middle) -> use center
-        // scrollProgress > 0.5 (toward end) -> bias right
-        // scrollProgress < 0.5 (toward start) -> bias left
-        const centerWeight = 1 - Math.abs(scrollProgress - 0.5) * 2; // 1 at middle, 0 at edges
-        const edgeBias =
-          scrollProgress > 0.5
-            ? (scrollProgress - 0.5) * 2 // 0 to 1 as we move toward end
-            : -(0.5 - scrollProgress) * 2; // -1 to 0 as we move toward start
-
-        focusPointX =
-          scrollbarWidth * (0.5 + edgeBias * ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER * (1 - centerWeight));
-      }
-    }
-
-    // Calculate the time at the focus point
-    const focusTimeInSeconds =
-      ((currentWorldX.value + focusPointX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
-
-    // Calculate where that time should be in the new timeline
-    const newFocusPositionX =
-      (focusTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
-
-    // Calculate new scroll position to keep the focus time at the focus point
-    const newWorldX = newFocusPositionX - focusPointX;
-    const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
-
-    if (newMaxScroll > 0) {
-      // If we were at the beginning before (<5%), snap to the beginning after zoom
-      if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll < ZOOM_SNAP_THRESHOLD_START) {
-        currentWorldX.value = 0;
-        horizontalScrollOffset.value = 0;
-      }
-      // If we were at the end before (>95%), snap to the end after zoom
-      else if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll > ZOOM_SNAP_THRESHOLD_END) {
-        currentWorldX.value = newMaxScroll;
-        horizontalScrollOffset.value = 1;
-      } else {
-        currentWorldX.value = Math.max(0, Math.min(newWorldX, newMaxScroll));
-        horizontalScrollOffset.value = currentWorldX.value / newMaxScroll;
-      }
-    } else {
-      currentWorldX.value = 0;
-      horizontalScrollOffset.value = 0;
-    }
-  }
-
-  // Recreate timeline with new scale
-  if (timeline.value && uiLayer.value) {
-    uiLayer.value.removeChild(timeline.value as any);
-    timeline.value = null;
-  }
-
-  createTimeline();
-
-  // Re-add buttons and channel list so they stay on top of timeline
-  if (plusButton.value && minusButton.value && uiLayer.value) {
-    uiLayer.value.removeChild(plusButton.value as any);
-    uiLayer.value.removeChild(minusButton.value as any);
-    uiLayer.value.addChild(plusButton.value as any);
-    uiLayer.value.addChild(minusButton.value as any);
-  }
-
-  // Re-add channel list container so it stays on top
-  if (channelListContainer.value && uiLayer.value) {
-    uiLayer.value.removeChild(channelListContainer.value as any);
-    uiLayer.value.addChild(channelListContainer.value as any);
-  }
-
-  // Update scrollbar to match new timeline width
-  updateHorizontalScrollbar();
-
-  // Update the timeline and scrollable content positions based on new scroll values
-  if (scrollableContentContainer.value && timeline.value && app.value) {
-    const canvasWidth = app.value.screen.width;
-    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
-    const maxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
-    const worldX = maxScroll > 0 ? horizontalScrollOffset.value * maxScroll : 0;
-    scrollableContentContainer.value.x = CHANNEL_LIST_WIDTH - worldX;
-    timeline.value.x = CHANNEL_LIST_WIDTH - worldX;
-    currentWorldX.value = worldX;
-  }
-
-  // Update all event box positions based on new timeline width
-  updateAllEventBoxPositions();
-
-  // Update all row backgrounds based on new timeline width
-  updateAllRowBackgrounds();
 }
 
 function createChannelList() {
@@ -709,6 +573,355 @@ function createChannelList() {
   });
 }
 
+function createChannelRowContainer(channelId: number, rowIndex: number) {
+  if (!scrollableContentContainer.value || !app.value) return;
+
+  // Create a container for this channel row
+  const rowContainer = new Container();
+  rowContainer.x = 0; // Aligned with timeline
+  rowContainer.y = rowIndex * ROW_HEIGHT;
+  rowContainer.eventMode = 'static';
+  rowContainer.cursor = 'pointer';
+
+  // Draw the row background
+  const rowBg = new Graphics();
+  const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
+  rowBg.rect(0, 0, TIMELINE_WIDTH.value, ROW_HEIGHT).fill(rowColor);
+
+  // Add border
+  rowBg.rect(0, ROW_HEIGHT - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
+
+  rowContainer.addChild(rowBg);
+
+  // Add click handler to create red box at click position
+  rowContainer.on('pointertap', (event) => {
+    // Only create box with left mouse button
+    if (event.button !== 0) return;
+
+    // Don't create box if user was dragging timeline or event box
+    if (hasDragged.value || hasEventBoxDragged.value) {
+      hasEventBoxDragged.value = false; // Reset flag
+      return;
+    }
+
+    if (!scrollableContentContainer.value || !app.value) return;
+
+    // Get the local position within the row container
+    const localPos = rowContainer.toLocal(event.global);
+
+    // Calculate the time in seconds based on pixel position
+    const timeInSeconds = (localPos.x / TIMELINE_WIDTH.value) * TIMELINE_DURATION_SECONDS;
+
+    // Create and store the event box
+    addEventBox(rowContainer, channelId, timeInSeconds, app, isDraggingTimeline);
+  });
+
+  scrollableContentContainer.value.addChild(rowContainer as any);
+
+  // Store the container in the map
+  channelRowContainers.value.set(channelId, rowContainer);
+
+  // Update positions of any existing event boxes for this channel
+  updateEventBoxPositions(channelId);
+}
+
+function addChannel() {
+  const newChannel: Channel = {
+    id: channels.value.length + 1,
+    name: `Channel ${channels.value.length + 1}`,
+    events: [],
+  };
+  channels.value.push(newChannel);
+
+  // Create the corresponding row container under the timeline
+  createChannelRowContainer(newChannel.id, channels.value.length - 1);
+
+  // Update vertical scrollbar to account for new content
+  updateVerticalScrollbar();
+
+  // Recreate the channel list UI
+  createChannelList();
+}
+
+// ============================================================================
+// UI Update Functions
+// ============================================================================
+
+function zoom(direction: 'in' | 'out') {
+  // Check bounds
+  if (direction === 'out' && zoomLevel.value >= ZOOM_LEVELS.length - 1) return;
+  if (direction === 'in' && zoomLevel.value <= 0) return;
+
+  // Update zoom level
+  zoomLevel.value = direction === 'out' ? zoomLevel.value + 1 : zoomLevel.value - 1;
+
+  // Get scale multiplier from configuration
+  const scaleMultiplier = ZOOM_LEVELS[zoomLevel.value]!.scaleMultiplier;
+
+  // Update timeline width based on scale
+  const oldTimelineWidth = TIMELINE_WIDTH.value;
+  TIMELINE_WIDTH.value = (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / scaleMultiplier;
+
+  // Mark event positions as dirty since timeline width changed
+  if (oldTimelineWidth !== TIMELINE_WIDTH.value) {
+    eventBoxPositionsDirty.value = true;
+    rowBackgroundsDirty.value = true;
+    lastTimelineWidth.value = TIMELINE_WIDTH.value;
+  }
+
+  // Calculate the focus point before zoom based on scroll position
+  if (app.value) {
+    const canvasWidth = app.value.screen.width;
+    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
+
+    // Calculate the old max scroll to determine position in timeline
+    const oldMaxScroll = calculateMaxScroll(oldTimelineWidth, scrollbarWidth);
+
+    // Determine the focus point based on current scroll position
+    let focusPointX: number;
+
+    if (oldMaxScroll === 0) {
+      // Timeline fits entirely in viewport, use center
+      focusPointX = scrollbarWidth / 2;
+    } else {
+      // Calculate how far through the timeline we are (0 = start, 1 = end)
+      const scrollProgress = currentWorldX.value / oldMaxScroll;
+
+      // If at the end (>95%), keep the end visible
+      if (scrollProgress > ZOOM_SNAP_THRESHOLD_END) {
+        // Focus on a point near the right edge of viewport
+        focusPointX = scrollbarWidth * ZOOM_FOCUS_EDGE_WEIGHT;
+      }
+      // If at the beginning (<5%), keep the beginning visible
+      else if (scrollProgress < ZOOM_SNAP_THRESHOLD_START) {
+        // Focus on a point near the left edge of viewport
+        focusPointX = scrollbarWidth * ZOOM_FOCUS_START_WEIGHT;
+      }
+      // Otherwise, use a weighted focus point
+      else {
+        // Blend between center and edges based on scroll progress
+        // scrollProgress 0.5 (middle) -> use center
+        // scrollProgress > 0.5 (toward end) -> bias right
+        // scrollProgress < 0.5 (toward start) -> bias left
+        const centerWeight = 1 - Math.abs(scrollProgress - 0.5) * 2; // 1 at middle, 0 at edges
+        const edgeBias =
+          scrollProgress > 0.5
+            ? (scrollProgress - 0.5) * 2 // 0 to 1 as we move toward end
+            : -(0.5 - scrollProgress) * 2; // -1 to 0 as we move toward start
+
+        focusPointX =
+          scrollbarWidth * (0.5 + edgeBias * ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER * (1 - centerWeight));
+      }
+    }
+
+    // Calculate the time at the focus point
+    const focusTimeInSeconds =
+      ((currentWorldX.value + focusPointX) / oldTimelineWidth) * TIMELINE_DURATION_SECONDS;
+
+    // Calculate where that time should be in the new timeline
+    const newFocusPositionX =
+      (focusTimeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
+
+    // Calculate new scroll position to keep the focus time at the focus point
+    const newWorldX = newFocusPositionX - focusPointX;
+    const newMaxScroll = calculateMaxScroll(TIMELINE_WIDTH.value, scrollbarWidth);
+
+    if (newMaxScroll > 0) {
+      // If we were at the beginning before (<5%), snap to the beginning after zoom
+      if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll < ZOOM_SNAP_THRESHOLD_START) {
+        currentWorldX.value = 0;
+        horizontalScrollOffset.value = 0;
+      }
+      // If we were at the end before (>95%), snap to the end after zoom
+      else if (oldMaxScroll > 0 && currentWorldX.value / oldMaxScroll > ZOOM_SNAP_THRESHOLD_END) {
+        currentWorldX.value = newMaxScroll;
+        horizontalScrollOffset.value = 1;
+      } else {
+        currentWorldX.value = clampWorldPosition(newWorldX, newMaxScroll);
+        horizontalScrollOffset.value = calculateScrollOffset(currentWorldX.value, newMaxScroll);
+      }
+    } else {
+      currentWorldX.value = 0;
+      horizontalScrollOffset.value = 0;
+    }
+  }
+
+  // Recreate timeline with new scale
+  if (timeline.value && uiLayer.value) {
+    uiLayer.value.removeChild(timeline.value as any);
+    timeline.value = null;
+  }
+
+  createTimeline();
+
+  // Re-add buttons and channel list so they stay on top of timeline
+  if (plusButton.value && minusButton.value && uiLayer.value) {
+    uiLayer.value.removeChild(plusButton.value as any);
+    uiLayer.value.removeChild(minusButton.value as any);
+    uiLayer.value.addChild(plusButton.value as any);
+    uiLayer.value.addChild(minusButton.value as any);
+  }
+
+  // Re-add channel list container so it stays on top
+  if (channelListContainer.value && uiLayer.value) {
+    uiLayer.value.removeChild(channelListContainer.value as any);
+    uiLayer.value.addChild(channelListContainer.value as any);
+  }
+
+  // Update scrollbar to match new timeline width
+  updateHorizontalScrollbar();
+
+  // Update the timeline and scrollable content positions based on new scroll values
+  if (app.value) {
+    const canvasWidth = app.value.screen.width;
+    const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
+    const maxScroll = calculateMaxScroll(TIMELINE_WIDTH.value, scrollbarWidth);
+    const worldX = calculateWorldPosition(horizontalScrollOffset.value, maxScroll);
+    currentWorldX.value = worldX;
+    updateContainerPositions(worldX, currentWorldY.value);
+  }
+
+  // Update all event box positions based on new timeline width
+  updateAllEventBoxPositions();
+
+  // Update all row backgrounds based on new timeline width
+  updateAllRowBackgrounds();
+}
+
+function handleResize() {
+  if (!app.value || !pixiContainer.value || !horizontalScrollBar.value) return;
+
+  // Force a reflow to get accurate dimensions
+  const containerWidth = pixiContainer.value.getBoundingClientRect().width;
+  const containerHeight = pixiContainer.value.getBoundingClientRect().height;
+
+  // Resize the canvas using getBoundingClientRect for accuracy
+  app.value.renderer.resize(Math.floor(containerWidth) || 800, Math.floor(containerHeight) || 600);
+
+  const newCanvasWidth = app.value.screen.width;
+  const scrollbarWidth = newCanvasWidth - CHANNEL_LIST_WIDTH;
+
+  // Calculate new scroll offset based on the stored world position
+  const newMaxScroll = calculateMaxScroll(TIMELINE_WIDTH.value, scrollbarWidth);
+
+  // If the viewport is now larger than or equal to the timeline, reset to start
+  if (newMaxScroll <= 0) {
+    horizontalScrollOffset.value = 0;
+    currentWorldX.value = 0;
+  } else {
+    // Clamp the world position to not exceed the new maximum scroll
+    const clampedWorldX = clampHorizontalScroll({
+      contentSize: TIMELINE_WIDTH.value,
+      viewportSize: scrollbarWidth,
+    });
+    // Manually update the container position since watch might not trigger if scrollOffset doesn't change
+    updateContainerPositions(clampedWorldX, currentWorldY.value);
+  }
+
+  // Handle vertical scroll clamping on resize
+  const canvasHeight = app.value.screen.height;
+  const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+  const totalContentHeight = channels.value.length * ROW_HEIGHT;
+  const newMaxScrollY = calculateMaxScroll(totalContentHeight, availableHeight);
+
+  // If the viewport is now larger than or equal to the content, reset to top
+  if (newMaxScrollY <= 0) {
+    verticalScrollOffset.value = 0;
+    currentWorldY.value = 0;
+  } else {
+    // Clamp the world position to not exceed the new maximum scroll
+    const clampedWorldY = clampVerticalScroll({
+      contentSize: totalContentHeight,
+      viewportSize: availableHeight,
+    });
+    // Manually update the container position since watch might not trigger if scrollOffset doesn't change
+    updateContainerPositions(currentWorldX.value, clampedWorldY);
+  }
+
+  updateHorizontalScrollbar();
+  updateVerticalScrollbar();
+  updateZoomButtonPositions();
+  createChannelList();
+}
+
+function updateHorizontalScrollbar() {
+  if (!app.value || !horizontalScrollBar.value) return;
+
+  const canvasWidth = app.value.screen.width;
+  const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
+
+  const viewportRatio = calculateViewportRatio(scrollbarWidth, TIMELINE_WIDTH.value);
+  const newThumbWidth = calculateThumbSize(scrollbarWidth, viewportRatio, MIN_SCROLL_THUMB_WIDTH);
+
+  horizontalScrollBar.value.resize(
+    scrollbarWidth,
+    newThumbWidth,
+    0,
+    horizontalScrollOffset.value);
+}
+
+function updateVerticalScrollbar() {
+  if (!app.value || !verticalScrollBar.value) return;
+
+  const canvasHeight = app.value.screen.height;
+  const scrollbarHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
+  const totalContentHeight = channels.value.length * ROW_HEIGHT;
+  const availableHeight = scrollbarHeight;
+
+  // Calculate thumb height based on content ratio
+  const viewportRatio = calculateViewportRatio(availableHeight, totalContentHeight);
+  const newThumbHeight = calculateThumbSize(
+    scrollbarHeight,
+    viewportRatio,
+    MIN_VERTICAL_SCROLL_THUMB_HEIGHT,
+  );
+
+  verticalScrollBar.value.resize(
+    scrollbarHeight,
+    newThumbHeight,
+    app.value.screen.width - VERTICAL_SCROLL_BAR_WIDTH,
+    verticalScrollOffset.value);
+}
+
+function updateZoomButtonPositions() {
+  if (!app.value || !plusButton.value || !minusButton.value) return;
+
+  const canvasWidth = app.value.screen.width;
+  const positions = getZoomButtonPositions(canvasWidth);
+
+  plusButton.value.x = positions.plus.x;
+  plusButton.value.y = positions.plus.y;
+
+  minusButton.value.x = positions.minus.x;
+  minusButton.value.y = positions.minus.y;
+}
+
+function updateAllRowBackgrounds() {
+  // Skip if backgrounds haven't changed
+  if (!rowBackgroundsDirty.value) return;
+
+  // Update background width for all channel rows
+  channelRowContainers.value.forEach((rowContainer, channelId) => {
+    // The first child is the background graphics
+    if (rowContainer.children.length > 0) {
+      const rowBg = rowContainer.children[0] as Graphics;
+      const rowIndex = Array.from(channelRowContainers.value.keys()).indexOf(channelId);
+      const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
+
+      rowBg.clear();
+      rowBg.rect(0, 0, TIMELINE_WIDTH.value, ROW_HEIGHT).fill(rowColor);
+      rowBg.rect(0, ROW_HEIGHT - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
+    }
+  });
+
+  // Clear dirty flag
+  rowBackgroundsDirty.value = false;
+}
+
+// ============================================================================
+// Mouse Handlers
+// ============================================================================
+
 function handleGlobalMouseMove(event: MouseEvent) {
   if (!app.value || !pixiContainer.value) return;
 
@@ -729,21 +942,19 @@ function handleGlobalMouseMove(event: MouseEvent) {
     // Calculate horizontal scroll offset
     const canvasWidth = app.value.screen.width;
     const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
-    const maxScrollX = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
-    if (maxScrollX > 0) {
-      const newWorldX = Math.max(0, Math.min(dragStartWorldX.value + deltaX, maxScrollX));
-      horizontalScrollOffset.value = newWorldX / maxScrollX;
-    }
+    updateHorizontalScrollByDelta(deltaX, {
+      contentSize: TIMELINE_WIDTH.value,
+      viewportSize: scrollbarWidth,
+    }, dragStartWorldX.value);
 
     // Calculate vertical scroll offset
     const canvasHeight = app.value.screen.height;
     const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
     const totalContentHeight = channels.value.length * ROW_HEIGHT;
-    const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
-    if (maxScrollY > 0) {
-      const newWorldY = Math.max(0, Math.min(dragStartWorldY.value + deltaY, maxScrollY));
-      verticalScrollOffset.value = newWorldY / maxScrollY;
-    }
+    updateVerticalScrollByDelta(deltaY, {
+      contentSize: totalContentHeight,
+      viewportSize: availableHeight,
+    }, dragStartWorldY.value);
   }
 
   if (horizontalScrollBar.value?.isDragging()) {
@@ -805,236 +1016,59 @@ function handleWheel(event: WheelEvent) {
   const canvasHeight = app.value.screen.height;
   const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
   const totalContentHeight = channels.value.length * ROW_HEIGHT;
-  const maxScrollY = Math.max(0, totalContentHeight - availableHeight);
 
-  // Only scroll if there's content to scroll
-  if (maxScrollY <= 0) return;
+  // Use scroll state manager to handle wheel scrolling
+  const didScroll = updateVerticalScrollByWheel(event.deltaY, {
+    contentSize: totalContentHeight,
+    viewportSize: availableHeight,
+  }, 0.5);
 
-  // Adjust scroll speed (pixels per wheel delta)
-  const scrollSpeed = 0.5;
-  const scrollDelta = event.deltaY * scrollSpeed;
-
-  // Calculate new world Y position
-  const newWorldY = Math.max(0, Math.min(currentWorldY.value + scrollDelta, maxScrollY));
-  currentWorldY.value = newWorldY;
-
-  verticalScrollOffset.value = newWorldY / maxScrollY;
+  if (!didScroll) return;
   verticalScrollBar.value.setDragging(true);
   verticalScrollBar.value?.drag(verticalScrollOffset.value * (canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT));
   verticalScrollBar.value.endDrag();
 }
 
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
-
-function handleResize() {
-  if (!app.value || !pixiContainer.value || !horizontalScrollBar.value) return;
-
-  // Force a reflow to get accurate dimensions
-  const containerWidth = pixiContainer.value.getBoundingClientRect().width;
-  const containerHeight = pixiContainer.value.getBoundingClientRect().height;
-
-  // Resize the canvas using getBoundingClientRect for accuracy
-  app.value.renderer.resize(Math.floor(containerWidth) || 800, Math.floor(containerHeight) || 600);
-
-  const newCanvasWidth = app.value.screen.width;
-  const scrollbarWidth = newCanvasWidth - CHANNEL_LIST_WIDTH;
-
-  // Calculate new scroll offset based on the stored world position
-  const newMaxScroll = Math.max(0, TIMELINE_WIDTH.value - scrollbarWidth);
-
-  // If the viewport is now larger than or equal to the timeline, reset to start
-  if (newMaxScroll <= 0) {
-    horizontalScrollOffset.value = 0;
-    currentWorldX.value = 0;
-  } else {
-    // Clamp the world position to not exceed the new maximum scroll
-    const clampedWorldX = Math.min(currentWorldX.value, newMaxScroll);
-    currentWorldX.value = clampedWorldX; // Update this FIRST
-    horizontalScrollOffset.value = clampedWorldX / newMaxScroll;
-    // Manually update the container position since watch might not trigger if scrollOffset doesn't change
-    if (scrollableContentContainer.value) {
-      scrollableContentContainer.value.x = CHANNEL_LIST_WIDTH - clampedWorldX;
-    }
-    if (timeline.value) {
-      timeline.value.x = CHANNEL_LIST_WIDTH - clampedWorldX;
-    }
+function updateContainerPositions(worldX: number, worldY: number) {
+  if (scrollableContentContainer.value) {
+    scrollableContentContainer.value.x = CHANNEL_LIST_WIDTH - worldX;
+    scrollableContentContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
   }
 
-  // Handle vertical scroll clamping on resize
-  const canvasHeight = app.value.screen.height;
-  const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
-  const totalContentHeight = channels.value.length * ROW_HEIGHT;
-  const newMaxScrollY = Math.max(0, totalContentHeight - availableHeight);
-
-  // If the viewport is now larger than or equal to the content, reset to top
-  if (newMaxScrollY <= 0) {
-    verticalScrollOffset.value = 0;
-    currentWorldY.value = 0;
-  } else {
-    // Clamp the world position to not exceed the new maximum scroll
-    const clampedWorldY = Math.min(currentWorldY.value, newMaxScrollY);
-    currentWorldY.value = clampedWorldY;
-    verticalScrollOffset.value = clampedWorldY / newMaxScrollY;
-    // Manually update the container position since watch might not trigger if scrollOffset doesn't change
-    if (scrollableContentContainer.value) {
-      scrollableContentContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - clampedWorldY;
-    }
-    if (channelListScrollableContainer.value) {
-      channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - clampedWorldY;
-    }
+  if (timeline.value) {
+    timeline.value.x = CHANNEL_LIST_WIDTH - worldX;
   }
 
-  updateHorizontalScrollbar();
-  updateVerticalScrollbar();
-  updateZoomButtonPositions();
-  createChannelList();
+  if (channelListScrollableContainer.value) {
+    channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
+  }
 }
 
-function updateHorizontalScrollbar() {
-  if (!app.value || !horizontalScrollBar.value) return;
-
-  const canvasWidth = app.value.screen.width;
-  const scrollbarWidth = canvasWidth - CHANNEL_LIST_WIDTH;
-
-  const viewportRatio = scrollbarWidth / TIMELINE_WIDTH.value;
-  const newThumbWidth = Math.max(MIN_SCROLL_THUMB_WIDTH, scrollbarWidth * viewportRatio);
-
-  horizontalScrollBar.value.resize(
-    scrollbarWidth,
-    newThumbWidth,
-    0,
-    horizontalScrollOffset.value);
-}
-
-function updateVerticalScrollbar() {
-  if (!app.value || !verticalScrollBar.value) return;
-
-  const canvasHeight = app.value.screen.height;
-  const scrollbarHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
-  const totalContentHeight = channels.value.length * ROW_HEIGHT;
-  const availableHeight = scrollbarHeight;
-
-  // Calculate thumb height based on content ratio
-  const viewportRatio = availableHeight / totalContentHeight;
-  const newThumbHeight = Math.max(
-    MIN_VERTICAL_SCROLL_THUMB_HEIGHT,
-    scrollbarHeight * viewportRatio,
-  );
-
-  verticalScrollBar.value.resize(
-    scrollbarHeight,
-    newThumbHeight,
-    app.value.screen.width - VERTICAL_SCROLL_BAR_WIDTH,
-    verticalScrollOffset.value);
-}
-
-function updateZoomButtonPositions() {
-  if (!app.value || !plusButton.value || !minusButton.value) return;
-
-  const canvasWidth = app.value.screen.width;
+function getZoomButtonPositions(canvasWidth: number) {
   const buttonRadius = 15;
   const buttonSpacing = 8;
   const rightMargin = VERTICAL_SCROLL_BAR_WIDTH + 10;
   const topMargin = SCROLL_BAR_HEIGHT + 10;
 
-  plusButton.value.x = canvasWidth - rightMargin - buttonRadius * 4 - buttonSpacing;
-  plusButton.value.y = topMargin;
-
-  minusButton.value.x = canvasWidth - rightMargin - buttonRadius * 2;
-  minusButton.value.y = topMargin;
-}
-
-function createChannelRowContainer(channelId: number, rowIndex: number) {
-  if (!scrollableContentContainer.value || !app.value) return;
-
-  // Create a container for this channel row
-  const rowContainer = new Container();
-  rowContainer.x = 0; // Aligned with timeline
-  rowContainer.y = rowIndex * ROW_HEIGHT;
-  rowContainer.eventMode = 'static';
-  rowContainer.cursor = 'pointer';
-
-  // Draw the row background
-  const rowBg = new Graphics();
-  const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
-  rowBg.rect(0, 0, TIMELINE_WIDTH.value, ROW_HEIGHT).fill(rowColor);
-
-  // Add border
-  rowBg.rect(0, ROW_HEIGHT - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
-
-  rowContainer.addChild(rowBg);
-
-  // Add click handler to create red box at click position
-  rowContainer.on('pointertap', (event) => {
-    // Only create box with left mouse button
-    if (event.button !== 0) return;
-
-    // Don't create box if user was dragging timeline or event box
-    if (hasDragged.value || hasEventBoxDragged.value) {
-      hasEventBoxDragged.value = false; // Reset flag
-      return;
-    }
-
-    if (!scrollableContentContainer.value || !app.value) return;
-
-    // Get the local position within the row container
-    const localPos = rowContainer.toLocal(event.global);
-
-    // Calculate the time in seconds based on pixel position
-    const timeInSeconds = (localPos.x / TIMELINE_WIDTH.value) * TIMELINE_DURATION_SECONDS;
-
-    // Create and store the event box
-    addEventBox(rowContainer, channelId, timeInSeconds, app, isDraggingTimeline);
-  });
-
-  scrollableContentContainer.value.addChild(rowContainer as any);
-
-  // Store the container in the map
-  channelRowContainers.value.set(channelId, rowContainer);
-
-  // Update positions of any existing event boxes for this channel
-  updateEventBoxPositions(channelId);
-}
-
-function updateAllRowBackgrounds() {
-  // Skip if backgrounds haven't changed
-  if (!rowBackgroundsDirty.value) return;
-
-  // Update background width for all channel rows
-  channelRowContainers.value.forEach((rowContainer, channelId) => {
-    // The first child is the background graphics
-    if (rowContainer.children.length > 0) {
-      const rowBg = rowContainer.children[0] as Graphics;
-      const rowIndex = Array.from(channelRowContainers.value.keys()).indexOf(channelId);
-      const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
-
-      rowBg.clear();
-      rowBg.rect(0, 0, TIMELINE_WIDTH.value, ROW_HEIGHT).fill(rowColor);
-      rowBg.rect(0, ROW_HEIGHT - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
-    }
-  });
-
-  // Clear dirty flag
-  rowBackgroundsDirty.value = false;
-}
-
-function addChannel() {
-  const newChannel: Channel = {
-    id: channels.value.length + 1,
-    name: `Channel ${channels.value.length + 1}`,
-    events: [],
+  return {
+    plus: {
+      x: canvasWidth - rightMargin - buttonRadius * 4 - buttonSpacing,
+      y: topMargin,
+    },
+    minus: {
+      x: canvasWidth - rightMargin - buttonRadius * 2,
+      y: topMargin,
+    },
+    radius: buttonRadius,
   };
-  channels.value.push(newChannel);
-
-  // Create the corresponding row container under the timeline
-  createChannelRowContainer(newChannel.id, channels.value.length - 1);
-
-  // Update vertical scrollbar to account for new content
-  updateVerticalScrollbar();
-
-  // Recreate the channel list UI
-  createChannelList();
 }
+
+//#endregion Mouse Handlers
+
 </script>
 
 <template>
