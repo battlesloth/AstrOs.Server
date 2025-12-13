@@ -41,6 +41,7 @@ const emit = defineEmits<{
 
 // Reactive state
 const openPanel = ref<string | null>(null);
+const openUartModuleId = ref<string | undefined>(undefined);
 const i2cUpdateTrigger = ref(0);
 
 // Methods
@@ -76,6 +77,10 @@ const removeModule = (evt: RemoveModuleEvent) => {
         id: evt.id,
         module: evt.module,
     });
+};
+
+const toggleUartModule = (moduleId: string) => {
+    openUartModuleId.value = openUartModuleId.value === moduleId ? undefined : moduleId;
 };
 
 const i2cAddressChanged = (evt: AddressChangeEvent) => {
@@ -125,8 +130,9 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
             <div class="collapse-content">
                 <ul v-if="location?.uartModules" class="space-y-2 max-h-96 overflow-y-auto p-0">
                     <li v-for="module in location.uartModules" :key="module.id">
-                        <AstrosUartModule @remove-module="removeModule" @servo-test="onServoTestEvent" :module="module"
-                            :is-master="isMaster" :parent-test-id="parentTestId" />
+                        <AstrosUartModule @remove-module="removeModule" @servo-test="onServoTestEvent"
+                            @toggle-module="toggleUartModule" :module="module" :is-master="isMaster"
+                            :parent-test-id="parentTestId" :open-module-id="openUartModuleId" />
                     </li>
                 </ul>
             </div>

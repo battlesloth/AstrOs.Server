@@ -101,7 +101,3 @@ const onI2cAddressChanged = (value: string) => {
         </div>
     </div>
 </template>
-
-<style scoped>
-/* Using Tailwind and DaisyUI utilities */
-</style>

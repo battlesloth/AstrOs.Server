@@ -46,7 +46,3 @@ const onI2cAddressChange = (val: string) => {
         </select>
     </div>
 </template>
-
-<style scoped>
-/* Using Tailwind and DaisyUI utilities */
-</style>

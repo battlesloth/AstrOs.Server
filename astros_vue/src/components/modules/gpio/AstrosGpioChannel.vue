@@ -48,7 +48,3 @@ const props = defineProps({
         </div>
     </div>
 </template>
-
-<style scoped>
-/* Using Tailwind and DaisyUI utilities */
-</style>

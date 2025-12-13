@@ -115,7 +115,3 @@ const homePositionModel = computed({
         </div>
     </div>
 </template>
-
-<style scoped>
-/* Using Tailwind and DaisyUI utilities */
-</style>
