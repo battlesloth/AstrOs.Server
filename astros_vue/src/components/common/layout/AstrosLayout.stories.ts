@@ -2,7 +2,7 @@ import { type Meta, type StoryObj } from '@storybook/vue3';
 import AstrosLayout from './AstrosLayout.vue';
 
 const meta = {
-    title: 'common/layout/AstrosLayout',
+    title: 'components/common/layout',
     component: AstrosLayout,
     render: (args: unknown) => ({
         components: { AstrosLayout },
