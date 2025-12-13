@@ -116,7 +116,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
             </select>
         </div>
         <div class="divider"></div>
-        <ul v-if="subModule && subModule.boards[0]" class="space-y-4 max-h-96 overflow-y-auto">
+        <ul v-if="subModule && subModule.boards[0]" class="space-y-4">
             <li v-for="(channel, i) in subModule.boards[0].channels" :key="channel.id"
                 v-show="i < subModule.boards[0].channelCount" class="border-2 border-base-300 rounded p-4">
                 <AstrosMaestroChannel :channel="channel" :parent-test-id="parentTestId"
