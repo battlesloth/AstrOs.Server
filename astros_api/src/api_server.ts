@@ -193,7 +193,12 @@ class ApiServer {
 
     this.app.use(loggerMiddleware);
     this.app.use(morgan("dev"));
-    this.app.use(cors());
+    this.app.use(cors(
+      {
+        origin: "http://localhost:5173",
+        credentials: true
+      }
+    ));
     this.app.use(fileUpload());
     this.app.use(Express.json());
     this.app.use(Express.urlencoded({ extended: false }));
@@ -245,6 +250,11 @@ class ApiServer {
 
     this.router.post(AuthContoller.route, AuthContoller.login);
     this.router.post(AuthContoller.reauthRoute, AuthContoller.reauth);
+
+    this.router.get('/check-session', this.authHandler, (req: any, res: any, next: any) => {
+      res.status(200);
+      res.json({ isAuthenticated: true });
+    });
 
     this.router.get(
       LocationsController.route,

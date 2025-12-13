@@ -7,9 +7,45 @@ const apiClient = axios.create({
     },
 })
 
-apiClient.defaults.withCredentials = true
+// Add request interceptor to include JWT token
+apiClient.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('jwt_token')
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`
+        }
+        return config
+    },
+    (error) => {
+        return Promise.reject(error)
+    }
+)
+
+// Add response interceptor to handle 401 errors
+apiClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            // Clear token on auth failure
+            localStorage.removeItem('jwt_token')
+        }
+        return Promise.reject(error)
+    }
+)
 
 export default {
+    setToken(token: string) {
+        localStorage.setItem('jwt_token', token)
+    },
+
+    clearToken() {
+        localStorage.removeItem('jwt_token')
+    },
+
+    getToken() {
+        return localStorage.getItem('jwt_token')
+    },
+
     async get(url: string) {
         try {
             const response = await apiClient.get(url)

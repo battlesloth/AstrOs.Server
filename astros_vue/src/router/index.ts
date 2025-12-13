@@ -52,6 +52,14 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   if (!to.meta.public && to.path !== '/auth') {
+    // Check if we have a token first
+    const token = api.getToken()
+    if (!token) {
+      console.log('No token found, redirecting to auth')
+      next('/auth')
+      return
+    }
+
     // Check if the route requires authentication
     try {
       const response = await api.get(CHECK_SESSION)

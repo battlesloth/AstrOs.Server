@@ -22,7 +22,13 @@ function login() {
         })
         .then((response) => {
             console.log('Login successful', response)
-            router.push({ name: 'home' })
+            // Store the JWT token
+            if (response.token) {
+                apiService.setToken(response.token)
+                router.push('/')
+            } else {
+                errorMessage.value = 'error.invalid_response'
+            }
         })
         .catch((error) => {
             console.error('Login failed', error)

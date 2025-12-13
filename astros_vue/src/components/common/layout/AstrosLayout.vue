@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import router from '@/router';
+import apiService from '@/api/apiService';
 import { ref, watch } from 'vue';
 
 const props = defineProps({
@@ -25,6 +26,11 @@ watch(
 watch(sidebarOpen, (newVal) => {
   emit('update:isSidebarOpen', newVal);
 });
+
+function logout() {
+  apiService.clearToken();
+  router.push('/auth');
+}
 </script>
 
 <template>
@@ -65,7 +71,7 @@ watch(sidebarOpen, (newVal) => {
             <p @click="router.push('/utility')">{{ $t('nav.utility') }}</p>
           </li>
           <li>
-            <p @click="">{{ $t('nav.logout') }}</p>
+            <p @click="logout">{{ $t('nav.logout') }}</p>
           </li>
         </ul>
       </div>
