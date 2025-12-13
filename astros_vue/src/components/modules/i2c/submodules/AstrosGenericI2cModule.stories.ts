@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import Pca9685Module from './Pca9685Module.vue';
+import AstrosGenericI2cModule from './AstrosGenericI2cModule.vue';
 import { ModuleSubType, ModuleType } from '@/models/enums';
 import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
 
@@ -11,24 +11,24 @@ function getModule(i2cAddress: number): I2cModule {
     return {
         idx: 22,
         id,
-        name: 'PCA9685',
+        name: 'Generic I2C',
         locationId,
         i2cAddress,
         moduleType: ModuleType.i2c,
-        moduleSubType: ModuleSubType.pwmBoard,
+        moduleSubType: ModuleSubType.genericI2C,
         subModule: {}
     };
 }
 
 const meta = {
-    title: 'components/modules/i2c/submodules/Pca9685Module',
-    component: Pca9685Module,
+    title: 'components/modules/i2c/submodules/GenericI2cModule',
+    component: AstrosGenericI2cModule,
     render: (args: unknown) => ({
-        components: { Pca9685Module },
+        components: { AstrosGenericI2cModule },
         setup() {
             return { args };
         },
-        template: '<Pca9685Module v-bind="args" />',
+        template: '<AstrosGenericI2cModule v-bind="args" />',
     }),
     args: {
         module: getModule(1),
@@ -41,14 +41,14 @@ const meta = {
             description: 'Test ID prefix for testing'
         }
     }
-} satisfies Meta<typeof Pca9685Module>;
+} satisfies Meta<typeof AstrosGenericI2cModule>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
 /**
- * Default PCA9685 module with address 1
+ * Default generic I2C module with address 1
  */
 export const Default: Story = {
     args: {
@@ -58,7 +58,7 @@ export const Default: Story = {
 };
 
 /**
- * PCA9685 module with standard address 0x40 (64)
+ * Generic I2C module with standard address 0x40 (64)
  */
 export const StandardAddress: Story = {
     args: {
@@ -68,9 +68,9 @@ export const StandardAddress: Story = {
 };
 
 /**
- * PCA9685 module with address 0x70 (112) - typical for multiplexed boards
+ * Generic I2C module with high address 0x70 (112)
  */
-export const MultiplexedAddress: Story = {
+export const HighAddress: Story = {
     args: {
         module: getModule(112),
         parentTestId: 'test'
@@ -82,7 +82,7 @@ export const MultiplexedAddress: Story = {
  */
 export const Interactive: Story = {
     render: () => ({
-        components: { Pca9685Module },
+        components: { AstrosGenericI2cModule },
         setup() {
             const module = getModule(64);
             const lastChangedAddress = { value: '' };
@@ -96,13 +96,13 @@ export const Interactive: Story = {
         },
         template: `
             <div class="space-y-4 p-4">
-                <Pca9685Module 
+                <AstrosGenericI2cModule 
                     :module="module"
                     parent-test-id="test"
                     @i2c-address-changed="handleAddressChange"
                 />
                 <div v-if="lastChangedAddress.value" class="alert alert-info">
-                    <span>PCA9685 Address changed to: {{ lastChangedAddress.value }}</span>
+                    <span>Address changed to: {{ lastChangedAddress.value }}</span>
                 </div>
             </div>
         `,

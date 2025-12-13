@@ -1,15 +1,15 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import ServoSettings from './ServoSettings.vue';
+import AstrosServoSettings from './AstrosServoSettings.vue';
 
 const meta = {
     title: 'components/modules/shared/ServoSettings',
-    component: ServoSettings,
+    component: AstrosServoSettings,
     render: (args: unknown) => ({
-        components: { ServoSettings },
+        components: { AstrosServoSettings },
         setup() {
             return { args };
         },
-        template: '<ServoSettings v-bind="args" />',
+        template: '<AstrosServoSettings v-bind="args" />',
     }),
     args: {
         testId: 'test',
@@ -56,7 +56,7 @@ const meta = {
             description: 'Test ID prefix for testing'
         }
     }
-} satisfies Meta<typeof ServoSettings>;
+} satisfies Meta<typeof AstrosServoSettings>;
 
 export default meta;
 
@@ -147,7 +147,7 @@ export const Disabled: Story = {
  */
 export const Interactive: Story = {
     render: () => ({
-        components: { ServoSettings },
+        components: { AstrosServoSettings },
         setup() {
             const settings = {
                 enabled: { value: true },
@@ -158,13 +158,13 @@ export const Interactive: Story = {
                 maxPulse: { value: 2500 },
                 homePosition: { value: 1500 }
             };
-            
+
             return { settings };
         },
         template: `
             <div class="space-y-4 p-4">
                 <div class="bg-base-200 p-4 rounded">
-                    <ServoSettings 
+                    <AstrosServoSettings 
                         :enabled="settings.enabled.value"
                         v-model:name="settings.name.value"
                         v-model:invert="settings.invert.value"
@@ -195,7 +195,7 @@ export const Interactive: Story = {
  */
 export const MultipleServos: Story = {
     render: () => ({
-        components: { ServoSettings },
+        components: { AstrosServoSettings },
         setup() {
             const servos = [
                 { enabled: true, name: 'Pan Servo', invert: false, isServo: true, minPulse: 500, maxPulse: 2500, homePosition: 1500 },
@@ -212,7 +212,7 @@ export const MultipleServos: Story = {
                     :key="index"
                     class="border-2 border-base-300 rounded p-4"
                 >
-                    <ServoSettings 
+                    <AstrosServoSettings 
                         :enabled="servo.enabled"
                         :name="servo.name"
                         :invert="servo.invert"

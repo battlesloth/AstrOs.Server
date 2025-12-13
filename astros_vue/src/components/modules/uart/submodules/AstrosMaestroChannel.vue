@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, type PropType } from 'vue';
-import ServoSettings from '../../shared/ServoSettings.vue';
+import AstrosServoSettings from '../../shared/AstrosServoSettings.vue';
 import { ModuleSubType } from '@/models/enums';
 import type { ServoTestEvent } from '@/models/events';
 
@@ -82,9 +82,9 @@ const testServoModal = () => {
             <button @click="testServoModal" class="btn btn-sm btn-outline">Test</button>
         </div>
         <div v-if="channel">
-            <ServoSettings :test-id="`${parentTestId}-maestro-ch-${channel.channelNumber}`" :enabled="channel.enabled"
-                v-model:name="channel.channelName" :is-servo="channel.isServo" v-model:invert="channel.inverted"
-                v-model:min-pulse="channel.minPos" v-model:max-pulse="channel.maxPos"
+            <AstrosServoSettings :test-id="`${parentTestId}-maestro-ch-${channel.channelNumber}`"
+                :enabled="channel.enabled" v-model:name="channel.channelName" :is-servo="channel.isServo"
+                v-model:invert="channel.inverted" v-model:min-pulse="channel.minPos" v-model:max-pulse="channel.maxPos"
                 v-model:home-position="channel.homePos" />
         </div>
     </div>

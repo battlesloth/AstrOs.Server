@@ -3,8 +3,8 @@ import { computed, type PropType, type Component } from 'vue';
 import { ModuleType, ModuleSubType } from '@/models/enums';
 import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
 import type { RemoveModuleEvent, AddressChangeEvent } from '@/models/events';
-import GenericI2cModule from './submodules/GenericI2cModule.vue';
-import Pca9685Module from './submodules/Pca9685Module.vue';
+import AstrosGenericI2cModule from './submodules/AstrosGenericI2cModule.vue';
+import AstrosPca9685Module from './submodules/AstrosPca9685Module.vue';
 
 // Props
 const props = defineProps({
@@ -45,10 +45,10 @@ const subtypeName = computed(() => {
 const subModuleComponent = computed<Component | null>(() => {
     switch (props.module.moduleSubType) {
         case ModuleSubType.genericI2C:
-            return GenericI2cModule;
+            return AstrosGenericI2cModule;
         case ModuleSubType.humanCyborgRelationsI2C:
         case ModuleSubType.pwmBoard:
-            return Pca9685Module;
+            return AstrosPca9685Module;
         default:
             return null;
     }

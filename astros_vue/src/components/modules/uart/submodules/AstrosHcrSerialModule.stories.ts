@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import HcrSerialModule from './HcrSerialModule.vue';
+import AstrosHcrSerialModule from './AstrosHcrSerialModule.vue';
 import { ModuleSubType, ModuleType } from '@/models/enums';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
@@ -20,13 +20,13 @@ function getSerialModule(ch: number, baudRate: number): UartModule {
 
 const meta = {
     title: 'components/modules/uart/submodules/HcrSerialModule',
-    component: HcrSerialModule,
+    component: AstrosHcrSerialModule,
     render: (args: unknown) => ({
-        components: { HcrSerialModule },
+        components: { AstrosHcrSerialModule },
         setup() {
             return { args };
         },
-        template: '<HcrSerialModule v-bind="args" />',
+        template: '<AstrosHcrSerialModule v-bind="args" />',
     }),
     args: {
         module: getSerialModule(1, 9600),
@@ -34,7 +34,7 @@ const meta = {
         isMaster: false
     },
     tags: ['autodocs']
-} satisfies Meta<typeof HcrSerialModule>;
+} satisfies Meta<typeof AstrosHcrSerialModule>;
 
 export default meta;
 

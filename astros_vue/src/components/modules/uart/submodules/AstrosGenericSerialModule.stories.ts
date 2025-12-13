@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import GenericSerialModule from './GenericSerialModule.vue';
+import AstrosGenericSerialModule from './AstrosGenericSerialModule.vue';
 import { ModuleSubType, ModuleType } from '@/models/enums';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
@@ -20,13 +20,13 @@ function getSerialModule(ch: number, baudRate: number): UartModule {
 
 const meta = {
     title: 'components/modules/uart/submodules/GenericSerialModule',
-    component: GenericSerialModule,
+    component: AstrosGenericSerialModule,
     render: (args: unknown) => ({
-        components: { GenericSerialModule },
+        components: { AstrosGenericSerialModule },
         setup() {
             return { args };
         },
-        template: '<GenericSerialModule v-bind="args" />',
+        template: '<AstrosGenericSerialModule v-bind="args" />',
     }),
     args: {
         module: getSerialModule(1, 9600),
@@ -44,7 +44,7 @@ const meta = {
             description: 'Whether this is a master controller'
         }
     }
-} satisfies Meta<typeof GenericSerialModule>;
+} satisfies Meta<typeof AstrosGenericSerialModule>;
 
 export default meta;
 
@@ -110,7 +110,7 @@ export const BaudRate57600: Story = {
  */
 export const Interactive: Story = {
     render: () => ({
-        components: { GenericSerialModule },
+        components: { AstrosGenericSerialModule },
         setup() {
             const module = getSerialModule(1, 9600);
 

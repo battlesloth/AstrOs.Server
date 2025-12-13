@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import KangarooModule from './KangarooModule.vue';
+import AstrosKangarooModule from './AstrosKangarooModule.vue';
 import { ModuleSubType, ModuleType } from '@/models/enums';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
@@ -24,13 +24,13 @@ function getSerialModule(ch: number, baudRate: number): UartModule {
 
 const meta = {
     title: 'components/modules/uart/submodules/KangarooModule',
-    component: KangarooModule,
+    component: AstrosKangarooModule,
     render: (args: unknown) => ({
-        components: { KangarooModule },
+        components: { AstrosKangarooModule },
         setup() {
             return { args };
         },
-        template: '<KangarooModule v-bind="args" />',
+        template: '<AstrosKangarooModule v-bind="args" />',
     }),
     args: {
         module: getSerialModule(1, 9600),
@@ -38,7 +38,7 @@ const meta = {
         isMaster: false
     },
     tags: ['autodocs']
-} satisfies Meta<typeof KangarooModule>;
+} satisfies Meta<typeof AstrosKangarooModule>;
 
 export default meta;
 

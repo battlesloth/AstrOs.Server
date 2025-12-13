@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import I2cModule from './I2cModule.vue';
+import AstrosI2cModule from './AstrosI2cModule.vue';
 import { ModuleSubType, ModuleType } from '@/models/enums';
 import type { I2cModule as I2cModuleType } from '@/models/controllers/modules/i2c/i2cModule';
 
@@ -39,14 +39,14 @@ function getI2cModule(
 }
 
 const meta = {
-    title: 'components/modules/i2c/I2cModule',
-    component: I2cModule,
+    title: 'components/modules/I2cModule',
+    component: AstrosI2cModule,
     render: (args: unknown) => ({
-        components: { I2cModule },
+        components: { AstrosI2cModule },
         setup() {
             return { args };
         },
-        template: '<I2cModule v-bind="args" />',
+        template: '<AstrosI2cModule v-bind="args" />',
     }),
     args: {
         module: getI2cModule(ModuleSubType.genericI2C, 0x40),
@@ -64,7 +64,7 @@ const meta = {
             description: 'Trigger to force re-render when module properties change'
         }
     }
-} satisfies Meta<typeof I2cModule>;
+} satisfies Meta<typeof AstrosI2cModule>;
 
 export default meta;
 
@@ -115,7 +115,7 @@ export const CustomName: Story = {
  */
 export const MultipleModules: Story = {
     render: () => ({
-        components: { I2cModule },
+        components: { AstrosI2cModule },
         setup() {
             const modules = [
                 getI2cModule(ModuleSubType.genericI2C, 0x40, 'Sensor Module 1'),
@@ -127,7 +127,7 @@ export const MultipleModules: Story = {
         },
         template: `
             <div class="space-y-4 p-4">
-                <I2cModule 
+                <AstrosI2cModule 
                     v-for="module in modules" 
                     :key="module.id"
                     :module="module"
@@ -143,7 +143,7 @@ export const MultipleModules: Story = {
  */
 export const WithUpdateTrigger: Story = {
     render: () => ({
-        components: { I2cModule },
+        components: { AstrosI2cModule },
         setup() {
             const module = getI2cModule(ModuleSubType.genericI2C, 0x40);
             const updateTrigger = { value: 0 };
@@ -159,7 +159,7 @@ export const WithUpdateTrigger: Story = {
                 <button @click="triggerUpdate" class="btn btn-primary btn-sm">
                     Trigger Update ({{ updateTrigger.value }})
                 </button>
-                <I2cModule 
+                <AstrosI2cModule 
                     :module="module"
                     :update-trigger="updateTrigger.value"
                     parent-test-id="test"

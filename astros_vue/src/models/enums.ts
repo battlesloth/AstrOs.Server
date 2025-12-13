@@ -1,3 +1,9 @@
+export enum Location {
+    body = 'body',
+    core = 'core',
+    dome = 'dome',
+}
+
 export enum ModuleType {
     none = 0,
     uart = 1,

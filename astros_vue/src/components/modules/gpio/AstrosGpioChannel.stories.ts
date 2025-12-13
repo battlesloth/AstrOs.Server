@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import GpioChannel from './GpioChannel.vue';
+import GpioChannel from './AstrosGpioChannel.vue';
 import type { GpioChannel as GpioChannelType } from '@/models/controllers/modules/gpio/gpioChannel';
 import { ModuleSubType, ModuleType } from '@/models/enums';
 

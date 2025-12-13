@@ -3,10 +3,10 @@ import { computed, type PropType, type Component } from 'vue';
 import { ModuleType, ModuleSubType } from '@/models/enums';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 import type { RemoveModuleEvent, ServoTestEvent } from '@/models/events';
-import GenericSerialModule from './submodules/GenericSerialModule.vue';
-import KangarooModule from './submodules/KangarooModule.vue';
-import HcrSerialModule from './submodules/HcrSerialModule.vue';
-import MaestroModule from './submodules/MaestroModule.vue';
+import AstrosGenericSerialModule from './submodules/AstrosGenericSerialModule.vue';
+import AstrosKangarooModule from './submodules/AstrosKangarooModule.vue';
+import AstrosHcrSerialModule from './submodules/AstrosHcrSerialModule.vue';
+import AstrosMaestroModule from './submodules/AstrosMaestroModule.vue';
 
 // Props
 const props = defineProps({
@@ -49,13 +49,13 @@ const subtypeName = computed(() => {
 const subModuleComponent = computed<Component | null>(() => {
     switch (props.module.moduleSubType) {
         case ModuleSubType.genericSerial:
-            return GenericSerialModule;
+            return AstrosGenericSerialModule;
         case ModuleSubType.kangaroo:
-            return KangarooModule;
+            return AstrosKangarooModule;
         case ModuleSubType.humanCyborgRelationsSerial:
-            return HcrSerialModule;
+            return AstrosHcrSerialModule;
         case ModuleSubType.maestro:
-            return MaestroModule;
+            return AstrosMaestroModule;
         default:
             return null;
     }

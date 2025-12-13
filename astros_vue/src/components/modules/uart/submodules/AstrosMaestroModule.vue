@@ -2,7 +2,7 @@
 import { ref, watch, type PropType } from 'vue';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 import type { ServoTestEvent } from '@/models/events';
-import MaestroChannel from './MaestroChannel.vue';
+import AstrosMaestroChannel from './AstrosMaestroChannel.vue';
 
 // MaestroChannel interface
 interface MaestroChannelType {
@@ -119,7 +119,8 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         <ul v-if="subModule && subModule.boards[0]" class="space-y-4 max-h-96 overflow-y-auto">
             <li v-for="(channel, i) in subModule.boards[0].channels" :key="channel.id"
                 v-show="i < subModule.boards[0].channelCount" class="border-2 border-base-300 rounded p-4">
-                <MaestroChannel :channel="channel" :parent-test-id="parentTestId" @servo-test="onServoTestEvent" />
+                <AstrosMaestroChannel :channel="channel" :parent-test-id="parentTestId"
+                    @servo-test="onServoTestEvent" />
             </li>
         </ul>
     </div>

@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { ref, type PropType } from 'vue';
-import { ModuleType } from '@/models/enums';
-import type { ControllerLocation } from '@/models/module.types';
+import { ref, computed, type PropType } from 'vue';
+import { ModuleType, Location } from '@/models/enums';
 import type {
     AddModuleEvent,
     RemoveModuleEvent,
     ServoTestEvent,
     AddressChangeEvent
 } from '@/models/events';
+import { useLocationStore } from '@/stores/location';
 
 // Props
 const props = defineProps({
@@ -15,8 +15,8 @@ const props = defineProps({
         type: Boolean,
         default: false
     },
-    location: {
-        type: Object as PropType<ControllerLocation>,
+    locationEnum: {
+        type: String as PropType<Location>,
         required: true
     },
     parentTestId: {
@@ -24,6 +24,10 @@ const props = defineProps({
         required: true
     }
 });
+
+// Store
+const locationStore = useLocationStore();
+const location = computed(() => locationStore.getLocation(props.locationEnum));
 
 // Emits
 const emit = defineEmits<{
@@ -47,7 +51,7 @@ const addUartModule = (evt: Event) => {
     }
 
     emit('addModule', {
-        locationId: props.location.id,
+        locationId: location.value?.id ?? '',
         module: ModuleType.uart,
     });
 };
@@ -60,28 +64,30 @@ const addI2cModule = (evt: Event) => {
     }
 
     emit('addModule', {
-        locationId: props.location.id,
+        locationId: location.value?.id ?? '',
         module: ModuleType.i2c,
     });
 };
 
 const removeModule = (evt: RemoveModuleEvent) => {
     emit('removeModule', {
-        locationId: props.location.id,
+        locationId: location.value?.id ?? '',
         id: evt.id,
         module: evt.module,
     });
 };
 
 const i2cAddressChanged = (evt: AddressChangeEvent) => {
+    if (!location.value) return;
+
     // if the new address is in use, swap it to the old address
-    const m1 = props.location.i2cModules.find((m) => m.i2cAddress === evt.new);
+    const m1 = location.value.i2cModules.find((m) => m.i2cAddress === evt.new);
 
     if (m1) {
         m1.i2cAddress = evt.old;
     }
 
-    const m2 = props.location.i2cModules.find((m) => m.i2cAddress === evt.old);
+    const m2 = location.value.i2cModules.find((m) => m.i2cAddress === evt.old);
 
     if (m2) {
         m2.i2cAddress = evt.new;
@@ -91,8 +97,10 @@ const i2cAddressChanged = (evt: AddressChangeEvent) => {
 };
 
 const onServoTestEvent = (evt: ServoTestEvent) => {
-    evt.controllerAddress = props.location.controller.address;
-    evt.controllerName = props.location.controller.name;
+    if (!location.value?.controller) return;
+
+    evt.controllerAddress = location.value.controller.address;
+    evt.controllerName = location.value.controller.name;
     emit('openServoTestModal', evt);
 };
 </script>

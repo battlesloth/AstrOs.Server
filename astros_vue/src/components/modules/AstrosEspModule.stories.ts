@@ -1,7 +1,9 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import EspModule from './EspModule.vue';
+import { createPinia } from 'pinia';
+import AstrosEspModule from './AstrosEspModule.vue';
 import type { ControllerLocation } from '@/models/controllers/controllerLocation';
-import { ModuleSubType, ModuleType } from '@/models/enums';
+import { ModuleSubType, ModuleType, Location } from '@/models/enums';
+import { useLocationStore } from '@/stores/location';
 
 // Helper function to create mock controller location
 function getControllerLocation(): ControllerLocation {
@@ -12,7 +14,7 @@ function getControllerLocation(): ControllerLocation {
         locationName: 'core',
         description: 'Test Location',
         configFingerprint: 'fingerprint',
-        contoller: {
+        controller: {
             id: 'controller-1',
             fingerprint: 'controller-fingerprint',
             address: '192.168.1.100',
@@ -55,17 +57,25 @@ function getControllerLocationWithModules(): ControllerLocation {
 
 const meta = {
     title: 'components/modules/EspModule',
-    component: EspModule,
-    render: (args: unknown) => ({
-        components: { EspModule },
+    component: AstrosEspModule,
+    render: (args: any) => ({
+        components: { AstrosEspModule },
         setup() {
-            return { args };
+            const pinia = createPinia();
+            const locationStore = useLocationStore(pinia);
+
+            // Set the location in the store from the story context
+            if ((args as any)._location && (args as any)._locationEnum) {
+                locationStore.setLocation((args as any)._locationEnum, (args as any)._location);
+            }
+
+            return { args, pinia };
         },
-        template: '<EspModule v-bind="args" />',
+        template: '<AstrosEspModule v-bind="args" />',
     }),
     args: {
         isMaster: false,
-        location: getControllerLocation(),
+        locationEnum: Location.core,
         parentTestId: 'test'
     },
     tags: ['autodocs'],
@@ -74,12 +84,17 @@ const meta = {
             control: 'boolean',
             description: 'Whether this is a master controller'
         },
+        locationEnum: {
+            control: 'select',
+            options: [Location.core, Location.dome, Location.body],
+            description: 'Location enum (core, dome, or body)'
+        },
         parentTestId: {
             control: 'text',
             description: 'Test ID prefix for testing'
         }
     }
-} satisfies Meta<typeof EspModule>;
+} satisfies Meta<typeof AstrosEspModule>;
 
 export default meta;
 
@@ -91,9 +106,11 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
     args: {
         isMaster: false,
-        location: getControllerLocation(),
-        parentTestId: 'test'
-    },
+        locationEnum: Location.core,
+        parentTestId: 'test',
+        _location: getControllerLocation(),
+        _locationEnum: Location.core
+    } as any,
 };
 
 /**
@@ -102,9 +119,11 @@ export const Default: Story = {
 export const WithModules: Story = {
     args: {
         isMaster: false,
-        location: getControllerLocationWithModules(),
-        parentTestId: 'test'
-    },
+        locationEnum: Location.core,
+        parentTestId: 'test',
+        _location: getControllerLocationWithModules(),
+        _locationEnum: Location.core
+    } as any,
 };
 
 /**
@@ -113,9 +132,11 @@ export const WithModules: Story = {
 export const MasterController: Story = {
     args: {
         isMaster: true,
-        location: getControllerLocationWithModules(),
-        parentTestId: 'test'
-    },
+        locationEnum: Location.dome,
+        parentTestId: 'test',
+        _location: getControllerLocationWithModules(),
+        _locationEnum: Location.dome
+    } as any,
 };
 
 /**
@@ -124,7 +145,9 @@ export const MasterController: Story = {
 export const OnlyUartModules: Story = {
     args: {
         isMaster: false,
-        location: {
+        locationEnum: Location.body,
+        parentTestId: 'test',
+        _location: {
             ...getControllerLocation(),
             uartModules: [
                 { id: 'uart-1', uartChannel: 1, baudRate: 9600, subModule: 'sub-1', idx: 1, name: 'UART Module 1', locationId: 'location-1', moduleSubType: 1 },
@@ -132,8 +155,8 @@ export const OnlyUartModules: Story = {
                 { id: 'uart-3', uartChannel: 3, baudRate: 4800, subModule: 'sub-3', idx: 3, name: 'UART Module 3', locationId: 'location-1', moduleSubType: 3 }
             ]
         },
-        parentTestId: 'test'
-    },
+        _locationEnum: Location.body
+    } as any,
 };
 
 /**
@@ -142,7 +165,9 @@ export const OnlyUartModules: Story = {
 export const OnlyI2cModules: Story = {
     args: {
         isMaster: false,
-        location: {
+        locationEnum: Location.core,
+        parentTestId: 'test',
+        _location: {
             ...getControllerLocation(),
             i2cModules: [
                 { id: 'i2c-1', i2cAddress: 0x40, idx: 1, name: 'I2C Module 1', locationId: 'location-1', moduleSubType: 1 },
@@ -150,8 +175,8 @@ export const OnlyI2cModules: Story = {
                 { id: 'i2c-3', i2cAddress: 0x70, idx: 3, name: 'I2C Module 3', locationId: 'location-1', moduleSubType: 3 }
             ]
         },
-        parentTestId: 'test'
-    },
+        _locationEnum: Location.core
+    } as any,
 };
 
 /**
@@ -160,7 +185,9 @@ export const OnlyI2cModules: Story = {
 export const ManyModules: Story = {
     args: {
         isMaster: false,
-        location: {
+        locationEnum: Location.dome,
+        parentTestId: 'test',
+        _location: {
             ...getControllerLocation(),
             uartModules: Array.from({ length: 10 }, (_, i) => ({
                 id: `uart-${i + 1}`,
@@ -191,6 +218,6 @@ export const ManyModules: Story = {
                 }))
             }
         },
-        parentTestId: 'test'
-    },
+        _locationEnum: Location.dome
+    } as any,
 };

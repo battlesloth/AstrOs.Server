@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import MaestroModule from './MaestroModule.vue';
+import AstrosMaestroModule from './AstrosMaestroModule.vue';
 import { ModuleSubType, ModuleType } from '@/models/enums';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
@@ -42,13 +42,13 @@ function getSerialModule(ch: number, baudRate: number, channelCount: number): Ua
 
 const meta = {
     title: 'components/modules/uart/submodules/MaestroModule',
-    component: MaestroModule,
+    component: AstrosMaestroModule,
     render: (args: unknown) => ({
-        components: { MaestroModule },
+        components: { AstrosMaestroModule },
         setup() {
             return { args };
         },
-        template: '<MaestroModule v-bind="args" />',
+        template: '<AstrosMaestroModule v-bind="args" />',
     }),
     args: {
         module: getSerialModule(1, 9600, 24),
@@ -56,7 +56,7 @@ const meta = {
         isMaster: false
     },
     tags: ['autodocs']
-} satisfies Meta<typeof MaestroModule>;
+} satisfies Meta<typeof AstrosMaestroModule>;
 
 export default meta;
 

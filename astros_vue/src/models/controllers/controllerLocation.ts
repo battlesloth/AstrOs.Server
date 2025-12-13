@@ -10,7 +10,7 @@ export interface ControllerLocation {
     description: string;
     configFingerprint: string;
 
-    contoller: ControllerModule;
+    controller: ControllerModule;
 
     gpioModule: GpioModule;
     i2cModules: I2cModule[];

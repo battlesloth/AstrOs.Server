@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import UartModule from './UartModule.vue';
+import AstrosUartModule from './AstrosUartModule.vue';
 import { ModuleSubType, ModuleType } from '@/models/enums';
 import type { UartModule as UartModuleType } from '@/models/controllers/modules/uart/uartModule';
 
@@ -44,14 +44,14 @@ function getSerialModule(
 }
 
 const meta = {
-    title: 'components/modules/uart/UartModule',
-    component: UartModule,
+    title: 'components/modules/UartModule',
+    component: AstrosUartModule,
     render: (args: unknown) => ({
-        components: { UartModule },
+        components: { AstrosUartModule },
         setup() {
             return { args };
         },
-        template: '<UartModule v-bind="args" />',
+        template: '<AstrosUartModule v-bind="args" />',
     }),
     args: {
         module: getSerialModule(ModuleSubType.genericSerial, 1, 9600),
@@ -69,7 +69,7 @@ const meta = {
             description: 'Whether this is a master controller'
         }
     }
-} satisfies Meta<typeof UartModule>;
+} satisfies Meta<typeof AstrosUartModule>;
 
 export default meta;
 
@@ -146,7 +146,7 @@ export const CustomBaudRate: Story = {
  */
 export const MultipleModules: Story = {
     render: () => ({
-        components: { UartModule },
+        components: { AstrosUartModule },
         setup() {
             const modules = [
                 getSerialModule(ModuleSubType.genericSerial, 1, 9600, 'GPS Module'),
@@ -158,7 +158,7 @@ export const MultipleModules: Story = {
         },
         template: `
             <div class="space-y-4 p-4">
-                <UartModule 
+                <AstrosUartModule 
                     v-for="module in modules" 
                     :key="module.id"
                     :module="module"
