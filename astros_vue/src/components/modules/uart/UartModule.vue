@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type PropType, type Component } from 'vue';
 import { ModuleType, ModuleSubType } from '@/models/enums';
-import type { UartModule } from '@/models/module.types';
+import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 import type { RemoveModuleEvent, ServoTestEvent } from '@/models/events';
 import GenericSerialModule from './submodules/GenericSerialModule.vue';
 import KangarooModule from './submodules/KangarooModule.vue';
@@ -85,7 +85,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         <input type="checkbox" class="peer" />
         <div :data-testid="`${parentTestId}-serial-${module.moduleSubType}-header`"
             class="collapse-title flex items-center justify-between pr-12">
-            <div class="flex-shrink-0 min-w-0">
+            <div class="shrink-0 min-w-0">
                 <input :data-testid="`${parentTestId}-serial-${module.moduleSubType}-name`" v-model="module.name"
                     @click="nameClicked" @keydown.space.stop placeholder="Name"
                     class="input input-bordered input-sm w-full max-w-xs" />

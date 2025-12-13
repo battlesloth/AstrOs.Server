@@ -1,6 +1,7 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import GpioChannel from './GpioChannel.vue';
-import type { GpioChannel as GpioChannelType } from '@/models/module.types';
+import type { GpioChannel as GpioChannelType } from '@/models/controllers/modules/gpio/gpioChannel';
+import { ModuleSubType, ModuleType } from '@/models/enums';
 
 // Helper function to create mock GPIO channel
 function createGpioChannel(
@@ -18,7 +19,9 @@ function createGpioChannel(
         channelNumber,
         enabled,
         channelName,
-        defaultHigh
+        defaultHigh,
+        moduleType: ModuleType.gpio,
+        moduleSubType: ModuleSubType.genericGpio
     };
 }
 

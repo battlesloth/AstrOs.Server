@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, type PropType } from 'vue';
-import type { UartModule } from '@/models/module.types';
+import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
 // Props
 const props = defineProps({
@@ -43,12 +43,12 @@ const onBaudRateChange = (val: string) => {
 <template>
     <div class="flex flex-row gap-5">
         <select :data-testid="`${parentTestId}-generic-serial-uart-channel`" v-model="uartChannel"
-            @change="onChannelChange(uartChannel)" class="select select-bordered select-sm w-[120px]">
+            @change="onChannelChange(uartChannel)" class="select select-bordered select-sm w-30">
             <option v-if="!isMaster" value="1">Channel 1</option>
             <option value="2">Channel 2</option>
         </select>
         <select :data-testid="`${parentTestId}-generic-serial-baud`" v-model="baudRate"
-            @change="onBaudRateChange(baudRate)" class="select select-bordered select-sm w-[120px]">
+            @change="onBaudRateChange(baudRate)" class="select select-bordered select-sm w-30">
             <option value="9600">9600</option>
             <option value="19200">19200</option>
             <option value="38400">38400</option>
@@ -57,7 +57,3 @@ const onBaudRateChange = (val: string) => {
         </select>
     </div>
 </template>
-
-<style scoped>
-/* Using Tailwind and DaisyUI utilities */
-</style>

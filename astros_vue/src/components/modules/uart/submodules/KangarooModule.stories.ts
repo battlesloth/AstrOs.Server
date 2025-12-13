@@ -1,7 +1,7 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import KangarooModule from './KangarooModule.vue';
-import { ModuleSubType } from '@/models/enums';
-import type { UartModule } from '@/models/module.types';
+import { ModuleSubType, ModuleType } from '@/models/enums';
+import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
 // Helper function to create mock UART module
 function getSerialModule(ch: number, baudRate: number): UartModule {
@@ -10,6 +10,7 @@ function getSerialModule(ch: number, baudRate: number): UartModule {
         id: '1234',
         name: 'Kangaroo X2',
         locationId: 'core',
+        moduleType: ModuleType.uart,
         moduleSubType: ModuleSubType.kangaroo,
         uartChannel: ch,
         baudRate,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, type PropType } from 'vue';
-import type { UartModule } from '@/models/module.types';
+import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 import type { ServoTestEvent } from '@/models/events';
 import MaestroChannel from './MaestroChannel.vue';
 
@@ -95,12 +95,12 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
     <div class="space-y-4">
         <div class="flex flex-row gap-5 flex-wrap">
             <select :data-testid="`${parentTestId}-maestro-uart-channel`" v-model="uartChannel"
-                @change="onChannelChange(uartChannel)" class="select select-bordered select-sm w-[120px]">
+                @change="onChannelChange(uartChannel)" class="select select-bordered select-sm w-30">
                 <option v-if="!isMaster" value="1">Channel 1</option>
                 <option value="2">Channel 2</option>
             </select>
             <select :data-testid="`${parentTestId}-maestro-baud`" v-model="baudRate"
-                @change="onBaudRateChange(baudRate)" class="select select-bordered select-sm w-[120px]">
+                @change="onBaudRateChange(baudRate)" class="select select-bordered select-sm w-30">
                 <option value="9600">9600</option>
                 <option value="19200">19200</option>
                 <option value="38400">38400</option>
@@ -108,7 +108,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
                 <option value="115200">115200</option>
             </select>
             <select :data-testid="`${parentTestId}-maestro-channel-count`" v-model="channelCount"
-                @change="onChannelCountChange(channelCount)" class="select select-bordered select-sm w-[120px]">
+                @change="onChannelCountChange(channelCount)" class="select select-bordered select-sm w-30">
                 <option value="6">6 Channels</option>
                 <option value="12">12 Channels</option>
                 <option value="18">18 Channels</option>

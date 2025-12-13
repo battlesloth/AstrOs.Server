@@ -1,7 +1,7 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import I2cModule from './I2cModule.vue';
-import { ModuleSubType } from '@/models/enums';
-import type { I2cModule as I2cModuleType } from '@/models/module.types';
+import { ModuleSubType, ModuleType } from '@/models/enums';
+import type { I2cModule as I2cModuleType } from '@/models/controllers/modules/i2c/i2cModule';
 
 // Helper function to create mock I2C module
 function getI2cModule(
@@ -32,6 +32,7 @@ function getI2cModule(
         name: moduleName,
         locationId,
         i2cAddress: address,
+        moduleType: ModuleType.i2c,
         moduleSubType: type,
         subModule: {}
     };

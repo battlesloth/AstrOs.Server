@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type PropType, type Component } from 'vue';
 import { ModuleType, ModuleSubType } from '@/models/enums';
-import type { I2cModule } from '@/models/module.types';
+import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
 import type { RemoveModuleEvent, AddressChangeEvent } from '@/models/events';
 import GenericI2cModule from './submodules/GenericI2cModule.vue';
 import Pca9685Module from './submodules/Pca9685Module.vue';
@@ -82,7 +82,7 @@ const onI2cAddressChanged = (value: string) => {
         <input type="checkbox" class="peer" />
         <div :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-header`"
             class="collapse-title flex items-center justify-between pr-12">
-            <div class="flex-shrink-0 min-w-0">
+            <div class="shrink-0 min-w-0">
                 <input :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-name`" v-model="module.name"
                     @click="nameClicked" @keydown.space.stop placeholder="Name"
                     class="input input-bordered input-sm w-full max-w-xs" />
@@ -96,13 +96,8 @@ const onI2cAddressChanged = (value: string) => {
             </div>
         </div>
         <div class="collapse-content">
-            <component 
-                v-if="subModuleComponent"
-                :is="subModuleComponent"
-                :module="module"
-                :parent-test-id="parentTestId"
-                @i2c-address-changed="onI2cAddressChanged"
-            />
+            <component v-if="subModuleComponent" :is="subModuleComponent" :module="module"
+                :parent-test-id="parentTestId" @i2c-address-changed="onI2cAddressChanged" />
         </div>
     </div>
 </template>

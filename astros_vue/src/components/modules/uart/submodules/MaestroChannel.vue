@@ -71,14 +71,14 @@ const testServoModal = () => {
 <template>
     <div class="space-y-2">
         <div class="flex items-center gap-4 flex-wrap">
-            <div class="font-medium min-w-[80px]">Channel {{ channel.channelNumber }}</div>
+            <div class="font-medium min-w-20">Channel {{ channel.channelNumber }}</div>
             <select :data-testid="`${parentTestId}-maestro-ch-${channel.channelNumber}-type`" v-model="type"
-                class="select select-bordered select-sm w-[120px]">
+                class="select select-bordered select-sm w-30">
                 <option value="0">Disabled</option>
                 <option value="1">Servo</option>
                 <option value="2">Output</option>
             </select>
-            <div class="flex-grow"></div>
+            <div class="grow"></div>
             <button @click="testServoModal" class="btn btn-sm btn-outline">Test</button>
         </div>
         <div v-if="channel">
@@ -89,7 +89,3 @@ const testServoModal = () => {
         </div>
     </div>
 </template>
-
-<style scoped>
-/* Using Tailwind and DaisyUI utilities */
-</style>

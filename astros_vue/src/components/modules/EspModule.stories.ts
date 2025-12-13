@@ -1,6 +1,7 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import EspModule from './EspModule.vue';
-import type { ControllerLocation } from '@/models/module.types';
+import type { ControllerLocation } from '@/models/controllers/controllerLocation';
+import { ModuleSubType, ModuleType } from '@/models/enums';
 
 // Helper function to create mock controller location
 function getControllerLocation(): ControllerLocation {
@@ -11,15 +12,23 @@ function getControllerLocation(): ControllerLocation {
         locationName: 'core',
         description: 'Test Location',
         configFingerprint: 'fingerprint',
-        controller: {
+        contoller: {
+            id: 'controller-1',
+            fingerprint: 'controller-fingerprint',
             address: '192.168.1.100',
             name: 'Core Controller'
         },
         gpioModule: {
+            id: 'gpio-module-1',
+            idx: 1,
+            name: 'GPIO Module 1',
+            locationId: 'location-1',
+            moduleType: ModuleType.gpio,
+            moduleSubType: ModuleSubType.genericGpio,
             channels: [
-                { id: 'gpio-1', parentId: 'parent-1', channelName: 'Channel 1', channelNumber: 1, enabled: true, defaultHigh: false },
-                { id: 'gpio-2', parentId: 'parent-2', channelName: 'Channel 2', channelNumber: 2, enabled: true, defaultHigh: false },
-                { id: 'gpio-3', parentId: 'parent-3', channelName: 'Channel 3', channelNumber: 3, enabled: true, defaultHigh: false }
+                { id: 'gpio-1', parentId: 'parent-1', channelName: 'Channel 1', channelNumber: 1, enabled: true, defaultHigh: false, moduleType: ModuleType.gpio, moduleSubType: ModuleSubType.genericGpio },
+                { id: 'gpio-2', parentId: 'parent-2', channelName: 'Channel 2', channelNumber: 2, enabled: true, defaultHigh: false, moduleType: ModuleType.gpio, moduleSubType: ModuleSubType.genericGpio },
+                { id: 'gpio-3', parentId: 'parent-3', channelName: 'Channel 3', channelNumber: 3, enabled: true, defaultHigh: false, moduleType: ModuleType.gpio, moduleSubType: ModuleSubType.genericGpio }
             ]
         },
         i2cModules: [],
@@ -32,13 +41,13 @@ function getControllerLocationWithModules(): ControllerLocation {
     const location = getControllerLocation();
 
     location.uartModules = [
-        { id: 'uart-1', uartChannel: 1, baudRate: 9600, subModule: 'sub-1', idx: 1, name: 'UART Module 1', locationId: 'location-1', moduleSubType: 1 },
-        { id: 'uart-2', uartChannel: 2, baudRate: 115200, subModule: 'sub-2', idx: 2, name: 'UART Module 2', locationId: 'location-1', moduleSubType: 2 }
+        { id: 'uart-1', uartChannel: 1, baudRate: 9600, subModule: 'sub-1', idx: 1, name: 'UART Module 1', locationId: 'location-1', moduleType: ModuleType.uart, moduleSubType: ModuleSubType.genericSerial },
+        { id: 'uart-2', uartChannel: 2, baudRate: 115200, subModule: 'sub-2', idx: 2, name: 'UART Module 2', locationId: 'location-1', moduleType: ModuleType.uart, moduleSubType: ModuleSubType.kangaroo }
     ];
 
     location.i2cModules = [
-        { id: 'i2c-1', i2cAddress: 0x40, idx: 1, name: 'I2C Module 1', locationId: 'location-1', moduleSubType: 1 },
-        { id: 'i2c-2', i2cAddress: 0x41, idx: 2, name: 'I2C Module 2', locationId: 'location-1', moduleSubType: 2 }
+        { id: 'i2c-1', i2cAddress: 0x40, idx: 1, name: 'I2C Module 1', locationId: 'location-1', moduleType: ModuleType.i2c, moduleSubType: ModuleSubType.genericI2C, subModule: null },
+        { id: 'i2c-2', i2cAddress: 0x41, idx: 2, name: 'I2C Module 2', locationId: 'location-1', moduleType: ModuleType.i2c, moduleSubType: ModuleSubType.genericI2C, subModule: null }
     ];
 
     return location;

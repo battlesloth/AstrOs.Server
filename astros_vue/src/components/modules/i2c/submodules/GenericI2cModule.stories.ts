@@ -1,19 +1,20 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import GenericI2cModule from './GenericI2cModule.vue';
-import { ModuleSubType } from '@/models/enums';
-import type { I2cModule } from '@/models/module.types';
+import { ModuleSubType, ModuleType } from '@/models/enums';
+import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
 
 // Helper function to create mock I2C module
 function getModule(i2cAddress: number): I2cModule {
     const id = crypto.randomUUID();
     const locationId = crypto.randomUUID();
-    
+
     return {
         idx: 22,
         id,
         name: 'Generic I2C',
         locationId,
         i2cAddress,
+        moduleType: ModuleType.i2c,
         moduleSubType: ModuleSubType.genericI2C,
         subModule: {}
     };
@@ -85,12 +86,12 @@ export const Interactive: Story = {
         setup() {
             const module = getModule(64);
             const lastChangedAddress = { value: '' };
-            
+
             const handleAddressChange = (addr: string) => {
                 lastChangedAddress.value = addr;
                 console.log('I2C Address changed to:', addr);
             };
-            
+
             return { module, lastChangedAddress, handleAddressChange };
         },
         template: `

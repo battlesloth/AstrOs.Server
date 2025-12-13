@@ -1,7 +1,7 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import UartModule from './UartModule.vue';
-import { ModuleSubType } from '@/models/enums';
-import type { UartModule as UartModuleType } from '@/models/module.types';
+import { ModuleSubType, ModuleType } from '@/models/enums';
+import type { UartModule as UartModuleType } from '@/models/controllers/modules/uart/uartModule';
 
 // Helper function to create mock UART module
 function getSerialModule(
@@ -35,6 +35,7 @@ function getSerialModule(
         id,
         name: moduleName,
         locationId,
+        moduleType: ModuleType.uart,
         moduleSubType: type,
         uartChannel: ch,
         baudRate,

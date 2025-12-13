@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, type PropType } from 'vue';
-import type { I2cModule } from '@/models/module.types';
+import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
 
 // Props
 const props = defineProps({
@@ -39,12 +39,8 @@ const onI2cAddressChange = (val: string) => {
 <template>
     <div>
         <div class="flex flex-row mb-4">
-            <select 
-                v-if="module"
-                v-model="i2cAddress"
-                @change="onI2cAddressChange(i2cAddress)"
-                class="select select-bordered select-sm w-[140px]"
-            >
+            <select v-if="module" v-model="i2cAddress" @change="onI2cAddressChange(i2cAddress)"
+                class="select select-bordered select-sm w-35">
                 <option v-for="addr in addresses" :key="addr" :value="addr">
                     Address {{ addr }}
                 </option>

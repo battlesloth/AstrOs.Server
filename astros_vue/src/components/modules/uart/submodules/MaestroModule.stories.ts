@@ -1,7 +1,7 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import MaestroModule from './MaestroModule.vue';
-import { ModuleSubType } from '@/models/enums';
-import type { UartModule } from '@/models/module.types';
+import { ModuleSubType, ModuleType } from '@/models/enums';
+import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
 // Helper function to create Maestro channel
 function createMaestroChannel(num: number) {
@@ -21,12 +21,13 @@ function createMaestroChannel(num: number) {
 // Helper function to create mock UART module
 function getSerialModule(ch: number, baudRate: number, channelCount: number): UartModule {
     const channels = Array.from({ length: 24 }, (_, i) => createMaestroChannel(i));
-    
+
     return {
         idx: 0,
         id: '1234',
         name: 'Maestro',
         locationId: 'core',
+        moduleType: ModuleType.uart,
         moduleSubType: ModuleSubType.maestro,
         uartChannel: ch,
         baudRate,
