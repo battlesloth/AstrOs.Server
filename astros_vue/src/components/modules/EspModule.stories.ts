@@ -5,7 +5,7 @@ import type { ControllerLocation } from '@/models/module.types';
 // Helper function to create mock controller location
 function getControllerLocation(): ControllerLocation {
     const id = crypto.randomUUID();
-    
+
     return {
         id: id,
         locationName: 'core',
@@ -30,17 +30,17 @@ function getControllerLocation(): ControllerLocation {
 // Helper function to create location with modules
 function getControllerLocationWithModules(): ControllerLocation {
     const location = getControllerLocation();
-    
+
     location.uartModules = [
         { id: 'uart-1' },
         { id: 'uart-2' }
     ];
-    
+
     location.i2cModules = [
         { id: 'i2c-1', i2cAddress: 0x40 },
         { id: 'i2c-2', i2cAddress: 0x41 }
     ];
-    
+
     return location;
 }
 
@@ -154,9 +154,9 @@ export const ManyModules: Story = {
         location: {
             ...getControllerLocation(),
             uartModules: Array.from({ length: 10 }, (_, i) => ({ id: `uart-${i + 1}` })),
-            i2cModules: Array.from({ length: 10 }, (_, i) => ({ 
-                id: `i2c-${i + 1}`, 
-                i2cAddress: 0x40 + i 
+            i2cModules: Array.from({ length: 10 }, (_, i) => ({
+                id: `i2c-${i + 1}`,
+                i2cAddress: 0x40 + i
             })),
             gpioModule: {
                 channels: Array.from({ length: 10 }, (_, i) => ({ id: `gpio-${i + 1}` }))
