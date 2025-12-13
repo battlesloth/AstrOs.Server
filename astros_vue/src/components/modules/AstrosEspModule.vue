@@ -8,6 +8,9 @@ import type {
     AddressChangeEvent
 } from '@/models/events';
 import { useLocationStore } from '@/stores/location';
+import AstrosUartModule from './uart/AstrosUartModule.vue';
+import AstrosI2cModule from './i2c/AstrosI2cModule.vue';
+import AstrosGpioChannel from './gpio/AstrosGpioChannel.vue';
 
 // Props
 const props = defineProps({
@@ -37,17 +40,15 @@ const emit = defineEmits<{
 }>();
 
 // Reactive state
-const uartPanelOpenState = ref(false);
-const i2cPanelOpenState = ref(false);
-const gpioPanelOpenState = ref(false);
+const openPanel = ref<string | null>(null);
 const i2cUpdateTrigger = ref(0);
 
 // Methods
 const addUartModule = (evt: Event) => {
     evt.stopPropagation();
 
-    if (!uartPanelOpenState.value) {
-        uartPanelOpenState.value = true;
+    if (openPanel.value !== 'uart') {
+        openPanel.value = 'uart';
     }
 
     emit('addModule', {
@@ -59,8 +60,8 @@ const addUartModule = (evt: Event) => {
 const addI2cModule = (evt: Event) => {
     evt.stopPropagation();
 
-    if (!i2cPanelOpenState.value) {
-        i2cPanelOpenState.value = true;
+    if (openPanel.value !== 'i2c') {
+        openPanel.value = 'i2c';
     }
 
     emit('addModule', {
@@ -109,11 +110,12 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
     <div class="w-full space-y-2">
         <!-- Serial Modules Panel -->
         <div class="collapse collapse-arrow bg-base-200 border border-base-300"
-            :class="{ 'collapse-open': uartPanelOpenState, 'collapse-close': !uartPanelOpenState }">
-            <input type="checkbox" v-model="uartPanelOpenState" class="hidden" />
+            :class="{ 'collapse-open': openPanel === 'uart', 'collapse-close': openPanel !== 'uart' }">
+            <input type="radio" :name="`${parentTestId}-panel`"
+                @change="openPanel = openPanel === 'uart' ? null : 'uart'" :checked="openPanel === 'uart'" />
             <div :data-testid="`${parentTestId}-serial-header`"
                 class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
-                @click="uartPanelOpenState = !uartPanelOpenState">
+                @click="openPanel = openPanel === 'uart' ? null : 'uart'">
                 <h3 class="font-medium">Serial Modules</h3>
                 <button :data-testid="`${parentTestId}-add-serial`" @click.stop="addUartModule"
                     class="btn btn-sm btn-circle btn-ghost">
@@ -123,18 +125,8 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
             <div class="collapse-content">
                 <ul v-if="location?.uartModules" class="space-y-2 max-h-96 overflow-y-auto p-0">
                     <li v-for="module in location.uartModules" :key="module.id">
-                        <!-- Replace with UartModule component when available -->
-                        <div
-                            class="p-4 bg-base-100 border border-dashed border-base-300 rounded italic text-base-content/60">
-                            UART Module: {{ module.id }}
-                            <!-- <UartModule 
-                @remove-module-event="removeModule" 
-                @servo-test-event="onServoTestEvent"
-                :module="module" 
-                :is-master="isMaster"
-                :parent-test-id="parentTestId"
-              /> -->
-                        </div>
+                        <AstrosUartModule @remove-module="removeModule" @servo-test="onServoTestEvent" :module="module"
+                            :is-master="isMaster" :parent-test-id="parentTestId" />
                     </li>
                 </ul>
             </div>
@@ -142,11 +134,12 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
 
         <!-- I2C Configuration Panel -->
         <div class="collapse collapse-arrow bg-base-200 border border-base-300"
-            :class="{ 'collapse-open': i2cPanelOpenState, 'collapse-close': !i2cPanelOpenState }">
-            <input type="checkbox" v-model="i2cPanelOpenState" class="hidden" />
+            :class="{ 'collapse-open': openPanel === 'i2c', 'collapse-close': openPanel !== 'i2c' }">
+            <input type="radio" :name="`${parentTestId}-panel`" @change="openPanel = openPanel === 'i2c' ? null : 'i2c'"
+                :checked="openPanel === 'i2c'" />
             <div :data-testid="`${parentTestId}-i2c-header`"
                 class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
-                @click="i2cPanelOpenState = !i2cPanelOpenState">
+                @click="openPanel = openPanel === 'i2c' ? null : 'i2c'">
                 <h3 class="font-medium">I2C configuration</h3>
                 <button :data-testid="`${parentTestId}-add-i2c`" @click.stop="addI2cModule"
                     class="btn btn-sm btn-circle btn-ghost">
@@ -156,17 +149,8 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
             <div class="collapse-content">
                 <ul v-if="location?.i2cModules" class="space-y-2 max-h-96 overflow-y-auto p-0">
                     <li v-for="module in location.i2cModules" :key="module.id">
-                        <!-- Replace with I2cModule component when available -->
-                        <div class="p-4 bg-base-100 border-2 border-base-content/20 rounded">
-                            I2C Module: {{ module.id }}
-                            <!-- <I2cModule 
-                @remove-module-event="removeModule" 
-                @i2c-address-changed-event="i2cAddressChanged"
-                :update-trigger="i2cUpdateTrigger"
-                :module="module" 
-                :parent-test-id="parentTestId"
-              /> -->
-                        </div>
+                        <AstrosI2cModule @remove-module="removeModule" @i2c-address-changed="i2cAddressChanged"
+                            :update-trigger="i2cUpdateTrigger" :module="module" :parent-test-id="parentTestId" />
                     </li>
                 </ul>
             </div>
@@ -174,30 +158,20 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
 
         <!-- GPIO Configuration Panel -->
         <div class="collapse collapse-arrow bg-base-200 border border-base-300"
-            :class="{ 'collapse-open': gpioPanelOpenState, 'collapse-close': !gpioPanelOpenState }">
-            <input type="checkbox" v-model="gpioPanelOpenState" class="hidden" />
+            :class="{ 'collapse-open': openPanel === 'gpio', 'collapse-close': openPanel !== 'gpio' }">
+            <input type="radio" :name="`${parentTestId}-panel`"
+                @change="openPanel = openPanel === 'gpio' ? null : 'gpio'" :checked="openPanel === 'gpio'" />
             <div :data-testid="`${parentTestId}-gpio-header`" class="collapse-title cursor-pointer"
-                @click="gpioPanelOpenState = !gpioPanelOpenState">
+                @click="openPanel = openPanel === 'gpio' ? null : 'gpio'">
                 <h3 class="font-medium">GPIO configuration</h3>
             </div>
             <div class="collapse-content">
                 <ul v-if="location?.gpioModule" class="space-y-2 max-h-96 overflow-y-auto p-0">
                     <li v-for="channel in location.gpioModule.channels" :key="channel.id">
-                        <!-- Replace with GpioChannel component when available -->
-                        <div class="p-4 bg-base-100 border-2 border-base-content/20 rounded">
-                            GPIO Channel: {{ channel.id }}
-                            <!-- <GpioChannel 
-                :channel="channel"
-                :parent-test-id="parentTestId"
-              /> -->
-                        </div>
+                        <AstrosGpioChannel :channel="channel" :parent-test-id="parentTestId" />
                     </li>
                 </ul>
             </div>
         </div>
     </div>
 </template>
-
-<style scoped>
-/* Minimal custom styles - using Tailwind and DaisyUI utilities */
-</style>

@@ -2,11 +2,42 @@ import { ref, computed } from 'vue';
 import { defineStore } from 'pinia';
 import type { ControllerLocation } from '@/models/controllers/controllerLocation';
 import { Location } from '@/models/enums';
+import apiService from '@/api/apiService';
+import { LOCATIONS_LOAD } from '@/api/enpoints';
 
 export const useLocationStore = defineStore('location', () => {
     const coreLocation = ref<ControllerLocation | null>(null);
     const domeLocation = ref<ControllerLocation | null>(null);
     const bodyLocation = ref<ControllerLocation | null>(null);
+    const isLoading = ref(false);
+    const loadError = ref<string | null>(null);
+
+    async function loadLocationsFromApi() {
+        isLoading.value = true;
+        loadError.value = null;
+
+        try {
+            const response = await apiService.get(LOCATIONS_LOAD);
+
+            if (response.coreModule) {
+                coreLocation.value = response.coreModule;
+            }
+            if (response.domeModule) {
+                domeLocation.value = response.domeModule;
+            }
+            if (response.bodyModule) {
+                bodyLocation.value = response.bodyModule;
+            }
+
+            return { success: true, data: response };
+        } catch (error) {
+            console.error('Failed to load locations:', error);
+            loadError.value = 'Failed to load locations from API';
+            return { success: false, error };
+        } finally {
+            isLoading.value = false;
+        }
+    }
 
     function setLocation(locationEnum: Location, location: ControllerLocation) {
         switch (locationEnum) {
@@ -59,6 +90,9 @@ export const useLocationStore = defineStore('location', () => {
         coreLocation,
         domeLocation,
         bodyLocation,
+        isLoading,
+        loadError,
+        loadLocationsFromApi,
         setLocation,
         getLocation,
         clearLocation,
