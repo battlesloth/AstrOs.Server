@@ -1,5 +1,13 @@
-import type { Preview } from '@storybook/vue3-vite'
+import { Preview, setup } from '@storybook/vue3-vite'
 import './preview.css';
+import i18n from '../src/i18n.ts';
+import { initialize, mswLoader } from 'msw-storybook-addon';
+
+initialize();
+
+setup((app) => {
+  app.use(i18n);
+});
 
 export const initialGlobals = {
   dataTheme: 'winter',
@@ -14,6 +22,7 @@ const preview: Preview = {
       },
     },
   },
+  loaders: [mswLoader],
 };
 
 export default preview;

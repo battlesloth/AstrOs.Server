@@ -1,0 +1,11 @@
+{
+    "astros": "AstrOs",
+    "nav": {
+        "status": "Status",
+        "scripts": "Scripts",
+        "remote": "Remote",
+        "modules": "Modules",
+        "utility": "Utility",
+        "logout": "Logout"
+    }
+}

@@ -15,10 +15,30 @@ const router = createRouter({
       component: () => import('../views/StatusView.vue'),
     },
     {
-      path: '/pixi',
-      name: 'pixi',
-      component: () => import('../views/PixiView.vue'),
+      path: '/scripts',
+      name: 'scripts',
+      component: () => import('../views/ScriptsView.vue'),
     },
+    {
+      path: '/scripter',
+      name: 'scripter',
+      component: () => import('../views/ScripterView.vue'),
+    },
+    {
+      path: '/remote',
+      name: 'remote',
+      component: () => import('../views/RemoteView.vue'),
+    },
+    {
+      path: '/modules',
+      name: 'modules',
+      component: () => import('../views/ModulesView.vue'),
+    },
+    {
+      path: '/utility',
+      name: 'utility',
+      component: () => import('../views/UtilityView.vue'),
+    }
   ],
 });
 

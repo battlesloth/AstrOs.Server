@@ -50,10 +50,22 @@ watch(sidebarOpen, (newVal) => {
       <div class="bg-base-200 min-h-full w-80">
         <ul class="menu w-80 p-4">
           <li>
-            <p @click="router.push('/status')">Status</p>
+            <p @click="router.push('/status')">{{ $t('nav.status') }}</p>
           </li>
           <li>
-            <p @click="router.push('/pixi')">Pixi</p>
+            <p @click="router.push('/scripts')">{{ $t('nav.scripts') }}</p>
+          </li>
+          <li>
+            <p @click="router.push('/remote')">{{ $t('nav.remote') }}</p>
+          </li>
+          <li>
+            <p @click="router.push('/modules')">{{ $t('nav.modules') }}</p>
+          </li>
+          <li>
+            <p @click="router.push('/utility')">{{ $t('nav.utility') }}</p>
+          </li>
+          <li>
+            <p @click="">{{ $t('nav.logout') }}</p>
           </li>
         </ul>
       </div>

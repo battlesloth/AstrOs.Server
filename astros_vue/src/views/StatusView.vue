@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
+import AstrosStatus from '@/components/status/AstrosStatus.vue';
+import { ControllerStatus } from '@/enums/controllerStatus';
 </script>
 
 <template>
   <AstrosLayout>
     <template v-slot:main>
-      <div class="p-4">
-        <h1 class="text-2xl font-bold mb-4">Status</h1>
-        <p>Content for the Status view goes here.</p>
+      <div class="h-full justify-center items-center flex flex-col">
+        <AstrosStatus :bodyStatus="ControllerStatus.DOWN" :domeStatus="ControllerStatus.UP"
+          :coreStatus="ControllerStatus.UP" />
       </div>
     </template>
   </AstrosLayout>
