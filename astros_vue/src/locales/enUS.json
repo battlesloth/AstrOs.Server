@@ -1,26 +1,26 @@
 {
-    "astros": "AstrOs",
-    "error": {
-        "invalid_email": "Enter valid email address",
-        "invalid_password": "Password must be at least 8 characters long and include a number, a lowercase letter, and an uppercase letter",
-        "invalid_credentials": "Invalid email or password",
-        "not_found_title_404": "Not Found",
-        "not_found_msg_404": "Your Princess is in another castle..."
-    },
-    "nav": {
-        "status": "Status",
-        "scripts": "Scripts",
-        "remote": "Remote",
-        "modules": "Modules",
-        "utility": "Utility",
-        "logout": "Logout"
-    },
-    "placeholder": {
-        "username": "username",
-        "email": "mail{'@'}site.com",
-        "password": "password"
-    },
-    "astrosLogin": {
-        "login": "Login"
-    }
+  "astros": "AstrOs",
+  "error": {
+    "invalid_email": "Enter valid email address",
+    "invalid_password": "Password must be at least 8 characters long and include a number, a lowercase letter, and an uppercase letter",
+    "invalid_credentials": "Invalid email or password",
+    "not_found_title_404": "Not Found",
+    "not_found_msg_404": "Your Princess is in another castle..."
+  },
+  "nav": {
+    "status": "Status",
+    "scripts": "Scripts",
+    "remote": "Remote",
+    "modules": "Modules",
+    "utility": "Utility",
+    "logout": "Logout"
+  },
+  "placeholder": {
+    "username": "username",
+    "email": "mail{'@'}site.com",
+    "password": "password"
+  },
+  "astrosLogin": {
+    "login": "Login"
+  }
 }

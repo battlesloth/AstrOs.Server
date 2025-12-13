@@ -1,6 +1,6 @@
 export interface ControllerModule {
-    id: string;
-    name: string;
-    address: string;
-    fingerprint: string;
+  id: string;
+  name: string;
+  address: string;
+  fingerprint: string;
 }

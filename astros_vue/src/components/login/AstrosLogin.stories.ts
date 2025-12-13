@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/vue3-vite'
-import { fn } from 'storybook/test'
+import type { Meta, StoryObj } from '@storybook/vue3-vite';
+import { fn } from 'storybook/test';
 
-import AstrosLogin from './AstrosLogin.vue'
+import AstrosLogin from './AstrosLogin.vue';
 
 const meta = {
   title: 'Components/Login',
@@ -9,7 +9,7 @@ const meta = {
   render: (args: unknown) => ({
     components: { AstrosLogin },
     setup() {
-      return { args }
+      return { args };
     },
     template: '<AstrosLogin />',
   }),
@@ -21,11 +21,11 @@ const meta = {
     onCreateAccount: fn(),
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof AstrosLogin>
+} satisfies Meta<typeof AstrosLogin>;
 
-export default meta
-type Story = StoryObj<typeof meta>
+export default meta;
+type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {},
-}
+};

@@ -2,60 +2,60 @@ import { type Meta, type StoryObj } from '@storybook/vue3';
 import AstrosServoSettings from './AstrosServoSettings.vue';
 
 const meta = {
-    title: 'components/modules/shared/ServoSettings',
-    component: AstrosServoSettings,
-    render: (args: unknown) => ({
-        components: { AstrosServoSettings },
-        setup() {
-            return { args };
-        },
-        template: '<AstrosServoSettings v-bind="args" />',
-    }),
-    args: {
-        testId: 'test',
-        enabled: true,
-        name: 'Servo 1',
-        invert: false,
-        isServo: true,
-        minPulse: 500,
-        maxPulse: 2500,
-        homePosition: 1500
+  title: 'components/modules/shared/ServoSettings',
+  component: AstrosServoSettings,
+  render: (args: unknown) => ({
+    components: { AstrosServoSettings },
+    setup() {
+      return { args };
     },
-    tags: ['autodocs'],
-    argTypes: {
-        enabled: {
-            control: 'boolean',
-            description: 'Whether the servo settings are enabled/visible'
-        },
-        name: {
-            control: 'text',
-            description: 'Name of the servo or GPIO channel'
-        },
-        invert: {
-            control: 'boolean',
-            description: 'Whether the servo is inverted or GPIO default high'
-        },
-        isServo: {
-            control: 'boolean',
-            description: 'True for servo settings, false for GPIO'
-        },
-        minPulse: {
-            control: 'number',
-            description: 'Minimum pulse width in microseconds'
-        },
-        maxPulse: {
-            control: 'number',
-            description: 'Maximum pulse width in microseconds'
-        },
-        homePosition: {
-            control: 'number',
-            description: 'Home position pulse width in microseconds'
-        },
-        testId: {
-            control: 'text',
-            description: 'Test ID prefix for testing'
-        }
-    }
+    template: '<AstrosServoSettings v-bind="args" />',
+  }),
+  args: {
+    testId: 'test',
+    enabled: true,
+    name: 'Servo 1',
+    invert: false,
+    isServo: true,
+    minPulse: 500,
+    maxPulse: 2500,
+    homePosition: 1500,
+  },
+  tags: ['autodocs'],
+  argTypes: {
+    enabled: {
+      control: 'boolean',
+      description: 'Whether the servo settings are enabled/visible',
+    },
+    name: {
+      control: 'text',
+      description: 'Name of the servo or GPIO channel',
+    },
+    invert: {
+      control: 'boolean',
+      description: 'Whether the servo is inverted or GPIO default high',
+    },
+    isServo: {
+      control: 'boolean',
+      description: 'True for servo settings, false for GPIO',
+    },
+    minPulse: {
+      control: 'number',
+      description: 'Minimum pulse width in microseconds',
+    },
+    maxPulse: {
+      control: 'number',
+      description: 'Maximum pulse width in microseconds',
+    },
+    homePosition: {
+      control: 'number',
+      description: 'Home position pulse width in microseconds',
+    },
+    testId: {
+      control: 'text',
+      description: 'Test ID prefix for testing',
+    },
+  },
 } satisfies Meta<typeof AstrosServoSettings>;
 
 export default meta;
@@ -66,102 +66,102 @@ type Story = StoryObj<typeof meta>;
  * Default servo configuration with standard settings
  */
 export const Default: Story = {
-    args: {
-        enabled: true,
-        name: 'Servo 1',
-        invert: false,
-        isServo: true,
-        minPulse: 500,
-        maxPulse: 2500,
-        homePosition: 1500,
-        testId: 'test'
-    },
+  args: {
+    enabled: true,
+    name: 'Servo 1',
+    invert: false,
+    isServo: true,
+    minPulse: 500,
+    maxPulse: 2500,
+    homePosition: 1500,
+    testId: 'test',
+  },
 };
 
 /**
  * Inverted servo with custom pulse settings
  */
 export const Inverted: Story = {
-    args: {
-        enabled: true,
-        name: 'Servo 2',
-        invert: true,
-        isServo: true,
-        minPulse: 900,
-        maxPulse: 2000,
-        homePosition: 1000,
-        testId: 'test'
-    },
+  args: {
+    enabled: true,
+    name: 'Servo 2',
+    invert: true,
+    isServo: true,
+    minPulse: 900,
+    maxPulse: 2000,
+    homePosition: 1000,
+    testId: 'test',
+  },
 };
 
 /**
  * GPIO channel configuration (no pulse settings)
  */
 export const GPIO: Story = {
-    args: {
-        enabled: true,
-        name: 'GPIO 1',
-        invert: false,
-        isServo: false,
-        minPulse: 900,
-        maxPulse: 2000,
-        homePosition: 1000,
-        testId: 'test'
-    },
+  args: {
+    enabled: true,
+    name: 'GPIO 1',
+    invert: false,
+    isServo: false,
+    minPulse: 900,
+    maxPulse: 2000,
+    homePosition: 1000,
+    testId: 'test',
+  },
 };
 
 /**
  * GPIO channel with default high enabled
  */
 export const GPIODefaultHigh: Story = {
-    args: {
-        enabled: true,
-        name: 'GPIO 2',
-        invert: true,
-        isServo: false,
-        minPulse: 900,
-        maxPulse: 2000,
-        homePosition: 1000,
-        testId: 'test'
-    },
+  args: {
+    enabled: true,
+    name: 'GPIO 2',
+    invert: true,
+    isServo: false,
+    minPulse: 900,
+    maxPulse: 2000,
+    homePosition: 1000,
+    testId: 'test',
+  },
 };
 
 /**
  * Disabled servo settings (not visible)
  */
 export const Disabled: Story = {
-    args: {
-        enabled: false,
-        name: 'Servo 3',
-        invert: false,
-        isServo: true,
-        minPulse: 500,
-        maxPulse: 2500,
-        homePosition: 1500,
-        testId: 'test'
-    },
+  args: {
+    enabled: false,
+    name: 'Servo 3',
+    invert: false,
+    isServo: true,
+    minPulse: 500,
+    maxPulse: 2500,
+    homePosition: 1500,
+    testId: 'test',
+  },
 };
 
 /**
  * Interactive example showing v-model updates
  */
 export const Interactive: Story = {
-    render: () => ({
-        components: { AstrosServoSettings },
-        setup() {
-            const settings = {
-                enabled: { value: true },
-                name: { value: 'Interactive Servo' },
-                invert: { value: false },
-                isServo: { value: true },
-                minPulse: { value: 500 },
-                maxPulse: { value: 2500 },
-                homePosition: { value: 1500 }
-            };
+  render: () => ({
+    components: { AstrosServoSettings },
+    setup() {
+      const settings = {
+        enabled: { value: true },
+        name: { value: 'Interactive Servo' },
+        invert: { value: false },
+        isServo: { value: true },
+        minPulse: { value: 500 },
+        maxPulse: { value: 2500 },
+        homePosition: { value: 1500 },
+      };
 
-            return { settings };
-        },
-        template: `
+      return { settings };
+    },
+    template: `
             <div class="space-y-4 p-4">
                 <div class="bg-base-200 p-4 rounded">
                     <AstrosServoSettings 
@@ -187,25 +187,57 @@ export const Interactive: Story = {
                 </div>
             </div>
         `,
-    }),
+  }),
 };
 
 /**
  * Multiple servo configurations
  */
 export const MultipleServos: Story = {
-    render: () => ({
-        components: { AstrosServoSettings },
-        setup() {
-            const servos = [
-                { enabled: true, name: 'Pan Servo', invert: false, isServo: true, minPulse: 500, maxPulse: 2500, homePosition: 1500 },
-                { enabled: true, name: 'Tilt Servo', invert: true, isServo: true, minPulse: 600, maxPulse: 2400, homePosition: 1200 },
-                { enabled: true, name: 'GPIO Enable', invert: false, isServo: false, minPulse: 0, maxPulse: 0, homePosition: 0 },
-                { enabled: true, name: 'Gripper Servo', invert: false, isServo: true, minPulse: 800, maxPulse: 2200, homePosition: 1500 },
-            ];
-            return { servos };
+  render: () => ({
+    components: { AstrosServoSettings },
+    setup() {
+      const servos = [
+        {
+          enabled: true,
+          name: 'Pan Servo',
+          invert: false,
+          isServo: true,
+          minPulse: 500,
+          maxPulse: 2500,
+          homePosition: 1500,
         },
-        template: `
+        {
+          enabled: true,
+          name: 'Tilt Servo',
+          invert: true,
+          isServo: true,
+          minPulse: 600,
+          maxPulse: 2400,
+          homePosition: 1200,
+        },
+        {
+          enabled: true,
+          name: 'GPIO Enable',
+          invert: false,
+          isServo: false,
+          minPulse: 0,
+          maxPulse: 0,
+          homePosition: 0,
+        },
+        {
+          enabled: true,
+          name: 'Gripper Servo',
+          invert: false,
+          isServo: true,
+          minPulse: 800,
+          maxPulse: 2200,
+          homePosition: 1500,
+        },
+      ];
+      return { servos };
+    },
+    template: `
             <div class="space-y-4 p-4">
                 <div 
                     v-for="(servo, index) in servos" 
@@ -225,5 +257,5 @@ export const MultipleServos: Story = {
                 </div>
             </div>
         `,
-    }),
+  }),
 };

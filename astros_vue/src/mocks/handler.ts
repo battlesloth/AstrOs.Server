@@ -1,5 +1,1 @@
-
-
-
-export const handlers = [
-];
+export const handlers = [];

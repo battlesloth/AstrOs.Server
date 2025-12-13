@@ -1,7 +1,7 @@
-import type { ControllerLocation } from "./controllerLocation";
+import type { ControllerLocation } from './controllerLocation';
 
 export interface ControllerLayout {
-    body: ControllerLocation
-    core: ControllerLocation
-    dome: ControllerLocation
+  body: ControllerLocation;
+  core: ControllerLocation;
+  dome: ControllerLocation;
 }

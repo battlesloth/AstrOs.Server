@@ -1,6 +1,6 @@
-export const CHECK_SESSION = 'api/check-session'
-export const LOGIN = 'api/login'
-export const LOGOUT = 'api/logout'
-export const LOCATIONS = 'api/locations/'
-export const LOCATIONS_LOAD = 'api/locations/load'
-export const SYNC_CONTROLLERS = 'api/locations/synccontrollers'
+export const CHECK_SESSION = 'api/check-session';
+export const LOGIN = 'api/login';
+export const LOGOUT = 'api/logout';
+export const LOCATIONS = 'api/locations/';
+export const LOCATIONS_LOAD = 'api/locations/load';
+export const SYNC_CONTROLLERS = 'api/locations/synccontrollers';

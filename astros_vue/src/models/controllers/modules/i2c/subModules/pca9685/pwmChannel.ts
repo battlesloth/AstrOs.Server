@@ -1,4 +1,4 @@
-import type { BaseChannel } from "@/models/controllers/baseChannel";
+import type { BaseChannel } from '@/models/controllers/baseChannel';
 
 export interface PwmChannel extends BaseChannel {
   channelId: number;

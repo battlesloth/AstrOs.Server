@@ -40,9 +40,18 @@ function logout() {
       <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-none pl-2 flex items-center">
           <label for="nav-menu-drawer" class="btn btn-ghost drawer-button pl-2 pr-2 h-12 ml-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-              class="inline-block h-9 w-9 stroke-current">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              class="inline-block h-9 w-9 stroke-current"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 6h16M4 12h16M4 18h16"
+              ></path>
             </svg>
           </label>
           <a class="text-xl pl-4 lg:block">AstrOs</a>

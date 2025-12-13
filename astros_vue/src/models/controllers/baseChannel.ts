@@ -1,11 +1,11 @@
-import type { ModuleSubType, ModuleType } from "../enums";
+import type { ModuleSubType, ModuleType } from '../enums';
 
 export interface BaseChannel {
-    id: string;
-    parentId: string;
-    channelName: string;
-    enabled: boolean;
+  id: string;
+  parentId: string;
+  channelName: string;
+  enabled: boolean;
 
-    moduleType: ModuleType;
-    moduleSubType: ModuleSubType;
+  moduleType: ModuleType;
+  moduleSubType: ModuleSubType;
 }

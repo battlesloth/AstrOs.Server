@@ -1,4 +1,3 @@
-import type { BaseChannel } from "@/models/controllers/baseChannel";
+import type { BaseChannel } from '@/models/controllers/baseChannel';
 
-export interface I2cChannel extends BaseChannel {
-}
+export interface I2cChannel extends BaseChannel {}

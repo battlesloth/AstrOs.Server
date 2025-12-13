@@ -1,4 +1,4 @@
-import type { MaestroBoard } from "./maestroBoard";
+import type { MaestroBoard } from './maestroBoard';
 
 export interface MaestroModule {
   boards: MaestroBoard[];

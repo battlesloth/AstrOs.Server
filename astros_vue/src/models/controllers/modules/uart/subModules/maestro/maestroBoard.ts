@@ -1,4 +1,4 @@
-import type { MaestroChannel } from "./maestroChannel";
+import type { MaestroChannel } from './maestroChannel';
 
 export interface MaestroBoard {
   id: string;

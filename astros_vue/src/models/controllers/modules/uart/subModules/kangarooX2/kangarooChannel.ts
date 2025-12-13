@@ -1,4 +1,4 @@
-import type { UartChannel } from "@/models/controllers/modules/uart/uartChannel";
+import type { UartChannel } from '@/models/controllers/modules/uart/uartChannel';
 
 export interface KangarooChannel extends UartChannel {
   ch1Name: string;

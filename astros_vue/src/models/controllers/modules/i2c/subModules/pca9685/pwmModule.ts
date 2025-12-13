@@ -1,4 +1,4 @@
-import type { PwmChannel } from "./pwmChannel";
+import type { PwmChannel } from './pwmChannel';
 
 // PCA9685 module
 // Address is the I2C address of the module

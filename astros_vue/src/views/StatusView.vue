@@ -8,8 +8,11 @@ import { ControllerStatus } from '@/enums/controllerStatus';
   <AstrosLayout>
     <template v-slot:main>
       <div class="h-full justify-center items-center flex flex-col">
-        <AstrosStatus :bodyStatus="ControllerStatus.DOWN" :domeStatus="ControllerStatus.UP"
-          :coreStatus="ControllerStatus.UP" />
+        <AstrosStatus
+          :bodyStatus="ControllerStatus.DOWN"
+          :domeStatus="ControllerStatus.UP"
+          :coreStatus="ControllerStatus.UP"
+        />
       </div>
     </template>
   </AstrosLayout>

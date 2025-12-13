@@ -39,151 +39,151 @@ export enum HumanCyborgRelationsCmd {
 export function getHcrCommandString(cmd: HumanCyborgRelationsCmd): string {
   switch (cmd) {
     case HumanCyborgRelationsCmd.mildHappy:
-      return "SH0";
+      return 'SH0';
     case HumanCyborgRelationsCmd.extremeHappy:
-      return "SH1";
+      return 'SH1';
     case HumanCyborgRelationsCmd.mildSad:
-      return "SS0";
+      return 'SS0';
     case HumanCyborgRelationsCmd.extremeSad:
-      return "SS1";
+      return 'SS1';
     case HumanCyborgRelationsCmd.mildAngry:
-      return "SM0";
+      return 'SM0';
     case HumanCyborgRelationsCmd.extremeAngry:
-      return "SM1";
+      return 'SM1';
     case HumanCyborgRelationsCmd.mildScared:
-      return "SC0";
+      return 'SC0';
     case HumanCyborgRelationsCmd.extremeScared:
-      return "SC1";
+      return 'SC1';
     case HumanCyborgRelationsCmd.overload:
-      return "SE";
+      return 'SE';
     case HumanCyborgRelationsCmd.enableMuse:
-      return "M1";
+      return 'M1';
     case HumanCyborgRelationsCmd.disableMuse:
-      return "M0";
+      return 'M0';
     case HumanCyborgRelationsCmd.toggleMuse:
-      return "MT";
+      return 'MT';
     case HumanCyborgRelationsCmd.triggerMusing:
-      return "MM";
+      return 'MM';
     case HumanCyborgRelationsCmd.minSecondsBetweenMusings:
-      return "MN#";
+      return 'MN#';
     case HumanCyborgRelationsCmd.maxSecondsBetweenMusings:
-      return "MX#";
+      return 'MX#';
     case HumanCyborgRelationsCmd.playWavOnA:
-      return "CA#";
+      return 'CA#';
     case HumanCyborgRelationsCmd.playWavOnB:
-      return "CB#";
+      return 'CB#';
     case HumanCyborgRelationsCmd.playSdRandomOnA:
-      return "CA#C*";
+      return 'CA#C*';
     case HumanCyborgRelationsCmd.playSdRandomOnB:
-      return "CB#C*";
+      return 'CB#C*';
     case HumanCyborgRelationsCmd.panicStop:
-      return "PSV";
+      return 'PSV';
     case HumanCyborgRelationsCmd.gracefulStop:
-      return "PSG";
+      return 'PSG';
     case HumanCyborgRelationsCmd.stopWavOnA:
-      return "PSA";
+      return 'PSA';
     case HumanCyborgRelationsCmd.stopWavOnB:
-      return "PSB";
+      return 'PSB';
     case HumanCyborgRelationsCmd.vocalizerVolume:
-      return "PVV#";
+      return 'PVV#';
     case HumanCyborgRelationsCmd.wavAVolume:
-      return "PVA#";
+      return 'PVA#';
     case HumanCyborgRelationsCmd.wavBVolume:
-      return "PVB#";
+      return 'PVB#';
     case HumanCyborgRelationsCmd.enableImprov:
-      return "OA0";
+      return 'OA0';
     case HumanCyborgRelationsCmd.enableCanonical:
-      return "OA1";
+      return 'OA1';
     case HumanCyborgRelationsCmd.enablePersonalityOverride:
-      return "O1";
+      return 'O1';
     case HumanCyborgRelationsCmd.disablePersonalityOverride:
-      return "O0";
+      return 'O0';
     case HumanCyborgRelationsCmd.zeroEmotions:
-      return "OR";
+      return 'OR';
     case HumanCyborgRelationsCmd.setHappyLevel:
-      return "OH#";
+      return 'OH#';
     case HumanCyborgRelationsCmd.setSadLevel:
-      return "OS#";
+      return 'OS#';
     case HumanCyborgRelationsCmd.setMadLevel:
-      return "OM#";
+      return 'OM#';
     case HumanCyborgRelationsCmd.setScaredLevel:
-      return "OC#";
+      return 'OC#';
     default:
-      return "";
+      return '';
   }
 }
 
 export function getHcrCommandName(cmd: HumanCyborgRelationsCmd) {
   switch (cmd) {
     case HumanCyborgRelationsCmd.mildHappy:
-      return "Mild Happy";
+      return 'Mild Happy';
     case HumanCyborgRelationsCmd.extremeHappy:
-      return "Extreme Happy";
+      return 'Extreme Happy';
     case HumanCyborgRelationsCmd.mildSad:
-      return "Mild Sad";
+      return 'Mild Sad';
     case HumanCyborgRelationsCmd.extremeSad:
-      return "Extreme ";
+      return 'Extreme ';
     case HumanCyborgRelationsCmd.mildAngry:
-      return "Mild Angry";
+      return 'Mild Angry';
     case HumanCyborgRelationsCmd.extremeAngry:
-      return "Extreme Angry";
+      return 'Extreme Angry';
     case HumanCyborgRelationsCmd.mildScared:
-      return "Mild Scared";
+      return 'Mild Scared';
     case HumanCyborgRelationsCmd.extremeScared:
-      return "Extreme Scared";
+      return 'Extreme Scared';
     case HumanCyborgRelationsCmd.overload:
-      return "Overload";
+      return 'Overload';
     case HumanCyborgRelationsCmd.enableMuse:
-      return "Enable Muse";
+      return 'Enable Muse';
     case HumanCyborgRelationsCmd.disableMuse:
-      return "DIsable Muse";
+      return 'DIsable Muse';
     case HumanCyborgRelationsCmd.toggleMuse:
-      return "Toggle Muse";
+      return 'Toggle Muse';
     case HumanCyborgRelationsCmd.triggerMusing:
-      return "Trigger Muse";
+      return 'Trigger Muse';
     case HumanCyborgRelationsCmd.minSecondsBetweenMusings:
-      return "Min Seconds Between";
+      return 'Min Seconds Between';
     case HumanCyborgRelationsCmd.maxSecondsBetweenMusings:
-      return "Max Seconds Between";
+      return 'Max Seconds Between';
     case HumanCyborgRelationsCmd.playWavOnA:
-      return "Play WAV on CH A";
+      return 'Play WAV on CH A';
     case HumanCyborgRelationsCmd.playWavOnB:
-      return "Play WAV on CH B";
+      return 'Play WAV on CH B';
     case HumanCyborgRelationsCmd.playSdRandomOnA:
-      return "Play Random WAV on CH A";
+      return 'Play Random WAV on CH A';
     case HumanCyborgRelationsCmd.playSdRandomOnB:
-      return "Play Random WAV on CH B";
+      return 'Play Random WAV on CH B';
     case HumanCyborgRelationsCmd.panicStop:
-      return "Sudden Stop";
+      return 'Sudden Stop';
     case HumanCyborgRelationsCmd.gracefulStop:
-      return "Graceful Stop";
+      return 'Graceful Stop';
     case HumanCyborgRelationsCmd.stopWavOnA:
-      return "Stop WAV on CH A";
+      return 'Stop WAV on CH A';
     case HumanCyborgRelationsCmd.stopWavOnB:
-      return "Stop WAV on CH B";
+      return 'Stop WAV on CH B';
     case HumanCyborgRelationsCmd.vocalizerVolume:
-      return "Vocalizer Volume";
+      return 'Vocalizer Volume';
     case HumanCyborgRelationsCmd.wavAVolume:
-      return "CH A Volume";
+      return 'CH A Volume';
     case HumanCyborgRelationsCmd.wavBVolume:
-      return "CH B Volume";
+      return 'CH B Volume';
     case HumanCyborgRelationsCmd.enableImprov:
-      return "Enable Improv";
+      return 'Enable Improv';
     case HumanCyborgRelationsCmd.enableCanonical:
-      return "Enable Canonical";
+      return 'Enable Canonical';
     case HumanCyborgRelationsCmd.enablePersonalityOverride:
-      return "Enable Personality Override";
+      return 'Enable Personality Override';
     case HumanCyborgRelationsCmd.disablePersonalityOverride:
-      return "Disable Personality Override";
+      return 'Disable Personality Override';
     case HumanCyborgRelationsCmd.zeroEmotions:
-      return "Reset Emotions";
+      return 'Reset Emotions';
     case HumanCyborgRelationsCmd.setHappyLevel:
-      return "Set Happy Level";
+      return 'Set Happy Level';
     case HumanCyborgRelationsCmd.setSadLevel:
-      return "Set Sad Level";
+      return 'Set Sad Level';
     case HumanCyborgRelationsCmd.setMadLevel:
-      return "Set Angry Level";
+      return 'Set Angry Level';
     case HumanCyborgRelationsCmd.setScaredLevel:
-      return "Set Scared Level";
+      return 'Set Scared Level';
   }
 }
