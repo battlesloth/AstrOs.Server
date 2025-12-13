@@ -116,8 +116,6 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         <!-- Serial Modules Panel -->
         <div class="collapse collapse-arrow bg-base-200 border border-base-300"
             :class="{ 'collapse-open': openPanel === 'uart', 'collapse-close': openPanel !== 'uart' }">
-            <input type="radio" :name="`${parentTestId}-panel`"
-                @change="openPanel = openPanel === 'uart' ? null : 'uart'" :checked="openPanel === 'uart'" />
             <div :data-testid="`${parentTestId}-serial-header`"
                 class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
                 @click="openPanel = openPanel === 'uart' ? null : 'uart'">
@@ -141,8 +139,6 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         <!-- I2C Configuration Panel -->
         <div class="collapse collapse-arrow bg-base-200 border border-base-300"
             :class="{ 'collapse-open': openPanel === 'i2c', 'collapse-close': openPanel !== 'i2c' }">
-            <input type="radio" :name="`${parentTestId}-panel`" @change="openPanel = openPanel === 'i2c' ? null : 'i2c'"
-                :checked="openPanel === 'i2c'" />
             <div :data-testid="`${parentTestId}-i2c-header`"
                 class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
                 @click="openPanel = openPanel === 'i2c' ? null : 'i2c'">
@@ -165,8 +161,6 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         <!-- GPIO Configuration Panel -->
         <div class="collapse collapse-arrow bg-base-200 border border-base-300"
             :class="{ 'collapse-open': openPanel === 'gpio', 'collapse-close': openPanel !== 'gpio' }">
-            <input type="radio" :name="`${parentTestId}-panel`"
-                @change="openPanel = openPanel === 'gpio' ? null : 'gpio'" :checked="openPanel === 'gpio'" />
             <div :data-testid="`${parentTestId}-gpio-header`" class="collapse-title cursor-pointer"
                 @click="openPanel = openPanel === 'gpio' ? null : 'gpio'">
                 <h3 class="font-medium">GPIO configuration</h3>
