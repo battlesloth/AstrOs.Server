@@ -1,0 +1,77 @@
+import { type Meta, type StoryObj } from '@storybook/vue3';
+import KangarooModule from './KangarooModule.vue';
+import { ModuleSubType } from '@/models/enums';
+import type { UartModule } from '@/models/module.types';
+
+// Helper function to create mock UART module
+function getSerialModule(ch: number, baudRate: number): UartModule {
+    return {
+        idx: 0,
+        id: '1234',
+        name: 'Kangaroo X2',
+        locationId: 'core',
+        moduleSubType: ModuleSubType.kangaroo,
+        uartChannel: ch,
+        baudRate,
+        subModule: {
+            id: '',
+            ch1Name: 'Lifter',
+            ch2Name: 'Spinner'
+        }
+    };
+}
+
+const meta = {
+    title: 'components/modules/uart/submodules/KangarooModule',
+    component: KangarooModule,
+    render: (args: unknown) => ({
+        components: { KangarooModule },
+        setup() {
+            return { args };
+        },
+        template: '<KangarooModule v-bind="args" />',
+    }),
+    args: {
+        module: getSerialModule(1, 9600),
+        parentTestId: 'test',
+        isMaster: false
+    },
+    tags: ['autodocs']
+} satisfies Meta<typeof KangarooModule>;
+
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+/**
+ * Default Kangaroo X2 configuration
+ */
+export const Default: Story = {
+    args: {
+        module: getSerialModule(1, 9600),
+        parentTestId: 'test',
+        isMaster: false
+    },
+};
+
+/**
+ * High-speed configuration at 115200 baud
+ */
+export const HighSpeed: Story = {
+    args: {
+        module: getSerialModule(2, 115200),
+        parentTestId: 'test',
+        isMaster: false
+    },
+};
+
+/**
+ * Master controller configuration
+ */
+export const Master: Story = {
+    args: {
+        module: getSerialModule(2, 115200),
+        parentTestId: 'test',
+        isMaster: true
+    },
+};

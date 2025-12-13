@@ -17,9 +17,9 @@ function getControllerLocation(): ControllerLocation {
         },
         gpioModule: {
             channels: [
-                { id: 'gpio-1' },
-                { id: 'gpio-2' },
-                { id: 'gpio-3' }
+                { id: 'gpio-1', parentId: 'parent-1', channelName: 'Channel 1', channelNumber: 1, enabled: true, defaultHigh: false },
+                { id: 'gpio-2', parentId: 'parent-2', channelName: 'Channel 2', channelNumber: 2, enabled: true, defaultHigh: false },
+                { id: 'gpio-3', parentId: 'parent-3', channelName: 'Channel 3', channelNumber: 3, enabled: true, defaultHigh: false }
             ]
         },
         i2cModules: [],
@@ -32,13 +32,13 @@ function getControllerLocationWithModules(): ControllerLocation {
     const location = getControllerLocation();
 
     location.uartModules = [
-        { id: 'uart-1' },
-        { id: 'uart-2' }
+        { id: 'uart-1', uartChannel: 1, baudRate: 9600, subModule: 'sub-1', idx: 1, name: 'UART Module 1', locationId: 'location-1', moduleSubType: 1 },
+        { id: 'uart-2', uartChannel: 2, baudRate: 115200, subModule: 'sub-2', idx: 2, name: 'UART Module 2', locationId: 'location-1', moduleSubType: 2 }
     ];
 
     location.i2cModules = [
-        { id: 'i2c-1', i2cAddress: 0x40 },
-        { id: 'i2c-2', i2cAddress: 0x41 }
+        { id: 'i2c-1', i2cAddress: 0x40, idx: 1, name: 'I2C Module 1', locationId: 'location-1', moduleSubType: 1 },
+        { id: 'i2c-2', i2cAddress: 0x41, idx: 2, name: 'I2C Module 2', locationId: 'location-1', moduleSubType: 2 }
     ];
 
     return location;
@@ -118,9 +118,9 @@ export const OnlyUartModules: Story = {
         location: {
             ...getControllerLocation(),
             uartModules: [
-                { id: 'uart-1' },
-                { id: 'uart-2' },
-                { id: 'uart-3' }
+                { id: 'uart-1', uartChannel: 1, baudRate: 9600, subModule: 'sub-1', idx: 1, name: 'UART Module 1', locationId: 'location-1', moduleSubType: 1 },
+                { id: 'uart-2', uartChannel: 2, baudRate: 115200, subModule: 'sub-2', idx: 2, name: 'UART Module 2', locationId: 'location-1', moduleSubType: 2 },
+                { id: 'uart-3', uartChannel: 3, baudRate: 4800, subModule: 'sub-3', idx: 3, name: 'UART Module 3', locationId: 'location-1', moduleSubType: 3 }
             ]
         },
         parentTestId: 'test'
@@ -136,9 +136,9 @@ export const OnlyI2cModules: Story = {
         location: {
             ...getControllerLocation(),
             i2cModules: [
-                { id: 'i2c-1', i2cAddress: 0x40 },
-                { id: 'i2c-2', i2cAddress: 0x41 },
-                { id: 'i2c-3', i2cAddress: 0x70 }
+                { id: 'i2c-1', i2cAddress: 0x40, idx: 1, name: 'I2C Module 1', locationId: 'location-1', moduleSubType: 1 },
+                { id: 'i2c-2', i2cAddress: 0x41, idx: 2, name: 'I2C Module 2', locationId: 'location-1', moduleSubType: 2 },
+                { id: 'i2c-3', i2cAddress: 0x70, idx: 3, name: 'I2C Module 3', locationId: 'location-1', moduleSubType: 3 }
             ]
         },
         parentTestId: 'test'
@@ -153,13 +153,33 @@ export const ManyModules: Story = {
         isMaster: false,
         location: {
             ...getControllerLocation(),
-            uartModules: Array.from({ length: 10 }, (_, i) => ({ id: `uart-${i + 1}` })),
+            uartModules: Array.from({ length: 10 }, (_, i) => ({
+                id: `uart-${i + 1}`,
+                uartChannel: i + 1,
+                baudRate: 9600 + i * 100,
+                subModule: `sub-${i + 1}`,
+                idx: i + 1,
+                name: `UART Module ${i + 1}`,
+                locationId: `location-${i + 1}`,
+                moduleSubType: i + 1
+            })),
             i2cModules: Array.from({ length: 10 }, (_, i) => ({
                 id: `i2c-${i + 1}`,
-                i2cAddress: 0x40 + i
+                i2cAddress: 0x40 + i,
+                idx: i + 1,
+                name: `I2C Module ${i + 1}`,
+                locationId: `location-${i + 1}`,
+                moduleSubType: i + 1
             })),
             gpioModule: {
-                channels: Array.from({ length: 10 }, (_, i) => ({ id: `gpio-${i + 1}` }))
+                channels: Array.from({ length: 10 }, (_, i) => ({
+                    id: `gpio-${i + 1}`,
+                    parentId: `parent-${i + 1}`,
+                    channelName: `Channel ${i + 1}`,
+                    channelNumber: i + 1,
+                    enabled: true,
+                    defaultHigh: false
+                }))
             }
         },
         parentTestId: 'test'

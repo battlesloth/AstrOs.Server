@@ -1,4 +1,4 @@
-import { ModuleType } from './enums';
+import { ModuleSubType, ModuleType } from './enums';
 
 export interface AddModuleEvent {
   locationId: string;
@@ -14,6 +14,8 @@ export interface RemoveModuleEvent {
 export interface ServoTestEvent {
   controllerAddress?: string;
   controllerName?: string;
+  moduleSubType: ModuleSubType;
+  channelNumber: number;
 }
 
 export interface AddressChangeEvent {
