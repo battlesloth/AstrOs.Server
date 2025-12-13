@@ -15,7 +15,9 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix --cache",
-    "format": "prettier --write --experimental-cli src/"
+    "format": "prettier --write --experimental-cli src/",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "pinia": "^3.0.4",
@@ -48,6 +50,9 @@
     "vite": "^7.2.4",
     "vite-plugin-vue-devtools": "^8.0.5",
     "vitest": "^4.0.14",
-    "vue-tsc": "^3.1.5"
+    "vue-tsc": "^3.1.5",
+    "storybook": "^10.1.8",
+    "@storybook/vue3-vite": "^10.1.8",
+    "eslint-plugin-storybook": "^10.1.8"
   }
 }
