@@ -3,7 +3,7 @@ import { ControllerStatus } from "@/enums/controllerStatus";
 import AstrosStatus from "./AstrosStatus.vue";
 
 const meta = {
-    title: 'status/AstrosStatus',
+    title: 'components/status/AstrosStatus',
     component: AstrosStatus,
     render: (args: unknown) => ({
         components: { AstrosStatus },

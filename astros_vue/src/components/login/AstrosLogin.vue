@@ -45,7 +45,7 @@ defineEmits<{
                         </button>
                     </div>
                     <div v-if="props.errorMessage" class="mt-4 text-red-600 font-bold text-center">
-                        {{ $t('astrosLogin.' + props.errorMessage) }}
+                        {{ $t(props.errorMessage) }}
                     </div>
                 </div>
             </div>

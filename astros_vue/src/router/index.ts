@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import StatusView from '../views/StatusView.vue';
+import api from '@/api/apiService';
+import { CHECK_SESSION } from '@/api/enpoints'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -8,6 +10,11 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: StatusView,
+    },
+    {
+      path: '/auth',
+      name: 'auth',
+      component: () => import('../views/AuthView.vue'),
     },
     {
       path: '/status',
@@ -41,5 +48,26 @@ const router = createRouter({
     }
   ],
 });
+
+
+router.beforeEach(async (to, from, next) => {
+  if (!to.meta.public && to.path !== '/auth') {
+    // Check if the route requires authentication
+    try {
+      const response = await api.get(CHECK_SESSION)
+      console.log('Session check response:', response)
+      if (response.isAuthenticated) {
+        next()
+      } else {
+        next('/auth')
+      }
+    } catch (error) {
+      console.error('Session check failed:', error)
+      next('/auth')
+    }
+  } else {
+    next()
+  }
+})
 
 export default router;

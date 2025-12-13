@@ -1,14 +1,15 @@
 import type { StorybookConfig } from '@storybook/vue3-vite';
 
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
-
 const config: StorybookConfig = {
   stories: [
+    '../src/**/*.mdx',
     "../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"
   ],
-  staticDirs: ['../public', '../src/assets/images/status'],
-  addons: [],
-  framework: "@storybook/vue3-vite"
+  addons: ['storybook-addon-data-theme-switcher', 'msw-storybook-addon'],
+  staticDirs: ['../public', '../src/assets'],
+  framework: {
+    name: '@storybook/vue3-vite',
+    options: {}
+  }
 };
 export default config;
