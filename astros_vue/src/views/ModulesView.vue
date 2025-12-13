@@ -85,11 +85,9 @@ function controllerSelectChanged(location: string) {
                         <!-- Body Module -->
                         <div class="collapse collapse-arrow bg-base-200 border border-base-300"
                             :class="{ 'collapse-open': openAccordion === 'body', 'collapse-close': openAccordion !== 'body' }">
-                            <input type="radio" name="modules-accordion"
-                                @change="openAccordion = openAccordion === 'body' ? null : 'body'"
-                                :checked="openAccordion === 'body'" />
                             <div data-testid="body-module-header"
-                                class="collapse-title text-xl font-medium flex items-center gap-2">
+                                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
+                                @click="openAccordion = openAccordion === 'body' ? null : 'body'">
                                 <span>Body Module</span>
                                 <!-- TODO: Add status warning icon -->
                             </div>
@@ -108,11 +106,9 @@ function controllerSelectChanged(location: string) {
                         <!-- Core Module -->
                         <div class="collapse collapse-arrow bg-base-200 border border-base-300"
                             :class="{ 'collapse-open': openAccordion === 'core', 'collapse-close': openAccordion !== 'core' }">
-                            <input type="radio" name="modules-accordion"
-                                @change="openAccordion = openAccordion === 'core' ? null : 'core'"
-                                :checked="openAccordion === 'core'" />
                             <div data-testid="core-module-header"
-                                class="collapse-title text-xl font-medium flex items-center gap-2">
+                                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
+                                @click="openAccordion = openAccordion === 'core' ? null : 'core'">
                                 <span>Core Module</span>
                                 <!-- TODO: Add status warning icon -->
                             </div>
@@ -137,11 +133,9 @@ function controllerSelectChanged(location: string) {
                         <!-- Dome Module -->
                         <div class="collapse collapse-arrow bg-base-200 border border-base-300"
                             :class="{ 'collapse-open': openAccordion === 'dome', 'collapse-close': openAccordion !== 'dome' }">
-                            <input type="radio" name="modules-accordion"
-                                @change="openAccordion = openAccordion === 'dome' ? null : 'dome'"
-                                :checked="openAccordion === 'dome'" />
                             <div data-testid="dome-module-header"
-                                class="collapse-title text-xl font-medium flex items-center gap-2">
+                                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
+                                @click="openAccordion = openAccordion === 'dome' ? null : 'dome'">
                                 <span>Dome Module</span>
                                 <!-- TODO: Add status warning icon -->
                             </div>
