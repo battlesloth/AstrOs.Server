@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import type { ControllerLocation } from '@/models/controllers/controllerLocation';
-import { Location } from '@/models/enums';
+import { Location } from '@/enums/modules/Location';
 import apiService from '@/api/apiService';
 import { LOCATIONS_LOAD } from '@/api/enpoints';
 

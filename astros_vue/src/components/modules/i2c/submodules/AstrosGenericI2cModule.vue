@@ -25,10 +25,10 @@ const addresses = Array.from(Array(128).keys()).map((val) => val.toString());
 
 // Watch for module changes
 watch(
-  () => props.module,
-  (newModule) => {
-    if (newModule) {
-      i2cAddress.value = newModule.i2cAddress.toString();
+  () => props.module.i2cAddress,
+  (newAddress) => {
+    if (newAddress !== undefined) {
+      i2cAddress.value = newAddress.toString();
     }
   },
   { immediate: true },
@@ -42,13 +42,8 @@ const onI2cAddressChange = (val: string) => {
 
 <template>
   <div class="flex flex-row">
-    <select
-      v-if="module"
-      :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-address`"
-      v-model="i2cAddress"
-      @change="onI2cAddressChange(i2cAddress)"
-      class="select select-bordered select-sm w-35"
-    >
+    <select v-if="module" :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-address`" v-model="i2cAddress"
+      @change="onI2cAddressChange(i2cAddress)" class="select select-bordered select-sm w-35">
       <option v-for="addr in addresses" :key="addr" :value="addr">Address {{ addr }}</option>
     </select>
   </div>

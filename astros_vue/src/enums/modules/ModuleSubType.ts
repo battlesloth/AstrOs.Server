@@ -1,16 +1,3 @@
-export enum Location {
-  unknown = 'unknown',
-  body = 'body',
-  core = 'core',
-  dome = 'dome',
-}
-
-export enum ModuleType {
-  none = 0,
-  uart = 1,
-  i2c = 2,
-  gpio = 3,
-}
 
 export enum ModuleSubType {
   none = 0,
@@ -26,5 +13,5 @@ export enum ModuleSubType {
   pwmBoard = 203,
 
   // gpio
-  genericGpio = 301,
+  genericGpio = 301
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, type PropType, type Component } from 'vue';
-import { ModuleType, ModuleSubType } from '@/models/enums';
+import { ModuleType } from "@/enums/modules/ModuleType";
+import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 import type { RemoveModuleEvent, ServoTestEvent } from '@/models/events';
 import AstrosGenericSerialModule from './submodules/AstrosGenericSerialModule.vue';
@@ -70,10 +71,6 @@ const subModuleComponent = computed<Component | null>(() => {
 });
 
 // Methods
-const nameClicked = (evt: MouseEvent) => {
-  evt.stopPropagation();
-};
-
 const removeModule = (event: Event) => {
   event.stopPropagation();
   emit('removeModule', {

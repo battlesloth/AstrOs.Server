@@ -2,7 +2,9 @@ import { type Meta, type StoryObj } from '@storybook/vue3';
 import { createPinia } from 'pinia';
 import AstrosEspModule from './AstrosEspModule.vue';
 import type { ControllerLocation } from '@/models/controllers/controllerLocation';
-import { ModuleSubType, ModuleType, Location } from '@/models/enums';
+import { Location } from '@/enums/modules/Location';
+import { ModuleType } from "@/enums/modules/ModuleType";
+import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import { useLocationStore } from '@/stores/location';
 
 // Helper function to create mock controller location

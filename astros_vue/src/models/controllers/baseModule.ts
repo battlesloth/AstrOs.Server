@@ -1,4 +1,6 @@
-import type { ModuleSubType, ModuleType } from '../enums';
+import type { Location } from '../../enums/modules/Location';
+import type { ModuleType } from "../../enums/modules/ModuleType";
+import type { ModuleSubType } from "../../enums/modules/ModuleSubType";
 
 export interface BaseModule {
   // idx is the primary key for the module,
@@ -12,7 +14,7 @@ export interface BaseModule {
   idx: number;
   id: string;
   name: string;
-  locationId: string;
+  locationId: Location;
   moduleType: ModuleType;
   moduleSubType: ModuleSubType;
 }

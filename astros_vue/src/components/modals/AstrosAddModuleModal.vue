@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { ModuleType, ModuleSubType, Location } from '@/models/enums';
+import { Location } from '@/enums/modules/Location';
+import { ModuleType } from "@/enums/modules/ModuleType";
+import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { AddModuleEvent } from '@/models/events';
 
 interface ModuleSubTypeSelection {

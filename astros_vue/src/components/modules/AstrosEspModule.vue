@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, type PropType } from 'vue';
-import { ModuleType, Location } from '@/models/enums';
+import { Location } from '@/enums/modules/Location';
+import { ModuleType } from "@/enums/modules/ModuleType";
 import type {
   AddModuleEvent,
   RemoveModuleEvent,
@@ -12,7 +13,6 @@ import AstrosUartModule from './uart/AstrosUartModule.vue';
 import AstrosI2cModule from './i2c/AstrosI2cModule.vue';
 import AstrosGpioChannel from './gpio/AstrosGpioChannel.vue';
 
-// Props
 const props = defineProps({
   isMaster: {
     type: Boolean,
@@ -28,23 +28,18 @@ const props = defineProps({
   },
 });
 
-// Store
 const locationStore = useLocationStore();
 const location = computed(() => locationStore.getLocation(props.locationEnum));
 
-// Emits
 const emit = defineEmits<{
   removeModule: [event: RemoveModuleEvent];
   addModule: [event: AddModuleEvent];
   openServoTestModal: [event: ServoTestEvent];
 }>();
 
-// Reactive state
 const openPanel = ref<string | null>(null);
 const openUartModuleId = ref<string | undefined>(undefined);
-const i2cUpdateTrigger = ref(0);
 
-// Methods
 const addUartModule = () => {
   if (openPanel.value !== 'uart') {
     openPanel.value = 'uart';
@@ -82,20 +77,22 @@ const toggleUartModule = (moduleId: string) => {
 const i2cAddressChanged = (evt: AddressChangeEvent) => {
   if (!location.value) return;
 
-  // if the new address is in use, swap it to the old address
-  const m1 = location.value.i2cModules.find((m) => m.i2cAddress === evt.new);
+  // Find the module that currently has the OLD address (the one being changed)
+  const moduleToUpdate = location.value.i2cModules.find(
+    (m) => m.i2cAddress === evt.old
+  );
 
-  if (m1) {
-    m1.i2cAddress = evt.old;
+  // Find any module that already has the NEW address (to swap with)
+  const existingModuleWithNewAddress = location.value.i2cModules.find(
+    (m) => m.i2cAddress === evt.new
+  );
+
+  if (moduleToUpdate) {
+    if (existingModuleWithNewAddress) {
+      existingModuleWithNewAddress.i2cAddress = evt.old;
+    }
+    moduleToUpdate.i2cAddress = evt.new;
   }
-
-  const m2 = location.value.i2cModules.find((m) => m.i2cAddress === evt.old);
-
-  if (m2) {
-    m2.i2cAddress = evt.new;
-  }
-
-  i2cUpdateTrigger.value++;
 };
 
 const onServoTestEvent = (evt: ServoTestEvent) => {
@@ -122,7 +119,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         </button>
       </div>
       <div class="collapse-content">
-        <ul v-if="location?.uartModules" class="space-y-2 max-h-96 overflow-y-auto p-0">
+        <ul v-if="location?.uartModules" class="space-y-2 max-h-96 overflow-y-scroll p-0">
           <li v-for="module in location.uartModules" :key="module.id">
             <AstrosUartModule @remove-module="removeModule" @servo-test="onServoTestEvent"
               @toggle-module="toggleUartModule" :module="module" :is-master="isMaster" :parent-test-id="parentTestId"
@@ -145,10 +142,10 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         </button>
       </div>
       <div class="collapse-content">
-        <ul v-if="location?.i2cModules" class="space-y-2 max-h-96 overflow-y-auto p-0">
+        <ul v-if="location?.i2cModules" class="space-y-2 max-h-96 overflow-y-scroll p-0">
           <li v-for="module in location.i2cModules" :key="module.id">
-            <AstrosI2cModule @remove-module="removeModule" @i2c-address-changed="i2cAddressChanged"
-              :update-trigger="i2cUpdateTrigger" :module="module" :parent-test-id="parentTestId" />
+            <AstrosI2cModule @remove-module="removeModule" @i2c-address-changed="i2cAddressChanged" :module="module"
+              :parent-test-id="parentTestId" />
           </li>
         </ul>
       </div>
@@ -162,7 +159,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         <h3 class="font-medium">GPIO configuration</h3>
       </div>
       <div class="collapse-content">
-        <ul v-if="location?.gpioModule" class="space-y-2 max-h-96 overflow-y-auto p-0">
+        <ul v-if="location?.gpioModule" class="space-y-2 max-h-96 overflow-y-scroll p-0">
           <li v-for="channel in location.gpioModule.channels" :key="channel.id">
             <AstrosGpioChannel :channel="channel" :parent-test-id="parentTestId" />
           </li>

@@ -4,7 +4,9 @@ import type { MaestroBoard } from '@/models/controllers/modules/uart/subModules/
 import type { MaestroChannel } from '@/models/controllers/modules/uart/subModules/maestro/maestroChannel';
 import type { MaestroModule } from '@/models/controllers/modules/uart/subModules/maestro/maestroModule';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
-import { ModuleType, ModuleSubType, Location } from '@/models/enums';
+import { Location } from '@/enums/modules/Location';
+import { ModuleType } from "@/enums/modules/ModuleType";
+import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import { useLocationStore } from '@/stores/location';
 import { v4 as uuid } from 'uuid';
 

@@ -1,4 +1,6 @@
-import { ModuleSubType, ModuleType, Location } from './enums';
+import { Location } from '../enums/modules/Location';
+import { ModuleType } from "../enums/modules/ModuleType";
+import { ModuleSubType } from "../enums/modules/ModuleSubType";
 
 export interface AddModuleEvent {
   locationId: Location;

@@ -1,6 +1,7 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import AstrosMaestroModule from './AstrosMaestroModule.vue';
-import { ModuleSubType, ModuleType } from '@/models/enums';
+import { ModuleType } from "@/enums/modules/ModuleType";
+import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
 // Helper function to create Maestro channel

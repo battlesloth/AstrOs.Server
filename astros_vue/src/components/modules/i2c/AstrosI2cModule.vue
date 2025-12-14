@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, type PropType, type Component } from 'vue';
-import { ModuleType, ModuleSubType } from '@/models/enums';
+import { Location } from '@/enums/modules/Location';
+import { ModuleType } from "@/enums/modules/ModuleType";
+import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
 import type { RemoveModuleEvent, AddressChangeEvent } from '@/models/events';
 import AstrosGenericI2cModule from './submodules/AstrosGenericI2cModule.vue';
@@ -15,10 +17,6 @@ const props = defineProps({
   parentTestId: {
     type: String,
     required: true,
-  },
-  updateTrigger: {
-    type: Number,
-    default: 0,
   },
 });
 
@@ -64,7 +62,7 @@ const removeModule = (event: Event) => {
   emit('removeModule', {
     locationId: props.module.locationId,
     id: props.module.id,
-    module: ModuleType.i2c,
+    moduleType: ModuleType.i2c,
   });
 };
 
@@ -80,40 +78,24 @@ const onI2cAddressChanged = (value: string) => {
 <template>
   <div class="collapse collapse-arrow bg-base-100 border border-base-300">
     <input type="checkbox" class="peer" />
-    <div
-      :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-header`"
-      class="collapse-title flex items-center justify-between pr-12"
-    >
+    <div :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-header`"
+      class="collapse-title flex items-center justify-between pr-12">
       <div class="shrink-0 min-w-0">
-        <input
-          :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-name`"
-          v-model="module.name"
-          @click="nameClicked"
-          @keydown.space.stop
-          placeholder="Name"
-          class="input input-bordered input-sm w-full max-w-xs"
-        />
+        <input :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-name`" v-model="module.name"
+          @click="nameClicked" @keydown.space.stop placeholder="Name"
+          class="input input-bordered input-sm w-full max-w-xs" />
       </div>
       <div class="flex items-center gap-2 ml-4">
         <p class="text-sm text-base-content/60">{{ subtypeName }}</p>
-        <button
-          @click.stop="removeModule"
-          @keydown.enter.prevent="removeModule"
-          @keydown.space.prevent="removeModule"
-          class="btn btn-sm btn-circle btn-ghost"
-        >
+        <button @click.stop="removeModule" @keydown.enter.prevent="removeModule" @keydown.space.prevent="removeModule"
+          class="btn btn-sm btn-circle btn-ghost">
           <span class="text-lg">×</span>
         </button>
       </div>
     </div>
     <div class="collapse-content">
-      <component
-        v-if="subModuleComponent"
-        :is="subModuleComponent"
-        :module="module"
-        :parent-test-id="parentTestId"
-        @i2c-address-changed="onI2cAddressChanged"
-      />
+      <component v-if="subModuleComponent" :is="subModuleComponent" :module="module" :parent-test-id="parentTestId"
+        @i2c-address-changed="onI2cAddressChanged" />
     </div>
   </div>
 </template>

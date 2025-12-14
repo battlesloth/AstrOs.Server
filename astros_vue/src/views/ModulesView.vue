@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import type { AddModuleEvent } from '@/models/events';
 import { useLocationStore } from '@/stores/location';
 import { useControllerStore } from '@/stores/controller';
-import { Location } from '@/models/enums';
+import { Location } from '@/enums/modules/Location';
 import { useModuleManagement } from '@/composables/useModuleManagement';
 import { ModalType } from '@/enums/modalType';
 
@@ -12,10 +12,12 @@ import AstrosLoadingModal from '@/components/modals/AstrosLoadingModal.vue';
 import AstrosEspModule from '@/components/modules/AstrosEspModule.vue';
 import AstrosAddModuleModal from '@/components/modals/AstrosAddModuleModal.vue';
 import AstrosAlertModal from '@/components/modals/AstrosAlertModal.vue';
+import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
 
 const showModal = ref<ModalType>(ModalType.loadingModal);
-const errorMessage = ref<string>('');
+const modalMessage = ref<string>('');
 const selectedLocationId = ref<Location>(Location.unknown);
+const selectedModuleId = ref<string>('');
 const selectedModuleType = ref<number>(0);
 const openAccordion = ref<string | null>(null);
 const locationStore = useLocationStore();
@@ -50,6 +52,7 @@ function saveModuleSettings() {
   console.log('Save module settings');
 }
 
+
 function syncModuleSettings() {
   // TODO: Implement sync functionality
   console.log('Sync module settings');
@@ -67,17 +70,25 @@ function handleAddModule(event: any) {
     showModal.value = ModalType.closeAll;
   } catch (error) {
     console.error('Error adding module:', error);
-    errorMessage.value = (error as Error).message;
+    modalMessage.value = (error as Error).message;
     showModal.value = ModalType.errorModal;
   }
 }
 
-function handleRemoveModule(event: any) {
+function openConfirmRemoveModuleModal(event: any) {
+  selectedLocationId.value = event.locationId;
+  selectedModuleId.value = event.id;
+  selectedModuleType.value = event.moduleType;
+  showModal.value = ModalType.confirmModal;
+}
+
+function handleRemoveModule() {
   try {
-    removeModule(event.locationId, event.id, event.moduleType);
+    removeModule(selectedLocationId.value, selectedModuleId.value, selectedModuleType.value);
+    showModal.value = ModalType.closeAll;
   } catch (error) {
     console.error('Error removing module:', error);
-    errorMessage.value = (error as Error).message;
+    modalMessage.value = (error as Error).message;
     showModal.value = ModalType.errorModal;
   }
 }
@@ -108,7 +119,7 @@ function controllerSelectChanged(location: string) {
         </div>
 
         <!-- Module Accordions -->
-        <div class="flex-1 overflow-y-auto p-4 pb-8 flex justify-center">
+        <div class="flex-1 overflow-y-scroll p-4 pb-8 flex justify-center">
           <div class="space-y-2 pb-4 w-full max-w-5xl">
             <!-- Body Module -->
             <div class="collapse collapse-arrow bg-base-200 border border-base-300" :class="{
@@ -128,7 +139,7 @@ function controllerSelectChanged(location: string) {
                   </select>
                 </div>
                 <AstrosEspModule :is-master="true" :location-enum="Location.body" :parent-test-id="'body'"
-                  @add-module="openAddModuleModal" @remove-module="handleRemoveModule"
+                  @add-module="openAddModuleModal" @remove-module="openConfirmRemoveModuleModal"
                   @open-servo-test-modal="handleServoTest" />
               </div>
             </div>
@@ -155,7 +166,7 @@ function controllerSelectChanged(location: string) {
                   </select>
                 </div>
                 <AstrosEspModule :location-enum="Location.core" :parent-test-id="'core'"
-                  @add-module="openAddModuleModal" @remove-module="handleRemoveModule"
+                  @add-module="openAddModuleModal" @remove-module="openConfirmRemoveModuleModal"
                   @open-servo-test-modal="handleServoTest" />
               </div>
             </div>
@@ -182,7 +193,7 @@ function controllerSelectChanged(location: string) {
                   </select>
                 </div>
                 <AstrosEspModule :location-enum="Location.dome" :parent-test-id="'dome'"
-                  @add-module="openAddModuleModal" @remove-module="handleRemoveModule"
+                  @add-module="openAddModuleModal" @remove-module="openConfirmRemoveModuleModal"
                   @open-servo-test-modal="handleServoTest" />
               </div>
             </div>
@@ -190,7 +201,10 @@ function controllerSelectChanged(location: string) {
         </div>
       </div>
 
-      <AstrosAlertModal v-if="showModal === ModalType.errorModal" :message="errorMessage"
+      <AstrosAlertModal v-if="showModal === ModalType.errorModal" :message="modalMessage"
+        @close="showModal = ModalType.closeAll" />
+      <AstrosConfirmModal v-if="showModal === ModalType.confirmModal"
+        :message="'Are you sure you want to remove this module?'" @confirm="handleRemoveModule"
         @close="showModal = ModalType.closeAll" />
       <AstrosLoadingModal v-if="showModal === ModalType.loadingModal" @loaded="onLocationsLoaded" />
       <AstrosAddModuleModal v-if="showModal === ModalType.addModule" :is-open="showModal === ModalType.addModule"

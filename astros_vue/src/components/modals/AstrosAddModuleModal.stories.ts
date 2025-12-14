@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import AstrosAddModuleModal from './AstrosAddModuleModal.vue';
-import { ModuleType, Location } from '@/models/enums';
+import { Location } from '@/enums/modules/Location';
+import { ModuleType } from "@/enums/modules/ModuleType";
 
 const meta = {
   title: 'Components/Modals/AddModuleModal',

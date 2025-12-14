@@ -1,6 +1,7 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import AstrosPca9685Module from './AstrosPca9685Module.vue';
-import { ModuleSubType, ModuleType } from '@/models/enums';
+import { ModuleType } from "@/enums/modules/ModuleType";
+import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
 
 // Helper function to create mock I2C module
