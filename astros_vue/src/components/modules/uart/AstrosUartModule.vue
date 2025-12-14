@@ -79,7 +79,7 @@ const removeModule = (event: Event) => {
   emit('removeModule', {
     locationId: props.module.locationId,
     id: props.module.id,
-    module: ModuleType.uart,
+    moduleType: ModuleType.uart,
   });
 };
 
@@ -93,52 +93,28 @@ const toggleCollapse = () => {
 </script>
 
 <template>
-  <div
-    class="collapse collapse-arrow bg-base-100 border border-base-300"
-    :class="{ 'collapse-open': isOpen, 'collapse-close': !isOpen }"
-  >
-    <div
-      :data-testid="`${parentTestId}-serial-${module.moduleSubType}-header`"
-      class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
-      @click="toggleCollapse"
-    >
+  <div class="collapse collapse-arrow bg-base-100 border border-base-300"
+    :class="{ 'collapse-open': isOpen, 'collapse-close': !isOpen }">
+    <div :data-testid="`${parentTestId}-serial-${module.moduleSubType}-header`"
+      class="collapse-title flex items-center justify-between pr-12 cursor-pointer" @click="toggleCollapse">
       <div class="shrink-0 min-w-0">
-        <input
-          :data-testid="`${parentTestId}-serial-${module.moduleSubType}-name`"
-          v-model="module.name"
-          @click.stop
-          @keydown.space.stop
-          placeholder="Name"
-          class="input input-bordered input-sm w-full max-w-xs"
-        />
+        <input :data-testid="`${parentTestId}-serial-${module.moduleSubType}-name`" v-model="module.name" @click.stop
+          @keydown.space.stop placeholder="Name" class="input input-bordered input-sm w-full max-w-xs" />
       </div>
       <div class="flex items-center gap-2 ml-4">
         <p class="text-sm text-base-content/60">{{ subtypeName }}</p>
-        <button
-          @click.stop="removeModule"
-          @keydown.enter.prevent="removeModule"
-          @keydown.space.prevent="removeModule"
-          class="btn btn-sm btn-circle btn-ghost"
-        >
+        <button @click.stop="removeModule" @keydown.enter.prevent="removeModule" @keydown.space.prevent="removeModule"
+          class="btn btn-sm btn-circle btn-ghost">
           <span class="text-lg">×</span>
         </button>
       </div>
     </div>
     <div class="collapse-content">
-      <div
-        v-if="!subModuleComponent"
-        class="p-4 bg-base-200 rounded border border-dashed border-base-300"
-      >
+      <div v-if="!subModuleComponent" class="p-4 bg-base-200 rounded border border-dashed border-base-300">
         <p class="text-sm text-base-content/60 italic">Unsupported UART Module Subtype.</p>
       </div>
-      <component
-        v-else
-        :is="subModuleComponent"
-        :module="module"
-        :parent-test-id="parentTestId"
-        :is-master="isMaster"
-        @servo-test-event="onServoTestEvent"
-      />
+      <component v-else :is="subModuleComponent" :module="module" :parent-test-id="parentTestId" :is-master="isMaster"
+        @servo-test-event="onServoTestEvent" />
     </div>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { ModuleType, ModuleSubType } from '@/models/enums';
+import { ModuleType, ModuleSubType, Location } from '@/models/enums';
+import type { AddModuleEvent } from '@/models/events';
 
 interface ModuleSubTypeSelection {
   id: ModuleSubType;
@@ -8,7 +9,7 @@ interface ModuleSubTypeSelection {
 }
 
 interface Props {
-  locationId: string;
+  locationId: Location;
   moduleType: ModuleType;
   isOpen: boolean;
 }
@@ -16,17 +17,11 @@ interface Props {
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  add: [response: { locationId: string; moduleType: ModuleType; moduleSubType: ModuleSubType }];
+  add: [response: AddModuleEvent];
   close: [];
 }>();
 
 const selectedSubType = ref<ModuleSubType>(ModuleSubType.none);
-
-const moduleTypes = new Map<ModuleType, string>([
-  [ModuleType.uart, 'Serial'],
-  [ModuleType.i2c, 'I2C'],
-  [ModuleType.gpio, 'GPIO'],
-]);
 
 const moduleSubTypes = new Map<ModuleType, ModuleSubTypeSelection[]>([
   [
@@ -93,12 +88,8 @@ const closeModal = () => {
           <div class="label">
             <span class="label-text">Select Module Type</span>
           </div>
-          <select
-            data-testid="modal-module-select"
-            v-model="selectedSubType"
-            class="select select-bordered w-full"
-            title="Module"
-          >
+          <select data-testid="modal-module-select" v-model="selectedSubType" class="select select-bordered w-full"
+            title="Module">
             <option :value="ModuleSubType.none" disabled selected>Select Module Type</option>
             <option v-for="option in options" :key="option.id" :value="option.id">
               {{ option.value }}
@@ -108,12 +99,8 @@ const closeModal = () => {
       </div>
 
       <div class="modal-action">
-        <button
-          data-testid="modal-add-module"
-          class="btn btn-primary"
-          :disabled="selectedSubType === ModuleSubType.none"
-          @click="addModule"
-        >
+        <button data-testid="modal-add-module" class="btn btn-primary"
+          :disabled="selectedSubType === ModuleSubType.none" @click="addModule">
           Add
         </button>
         <button data-testid="modal-close" class="btn" @click="closeModal">Close</button>

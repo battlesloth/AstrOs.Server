@@ -1,14 +1,15 @@
-import { ModuleSubType, ModuleType } from './enums';
+import { ModuleSubType, ModuleType, Location } from './enums';
 
 export interface AddModuleEvent {
-  locationId: string;
-  module: ModuleType;
+  locationId: Location;
+  moduleType: ModuleType;
+  moduleSubType?: ModuleSubType;
 }
 
 export interface RemoveModuleEvent {
-  locationId?: string;
+  locationId: Location;
   id: string;
-  module: ModuleType;
+  moduleType: ModuleType;
 }
 
 export interface ServoTestEvent {

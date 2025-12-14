@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import AstrosAddModuleModal from './AstrosAddModuleModal.vue';
-import { ModuleType } from '@/models/enums';
+import { ModuleType, Location } from '@/models/enums';
 
 const meta = {
   title: 'Components/Modals/AddModuleModal',
@@ -22,35 +22,35 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    locationId: 'core',
+    locationId: Location.core,
     moduleType: ModuleType.uart,
   },
 };
 
 export const Serial: Story = {
   args: {
-    locationId: 'core',
+    locationId: Location.core,
     moduleType: ModuleType.uart,
   },
 };
 
 export const I2C: Story = {
   args: {
-    locationId: 'core',
+    locationId: Location.core,
     moduleType: ModuleType.i2c,
   },
 };
 
 export const GPIO: Story = {
   args: {
-    locationId: 'core',
+    locationId: Location.core,
     moduleType: ModuleType.gpio,
   },
 };
 
 export const Closed: Story = {
   args: {
-    locationId: 'core',
+    locationId: Location.core,
     moduleType: ModuleType.uart,
     isOpen: false,
   },

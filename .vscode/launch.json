@@ -1,51 +1,79 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "nodejs",
-            "type": "node",
-            "request": "launch",
-            "cwd": "${workspaceFolder}/astros_api",
-            "runtimeExecutable": "npm",
-            "runtimeArgs": [
-                "run-script",
-                "start"
-            ],
-            "console": "integratedTerminal",
-            "preLaunchTask": "build server"
-        },
-        {
-            "name": "angular",
-            "type": "node",
-            "request": "launch",
-            "cwd": "${workspaceFolder}/astros_client",
-            "runtimeExecutable": "npm",
-            "runtimeArgs": [
-                "run-script",
-                "start"
-            ],
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "browser",
-            "type": "msedge",
-            "request": "launch",
-            "url": "http://localhost:4200",
-            "webRoot": "${workspaceFolder}/astros_client",
-            "userDataDir": "${workspaceRoot}/.vscode/edge"
-        },
-    ],
-    "compounds": [
-        {
-            "name": "server/client",
-            "configurations": [
-                "nodejs",
-                "angular",
-                "browser"                    
-            ]
-        }
-    ]
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "nodejs",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/astros_api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run-script",
+        "start"
+      ],
+      "console": "integratedTerminal",
+      "preLaunchTask": "build server"
+    },
+    {
+      "name": "vue",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/astros_vue",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run-script",
+        "dev"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "angular",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/astros_client",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run-script",
+        "start"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "angular_browser",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:4200",
+      "webRoot": "${workspaceFolder}/astros_client",
+      "userDataDir": "${workspaceRoot}/.vscode/edge"
+    },
+    {
+      "name": "vue_browser",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/astros_vue",
+      "userDataDir": "${workspaceRoot}/.vscode/edge"
+    },
+  ],
+  "compounds": [
+    {
+      "name": "server/client",
+      "configurations": [
+        "nodejs",
+        "angular",
+        "angular_browser"
+      ]
+    },
+    {
+      "name": "server/vue",
+      "configurations": [
+        "nodejs",
+        "vue",
+        "vue_browser"
+      ]
+    }
+  ]
 }

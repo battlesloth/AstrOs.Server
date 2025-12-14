@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import type { ControllerLocation } from '@/models/controllers/controllerLocation';
 import { Location } from '@/models/enums';
