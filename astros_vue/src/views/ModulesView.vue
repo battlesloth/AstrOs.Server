@@ -14,12 +14,16 @@ import AstrosAddModuleModal from '@/components/modals/AstrosAddModuleModal.vue';
 import AstrosAlertModal from '@/components/modals/AstrosAlertModal.vue';
 import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
 
+
 const showModal = ref<ModalType>(ModalType.loadingModal);
 const modalMessage = ref<string>('');
+
 const selectedLocationId = ref<Location>(Location.unknown);
 const selectedModuleId = ref<string>('');
 const selectedModuleType = ref<number>(0);
+
 const openAccordion = ref<string | null>(null);
+
 const locationStore = useLocationStore();
 const controllerStore = useControllerStore();
 
@@ -44,14 +48,18 @@ const availableDomeControllers = computed(() =>
 );
 
 function onLocationsLoaded() {
-  showModal.value = ModalType.closeAll;
+  if (controllerStore.syncError) {
+    modalMessage.value = controllerStore.syncError;
+    showModal.value = ModalType.errorModal;
+  } else {
+    showModal.value = ModalType.closeAll;
+  }
 }
 
 function saveModuleSettings() {
   // TODO: Implement save functionality
   console.log('Save module settings');
 }
-
 
 function syncModuleSettings() {
   // TODO: Implement sync functionality

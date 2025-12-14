@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useLocationStore } from '@/stores/location';
 import { useControllerStore } from '@/stores/controller';
+import { storeToRefs } from 'pinia';
 
 interface Props {
   skipControllerLoading?: boolean;
@@ -18,11 +19,33 @@ const emit = defineEmits<{
 const locationStore = useLocationStore();
 const controllerStore = useControllerStore();
 
+const { isSyncing } = storeToRefs(controllerStore);
+
 const message = ref('Loading locations...');
 const locationsLoaded = ref(false);
 const controllersLoaded = ref(false);
 const loadingComplete = ref(false);
 const loadError = ref(false);
+
+watch(isSyncing, (inProgress) => {
+  controllersLoaded.value = !inProgress;
+});
+
+watch(controllersLoaded,
+  (loaded) => {
+    if (loaded && locationsLoaded.value) {
+      onLoadComplete();
+    }
+  },
+);
+
+watch(locationsLoaded,
+  (loaded) => {
+    if (loaded && controllersLoaded.value) {
+      onLoadComplete();
+    }
+  },
+);
 
 onMounted(async () => {
   // Load locations
@@ -41,37 +64,29 @@ onMounted(async () => {
   // Handle controller sync
   if (props.skipControllerLoading) {
     message.value = 'Skipping controller loading...';
-    controllersLoaded.value = true;
-    checkLoadedState();
+    controllersLoaded.value = true;;
   } else {
     message.value = 'Syncing controllers...';
     const controllerResult = await controllerStore.syncControllers();
 
-    if (controllerResult.success) {
-      controllersLoaded.value = true;
-      console.log('Controllers synced successfully');
-      checkLoadedState();
-    } else {
+    if (!controllerResult.success) {
       console.error('Failed to sync controllers:', controllerResult.error);
       loadError.value = true;
       message.value = 'Failed to sync controllers, using cached values.';
       controllersLoaded.value = true;
-      checkLoadedState();
     }
   }
 });
 
-function checkLoadedState() {
-  if (locationsLoaded.value && controllersLoaded.value) {
-    loadingComplete.value = true;
-    message.value = 'Loading complete!';
+function onLoadComplete() {
+  loadingComplete.value = true;
+  message.value = 'Loading complete!';
 
-    // Auto-close modal after successful load
-    if (!loadError.value) {
-      setTimeout(() => {
-        emit('loaded');
-      }, 500);
-    }
+  // Auto-close modal after successful load
+  if (!loadError.value) {
+    setTimeout(() => {
+      emit('loaded');
+    }, 500);
   }
 }
 </script>

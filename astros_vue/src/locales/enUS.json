@@ -22,5 +22,22 @@
   },
   "astrosLogin": {
     "login": "Login"
+  },
+  "modals": {
+    "add_module": {
+      "title": "Add Module",
+      "select_type": "Select Module Type",
+      "select_subtype": "Select Module Subtype",
+      "select_location": "Select Location",
+      "add_button": "Add Module",
+      "cancel_button": "Cancel",
+      "module_types": {
+        "generic": "Generic",
+        "hcr": "Humnan Cyborg Relations",
+        "kangaroo": "Kangaroo X2",
+        "maestro": "Maestro",
+        "pwm_board": "PWM Board"
+      }
+    }
   }
 }

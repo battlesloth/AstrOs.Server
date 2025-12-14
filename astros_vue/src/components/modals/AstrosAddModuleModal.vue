@@ -4,19 +4,19 @@ import { Location } from '@/enums/modules/Location';
 import { ModuleType } from "@/enums/modules/ModuleType";
 import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { AddModuleEvent } from '@/models/events';
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 
 interface ModuleSubTypeSelection {
   id: ModuleSubType;
   value: string;
 }
 
-interface Props {
+const props = defineProps<{
   locationId: Location;
   moduleType: ModuleType;
   isOpen: boolean;
-}
-
-const props = defineProps<Props>();
+}>();
 
 const emit = defineEmits<{
   add: [response: AddModuleEvent];
@@ -29,24 +29,24 @@ const moduleSubTypes = new Map<ModuleType, ModuleSubTypeSelection[]>([
   [
     ModuleType.uart,
     [
-      { id: ModuleSubType.genericSerial, value: 'Generic' },
+      { id: ModuleSubType.genericSerial, value: t('modals.add_module.module_types.generic') },
       {
         id: ModuleSubType.humanCyborgRelationsSerial,
-        value: 'Human Cyborg Relations',
+        value: t('modals.add_module.module_types.hcr'),
       },
-      { id: ModuleSubType.kangaroo, value: 'Kangaroo' },
-      { id: ModuleSubType.maestro, value: 'Maestro' },
+      { id: ModuleSubType.kangaroo, value: t('modals.add_module.module_types.kangaroo') },
+      { id: ModuleSubType.maestro, value: t('modals.add_module.module_types.maestro') },
     ],
   ],
   [
     ModuleType.i2c,
     [
-      { id: ModuleSubType.genericI2C, value: 'Generic' },
+      { id: ModuleSubType.genericI2C, value: t('modals.add_module.module_types.generic') },
       {
         id: ModuleSubType.humanCyborgRelationsI2C,
-        value: 'Human Cyborg Relations',
+        value: t('modals.add_module.module_types.hcr'),
       },
-      { id: ModuleSubType.pwmBoard, value: 'PWM Board' },
+      { id: ModuleSubType.pwmBoard, value: t('modals.add_module.module_types.pwm_board') },
     ],
   ],
 ]);
@@ -83,16 +83,16 @@ const closeModal = () => {
 <template>
   <dialog class="modal" :class="{ 'modal-open': isOpen }">
     <div class="modal-box">
-      <h2 class="text-2xl font-bold mb-4">Add Module</h2>
+      <h2 class="text-2xl font-bold mb-4">{{ $t('modals.add_module.title') }}</h2>
 
       <div class="modal-body py-4">
         <label class="form-control w-full">
           <div class="label">
-            <span class="label-text">Select Module Type</span>
+            <span class="label-text">{{ $t('modals.add_module.select_type') }}</span>
           </div>
           <select data-testid="modal-module-select" v-model="selectedSubType" class="select select-bordered w-full"
             title="Module">
-            <option :value="ModuleSubType.none" disabled selected>Select Module Type</option>
+            <option :value="ModuleSubType.none" disabled selected>{{ $t('modals.add_module.select_type') }}</option>
             <option v-for="option in options" :key="option.id" :value="option.id">
               {{ option.value }}
             </option>
@@ -103,13 +103,14 @@ const closeModal = () => {
       <div class="modal-action">
         <button data-testid="modal-add-module" class="btn btn-primary"
           :disabled="selectedSubType === ModuleSubType.none" @click="addModule">
-          Add
+          {{ $t('modals.add_module.add_button') }}
         </button>
-        <button data-testid="modal-close" class="btn" @click="closeModal">Close</button>
+        <button data-testid="modal-close" class="btn" @click="closeModal">{{ $t('modals.add_module.cancel_button')
+          }}</button>
       </div>
     </div>
     <form method="dialog" class="modal-backdrop" @click="closeModal">
-      <button>close</button>
+      <button>{{ $t('modals.add_module.cancel_button') }}</button>
     </form>
   </dialog>
 </template>
