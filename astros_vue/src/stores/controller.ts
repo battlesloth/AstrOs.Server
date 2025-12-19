@@ -2,7 +2,7 @@ import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import type { ControllerModule } from '@/models/controllers/modules/controlModule';
 import apiService from '@/api/apiService';
-import { SYNC_CONTROLLERS } from '@/api/enpoints';
+import { SYNC_CONTROLLERS } from '@/api/endpoints';
 import type { ControllerSync } from '@/models/websocket/controllerSync';
 
 export const useControllerStore = defineStore('controller', () => {
@@ -37,14 +37,14 @@ export const useControllerStore = defineStore('controller', () => {
       lastSyncTime.value = new Date();
       if (!message.success) {
         console.error('Controller sync failed:', message.message);
-        syncError.value = message.message || 'Controller sync failed';
+        syncError.value = message.message || 'error.controller_sync_failed';
         return;
       } else {
         syncError.value = null;
       }
     } catch (error) {
       console.error('Error processing controller sync response:', error);
-      syncError.value = 'Error processing controller sync response';
+      syncError.value = 'error.controller_sync_error';
     } finally {
       isSyncing.value = false;
     }

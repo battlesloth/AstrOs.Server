@@ -4,8 +4,6 @@ import { Location } from '@/enums/modules/Location';
 import { ModuleType } from "@/enums/modules/ModuleType";
 import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { AddModuleEvent } from '@/models/events';
-import { useI18n } from 'vue-i18n'
-const { t } = useI18n()
 
 interface ModuleSubTypeSelection {
   id: ModuleSubType;
@@ -29,24 +27,24 @@ const moduleSubTypes = new Map<ModuleType, ModuleSubTypeSelection[]>([
   [
     ModuleType.uart,
     [
-      { id: ModuleSubType.genericSerial, value: t('modals.add_module.module_types.generic') },
+      { id: ModuleSubType.genericSerial, value: "modals.add_module.module_types.generic" },
       {
         id: ModuleSubType.humanCyborgRelationsSerial,
-        value: t('modals.add_module.module_types.hcr'),
+        value: "modals.add_module.module_types.hcr",
       },
-      { id: ModuleSubType.kangaroo, value: t('modals.add_module.module_types.kangaroo') },
-      { id: ModuleSubType.maestro, value: t('modals.add_module.module_types.maestro') },
+      { id: ModuleSubType.kangaroo, value: "modals.add_module.module_types.kangaroo" },
+      { id: ModuleSubType.maestro, value: "modals.add_module.module_types.maestro" },
     ],
   ],
   [
     ModuleType.i2c,
     [
-      { id: ModuleSubType.genericI2C, value: t('modals.add_module.module_types.generic') },
+      { id: ModuleSubType.genericI2C, value: "modals.add_module.module_types.generic" },
       {
         id: ModuleSubType.humanCyborgRelationsI2C,
-        value: t('modals.add_module.module_types.hcr'),
+        value: "modals.add_module.module_types.hcr",
       },
-      { id: ModuleSubType.pwmBoard, value: t('modals.add_module.module_types.pwm_board') },
+      { id: ModuleSubType.pwmBoard, value: "modals.add_module.module_types.pwm_board" },
     ],
   ],
 ]);
@@ -94,7 +92,7 @@ const closeModal = () => {
             title="Module">
             <option :value="ModuleSubType.none" disabled selected>{{ $t('modals.add_module.select_type') }}</option>
             <option v-for="option in options" :key="option.id" :value="option.id">
-              {{ option.value }}
+              {{ $t(option.value) }}
             </option>
           </select>
         </label>
@@ -106,7 +104,7 @@ const closeModal = () => {
           {{ $t('modals.add_module.add_button') }}
         </button>
         <button data-testid="modal-close" class="btn" @click="closeModal">{{ $t('modals.add_module.cancel_button')
-          }}</button>
+        }}</button>
       </div>
     </div>
     <form method="dialog" class="modal-backdrop" @click="closeModal">

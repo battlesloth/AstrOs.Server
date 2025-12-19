@@ -74,12 +74,12 @@ const testServoModal = () => {
       <div class="font-medium min-w-20">Channel {{ channel.channelNumber }}</div>
       <select :data-testid="`${parentTestId}-maestro-ch-${channel.channelNumber}-type`" v-model="type"
         class="select select-bordered select-sm w-30">
-        <option value="0">Disabled</option>
-        <option value="1">Servo</option>
-        <option value="2">Output</option>
+        <option value="0">{{ $t('uart.disabled') }}</option>
+        <option value="1">{{ $t('uart.servo') }}</option>
+        <option value="2">{{ $t('uart.output') }}</option>
       </select>
       <div class="grow"></div>
-      <button @click="testServoModal" class="btn btn-sm btn-outline">Test</button>
+      <button @click="testServoModal" class="btn btn-sm btn-outline">{{ $t('uart.test') }}</button>
     </div>
     <div v-if="channel">
       <AstrosServoSettings :test-id="`${parentTestId}-maestro-ch-${channel.channelNumber}`" :enabled="channel.enabled"

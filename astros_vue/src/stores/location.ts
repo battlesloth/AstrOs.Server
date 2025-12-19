@@ -3,19 +3,17 @@ import { defineStore } from 'pinia';
 import type { ControllerLocation } from '@/models/controllers/controllerLocation';
 import { Location } from '@/enums/modules/Location';
 import apiService from '@/api/apiService';
-import { LOCATIONS_LOAD } from '@/api/enpoints';
+import { LOCATIONS, LOCATIONS_LOAD } from '@/api/endpoints';
 
 export const useLocationStore = defineStore('location', () => {
   const coreLocation = ref<ControllerLocation | null>(null);
   const domeLocation = ref<ControllerLocation | null>(null);
   const bodyLocation = ref<ControllerLocation | null>(null);
   const isLoading = ref(false);
-  const loadError = ref<string | null>(null);
+  const isSaving = ref(false);
 
   async function loadLocationsFromApi() {
     isLoading.value = true;
-    loadError.value = null;
-
     try {
       const response = await apiService.get(LOCATIONS_LOAD);
 
@@ -32,10 +30,28 @@ export const useLocationStore = defineStore('location', () => {
       return { success: true, data: response };
     } catch (error) {
       console.error('Failed to load locations:', error);
-      loadError.value = 'Failed to load locations from API';
-      return { success: false, error };
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  async function saveLocationsToApi() {
+    try {
+      isSaving.value = true;
+
+      await apiService.put(LOCATIONS, {
+        coreModule: coreLocation.value,
+        domeModule: domeLocation.value,
+        bodyModule: bodyLocation.value,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to save locations:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      isSaving.value = false;
     }
   }
 
@@ -91,8 +107,9 @@ export const useLocationStore = defineStore('location', () => {
     domeLocation,
     bodyLocation,
     isLoading,
-    loadError,
+    isSaving,
     loadLocationsFromApi,
+    saveLocationsToApi,
     setLocation,
     getLocation,
     clearLocation,

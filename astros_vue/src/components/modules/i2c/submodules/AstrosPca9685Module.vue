@@ -45,13 +45,13 @@ const onI2cAddressChange = (val: string) => {
     <div class="flex flex-row mb-4">
       <select v-if="module" v-model="i2cAddress" @change="onI2cAddressChange(i2cAddress)"
         class="select select-bordered select-sm w-35">
-        <option v-for="addr in addresses" :key="addr" :value="addr">Address {{ addr }}</option>
+        <option v-for="addr in addresses" :key="addr" :value="addr">{{ $t('i2c.address') }} {{ addr }}</option>
       </select>
     </div>
     <div class="p-4 bg-warning/10 border border-warning rounded">
-      <h3 class="text-lg font-semibold">Not Yet Implemented</h3>
+      <h3 class="text-lg font-semibold">{{ $t('error.not_yet_implemented') }}</h3>
       <p class="text-sm text-base-content/70 mt-2">
-        PCA9685 PWM Board configuration interface coming soon
+        {{ $t('error.not_yet_implemented_msg') }}
       </p>
     </div>
   </div>

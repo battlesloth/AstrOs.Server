@@ -43,13 +43,13 @@ const isOpen = computed(() => props.openModuleId === props.module.id);
 const subtypeName = computed(() => {
   switch (props.module.moduleSubType) {
     case ModuleSubType.genericSerial:
-      return 'Generic Serial';
+      return "uart.module_types.generic";
     case ModuleSubType.kangaroo:
-      return 'Kangaroo X2';
+      return "uart.module_types.kangaroo";
     case ModuleSubType.humanCyborgRelationsSerial:
-      return 'HCR';
+      return "uart.module_types.hcr";
     case ModuleSubType.maestro:
-      return 'Pololu Maestro';
+      return "uart.module_types.maestro";
     default:
       return '';
   }
@@ -99,7 +99,7 @@ const toggleCollapse = () => {
           @keydown.space.stop placeholder="Name" class="input input-bordered input-sm w-full max-w-xs" />
       </div>
       <div class="flex items-center gap-2 ml-4">
-        <p class="text-sm text-base-content/60">{{ subtypeName }}</p>
+        <p class="text-sm text-base-content/60">{{ $t(subtypeName) }}</p>
         <button @click.stop="removeModule" @keydown.enter.prevent="removeModule" @keydown.space.prevent="removeModule"
           class="btn btn-sm btn-circle btn-ghost">
           <span class="text-lg">×</span>
@@ -108,7 +108,7 @@ const toggleCollapse = () => {
     </div>
     <div class="collapse-content">
       <div v-if="!subModuleComponent" class="p-4 bg-base-200 rounded border border-dashed border-base-300">
-        <p class="text-sm text-base-content/60 italic">Unsupported UART Module Subtype.</p>
+        <p class="text-sm text-base-content/60 italic">{{ $t('uart.unsupported_module') }}</p>
       </div>
       <component v-else :is="subModuleComponent" :module="module" :parent-test-id="parentTestId" :is-master="isMaster"
         @servo-test-event="onServoTestEvent" />

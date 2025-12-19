@@ -6,4 +6,5 @@ export enum ModalType {
   addModule = 'addModule',
   removeModule = 'removeModule',
   configureModule = 'configureModule',
+  interruptModal = 'interruptModal',
 }

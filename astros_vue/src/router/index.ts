@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import StatusView from '../views/StatusView.vue';
 import api from '@/api/apiService';
-import { CHECK_SESSION } from '@/api/enpoints';
+import { CHECK_SESSION } from '@/api/endpoints';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),

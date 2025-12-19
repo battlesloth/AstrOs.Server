@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, type PropType, type Component } from 'vue';
-import { Location } from '@/enums/modules/Location';
 import { ModuleType } from "@/enums/modules/ModuleType";
 import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
@@ -8,7 +7,6 @@ import type { RemoveModuleEvent, AddressChangeEvent } from '@/models/events';
 import AstrosGenericI2cModule from './submodules/AstrosGenericI2cModule.vue';
 import AstrosPca9685Module from './submodules/AstrosPca9685Module.vue';
 
-// Props
 const props = defineProps({
   module: {
     type: Object as PropType<I2cModule>,
@@ -20,21 +18,19 @@ const props = defineProps({
   },
 });
 
-// Emits
 const emit = defineEmits<{
   removeModule: [event: RemoveModuleEvent];
   i2cAddressChanged: [event: AddressChangeEvent];
 }>();
 
-// Computed properties
 const subtypeName = computed(() => {
   switch (props.module.moduleSubType) {
     case ModuleSubType.genericI2C:
-      return 'Generic I2C';
+      return "i2c.generic";
     case ModuleSubType.humanCyborgRelationsI2C:
-      return 'Human Cyborg Relations';
+      return 'i2c.hcr';
     case ModuleSubType.pwmBoard:
-      return 'PCA9685 PWM Board';
+      return 'i2c.pwm_board';
     default:
       return '';
   }
@@ -52,7 +48,6 @@ const subModuleComponent = computed<Component | null>(() => {
   }
 });
 
-// Methods
 const nameClicked = (evt: MouseEvent) => {
   evt.stopPropagation();
 };
@@ -67,7 +62,6 @@ const removeModule = (event: Event) => {
 };
 
 const onI2cAddressChanged = (value: string) => {
-  console.log('I2C Address Changed:', value);
   emit('i2cAddressChanged', {
     old: props.module.i2cAddress,
     new: parseInt(value, 10),
@@ -86,7 +80,7 @@ const onI2cAddressChanged = (value: string) => {
           class="input input-bordered input-sm w-full max-w-xs" />
       </div>
       <div class="flex items-center gap-2 ml-4">
-        <p class="text-sm text-base-content/60">{{ subtypeName }}</p>
+        <p class="text-sm text-base-content/60">{{ $t(subtypeName) }}</p>
         <button @click.stop="removeModule" @keydown.enter.prevent="removeModule" @keydown.space.prevent="removeModule"
           class="btn btn-sm btn-circle btn-ghost">
           <span class="text-lg">×</span>

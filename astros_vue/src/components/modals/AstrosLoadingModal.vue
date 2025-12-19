@@ -12,16 +12,14 @@ const props = withDefaults(defineProps<Props>(), {
   skipControllerLoading: false,
 });
 
-const emit = defineEmits<{
-  loaded: [];
-}>();
+const emit = defineEmits(['loaded']);
 
 const locationStore = useLocationStore();
 const controllerStore = useControllerStore();
 
 const { isSyncing } = storeToRefs(controllerStore);
 
-const message = ref('Loading locations...');
+const message = ref("modals.loading.loading");
 const locationsLoaded = ref(false);
 const controllersLoaded = ref(false);
 const loadingComplete = ref(false);
@@ -57,36 +55,40 @@ onMounted(async () => {
   } else {
     console.error('Failed to load locations');
     loadError.value = true;
-    message.value = 'Failed to load locations from API';
+    message.value = "modals.loading.request_failed";
     return;
   }
 
   // Handle controller sync
   if (props.skipControllerLoading) {
-    message.value = 'Skipping controller loading...';
+    message.value = "modals.loading.skipping";
     controllersLoaded.value = true;;
   } else {
-    message.value = 'Syncing controllers...';
+    message.value = "modals.loading.syncing";
     const controllerResult = await controllerStore.syncControllers();
 
     if (!controllerResult.success) {
       console.error('Failed to sync controllers:', controllerResult.error);
       loadError.value = true;
-      message.value = 'Failed to sync controllers, using cached values.';
+      message.value = "modals.loading.sync_failed";
       controllersLoaded.value = true;
     }
   }
 });
 
 function onLoadComplete() {
-  loadingComplete.value = true;
-  message.value = 'Loading complete!';
 
-  // Auto-close modal after successful load
-  if (!loadError.value) {
+  loadingComplete.value = true;
+
+  if (!loadError.value && !controllerStore.syncError) {
+    message.value = "modals.loading.complete";
     setTimeout(() => {
       emit('loaded');
     }, 500);
+  }
+  else {
+    loadError.value = true;
+    message.value = controllerStore.syncError ? controllerStore.syncError : "modals.loading.request_failed";
   }
 }
 </script>
@@ -94,18 +96,18 @@ function onLoadComplete() {
 <template>
   <dialog data-testid="loading-modal" class="modal modal-open">
     <div class="modal-box">
-      <h3 class="font-bold text-lg">Loading</h3>
+      <h3 class="font-bold text-lg">{{ $t("modals.loading.title") }}</h3>
 
       <div class="py-8">
         <div class="flex flex-col items-center gap-4">
-          <span class="loading loading-spinner loading-lg"></span>
-          <div class="text-center">{{ message }}</div>
+          <span v-if="!loadingComplete" class="loading loading-spinner loading-lg"></span>
+          <div class="text-center">{{ $t(message) }}</div>
         </div>
       </div>
 
       <div class="modal-action" v-if="loadError">
         <button data-testid="loading-modal-close" class="btn btn-primary" @click="emit('loaded')">
-          Continue with cached values
+          {{ $t("modals.loading.continue") }}
         </button>
       </div>
     </div>

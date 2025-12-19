@@ -5,7 +5,11 @@
     "invalid_password": "Password must be at least 8 characters long and include a number, a lowercase letter, and an uppercase letter",
     "invalid_credentials": "Invalid email or password",
     "not_found_title_404": "Not Found",
-    "not_found_msg_404": "Your Princess is in another castle..."
+    "not_found_msg_404": "Your Princess is in another castle...",
+    "not_yet_implemented": "Not Yet Implemented.",
+    "not_yet_implemented_msg": "This feature is not yet implemented.",
+    "controller_sync_failed": "Failed to sync controllers, using cached values.",
+    "controller_sync_error": "Error processing controller sync response"
   },
   "nav": {
     "status": "Status",
@@ -38,6 +42,95 @@
         "maestro": "Maestro",
         "pwm_board": "PWM Board"
       }
+    },
+    "alert": {
+      "title": "Alert",
+      "close": "Close"
+    },
+    "confirm": {
+      "title": "Confirm",
+      "confirm": "Confirm",
+      "close": "Close"
+    },
+    "loading": {
+      "title": "Loading",
+      "skipping": "Skipping controller loading...",
+      "loading": "Loading locations...",
+      "complete": "Loading complete!",
+      "syncing": "Syncing controllers...",
+      "request_failed": "Failed to load locations from API.",
+      "sync_failed": "Failed to sync controllers, using cached values.",
+      "continue": "Continue with cached values"
     }
+  },
+  "esp": {
+    "serial_modules": "Serial Modules",
+    "i2c_modules": "I2C Modules",
+    "gpio_config": "GPIO Configuration"
+  },
+  "gpio": {
+    "channel": "Channel",
+    "enabled": "Enabled",
+    "default_high": "Default High?"
+  },
+  "i2c": {
+    "address": "Address",
+    "generic": "Generic I2C",
+    "hcr": "Humnan Cyborg Relations",
+    "pwm_board": "PCA9685 PWM Board"
+  },
+  "servo": {
+    "channel": "Channel",
+    "enabled": "Enabled",
+    "inverted": "Inverted?",
+    "default_high": "Default High",
+    "home_position": "Home µs",
+    "min_pulse": "Min µs",
+    "max_pulse": "Max µs",
+    "name": "Name"
+  },
+  "uart": {
+    "channel_1": "Channel 1",
+    "channel_2": "Channel 2",
+    "enabled": "Enabled",
+    "port": "Port",
+    "baudrate": "Baudrate",
+    "disabled": "Disabled",
+    "servo": "Servo",
+    "output": "Output",
+    "test": "Test",
+    "unsupported_module": "Unsupported UART Module",
+    "channels": {
+      "6": "6 Channels",
+      "12": "12 Channels",
+      "18": "18 Channels",
+      "24": "24 Channels"
+    },
+    "baudrates": {
+      "9600": "9600",
+      "19200": "19200",
+      "38400": "38400",
+      "57600": "57600",
+      "115200": "115200"
+    },
+    "module_types": {
+      "generic": "Generic Serial",
+      "kangaroo": "Kangaroo X2",
+      "hcr": "Humnan Cyborg Relations",
+      "maestro": "Pololu Maestro"
+    }
+  },
+  "module_view": {
+    "confirm_remove": "Are you sure you want to remove this module?",
+    "disabled": "Disabled",
+    "modules": "Modules",
+    "save": "Save",
+    "saving": "Saving...",
+    "sync": "Sync",
+    "syncing": "Syncing...",
+    "body": "Body Module",
+    "dome": "Dome Module",
+    "core": "Core Module",
+    "master": "Master Controller"
   }
 }

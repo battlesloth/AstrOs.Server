@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-// Props
 const props = defineProps({
   testId: {
     type: String,
@@ -37,7 +36,7 @@ const props = defineProps({
   },
 });
 
-// Emits
+
 const emit = defineEmits<{
   'update:name': [value: string];
   'update:invert': [value: boolean];
@@ -46,10 +45,8 @@ const emit = defineEmits<{
   'update:homePosition': [value: number];
 }>();
 
-// Computed
-const typeLabel = computed(() => (props.isServo ? 'Inverted' : 'Default High'));
+const typeLabel = computed(() => (props.isServo ? 'servo.inverted' : 'servo.default_high'));
 
-// Local models with emit
 const nameModel = computed({
   get: () => props.name,
   set: (value) => emit('update:name', value),
@@ -81,22 +78,14 @@ const homePositionModel = computed({
     <!-- First Row: Name and Type -->
     <div class="flex items-center gap-4 min-w-87.5 grow">
       <div class="grow">
-        <input
-          :data-testid="`${testId}-name`"
-          v-model="nameModel"
-          placeholder="Name"
-          class="input input-bordered input-sm w-full"
-        />
+        <input :data-testid="`${testId}-name`" v-model="nameModel" :placeholder="$t('servo.name')"
+          class="input input-bordered input-sm w-full" />
       </div>
       <div class="form-control">
         <label class="label cursor-pointer gap-2">
-          <span class="label-text">{{ typeLabel }}</span>
-          <input
-            type="checkbox"
-            :data-testid="`${testId}-invert-cbx`"
-            v-model="invertModel"
-            class="checkbox checkbox-sm"
-          />
+          <span class="label-text">{{ $t(typeLabel) }}</span>
+          <input type="checkbox" :data-testid="`${testId}-invert-cbx`" v-model="invertModel"
+            class="checkbox checkbox-sm" />
         </label>
       </div>
     </div>
@@ -104,36 +93,21 @@ const homePositionModel = computed({
     <!-- Second Row: Servo Settings (only if isServo) -->
     <div v-if="isServo" class="flex items-center gap-4 min-w-87.5 grow">
       <div class="flex items-center gap-2">
-        <span class="text-sm">Min μS</span>
-        <input
-          :data-testid="`${testId}-minPulse`"
-          v-model.number="minPulseModel"
-          type="number"
-          placeholder="500"
-          class="input input-bordered input-sm w-16 text-center"
-        />
+        <span class="text-sm">{{ $t('servo.min_pulse') }}</span>
+        <input :data-testid="`${testId}-minPulse`" v-model.number="minPulseModel" type="number" placeholder="500"
+          class="input input-bordered input-sm w-16 text-center" />
       </div>
       <div class="grow"></div>
       <div class="flex items-center gap-2">
-        <span class="text-sm">Max μS</span>
-        <input
-          :data-testid="`${testId}-maxPulse`"
-          v-model.number="maxPulseModel"
-          type="number"
-          placeholder="2500"
-          class="input input-bordered input-sm w-16 text-center"
-        />
+        <span class="text-sm">{{ $t('servo.max_pulse') }}</span>
+        <input :data-testid="`${testId}-maxPulse`" v-model.number="maxPulseModel" type="number" placeholder="2500"
+          class="input input-bordered input-sm w-16 text-center" />
       </div>
       <div class="grow"></div>
       <div class="flex items-center gap-2">
-        <span class="text-sm">Home μS</span>
-        <input
-          :data-testid="`${testId}-homePosition`"
-          v-model.number="homePositionModel"
-          type="number"
-          placeholder="1500"
-          class="input input-bordered input-sm w-16 text-center"
-        />
+        <span class="text-sm">{{ $t('servo.home_position') }}</span>
+        <input :data-testid="`${testId}-homePosition`" v-model.number="homePositionModel" type="number"
+          placeholder="1500" class="input input-bordered input-sm w-16 text-center" />
       </div>
     </div>
   </div>

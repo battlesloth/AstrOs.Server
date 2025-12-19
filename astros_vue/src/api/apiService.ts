@@ -78,6 +78,16 @@ export default {
     }
   },
 
+  async put(url: string, data: unknown) {
+    try {
+      const response = await apiClient.put(url, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error putting data:', error);
+      throw error;
+    }
+  },
+
   async delete(url: string) {
     try {
       const response = await apiClient.delete(url);

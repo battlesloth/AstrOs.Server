@@ -33,7 +33,7 @@ const createStoryRender = (mockSuccess: boolean, mockError: boolean) => (args: a
       locationStore.loadLocationsFromApi = async () => {
         return new Promise((resolve) => {
           setTimeout(() => {
-            resolve({ success: false, error: new Error('Failed to load') });
+            resolve({ success: false, error: 'Failed to load' });
           }, 1000);
         });
       };

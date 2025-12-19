@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import apiService from '@/api/apiService';
-import { LOGIN } from '@/api/enpoints';
+import { LOGIN } from '@/api/endpoints';
 import { AstrosLogin } from '@/components/index';
 import router from '@/router';
 import { ref } from 'vue';

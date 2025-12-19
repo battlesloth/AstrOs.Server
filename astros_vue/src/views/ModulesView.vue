@@ -13,6 +13,7 @@ import AstrosEspModule from '@/components/modules/AstrosEspModule.vue';
 import AstrosAddModuleModal from '@/components/modals/AstrosAddModuleModal.vue';
 import AstrosAlertModal from '@/components/modals/AstrosAlertModal.vue';
 import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
+import AstrosInterruptModal from '@/components/modals/AstrosInterruptModal.vue';
 
 
 const showModal = ref<ModalType>(ModalType.loadingModal);
@@ -48,22 +49,43 @@ const availableDomeControllers = computed(() =>
 );
 
 function onLocationsLoaded() {
-  if (controllerStore.syncError) {
-    modalMessage.value = controllerStore.syncError;
-    showModal.value = ModalType.errorModal;
-  } else {
+  showModal.value = ModalType.closeAll;
+}
+
+async function saveModuleSettings() {
+  modalMessage.value = 'module_view.saving';
+  showModal.value = ModalType.interruptModal;
+  const result = await locationStore.saveLocationsToApi();
+
+  // wait 1 second so it's not so abrupt
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  if (result.success) {
     showModal.value = ModalType.closeAll;
+    modalMessage.value = '';
+  } else {
+    modalMessage.value = result.error ?? 'module_view.save_failed';
+    showModal.value = ModalType.errorModal;
   }
 }
 
-function saveModuleSettings() {
-  // TODO: Implement save functionality
-  console.log('Save module settings');
-}
+async function syncModuleSettings() {
+  modalMessage.value = 'module_view.syncing';
+  showModal.value = ModalType.interruptModal;
 
-function syncModuleSettings() {
-  // TODO: Implement sync functionality
-  console.log('Sync module settings');
+  //TODO: Implement sync logic
+  const result = { success: false, error: 'Not implemented' };
+
+  // wait 1 second so it's not so abrupt
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  if (result.success) {
+    showModal.value = ModalType.closeAll;
+    modalMessage.value = '';
+  } else {
+    modalMessage.value = result.error ?? 'module_view.sync_failed';
+    showModal.value = ModalType.errorModal;
+  };
 }
 
 function openAddModuleModal(evt: AddModuleEvent) {
@@ -118,12 +140,12 @@ function controllerSelectChanged(location: string) {
       <div class="flex flex-col overflow-hidden" style="height: calc(100vh - 64px)">
         <!-- Header with buttons -->
         <div class="flex items-center gap-4 p-4 bg-base-200 shrink-0">
-          <h1 class="text-2xl font-bold">Modules</h1>
+          <h1 class="text-2xl font-bold">{{ $t('module_view.modules') }}</h1>
           <div class="grow"></div>
           <button data-testid="save_module_settings" class="btn btn-primary" @click="saveModuleSettings">
-            Save
+            {{ $t('module_view.save') }}
           </button>
-          <button class="btn btn-secondary" @click="syncModuleSettings">Sync</button>
+          <button class="btn btn-secondary" @click="syncModuleSettings">{{ $t('module_view.sync') }}</button>
         </div>
 
         <!-- Module Accordions -->
@@ -137,13 +159,13 @@ function controllerSelectChanged(location: string) {
               <div data-testid="body-module-header"
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
                 @click="openAccordion = openAccordion === 'body' ? null : 'body'">
-                <span>Body Module</span>
+                <span>{{ $t('module_view.body') }}</span>
                 <!-- TODO: Add status warning icon -->
               </div>
               <div class="collapse-content" v-if="bodyLocation">
                 <div class="mb-4">
                   <select class="select select-bordered w-full" title="Controller Select" disabled>
-                    <option value="0" selected>Master Controller</option>
+                    <option value="0" selected>{{ $t('module_view.master') }}</option>
                   </select>
                 </div>
                 <AstrosEspModule :is-master="true" :location-enum="Location.body" :parent-test-id="'body'"
@@ -160,14 +182,14 @@ function controllerSelectChanged(location: string) {
               <div data-testid="core-module-header"
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
                 @click="openAccordion = openAccordion === 'core' ? null : 'core'">
-                <span>Core Module</span>
+                <span>{{ $t('module_view.core') }}</span>
                 <!-- TODO: Add status warning icon -->
               </div>
               <div class="collapse-content" v-if="coreLocation">
                 <div class="mb-4">
                   <select id="core-controller-select" class="select select-bordered w-full" title="Controller Select"
                     v-model="coreLocation.controller.id" @change="controllerSelectChanged('core')">
-                    <option value="0" selected>Disabled</option>
+                    <option value="0" selected>{{ $t('module_view.disabled') }}</option>
                     <option v-for="controller in availableCoreControllers" :key="controller.id" :value="controller.id">
                       {{ controller.name }}
                     </option>
@@ -187,14 +209,14 @@ function controllerSelectChanged(location: string) {
               <div data-testid="dome-module-header"
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
                 @click="openAccordion = openAccordion === 'dome' ? null : 'dome'">
-                <span>Dome Module</span>
+                <span>{{ $t('module_view.dome') }}</span>
                 <!-- TODO: Add status warning icon -->
               </div>
               <div class="collapse-content" v-if="domeLocation">
                 <div class="mb-4">
                   <select id="dome-controller-select" class="select select-bordered w-full" title="Controller Select"
                     v-model="domeLocation.controller.id" @change="controllerSelectChanged('dome')">
-                    <option value="0" selected>Disabled</option>
+                    <option value="0" selected>{{ $t('module_view.disabled') }}</option>
                     <option v-for="controller in availableDomeControllers" :key="controller.id" :value="controller.id">
                       {{ controller.name }}
                     </option>
@@ -209,11 +231,11 @@ function controllerSelectChanged(location: string) {
         </div>
       </div>
 
+      <AstrosInterruptModal v-if="showModal === ModalType.interruptModal" :message="modalMessage" />
       <AstrosAlertModal v-if="showModal === ModalType.errorModal" :message="modalMessage"
         @close="showModal = ModalType.closeAll" />
-      <AstrosConfirmModal v-if="showModal === ModalType.confirmModal"
-        :message="'Are you sure you want to remove this module?'" @confirm="handleRemoveModule"
-        @close="showModal = ModalType.closeAll" />
+      <AstrosConfirmModal v-if="showModal === ModalType.confirmModal" :message="$t('module_view.confirm_remove')"
+        @confirm="handleRemoveModule" @close="showModal = ModalType.closeAll" />
       <AstrosLoadingModal v-if="showModal === ModalType.loadingModal" @loaded="onLocationsLoaded" />
       <AstrosAddModuleModal v-if="showModal === ModalType.addModule" :is-open="showModal === ModalType.addModule"
         :location-id="selectedLocationId" :module-type="selectedModuleType" @add="handleAddModule"

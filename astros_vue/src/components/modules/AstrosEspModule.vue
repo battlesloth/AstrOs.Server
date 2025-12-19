@@ -112,7 +112,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
       <div :data-testid="`${parentTestId}-serial-header`"
         class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
         @click="openPanel = openPanel === 'uart' ? null : 'uart'">
-        <h3 class="font-medium">Serial Modules</h3>
+        <h3 class="font-medium">{{ $t('esp.serial_modules') }}</h3>
         <button type="button" :data-testid="`${parentTestId}-add-serial`" @click.stop="addUartModule"
           class="btn btn-sm btn-circle btn-ghost">
           <span class="text-lg">+</span>
@@ -135,7 +135,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
       <div :data-testid="`${parentTestId}-i2c-header`"
         class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
         @click="openPanel = openPanel === 'i2c' ? null : 'i2c'">
-        <h3 class="font-medium">I2C configuration</h3>
+        <h3 class="font-medium">{{ $t('esp.i2c_modules') }}</h3>
         <button type="button" :data-testid="`${parentTestId}-add-i2c`" @click.stop="addI2cModule"
           class="btn btn-sm btn-circle btn-ghost">
           <span class="text-lg">+</span>
@@ -156,7 +156,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
       :class="{ 'collapse-open': openPanel === 'gpio', 'collapse-close': openPanel !== 'gpio' }">
       <div :data-testid="`${parentTestId}-gpio-header`" class="collapse-title cursor-pointer"
         @click="openPanel = openPanel === 'gpio' ? null : 'gpio'">
-        <h3 class="font-medium">GPIO configuration</h3>
+        <h3 class="font-medium">{{ $t('esp.gpio_config') }}</h3>
       </div>
       <div class="collapse-content">
         <ul v-if="location?.gpioModule" class="space-y-2 max-h-96 overflow-y-scroll p-0">
