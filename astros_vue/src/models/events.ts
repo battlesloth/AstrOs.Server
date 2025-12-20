@@ -18,7 +18,9 @@ export interface ServoTestEvent {
   controllerAddress?: string;
   controllerName?: string;
   moduleSubType: ModuleSubType;
+  moduleIdx: number;
   channelNumber: number;
+  homePosition: number;
 }
 
 export interface AddressChangeEvent {

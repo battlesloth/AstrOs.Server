@@ -91,6 +91,7 @@ const onChannelCountChange = (val: string) => {
 };
 
 const onServoTestEvent = (evt: ServoTestEvent) => {
+  evt.moduleIdx = props.module.idx;
   emit('servoTest', evt);
 };
 </script>

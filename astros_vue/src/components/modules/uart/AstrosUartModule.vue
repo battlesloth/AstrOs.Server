@@ -81,6 +81,7 @@ const removeModule = (event: Event) => {
 };
 
 const onServoTestEvent = (evt: ServoTestEvent) => {
+  console.log('AstrosMaestroModule received servo test event:', evt);
   emit('servoTest', evt);
 };
 
@@ -111,7 +112,7 @@ const toggleCollapse = () => {
         <p class="text-sm text-base-content/60 italic">{{ $t('uart.unsupported_module') }}</p>
       </div>
       <component v-else :is="subModuleComponent" :module="module" :parent-test-id="parentTestId" :is-master="isMaster"
-        @servo-test-event="onServoTestEvent" />
+        @servo-test="onServoTestEvent" />
     </div>
   </div>
 </template>

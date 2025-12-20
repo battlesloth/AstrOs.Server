@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { AddModuleEvent } from '@/models/events';
+import type { AddModuleEvent, ServoTestEvent } from '@/models/events';
 import { useLocationStore } from '@/stores/location';
 import { useControllerStore } from '@/stores/controller';
 import { Location } from '@/enums/modules/Location';
@@ -14,6 +14,7 @@ import AstrosAddModuleModal from '@/components/modals/AstrosAddModuleModal.vue';
 import AstrosAlertModal from '@/components/modals/AstrosAlertModal.vue';
 import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
 import AstrosInterruptModal from '@/components/modals/AstrosInterruptModal.vue';
+import AstrosServoTestModal from '@/components/modals/AstrosServoTestModal.vue';
 
 
 const showModal = ref<ModalType>(ModalType.loadingModal);
@@ -22,6 +23,8 @@ const modalMessage = ref<string>('');
 const selectedLocationId = ref<Location>(Location.unknown);
 const selectedModuleId = ref<string>('');
 const selectedModuleType = ref<number>(0);
+
+const servoTestProps = ref<ServoTestEvent | null>(null);
 
 const openAccordion = ref<string | null>(null);
 
@@ -123,9 +126,10 @@ function handleRemoveModule() {
   }
 }
 
-function handleServoTest(event: any) {
-  // TODO: Implement servo test modal
-  console.log('Open servo test modal:', event);
+function handleServoTest(event: ServoTestEvent) {
+  console.log('Handling servo test event:', event);
+  servoTestProps.value = event;
+  showModal.value = ModalType.servoTestModal;
 }
 
 function controllerSelectChanged(location: string) {
@@ -240,6 +244,8 @@ function controllerSelectChanged(location: string) {
       <AstrosAddModuleModal v-if="showModal === ModalType.addModule" :is-open="showModal === ModalType.addModule"
         :location-id="selectedLocationId" :module-type="selectedModuleType" @add="handleAddModule"
         @close="showModal = ModalType.closeAll" />
+      <AstrosServoTestModal v-if="showModal === ModalType.servoTestModal && servoTestProps !== null"
+        v-bind="servoTestProps as Required<ServoTestEvent>" @close="showModal = ModalType.closeAll" />
     </template>
   </AstrosLayout>
 </template>

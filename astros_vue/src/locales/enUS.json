@@ -61,6 +61,12 @@
       "request_failed": "Failed to load locations from API.",
       "sync_failed": "Failed to sync controllers, using cached values.",
       "continue": "Continue with cached values"
+    },
+    "servo_test": {
+      "title": "Servo {channel} Test",
+      "enable_test": "Enable",
+      "disable_test": "Disable",
+      "close": "Close"
     }
   },
   "esp": {

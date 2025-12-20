@@ -63,7 +63,9 @@ const testServoModal = () => {
     controllerAddress: '',
     controllerName: '',
     moduleSubType: ModuleSubType.maestro,
+    moduleIdx: -1,
     channelNumber: props.channel.channelNumber,
+    homePosition: props.channel.homePos,
   });
 };
 </script>

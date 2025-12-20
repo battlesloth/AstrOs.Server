@@ -7,4 +7,5 @@ export enum ModalType {
   removeModule = 'removeModule',
   configureModule = 'configureModule',
   interruptModal = 'interruptModal',
+  servoTestModal = 'servoTestModal',
 }
