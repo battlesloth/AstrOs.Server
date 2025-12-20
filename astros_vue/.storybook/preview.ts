@@ -7,6 +7,8 @@ import { OhVueIcon, addIcons } from 'oh-vue-icons'
 import {
   IoPersonOutline,
   IoKeyOutline,
+  IoWarning,
+  IoCheckmarkCircle
 } from 'oh-vue-icons/icons';
 
 initialize();
@@ -14,7 +16,12 @@ initialize();
 setup((app) => {
   app.use(i18n);
 
-  addIcons(IoPersonOutline, IoKeyOutline);
+  addIcons(
+    IoPersonOutline,
+    IoKeyOutline,
+    IoWarning,
+    IoCheckmarkCircle
+  );
 
   app.component('v-icon', OhVueIcon)
 });

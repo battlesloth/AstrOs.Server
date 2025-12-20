@@ -15,6 +15,7 @@ import AstrosAlertModal from '@/components/modals/AstrosAlertModal.vue';
 import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
 import AstrosInterruptModal from '@/components/modals/AstrosInterruptModal.vue';
 import AstrosServoTestModal from '@/components/modals/AstrosServoTestModal.vue';
+import { ControllerStatus } from '@/enums/controllerStatus';
 
 
 const showModal = ref<ModalType>(ModalType.loadingModal);
@@ -36,8 +37,11 @@ const {
 } = useModuleManagement();
 
 const bodyLocation = computed(() => locationStore.getLocation(Location.body));
+const bodyStatus = computed(() => controllerStore.bodyStatus);
 const coreLocation = computed(() => locationStore.getLocation(Location.core));
+const coreStatus = computed(() => controllerStore.coreStatus);
 const domeLocation = computed(() => locationStore.getLocation(Location.dome));
+const domeStatus = computed(() => controllerStore.domeStatus);
 
 const availableCoreControllers = computed(() =>
   controllerStore.controllers.filter(
@@ -164,7 +168,11 @@ function controllerSelectChanged(location: string) {
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
                 @click="openAccordion = openAccordion === 'body' ? null : 'body'">
                 <span>{{ $t('module_view.body') }}</span>
-                <!-- TODO: Add status warning icon -->
+                <div class="grow"></div>
+                <v-icon :name="bodyStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'" :class="[
+                  { 'text-green-500': bodyStatus === ControllerStatus.UP },
+                  { 'text-yellow-500': bodyStatus === ControllerStatus.NEEDS_SYNCED },
+                  { 'text-red-500': bodyStatus === ControllerStatus.DOWN }]" scale="1.5" />
               </div>
               <div class="collapse-content" v-if="bodyLocation">
                 <div class="mb-4">
@@ -187,7 +195,11 @@ function controllerSelectChanged(location: string) {
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
                 @click="openAccordion = openAccordion === 'core' ? null : 'core'">
                 <span>{{ $t('module_view.core') }}</span>
-                <!-- TODO: Add status warning icon -->
+                <div class="grow"></div>
+                <v-icon :name="coreStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'" :class="[
+                  { 'text-green-500': coreStatus === ControllerStatus.UP },
+                  { 'text-yellow-500': coreStatus === ControllerStatus.NEEDS_SYNCED },
+                  { 'text-red-500': coreStatus === ControllerStatus.DOWN }]" scale="1.5" />
               </div>
               <div class="collapse-content" v-if="coreLocation">
                 <div class="mb-4">
@@ -214,7 +226,11 @@ function controllerSelectChanged(location: string) {
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
                 @click="openAccordion = openAccordion === 'dome' ? null : 'dome'">
                 <span>{{ $t('module_view.dome') }}</span>
-                <!-- TODO: Add status warning icon -->
+                <div class="grow"></div>
+                <v-icon :name="domeStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'" :class="[
+                  { 'text-green-500': domeStatus === ControllerStatus.UP },
+                  { 'text-yellow-500': domeStatus === ControllerStatus.NEEDS_SYNCED },
+                  { 'text-red-500': domeStatus === ControllerStatus.DOWN }]" scale="1.5" />
               </div>
               <div class="collapse-content" v-if="domeLocation">
                 <div class="mb-4">

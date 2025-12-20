@@ -4,6 +4,8 @@ import type { BaseWsMessage } from "@/models/websocket/baseWsMessage";
 import type { LocationStatus } from "@/models/websocket/locationStatus";
 import type { ControllerSync } from "@/models/websocket/controllerSync";
 import { useControllerStore } from "@/stores/controller";
+import { Location } from "@/enums/modules/Location";
+import { ControllerStatus } from "@/enums/controllerStatus";
 
 const ws = ref<WebSocket | null>(null);
 const wsIsConnected = ref(false);
@@ -97,6 +99,26 @@ export function useWebsocket() {
   function handleStatusMessage(message: BaseWsMessage) {
     try {
       const data = message as LocationStatus;
+      const controllerStore = useControllerStore();
+      let status = ControllerStatus.DOWN;
+
+      if (data.synced) {
+        status = ControllerStatus.UP;
+      } else if (data.up) {
+        status = ControllerStatus.NEEDS_SYNCED;
+      }
+
+      switch (data.locationId) {
+        case Location.dome:
+          controllerStore.domeStatus = status;
+          break;
+        case Location.core:
+          controllerStore.coreStatus = status;
+          break;
+        case Location.body:
+          controllerStore.bodyStatus = status;
+          break;
+      }
     } catch (error) {
       console.error('Error handling status message:', error);
     }

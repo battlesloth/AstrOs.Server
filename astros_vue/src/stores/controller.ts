@@ -4,12 +4,17 @@ import type { ControllerModule } from '@/models/controllers/modules/controlModul
 import apiService from '@/api/apiService';
 import { SYNC_CONTROLLERS } from '@/api/endpoints';
 import type { ControllerSync } from '@/models/websocket/controllerSync';
+import { ControllerStatus } from '@/enums/controllerStatus';
 
 export const useControllerStore = defineStore('controller', () => {
   const controllers = ref<ControllerModule[]>([]);
   const isSyncing = ref(false);
   const syncError = ref<string | null>(null);
   const lastSyncTime = ref<Date | null>(null);
+
+  const domeStatus = ref<ControllerStatus>(ControllerStatus.DOWN);
+  const coreStatus = ref<ControllerStatus>(ControllerStatus.DOWN);
+  const bodyStatus = ref<ControllerStatus>(ControllerStatus.DOWN);
 
   async function syncControllers() {
     isSyncing.value = true;
@@ -59,6 +64,9 @@ export const useControllerStore = defineStore('controller', () => {
     isSyncing,
     syncError,
     lastSyncTime,
+    domeStatus,
+    coreStatus,
+    bodyStatus,
     syncControllers,
     setControllers,
     controllerSyncResponse,
