@@ -46,9 +46,9 @@ export default {
     return localStorage.getItem('jwt_token');
   },
 
-  async get(url: string) {
+  async get(url: string, params?: Record<string, unknown>) {
     try {
-      const response = await apiClient.get(url);
+      const response = await apiClient.get(url, { params });
       return response.data;
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -88,9 +88,9 @@ export default {
     }
   },
 
-  async delete(url: string) {
+  async delete(url: string, params?: Record<string, unknown>) {
     try {
-      const response = await apiClient.delete(url);
+      const response = await apiClient.delete(url, { params });
       return response.data;
     } catch (error) {
       console.error('Error deleting data:', error);

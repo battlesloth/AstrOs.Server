@@ -6,6 +6,8 @@ import type { ControllerSync } from "@/models/websocket/controllerSync";
 import { useControllerStore } from "@/stores/controller";
 import { Location } from "@/enums/modules/Location";
 import { ControllerStatus } from "@/enums/controllerStatus";
+import type { ScriptStatus } from "@/models/websocket/scriptStatus";
+import { useScriptsStore } from "@/stores/scripts";
 
 const ws = ref<WebSocket | null>(null);
 const wsIsConnected = ref(false);
@@ -80,6 +82,8 @@ export function useWebsocket() {
       case WebsocketMessageType.locationStatus:
         handleStatusMessage(parsedMessage);
         break;
+      case WebsocketMessageType.script:
+        handleScriptMessage(parsedMessage);
       default:
         console.warn('Unhandled message type:', parsedMessage.type);
         break;
@@ -121,6 +125,16 @@ export function useWebsocket() {
       }
     } catch (error) {
       console.error('Error handling status message:', error);
+    }
+  }
+
+  function handleScriptMessage(message: BaseWsMessage) {
+    try {
+      const data = message as ScriptStatus;
+      const scriptStore = useScriptsStore();
+      scriptStore.updateScriptStatus(data);
+    } catch (error) {
+      console.error('Error handling script message:', error);
     }
   }
 

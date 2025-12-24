@@ -7,7 +7,7 @@ export interface Script {
   description: string;
   lastSaved: Date;
 
-  deploymentStatus: Array<Record<string, DeploymentStatus>>;
+  deploymentStatus: Record<string, DeploymentStatus>;
 
   scriptChannels: Array<ScriptChannel>;
 }

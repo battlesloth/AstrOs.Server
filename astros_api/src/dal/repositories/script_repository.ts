@@ -36,7 +36,7 @@ export class ScriptRepository {
   private characters =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-  constructor(private readonly db: Kysely<Database>) {}
+  constructor(private readonly db: Kysely<Database>) { }
 
   //#region Script Create
 
@@ -93,7 +93,7 @@ export class ScriptRepository {
         kvp.value.scriptChannel = ch.id;
       }
     }
-    script.deploymentStatusKvp = new Array<DeploymentStatus>();
+    script.deploymentStatus = {};
     script.lastSaved = new Date();
 
     await this.upsertScript(script).catch((err: any) => {
@@ -151,12 +151,12 @@ export class ScriptRepository {
         });
 
       for (const dep of deployments) {
-        const status = new DeploymentStatus(dep.location_id, {
-          date: new Date(dep.last_deployed),
-          value: UploadStatus.uploaded,
-          locationName: dep.location_name || "",
-        });
-        scr.deploymentStatusKvp.push(status);
+        const status = new DeploymentStatus(
+          new Date(dep.last_deployed),
+          UploadStatus.uploaded,
+          dep.location_name || "",
+        );
+        scr.deploymentStatus[dep.location_id] = status;
       }
     }
 
@@ -199,13 +199,12 @@ export class ScriptRepository {
       });
 
     for (const dep of deployments) {
-      const status = new DeploymentStatus(dep.location_id, {
-        date: new Date(dep.last_deployed),
-        value: UploadStatus.uploaded,
-        locationName: dep.location_name || "",
-      });
-
-      result.deploymentStatusKvp.push(status);
+      const status = new DeploymentStatus(
+        new Date(dep.last_deployed),
+        UploadStatus.uploaded,
+        dep.location_name || "",
+      );
+      result.deploymentStatus[dep.location_id] = status;
     }
 
     result.scriptChannels = await this.readScriptChannels(id);

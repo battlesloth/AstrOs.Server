@@ -1,18 +1,13 @@
 import { UploadStatus } from "../astros_enums";
-import { Kvp } from "../kvp";
 
-export class DeploymentStatus extends Kvp<
-  string,
-  {
-    date: Date;
-    value: UploadStatus;
-    locationName: string;
-  }
-> {
-  constructor(
-    key: string,
-    value: { date: Date; value: UploadStatus; locationName: string },
-  ) {
-    super(key, value);
+export class DeploymentStatus {
+  date: Date;
+  value: UploadStatus;
+  locationName: string;
+
+  constructor(date: Date, value: UploadStatus, locationName: string) {
+    this.date = date;
+    this.value = value;
+    this.locationName = locationName;
   }
 }
