@@ -7,3 +7,6 @@ export const SYNC_CONTROLLERS = 'api/locations/synccontrollers';
 export const SETTINGS = 'api/settings';
 export const SETTINGS_CONTROLLERS = 'api/settings/controllers';
 export const SETTINGS_FORMAT_SD = 'api/settings/formatSD';
+export const SCRIPTS_ALL = 'api/scripts/all';
+export const SCRIPTS = 'api/scripts';
+export const REMOTE_CONFIG = 'api/remoteConfig';
