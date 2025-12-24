@@ -4,3 +4,6 @@ export const LOGOUT = 'api/logout';
 export const LOCATIONS = 'api/locations/';
 export const LOCATIONS_LOAD = 'api/locations/load';
 export const SYNC_CONTROLLERS = 'api/locations/synccontrollers';
+export const SETTINGS = 'api/settings';
+export const SETTINGS_CONTROLLERS = 'api/settings/controllers';
+export const SETTINGS_FORMAT_SD = 'api/settings/formatSD';
