@@ -6,6 +6,7 @@ import { useToast } from '@/composables/useToast';
 import type { Script } from '@/models/scripts/script';
 import { useScriptsStore } from '@/stores/scripts';
 import { UploadStatus } from '@/enums/scripts/uploadStatus';
+import AstrosScriptRow from '@/components/scripts/AstrosScriptRow.vue';
 
 const router = useRouter();
 const { success, error } = useToast();
@@ -106,7 +107,7 @@ const getUploadStatus = (script: Script, locationId: string) => {
   let uploadStatus = status.value;
 
   if (status.value) {
-    const uploaddate = new Date(status.date);
+    const uploaddate = new Date(status.date || '1970-01-01T00:00:00Z');
     const scriptdate = new Date(script.lastSaved);
     if (uploaddate < scriptdate) {
       uploadStatus = UploadStatus.notUploaded;
@@ -159,12 +160,22 @@ const editScript = (id: string) => {
             </div>
           </div>
 
-          <!-- Scripts List -->
-          <ul class="m-0 p-0 list-none">
-            <li v-for="script in scriptStore.scripts" :key="script.id">
-
-            </li>
-          </ul>
+          <table class="table w-full">
+            <thead>
+              <tr>
+                <th class="w-1/3">Script Name</th>
+                <th class="w-2/3">Description</th>
+                <th class="text-center">Status</th>
+                <th class="text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <AstrosScriptRow v-for="script in scriptStore.scripts" :key="script.id" :script="script"
+                :locations="locations" @edit="editScript" @copy="copyScript" @upload="uploadScript" @run="runScript"
+                @delete="openDeleteModal">
+              </AstrosScriptRow>
+            </tbody>
+          </table>
         </div>
         <div class="grow"></div>
       </div>

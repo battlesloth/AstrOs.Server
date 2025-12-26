@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import AstrosScriptRow from './AstrosScriptRow.vue';
+import { UploadStatus } from '@/enums/scripts/uploadStatus';
 
 const meta = {
   title: 'Components/Scripts/ScriptRow',
@@ -8,12 +9,31 @@ const meta = {
   parameters: {
     layout: 'padded',
   },
+  decorators: [
+    () => ({
+      template: `
+        <table class="table w-full">
+          <thead>
+            <tr>
+              <th class="w-1/3">Script Name</th>
+              <th class="w-2/3">Description</th>
+              <th class="text-center">Status</th>
+              <th class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <story />
+          </tbody>
+        </table>
+      `,
+    }),
+  ],
   args: {
-    onEditScript: fn(),
-    onCopyScript: fn(),
-    onUploadScript: fn(),
-    onRunScript: fn(),
-    onOpenDeleteModal: fn(),
+    onEdit: fn(),
+    onCopy: fn(),
+    onUpload: fn(),
+    onRun: fn(),
+    onDelete: fn(),
   },
   tags: ['autodocs'],
 } satisfies Meta<typeof AstrosScriptRow>;
@@ -30,9 +50,9 @@ export const Default: Story = {
       scriptName: 'Open Dome',
       description: 'Opens the observatory dome',
       deploymentStatus: {
-        body: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
-        core: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
-        dome: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
+        body: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
+        core: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
+        dome: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
       },
     },
     locations: defaultLocations,
@@ -46,9 +66,9 @@ export const NotUploaded: Story = {
       scriptName: 'Close Dome',
       description: 'Closes the observatory dome',
       deploymentStatus: {
-        body: { value: 'notUploaded', date: '' },
-        core: { value: 'notUploaded', date: '' },
-        dome: { value: 'notUploaded', date: '' },
+        body: { value: UploadStatus.notUploaded, date: undefined },
+        core: { value: UploadStatus.notUploaded, date: undefined },
+        dome: { value: UploadStatus.notUploaded, date: undefined },
       },
     },
     locations: defaultLocations,
@@ -62,9 +82,9 @@ export const Uploading: Story = {
       scriptName: 'Start Tracking',
       description: 'Begin telescope tracking',
       deploymentStatus: {
-        body: { value: 'uploading', date: '' },
-        core: { value: 'uploaded', date: new Date('2025-12-15T14:20:00').toISOString() },
-        dome: { value: 'uploaded', date: new Date('2025-12-15T14:20:00').toISOString() },
+        body: { value: UploadStatus.uploading, date: undefined },
+        core: { value: UploadStatus.uploaded, date: new Date('2025-12-15T14:20:00') },
+        dome: { value: UploadStatus.uploaded, date: new Date('2025-12-15T14:20:00') },
       },
     },
     locations: defaultLocations,
@@ -78,9 +98,9 @@ export const MixedStatus: Story = {
       scriptName: 'Emergency Stop',
       description: 'Emergency stop all motors',
       deploymentStatus: {
-        body: { value: 'uploaded', date: new Date('2025-12-18T09:15:00').toISOString() },
-        core: { value: 'notUploaded', date: '' },
-        dome: { value: 'uploading', date: '' },
+        body: { value: UploadStatus.uploaded, date: new Date('2025-12-18T09:15:00') },
+        core: { value: UploadStatus.notUploaded, date: undefined },
+        dome: { value: UploadStatus.uploading, date: undefined },
       },
     },
     locations: defaultLocations,
@@ -94,9 +114,9 @@ export const LongName: Story = {
       scriptName: 'Very Long Script Name That Should Truncate',
       description: 'This is a very long description that should also truncate when it exceeds the available space',
       deploymentStatus: {
-        body: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
-        core: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
-        dome: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
+        body: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
+        core: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
+        dome: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
       },
     },
     locations: defaultLocations,
@@ -110,9 +130,9 @@ export const ShortDescription: Story = {
       scriptName: 'Calibrate',
       description: 'Cal',
       deploymentStatus: {
-        body: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
-        core: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
-        dome: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
+        body: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
+        core: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
+        dome: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
       },
     },
     locations: defaultLocations,
@@ -126,9 +146,9 @@ export const NoDescription: Story = {
       scriptName: 'Test Script',
       description: '',
       deploymentStatus: {
-        body: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
-        core: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
-        dome: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
+        body: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
+        core: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
+        dome: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
       },
     },
     locations: defaultLocations,
@@ -142,7 +162,7 @@ export const PartialDeployment: Story = {
       scriptName: 'Park Telescope',
       description: 'Parks the telescope in home position',
       deploymentStatus: {
-        body: { value: 'uploaded', date: new Date('2025-12-19T16:45:00').toISOString() },
+        body: { value: UploadStatus.uploaded, date: new Date('2025-12-19T16:45:00') },
       },
     },
     locations: defaultLocations,
@@ -156,9 +176,9 @@ export const AllUploading: Story = {
       scriptName: 'System Update',
       description: 'Updates all system components',
       deploymentStatus: {
-        body: { value: 'uploading', date: '' },
-        core: { value: 'uploading', date: '' },
-        dome: { value: 'uploading', date: '' },
+        body: { value: UploadStatus.uploading, date: undefined },
+        core: { value: UploadStatus.uploading, date: undefined },
+        dome: { value: UploadStatus.uploading, date: undefined },
       },
     },
     locations: defaultLocations,
@@ -172,9 +192,9 @@ export const Interactive: Story = {
       scriptName: 'Interactive Script',
       description: 'Click buttons to see events fired',
       deploymentStatus: {
-        body: { value: 'uploaded', date: new Date('2025-12-20T10:30:00').toISOString() },
-        core: { value: 'notUploaded', date: '' },
-        dome: { value: 'uploading', date: '' },
+        body: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
+        core: { value: UploadStatus.notUploaded, date: undefined },
+        dome: { value: UploadStatus.uploading, date: undefined },
       },
     },
     locations: defaultLocations,

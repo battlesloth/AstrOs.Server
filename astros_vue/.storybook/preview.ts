@@ -5,10 +5,14 @@ import i18n from '../src/i18n.ts';
 import { initialize, mswLoader } from 'msw-storybook-addon';
 import { OhVueIcon, addIcons } from 'oh-vue-icons'
 import {
+  IoCloudUpload,
+  IoCopy,
   IoPersonOutline,
   IoKeyOutline,
   IoWarning,
-  IoCheckmarkCircle
+  IoCheckmarkCircle,
+  IoTrashBin,
+  IoPlay
 } from 'oh-vue-icons/icons';
 
 initialize();
@@ -17,7 +21,11 @@ setup((app) => {
   app.use(i18n);
 
   addIcons(
+    IoCloudUpload,
+    IoCopy,
+    IoTrashBin,
     IoPersonOutline,
+    IoPlay,
     IoKeyOutline,
     IoWarning,
     IoCheckmarkCircle
