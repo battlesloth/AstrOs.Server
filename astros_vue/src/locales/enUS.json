@@ -137,6 +137,8 @@
     "body": "Body Module",
     "dome": "Dome Module",
     "core": "Core Module",
-    "master": "Master Controller"
+    "master": "Master Controller",
+    "sync_successful": "Controllers sync queued!",
+    "sync_failed": "Controllers sync failed."
   }
 }

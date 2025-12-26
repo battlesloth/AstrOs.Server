@@ -71,7 +71,6 @@ export function useWebsocket() {
   }
 
   function handleMessage(message: string) {
-    console.log('Received message:', message);
 
     const parsedMessage = JSON.parse(message) as BaseWsMessage;
 
@@ -85,7 +84,7 @@ export function useWebsocket() {
       case WebsocketMessageType.script:
         handleScriptMessage(parsedMessage);
       default:
-        console.warn('Unhandled message type:', parsedMessage.type);
+        console.warn('Unhandled message type:', message);
         break;
     }
   }
@@ -112,7 +111,7 @@ export function useWebsocket() {
         status = ControllerStatus.NEEDS_SYNCED;
       }
 
-      switch (data.locationId) {
+      switch (data.controllerLocation) {
         case Location.dome:
           controllerStore.domeStatus = status;
           break;

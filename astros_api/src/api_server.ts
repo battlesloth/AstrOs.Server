@@ -508,6 +508,7 @@ class ApiServer {
       this.updateClients(update);
     } catch (error) {
       logger.error(`Error handling registration response: ${error}`);
+      this.updateClients(new ControllersResponse(false, []));
     }
   }
 

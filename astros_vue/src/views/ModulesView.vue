@@ -16,10 +16,16 @@ import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
 import AstrosInterruptModal from '@/components/modals/AstrosInterruptModal.vue';
 import AstrosServoTestModal from '@/components/modals/AstrosServoTestModal.vue';
 import { ControllerStatus } from '@/enums/controllerStatus';
+import apiService from '@/api/apiService';
+import { SYNC_CONFIG } from '@/api/endpoints';
+import { useToast } from '@/composables/useToast';
+import { useI18n } from 'vue-i18n';
 
 
 const showModal = ref<ModalType>(ModalType.loadingModal);
 const modalMessage = ref<string>('');
+
+const { t } = useI18n();
 
 const selectedLocationId = ref<Location>(Location.unknown);
 const selectedModuleId = ref<string>('');
@@ -31,6 +37,8 @@ const openAccordion = ref<string | null>(null);
 
 const locationStore = useLocationStore();
 const controllerStore = useControllerStore();
+
+const { success, error } = useToast();
 
 const {
   addModule, removeModule,
@@ -77,21 +85,14 @@ async function saveModuleSettings() {
 }
 
 async function syncModuleSettings() {
-  modalMessage.value = 'module_view.syncing';
-  showModal.value = ModalType.interruptModal;
+  const result = await apiService.get(SYNC_CONFIG);
 
-  //TODO: Implement sync logic
-  const result = { success: false, error: 'Not implemented' };
+  console.log('Sync result:', result);
 
-  // wait 1 second so it's not so abrupt
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  if (result.success) {
-    showModal.value = ModalType.closeAll;
-    modalMessage.value = '';
+  if (result.message === 'success') {
+    success(t('module_view.sync_successful'));
   } else {
-    modalMessage.value = result.error ?? 'module_view.sync_failed';
-    showModal.value = ModalType.errorModal;
+    error(t('module_view.sync_failed'));
   };
 }
 
