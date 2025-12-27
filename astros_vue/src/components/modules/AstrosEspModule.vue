@@ -39,6 +39,7 @@ const emit = defineEmits<{
 
 const openPanel = ref<string | null>(null);
 const openUartModuleId = ref<string | undefined>(undefined);
+const openI2cModuleId = ref<string | undefined>(undefined);
 
 const addUartModule = () => {
   if (openPanel.value !== 'uart') {
@@ -72,6 +73,10 @@ const removeModule = (evt: RemoveModuleEvent) => {
 
 const toggleUartModule = (moduleId: string) => {
   openUartModuleId.value = openUartModuleId.value === moduleId ? undefined : moduleId;
+};
+
+const toggleI2cModule = (moduleId: string) => {
+  openI2cModuleId.value = openI2cModuleId.value === moduleId ? undefined : moduleId;
 };
 
 const i2cAddressChanged = (evt: AddressChangeEvent) => {
@@ -122,8 +127,8 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         <ul v-if="location?.uartModules" class="space-y-2 max-h-96 overflow-y-scroll p-0">
           <li v-for="module in location.uartModules" :key="module.id">
             <AstrosUartModule @remove-module="removeModule" @servo-test="onServoTestEvent"
-              @toggle-module="toggleUartModule" :module="module" :is-master="isMaster" :parent-test-id="parentTestId"
-              :open-module-id="openUartModuleId" />
+              @toggle-module="toggleUartModule" :location-id="props.locationEnum" :module="module" :is-master="isMaster"
+              :parent-test-id="parentTestId" :open-module-id="openUartModuleId" />
           </li>
         </ul>
       </div>
@@ -144,8 +149,9 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
       <div class="collapse-content">
         <ul v-if="location?.i2cModules" class="space-y-2 max-h-96 overflow-y-scroll p-0">
           <li v-for="module in location.i2cModules" :key="module.id">
-            <AstrosI2cModule @remove-module="removeModule" @i2c-address-changed="i2cAddressChanged" :module="module"
-              :parent-test-id="parentTestId" />
+            <AstrosI2cModule @remove-module="removeModule" @i2c-address-changed="i2cAddressChanged"
+              @toggle-module="toggleI2cModule" :module="module" :location-id="props.locationEnum"
+              :parent-test-id="parentTestId" :open-module-id="openI2cModuleId" />
           </li>
         </ul>
       </div>

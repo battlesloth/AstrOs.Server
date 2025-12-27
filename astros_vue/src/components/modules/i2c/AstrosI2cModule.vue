@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, type PropType, type Component } from 'vue';
+import { ref, computed, type PropType, type Component } from 'vue';
 import { ModuleType } from "@/enums/modules/ModuleType";
 import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
 import type { RemoveModuleEvent, AddressChangeEvent } from '@/models/events';
+import { Location } from '@/enums/modules/Location';
 import AstrosGenericI2cModule from './submodules/AstrosGenericI2cModule.vue';
 import AstrosPca9685Module from './submodules/AstrosPca9685Module.vue';
 
@@ -12,16 +13,27 @@ const props = defineProps({
     type: Object as PropType<I2cModule>,
     required: true,
   },
+  locationId: {
+    type: String as PropType<Location>,
+    required: true,
+  },
   parentTestId: {
     type: String,
     required: true,
+  },
+  openModuleId: {
+    type: String,
+    default: null,
   },
 });
 
 const emit = defineEmits<{
   removeModule: [event: RemoveModuleEvent];
   i2cAddressChanged: [event: AddressChangeEvent];
+  toggleModule: [moduleId: string];
 }>();
+
+const isOpen = computed(() => props.openModuleId === props.module.id);
 
 const subtypeName = computed(() => {
   switch (props.module.moduleSubType) {
@@ -55,10 +67,14 @@ const nameClicked = (evt: MouseEvent) => {
 const removeModule = (event: Event) => {
   event.stopPropagation();
   emit('removeModule', {
-    locationId: props.module.locationId,
+    locationId: props.locationId,
     id: props.module.id,
     moduleType: ModuleType.i2c,
   });
+};
+
+const toggleCollapse = () => {
+  emit('toggleModule', props.module.id);
 };
 
 const onI2cAddressChanged = (value: string) => {
@@ -70,14 +86,13 @@ const onI2cAddressChanged = (value: string) => {
 </script>
 
 <template>
-  <div class="collapse collapse-arrow bg-base-100 border border-base-300">
-    <input type="checkbox" class="peer" />
+  <div class="collapse collapse-arrow bg-base-100 border border-base-300"
+    :class="{ 'collapse-open': isOpen, 'collapse-close': !isOpen }">
     <div :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-header`"
-      class="collapse-title flex items-center justify-between pr-12">
+      class="collapse-title flex items-center justify-between pr-12 cursor-pointer" @click="toggleCollapse">
       <div class="shrink-0 min-w-0">
-        <input :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-name`" v-model="module.name"
-          @click="nameClicked" @keydown.space.stop placeholder="Name"
-          class="input input-bordered input-sm w-full max-w-xs" />
+        <input :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-name`" v-model="module.name" @click.stop
+          @keydown.space.stop placeholder="Name" class="input input-bordered input-sm w-full max-w-xs" />
       </div>
       <div class="flex items-center gap-2 ml-4">
         <p class="text-sm text-base-content/60">{{ $t(subtypeName) }}</p>

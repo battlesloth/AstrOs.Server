@@ -69,7 +69,7 @@ export function useModuleManagement() {
     const module: UartModule = {
       id: uuid(),
       idx: -1,
-      locationId: locationId,
+      locationId: location.id,
       moduleType: ModuleType.uart,
       moduleSubType: moduleSubType ?? ModuleSubType.genericSerial,
       name: 'New Serial Module',
@@ -108,7 +108,7 @@ export function useModuleManagement() {
     const module: I2cModule = {
       id: uuid(),
       idx: -1,
-      locationId: locationId,
+      locationId: location.id,
       moduleType: ModuleType.i2c,
       moduleSubType: moduleSubType ?? ModuleSubType.genericI2C,
       name: 'New I2C Module',

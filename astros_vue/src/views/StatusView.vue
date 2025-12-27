@@ -2,13 +2,13 @@
 import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
 import AstrosStatus from '@/components/status/AstrosStatus.vue';
 import { useControllerStore } from '@/stores/controller';
-import { computed } from 'vue';
+import { storeToRefs } from 'pinia';
 
 const controllerStore = useControllerStore();
 
-const bodyStatus = computed(() => controllerStore.bodyStatus);
-const domeStatus = computed(() => controllerStore.domeStatus);
-const coreStatus = computed(() => controllerStore.coreStatus);
+const bodyStatus = storeToRefs(controllerStore).bodyStatus;
+const domeStatus = storeToRefs(controllerStore).domeStatus;
+const coreStatus = storeToRefs(controllerStore).coreStatus;
 
 </script>
 

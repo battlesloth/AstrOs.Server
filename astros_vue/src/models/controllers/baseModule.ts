@@ -1,4 +1,3 @@
-import type { Location } from '../../enums/modules/Location';
 import type { ModuleType } from "../../enums/modules/ModuleType";
 import type { ModuleSubType } from "../../enums/modules/ModuleSubType";
 
@@ -14,7 +13,7 @@ export interface BaseModule {
   idx: number;
   id: string;
   name: string;
-  locationId: Location;
+  locationId: string; // uuid of location
   moduleType: ModuleType;
   moduleSubType: ModuleSubType;
 }

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, type PropType, type Component } from 'vue';
+import { computed, type PropType, type Component } from 'vue';
 import { ModuleType } from "@/enums/modules/ModuleType";
 import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 import type { RemoveModuleEvent, ServoTestEvent } from '@/models/events';
+import { Location } from '@/enums/modules/Location';
 import AstrosGenericSerialModule from './submodules/AstrosGenericSerialModule.vue';
 import AstrosKangarooModule from './submodules/AstrosKangarooModule.vue';
 import AstrosHcrSerialModule from './submodules/AstrosHcrSerialModule.vue';
@@ -13,6 +14,10 @@ import AstrosMaestroModule from './submodules/AstrosMaestroModule.vue';
 const props = defineProps({
   module: {
     type: Object as PropType<UartModule>,
+    required: true,
+  },
+  locationId: {
+    type: String as PropType<Location>,
     required: true,
   },
   parentTestId: {
@@ -74,7 +79,7 @@ const subModuleComponent = computed<Component | null>(() => {
 const removeModule = (event: Event) => {
   event.stopPropagation();
   emit('removeModule', {
-    locationId: props.module.locationId,
+    locationId: props.locationId,
     id: props.module.id,
     moduleType: ModuleType.uart,
   });

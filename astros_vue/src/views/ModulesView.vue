@@ -20,12 +20,12 @@ import apiService from '@/api/apiService';
 import { SYNC_CONFIG } from '@/api/endpoints';
 import { useToast } from '@/composables/useToast';
 import { useI18n } from 'vue-i18n';
+import { storeToRefs } from 'pinia';
 
+const { t } = useI18n();
 
 const showModal = ref<ModalType>(ModalType.loadingModal);
 const modalMessage = ref<string>('');
-
-const { t } = useI18n();
 
 const selectedLocationId = ref<Location>(Location.unknown);
 const selectedModuleId = ref<string>('');
@@ -44,12 +44,12 @@ const {
   addModule, removeModule,
 } = useModuleManagement();
 
-const bodyLocation = computed(() => locationStore.getLocation(Location.body));
-const bodyStatus = computed(() => controllerStore.bodyStatus);
-const coreLocation = computed(() => locationStore.getLocation(Location.core));
-const coreStatus = computed(() => controllerStore.coreStatus);
-const domeLocation = computed(() => locationStore.getLocation(Location.dome));
-const domeStatus = computed(() => controllerStore.domeStatus);
+const bodyLocation = storeToRefs(locationStore).bodyLocation;
+const bodyStatus = storeToRefs(controllerStore).bodyStatus;
+const coreLocation = storeToRefs(locationStore).coreLocation;
+const coreStatus = storeToRefs(controllerStore).coreStatus;
+const domeLocation = storeToRefs(locationStore).domeLocation;
+const domeStatus = storeToRefs(controllerStore).domeStatus;
 
 const availableCoreControllers = computed(() =>
   controllerStore.controllers.filter(
@@ -86,8 +86,6 @@ async function saveModuleSettings() {
 
 async function syncModuleSettings() {
   const result = await apiService.get(SYNC_CONFIG);
-
-  console.log('Sync result:', result);
 
   if (result.message === 'success') {
     success(t('module_view.sync_successful'));
