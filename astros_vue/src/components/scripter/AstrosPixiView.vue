@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
-import { Application, Container, Graphics, HTMLText } from 'pixi.js';
+import { Application, Assets, Container, FillGradient, Graphics, Text, TextStyle } from 'pixi.js';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 
 // Import composables
@@ -29,6 +28,9 @@ import {
 } from '@/pixiComponents/timelineRendering';
 import { PixiScrollBar } from '@/pixiComponents/pixiScrollBar';
 import { ScrollBarDirection } from '@/pixiComponents/pixiScrollBarOptions';
+import { PixiChannelData, type PixiChannelSelectItem } from '@/pixiComponents/pixiChannelData';
+import { loadAssets } from '@/pixiComponents/assets/assetLoader';
+import { on } from 'events';
 
 // ============================================================================
 // APPLICATION REFS
@@ -187,6 +189,8 @@ onMounted(async () => {
 
   app.value = new Application();
 
+  await loadAssets();
+
   await app.value.init({
     width: pixiContainer.value.clientWidth || 800,
     height: pixiContainer.value.clientHeight || 600,
@@ -340,6 +344,22 @@ function addAppStageListeners() {
       endEventBoxDrag();
     });
   }
+}
+
+// ============================================================================
+// callbacks and handlers
+// ===========================================================================
+
+function onChannelTest(id: string) {
+  console.log('Test channel item:', id);
+}
+
+function onChannelSwap(id: string) {
+  console.log('Swap channel item:', id);
+}
+
+function onChannelDelete(id: string) {
+  console.log('Delete channel item:', id);
 }
 
 // ============================================================================
@@ -506,14 +526,20 @@ function createChannelList() {
     addChannel();
   });
 
-  const buttonText = new HTMLText({
+  const fill = new FillGradient(0, 0, 1, 1)
+  fill.addColorStop(0, 0xffffff);
+  fill.addColorStop(1, 0xffffff);
+
+  const style = new TextStyle({
+    fontFamily: 'Arial',
+    fontSize: 20,
+    fontWeight: 'bold',
+    fill: fill,
+  });
+
+  const buttonText = new Text({
     text: 'Add Channel',
-    style: {
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '16px',
-      fill: '#ffffff',
-      fontWeight: 'bold',
-    },
+    style: style,
   });
 
   // Center the text
@@ -535,33 +561,22 @@ function createChannelList() {
   channels.value.forEach((channel, index) => {
     const yPos = index * ROW_HEIGHT;
 
-    // Create container for the row
-    const rowContainer = new Container();
-    rowContainer.y = yPos;
-
     // Alternating background colors
     const rowColor = index % 2 === 0 ? 0xe5e5e5 : 0xf5f5f5;
-    const row = new Graphics().rect(0, 0, CHANNEL_LIST_WIDTH, ROW_HEIGHT).fill(rowColor);
 
-    // Add border
-    row.rect(0, ROW_HEIGHT - 1, CHANNEL_LIST_WIDTH, 1).fill(0xcccccc);
+    const options = {
+      channelId: channel.id.toString(),
+      channelName: channel.name,
+      yOffset: yPos,
+      rowColor: rowColor,
+      onSwap: onChannelSwap,
+      onTest: onChannelTest,
+      onDelete: onChannelDelete,
+    }
 
-    rowContainer.addChild(row);
+    const channelData = new PixiChannelData(options);
 
-    const rowText = new HTMLText({
-      text: `Row ${index + 1}`,
-      style: {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '14px',
-        fill: '#000000',
-      },
-    });
-
-    rowText.x = 16;
-    rowText.y = ROW_HEIGHT / 2 - 7;
-
-    rowContainer.addChild(rowText);
-    channelListScrollableContainer.value!.addChild(rowContainer);
+    channelListScrollableContainer.value!.addChild(channelData);
   });
 }
 
@@ -623,6 +638,7 @@ function addChannel() {
     name: `Channel ${channels.value.length + 1}`,
     events: [],
   };
+  const newIndex = channels.value.length;
   channels.value.push(newChannel);
 
   // Create the corresponding row container under the timeline
@@ -631,8 +647,32 @@ function addChannel() {
   // Update vertical scrollbar to account for new content
   updateVerticalScrollbar();
 
-  // Recreate the channel list UI
-  createChannelList();
+  // Add just the new channel row to the UI instead of recreating everything
+  if (channelListScrollableContainer.value) {
+    const yPos = newIndex * ROW_HEIGHT;
+    const rowColor = newIndex % 2 === 0 ? 0xe5e5e5 : 0xf5f5f5;
+
+    const options = {
+      channelId: newChannel.id.toString(),
+      channelName: newChannel.name,
+      yOffset: yPos,
+      rowColor: rowColor,
+      onSwap: onChannelSwap,
+      onTest: onChannelTest,
+      onDelete: onChannelDelete,
+    }
+
+    const channelData = new PixiChannelData(options);
+    channelListScrollableContainer.value.addChild(channelData);
+  }
+
+  // Update the background height to accommodate the new channel
+  if (channelListContainer.value && channelListContainer.value.children[0]) {
+    const background = channelListContainer.value.children[0] as Graphics;
+    if (app.value) {
+      background.clear().rect(0, 0, CHANNEL_LIST_WIDTH, app.value.screen.height).fill(0x2a2a2a);
+    }
+  };
 }
 
 // ============================================================================
