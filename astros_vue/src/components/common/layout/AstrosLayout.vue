@@ -35,7 +35,8 @@ function logout() {
 
 <template>
   <div class="drawer">
-    <input id="nav-menu-drawer" type="checkbox" class="drawer-toggle" v-model="sidebarOpen" />
+    <input id="nav-menu-drawer" type="checkbox" class="drawer-toggle" v-model="sidebarOpen" aria-label="open sidebar"
+      aria-controls="sidebar-menu" />
     <div class="drawer-content">
       <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-none pl-2 flex items-center">
@@ -54,26 +55,28 @@ function logout() {
     <div class="drawer-side">
       <label for="nav-menu-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
       <div class="bg-base-200 min-h-full w-80">
-        <ul class="menu w-80 p-4">
-          <li>
-            <p @click="router.push('/status')">{{ $t('nav.status') }}</p>
-          </li>
-          <li>
-            <p @click="router.push('/scripts')">{{ $t('nav.scripts') }}</p>
-          </li>
-          <li>
-            <p @click="router.push('/remote')">{{ $t('nav.remote') }}</p>
-          </li>
-          <li>
-            <p @click="router.push('/modules')">{{ $t('nav.modules') }}</p>
-          </li>
-          <li>
-            <p @click="router.push('/utility')">{{ $t('nav.utility') }}</p>
-          </li>
-          <li>
-            <p @click="logout">{{ $t('nav.logout') }}</p>
-          </li>
-        </ul>
+        <nav aria-label="Main menu">
+          <ul class="menu w-80 p-4">
+            <li>
+              <router-link to="/status">{{ $t('nav.status') }}</router-link>
+            </li>
+            <li>
+              <router-link to="/scripts">{{ $t('nav.scripts') }}</router-link>
+            </li>
+            <li>
+              <router-link to="/remote">{{ $t('nav.remote') }}</router-link>
+            </li>
+            <li>
+              <router-link to="/modules">{{ $t('nav.modules') }}</router-link>
+            </li>
+            <li>
+              <router-link to="/utility">{{ $t('nav.utility') }}</router-link>
+            </li>
+            <li>
+              <button @click="logout">{{ $t('nav.logout') }}</button>
+            </li>
+          </ul>
+        </nav>
       </div>
     </div>
   </div>

@@ -80,7 +80,7 @@ export function useModuleManagement() {
 
     switch (moduleSubType) {
       case ModuleSubType.humanCyborgRelationsSerial:
-        module.name = 'New HCR Serial Module';
+        module.name = 'New HCR Module';
         break;
       case ModuleSubType.kangaroo:
         module.name = 'New Kangaroo Module';
@@ -156,7 +156,7 @@ export function useModuleManagement() {
         id: uuid(),
         parentId: board.id,
         channelNumber: i,
-        channelName: `Channel ${i + 1}`,
+        channelName: `Channel ${i}`,
         enabled: false,
         isServo: false,
         inverted: false,

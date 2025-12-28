@@ -1,90 +1,79 @@
 {
-    // See https://go.microsoft.com/fwlink/?LinkId=733558
-    // for the documentation about the tasks.json format
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "test api",
-            "type": "shell",
-            "command": "npm",
-            "args": ["run", "test"],
-            "options": {
-                "cwd": "${workspaceFolder}/astros_api"
-            },
-            "dependsOn": "build commons"
-        },
-        {
-            "label": "build commons",
-            "type": "shell",
-            "command": "npm",
-            "args": ["run", "build"],
-            "options": {
-                "cwd": "${workspaceFolder}/astros_common"
-            }
-        },
-        {
-            "label": "move commons to api",
-            "type": "shell",
-            "command": "",
-            "windows": {
-                "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_api/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/dist -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/package.json",
-            },
-            "options": {
-                "shell": {
-                    "executable": "powershell.exe"
-                }
-            },
-            "dependsOn": "build commons"
-        },
-        {
-            "label": "move commons to client",
-            "type": "shell",
-            "command": "",
-            "windows": {
-                "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_client/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/dist -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/package.json",
-            },
-            "options": {
-                "shell": {
-                    "executable": "powershell.exe"
-                }
-            },
-            "dependsOn": "build commons"
-        },
-        {
-            "label": "move commons package",
-            "dependsOn":[
-                "move commons to api",
-                "move commons to client"
-            ]
-        },
-        {
-            "label": "lint and build",
-            "type": "shell",
-            "command": "npm",
-            "args": ["run","build"],
-            "options": {
-                "cwd": "${workspaceFolder}/astros_api"
-            }
-        },
-        {
-            "label": "copy .env",
-            "type": "shell",
-            "command": "",
-            "windows":{
-                "command": "Copy-Item -Path ${workspaceFolder}/astros_api/src/.env -Destination ${workspaceFolder}/astros_api/dist/.env "  
-            },
-            "options": {
-                "shell": {
-                    "executable": "powershell.exe"
-                }
-            },
-            "dependsOn": "lint and build"
-        },
-        {
-        "label": "build server",
-        "dependsOn": [
-            "copy .env"
-            ]
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "test api",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "test"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/astros_api"
+      },
+      "dependsOn": "build commons"
+    },
+    {
+      "label": "build commons",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/astros_common"
+      }
+    },
+    {
+      "label": "move commons to api",
+      "type": "shell",
+      "command": "",
+      "windows": {
+        "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_api/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/dist -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/package.json",
+      },
+      "options": {
+        "shell": {
+          "executable": "powershell.exe"
         }
-    ]
+      },
+      "dependsOn": "build commons"
+    },
+    {
+      "label": "move commons to client",
+      "type": "shell",
+      "command": "",
+      "windows": {
+        "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_client/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/dist -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/package.json",
+      },
+      "options": {
+        "shell": {
+          "executable": "powershell.exe"
+        }
+      },
+      "dependsOn": "build commons"
+    },
+    {
+      "label": "move commons package",
+      "dependsOn": [
+        "move commons to api",
+        "move commons to client"
+      ]
+    },
+    {
+      "label": "build server",
+      "type": "shell",
+      "command": "npm",
+      "args": [
+        "run",
+        "build"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/astros_api"
+      }
+    }
+  ]
 }

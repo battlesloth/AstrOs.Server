@@ -126,8 +126,13 @@ class ApiServer {
     logger.info("Setting up routes");
     this.setRoutes();
 
-    logger.info("Starting up serial port services");
-    this.setupSerialPort();
+    if (process.env.NODE_ENV?.toLocaleLowerCase() === "test") {
+      logger.warn("Running in test mode, skipping serial port setup");
+    }
+    else {
+      logger.info("Starting up serial port services");
+      this.setupSerialPort();
+    }
 
     logger.info("Starting web services");
     this.runWebServices();

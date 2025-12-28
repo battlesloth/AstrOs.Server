@@ -42,6 +42,11 @@ const router = createRouter({
       component: () => import('../views/ModulesView.vue'),
     },
     {
+      path: '/modules/:skipControllers',
+      name: 'modules-skip-controllers',
+      component: () => import('../views/ModulesView.vue'),
+    },
+    {
       path: '/utility',
       name: 'utility',
       component: () => import('../views/UtilityView.vue'),

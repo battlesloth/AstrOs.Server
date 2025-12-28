@@ -5,8 +5,10 @@
   "main": "api_server.js",
   "private": true,
   "scripts": {
-    "prebuild": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "prebuild": "rm -rf dist && eslint . --ext .js,.jsx,.ts,.tsx",
     "build": "tsc",
+    "postbuild": "cp .env ./dist/.env",
+    "postbuild:test": "cp .env.test ./dist/.env",
     "start": "node ./dist/api_server.js",
     "start:tsx": "tsx ./src/api_server.ts",
     "test": "vitest",
