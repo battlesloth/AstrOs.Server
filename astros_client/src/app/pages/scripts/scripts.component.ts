@@ -146,13 +146,9 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
     }
 
     for (const location of this.locations) {
-      if (
-        script.deploymentStatusKvp
-          .map((s) => {
-            return s.key;
-          })
-          .indexOf(location) > -1
-      ) {
+
+      const status = script.deploymentStatus[location];
+      if (status) {
         const el = document.getElementById(`${scriptId}_${location}`);
         if (el === null) {
           continue;
@@ -336,18 +332,16 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
       return { s: 'notuploaded', d: dateString };
     }
 
-    const status = script.deploymentStatusKvp.find((s) => {
-      return s.value.locationName === locationId;
-    });
+    const status = script.deploymentStatus[locationId];
 
     if (!status) {
       return { s: 'notuploaded', d: dateString };
     }
 
-    let uploadStatus = status.value.value;
+    let uploadStatus = status.value;
 
-    if (status.value.date) {
-      const uploaddate = new Date(status.value.date);
+    if (status.date) {
+      const uploaddate = new Date(status.date);
       const scriptdate = new Date(script.lastSaved);
       if (uploaddate < scriptdate) {
         uploadStatus = UploadStatus.notUploaded;
@@ -386,17 +380,13 @@ export class ScriptsComponent implements OnInit, AfterViewChecked {
       return;
     }
 
-    const sidx = script.deploymentStatusKvp
-      .map((s) => {
-        return s.key;
-      })
-      .indexOf(controllerId.toString());
+    const sidx = script.deploymentStatus[controllerId.toString()]
 
-    if (sidx < 0) {
+    if (!sidx) {
       return;
     }
 
-    script.deploymentStatusKvp[sidx].value.date = date;
+    script.deploymentStatus[controllerId.toString()].date = date;
   }
 
   getScript(id: string): Script | undefined {

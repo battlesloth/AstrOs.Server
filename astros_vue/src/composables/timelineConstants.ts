@@ -3,7 +3,7 @@
 // ============================================================================
 
 // Element dimensions
-export const ROW_HEIGHT = 60;
+export const ROW_HEIGHT = 96;
 export const TIMELINE_HEIGHT = 50;
 export const SCROLL_BAR_HEIGHT = 15;
 export const ADD_CHANNEL_BUTTON_HEIGHT = SCROLL_BAR_HEIGHT + TIMELINE_HEIGHT; // Combined height of scrollbar and timeline

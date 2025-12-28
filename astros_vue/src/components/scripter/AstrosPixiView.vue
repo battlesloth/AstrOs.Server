@@ -43,7 +43,7 @@ const channels = ref<Channel[]>([]);
 // ============================================================================
 
 const {
-  ROW_HEIGHT: ROW_HEIGHT,
+  ROW_HEIGHT,
   TIMELINE_HEIGHT,
   SCROLL_BAR_HEIGHT,
   ADD_CHANNEL_BUTTON_HEIGHT,
