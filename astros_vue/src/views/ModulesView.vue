@@ -8,13 +8,14 @@ import { useModuleManagement } from '@/composables/useModuleManagement';
 import { ModalType } from '@/enums/modalType';
 
 import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
-import AstrosLoadingModal from '@/components/modals/AstrosLoadingModal.vue';
 import AstrosEspModule from '@/components/modules/AstrosEspModule.vue';
-import AstrosAddModuleModal from '@/components/modals/AstrosAddModuleModal.vue';
 import AstrosAlertModal from '@/components/modals/AstrosAlertModal.vue';
 import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
 import AstrosInterruptModal from '@/components/modals/AstrosInterruptModal.vue';
-import AstrosServoTestModal from '@/components/modals/AstrosServoTestModal.vue';
+import AstrosLoadingModal from '@/components/modals/modules/AstrosLoadingModal.vue';
+import AstrosAddModuleModal from '@/components/modals/modules/AstrosAddModuleModal.vue';
+import AstrosServoTestModal from '@/components/modals/modules/AstrosServoTestModal.vue';
+
 import { ControllerStatus } from '@/enums/controllerStatus';
 import apiService from '@/api/apiService';
 import { SYNC_CONFIG } from '@/api/endpoints';

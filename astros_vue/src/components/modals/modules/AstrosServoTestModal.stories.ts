@@ -4,7 +4,7 @@ import AstrosServoTestModal from './AstrosServoTestModal.vue';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 
 const meta = {
-  title: 'Components/Modals/ServoTestModal',
+  title: 'Components/Modals/Modules/ServoTestModal',
   component: AstrosServoTestModal,
   parameters: {
     layout: 'centered',

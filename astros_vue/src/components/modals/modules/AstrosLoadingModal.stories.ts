@@ -45,7 +45,7 @@ const createStoryRender = (mockSuccess: boolean, mockError: boolean) => (args: a
 });
 
 const meta = {
-  title: 'Components/Modals/LoadingModal',
+  title: 'Components/Modals/Modules/LoadingModal',
   component: AstrosLoadingModal,
   render: createStoryRender(true, false),
   parameters: {

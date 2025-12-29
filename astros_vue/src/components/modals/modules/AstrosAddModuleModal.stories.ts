@@ -5,7 +5,7 @@ import { Location } from '@/enums/modules/Location';
 import { ModuleType } from "@/enums/modules/ModuleType";
 
 const meta = {
-  title: 'Components/Modals/AddModuleModal',
+  title: 'Components/Modals/Modules/AddModuleModal',
   component: AstrosAddModuleModal,
   parameters: {
     layout: 'centered',
