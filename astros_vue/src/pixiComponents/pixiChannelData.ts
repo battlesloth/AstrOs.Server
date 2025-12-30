@@ -1,6 +1,5 @@
 import {
   Assets,
-  BitmapText,
   Container,
   FillGradient,
   Graphics,
@@ -9,14 +8,16 @@ import {
   TextStyle,
   Texture,
 } from 'pixi.js';
-import { CHANNEL_LIST_WIDTH, ROW_HEIGHT } from '@/composables/timelineConstants';
 import { truncateText } from './helpers';
 
 export interface PixiChannelDataOptions {
   channelId: string;
   channelName: string;
-  yOffset: number;
-  rowColor: number;
+  rowIdx: number;
+  height: number;
+  width: number;
+  rowColor?: number;
+  borderColor?: number;
   onSwap?: (id: string) => void;
   onTest?: (id: string) => void;
   onDelete?: (id: string, name: string) => void;
@@ -37,19 +38,23 @@ export class PixiChannelData extends Container {
 
   channelId: string;
   channelName: string;
+  rowIdx: number;
+  options: PixiChannelDataOptions;
 
   constructor(options: PixiChannelDataOptions) {
     super();
     this.channelId = options.channelId;
     this.channelName = options.channelName;
-    this.y = options.yOffset;
-
+    this.rowIdx = options.rowIdx;
+    this.y = this.rowIdx * options.height;
+    this.options = options;
     const background = new Graphics()
-      .rect(0, 0, CHANNEL_LIST_WIDTH, ROW_HEIGHT)
-      .fill(options.rowColor);
+      .rect(0, 0, options.width, options.height)
+      .fill(this.getRowColor());
 
     // Add bottom border line
-    background.rect(0, ROW_HEIGHT - 1, CHANNEL_LIST_WIDTH, 1).fill(0xcccccc);
+    background.rect(0, options.height - 1, options.width, 1)
+      .fill(this.getBorderColor());
 
     this.addChild(background);
 
@@ -63,7 +68,7 @@ export class PixiChannelData extends Container {
       fill: fill,
     });
 
-    const text = truncateText(this.channelName, style, CHANNEL_LIST_WIDTH - 20);
+    const text = truncateText(this.channelName, style, options.width - 20);
 
     const rowText = new Text({
       text: text,
@@ -99,8 +104,8 @@ export class PixiChannelData extends Container {
 
   createButton(xOffset: number, callback?: (id: string, name: string) => void) {
     const button = new Container();
-    button.x = CHANNEL_LIST_WIDTH - xOffset;
-    button.y = ROW_HEIGHT - this.buttonYoffset;
+    button.x = this.options.width - xOffset;
+    button.y = this.options.height - this.buttonYoffset;
     button.cursor = 'pointer';
     button.eventMode = 'static';
 
@@ -128,5 +133,19 @@ export class PixiChannelData extends Container {
     icon.x = this.buttonSize / 2;
     icon.y = this.buttonSize / 2;
     button.addChild(icon);
+  }
+
+  getRowColor(): number {
+    if (this.options.rowColor !== undefined) {
+      return this.options.rowColor;
+    }
+    return this.rowIdx % 2 === 0 ? 0xe5e5e5 : 0xf5f5f5;
+  }
+
+  getBorderColor(): number {
+    if (this.options.borderColor !== undefined) {
+      return this.options.borderColor;
+    }
+    return 0xcccccc;
   }
 }

@@ -51,6 +51,9 @@ import { PixiScrollBar } from '@/pixiComponents/pixiScrollBar';
 import { ScrollBarDirection } from '@/pixiComponents/pixiScrollBarOptions';
 import { PixiChannelData, type PixiChannelSelectItem } from '@/pixiComponents/pixiChannelData';
 import { loadAssets } from '@/pixiComponents/assets/assetLoader';
+import { PixiChannelEventRow, type PixiChannelEventRowOptions } from '@/pixiComponents/pixiChannelEventRow';
+import { PixiTimeline, type PixiTimelineOptions } from '@/pixiComponents/pixiTimeline';
+import { PixiChannelList } from '@/pixiComponents/pixiChannelList';
 
 // ============================================================================
 // APPLICATION REFS
@@ -67,10 +70,10 @@ const channels = ref<Channel[]>([]);
 const mainContainer = ref<Container | null>(null);
 const scrollableContentContainer = ref<Container | null>(null);
 const uiLayer = ref<Container | null>(null);
-const channelListContainer = ref<Container | null>(null);
-const channelListScrollableContainer = ref<Container | null>(null);
-const timeline = ref<Container | null>(null);
-const channelRowContainers = ref<Map<string, Container>>(new Map());
+const channelListContainer = ref<PixiChannelList | null>(null);
+//const channelListScrollableContainer = ref<Container | null>(null);
+const timeline = ref<PixiTimeline | null>(null);
+const channelRowContainers = ref<Map<string, PixiChannelEventRow>>(new Map());
 
 // Scrollbar graphics
 const horizontalScrollBar = ref<PixiScrollBar | null>(null);
@@ -233,7 +236,7 @@ watch(horizontalScrollOffset, (newOffset) => {
 
 // Watch vertical scroll offset and update container Y position
 watch(verticalScrollOffset, (newOffset) => {
-  if (scrollableContentContainer.value && app.value && channelListScrollableContainer.value) {
+  if (scrollableContentContainer.value && app.value){ //&& channelListScrollableContainer.value) {
     const canvasHeight = app.value.screen.height;
     const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
     const totalContentHeight = channels.value.length * ROW_HEIGHT;
@@ -313,15 +316,8 @@ onMounted(async () => {
   createVerticalScrollbar();
   createTimeline();
   createZoomButtons();
-
-  channelListContainer.value = new Container();
-  uiLayer.value.addChild(channelListContainer.value as any);
-
-  channelListScrollableContainer.value = new Container();
-  channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT;
-  channelListContainer.value.addChild(channelListScrollableContainer.value as any);
-
   createChannelList();
+  uiLayer.value.addChild(channelListContainer.value as any);
 
   resizeObserver = new ResizeObserver((entries) => {
     // Use requestAnimationFrame to ensure layout is complete
@@ -378,7 +374,7 @@ onUnmounted(() => {
   scrollableContentContainer.value = null;
   uiLayer.value = null;
   channelListContainer.value = null;
-  channelListScrollableContainer.value = null;
+  //channelListScrollableContainer.value = null;
   horizontalScrollBar.value = null;
   timeline.value = null;
   verticalScrollBar.value = null;
@@ -477,6 +473,20 @@ function createVerticalScrollbar() {
 function createTimeline() {
   if (!app.value || !uiLayer.value) return;
 
+  const timelineOptions: PixiTimelineOptions = {
+    xOffset: CHANNEL_LIST_WIDTH,
+    yOffset: SCROLL_BAR_HEIGHT,
+    width: TIMELINE_WIDTH.value,
+    height: TIMELINE_HEIGHT,
+    duration: TIMELINE_DURATION_SECONDS,
+    zoomLevel: zoomLevel.value,
+    pixelsPerMajorTick: PIXELS_PER_MAJOR_TICK,
+  };
+
+  const timelineInstance = new PixiTimeline(timelineOptions);
+  timeline.value = timelineInstance;
+  uiLayer.value.addChild(timeline.value as any);
+/*
   timeline.value = new Container();
   timeline.value.x = CHANNEL_LIST_WIDTH; // Start after channel list
   timeline.value.y = SCROLL_BAR_HEIGHT; // Position below the scrollbar
@@ -510,8 +520,8 @@ function createTimeline() {
     PIXELS_PER_MAJOR_TICK,
     TIMELINE_HEIGHT,
   );
-
-  uiLayer.value.addChild(timeline.value as any);
+*/
+  
 }
 
 function createZoomButtons() {
@@ -542,13 +552,25 @@ function createZoomButtons() {
 }
 
 function createChannelList() {
-  if (!app.value || !channelListContainer.value || !channelListScrollableContainer.value) return;
-
-  // Clear existing content
-  channelListContainer.value.removeChildren();
+  if (!app.value) return;
 
   const canvasHeight = app.value.screen.height;
 
+  if (channelListContainer.value == null) {
+    channelListContainer.value = new PixiChannelList({
+      width: CHANNEL_LIST_WIDTH,
+      height: canvasHeight,
+      buttonHeight: ADD_CHANNEL_BUTTON_HEIGHT,
+      emitAddChannel: emitAddChannel,
+    });
+  } else {
+    channelListContainer.value.redraw(canvasHeight);
+  }
+ /*
+  // Clear existing content
+  channelListContainer.value.removeChildren();
+
+  
   // Create background for channel list area (add first so it's behind everything)
   const background = new Graphics().rect(0, 0, CHANNEL_LIST_WIDTH, canvasHeight).fill(0x2a2a2a);
   channelListContainer.value.addChild(background);
@@ -611,19 +633,17 @@ function createChannelList() {
   buttonContainer.addChild(buttonText);
   buttonContainer.zIndex = 10; // Ensure it's on top
   channelListContainer.value.addChild(buttonContainer);
+*/
 
-  // Draw channel rows in scrollable container
+// Draw channel rows in scrollable container
   channels.value.forEach((channel, index) => {
-    const yPos = index * ROW_HEIGHT;
-
-    // Alternating background colors
-    const rowColor = index % 2 === 0 ? 0xe5e5e5 : 0xf5f5f5;
-
+  
     const options = {
       channelId: channel.id.toString(),
       channelName: channel.name,
-      yOffset: yPos,
-      rowColor: rowColor,
+      rowIdx: index,
+      height: ROW_HEIGHT,
+      width: CHANNEL_LIST_WIDTH,
       onSwap: emitChannelSwap,
       onTest: emitChannelTest,
       onDelete: emitChannelDelete,
@@ -631,57 +651,30 @@ function createChannelList() {
 
     const channelData = new PixiChannelData(options);
 
-    channelListScrollableContainer.value!.addChild(channelData);
+    channelListContainer.value?.addChannelRow(channelData);
+
+    //    channelListScrollableContainer.value!.addChild(channelData);
   });
 }
 
 function createChannelRowContainer(channelId: string, rowIndex: number) {
   if (!scrollableContentContainer.value || !app.value) return;
+  
+  const options: PixiChannelEventRowOptions = {
+    channelId: channelId,
+    rowIdx: rowIndex,
+    height: ROW_HEIGHT,
+    timeLineDuration: TIMELINE_DURATION_SECONDS,
+    timeLineWidth: TIMELINE_WIDTH,
+    isDragging: isDraggingTimeline,
+    onClick: emitAddEvent,
+  };
 
-  // Create a container for this channel row
-  const rowContainer = new Container();
-  rowContainer.x = 0; // Aligned with timeline
-  rowContainer.y = rowIndex * ROW_HEIGHT;
-  rowContainer.eventMode = 'static';
-  rowContainer.cursor = 'pointer';
+  const eventRow = new PixiChannelEventRow(options);
 
-  // Draw the row background
-  const rowBg = new Graphics();
-  const rowColor = rowIndex % 2 === 0 ? 0x2a2a2a : 0x1a1a1a;
-  rowBg.rect(0, 0, TIMELINE_WIDTH.value, ROW_HEIGHT).fill(rowColor);
+  scrollableContentContainer.value.addChild(eventRow as any);
 
-  // Add border
-  rowBg.rect(0, ROW_HEIGHT - 1, TIMELINE_WIDTH.value, 1).fill(0x444444);
-
-  rowContainer.addChild(rowBg);
-
-  // Add click handler to create red box at click position
-  rowContainer.on('pointertap', (event) => {
-    // Only create box with left mouse button
-    if (event.button !== 0) return;
-
-    // Don't create box if user was dragging timeline or event box
-    if (hasDragged.value || hasEventBoxDragged.value) {
-      hasEventBoxDragged.value = false; // Reset flag
-      return;
-    }
-
-    if (!scrollableContentContainer.value || !app.value) return;
-
-    // Get the local position within the row container
-    const localPos = rowContainer.toLocal(event.global);
-
-    // Calculate the time in seconds based on pixel position
-    const timeInSeconds = (localPos.x / TIMELINE_WIDTH.value) * TIMELINE_DURATION_SECONDS;
-
-    // Create and store the event box
-    //addEventBox(rowContainer, channelId, timeInSeconds, app, isDraggingTimeline);
-  });
-
-  scrollableContentContainer.value.addChild(rowContainer as any);
-
-  // Store the container in the map
-  channelRowContainers.value.set(channelId, rowContainer);
+  channelRowContainers.value.set(channelId, eventRow as any);
 
   // Update positions of any existing event boxes for this channel
   updateEventBoxPositions(channelId);
@@ -704,23 +697,23 @@ function doAddChannel(id: string, name: string) {
   updateVerticalScrollbar();
 
   // Add just the new channel row to the UI instead of recreating everything
-  if (channelListScrollableContainer.value) {
-    const yPos = newIndex * ROW_HEIGHT;
-    const rowColor = newIndex % 2 === 0 ? 0xe5e5e5 : 0xf5f5f5;
+  //if (channelListScrollableContainer.value) {
 
     const options = {
       channelId: newChannel.id,
       channelName: newChannel.name,
-      yOffset: yPos,
-      rowColor: rowColor,
+      rowIdx: newIndex,
+      height: ROW_HEIGHT,
+      width: CHANNEL_LIST_WIDTH,
       onSwap: emitChannelSwap,
       onTest: emitChannelTest,
       onDelete: emitChannelDelete,
     };
 
     const channelData = new PixiChannelData(options);
-    channelListScrollableContainer.value.addChild(channelData);
-  }
+    channelListContainer.value?.addChannelRow(channelData);
+    //channelListScrollableContainer.value.addChild(channelData);
+  //}
 
   // Update the background height to accommodate the new channel
   if (channelListContainer.value && channelListContainer.value.children[0]) {
@@ -742,9 +735,9 @@ function doRemoveChannel(chId: string) {
   const removedChannel = channels.value.splice(channelIndex, 1)[0];
 
   // Remove the corresponding row container under the timeline
-  const rowContainer = channelRowContainers.value.get(chId) as Container;
+  const rowContainer = channelRowContainers.value.get(chId);
   if (rowContainer && scrollableContentContainer.value) {
-    scrollableContentContainer.value.removeChild(rowContainer);
+    scrollableContentContainer.value.removeChild(rowContainer as any);
     channelRowContainers.value.delete(chId);
   }
 
@@ -769,7 +762,7 @@ function doAddEvent(chlId: string, time: number) {
     console.error('Channel row container not found for channel ID:', chlId);
     return;
   }
-  addEventBox(rowContainer as Container, chlId, time, app, isDraggingTimeline);
+  addEventBox(rowContainer as any, chlId, time, app, isDraggingTimeline);
 }
 
 // ============================================================================
@@ -1183,9 +1176,12 @@ function updateContainerPositions(worldX: number, worldY: number) {
     timeline.value.x = CHANNEL_LIST_WIDTH - worldX;
   }
 
-  if (channelListScrollableContainer.value) {
-    channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
+  if (channelListContainer.value) {
+    channelListContainer.value.setScrollableY(worldY);
   }
+  /*if (channelListScrollableContainer.value) {
+    channelListScrollableContainer.value.y = ADD_CHANNEL_BUTTON_HEIGHT - worldY;
+  }*/
 }
 
 function getZoomButtonPositions(canvasWidth: number) {
