@@ -1,50 +1,50 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { type GenericSerialEvent, type ScriptEvent } from '@/models/scripts/scripting'
+import { ref, computed } from 'vue';
+import { type GenericSerialEvent, type ScriptEvent } from '@/models/scripts/scripting';
 
 export interface UartEventModalProps {
-  mode?: 'add' | 'edit'
-  scriptEvent: ScriptEvent
-  timeFactor?: number
-  maxTime?: number
+  mode?: 'add' | 'edit';
+  scriptEvent: ScriptEvent;
+  timeFactor?: number;
+  maxTime?: number;
 }
 
 const props = withDefaults(defineProps<UartEventModalProps>(), {
   mode: 'add',
   timeFactor: 1000,
   maxTime: 600000,
-})
+});
 
 const emit = defineEmits<{
-  addEvent: [data: { scriptEvent: ScriptEvent; time: number }]
-  editEvent: [data: { scriptEvent: ScriptEvent; time: number }]
-  removeEvent: []
-  close: []
-}>()
+  addEvent: [data: { scriptEvent: ScriptEvent; time: number }];
+  editEvent: [data: { scriptEvent: ScriptEvent; time: number }];
+  removeEvent: [];
+  close: [];
+}>();
 
-const originalEventTime = ref(0)
-const eventTime = ref(0)
-const eventValue = ref('')
-const errorMessage = ref('')
+const originalEventTime = ref(0);
+const eventTime = ref(0);
+const eventValue = ref('');
+const errorMessage = ref('');
 
 // Initialize values from scriptEvent
 const initializeValues = () => {
   if (props.scriptEvent.event !== undefined) {
-    const temp = props.scriptEvent.event as GenericSerialEvent
-    eventValue.value = temp.value
+    const temp = props.scriptEvent.event as GenericSerialEvent;
+    eventValue.value = temp.value;
   }
 
-  originalEventTime.value = props.scriptEvent.time / props.timeFactor
-  eventTime.value = props.scriptEvent.time / props.timeFactor
-}
+  originalEventTime.value = props.scriptEvent.time / props.timeFactor;
+  eventTime.value = props.scriptEvent.time / props.timeFactor;
+};
 
-initializeValues()
+initializeValues();
 
 const saveEvent = () => {
-  errorMessage.value = ''
+  errorMessage.value = '';
 
   if (+eventTime.value > props.maxTime) {
-    errorMessage.value = `Event time cannot be larger than ${props.maxTime / props.timeFactor}`
+    errorMessage.value = `Event time cannot be larger than ${props.maxTime / props.timeFactor}`;
     return;
   }
 
@@ -54,22 +54,22 @@ const saveEvent = () => {
   const eventData = {
     scriptEvent: props.scriptEvent,
     time: originalEventTime.value * props.timeFactor,
-  }
+  };
 
   if (props.mode === 'add') {
-    emit('addEvent', eventData)
+    emit('addEvent', eventData);
   } else {
-    emit('editEvent', eventData)
+    emit('editEvent', eventData);
   }
-}
+};
 
 const removeEvent = () => {
-  emit('removeEvent')
-}
+  emit('removeEvent');
+};
 
 const closeModal = () => {
-  emit('close')
-}
+  emit('close');
+};
 </script>
 
 <template>
@@ -79,7 +79,10 @@ const closeModal = () => {
 
       <div class="space-y-4">
         <div>
-          <label for="time" class="label">
+          <label
+            for="time"
+            class="label"
+          >
             <span class="label-text">Event Time (seconds)</span>
           </label>
           <input
@@ -93,7 +96,10 @@ const closeModal = () => {
         </div>
 
         <div>
-          <label for="value" class="label">
+          <label
+            for="value"
+            class="label"
+          >
             <span class="label-text">Serial Command</span>
           </label>
           <input
@@ -105,15 +111,34 @@ const closeModal = () => {
           />
         </div>
 
-        <div v-if="errorMessage" class="text-error text-sm">
+        <div
+          v-if="errorMessage"
+          class="text-error text-sm"
+        >
           {{ errorMessage }}
         </div>
       </div>
 
       <div class="modal-action">
-        <button class="btn btn-primary" @click="saveEvent">Save</button>
-        <button v-if="mode === 'edit'" class="btn btn-error" @click="removeEvent">Remove</button>
-        <button class="btn" @click="closeModal">Close</button>
+        <button
+          class="btn btn-primary"
+          @click="saveEvent"
+        >
+          Save
+        </button>
+        <button
+          v-if="mode === 'edit'"
+          class="btn btn-error"
+          @click="removeEvent"
+        >
+          Remove
+        </button>
+        <button
+          class="btn"
+          @click="closeModal"
+        >
+          Close
+        </button>
       </div>
     </div>
   </div>

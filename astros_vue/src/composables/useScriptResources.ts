@@ -18,12 +18,8 @@ export function useScriptResources() {
   const kangarooChannels = ref<Map<string, ScriptChannelResource>>(new Map());
   const audioChannels = ref<Map<string, ScriptChannelResource>>(new Map());
 
-  const {
-    getGpioScriptResources,
-    getI2cScriptResources,
-    getUartScriptResources,
-  } = useModuleScriptResources();
-
+  const { getGpioScriptResources, getI2cScriptResources, getUartScriptResources } =
+    useModuleScriptResources();
 
   function clearResources() {
     locations.value.clear();
@@ -48,7 +44,6 @@ export function useScriptResources() {
       addLocationResources(locations.domeModule);
     }
   }
-
 
   function addLocationResources(location: ControllerLocation) {
     const assigned = location.controller?.address ? true : false;
@@ -108,9 +103,7 @@ export function useScriptResources() {
     return details;
   }
 
-  function getChannelDetailsMap(
-    availableOnly = true,
-  ): Map<ScriptChannelType, ChannelDetails[]> {
+  function getChannelDetailsMap(availableOnly = true): Map<ScriptChannelType, ChannelDetails[]> {
     const maps = new Map<ScriptChannelType, ChannelDetails[]>();
 
     for (const chType of ScriptChannelTypes) {
@@ -122,7 +115,10 @@ export function useScriptResources() {
     return maps;
   }
 
-  function getChannelDetailsList(channelType: ScriptChannelType, availableOnly = true): ChannelDetails[] {
+  function getChannelDetailsList(
+    channelType: ScriptChannelType,
+    availableOnly = true,
+  ): ChannelDetails[] {
     switch (channelType) {
       case ScriptChannelType.GENERIC_I2C:
         return getChannelDetailsFromMap(genericI2cChannels.value, availableOnly);
@@ -188,7 +184,9 @@ export function useScriptResources() {
     scriptChannelType: ScriptChannelType,
     available: boolean,
   ) {
-    console.log(`Setting availability of channel ${id} of type ${ScriptChannelType[scriptChannelType]} to ${available}`);
+    console.log(
+      `Setting availability of channel ${id} of type ${ScriptChannelType[scriptChannelType]} to ${available}`,
+    );
     switch (scriptChannelType) {
       case ScriptChannelType.GENERIC_I2C:
         genericI2cChannels.value.get(id)!.available = available;
@@ -231,6 +229,6 @@ export function useScriptResources() {
     getChannelDetailsMap,
     getChannelDetailsList,
     getScriptChannelResource,
-    setChannelAvailability
+    setChannelAvailability,
   };
 }

@@ -20,9 +20,19 @@ const getAlertClass = (type: string) => {
 
 <template>
   <div class="toast toast-center z-50">
-    <div v-for="toast in toasts" :key="toast.id" class="alert" :class="getAlertClass(toast.type)">
+    <div
+      v-for="toast in toasts"
+      :key="toast.id"
+      class="alert"
+      :class="getAlertClass(toast.type)"
+    >
       <span>{{ toast.message }}</span>
-      <button class="btn btn-sm btn-circle btn-ghost" @click="removeToast(toast.id)">✕</button>
+      <button
+        class="btn btn-sm btn-circle btn-ghost"
+        @click="removeToast(toast.id)"
+      >
+        ✕
+      </button>
     </div>
   </div>
 </template>

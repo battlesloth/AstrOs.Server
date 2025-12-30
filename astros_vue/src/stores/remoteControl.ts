@@ -5,14 +5,13 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
 export const useRemoteControlStore = defineStore('remoteControl', () => {
-
   const remoteControlPages = ref<RemoteControlPage[]>([]);
   const isLoading = ref(false);
 
   async function loadRemoteControl() {
     isLoading.value = true;
     try {
-      const response = await apiService.get(REMOTE_CONFIG) as string;
+      const response = (await apiService.get(REMOTE_CONFIG)) as string;
 
       const result = JSON.parse(response) as RemoteControlPage[];
 
@@ -38,17 +37,15 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
         ];
       }
       return { success: true, data: result };
-
     } catch (error) {
       console.error('Failed to load remote control configuration:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
 
-
   async function saveRemoteControl() {
-    const contentPages = remoteControlPages.value.filter(page => {
-      return Object.values(page).some(button => button.id !== '0');
+    const contentPages = remoteControlPages.value.filter((page) => {
+      return Object.values(page).some((button) => button.id !== '0');
     });
 
     const payload = JSON.stringify(contentPages);

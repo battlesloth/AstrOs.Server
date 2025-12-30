@@ -1,10 +1,7 @@
 import { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
 import { ModuleType } from '@/enums/modules/ModuleType';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
-import {
-  HumanCyborgRelationsCmd,
-  HcrCommandCategory,
-} from '@/enums/scripts/humanCyborgRelations';
+import { HumanCyborgRelationsCmd, HcrCommandCategory } from '@/enums/scripts/humanCyborgRelations';
 import type { ScriptEvent } from './scriptEvent';
 
 export interface LocationDetails {
@@ -96,7 +93,6 @@ export type ScriptEventTypes =
   | KangarooEvent
   | GenericSerialEvent
   | undefined;
-
 
 export interface ScriptEventModalResponse {
   scriptEvent: ScriptEvent;

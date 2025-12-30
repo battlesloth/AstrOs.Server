@@ -1,5 +1,5 @@
-import type { BaseWsMessage } from "./baseWsMessage";
-import { Location } from "@/enums/modules/Location";
+import type { BaseWsMessage } from './baseWsMessage';
+import { Location } from '@/enums/modules/Location';
 
 export interface LocationStatus extends BaseWsMessage {
   controllerLocation: Location;

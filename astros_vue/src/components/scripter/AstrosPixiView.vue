@@ -28,7 +28,7 @@ import {
   ZOOM_SNAP_THRESHOLD_END,
   ZOOM_FOCUS_EDGE_WEIGHT,
   ZOOM_FOCUS_START_WEIGHT,
-  ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER
+  ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER,
 } from '@/composables/timelineConstants';
 import type { Channel } from '@/composables/types';
 
@@ -51,7 +51,6 @@ import { PixiScrollBar } from '@/pixiComponents/pixiScrollBar';
 import { ScrollBarDirection } from '@/pixiComponents/pixiScrollBarOptions';
 import { PixiChannelData, type PixiChannelSelectItem } from '@/pixiComponents/pixiChannelData';
 import { loadAssets } from '@/pixiComponents/assets/assetLoader';
-
 
 // ============================================================================
 // APPLICATION REFS
@@ -84,7 +83,6 @@ const minusButton = ref<Container | null>(null);
 // ============================================================================
 // Exposed Methods
 // ============================================================================
-
 
 const initializePixi = async () => {
   // Initialization logic if needed
@@ -157,7 +155,6 @@ function emitRemoveEvent(chlId: string, eventId: number) {
 function emitEditEvent(chId: string, eventId: number) {
   emit('editEvent', chId, eventId);
 }
-
 
 // ============================================================================
 // STATE (using composables)
@@ -420,8 +417,6 @@ function addAppStageListeners() {
   }
 }
 
-
-
 // ============================================================================
 // Create UI Components
 // ============================================================================
@@ -586,7 +581,7 @@ function createChannelList() {
     emitAddChannel();
   });
 
-  const fill = new FillGradient(0, 0, 1, 1)
+  const fill = new FillGradient(0, 0, 1, 1);
   fill.addColorStop(0, 0xffffff);
   fill.addColorStop(1, 0xffffff);
 
@@ -632,7 +627,7 @@ function createChannelList() {
       onSwap: emitChannelSwap,
       onTest: emitChannelTest,
       onDelete: emitChannelDelete,
-    }
+    };
 
     const channelData = new PixiChannelData(options);
 
@@ -721,7 +716,7 @@ function doAddChannel(id: string, name: string) {
       onSwap: emitChannelSwap,
       onTest: emitChannelTest,
       onDelete: emitChannelDelete,
-    }
+    };
 
     const channelData = new PixiChannelData(options);
     channelListScrollableContainer.value.addChild(channelData);
@@ -733,7 +728,7 @@ function doAddChannel(id: string, name: string) {
     if (app.value) {
       background.clear().rect(0, 0, CHANNEL_LIST_WIDTH, app.value.screen.height).fill(0x2a2a2a);
     }
-  };
+  }
 }
 
 function doRemoveChannel(chId: string) {
@@ -765,7 +760,7 @@ function doRemoveChannel(chId: string) {
     if (app.value) {
       background.clear().rect(0, 0, CHANNEL_LIST_WIDTH, app.value.screen.height).fill(0x2a2a2a);
     }
-  };
+  }
 }
 
 function doAddEvent(chlId: string, time: number) {
@@ -1217,8 +1212,14 @@ function getZoomButtonPositions(canvasWidth: number) {
 
 <template>
   <div class="h-full w-full overflow-hidden flex flex-col">
-    <div id="scripter" class="flex-1 min-h-0 border border-gray-300 m-4">
-      <div ref="pixiContainer" class="w-full h-full bg-black"></div>
+    <div
+      id="scripter"
+      class="flex-1 min-h-0 border border-gray-300 m-4"
+    >
+      <div
+        ref="pixiContainer"
+        class="w-full h-full bg-black"
+      ></div>
     </div>
   </div>
 </template>

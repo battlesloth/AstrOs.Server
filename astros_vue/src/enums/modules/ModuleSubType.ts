@@ -1,4 +1,3 @@
-
 export enum ModuleSubType {
   none = 0,
   // serial subtypes
@@ -13,5 +12,5 @@ export enum ModuleSubType {
   pwmBoard = 203,
 
   // gpio
-  genericGpio = 301
+  genericGpio = 301,
 }

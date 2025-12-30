@@ -5,13 +5,12 @@ import type { MaestroChannel } from '@/models/controllers/modules/uart/subModule
 import type { MaestroModule } from '@/models/controllers/modules/uart/subModules/maestro/maestroModule';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 import { Location } from '@/enums/modules/Location';
-import { ModuleType } from "@/enums/modules/ModuleType";
-import { ModuleSubType } from "@/enums/modules/ModuleSubType";
+import { ModuleType } from '@/enums/modules/ModuleType';
+import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import { useLocationStore } from '@/stores/location';
 import { v4 as uuid } from 'uuid';
 
 export function useModuleManagement() {
-
   const locationStore = useLocationStore();
 
   function removeModule(locationId: Location, id: string, moduleType: ModuleType) {
@@ -32,16 +31,15 @@ export function useModuleManagement() {
     if (!location) {
       throw new Error(`Location not found for ID: ${locationId}`);
     }
-    location.uartModules = location.uartModules.filter(module => module.id !== id);
+    location.uartModules = location.uartModules.filter((module) => module.id !== id);
   }
 
   function removeI2cModule(locationId: Location, id: string) {
-
     const location = locationStore.getLocation(locationId);
     if (!location) {
       throw new Error(`Location not found for ID: ${locationId}`);
     }
-    location.i2cModules = location.i2cModules.filter(module => module.id !== id);
+    location.i2cModules = location.i2cModules.filter((module) => module.id !== id);
   }
 
   function addModule(locationId: Location, moduleType: ModuleType, moduleSubType?: ModuleSubType) {
@@ -76,7 +74,7 @@ export function useModuleManagement() {
       uartChannel: defaultChannel,
       baudRate: 9600,
       subModule: undefined,
-    }
+    };
 
     switch (moduleSubType) {
       case ModuleSubType.humanCyborgRelationsSerial:
@@ -114,7 +112,7 @@ export function useModuleManagement() {
       name: 'New I2C Module',
       i2cAddress: nextAddress,
       subModule: undefined,
-    }
+    };
 
     switch (moduleSubType) {
       case ModuleSubType.genericI2C:
@@ -139,7 +137,6 @@ export function useModuleManagement() {
   }
 
   function newMaestroModule(): MaestroModule {
-
     const moduleId = uuid();
 
     const board: MaestroBoard = {
@@ -192,4 +189,3 @@ export function useModuleManagement() {
     removeModule,
   };
 }
-

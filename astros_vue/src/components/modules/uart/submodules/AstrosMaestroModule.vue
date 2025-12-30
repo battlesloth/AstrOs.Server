@@ -99,21 +99,38 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
 <template>
   <div class="space-y-4">
     <div class="flex flex-row gap-5 flex-wrap">
-      <select :data-testid="`${parentTestId}-maestro-uart-channel`" v-model="uartChannel"
-        @change="onChannelChange(uartChannel)" class="select select-bordered select-sm w-30">
-        <option v-if="!isMaster" value="1">{{ $t('uart.channel_1') }}</option>
+      <select
+        :data-testid="`${parentTestId}-maestro-uart-channel`"
+        v-model="uartChannel"
+        @change="onChannelChange(uartChannel)"
+        class="select select-bordered select-sm w-30"
+      >
+        <option
+          v-if="!isMaster"
+          value="1"
+        >
+          {{ $t('uart.channel_1') }}
+        </option>
         <option value="2">{{ $t('uart.channel_2') }}</option>
       </select>
-      <select :data-testid="`${parentTestId}-maestro-baud`" v-model="baudRate" @change="onBaudRateChange(baudRate)"
-        class="select select-bordered select-sm w-30">
+      <select
+        :data-testid="`${parentTestId}-maestro-baud`"
+        v-model="baudRate"
+        @change="onBaudRateChange(baudRate)"
+        class="select select-bordered select-sm w-30"
+      >
         <option value="9600">{{ $t('uart.baudrates.9600') }}</option>
         <option value="19200">{{ $t('uart.baudrates.19200') }}</option>
         <option value="38400">{{ $t('uart.baudrates.38400') }}</option>
         <option value="57600">{{ $t('uart.baudrates.57600') }}</option>
         <option value="115200">{{ $t('uart.baudrates.115200') }}</option>
       </select>
-      <select :data-testid="`${parentTestId}-maestro-channel-count`" v-model="channelCount"
-        @change="onChannelCountChange(channelCount)" class="select select-bordered select-sm w-30">
+      <select
+        :data-testid="`${parentTestId}-maestro-channel-count`"
+        v-model="channelCount"
+        @change="onChannelCountChange(channelCount)"
+        class="select select-bordered select-sm w-30"
+      >
         <option value="6">{{ $t('uart.channels.6') }}</option>
         <option value="12">{{ $t('uart.channels.12') }}</option>
         <option value="18">{{ $t('uart.channels.18') }}</option>
@@ -121,10 +138,21 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
       </select>
     </div>
     <div class="divider"></div>
-    <ul v-if="subModule && subModule.boards[0]" class="space-y-4">
-      <li v-for="(channel, i) in subModule.boards[0].channels" :key="channel.id"
-        v-show="i < subModule.boards[0].channelCount" class="border-2 border-base-300 rounded p-4">
-        <AstrosMaestroChannel :channel="channel" :parent-test-id="parentTestId" @servo-test="onServoTestEvent" />
+    <ul
+      v-if="subModule && subModule.boards[0]"
+      class="space-y-4"
+    >
+      <li
+        v-for="(channel, i) in subModule.boards[0].channels"
+        :key="channel.id"
+        v-show="i < subModule.boards[0].channelCount"
+        class="border-2 border-base-300 rounded p-4"
+      >
+        <AstrosMaestroChannel
+          :channel="channel"
+          :parent-test-id="parentTestId"
+          @servo-test="onServoTestEvent"
+        />
       </li>
     </ul>
   </div>

@@ -90,9 +90,7 @@ const setUploadingStatus = (scriptId: string) => {
   }
 };
 
-
 const getUploadStatus = (script: Script, locationId: string) => {
-
   let dateString = 'Not Uploaded';
   let statusClass = 'bg-red-900 text-white';
 
@@ -156,7 +154,12 @@ const editScript = (id: string) => {
             <div class="w-50 text-3xl font-bold">Scripts</div>
             <div class="grow"></div>
             <div class="float-right">
-              <button class="btn btn-primary text-xl" @click="newScript">New</button>
+              <button
+                class="btn btn-primary text-xl"
+                @click="newScript"
+              >
+                New
+              </button>
             </div>
           </div>
 
@@ -170,9 +173,17 @@ const editScript = (id: string) => {
               </tr>
             </thead>
             <tbody>
-              <AstrosScriptRow v-for="script in scriptStore.scripts" :key="script.id" :script="script"
-                :locations="locations" @edit="editScript" @copy="copyScript" @upload="uploadScript" @run="runScript"
-                @delete="openDeleteModal">
+              <AstrosScriptRow
+                v-for="script in scriptStore.scripts"
+                :key="script.id"
+                :script="script"
+                :locations="locations"
+                @edit="editScript"
+                @copy="copyScript"
+                @upload="uploadScript"
+                @run="runScript"
+                @delete="openDeleteModal"
+              >
               </AstrosScriptRow>
             </tbody>
           </table>
@@ -181,16 +192,33 @@ const editScript = (id: string) => {
       </div>
 
       <!-- Delete Confirmation Modal -->
-      <dialog v-if="showDeleteModal" class="modal modal-open">
+      <dialog
+        v-if="showDeleteModal"
+        class="modal modal-open"
+      >
         <div class="modal-box">
           <h3 class="font-bold text-lg">Delete Script</h3>
           <p class="py-4">Are you sure you want to delete script "{{ deleteScriptName }}"?</p>
           <div class="modal-action">
-            <button class="btn btn-error" @click="confirmDelete">Delete</button>
-            <button class="btn" @click="closeDeleteModal">Cancel</button>
+            <button
+              class="btn btn-error"
+              @click="confirmDelete"
+            >
+              Delete
+            </button>
+            <button
+              class="btn"
+              @click="closeDeleteModal"
+            >
+              Cancel
+            </button>
           </div>
         </div>
-        <form method="dialog" class="modal-backdrop" @click="closeDeleteModal">
+        <form
+          method="dialog"
+          class="modal-backdrop"
+          @click="closeDeleteModal"
+        >
           <button>Close</button>
         </form>
       </dialog>

@@ -1,6 +1,6 @@
-import type { ScriptChannelType } from "@/enums/scripts/scriptChannelType";
-import type { ModuleChannelType } from "../controllers/moduleChannels";
-import type { ScriptEvent } from "./scriptEvent";
+import type { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
+import type { ModuleChannelType } from '../controllers/moduleChannels';
+import type { ScriptEvent } from './scriptEvent';
 
 export interface ScriptChannel {
   id: string;

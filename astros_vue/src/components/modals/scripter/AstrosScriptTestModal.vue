@@ -10,19 +10,15 @@ interface Caption {
 
 const locations = ref<DeploymentLocation[]>([]);
 
-async function onUploadScript(
-  scriptId: string,
-): Promise<void> {
+async function onUploadScript(scriptId: string): Promise<void> {
   // Placeholder function for uploading script
   console.log(`Uploading script with ID: ${scriptId}`);
-};
+}
 
-async function onRunScript(
-  scriptId: string,
-): Promise<void> {
+async function onRunScript(scriptId: string): Promise<void> {
   // Placeholder function for running script
   console.log(`Running script with ID: ${scriptId}`);
-};
+}
 
 const props = defineProps<{
   scriptId: string;
@@ -96,7 +92,7 @@ const setCaption = (caption: Caption, uploadStatus: TransmissionStatus) => {
 const statusUpdate = (msg: ScriptResponse) => {
   console.log('message', msg);
 
-  const location = locations.value.find(loc => loc.id === msg.locationId);
+  const location = locations.value.find((loc) => loc.id === msg.locationId);
 
   if (!location) {
     console.warn(`Location with ID ${msg.locationId} not found.`);
@@ -125,10 +121,7 @@ const statusUpdate = (msg: ScriptResponse) => {
   ) {
     status.value = 'Upload Complete.';
     uploadInProgress.value = false;
-    if (
-      coreUpload.value + domeUpload.value + bodyUpload.value >=
-      TransmissionStatus.success * 3
-    ) {
+    if (coreUpload.value + domeUpload.value + bodyUpload.value >= TransmissionStatus.success * 3) {
       runDisabled.value = false;
     }
   }
@@ -172,8 +165,7 @@ onMounted(async () => {
   // Upload the script
   if (props.scriptId) {
     try {
-     await onUploadScript(props.scriptId);
-      
+      await onUploadScript(props.scriptId);
     } catch (err) {
       console.error(err);
       status.value = 'Error requesting Script Upload';
@@ -198,7 +190,7 @@ onUnmounted(() => {
 const runClicked = async () => {
   console.log(`Running script: ${props.scriptId}`);
   await onRunScript(props.scriptId);
-  
+
   emit('run', props.scriptId);
   closeModal();
 };
@@ -236,15 +228,28 @@ const closeModal = () => {
       </div>
 
       <div class="modal-action justify-center mt-5">
-        <button class="btn btn-primary w-24 text-lg" data-testid="run-button" :disabled="!canRun" @click="runClicked">
+        <button
+          class="btn btn-primary w-24 text-lg"
+          data-testid="run-button"
+          :disabled="!canRun"
+          @click="runClicked"
+        >
           Run
         </button>
-        <button class="btn w-24 text-lg" data-testid="cancel-button" @click="closeModal">
+        <button
+          class="btn w-24 text-lg"
+          data-testid="cancel-button"
+          @click="closeModal"
+        >
           Cancel
         </button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="closeModal">
+    <form
+      method="dialog"
+      class="modal-backdrop"
+      @click="closeModal"
+    >
       <button>Close</button>
     </form>
   </dialog>

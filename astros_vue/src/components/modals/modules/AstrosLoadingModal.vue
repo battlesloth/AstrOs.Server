@@ -19,7 +19,7 @@ const controllerStore = useControllerStore();
 
 const { isSyncing } = storeToRefs(controllerStore);
 
-const message = ref("modals.loading.loading");
+const message = ref('modals.loading.loading');
 const locationsLoaded = ref(false);
 const controllersLoaded = ref(false);
 const loadingComplete = ref(false);
@@ -29,21 +29,17 @@ watch(isSyncing, (inProgress) => {
   controllersLoaded.value = !inProgress;
 });
 
-watch(controllersLoaded,
-  (loaded) => {
-    if (loaded && locationsLoaded.value) {
-      onLoadComplete();
-    }
-  },
-);
+watch(controllersLoaded, (loaded) => {
+  if (loaded && locationsLoaded.value) {
+    onLoadComplete();
+  }
+});
 
-watch(locationsLoaded,
-  (loaded) => {
-    if (loaded && controllersLoaded.value) {
-      onLoadComplete();
-    }
-  },
-);
+watch(locationsLoaded, (loaded) => {
+  if (loaded && controllersLoaded.value) {
+    onLoadComplete();
+  }
+});
 
 onMounted(async () => {
   // Load locations
@@ -55,59 +51,72 @@ onMounted(async () => {
   } else {
     console.error('Failed to load locations');
     loadError.value = true;
-    message.value = "modals.loading.request_failed";
+    message.value = 'modals.loading.request_failed';
     return;
   }
 
   // Handle controller sync
   if (props.skipControllerLoading) {
-    message.value = "modals.loading.skipping";
-    controllersLoaded.value = true;;
+    message.value = 'modals.loading.skipping';
+    controllersLoaded.value = true;
   } else {
-    message.value = "modals.loading.syncing";
+    message.value = 'modals.loading.syncing';
     const controllerResult = await controllerStore.syncControllers();
 
     if (!controllerResult.success) {
       console.error('Failed to sync controllers:', controllerResult.error);
       loadError.value = true;
-      message.value = "modals.loading.sync_failed";
+      message.value = 'modals.loading.sync_failed';
       controllersLoaded.value = true;
     }
   }
 });
 
 function onLoadComplete() {
-
   loadingComplete.value = true;
 
   if (!loadError.value && !controllerStore.syncError) {
-    message.value = "modals.loading.complete";
+    message.value = 'modals.loading.complete';
     setTimeout(() => {
       emit('loaded');
     }, 500);
-  }
-  else {
+  } else {
     loadError.value = true;
-    message.value = controllerStore.syncError ? controllerStore.syncError : "modals.loading.request_failed";
+    message.value = controllerStore.syncError
+      ? controllerStore.syncError
+      : 'modals.loading.request_failed';
   }
 }
 </script>
 
 <template>
-  <dialog data-testid="loading-modal" class="modal modal-open">
+  <dialog
+    data-testid="loading-modal"
+    class="modal modal-open"
+  >
     <div class="modal-box">
-      <h3 class="font-bold text-lg">{{ $t("modals.loading.title") }}</h3>
+      <h3 class="font-bold text-lg">{{ $t('modals.loading.title') }}</h3>
 
       <div class="py-8">
         <div class="flex flex-col items-center gap-4">
-          <span v-if="!loadingComplete" class="loading loading-spinner loading-lg"></span>
+          <span
+            v-if="!loadingComplete"
+            class="loading loading-spinner loading-lg"
+          ></span>
           <div class="text-center">{{ $t(message) }}</div>
         </div>
       </div>
 
-      <div class="modal-action" v-if="loadError">
-        <button data-testid="loading-modal-close" class="btn btn-primary" @click="emit('loaded')">
-          {{ $t("modals.loading.continue") }}
+      <div
+        class="modal-action"
+        v-if="loadError"
+      >
+        <button
+          data-testid="loading-modal-close"
+          class="btn btn-primary"
+          @click="emit('loaded')"
+        >
+          {{ $t('modals.loading.continue') }}
         </button>
       </div>
     </div>

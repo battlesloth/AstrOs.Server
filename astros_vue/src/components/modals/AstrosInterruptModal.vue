@@ -5,7 +5,10 @@ defineProps<{
 </script>
 
 <template>
-  <dialog data-testid="loading-modal" class="modal modal-open">
+  <dialog
+    data-testid="loading-modal"
+    class="modal modal-open"
+  >
     <div class="modal-box">
       <div class="py-8">
         <div class="flex flex-col items-center gap-4">

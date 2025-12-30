@@ -45,18 +45,27 @@ defineEmits<{
           <div class="flex flex-row">
             <h2 class="text-2xl font-bold mb-4">{{ $t('astros') }}</h2>
           </div>
-          <AstrosFieldUsername class="w-full mb-4" v-model="credentials.email" />
+          <AstrosFieldUsername
+            class="w-full mb-4"
+            v-model="credentials.email"
+          />
           <AstrosFieldPassword
             class="w-full mb-4"
             v-model="credentials.password"
             @enter="$emit('login')"
           />
           <div class="flex justify-center w-full mt-4">
-            <button class="btn btn-secondary w-1/2" @click="$emit('login')">
+            <button
+              class="btn btn-secondary w-1/2"
+              @click="$emit('login')"
+            >
               {{ $t('astrosLogin.login') }}
             </button>
           </div>
-          <div v-if="props.errorMessage" class="mt-4 text-red-600 font-bold text-center">
+          <div
+            v-if="props.errorMessage"
+            class="mt-4 text-red-600 font-bold text-center"
+          >
             {{ $t(props.errorMessage) }}
           </div>
         </div>

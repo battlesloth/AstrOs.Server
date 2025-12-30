@@ -1,13 +1,15 @@
 <script setup lang="ts">
-
-const props = withDefaults(defineProps<{
-  message: string;
-  onClose: () => void;
-  onConfirm: () => void;
-  title?: string;
-}>(), {
-  title: "modals.confirm.title",
-});
+const props = withDefaults(
+  defineProps<{
+    message: string;
+    onClose: () => void;
+    onConfirm: () => void;
+    title?: string;
+  }>(),
+  {
+    title: 'modals.confirm.title',
+  },
+);
 
 const emit = defineEmits<{
   close: null;
@@ -28,14 +30,28 @@ const closeModal = () => {
         </div>
       </div>
       <div class="modal-action">
-        <button data-testid="modal-confirm" class="btn btn-primary" @click="onConfirm">
-          {{ $t("modals.confirm.confirm") }}
+        <button
+          data-testid="modal-confirm"
+          class="btn btn-primary"
+          @click="onConfirm"
+        >
+          {{ $t('modals.confirm.confirm') }}
         </button>
-        <button data-testid="modal-close" class="btn" @click="closeModal">{{ $t("modals.confirm.close") }}</button>
+        <button
+          data-testid="modal-close"
+          class="btn"
+          @click="closeModal"
+        >
+          {{ $t('modals.confirm.close') }}
+        </button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="closeModal">
-      <button>{{ $t("modals.confirm.close") }}</button>
+    <form
+      method="dialog"
+      class="modal-backdrop"
+      @click="closeModal"
+    >
+      <button>{{ $t('modals.confirm.close') }}</button>
     </form>
   </dialog>
 </template>

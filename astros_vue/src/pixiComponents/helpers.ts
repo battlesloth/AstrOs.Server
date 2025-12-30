@@ -6,7 +6,10 @@ export function truncateText(text: string, style: TextStyle, maxWidth: number) {
   if (metrics.width <= maxWidth) return text;
 
   let currentText = text;
-  while (currentText.length > 0 && CanvasTextMetrics.measureText(currentText + '...', style).width > maxWidth) {
+  while (
+    currentText.length > 0 &&
+    CanvasTextMetrics.measureText(currentText + '...', style).width > maxWidth
+  ) {
     currentText = currentText.substring(0, currentText.length - 1);
   }
 

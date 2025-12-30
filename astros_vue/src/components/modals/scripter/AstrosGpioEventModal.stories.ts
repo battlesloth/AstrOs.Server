@@ -4,11 +4,7 @@ import { v4 as uuid } from 'uuid';
 import AstrosGpioEventModal from './AstrosGpioEventModal.vue';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import { ModuleType } from '@/enums/modules/ModuleType';
-import {
-  GpioEvent,
-  MaestroEvent,
-  ScriptEvent,
-} from '@/models/scripts/scripting';
+import { GpioEvent, MaestroEvent, ScriptEvent } from '@/models/scripts/scripting';
 
 const meta = {
   title: 'Components/Modals/Scripter/GpioEventModal',
@@ -70,11 +66,7 @@ export const EditMode: Story = {
   },
 };
 
-function getScriptEvent(
-  type: ModuleSubType,
-  setHigh: boolean,
-  undefinedEvt = false,
-): ScriptEvent {
+function getScriptEvent(type: ModuleSubType, setHigh: boolean, undefinedEvt = false): ScriptEvent {
   let modType = ModuleType.gpio;
   let evt: GpioEvent | MaestroEvent | undefined = new GpioEvent(setHigh);
 
@@ -87,11 +79,5 @@ function getScriptEvent(
       break;
   }
 
-  return new ScriptEvent(
-    uuid(),
-    modType,
-    type,
-    2000,
-    undefinedEvt ? undefined : evt,
-  );
+  return new ScriptEvent(uuid(), modType, type, 2000, undefinedEvt ? undefined : evt);
 }

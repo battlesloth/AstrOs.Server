@@ -1,9 +1,9 @@
-import apiService from "@/api/apiService";
-import { SCRIPTS, SCRIPTS_ALL, SCRIPTS_COPY, SCRIPTS_RUN, SCRIPTS_UPLOAD } from "@/api/endpoints";
-import type { Script } from "@/models/scripts/script";
-import type { ScriptStatus } from "@/models/websocket/scriptStatus";
-import { defineStore } from "pinia";
-import { ref } from "vue";
+import apiService from '@/api/apiService';
+import { SCRIPTS, SCRIPTS_ALL, SCRIPTS_COPY, SCRIPTS_RUN, SCRIPTS_UPLOAD } from '@/api/endpoints';
+import type { Script } from '@/models/scripts/script';
+import type { ScriptStatus } from '@/models/websocket/scriptStatus';
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
 
 export const useScriptsStore = defineStore('scripts', () => {
   const scripts = ref<Script[]>([]);
@@ -13,14 +13,13 @@ export const useScriptsStore = defineStore('scripts', () => {
   async function loadScripts() {
     isLoading.value = true;
     try {
-      const response = await apiService.get(SCRIPTS_ALL) as Script[];
+      const response = (await apiService.get(SCRIPTS_ALL)) as Script[];
       scripts.value = [...response];
       return { success: true, data: response };
     } catch (error) {
       console.error('Failed to load scripts:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-    finally {
+    } finally {
       isLoading.value = false;
     }
   }
@@ -40,7 +39,7 @@ export const useScriptsStore = defineStore('scripts', () => {
 
   async function copyScript(scriptId: string) {
     try {
-      const response = await apiService.get(SCRIPTS_COPY, { id: scriptId }) as Script;
+      const response = (await apiService.get(SCRIPTS_COPY, { id: scriptId })) as Script;
       scripts.value.push(response);
       return { success: true, data: response };
     } catch (error) {
@@ -52,7 +51,7 @@ export const useScriptsStore = defineStore('scripts', () => {
   async function deleteScript(scriptId: string) {
     try {
       await apiService.delete(SCRIPTS, { id: scriptId });
-      scripts.value = scripts.value.filter(s => s.id !== scriptId);
+      scripts.value = scripts.value.filter((s) => s.id !== scriptId);
       return { success: true };
     } catch (error) {
       console.error('Failed to delete script:', error);
@@ -81,12 +80,12 @@ export const useScriptsStore = defineStore('scripts', () => {
   }
 
   async function updateScriptStatus(status: ScriptStatus) {
-    const script = scripts.value.find(s => s.id === status.scriptId);
+    const script = scripts.value.find((s) => s.id === status.scriptId);
     if (script) {
       // Update the script's deployment status based on the incoming status
       script.deploymentStatus[status.locationId] = {
         date: status.date,
-        value: status.status
+        value: status.status,
       };
     }
   }
@@ -101,6 +100,6 @@ export const useScriptsStore = defineStore('scripts', () => {
     copyScript,
     uploadScript,
     runScript,
-    updateScriptStatus
+    updateScriptStatus,
   };
 });

@@ -4,12 +4,7 @@ import { v4 as uuid } from 'uuid';
 import AstrosKangarooEventModal from './AstrosKangarooEventModal.vue';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import { ModuleType } from '@/enums/modules/ModuleType';
-import {
-  KangarooAction,
-  KangarooEvent,
-  KangarooX2,
-  ScriptEvent,
-} from '@/models/scripts/scripting';
+import { KangarooAction, KangarooEvent, KangarooX2, ScriptEvent } from '@/models/scripts/scripting';
 
 const meta = {
   title: 'Components/Modals/Scripter/KangarooEventModal',
@@ -58,14 +53,7 @@ function getKangarooModule(): KangarooX2 {
 }
 
 function getKangarooEvent(undefinedEvt = false): ScriptEvent {
-  const evt = new KangarooEvent(
-    KangarooAction.position,
-    100,
-    200,
-    KangarooAction.start,
-    0,
-    0,
-  );
+  const evt = new KangarooEvent(KangarooAction.position, 100, 200, KangarooAction.start, 0, 0);
 
   return new ScriptEvent(
     uuid(),

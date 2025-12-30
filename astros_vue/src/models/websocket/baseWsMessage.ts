@@ -1,4 +1,4 @@
-import type { WebsocketMessageType } from "@/enums/WebsocketMessageType";
+import type { WebsocketMessageType } from '@/enums/WebsocketMessageType';
 
 export interface BaseWsMessage {
   type: WebsocketMessageType;

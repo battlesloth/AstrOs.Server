@@ -41,9 +41,7 @@ const controllerStore = useControllerStore();
 
 const { success, error } = useToast();
 
-const {
-  addModule, removeModule,
-} = useModuleManagement();
+const { addModule, removeModule } = useModuleManagement();
 
 const bodyLocation = storeToRefs(locationStore).bodyLocation;
 const bodyStatus = storeToRefs(controllerStore).bodyStatus;
@@ -92,7 +90,7 @@ async function syncModuleSettings() {
     success(t('module_view.sync_successful'));
   } else {
     error(t('module_view.sync_failed'));
-  };
+  }
 }
 
 function openAddModuleModal(evt: AddModuleEvent) {
@@ -145,123 +143,245 @@ function controllerSelectChanged(location: string) {
 <template>
   <AstrosLayout>
     <template v-slot:main>
-      <div class="flex flex-col overflow-hidden" style="height: calc(100vh - 64px)">
+      <div
+        class="flex flex-col overflow-hidden"
+        style="height: calc(100vh - 64px)"
+      >
         <!-- Header with buttons -->
         <div class="flex items-center gap-4 p-4 bg-base-200 shrink-0">
           <h1 class="text-2xl font-bold">{{ $t('module_view.modules') }}</h1>
           <div class="grow"></div>
-          <button data-testid="save_module_settings" class="btn btn-primary" @click="saveModuleSettings">
+          <button
+            data-testid="save_module_settings"
+            class="btn btn-primary"
+            @click="saveModuleSettings"
+          >
             {{ $t('module_view.save') }}
           </button>
-          <button class="btn btn-secondary" @click="syncModuleSettings">{{ $t('module_view.sync') }}</button>
+          <button
+            class="btn btn-secondary"
+            @click="syncModuleSettings"
+          >
+            {{ $t('module_view.sync') }}
+          </button>
         </div>
 
         <!-- Module Accordions -->
         <div class="flex-1 overflow-y-scroll p-4 pb-8 flex justify-center">
           <div class="space-y-2 pb-4 w-full max-w-5xl">
             <!-- Body Module -->
-            <div class="collapse collapse-arrow bg-base-200 border border-base-300" :class="{
-              'collapse-open': openAccordion === 'body',
-              'collapse-close': openAccordion !== 'body',
-            }">
-              <div data-testid="body-module-header"
+            <div
+              class="collapse collapse-arrow bg-base-200 border border-base-300"
+              :class="{
+                'collapse-open': openAccordion === 'body',
+                'collapse-close': openAccordion !== 'body',
+              }"
+            >
+              <div
+                data-testid="body-module-header"
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
-                @click="openAccordion = openAccordion === 'body' ? null : 'body'">
+                @click="openAccordion = openAccordion === 'body' ? null : 'body'"
+              >
                 <span>{{ $t('module_view.body') }}</span>
                 <div class="grow"></div>
-                <v-icon :name="bodyStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'" :class="[
-                  { 'text-green-500': bodyStatus === ControllerStatus.UP },
-                  { 'text-yellow-500': bodyStatus === ControllerStatus.NEEDS_SYNCED },
-                  { 'text-red-500': bodyStatus === ControllerStatus.DOWN }]" scale="1.5" />
+                <v-icon
+                  :name="bodyStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
+                  :class="[
+                    { 'text-green-500': bodyStatus === ControllerStatus.UP },
+                    { 'text-yellow-500': bodyStatus === ControllerStatus.NEEDS_SYNCED },
+                    { 'text-red-500': bodyStatus === ControllerStatus.DOWN },
+                  ]"
+                  scale="1.5"
+                />
               </div>
-              <div class="collapse-content" v-if="bodyLocation">
+              <div
+                class="collapse-content"
+                v-if="bodyLocation"
+              >
                 <div class="mb-4">
-                  <select class="select select-bordered w-full" title="Controller Select" disabled>
-                    <option value="0" selected>{{ $t('module_view.master') }}</option>
+                  <select
+                    class="select select-bordered w-full"
+                    title="Controller Select"
+                    disabled
+                  >
+                    <option
+                      value="0"
+                      selected
+                    >
+                      {{ $t('module_view.master') }}
+                    </option>
                   </select>
                 </div>
-                <AstrosEspModule :is-master="true" :location-enum="Location.body" :parent-test-id="'body'"
-                  @add-module="openAddModuleModal" @remove-module="openConfirmRemoveModuleModal"
-                  @open-servo-test-modal="handleServoTest" />
+                <AstrosEspModule
+                  :is-master="true"
+                  :location-enum="Location.body"
+                  :parent-test-id="'body'"
+                  @add-module="openAddModuleModal"
+                  @remove-module="openConfirmRemoveModuleModal"
+                  @open-servo-test-modal="handleServoTest"
+                />
               </div>
             </div>
 
             <!-- Core Module -->
-            <div class="collapse collapse-arrow bg-base-200 border border-base-300" :class="{
-              'collapse-open': openAccordion === 'core',
-              'collapse-close': openAccordion !== 'core',
-            }">
-              <div data-testid="core-module-header"
+            <div
+              class="collapse collapse-arrow bg-base-200 border border-base-300"
+              :class="{
+                'collapse-open': openAccordion === 'core',
+                'collapse-close': openAccordion !== 'core',
+              }"
+            >
+              <div
+                data-testid="core-module-header"
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
-                @click="openAccordion = openAccordion === 'core' ? null : 'core'">
+                @click="openAccordion = openAccordion === 'core' ? null : 'core'"
+              >
                 <span>{{ $t('module_view.core') }}</span>
                 <div class="grow"></div>
-                <v-icon :name="coreStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'" :class="[
-                  { 'text-green-500': coreStatus === ControllerStatus.UP },
-                  { 'text-yellow-500': coreStatus === ControllerStatus.NEEDS_SYNCED },
-                  { 'text-red-500': coreStatus === ControllerStatus.DOWN }]" scale="1.5" />
+                <v-icon
+                  :name="coreStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
+                  :class="[
+                    { 'text-green-500': coreStatus === ControllerStatus.UP },
+                    { 'text-yellow-500': coreStatus === ControllerStatus.NEEDS_SYNCED },
+                    { 'text-red-500': coreStatus === ControllerStatus.DOWN },
+                  ]"
+                  scale="1.5"
+                />
               </div>
-              <div class="collapse-content" v-if="coreLocation">
+              <div
+                class="collapse-content"
+                v-if="coreLocation"
+              >
                 <div class="mb-4">
-                  <select id="core-controller-select" class="select select-bordered w-full" title="Controller Select"
-                    v-model="coreLocation.controller.id" @change="controllerSelectChanged('core')">
-                    <option value="0" selected>{{ $t('module_view.disabled') }}</option>
-                    <option v-for="controller in availableCoreControllers" :key="controller.id" :value="controller.id">
+                  <select
+                    id="core-controller-select"
+                    class="select select-bordered w-full"
+                    title="Controller Select"
+                    v-model="coreLocation.controller.id"
+                    @change="controllerSelectChanged('core')"
+                  >
+                    <option
+                      value="0"
+                      selected
+                    >
+                      {{ $t('module_view.disabled') }}
+                    </option>
+                    <option
+                      v-for="controller in availableCoreControllers"
+                      :key="controller.id"
+                      :value="controller.id"
+                    >
                       {{ controller.name }}
                     </option>
                   </select>
                 </div>
-                <AstrosEspModule :location-enum="Location.core" :parent-test-id="'core'"
-                  @add-module="openAddModuleModal" @remove-module="openConfirmRemoveModuleModal"
-                  @open-servo-test-modal="handleServoTest" />
+                <AstrosEspModule
+                  :location-enum="Location.core"
+                  :parent-test-id="'core'"
+                  @add-module="openAddModuleModal"
+                  @remove-module="openConfirmRemoveModuleModal"
+                  @open-servo-test-modal="handleServoTest"
+                />
               </div>
             </div>
 
             <!-- Dome Module -->
-            <div class="collapse collapse-arrow bg-base-200 border border-base-300" :class="{
-              'collapse-open': openAccordion === 'dome',
-              'collapse-close': openAccordion !== 'dome',
-            }">
-              <div data-testid="dome-module-header"
+            <div
+              class="collapse collapse-arrow bg-base-200 border border-base-300"
+              :class="{
+                'collapse-open': openAccordion === 'dome',
+                'collapse-close': openAccordion !== 'dome',
+              }"
+            >
+              <div
+                data-testid="dome-module-header"
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
-                @click="openAccordion = openAccordion === 'dome' ? null : 'dome'">
+                @click="openAccordion = openAccordion === 'dome' ? null : 'dome'"
+              >
                 <span>{{ $t('module_view.dome') }}</span>
                 <div class="grow"></div>
-                <v-icon :name="domeStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'" :class="[
-                  { 'text-green-500': domeStatus === ControllerStatus.UP },
-                  { 'text-yellow-500': domeStatus === ControllerStatus.NEEDS_SYNCED },
-                  { 'text-red-500': domeStatus === ControllerStatus.DOWN }]" scale="1.5" />
+                <v-icon
+                  :name="domeStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
+                  :class="[
+                    { 'text-green-500': domeStatus === ControllerStatus.UP },
+                    { 'text-yellow-500': domeStatus === ControllerStatus.NEEDS_SYNCED },
+                    { 'text-red-500': domeStatus === ControllerStatus.DOWN },
+                  ]"
+                  scale="1.5"
+                />
               </div>
-              <div class="collapse-content" v-if="domeLocation">
+              <div
+                class="collapse-content"
+                v-if="domeLocation"
+              >
                 <div class="mb-4">
-                  <select id="dome-controller-select" class="select select-bordered w-full" title="Controller Select"
-                    v-model="domeLocation.controller.id" @change="controllerSelectChanged('dome')">
-                    <option value="0" selected>{{ $t('module_view.disabled') }}</option>
-                    <option v-for="controller in availableDomeControllers" :key="controller.id" :value="controller.id">
+                  <select
+                    id="dome-controller-select"
+                    class="select select-bordered w-full"
+                    title="Controller Select"
+                    v-model="domeLocation.controller.id"
+                    @change="controllerSelectChanged('dome')"
+                  >
+                    <option
+                      value="0"
+                      selected
+                    >
+                      {{ $t('module_view.disabled') }}
+                    </option>
+                    <option
+                      v-for="controller in availableDomeControllers"
+                      :key="controller.id"
+                      :value="controller.id"
+                    >
                       {{ controller.name }}
                     </option>
                   </select>
                 </div>
-                <AstrosEspModule :location-enum="Location.dome" :parent-test-id="'dome'"
-                  @add-module="openAddModuleModal" @remove-module="openConfirmRemoveModuleModal"
-                  @open-servo-test-modal="handleServoTest" />
+                <AstrosEspModule
+                  :location-enum="Location.dome"
+                  :parent-test-id="'dome'"
+                  @add-module="openAddModuleModal"
+                  @remove-module="openConfirmRemoveModuleModal"
+                  @open-servo-test-modal="handleServoTest"
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <AstrosInterruptModal v-if="showModal === ModalType.INTERRUPT" :message="modalMessage" />
-      <AstrosAlertModal v-if="showModal === ModalType.ERROR" :message="modalMessage"
-        @close="showModal = ModalType.CLOSE_ALL" />
-      <AstrosConfirmModal v-if="showModal === ModalType.CONFIRM" :message="$t('module_view.confirm_remove')"
-        @confirm="handleRemoveModule" @close="showModal = ModalType.CLOSE_ALL" />
-      <AstrosLoadingModal v-if="showModal === ModalType.LOADING" @loaded="onLocationsLoaded" />
-      <AstrosAddModuleModal v-if="showModal === ModalType.ADD_MODULE" :is-open="showModal === ModalType.ADD_MODULE"
-        :location-id="selectedLocationId" :module-type="selectedModuleType" @add="handleAddModule"
-        @close="showModal = ModalType.CLOSE_ALL" />
-      <AstrosServoTestModal v-if="showModal === ModalType.SERVO_TEST && servoTestProps !== null"
-        v-bind="servoTestProps as Required<ServoTestEvent>" @close="showModal = ModalType.CLOSE_ALL" />
+      <AstrosInterruptModal
+        v-if="showModal === ModalType.INTERRUPT"
+        :message="modalMessage"
+      />
+      <AstrosAlertModal
+        v-if="showModal === ModalType.ERROR"
+        :message="modalMessage"
+        @close="showModal = ModalType.CLOSE_ALL"
+      />
+      <AstrosConfirmModal
+        v-if="showModal === ModalType.CONFIRM"
+        :message="$t('module_view.confirm_remove')"
+        @confirm="handleRemoveModule"
+        @close="showModal = ModalType.CLOSE_ALL"
+      />
+      <AstrosLoadingModal
+        v-if="showModal === ModalType.LOADING"
+        @loaded="onLocationsLoaded"
+      />
+      <AstrosAddModuleModal
+        v-if="showModal === ModalType.ADD_MODULE"
+        :is-open="showModal === ModalType.ADD_MODULE"
+        :location-id="selectedLocationId"
+        :module-type="selectedModuleType"
+        @add="handleAddModule"
+        @close="showModal = ModalType.CLOSE_ALL"
+      />
+      <AstrosServoTestModal
+        v-if="showModal === ModalType.SERVO_TEST && servoTestProps !== null"
+        v-bind="servoTestProps as Required<ServoTestEvent>"
+        @close="showModal = ModalType.CLOSE_ALL"
+      />
     </template>
   </AstrosLayout>
 </template>

@@ -42,9 +42,20 @@ const onI2cAddressChange = (val: string) => {
 
 <template>
   <div class="flex flex-row">
-    <select v-if="module" :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-address`" v-model="i2cAddress"
-      @change="onI2cAddressChange(i2cAddress)" class="select select-bordered select-sm w-35">
-      <option v-for="addr in addresses" :key="addr" :value="addr">{{ $t('i2c.address') }} {{ addr }}</option>
+    <select
+      v-if="module"
+      :data-testid="`${parentTestId}-i2c-${module.moduleSubType}-address`"
+      v-model="i2cAddress"
+      @change="onI2cAddressChange(i2cAddress)"
+      class="select select-bordered select-sm w-35"
+    >
+      <option
+        v-for="addr in addresses"
+        :key="addr"
+        :value="addr"
+      >
+        {{ $t('i2c.address') }} {{ addr }}
+      </option>
     </select>
   </div>
 </template>

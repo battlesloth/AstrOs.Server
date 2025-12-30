@@ -4,15 +4,8 @@ import { v4 as uuid } from 'uuid';
 import AstrosHumanCyborgModal from './AstrosHumanCyborgModal.vue';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import { ModuleType } from '@/enums/modules/ModuleType';
-import {
-  HcrCommandCategory,
-  HumanCyborgRelationsCmd,
-} from '@/enums/scripts/humanCyborgRelations';
-import {
-  HcrCommand,
-  HumanCyborgRelationsEvent,
-  ScriptEvent,
-} from '@/models/scripts/scripting';
+import { HcrCommandCategory, HumanCyborgRelationsCmd } from '@/enums/scripts/humanCyborgRelations';
+import { HcrCommand, HumanCyborgRelationsEvent, ScriptEvent } from '@/models/scripts/scripting';
 
 const meta = {
   title: 'Components/Modals/Scripter/HumanCyborgModal',
@@ -65,19 +58,7 @@ function getScriptEvent(undefinedEvt = false): ScriptEvent {
 
 function getHcrEvents(): HumanCyborgRelationsEvent {
   return new HumanCyborgRelationsEvent([
-    new HcrCommand(
-      uuid(),
-      HcrCommandCategory.stimuli,
-      HumanCyborgRelationsCmd.mildHappy,
-      0,
-      0,
-    ),
-    new HcrCommand(
-      uuid(),
-      HcrCommandCategory.stop,
-      HumanCyborgRelationsCmd.panicStop,
-      0,
-      0,
-    ),
+    new HcrCommand(uuid(), HcrCommandCategory.stimuli, HumanCyborgRelationsCmd.mildHappy, 0, 0),
+    new HcrCommand(uuid(), HcrCommandCategory.stop, HumanCyborgRelationsCmd.panicStop, 0, 0),
   ]);
 }

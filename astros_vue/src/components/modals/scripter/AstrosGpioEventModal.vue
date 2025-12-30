@@ -17,7 +17,7 @@ const props = withDefaults(
   }>(),
   {
     mode: 'add',
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -66,7 +66,7 @@ const addEvent = () => {
   if (props.scriptEvent.moduleSubType === ModuleSubType.genericGpio) {
     props.scriptEvent.event = { setHigh: state.value === 1 };
   } else if (props.scriptEvent.moduleSubType === ModuleSubType.maestro) {
-    props.scriptEvent.event = { 
+    props.scriptEvent.event = {
       channel: -1,
       isServo: false,
       position: state.value === 1 ? 2500 : 500,
@@ -109,21 +109,42 @@ const closeModal = () => {
         <div class="grow"></div>
         <div class="w-75">
           <div class="mb-2">
-            <label for="time" class="block w-full mb-0.5 text-lg">Event Time (seconds)</label>
-            <input id="time" v-model.number="eventTime" type="number" step="0.1" placeholder="Time"
-              class="input input-bordered w-full text-lg h-9" />
+            <label
+              for="time"
+              class="block w-full mb-0.5 text-lg"
+              >Event Time (seconds)</label
+            >
+            <input
+              id="time"
+              v-model.number="eventTime"
+              type="number"
+              step="0.1"
+              placeholder="Time"
+              class="input input-bordered w-full text-lg h-9"
+            />
           </div>
 
           <div class="mb-2">
-            <label for="state-select" class="block w-full mb-0.5 text-lg">State</label>
-            <select id="state-select" v-model.number="state" title="State"
-              class="select select-bordered w-full text-2xl mt-2">
+            <label
+              for="state-select"
+              class="block w-full mb-0.5 text-lg"
+              >State</label
+            >
+            <select
+              id="state-select"
+              v-model.number="state"
+              title="State"
+              class="select select-bordered w-full text-2xl mt-2"
+            >
               <option :value="0">Low</option>
               <option :value="1">High</option>
             </select>
           </div>
 
-          <div v-if="errorMessage" class="text-center text-error text-lg">
+          <div
+            v-if="errorMessage"
+            class="text-center text-error text-lg"
+          >
             {{ errorMessage }}
           </div>
         </div>
@@ -131,19 +152,35 @@ const closeModal = () => {
       </div>
 
       <div class="modal-action justify-center mt-5">
-        <button class="btn btn-primary w-24 text-lg" data-testid="save-button" @click="addEvent">
+        <button
+          class="btn btn-primary w-24 text-lg"
+          data-testid="save-button"
+          @click="addEvent"
+        >
           Save
         </button>
-        <button v-if="showRemoveButton" class="btn btn-error w-24 text-lg" data-testid="remove-button"
-          @click="removeEvent">
+        <button
+          v-if="showRemoveButton"
+          class="btn btn-error w-24 text-lg"
+          data-testid="remove-button"
+          @click="removeEvent"
+        >
           Remove
         </button>
-        <button class="btn w-24 text-lg" data-testid="close-button" @click="closeModal">
+        <button
+          class="btn w-24 text-lg"
+          data-testid="close-button"
+          @click="closeModal"
+        >
           Close
         </button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="closeModal">
+    <form
+      method="dialog"
+      class="modal-backdrop"
+      @click="closeModal"
+    >
       <button>Close</button>
     </form>
   </dialog>

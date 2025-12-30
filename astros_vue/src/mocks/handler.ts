@@ -149,7 +149,7 @@ export const multiplePagesHandlers = [
           button8: { id: '0', name: 'None' },
           button9: { id: '2', name: 'Close Dome' },
         },
-      ])
+      ]),
     );
   }),
 ];
@@ -206,8 +206,7 @@ export const fullyConfiguredHandlers = [
           button8: { id: '8', name: 'Park Telescope' },
           button9: { id: '9', name: 'Unpark Telescope' },
         },
-      ])
+      ]),
     );
   }),
 ];
-

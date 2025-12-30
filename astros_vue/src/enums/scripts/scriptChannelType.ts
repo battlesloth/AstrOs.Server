@@ -15,4 +15,4 @@ export const ScriptChannelTypes = [
   ScriptChannelType.GENERIC_I2C,
   ScriptChannelType.GENERIC_UART,
   ScriptChannelType.KANGAROO,
-]
+];

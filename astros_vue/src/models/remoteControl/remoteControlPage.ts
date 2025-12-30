@@ -1,4 +1,4 @@
-import type { PageButton } from "./pageButton";
+import type { PageButton } from './pageButton';
 
 export interface RemoteControlPage {
   button1: PageButton;

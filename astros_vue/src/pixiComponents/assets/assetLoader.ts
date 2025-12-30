@@ -1,5 +1,5 @@
-import { Assets } from "pixi.js";
-import swapIcon from '@/pixiComponents/assets/swap.svg'
+import { Assets } from 'pixi.js';
+import swapIcon from '@/pixiComponents/assets/swap.svg';
 import deleteIcon from '@/pixiComponents/assets/trash.svg';
 import playIcon from '@/pixiComponents/assets/play.svg';
 

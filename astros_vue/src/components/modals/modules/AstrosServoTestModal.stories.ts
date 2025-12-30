@@ -61,4 +61,3 @@ export const PWMBoard: Story = {
     homePosition: 1700,
   },
 };
-

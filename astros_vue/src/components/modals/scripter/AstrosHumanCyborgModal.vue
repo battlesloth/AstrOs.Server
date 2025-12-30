@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import {
-  HumanCyborgRelationsCmd,
-  HcrCommandCategory,
-} from '@/enums/scripts/humanCyborgRelations';
+import { HumanCyborgRelationsCmd, HcrCommandCategory } from '@/enums/scripts/humanCyborgRelations';
 import {
   type HcrCommand,
   type HumanCyborgRelationsEvent,
@@ -27,7 +24,7 @@ const props = withDefaults(
   }>(),
   {
     mode: 'add',
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -180,11 +177,11 @@ const commandChange = () => {
 };
 
 const hcrHasBValue = (cmd: HumanCyborgRelationsCmd): boolean => {
-  return hasValueB.find(x => x === cmd) !== undefined;
+  return hasValueB.find((x) => x === cmd) !== undefined;
 };
 
 const hcrHasAValue = (cmd: HumanCyborgRelationsCmd): boolean => {
-  return hasValueA.find(x => x === cmd) !== undefined;
+  return hasValueA.find((x) => x === cmd) !== undefined;
 };
 
 const addCommand = () => {
@@ -208,19 +205,19 @@ const addCommand = () => {
   }
 
   if (missingA || missingB) {
-    errorMessage.value = `Required Values Missing: ${missingA ? 'A' : ''}${missingA && missingB ? ',' : ''
-      }${missingB ? 'B' : ''}`;
+    errorMessage.value = `Required Values Missing: ${missingA ? 'A' : ''}${
+      missingA && missingB ? ',' : ''
+    }${missingB ? 'B' : ''}`;
     return;
   }
 
-  selectedCommands.value.push(
-    { id: uuid(),
-      category: Number(commandCategory.value),
-      command: cmdNum,
-      valueA: Number(valueA.value) || 0,
-      valueB: Number(valueB.value) || 0,
-    },
-  );
+  selectedCommands.value.push({
+    id: uuid(),
+    category: Number(commandCategory.value),
+    command: cmdNum,
+    valueA: Number(valueA.value) || 0,
+    valueB: Number(valueB.value) || 0,
+  });
 
   // Clear input values after adding
   valueA.value = '';
@@ -228,7 +225,7 @@ const addCommand = () => {
 };
 
 const removeCommand = (id: string) => {
-  const cmdIdx = selectedCommands.value.findIndex(x => x.id === id);
+  const cmdIdx = selectedCommands.value.findIndex((x) => x.id === id);
   if (cmdIdx !== undefined && cmdIdx > -1) {
     selectedCommands.value.splice(cmdIdx, 1);
   }
@@ -291,19 +288,37 @@ const closeModal = () => {
         <div class="grow"></div>
         <div class="w-75">
           <div class="mb-2">
-            <label for="time" class="block w-full mb-0.5 text-lg">Event Time (seconds)</label>
-            <input id="time" v-model.number="eventTime" type="number" step="0.1" placeholder="Time"
-              class="input input-bordered w-full text-lg h-9" />
+            <label
+              for="time"
+              class="block w-full mb-0.5 text-lg"
+              >Event Time (seconds)</label
+            >
+            <input
+              id="time"
+              v-model.number="eventTime"
+              type="number"
+              step="0.1"
+              placeholder="Time"
+              class="input input-bordered w-full text-lg h-9"
+            />
           </div>
 
           <!-- Command list -->
           <div class="border border-base-300 w-full h-20 overflow-auto mb-2">
             <ul class="list-none p-0 m-0">
-              <li v-for="cmd in selectedCommands" :key="cmd.id" class="flex flex-row items-center">
+              <li
+                v-for="cmd in selectedCommands"
+                :key="cmd.id"
+                class="flex flex-row items-center"
+              >
                 <div class="grow whitespace-nowrap overflow-hidden text-ellipsis">
                   {{ formatSelectedCommand(cmd) }}
                 </div>
-                <button class="btn btn-ghost btn-xs mx-1" title="remove" @click="removeCommand(cmd.id)">
+                <button
+                  class="btn btn-ghost btn-xs mx-1"
+                  title="remove"
+                  @click="removeCommand(cmd.id)"
+                >
                   ✕
                 </button>
               </li>
@@ -314,9 +329,18 @@ const closeModal = () => {
 
           <!-- Command Category -->
           <div class="mb-2">
-            <label for="commandCategory" class="block w-full mb-0.5 text-lg font-medium">Command Category</label>
-            <select id="commandCategory" v-model="commandCategory" title="Command Category"
-              class="select select-bordered w-full text-lg mt-2" @change="categoryChange">
+            <label
+              for="commandCategory"
+              class="block w-full mb-0.5 text-lg font-medium"
+              >Command Category</label
+            >
+            <select
+              id="commandCategory"
+              v-model="commandCategory"
+              title="Command Category"
+              class="select select-bordered w-full text-lg mt-2"
+              @change="categoryChange"
+            >
               <option :value="HcrCommandCategory.stimuli">Stimuli</option>
               <option :value="HcrCommandCategory.muse">Muse</option>
               <option :value="HcrCommandCategory.sdWav">SD Wav</option>
@@ -328,10 +352,23 @@ const closeModal = () => {
 
           <!-- Command -->
           <div class="mb-2">
-            <label for="command" class="block w-full mb-0.5 text-lg font-medium">Command</label>
-            <select id="command" v-model="command" title="Command" class="select select-bordered w-full text-lg mt-2"
-              @change="commandChange">
-              <option v-for="cmd in commands" :key="cmd.id" :value="cmd.id">
+            <label
+              for="command"
+              class="block w-full mb-0.5 text-lg font-medium"
+              >Command</label
+            >
+            <select
+              id="command"
+              v-model="command"
+              title="Command"
+              class="select select-bordered w-full text-lg mt-2"
+              @change="commandChange"
+            >
+              <option
+                v-for="cmd in commands"
+                :key="cmd.id"
+                :value="cmd.id"
+              >
                 {{ cmd.name }}
               </option>
             </select>
@@ -339,26 +376,54 @@ const closeModal = () => {
 
           <!-- Value A -->
           <div class="mb-2">
-            <label for="value-a" class="block w-full mb-0.5 text-lg">Value A</label>
-            <input id="value-a" v-model="valueA" type="number" step="1" placeholder="Value A" :disabled="valueADisabled"
-              class="input input-bordered w-full text-lg h-9" />
+            <label
+              for="value-a"
+              class="block w-full mb-0.5 text-lg"
+              >Value A</label
+            >
+            <input
+              id="value-a"
+              v-model="valueA"
+              type="number"
+              step="1"
+              placeholder="Value A"
+              :disabled="valueADisabled"
+              class="input input-bordered w-full text-lg h-9"
+            />
           </div>
 
           <!-- Value B -->
           <div class="mb-2">
-            <label for="value-b" class="block w-full mb-0.5 text-lg">Value B</label>
-            <input id="value-b" v-model="valueB" type="number" step="1" placeholder="Value B" :disabled="valueBDisabled"
-              class="input input-bordered w-full text-lg h-9" />
+            <label
+              for="value-b"
+              class="block w-full mb-0.5 text-lg"
+              >Value B</label
+            >
+            <input
+              id="value-b"
+              v-model="valueB"
+              type="number"
+              step="1"
+              placeholder="Value B"
+              :disabled="valueBDisabled"
+              class="input input-bordered w-full text-lg h-9"
+            />
           </div>
 
           <!-- Add Command Button -->
           <div class="flex justify-center mt-1 mb-2">
-            <button class="btn btn-sm btn-primary h-7 text-lg w-15 px-0" @click="addCommand">
+            <button
+              class="btn btn-sm btn-primary h-7 text-lg w-15 px-0"
+              @click="addCommand"
+            >
               Add
             </button>
           </div>
 
-          <div v-if="errorMessage" class="text-center text-error text-lg">
+          <div
+            v-if="errorMessage"
+            class="text-center text-error text-lg"
+          >
             {{ errorMessage }}
           </div>
         </div>
@@ -366,19 +431,35 @@ const closeModal = () => {
       </div>
 
       <div class="modal-action justify-center mt-5">
-        <button class="btn btn-primary w-24 text-lg" data-testid="save-button" @click="addEvent">
+        <button
+          class="btn btn-primary w-24 text-lg"
+          data-testid="save-button"
+          @click="addEvent"
+        >
           Save
         </button>
-        <button v-if="showRemoveButton" class="btn btn-error w-24 text-lg" data-testid="remove-button"
-          @click="removeEvent">
+        <button
+          v-if="showRemoveButton"
+          class="btn btn-error w-24 text-lg"
+          data-testid="remove-button"
+          @click="removeEvent"
+        >
           Remove
         </button>
-        <button class="btn w-24 text-lg" data-testid="close-button" @click="closeModal">
+        <button
+          class="btn w-24 text-lg"
+          data-testid="close-button"
+          @click="closeModal"
+        >
           Close
         </button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="closeModal">
+    <form
+      method="dialog"
+      class="modal-backdrop"
+      @click="closeModal"
+    >
       <button>Close</button>
     </form>
   </dialog>

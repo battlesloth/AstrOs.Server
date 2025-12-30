@@ -1,5 +1,5 @@
-import type { ModuleType } from "../../enums/modules/ModuleType";
-import type { ModuleSubType } from "../../enums/modules/ModuleSubType";
+import type { ModuleType } from '../../enums/modules/ModuleType';
+import type { ModuleSubType } from '../../enums/modules/ModuleSubType';
 
 export interface BaseModule {
   // idx is the primary key for the module,

@@ -42,12 +42,12 @@ function doAddChannel(response: AddChannelModalResponse) {
   for (const [channelType, ids] of response.channels.entries()) {
     for (const id of ids) {
       const result = scripterStore.addChannel(id, channelType);
-      
-      if (!result.success){
+
+      if (!result.success) {
         console.log(`Failed to add channel for ID ${id} and type ${channelType}`);
         continue;
       }
-      
+
       scripter.value?.addChannel(result.id, result.name);
     }
   }
@@ -68,7 +68,6 @@ function doRemoveChannel(chId: string) {
 function swapChannel() {}
 function doSwapChannel() {}
 
-
 function addEvent() {}
 function doAddEvent() {}
 
@@ -80,7 +79,6 @@ function doUpdateEvent() {}
 
 function testChannel() {}
 function scriptTest() {}
-
 
 function alertClose() {
   if (scriptLoadFailed.value) {
@@ -102,9 +100,9 @@ onMounted(async () => {
     showModal.value = ModalType.ERROR;
     return;
   }
-  
+
   const result = await scripterStore.loadScripterData(route.params.id as string);
-  
+
   if (!result.success) {
     modalMessage.value = `Failed to load script: ${result.error}`;
     scriptLoadFailed.value = true;
@@ -116,7 +114,6 @@ onMounted(async () => {
   await scripter.value?.initializePixi();
   showModal.value = ModalType.CLOSE_ALL;
 });
-
 </script>
 
 <template>
@@ -132,7 +129,7 @@ onMounted(async () => {
         @remove-event="removeEvent"
         @edit-event="updateEvent"
       />
-      
+
       <AstrosInterruptModal
         v-if="showModal === ModalType.INTERRUPT"
         @close="showModal = ModalType.CLOSE_ALL"
@@ -166,7 +163,7 @@ onMounted(async () => {
         :script-channel-type="ScriptChannelType.NONE"
         :channel-id="0"
       />
-     
+
       <AstrosGpioEventModal
         v-if="showModal === ModalType.GPIO_EVENT"
         @close="showModal = ModalType.CLOSE_ALL"
@@ -186,7 +183,7 @@ onMounted(async () => {
           moduleType: 0,
           moduleSubType: 0,
           time: 0,
-          event: { commands: [] }, 
+          event: { commands: [] },
         }"
       />
       <AstrosI2cEventModal
@@ -206,14 +203,21 @@ onMounted(async () => {
         :kangaroo="{
           id: '',
           ch1Name: 'ch 1',
-          ch2Name: 'ch 2'
+          ch2Name: 'ch 2',
         }"
         :script-event="{
           scriptChannel: '',
           moduleType: 0,
           moduleSubType: 0,
           time: 0,
-          event: { ch1Action: 0, ch1Speed: 0, ch1Position: 0, ch2Action: 0, ch2Speed: 0, ch2Position: 0 },
+          event: {
+            ch1Action: 0,
+            ch1Speed: 0,
+            ch1Position: 0,
+            ch2Action: 0,
+            ch2Speed: 0,
+            ch2Position: 0,
+          },
         }"
       />
       <AstrosServoEventModal
@@ -238,7 +242,6 @@ onMounted(async () => {
           event: { value: '' },
         }"
       />
-    
     </template>
   </AstrosLayout>
 </template>

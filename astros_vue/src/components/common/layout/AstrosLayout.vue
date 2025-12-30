@@ -35,15 +35,33 @@ function logout() {
 
 <template>
   <div class="drawer">
-    <input id="nav-menu-drawer" type="checkbox" class="drawer-toggle" v-model="sidebarOpen" aria-label="open sidebar"
-      aria-controls="sidebar-menu" />
+    <input
+      id="nav-menu-drawer"
+      type="checkbox"
+      class="drawer-toggle"
+      v-model="sidebarOpen"
+      aria-label="open sidebar"
+      aria-controls="sidebar-menu"
+    />
     <div class="drawer-content">
       <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-none pl-2 flex items-center">
-          <label for="nav-menu-drawer" class="btn btn-ghost drawer-button pl-2 pr-2 h-12 ml-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-              class="inline-block h-9 w-9 stroke-current">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+          <label
+            for="nav-menu-drawer"
+            class="btn btn-ghost drawer-button pl-2 pr-2 h-12 ml-2"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              class="inline-block h-9 w-9 stroke-current"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 6h16M4 12h16M4 18h16"
+              ></path>
             </svg>
           </label>
           <a class="text-xl pl-4 lg:block">{{ $t('astros') }}</a>
@@ -53,7 +71,11 @@ function logout() {
       <slot name="main"></slot>
     </div>
     <div class="drawer-side">
-      <label for="nav-menu-drawer" aria-label="close sidebar" class="drawer-overlay"></label>
+      <label
+        for="nav-menu-drawer"
+        aria-label="close sidebar"
+        class="drawer-overlay"
+      ></label>
       <div class="bg-base-200 min-h-full w-80">
         <nav aria-label="Main menu">
           <ul class="menu w-80 p-4">

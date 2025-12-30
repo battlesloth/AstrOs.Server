@@ -42,13 +42,26 @@ const onBaudRateChange = (val: string) => {
 
 <template>
   <div class="flex flex-row gap-5">
-    <select :data-testid="`${parentTestId}-generic-serial-uart-channel`" v-model="uartChannel"
-      @change="onChannelChange(uartChannel)" class="select select-bordered select-sm w-30">
-      <option v-if="!isMaster" value="1">{{ $t('uart.channel_1') }}</option>
+    <select
+      :data-testid="`${parentTestId}-generic-serial-uart-channel`"
+      v-model="uartChannel"
+      @change="onChannelChange(uartChannel)"
+      class="select select-bordered select-sm w-30"
+    >
+      <option
+        v-if="!isMaster"
+        value="1"
+      >
+        {{ $t('uart.channel_1') }}
+      </option>
       <option value="2">{{ $t('uart.channel_2') }}</option>
     </select>
-    <select :data-testid="`${parentTestId}-generic-serial-baud`" v-model="baudRate" @change="onBaudRateChange(baudRate)"
-      class="select select-bordered select-sm w-30">
+    <select
+      :data-testid="`${parentTestId}-generic-serial-baud`"
+      v-model="baudRate"
+      @change="onBaudRateChange(baudRate)"
+      class="select select-bordered select-sm w-30"
+    >
       <option value="9600">{{ $t('uart.baudrates.9600') }}</option>
       <option value="19200">{{ $t('uart.baudrates.19200') }}</option>
       <option value="38400">{{ $t('uart.baudrates.38400') }}</option>

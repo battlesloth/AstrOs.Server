@@ -1,13 +1,13 @@
 <script setup lang="ts">
-
-const props = withDefaults(defineProps<{
-  message: string;
-  title?: string;
-}>(), {
-  title: "modals.alert.title",
-});
-
-
+const props = withDefaults(
+  defineProps<{
+    message: string;
+    title?: string;
+  }>(),
+  {
+    title: 'modals.alert.title',
+  },
+);
 
 const emit = defineEmits({
   close: null,
@@ -28,11 +28,21 @@ const closeModal = () => {
         </div>
       </div>
       <div class="modal-action">
-        <button data-testid="modal-close" class="btn" @click="closeModal">{{ $t("modals.alert.close") }}</button>
+        <button
+          data-testid="modal-close"
+          class="btn"
+          @click="closeModal"
+        >
+          {{ $t('modals.alert.close') }}
+        </button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="closeModal">
-      <button>{{ $t("modals.alert.close") }}</button>
+    <form
+      method="dialog"
+      class="modal-backdrop"
+      @click="closeModal"
+    >
+      <button>{{ $t('modals.alert.close') }}</button>
     </form>
   </dialog>
 </template>

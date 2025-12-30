@@ -44,7 +44,6 @@ onMounted(async () => {
   setButtonScripts();
 });
 
-
 function createEmptyButton(): PageButton {
   return { id: '0', name: 'None' };
 }
@@ -81,7 +80,7 @@ function selectionChange(button: number, newId: string) {
   const buttonKey = `button${button}` as keyof RemoteControlPage;
   if (!currentPage.value) return;
   currentPage.value[buttonKey] = { id, name: scriptName };
-};
+}
 
 function pageForward() {
   currentIndex.value++;
@@ -92,7 +91,7 @@ function pageForward() {
   currentPage.value = remoteControlStore.remoteControlPages[currentIndex.value]!;
   pageNumber.value = currentIndex.value + 1;
   setButtonScripts();
-};
+}
 
 function pageBackward() {
   currentIndex.value--;
@@ -104,7 +103,7 @@ function pageBackward() {
   currentPage.value = remoteControlStore.remoteControlPages[currentIndex.value]!;
   pageNumber.value = currentIndex.value + 1;
   setButtonScripts();
-};
+}
 
 // Set button scripts from current page
 function setButtonScripts() {
@@ -117,7 +116,7 @@ function setButtonScripts() {
   currentButton7Script.value = currentPage.value?.button7?.id || '0';
   currentButton8Script.value = currentPage.value?.button8?.id || '0';
   currentButton9Script.value = currentPage.value?.button9?.id || '0';
-};
+}
 
 async function saveConfig() {
   try {
@@ -126,7 +125,7 @@ async function saveConfig() {
     console.error('Error saving remote control configuration:', err);
     error('Failed to save remote control configuration.');
   }
-};
+}
 </script>
 
 <template>
@@ -135,13 +134,21 @@ async function saveConfig() {
     <div class="flex flex-nowrap w-full my-5 items-center">
       <div class="grow-3"></div>
       <div>
-        <button class="btn btn-circle btn-ghost text-2xl" title="Backward" @click="pageBackward">
+        <button
+          class="btn btn-circle btn-ghost text-2xl"
+          title="Backward"
+          @click="pageBackward"
+        >
           &#8249;
         </button>
       </div>
       <div class="text-3xl mx-3 font-bold">Page {{ pageNumber }}</div>
       <div>
-        <button class="btn btn-circle btn-ghost text-2xl" title="Forward" @click="pageForward">
+        <button
+          class="btn btn-circle btn-ghost text-2xl"
+          title="Forward"
+          @click="pageForward"
+        >
           &#8250;
         </button>
       </div>
@@ -149,38 +156,73 @@ async function saveConfig() {
     </div>
 
     <!-- Grid of Button Selects -->
-    <div v-if="currentPage" class="grid grid-cols-3 gap-5 w-full max-w-6xl mx-auto">
+    <div
+      v-if="currentPage"
+      class="grid grid-cols-3 gap-5 w-full max-w-6xl mx-auto"
+    >
       <!-- Button 1 -->
-      <AstrosRemoteButton :currentScript="currentButton1Script" :scripts="scripts"
-        @changed="value => selectionChange(1, value)" />
+      <AstrosRemoteButton
+        :currentScript="currentButton1Script"
+        :scripts="scripts"
+        @changed="(value) => selectionChange(1, value)"
+      />
       <!-- Button 2 -->
-      <AstrosRemoteButton :currentScript="currentButton2Script" :scripts="scripts"
-        @changed="value => selectionChange(2, value)" />
+      <AstrosRemoteButton
+        :currentScript="currentButton2Script"
+        :scripts="scripts"
+        @changed="(value) => selectionChange(2, value)"
+      />
       <!-- Button 3 -->
-      <AstrosRemoteButton :currentScript="currentButton3Script" :scripts="scripts"
-        @changed="value => selectionChange(3, value)" />
+      <AstrosRemoteButton
+        :currentScript="currentButton3Script"
+        :scripts="scripts"
+        @changed="(value) => selectionChange(3, value)"
+      />
       <!-- Button 4 -->
-      <AstrosRemoteButton :currentScript="currentButton4Script" :scripts="scripts"
-        @changed="value => selectionChange(4, value)" />
+      <AstrosRemoteButton
+        :currentScript="currentButton4Script"
+        :scripts="scripts"
+        @changed="(value) => selectionChange(4, value)"
+      />
       <!-- Button 5 -->
-      <AstrosRemoteButton :currentScript="currentButton5Script" :scripts="scripts"
-        @changed="value => selectionChange(5, value)" />
+      <AstrosRemoteButton
+        :currentScript="currentButton5Script"
+        :scripts="scripts"
+        @changed="(value) => selectionChange(5, value)"
+      />
       <!-- Button 6 -->
-      <AstrosRemoteButton :currentScript="currentButton6Script" :scripts="scripts"
-        @changed="value => selectionChange(6, value)" />
+      <AstrosRemoteButton
+        :currentScript="currentButton6Script"
+        :scripts="scripts"
+        @changed="(value) => selectionChange(6, value)"
+      />
       <!-- Button 7 -->
-      <AstrosRemoteButton :currentScript="currentButton7Script" :scripts="scripts"
-        @changed="value => selectionChange(7, value)" />
+      <AstrosRemoteButton
+        :currentScript="currentButton7Script"
+        :scripts="scripts"
+        @changed="(value) => selectionChange(7, value)"
+      />
       <!-- Button 8 -->
-      <AstrosRemoteButton :currentScript="currentButton8Script" :scripts="scripts"
-        @changed="value => selectionChange(8, value)" />
+      <AstrosRemoteButton
+        :currentScript="currentButton8Script"
+        :scripts="scripts"
+        @changed="(value) => selectionChange(8, value)"
+      />
       <!-- Button 9 -->
-      <AstrosRemoteButton :currentScript="currentButton9Script" :scripts="scripts"
-        @changed="value => selectionChange(9, value)" />
+      <AstrosRemoteButton
+        :currentScript="currentButton9Script"
+        :scripts="scripts"
+        @changed="(value) => selectionChange(9, value)"
+      />
     </div>
     <!-- Save Button -->
     <div class="flex justify-center mt-8">
-      <button class="btn btn-primary btn-wide" @click="saveConfig">Save Configuration</button>
+      <button
+        class="btn btn-primary btn-wide"
+        @click="saveConfig"
+      >
+        Save Configuration
+      </button>
     </div>
   </div>
 </template>

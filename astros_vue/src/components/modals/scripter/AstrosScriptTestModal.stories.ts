@@ -1,52 +1,52 @@
-import type { Meta, StoryObj } from '@storybook/vue3'
-import { fn } from 'storybook/test'
-import AstrosScriptTestModal from './AstrosScriptTestModal.vue'
-import type { ScriptResponse } from '@/models/scripts/scriptTest'
+import type { Meta, StoryObj } from '@storybook/vue3';
+import { fn } from 'storybook/test';
+import AstrosScriptTestModal from './AstrosScriptTestModal.vue';
+import type { ScriptResponse } from '@/models/scripts/scriptTest';
 
 // Mock observable for websocket messages
 const createMockObservable = (initialValue?: ScriptResponse) => {
-  const subscribers: Array<(value: ScriptResponse) => void> = []
+  const subscribers: Array<(value: ScriptResponse) => void> = [];
 
   return {
     subscribe: (callback: (value: ScriptResponse) => void) => {
-      subscribers.push(callback)
+      subscribers.push(callback);
       return {
         unsubscribe: () => {
-          const index = subscribers.indexOf(callback)
-          if (index > -1) subscribers.splice(index, 1)
-        }
-      }
+          const index = subscribers.indexOf(callback);
+          if (index > -1) subscribers.splice(index, 1);
+        },
+      };
     },
     next: (value: ScriptResponse) => {
-      subscribers.forEach(callback => callback(value))
-    }
-  }
-}
+      subscribers.forEach((callback) => callback(value));
+    },
+  };
+};
 
 const meta: Meta<typeof AstrosScriptTestModal> = {
   title: 'Components/Modals/Scripter/ScriptTest',
   component: AstrosScriptTestModal,
   tags: ['autodocs'],
   args: {
-    onClose: fn()
-  }
-}
+    onClose: fn(),
+  },
+};
 
-export default meta
-type Story = StoryObj<typeof AstrosScriptTestModal>
+export default meta;
+type Story = StoryObj<typeof AstrosScriptTestModal>;
 
 export const Default: Story = {
   args: {
-    scriptId: '42'
+    scriptId: '42',
   },
   render: (args) => ({
     components: { AstrosScriptTestModal },
     setup() {
-      return { args }
+      return { args };
     },
-    template: '<AstrosScriptTestModal v-bind="args" />'
-  })
-}
+    template: '<AstrosScriptTestModal v-bind="args" />',
+  }),
+};
 
 export const UploadInProgress: Story = {
   args: {
@@ -55,11 +55,11 @@ export const UploadInProgress: Story = {
   render: (args) => ({
     components: { AstrosScriptTestModal },
     setup() {
-      return { args }
+      return { args };
     },
-    template: '<AstrosScriptTestModal v-bind="args" />'
-  })
-}
+    template: '<AstrosScriptTestModal v-bind="args" />',
+  }),
+};
 
 export const AllUploadsComplete: Story = {
   args: {
@@ -68,11 +68,11 @@ export const AllUploadsComplete: Story = {
   render: (args) => ({
     components: { AstrosScriptTestModal },
     setup() {
-      return { args }
+      return { args };
     },
-    template: '<AstrosScriptTestModal v-bind="args" />'
-  })
-}
+    template: '<AstrosScriptTestModal v-bind="args" />',
+  }),
+};
 
 export const UploadFailed: Story = {
   args: {
@@ -81,11 +81,11 @@ export const UploadFailed: Story = {
   render: (args) => ({
     components: { AstrosScriptTestModal },
     setup() {
-      return { args }
+      return { args };
     },
-    template: '<AstrosScriptTestModal v-bind="args" />'
-  })
-}
+    template: '<AstrosScriptTestModal v-bind="args" />',
+  }),
+};
 
 export const SingleLocation: Story = {
   args: {
@@ -94,8 +94,8 @@ export const SingleLocation: Story = {
   render: (args) => ({
     components: { AstrosScriptTestModal },
     setup() {
-      return { args }
+      return { args };
     },
-    template: '<AstrosScriptTestModal v-bind="args" />'
-  })
-}
+    template: '<AstrosScriptTestModal v-bind="args" />',
+  }),
+};

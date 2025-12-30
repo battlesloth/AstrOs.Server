@@ -1,8 +1,15 @@
-import { Assets, BitmapText, Container, FillGradient, Graphics, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import {
-  CHANNEL_LIST_WIDTH,
-  ROW_HEIGHT
-} from '@/composables/timelineConstants';
+  Assets,
+  BitmapText,
+  Container,
+  FillGradient,
+  Graphics,
+  Sprite,
+  Text,
+  TextStyle,
+  Texture,
+} from 'pixi.js';
+import { CHANNEL_LIST_WIDTH, ROW_HEIGHT } from '@/composables/timelineConstants';
 import { truncateText } from './helpers';
 
 export interface PixiChannelDataOptions {
@@ -28,8 +35,8 @@ export class PixiChannelData extends Container {
   buttonXspacing: number = 6;
   buttonYoffset: number = 34;
 
-  channelId: string
-  channelName: string
+  channelId: string;
+  channelName: string;
 
   constructor(options: PixiChannelDataOptions) {
     super();
@@ -42,13 +49,11 @@ export class PixiChannelData extends Container {
       .fill(options.rowColor);
 
     // Add bottom border line
-    background
-      .rect(0, ROW_HEIGHT - 1, CHANNEL_LIST_WIDTH, 1)
-      .fill(0xcccccc);
+    background.rect(0, ROW_HEIGHT - 1, CHANNEL_LIST_WIDTH, 1).fill(0xcccccc);
 
     this.addChild(background);
 
-    const fill = new FillGradient(0, 0, 1, 1)
+    const fill = new FillGradient(0, 0, 1, 1);
     fill.addColorStop(0, 0x000000);
     fill.addColorStop(1, 0x000000);
 
@@ -62,7 +67,7 @@ export class PixiChannelData extends Container {
 
     const rowText = new Text({
       text: text,
-      style: style
+      style: style,
     });
 
     rowText.x = 10;
@@ -76,23 +81,20 @@ export class PixiChannelData extends Container {
     xOffset += this.buttonSize + this.buttonXspacing;
     const swapButton = this.createButton(xOffset, options.onSwap);
 
-    Assets.load('swapIcon')
-      .then((texture) => {
-        this.addIcon(swapButton, texture);
-        this.addChild(swapButton);
-      });
+    Assets.load('swapIcon').then((texture) => {
+      this.addIcon(swapButton, texture);
+      this.addChild(swapButton);
+    });
 
-    Assets.load('deleteIcon')
-      .then((texture) => {
-        this.addIcon(deleteButton, texture);
-        this.addChild(deleteButton);
-      });
+    Assets.load('deleteIcon').then((texture) => {
+      this.addIcon(deleteButton, texture);
+      this.addChild(deleteButton);
+    });
 
-    Assets.load('playIcon')
-      .then((texture) => {
-        this.addIcon(testButton, texture);
-        this.addChild(testButton);
-      });
+    Assets.load('playIcon').then((texture) => {
+      this.addIcon(testButton, texture);
+      this.addChild(testButton);
+    });
   }
 
   createButton(xOffset: number, callback?: (id: string, name: string) => void) {

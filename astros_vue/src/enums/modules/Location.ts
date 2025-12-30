@@ -4,5 +4,3 @@ export enum Location {
   core = 'core',
   dome = 'dome',
 }
-
-

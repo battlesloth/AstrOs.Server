@@ -39,6 +39,10 @@ function login() {
 
 <template>
   <main>
-    <AstrosLogin v-model="credentials" @login="login" :errorMessage="errorMessage" />
+    <AstrosLogin
+      v-model="credentials"
+      @login="login"
+      :errorMessage="errorMessage"
+    />
   </main>
 </template>

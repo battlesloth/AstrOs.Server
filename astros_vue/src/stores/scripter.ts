@@ -31,7 +31,6 @@ export const useScripterStore = defineStore('scripter', () => {
   async function loadScripterData(scriptId: string) {
     isLoading.value = true;
     try {
-
       const result = await locationsStore.loadLocationsFromApi();
 
       if (!result.success) {
@@ -77,10 +76,13 @@ export const useScripterStore = defineStore('scripter', () => {
     }
   }
 
-  function addChannel(id: string, channelType: ScriptChannelType): {
+  function addChannel(
+    id: string,
+    channelType: ScriptChannelType,
+  ): {
     success: boolean;
     id: string;
-    name: string
+    name: string;
   } {
     const resource = getScriptChannelResource(id, channelType);
     if (!resource || !script.value) return { success: false, id: '', name: '' };
@@ -128,5 +130,5 @@ export const useScripterStore = defineStore('scripter', () => {
     getScriptChannelResource,
     addChannel,
     removeChannel,
-  }
+  };
 });

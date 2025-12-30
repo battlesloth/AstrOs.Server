@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, type PropType } from 'vue';
 import AstrosServoSettings from '../../shared/AstrosServoSettings.vue';
-import { ModuleSubType } from "@/enums/modules/ModuleSubType";
+import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import type { ServoTestEvent } from '@/models/events';
 
 // MaestroChannel interface
@@ -74,19 +74,34 @@ const testServoModal = () => {
   <div class="space-y-2">
     <div class="flex items-center gap-4 flex-wrap">
       <div class="font-medium min-w-20">Channel {{ channel.channelNumber }}</div>
-      <select :data-testid="`${parentTestId}-maestro-ch-${channel.channelNumber}-type`" v-model="type"
-        class="select select-bordered select-sm w-30">
+      <select
+        :data-testid="`${parentTestId}-maestro-ch-${channel.channelNumber}-type`"
+        v-model="type"
+        class="select select-bordered select-sm w-30"
+      >
         <option value="0">{{ $t('uart.disabled') }}</option>
         <option value="1">{{ $t('uart.servo') }}</option>
         <option value="2">{{ $t('uart.output') }}</option>
       </select>
       <div class="grow"></div>
-      <button @click="testServoModal" class="btn btn-sm btn-outline">{{ $t('uart.test') }}</button>
+      <button
+        @click="testServoModal"
+        class="btn btn-sm btn-outline"
+      >
+        {{ $t('uart.test') }}
+      </button>
     </div>
     <div v-if="channel">
-      <AstrosServoSettings :test-id="`${parentTestId}-maestro-ch-${channel.channelNumber}`" :enabled="channel.enabled"
-        v-model:name="channel.channelName" :is-servo="channel.isServo" v-model:invert="channel.inverted"
-        v-model:min-pulse="channel.minPos" v-model:max-pulse="channel.maxPos" v-model:home-position="channel.homePos" />
+      <AstrosServoSettings
+        :test-id="`${parentTestId}-maestro-ch-${channel.channelNumber}`"
+        :enabled="channel.enabled"
+        v-model:name="channel.channelName"
+        :is-servo="channel.isServo"
+        v-model:invert="channel.inverted"
+        v-model:min-pulse="channel.minPos"
+        v-model:max-pulse="channel.maxPos"
+        v-model:home-position="channel.homePos"
+      />
     </div>
   </div>
 </template>

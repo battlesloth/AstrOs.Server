@@ -1,7 +1,4 @@
-import {
-  HcrCommandCategory,
-  HumanCyborgRelationsCmd,
-} from "@/enums/scripts/humanCyborgRelations";
+import { HcrCommandCategory, HumanCyborgRelationsCmd } from '@/enums/scripts/humanCyborgRelations';
 
 export interface HcrCommand {
   id: string;

@@ -23,7 +23,6 @@ const onSliderChange = () => {
 };
 
 function servoTestMessage() {
-
   return {
     msgType: 'SERVO_TEST',
     data: {
@@ -34,8 +33,8 @@ function servoTestMessage() {
       channelNumber: props.channelNumber,
       value: value.value,
     },
-  }
-};
+  };
+}
 
 const enableTest = () => {
   disabled.value = !disabled.value;
@@ -56,29 +55,56 @@ const closeModal = () => {
   <dialog class="modal modal-open">
     <div class="modal-box w-75">
       <div class="flex flex-col text-lg">
-        <div class="text-center">{{ $t('modals.servo_test.title', { channel: channelNumber }) }}</div>
+        <div class="text-center">
+          {{ $t('modals.servo_test.title', { channel: channelNumber }) }}
+        </div>
         <div class="h-5 grow"></div>
         <div class="flex flex-row items-center justify-center gap-2 mt-2">
-          <input type="number" min="500" max="2500" v-model.number="value" @input="onSliderChange"
-            class="input input-bordered w-24 text-center" />
+          <input
+            type="number"
+            min="500"
+            max="2500"
+            v-model.number="value"
+            @input="onSliderChange"
+            class="input input-bordered w-24 text-center"
+          />
           <span class="text-sm">μs</span>
         </div>
-        <input type="range" min="500" max="2500" v-model.number="value" :disabled="disabled" @input="onSliderChange"
-          class="range range-primary mt-4" step="1" />
+        <input
+          type="range"
+          min="500"
+          max="2500"
+          v-model.number="value"
+          :disabled="disabled"
+          @input="onSliderChange"
+          class="range range-primary mt-4"
+          step="1"
+        />
       </div>
       <div class="mt-5 flex flex-row">
         <div class="grow"></div>
-        <button data-testid="enable-test-button" class="btn btn-primary w-25 text-lg py-1.25 mx-1.25"
-          @click="enableTest">
+        <button
+          data-testid="enable-test-button"
+          class="btn btn-primary w-25 text-lg py-1.25 mx-1.25"
+          @click="enableTest"
+        >
           {{ $t(label) }}
         </button>
-        <button data-testid="close-button" class="btn w-25 text-lg py-1.25 mx-1.25" @click="closeModal">
+        <button
+          data-testid="close-button"
+          class="btn w-25 text-lg py-1.25 mx-1.25"
+          @click="closeModal"
+        >
           {{ $t('modals.servo_test.close') }}
         </button>
         <div class="grow"></div>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="closeModal">
+    <form
+      method="dialog"
+      class="modal-backdrop"
+      @click="closeModal"
+    >
       <button>{{ $t('modals.servo_test.close') }}</button>
     </form>
   </dialog>

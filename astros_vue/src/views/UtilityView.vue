@@ -8,7 +8,6 @@ interface SelectedControllerModule extends ControllerModule {
   selected: boolean;
 }
 
-
 // State
 const apiKey = ref('');
 const controllers = ref<ControllerModule[]>([]);
@@ -110,9 +109,16 @@ const closeAlert = () => {
           <div class="grow">
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
-              <div class="w-50 text-2xl mr-4 border-2 border-black rounded text-center">{{ apiKey }}</div>
+              <div class="w-50 text-2xl mr-4 border-2 border-black rounded text-center">
+                {{ apiKey }}
+              </div>
               <div class="float-right">
-                <button class="btn btn-primary w-35 px-5 py-0.75" @click="generateApiKey">Generate</button>
+                <button
+                  class="btn btn-primary w-35 px-5 py-0.75"
+                  @click="generateApiKey"
+                >
+                  Generate
+                </button>
               </div>
             </div>
           </div>
@@ -123,7 +129,12 @@ const closeAlert = () => {
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
               <div class="float-right">
-                <button class="btn btn-primary w-35 px-5 py-0.75" @click="openFormatModal">Format</button>
+                <button
+                  class="btn btn-primary w-35 px-5 py-0.75"
+                  @click="openFormatModal"
+                >
+                  Format
+                </button>
               </div>
             </div>
           </div>
@@ -131,39 +142,76 @@ const closeAlert = () => {
       </div>
 
       <!-- Format Modal -->
-      <dialog v-if="showFormatModal" class="modal modal-open">
+      <dialog
+        v-if="showFormatModal"
+        class="modal modal-open"
+      >
         <div class="modal-box">
           <h3 class="font-bold text-lg mb-4">Format Module SD Card</h3>
           <div class="py-5">
             <div class="max-h-96 overflow-y-auto">
-              <div v-for="ctl in selectedControllers" :key="ctl.id" class="py-2">
+              <div
+                v-for="ctl in selectedControllers"
+                :key="ctl.id"
+                class="py-2"
+              >
                 <label class="cursor-pointer label">
                   <span class="label-text">{{ ctl.name }}</span>
-                  <input type="checkbox" v-model="ctl.selected" class="checkbox" />
+                  <input
+                    type="checkbox"
+                    v-model="ctl.selected"
+                    class="checkbox"
+                  />
                 </label>
               </div>
             </div>
           </div>
           <div class="modal-action">
-            <button class="btn btn-primary" @click="confirmFormat">OK</button>
-            <button class="btn" @click="closeFormatModal">Close</button>
+            <button
+              class="btn btn-primary"
+              @click="confirmFormat"
+            >
+              OK
+            </button>
+            <button
+              class="btn"
+              @click="closeFormatModal"
+            >
+              Close
+            </button>
           </div>
         </div>
-        <form method="dialog" class="modal-backdrop" @click="closeFormatModal">
+        <form
+          method="dialog"
+          class="modal-backdrop"
+          @click="closeFormatModal"
+        >
           <button>Close</button>
         </form>
       </dialog>
 
       <!-- Alert Modal -->
-      <dialog v-if="showAlert" class="modal modal-open">
+      <dialog
+        v-if="showAlert"
+        class="modal modal-open"
+      >
         <div class="modal-box">
           <h3 class="font-bold text-lg">Alert</h3>
           <p class="py-4">{{ alertMessage }}</p>
           <div class="modal-action">
-            <button class="btn" @click="closeAlert">Close</button>
+            <button
+              class="btn"
+              @click="closeAlert"
+            >
+              Close
+            </button>
           </div>
         </div>
-        <form method="dialog" class="modal-backdrop" @click="closeAlert">
+        <form
+          method="dialog"
+          class="modal-backdrop"
+          @click="closeAlert"
+        >
           <button>Close</button>
         </form>
       </dialog>

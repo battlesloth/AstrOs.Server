@@ -112,7 +112,8 @@ export const LongName: Story = {
     script: {
       id: '5',
       scriptName: 'Very Long Script Name That Should Truncate',
-      description: 'This is a very long description that should also truncate when it exceeds the available space',
+      description:
+        'This is a very long description that should also truncate when it exceeds the available space',
       deploymentStatus: {
         body: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
         core: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
@@ -227,7 +228,14 @@ export const Interactive: Story = {
         alert(`Delete script: ${name} (${id})`);
       };
 
-      return { args, handleEditScript, handleCopyScript, handleUploadScript, handleRunScript, handleOpenDeleteModal };
+      return {
+        args,
+        handleEditScript,
+        handleCopyScript,
+        handleUploadScript,
+        handleRunScript,
+        handleOpenDeleteModal,
+      };
     },
     template: `
       <AstrosScriptRow 

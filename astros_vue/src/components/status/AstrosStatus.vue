@@ -41,7 +41,11 @@ const coreImg = computed(() => {
 
 <template>
   <div class="flex justify-center">
-    <img src="@/assets/images/status/r2.png" class="max-w-72" alt="Astro base" />
+    <img
+      src="@/assets/images/status/r2.png"
+      class="max-w-72"
+      alt="Astro base"
+    />
     <img
       v-show="bodyStatus !== ControllerStatus.UP"
       :src="bodyImg"

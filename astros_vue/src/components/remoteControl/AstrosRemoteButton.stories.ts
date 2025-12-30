@@ -1,9 +1,9 @@
-import { type Meta, type StoryObj } from "@storybook/vue3";
+import { type Meta, type StoryObj } from '@storybook/vue3';
 
-import AstrosRemoteButton from "./AstrosRemoteButton.vue";
+import AstrosRemoteButton from './AstrosRemoteButton.vue';
 
 const meta = {
-  title: "components/remoteControl/AstrosRemoteButton",
+  title: 'components/remoteControl/AstrosRemoteButton',
   component: AstrosRemoteButton,
   render: (args: unknown) => ({
     components: { AstrosRemoteButton },
@@ -13,11 +13,10 @@ const meta = {
     template: '<AstrosRemoteButton v-bind="args" />',
   }),
   parameters: {
-    layout: "centered",
+    layout: 'centered',
   },
-  args: {
-  },
-  tags: ["autodocs"],
+  args: {},
+  tags: ['autodocs'],
 } satisfies Meta<typeof AstrosRemoteButton>;
 
 export default meta;
@@ -25,15 +24,14 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const demoScripts = [
-  { id: "1", name: "Script 1" },
-  { id: "2", name: "Script 2" },
-  { id: "3", name: "Script 3" },
+  { id: '1', name: 'Script 1' },
+  { id: '2', name: 'Script 2' },
+  { id: '3', name: 'Script 3' },
 ];
-
 
 export const Primary: Story = {
   args: {
-    currentScript: "1",
+    currentScript: '1',
     scripts: demoScripts,
   },
 };

@@ -1,7 +1,7 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
 import AstrosGenericSerialModule from './AstrosGenericSerialModule.vue';
-import { ModuleType } from "@/enums/modules/ModuleType";
-import { ModuleSubType } from "@/enums/modules/ModuleSubType";
+import { ModuleType } from '@/enums/modules/ModuleType';
+import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
 // Helper function to create mock UART module

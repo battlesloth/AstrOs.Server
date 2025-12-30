@@ -36,7 +36,6 @@ const props = defineProps({
   },
 });
 
-
 const emit = defineEmits<{
   'update:name': [value: string];
   'update:invert': [value: boolean];
@@ -74,40 +73,69 @@ const homePositionModel = computed({
 </script>
 
 <template>
-  <div v-if="enabled" class="flex flex-wrap gap-4">
+  <div
+    v-if="enabled"
+    class="flex flex-wrap gap-4"
+  >
     <!-- First Row: Name and Type -->
     <div class="flex items-center gap-4 min-w-87.5 grow">
       <div class="grow">
-        <input :data-testid="`${testId}-name`" v-model="nameModel" :placeholder="$t('servo.name')"
-          class="input input-bordered input-sm w-full" />
+        <input
+          :data-testid="`${testId}-name`"
+          v-model="nameModel"
+          :placeholder="$t('servo.name')"
+          class="input input-bordered input-sm w-full"
+        />
       </div>
       <div class="form-control">
         <label class="label cursor-pointer gap-2">
           <span class="label-text">{{ $t(typeLabel) }}</span>
-          <input type="checkbox" :data-testid="`${testId}-invert-cbx`" v-model="invertModel"
-            class="checkbox checkbox-sm" />
+          <input
+            type="checkbox"
+            :data-testid="`${testId}-invert-cbx`"
+            v-model="invertModel"
+            class="checkbox checkbox-sm"
+          />
         </label>
       </div>
     </div>
 
     <!-- Second Row: Servo Settings (only if isServo) -->
-    <div v-if="isServo" class="flex items-center gap-4 min-w-87.5 grow">
+    <div
+      v-if="isServo"
+      class="flex items-center gap-4 min-w-87.5 grow"
+    >
       <div class="flex items-center gap-2">
         <span class="text-sm">{{ $t('servo.min_pulse') }}</span>
-        <input :data-testid="`${testId}-minPulse`" v-model.number="minPulseModel" type="number" placeholder="500"
-          class="input input-bordered input-sm w-16 text-center" />
+        <input
+          :data-testid="`${testId}-minPulse`"
+          v-model.number="minPulseModel"
+          type="number"
+          placeholder="500"
+          class="input input-bordered input-sm w-16 text-center"
+        />
       </div>
       <div class="grow"></div>
       <div class="flex items-center gap-2">
         <span class="text-sm">{{ $t('servo.max_pulse') }}</span>
-        <input :data-testid="`${testId}-maxPulse`" v-model.number="maxPulseModel" type="number" placeholder="2500"
-          class="input input-bordered input-sm w-16 text-center" />
+        <input
+          :data-testid="`${testId}-maxPulse`"
+          v-model.number="maxPulseModel"
+          type="number"
+          placeholder="2500"
+          class="input input-bordered input-sm w-16 text-center"
+        />
       </div>
       <div class="grow"></div>
       <div class="flex items-center gap-2">
         <span class="text-sm">{{ $t('servo.home_position') }}</span>
-        <input :data-testid="`${testId}-homePosition`" v-model.number="homePositionModel" type="number"
-          placeholder="1500" class="input input-bordered input-sm w-16 text-center" />
+        <input
+          :data-testid="`${testId}-homePosition`"
+          v-model.number="homePositionModel"
+          type="number"
+          placeholder="1500"
+          class="input input-bordered input-sm w-16 text-center"
+        />
       </div>
     </div>
   </div>

@@ -83,10 +83,7 @@ function generateChannels(addUnavailable = false): Map<ScriptChannelType, Channe
   return result;
 }
 
-function generateChannelDetails(
-  type: ScriptChannelType,
-  addUnavailable = false,
-): ChannelDetails[] {
+function generateChannelDetails(type: ScriptChannelType, addUnavailable = false): ChannelDetails[] {
   const result: ChannelDetails[] = [];
 
   let name = '';

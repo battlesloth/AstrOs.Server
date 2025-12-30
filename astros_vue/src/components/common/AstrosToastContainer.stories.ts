@@ -156,7 +156,9 @@ export const LongMessage: Story = {
       const { success } = useToast();
 
       const showToast = () => {
-        success('This is a very long toast message that contains a lot of text to demonstrate how the toast handles lengthy content and wrapping behavior.');
+        success(
+          'This is a very long toast message that contains a lot of text to demonstrate how the toast handles lengthy content and wrapping behavior.',
+        );
       };
 
       return { showToast };

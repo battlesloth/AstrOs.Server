@@ -123,22 +123,52 @@ const closeModal = () => {
           <!-- Servo Controls -->
           <div v-if="scriptChannelType === ScriptChannelType.SERVO">
             <div class="mb-2">
-              <label for="position" class="block w-full mb-0.5 text-lg">Position</label>
-              <input id="position" v-model.number="position" type="number" min="0" max="100"
-                class="input input-bordered w-full text-lg h-9" @change="clampPosition" />
+              <label
+                for="position"
+                class="block w-full mb-0.5 text-lg"
+                >Position</label
+              >
+              <input
+                id="position"
+                v-model.number="position"
+                type="number"
+                min="0"
+                max="100"
+                class="input input-bordered w-full text-lg h-9"
+                @change="clampPosition"
+              />
             </div>
             <div class="mb-2">
-              <label for="speed" class="block w-full mb-0.5 text-lg">Speed</label>
-              <input id="speed" v-model.number="speed" type="number" min="0" max="10"
-                class="input input-bordered w-full text-lg h-9" @change="clampSpeed" />
+              <label
+                for="speed"
+                class="block w-full mb-0.5 text-lg"
+                >Speed</label
+              >
+              <input
+                id="speed"
+                v-model.number="speed"
+                type="number"
+                min="0"
+                max="10"
+                class="input input-bordered w-full text-lg h-9"
+                @change="clampSpeed"
+              />
             </div>
           </div>
 
           <!-- GPIO Controls -->
           <div v-if="scriptChannelType === ScriptChannelType.GPIO">
-            <label for="gpiolevel" class="block w-full mb-0.5 text-lg">GPIO Command</label>
-            <select id="gpiolevel" v-model.number="gpioLevel" title="GPIO Level"
-              class="select select-bordered w-full text-lg mt-2">
+            <label
+              for="gpiolevel"
+              class="block w-full mb-0.5 text-lg"
+              >GPIO Command</label
+            >
+            <select
+              id="gpiolevel"
+              v-model.number="gpioLevel"
+              title="GPIO Level"
+              class="select select-bordered w-full text-lg mt-2"
+            >
               <option :value="0">Low</option>
               <option :value="1">High</option>
             </select>
@@ -146,32 +176,66 @@ const closeModal = () => {
 
           <!-- I2C Controls -->
           <div v-if="scriptChannelType === ScriptChannelType.GENERIC_I2C">
-            <label for="i2c-value" class="block w-full mb-0.5 text-lg">I2C Command</label>
-            <input id="i2c-value" v-model="value" type="text" placeholder="Value"
-              class="input input-bordered w-full text-lg h-9 mb-2" />
+            <label
+              for="i2c-value"
+              class="block w-full mb-0.5 text-lg"
+              >I2C Command</label
+            >
+            <input
+              id="i2c-value"
+              v-model="value"
+              type="text"
+              placeholder="Value"
+              class="input input-bordered w-full text-lg h-9 mb-2"
+            />
           </div>
 
           <!-- Serial/UART Controls -->
           <div v-if="scriptChannelType === ScriptChannelType.GENERIC_UART">
-            <label for="uart-value" class="block w-full mb-0.5 text-lg">Serial Command</label>
-            <input id="uart-value" v-model="value" type="text" placeholder="Value"
-              class="input input-bordered w-full text-lg h-9 mb-2" />
+            <label
+              for="uart-value"
+              class="block w-full mb-0.5 text-lg"
+              >Serial Command</label
+            >
+            <input
+              id="uart-value"
+              v-model="value"
+              type="text"
+              placeholder="Value"
+              class="input input-bordered w-full text-lg h-9 mb-2"
+            />
           </div>
 
           <!-- Kangaroo Controls -->
           <div v-if="scriptChannelType === ScriptChannelType.KANGAROO">
             <div class="mb-2">
-              <label for="chselect" class="block w-full mb-0.5 text-lg">Kangaroo Channel</label>
-              <select id="chselect" v-model.number="kangarooCh" title="Kangaroo channel"
-                class="select select-bordered w-full text-lg mt-2">
+              <label
+                for="chselect"
+                class="block w-full mb-0.5 text-lg"
+                >Kangaroo Channel</label
+              >
+              <select
+                id="chselect"
+                v-model.number="kangarooCh"
+                title="Kangaroo channel"
+                class="select select-bordered w-full text-lg mt-2"
+              >
                 <option :value="1">Channel 1</option>
                 <option :value="2">Channel 2</option>
               </select>
             </div>
             <div class="mb-2">
-              <label for="cmdselect" class="block w-full mb-0.5 text-lg">Command</label>
-              <select id="cmdselect" v-model.number="kangarooAction" title="Command"
-                class="select select-bordered w-full text-lg mt-2">
+              <label
+                for="cmdselect"
+                class="block w-full mb-0.5 text-lg"
+                >Command</label
+              >
+              <select
+                id="cmdselect"
+                v-model.number="kangarooAction"
+                title="Command"
+                class="select select-bordered w-full text-lg mt-2"
+              >
                 <option :value="1">Start</option>
                 <option :value="2">Home</option>
                 <option :value="3">Speed</option>
@@ -179,12 +243,32 @@ const closeModal = () => {
               </select>
             </div>
             <div class="mb-2">
-              <label for="chspd" class="block w-full mb-0.5 text-lg">Speed</label>
-              <input id="chspd" v-model.number="kangarooSpd" type="number" placeholder="Speed" :disabled="spdDisabled"
-                class="input input-bordered w-full text-lg h-9" />
-              <label for="chpos" class="block w-full mb-0.5 text-lg mt-2">Position</label>
-              <input id="chpos" v-model.number="kangarooPos" type="number" placeholder="Position"
-                :disabled="posDisabled" class="input input-bordered w-full text-lg h-9" />
+              <label
+                for="chspd"
+                class="block w-full mb-0.5 text-lg"
+                >Speed</label
+              >
+              <input
+                id="chspd"
+                v-model.number="kangarooSpd"
+                type="number"
+                placeholder="Speed"
+                :disabled="spdDisabled"
+                class="input input-bordered w-full text-lg h-9"
+              />
+              <label
+                for="chpos"
+                class="block w-full mb-0.5 text-lg mt-2"
+                >Position</label
+              >
+              <input
+                id="chpos"
+                v-model.number="kangarooPos"
+                type="number"
+                placeholder="Position"
+                :disabled="posDisabled"
+                class="input input-bordered w-full text-lg h-9"
+              />
             </div>
           </div>
         </div>
@@ -192,15 +276,27 @@ const closeModal = () => {
       </div>
 
       <div class="modal-action justify-center mt-5">
-        <button class="btn btn-primary w-24 text-lg" data-testid="send-button" @click="runClicked">
+        <button
+          class="btn btn-primary w-24 text-lg"
+          data-testid="send-button"
+          @click="runClicked"
+        >
           Send
         </button>
-        <button class="btn w-24 text-lg" data-testid="cancel-button" @click="closeModal">
+        <button
+          class="btn w-24 text-lg"
+          data-testid="cancel-button"
+          @click="closeModal"
+        >
           Cancel
         </button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="closeModal">
+    <form
+      method="dialog"
+      class="modal-backdrop"
+      @click="closeModal"
+    >
       <button>Close</button>
     </form>
   </dialog>

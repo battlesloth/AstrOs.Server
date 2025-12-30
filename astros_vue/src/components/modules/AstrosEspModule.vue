@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, type PropType } from 'vue';
 import { Location } from '@/enums/modules/Location';
-import { ModuleType } from "@/enums/modules/ModuleType";
+import { ModuleType } from '@/enums/modules/ModuleType';
 import type {
   AddModuleEvent,
   RemoveModuleEvent,
@@ -83,13 +83,11 @@ const i2cAddressChanged = (evt: AddressChangeEvent) => {
   if (!location.value) return;
 
   // Find the module that currently has the OLD address (the one being changed)
-  const moduleToUpdate = location.value.i2cModules.find(
-    (m) => m.i2cAddress === evt.old
-  );
+  const moduleToUpdate = location.value.i2cModules.find((m) => m.i2cAddress === evt.old);
 
   // Find any module that already has the NEW address (to swap with)
   const existingModuleWithNewAddress = location.value.i2cModules.find(
-    (m) => m.i2cAddress === evt.new
+    (m) => m.i2cAddress === evt.new,
   );
 
   if (moduleToUpdate) {
@@ -112,62 +110,117 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
 <template>
   <div class="w-full space-y-2">
     <!-- Serial Modules Panel -->
-    <div class="collapse collapse-arrow bg-base-200 border border-base-300"
-      :class="{ 'collapse-open': openPanel === 'uart', 'collapse-close': openPanel !== 'uart' }">
-      <div :data-testid="`${parentTestId}-serial-header`"
+    <div
+      class="collapse collapse-arrow bg-base-200 border border-base-300"
+      :class="{ 'collapse-open': openPanel === 'uart', 'collapse-close': openPanel !== 'uart' }"
+    >
+      <div
+        :data-testid="`${parentTestId}-serial-header`"
         class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
-        @click="openPanel = openPanel === 'uart' ? null : 'uart'">
+        @click="openPanel = openPanel === 'uart' ? null : 'uart'"
+      >
         <h3 class="font-medium">{{ $t('esp.serial_modules') }}</h3>
-        <button type="button" :data-testid="`${parentTestId}-add-serial`" @click.stop="addUartModule"
-          class="btn btn-sm btn-circle btn-ghost">
+        <button
+          type="button"
+          :data-testid="`${parentTestId}-add-serial`"
+          @click.stop="addUartModule"
+          class="btn btn-sm btn-circle btn-ghost"
+        >
           <span class="text-lg">+</span>
         </button>
       </div>
       <div class="collapse-content">
-        <ul v-if="location?.uartModules" class="space-y-2 max-h-96 overflow-y-scroll p-0">
-          <li v-for="module in location.uartModules" :key="module.id">
-            <AstrosUartModule @remove-module="removeModule" @servo-test="onServoTestEvent"
-              @toggle-module="toggleUartModule" :location-id="props.locationEnum" :module="module" :is-master="isMaster"
-              :parent-test-id="parentTestId" :open-module-id="openUartModuleId" />
+        <ul
+          v-if="location?.uartModules"
+          class="space-y-2 max-h-96 overflow-y-scroll p-0"
+        >
+          <li
+            v-for="module in location.uartModules"
+            :key="module.id"
+          >
+            <AstrosUartModule
+              @remove-module="removeModule"
+              @servo-test="onServoTestEvent"
+              @toggle-module="toggleUartModule"
+              :location-id="props.locationEnum"
+              :module="module"
+              :is-master="isMaster"
+              :parent-test-id="parentTestId"
+              :open-module-id="openUartModuleId"
+            />
           </li>
         </ul>
       </div>
     </div>
 
     <!-- I2C Configuration Panel -->
-    <div class="collapse collapse-arrow bg-base-200 border border-base-300"
-      :class="{ 'collapse-open': openPanel === 'i2c', 'collapse-close': openPanel !== 'i2c' }">
-      <div :data-testid="`${parentTestId}-i2c-header`"
+    <div
+      class="collapse collapse-arrow bg-base-200 border border-base-300"
+      :class="{ 'collapse-open': openPanel === 'i2c', 'collapse-close': openPanel !== 'i2c' }"
+    >
+      <div
+        :data-testid="`${parentTestId}-i2c-header`"
         class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
-        @click="openPanel = openPanel === 'i2c' ? null : 'i2c'">
+        @click="openPanel = openPanel === 'i2c' ? null : 'i2c'"
+      >
         <h3 class="font-medium">{{ $t('esp.i2c_modules') }}</h3>
-        <button type="button" :data-testid="`${parentTestId}-add-i2c`" @click.stop="addI2cModule"
-          class="btn btn-sm btn-circle btn-ghost">
+        <button
+          type="button"
+          :data-testid="`${parentTestId}-add-i2c`"
+          @click.stop="addI2cModule"
+          class="btn btn-sm btn-circle btn-ghost"
+        >
           <span class="text-lg">+</span>
         </button>
       </div>
       <div class="collapse-content">
-        <ul v-if="location?.i2cModules" class="space-y-2 max-h-96 overflow-y-scroll p-0">
-          <li v-for="module in location.i2cModules" :key="module.id">
-            <AstrosI2cModule @remove-module="removeModule" @i2c-address-changed="i2cAddressChanged"
-              @toggle-module="toggleI2cModule" :module="module" :location-id="props.locationEnum"
-              :parent-test-id="parentTestId" :open-module-id="openI2cModuleId" />
+        <ul
+          v-if="location?.i2cModules"
+          class="space-y-2 max-h-96 overflow-y-scroll p-0"
+        >
+          <li
+            v-for="module in location.i2cModules"
+            :key="module.id"
+          >
+            <AstrosI2cModule
+              @remove-module="removeModule"
+              @i2c-address-changed="i2cAddressChanged"
+              @toggle-module="toggleI2cModule"
+              :module="module"
+              :location-id="props.locationEnum"
+              :parent-test-id="parentTestId"
+              :open-module-id="openI2cModuleId"
+            />
           </li>
         </ul>
       </div>
     </div>
 
     <!-- GPIO Configuration Panel -->
-    <div class="collapse collapse-arrow bg-base-200 border border-base-300"
-      :class="{ 'collapse-open': openPanel === 'gpio', 'collapse-close': openPanel !== 'gpio' }">
-      <div :data-testid="`${parentTestId}-gpio-header`" class="collapse-title cursor-pointer"
-        @click="openPanel = openPanel === 'gpio' ? null : 'gpio'">
+    <div
+      class="collapse collapse-arrow bg-base-200 border border-base-300"
+      :class="{ 'collapse-open': openPanel === 'gpio', 'collapse-close': openPanel !== 'gpio' }"
+    >
+      <div
+        :data-testid="`${parentTestId}-gpio-header`"
+        class="collapse-title cursor-pointer"
+        @click="openPanel = openPanel === 'gpio' ? null : 'gpio'"
+      >
         <h3 class="font-medium">{{ $t('esp.gpio_config') }}</h3>
       </div>
       <div class="collapse-content">
-        <ul v-if="location?.gpioModule" class="space-y-2 max-h-96 overflow-y-scroll p-0">
-          <li v-for="channel in location.gpioModule.channels" :key="channel.id">
-            <AstrosGpioChannel :channel="channel" :parent-test-id="parentTestId" />
+        <ul
+          v-if="location?.gpioModule"
+          class="space-y-2 max-h-96 overflow-y-scroll p-0"
+        >
+          <li
+            v-for="channel in location.gpioModule.channels"
+            :key="channel.id"
+          >
+            <AstrosGpioChannel
+              :channel="channel"
+              :parent-test-id="parentTestId"
+            />
           </li>
         </ul>
       </div>

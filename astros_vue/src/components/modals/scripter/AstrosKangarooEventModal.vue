@@ -18,7 +18,7 @@ const props = withDefaults(
   }>(),
   {
     mode: 'add',
-  }
+  },
 );
 
 const emit = defineEmits<{
@@ -158,20 +158,37 @@ const closeModal = () => {
         <div class="grow"></div>
         <div class="w-75">
           <div class="mb-2">
-            <label for="time" class="block w-full mb-0.5 text-lg">Event Time (seconds)</label>
-            <input id="time" v-model.number="eventTime" type="number" step="0.1" placeholder="Time"
-              class="input input-bordered w-full text-lg h-9" />
+            <label
+              for="time"
+              class="block w-full mb-0.5 text-lg"
+              >Event Time (seconds)</label
+            >
+            <input
+              id="time"
+              v-model.number="eventTime"
+              type="number"
+              step="0.1"
+              placeholder="Time"
+              class="input input-bordered w-full text-lg h-9"
+            />
           </div>
 
           <div class="divider my-2"></div>
 
           <!-- Channel 1 -->
           <div class="mb-2">
-            <label for="ch1select" class="block w-full mb-0.5 text-xl font-medium">
+            <label
+              for="ch1select"
+              class="block w-full mb-0.5 text-xl font-medium"
+            >
               {{ kangaroo.ch1Name }}
             </label>
-            <select id="ch1select" v-model="ch1Action" title="channel 1"
-              class="select select-bordered w-full text-lg mt-2">
+            <select
+              id="ch1select"
+              v-model="ch1Action"
+              title="channel 1"
+              class="select select-bordered w-full text-lg mt-2"
+            >
               <option value="0">None</option>
               <option value="1">Start</option>
               <option value="2">Home</option>
@@ -182,14 +199,34 @@ const closeModal = () => {
 
           <div class="mb-2 flex gap-4">
             <div class="flex-1">
-              <label for="ch1spd" class="block mb-0.5 text-lg">Speed</label>
-              <input id="ch1spd" v-model.number="ch1Speed" type="number" placeholder="Speed" :disabled="ch1SpdDisabled"
-                class="input input-bordered w-full text-lg h-9" />
+              <label
+                for="ch1spd"
+                class="block mb-0.5 text-lg"
+                >Speed</label
+              >
+              <input
+                id="ch1spd"
+                v-model.number="ch1Speed"
+                type="number"
+                placeholder="Speed"
+                :disabled="ch1SpdDisabled"
+                class="input input-bordered w-full text-lg h-9"
+              />
             </div>
             <div class="flex-1">
-              <label for="ch1pos" class="block mb-0.5 text-lg">Position</label>
-              <input id="ch1pos" v-model.number="ch1Position" type="number" placeholder="Position"
-                :disabled="ch1PosDisabled" class="input input-bordered w-full text-lg h-9" />
+              <label
+                for="ch1pos"
+                class="block mb-0.5 text-lg"
+                >Position</label
+              >
+              <input
+                id="ch1pos"
+                v-model.number="ch1Position"
+                type="number"
+                placeholder="Position"
+                :disabled="ch1PosDisabled"
+                class="input input-bordered w-full text-lg h-9"
+              />
             </div>
           </div>
 
@@ -197,11 +234,18 @@ const closeModal = () => {
 
           <!-- Channel 2 -->
           <div class="mb-2">
-            <label for="ch2select" class="block w-full mb-0.5 text-xl font-medium">
+            <label
+              for="ch2select"
+              class="block w-full mb-0.5 text-xl font-medium"
+            >
               {{ kangaroo.ch2Name }}
             </label>
-            <select id="ch2select" v-model="ch2Action" title="channel 2"
-              class="select select-bordered w-full text-lg mt-2">
+            <select
+              id="ch2select"
+              v-model="ch2Action"
+              title="channel 2"
+              class="select select-bordered w-full text-lg mt-2"
+            >
               <option value="0">None</option>
               <option value="1">Start</option>
               <option value="2">Home</option>
@@ -212,18 +256,41 @@ const closeModal = () => {
 
           <div class="mb-2 flex gap-4">
             <div class="flex-1">
-              <label for="ch2spd" class="block mb-0.5 text-lg">Speed</label>
-              <input id="ch2spd" v-model.number="ch2Speed" type="number" placeholder="Speed" :disabled="ch2SpdDisabled"
-                class="input input-bordered w-full text-lg h-9" />
+              <label
+                for="ch2spd"
+                class="block mb-0.5 text-lg"
+                >Speed</label
+              >
+              <input
+                id="ch2spd"
+                v-model.number="ch2Speed"
+                type="number"
+                placeholder="Speed"
+                :disabled="ch2SpdDisabled"
+                class="input input-bordered w-full text-lg h-9"
+              />
             </div>
             <div class="flex-1">
-              <label for="ch2pos" class="block mb-0.5 text-lg">Position</label>
-              <input id="ch2pos" v-model.number="ch2Position" type="number" placeholder="Position"
-                :disabled="ch2PosDisabled" class="input input-bordered w-full text-lg h-9" />
+              <label
+                for="ch2pos"
+                class="block mb-0.5 text-lg"
+                >Position</label
+              >
+              <input
+                id="ch2pos"
+                v-model.number="ch2Position"
+                type="number"
+                placeholder="Position"
+                :disabled="ch2PosDisabled"
+                class="input input-bordered w-full text-lg h-9"
+              />
             </div>
           </div>
 
-          <div v-if="errorMessage" class="text-center text-error text-lg">
+          <div
+            v-if="errorMessage"
+            class="text-center text-error text-lg"
+          >
             {{ errorMessage }}
           </div>
         </div>
@@ -231,19 +298,35 @@ const closeModal = () => {
       </div>
 
       <div class="modal-action justify-center mt-5">
-        <button class="btn btn-primary w-24 text-lg" data-testid="save-button" @click="addEvent">
+        <button
+          class="btn btn-primary w-24 text-lg"
+          data-testid="save-button"
+          @click="addEvent"
+        >
           Save
         </button>
-        <button v-if="showRemoveButton" class="btn btn-error w-24 text-lg" data-testid="remove-button"
-          @click="removeEvent">
+        <button
+          v-if="showRemoveButton"
+          class="btn btn-error w-24 text-lg"
+          data-testid="remove-button"
+          @click="removeEvent"
+        >
           Remove
         </button>
-        <button class="btn w-24 text-lg" data-testid="close-button" @click="closeModal">
+        <button
+          class="btn w-24 text-lg"
+          data-testid="close-button"
+          @click="closeModal"
+        >
           Close
         </button>
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop" @click="closeModal">
+    <form
+      method="dialog"
+      class="modal-backdrop"
+      @click="closeModal"
+    >
       <button>Close</button>
     </form>
   </dialog>

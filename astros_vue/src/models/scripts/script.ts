@@ -1,5 +1,5 @@
-import type { DeploymentStatus } from "./deploymentStatus";
-import type { ScriptChannel } from "./scriptChannel";
+import type { DeploymentStatus } from './deploymentStatus';
+import type { ScriptChannel } from './scriptChannel';
 
 export interface Script {
   id: string;
