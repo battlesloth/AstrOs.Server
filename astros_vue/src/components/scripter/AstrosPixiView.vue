@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Application, Assets, Container, FillGradient, Graphics, Text, TextStyle } from 'pixi.js';
+import { Application, Container, FillGradient, Graphics, Text, TextStyle } from 'pixi.js';
 import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { v4 as uuid } from 'uuid';
 
 // Import composables
 import { useZoomState, ZOOM_LEVELS } from '@/composables/useZoomState';
@@ -8,7 +9,27 @@ import { useScrollState } from '@/composables/useScrollState';
 import { useDragState } from '@/composables/useDragState';
 import { usePerformanceFlags } from '@/composables/usePerformanceFlags';
 import { useEventBoxes } from '@/composables/useEventBoxes';
-import * as constants from '@/composables/timelineConstants';
+
+import {
+  ROW_HEIGHT,
+  TIMELINE_HEIGHT,
+  SCROLL_BAR_HEIGHT,
+  ADD_CHANNEL_BUTTON_HEIGHT,
+  CHANNEL_LIST_WIDTH,
+  VERTICAL_SCROLL_BAR_WIDTH,
+  MIN_VERTICAL_SCROLL_THUMB_HEIGHT,
+  MIN_SCROLL_THUMB_WIDTH,
+  PIXELS_PER_SECOND,
+  TIMELINE_DURATION_SECONDS,
+  PIXELS_PER_MAJOR_TICK,
+  DRAG_THRESHOLD_PIXELS,
+  ZOOM_SCROLL_TICKS_REQUIRED,
+  ZOOM_SNAP_THRESHOLD_START,
+  ZOOM_SNAP_THRESHOLD_END,
+  ZOOM_FOCUS_EDGE_WEIGHT,
+  ZOOM_FOCUS_START_WEIGHT,
+  ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER
+} from '@/composables/timelineConstants';
 import type { Channel } from '@/composables/types';
 
 // Import utilities
@@ -30,7 +51,7 @@ import { PixiScrollBar } from '@/pixiComponents/pixiScrollBar';
 import { ScrollBarDirection } from '@/pixiComponents/pixiScrollBarOptions';
 import { PixiChannelData, type PixiChannelSelectItem } from '@/pixiComponents/pixiChannelData';
 import { loadAssets } from '@/pixiComponents/assets/assetLoader';
-import { on } from 'events';
+
 
 // ============================================================================
 // APPLICATION REFS
@@ -39,31 +60,6 @@ import { on } from 'events';
 const app = ref<Application | null>(null);
 const pixiContainer = ref<HTMLDivElement | null>(null);
 const channels = ref<Channel[]>([]);
-
-// ============================================================================
-// CONSTANTS (imported from composables)
-// ============================================================================
-
-const {
-  ROW_HEIGHT,
-  TIMELINE_HEIGHT,
-  SCROLL_BAR_HEIGHT,
-  ADD_CHANNEL_BUTTON_HEIGHT,
-  CHANNEL_LIST_WIDTH,
-  VERTICAL_SCROLL_BAR_WIDTH,
-  MIN_VERTICAL_SCROLL_THUMB_HEIGHT,
-  MIN_SCROLL_THUMB_WIDTH,
-  PIXELS_PER_SECOND,
-  TIMELINE_DURATION_SECONDS,
-  PIXELS_PER_MAJOR_TICK,
-  DRAG_THRESHOLD_PIXELS,
-  ZOOM_SCROLL_TICKS_REQUIRED,
-  ZOOM_SNAP_THRESHOLD_START,
-  ZOOM_SNAP_THRESHOLD_END,
-  ZOOM_FOCUS_EDGE_WEIGHT,
-  ZOOM_FOCUS_START_WEIGHT,
-  ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER,
-} = constants;
 
 // ============================================================================
 // PIXI CONTAINERS & GRAPHICS REFS
@@ -75,7 +71,7 @@ const uiLayer = ref<Container | null>(null);
 const channelListContainer = ref<Container | null>(null);
 const channelListScrollableContainer = ref<Container | null>(null);
 const timeline = ref<Container | null>(null);
-const channelRowContainers = ref<Map<number, Container>>(new Map());
+const channelRowContainers = ref<Map<string, Container>>(new Map());
 
 // Scrollbar graphics
 const horizontalScrollBar = ref<PixiScrollBar | null>(null);
@@ -84,6 +80,84 @@ const verticalScrollBar = ref<PixiScrollBar | null>(null);
 // UI buttons
 const plusButton = ref<Container | null>(null);
 const minusButton = ref<Container | null>(null);
+
+// ============================================================================
+// Exposed Methods
+// ============================================================================
+
+
+const initializePixi = async () => {
+  // Initialization logic if needed
+};
+
+const addChannel = (id: string, name: string) => {
+  doAddChannel(id, name);
+};
+
+const removeChannel = (chId: string) => {
+  doRemoveChannel(chId);
+};
+
+const addEvent = (chlId: string, time: number) => {
+  doAddEvent(chlId, time);
+};
+
+const removeEvent = (chlId: string, eventId: number) => {
+  console.log('removing event', eventId, 'from channel', chlId);
+};
+
+const updateEvent = (chlId: string, eventId: number) => {
+  console.log('updating event', eventId, 'from channel', chlId);
+};
+
+defineExpose({
+  initializePixi,
+  addChannel,
+  removeChannel,
+  addEvent,
+  removeEvent,
+  updateEvent,
+});
+
+// ============================================================================
+// emmitters
+// ===========================================================================
+
+const emit = defineEmits<{
+  (e: 'addChannel'): void;
+  (e: 'removeChannel', chId: string, name: string): void;
+  (e: 'swapChannel', chId: string): void;
+  (e: 'testChannel', chId: string): void;
+  (e: 'addEvent', chlId: string, time: number): void;
+  (e: 'removeEvent', chlId: string, eventId: number): void;
+  (e: 'editEvent', chId: string, eventId: number): void;
+}>();
+
+function emitAddChannel() {
+  emit('addChannel');
+}
+function emitChannelDelete(chId: string, name: string) {
+  emit('removeChannel', chId, name);
+}
+
+function emitChannelSwap(chId: string) {
+  emit('swapChannel', chId);
+}
+
+function emitChannelTest(chId: string) {
+  emit('testChannel', chId);
+}
+
+function emitAddEvent(chlId: string, time: number) {
+  emit('addEvent', chlId, time);
+}
+function emitRemoveEvent(chlId: string, eventId: number) {
+  emit('removeEvent', chlId, eventId);
+}
+function emitEditEvent(chId: string, eventId: number) {
+  emit('editEvent', chId, eventId);
+}
+
 
 // ============================================================================
 // STATE (using composables)
@@ -346,21 +420,7 @@ function addAppStageListeners() {
   }
 }
 
-// ============================================================================
-// callbacks and handlers
-// ===========================================================================
 
-function onChannelTest(id: string) {
-  console.log('Test channel item:', id);
-}
-
-function onChannelSwap(id: string) {
-  console.log('Swap channel item:', id);
-}
-
-function onChannelDelete(id: string) {
-  console.log('Delete channel item:', id);
-}
 
 // ============================================================================
 // Create UI Components
@@ -523,7 +583,7 @@ function createChannelList() {
   });
 
   buttonContainer.on('pointertap', () => {
-    addChannel();
+    emitAddChannel();
   });
 
   const fill = new FillGradient(0, 0, 1, 1)
@@ -569,9 +629,9 @@ function createChannelList() {
       channelName: channel.name,
       yOffset: yPos,
       rowColor: rowColor,
-      onSwap: onChannelSwap,
-      onTest: onChannelTest,
-      onDelete: onChannelDelete,
+      onSwap: emitChannelSwap,
+      onTest: emitChannelTest,
+      onDelete: emitChannelDelete,
     }
 
     const channelData = new PixiChannelData(options);
@@ -580,7 +640,7 @@ function createChannelList() {
   });
 }
 
-function createChannelRowContainer(channelId: number, rowIndex: number) {
+function createChannelRowContainer(channelId: string, rowIndex: number) {
   if (!scrollableContentContainer.value || !app.value) return;
 
   // Create a container for this channel row
@@ -620,7 +680,7 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
     const timeInSeconds = (localPos.x / TIMELINE_WIDTH.value) * TIMELINE_DURATION_SECONDS;
 
     // Create and store the event box
-    addEventBox(rowContainer, channelId, timeInSeconds, app, isDraggingTimeline);
+    //addEventBox(rowContainer, channelId, timeInSeconds, app, isDraggingTimeline);
   });
 
   scrollableContentContainer.value.addChild(rowContainer as any);
@@ -632,10 +692,11 @@ function createChannelRowContainer(channelId: number, rowIndex: number) {
   updateEventBoxPositions(channelId);
 }
 
-function addChannel() {
+function doAddChannel(id: string, name: string) {
   const newChannel: Channel = {
-    id: channels.value.length + 1,
-    name: `Channel ${channels.value.length + 1}`,
+    id: id,
+    chNum: channels.value.length + 1,
+    name: name,
     events: [],
   };
   const newIndex = channels.value.length;
@@ -653,13 +714,13 @@ function addChannel() {
     const rowColor = newIndex % 2 === 0 ? 0xe5e5e5 : 0xf5f5f5;
 
     const options = {
-      channelId: newChannel.id.toString(),
+      channelId: newChannel.id,
       channelName: newChannel.name,
       yOffset: yPos,
       rowColor: rowColor,
-      onSwap: onChannelSwap,
-      onTest: onChannelTest,
-      onDelete: onChannelDelete,
+      onSwap: emitChannelSwap,
+      onTest: emitChannelTest,
+      onDelete: emitChannelDelete,
     }
 
     const channelData = new PixiChannelData(options);
@@ -673,6 +734,47 @@ function addChannel() {
       background.clear().rect(0, 0, CHANNEL_LIST_WIDTH, app.value.screen.height).fill(0x2a2a2a);
     }
   };
+}
+
+function doRemoveChannel(chId: string) {
+  const channelIndex = channels.value.findIndex((ch) => ch.id === chId);
+  if (channelIndex === -1) {
+    console.error('Channel not found for ID:', chId);
+    return;
+  }
+
+  // Remove channel from data
+  const removedChannel = channels.value.splice(channelIndex, 1)[0];
+
+  // Remove the corresponding row container under the timeline
+  const rowContainer = channelRowContainers.value.get(chId) as Container;
+  if (rowContainer && scrollableContentContainer.value) {
+    scrollableContentContainer.value.removeChild(rowContainer);
+    channelRowContainers.value.delete(chId);
+  }
+
+  // Update vertical scrollbar to account for removed content
+  updateVerticalScrollbar();
+
+  // Recreate the channel list to update positions
+  createChannelList();
+
+  // Update the background height to accommodate the removed channel
+  if (channelListContainer.value && channelListContainer.value.children[0]) {
+    const background = channelListContainer.value.children[0] as Graphics;
+    if (app.value) {
+      background.clear().rect(0, 0, CHANNEL_LIST_WIDTH, app.value.screen.height).fill(0x2a2a2a);
+    }
+  };
+}
+
+function doAddEvent(chlId: string, time: number) {
+  const rowContainer = channelRowContainers.value.get(chlId);
+  if (!rowContainer || !app.value) {
+    console.error('Channel row container not found for channel ID:', chlId);
+    return;
+  }
+  addEventBox(rowContainer as Container, chlId, time, app, isDraggingTimeline);
 }
 
 // ============================================================================

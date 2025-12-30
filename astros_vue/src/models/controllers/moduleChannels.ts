@@ -1,3 +1,4 @@
+import { ModuleSubType } from "@/enums/modules/ModuleSubType";
 import type { BaseChannel } from "./baseChannel";
 import type { GpioChannel } from "./modules/gpio/gpioChannel";
 import type { I2cChannel } from "./modules/i2c/i2cChannel";
@@ -14,3 +15,22 @@ export type ModuleChannelType =
   | UartChannel
   | KangarooChannel
   | MaestroChannel;
+
+export function moduleChannelTypeFromSubType(subtype: ModuleSubType): string {
+  switch (subtype) {
+    case ModuleSubType.genericGpio:
+      return "GpioChannel";
+    case ModuleSubType.genericI2C:
+      return "I2cChannel";
+    case ModuleSubType.pwmBoard:
+      return "PwmChannel";
+    case ModuleSubType.genericSerial:
+      return "UartChannel";
+    case ModuleSubType.kangaroo:
+      return "KangarooX2Channel";
+    case ModuleSubType.maestro:
+      return "MaestroChannel";
+    default:
+      return "";
+  }
+}    

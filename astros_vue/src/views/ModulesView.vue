@@ -25,7 +25,7 @@ import { storeToRefs } from 'pinia';
 
 const { t } = useI18n();
 
-const showModal = ref<ModalType>(ModalType.loadingModal);
+const showModal = ref<ModalType>(ModalType.LOADING);
 const modalMessage = ref<string>('');
 
 const selectedLocationId = ref<Location>(Location.unknown);
@@ -65,23 +65,23 @@ const availableDomeControllers = computed(() =>
 );
 
 function onLocationsLoaded() {
-  showModal.value = ModalType.closeAll;
+  showModal.value = ModalType.CLOSE_ALL;
 }
 
 async function saveModuleSettings() {
   modalMessage.value = 'module_view.saving';
-  showModal.value = ModalType.interruptModal;
+  showModal.value = ModalType.INTERRUPT;
   const result = await locationStore.saveLocationsToApi();
 
   // wait 1 second so it's not so abrupt
   await new Promise((resolve) => setTimeout(resolve, 1000));
 
   if (result.success) {
-    showModal.value = ModalType.closeAll;
+    showModal.value = ModalType.CLOSE_ALL;
     modalMessage.value = '';
   } else {
     modalMessage.value = result.error ?? 'module_view.save_failed';
-    showModal.value = ModalType.errorModal;
+    showModal.value = ModalType.ERROR;
   }
 }
 
@@ -98,17 +98,17 @@ async function syncModuleSettings() {
 function openAddModuleModal(evt: AddModuleEvent) {
   selectedLocationId.value = evt.locationId;
   selectedModuleType.value = evt.moduleType;
-  showModal.value = ModalType.addModule;
+  showModal.value = ModalType.ADD_MODULE;
 }
 
 function handleAddModule(event: any) {
   try {
     addModule(event.locationId, event.moduleType, event.moduleSubType);
-    showModal.value = ModalType.closeAll;
+    showModal.value = ModalType.CLOSE_ALL;
   } catch (error) {
     console.error('Error adding module:', error);
     modalMessage.value = (error as Error).message;
-    showModal.value = ModalType.errorModal;
+    showModal.value = ModalType.ERROR;
   }
 }
 
@@ -116,24 +116,24 @@ function openConfirmRemoveModuleModal(event: any) {
   selectedLocationId.value = event.locationId;
   selectedModuleId.value = event.id;
   selectedModuleType.value = event.moduleType;
-  showModal.value = ModalType.confirmModal;
+  showModal.value = ModalType.CONFIRM;
 }
 
 function handleRemoveModule() {
   try {
     removeModule(selectedLocationId.value, selectedModuleId.value, selectedModuleType.value);
-    showModal.value = ModalType.closeAll;
+    showModal.value = ModalType.CLOSE_ALL;
   } catch (error) {
     console.error('Error removing module:', error);
     modalMessage.value = (error as Error).message;
-    showModal.value = ModalType.errorModal;
+    showModal.value = ModalType.ERROR;
   }
 }
 
 function handleServoTest(event: ServoTestEvent) {
   console.log('Handling servo test event:', event);
   servoTestProps.value = event;
-  showModal.value = ModalType.servoTestModal;
+  showModal.value = ModalType.SERVO_TEST;
 }
 
 function controllerSelectChanged(location: string) {
@@ -251,17 +251,17 @@ function controllerSelectChanged(location: string) {
         </div>
       </div>
 
-      <AstrosInterruptModal v-if="showModal === ModalType.interruptModal" :message="modalMessage" />
-      <AstrosAlertModal v-if="showModal === ModalType.errorModal" :message="modalMessage"
-        @close="showModal = ModalType.closeAll" />
-      <AstrosConfirmModal v-if="showModal === ModalType.confirmModal" :message="$t('module_view.confirm_remove')"
-        @confirm="handleRemoveModule" @close="showModal = ModalType.closeAll" />
-      <AstrosLoadingModal v-if="showModal === ModalType.loadingModal" @loaded="onLocationsLoaded" />
-      <AstrosAddModuleModal v-if="showModal === ModalType.addModule" :is-open="showModal === ModalType.addModule"
+      <AstrosInterruptModal v-if="showModal === ModalType.INTERRUPT" :message="modalMessage" />
+      <AstrosAlertModal v-if="showModal === ModalType.ERROR" :message="modalMessage"
+        @close="showModal = ModalType.CLOSE_ALL" />
+      <AstrosConfirmModal v-if="showModal === ModalType.CONFIRM" :message="$t('module_view.confirm_remove')"
+        @confirm="handleRemoveModule" @close="showModal = ModalType.CLOSE_ALL" />
+      <AstrosLoadingModal v-if="showModal === ModalType.LOADING" @loaded="onLocationsLoaded" />
+      <AstrosAddModuleModal v-if="showModal === ModalType.ADD_MODULE" :is-open="showModal === ModalType.ADD_MODULE"
         :location-id="selectedLocationId" :module-type="selectedModuleType" @add="handleAddModule"
-        @close="showModal = ModalType.closeAll" />
-      <AstrosServoTestModal v-if="showModal === ModalType.servoTestModal && servoTestProps !== null"
-        v-bind="servoTestProps as Required<ServoTestEvent>" @close="showModal = ModalType.closeAll" />
+        @close="showModal = ModalType.CLOSE_ALL" />
+      <AstrosServoTestModal v-if="showModal === ModalType.SERVO_TEST && servoTestProps !== null"
+        v-bind="servoTestProps as Required<ServoTestEvent>" @close="showModal = ModalType.CLOSE_ALL" />
     </template>
   </AstrosLayout>
 </template>

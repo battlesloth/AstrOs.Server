@@ -1,3 +1,4 @@
+import type { Location } from '@/enums/modules/Location';
 import type { ControllerModule } from './modules/controlModule';
 import type { GpioModule } from './modules/gpio/gpioModule';
 import type { I2cModule } from './modules/i2c/i2cModule';
@@ -5,7 +6,7 @@ import type { UartModule } from './modules/uart/uartModule';
 
 export interface ControllerLocation {
   id: string;
-  locationName: string;
+  locationName: Location;
   description: string;
   configFingerprint: string;
 

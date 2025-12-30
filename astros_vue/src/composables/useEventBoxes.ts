@@ -10,7 +10,7 @@ export function useEventBoxes(
   TIMELINE_DURATION_SECONDS: number,
   rowHeight: number,
 ) {
-  const channelEventBoxes = ref<Map<number, EventBox[]>>(new Map());
+  const channelEventBoxes = ref<Map<string, EventBox[]>>(new Map());
   const isDraggingEventBox = ref(false);
   const draggedEventBox = ref<EventBox | null>(null);
   const eventBoxDragStartX = ref(0);
@@ -22,7 +22,7 @@ export function useEventBoxes(
    */
   function addEventBox(
     rowContainer: Container,
-    channelId: number,
+    channelId: string,
     timeInSeconds: number,
     app: Ref<any>,
     isDraggingTimeline: Ref<boolean>,
@@ -87,7 +87,7 @@ export function useEventBoxes(
   /**
    * Updates positions of event boxes for a specific channel
    */
-  function updateEventBoxPositions(channelId: number) {
+  function updateEventBoxPositions(channelId: string) {
     const events = channelEventBoxes.value.get(channelId) || [];
 
     // Update positions of all event boxes based on current timeline width

@@ -4,6 +4,7 @@ import type { ControllerLocation } from '@/models/controllers/controllerLocation
 import { Location } from '@/enums/modules/Location';
 import apiService from '@/api/apiService';
 import { LOCATIONS, LOCATIONS_LOAD } from '@/api/endpoints';
+import type { LocationCollection } from '@/models/controllers/locationCollection';
 
 export const useLocationStore = defineStore('location', () => {
   const coreLocation = ref<ControllerLocation | null>(null);
@@ -82,6 +83,14 @@ export const useLocationStore = defineStore('location', () => {
     }
   }
 
+  function getLocationCollection(): LocationCollection {
+    return {
+      coreModule: coreLocation.value as ControllerLocation,
+      domeModule: domeLocation.value as ControllerLocation,
+      bodyModule: bodyLocation.value as ControllerLocation,
+    };
+  }
+
   function clearLocation(locationEnum: Location) {
     switch (locationEnum) {
       case Location.core:
@@ -112,6 +121,7 @@ export const useLocationStore = defineStore('location', () => {
     saveLocationsToApi,
     setLocation,
     getLocation,
+    getLocationCollection,
     clearLocation,
     clearAllLocations,
   };

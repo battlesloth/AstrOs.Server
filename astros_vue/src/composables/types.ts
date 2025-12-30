@@ -1,13 +1,14 @@
 import type { Graphics } from 'pixi.js';
 
 export interface Channel {
-  id: number;
+  chNum: number;
+  id: string;
   name: string;
   events: any[];
 }
 
 export interface EventBox {
-  channelId: number;
+  channelId: string;
   timeInSeconds: number;
   graphics: Graphics;
 }

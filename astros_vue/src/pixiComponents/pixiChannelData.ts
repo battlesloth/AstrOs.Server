@@ -4,7 +4,6 @@ import {
   ROW_HEIGHT
 } from '@/composables/timelineConstants';
 import { truncateText } from './helpers';
-import type { T } from 'vue-router/dist/router-CWoNjPRp.mjs';
 
 export interface PixiChannelDataOptions {
   channelId: string;
@@ -13,7 +12,7 @@ export interface PixiChannelDataOptions {
   rowColor: number;
   onSwap?: (id: string) => void;
   onTest?: (id: string) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string, name: string) => void;
 }
 
 export interface PixiChannelSelectItem {
@@ -59,7 +58,7 @@ export class PixiChannelData extends Container {
       fill: fill,
     });
 
-    const text = truncateText(`Channel ${options.channelId} with a really long name to test wrapping`, style, CHANNEL_LIST_WIDTH - 20);
+    const text = truncateText(this.channelName, style, CHANNEL_LIST_WIDTH - 20);
 
     const rowText = new Text({
       text: text,
@@ -71,7 +70,7 @@ export class PixiChannelData extends Container {
     this.addChild(rowText);
 
     let xOffset = this.buttonXstart;
-    const deleteButton = this.createButton(xOffset, options.onDelete);
+    const deleteButton = this.createButton(xOffset, (id, name) => options.onDelete?.(id, name));
     xOffset += this.buttonSize + this.buttonXspacing;
     const testButton = this.createButton(xOffset, options.onTest);
     xOffset += this.buttonSize + this.buttonXspacing;
@@ -96,7 +95,7 @@ export class PixiChannelData extends Container {
       });
   }
 
-  createButton(xOffset: number, callback?: (id: string) => void) {
+  createButton(xOffset: number, callback?: (id: string, name: string) => void) {
     const button = new Container();
     button.x = CHANNEL_LIST_WIDTH - xOffset;
     button.y = ROW_HEIGHT - this.buttonYoffset;
@@ -105,7 +104,7 @@ export class PixiChannelData extends Container {
 
     if (callback) {
       button.on('pointerdown', () => {
-        callback?.(this.channelId);
+        callback?.(this.channelId, this.channelName);
       });
     }
 
