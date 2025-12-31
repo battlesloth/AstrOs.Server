@@ -13,7 +13,7 @@ function getControllerLocation(): ControllerLocation {
 
   return {
     id: id,
-    locationName: 'core',
+    locationName: Location.CORE,
     description: 'Test Location',
     configFingerprint: 'fingerprint',
     controller: {

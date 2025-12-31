@@ -2,6 +2,7 @@ import { type Meta, type StoryObj } from '@storybook/vue3';
 import AstrosI2cModule from './AstrosI2cModule.vue';
 import { ModuleType } from '@/enums/modules/ModuleType';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
+import { Location } from '@/enums';
 import type { I2cModule as I2cModuleType } from '@/models/controllers/modules/i2c/i2cModule';
 
 // Helper function to create mock I2C module
@@ -47,18 +48,14 @@ const meta = {
   }),
   args: {
     module: getI2cModule(ModuleSubType.GENERIC_I2C, 0x40),
+    locationId: Location.CORE,
     parentTestId: 'test',
-    updateTrigger: 0,
   },
   tags: ['autodocs'],
   argTypes: {
     parentTestId: {
       control: 'text',
       description: 'Test ID prefix for testing',
-    },
-    updateTrigger: {
-      control: 'number',
-      description: 'Trigger to force re-render when module properties change',
     },
   },
 } satisfies Meta<typeof AstrosI2cModule>;
@@ -73,6 +70,7 @@ type Story = StoryObj<typeof meta>;
 export const GenericI2c: Story = {
   args: {
     module: getI2cModule(ModuleSubType.GENERIC_I2C, 0x40),
+    locationId: Location.CORE,
     parentTestId: 'test',
   },
 };
@@ -83,6 +81,7 @@ export const GenericI2c: Story = {
 export const HumanCyborgRelations: Story = {
   args: {
     module: getI2cModule(ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C, 0x41),
+    locationId: Location.CORE,
     parentTestId: 'test',
   },
 };
@@ -93,6 +92,7 @@ export const HumanCyborgRelations: Story = {
 export const PwmBoard: Story = {
   args: {
     module: getI2cModule(ModuleSubType.PWM_BOARD, 0x70),
+    locationId: Location.CORE,
     parentTestId: 'test',
   },
 };
@@ -103,6 +103,7 @@ export const PwmBoard: Story = {
 export const CustomName: Story = {
   args: {
     module: getI2cModule(ModuleSubType.GENERIC_I2C, 0x3c, 'OLED Display Controller'),
+    locationId: Location.CORE,
     parentTestId: 'test',
   },
 };
@@ -111,6 +112,9 @@ export const CustomName: Story = {
  * Multiple I2C modules with different addresses
  */
 export const MultipleModules: Story = {
+  args: {
+    locationId: Location.CORE,
+  },
   render: () => ({
     components: { AstrosI2cModule },
     setup() {
@@ -120,7 +124,7 @@ export const MultipleModules: Story = {
         getI2cModule(ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C, 0x41, 'HCR Module'),
         getI2cModule(ModuleSubType.GENERIC_I2C, 0x3c, 'OLED Display'),
       ];
-      return { modules };
+      return { modules, Location };
     },
     template: `
             <div class="space-y-4 p-4">
@@ -128,6 +132,7 @@ export const MultipleModules: Story = {
                     v-for="module in modules" 
                     :key="module.id"
                     :module="module"
+                    :locationId="Location.CORE"
                     parent-test-id="test"
                 />
             </div>
@@ -136,29 +141,33 @@ export const MultipleModules: Story = {
 };
 
 /**
- * Module with update trigger demonstration
+ * Module with controlled re-rendering
  */
 export const WithUpdateTrigger: Story = {
+  args: {
+    locationId: Location.CORE,
+  },
   render: () => ({
     components: { AstrosI2cModule },
     setup() {
       const module = getI2cModule(ModuleSubType.GENERIC_I2C, 0x40);
-      const updateTrigger = { value: 0 };
+      const counter = { value: 0 };
 
-      const triggerUpdate = () => {
-        updateTrigger.value++;
+      const updateModule = () => {
+        counter.value++;
+        module.name = `Updated Module ${counter.value}`;
       };
 
-      return { module, updateTrigger, triggerUpdate };
+      return { module, counter, updateModule, Location };
     },
     template: `
             <div class="space-y-4 p-4">
-                <button @click="triggerUpdate" class="btn btn-primary btn-sm">
-                    Trigger Update ({{ updateTrigger.value }})
+                <button @click="updateModule" class="btn btn-primary btn-sm">
+                    Update Module Name ({{ counter.value }})
                 </button>
                 <AstrosI2cModule 
                     :module="module"
-                    :update-trigger="updateTrigger.value"
+                    :locationId="Location.CORE"
                     parent-test-id="test"
                 />
             </div>

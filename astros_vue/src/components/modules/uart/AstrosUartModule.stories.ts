@@ -2,6 +2,7 @@ import { type Meta, type StoryObj } from '@storybook/vue3';
 import AstrosUartModule from './AstrosUartModule.vue';
 import { ModuleType } from '@/enums/modules/ModuleType';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
+import { Location } from '@/enums/modules/Location';
 import type { UartModule as UartModuleType } from '@/models/controllers/modules/uart/uartModule';
 
 // Helper function to create mock UART module
@@ -82,6 +83,7 @@ type Story = StoryObj<typeof meta>;
 export const GenericSerial: Story = {
   args: {
     module: getSerialModule(ModuleSubType.GENERIC_SERIAL, 1, 9600),
+    locationId: Location.CORE,
     parentTestId: 'test',
     isMaster: false,
   },
@@ -93,6 +95,7 @@ export const GenericSerial: Story = {
 export const KangarooX2: Story = {
   args: {
     module: getSerialModule(ModuleSubType.KANGAROO, 2, 115200),
+    locationId: Location.CORE,
     parentTestId: 'test',
     isMaster: false,
   },
@@ -104,6 +107,7 @@ export const KangarooX2: Story = {
 export const Maestro: Story = {
   args: {
     module: getSerialModule(ModuleSubType.MAESTRO, 1, 57600),
+    locationId: Location.CORE,
     parentTestId: 'test',
     isMaster: false,
   },
@@ -115,6 +119,7 @@ export const Maestro: Story = {
 export const HumanCyborgRelations: Story = {
   args: {
     module: getSerialModule(ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL, 1, 9600),
+    locationId: Location.CORE,
     parentTestId: 'test',
     isMaster: false,
   },
@@ -126,6 +131,7 @@ export const HumanCyborgRelations: Story = {
 export const MasterModule: Story = {
   args: {
     module: getSerialModule(ModuleSubType.GENERIC_SERIAL, 2, 9600),
+    locationId: Location.CORE,
     parentTestId: 'test',
     isMaster: true,
   },
@@ -137,6 +143,7 @@ export const MasterModule: Story = {
 export const CustomBaudRate: Story = {
   args: {
     module: getSerialModule(ModuleSubType.GENERIC_SERIAL, 1, 115200, 'High Speed Serial'),
+    locationId: Location.CORE,
     parentTestId: 'test',
     isMaster: false,
   },
@@ -146,6 +153,9 @@ export const CustomBaudRate: Story = {
  * Multiple UART modules
  */
 export const MultipleModules: Story = {
+  args: {
+    locationId: Location.CORE,
+  },
   render: () => ({
     components: { AstrosUartModule },
     setup() {
@@ -155,7 +165,7 @@ export const MultipleModules: Story = {
         getSerialModule(ModuleSubType.MAESTRO, 3, 57600, 'Servo Controller'),
         getSerialModule(ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL, 0, 9600, 'Voice Module'),
       ];
-      return { modules };
+      return { modules, Location };
     },
     template: `
             <div class="space-y-4 p-4">
@@ -163,6 +173,7 @@ export const MultipleModules: Story = {
                     v-for="module in modules" 
                     :key="module.id"
                     :module="module"
+                    :locationId="Location.CORE"
                     parent-test-id="test"
                 />
             </div>
