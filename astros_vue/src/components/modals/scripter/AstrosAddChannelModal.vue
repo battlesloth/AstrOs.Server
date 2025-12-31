@@ -5,7 +5,7 @@ import type {
   LocationDetails,
   ChannelDetails,
   AddChannelModalResponse,
-} from '@/models/scripts/scripting';
+} from '@/models';
 import { useScripterStore } from '@/stores/scripter';
 
 interface ScriptChannelTypeOption {
@@ -82,7 +82,7 @@ watch([selectedController, selectedChannelType], () => {
 });
 
 const addChannel = () => {
-  const toAdd = new Map<ScriptChannelType, string[]>();
+  const toAdd = new Map<ScriptChannelType, ChannelDetails[]>();
 
   for (const channelId of selectedChannels.value) {
     const channelDetails = filteredChannels.value.find((x) => x.id === channelId);
@@ -92,7 +92,7 @@ const addChannel = () => {
         toAdd.set(channelDetails.scriptChannelType, []);
       }
 
-      toAdd.get(channelDetails.scriptChannelType)?.push(channelDetails.id);
+      toAdd.get(channelDetails.scriptChannelType)?.push(channelDetails);
     }
   }
 

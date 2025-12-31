@@ -1,4 +1,9 @@
-export { default as AstrosFieldUsername } from './common/fields/username/AstrosFieldUsername.vue';
-export { default as AstrosFieldPassword } from './common/fields/password/AstrosFieldPassword.vue';
-export { default as AstrosLayout } from './common/layout/AstrosLayout.vue';
-export { default as AstrosLogin } from './login/AstrosLogin.vue';
+// Re-export all components from subdirectories
+export * from './common';
+export * from './login';
+export * from './modals';
+export * from './modules';
+export * from './remoteControl';
+export * from './scripter';
+export * from './scripts';
+export * from './status';

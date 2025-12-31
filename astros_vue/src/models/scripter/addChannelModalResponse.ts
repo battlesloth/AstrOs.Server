@@ -1,5 +1,6 @@
-import type { ScriptChannelValue } from './scriptChannelValue';
+import type { ScriptChannelType } from '@/enums';
+import type { ChannelDetails } from './channelDetails';
 
 export interface AddChannelModalResponse {
-  channels: Map<ScriptChannelValue, string[]>;
+  channels: Map<ScriptChannelType, ChannelDetails[]>;
 }

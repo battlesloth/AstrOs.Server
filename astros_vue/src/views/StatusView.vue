@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
-import AstrosStatus from '@/components/status/AstrosStatus.vue';
+import { AstrosLayout, AstrosStatus } from '@/components';
 import { useControllerStore } from '@/stores/controller';
 import { storeToRefs } from 'pinia';
 

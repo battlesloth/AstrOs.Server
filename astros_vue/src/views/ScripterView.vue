@@ -3,22 +3,23 @@ import { onMounted, ref, useTemplateRef } from 'vue';
 import { ModalType, ScriptChannelType } from '@/enums';
 import { useScripterStore } from '@/stores/scripter';
 import { useRoute } from 'vue-router';
-import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
-import AstrosPixiView from '@/components/scripter/AstrosPixiView.vue';
-
-import AstrosAddChannelModal from '@/components/modals/scripter/AstrosAddChannelModal.vue';
-import AstrosScriptTestModal from '@/components/modals/scripter/AstrosScriptTestModal.vue';
-import AstrosChannelTestModal from '@/components/modals/scripter/AstrosChannelTestModal.vue';
-import AstrosGpioEventModal from '@/components/modals/scripter/AstrosGpioEventModal.vue';
-import AstrosHumanCyborgModal from '@/components/modals/scripter/AstrosHumanCyborgModal.vue';
-import AstrosI2cEventModal from '@/components/modals/scripter/AstrosI2cEventModal.vue';
-import AstrosKangarooEventModal from '@/components/modals/scripter/AstrosKangarooEventModal.vue';
-import AstrosServoEventModal from '@/components/modals/scripter/AstrosServoEventModal.vue';
-import AstrosUartEventModal from '@/components/modals/scripter/AstrosUartEventModal.vue';
-import AstrosInterruptModal from '@/components/modals/AstrosInterruptModal.vue';
-import AstrosAlertModal from '@/components/modals/AstrosAlertModal.vue';
+import {
+  AstrosLayout,
+  AstrosPixiView,
+  AstrosAddChannelModal,
+  AstrosScriptTestModal,
+  AstrosChannelTestModal,
+  AstrosGpioEventModal,
+  AstrosHumanCyborgModal,
+  AstrosI2cEventModal,
+  AstrosKangarooEventModal,
+  AstrosServoEventModal,
+  AstrosUartEventModal,
+  AstrosInterruptModal,
+  AstrosAlertModal,
+  AstrosConfirmModal,
+} from '@/components';
 import router from '@/router';
-import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
 import type { AddChannelModalResponse, ScriptEvent } from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
 
@@ -43,12 +44,12 @@ function addChannel() {
 function doAddChannel(response: AddChannelModalResponse) {
   showModal.value = ModalType.CLOSE_ALL;
   let map = scripterStore.getChannelDetailsMap();
-  for (const [channelType, ids] of response.channels.entries()) {
-    for (const id of ids) {
-      const result = scripterStore.addChannel(id, channelType);
+  for (const [channelType, detailList ] of response.channels.entries()) {
+    for (const detail of detailList) {
+      const result = scripterStore.addChannel(detail.id, channelType);
 
       if (!result.success) {
-        console.log(`Failed to add channel for ID ${id} and type ${channelType}`);
+        console.log(`Failed to add channel for ID ${detail.id} and type ${channelType}`);
         continue;
       }
 
@@ -208,17 +209,17 @@ onMounted(async () => {
       <AstrosGpioEventModal
         v-if="showModal === ModalType.GPIO_EVENT"
         @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent"
+        :script-event="selectedScriptEvent!"
       />
       <AstrosHumanCyborgModal
         v-if="showModal === ModalType.HCR_EVENT"
         @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent"
+        :script-event="selectedScriptEvent!"
       />
       <AstrosI2cEventModal
         v-if="showModal === ModalType.I2C_EVENT"
         @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent"
+        :script-event="selectedScriptEvent!"
       />
       <AstrosKangarooEventModal
         v-if="showModal === ModalType.KANGAROO_EVENT"
@@ -228,17 +229,17 @@ onMounted(async () => {
           ch1Name: 'ch 1',
           ch2Name: 'ch 2',
         }"
-        :script-event="selectedScriptEvent"
+        :script-event="selectedScriptEvent!"
       />
       <AstrosServoEventModal
         v-if="showModal === ModalType.SERVO_EVENT"
         @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent"
+        :script-event="selectedScriptEvent!"
       />
       <AstrosUartEventModal
         v-if="showModal === ModalType.UART_EVENT"
         @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent"
+        :script-event="selectedScriptEvent!"
       />
     </template>
   </AstrosLayout>

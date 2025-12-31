@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
-import AstrosRemoteControl from '@/components/remoteControl/AstrosRemoteControl.vue';
+import { AstrosLayout, AstrosRemoteControl } from '@/components';
 </script>
 
 <template>

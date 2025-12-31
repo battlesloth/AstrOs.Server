@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted} from 'vue';
 import { useRouter } from 'vue-router';
-import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
+import { AstrosLayout, AstrosScriptRow } from '@/components';
 import { useToast } from '@/composables/useToast';
 import type { Script } from '@/models';
 import { useScriptsStore } from '@/stores/scripts';
 import { UploadStatus } from '@/enums';
-import AstrosScriptRow from '@/components/scripts/AstrosScriptRow.vue';
 
 const router = useRouter();
 const { success, error } = useToast();

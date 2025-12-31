@@ -5,7 +5,7 @@ import {
   type GpioEvent,
   type MaestroEvent,
   type ScriptEventModalResponse,
-} from '@/models/scripts/scripting';
+} from '@/models';
 import type { ScriptEvent } from '@/models/scripts/scriptEvent';
 
 export type GpioEventModalMode = 'add' | 'edit';

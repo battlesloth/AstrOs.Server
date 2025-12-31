@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
+import { AstrosLayout } from '@/components';
 import apiService from '@/api/apiService';
 import type { ControllerModule } from '@/models';
 

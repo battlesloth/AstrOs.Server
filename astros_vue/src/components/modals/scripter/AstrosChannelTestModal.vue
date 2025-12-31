@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
-import { KangarooAction, type ChannelTestModalResponse } from '@/models/scripts/scripting';
+import { KangarooAction } from '@/enums';
+import { type ChannelTestModalResponse } from '@/models';
 
 const props = defineProps<{
   controllerId: number;
@@ -62,16 +63,16 @@ const getKangarooCommand = (): string => {
   let cmd = '';
 
   switch (kangarooAction.value) {
-    case KangarooAction.start:
+    case KangarooAction.START:
       cmd = 'start';
       break;
-    case KangarooAction.home:
+    case KangarooAction.HOME:
       cmd = 'home';
       break;
-    case KangarooAction.speed:
+    case KangarooAction.SPEED:
       cmd = `s${kangarooSpd.value === undefined ? 0 : kangarooSpd.value}`;
       break;
-    case KangarooAction.position:
+    case KangarooAction.POSITION:
       cmd = `p${kangarooPos.value === undefined ? 0 : kangarooPos.value} s${kangarooSpd.value === undefined ? 0 : kangarooSpd.value}`;
       break;
   }
