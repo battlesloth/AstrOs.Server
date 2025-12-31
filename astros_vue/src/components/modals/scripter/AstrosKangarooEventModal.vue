@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import {
-  KangarooAction,
-  type KangarooEvent,
-  type KangarooX2,
-  type ScriptEventModalResponse,
-} from '@/models/scripts/scripting';
-import type { ScriptEvent } from '@/models/scripts/scriptEvent';
+  KangarooAction} from '@/enums';
+import type {
+   KangarooEvent,
+   KangarooX2,
+   ScriptEventModalResponse,
+  ScriptEvent } from '@/models';
 
 export type KangarooEventModalMode = 'add' | 'edit';
 
@@ -49,41 +49,41 @@ const showRemoveButton = computed(() => props.mode === 'edit');
 
 const ch1SpdDisabled = computed(() => {
   const action = Number(ch1Action.value);
-  return action !== KangarooAction.speed && action !== KangarooAction.position;
+  return action !== KangarooAction.SPEED && action !== KangarooAction.POSITION;
 });
 
 const ch1PosDisabled = computed(() => {
   const action = Number(ch1Action.value);
-  return action !== KangarooAction.position;
+  return action !== KangarooAction.POSITION;
 });
 
 const ch2SpdDisabled = computed(() => {
   const action = Number(ch2Action.value);
-  return action !== KangarooAction.speed && action !== KangarooAction.position;
+  return action !== KangarooAction.SPEED && action !== KangarooAction.POSITION;
 });
 
 const ch2PosDisabled = computed(() => {
   const action = Number(ch2Action.value);
-  return action !== KangarooAction.position;
+  return action !== KangarooAction.POSITION;
 });
 
 // Watch for changes to clear disabled values
 watch(ch1Action, (newAction) => {
   const action = Number(newAction);
-  if (action !== KangarooAction.speed && action !== KangarooAction.position) {
+  if (action !== KangarooAction.SPEED && action !== KangarooAction.POSITION) {
     ch1Speed.value = undefined;
   }
-  if (action !== KangarooAction.position) {
+  if (action !== KangarooAction.POSITION) {
     ch1Position.value = undefined;
   }
 });
 
 watch(ch2Action, (newAction) => {
   const action = Number(newAction);
-  if (action !== KangarooAction.speed && action !== KangarooAction.position) {
+  if (action !== KangarooAction.SPEED && action !== KangarooAction.POSITION) {
     ch2Speed.value = undefined;
   }
-  if (action !== KangarooAction.position) {
+  if (action !== KangarooAction.POSITION) {
     ch2Position.value = undefined;
   }
 });

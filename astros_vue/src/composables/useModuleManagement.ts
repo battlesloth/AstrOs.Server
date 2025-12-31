@@ -8,10 +8,10 @@ export function useModuleManagement() {
 
   function removeModule(locationId: Location, id: string, moduleType: ModuleType) {
     switch (moduleType) {
-      case ModuleType.uart:
+      case ModuleType.UART:
         removeUartModule(locationId, id);
         break;
-      case ModuleType.i2c:
+      case ModuleType.I2C:
         removeI2cModule(locationId, id);
         break;
       default:
@@ -37,10 +37,10 @@ export function useModuleManagement() {
 
   function addModule(locationId: Location, moduleType: ModuleType, moduleSubType?: ModuleSubType) {
     switch (moduleType) {
-      case ModuleType.uart:
+      case ModuleType.UART:
         addUartModule(locationId, moduleSubType);
         break;
-      case ModuleType.i2c:
+      case ModuleType.I2C:
         addI2cModule(locationId, moduleSubType);
         break;
       default:
@@ -55,14 +55,14 @@ export function useModuleManagement() {
     }
 
     // body reserves channel 1 for other Rasberry Pi communications
-    const defaultChannel = locationId === Location.body ? 2 : 1;
+    const defaultChannel = locationId === Location.BODY ? 2 : 1;
 
     const module: UartModule = {
       id: uuid(),
       idx: -1,
       locationId: location.id,
-      moduleType: ModuleType.uart,
-      moduleSubType: moduleSubType ?? ModuleSubType.genericSerial,
+      moduleType: ModuleType.UART,
+      moduleSubType: moduleSubType ?? ModuleSubType.GENERIC_SERIAL,
       name: 'New Serial Module',
       uartChannel: defaultChannel,
       baudRate: 9600,
@@ -70,14 +70,14 @@ export function useModuleManagement() {
     };
 
     switch (moduleSubType) {
-      case ModuleSubType.humanCyborgRelationsSerial:
+      case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
         module.name = 'New HCR Module';
         break;
-      case ModuleSubType.kangaroo:
+      case ModuleSubType.KANGAROO:
         module.name = 'New Kangaroo Module';
         module.subModule = newKangarooModule();
         break;
-      case ModuleSubType.maestro:
+      case ModuleSubType.MAESTRO:
         module.name = 'New Maestro Module';
         module.subModule = newMaestroModule();
         break;
@@ -100,19 +100,19 @@ export function useModuleManagement() {
       id: uuid(),
       idx: -1,
       locationId: location.id,
-      moduleType: ModuleType.i2c,
-      moduleSubType: moduleSubType ?? ModuleSubType.genericI2C,
+      moduleType: ModuleType.I2C,
+      moduleSubType: moduleSubType ?? ModuleSubType.GENERIC_I2C,
       name: 'New I2C Module',
       i2cAddress: nextAddress,
       subModule: undefined,
     };
 
     switch (moduleSubType) {
-      case ModuleSubType.genericI2C:
+      case ModuleSubType.GENERIC_I2C:
         break;
-      case ModuleSubType.pwmBoard:
+      case ModuleSubType.PWM_BOARD:
         throw new Error('I2C PWM Board not implemented yet.');
-      case ModuleSubType.humanCyborgRelationsI2C:
+      case ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C:
         throw new Error('I2C HCR not implemented yet.');
       default:
         console.error('Unsupported I2C module subtype for addition:', moduleSubType);
@@ -153,8 +153,8 @@ export function useModuleManagement() {
         minPos: 500,
         maxPos: 2500,
         homePos: 1250,
-        moduleType: ModuleType.uart,
-        moduleSubType: ModuleSubType.maestro,
+        moduleType: ModuleType.UART,
+        moduleSubType: ModuleSubType.MAESTRO,
       };
       board.channels.push(channel);
     }

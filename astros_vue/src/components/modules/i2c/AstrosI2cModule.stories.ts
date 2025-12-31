@@ -12,13 +12,13 @@ function getI2cModule(type: ModuleSubType, address: number, name?: string): I2cM
   let moduleName = name || 'I2C Module';
 
   switch (type) {
-    case ModuleSubType.genericI2C:
+    case ModuleSubType.GENERIC_I2C:
       moduleName = name || 'Generic I2C Module';
       break;
-    case ModuleSubType.humanCyborgRelationsI2C:
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C:
       moduleName = name || 'Human Cyborg Relations Module';
       break;
-    case ModuleSubType.pwmBoard:
+    case ModuleSubType.PWM_BOARD:
       moduleName = name || 'PWM Board Module';
       break;
   }
@@ -29,7 +29,7 @@ function getI2cModule(type: ModuleSubType, address: number, name?: string): I2cM
     name: moduleName,
     locationId,
     i2cAddress: address,
-    moduleType: ModuleType.i2c,
+    moduleType: ModuleType.I2C,
     moduleSubType: type,
     subModule: {},
   };
@@ -46,7 +46,7 @@ const meta = {
     template: '<AstrosI2cModule v-bind="args" />',
   }),
   args: {
-    module: getI2cModule(ModuleSubType.genericI2C, 0x40),
+    module: getI2cModule(ModuleSubType.GENERIC_I2C, 0x40),
     parentTestId: 'test',
     updateTrigger: 0,
   },
@@ -72,7 +72,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const GenericI2c: Story = {
   args: {
-    module: getI2cModule(ModuleSubType.genericI2C, 0x40),
+    module: getI2cModule(ModuleSubType.GENERIC_I2C, 0x40),
     parentTestId: 'test',
   },
 };
@@ -82,7 +82,7 @@ export const GenericI2c: Story = {
  */
 export const HumanCyborgRelations: Story = {
   args: {
-    module: getI2cModule(ModuleSubType.humanCyborgRelationsI2C, 0x41),
+    module: getI2cModule(ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C, 0x41),
     parentTestId: 'test',
   },
 };
@@ -92,7 +92,7 @@ export const HumanCyborgRelations: Story = {
  */
 export const PwmBoard: Story = {
   args: {
-    module: getI2cModule(ModuleSubType.pwmBoard, 0x70),
+    module: getI2cModule(ModuleSubType.PWM_BOARD, 0x70),
     parentTestId: 'test',
   },
 };
@@ -102,7 +102,7 @@ export const PwmBoard: Story = {
  */
 export const CustomName: Story = {
   args: {
-    module: getI2cModule(ModuleSubType.genericI2C, 0x3c, 'OLED Display Controller'),
+    module: getI2cModule(ModuleSubType.GENERIC_I2C, 0x3c, 'OLED Display Controller'),
     parentTestId: 'test',
   },
 };
@@ -115,10 +115,10 @@ export const MultipleModules: Story = {
     components: { AstrosI2cModule },
     setup() {
       const modules = [
-        getI2cModule(ModuleSubType.genericI2C, 0x40, 'Sensor Module 1'),
-        getI2cModule(ModuleSubType.pwmBoard, 0x70, 'Servo Controller'),
-        getI2cModule(ModuleSubType.humanCyborgRelationsI2C, 0x41, 'HCR Module'),
-        getI2cModule(ModuleSubType.genericI2C, 0x3c, 'OLED Display'),
+        getI2cModule(ModuleSubType.GENERIC_I2C, 0x40, 'Sensor Module 1'),
+        getI2cModule(ModuleSubType.PWM_BOARD, 0x70, 'Servo Controller'),
+        getI2cModule(ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C, 0x41, 'HCR Module'),
+        getI2cModule(ModuleSubType.GENERIC_I2C, 0x3c, 'OLED Display'),
       ];
       return { modules };
     },
@@ -142,7 +142,7 @@ export const WithUpdateTrigger: Story = {
   render: () => ({
     components: { AstrosI2cModule },
     setup() {
-      const module = getI2cModule(ModuleSubType.genericI2C, 0x40);
+      const module = getI2cModule(ModuleSubType.GENERIC_I2C, 0x40);
       const updateTrigger = { value: 0 };
 
       const triggerUpdate = () => {

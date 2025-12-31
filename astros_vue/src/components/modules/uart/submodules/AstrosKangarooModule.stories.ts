@@ -11,8 +11,8 @@ function getSerialModule(ch: number, baudRate: number): UartModule {
     id: '1234',
     name: 'Kangaroo X2',
     locationId: 'core',
-    moduleType: ModuleType.uart,
-    moduleSubType: ModuleSubType.kangaroo,
+    moduleType: ModuleType.UART,
+    moduleSubType: ModuleSubType.KANGAROO,
     uartChannel: ch,
     baudRate,
     subModule: {

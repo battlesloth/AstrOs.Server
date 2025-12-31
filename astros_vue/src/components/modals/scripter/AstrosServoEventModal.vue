@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { type MaestroEvent } from '@/models/scripts/scripting';
-import type { ScriptEvent } from '@/models/scripts/scriptEvent';
-import { ModuleSubType } from '@/enums/modules/ModuleSubType';
+import type { MaestroEvent, ScriptEvent } from '@/models';
+import { ModuleSubType } from '@/enums';
 
 export interface ServoEventModalProps {
   mode?: 'add' | 'edit';

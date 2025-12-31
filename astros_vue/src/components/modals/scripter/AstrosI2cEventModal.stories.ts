@@ -4,7 +4,7 @@ import { v4 as uuid } from 'uuid';
 import AstrosI2cEventModal from './AstrosI2cEventModal.vue';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import { ModuleType } from '@/enums/modules/ModuleType';
-import { I2cEvent, ScriptEvent } from '@/models/scripts/scripting';
+import type { I2cEvent, ScriptEvent } from '@/models';
 
 const meta = {
   title: 'Components/Modals/Scripter/I2cEventModal',
@@ -46,13 +46,13 @@ export const EditMode: Story = {
 };
 
 function getScriptEvent(undefinedEvt = false): ScriptEvent {
-  const i2cEvent = new I2cEvent('test message');
+  const i2cEvent: I2cEvent = { message: 'test message' };
 
-  return new ScriptEvent(
-    uuid(),
-    ModuleType.i2c,
-    ModuleSubType.genericI2C,
-    4000,
-    undefinedEvt ? undefined : i2cEvent,
-  );
+  return {
+    scriptChannelId: uuid(),
+    moduleType: ModuleType.I2C,
+    moduleSubType: ModuleSubType.GENERIC_I2C,
+    time: 5000,
+    event: undefinedEvt ? undefined : i2cEvent,
+  };
 }

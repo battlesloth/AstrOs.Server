@@ -51,7 +51,8 @@ import {
 } from '@/pixiComponents/pixiChannelEventRow';
 import { PixiTimeline, type PixiTimelineOptions } from '@/pixiComponents/pixiTimeline';
 import { PixiChannelList } from '@/pixiComponents/pixiChannelList';
-import type { ScriptChannelType, ScriptEvent } from '@/models';
+import { ScriptChannelType } from '@/enums';
+import type { ScriptEvent } from '@/models';
 
 // ============================================================================
 // APPLICATION REFS

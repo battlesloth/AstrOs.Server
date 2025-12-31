@@ -38,9 +38,9 @@ const uploadInProgress = ref(true);
 const runDisabled = ref(true);
 const status = ref('Uploading script...');
 
-const coreUpload = ref<TransmissionStatus>(TransmissionStatus.sending);
-const domeUpload = ref<TransmissionStatus>(TransmissionStatus.sending);
-const bodyUpload = ref<TransmissionStatus>(TransmissionStatus.sending);
+const coreUpload = ref<TransmissionStatus>(TransmissionStatus.SENDING);
+const domeUpload = ref<TransmissionStatus>(TransmissionStatus.SENDING);
+const bodyUpload = ref<TransmissionStatus>(TransmissionStatus.SENDING);
 
 const coreCaption = ref<Caption>({ str: 'Uploading' });
 const domeCaption = ref<Caption>({ str: 'Uploading' });
@@ -54,36 +54,36 @@ const canRun = computed(() => {
 
 const setInitialUploadStatus = (hasBody: boolean, hasCore: boolean, hasDome: boolean) => {
   if (hasBody) {
-    bodyUpload.value = TransmissionStatus.sending;
+    bodyUpload.value = TransmissionStatus.SENDING;
     bodyCaption.value.str = 'Uploading';
   } else {
-    bodyUpload.value = TransmissionStatus.success;
+    bodyUpload.value = TransmissionStatus.SUCCESS;
     bodyCaption.value.str = 'Not Assigned';
   }
 
   if (hasCore) {
-    coreUpload.value = TransmissionStatus.sending;
+    coreUpload.value = TransmissionStatus.SENDING;
     coreCaption.value.str = 'Uploading';
   } else {
-    coreUpload.value = TransmissionStatus.success;
+    coreUpload.value = TransmissionStatus.SUCCESS;
     coreCaption.value.str = 'Not Assigned';
   }
 
   if (hasDome) {
-    domeUpload.value = TransmissionStatus.sending;
+    domeUpload.value = TransmissionStatus.SENDING;
     domeCaption.value.str = 'Uploading';
   } else {
-    domeUpload.value = TransmissionStatus.success;
+    domeUpload.value = TransmissionStatus.SUCCESS;
     domeCaption.value.str = 'Not Assigned';
   }
 };
 
 const setCaption = (caption: Caption, uploadStatus: TransmissionStatus) => {
   switch (uploadStatus) {
-    case TransmissionStatus.success:
+    case TransmissionStatus.SUCCESS:
       caption.str = 'Success';
       break;
-    case TransmissionStatus.failed:
+    case TransmissionStatus.FAILED:
       caption.str = 'Failed';
       break;
   }
@@ -115,13 +115,13 @@ const statusUpdate = (msg: ScriptResponse) => {
   }
 
   if (
-    coreUpload.value > TransmissionStatus.sending &&
-    domeUpload.value > TransmissionStatus.sending &&
-    bodyUpload.value > TransmissionStatus.sending
+    coreUpload.value > TransmissionStatus.SENDING &&
+    domeUpload.value > TransmissionStatus.SENDING &&
+    bodyUpload.value > TransmissionStatus.SENDING
   ) {
     status.value = 'Upload Complete.';
     uploadInProgress.value = false;
-    if (coreUpload.value + domeUpload.value + bodyUpload.value >= TransmissionStatus.success * 3) {
+    if (coreUpload.value + domeUpload.value + bodyUpload.value >= TransmissionStatus.SUCCESS * 3) {
       runDisabled.value = false;
     }
   }
@@ -169,11 +169,11 @@ onMounted(async () => {
     } catch (err) {
       console.error(err);
       status.value = 'Error requesting Script Upload';
-      coreUpload.value = TransmissionStatus.failed;
+      coreUpload.value = TransmissionStatus.FAILED;
       coreCaption.value.str = 'Failed';
-      domeUpload.value = TransmissionStatus.failed;
+      domeUpload.value = TransmissionStatus.FAILED;
       domeCaption.value.str = 'Failed';
-      bodyUpload.value = TransmissionStatus.failed;
+      bodyUpload.value = TransmissionStatus.FAILED;
       bodyCaption.value.str = 'Failed';
     }
   } else {

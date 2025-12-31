@@ -37,11 +37,11 @@ const isOpen = computed(() => props.openModuleId === props.module.id);
 
 const subtypeName = computed(() => {
   switch (props.module.moduleSubType) {
-    case ModuleSubType.genericI2C:
+    case ModuleSubType.GENERIC_I2C:
       return 'i2c.generic';
-    case ModuleSubType.humanCyborgRelationsI2C:
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C:
       return 'i2c.hcr';
-    case ModuleSubType.pwmBoard:
+    case ModuleSubType.PWM_BOARD:
       return 'i2c.pwm_board';
     default:
       return '';
@@ -50,10 +50,10 @@ const subtypeName = computed(() => {
 
 const subModuleComponent = computed<Component | null>(() => {
   switch (props.module.moduleSubType) {
-    case ModuleSubType.genericI2C:
+    case ModuleSubType.GENERIC_I2C:
       return AstrosGenericI2cModule;
-    case ModuleSubType.humanCyborgRelationsI2C:
-    case ModuleSubType.pwmBoard:
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C:
+    case ModuleSubType.PWM_BOARD:
       return AstrosPca9685Module;
     default:
       return null;
@@ -69,7 +69,7 @@ const removeModule = (event: Event) => {
   emit('removeModule', {
     locationId: props.locationId,
     id: props.module.id,
-    moduleType: ModuleType.i2c,
+    moduleType: ModuleType.I2C,
   });
 };
 

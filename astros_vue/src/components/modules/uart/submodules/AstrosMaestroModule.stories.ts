@@ -28,8 +28,8 @@ function getSerialModule(ch: number, baudRate: number, channelCount: number): Ua
     id: '1234',
     name: 'Maestro',
     locationId: 'core',
-    moduleType: ModuleType.uart,
-    moduleSubType: ModuleSubType.maestro,
+    moduleType: ModuleType.UART,
+    moduleSubType: ModuleSubType.MAESTRO,
     uartChannel: ch,
     baudRate,
     subModule: {

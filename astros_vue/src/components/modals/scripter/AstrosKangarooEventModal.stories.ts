@@ -2,9 +2,8 @@ import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import { v4 as uuid } from 'uuid';
 import AstrosKangarooEventModal from './AstrosKangarooEventModal.vue';
-import { ModuleSubType } from '@/enums/modules/ModuleSubType';
-import { ModuleType } from '@/enums/modules/ModuleType';
-import { KangarooAction, KangarooEvent, KangarooX2, ScriptEvent } from '@/models/scripts/scripting';
+import { ModuleType, ModuleSubType, KangarooAction } from '@/enums';
+import type { KangarooEvent, KangarooX2, ScriptEvent } from '@/models';
 
 const meta = {
   title: 'Components/Modals/Scripter/KangarooEventModal',
@@ -49,17 +48,24 @@ export const EditMode: Story = {
 };
 
 function getKangarooModule(): KangarooX2 {
-  return new KangarooX2(uuid(), 'Lifter', 'Spinner');
+  return { id: uuid(), ch1Name: 'Lifter', ch2Name: 'Spinner' };
 }
 
 function getKangarooEvent(undefinedEvt = false): ScriptEvent {
-  const evt = new KangarooEvent(KangarooAction.position, 100, 200, KangarooAction.start, 0, 0);
+  const evt: KangarooEvent = {
+    ch1Action: KangarooAction.POSITION,
+    ch1Speed: 100,
+    ch1Position: 1000,
+    ch2Action: KangarooAction.POSITION,
+    ch2Speed: 200,
+    ch2Position: 2000
+  };
 
-  return new ScriptEvent(
-    uuid(),
-    ModuleType.uart,
-    ModuleSubType.kangaroo,
-    5000,
-    undefinedEvt ? undefined : evt,
-  );
+  return {
+    scriptChannelId: uuid(),
+    moduleType: ModuleType.UART,
+    moduleSubType: ModuleSubType.KANGAROO,
+    time: 5000,
+    event: undefinedEvt ? undefined : evt,
+  };
 }

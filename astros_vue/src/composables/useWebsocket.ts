@@ -68,10 +68,10 @@ export function useWebsocket() {
     const parsedMessage = JSON.parse(message) as BaseWsMessage;
 
     switch (parsedMessage.type) {
-      case WebsocketMessageType.controllersSync:
+      case WebsocketMessageType.CONTROLLERS_SYNC:
         handleSyncMessage(parsedMessage);
         break;
-      case WebsocketMessageType.locationStatus:
+      case WebsocketMessageType.LOCATION_STATUS:
         handleStatusMessage(parsedMessage);
         break;
       case WebsocketMessageType.SCRIPT:
@@ -105,13 +105,13 @@ export function useWebsocket() {
       }
 
       switch (data.controllerLocation) {
-        case Location.dome:
+        case Location.DOME:
           controllerStore.domeStatus = status;
           break;
-        case Location.core:
+        case Location.CORE:
           controllerStore.coreStatus = status;
           break;
-        case Location.body:
+        case Location.BODY:
           controllerStore.bodyStatus = status;
           break;
       }

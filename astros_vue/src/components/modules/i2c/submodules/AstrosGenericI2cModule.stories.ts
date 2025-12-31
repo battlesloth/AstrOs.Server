@@ -15,8 +15,8 @@ function getModule(i2cAddress: number): I2cModule {
     name: 'Generic I2C',
     locationId,
     i2cAddress,
-    moduleType: ModuleType.i2c,
-    moduleSubType: ModuleSubType.genericI2C,
+    moduleType: ModuleType.I2C,
+    moduleSubType: ModuleSubType.GENERIC_I2C,
     subModule: {},
   };
 }

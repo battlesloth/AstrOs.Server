@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { HumanCyborgRelationsCmd, HcrCommandCategory } from '@/enums/scripts/humanCyborgRelations';
-import {
-  type HcrCommand,
-  type HumanCyborgRelationsEvent,
-  type ScriptEventModalResponse,
-} from '@/models/scripts/scripting';
-import type { ScriptEvent } from '@/models/scripts/scriptEvent';
-import { HumanCyborgRelationsHelper } from '@/utils/humanCyborgRelationsHelper';
+import { HumanCyborgRelationsCmd, HcrCommandCategory } from '@/enums';
+import type {
+  HcrCommand,
+  HumanCyborgRelationsEvent,
+  ScriptEventModalResponse,
+  ScriptEvent
+} from '@/models';
+
 import { v4 as uuid } from 'uuid';
+import { useHumanCyborgRelations } from '@/composables/useHumanCyborgRelations';
 
 export type HumanCyborgModalMode = 'add' | 'edit';
+
+const {getHcrCommandName, getHcrCommandString } = useHumanCyborgRelations();
 
 interface HcrCommandListItem {
   id: HumanCyborgRelationsCmd;
@@ -42,7 +45,7 @@ const timeFactor = 10;
 const eventTime = ref(0);
 const originalEventTime = ref(0);
 const errorMessage = ref('');
-const commandCategory = ref<string>(HcrCommandCategory.stimuli.toString());
+const commandCategory = ref<string>(HcrCommandCategory.STIMULI.toString());
 const command = ref<string>('');
 const valueA = ref<string>('');
 const valueB = ref<string>('');
@@ -51,22 +54,22 @@ const commands = ref<HcrCommandListItem[]>([]);
 
 // Commands that have values
 const hasValueA = [
-  HumanCyborgRelationsCmd.minSecondsBetweenMusings,
-  HumanCyborgRelationsCmd.maxSecondsBetweenMusings,
-  HumanCyborgRelationsCmd.playWavOnA,
-  HumanCyborgRelationsCmd.playWavOnB,
-  HumanCyborgRelationsCmd.vocalizerVolume,
-  HumanCyborgRelationsCmd.wavAVolume,
-  HumanCyborgRelationsCmd.wavBVolume,
-  HumanCyborgRelationsCmd.setHappyLevel,
-  HumanCyborgRelationsCmd.setSadLevel,
-  HumanCyborgRelationsCmd.setMadLevel,
-  HumanCyborgRelationsCmd.setScaredLevel,
+  HumanCyborgRelationsCmd.MIN_SECONDS_BETWEEN_MUSINGS,
+  HumanCyborgRelationsCmd.MAX_SECONDS_BETWEEN_MUSINGS,
+  HumanCyborgRelationsCmd.PLAY_WAV_ON_A,
+  HumanCyborgRelationsCmd.PLAY_WAV_ON_B,
+  HumanCyborgRelationsCmd.VOCALIZER_VOLUME,
+  HumanCyborgRelationsCmd.WAV_A_VOLUME,
+  HumanCyborgRelationsCmd.WAV_B_VOLUME,
+  HumanCyborgRelationsCmd.SET_HAPPY_LEVEL,
+  HumanCyborgRelationsCmd.SET_SAD_LEVEL,
+  HumanCyborgRelationsCmd.SET_MAD_LEVEL,
+  HumanCyborgRelationsCmd.SET_SCARED_LEVEL,
 ];
 
 const hasValueB = [
-  HumanCyborgRelationsCmd.playSdRandomOnA,
-  HumanCyborgRelationsCmd.playSdRandomOnB,
+  HumanCyborgRelationsCmd.PLAY_SD_RANDOM_ON_A,
+  HumanCyborgRelationsCmd.PLAY_SD_RANDOM_ON_B,
 ];
 
 const showRemoveButton = computed(() => props.mode === 'edit');
@@ -94,70 +97,70 @@ onMounted(() => {
 });
 
 const hcrListItem = (cmd: HumanCyborgRelationsCmd): HcrCommandListItem => {
-  return { id: cmd, name: HumanCyborgRelationsHelper.getCommandName(cmd) };
+  return { id: cmd, name: getHcrCommandName(cmd) };
 };
 
 const setAvailableCommands = (category: HcrCommandCategory) => {
   commands.value = [];
 
   switch (category) {
-    case HcrCommandCategory.stimuli:
+    case HcrCommandCategory.STIMULI:
       commands.value.push(
         hcrListItem(HumanCyborgRelationsCmd.MILD_HAPPY),
-        hcrListItem(HumanCyborgRelationsCmd.extremeHappy),
-        hcrListItem(HumanCyborgRelationsCmd.mildSad),
-        hcrListItem(HumanCyborgRelationsCmd.extremeSad),
-        hcrListItem(HumanCyborgRelationsCmd.mildAngry),
-        hcrListItem(HumanCyborgRelationsCmd.extremeAngry),
-        hcrListItem(HumanCyborgRelationsCmd.mildScared),
-        hcrListItem(HumanCyborgRelationsCmd.extremeScared),
-        hcrListItem(HumanCyborgRelationsCmd.overload),
+        hcrListItem(HumanCyborgRelationsCmd.EXTREME_HAPPY),
+        hcrListItem(HumanCyborgRelationsCmd.MILD_SAD),
+        hcrListItem(HumanCyborgRelationsCmd.EXTREME_SAD),
+        hcrListItem(HumanCyborgRelationsCmd.MILD_ANGRY),
+        hcrListItem(HumanCyborgRelationsCmd.EXTREME_ANGRY),
+        hcrListItem(HumanCyborgRelationsCmd.MILD_SCARED),
+        hcrListItem(HumanCyborgRelationsCmd.EXTREME_SCARED),
+        hcrListItem(HumanCyborgRelationsCmd.OVERLOAD),
       );
       break;
-    case HcrCommandCategory.muse:
+    case HcrCommandCategory.MUSE:
       commands.value.push(
-        hcrListItem(HumanCyborgRelationsCmd.enableMuse),
-        hcrListItem(HumanCyborgRelationsCmd.disableMuse),
-        hcrListItem(HumanCyborgRelationsCmd.toggleMuse),
-        hcrListItem(HumanCyborgRelationsCmd.triggerMusing),
-        hcrListItem(HumanCyborgRelationsCmd.minSecondsBetweenMusings),
-        hcrListItem(HumanCyborgRelationsCmd.maxSecondsBetweenMusings),
+        hcrListItem(HumanCyborgRelationsCmd.ENABLE_MUSE),
+        hcrListItem(HumanCyborgRelationsCmd.DISABLE_MUSE),
+        hcrListItem(HumanCyborgRelationsCmd.TOGGLE_MUSE),
+        hcrListItem(HumanCyborgRelationsCmd.TRIGGER_MUSING),
+        hcrListItem(HumanCyborgRelationsCmd.MIN_SECONDS_BETWEEN_MUSINGS),
+        hcrListItem(HumanCyborgRelationsCmd.MAX_SECONDS_BETWEEN_MUSINGS),
       );
       break;
-    case HcrCommandCategory.sdWav:
+    case HcrCommandCategory.SD_WAV:
       commands.value.push(
-        hcrListItem(HumanCyborgRelationsCmd.playWavOnA),
-        hcrListItem(HumanCyborgRelationsCmd.playWavOnB),
-        hcrListItem(HumanCyborgRelationsCmd.playSdRandomOnA),
-        hcrListItem(HumanCyborgRelationsCmd.playSdRandomOnB),
+        hcrListItem(HumanCyborgRelationsCmd.PLAY_WAV_ON_A),
+        hcrListItem(HumanCyborgRelationsCmd.PLAY_WAV_ON_B),
+        hcrListItem(HumanCyborgRelationsCmd.PLAY_SD_RANDOM_ON_A),
+        hcrListItem(HumanCyborgRelationsCmd.PLAY_SD_RANDOM_ON_B),
       );
       break;
-    case HcrCommandCategory.stop:
+    case HcrCommandCategory.STOP:
       commands.value.push(
-        hcrListItem(HumanCyborgRelationsCmd.panicStop),
-        hcrListItem(HumanCyborgRelationsCmd.gracefulStop),
-        hcrListItem(HumanCyborgRelationsCmd.stopWavOnA),
-        hcrListItem(HumanCyborgRelationsCmd.stopWavOnB),
+        hcrListItem(HumanCyborgRelationsCmd.PANIC_STOP),
+        hcrListItem(HumanCyborgRelationsCmd.GRACEFUL_STOP),
+        hcrListItem(HumanCyborgRelationsCmd.STOP_WAV_ON_A),
+        hcrListItem(HumanCyborgRelationsCmd.STOP_WAV_ON_B),
       );
       break;
-    case HcrCommandCategory.volume:
+    case HcrCommandCategory.VOLUME:
       commands.value.push(
-        hcrListItem(HumanCyborgRelationsCmd.vocalizerVolume),
-        hcrListItem(HumanCyborgRelationsCmd.wavAVolume),
-        hcrListItem(HumanCyborgRelationsCmd.wavBVolume),
+        hcrListItem(HumanCyborgRelationsCmd.VOCALIZER_VOLUME),
+        hcrListItem(HumanCyborgRelationsCmd.WAV_A_VOLUME),
+        hcrListItem(HumanCyborgRelationsCmd.WAV_B_VOLUME),
       );
       break;
-    case HcrCommandCategory.override:
+    case HcrCommandCategory.OVERRIDE:
       commands.value.push(
-        hcrListItem(HumanCyborgRelationsCmd.enableImprov),
-        hcrListItem(HumanCyborgRelationsCmd.enableCanonical),
-        hcrListItem(HumanCyborgRelationsCmd.enablePersonalityOverride),
-        hcrListItem(HumanCyborgRelationsCmd.disablePersonalityOverride),
-        hcrListItem(HumanCyborgRelationsCmd.zeroEmotions),
-        hcrListItem(HumanCyborgRelationsCmd.setHappyLevel),
-        hcrListItem(HumanCyborgRelationsCmd.setSadLevel),
-        hcrListItem(HumanCyborgRelationsCmd.setMadLevel),
-        hcrListItem(HumanCyborgRelationsCmd.setScaredLevel),
+        hcrListItem(HumanCyborgRelationsCmd.ENABLE_IMPROV),
+        hcrListItem(HumanCyborgRelationsCmd.ENABLE_CANONICAL),
+        hcrListItem(HumanCyborgRelationsCmd.ENABLE_PERSONALITY_OVERRIDE),
+        hcrListItem(HumanCyborgRelationsCmd.DISABLE_PERSONALITY_OVERRIDE),
+        hcrListItem(HumanCyborgRelationsCmd.ZERO_EMOTIONS),
+        hcrListItem(HumanCyborgRelationsCmd.SET_HAPPY_LEVEL),
+        hcrListItem(HumanCyborgRelationsCmd.SET_SAD_LEVEL),
+        hcrListItem(HumanCyborgRelationsCmd.SET_MAD_LEVEL),
+        hcrListItem(HumanCyborgRelationsCmd.SET_SCARED_LEVEL),
       );
       break;
   }
@@ -233,14 +236,14 @@ const removeCommand = (id: string) => {
 
 const formatSelectedCommand = (cmd: HcrCommand): string => {
   if (hcrHasBValue(cmd.command)) {
-    return `${HumanCyborgRelationsHelper.getCommandName(cmd.command)}: ${cmd.valueA} ${cmd.valueB}`;
+    return `${getHcrCommandName(cmd.command)}: ${cmd.valueA} ${cmd.valueB}`;
   }
 
   if (hcrHasAValue(cmd.command)) {
-    return `${HumanCyborgRelationsHelper.getCommandName(cmd.command)}: ${cmd.valueA}`;
+    return `${getHcrCommandName(cmd.command)}: ${cmd.valueA}`;
   }
 
-  return HumanCyborgRelationsHelper.getCommandName(cmd.command);
+  return getHcrCommandName(cmd.command);
 };
 
 const addEvent = () => {
@@ -341,12 +344,12 @@ const closeModal = () => {
               class="select select-bordered w-full text-lg mt-2"
               @change="categoryChange"
             >
-              <option :value="HcrCommandCategory.stimuli">Stimuli</option>
-              <option :value="HcrCommandCategory.muse">Muse</option>
-              <option :value="HcrCommandCategory.sdWav">SD Wav</option>
-              <option :value="HcrCommandCategory.stop">Stop</option>
-              <option :value="HcrCommandCategory.volume">Volume</option>
-              <option :value="HcrCommandCategory.override">Override</option>
+              <option :value="HcrCommandCategory.STIMULI">Stimuli</option>
+              <option :value="HcrCommandCategory.MUSE">Muse</option>
+              <option :value="HcrCommandCategory.SD_WAV">SD Wav</option>
+              <option :value="HcrCommandCategory.STOP">Stop</option>
+              <option :value="HcrCommandCategory.VOLUME">Volume</option>
+              <option :value="HcrCommandCategory.OVERRIDE">Override</option>
             </select>
           </div>
 

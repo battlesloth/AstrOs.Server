@@ -27,8 +27,8 @@ function getControllerLocation(): ControllerLocation {
       idx: 1,
       name: 'GPIO Module 1',
       locationId: 'location-1',
-      moduleType: ModuleType.gpio,
-      moduleSubType: ModuleSubType.genericGpio,
+      moduleType: ModuleType.GPIO,
+      moduleSubType: ModuleSubType.GENERIC_GPIO,
       channels: [
         {
           id: 'gpio-1',
@@ -37,8 +37,8 @@ function getControllerLocation(): ControllerLocation {
           channelNumber: 1,
           enabled: true,
           defaultHigh: false,
-          moduleType: ModuleType.gpio,
-          moduleSubType: ModuleSubType.genericGpio,
+          moduleType: ModuleType.GPIO,
+          moduleSubType: ModuleSubType.GENERIC_GPIO,
         },
         {
           id: 'gpio-2',
@@ -47,8 +47,8 @@ function getControllerLocation(): ControllerLocation {
           channelNumber: 2,
           enabled: true,
           defaultHigh: false,
-          moduleType: ModuleType.gpio,
-          moduleSubType: ModuleSubType.genericGpio,
+          moduleType: ModuleType.GPIO,
+          moduleSubType: ModuleSubType.GENERIC_GPIO,
         },
         {
           id: 'gpio-3',
@@ -57,8 +57,8 @@ function getControllerLocation(): ControllerLocation {
           channelNumber: 3,
           enabled: true,
           defaultHigh: false,
-          moduleType: ModuleType.gpio,
-          moduleSubType: ModuleSubType.genericGpio,
+          moduleType: ModuleType.GPIO,
+          moduleSubType: ModuleSubType.GENERIC_GPIO,
         },
       ],
     },
@@ -80,8 +80,8 @@ function getControllerLocationWithModules(): ControllerLocation {
       idx: 1,
       name: 'UART Module 1',
       locationId: 'location-1',
-      moduleType: ModuleType.uart,
-      moduleSubType: ModuleSubType.genericSerial,
+      moduleType: ModuleType.UART,
+      moduleSubType: ModuleSubType.GENERIC_SERIAL,
     },
     {
       id: 'uart-2',
@@ -91,8 +91,8 @@ function getControllerLocationWithModules(): ControllerLocation {
       idx: 2,
       name: 'UART Module 2',
       locationId: 'location-1',
-      moduleType: ModuleType.uart,
-      moduleSubType: ModuleSubType.kangaroo,
+      moduleType: ModuleType.UART,
+      moduleSubType: ModuleSubType.KANGAROO,
     },
   ];
 
@@ -103,8 +103,8 @@ function getControllerLocationWithModules(): ControllerLocation {
       idx: 1,
       name: 'I2C Module 1',
       locationId: 'location-1',
-      moduleType: ModuleType.i2c,
-      moduleSubType: ModuleSubType.genericI2C,
+      moduleType: ModuleType.I2C,
+      moduleSubType: ModuleSubType.GENERIC_I2C,
       subModule: null,
     },
     {
@@ -113,8 +113,8 @@ function getControllerLocationWithModules(): ControllerLocation {
       idx: 2,
       name: 'I2C Module 2',
       locationId: 'location-1',
-      moduleType: ModuleType.i2c,
-      moduleSubType: ModuleSubType.genericI2C,
+      moduleType: ModuleType.I2C,
+      moduleSubType: ModuleSubType.GENERIC_I2C,
       subModule: null,
     },
   ];
@@ -142,7 +142,7 @@ const meta = {
   }),
   args: {
     isMaster: false,
-    locationEnum: Location.core,
+    locationEnum: Location.CORE,
     parentTestId: 'test',
   },
   tags: ['autodocs'],
@@ -153,7 +153,7 @@ const meta = {
     },
     locationEnum: {
       control: 'select',
-      options: [Location.core, Location.dome, Location.body],
+      options: [Location.CORE, Location.DOME, Location.BODY],
       description: 'Location enum (core, dome, or body)',
     },
     parentTestId: {
@@ -173,10 +173,10 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     isMaster: false,
-    locationEnum: Location.core,
+    locationEnum: Location.CORE,
     parentTestId: 'test',
     _location: getControllerLocation(),
-    _locationEnum: Location.core,
+    _locationEnum: Location.CORE,
   } as any,
 };
 
@@ -186,10 +186,10 @@ export const Default: Story = {
 export const WithModules: Story = {
   args: {
     isMaster: false,
-    locationEnum: Location.core,
+    locationEnum: Location.CORE,
     parentTestId: 'test',
     _location: getControllerLocationWithModules(),
-    _locationEnum: Location.core,
+    _locationEnum: Location.CORE,
   } as any,
 };
 
@@ -199,10 +199,10 @@ export const WithModules: Story = {
 export const MasterController: Story = {
   args: {
     isMaster: true,
-    locationEnum: Location.dome,
+    locationEnum: Location.DOME,
     parentTestId: 'test',
     _location: getControllerLocationWithModules(),
-    _locationEnum: Location.dome,
+    _locationEnum: Location.DOME,
   } as any,
 };
 
@@ -212,7 +212,7 @@ export const MasterController: Story = {
 export const OnlyUartModules: Story = {
   args: {
     isMaster: false,
-    locationEnum: Location.body,
+    locationEnum: Location.BODY,
     parentTestId: 'test',
     _location: {
       ...getControllerLocation(),
@@ -249,7 +249,7 @@ export const OnlyUartModules: Story = {
         },
       ],
     },
-    _locationEnum: Location.body,
+    _locationEnum: Location.BODY,
   } as any,
 };
 
@@ -259,7 +259,7 @@ export const OnlyUartModules: Story = {
 export const OnlyI2cModules: Story = {
   args: {
     isMaster: false,
-    locationEnum: Location.core,
+    locationEnum: Location.CORE,
     parentTestId: 'test',
     _location: {
       ...getControllerLocation(),
@@ -290,7 +290,7 @@ export const OnlyI2cModules: Story = {
         },
       ],
     },
-    _locationEnum: Location.core,
+    _locationEnum: Location.CORE,
   } as any,
 };
 
@@ -300,7 +300,7 @@ export const OnlyI2cModules: Story = {
 export const ManyModules: Story = {
   args: {
     isMaster: false,
-    locationEnum: Location.dome,
+    locationEnum: Location.DOME,
     parentTestId: 'test',
     _location: {
       ...getControllerLocation(),
@@ -333,6 +333,6 @@ export const ManyModules: Story = {
         })),
       },
     },
-    _locationEnum: Location.dome,
+    _locationEnum: Location.DOME,
   } as any,
 };

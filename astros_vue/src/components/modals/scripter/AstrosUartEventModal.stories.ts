@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import AstrosUartEventModal from './AstrosUartEventModal.vue';
-import { ScriptEvent, GenericSerialEvent } from '@/models/scripts/scripting';
+import type { ScriptEvent, GenericSerialEvent } from '@/models';
 import { ModuleType } from '@/enums/modules/ModuleType';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 
@@ -24,14 +24,14 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const createScriptEvent = (time: number = 0, value: string = ''): ScriptEvent => {
-  const event = value ? new GenericSerialEvent(value) : undefined;
-  return new ScriptEvent(
-    'uart-channel-1',
-    ModuleType.uart,
-    ModuleSubType.genericSerial,
+  const event: GenericSerialEvent | undefined = value ? { value: value } : undefined;
+  return {
+    scriptChannelId: 'uart-channel-1',
+    moduleType: ModuleType.UART,
+    moduleSubType: ModuleSubType.GENERIC_SERIAL,
     time,
-    event,
-  );
+    event: event as ScriptEvent['event'],
+  }
 };
 
 export const AddMode: Story = {

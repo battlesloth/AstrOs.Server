@@ -3,8 +3,8 @@ import { ref, computed, onMounted } from 'vue';
 import {
   type I2cEvent,
   type ScriptEventModalResponse,
-} from '@/models/scripts/scripting';
-import type { ScriptEvent } from '@/models/scripts/scriptEvent';
+  type ScriptEvent,
+} from '@/models';
 
 export type I2cEventModalMode = 'add' | 'edit';
 

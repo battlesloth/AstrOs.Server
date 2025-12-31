@@ -4,7 +4,8 @@ import { v4 as uuid } from 'uuid';
 import AstrosGpioEventModal from './AstrosGpioEventModal.vue';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import { ModuleType } from '@/enums/modules/ModuleType';
-import { GpioEvent, MaestroEvent, ScriptEvent } from '@/models/scripts/scripting';
+import type { GpioEvent, MaestroEvent, ScriptEvent } from '@/models';
+
 
 const meta = {
   title: 'Components/Modals/Scripter/GpioEventModal',
@@ -26,58 +27,70 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    scriptEvent: getScriptEvent(ModuleSubType.genericGpio, true),
+    scriptEvent: getScriptEvent(ModuleSubType.GENERIC_GPIO, true),
     mode: 'add',
   },
 };
 
 export const GpioLow: Story = {
   args: {
-    scriptEvent: getScriptEvent(ModuleSubType.genericGpio, false),
+    scriptEvent: getScriptEvent(ModuleSubType.GENERIC_GPIO, false),
     mode: 'add',
   },
 };
 
 export const MaestroHigh: Story = {
   args: {
-    scriptEvent: getScriptEvent(ModuleSubType.maestro, true),
+    scriptEvent: getScriptEvent(ModuleSubType.MAESTRO, true),
     mode: 'add',
   },
 };
 
 export const MaestroLow: Story = {
   args: {
-    scriptEvent: getScriptEvent(ModuleSubType.maestro, false),
+    scriptEvent: getScriptEvent(ModuleSubType.MAESTRO, false),
     mode: 'add',
   },
 };
 
 export const UndefinedEvent: Story = {
   args: {
-    scriptEvent: getScriptEvent(ModuleSubType.maestro, false, true),
+    scriptEvent: getScriptEvent(ModuleSubType.MAESTRO, false, true),
     mode: 'add',
   },
 };
 
 export const EditMode: Story = {
   args: {
-    scriptEvent: getScriptEvent(ModuleSubType.genericGpio, true),
+    scriptEvent: getScriptEvent(ModuleSubType.GENERIC_GPIO, true),
     mode: 'edit',
   },
 };
 
 function getScriptEvent(type: ModuleSubType, setHigh: boolean, undefinedEvt = false): ScriptEvent {
-  let modType = ModuleType.gpio;
-  let evt: GpioEvent | MaestroEvent | undefined = new GpioEvent(setHigh);
+  let modType = ModuleType.GPIO;
+  let evt: GpioEvent | MaestroEvent | undefined = { setHigh };
 
   switch (type) {
-    case ModuleSubType.maestro:
-      modType = ModuleType.uart;
-      evt = new MaestroEvent(-1, false, setHigh ? 2500 : 500, 0, 0);
+    case ModuleSubType.MAESTRO:
+      modType = ModuleType.UART;
+      evt = {
+        channel: -1,
+        isServo: false,
+        position: setHigh ? 2500 : 500,
+        speed: 0,
+        acceleration: 0,
+      };
       break;
     default:
       break;
   }
 
-  return new ScriptEvent(uuid(), modType, type, 2000, undefinedEvt ? undefined : evt);
+  return {
+    scriptChannelId: uuid(),
+    moduleType: modType,
+    moduleSubType: type,
+    time: 2000,
+    event: undefinedEvt ? undefined : evt,
+  };
 }

@@ -15,8 +15,8 @@ function getModule(i2cAddress: number): I2cModule {
     name: 'PCA9685',
     locationId,
     i2cAddress,
-    moduleType: ModuleType.i2c,
-    moduleSubType: ModuleSubType.pwmBoard,
+    moduleType: ModuleType.I2C,
+    moduleSubType: ModuleSubType.PWM_BOARD,
     subModule: {},
   };
 }

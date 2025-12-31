@@ -22,7 +22,7 @@ export const Default: Story = {
   args: {
     controllerAddress: '192.168.1.100',
     controllerName: 'MainController',
-    moduleSubType: ModuleSubType.maestro,
+    moduleSubType: ModuleSubType.MAESTRO,
     moduleIdx: 0,
     channelNumber: 1,
     homePosition: 1500,
@@ -33,7 +33,7 @@ export const Channel0: Story = {
   args: {
     controllerAddress: '192.168.1.100',
     controllerName: 'MainController',
-    moduleSubType: ModuleSubType.maestro,
+    moduleSubType: ModuleSubType.MAESTRO,
     moduleIdx: 0,
     channelNumber: 0,
     homePosition: 1500,
@@ -44,7 +44,7 @@ export const Channel5: Story = {
   args: {
     controllerAddress: '192.168.1.100',
     controllerName: 'MainController',
-    moduleSubType: ModuleSubType.maestro,
+    moduleSubType: ModuleSubType.MAESTRO,
     moduleIdx: 1,
     channelNumber: 5,
     homePosition: 1200,
@@ -55,7 +55,7 @@ export const PWMBoard: Story = {
   args: {
     controllerAddress: '192.168.1.200',
     controllerName: 'SecondaryController',
-    moduleSubType: ModuleSubType.pwmBoard,
+    moduleSubType: ModuleSubType.PWM_BOARD,
     moduleIdx: 2,
     channelNumber: 8,
     homePosition: 1700,

@@ -47,13 +47,13 @@ const isOpen = computed(() => props.openModuleId === props.module.id);
 // Computed properties
 const subtypeName = computed(() => {
   switch (props.module.moduleSubType) {
-    case ModuleSubType.genericSerial:
+    case ModuleSubType.GENERIC_SERIAL:
       return 'uart.module_types.generic';
-    case ModuleSubType.kangaroo:
+    case ModuleSubType.KANGAROO:
       return 'uart.module_types.kangaroo';
-    case ModuleSubType.humanCyborgRelationsSerial:
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
       return 'uart.module_types.hcr';
-    case ModuleSubType.maestro:
+    case ModuleSubType.MAESTRO:
       return 'uart.module_types.maestro';
     default:
       return '';
@@ -62,13 +62,13 @@ const subtypeName = computed(() => {
 
 const subModuleComponent = computed<Component | null>(() => {
   switch (props.module.moduleSubType) {
-    case ModuleSubType.genericSerial:
+    case ModuleSubType.GENERIC_SERIAL:
       return AstrosGenericSerialModule;
-    case ModuleSubType.kangaroo:
+    case ModuleSubType.KANGAROO:
       return AstrosKangarooModule;
-    case ModuleSubType.humanCyborgRelationsSerial:
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
       return AstrosHcrSerialModule;
-    case ModuleSubType.maestro:
+    case ModuleSubType.MAESTRO:
       return AstrosMaestroModule;
     default:
       return null;
@@ -81,7 +81,7 @@ const removeModule = (event: Event) => {
   emit('removeModule', {
     locationId: props.locationId,
     id: props.module.id,
-    moduleType: ModuleType.uart,
+    moduleType: ModuleType.UART,
   });
 };
 

@@ -17,16 +17,16 @@ function getSerialModule(
   let moduleName = name || 'UART Module';
 
   switch (type) {
-    case ModuleSubType.genericSerial:
+    case ModuleSubType.GENERIC_SERIAL:
       moduleName = name || 'Generic Serial';
       break;
-    case ModuleSubType.kangaroo:
+    case ModuleSubType.KANGAROO:
       moduleName = name || 'Kangaroo X2';
       break;
-    case ModuleSubType.maestro:
+    case ModuleSubType.MAESTRO:
       moduleName = name || 'Maestro';
       break;
-    case ModuleSubType.humanCyborgRelationsSerial:
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
       moduleName = name || 'HCR';
       break;
   }
@@ -36,7 +36,7 @@ function getSerialModule(
     id,
     name: moduleName,
     locationId,
-    moduleType: ModuleType.uart,
+    moduleType: ModuleType.UART,
     moduleSubType: type,
     uartChannel: ch,
     baudRate,
@@ -55,7 +55,7 @@ const meta = {
     template: '<AstrosUartModule v-bind="args" />',
   }),
   args: {
-    module: getSerialModule(ModuleSubType.genericSerial, 1, 9600),
+    module: getSerialModule(ModuleSubType.GENERIC_SERIAL, 1, 9600),
     parentTestId: 'test',
     isMaster: false,
   },
@@ -81,7 +81,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const GenericSerial: Story = {
   args: {
-    module: getSerialModule(ModuleSubType.genericSerial, 1, 9600),
+    module: getSerialModule(ModuleSubType.GENERIC_SERIAL, 1, 9600),
     parentTestId: 'test',
     isMaster: false,
   },
@@ -92,7 +92,7 @@ export const GenericSerial: Story = {
  */
 export const KangarooX2: Story = {
   args: {
-    module: getSerialModule(ModuleSubType.kangaroo, 2, 115200),
+    module: getSerialModule(ModuleSubType.KANGAROO, 2, 115200),
     parentTestId: 'test',
     isMaster: false,
   },
@@ -103,7 +103,7 @@ export const KangarooX2: Story = {
  */
 export const Maestro: Story = {
   args: {
-    module: getSerialModule(ModuleSubType.maestro, 1, 57600),
+    module: getSerialModule(ModuleSubType.MAESTRO, 1, 57600),
     parentTestId: 'test',
     isMaster: false,
   },
@@ -114,7 +114,7 @@ export const Maestro: Story = {
  */
 export const HumanCyborgRelations: Story = {
   args: {
-    module: getSerialModule(ModuleSubType.humanCyborgRelationsSerial, 1, 9600),
+    module: getSerialModule(ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL, 1, 9600),
     parentTestId: 'test',
     isMaster: false,
   },
@@ -125,7 +125,7 @@ export const HumanCyborgRelations: Story = {
  */
 export const MasterModule: Story = {
   args: {
-    module: getSerialModule(ModuleSubType.genericSerial, 2, 9600),
+    module: getSerialModule(ModuleSubType.GENERIC_SERIAL, 2, 9600),
     parentTestId: 'test',
     isMaster: true,
   },
@@ -136,7 +136,7 @@ export const MasterModule: Story = {
  */
 export const CustomBaudRate: Story = {
   args: {
-    module: getSerialModule(ModuleSubType.genericSerial, 1, 115200, 'High Speed Serial'),
+    module: getSerialModule(ModuleSubType.GENERIC_SERIAL, 1, 115200, 'High Speed Serial'),
     parentTestId: 'test',
     isMaster: false,
   },
@@ -150,10 +150,10 @@ export const MultipleModules: Story = {
     components: { AstrosUartModule },
     setup() {
       const modules = [
-        getSerialModule(ModuleSubType.genericSerial, 1, 9600, 'GPS Module'),
-        getSerialModule(ModuleSubType.kangaroo, 2, 115200, 'Drive Motors'),
-        getSerialModule(ModuleSubType.maestro, 3, 57600, 'Servo Controller'),
-        getSerialModule(ModuleSubType.humanCyborgRelationsSerial, 0, 9600, 'Voice Module'),
+        getSerialModule(ModuleSubType.GENERIC_SERIAL, 1, 9600, 'GPS Module'),
+        getSerialModule(ModuleSubType.KANGAROO, 2, 115200, 'Drive Motors'),
+        getSerialModule(ModuleSubType.MAESTRO, 3, 57600, 'Servo Controller'),
+        getSerialModule(ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL, 0, 9600, 'Voice Module'),
       ];
       return { modules };
     },

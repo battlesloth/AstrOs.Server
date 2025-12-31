@@ -23,36 +23,36 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    locationId: Location.core,
-    moduleType: ModuleType.uart,
+    locationId: Location.CORE,
+    moduleType: ModuleType.UART,
   },
 };
 
 export const Serial: Story = {
   args: {
-    locationId: Location.core,
-    moduleType: ModuleType.uart,
+    locationId: Location.CORE,
+    moduleType: ModuleType.UART,
   },
 };
 
 export const I2C: Story = {
   args: {
-    locationId: Location.core,
-    moduleType: ModuleType.i2c,
+    locationId: Location.CORE,
+    moduleType: ModuleType.I2C,
   },
 };
 
 export const GPIO: Story = {
   args: {
-    locationId: Location.core,
-    moduleType: ModuleType.gpio,
+    locationId: Location.CORE,
+    moduleType: ModuleType.GPIO,
   },
 };
 
 export const Closed: Story = {
   args: {
-    locationId: Location.core,
-    moduleType: ModuleType.uart,
+    locationId: Location.CORE,
+    moduleType: ModuleType.UART,
     isOpen: false,
   },
 };

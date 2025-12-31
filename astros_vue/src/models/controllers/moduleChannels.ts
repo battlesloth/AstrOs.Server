@@ -18,17 +18,17 @@ export type ModuleChannelType =
 
 export function moduleChannelTypeFromSubType(subtype: ModuleSubType): string {
   switch (subtype) {
-    case ModuleSubType.genericGpio:
+    case ModuleSubType.GENERIC_GPIO:
       return 'GpioChannel';
-    case ModuleSubType.genericI2C:
+    case ModuleSubType.GENERIC_I2C:
       return 'I2cChannel';
-    case ModuleSubType.pwmBoard:
+    case ModuleSubType.PWM_BOARD:
       return 'PwmChannel';
-    case ModuleSubType.genericSerial:
+    case ModuleSubType.GENERIC_SERIAL:
       return 'UartChannel';
-    case ModuleSubType.kangaroo:
+    case ModuleSubType.KANGAROO:
       return 'KangarooX2Channel';
-    case ModuleSubType.maestro:
+    case ModuleSubType.MAESTRO:
       return 'MaestroChannel';
     default:
       return '';

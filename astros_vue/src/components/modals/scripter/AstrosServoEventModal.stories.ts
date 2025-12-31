@@ -1,9 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import AstrosServoEventModal from './AstrosServoEventModal.vue';
-import { ScriptEvent, MaestroEvent } from '@/models/scripts/scripting';
-import { ModuleType } from '@/enums/modules/ModuleType';
-import { ModuleSubType } from '@/enums/modules/ModuleSubType';
+import type { ScriptEvent, MaestroEvent } from '@/models';
+import { ModuleType, ModuleSubType } from '@/enums';
 
 const meta = {
   title: 'Components/Modals/Scripter/ServoEventModal',
@@ -29,8 +28,21 @@ const createScriptEvent = (
   speed: number = 0,
   acceleration: number = 0,
 ): ScriptEvent => {
-  const event = new MaestroEvent(-1, true, position, speed, acceleration);
-  return new ScriptEvent('channel-1', ModuleType.uart, ModuleSubType.maestro, time, event);
+  const event: MaestroEvent = {
+    channel: 0,
+    isServo: true,
+    position,
+    speed,
+    acceleration,
+  };
+
+  return {
+    scriptChannelId: 'channel-1',
+    moduleType: ModuleType.UART,
+    moduleSubType: ModuleSubType.MAESTRO,
+    time,
+    event,
+  };
 };
 
 export const AddMode: Story = {

@@ -27,12 +27,12 @@ function getUploadStatus(location: string): { class: string; text: string } {
   }
 
   switch (status.value) {
-    case UploadStatus.uploaded:
+    case UploadStatus.UPLOADED:
       return {
         class: 'badge-success',
         text: status.date ? new Date(status.date).toLocaleString() : 'No date',
       };
-    case UploadStatus.uploading:
+    case UploadStatus.UPLOADING:
       return { class: 'badge-warning', text: 'Uploading...' };
     case UploadStatus.NOT_UPLOADED:
       return { class: 'badge-error', text: 'Not uploaded' };

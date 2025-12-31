@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import { v4 as uuid } from 'uuid';
 import AstrosAddChannelModal from './AstrosAddChannelModal.vue';
-import { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
-import type { LocationDetails, ChannelDetails } from '@/models/scripts/scripting';
+import { ScriptChannelType } from '@/enums';
+import type { LocationDetails, ChannelDetails } from '@/models';
 
 const bodyUuid = '1035b586-54ea-4e12-b08c-b47c20ec4d76';
 const coreUuid = '1a216e62-3224-4113-a3a5-24d486d83ca4';
@@ -27,16 +27,11 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    controllers: generateControllers(),
-    channels: generateChannels(),
   },
 };
 
 export const Unavailable: Story = {
-  args: {
-    controllers: generateControllers(),
-    channels: generateChannels(true),
-  },
+  args: {},
 };
 
 function generateControllers(): LocationDetails[] {

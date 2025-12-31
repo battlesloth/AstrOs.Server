@@ -21,8 +21,8 @@ function createGpioChannel(
     enabled,
     channelName,
     defaultHigh,
-    moduleType: ModuleType.gpio,
-    moduleSubType: ModuleSubType.genericGpio,
+    moduleType: ModuleType.GPIO,
+    moduleSubType: ModuleSubType.GENERIC_GPIO,
   };
 }
 

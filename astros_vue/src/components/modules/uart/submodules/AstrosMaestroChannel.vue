@@ -62,7 +62,7 @@ const testServoModal = () => {
   emit('servoTest', {
     controllerAddress: '',
     controllerName: '',
-    moduleSubType: ModuleSubType.maestro,
+    moduleSubType: ModuleSubType.MAESTRO,
     moduleIdx: -1,
     channelNumber: props.channel.channelNumber,
     homePosition: props.channel.homePos,
