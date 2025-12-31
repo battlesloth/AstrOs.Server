@@ -14,4 +14,5 @@ export interface EventBox {
   channelId: string;
   timeInSeconds: number;
   graphics: Graphics;
+  scriptEvent: ScriptEvent;
 }

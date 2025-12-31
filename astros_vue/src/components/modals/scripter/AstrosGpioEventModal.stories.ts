@@ -2,8 +2,7 @@ import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import { v4 as uuid } from 'uuid';
 import AstrosGpioEventModal from './AstrosGpioEventModal.vue';
-import { ModuleSubType } from '@/enums/modules/ModuleSubType';
-import { ModuleType } from '@/enums/modules/ModuleType';
+import { ModuleSubType, ModuleType, ModalMode } from '@/enums';
 import type { GpioEvent, MaestroEvent, ScriptEvent } from '@/models';
 
 
@@ -28,42 +27,42 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     scriptEvent: getScriptEvent(ModuleSubType.GENERIC_GPIO, true),
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 };
 
 export const GpioLow: Story = {
   args: {
     scriptEvent: getScriptEvent(ModuleSubType.GENERIC_GPIO, false),
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 };
 
 export const MaestroHigh: Story = {
   args: {
     scriptEvent: getScriptEvent(ModuleSubType.MAESTRO, true),
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 };
 
 export const MaestroLow: Story = {
   args: {
     scriptEvent: getScriptEvent(ModuleSubType.MAESTRO, false),
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 };
 
 export const UndefinedEvent: Story = {
   args: {
     scriptEvent: getScriptEvent(ModuleSubType.MAESTRO, false, true),
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 };
 
 export const EditMode: Story = {
   args: {
     scriptEvent: getScriptEvent(ModuleSubType.GENERIC_GPIO, true),
-    mode: 'edit',
+    mode: ModalMode.EDIT,
   },
 };
 

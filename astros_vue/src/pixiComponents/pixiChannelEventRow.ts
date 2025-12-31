@@ -1,3 +1,4 @@
+import type { useEventBoxes } from '@/composables/useEventBoxes';
 import type { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
 import { Container, Graphics } from 'pixi.js';
 import { type Ref } from 'vue';
@@ -11,8 +12,10 @@ export interface PixiChannelEventRowOptions {
   borderColor?: number;
   timeLineDuration: number;
   timeLineWidth: Ref<number>;
-  isDragging: Ref<boolean>;
+  hasDragged: Ref<boolean>;
+  hasEventBoxDragged: Ref<boolean>;
   onClick: (id: string, time: number) => void;
+  resetDraggedFlag: () => void;
 }
 
 export class PixiChannelEventRow extends Container {
@@ -23,12 +26,19 @@ export class PixiChannelEventRow extends Container {
 
   background: Graphics | null = null;
 
+  hasDragged: Ref<boolean>;
+  hasEventBoxDragged: Ref<boolean>;
+
   constructor(options: PixiChannelEventRowOptions) {
     super();
+
     this.options = options;
     this.channelId = options.channelId;
     this.channelType = options.channelType;
     this.rowIdx = options.rowIdx;
+    this.hasDragged = options.hasDragged;
+    this.hasEventBoxDragged = options.hasEventBoxDragged;
+
     this.x = 0;
     this.y = this.rowIdx * options.height;
     this.eventMode = 'static';
@@ -42,20 +52,17 @@ export class PixiChannelEventRow extends Container {
       // Only respond to left-click
       if (event.button !== 0) return;
 
-      // Don't create box if user was dragging timeline or event box
-      /*if (hasDragged.value || hasEventBoxDragged.value) {
-        hasEventBoxDragged.value = false; // Reset flag
-        return;
-      }*/
-      if (this.options.isDragging.value) {
+
+      if (this.hasDragged.value || this.hasEventBoxDragged.value) {
+        this.options.resetDraggedFlag();
         return;
       }
 
       const localPos = this.toLocal(event.global);
 
-      const time = Math.floor(
-        (localPos.x / this.options.timeLineWidth.value) * this.options.timeLineDuration,
-      );
+      // Calculate time with 0.1 second precision
+      const timeInSeconds = (localPos.x / this.options.timeLineWidth.value) * this.options.timeLineDuration;
+      const time = Math.round(timeInSeconds * 10) / 10;
 
       this.options.onClick(this.channelId, time);
     });

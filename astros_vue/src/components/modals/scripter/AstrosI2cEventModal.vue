@@ -5,16 +5,16 @@ import {
   type ScriptEventModalResponse,
   type ScriptEvent,
 } from '@/models';
+import { ModalMode } from '@/enums';
 
-export type I2cEventModalMode = 'add' | 'edit';
 
 const props = withDefaults(
   defineProps<{
     scriptEvent: ScriptEvent;
-    mode?: I2cEventModalMode;
+    mode?: ModalMode;
   }>(),
   {
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 );
 
@@ -26,8 +26,7 @@ const emit = defineEmits<{
 }>();
 
 // Constants
-const maxTime = 3000;
-const timeFactor = 10;
+const maxTime = 600;
 
 // Local state
 const eventTime = ref(0);
@@ -35,7 +34,7 @@ const originalEventTime = ref(0);
 const message = ref('');
 const errorMessage = ref('');
 
-const showRemoveButton = computed(() => props.mode === 'edit');
+const showRemoveButton = computed(() => props.mode === ModalMode.EDIT);
 
 onMounted(() => {
   const temp = props.scriptEvent.event as I2cEvent;
@@ -44,22 +43,22 @@ onMounted(() => {
     message.value = temp.message;
   }
 
-  originalEventTime.value = props.scriptEvent.time / timeFactor;
-  eventTime.value = props.scriptEvent.time / timeFactor;
+  originalEventTime.value = props.scriptEvent.time;
+  eventTime.value = props.scriptEvent.time;
 });
 
 const addEvent = () => {
   if (eventTime.value > maxTime) {
-    errorMessage.value = `Event time cannot be larger than ${maxTime / timeFactor}`;
+    errorMessage.value = `Event time cannot be larger than ${maxTime} seconds`;
     return;
   }
 
-  props.scriptEvent.time = eventTime.value * timeFactor;
+  props.scriptEvent.time = eventTime.value;
   props.scriptEvent.event = { message: message.value };
 
   const response: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value * timeFactor,
+    time: originalEventTime.value
   };
 
   if (props.mode === 'edit') {
@@ -72,7 +71,7 @@ const addEvent = () => {
 const removeEvent = () => {
   const response: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value * timeFactor,
+    time: originalEventTime.value
   };
   emit('removeEvent', response);
 };

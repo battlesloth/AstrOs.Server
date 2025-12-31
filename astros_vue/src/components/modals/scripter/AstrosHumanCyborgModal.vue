@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { HumanCyborgRelationsCmd, HcrCommandCategory } from '@/enums';
+import { HumanCyborgRelationsCmd, HcrCommandCategory, ModalMode } from '@/enums';
 import type {
   HcrCommand,
   HumanCyborgRelationsEvent,
@@ -11,7 +11,6 @@ import type {
 import { v4 as uuid } from 'uuid';
 import { useHumanCyborgRelations } from '@/composables/useHumanCyborgRelations';
 
-export type HumanCyborgModalMode = 'add' | 'edit';
 
 const {getHcrCommandName, getHcrCommandString } = useHumanCyborgRelations();
 
@@ -23,10 +22,10 @@ interface HcrCommandListItem {
 const props = withDefaults(
   defineProps<{
     scriptEvent: ScriptEvent;
-    mode?: HumanCyborgModalMode;
+    mode?: ModalMode;
   }>(),
   {
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 );
 
@@ -38,8 +37,7 @@ const emit = defineEmits<{
 }>();
 
 // Constants
-const maxTime = 3000;
-const timeFactor = 10;
+const maxTime = 600;
 
 // Local state
 const eventTime = ref(0);
@@ -72,7 +70,7 @@ const hasValueB = [
   HumanCyborgRelationsCmd.PLAY_SD_RANDOM_ON_B,
 ];
 
-const showRemoveButton = computed(() => props.mode === 'edit');
+const showRemoveButton = computed(() => props.mode === ModalMode.EDIT);
 
 const valueADisabled = computed(() => {
   const cmdNum = Number(command.value);
@@ -92,8 +90,8 @@ onMounted(() => {
     selectedCommands.value.push(...temp.commands);
   }
 
-  originalEventTime.value = props.scriptEvent.time / timeFactor;
-  eventTime.value = props.scriptEvent.time / timeFactor;
+  originalEventTime.value = props.scriptEvent.time;
+  eventTime.value = props.scriptEvent.time;
 });
 
 const hcrListItem = (cmd: HumanCyborgRelationsCmd): HcrCommandListItem => {
@@ -248,11 +246,11 @@ const formatSelectedCommand = (cmd: HcrCommand): string => {
 
 const addEvent = () => {
   if (eventTime.value > maxTime) {
-    errorMessage.value = `Event time cannot be larger than ${maxTime / timeFactor}`;
+    errorMessage.value = `Event time cannot be larger than ${maxTime} seconds`;
     return;
   }
 
-  props.scriptEvent.time = eventTime.value * timeFactor;
+  props.scriptEvent.time = eventTime.value;
 
   const data = { commands: selectedCommands.value };
   props.scriptEvent.event = data;
@@ -272,7 +270,7 @@ const addEvent = () => {
 const removeEvent = () => {
   const response: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value * timeFactor,
+    time: originalEventTime.value
   };
   emit('removeEvent', response);
 };

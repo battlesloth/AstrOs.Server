@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { AstrosFieldUsername, AstrosFieldPassword } from '@/components';
+import { AstrosFieldUsername, AstrosFieldPassword } from '@/components/common';
 
 const props = defineProps({
   background: {

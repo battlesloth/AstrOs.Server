@@ -9,6 +9,7 @@ export function useEventBoxes(
   TIMELINE_WIDTH: Ref<number>,
   TIMELINE_DURATION_SECONDS: number,
   rowHeight: number,
+  onEditEvent: (event: any) => void,
 ) {
   const channelEventBoxes = ref<Map<string, EventBox[]>>(new Map());
   const isDraggingEventBox = ref(false);
@@ -23,10 +24,11 @@ export function useEventBoxes(
   function addEventBox(
     rowContainer: Container,
     channelId: string,
-    timeInSeconds: number,
+    scriptEvent: any,
     app: Ref<any>,
     isDraggingTimeline: Ref<boolean>,
   ) {
+    const timeInSeconds = scriptEvent.time;
     const boxWidth = 60;
     const boxHeight = rowHeight - 10;
     const boxY = 5;
@@ -51,12 +53,22 @@ export function useEventBoxes(
     eventBox.cursor = 'grab';
 
     // Store the event data with graphics reference
-    const eventBoxData: EventBox = { channelId, timeInSeconds, graphics: eventBox };
+    const eventBoxData: EventBox = { channelId, timeInSeconds, graphics: eventBox, scriptEvent };
 
     if (!channelEventBoxes.value.has(channelId)) {
       channelEventBoxes.value.set(channelId, []);
     }
     channelEventBoxes.value.get(channelId)!.push(eventBoxData);
+
+    // Add click handler for editing
+    eventBox.on('pointertap', (event) => {
+      if (hasEventBoxDragged.value) {
+        hasEventBoxDragged.value = false;
+        return;
+      }
+      event.stopPropagation();
+      onEditEvent(scriptEvent);
+    });
 
     // Add drag handlers
     eventBox.on('pointerdown', (event) => {
@@ -124,13 +136,17 @@ export function useEventBoxes(
     }
 
     const deltaTimeSeconds = (deltaX / TIMELINE_WIDTH.value) * TIMELINE_DURATION_SECONDS;
-    const newTime = Math.max(
+    let newTime = Math.max(
       0,
       Math.min(TIMELINE_DURATION_SECONDS, eventBoxStartTime.value + deltaTimeSeconds),
     );
 
+    // Round to 0.1 second precision
+    newTime = Math.round(newTime * 10) / 10;
+
     // Update the event box time and position
     draggedEventBox.value.timeInSeconds = newTime;
+    draggedEventBox.value.scriptEvent.time = newTime;
     const pixelPosition = (newTime / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
     draggedEventBox.value.graphics.x = pixelPosition;
   }

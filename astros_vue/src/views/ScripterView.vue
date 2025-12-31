@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, useTemplateRef } from 'vue';
-import { ModalType, ScriptChannelType } from '@/enums';
+import { ModalMode, ModalType, ScriptChannelType } from '@/enums';
 import { useScripterStore } from '@/stores/scripter';
 import { useRoute } from 'vue-router';
 import {
@@ -20,7 +20,7 @@ import {
   AstrosConfirmModal,
 } from '@/components';
 import router from '@/router';
-import type { AddChannelModalResponse, ScriptEvent } from '@/models';
+import type { AddChannelModalResponse, ScriptEvent, ScriptEventModalResponse } from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
 
 const scripter = useTemplateRef('scripter');
@@ -31,6 +31,7 @@ const modalMessage = ref<string>('Loading...');
 const scriptLoadFailed = ref<boolean>(false);
 
 const selectedScriptEvent = ref<ScriptEvent | null>(null);
+const modalMode = ref<ModalMode>(ModalMode.ADD);
 
 const route = useRoute();
 const scripterStore = useScripterStore();
@@ -74,6 +75,7 @@ function swapChannel() {}
 function doSwapChannel() {}
 
 function addEvent(chId: string, time: number) {
+  modalMode.value = ModalMode.ADD;
   const channel = scripterStore.getChannel(chId);
 
   if (!channel) {
@@ -95,7 +97,7 @@ function addEvent(chId: string, time: number) {
   );
 }
 
-function doAddEvent(event: ScriptEvent) {
+function doAddEvent(response: ScriptEventModalResponse) {
   if (!selectedScriptEvent.value) {
     console.log('No selected script event to add.');
     return;
@@ -106,8 +108,34 @@ function doAddEvent(event: ScriptEvent) {
     event,
   );*/
   scripter.value?.addEvent(
-    event,
+    response.scriptEvent
   );
+
+  selectedScriptEvent.value = null;
+}
+
+function editEvent(event: ScriptEvent) {
+  modalMode.value = ModalMode.EDIT;
+  selectedScriptEvent.value = event;
+  
+  const channel = scripterStore.getChannel(event.scriptChannelId);
+
+  if (!channel) {
+    console.log(`Channel with ID ${event.scriptChannelId} not found.`);
+    return;
+  }
+
+  showModal.value = eventTypeToModalType(
+    channel.moduleChannel.moduleType,
+    channel.moduleChannel.moduleSubType,
+  );
+}
+
+function doEditEvent(response: ScriptEventModalResponse) {
+  if (!selectedScriptEvent.value) {
+    console.log('No selected script event to edit.');
+    return;
+  }
 
   selectedScriptEvent.value = null;
 }
@@ -127,6 +155,11 @@ function alertClose() {
     return;
   }
   showModal.value = ModalType.CLOSE_ALL;
+}
+
+function eventModalClose() {
+  showModal.value = ModalType.CLOSE_ALL;
+  selectedScriptEvent.value = null;
 }
 
 function confirm() {
@@ -207,39 +240,55 @@ onMounted(async () => {
       />
 
       <AstrosGpioEventModal
-        v-if="showModal === ModalType.GPIO_EVENT"
-        @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent!"
+        v-if="showModal === ModalType.GPIO_EVENT && selectedScriptEvent"
+        @close="eventModalClose"
+        @add-event="doAddEvent"
+        @edit-event="doEditEvent"
+        :mode="modalMode"
+        :script-event="selectedScriptEvent"
       />
       <AstrosHumanCyborgModal
-        v-if="showModal === ModalType.HCR_EVENT"
-        @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent!"
+        v-if="showModal === ModalType.HCR_EVENT && selectedScriptEvent"
+        @close="eventModalClose"
+        @add-event="doAddEvent"
+        @edit-event="doEditEvent"
+        :mode="modalMode"
+        :script-event="selectedScriptEvent"
       />
       <AstrosI2cEventModal
-        v-if="showModal === ModalType.I2C_EVENT"
-        @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent!"
+        v-if="showModal === ModalType.I2C_EVENT && selectedScriptEvent"
+        @close="eventModalClose"
+        @add-event="doAddEvent"
+        @edit-event="doEditEvent"
+        :mode="modalMode"
+        :script-event="selectedScriptEvent"
       />
       <AstrosKangarooEventModal
-        v-if="showModal === ModalType.KANGAROO_EVENT"
-        @close="showModal = ModalType.CLOSE_ALL"
+        v-if="showModal === ModalType.KANGAROO_EVENT && selectedScriptEvent"
+        @close="eventModalClose"
+        @add-event="doAddEvent"
+        @edit-event="doEditEvent"
+        :mode="modalMode"
         :kangaroo="{
           id: '',
           ch1Name: 'ch 1',
           ch2Name: 'ch 2',
         }"
-        :script-event="selectedScriptEvent!"
+        :script-event="selectedScriptEvent"
       />
       <AstrosServoEventModal
-        v-if="showModal === ModalType.SERVO_EVENT"
-        @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent!"
+        v-if="showModal === ModalType.SERVO_EVENT && selectedScriptEvent"
+        @close="eventModalClose"
+        @add-event="doAddEvent"
+        @edit-event="doEditEvent"
+        :mode="modalMode"
+        :script-event="selectedScriptEvent"
       />
       <AstrosUartEventModal
-        v-if="showModal === ModalType.UART_EVENT"
-        @close="showModal = ModalType.CLOSE_ALL"
-        :script-event="selectedScriptEvent!"
+        v-if="showModal === ModalType.UART_EVENT && selectedScriptEvent"
+        @close="eventModalClose"
+        :mode="modalMode"
+        :script-event="selectedScriptEvent"
       />
     </template>
   </AstrosLayout>

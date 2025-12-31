@@ -195,7 +195,9 @@ const {
   updateAllEventBoxPositions,
   handleEventBoxDrag,
   endEventBoxDrag,
-} = useEventBoxes(TIMELINE_WIDTH, TIMELINE_DURATION_SECONDS, ROW_HEIGHT);
+} = useEventBoxes(TIMELINE_WIDTH, TIMELINE_DURATION_SECONDS, ROW_HEIGHT, (event) => {
+  emitEditEvent(event.scriptChannelId, event.id ?? 0);
+});
 
 // Other
 let resizeObserver: ResizeObserver | null = null;
@@ -558,7 +560,11 @@ function createChannelRowContainer(channelId: string, channelType: ScriptChannel
     height: ROW_HEIGHT,
     timeLineDuration: TIMELINE_DURATION_SECONDS,
     timeLineWidth: TIMELINE_WIDTH,
-    isDragging: isDraggingTimeline,
+    hasDragged: hasDragged,
+    hasEventBoxDragged: hasEventBoxDragged,
+    resetDraggedFlag: () => {
+      hasEventBoxDragged.value = false;
+    },
     onClick: emitAddEvent,
   };
 
@@ -658,7 +664,7 @@ function doAddEvent(event: ScriptEvent) {
     console.error('Channel row container not found for channel ID:', event.scriptChannelId);
     return;
   }
-  addEventBox(rowContainer as any, event.scriptChannelId, event.time, app, isDraggingTimeline);
+  addEventBox(rowContainer as any, event.scriptChannelId, event, app, isDraggingTimeline);
 }
 
 // ============================================================================

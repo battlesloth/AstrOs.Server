@@ -2,18 +2,17 @@
 import { ref } from 'vue';
 import { type GenericSerialEvent } from '@/models';
 import type { ScriptEvent } from '@/models/scripts/scriptEvent';
+import { ModalMode } from '@/enums';
 
 export interface UartEventModalProps {
-  mode?: 'add' | 'edit';
+  mode?: ModalMode;
   scriptEvent: ScriptEvent;
-  timeFactor?: number;
   maxTime?: number;
 }
 
 const props = withDefaults(defineProps<UartEventModalProps>(), {
-  mode: 'add',
-  timeFactor: 1000,
-  maxTime: 600000,
+  mode: ModalMode.ADD,
+  maxTime: 600,
 });
 
 const emit = defineEmits<{
@@ -35,8 +34,8 @@ const initializeValues = () => {
     eventValue.value = temp.value;
   }
 
-  originalEventTime.value = props.scriptEvent.time / props.timeFactor;
-  eventTime.value = props.scriptEvent.time / props.timeFactor;
+  originalEventTime.value = props.scriptEvent.time;
+  eventTime.value = props.scriptEvent.time;
 };
 
 initializeValues();
@@ -45,19 +44,19 @@ const saveEvent = () => {
   errorMessage.value = '';
 
   if (+eventTime.value > props.maxTime) {
-    errorMessage.value = `Event time cannot be larger than ${props.maxTime / props.timeFactor}`;
+    errorMessage.value = `Event time cannot be larger than ${props.maxTime} seconds`;
     return;
   }
 
-  props.scriptEvent.time = +eventTime.value * props.timeFactor;
+  props.scriptEvent.time = +eventTime.value;
   props.scriptEvent.event = { value: eventValue.value };
 
   const eventData = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value * props.timeFactor,
+    time: originalEventTime.value
   };
 
-  if (props.mode === 'add') {
+  if (props.mode === ModalMode.ADD) {
     emit('addEvent', eventData);
   } else {
     emit('editEvent', eventData);
@@ -128,7 +127,7 @@ const closeModal = () => {
           Save
         </button>
         <button
-          v-if="mode === 'edit'"
+          v-if="mode === ModalMode.EDIT"
           class="btn btn-error"
           @click="removeEvent"
         >

@@ -1,19 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { MaestroEvent, ScriptEvent } from '@/models';
-import { ModuleSubType } from '@/enums';
+import { ModalMode, ModuleSubType } from '@/enums';
 
 export interface ServoEventModalProps {
-  mode?: 'add' | 'edit';
+  mode?:  ModalMode;
   scriptEvent: ScriptEvent;
-  timeFactor?: number;
   maxTime?: number;
 }
 
 const props = withDefaults(defineProps<ServoEventModalProps>(), {
-  mode: 'add',
-  timeFactor: 1000,
-  maxTime: 600000,
+  mode: ModalMode.ADD,
+  maxTime: 600,
 });
 
 const emit = defineEmits<{
@@ -43,8 +41,8 @@ const initializeValues = () => {
     acceleration.value = temp.acceleration;
   }
 
-  originalEventTime.value = props.scriptEvent.time / props.timeFactor;
-  eventTime.value = props.scriptEvent.time / props.timeFactor;
+  originalEventTime.value = props.scriptEvent.time;
+  eventTime.value = props.scriptEvent.time;
 };
 
 initializeValues();
@@ -71,11 +69,11 @@ const saveEvent = () => {
   errorMessage.value = '';
 
   if (+eventTime.value > props.maxTime) {
-    errorMessage.value = `Event time cannot be larger than ${props.maxTime / props.timeFactor}`;
+    errorMessage.value = `Event time cannot be larger than ${props.maxTime} seconds`;
     return;
   }
 
-  props.scriptEvent.time = +eventTime.value * props.timeFactor;
+  props.scriptEvent.time = +eventTime.value;
 
   if (props.scriptEvent.moduleSubType === ModuleSubType.MAESTRO) {
     const data: MaestroEvent = {
@@ -92,10 +90,10 @@ const saveEvent = () => {
 
   const eventData = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value * props.timeFactor,
+    time: originalEventTime.value
   };
 
-  if (props.mode === 'add') {
+  if (props.mode === ModalMode.ADD) {
     emit('addEvent', eventData);
   } else {
     emit('editEvent', eventData);
@@ -207,7 +205,7 @@ const closeModal = () => {
           Save
         </button>
         <button
-          v-if="mode === 'edit'"
+          v-if="mode === ModalMode.EDIT"
           class="btn btn-error"
           @click="removeEvent"
         >

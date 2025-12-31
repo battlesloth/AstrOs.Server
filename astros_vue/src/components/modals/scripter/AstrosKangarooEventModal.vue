@@ -1,23 +1,24 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import {
-  KangarooAction} from '@/enums';
+  KangarooAction,
+  ModalMode,
+} from '@/enums';
 import type {
    KangarooEvent,
    KangarooX2,
    ScriptEventModalResponse,
   ScriptEvent } from '@/models';
 
-export type KangarooEventModalMode = 'add' | 'edit';
 
 const props = withDefaults(
   defineProps<{
     scriptEvent: ScriptEvent;
     kangaroo: KangarooX2;
-    mode?: KangarooEventModalMode;
+    mode?: ModalMode;
   }>(),
   {
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 );
 
@@ -29,8 +30,7 @@ const emit = defineEmits<{
 }>();
 
 // Constants
-const maxTime = 3000;
-const timeFactor = 10;
+const maxTime = 600;
 
 // Local state
 const eventTime = ref(0);
@@ -45,7 +45,7 @@ const ch2Action = ref<string>('0');
 const ch2Speed = ref<number>();
 const ch2Position = ref<number>();
 
-const showRemoveButton = computed(() => props.mode === 'edit');
+const showRemoveButton = computed(() => props.mode === ModalMode.EDIT);
 
 const ch1SpdDisabled = computed(() => {
   const action = Number(ch1Action.value);
@@ -101,17 +101,17 @@ onMounted(() => {
     ch2Position.value = temp.ch2Position;
   }
 
-  originalEventTime.value = props.scriptEvent.time / timeFactor;
-  eventTime.value = props.scriptEvent.time / timeFactor;
+  originalEventTime.value = props.scriptEvent.time;
+  eventTime.value = props.scriptEvent.time;
 });
 
 const addEvent = () => {
   if (eventTime.value > maxTime) {
-    errorMessage.value = `Event time cannot be larger than ${maxTime / timeFactor}`;
+    errorMessage.value = `Event time cannot be larger than ${maxTime} seconds`;
     return;
   }
 
-  props.scriptEvent.time = eventTime.value * timeFactor;
+  props.scriptEvent.time = eventTime.value;
 
   const data: KangarooEvent = {
     ch1Action: Number(ch1Action.value),
@@ -126,7 +126,7 @@ const addEvent = () => {
 
   const response: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value * timeFactor,
+    time: originalEventTime.value
   };
 
   if (props.mode === 'edit') {
@@ -139,7 +139,7 @@ const addEvent = () => {
 const removeEvent = () => {
   const response: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value * timeFactor,
+    time: originalEventTime.value
   };
   emit('removeEvent', response);
 };

@@ -7,16 +7,15 @@ import {
   type ScriptEventModalResponse,
 } from '@/models';
 import type { ScriptEvent } from '@/models/scripts/scriptEvent';
-
-export type GpioEventModalMode = 'add' | 'edit';
+import { ModalMode } from '@/enums';
 
 const props = withDefaults(
   defineProps<{
     scriptEvent: ScriptEvent;
-    mode?: GpioEventModalMode;
+    mode?: ModalMode;
   }>(),
   {
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 );
 
@@ -28,8 +27,7 @@ const emit = defineEmits<{
 }>();
 
 // Constants
-const maxTime = 3000;
-const timeFactor = 10;
+const maxTime = 600;
 
 // Local state
 const state = ref(0);
@@ -37,7 +35,7 @@ const eventTime = ref(0);
 const originalEventTime = ref(0);
 const errorMessage = ref('');
 
-const showRemoveButton = computed(() => props.mode === 'edit');
+const showRemoveButton = computed(() => props.mode === ModalMode.EDIT);
 
 onMounted(() => {
   // Initialize state based on scriptEvent
@@ -51,17 +49,17 @@ onMounted(() => {
     state.value = temp.position >= 1500 ? 1 : 0;
   }
 
-  originalEventTime.value = props.scriptEvent.time / timeFactor;
-  eventTime.value = props.scriptEvent.time / timeFactor;
+  originalEventTime.value = props.scriptEvent.time;
+  eventTime.value = props.scriptEvent.time;
 });
 
 const addEvent = () => {
   if (eventTime.value > maxTime) {
-    errorMessage.value = `Event time cannot be larger than ${maxTime / timeFactor}`;
+    errorMessage.value = `Event time cannot be larger than ${maxTime} seconds`;
     return;
   }
 
-  props.scriptEvent.time = eventTime.value * timeFactor;
+  props.scriptEvent.time = eventTime.value;
 
   if (props.scriptEvent.moduleSubType === ModuleSubType.GENERIC_GPIO) {
     props.scriptEvent.event = { setHigh: state.value === 1 };
@@ -80,7 +78,7 @@ const addEvent = () => {
     time: originalEventTime.value,
   };
 
-  if (props.mode === 'edit') {
+  if (props.mode === ModalMode.EDIT) {
     emit('editEvent', response);
   } else {
     emit('addEvent', response);
@@ -90,7 +88,7 @@ const addEvent = () => {
 const removeEvent = () => {
   const response: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value * timeFactor,
+    time: originalEventTime.value
   };
   emit('removeEvent', response);
 };
