@@ -1,12 +1,7 @@
 import { ref } from 'vue';
-import type { ChannelDetails, LocationDetails } from '@/models/scripts/scripting';
-import { Location } from '@/enums/modules/Location';
-import type { ScriptChannelResource } from '@/models/scripter/ScriptChannelResource';
-import { ScriptChannelTypes, ScriptChannelType } from '@/enums/scripts/scriptChannelType';
-import type { Script } from '@/models/scripts/script';
-import type { ControllerLocation } from '@/models/controllers/controllerLocation';
+import type { ChannelDetails, LocationDetails, ScriptChannelResource, Script, ControllerLocation, LocationCollection } from '@/models';
+import { Location, ScriptChannelTypes, ScriptChannelType } from '@/enums';
 import { useModuleScriptResources } from './useModuleScriptResources';
-import type { LocationCollection } from '@/models/controllers/locationCollection';
 
 export function useScriptResources() {
   const locations = ref<Map<Location, LocationDetails>>(new Map());

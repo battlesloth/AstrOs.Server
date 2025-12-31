@@ -1,12 +1,7 @@
 import { ref } from 'vue';
-import { WebsocketMessageType } from '@/enums/WebsocketMessageType';
-import type { BaseWsMessage } from '@/models/websocket/baseWsMessage';
-import type { LocationStatus } from '@/models/websocket/locationStatus';
-import type { ControllerSync } from '@/models/websocket/controllerSync';
+import type { BaseWsMessage, LocationStatus, ControllerSync, ScriptStatus } from '@/models';
+import { WebsocketMessageType, Location, ControllerStatus } from '@/enums';
 import { useControllerStore } from '@/stores/controller';
-import { Location } from '@/enums/modules/Location';
-import { ControllerStatus } from '@/enums/controllerStatus';
-import type { ScriptStatus } from '@/models/websocket/scriptStatus';
 import { useScriptsStore } from '@/stores/scripts';
 
 const ws = ref<WebSocket | null>(null);

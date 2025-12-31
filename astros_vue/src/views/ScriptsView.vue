@@ -3,9 +3,9 @@ import { ref, onMounted} from 'vue';
 import { useRouter } from 'vue-router';
 import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
 import { useToast } from '@/composables/useToast';
-import type { Script } from '@/models/scripts/script';
+import type { Script } from '@/models';
 import { useScriptsStore } from '@/stores/scripts';
-import { UploadStatus } from '@/enums/scripts/uploadStatus';
+import { UploadStatus } from '@/enums';
 import AstrosScriptRow from '@/components/scripts/AstrosScriptRow.vue';
 
 const router = useRouter();

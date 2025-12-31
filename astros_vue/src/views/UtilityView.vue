@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue';
 import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
 import apiService from '@/api/apiService';
-import type { ControllerModule } from '@/models/controllers/modules/controlModule';
+import type { ControllerModule } from '@/models';
 
 interface SelectedControllerModule extends ControllerModule {
   selected: boolean;

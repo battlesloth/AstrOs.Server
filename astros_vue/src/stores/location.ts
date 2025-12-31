@@ -1,10 +1,9 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
-import type { ControllerLocation } from '@/models/controllers/controllerLocation';
-import { Location } from '@/enums/modules/Location';
+import type { ControllerLocation, LocationCollection } from '@/models';
+import { Location } from '@/enums';
 import apiService from '@/api/apiService';
 import { LOCATIONS, LOCATIONS_LOAD } from '@/api/endpoints';
-import type { LocationCollection } from '@/models/controllers/locationCollection';
 
 export const useLocationStore = defineStore('location', () => {
   const coreLocation = ref<ControllerLocation | null>(null);
@@ -58,13 +57,13 @@ export const useLocationStore = defineStore('location', () => {
 
   function setLocation(locationEnum: Location, location: ControllerLocation) {
     switch (locationEnum) {
-      case Location.core:
+      case Location.CORE:
         coreLocation.value = location;
         break;
-      case Location.dome:
+      case Location.DOME:
         domeLocation.value = location;
         break;
-      case Location.body:
+      case Location.BODY:
         bodyLocation.value = location;
         break;
     }
@@ -72,11 +71,11 @@ export const useLocationStore = defineStore('location', () => {
 
   function getLocation(locationEnum: Location) {
     switch (locationEnum) {
-      case Location.core:
+      case Location.CORE:
         return coreLocation.value;
-      case Location.dome:
+      case Location.DOME:
         return domeLocation.value;
-      case Location.body:
+      case Location.BODY:
         return bodyLocation.value;
       default:
         return null;
@@ -93,13 +92,13 @@ export const useLocationStore = defineStore('location', () => {
 
   function clearLocation(locationEnum: Location) {
     switch (locationEnum) {
-      case Location.core:
+      case Location.CORE:
         coreLocation.value = null;
         break;
-      case Location.dome:
+      case Location.DOME:
         domeLocation.value = null;
         break;
-      case Location.body:
+      case Location.BODY:
         bodyLocation.value = null;
         break;
     }

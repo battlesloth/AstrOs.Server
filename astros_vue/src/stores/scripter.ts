@@ -4,12 +4,10 @@ import { useScriptResources } from '@/composables/useScriptResources';
 import { useLocationStore } from './location';
 import apiService from '@/api/apiService';
 import { SCRIPTS } from '@/api/endpoints';
-import type { Script } from '@/models/scripts/script';
-import type { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
+import type { Script, ScriptChannel, ScriptEvent } from '@/models';
+import type { ScriptChannelType } from '@/enums';
 import { v4 as uuid } from 'uuid';
-import type { ScriptChannel } from '@/models/scripts/scriptChannel';
-import type { ScriptEvent } from '@/models/scripts/scriptEvent';
-import { moduleChannelTypeFromSubType } from '@/models/controllers/moduleChannels';
+import { moduleChannelTypeFromSubType } from '@/models';
 
 export const useScripterStore = defineStore('scripter', () => {
   const isLoading = ref(false);

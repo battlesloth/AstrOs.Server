@@ -1,14 +1,5 @@
-import { ModuleSubType } from '@/enums/modules/ModuleSubType';
-import { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
-import type { GpioModule } from '@/models/controllers/modules/gpio/gpioModule';
-import type { I2cChannel } from '@/models/controllers/modules/i2c/i2cChannel';
-import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
-import type { KangarooChannel } from '@/models/controllers/modules/uart/subModules/kangarooX2/kangarooChannel';
-import type { MaestroModule } from '@/models/controllers/modules/uart/subModules/maestro/maestroModule';
-import type { UartChannel } from '@/models/controllers/modules/uart/uartChannel';
-import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
-import type { ScriptChannelResource } from '@/models/scripter/ScriptChannelResource';
-import type { KangarooX2 } from '@/models/scripts/scripting';
+import { ModuleSubType, ScriptChannelType } from '@/enums';
+import type { GpioModule, I2cChannel, I2cModule, KangarooChannel, MaestroModule, UartChannel, UartModule, ScriptChannelResource, KangarooX2 } from '@/models';
 
 export function useModuleScriptResources() {
   function getGpioScriptResources(m: GpioModule): ScriptChannelResource[] {

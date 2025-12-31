@@ -1,6 +1,6 @@
 import apiService from '@/api/apiService';
 import { REMOTE_CONFIG } from '@/api/endpoints';
-import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
+import type { RemoteControlPage } from '@/models';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 

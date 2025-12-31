@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ControllerStatus } from '@/enums/controllerStatus';
+import { ControllerStatus } from '@/enums';
 import { computed } from 'vue';
 
 const props = defineProps<{

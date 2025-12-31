@@ -1,7 +1,6 @@
 import apiService from '@/api/apiService';
 import { SCRIPTS, SCRIPTS_ALL, SCRIPTS_COPY, SCRIPTS_RUN, SCRIPTS_UPLOAD } from '@/api/endpoints';
-import type { Script } from '@/models/scripts/script';
-import type { ScriptStatus } from '@/models/websocket/scriptStatus';
+import type { Script, ScriptStatus } from '@/models';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 

@@ -1,5 +1,5 @@
 import { type Meta, type StoryObj } from '@storybook/vue3';
-import { ControllerStatus } from '@/enums/controllerStatus';
+import { ControllerStatus } from '@/enums';
 import AstrosStatus from './AstrosStatus.vue';
 
 const meta = {

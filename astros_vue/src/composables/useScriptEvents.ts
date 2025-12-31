@@ -1,7 +1,5 @@
-import { ModalType } from "@/enums/modalType";
-import { ModuleSubType } from "@/enums/modules/ModuleSubType";
-import { ModuleType } from "@/enums/modules/ModuleType";
-import type { GenericSerialEvent, GpioEvent, HumanCyborgRelationsEvent, I2cEvent, KangarooEvent, MaestroEvent } from "@/models/scripts/events/index";
+import { ModalType, ModuleSubType, ModuleType } from '@/enums';
+import type { GenericSerialEvent, GpioEvent, HumanCyborgRelationsEvent, I2cEvent, KangarooEvent, MaestroEvent } from '@/models';
 
 export function useScriptEvents() {
 

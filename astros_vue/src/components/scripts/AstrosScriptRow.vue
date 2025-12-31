@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { UploadStatus } from '@/enums/scripts/uploadStatus';
-import type { DeploymentStatus } from '@/models/scripts/deploymentStatus';
+import { UploadStatus } from '@/enums';
+import type { DeploymentStatus } from '@/models';
 
 const props = defineProps<{
   script: {

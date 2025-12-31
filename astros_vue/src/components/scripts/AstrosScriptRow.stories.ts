@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import AstrosScriptRow from './AstrosScriptRow.vue';
-import { UploadStatus } from '@/enums/scripts/uploadStatus';
+import { UploadStatus } from '@/enums';
 
 const meta = {
   title: 'Components/Scripts/ScriptRow',

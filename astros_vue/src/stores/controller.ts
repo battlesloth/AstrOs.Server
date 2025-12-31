@@ -1,10 +1,9 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
-import type { ControllerModule } from '@/models/controllers/modules/controlModule';
+import type { ControllerModule, ControllerSync } from '@/models';
 import apiService from '@/api/apiService';
 import { SYNC_CONTROLLERS } from '@/api/endpoints';
-import type { ControllerSync } from '@/models/websocket/controllerSync';
-import { ControllerStatus } from '@/enums/controllerStatus';
+import { ControllerStatus } from '@/enums';
 
 export const useControllerStore = defineStore('controller', () => {
   const controllers = ref<ControllerModule[]>([]);

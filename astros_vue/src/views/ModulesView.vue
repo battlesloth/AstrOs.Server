@@ -3,9 +3,8 @@ import { ref, computed } from 'vue';
 import type { AddModuleEvent, RemoveModuleEvent, ServoTestEvent } from '@/models/events';
 import { useLocationStore } from '@/stores/location';
 import { useControllerStore } from '@/stores/controller';
-import { Location } from '@/enums/modules/Location';
+import { Location, ModalType, ControllerStatus } from '@/enums';
 import { useModuleManagement } from '@/composables/useModuleManagement';
-import { ModalType } from '@/enums/modalType';
 
 import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
 import AstrosEspModule from '@/components/modules/AstrosEspModule.vue';
@@ -16,7 +15,6 @@ import AstrosLoadingModal from '@/components/modals/modules/AstrosLoadingModal.v
 import AstrosAddModuleModal from '@/components/modals/modules/AstrosAddModuleModal.vue';
 import AstrosServoTestModal from '@/components/modals/modules/AstrosServoTestModal.vue';
 
-import { ControllerStatus } from '@/enums/controllerStatus';
 import apiService from '@/api/apiService';
 import { SYNC_CONFIG } from '@/api/endpoints';
 import { useToast } from '@/composables/useToast';

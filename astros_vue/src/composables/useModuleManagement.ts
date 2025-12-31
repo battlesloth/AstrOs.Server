@@ -1,12 +1,5 @@
-import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
-import type { KangarooModule } from '@/models/controllers/modules/uart/subModules/kangarooX2/kangarooModule';
-import type { MaestroBoard } from '@/models/controllers/modules/uart/subModules/maestro/maestroBoard';
-import type { MaestroChannel } from '@/models/controllers/modules/uart/subModules/maestro/maestroChannel';
-import type { MaestroModule } from '@/models/controllers/modules/uart/subModules/maestro/maestroModule';
-import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
-import { Location } from '@/enums/modules/Location';
-import { ModuleType } from '@/enums/modules/ModuleType';
-import { ModuleSubType } from '@/enums/modules/ModuleSubType';
+import type { I2cModule, KangarooModule, MaestroBoard, MaestroChannel, MaestroModule, UartModule } from '@/models';
+import { Location, ModuleType, ModuleSubType } from '@/enums';
 import { useLocationStore } from '@/stores/location';
 import { v4 as uuid } from 'uuid';
 

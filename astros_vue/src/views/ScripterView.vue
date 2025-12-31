@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, useTemplateRef } from 'vue';
-import { ModalType } from '@/enums/modalType';
+import { ModalType, ScriptChannelType } from '@/enums';
 import { useScripterStore } from '@/stores/scripter';
 import { useRoute } from 'vue-router';
 import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
@@ -15,13 +15,11 @@ import AstrosI2cEventModal from '@/components/modals/scripter/AstrosI2cEventModa
 import AstrosKangarooEventModal from '@/components/modals/scripter/AstrosKangarooEventModal.vue';
 import AstrosServoEventModal from '@/components/modals/scripter/AstrosServoEventModal.vue';
 import AstrosUartEventModal from '@/components/modals/scripter/AstrosUartEventModal.vue';
-import { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
 import AstrosInterruptModal from '@/components/modals/AstrosInterruptModal.vue';
 import AstrosAlertModal from '@/components/modals/AstrosAlertModal.vue';
 import router from '@/router';
 import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
-import type { AddChannelModalResponse } from '@/models/scripts/scripting';
-import type { ScriptEvent } from '@/models/scripts/scriptEvent';
+import type { AddChannelModalResponse, ScriptEvent } from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
 
 const scripter = useTemplateRef('scripter');

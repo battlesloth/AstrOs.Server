@@ -1,4 +1,4 @@
-import { HumanCyborgRelationsCmd } from "@/enums/scripts/humanCyborgRelations";
+import { HumanCyborgRelationsCmd } from '@/enums';
 
 export function useHumanCyborgRelations() {
 
