@@ -48,7 +48,7 @@ const addUartModule = () => {
 
   emit('addModule', {
     locationId: props.locationEnum,
-    moduleType: ModuleType.uart,
+    moduleType: ModuleType.UART,
   });
 };
 
@@ -59,7 +59,7 @@ const addI2cModule = () => {
 
   emit('addModule', {
     locationId: props.locationEnum,
-    moduleType: ModuleType.i2c,
+    moduleType: ModuleType.I2C,
   });
 };
 

@@ -1,6 +1,6 @@
 export enum Location {
-  unknown = 'unknown',
-  body = 'body',
-  core = 'core',
-  dome = 'dome',
+  UNKNOWN = 'unknown',
+  BODY = 'body',
+  CORE = 'core',
+  DOME = 'dome',
 }

@@ -1,8 +1,5 @@
-import { ref } from 'vue';
-
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
-import type { ControllerLocation } from '@/models/controllers/controllerLocation';
 import type { GpioModule } from '@/models/controllers/modules/gpio/gpioModule';
 import type { I2cChannel } from '@/models/controllers/modules/i2c/i2cChannel';
 import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
@@ -34,7 +31,7 @@ export function useModuleScriptResources() {
   function getI2cScriptResources(m: I2cModule): ScriptChannelResource[] {
     const resources: ScriptChannelResource[] = [];
     switch (m.moduleSubType) {
-      case ModuleSubType.genericI2C: {
+      case ModuleSubType.GENERIC_I2C: {
         const ch: I2cChannel = {
           id: m.id,
           parentId: m.id,
@@ -63,16 +60,16 @@ export function useModuleScriptResources() {
     let resources: ScriptChannelResource[] = [];
 
     switch (m.moduleSubType) {
-      case ModuleSubType.genericSerial:
+      case ModuleSubType.GENERIC_SERIAL:
         resources = generateGenericSerialResources(m);
         break;
-      case ModuleSubType.kangaroo:
+      case ModuleSubType.KANGAROO:
         resources = generateKangarooResources(m);
         break;
-      case ModuleSubType.maestro:
+      case ModuleSubType.MAESTRO:
         resources = generateMaestroResources(m);
         break;
-      case ModuleSubType.humanCyborgRelationsSerial:
+      case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
         resources = generateHCRResources(m);
         break;
     }

@@ -105,6 +105,12 @@ export const useScripterStore = defineStore('scripter', () => {
     return { success: true, id: newChannel.id, name: resource.name };
   }
 
+  function getChannel(id: string): ScriptChannel | null {
+    if (!script.value) return null;
+    const channel = script.value.scriptChannels.find((ch) => ch.id === id);
+    return channel || null;
+  }
+
   function removeChannel(id: string) {
     if (!script.value) return;
     const index = script.value.scriptChannels.findIndex((ch) => ch.id === id);
@@ -130,5 +136,6 @@ export const useScripterStore = defineStore('scripter', () => {
     getScriptChannelResource,
     addChannel,
     removeChannel,
+    getChannel,
   };
 });

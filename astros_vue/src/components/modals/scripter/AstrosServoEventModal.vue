@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { type MaestroEvent, type ScriptEvent } from '@/models/scripts/scripting';
+import { ref } from 'vue';
+import { type MaestroEvent } from '@/models/scripts/scripting';
+import type { ScriptEvent } from '@/models/scripts/scriptEvent';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 
 export interface ServoEventModalProps {
@@ -36,7 +37,7 @@ const initializeValues = () => {
     position.value = 0;
     speed.value = 0;
     acceleration.value = 0;
-  } else if (props.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+  } else if (props.scriptEvent.moduleSubType === ModuleSubType.MAESTRO) {
     const temp = props.scriptEvent.event as MaestroEvent;
     position.value = temp.position;
     speed.value = temp.speed;
@@ -77,7 +78,7 @@ const saveEvent = () => {
 
   props.scriptEvent.time = +eventTime.value * props.timeFactor;
 
-  if (props.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+  if (props.scriptEvent.moduleSubType === ModuleSubType.MAESTRO) {
     const data: MaestroEvent = {
       // channel will be set when persisting the event to the DB
       channel: -1,

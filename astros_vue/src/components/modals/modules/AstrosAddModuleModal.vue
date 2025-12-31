@@ -21,30 +21,30 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-const selectedSubType = ref<ModuleSubType>(ModuleSubType.none);
+const selectedSubType = ref<ModuleSubType>(ModuleSubType.NONE);
 
 const moduleSubTypes = new Map<ModuleType, ModuleSubTypeSelection[]>([
   [
-    ModuleType.uart,
+    ModuleType.UART,
     [
-      { id: ModuleSubType.genericSerial, value: 'modals.add_module.module_types.generic' },
+      { id: ModuleSubType.GENERIC_SERIAL, value: 'modals.add_module.module_types.generic' },
       {
-        id: ModuleSubType.humanCyborgRelationsSerial,
+        id: ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL,
         value: 'modals.add_module.module_types.hcr',
       },
-      { id: ModuleSubType.kangaroo, value: 'modals.add_module.module_types.kangaroo' },
-      { id: ModuleSubType.maestro, value: 'modals.add_module.module_types.maestro' },
+      { id: ModuleSubType.KANGAROO, value: 'modals.add_module.module_types.kangaroo' },
+      { id: ModuleSubType.MAESTRO, value: 'modals.add_module.module_types.maestro' },
     ],
   ],
   [
-    ModuleType.i2c,
+    ModuleType.I2C,
     [
-      { id: ModuleSubType.genericI2C, value: 'modals.add_module.module_types.generic' },
+      { id: ModuleSubType.GENERIC_I2C, value: 'modals.add_module.module_types.generic' },
       {
-        id: ModuleSubType.humanCyborgRelationsI2C,
+        id: ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C,
         value: 'modals.add_module.module_types.hcr',
       },
-      { id: ModuleSubType.pwmBoard, value: 'modals.add_module.module_types.pwm_board' },
+      { id: ModuleSubType.PWM_BOARD, value: 'modals.add_module.module_types.pwm_board' },
     ],
   ],
 ]);
@@ -57,12 +57,12 @@ const options = computed(() => {
 watch(
   () => [props.isOpen, props.moduleType],
   () => {
-    selectedSubType.value = ModuleSubType.none;
+    selectedSubType.value = ModuleSubType.NONE;
   },
 );
 
 const addModule = () => {
-  if (selectedSubType.value === ModuleSubType.none) {
+  if (selectedSubType.value === ModuleSubType.NONE) {
     return;
   }
 
@@ -98,7 +98,7 @@ const closeModal = () => {
             title="Module"
           >
             <option
-              :value="ModuleSubType.none"
+              :value="ModuleSubType.NONE"
               disabled
               selected
             >
@@ -119,7 +119,7 @@ const closeModal = () => {
         <button
           data-testid="modal-add-module"
           class="btn btn-primary"
-          :disabled="selectedSubType === ModuleSubType.none"
+          :disabled="selectedSubType === ModuleSubType.NONE"
           @click="addModule"
         >
           {{ $t('modals.add_module.add_button') }}

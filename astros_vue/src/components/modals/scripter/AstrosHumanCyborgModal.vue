@@ -4,9 +4,9 @@ import { HumanCyborgRelationsCmd, HcrCommandCategory } from '@/enums/scripts/hum
 import {
   type HcrCommand,
   type HumanCyborgRelationsEvent,
-  type ScriptEvent,
   type ScriptEventModalResponse,
 } from '@/models/scripts/scripting';
+import type { ScriptEvent } from '@/models/scripts/scriptEvent';
 import { HumanCyborgRelationsHelper } from '@/utils/humanCyborgRelationsHelper';
 import { v4 as uuid } from 'uuid';
 
@@ -103,7 +103,7 @@ const setAvailableCommands = (category: HcrCommandCategory) => {
   switch (category) {
     case HcrCommandCategory.stimuli:
       commands.value.push(
-        hcrListItem(HumanCyborgRelationsCmd.mildHappy),
+        hcrListItem(HumanCyborgRelationsCmd.MILD_HAPPY),
         hcrListItem(HumanCyborgRelationsCmd.extremeHappy),
         hcrListItem(HumanCyborgRelationsCmd.mildSad),
         hcrListItem(HumanCyborgRelationsCmd.extremeSad),

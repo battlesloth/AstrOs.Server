@@ -1,6 +1,7 @@
 import { Container, TextStyle, Text, Graphics, FillGradient } from 'pixi.js';
 import type { PixiChannelData } from './pixiChannelData';
 
+
 export interface PixiChannelListOptions {
   width: number;
   height: number;
@@ -16,6 +17,8 @@ export class PixiChannelList extends Container {
 
   options: PixiChannelListOptions;
   containerWidth: number;
+
+  channels: Map<string, PixiChannelData> = new Map();
 
   channelListScrollableContainer: Container | null = null;
 
@@ -98,8 +101,24 @@ export class PixiChannelList extends Container {
   }
 
   addChannelRow(row: PixiChannelData) {
+    this.channels.set(row.channelId, row);
     if (this.channelListScrollableContainer) {
       this.channelListScrollableContainer.addChild(row);
+    }
+  }
+
+  removeChannelRow(channelId: string) {
+    const row = this.channels.get(channelId);
+    if (row && this.channelListScrollableContainer) {
+      this.channelListScrollableContainer.removeChild(row);
+      this.channels.delete(channelId);
+    }
+  }
+
+  updateChannelIndex(channelId: string, newIdx: number) {
+    const row = this.channels.get(channelId);
+    if (row) {
+      row.updateIdx(newIdx);
     }
   }
 

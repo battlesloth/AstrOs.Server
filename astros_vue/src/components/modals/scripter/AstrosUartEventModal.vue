@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { type GenericSerialEvent, type ScriptEvent } from '@/models/scripts/scripting';
+import { ref } from 'vue';
+import { type GenericSerialEvent } from '@/models/scripts/scripting';
+import type { ScriptEvent } from '@/models/scripts/scriptEvent';
 
 export interface UartEventModalProps {
   mode?: 'add' | 'edit';

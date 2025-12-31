@@ -34,7 +34,7 @@ function getUploadStatus(location: string): { class: string; text: string } {
       };
     case UploadStatus.uploading:
       return { class: 'badge-warning', text: 'Uploading...' };
-    case UploadStatus.notUploaded:
+    case UploadStatus.NOT_UPLOADED:
       return { class: 'badge-error', text: 'Not uploaded' };
     default:
       return { class: 'badge-error', text: 'Not uploaded' };

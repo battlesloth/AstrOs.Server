@@ -11,10 +11,6 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<{
-  close: null;
-}>();
-
 const closeModal = () => {
   props.onClose();
 };

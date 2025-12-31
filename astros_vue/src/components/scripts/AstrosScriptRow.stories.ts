@@ -66,9 +66,9 @@ export const NotUploaded: Story = {
       scriptName: 'Close Dome',
       description: 'Closes the observatory dome',
       deploymentStatus: {
-        body: { value: UploadStatus.notUploaded, date: undefined },
-        core: { value: UploadStatus.notUploaded, date: undefined },
-        dome: { value: UploadStatus.notUploaded, date: undefined },
+        body: { value: UploadStatus.NOT_UPLOADED, date: undefined },
+        core: { value: UploadStatus.NOT_UPLOADED, date: undefined },
+        dome: { value: UploadStatus.NOT_UPLOADED, date: undefined },
       },
     },
     locations: defaultLocations,
@@ -99,7 +99,7 @@ export const MixedStatus: Story = {
       description: 'Emergency stop all motors',
       deploymentStatus: {
         body: { value: UploadStatus.uploaded, date: new Date('2025-12-18T09:15:00') },
-        core: { value: UploadStatus.notUploaded, date: undefined },
+        core: { value: UploadStatus.NOT_UPLOADED, date: undefined },
         dome: { value: UploadStatus.uploading, date: undefined },
       },
     },
@@ -194,7 +194,7 @@ export const Interactive: Story = {
       description: 'Click buttons to see events fired',
       deploymentStatus: {
         body: { value: UploadStatus.uploaded, date: new Date('2025-12-20T10:30:00') },
-        core: { value: UploadStatus.notUploaded, date: undefined },
+        core: { value: UploadStatus.NOT_UPLOADED, date: undefined },
         dome: { value: UploadStatus.uploading, date: undefined },
       },
     },

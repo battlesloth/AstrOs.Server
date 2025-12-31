@@ -4,9 +4,9 @@ import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import {
   type GpioEvent,
   type MaestroEvent,
-  type ScriptEvent,
   type ScriptEventModalResponse,
 } from '@/models/scripts/scripting';
+import type { ScriptEvent } from '@/models/scripts/scriptEvent';
 
 export type GpioEventModalMode = 'add' | 'edit';
 
@@ -43,10 +43,10 @@ onMounted(() => {
   // Initialize state based on scriptEvent
   if (props.scriptEvent.event === undefined) {
     state.value = 0;
-  } else if (props.scriptEvent.moduleSubType === ModuleSubType.genericGpio) {
+  } else if (props.scriptEvent.moduleSubType === ModuleSubType.GENERIC_GPIO) {
     const temp = props.scriptEvent.event as GpioEvent;
     state.value = temp.setHigh ? 1 : 0;
-  } else if (props.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+  } else if (props.scriptEvent.moduleSubType === ModuleSubType.MAESTRO) {
     const temp = props.scriptEvent.event as MaestroEvent;
     state.value = temp.position >= 1500 ? 1 : 0;
   }
@@ -63,9 +63,9 @@ const addEvent = () => {
 
   props.scriptEvent.time = eventTime.value * timeFactor;
 
-  if (props.scriptEvent.moduleSubType === ModuleSubType.genericGpio) {
+  if (props.scriptEvent.moduleSubType === ModuleSubType.GENERIC_GPIO) {
     props.scriptEvent.event = { setHigh: state.value === 1 };
-  } else if (props.scriptEvent.moduleSubType === ModuleSubType.maestro) {
+  } else if (props.scriptEvent.moduleSubType === ModuleSubType.MAESTRO) {
     props.scriptEvent.event = {
       channel: -1,
       isServo: false,

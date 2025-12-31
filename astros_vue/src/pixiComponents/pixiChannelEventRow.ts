@@ -1,8 +1,10 @@
-import { Container, Graphics } from "pixi.js";
-import { type Ref } from "vue";
+import type { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
+import { Container, Graphics } from 'pixi.js';
+import { type Ref } from 'vue';
 
 export interface PixiChannelEventRowOptions {
   channelId: string;
+  channelType: ScriptChannelType;
   rowIdx: number;
   height: number;
   rowColor?: number;
@@ -15,27 +17,26 @@ export interface PixiChannelEventRowOptions {
 
 export class PixiChannelEventRow extends Container {
   channelId: string;
+  channelType: ScriptChannelType;
   rowIdx: number;
   options: PixiChannelEventRowOptions;
 
+  background: Graphics | null = null;
+
   constructor(options: PixiChannelEventRowOptions) {
-    super()
+    super();
     this.options = options;
     this.channelId = options.channelId;
+    this.channelType = options.channelType;
     this.rowIdx = options.rowIdx;
     this.x = 0;
-    this.y = options.rowIdx * options.height;
-    this.eventMode = "static";
-    this.cursor = "pointer";
+    this.y = this.rowIdx * options.height;
+    this.eventMode = 'static';
+    this.cursor = 'pointer';
 
-    const background = new Graphics();
-    background.rect(0, 0, options.timeLineWidth.value, options.height)
-      .fill(this.getRowColor());
-
-    // Add bottom border line
-    background.rect(0, options.height - 1, options.timeLineWidth.value, 1)
-      .fill(this.getBorderColor());
-    this.addChild(background);
+    this.background = new Graphics();
+    this.setBackground();
+    this.addChild(this.background);
 
     this.on('pointertap', (event) => {
       // Only respond to left-click
@@ -52,7 +53,9 @@ export class PixiChannelEventRow extends Container {
 
       const localPos = this.toLocal(event.global);
 
-      const time = Math.floor((localPos.x / this.options.timeLineWidth.value) * this.options.timeLineDuration);
+      const time = Math.floor(
+        (localPos.x / this.options.timeLineWidth.value) * this.options.timeLineDuration,
+      );
 
       this.options.onClick(this.channelId, time);
     });
@@ -70,5 +73,36 @@ export class PixiChannelEventRow extends Container {
       return this.options.borderColor;
     }
     return 0x444444;
+  }
+
+  updateIdx(newIdx: number) {
+    this.rowIdx = newIdx;
+    this.y = this.rowIdx * this.options.height;
+    this.setBackground();
+  }
+
+  setBackground() {
+    if (this.background) {
+      // Get width from the ref - handle both ref and unwrapped cases
+      let width: number | undefined;
+      const timeLineWidth = this.options.timeLineWidth;
+
+      if (timeLineWidth && typeof timeLineWidth === 'object' && 'value' in timeLineWidth) {
+        // It's still a ref
+        width = timeLineWidth.value;
+      } else if (typeof timeLineWidth === 'number') {
+        // It got unwrapped to a plain number
+        width = timeLineWidth;
+      }
+
+      this.background.clear();
+      this.background
+        .rect(0, 0, width!, this.options.height)
+        .fill(this.getRowColor());
+      // Add bottom border line
+      this.background
+        .rect(0, this.options.height - 1, width!, 1)
+        .fill(this.getBorderColor());
+    }
   }
 }

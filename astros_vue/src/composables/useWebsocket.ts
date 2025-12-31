@@ -79,7 +79,7 @@ export function useWebsocket() {
       case WebsocketMessageType.locationStatus:
         handleStatusMessage(parsedMessage);
         break;
-      case WebsocketMessageType.script:
+      case WebsocketMessageType.SCRIPT:
         handleScriptMessage(parsedMessage);
       default:
         console.warn('Unhandled message type:', message);

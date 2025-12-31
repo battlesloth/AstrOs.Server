@@ -1,7 +1,7 @@
 import { CanvasTextMetrics, TextStyle } from 'pixi.js';
 
 export function truncateText(text: string, style: TextStyle, maxWidth: number) {
-  let metrics = CanvasTextMetrics.measureText(text, style);
+  const metrics = CanvasTextMetrics.measureText(text, style);
 
   if (metrics.width <= maxWidth) return text;
 

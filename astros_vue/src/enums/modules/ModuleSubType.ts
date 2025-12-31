@@ -1,16 +1,16 @@
 export enum ModuleSubType {
-  none = 0,
+  NONE = 0,
   // serial subtypes
-  genericSerial = 101,
-  kangaroo = 102,
-  humanCyborgRelationsSerial = 103,
-  maestro = 104,
+  GENERIC_SERIAL = 101,
+  KANGAROO = 102,
+  HUMAN_CYBORG_RELATIONS_SERIAL = 103,
+  MAESTRO = 104,
 
   // i2c subtypes
-  genericI2C = 201,
-  humanCyborgRelationsI2C = 202,
-  pwmBoard = 203,
+  GENERIC_I2C = 201,
+  HUMAN_CYBORG_RELATIONS_I2C = 202,
+  PWM_BOARD = 203,
 
   // gpio
-  genericGpio = 301,
+  GENERIC_GPIO = 301,
 }

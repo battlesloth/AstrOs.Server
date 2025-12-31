@@ -41,6 +41,8 @@ export class PixiChannelData extends Container {
   rowIdx: number;
   options: PixiChannelDataOptions;
 
+  background: Graphics | null = null;
+
   constructor(options: PixiChannelDataOptions) {
     super();
     this.channelId = options.channelId;
@@ -48,15 +50,10 @@ export class PixiChannelData extends Container {
     this.rowIdx = options.rowIdx;
     this.y = this.rowIdx * options.height;
     this.options = options;
-    const background = new Graphics()
-      .rect(0, 0, options.width, options.height)
-      .fill(this.getRowColor());
 
-    // Add bottom border line
-    background.rect(0, options.height - 1, options.width, 1)
-      .fill(this.getBorderColor());
-
-    this.addChild(background);
+    this.background = new Graphics()
+    this.setBackground();
+    this.addChild(this.background);
 
     const fill = new FillGradient(0, 0, 1, 1);
     fill.addColorStop(0, 0x000000);
@@ -147,5 +144,24 @@ export class PixiChannelData extends Container {
       return this.options.borderColor;
     }
     return 0xcccccc;
+  }
+
+  updateIdx(newIdx: number) {
+    this.rowIdx = newIdx;
+    this.y = this.rowIdx * this.options.height;
+    this.setBackground();
+  }
+
+  setBackground() {
+    if (this.background) {
+      this.background.clear();
+      this.background
+        .rect(0, 0, this.options.width, this.options.height)
+        .fill(this.getRowColor());
+      // Add bottom border line
+      this.background
+        .rect(0, this.options.height - 1, this.options.width, 1)
+        .fill(this.getBorderColor());
+    }
   }
 }

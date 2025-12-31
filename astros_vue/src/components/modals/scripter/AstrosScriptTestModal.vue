@@ -46,7 +46,7 @@ const coreCaption = ref<Caption>({ str: 'Uploading' });
 const domeCaption = ref<Caption>({ str: 'Uploading' });
 const bodyCaption = ref<Caption>({ str: 'Uploading' });
 
-let websocketSubscription: any = null;
+const websocketSubscription: any = null;
 
 const canRun = computed(() => {
   return !uploadInProgress.value && !runDisabled.value;

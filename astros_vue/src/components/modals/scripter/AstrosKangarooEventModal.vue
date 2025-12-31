@@ -4,9 +4,9 @@ import {
   KangarooAction,
   type KangarooEvent,
   type KangarooX2,
-  type ScriptEvent,
   type ScriptEventModalResponse,
 } from '@/models/scripts/scripting';
+import type { ScriptEvent } from '@/models/scripts/scriptEvent';
 
 export type KangarooEventModalMode = 'add' | 'edit';
 

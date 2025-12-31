@@ -1,5 +1,5 @@
 export enum UploadStatus {
-  notUploaded,
-  uploading,
-  uploaded,
+  NOT_UPLOADED,
+  UPLOADING,
+  UPLOADED,
 }

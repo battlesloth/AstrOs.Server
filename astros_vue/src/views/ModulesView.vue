@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { AddModuleEvent, ServoTestEvent } from '@/models/events';
+import type { AddModuleEvent, RemoveModuleEvent, ServoTestEvent } from '@/models/events';
 import { useLocationStore } from '@/stores/location';
 import { useControllerStore } from '@/stores/controller';
 import { Location } from '@/enums/modules/Location';
@@ -28,7 +28,7 @@ const { t } = useI18n();
 const showModal = ref<ModalType>(ModalType.LOADING);
 const modalMessage = ref<string>('');
 
-const selectedLocationId = ref<Location>(Location.unknown);
+const selectedLocationId = ref<Location>(Location.UNKNOWN);
 const selectedModuleId = ref<string>('');
 const selectedModuleType = ref<number>(0);
 
@@ -99,7 +99,7 @@ function openAddModuleModal(evt: AddModuleEvent) {
   showModal.value = ModalType.ADD_MODULE;
 }
 
-function handleAddModule(event: any) {
+function handleAddModule(event: AddModuleEvent) {
   try {
     addModule(event.locationId, event.moduleType, event.moduleSubType);
     showModal.value = ModalType.CLOSE_ALL;
@@ -110,7 +110,7 @@ function handleAddModule(event: any) {
   }
 }
 
-function openConfirmRemoveModuleModal(event: any) {
+function openConfirmRemoveModuleModal(event: RemoveModuleEvent) {
   selectedLocationId.value = event.locationId;
   selectedModuleId.value = event.id;
   selectedModuleType.value = event.moduleType;
@@ -214,7 +214,7 @@ function controllerSelectChanged(location: string) {
                 </div>
                 <AstrosEspModule
                   :is-master="true"
-                  :location-enum="Location.body"
+                  :location-enum="Location.BODY"
                   :parent-test-id="'body'"
                   @add-module="openAddModuleModal"
                   @remove-module="openConfirmRemoveModuleModal"
@@ -276,7 +276,7 @@ function controllerSelectChanged(location: string) {
                   </select>
                 </div>
                 <AstrosEspModule
-                  :location-enum="Location.core"
+                  :location-enum="Location.CORE"
                   :parent-test-id="'core'"
                   @add-module="openAddModuleModal"
                   @remove-module="openConfirmRemoveModuleModal"
@@ -338,7 +338,7 @@ function controllerSelectChanged(location: string) {
                   </select>
                 </div>
                 <AstrosEspModule
-                  :location-enum="Location.dome"
+                  :location-enum="Location.DOME"
                   :parent-test-id="'dome'"
                   @add-module="openAddModuleModal"
                   @remove-module="openConfirmRemoveModuleModal"

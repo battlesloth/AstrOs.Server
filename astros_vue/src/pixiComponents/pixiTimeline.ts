@@ -23,8 +23,7 @@ export class PixiTimeline extends Container {
     this.x = options.xOffset;
     const graphics = new Graphics();
 
-    graphics.rect(0, 0, options.width, options.height)
-      .fill(0x1a1a1a);
+    graphics.rect(0, 0, options.width, options.height).fill(0x1a1a1a);
 
     const zoom = ZOOM_LEVELS[this.zoomLevel]!;
 
@@ -35,10 +34,7 @@ export class PixiTimeline extends Container {
     this.drawTimelineLabels(this, zoom);
   }
 
-  drawTimelineTicks(
-    graphics: Graphics,
-    zoom: ZoomLevelConfig,
-  ) {
+  drawTimelineTicks(graphics: Graphics, zoom: ZoomLevelConfig) {
     const numMajorTicks = Math.floor(this.options.duration / zoom.majorTickInterval);
     const ppMt = this.options.pixelsPerMajorTick;
 
@@ -79,10 +75,7 @@ export class PixiTimeline extends Container {
     }
   }
 
-  drawTimelineLabels(
-    container: Container,
-    zoom: ZoomLevelConfig,
-  ) {
+  drawTimelineLabels(container: Container, zoom: ZoomLevelConfig) {
     const numMajorTicks = Math.floor(this.options.duration / zoom.majorTickInterval);
 
     // Add time labels at major ticks
@@ -109,7 +102,7 @@ export class PixiTimeline extends Container {
       });
 
       timeLabel.x = x - timeLabel.width / 2;
-      timeLabel.y = this.options.height - 35;
+      timeLabel.y = this.options.height - 43;
 
       container.addChild(timeLabel);
     }

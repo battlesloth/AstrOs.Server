@@ -21,7 +21,7 @@ test.describe('Login Page', () => {
     await page.getByText('AstrOs').click();
 */
 
-    await expect(page.url()).toBe('http://localhost:5173/');
+    expect(page.url()).toBe('http://localhost:5173/');
     await expect(page).toHaveTitle('AstrOs');
     await expect(page.locator('[data-v-app]')).toBeVisible();
 

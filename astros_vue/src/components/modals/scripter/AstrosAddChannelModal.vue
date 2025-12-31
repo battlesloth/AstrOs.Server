@@ -16,8 +16,8 @@ interface ScriptChannelTypeOption {
 const scripterStore = useScripterStore();
 
 const emit = defineEmits<{
-  addChannel: [response: AddChannelModalResponse];
-  close: [];
+  (e: 'addChannel', response: AddChannelModalResponse): void;
+  (e: 'close'): void;
 }>();
 
 // Local state

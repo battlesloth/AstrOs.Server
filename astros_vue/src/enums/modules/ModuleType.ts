@@ -1,6 +1,6 @@
 export enum ModuleType {
-  none = 0,
-  uart = 1,
-  i2c = 2,
-  gpio = 3,
+  NONE = 0,
+  UART = 1,
+  I2C = 2,
+  GPIO = 3,
 }

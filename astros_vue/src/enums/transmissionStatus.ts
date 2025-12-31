@@ -1,6 +1,6 @@
 export enum TransmissionStatus {
-  unknown,
-  sending,
-  success,
-  failed,
+  UNKNOWN,
+  SENDING,
+  SUCCESS,
+  FAILED,
 }

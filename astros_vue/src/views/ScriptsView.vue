@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted} from 'vue';
 import { useRouter } from 'vue-router';
 import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
 import { useToast } from '@/composables/useToast';
@@ -85,7 +85,7 @@ const setUploadingStatus = (scriptId: string) => {
   for (const location of locations) {
     const status = script.deploymentStatus[location];
     if (status) {
-      status.value = UploadStatus.uploading;
+      status.value = UploadStatus.UPLOADING;
     }
   }
 };
@@ -108,7 +108,7 @@ const getUploadStatus = (script: Script, locationId: string) => {
     const uploaddate = new Date(status.date || '1970-01-01T00:00:00Z');
     const scriptdate = new Date(script.lastSaved);
     if (uploaddate < scriptdate) {
-      uploadStatus = UploadStatus.notUploaded;
+      uploadStatus = UploadStatus.NOT_UPLOADED;
       dateString = 'Out of date';
     } else {
       dateString = uploaddate.toLocaleDateString(navigator.language, {
@@ -122,14 +122,14 @@ const getUploadStatus = (script: Script, locationId: string) => {
   }
 
   switch (uploadStatus) {
-    case UploadStatus.uploaded:
+    case UploadStatus.UPLOADED:
       statusClass = 'bg-green-600 text-white';
       break;
-    case UploadStatus.uploading:
+    case UploadStatus.UPLOADING:
       statusClass = 'bg-yellow-600 text-black';
       dateString = 'Uploading...';
       break;
-    case UploadStatus.notUploaded:
+    case UploadStatus.NOT_UPLOADED:
     default:
       statusClass = 'bg-red-900 text-white';
       break;
