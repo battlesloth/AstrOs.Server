@@ -47,7 +47,7 @@ describe("Script Repository", () => {
     expect(savedScripts[0].id).toBe(scriptId);
     expect(savedScripts[0].scriptName).toBe("Test Script");
     expect(savedScripts[0].description).toBe("Test Description");
-    expect(savedScripts[0].deploymentStatusKvp.length).toBe(0);
+    expect(savedScripts[0].deploymentStatus).toEqual({});
   });
 
   it("should update script", async () => {
@@ -70,7 +70,7 @@ describe("Script Repository", () => {
     expect(savedScripts[0].id).toBe(scriptId);
     expect(savedScripts[0].scriptName).toBe("Test Script");
     expect(savedScripts[0].description).toBe("Test Description");
-    expect(savedScripts[0].deploymentStatusKvp.length).toBe(0);
+    expect(savedScripts[0].deploymentStatus).toEqual({});
 
     script.scriptName = "Updated Script";
     script.description = "Updated Description";
@@ -83,7 +83,7 @@ describe("Script Repository", () => {
     expect(updatedScripts[0].id).toBe(scriptId);
     expect(updatedScripts[0].scriptName).toBe("Updated Script");
     expect(updatedScripts[0].description).toBe("Updated Description");
-    expect(updatedScripts[0].deploymentStatusKvp.length).toBe(0);
+    expect(updatedScripts[0].deploymentStatus).toEqual({});
   });
 
   it("should delete script", async () => {
@@ -106,7 +106,7 @@ describe("Script Repository", () => {
     expect(savedScripts[0].id).toBe(scriptId);
     expect(savedScripts[0].scriptName).toBe("Test Script");
     expect(savedScripts[0].description).toBe("Test Description");
-    expect(savedScripts[0].deploymentStatusKvp.length).toBe(0);
+    expect(savedScripts[0].deploymentStatus).toEqual({});
 
     await repo.deleteScript(scriptId);
 

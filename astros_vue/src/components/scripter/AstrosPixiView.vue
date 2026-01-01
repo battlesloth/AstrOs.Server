@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Application, Container, Graphics } from 'pixi.js';
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onUnmounted, ref, watch } from 'vue';
 
 // Import composables
 import { useZoomState, ZOOM_LEVELS } from '@/composables/useZoomState';
@@ -28,7 +28,7 @@ import {
   ZOOM_FOCUS_START_WEIGHT,
   ZOOM_FOCUS_EDGE_BIAS_MULTIPLIER,
 } from '@/composables/timelineConstants';
-import type { Channel } from '@/composables/types';
+import type { Channel } from '@/models';
 
 // Import utilities
 import { createCircularButton, drawPlusIcon, drawMinusIcon } from '@/pixiComponents/pixiButtons';
@@ -84,12 +84,20 @@ const minusButton = ref<Container | null>(null);
 // Exposed Methods
 // ============================================================================
 
-const initializePixi = async () => {
-  // Initialization logic if needed
+const initializePixi = async (scriptChannels: Channel[]) => {
+  await init();
+  for (const channel of scriptChannels) {
+    doAddChannel(channel);
+  }
 };
 
-const addChannel = (id: string, name: string, channelType: ScriptChannelType) => {
-  doAddChannel(id, name, channelType);
+const addChannel = (channel: Channel) => {
+  doAddChannel(channel);
+  if (channel.events.length > 0) {
+    for (const event of channel.events) {
+      addEvent(event);
+    }
+  }
 };
 
 const removeChannel = (chId: string) => {
@@ -118,7 +126,7 @@ defineExpose({
 });
 
 // ============================================================================
-// emmitters
+// emitters
 // ===========================================================================
 
 const emit = defineEmits<{
@@ -239,7 +247,6 @@ watch(horizontalScrollOffset, (newOffset) => {
 // Watch vertical scroll offset and update container Y position
 watch(verticalScrollOffset, (newOffset) => {
   if (scrollableContentContainer.value && app.value) {
-    //&& channelListScrollableContainer.value) {
     const canvasHeight = app.value.screen.height;
     const availableHeight = canvasHeight - ADD_CHANNEL_BUTTON_HEIGHT;
     const totalContentHeight = channels.value.length * ROW_HEIGHT;
@@ -258,11 +265,13 @@ watch(verticalScrollOffset, (newOffset) => {
 });
 
 // ============================================================================
-// Mounted / Unmounted
+// Initialize / Unmounted
 // ============================================================================
 
-onMounted(async () => {
-  if (!pixiContainer.value) return;
+async function  init(){
+if (!pixiContainer.value) return;
+
+  console.log('AstrosPixiView mounted, initializing PIXI...');
 
   app.value = new Application();
 
@@ -352,7 +361,9 @@ onMounted(async () => {
   if (pixiContainer.value) {
     pixiContainer.value.addEventListener('wheel', handleWheel, { passive: false });
   }
-});
+
+  console.log('PIXI initialized.');
+}
 
 onUnmounted(() => {
   if (resizeObserver) {
@@ -584,26 +595,18 @@ function createChannelRowContainer(
   updateEventBoxPositions(channelId);
 }
 
-function doAddChannel(id: string, name: string, channelType: ScriptChannelType) {
-  const newChannel: Channel = {
-    id: id,
-    chNum: channels.value.length + 1,
-    name: name,
-    channelType: channelType,
-    events: [],
-  };
+function doAddChannel(channel: Channel) {
   const newIndex = channels.value.length;
-  channels.value.push(newChannel);
+  channels.value.push(channel);
 
   // Create the corresponding row container under the timeline
-  createChannelRowContainer(newChannel.id, newChannel.channelType, channels.value.length - 1);
-
+  createChannelRowContainer(channel.id, channel.channelType, newIndex); 
   // Update vertical scrollbar to account for new content
   updateVerticalScrollbar();
 
   const options = {
-    channelId: newChannel.id,
-    channelName: newChannel.name,
+    channelId: channel.id,
+    channelName: channel.name,
     rowIdx: newIndex,
     height: ROW_HEIGHT,
     width: CHANNEL_LIST_WIDTH,

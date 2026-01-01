@@ -20,7 +20,7 @@ import {
   AstrosConfirmModal,
 } from '@/components';
 import router from '@/router';
-import type { AddChannelModalResponse, ScriptEvent, ScriptEventModalResponse } from '@/models';
+import type { AddChannelModalResponse, ScriptEvent, ScriptEventModalResponse, Channel } from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
 
 const scripter = useTemplateRef('scripter');
@@ -54,7 +54,14 @@ function doAddChannel(response: AddChannelModalResponse) {
         continue;
       }
 
-      scripter.value?.addChannel(result.id, result.name, channelType);
+      const ch: Channel = {
+        id: result.id,
+        name: result.name,
+        channelType: channelType,
+        events: [],
+      };
+
+      scripter.value?.addChannel(ch);
     }
   }
   map = scripterStore.getChannelDetailsMap();
@@ -187,7 +194,26 @@ onMounted(async () => {
   }
 
   modalMessage.value = 'Initializing...';
-  await scripter.value?.initializePixi();
+
+  const scriptChannels = scripterStore.script?.scriptChannels;
+
+  console.log('Loaded script ', scriptChannels);
+  const channels: Channel[] = [];
+  if (scriptChannels) {
+    for (const sc of scriptChannels) {
+      const ch: Channel ={
+        id: sc.id,
+        name: sc.moduleChannel.channelName,
+        channelType: sc.channelType,
+        events: [],
+      };
+      channels.push(ch);
+    }
+  }
+
+    console.log('Channels to initialize:', channels);
+
+  await scripter.value?.initializePixi(channels);
   showModal.value = ModalType.CLOSE_ALL;
 });
 </script>

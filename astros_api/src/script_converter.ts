@@ -186,8 +186,8 @@ export class ScriptConverter {
 
     this.scriptChannelModuleMap.set(channel.id, module.id);
 
-    for (const kvp of channel.eventsKvpArray) {
-      const evt = kvp.value as ScriptEvent;
+    for (const key in channel.events) {
+      const evt = channel.events[key] as ScriptEvent;
 
       // convert from 10ths of a second to ms
       evt.time = evt.time * 100;

@@ -434,7 +434,7 @@ function coreGenericSeriaScriptCh(scriptId: string): ScriptChannel {
       i * 10,
       evt,
     );
-    scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
+    scriptCh.events[i * 1000] = sevt;
   }
 
   return scriptCh;
@@ -470,7 +470,7 @@ function domeGenericSerialScriptCh(scriptId: string): ScriptChannel {
         i * 10,
         evt,
       );
-      scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
+      scriptCh.events[i * 1000] = sevt;
     }
   }
 
@@ -501,7 +501,7 @@ function domeI2cScriptCh(scriptId: string): ScriptChannel {
         i * 10,
         evt,
       );
-      scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
+      scriptCh.events[i * 1000] = sevt;
     }
   }
 

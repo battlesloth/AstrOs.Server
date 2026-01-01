@@ -17,8 +17,7 @@ export class ScriptChannel {
   moduleChannel: ModuleChannelType;
   maxDuration: number;
 
-  events: Map<number, ScriptEvent>;
-  eventsKvpArray: Array<EventKVP>;
+  events: Record<number, ScriptEvent>;
 
   constructor(
     id: string,
@@ -40,7 +39,6 @@ export class ScriptChannel {
     this.moduleChannel = moduleChannel;
     this.maxDuration = maxDuration;
 
-    this.events = new Map<number, ScriptEvent>();
-    this.eventsKvpArray = new Array<EventKVP>();
+    this.events = {};
   }
 }

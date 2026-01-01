@@ -36,7 +36,7 @@ export class ScriptRepository {
   private characters =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
-  constructor(private readonly db: Kysely<Database>) { }
+  constructor(private readonly db: Kysely<Database>) {}
 
   //#region Script Create
 
@@ -89,8 +89,8 @@ export class ScriptRepository {
     script.scriptName = script.scriptName + " - copy";
     for (const ch of script.scriptChannels) {
       ch.id = Guid.create().toString();
-      for (const kvp of ch.eventsKvpArray) {
-        kvp.value.scriptChannel = ch.id;
+      for (const key in ch.events) {
+        ch.events[key].scriptChannel = ch.id;
       }
     }
     script.deploymentStatus = {};
@@ -254,8 +254,8 @@ export class ScriptRepository {
         throw err;
       });
 
-    for (const kvp of ch.eventsKvpArray) {
-      const evt = kvp.value;
+    for (const key in ch.events) {
+      const evt = ch.events[key] as ScriptEvent;
 
       // set the channel number for Maestro events
       // we do this here because the channel can be changed in the UI
@@ -304,7 +304,7 @@ export class ScriptRepository {
 
       await this.configScriptChannel(channel);
 
-      channel.eventsKvpArray = await this.readScriptEvents(scriptId, ch.id);
+      channel.events = await this.readScriptEvents(scriptId, ch.id);
 
       result.push(channel);
     }
@@ -403,8 +403,8 @@ export class ScriptRepository {
   private async readScriptEvents(
     scriptId: string,
     channelId: string,
-  ): Promise<Array<{ key: number; value: ScriptEvent }>> {
-    const result = new Array<{ key: number; value: ScriptEvent }>();
+  ): Promise<Record<number, ScriptEvent>> {
+    const result = {} as Record<number, ScriptEvent>;
 
     const events = await this.db
       .selectFrom("script_events")
@@ -434,7 +434,7 @@ export class ScriptRepository {
         scriptEventType,
       );
 
-      result.push({ key: event.time, value: event });
+      result[event.time] = event;
     }
 
     return result;

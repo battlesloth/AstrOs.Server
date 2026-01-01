@@ -5,3 +5,4 @@ export * from './locationDetails';
 export * from './scriptChannelResource';
 export * from './scriptChannelValue';
 export * from './scriptEventModalResponse';
+export * from './channel';
