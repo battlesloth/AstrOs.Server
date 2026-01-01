@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import AstrosServoEventModal from './AstrosServoEventModal.vue';
 import type { ScriptEvent, MaestroEvent } from '@/models';
-import { ModuleType, ModuleSubType } from '@/enums';
+import { ModuleType, ModuleSubType, ModalMode } from '@/enums';
 
 const meta = {
   title: 'Components/Modals/Scripter/ServoEventModal',
@@ -47,35 +47,35 @@ const createScriptEvent = (
 
 export const AddMode: Story = {
   args: {
-    mode: 'add',
+    mode: ModalMode.ADD,
     scriptEvent: createScriptEvent(),
   },
 };
 
 export const EditMode: Story = {
   args: {
-    mode: 'edit',
+    mode: ModalMode.EDIT,
     scriptEvent: createScriptEvent(5000, 50, 100, 50),
   },
 };
 
 export const EditModeHome: Story = {
   args: {
-    mode: 'edit',
+    mode: ModalMode.EDIT,
     scriptEvent: createScriptEvent(2000, -1, 255, 255),
   },
 };
 
 export const EditModeUnlimited: Story = {
   args: {
-    mode: 'edit',
+    mode: ModalMode.EDIT,
     scriptEvent: createScriptEvent(10000, 75, 0, 0),
   },
 };
 
 export const EditModeFullSpeed: Story = {
   args: {
-    mode: 'edit',
+    mode: ModalMode.EDIT,
     scriptEvent: createScriptEvent(3000, 100, 255, 128),
   },
 };

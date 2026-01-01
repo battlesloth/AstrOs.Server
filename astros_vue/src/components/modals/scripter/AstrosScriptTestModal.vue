@@ -29,8 +29,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  run: [scriptId: string];
-  close: [];
+  (e: 'run', scriptId: string): void;
+  (e: 'close'): void;
 }>();
 
 // Local state

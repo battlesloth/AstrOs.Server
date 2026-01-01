@@ -1,7 +1,6 @@
 import { Container, TextStyle, Text, Graphics, FillGradient } from 'pixi.js';
 import type { PixiChannelData } from './pixiChannelData';
 
-
 export interface PixiChannelListOptions {
   width: number;
   height: number;

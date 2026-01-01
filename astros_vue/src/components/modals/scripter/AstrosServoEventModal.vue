@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { MaestroEvent, ScriptEvent } from '@/models';
+import type { MaestroEvent, ScriptEvent, ScriptEventModalResponse } from '@/models';
 import { ModalMode, ModuleSubType } from '@/enums';
 
 export interface ServoEventModalProps {
-  mode?:  ModalMode;
+  mode?: ModalMode;
   scriptEvent: ScriptEvent;
   maxTime?: number;
 }
@@ -15,10 +15,10 @@ const props = withDefaults(defineProps<ServoEventModalProps>(), {
 });
 
 const emit = defineEmits<{
-  addEvent: [data: { scriptEvent: ScriptEvent; time: number }];
-  editEvent: [data: { scriptEvent: ScriptEvent; time: number }];
-  removeEvent: [];
-  close: [];
+  (e: 'addEvent', data: ScriptEventModalResponse): void;
+  (e: 'editEvent', data: ScriptEventModalResponse): void;
+  (e: 'removeEvent', data: ScriptEventModalResponse): void;
+  (e: 'close'): void;
 }>();
 
 const originalEventTime = ref(0);
@@ -90,7 +90,7 @@ const saveEvent = () => {
 
   const eventData = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value
+    time: originalEventTime.value,
   };
 
   if (props.mode === ModalMode.ADD) {
@@ -101,7 +101,11 @@ const saveEvent = () => {
 };
 
 const removeEvent = () => {
-  emit('removeEvent');
+  const eventData = {
+    scriptEvent: props.scriptEvent,
+    time: originalEventTime.value,
+  };
+  emit('removeEvent', eventData);
 };
 
 const closeModal = () => {

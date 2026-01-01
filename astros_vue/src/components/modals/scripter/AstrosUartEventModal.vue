@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { type GenericSerialEvent } from '@/models';
+import { type GenericSerialEvent, type ScriptEventModalResponse } from '@/models';
 import type { ScriptEvent } from '@/models/scripts/scriptEvent';
 import { ModalMode } from '@/enums';
 
@@ -16,10 +16,10 @@ const props = withDefaults(defineProps<UartEventModalProps>(), {
 });
 
 const emit = defineEmits<{
-  addEvent: [data: { scriptEvent: ScriptEvent; time: number }];
-  editEvent: [data: { scriptEvent: ScriptEvent; time: number }];
-  removeEvent: [];
-  close: [];
+  (e: 'addEvent', data: ScriptEventModalResponse): void;
+  (e: 'editEvent', data: ScriptEventModalResponse): void;
+  (e: 'removeEvent', data: ScriptEventModalResponse): void;
+  (e: 'close'): void;
 }>();
 
 const originalEventTime = ref(0);
@@ -51,9 +51,9 @@ const saveEvent = () => {
   props.scriptEvent.time = +eventTime.value;
   props.scriptEvent.event = { value: eventValue.value };
 
-  const eventData = {
+  const eventData: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value
+    time: originalEventTime.value,
   };
 
   if (props.mode === ModalMode.ADD) {
@@ -64,7 +64,11 @@ const saveEvent = () => {
 };
 
 const removeEvent = () => {
-  emit('removeEvent');
+  const eventData: ScriptEventModalResponse = {
+    scriptEvent: props.scriptEvent,
+    time: originalEventTime.value,
+  };
+  emit('removeEvent', eventData);
 };
 
 const closeModal = () => {

@@ -52,7 +52,6 @@ export class PixiChannelEventRow extends Container {
       // Only respond to left-click
       if (event.button !== 0) return;
 
-
       if (this.hasDragged.value || this.hasEventBoxDragged.value) {
         this.options.resetDraggedFlag();
         return;
@@ -61,7 +60,8 @@ export class PixiChannelEventRow extends Container {
       const localPos = this.toLocal(event.global);
 
       // Calculate time with 0.1 second precision
-      const timeInSeconds = (localPos.x / this.options.timeLineWidth.value) * this.options.timeLineDuration;
+      const timeInSeconds =
+        (localPos.x / this.options.timeLineWidth.value) * this.options.timeLineDuration;
       const time = Math.round(timeInSeconds * 10) / 10;
 
       this.options.onClick(this.channelId, time);
@@ -103,13 +103,9 @@ export class PixiChannelEventRow extends Container {
       }
 
       this.background.clear();
-      this.background
-        .rect(0, 0, width!, this.options.height)
-        .fill(this.getRowColor());
+      this.background.rect(0, 0, width!, this.options.height).fill(this.getRowColor());
       // Add bottom border line
-      this.background
-        .rect(0, this.options.height - 1, width!, 1)
-        .fill(this.getBorderColor());
+      this.background.rect(0, this.options.height - 1, width!, 1).fill(this.getBorderColor());
     }
   }
 }

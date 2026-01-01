@@ -1,5 +1,12 @@
 import { ref } from 'vue';
-import type { ChannelDetails, LocationDetails, ScriptChannelResource, Script, ControllerLocation, LocationCollection } from '@/models';
+import type {
+  ChannelDetails,
+  LocationDetails,
+  ScriptChannelResource,
+  Script,
+  ControllerLocation,
+  LocationCollection,
+} from '@/models';
 import { Location, ScriptChannelTypes, ScriptChannelType } from '@/enums';
 import { useModuleScriptResources } from './useModuleScriptResources';
 

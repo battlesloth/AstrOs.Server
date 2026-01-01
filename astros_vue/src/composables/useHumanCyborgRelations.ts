@@ -1,7 +1,6 @@
 import { HumanCyborgRelationsCmd } from '@/enums';
 
 export function useHumanCyborgRelations() {
-
   function getHcrCommandString(cmd: HumanCyborgRelationsCmd): string {
     switch (cmd) {
       case HumanCyborgRelationsCmd.MILD_HAPPY:
@@ -158,5 +157,4 @@ export function useHumanCyborgRelations() {
     getHcrCommandString,
     getHcrCommandName,
   };
-
 }

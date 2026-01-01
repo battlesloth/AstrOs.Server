@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted} from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { AstrosLayout, AstrosScriptRow } from '@/components';
 import { useToast } from '@/composables/useToast';

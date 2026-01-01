@@ -5,7 +5,6 @@ import AstrosGpioEventModal from './AstrosGpioEventModal.vue';
 import { ModuleSubType, ModuleType, ModalMode } from '@/enums';
 import type { GpioEvent, MaestroEvent, ScriptEvent } from '@/models';
 
-
 const meta = {
   title: 'Components/Modals/Scripter/GpioEventModal',
   component: AstrosGpioEventModal,

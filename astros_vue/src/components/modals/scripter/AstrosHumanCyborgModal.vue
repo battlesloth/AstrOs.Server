@@ -5,14 +5,13 @@ import type {
   HcrCommand,
   HumanCyborgRelationsEvent,
   ScriptEventModalResponse,
-  ScriptEvent
+  ScriptEvent,
 } from '@/models';
 
 import { v4 as uuid } from 'uuid';
 import { useHumanCyborgRelations } from '@/composables/useHumanCyborgRelations';
 
-
-const {getHcrCommandName, getHcrCommandString } = useHumanCyborgRelations();
+const { getHcrCommandName, getHcrCommandString } = useHumanCyborgRelations();
 
 interface HcrCommandListItem {
   id: HumanCyborgRelationsCmd;
@@ -30,10 +29,10 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  addEvent: [response: ScriptEventModalResponse];
-  editEvent: [response: ScriptEventModalResponse];
-  removeEvent: [response: ScriptEventModalResponse];
-  close: [];
+  (e: 'addEvent', response: ScriptEventModalResponse): void;
+  (e: 'editEvent', response: ScriptEventModalResponse): void;
+  (e: 'removeEvent', response: ScriptEventModalResponse): void;
+  (e: 'close'): void;
 }>();
 
 // Constants
@@ -270,7 +269,7 @@ const addEvent = () => {
 const removeEvent = () => {
   const response: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value
+    time: originalEventTime.value,
   };
   emit('removeEvent', response);
 };

@@ -1,8 +1,14 @@
 import { ModalType, ModuleSubType, ModuleType } from '@/enums';
-import type { GenericSerialEvent, GpioEvent, HumanCyborgRelationsEvent, I2cEvent, KangarooEvent, MaestroEvent } from '@/models';
+import type {
+  GenericSerialEvent,
+  GpioEvent,
+  HumanCyborgRelationsEvent,
+  I2cEvent,
+  KangarooEvent,
+  MaestroEvent,
+} from '@/models';
 
 export function useScriptEvents() {
-
   function eventTypeToModalType(moduleType: ModuleType, moduleSubType: ModuleSubType): ModalType {
     switch (moduleType) {
       case ModuleType.UART:
@@ -44,15 +50,17 @@ export function useScriptEvents() {
 
   function generateI2cEvent(): I2cEvent {
     return {
-      message: "",
+      message: '',
     };
   }
 
-  function generateUartEvent(moduleSubType: ModuleSubType): GenericSerialEvent | HumanCyborgRelationsEvent | KangarooEvent | MaestroEvent {
+  function generateUartEvent(
+    moduleSubType: ModuleSubType,
+  ): GenericSerialEvent | HumanCyborgRelationsEvent | KangarooEvent | MaestroEvent {
     switch (moduleSubType) {
       case ModuleSubType.GENERIC_SERIAL:
         return {
-          value: "",
+          value: '',
         } as GenericSerialEvent;
       case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
         return {
@@ -77,7 +85,7 @@ export function useScriptEvents() {
         } as MaestroEvent;
     }
     return {
-      value: "",
+      value: '',
     } as GenericSerialEvent;
   }
 

@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
 import { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
-import type {
-  LocationDetails,
-  ChannelDetails,
-  AddChannelModalResponse,
-} from '@/models';
+import type { LocationDetails, ChannelDetails, AddChannelModalResponse } from '@/models';
 import { useScripterStore } from '@/stores/scripter';
 
 interface ScriptChannelTypeOption {

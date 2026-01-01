@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import { v4 as uuid } from 'uuid';
 import AstrosKangarooEventModal from './AstrosKangarooEventModal.vue';
-import { ModuleType, ModuleSubType, KangarooAction } from '@/enums';
+import { ModuleType, ModuleSubType, KangarooAction, ModalMode } from '@/enums';
 import type { KangarooEvent, KangarooX2, ScriptEvent } from '@/models';
 
 const meta = {
@@ -27,7 +27,7 @@ export const Default: Story = {
   args: {
     kangaroo: getKangarooModule(),
     scriptEvent: getKangarooEvent(),
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 };
 
@@ -35,7 +35,7 @@ export const UndefinedEvent: Story = {
   args: {
     kangaroo: getKangarooModule(),
     scriptEvent: getKangarooEvent(true),
-    mode: 'add',
+    mode: ModalMode.ADD,
   },
 };
 
@@ -43,7 +43,7 @@ export const EditMode: Story = {
   args: {
     kangaroo: getKangarooModule(),
     scriptEvent: getKangarooEvent(),
-    mode: 'edit',
+    mode: ModalMode.EDIT,
   },
 };
 
@@ -58,7 +58,7 @@ function getKangarooEvent(undefinedEvt = false): ScriptEvent {
     ch1Position: 1000,
     ch2Action: KangarooAction.POSITION,
     ch2Speed: 200,
-    ch2Position: 2000
+    ch2Position: 2000,
   };
 
   return {

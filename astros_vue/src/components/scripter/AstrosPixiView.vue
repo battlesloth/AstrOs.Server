@@ -6,7 +6,6 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useZoomState, ZOOM_LEVELS } from '@/composables/useZoomState';
 import { useScrollState } from '@/composables/useScrollState';
 import { useDragState } from '@/composables/useDragState';
-import { usePerformanceFlags } from '@/composables/usePerformanceFlags';
 import { useEventBoxes } from '@/composables/useEventBoxes';
 
 import {
@@ -129,7 +128,7 @@ const emit = defineEmits<{
   (e: 'testChannel', chId: string): void;
   (e: 'addEvent', chlId: string, time: number): void;
   (e: 'removeEvent', chlId: string, eventId: number): void;
-  (e: 'editEvent', chId: string, eventId: number): void;
+  (e: 'editEvent', event: ScriptEvent): void;
 }>();
 
 function emitAddChannel() {
@@ -153,8 +152,8 @@ function emitAddEvent(chlId: string, time: number) {
 function emitRemoveEvent(chlId: string, eventId: number) {
   emit('removeEvent', chlId, eventId);
 }
-function emitEditEvent(chId: string, eventId: number) {
-  emit('editEvent', chId, eventId);
+function emitEditEvent(event: ScriptEvent) {
+  emit('editEvent', event);
 }
 
 // ============================================================================
@@ -181,7 +180,10 @@ const {
 const { isDraggingTimeline, dragStartX, dragStartY, dragStartWorldX, dragStartWorldY, hasDragged } =
   useDragState();
 
-const { eventBoxPositionsDirty, rowBackgroundsDirty, lastTimelineWidth } = usePerformanceFlags(
+// Performance optimization flags
+const eventBoxPositionsDirty = ref(false);
+const rowBackgroundsDirty = ref(false);
+const lastTimelineWidth = ref(
   (PIXELS_PER_SECOND * TIMELINE_DURATION_SECONDS) / ZOOM_LEVELS[0]!.scaleMultiplier,
 );
 
@@ -196,7 +198,7 @@ const {
   handleEventBoxDrag,
   endEventBoxDrag,
 } = useEventBoxes(TIMELINE_WIDTH, TIMELINE_DURATION_SECONDS, ROW_HEIGHT, (event) => {
-  emitEditEvent(event.scriptChannelId, event.id ?? 0);
+  emitEditEvent(event);
 });
 
 // Other
@@ -550,7 +552,11 @@ function createChannelList() {
   });
 }
 
-function createChannelRowContainer(channelId: string, channelType: ScriptChannelType, rowIndex: number) {
+function createChannelRowContainer(
+  channelId: string,
+  channelType: ScriptChannelType,
+  rowIndex: number,
+) {
   if (!scrollableContentContainer.value || !app.value) return;
 
   const options: PixiChannelEventRowOptions = {
@@ -635,13 +641,13 @@ function doRemoveChannel(chId: string) {
   }
 
   channelListContainer.value?.removeChannelRow(chId);
-  
+
   // Update remaining row indices to match their position in the channels array
   channels.value.forEach((channel, index) => {
     const rowContainer = channelRowContainers.value.get(channel.id);
     if (rowContainer && rowContainer.rowIdx !== index) {
       // Calculate the difference and update
-      rowContainer.updateIdx(index)
+      rowContainer.updateIdx(index);
       channelListContainer.value?.updateChannelIndex(channel.id, index);
     }
   });
@@ -1101,7 +1107,6 @@ function getZoomButtonPositions(canvasWidth: number) {
     radius: buttonRadius,
   };
 }
-
 </script>
 
 <template>

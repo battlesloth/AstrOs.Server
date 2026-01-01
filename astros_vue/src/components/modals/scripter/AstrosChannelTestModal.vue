@@ -11,8 +11,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  test: [response: ChannelTestModalResponse];
-  close: [];
+  (e: 'test', response: ChannelTestModalResponse): void;
+  (e: 'close'): void;
 }>();
 
 // Servo state

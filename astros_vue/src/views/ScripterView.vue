@@ -45,7 +45,7 @@ function addChannel() {
 function doAddChannel(response: AddChannelModalResponse) {
   showModal.value = ModalType.CLOSE_ALL;
   let map = scripterStore.getChannelDetailsMap();
-  for (const [channelType, detailList ] of response.channels.entries()) {
+  for (const [channelType, detailList] of response.channels.entries()) {
     for (const detail of detailList) {
       const result = scripterStore.addChannel(detail.id, channelType);
 
@@ -85,11 +85,14 @@ function addEvent(chId: string, time: number) {
 
   selectedScriptEvent.value = {
     scriptChannelId: chId,
-    moduleType: channel.moduleChannel.moduleType ,
+    moduleType: channel.moduleChannel.moduleType,
     moduleSubType: channel.moduleChannel.moduleSubType,
     time: time,
-    event: getDefaultScriptEvent(channel.moduleChannel.moduleType, channel.moduleChannel.moduleSubType),
-  };  
+    event: getDefaultScriptEvent(
+      channel.moduleChannel.moduleType,
+      channel.moduleChannel.moduleSubType,
+    ),
+  };
 
   showModal.value = eventTypeToModalType(
     channel.moduleChannel.moduleType,
@@ -107,9 +110,7 @@ function doAddEvent(response: ScriptEventModalResponse) {
     selectedScriptEvent.value.scriptChannelId,
     event,
   );*/
-  scripter.value?.addEvent(
-    response.scriptEvent
-  );
+  scripter.value?.addEvent(response.scriptEvent);
 
   selectedScriptEvent.value = null;
 }
@@ -117,7 +118,7 @@ function doAddEvent(response: ScriptEventModalResponse) {
 function editEvent(event: ScriptEvent) {
   modalMode.value = ModalMode.EDIT;
   selectedScriptEvent.value = event;
-  
+
   const channel = scripterStore.getChannel(event.scriptChannelId);
 
   if (!channel) {
@@ -141,10 +142,11 @@ function doEditEvent(response: ScriptEventModalResponse) {
 }
 
 function removeEvent() {}
-function doRemoveEvent() {}
+function doRemoveEvent(response: ScriptEventModalResponse) {
+  scripter.value?.removeEvent(response.scriptEvent.scriptChannelId, response.scriptEvent.time);
 
-function updateEvent() {}
-function doUpdateEvent() {}
+  selectedScriptEvent.value = null;
+}
 
 function testChannel() {}
 function scriptTest() {}
@@ -201,7 +203,7 @@ onMounted(async () => {
         @test-channel="testChannel"
         @add-event="addEvent"
         @remove-event="removeEvent"
-        @edit-event="updateEvent"
+        @edit-event="editEvent"
       />
 
       <AstrosInterruptModal
@@ -244,6 +246,7 @@ onMounted(async () => {
         @close="eventModalClose"
         @add-event="doAddEvent"
         @edit-event="doEditEvent"
+        @remove-event="doRemoveEvent"
         :mode="modalMode"
         :script-event="selectedScriptEvent"
       />
@@ -252,6 +255,7 @@ onMounted(async () => {
         @close="eventModalClose"
         @add-event="doAddEvent"
         @edit-event="doEditEvent"
+        @remove-event="doRemoveEvent"
         :mode="modalMode"
         :script-event="selectedScriptEvent"
       />
@@ -260,6 +264,7 @@ onMounted(async () => {
         @close="eventModalClose"
         @add-event="doAddEvent"
         @edit-event="doEditEvent"
+        @remove-event="doRemoveEvent"
         :mode="modalMode"
         :script-event="selectedScriptEvent"
       />
@@ -268,6 +273,7 @@ onMounted(async () => {
         @close="eventModalClose"
         @add-event="doAddEvent"
         @edit-event="doEditEvent"
+        @remove-event="doRemoveEvent"
         :mode="modalMode"
         :kangaroo="{
           id: '',
@@ -281,12 +287,16 @@ onMounted(async () => {
         @close="eventModalClose"
         @add-event="doAddEvent"
         @edit-event="doEditEvent"
+        @remove-event="doRemoveEvent"
         :mode="modalMode"
         :script-event="selectedScriptEvent"
       />
       <AstrosUartEventModal
         v-if="showModal === ModalType.UART_EVENT && selectedScriptEvent"
         @close="eventModalClose"
+        @add-event="doAddEvent"
+        @edit-event="doEditEvent"
+        @remove-event="doRemoveEvent"
         :mode="modalMode"
         :script-event="selectedScriptEvent"
       />

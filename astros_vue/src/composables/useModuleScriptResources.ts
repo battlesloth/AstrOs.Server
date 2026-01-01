@@ -1,5 +1,15 @@
 import { ModuleSubType, ScriptChannelType } from '@/enums';
-import type { GpioModule, I2cChannel, I2cModule, KangarooChannel, MaestroModule, UartChannel, UartModule, ScriptChannelResource, KangarooX2 } from '@/models';
+import type {
+  GpioModule,
+  I2cChannel,
+  I2cModule,
+  KangarooChannel,
+  MaestroModule,
+  UartChannel,
+  UartModule,
+  ScriptChannelResource,
+  KangarooX2,
+} from '@/models';
 
 export function useModuleScriptResources() {
   function getGpioScriptResources(m: GpioModule): ScriptChannelResource[] {

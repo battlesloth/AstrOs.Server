@@ -1,4 +1,11 @@
-import type { I2cModule, KangarooModule, MaestroBoard, MaestroChannel, MaestroModule, UartModule } from '@/models';
+import type {
+  I2cModule,
+  KangarooModule,
+  MaestroBoard,
+  MaestroChannel,
+  MaestroModule,
+  UartModule,
+} from '@/models';
 import { Location, ModuleType, ModuleSubType } from '@/enums';
 import { useLocationStore } from '@/stores/location';
 import { v4 as uuid } from 'uuid';

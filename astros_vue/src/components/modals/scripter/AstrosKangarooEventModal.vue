@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import {
-  KangarooAction,
-  ModalMode,
-} from '@/enums';
-import type {
-   KangarooEvent,
-   KangarooX2,
-   ScriptEventModalResponse,
-  ScriptEvent } from '@/models';
-
+import { KangarooAction, ModalMode } from '@/enums';
+import type { KangarooEvent, KangarooX2, ScriptEventModalResponse, ScriptEvent } from '@/models';
 
 const props = withDefaults(
   defineProps<{
@@ -23,10 +15,10 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  addEvent: [response: ScriptEventModalResponse];
-  editEvent: [response: ScriptEventModalResponse];
-  removeEvent: [response: ScriptEventModalResponse];
-  close: [];
+  (e: 'addEvent', response: ScriptEventModalResponse): void;
+  (e: 'editEvent', response: ScriptEventModalResponse): void;
+  (e: 'removeEvent', response: ScriptEventModalResponse): void;
+  (e: 'close'): void;
 }>();
 
 // Constants
@@ -126,7 +118,7 @@ const addEvent = () => {
 
   const response: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value
+    time: originalEventTime.value,
   };
 
   if (props.mode === 'edit') {
@@ -139,7 +131,7 @@ const addEvent = () => {
 const removeEvent = () => {
   const response: ScriptEventModalResponse = {
     scriptEvent: props.scriptEvent,
-    time: originalEventTime.value
+    time: originalEventTime.value,
   };
   emit('removeEvent', response);
 };

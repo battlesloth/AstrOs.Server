@@ -51,7 +51,7 @@ export class PixiChannelData extends Container {
     this.y = this.rowIdx * options.height;
     this.options = options;
 
-    this.background = new Graphics()
+    this.background = new Graphics();
     this.setBackground();
     this.addChild(this.background);
 
@@ -155,9 +155,7 @@ export class PixiChannelData extends Container {
   setBackground() {
     if (this.background) {
       this.background.clear();
-      this.background
-        .rect(0, 0, this.options.width, this.options.height)
-        .fill(this.getRowColor());
+      this.background.rect(0, 0, this.options.width, this.options.height).fill(this.getRowColor());
       // Add bottom border line
       this.background
         .rect(0, this.options.height - 1, this.options.width, 1)

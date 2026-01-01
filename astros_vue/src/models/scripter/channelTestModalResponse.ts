@@ -1,4 +1,4 @@
-import type { ScriptChannelType } from "@/enums";
+import type { ScriptChannelType } from '@/enums';
 
 export interface ChannelTestModalResponse {
   controllerId: number;

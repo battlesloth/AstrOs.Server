@@ -23,47 +23,18 @@ export const ZOOM_LEVELS: ZoomLevelConfig[] = [
   { majorTickInterval: 120, minorTickInterval: 20, scaleMultiplier: 12, label: '2min' },
 ];
 
-export interface ZoomState {
-  level: number;
-  scrollAccumulator: number;
-  timelineWidth: number;
-}
-
 export function useZoomState(pixelsPerSecond: number, timelineDurationSeconds: number) {
-  const zoomState = ref<ZoomState>({
-    level: 0,
-    scrollAccumulator: 0,
-    timelineWidth: (pixelsPerSecond * timelineDurationSeconds) / ZOOM_LEVELS[0]!.scaleMultiplier,
-  });
-
-  // Computed refs for backward compatibility
-  const zoomLevel = computed({
-    get: () => zoomState.value.level,
-    set: (val) => {
-      zoomState.value.level = val;
-    },
-  });
-
-  const zoomScrollAccumulator = computed({
-    get: () => zoomState.value.scrollAccumulator,
-    set: (val) => {
-      zoomState.value.scrollAccumulator = val;
-    },
-  });
-
-  const TIMELINE_WIDTH = computed({
-    get: () => zoomState.value.timelineWidth,
-    set: (val) => {
-      zoomState.value.timelineWidth = val;
-    },
-  });
+  const zoomLevel = ref(0);
+  const zoomScrollAccumulator = ref(0);
+  const TIMELINE_WIDTH = ref(
+    (pixelsPerSecond * timelineDurationSeconds) / ZOOM_LEVELS[0]!.scaleMultiplier,
+  );
 
   const canZoomIn = computed(() => zoomLevel.value > 0);
   const canZoomOut = computed(() => zoomLevel.value < ZOOM_LEVELS.length - 1);
   const currentZoomConfig = computed(() => ZOOM_LEVELS[zoomLevel.value]!);
 
   return {
-    zoomState,
     zoomLevel,
     zoomScrollAccumulator,
     TIMELINE_WIDTH,

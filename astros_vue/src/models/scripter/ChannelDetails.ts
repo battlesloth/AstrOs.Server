@@ -1,4 +1,4 @@
-import type { ScriptChannelType } from "@/enums/scripts/scriptChannelType";
+import type { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
 
 export interface ChannelDetails {
   id: string;

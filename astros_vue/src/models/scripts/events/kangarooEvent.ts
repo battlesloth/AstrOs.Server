@@ -1,4 +1,4 @@
-import type { KangarooAction } from "@/enums/scripter/kangarooActions";
+import type { KangarooAction } from '@/enums/scripter/kangarooActions';
 
 export interface KangarooEvent {
   ch1Action: KangarooAction;

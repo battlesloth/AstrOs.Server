@@ -62,11 +62,11 @@ export function useEventBoxes(
 
     // Add click handler for editing
     eventBox.on('pointertap', (event) => {
+      event.stopPropagation(); // Always stop propagation to prevent row click
       if (hasEventBoxDragged.value) {
         hasEventBoxDragged.value = false;
         return;
       }
-      event.stopPropagation();
       onEditEvent(scriptEvent);
     });
 
@@ -127,8 +127,6 @@ export function useEventBoxes(
     if (!isDraggingEventBox.value || !draggedEventBox.value) return;
 
     const deltaX = globalX - eventBoxDragStartX.value;
-
-    console.log('Dragging event box', { deltaX, isDraggingEventBox: isDraggingEventBox.value });
 
     // Mark as dragged if moved more than a small threshold
     if (Math.abs(deltaX) > 2) {
