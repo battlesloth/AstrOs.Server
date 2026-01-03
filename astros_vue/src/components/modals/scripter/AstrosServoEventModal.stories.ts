@@ -37,7 +37,8 @@ const createScriptEvent = (
   };
 
   return {
-    scriptChannelId: 'channel-1',
+    id: 'event-1',
+    scriptChannel: 'channel-1',
     moduleType: ModuleType.UART,
     moduleSubType: ModuleSubType.MAESTRO,
     time,

@@ -52,7 +52,8 @@ export const EditMode: Story = {
 
 function getScriptEvent(undefinedEvt = false): ScriptEvent {
   return {
-    scriptChannelId: uuid(),
+    id: uuid(),
+    scriptChannel: uuid(),
     moduleType: ModuleType.UART,
     moduleSubType: ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL,
     time: 3000,

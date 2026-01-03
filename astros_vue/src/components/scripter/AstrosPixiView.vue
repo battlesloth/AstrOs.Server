@@ -70,7 +70,7 @@ const scrollableContentContainer = ref<Container | null>(null);
 const uiLayer = ref<Container | null>(null);
 const channelListContainer = ref<PixiChannelList | null>(null);
 const timeline = ref<PixiTimeline | null>(null);
-const channelRowContainers = ref<Map<string, PixiChannelEventRow>>(new Map());
+const channelRowContainers = ref(new Map<string, PixiChannelEventRow>());
 
 // Scrollbar graphics
 const horizontalScrollBar = ref<PixiScrollBar | null>(null);
@@ -109,11 +109,11 @@ const addEvent = (event: ScriptEvent) => {
   doAddEvent(event);
 };
 
-const removeEvent = (chlId: string, eventId: number) => {
-  console.log('removing event', eventId, 'from channel', chlId);
+const removeEvent = (chlId: string, eventId: string) => {
+  doRemoveEvent(chlId, eventId);
 };
 
-const updateEvent = (chlId: string, eventId: number) => {
+const updateEvent = (chlId: string, eventId: string) => {
   console.log('updating event', eventId, 'from channel', chlId);
 };
 
@@ -158,9 +158,9 @@ function emitChannelTest(chId: string) {
 function emitAddEvent(chlId: string, time: number) {
   emit('addEvent', chlId, time);
 }
-function emitRemoveEvent(chlId: string, eventId: number) {
-  emit('removeEvent', chlId, eventId);
-}
+//function emitRemoveEvent(chlId: string, eventId: number) {
+//  emit('removeEvent', chlId, eventId);
+//}
 function emitEditEvent(event: ScriptEvent) {
   emit('editEvent', event);
 }
@@ -198,10 +198,9 @@ const lastTimelineWidth = ref(
 
 // Event boxes composable
 const {
-  channelEventBoxes,
-  isDraggingEventBox,
   hasEventBoxDragged,
   addEventBox,
+  removeEventBox,
   updateEventBoxPositions,
   updateAllEventBoxPositions,
   handleEventBoxDrag,
@@ -269,8 +268,8 @@ watch(verticalScrollOffset, (newOffset) => {
 // Initialize / Unmounted
 // ============================================================================
 
-async function  init(){
-if (!pixiContainer.value) return;
+async function init() {
+  if (!pixiContainer.value) return;
 
   console.log('AstrosPixiView mounted, initializing PIXI...');
 
@@ -297,7 +296,8 @@ if (!pixiContainer.value) return;
 
   // Create main container for content
   mainContainer.value = new Container();
-  app.value.stage.addChild(mainContainer.value as any);
+  app.value.stage.eventMode = 'static';
+  app.value.stage.addChild(mainContainer.value as Container);
 
   // Create scrollable content container inside main container
   scrollableContentContainer.value = new Container();
@@ -317,21 +317,25 @@ if (!pixiContainer.value) return;
     dragStartY.value = globalPos.y;
     dragStartWorldX.value = currentWorldX.value;
     dragStartWorldY.value = currentWorldY.value;
+
+    // Change cursor to grabbing
+    if (app.value?.canvas) {
+      app.value.canvas.style.cursor = 'grabbing';
+    }
   });
 
-  mainContainer.value.addChild(scrollableContentContainer.value as any);
+  mainContainer.value.addChild(scrollableContentContainer.value as Container);
 
   // Create UI layer (always on top)
   uiLayer.value = new Container();
-  app.value.stage.addChild(uiLayer.value as any);
-
+  app.value.stage.addChild(uiLayer.value as Container);
   createHorizontalScrollbar();
   createVerticalScrollbar();
   createTimeline();
   createZoomButtons();
   createChannelList();
 
-  uiLayer.value.addChild(channelListContainer.value as any);
+  uiLayer.value.addChild(channelListContainer.value as unknown as Container);
 
   resizeObserver = new ResizeObserver((entries) => {
     // Use requestAnimationFrame to ensure layout is complete
@@ -356,7 +360,7 @@ if (!pixiContainer.value) return;
 
   // Global mouse move and up events for continuous dragging
   window.addEventListener('mousemove', handleGlobalMouseMove);
-  window.addEventListener('mouseup', handleGlobalMouseUp);
+  window.addEventListener('mouseup', (event) => handleGlobalMouseUp(event));
 
   // Add wheel event listener for scrolling
   if (pixiContainer.value) {
@@ -449,15 +453,10 @@ function createHorizontalScrollbar() {
     thumbSize,
     thumbFillColor: 0x888888,
     thumbFocusColor: 0xcccccc,
-    onThumbDragStart: () => {
-      if (app.value) {
-        app.value.stage.eventMode = 'static';
-      }
-    },
   };
 
   horizontalScrollBar.value = new PixiScrollBar(options);
-  uiLayer.value.addChild(horizontalScrollBar.value as any);
+  uiLayer.value.addChild(horizontalScrollBar.value as unknown as Container);
 }
 
 function createVerticalScrollbar() {
@@ -473,16 +472,11 @@ function createVerticalScrollbar() {
     thumbSize: 0,
     thumbFillColor: 0x888888,
     thumbFocusColor: 0xaaaaaa,
-    onThumbDragStart: () => {
-      if (app.value) {
-        app.value.stage.eventMode = 'static';
-      }
-    },
   };
 
   verticalScrollBar.value = new PixiScrollBar(options);
 
-  uiLayer.value.addChild(verticalScrollBar.value as any);
+  uiLayer.value.addChild(verticalScrollBar.value as unknown as Container);
 }
 
 function createTimeline() {
@@ -500,7 +494,7 @@ function createTimeline() {
 
   const timelineInstance = new PixiTimeline(timelineOptions);
   timeline.value = timelineInstance;
-  uiLayer.value.addChild(timeline.value as any);
+  uiLayer.value.addChild(timeline.value as unknown as Container);
 }
 
 function createZoomButtons() {
@@ -526,8 +520,8 @@ function createZoomButtons() {
     () => zoom('in'),
   );
 
-  uiLayer.value.addChild(plusButton.value as any);
-  uiLayer.value.addChild(minusButton.value as any);
+  uiLayer.value.addChild(plusButton.value as unknown as Container);
+  uiLayer.value.addChild(minusButton.value as unknown as Container);
 }
 
 function createChannelList() {
@@ -588,9 +582,10 @@ function createChannelRowContainer(
 
   const eventRow = new PixiChannelEventRow(options);
 
-  scrollableContentContainer.value.addChild(eventRow as any);
+  scrollableContentContainer.value.addChild(eventRow as unknown as Container);
 
-  channelRowContainers.value.set(channelId, eventRow as any);
+  // @ts-expect-error - Vue ref unwrapping causes type incompatibility with nested Ref types
+  channelRowContainers.value.set(channelId, eventRow);
 
   // Update positions of any existing event boxes for this channel
   updateEventBoxPositions(channelId);
@@ -601,7 +596,7 @@ function doAddChannel(channel: Channel) {
   channels.value.push(channel);
 
   // Create the corresponding row container under the timeline
-  createChannelRowContainer(channel.id, channel.channelType, newIndex); 
+  createChannelRowContainer(channel.id, channel.channelType, newIndex);
   // Update vertical scrollbar to account for new content
   updateVerticalScrollbar();
 
@@ -640,7 +635,7 @@ function doRemoveChannel(chId: string) {
   // Remove the corresponding row container under the timeline
   const rowContainer = channelRowContainers.value.get(chId);
   if (rowContainer && scrollableContentContainer.value) {
-    scrollableContentContainer.value.removeChild(rowContainer as any);
+    scrollableContentContainer.value.removeChild(rowContainer as unknown as Container);
     channelRowContainers.value.delete(chId);
   }
 
@@ -676,7 +671,18 @@ function doAddEvent(event: ScriptEvent) {
     console.error('Channel row container not found for channel ID:', event.scriptChannel);
     return;
   }
-  addEventBox(rowContainer as any, event.scriptChannel, event, app, isDraggingTimeline);
+  addEventBox(rowContainer as unknown as Container, event.scriptChannel, event, isDraggingTimeline);
+}
+
+function doRemoveEvent(chlId: string, eventId: string) {
+  console.log('removing event', eventId, 'from channel', chlId);
+  const rowContainer = channelRowContainers.value.get(chlId);
+  if (!rowContainer) {
+    console.error('Channel row container not found for channel ID:', chlId);
+    return;
+  }
+
+  removeEventBox(chlId, eventId);
 }
 
 // ============================================================================
@@ -784,7 +790,7 @@ function zoom(direction: 'in' | 'out') {
 
   // Recreate timeline with new scale
   if (timeline.value && uiLayer.value) {
-    uiLayer.value.removeChild(timeline.value as any);
+    uiLayer.value.removeChild(timeline.value as unknown as Container);
     timeline.value = null;
   }
 
@@ -792,16 +798,16 @@ function zoom(direction: 'in' | 'out') {
 
   // Re-add buttons and channel list so they stay on top of timeline
   if (plusButton.value && minusButton.value && uiLayer.value) {
-    uiLayer.value.removeChild(plusButton.value as any);
-    uiLayer.value.removeChild(minusButton.value as any);
-    uiLayer.value.addChild(plusButton.value as any);
-    uiLayer.value.addChild(minusButton.value as any);
+    uiLayer.value.removeChild(plusButton.value as unknown as Container);
+    uiLayer.value.removeChild(minusButton.value as unknown as Container);
+    uiLayer.value.addChild(plusButton.value as unknown as Container);
+    uiLayer.value.addChild(minusButton.value as unknown as Container);
   }
 
   // Re-add channel list container so it stays on top
   if (channelListContainer.value && uiLayer.value) {
-    uiLayer.value.removeChild(channelListContainer.value as any);
-    uiLayer.value.addChild(channelListContainer.value as any);
+    uiLayer.value.removeChild(channelListContainer.value as unknown as Container);
+    uiLayer.value.addChild(channelListContainer.value as unknown as Container);
   }
 
   // Update scrollbar to match new timeline width
@@ -1007,9 +1013,23 @@ function handleGlobalMouseMove(event: MouseEvent) {
   }
 }
 
-function handleGlobalMouseUp() {
+function handleGlobalMouseUp(event?: MouseEvent) {
   if (isDraggingTimeline.value) {
     isDraggingTimeline.value = false;
+
+    // Check what's under the cursor and set appropriate cursor
+    if (app.value?.canvas && pixiContainer.value && event) {
+      const rect = pixiContainer.value.getBoundingClientRect();
+      const canvasX = event.clientX - rect.left;
+      const canvasY = event.clientY - rect.top;
+
+      // Check if cursor is over a channel row (in the scrollable content area)
+      const isOverChannelRows =
+        canvasX >= CHANNEL_LIST_WIDTH && canvasY >= ADD_CHANNEL_BUTTON_HEIGHT;
+
+      app.value.canvas.style.cursor = isOverChannelRows ? 'pointer' : '';
+    }
+
     // Reset the drag flag after a short delay to allow pointertap to check it first
     setTimeout(() => {
       hasDragged.value = false;

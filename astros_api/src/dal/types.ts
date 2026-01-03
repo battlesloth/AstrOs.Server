@@ -1,4 +1,4 @@
-import { Generated, Insertable, Selectable, Updateable } from "kysely";
+import { Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 export interface Database {
   settings: SettingsTable;
@@ -115,6 +115,7 @@ export type ScriptChannelUpdate = Updateable<ScriptChannelsTable>;
 //#region ScriptEvents
 
 export interface ScriptEventsTable {
+  id: string;
   script_id: string;
   script_channel_id: string;
   module_type: number;

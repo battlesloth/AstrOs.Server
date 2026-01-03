@@ -1,10 +1,10 @@
-import { ModuleType, ModuleSubType } from "../astros_enums";
-import { GenericSerialEvent } from "./events/generic_serial_event";
-import { GpioEvent } from "./events/gpio_event";
-import { HumanCyborgRelationsEvent } from "./events/human_cyborg_relations_event";
-import { I2cEvent } from "./events/i2c_event";
-import { KangarooEvent } from "./events/kangaroo_event";
-import { MaestroEvent } from "./events/maestro_event";
+import { ModuleType, ModuleSubType } from '../astros_enums';
+import { GenericSerialEvent } from './events/generic_serial_event';
+import { GpioEvent } from './events/gpio_event';
+import { HumanCyborgRelationsEvent } from './events/human_cyborg_relations_event';
+import { I2cEvent } from './events/i2c_event';
+import { KangarooEvent } from './events/kangaroo_event';
+import { MaestroEvent } from './events/maestro_event';
 
 export type ScriptEventTypes =
   | GenericSerialEvent
@@ -39,6 +39,7 @@ export function moduleSubTypeToScriptEventTypes(
 }
 
 export class ScriptEvent {
+  id: string;
   scriptChannel: string;
   moduleType: ModuleType;
   moduleSubType: ModuleSubType;
@@ -46,12 +47,14 @@ export class ScriptEvent {
   event: ScriptEventTypes;
 
   constructor(
+    id: string,
     scriptChannel: string,
     moduleType: ModuleType,
     moduleSubType: ModuleSubType,
     time: number,
     event: ScriptEventTypes,
   ) {
+    this.id = id;
     this.scriptChannel = scriptChannel;
     this.moduleType = moduleType;
     this.moduleSubType = moduleSubType;

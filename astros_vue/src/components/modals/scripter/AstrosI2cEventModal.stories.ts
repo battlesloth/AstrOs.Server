@@ -48,7 +48,8 @@ function getScriptEvent(undefinedEvt = false): ScriptEvent {
   const i2cEvent: I2cEvent = { message: 'test message' };
 
   return {
-    scriptChannelId: uuid(),
+    id: uuid(),
+    scriptChannel: uuid(),
     moduleType: ModuleType.I2C,
     moduleSubType: ModuleSubType.GENERIC_I2C,
     time: 5000,

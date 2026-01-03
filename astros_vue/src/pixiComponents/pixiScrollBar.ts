@@ -3,6 +3,10 @@ import type { PixiScrollBarOptions } from './pixiScrollBarOptions';
 import { ScrollBarDirection } from './pixiScrollBarOptions';
 import { PixiScrollBarThumb } from './pixiScrollBarThumb';
 
+/// <summary>
+/// A scroll bar component for PixiJS applications
+/// Application.value.stage.eventMode = 'static' must be set for pointer events to work correctly
+/// </summary>
 export class PixiScrollBar extends Container {
   barWidth: number;
   barHeight: number;
@@ -14,7 +18,6 @@ export class PixiScrollBar extends Container {
   thumbSize: number;
   thumbFillColor: number;
   thumbFocusColor: number;
-  onThumbDragStart: () => void;
 
   private background: Graphics;
   private scrollThumb: PixiScrollBarThumb;
@@ -32,7 +35,6 @@ export class PixiScrollBar extends Container {
     this.thumbSize = options.thumbSize;
     this.thumbFillColor = options.thumbFillColor ?? 0x888888;
     this.thumbFocusColor = options.thumbFocusColor ?? 0xcccccc;
-    this.onThumbDragStart = options.onThumbDragStart;
 
     this.background = new Graphics();
     this.background
@@ -44,7 +46,6 @@ export class PixiScrollBar extends Container {
       this.direction === ScrollBarDirection.VERTICAL ? this.thumbSize : this.barHeight,
       this.xOffset,
       this.yOffset,
-      this.onThumbDragStart,
       this.thumbFillColor,
       this.thumbFocusColor,
     );

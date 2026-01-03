@@ -25,7 +25,8 @@ type Story = StoryObj<typeof meta>;
 const createScriptEvent = (time: number = 0, value: string = ''): ScriptEvent => {
   const event: GenericSerialEvent | undefined = value ? { value: value } : undefined;
   return {
-    scriptChannelId: 'uart-channel-1',
+    id: 'uart-event-1',
+    scriptChannel: 'uart-channel-1',
     moduleType: ModuleType.UART,
     moduleSubType: ModuleSubType.GENERIC_SERIAL,
     time,

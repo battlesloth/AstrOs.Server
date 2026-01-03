@@ -85,7 +85,8 @@ function getScriptEvent(type: ModuleSubType, setHigh: boolean, undefinedEvt = fa
   }
 
   return {
-    scriptChannelId: uuid(),
+    id: uuid(),
+    scriptChannel: uuid(),
     moduleType: modType,
     moduleSubType: type,
     time: 2000,

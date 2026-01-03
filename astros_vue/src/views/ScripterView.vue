@@ -28,6 +28,7 @@ import type {
 } from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
 import { useToast } from '@/composables/useToast';
+import { v4 as uuid } from 'uuid';
 
 const scripter = useTemplateRef('scripter');
 
@@ -97,6 +98,7 @@ function addEvent(chId: string, time: number) {
   }
 
   selectedScriptEvent.value = {
+    id: uuid(),
     scriptChannel: chId,
     moduleType: channel.moduleChannel.moduleType,
     moduleSubType: channel.moduleChannel.moduleSubType,
@@ -119,10 +121,7 @@ function doAddEvent(response: ScriptEventModalResponse) {
     return;
   }
 
-  /*scripterStore.addEventToChannel(
-    selectedScriptEvent.value.scriptChannelId,
-    event,
-  );*/
+  scripterStore.addEventToChannel(response.scriptEvent.scriptChannel, response.scriptEvent);
   scripter.value?.addEvent(response.scriptEvent);
 
   selectedScriptEvent.value = null;
@@ -157,7 +156,9 @@ function doEditEvent(response: ScriptEventModalResponse) {
 
 function removeEvent() {}
 function doRemoveEvent(response: ScriptEventModalResponse) {
-  scripter.value?.removeEvent(response.scriptEvent.scriptChannel, response.scriptEvent.time);
+  scripterStore.removeEventFromChannel(response.scriptEvent.scriptChannel, response.scriptEvent.id);
+
+  scripter.value?.removeEvent(response.scriptEvent.scriptChannel, response.scriptEvent.id);
 
   selectedScriptEvent.value = null;
 }

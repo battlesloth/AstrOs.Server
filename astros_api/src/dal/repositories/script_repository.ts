@@ -12,29 +12,22 @@ import {
   ModuleClassType,
   MaestroEvent,
   MaestroChannel,
-} from "astros-common";
-import { logger } from "../../logger.js";
-import { Guid } from "guid-typescript";
-import { Database, ScriptsTable } from "../types.js";
-import { Kysely, Transaction } from "kysely";
-import {
-  getGpioModule,
-  readGpioChannel,
-} from "./module_repositories/gpio_repository.js";
+} from 'astros-common';
+import { logger } from '../../logger.js';
+import { Guid } from 'guid-typescript';
+import { Database, ScriptsTable } from '../types.js';
+import { Kysely, Transaction } from 'kysely';
+import { getGpioModule, readGpioChannel } from './module_repositories/gpio_repository.js';
 import {
   getUartModules,
   readKangarooChannel,
   readMaestroChannel,
   readUartChannel,
-} from "./module_repositories/uart_repository.js";
-import {
-  getI2cModules,
-  readI2cChannel,
-} from "./module_repositories/i2c_repository.js";
+} from './module_repositories/uart_repository.js';
+import { getI2cModules, readI2cChannel } from './module_repositories/i2c_repository.js';
 
 export class ScriptRepository {
-  private characters =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
   constructor(private readonly db: Kysely<Database>) {}
 
@@ -43,7 +36,7 @@ export class ScriptRepository {
   async upsertScript(script: Script): Promise<boolean> {
     await this.db.transaction().execute(async (tx) => {
       await tx
-        .insertInto("scripts")
+        .insertInto('scripts')
         .values({
           id: script.id,
           name: script.scriptName,
@@ -52,16 +45,16 @@ export class ScriptRepository {
           enabled: 1,
         })
         .onConflict((c) =>
-          c.columns(["id"]).doUpdateSet((eb) => ({
-            name: eb.ref("excluded.name"),
-            description: eb.ref("excluded.description"),
+          c.columns(['id']).doUpdateSet((eb) => ({
+            name: eb.ref('excluded.name'),
+            description: eb.ref('excluded.description'),
             last_modified: Date.now(),
             enabled: 1,
           })),
         )
         .execute()
         .catch((err) => {
-          logger.error("ScriptRepository.upsertScript", err);
+          logger.error('ScriptRepository.upsertScript', err);
           throw err;
         });
 
@@ -86,7 +79,7 @@ export class ScriptRepository {
     const script = await this.getScript(id);
 
     script.id = this.generateScriptId(5);
-    script.scriptName = script.scriptName + " - copy";
+    script.scriptName = script.scriptName + ' - copy';
     for (const ch of script.scriptChannels) {
       ch.id = Guid.create().toString();
       for (const key in ch.events) {
@@ -115,38 +108,33 @@ export class ScriptRepository {
 
   async getScripts(): Promise<Array<Script>> {
     const scripts = await this.db
-      .selectFrom("scripts")
+      .selectFrom('scripts')
       .selectAll()
-      .where("enabled", "=", 1)
+      .where('enabled', '=', 1)
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.getScripts", err);
+        logger.error('ScriptRepository.getScripts', err);
         throw err;
       });
 
     if (scripts === undefined) {
-      throw "error";
+      throw 'error';
     }
 
     const result = scripts.map((scr: ScriptsTable) => {
-      return new Script(
-        scr.id,
-        scr.name,
-        scr.description,
-        new Date(scr.last_modified),
-      );
+      return new Script(scr.id, scr.name, scr.description, new Date(scr.last_modified));
     });
 
     for (const scr of result) {
       const deployments = await this.db
-        .selectFrom("script_deployments")
+        .selectFrom('script_deployments')
         .selectAll()
-        .leftJoin("locations", "locations.id", "script_deployments.location_id")
-        .select(["locations.name as location_name"])
-        .where("script_id", "=", scr.id)
+        .leftJoin('locations', 'locations.id', 'script_deployments.location_id')
+        .select(['locations.name as location_name'])
+        .where('script_id', '=', scr.id)
         .execute()
         .catch((err) => {
-          logger.error("ScriptRepository.getScripts.deployments", err);
+          logger.error('ScriptRepository.getScripts.deployments', err);
           throw err;
         });
 
@@ -154,7 +142,7 @@ export class ScriptRepository {
         const status = new DeploymentStatus(
           new Date(dep.last_deployed),
           UploadStatus.uploaded,
-          dep.location_name || "",
+          dep.location_name || '',
         );
         scr.deploymentStatus[dep.location_id] = status;
       }
@@ -170,12 +158,12 @@ export class ScriptRepository {
   /// <returns>The script</returns>
   async getScript(id: string): Promise<Script> {
     const script = await this.db
-      .selectFrom("scripts")
+      .selectFrom('scripts')
       .selectAll()
-      .where("id", "=", id)
+      .where('id', '=', id)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error("ScriptRepository.getScript", err);
+        logger.error('ScriptRepository.getScript', err);
         throw err;
       });
 
@@ -187,14 +175,14 @@ export class ScriptRepository {
     );
 
     const deployments = await this.db
-      .selectFrom("script_deployments")
+      .selectFrom('script_deployments')
       .selectAll()
-      .leftJoin("locations", "locations.id", "script_deployments.location_id")
-      .select(["locations.name as location_name"])
-      .where("script_id", "=", id)
+      .leftJoin('locations', 'locations.id', 'script_deployments.location_id')
+      .select(['locations.name as location_name'])
+      .where('script_id', '=', id)
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.getScript.deployments", err);
+        logger.error('ScriptRepository.getScript.deployments', err);
         throw err;
       });
 
@@ -202,7 +190,7 @@ export class ScriptRepository {
       const status = new DeploymentStatus(
         new Date(dep.last_deployed),
         UploadStatus.uploaded,
-        dep.location_name || "",
+        dep.location_name || '',
       );
       result.deploymentStatus[dep.location_id] = status;
     }
@@ -217,12 +205,12 @@ export class ScriptRepository {
 
   async deleteScript(id: string): Promise<boolean> {
     this.db
-      .updateTable("scripts")
-      .set("enabled", 0)
-      .where("id", "=", id)
+      .updateTable('scripts')
+      .set('enabled', 0)
+      .where('id', '=', id)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error("ScriptRepository.deleteScript", err);
+        logger.error('ScriptRepository.deleteScript', err);
         throw err;
       });
 
@@ -233,13 +221,9 @@ export class ScriptRepository {
 
   //#region Channels Create
 
-  private async saveScriptChannel(
-    tx: Transaction<Database>,
-    script: Script,
-    ch: ScriptChannel,
-  ) {
+  private async saveScriptChannel(tx: Transaction<Database>, script: Script, ch: ScriptChannel) {
     await tx
-      .insertInto("script_channels")
+      .insertInto('script_channels')
       .values({
         id: ch.id,
         script_id: script.id,
@@ -250,7 +234,7 @@ export class ScriptRepository {
       })
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.saveScriptChannel", err);
+        logger.error('ScriptRepository.saveScriptChannel', err);
         throw err;
       });
 
@@ -275,18 +259,16 @@ export class ScriptRepository {
 
   //#region Channels Read
 
-  private async readScriptChannels(
-    scriptId: string,
-  ): Promise<Array<ScriptChannel>> {
+  private async readScriptChannels(scriptId: string): Promise<Array<ScriptChannel>> {
     const result = new Array<ScriptChannel>();
 
     const channels = await this.db
-      .selectFrom("script_channels")
+      .selectFrom('script_channels')
       .selectAll()
-      .where("script_id", "=", scriptId)
+      .where('script_id', '=', scriptId)
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.readScriptChannels", err);
+        logger.error('ScriptRepository.readScriptChannels', err);
         throw err;
       });
 
@@ -298,7 +280,7 @@ export class ScriptRepository {
         ch.parent_module_id,
         ch.module_channel_id,
         ch.module_channel_type,
-        new BaseChannel("", "", "", ModuleType.none, ModuleSubType.none, false),
+        new BaseChannel('', '', '', ModuleType.none, ModuleSubType.none, false),
         0,
       );
 
@@ -312,39 +294,22 @@ export class ScriptRepository {
     return result;
   }
 
-  private async configScriptChannel(
-    channel: ScriptChannel,
-  ): Promise<ScriptChannel> {
+  private async configScriptChannel(channel: ScriptChannel): Promise<ScriptChannel> {
     switch (channel.moduleChannelType) {
       case ModuleChannelTypes.GpioChannel:
-        channel.moduleChannel = await readGpioChannel(
-          this.db,
-          channel.moduleChannelId,
-        );
+        channel.moduleChannel = await readGpioChannel(this.db, channel.moduleChannelId);
         break;
       case ModuleChannelTypes.MaestroChannel:
-        channel.moduleChannel = await readMaestroChannel(
-          this.db,
-          channel.moduleChannelId,
-        );
+        channel.moduleChannel = await readMaestroChannel(this.db, channel.moduleChannelId);
         break;
       case ModuleChannelTypes.KangarooX2Channel:
-        channel.moduleChannel = await readKangarooChannel(
-          this.db,
-          channel.moduleChannelId,
-        );
+        channel.moduleChannel = await readKangarooChannel(this.db, channel.moduleChannelId);
         break;
       case ModuleChannelTypes.UartChannel:
-        channel.moduleChannel = await readUartChannel(
-          this.db,
-          channel.moduleChannelId,
-        );
+        channel.moduleChannel = await readUartChannel(this.db, channel.moduleChannelId);
         break;
       case ModuleChannelTypes.I2cChannel:
-        channel.moduleChannel = await readI2cChannel(
-          this.db,
-          channel.moduleChannelId,
-        );
+        channel.moduleChannel = await readI2cChannel(this.db, channel.moduleChannelId);
         break;
     }
 
@@ -355,16 +320,13 @@ export class ScriptRepository {
 
   //#region Channels Delete
 
-  private async deleteScriptChannels(
-    trx: Transaction<Database>,
-    scriptId: string,
-  ) {
+  private async deleteScriptChannels(trx: Transaction<Database>, scriptId: string) {
     await trx
-      .deleteFrom("script_channels")
-      .where("script_id", "=", scriptId)
+      .deleteFrom('script_channels')
+      .where('script_id', '=', scriptId)
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.deleteScriptChannels", err);
+        logger.error('ScriptRepository.deleteScriptChannels', err);
         throw err;
       });
   }
@@ -380,8 +342,9 @@ export class ScriptRepository {
     evt: ScriptEvent,
   ) {
     await tx
-      .insertInto("script_events")
+      .insertInto('script_events')
       .values({
+        id: evt.id,
         script_id: scriptId,
         script_channel_id: channelId,
         module_type: evt.moduleType,
@@ -391,7 +354,7 @@ export class ScriptRepository {
       })
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.saveScriptEvent", err);
+        logger.error('ScriptRepository.saveScriptEvent', err);
         throw err;
       });
   }
@@ -403,30 +366,27 @@ export class ScriptRepository {
   private async readScriptEvents(
     scriptId: string,
     channelId: string,
-  ): Promise<Record<number, ScriptEvent>> {
-    const result = {} as Record<number, ScriptEvent>;
+  ): Promise<Record<string, ScriptEvent>> {
+    const result = {} as Record<string, ScriptEvent>;
 
     const events = await this.db
-      .selectFrom("script_events")
+      .selectFrom('script_events')
       .selectAll()
-      .where("script_id", "=", scriptId)
-      .where("script_channel_id", "=", channelId)
+      .where('script_id', '=', scriptId)
+      .where('script_channel_id', '=', channelId)
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.readScriptEvents", err);
+        logger.error('ScriptRepository.readScriptEvents', err);
         throw err;
       });
 
     for (const evt of events) {
-      const subtype =
-        evt.module_sub_type !== null ? evt.module_sub_type : ModuleSubType.none;
+      const subtype = evt.module_sub_type !== null ? evt.module_sub_type : ModuleSubType.none;
 
-      const scriptEventType = moduleSubTypeToScriptEventTypes(
-        subtype,
-        evt.data,
-      );
+      const scriptEventType = moduleSubTypeToScriptEventTypes(subtype, evt.data);
 
       const event = new ScriptEvent(
+        evt.id,
         evt.script_channel_id,
         evt.module_type,
         subtype,
@@ -434,7 +394,7 @@ export class ScriptRepository {
         scriptEventType,
       );
 
-      result[event.time] = event;
+      result[event.id] = event;
     }
 
     return result;
@@ -444,16 +404,13 @@ export class ScriptRepository {
 
   //#region Events Delete
 
-  private async deleteScriptEvents(
-    trx: Transaction<Database>,
-    scriptId: string,
-  ) {
+  private async deleteScriptEvents(trx: Transaction<Database>, scriptId: string) {
     await trx
-      .deleteFrom("script_events")
-      .where("script_id", "=", scriptId)
+      .deleteFrom('script_events')
+      .where('script_id', '=', scriptId)
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.deleteScriptEvents", err);
+        logger.error('ScriptRepository.deleteScriptEvents', err);
         throw err;
       });
   }
@@ -467,40 +424,37 @@ export class ScriptRepository {
     dateTime: Date,
   ): Promise<boolean> {
     await this.db
-      .insertInto("script_deployments")
+      .insertInto('script_deployments')
       .values({
         script_id: scriptId,
         location_id: locationId,
         last_deployed: new Date(dateTime).getTime(),
       })
       .onConflict((c) =>
-        c.columns(["script_id", "location_id"]).doUpdateSet((_) => ({
+        c.columns(['script_id', 'location_id']).doUpdateSet((_) => ({
           last_deployed: new Date(dateTime).getTime(),
         })),
       )
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error("ScriptRepository.updateScriptControllerUploaded", err);
+        logger.error('ScriptRepository.updateScriptControllerUploaded', err);
         throw err;
       });
 
     return true;
   }
 
-  async getLastScriptUploadedDate(
-    scriptId: string,
-    locationId: string,
-  ): Promise<Date> {
-    let result = new Date("1970-01-01T00:00:00.000Z");
+  async getLastScriptUploadedDate(scriptId: string, locationId: string): Promise<Date> {
+    let result = new Date('1970-01-01T00:00:00.000Z');
 
     const deployment = await this.db
-      .selectFrom("script_deployments")
-      .select("last_deployed")
-      .where("script_id", "=", scriptId)
-      .where("location_id", "=", locationId)
+      .selectFrom('script_deployments')
+      .select('last_deployed')
+      .where('script_id', '=', scriptId)
+      .where('location_id', '=', locationId)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error("ScriptRepository.getLastScriptUploadedDate", err);
+        logger.error('ScriptRepository.getLastScriptUploadedDate', err);
         throw err;
       });
 
@@ -519,11 +473,11 @@ export class ScriptRepository {
     const result = new Map<string, ModuleClassType>();
 
     const locations = await this.db
-      .selectFrom("locations")
+      .selectFrom('locations')
       .selectAll()
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.getModules.locations", err);
+        logger.error('ScriptRepository.getModules.locations', err);
         throw err;
       });
 
@@ -547,11 +501,11 @@ export class ScriptRepository {
 
   public async getLocationIds(): Promise<Array<string>> {
     const locations = await this.db
-      .selectFrom("locations")
-      .select("id")
+      .selectFrom('locations')
+      .select('id')
       .execute()
       .catch((err) => {
-        logger.error("ScriptRepository.getLocationIds", err);
+        logger.error('ScriptRepository.getLocationIds', err);
         throw err;
       });
 
@@ -562,9 +516,7 @@ export class ScriptRepository {
     let result = `s${Math.floor(Date.now() / 1000)}`;
     const charactersLength = this.characters.length;
     for (let i = 0; i < length; i++) {
-      result += this.characters.charAt(
-        Math.floor(Math.random() * charactersLength),
-      );
+      result += this.characters.charAt(Math.floor(Math.random() * charactersLength));
     }
     return result;
   }

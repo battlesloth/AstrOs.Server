@@ -45,6 +45,8 @@ export const useScripterStore = defineStore('scripter', () => {
 
       script.value = response as Script;
 
+      console.log('loaded script channels:', script.value.scriptChannels);
+
       applyScript(script.value);
 
       return { success: true };
@@ -59,6 +61,8 @@ export const useScripterStore = defineStore('scripter', () => {
   async function saveScript() {
     isSaving.value = true;
     try {
+      console.log('channels to save:', script.value?.scriptChannels);
+
       const response = await apiService.put(SCRIPTS, script.value);
 
       if (!response || response.message !== 'success') {
@@ -122,20 +126,49 @@ export const useScripterStore = defineStore('scripter', () => {
     setChannelAvailability(resourceId, channelType, true);
   }
 
-
   function addEventToChannel(
-    channel: ScriptChannel,
+    channelId: string,
     event: ScriptEvent,
-  ): { success: boolean; } {
-    
-    const idx = script.value?.scriptChannels.findIndex((ch) => ch.id === channel.id);
-    if (idx === undefined || idx === -1 || !script.value) {
-      console.warn(`Channel with id ${channel.id} not found in script.`);
+  ): { success: boolean; event: ScriptEvent | undefined } {
+    if (!script.value) {
+      console.warn('No script loaded.');
+      return { success: false, event: undefined };
+    }
+
+    const idx = script.value?.scriptChannels.findIndex((ch) => ch.id === channelId);
+    if (idx === undefined || idx === -1) {
+      console.warn(`Channel with id ${channelId} not found in script.`);
+      return { success: false, event: undefined };
+    }
+
+    if (script.value) {
+      script.value.scriptChannels[idx]!.events[event.id] = event;
+    }
+
+    console.log('channel events:', script.value.scriptChannels[idx]!.events);
+
+    return { success: true, event: script.value.scriptChannels[idx]!.events[event.id] };
+  }
+
+  function removeEventFromChannel(channelId: string, eventId: string): { success: boolean } {
+    if (!script.value) {
+      console.warn('No script loaded.');
       return { success: false };
     }
 
-    script.value?.scriptChannels[idx]!.events[event.time] = event;
-    return { success: true, eventId };
+    const idx = script.value?.scriptChannels.findIndex((ch) => ch.id === channelId);
+    if (idx === undefined || idx === -1) {
+      console.warn(`Channel with id ${channelId} not found in script.`);
+      return { success: false };
+    }
+
+    if (script.value && script.value.scriptChannels[idx]!.events[eventId]) {
+      delete script.value.scriptChannels[idx]!.events[eventId];
+      return { success: true };
+    } else {
+      console.warn(`Event with id ${eventId} not found in channel ${channelId}.`);
+      return { success: false };
+    }
   }
 
   return {
@@ -151,5 +184,7 @@ export const useScripterStore = defineStore('scripter', () => {
     addChannel,
     removeChannel,
     getChannel,
+    addEventToChannel,
+    removeEventFromChannel,
   };
 });

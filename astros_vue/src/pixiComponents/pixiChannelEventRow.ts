@@ -1,4 +1,3 @@
-import type { useEventBoxes } from '@/composables/useEventBoxes';
 import type { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
 import { Container, Graphics } from 'pixi.js';
 import { type Ref } from 'vue';

@@ -15,10 +15,10 @@ import {
   UartModule,
   I2cModule,
   ScriptEventTypes,
-} from "astros-common";
-
-import { logger } from "./logger.js";
-import { ScriptRepository } from "./dal/repositories/script_repository.js";
+} from 'astros-common';
+import { v4 as uuid } from 'uuid';
+import { logger } from './logger.js';
+import { ScriptRepository } from './dal/repositories/script_repository.js';
 
 interface IUartValues {
   idx: number;
@@ -43,7 +43,7 @@ export enum CommandType {
 }
 
 export class ScriptConverter {
-  readonly TAG = "ScriptConverter";
+  readonly TAG = 'ScriptConverter';
 
   locationIds: string[];
   scriptChannelModuleMap: Map<string, string>;
@@ -63,10 +63,10 @@ export class ScriptConverter {
    * @returns
    */
   public static convertCommand(command: unknown): string {
-    let script = "";
+    let script = '';
 
     if (command === undefined || command === null) {
-      return "";
+      return '';
     }
 
     const cmd = command as ISingleCommand;
@@ -108,11 +108,11 @@ export class ScriptConverter {
         break;
       default:
         logger.error(`No module found for test command: ${cmd.moduleSubType}`);
-        return "";
+        return '';
     }
 
     // remove the last semicolon
-    if (script.endsWith(";")) {
+    if (script.endsWith(';')) {
       script = script.slice(0, -1);
     }
 
@@ -169,9 +169,7 @@ export class ScriptConverter {
     const module = this.modulesMap.get(channel.parentModuleId);
 
     if (module === undefined) {
-      logger.error(
-        `${this.TAG}: No module found for script channel ${channel.id}`,
-      );
+      logger.error(`${this.TAG}: No module found for script channel ${channel.id}`);
       return;
     }
 
@@ -207,9 +205,7 @@ export class ScriptConverter {
     }
   }
 
-  private addBufferEvents(
-    map: Map<string, Map<number, Array<ScriptEvent>>>,
-  ): void {
+  private addBufferEvents(map: Map<string, Map<number, Array<ScriptEvent>>>): void {
     // get the script duration for all locations
     // figure out which one is the longest
     let maxDuration = 0;
@@ -267,10 +263,7 @@ export class ScriptConverter {
     }
   }
 
-  private addBufferEvent(
-    map: Map<number, Array<ScriptEvent>>,
-    time: number,
-  ): void {
+  private addBufferEvent(map: Map<number, Array<ScriptEvent>>, time: number): void {
     if (map.has(time)) {
       const events = map.get(time);
       if (events !== undefined && events.length > 0) {
@@ -280,7 +273,8 @@ export class ScriptConverter {
     }
 
     const bufferEvent = new ScriptEvent(
-      "buffer",
+      uuid(),
+      'buffer',
       ModuleType.none,
       ModuleSubType.none,
       time,
@@ -290,10 +284,8 @@ export class ScriptConverter {
     map.get(time)?.push(bufferEvent);
   }
 
-  private convertScriptEvents(
-    timeMap: Map<number, Array<ScriptEvent>>,
-  ): string {
-    let script = "";
+  private convertScriptEvents(timeMap: Map<number, Array<ScriptEvent>>): string {
+    let script = '';
 
     const times = Array.from(timeMap.keys());
 
@@ -339,7 +331,7 @@ export class ScriptConverter {
     }
 
     // remove the last semicolon
-    if (script.endsWith(";")) {
+    if (script.endsWith(';')) {
       script = script.slice(0, -1);
     }
 
@@ -359,10 +351,10 @@ export class ScriptConverter {
       case ModuleSubType.maestro:
         return this.convertMaestroEvent(evt, timeTillNextEvent);
       default:
-        logger.warn("ScriptConverter: invalid subtype");
+        logger.warn('ScriptConverter: invalid subtype');
     }
 
-    return "";
+    return '';
   }
 
   //#endregion
@@ -370,28 +362,17 @@ export class ScriptConverter {
 
   // |___|_________|___________|___________|___________;
   //  evt time_till serial ch   baud rate   msg
-  convertGenericSerialEvent(
-    evt: ScriptEvent,
-    timeTillNextEvent: number,
-  ): string {
+  convertGenericSerialEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
     const serial = evt.event as GenericSerialEvent;
 
     const uart = this.getUartValues(evt.scriptChannel);
 
     if (uart === undefined) {
-      logger.error(
-        `${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`,
-      );
-      throw new Error(
-        `No UART module found for script channel ${evt.scriptChannel}`,
-      );
+      logger.error(`${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`);
+      throw new Error(`No UART module found for script channel ${evt.scriptChannel}`);
     }
 
-    return ScriptConverter.genericSerialAsString(
-      serial,
-      uart,
-      timeTillNextEvent,
-    );
+    return ScriptConverter.genericSerialAsString(serial, uart, timeTillNextEvent);
   }
 
   static genericSerialAsString(
@@ -413,12 +394,8 @@ export class ScriptConverter {
     const uart = this.getUartValues(evt.scriptChannel);
 
     if (uart === undefined) {
-      logger.error(
-        `${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`,
-      );
-      throw new Error(
-        `No UART module found for script channel ${evt.scriptChannel}`,
-      );
+      logger.error(`${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`);
+      throw new Error(`No UART module found for script channel ${evt.scriptChannel}`);
     }
 
     return ScriptConverter.hcrAsString(hcr, uart, timeTillNextEvent);
@@ -429,7 +406,7 @@ export class ScriptConverter {
     uart: IUartValues,
     timeTillNextEvent: number,
   ): string {
-    let val = "<";
+    let val = '<';
 
     for (const cmd of hcr.commands) {
       if (cmd.valueA === null || cmd.valueA === undefined) {
@@ -445,12 +422,12 @@ export class ScriptConverter {
       cmdS = cmdS.replace(re, cmd.valueA.toString());
       re = /\*/;
       cmdS = cmdS.replace(re, cmd.valueB.toString());
-      val += cmdS + ",";
+      val += cmdS + ',';
     }
 
     val = val.slice(0, -1);
 
-    val += ">";
+    val += '>';
 
     return `${CommandType.genericSerial}|${timeTillNextEvent}|${uart.ch}|${uart.baud}|${val};`;
   }
@@ -464,12 +441,8 @@ export class ScriptConverter {
     const uart = this.getUartValues(evt.scriptChannel);
 
     if (uart === undefined) {
-      logger.error(
-        `${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`,
-      );
-      throw new Error(
-        `No UART module found for script channel ${evt.scriptChannel}`,
-      );
+      logger.error(`${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`);
+      throw new Error(`No UART module found for script channel ${evt.scriptChannel}`);
     }
 
     const kangaroo = evt.event as KangarooEvent;
@@ -482,11 +455,10 @@ export class ScriptConverter {
     uart: IUartValues,
     timeTillNextEvent: number,
   ): string {
-    let command = "";
+    let command = '';
 
     if (evt.ch1Action != KangarooAction.none) {
-      const evtTime =
-        evt.ch2Action === KangarooAction.none ? timeTillNextEvent : 0;
+      const evtTime = evt.ch2Action === KangarooAction.none ? timeTillNextEvent : 0;
 
       // if the ch2 action is none, use timeTill. Otherwise we have 2 actions for the
       // same time period, so don't delay untill after second action is done.
@@ -520,22 +492,14 @@ export class ScriptConverter {
 
     const uart = this.getUartValues(evt.scriptChannel);
     if (uart === undefined) {
-      logger.error(
-        `${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`,
-      );
-      throw new Error(
-        `No UART module found for script channel ${evt.scriptChannel}`,
-      );
+      logger.error(`${this.TAG}: No UART module found for script channel ${evt.scriptChannel}`);
+      throw new Error(`No UART module found for script channel ${evt.scriptChannel}`);
     }
 
     return ScriptConverter.masetroAsToString(maestro, uart, timeTillNextEvent);
   }
 
-  static masetroAsToString(
-    evt: MaestroEvent,
-    uart: IUartValues,
-    next: number,
-  ): string {
+  static masetroAsToString(evt: MaestroEvent, uart: IUartValues, next: number): string {
     return `${CommandType.maestro}|${next}|${uart.idx}|${evt.channel}|${evt.position}|${evt.speed}|${evt.acceleration};`;
   }
 
@@ -549,22 +513,14 @@ export class ScriptConverter {
 
     const i2cAddress = this.getI2cChannel(evt.scriptChannel);
     if (i2cAddress === undefined) {
-      logger.error(
-        `${this.TAG}: No I2C module found for script channel ${evt.scriptChannel}`,
-      );
-      throw new Error(
-        `No I2C module found for script channel ${evt.scriptChannel}`,
-      );
+      logger.error(`${this.TAG}: No I2C module found for script channel ${evt.scriptChannel}`);
+      throw new Error(`No I2C module found for script channel ${evt.scriptChannel}`);
     }
 
     return ScriptConverter.i2cAsString(i2c, i2cAddress, timeTillNextEvent);
   }
 
-  static i2cAsString(
-    evt: I2cEvent,
-    i2cAddress: number,
-    timeTillNextEvent: number,
-  ): string {
+  static i2cAsString(evt: I2cEvent, i2cAddress: number, timeTillNextEvent: number): string {
     return `${CommandType.i2c}|${timeTillNextEvent}|${i2cAddress}|${evt.message};`;
   }
 
@@ -576,30 +532,16 @@ export class ScriptConverter {
   convertGpioEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
     const gpio = evt.event as GpioEvent;
 
-    const gpioChannel = this.scriptChannerlGpioChannelMap.get(
-      evt.scriptChannel,
-    );
+    const gpioChannel = this.scriptChannerlGpioChannelMap.get(evt.scriptChannel);
     if (gpioChannel === undefined) {
-      logger.error(
-        `${this.TAG}: No GPIO channel found for script channel ${evt.scriptChannel}`,
-      );
-      throw new Error(
-        `No GPIO channel found for script channel ${evt.scriptChannel}`,
-      );
+      logger.error(`${this.TAG}: No GPIO channel found for script channel ${evt.scriptChannel}`);
+      throw new Error(`No GPIO channel found for script channel ${evt.scriptChannel}`);
     }
 
-    return ScriptConverter.gpioEvtAsString(
-      gpio,
-      gpioChannel,
-      timeTillNextEvent,
-    );
+    return ScriptConverter.gpioEvtAsString(gpio, gpioChannel, timeTillNextEvent);
   }
 
-  static gpioEvtAsString(
-    evt: GpioEvent,
-    gpioChannel: number,
-    timeTillNextEvent: number,
-  ): string {
+  static gpioEvtAsString(evt: GpioEvent, gpioChannel: number, timeTillNextEvent: number): string {
     return `${CommandType.gpio}|${timeTillNextEvent}|${gpioChannel}|${evt.setHigh ? 1 : 0};`;
   }
 
@@ -609,7 +551,7 @@ export class ScriptConverter {
   // |___|_________|____;
   //  evt time_till ch (event is at least 3 parts)
   convertBufferEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
-    if (evt.scriptChannel !== "buffer") {
+    if (evt.scriptChannel !== 'buffer') {
       logger.error(
         `${this.TAG}: Buffer event requested but script channel is incorrect: ${evt.scriptChannel}`,
       );

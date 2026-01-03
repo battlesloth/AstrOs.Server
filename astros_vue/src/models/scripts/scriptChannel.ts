@@ -12,5 +12,5 @@ export interface ScriptChannel {
   moduleChannel: ModuleChannelType;
   maxDuration: number;
 
-  events: Record<number, ScriptEvent>;
+  events: Record<string, ScriptEvent>;
 }

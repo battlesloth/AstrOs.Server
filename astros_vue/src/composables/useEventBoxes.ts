@@ -1,17 +1,17 @@
 import { ref, type Ref } from 'vue';
-import { Container, FederatedPointerEvent } from 'pixi.js';
+import { Container, FederatedPointerEvent, type ContainerChild } from 'pixi.js';
 import { PixiChannelEvent } from '@/pixiComponents/pixiChannelEvent';
 import type { ScriptEvent } from '@/models';
 
-
 /**
  * Composable for managing event boxes on the timeline
+ * Applicaiton.stage.eventMode must be set to 'static' for pointer events to work correctly
  */
 export function useEventBoxes(
   TIMELINE_WIDTH: Ref<number>,
   TIMELINE_DURATION_SECONDS: number,
   rowHeight: number,
-  onEditEvent: (event: any) => void,
+  onEditEvent: (event: ScriptEvent) => void,
 ) {
   const channelEventBoxes = ref<Map<string, PixiChannelEvent[]>>(new Map());
   const isDraggingEventBox = ref(false);
@@ -27,11 +27,8 @@ export function useEventBoxes(
     rowContainer: Container,
     channelId: string,
     scriptEvent: ScriptEvent,
-    app: Ref<any>,
     isDraggingTimeline: Ref<boolean>,
   ) {
-
-
     const onEventPointerTap = (event: FederatedPointerEvent, scriptEvent: ScriptEvent) => {
       event.stopPropagation(); // Always stop propagation to prevent row click
       if (hasEventBoxDragged.value) {
@@ -39,7 +36,7 @@ export function useEventBoxes(
         return;
       }
       onEditEvent(scriptEvent);
-    }
+    };
 
     const onEventPointerDown = (event: FederatedPointerEvent, eventBox: PixiChannelEvent) => {
       console.log('Event box pointerdown', { isDraggingTimeline: isDraggingTimeline.value });
@@ -54,14 +51,8 @@ export function useEventBoxes(
       console.log('Set isDraggingEventBox to true', {
         eventBoxDragStartX: eventBoxDragStartX.value,
       });
-
-      // Enable global move tracking
-      if (app.value?.stage) {
-        app.value.stage.eventMode = 'static';
-      }
-
       event.stopPropagation();
-    }
+    };
 
     const options = {
       channelId,
@@ -82,78 +73,27 @@ export function useEventBoxes(
       channelEventBoxes.value.set(channelId, []);
     }
     channelEventBoxes.value.get(channelId)!.push(eventBox);
-
-    /*const timeInSeconds = scriptEvent.time;
-    const boxWidth = 60;
-    const boxHeight = rowHeight - 10;
-    const boxY = 5;
-
-    // Calculate pixel position from time in seconds (this will be the center of the box)
-    const pixelPosition = (timeInSeconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
-
-    const eventBox = new Graphics();
-    eventBox.rect(0, 0, boxWidth, boxHeight).fill(0xff0000);
-
-    eventBox.rect(0, 0, boxWidth, boxHeight).stroke({ width: 2, color: 0xaa0000 });
-
-    // Set pivot to center of the box so it's centered on the time position
-    eventBox.pivot.set(boxWidth / 2, 0);
-
-    // Position the box (x is now the center thanks to pivot)
-    eventBox.x = pixelPosition;
-    eventBox.y = boxY;
-
-    // Make event box interactive
-    eventBox.eventMode = 'static';
-    eventBox.cursor = 'grab';
-
-    // Store the event data with graphics reference
-    const eventBoxData: EventBox = { channelId, timeInSeconds, graphics: eventBox, scriptEvent };
-
-    if (!channelEventBoxes.value.has(channelId)) {
-      channelEventBoxes.value.set(channelId, []);
-    }
-    channelEventBoxes.value.get(channelId)!.push(eventBoxData);
-
-    //Add click handler for editing
-    eventBox.on('pointertap', (event) => {
-      event.stopPropagation(); // Always stop propagation to prevent row click
-      if (hasEventBoxDragged.value) {
-        hasEventBoxDragged.value = false;
-        return;
-      }
-      onEditEvent(scriptEvent);
-    });
-
-    // Add drag handlers
-    eventBox.on('pointerdown', (event) => {
-      console.log('Event box pointerdown', { isDraggingTimeline: isDraggingTimeline.value });
-      if (isDraggingTimeline.value) return;
-
-      isDraggingEventBox.value = true;
-      draggedEventBox.value = eventBoxData;
-      eventBoxDragStartX.value = event.global.x;
-      eventBoxStartTime.value = eventBoxData.timeInSeconds;
-      hasEventBoxDragged.value = false; // Reset at start
-      eventBox.cursor = 'grabbing';
-      console.log('Set isDraggingEventBox to true', {
-        eventBoxDragStartX: eventBoxDragStartX.value,
-      });
-
-      // Enable global move tracking
-      if (app.value?.stage) {
-        app.value.stage.eventMode = 'static';
-      }
-
-      event.stopPropagation();
-    });
-*/
-
   }
 
+  function removeEventBox(channelId: string, eventId: string) {
+    const eventBoxes = channelEventBoxes.value.get(channelId);
+    if (!eventBoxes) return;
 
+    const index = eventBoxes.findIndex((box) => box.scriptEvent.id === eventId);
+    if (index !== -1) {
+      const [removedBox] = eventBoxes.splice(index, 1);
 
+      if (!removedBox) {
+        console.warn(`Event box with id ${eventId} not found in channel ${channelId}.`);
+        return;
+      }
 
+      // Also remove from PIXI container
+      if (removedBox.parent) {
+        removedBox.parent.removeChild(removedBox as unknown as ContainerChild);
+      }
+    }
+  }
 
   /**
    * Updates positions of event boxes for a specific channel
@@ -164,8 +104,7 @@ export function useEventBoxes(
     // Update positions of all event boxes based on current timeline width
     // Position is the center of the box (thanks to pivot)
     events.forEach((event) => {
-      const pixelPosition =
-        (event.deciseconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
+      const pixelPosition = (event.deciseconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
       event.x = pixelPosition;
     });
   }
@@ -228,6 +167,7 @@ export function useEventBoxes(
 
     // Methods
     addEventBox,
+    removeEventBox,
     updateEventBoxPositions,
     updateAllEventBoxPositions,
     handleEventBoxDrag,

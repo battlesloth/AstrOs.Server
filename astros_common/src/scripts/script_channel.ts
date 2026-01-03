@@ -1,6 +1,6 @@
-import { ScriptChannelType } from "../astros_enums";
-import { ModuleChannelType } from "../control_module/base_channel";
-import { ScriptEvent } from "./script_event";
+import { ScriptChannelType } from '../astros_enums';
+import { ModuleChannelType } from '../control_module/base_channel';
+import { ScriptEvent } from './script_event';
 
 export class ScriptChannel {
   id: string;
@@ -12,7 +12,7 @@ export class ScriptChannel {
   moduleChannel: ModuleChannelType;
   maxDuration: number;
 
-  events: Record<number, ScriptEvent>;
+  events: Record<string, ScriptEvent>;
 
   constructor(
     id: string,

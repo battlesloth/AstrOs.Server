@@ -13,5 +13,4 @@ export interface PixiScrollBarOptions {
   thumbSize: number;
   thumbFillColor?: number;
   thumbFocusColor?: number;
-  onThumbDragStart: () => void;
 }
