@@ -42,7 +42,7 @@ import {
 } from '@/utils/scrollCalculations';
 import { PixiScrollBar } from '@/pixiComponents/pixiScrollBar';
 import { ScrollBarDirection } from '@/pixiComponents/pixiScrollBarOptions';
-import { PixiChannelData, type PixiChannelSelectItem } from '@/pixiComponents/pixiChannelData';
+import { PixiChannelData } from '@/pixiComponents/pixiChannelData';
 import { loadAssets } from '@/pixiComponents/assets/assetLoader';
 import {
   PixiChannelEventRow,
@@ -87,11 +87,12 @@ const minusButton = ref<Container | null>(null);
 const initializePixi = async (scriptChannels: Channel[]) => {
   await init();
   for (const channel of scriptChannels) {
-    doAddChannel(channel);
+    addChannel(channel);
   }
 };
 
 const addChannel = (channel: Channel) => {
+  console.log('adding channel', channel);
   doAddChannel(channel);
   if (channel.events.length > 0) {
     for (const event of channel.events) {
@@ -668,12 +669,14 @@ function doRemoveChannel(chId: string) {
 }
 
 function doAddEvent(event: ScriptEvent) {
-  const rowContainer = channelRowContainers.value.get(event.scriptChannelId);
+  console.log('adding event', event);
+  console.log('channelRowContainers:', channelRowContainers.value);
+  const rowContainer = channelRowContainers.value.get(event.scriptChannel);
   if (!rowContainer || !app.value) {
-    console.error('Channel row container not found for channel ID:', event.scriptChannelId);
+    console.error('Channel row container not found for channel ID:', event.scriptChannel);
     return;
   }
-  addEventBox(rowContainer as any, event.scriptChannelId, event, app, isDraggingTimeline);
+  addEventBox(rowContainer as any, event.scriptChannel, event, app, isDraggingTimeline);
 }
 
 // ============================================================================

@@ -20,8 +20,14 @@ import {
   AstrosConfirmModal,
 } from '@/components';
 import router from '@/router';
-import type { AddChannelModalResponse, ScriptEvent, ScriptEventModalResponse, Channel } from '@/models';
+import type {
+  AddChannelModalResponse,
+  ScriptEvent,
+  ScriptEventModalResponse,
+  Channel,
+} from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
+import { useToast } from '@/composables/useToast';
 
 const scripter = useTemplateRef('scripter');
 
@@ -38,13 +44,14 @@ const scripterStore = useScripterStore();
 
 const { eventTypeToModalType, getDefaultScriptEvent } = useScriptEvents();
 
+const { success } = useToast();
+
 function addChannel() {
   showModal.value = ModalType.ADD_CHANNEL;
 }
 
 function doAddChannel(response: AddChannelModalResponse) {
   showModal.value = ModalType.CLOSE_ALL;
-  let map = scripterStore.getChannelDetailsMap();
   for (const [channelType, detailList] of response.channels.entries()) {
     for (const detail of detailList) {
       const result = scripterStore.addChannel(detail.id, channelType);
@@ -64,7 +71,6 @@ function doAddChannel(response: AddChannelModalResponse) {
       scripter.value?.addChannel(ch);
     }
   }
-  map = scripterStore.getChannelDetailsMap();
 }
 
 function removeChannel(id: string, name: string) {
@@ -79,7 +85,7 @@ function doRemoveChannel(chId: string) {
 }
 
 function swapChannel() {}
-function doSwapChannel() {}
+//function doSwapChannel() {}
 
 function addEvent(chId: string, time: number) {
   modalMode.value = ModalMode.ADD;
@@ -91,7 +97,7 @@ function addEvent(chId: string, time: number) {
   }
 
   selectedScriptEvent.value = {
-    scriptChannelId: chId,
+    scriptChannel: chId,
     moduleType: channel.moduleChannel.moduleType,
     moduleSubType: channel.moduleChannel.moduleSubType,
     time: time,
@@ -126,10 +132,10 @@ function editEvent(event: ScriptEvent) {
   modalMode.value = ModalMode.EDIT;
   selectedScriptEvent.value = event;
 
-  const channel = scripterStore.getChannel(event.scriptChannelId);
+  const channel = scripterStore.getChannel(event.scriptChannel);
 
   if (!channel) {
-    console.log(`Channel with ID ${event.scriptChannelId} not found.`);
+    console.log(`Channel with ID ${event.scriptChannel} not found.`);
     return;
   }
 
@@ -140,6 +146,7 @@ function editEvent(event: ScriptEvent) {
 }
 
 function doEditEvent(response: ScriptEventModalResponse) {
+  console.log('Editing event:', response.scriptEvent);
   if (!selectedScriptEvent.value) {
     console.log('No selected script event to edit.');
     return;
@@ -150,13 +157,23 @@ function doEditEvent(response: ScriptEventModalResponse) {
 
 function removeEvent() {}
 function doRemoveEvent(response: ScriptEventModalResponse) {
-  scripter.value?.removeEvent(response.scriptEvent.scriptChannelId, response.scriptEvent.time);
+  scripter.value?.removeEvent(response.scriptEvent.scriptChannel, response.scriptEvent.time);
 
   selectedScriptEvent.value = null;
 }
 
 function testChannel() {}
 function scriptTest() {}
+
+async function saveScript() {
+  const result = await scripterStore.saveScript();
+  if (!result.success) {
+    modalMessage.value = `Failed to save script: ${result.error}`;
+    showModal.value = ModalType.ERROR;
+  } else {
+    success('Script saved successfully.');
+  }
+}
 
 function alertClose() {
   if (scriptLoadFailed.value) {
@@ -197,21 +214,18 @@ onMounted(async () => {
 
   const scriptChannels = scripterStore.script?.scriptChannels;
 
-  console.log('Loaded script ', scriptChannels);
   const channels: Channel[] = [];
   if (scriptChannels) {
     for (const sc of scriptChannels) {
-      const ch: Channel ={
+      const ch: Channel = {
         id: sc.id,
         name: sc.moduleChannel.channelName,
         channelType: sc.channelType,
-        events: [],
+        events: Object.values(sc.events),
       };
       channels.push(ch);
     }
   }
-
-    console.log('Channels to initialize:', channels);
 
   await scripter.value?.initializePixi(channels);
   showModal.value = ModalType.CLOSE_ALL;
@@ -221,6 +235,36 @@ onMounted(async () => {
 <template>
   <AstrosLayout>
     <template v-slot:main>
+      <div v-if="scripterStore.script">
+        <div class="flex m-8 mb-4 items-center gap-4">
+          <div class="w-1/4 text-2xl font-bold">
+            <input
+              v-model="scripterStore.script.scriptName"
+              class="bg-transparent border border-gray-400 focus:outline-none w-full"
+              placeholder="Script Name"
+            />
+          </div>
+          <div class="grow text-2xl flex items-center gap-2">
+            <input
+              v-model.number="scripterStore.script.description"
+              class="bg-transparent border border-gray-400 focus:outline-none w-full"
+              min="0"
+            />
+          </div>
+          <button
+            class="btn btn--primary"
+            @click="saveScript"
+          >
+            Save
+          </button>
+          <button
+            class="btn btn--primary"
+            @click="scriptTest"
+          >
+            Test
+          </button>
+        </div>
+      </div>
       <AstrosPixiView
         ref="scripter"
         @add-channel="addChannel"

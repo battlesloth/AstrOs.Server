@@ -59,7 +59,7 @@ export const useScripterStore = defineStore('scripter', () => {
   async function saveScript() {
     isSaving.value = true;
     try {
-      const response = await apiService.post(`${SCRIPTS}/?id=${script.value?.id}`, script.value);
+      const response = await apiService.put(SCRIPTS, script.value);
 
       if (!response || response.message !== 'success') {
         throw new Error('Failed to save script');
@@ -94,7 +94,7 @@ export const useScripterStore = defineStore('scripter', () => {
       moduleChannelType: moduleChannelTypeFromSubType(resource.channel.moduleSubType),
       moduleChannel: resource.channel,
       maxDuration: 0,
-      events: new Map<number, ScriptEvent>(),
+      events: {},
     };
 
     script.value.scriptChannels.push(newChannel);
@@ -120,6 +120,22 @@ export const useScripterStore = defineStore('scripter', () => {
     const resourceId = script.value.scriptChannels[index]!.moduleChannelId;
     script.value.scriptChannels.splice(index, 1);
     setChannelAvailability(resourceId, channelType, true);
+  }
+
+
+  function addEventToChannel(
+    channel: ScriptChannel,
+    event: ScriptEvent,
+  ): { success: boolean; } {
+    
+    const idx = script.value?.scriptChannels.findIndex((ch) => ch.id === channel.id);
+    if (idx === undefined || idx === -1 || !script.value) {
+      console.warn(`Channel with id ${channel.id} not found in script.`);
+      return { success: false };
+    }
+
+    script.value?.scriptChannels[idx]!.events[event.time] = event;
+    return { success: true, eventId };
   }
 
   return {

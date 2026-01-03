@@ -103,9 +103,11 @@ export class PixiChannelEventRow extends Container {
       }
 
       this.background.clear();
-      this.background.rect(0, 0, width!, this.options.height).fill(this.getRowColor());
+      this.background.rect(0, 0, width!, this.options.height);
+      this.background.fill(this.getRowColor());
       // Add bottom border line
-      this.background.rect(0, this.options.height - 1, width!, 1).fill(this.getBorderColor());
+      this.background.rect(0, this.options.height - 1, width!, 1);
+      this.background.fill(this.getBorderColor());
     }
   }
 }
