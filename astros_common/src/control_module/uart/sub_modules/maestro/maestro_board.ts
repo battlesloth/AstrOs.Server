@@ -1,4 +1,4 @@
-import { MaestroChannel } from "./maestro_channel";
+import { MaestroChannel } from './maestro_channel';
 
 export class MaestroBoard {
   id: string;
@@ -8,13 +8,7 @@ export class MaestroBoard {
   channelCount: number;
   channels: MaestroChannel[];
 
-  constructor(
-    id: string,
-    parentId: string,
-    boardId: number,
-    name: string,
-    channelCount: number,
-  ) {
+  constructor(id: string, parentId: string, boardId: number, name: string, channelCount: number) {
     this.id = id;
     this.parentId = parentId;
     this.boardId = boardId;

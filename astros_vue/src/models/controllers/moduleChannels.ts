@@ -20,10 +20,12 @@ export function moduleChannelTypeFromSubType(subtype: ModuleSubType): string {
   switch (subtype) {
     case ModuleSubType.GENERIC_GPIO:
       return 'GpioChannel';
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C:
     case ModuleSubType.GENERIC_I2C:
       return 'I2cChannel';
     case ModuleSubType.PWM_BOARD:
       return 'PwmChannel';
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
     case ModuleSubType.GENERIC_SERIAL:
       return 'UartChannel';
     case ModuleSubType.KANGAROO:

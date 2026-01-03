@@ -253,13 +253,13 @@ onMounted(async () => {
             />
           </div>
           <button
-            class="btn btn--primary"
+            class="btn w-24 btn-primary"
             @click="saveScript"
           >
             Save
           </button>
           <button
-            class="btn btn--primary"
+            class="btn w-24 btn-primary"
             @click="scriptTest"
           >
             Test
