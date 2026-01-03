@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type PropType } from 'vue';
+import { computed } from 'vue';
 import AstrosServoSettings from '../../shared/AstrosServoSettings.vue';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import type { ServoTestEvent } from '@/models/events';
@@ -17,12 +17,10 @@ interface MaestroChannel {
   homePos: number;
 }
 
+const channel = defineModel<MaestroChannel>('channel', { required: true });
+
 // Props
-const props = defineProps({
-  channel: {
-    type: Object as PropType<MaestroChannel>,
-    required: true,
-  },
+defineProps({
   parentTestId: {
     type: String,
     required: true,
@@ -37,21 +35,19 @@ const emit = defineEmits<{
 // Computed
 const type = computed({
   get: () => {
-    if (!props.channel.enabled) return '0';
-    return props.channel.isServo ? '1' : '2';
+    if (!channel.value.enabled) return '0';
+    return channel.value.isServo ? '1' : '2';
   },
   set: (val: string) => {
     switch (val) {
       case '0':
-        props.channel.enabled = false;
+        channel.value = { ...channel.value, enabled: false };
         break;
       case '1':
-        props.channel.enabled = true;
-        props.channel.isServo = true;
+        channel.value = { ...channel.value, enabled: true, isServo: true };
         break;
       case '2':
-        props.channel.enabled = true;
-        props.channel.isServo = false;
+        channel.value = { ...channel.value, enabled: true, isServo: false };
         break;
     }
   },
@@ -64,8 +60,8 @@ const testServoModal = () => {
     controllerName: '',
     moduleSubType: ModuleSubType.MAESTRO,
     moduleIdx: -1,
-    channelNumber: props.channel.channelNumber,
-    homePosition: props.channel.homePos,
+    channelNumber: channel.value.channelNumber,
+    homePosition: channel.value.homePos,
   });
 };
 </script>

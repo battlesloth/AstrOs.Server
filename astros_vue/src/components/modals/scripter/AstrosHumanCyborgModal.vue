@@ -1,26 +1,22 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { HumanCyborgRelationsCmd, HcrCommandCategory, ModalMode } from '@/enums';
-import type {
-  HcrCommand,
-  HumanCyborgRelationsEvent,
-  ScriptEventModalResponse,
-  ScriptEvent,
-} from '@/models';
+import type { HcrCommand, HumanCyborgRelationsEvent, ScriptEvent } from '@/models';
 
 import { v4 as uuid } from 'uuid';
 import { useHumanCyborgRelations } from '@/composables/useHumanCyborgRelations';
 
-const { getHcrCommandName, getHcrCommandString } = useHumanCyborgRelations();
+const { getHcrCommandName } = useHumanCyborgRelations();
 
 interface HcrCommandListItem {
   id: HumanCyborgRelationsCmd;
   name: string;
 }
 
+const scriptEvent = defineModel<ScriptEvent>('scriptEvent', { required: true });
+
 const props = withDefaults(
   defineProps<{
-    scriptEvent: ScriptEvent;
     mode?: ModalMode;
   }>(),
   {
@@ -29,9 +25,8 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (e: 'addEvent', response: ScriptEventModalResponse): void;
-  (e: 'editEvent', response: ScriptEventModalResponse): void;
-  (e: 'removeEvent', response: ScriptEventModalResponse): void;
+  (e: 'save', originalTime: number): void;
+  (e: 'remove', originalTime: number): void;
   (e: 'close'): void;
 }>();
 
@@ -41,6 +36,8 @@ const maxTime = 600;
 // Local state
 const eventTime = ref(0);
 const originalEventTime = ref(0);
+const originalTime = ref(0);
+const originalEvent = ref<unknown>(null);
 const errorMessage = ref('');
 const commandCategory = ref<string>(HcrCommandCategory.STIMULI.toString());
 const command = ref<string>('');
@@ -84,13 +81,17 @@ const valueBDisabled = computed(() => {
 onMounted(() => {
   setAvailableCommands(Number(commandCategory.value));
 
-  const temp = props.scriptEvent.event as HumanCyborgRelationsEvent;
+  // Store original state for reverting
+  originalTime.value = scriptEvent.value.time;
+  originalEvent.value = JSON.parse(JSON.stringify(scriptEvent.value.event));
+
+  const temp = scriptEvent.value.event as HumanCyborgRelationsEvent;
   if (temp !== undefined && temp.commands) {
     selectedCommands.value.push(...temp.commands);
   }
 
-  originalEventTime.value = props.scriptEvent.time;
-  eventTime.value = props.scriptEvent.time;
+  originalEventTime.value = scriptEvent.value.time;
+  eventTime.value = scriptEvent.value.time;
 });
 
 const hcrListItem = (cmd: HumanCyborgRelationsCmd): HcrCommandListItem => {
@@ -249,32 +250,24 @@ const addEvent = () => {
     return;
   }
 
-  props.scriptEvent.time = eventTime.value;
+  scriptEvent.value.time = eventTime.value;
 
   const data = { commands: selectedCommands.value };
-  props.scriptEvent.event = data;
+  scriptEvent.value.event = data;
 
-  const response: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-
-  if (props.mode === 'edit') {
-    emit('editEvent', response);
-  } else {
-    emit('addEvent', response);
-  }
+  emit('save', originalEventTime.value);
 };
 
 const removeEvent = () => {
-  const response: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-  emit('removeEvent', response);
+  emit('remove', originalEventTime.value);
 };
 
 const closeModal = () => {
+  // Revert changes if in edit mode
+  if (props.mode === ModalMode.EDIT) {
+    scriptEvent.value.time = originalTime.value;
+    scriptEvent.value.event = JSON.parse(JSON.stringify(originalEvent.value));
+  }
   emit('close');
 };
 </script>

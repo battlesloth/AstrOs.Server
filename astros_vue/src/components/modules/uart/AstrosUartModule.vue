@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, type PropType, type Component } from 'vue';
+import { computed, type Component } from 'vue';
 import { ModuleType } from '@/enums/modules/ModuleType';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
@@ -10,29 +10,15 @@ import AstrosKangarooModule from './submodules/AstrosKangarooModule.vue';
 import AstrosHcrSerialModule from './submodules/AstrosHcrSerialModule.vue';
 import AstrosMaestroModule from './submodules/AstrosMaestroModule.vue';
 
+const module = defineModel<UartModule>('module', { required: true });
+
 // Props
-const props = defineProps({
-  module: {
-    type: Object as PropType<UartModule>,
-    required: true,
-  },
-  locationId: {
-    type: String as PropType<Location>,
-    required: true,
-  },
-  parentTestId: {
-    type: String,
-    required: true,
-  },
-  isMaster: {
-    type: Boolean,
-    default: false,
-  },
-  openModuleId: {
-    type: String,
-    default: null,
-  },
-});
+const props = defineProps<{
+  locationId: Location;
+  parentTestId: string;
+  isMaster?: boolean;
+  openModuleId?: string | null;
+}>();
 
 // Emits
 const emit = defineEmits<{
@@ -42,11 +28,11 @@ const emit = defineEmits<{
 }>();
 
 // Computed
-const isOpen = computed(() => props.openModuleId === props.module.id);
+const isOpen = computed(() => props.openModuleId === module.value.id);
 
 // Computed properties
 const subtypeName = computed(() => {
-  switch (props.module.moduleSubType) {
+  switch (module.value.moduleSubType) {
     case ModuleSubType.GENERIC_SERIAL:
       return 'uart.module_types.generic';
     case ModuleSubType.KANGAROO:
@@ -61,7 +47,7 @@ const subtypeName = computed(() => {
 });
 
 const subModuleComponent = computed<Component | null>(() => {
-  switch (props.module.moduleSubType) {
+  switch (module.value.moduleSubType) {
     case ModuleSubType.GENERIC_SERIAL:
       return AstrosGenericSerialModule;
     case ModuleSubType.KANGAROO:
@@ -80,7 +66,7 @@ const removeModule = (event: Event) => {
   event.stopPropagation();
   emit('removeModule', {
     locationId: props.locationId,
-    id: props.module.id,
+    id: module.value.id,
     moduleType: ModuleType.UART,
   });
 };
@@ -91,7 +77,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
 };
 
 const toggleCollapse = () => {
-  emit('toggleModule', props.module.id);
+  emit('toggleModule', module.value.id);
 };
 </script>
 
@@ -137,7 +123,7 @@ const toggleCollapse = () => {
       <component
         v-else
         :is="subModuleComponent"
-        :module="module"
+        v-model:module="module"
         :parent-test-id="parentTestId"
         :is-master="isMaster"
         @servo-test="onServoTestEvent"

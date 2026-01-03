@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, type PropType } from 'vue';
+import { ref, watch } from 'vue';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 import type { ServoTestEvent } from '@/models/events';
 import AstrosMaestroChannel from './AstrosMaestroChannel.vue';
@@ -28,12 +28,10 @@ interface MaestroModule {
   boards: MaestroBoard[];
 }
 
+const module = defineModel<UartModule>('module', { required: true });
+
 // Props
-const props = defineProps({
-  module: {
-    type: Object as PropType<UartModule>,
-    required: true,
-  },
+defineProps({
   parentTestId: {
     type: String,
     required: true,
@@ -57,7 +55,7 @@ const subModule = ref<MaestroModule | null>(null);
 
 // Watch for module changes
 watch(
-  () => props.module,
+  module,
   (newModule) => {
     if (newModule) {
       uartChannel.value = newModule.uartChannel.toString();
@@ -73,11 +71,11 @@ watch(
 
 // Methods
 const onChannelChange = (val: string) => {
-  props.module.uartChannel = parseInt(val);
+  module.value = { ...module.value, uartChannel: parseInt(val) };
 };
 
 const onBaudRateChange = (val: string) => {
-  props.module.baudRate = parseInt(val);
+  module.value = { ...module.value, baudRate: parseInt(val) };
 };
 
 const onChannelCountChange = (val: string) => {
@@ -91,7 +89,7 @@ const onChannelCountChange = (val: string) => {
 };
 
 const onServoTestEvent = (evt: ServoTestEvent) => {
-  evt.moduleIdx = props.module.idx;
+  evt.moduleIdx = module.value.idx;
   emit('servoTest', evt);
 };
 </script>
@@ -149,7 +147,8 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         class="border-2 border-base-300 rounded p-4"
       >
         <AstrosMaestroChannel
-          :channel="channel"
+          v-if="channel"
+          v-model:channel="subModule.boards[0].channels[i]!"
           :parent-test-id="parentTestId"
           @servo-test="onServoTestEvent"
         />

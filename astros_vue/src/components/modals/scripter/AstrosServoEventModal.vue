@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import type { MaestroEvent, ScriptEvent, ScriptEventModalResponse } from '@/models';
+import type { MaestroEvent, ScriptEvent } from '@/models';
 import { ModalMode, ModuleSubType } from '@/enums';
+
+const scriptEvent = defineModel<ScriptEvent>('scriptEvent', { required: true });
 
 export interface ServoEventModalProps {
   mode?: ModalMode;
-  scriptEvent: ScriptEvent;
   maxTime?: number;
 }
 
@@ -15,13 +16,14 @@ const props = withDefaults(defineProps<ServoEventModalProps>(), {
 });
 
 const emit = defineEmits<{
-  (e: 'addEvent', data: ScriptEventModalResponse): void;
-  (e: 'editEvent', data: ScriptEventModalResponse): void;
-  (e: 'removeEvent', data: ScriptEventModalResponse): void;
+  (e: 'save', originalTime: number): void;
+  (e: 'remove', originalTime: number): void;
   (e: 'close'): void;
 }>();
 
 const originalEventTime = ref(0);
+const originalTime = ref(0);
+const originalEvent = ref<unknown>(null);
 const eventTime = ref(0);
 const speed = ref(1);
 const position = ref(0);
@@ -30,19 +32,23 @@ const errorMessage = ref('');
 
 // Initialize values from scriptEvent
 const initializeValues = () => {
-  if (props.scriptEvent.event === undefined) {
+  // Store original state for reverting
+  originalTime.value = scriptEvent.value.time;
+  originalEvent.value = JSON.parse(JSON.stringify(scriptEvent.value.event));
+
+  if (scriptEvent.value.event === undefined) {
     position.value = 0;
     speed.value = 0;
     acceleration.value = 0;
-  } else if (props.scriptEvent.moduleSubType === ModuleSubType.MAESTRO) {
-    const temp = props.scriptEvent.event as MaestroEvent;
+  } else if (scriptEvent.value.moduleSubType === ModuleSubType.MAESTRO) {
+    const temp = scriptEvent.value.event as MaestroEvent;
     position.value = temp.position;
     speed.value = temp.speed;
     acceleration.value = temp.acceleration;
   }
 
-  originalEventTime.value = props.scriptEvent.time;
-  eventTime.value = props.scriptEvent.time;
+  originalEventTime.value = scriptEvent.value.time;
+  eventTime.value = scriptEvent.value.time;
 };
 
 initializeValues();
@@ -73,9 +79,9 @@ const saveEvent = () => {
     return;
   }
 
-  props.scriptEvent.time = +eventTime.value;
+  scriptEvent.value.time = +eventTime.value;
 
-  if (props.scriptEvent.moduleSubType === ModuleSubType.MAESTRO) {
+  if (scriptEvent.value.moduleSubType === ModuleSubType.MAESTRO) {
     const data: MaestroEvent = {
       // channel will be set when persisting the event to the DB
       channel: -1,
@@ -85,30 +91,22 @@ const saveEvent = () => {
       acceleration: acceleration.value,
     };
 
-    props.scriptEvent.event = data;
+    scriptEvent.value.event = data;
   }
 
-  const eventData = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-
-  if (props.mode === ModalMode.ADD) {
-    emit('addEvent', eventData);
-  } else {
-    emit('editEvent', eventData);
-  }
+  emit('save', originalEventTime.value);
 };
 
 const removeEvent = () => {
-  const eventData = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-  emit('removeEvent', eventData);
+  emit('remove', originalEventTime.value);
 };
 
 const closeModal = () => {
+  // Revert changes if in edit mode
+  if (props.mode === ModalMode.EDIT) {
+    scriptEvent.value.time = originalTime.value;
+    scriptEvent.value.event = JSON.parse(JSON.stringify(originalEvent.value));
+  }
   emit('close');
 };
 </script>

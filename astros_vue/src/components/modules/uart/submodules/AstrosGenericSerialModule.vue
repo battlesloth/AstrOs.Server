@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, type PropType } from 'vue';
+import { ref, watch } from 'vue';
 import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
 
-const props = defineProps({
-  module: {
-    type: Object as PropType<UartModule>,
-    required: true,
-  },
+const module = defineModel<UartModule>('module', { required: true });
+
+defineProps({
   parentTestId: {
     type: String,
     required: true,
@@ -21,7 +19,7 @@ const uartChannel = ref<string>('');
 const baudRate = ref<string>('');
 
 watch(
-  () => props.module,
+  module,
   (newModule) => {
     if (newModule) {
       uartChannel.value = newModule.uartChannel.toString();
@@ -32,11 +30,11 @@ watch(
 );
 
 const onChannelChange = (val: string) => {
-  props.module.uartChannel = parseInt(val);
+  module.value = { ...module.value, uartChannel: parseInt(val) };
 };
 
 const onBaudRateChange = (val: string) => {
-  props.module.baudRate = parseInt(val);
+  module.value = { ...module.value, baudRate: parseInt(val) };
 };
 </script>
 

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
 import { KangarooAction, ModalMode } from '@/enums';
-import type { KangarooEvent, KangarooX2, ScriptEventModalResponse, ScriptEvent } from '@/models';
+import type { KangarooEvent, KangarooX2, ScriptEvent } from '@/models';
+
+const scriptEvent = defineModel<ScriptEvent>('scriptEvent', { required: true });
 
 const props = withDefaults(
   defineProps<{
-    scriptEvent: ScriptEvent;
     kangaroo: KangarooX2;
     mode?: ModalMode;
   }>(),
@@ -15,9 +16,8 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (e: 'addEvent', response: ScriptEventModalResponse): void;
-  (e: 'editEvent', response: ScriptEventModalResponse): void;
-  (e: 'removeEvent', response: ScriptEventModalResponse): void;
+  (e: 'save', originalTime: number): void;
+  (e: 'remove', originalTime: number): void;
   (e: 'close'): void;
 }>();
 
@@ -27,6 +27,8 @@ const maxTime = 600;
 // Local state
 const eventTime = ref(0);
 const originalEventTime = ref(0);
+const originalTime = ref(0);
+const originalEvent = ref<unknown>(null);
 const errorMessage = ref('');
 
 const ch1Action = ref<string>('0');
@@ -81,7 +83,11 @@ watch(ch2Action, (newAction) => {
 });
 
 onMounted(() => {
-  const temp = props.scriptEvent.event as KangarooEvent;
+  // Store original state for reverting
+  originalTime.value = scriptEvent.value.time;
+  originalEvent.value = JSON.parse(JSON.stringify(scriptEvent.value.event));
+
+  const temp = scriptEvent.value.event as KangarooEvent;
 
   if (temp !== undefined) {
     ch1Action.value = temp.ch1Action.toString();
@@ -93,8 +99,8 @@ onMounted(() => {
     ch2Position.value = temp.ch2Position;
   }
 
-  originalEventTime.value = props.scriptEvent.time;
-  eventTime.value = props.scriptEvent.time;
+  originalEventTime.value = scriptEvent.value.time;
+  eventTime.value = scriptEvent.value.time;
 });
 
 const addEvent = () => {
@@ -103,7 +109,7 @@ const addEvent = () => {
     return;
   }
 
-  props.scriptEvent.time = eventTime.value;
+  scriptEvent.value.time = eventTime.value;
 
   const data: KangarooEvent = {
     ch1Action: Number(ch1Action.value),
@@ -114,29 +120,21 @@ const addEvent = () => {
     ch2Position: ch2Position.value ?? 0,
   };
 
-  props.scriptEvent.event = data;
+  scriptEvent.value.event = data;
 
-  const response: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-
-  if (props.mode === 'edit') {
-    emit('editEvent', response);
-  } else {
-    emit('addEvent', response);
-  }
+  emit('save', originalEventTime.value);
 };
 
 const removeEvent = () => {
-  const response: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-  emit('removeEvent', response);
+  emit('remove', originalEventTime.value);
 };
 
 const closeModal = () => {
+  // Revert changes if in edit mode
+  if (props.mode === ModalMode.EDIT) {
+    scriptEvent.value.time = originalTime.value;
+    scriptEvent.value.event = JSON.parse(JSON.stringify(originalEvent.value));
+  }
   emit('close');
 };
 </script>

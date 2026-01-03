@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { type I2cEvent, type ScriptEventModalResponse, type ScriptEvent } from '@/models';
+import { type I2cEvent, type ScriptEvent } from '@/models';
 import { ModalMode } from '@/enums';
+
+const scriptEvent = defineModel<ScriptEvent>('scriptEvent', { required: true });
 
 const props = withDefaults(
   defineProps<{
-    scriptEvent: ScriptEvent;
     mode?: ModalMode;
   }>(),
   {
@@ -14,9 +15,8 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (e: 'addEvent', response: ScriptEventModalResponse): void;
-  (e: 'editEvent', response: ScriptEventModalResponse): void;
-  (e: 'removeEvent', response: ScriptEventModalResponse): void;
+  (e: 'save', originalTime: number): void;
+  (e: 'remove', originalTime: number): void;
   (e: 'close'): void;
 }>();
 
@@ -26,20 +26,26 @@ const maxTime = 600;
 // Local state
 const eventTime = ref(0);
 const originalEventTime = ref(0);
+const originalTime = ref(0);
+const originalEvent = ref<unknown>(null);
 const message = ref('');
 const errorMessage = ref('');
 
 const showRemoveButton = computed(() => props.mode === ModalMode.EDIT);
 
 onMounted(() => {
-  const temp = props.scriptEvent.event as I2cEvent;
+  // Store original state for reverting
+  originalTime.value = scriptEvent.value.time;
+  originalEvent.value = JSON.parse(JSON.stringify(scriptEvent.value.event));
+
+  const temp = scriptEvent.value.event as I2cEvent;
 
   if (temp !== undefined) {
     message.value = temp.message;
   }
 
-  originalEventTime.value = props.scriptEvent.time;
-  eventTime.value = props.scriptEvent.time;
+  originalEventTime.value = scriptEvent.value.time;
+  eventTime.value = scriptEvent.value.time;
 });
 
 const addEvent = () => {
@@ -48,30 +54,22 @@ const addEvent = () => {
     return;
   }
 
-  props.scriptEvent.time = eventTime.value;
-  props.scriptEvent.event = { message: message.value };
+  scriptEvent.value.time = eventTime.value;
+  scriptEvent.value.event = { message: message.value };
 
-  const response: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-
-  if (props.mode === 'edit') {
-    emit('editEvent', response);
-  } else {
-    emit('addEvent', response);
-  }
+  emit('save', originalEventTime.value);
 };
 
 const removeEvent = () => {
-  const response: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-  emit('removeEvent', response);
+  emit('remove', originalEventTime.value);
 };
 
 const closeModal = () => {
+  // Revert changes if in edit mode
+  if (props.mode === ModalMode.EDIT) {
+    scriptEvent.value.time = originalTime.value;
+    scriptEvent.value.event = JSON.parse(JSON.stringify(originalEvent.value));
+  }
   emit('close');
 };
 </script>

@@ -135,15 +135,15 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
           class="space-y-2 max-h-96 overflow-y-scroll p-0"
         >
           <li
-            v-for="module in location.uartModules"
+            v-for="(module, index) in location.uartModules"
             :key="module.id"
           >
             <AstrosUartModule
+              v-model:module="location.uartModules[index]!"
               @remove-module="removeModule"
               @servo-test="onServoTestEvent"
               @toggle-module="toggleUartModule"
               :location-id="props.locationEnum"
-              :module="module"
               :is-master="isMaster"
               :parent-test-id="parentTestId"
               :open-module-id="openUartModuleId"

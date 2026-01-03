@@ -104,6 +104,9 @@ export function useEventBoxes(
     // Update positions of all event boxes based on current timeline width
     // Position is the center of the box (thanks to pivot)
     events.forEach((event) => {
+      // Update deciseconds from the actual scriptEvent data in case it changed
+      event.deciseconds = event.scriptEvent.time;
+
       const pixelPosition = (event.deciseconds / TIMELINE_DURATION_SECONDS) * TIMELINE_WIDTH.value;
       event.x = pixelPosition;
     });

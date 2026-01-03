@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { type GenericSerialEvent, type ScriptEventModalResponse } from '@/models';
+import { type GenericSerialEvent } from '@/models';
 import type { ScriptEvent } from '@/models/scripts/scriptEvent';
 import { ModalMode } from '@/enums';
 
+const scriptEvent = defineModel<ScriptEvent>('scriptEvent', { required: true });
+
 export interface UartEventModalProps {
   mode?: ModalMode;
-  scriptEvent: ScriptEvent;
   maxTime?: number;
 }
 
@@ -16,26 +17,31 @@ const props = withDefaults(defineProps<UartEventModalProps>(), {
 });
 
 const emit = defineEmits<{
-  (e: 'addEvent', data: ScriptEventModalResponse): void;
-  (e: 'editEvent', data: ScriptEventModalResponse): void;
-  (e: 'removeEvent', data: ScriptEventModalResponse): void;
+  (e: 'save', originalTime: number): void;
+  (e: 'remove', originalTime: number): void;
   (e: 'close'): void;
 }>();
 
 const originalEventTime = ref(0);
+const originalTime = ref(0);
+const originalEvent = ref<unknown>(null);
 const eventTime = ref(0);
 const eventValue = ref('');
 const errorMessage = ref('');
 
 // Initialize values from scriptEvent
 const initializeValues = () => {
-  if (props.scriptEvent.event !== undefined) {
-    const temp = props.scriptEvent.event as GenericSerialEvent;
+  // Store original state for reverting
+  originalTime.value = scriptEvent.value.time;
+  originalEvent.value = JSON.parse(JSON.stringify(scriptEvent.value.event));
+
+  if (scriptEvent.value.event !== undefined) {
+    const temp = scriptEvent.value.event as GenericSerialEvent;
     eventValue.value = temp.value;
   }
 
-  originalEventTime.value = props.scriptEvent.time;
-  eventTime.value = props.scriptEvent.time;
+  originalEventTime.value = scriptEvent.value.time;
+  eventTime.value = scriptEvent.value.time;
 };
 
 initializeValues();
@@ -48,30 +54,22 @@ const saveEvent = () => {
     return;
   }
 
-  props.scriptEvent.time = +eventTime.value;
-  props.scriptEvent.event = { value: eventValue.value };
+  scriptEvent.value.time = +eventTime.value;
+  scriptEvent.value.event = { value: eventValue.value };
 
-  const eventData: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-
-  if (props.mode === ModalMode.ADD) {
-    emit('addEvent', eventData);
-  } else {
-    emit('editEvent', eventData);
-  }
+  emit('save', originalEventTime.value);
 };
 
 const removeEvent = () => {
-  const eventData: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-  emit('removeEvent', eventData);
+  emit('remove', originalEventTime.value);
 };
 
 const closeModal = () => {
+  // Revert changes if in edit mode
+  if (props.mode === ModalMode.EDIT) {
+    scriptEvent.value.time = originalTime.value;
+    scriptEvent.value.event = JSON.parse(JSON.stringify(originalEvent.value));
+  }
   emit('close');
 };
 </script>

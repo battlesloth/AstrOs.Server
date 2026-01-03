@@ -115,6 +115,7 @@ const removeEvent = (chlId: string, eventId: string) => {
 
 const updateEvent = (chlId: string, eventId: string) => {
   console.log('updating event', eventId, 'from channel', chlId);
+  updateEventBoxPositions(chlId);
 };
 
 defineExpose({

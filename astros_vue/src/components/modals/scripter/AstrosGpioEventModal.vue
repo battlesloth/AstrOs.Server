@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
-import { type GpioEvent, type MaestroEvent, type ScriptEventModalResponse } from '@/models';
+import { type GpioEvent, type MaestroEvent } from '@/models';
 import type { ScriptEvent } from '@/models/scripts/scriptEvent';
 import { ModalMode } from '@/enums';
 
+const scriptEvent = defineModel<ScriptEvent>('scriptEvent', { required: true });
+
 const props = withDefaults(
   defineProps<{
-    scriptEvent: ScriptEvent;
     mode?: ModalMode;
   }>(),
   {
@@ -16,9 +17,8 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  (e: 'addEvent', response: ScriptEventModalResponse): void;
-  (e: 'editEvent', response: ScriptEventModalResponse): void;
-  (e: 'removeEvent', response: ScriptEventModalResponse): void;
+  (e: 'save', originalTime: number): void;
+  (e: 'remove', originalTime: number): void;
   (e: 'close'): void;
 }>();
 
@@ -29,24 +29,30 @@ const maxTime = 600;
 const state = ref(0);
 const eventTime = ref(0);
 const originalEventTime = ref(0);
+const originalTime = ref(0);
+const originalEvent = ref<unknown>(null);
 const errorMessage = ref('');
 
 const showRemoveButton = computed(() => props.mode === ModalMode.EDIT);
 
 onMounted(() => {
+  // Store original state for reverting
+  originalTime.value = scriptEvent.value.time;
+  originalEvent.value = JSON.parse(JSON.stringify(scriptEvent.value.event));
+
   // Initialize state based on scriptEvent
-  if (props.scriptEvent.event === undefined) {
+  if (scriptEvent.value.event === undefined) {
     state.value = 0;
-  } else if (props.scriptEvent.moduleSubType === ModuleSubType.GENERIC_GPIO) {
-    const temp = props.scriptEvent.event as GpioEvent;
+  } else if (scriptEvent.value.moduleSubType === ModuleSubType.GENERIC_GPIO) {
+    const temp = scriptEvent.value.event as GpioEvent;
     state.value = temp.setHigh ? 1 : 0;
-  } else if (props.scriptEvent.moduleSubType === ModuleSubType.MAESTRO) {
-    const temp = props.scriptEvent.event as MaestroEvent;
+  } else if (scriptEvent.value.moduleSubType === ModuleSubType.MAESTRO) {
+    const temp = scriptEvent.value.event as MaestroEvent;
     state.value = temp.position >= 1500 ? 1 : 0;
   }
 
-  originalEventTime.value = props.scriptEvent.time;
-  eventTime.value = props.scriptEvent.time;
+  originalEventTime.value = scriptEvent.value.time;
+  eventTime.value = scriptEvent.value.time;
 });
 
 const addEvent = () => {
@@ -55,12 +61,12 @@ const addEvent = () => {
     return;
   }
 
-  props.scriptEvent.time = eventTime.value;
+  scriptEvent.value.time = eventTime.value;
 
-  if (props.scriptEvent.moduleSubType === ModuleSubType.GENERIC_GPIO) {
-    props.scriptEvent.event = { setHigh: state.value === 1 };
-  } else if (props.scriptEvent.moduleSubType === ModuleSubType.MAESTRO) {
-    props.scriptEvent.event = {
+  if (scriptEvent.value.moduleSubType === ModuleSubType.GENERIC_GPIO) {
+    scriptEvent.value.event = { setHigh: state.value === 1 };
+  } else if (scriptEvent.value.moduleSubType === ModuleSubType.MAESTRO) {
+    scriptEvent.value.event = {
       channel: -1,
       isServo: false,
       position: state.value === 1 ? 2500 : 500,
@@ -69,27 +75,19 @@ const addEvent = () => {
     };
   }
 
-  const response: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-
-  if (props.mode === ModalMode.EDIT) {
-    emit('editEvent', response);
-  } else {
-    emit('addEvent', response);
-  }
+  emit('save', originalEventTime.value);
 };
 
 const removeEvent = () => {
-  const response: ScriptEventModalResponse = {
-    scriptEvent: props.scriptEvent,
-    time: originalEventTime.value,
-  };
-  emit('removeEvent', response);
+  emit('remove', originalEventTime.value);
 };
 
 const closeModal = () => {
+  // Revert changes if in edit mode
+  if (props.mode === ModalMode.EDIT) {
+    scriptEvent.value.time = originalTime.value;
+    scriptEvent.value.event = JSON.parse(JSON.stringify(originalEvent.value));
+  }
   emit('close');
 };
 </script>
