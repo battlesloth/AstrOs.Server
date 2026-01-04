@@ -206,6 +206,16 @@ onMounted(async () => {
     return;
   }
 
+  console.log(`Loading script with ID: ${route.params.id}`);
+
+  if (route.params.id === '0') {
+    scripterStore.createNewScript();
+    modalMessage.value = 'Initializing...';
+    await scripter.value?.initializePixi([]);
+    showModal.value = ModalType.CLOSE_ALL;
+    return;
+  }
+
   const result = await scripterStore.loadScripterData(route.params.id as string);
 
   if (!result.success) {

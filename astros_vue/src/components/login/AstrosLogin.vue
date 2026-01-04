@@ -43,7 +43,12 @@ defineEmits<{
       <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
         <div class="flex flex-col items-center justify-center">
           <div class="flex flex-row">
-            <h2 class="text-2xl font-bold mb-4">{{ $t('astros') }}</h2>
+            <div class="font-starwars mb-2 text-center">
+              <span class="text-3xl">A</span>
+              <span class="text-2xl">str</span>
+              <span class="text-3xl">O</span>
+              <span class="text-2xl">s</span>
+            </div>
           </div>
           <AstrosFieldUsername
             class="w-full mb-4"

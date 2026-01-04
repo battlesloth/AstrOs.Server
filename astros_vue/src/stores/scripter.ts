@@ -5,7 +5,7 @@ import { useLocationStore } from './location';
 import apiService from '@/api/apiService';
 import { SCRIPTS } from '@/api/endpoints';
 import type { Script, ScriptChannel, ScriptEvent } from '@/models';
-import { ScriptChannelType } from '@/enums';
+import { ScriptChannelType, Location, UploadStatus } from '@/enums';
 import { v4 as uuid } from 'uuid';
 import { moduleChannelTypeFromSubType } from '@/models';
 
@@ -25,6 +25,41 @@ export const useScripterStore = defineStore('scripter', () => {
     getScriptChannelResource,
     setChannelAvailability,
   } = useScriptResources();
+
+  async function createNewScript() {
+    isLoading.value = true;
+    try {
+      const result = await locationsStore.loadLocationsFromApi();
+
+      if (!result.success) {
+        throw new Error(`Failed to load locations for scripter: ${result.error}`);
+      }
+
+      loadResources(locationsStore.getLocationCollection());
+
+      script.value = {
+        id: generateScriptId(5),
+        scriptName: 'New Script',
+        description: '',
+        lastSaved: new Date('1970-01-01T00:00:00Z'),
+        deploymentStatus: {
+          [Location.BODY]: { date: undefined, value: UploadStatus.NOT_UPLOADED },
+          [Location.CORE]: { date: undefined, value: UploadStatus.NOT_UPLOADED },
+          [Location.DOME]: { date: undefined, value: UploadStatus.NOT_UPLOADED },
+          [Location.UNKNOWN]: { date: undefined, value: UploadStatus.NOT_UPLOADED },
+        },
+        scriptChannels: [],
+      };
+
+      applyScript(script.value);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to create new script:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
   async function loadScripterData(scriptId: string) {
     isLoading.value = true;
@@ -175,10 +210,21 @@ export const useScripterStore = defineStore('scripter', () => {
     }
   }
 
+  function generateScriptId(length: number): string {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = `s${Math.floor(Date.now() / 1000)}`;
+    const charactersLength = characters.length;
+    for (let i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+  }
+
   return {
     isLoading,
     isSaving,
     script,
+    createNewScript,
     loadScripterData,
     saveScript,
     getLocationDetailsList,

@@ -1,5 +1,6 @@
 import type { DeploymentStatus } from './deploymentStatus';
 import type { ScriptChannel } from './scriptChannel';
+import type { Location } from '@/enums';
 
 export interface Script {
   id: string;
@@ -7,7 +8,7 @@ export interface Script {
   description: string;
   lastSaved: Date;
 
-  deploymentStatus: Record<string, DeploymentStatus>;
+  deploymentStatus: Record<Location, DeploymentStatus>;
 
   scriptChannels: Array<ScriptChannel>;
 }

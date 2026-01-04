@@ -12,9 +12,8 @@ const meta = {
     layout: 'centered',
   },
   args: {
-    onAddEvent: fn(),
-    onEditEvent: fn(),
-    onRemoveEvent: fn(),
+    onSave: fn(),
+    onRemove: fn(),
     onClose: fn(),
   },
   tags: ['autodocs'],
@@ -62,7 +61,8 @@ function getKangarooEvent(undefinedEvt = false): ScriptEvent {
   };
 
   return {
-    scriptChannelId: uuid(),
+    id: uuid(),
+    scriptChannel: uuid(),
     moduleType: ModuleType.UART,
     moduleSubType: ModuleSubType.KANGAROO,
     time: 5000,
