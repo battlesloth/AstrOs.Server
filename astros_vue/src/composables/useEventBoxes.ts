@@ -2,6 +2,7 @@ import { ref, type Ref } from 'vue';
 import { Container, FederatedPointerEvent, type ContainerChild } from 'pixi.js';
 import { PixiChannelEvent } from '@/pixiComponents/pixiChannelEvent';
 import type { ScriptEvent } from '@/models';
+import type { ScriptChannelType } from '@/enums';
 
 /**
  * Composable for managing event boxes on the timeline
@@ -27,6 +28,7 @@ export function useEventBoxes(
     rowContainer: Container,
     channelId: string,
     scriptEvent: ScriptEvent,
+    scriptChannelType: ScriptChannelType,
     isDraggingTimeline: Ref<boolean>,
   ) {
     const onEventPointerTap = (event: FederatedPointerEvent, scriptEvent: ScriptEvent) => {
@@ -58,6 +60,7 @@ export function useEventBoxes(
       channelId,
       deciseconds: scriptEvent.time,
       scriptEvent,
+      scriptChannelType,
       rowHeight,
       timelineWidth: TIMELINE_WIDTH.value,
       timelineDurationSeconds: TIMELINE_DURATION_SECONDS,

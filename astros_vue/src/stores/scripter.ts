@@ -5,7 +5,7 @@ import { useLocationStore } from './location';
 import apiService from '@/api/apiService';
 import { SCRIPTS } from '@/api/endpoints';
 import type { Script, ScriptChannel, ScriptEvent } from '@/models';
-import type { ScriptChannelType } from '@/enums';
+import { ScriptChannelType } from '@/enums';
 import { v4 as uuid } from 'uuid';
 import { moduleChannelTypeFromSubType } from '@/models';
 
@@ -129,16 +129,16 @@ export const useScripterStore = defineStore('scripter', () => {
   function addEventToChannel(
     channelId: string,
     event: ScriptEvent,
-  ): { success: boolean; event: ScriptEvent | undefined } {
+  ): { success: boolean; event: ScriptEvent | undefined; channelType: ScriptChannelType } {
     if (!script.value) {
       console.warn('No script loaded.');
-      return { success: false, event: undefined };
+      return { success: false, event: undefined, channelType: ScriptChannelType.NONE };
     }
 
     const idx = script.value?.scriptChannels.findIndex((ch) => ch.id === channelId);
     if (idx === undefined || idx === -1) {
       console.warn(`Channel with id ${channelId} not found in script.`);
-      return { success: false, event: undefined };
+      return { success: false, event: undefined, channelType: ScriptChannelType.NONE };
     }
 
     if (script.value) {
@@ -147,7 +147,11 @@ export const useScripterStore = defineStore('scripter', () => {
 
     console.log('channel events:', script.value.scriptChannels[idx]!.events);
 
-    return { success: true, event: script.value.scriptChannels[idx]!.events[event.id] };
+    return {
+      success: true,
+      event: script.value.scriptChannels[idx]!.events[event.id],
+      channelType: script.value.scriptChannels[idx]!.channelType,
+    };
   }
 
   function removeEventFromChannel(channelId: string, eventId: string): { success: boolean } {

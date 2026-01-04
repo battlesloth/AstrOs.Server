@@ -64,7 +64,12 @@ function logout() {
               ></path>
             </svg>
           </label>
-          <a class="text-xl pl-4 lg:block">{{ $t('astros') }}</a>
+          <div class="font-starwars pt-1.5 pl-4 lg:block">
+            <span class="text-3xl">A</span>
+            <span class="text-2xl">str</span>
+            <span class="text-3xl">O</span>
+            <span class="text-2xl">s</span>
+          </div>
         </div>
         <div class="flex-1"></div>
       </div>

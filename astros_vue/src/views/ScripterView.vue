@@ -104,10 +104,7 @@ function addEvent(chId: string, time: number) {
     ),
   };
 
-  showModal.value = eventTypeToModalType(
-    channel.moduleChannel.moduleType,
-    channel.moduleChannel.moduleSubType,
-  );
+  showModal.value = eventTypeToModalType(channel.channelType);
 }
 
 function doAddEvent() {
@@ -117,11 +114,12 @@ function doAddEvent() {
   }
 
   if (modalMode.value === ModalMode.ADD) {
-    scripterStore.addEventToChannel(
+    const result = scripterStore.addEventToChannel(
       selectedScriptEvent.value.scriptChannel,
       selectedScriptEvent.value,
     );
-    scripter.value?.addEvent(selectedScriptEvent.value);
+
+    scripter.value?.addEvent(selectedScriptEvent.value, result.channelType);
   } else {
     // Edit mode - update the visual timeline position
     scripter.value?.updateEvent(
@@ -145,10 +143,7 @@ function editEvent(event: ScriptEvent) {
     return;
   }
 
-  showModal.value = eventTypeToModalType(
-    channel.moduleChannel.moduleType,
-    channel.moduleChannel.moduleSubType,
-  );
+  showModal.value = eventTypeToModalType(channel.channelType);
 }
 
 function removeEvent() {}

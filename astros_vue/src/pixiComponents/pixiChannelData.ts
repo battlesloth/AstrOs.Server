@@ -1,18 +1,11 @@
-import {
-  Assets,
-  Container,
-  FillGradient,
-  Graphics,
-  Sprite,
-  Text,
-  TextStyle,
-  Texture,
-} from 'pixi.js';
-import { truncateText } from './helpers';
+import { Assets, Container, Graphics, Sprite, Texture } from 'pixi.js';
+import { getText, getTruncatedText } from './helpers';
+import { ScriptChannelType } from '@/enums';
 
 export interface PixiChannelDataOptions {
   channelId: string;
   channelName: string;
+  channelType: ScriptChannelType;
   rowIdx: number;
   height: number;
   width: number;
@@ -38,6 +31,7 @@ export class PixiChannelData extends Container {
 
   channelId: string;
   channelName: string;
+  channelType: ScriptChannelType;
   rowIdx: number;
   options: PixiChannelDataOptions;
 
@@ -47,6 +41,7 @@ export class PixiChannelData extends Container {
     super();
     this.channelId = options.channelId;
     this.channelName = options.channelName;
+    this.channelType = options.channelType;
     this.rowIdx = options.rowIdx;
     this.y = this.rowIdx * options.height;
     this.options = options;
@@ -55,26 +50,16 @@ export class PixiChannelData extends Container {
     this.setBackground();
     this.addChild(this.background);
 
-    const fill = new FillGradient(0, 0, 1, 1);
-    fill.addColorStop(0, 0x000000);
-    fill.addColorStop(1, 0x000000);
-
-    const style = new TextStyle({
-      fontFamily: 'Arial',
-      fontSize: 20,
-      fill: fill,
-    });
-
-    const text = truncateText(this.channelName, style, options.width - 20);
-
-    const rowText = new Text({
-      text: text,
-      style: style,
-    });
+    const rowText = getTruncatedText(this.channelName, 0x000000, options.width - 20, 20);
 
     rowText.x = 10;
     rowText.y = 10;
     this.addChild(rowText);
+
+    const typeText = getText(this.getTypeName(this.channelType), 0x666666, 16);
+    typeText.x = 10;
+    typeText.y = options.height - 30;
+    this.addChild(typeText);
 
     let xOffset = this.buttonXstart;
     const deleteButton = this.createButton(xOffset, (id, name) => options.onDelete?.(id, name));
@@ -130,6 +115,27 @@ export class PixiChannelData extends Container {
     icon.x = this.buttonSize / 2;
     icon.y = this.buttonSize / 2;
     button.addChild(icon);
+  }
+
+  getTypeName(type: ScriptChannelType): string {
+    switch (type) {
+      case ScriptChannelType.NONE:
+        return 'None';
+      case ScriptChannelType.SERVO:
+        return 'Servo';
+      case ScriptChannelType.GPIO:
+        return 'GPIO';
+      case ScriptChannelType.AUDIO:
+        return 'Audio';
+      case ScriptChannelType.GENERIC_I2C:
+        return 'I2C';
+      case ScriptChannelType.GENERIC_UART:
+        return 'Serial';
+      case ScriptChannelType.KANGAROO:
+        return 'KangarooX2';
+      default:
+        return 'Unknown';
+    }
   }
 
   getRowColor(): number {

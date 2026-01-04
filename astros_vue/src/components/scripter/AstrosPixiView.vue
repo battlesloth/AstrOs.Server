@@ -96,7 +96,7 @@ const addChannel = (channel: Channel) => {
   doAddChannel(channel);
   if (channel.events.length > 0) {
     for (const event of channel.events) {
-      addEvent(event);
+      addEvent(event, channel.channelType);
     }
   }
 };
@@ -105,8 +105,8 @@ const removeChannel = (chId: string) => {
   doRemoveChannel(chId);
 };
 
-const addEvent = (event: ScriptEvent) => {
-  doAddEvent(event);
+const addEvent = (event: ScriptEvent, scriptChannelType: ScriptChannelType) => {
+  doAddEvent(event, scriptChannelType);
 };
 
 const removeEvent = (chlId: string, eventId: string) => {
@@ -545,6 +545,7 @@ function createChannelList() {
     const options = {
       channelId: channel.id.toString(),
       channelName: channel.name,
+      channelType: channel.channelType,
       rowIdx: index,
       height: ROW_HEIGHT,
       width: CHANNEL_LIST_WIDTH,
@@ -604,6 +605,7 @@ function doAddChannel(channel: Channel) {
   const options = {
     channelId: channel.id,
     channelName: channel.name,
+    channelType: channel.channelType,
     rowIdx: newIndex,
     height: ROW_HEIGHT,
     width: CHANNEL_LIST_WIDTH,
@@ -664,19 +666,22 @@ function doRemoveChannel(chId: string) {
   }
 }
 
-function doAddEvent(event: ScriptEvent) {
-  console.log('adding event', event);
-  console.log('channelRowContainers:', channelRowContainers.value);
+function doAddEvent(event: ScriptEvent, scriptChannelType: ScriptChannelType) {
   const rowContainer = channelRowContainers.value.get(event.scriptChannel);
   if (!rowContainer || !app.value) {
     console.error('Channel row container not found for channel ID:', event.scriptChannel);
     return;
   }
-  addEventBox(rowContainer as unknown as Container, event.scriptChannel, event, isDraggingTimeline);
+  addEventBox(
+    rowContainer as unknown as Container,
+    event.scriptChannel,
+    event,
+    scriptChannelType,
+    isDraggingTimeline,
+  );
 }
 
 function doRemoveEvent(chlId: string, eventId: string) {
-  console.log('removing event', eventId, 'from channel', chlId);
   const rowContainer = channelRowContainers.value.get(chlId);
   if (!rowContainer) {
     console.error('Channel row container not found for channel ID:', chlId);

@@ -1,4 +1,4 @@
-import { ModalType, ModuleSubType, ModuleType } from '@/enums';
+import { ModalType, ModuleSubType, ModuleType, ScriptChannelType } from '@/enums';
 import type {
   GenericSerialEvent,
   GpioEvent,
@@ -9,26 +9,23 @@ import type {
 } from '@/models';
 
 export function useScriptEvents() {
-  function eventTypeToModalType(moduleType: ModuleType, moduleSubType: ModuleSubType): ModalType {
-    switch (moduleType) {
-      case ModuleType.UART:
-        switch (moduleSubType) {
-          case ModuleSubType.GENERIC_SERIAL:
-            return ModalType.UART_EVENT;
-          case ModuleSubType.KANGAROO:
-            return ModalType.KANGAROO_EVENT;
-          case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
-            return ModalType.HCR_EVENT;
-          case ModuleSubType.MAESTRO:
-            return ModalType.SERVO_EVENT;
-        }
-        break;
-      case ModuleType.I2C:
-        return ModalType.I2C_EVENT;
-      case ModuleType.GPIO:
+  function eventTypeToModalType(channelType: ScriptChannelType): ModalType {
+    switch (channelType) {
+      case ScriptChannelType.GPIO:
         return ModalType.GPIO_EVENT;
+      case ScriptChannelType.GENERIC_I2C:
+        return ModalType.I2C_EVENT;
+      case ScriptChannelType.GENERIC_UART:
+        return ModalType.UART_EVENT;
+      case ScriptChannelType.KANGAROO:
+        return ModalType.KANGAROO_EVENT;
+      case ScriptChannelType.SERVO:
+        return ModalType.SERVO_EVENT;
+      case ScriptChannelType.AUDIO:
+        return ModalType.HCR_EVENT;
+      default:
+        return ModalType.CLOSE_ALL;
     }
-    return ModalType.CLOSE_ALL;
   }
 
   function getDefaultScriptEvent(moduleType: ModuleType, moduleSubType: ModuleSubType) {

@@ -1,6 +1,6 @@
-import { Kysely, Transaction } from "kysely";
-import { Database, UartModule as UartModuleRow } from "../../types.js";
-import { logger } from "../../../logger.js";
+import { Kysely, Transaction } from 'kysely';
+import { Database, UartModule as UartModuleRow } from '../../types.js';
+import { logger } from '../../../logger.js';
 import {
   HumanCyborgRelationsModule,
   KangarooX2,
@@ -11,7 +11,7 @@ import {
   ModuleSubType,
   UartModule,
   UartChannel,
-} from "astros-common";
+} from 'astros-common';
 
 //#region Uart Modules
 export async function getUartModules(
@@ -21,27 +21,19 @@ export async function getUartModules(
   const modules: UartModule[] = [];
 
   const uartData = await db
-    .selectFrom("uart_modules")
+    .selectFrom('uart_modules')
     .selectAll()
-    .where("location_id", "=", locationId)
-    .orderBy("name")
+    .where('location_id', '=', locationId)
+    .orderBy('name')
     .execute()
     .catch((err) => {
-      logger.error("UartRepository.getUartModules", err);
+      logger.error('UartRepository.getUartModules', err);
       throw err;
     });
 
   uartData.map((m: UartModuleRow) => {
     modules.push(
-      new UartModule(
-        m.idx,
-        m.id,
-        m.name,
-        m.location_id,
-        m.uart_type,
-        m.uart_channel,
-        m.baud_rate,
-      ),
+      new UartModule(m.idx, m.id, m.name, m.location_id, m.uart_type, m.uart_channel, m.baud_rate),
     );
   });
 
@@ -70,12 +62,10 @@ export async function upsertUartModules(
   modules: UartModule[],
 ): Promise<void> {
   for (const uart of modules) {
-    logger.info(
-      `Upserting uart module ${uart.name}, id: ${uart.id}, type: ${uart.moduleSubType}`,
-    );
+    logger.info(`Upserting uart module ${uart.name}, id: ${uart.id}, type: ${uart.moduleSubType}`);
 
     await trx
-      .insertInto("uart_modules")
+      .insertInto('uart_modules')
       .values({
         id: uart.id,
         name: uart.name,
@@ -85,17 +75,17 @@ export async function upsertUartModules(
         baud_rate: uart.baudRate,
       })
       .onConflict((c) =>
-        c.column("id").doUpdateSet((eb) => ({
-          name: eb.ref("excluded.name"),
-          location_id: eb.ref("excluded.location_id"),
-          uart_type: eb.ref("excluded.uart_type"),
-          uart_channel: eb.ref("excluded.uart_channel"),
-          baud_rate: eb.ref("excluded.baud_rate"),
+        c.column('id').doUpdateSet((eb) => ({
+          name: eb.ref('excluded.name'),
+          location_id: eb.ref('excluded.location_id'),
+          uart_type: eb.ref('excluded.uart_type'),
+          uart_channel: eb.ref('excluded.uart_channel'),
+          baud_rate: eb.ref('excluded.baud_rate'),
         })),
       )
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error("UartRepository.upsertUartModules", err);
+        logger.error('UartRepository.upsertUartModules', err);
         throw err;
       });
 
@@ -104,11 +94,7 @@ export async function upsertUartModules(
         await upsertKangarooModule(trx, uart.id, uart.subModule as KangarooX2);
         break;
       case ModuleSubType.maestro:
-        await upsertMaestroModule(
-          trx,
-          uart.id,
-          uart.subModule as MaestroModule,
-        );
+        await upsertMaestroModule(trx, uart.id, uart.subModule as MaestroModule);
         break;
     }
   }
@@ -120,12 +106,12 @@ export async function removeStaleUartModules(
   currentMods: Array<string>,
 ): Promise<void> {
   const uartMods = await trx
-    .selectFrom("uart_modules")
+    .selectFrom('uart_modules')
     .selectAll()
-    .where("location_id", "=", locationId)
+    .where('location_id', '=', locationId)
     .execute()
     .catch((err) => {
-      logger.error("UartRepository.removeStaleUartModules", err);
+      logger.error('UartRepository.removeStaleUartModules', err);
       throw err;
     });
 
@@ -150,11 +136,11 @@ export async function removeStaleUartModules(
     }
 
     await trx
-      .deleteFrom("uart_modules")
-      .where("id", "=", uartMod.id)
+      .deleteFrom('uart_modules')
+      .where('id', '=', uartMod.id)
       .execute()
       .catch((err) => {
-        logger.error("UartRepository.removeStaleUartModules", err);
+        logger.error('UartRepository.removeStaleUartModules', err);
         throw err;
       });
   }
@@ -163,27 +149,18 @@ export async function removeStaleUartModules(
 
 //#region Generic Uart
 
-export async function readUartChannel(
-  db: Kysely<Database>,
-  id: string,
-): Promise<UartChannel> {
+export async function readUartChannel(db: Kysely<Database>, id: string): Promise<UartChannel> {
   const channel = await db
-    .selectFrom("uart_modules")
+    .selectFrom('uart_modules')
     .selectAll()
-    .where("id", "=", id)
+    .where('id', '=', id)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error("UartRepository.readUartChannel", err);
+      logger.error('UartRepository.readUartChannel', err);
       throw err;
     });
 
-  return new UartChannel(
-    channel.id,
-    channel.id,
-    channel.name,
-    channel.uart_type,
-    true,
-  );
+  return new UartChannel(channel.id, channel.id, channel.name, channel.uart_type, true);
 }
 
 //#endregion
@@ -196,7 +173,7 @@ async function upsertKangarooModule(
   module: KangarooX2,
 ): Promise<void> {
   await trx
-    .insertInto("kangaroo_x2")
+    .insertInto('kangaroo_x2')
     .values({
       id: module.id,
       parent_id: parentId,
@@ -204,45 +181,39 @@ async function upsertKangarooModule(
       ch2_name: module.ch2Name,
     })
     .onConflict((c) =>
-      c.column("id").doUpdateSet((eb) => ({
-        ch1_name: eb.ref("excluded.ch1_name"),
-        ch2_name: eb.ref("excluded.ch2_name"),
+      c.column('id').doUpdateSet((eb) => ({
+        ch1_name: eb.ref('excluded.ch1_name'),
+        ch2_name: eb.ref('excluded.ch2_name'),
       })),
     )
     .executeTakeFirst()
     .catch((err) => {
-      logger.error("UartRepository.upsertKangarooModule", err);
+      logger.error('UartRepository.upsertKangarooModule', err);
       throw err;
     });
 }
 
-async function loadKangarooModule(
-  db: Kysely<Database>,
-  uartId: string,
-): Promise<KangarooX2> {
+async function loadKangarooModule(db: Kysely<Database>, uartId: string): Promise<KangarooX2> {
   const data = await db
-    .selectFrom("kangaroo_x2")
+    .selectFrom('kangaroo_x2')
     .selectAll()
-    .where("parent_id", "=", uartId)
+    .where('parent_id', '=', uartId)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error("UartRepository.loadKangarooModule", err);
+      logger.error('UartRepository.loadKangarooModule', err);
       throw err;
     });
 
   return new KangarooX2(data.id, data.ch1_name, data.ch2_name);
 }
 
-async function deleteKangarooModule(
-  trx: Transaction<Database>,
-  parentId: string,
-): Promise<void> {
+async function deleteKangarooModule(trx: Transaction<Database>, parentId: string): Promise<void> {
   await trx
-    .deleteFrom("kangaroo_x2")
-    .where("parent_id", "=", parentId)
+    .deleteFrom('kangaroo_x2')
+    .where('parent_id', '=', parentId)
     .execute()
     .catch((err) => {
-      logger.error("UartRepository.deleteKangarooModule", err);
+      logger.error('UartRepository.deleteKangarooModule', err);
       throw err;
     });
 }
@@ -252,19 +223,35 @@ export async function readKangarooChannel(
   id: string,
 ): Promise<KangarooX2Channel> {
   const channel = await db
-    .selectFrom("kangaroo_x2")
+    .selectFrom('kangaroo_x2')
     .selectAll()
-    .where("id", "=", id)
+    .where('id', '=', id)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error("UartRepository.readKangarooChannel", err);
+      logger.error('UartRepository.readKangarooChannel', err);
       throw err;
     });
+
+  let name = '';
+
+  const result = await db
+    .selectFrom('uart_modules')
+    .select('name')
+    .where('id', '=', channel.parent_id)
+    .executeTakeFirstOrThrow()
+    .catch((err) => {
+      logger.error('UartRepository.readKangarooChannel', err);
+      name = 'error';
+    });
+
+  if (result) {
+    name = result.name;
+  }
 
   return new KangarooX2Channel(
     channel.id,
     channel.parent_id,
-    "",
+    name,
     channel.ch1_name,
     channel.ch2_name,
   );
@@ -280,7 +267,7 @@ async function upsertMaestroModule(
 ): Promise<void> {
   for (const board of module.boards) {
     await trx
-      .insertInto("maestro_boards")
+      .insertInto('maestro_boards')
       .values({
         id: board.id,
         parent_id: parentId,
@@ -289,20 +276,20 @@ async function upsertMaestroModule(
         channel_count: board.channelCount,
       })
       .onConflict((c) =>
-        c.column("id").doUpdateSet((eb) => ({
-          name: eb.ref("excluded.name"),
-          channel_count: eb.ref("excluded.channel_count"),
+        c.column('id').doUpdateSet((eb) => ({
+          name: eb.ref('excluded.name'),
+          channel_count: eb.ref('excluded.channel_count'),
         })),
       )
       .executeTakeFirst()
       .catch((err) => {
-        logger.error("UartRepository.upsertMaestroModule", err);
+        logger.error('UartRepository.upsertMaestroModule', err);
         throw err;
       });
 
     for (const channel of board.channels) {
       await trx
-        .insertInto("maestro_channels")
+        .insertInto('maestro_channels')
         .values({
           id: channel.id,
           board_id: board.id,
@@ -316,21 +303,21 @@ async function upsertMaestroModule(
           inverted: channel.inverted ? 1 : 0,
         })
         .onConflict((c) =>
-          c.column("id").doUpdateSet((eb) => ({
-            board_id: eb.ref("excluded.board_id"),
-            channel_number: eb.ref("excluded.channel_number"),
-            name: eb.ref("excluded.name"),
-            enabled: eb.ref("excluded.enabled"),
-            is_servo: eb.ref("excluded.is_servo"),
-            min_pos: eb.ref("excluded.min_pos"),
-            max_pos: eb.ref("excluded.max_pos"),
-            home_pos: eb.ref("excluded.home_pos"),
-            inverted: eb.ref("excluded.inverted"),
+          c.column('id').doUpdateSet((eb) => ({
+            board_id: eb.ref('excluded.board_id'),
+            channel_number: eb.ref('excluded.channel_number'),
+            name: eb.ref('excluded.name'),
+            enabled: eb.ref('excluded.enabled'),
+            is_servo: eb.ref('excluded.is_servo'),
+            min_pos: eb.ref('excluded.min_pos'),
+            max_pos: eb.ref('excluded.max_pos'),
+            home_pos: eb.ref('excluded.home_pos'),
+            inverted: eb.ref('excluded.inverted'),
           })),
         )
         .executeTakeFirst()
         .catch((err) => {
-          logger.error("UartRepository.upsertMaestroModule", err);
+          logger.error('UartRepository.upsertMaestroModule', err);
           throw err;
         });
     }
@@ -344,31 +331,29 @@ async function loadMaestroModule(
   const module = new MaestroModule();
 
   const boards = await db
-    .selectFrom("maestro_boards")
+    .selectFrom('maestro_boards')
     .selectAll()
-    .where("parent_id", "=", uartMod.id)
-    .orderBy("board_id")
+    .where('parent_id', '=', uartMod.id)
+    .orderBy('board_id')
     .execute()
     .catch((err) => {
-      logger.error("UartRepository.loadMaestroModule", err);
+      logger.error('UartRepository.loadMaestroModule', err);
       throw err;
     });
 
   for (const b of boards) {
-    module.boards.push(
-      new MaestroBoard(b.id, b.parent_id, b.board_id, b.name, b.channel_count),
-    );
+    module.boards.push(new MaestroBoard(b.id, b.parent_id, b.board_id, b.name, b.channel_count));
   }
 
   for (const board of module.boards) {
     const channels = await db
-      .selectFrom("maestro_channels")
+      .selectFrom('maestro_channels')
       .selectAll()
-      .where("board_id", "=", board.id)
-      .orderBy("channel_number")
+      .where('board_id', '=', board.id)
+      .orderBy('channel_number')
       .execute()
       .catch((err) => {
-        logger.error("UartRepository.loadMaestroModule", err);
+        logger.error('UartRepository.loadMaestroModule', err);
         throw err;
       });
 
@@ -393,37 +378,34 @@ async function loadMaestroModule(
   return module;
 }
 
-async function deleteMaestroModule(
-  trx: Transaction<Database>,
-  parentId: string,
-): Promise<void> {
+async function deleteMaestroModule(trx: Transaction<Database>, parentId: string): Promise<void> {
   const boardIds = await trx
-    .selectFrom("maestro_boards")
-    .select("id")
-    .where("parent_id", "=", parentId)
+    .selectFrom('maestro_boards')
+    .select('id')
+    .where('parent_id', '=', parentId)
     .execute()
     .catch((err) => {
-      logger.error("UartRepository.deleteMaestroModule", err);
+      logger.error('UartRepository.deleteMaestroModule', err);
       throw err;
     });
 
   for (const id of boardIds) {
     await trx
-      .deleteFrom("maestro_channels")
-      .where("board_id", "=", id.id)
+      .deleteFrom('maestro_channels')
+      .where('board_id', '=', id.id)
       .execute()
       .catch((err) => {
-        logger.error("UartRepository.deleteMaestroModule", err);
+        logger.error('UartRepository.deleteMaestroModule', err);
         throw err;
       });
   }
 
   await trx
-    .deleteFrom("maestro_boards")
-    .where("parent_id", "=", parentId)
+    .deleteFrom('maestro_boards')
+    .where('parent_id', '=', parentId)
     .execute()
     .catch((err) => {
-      logger.error("UartRepository.deleteMaestroModule", err);
+      logger.error('UartRepository.deleteMaestroModule', err);
       throw err;
     });
 }
@@ -433,12 +415,12 @@ export async function readMaestroChannel(
   id: string,
 ): Promise<MaestroChannel> {
   const channel = await db
-    .selectFrom("maestro_channels")
+    .selectFrom('maestro_channels')
     .selectAll()
-    .where("id", "=", id)
+    .where('id', '=', id)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error("UartRepository.readMaestroChannel", err);
+      logger.error('UartRepository.readMaestroChannel', err);
       throw err;
     });
 
