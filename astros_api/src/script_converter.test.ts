@@ -413,10 +413,10 @@ function coreGenericSeriaScriptCh(scriptId: string): ScriptChannel {
       scriptCh.id,
       ModuleType.uart,
       ModuleSubType.genericSerial,
-      i * 10,
+      i,
       evt,
     );
-    scriptCh.events[i * 1000] = sevt;
+    scriptCh.events[uuid()] = sevt;
   }
 
   return scriptCh;
@@ -450,10 +450,10 @@ function domeGenericSerialScriptCh(scriptId: string): ScriptChannel {
         scriptCh.id,
         ModuleType.uart,
         ModuleSubType.genericSerial,
-        i * 10,
+        i,
         evt,
       );
-      scriptCh.events[i * 1000] = sevt;
+      scriptCh.events[uuid()] = sevt;
     }
   }
 
@@ -482,10 +482,10 @@ function domeI2cScriptCh(scriptId: string): ScriptChannel {
         scriptCh.id,
         ModuleType.i2c,
         ModuleSubType.genericI2C,
-        i * 10,
+        i,
         evt,
       );
-      scriptCh.events[i * 1000] = sevt;
+      scriptCh.events[uuid()] = sevt;
     }
   }
 

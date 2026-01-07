@@ -187,8 +187,8 @@ export class ScriptConverter {
     for (const key in channel.events) {
       const evt = channel.events[key] as ScriptEvent;
 
-      // convert from 10ths of a second to ms
-      evt.time = evt.time * 100;
+      // convert from seconds to ms
+      evt.time = evt.time * 1000;
 
       if (map.has(locationId)) {
         if (map.get(locationId)?.has(evt.time)) {

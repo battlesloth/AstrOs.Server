@@ -82,15 +82,23 @@ export class ScriptRepository {
     script.scriptName = script.scriptName + ' - copy';
     for (const ch of script.scriptChannels) {
       ch.id = Guid.create().toString();
-      for (const key in ch.events) {
-        ch.events[key].scriptChannel = ch.id;
+
+      const events = [...Object.values(ch.events)];
+
+      ch.events = {};
+      for (const evt of events) {
+        evt.id = Guid.create().toString();
+        evt.scriptChannel = ch.id;
+        ch.events[evt.id] = evt;
       }
     }
+
     script.deploymentStatus = {};
     script.lastSaved = new Date();
 
     await this.upsertScript(script).catch((err: any) => {
       logger.error(`Exception saving copy script for ${id} => ${err}`);
+      throw err;
     });
 
     result = new Script(
@@ -349,7 +357,7 @@ export class ScriptRepository {
         script_channel_id: channelId,
         module_type: evt.moduleType,
         module_sub_type: evt.moduleSubType,
-        time: evt.time,
+        time: Math.round(evt.time * 10), // stored as integer scaled storage to 0.1s
         data: JSON.stringify(evt.event),
       })
       .execute()
@@ -390,7 +398,7 @@ export class ScriptRepository {
         evt.script_channel_id,
         evt.module_type,
         subtype,
-        evt.time,
+        evt.time / 10, // stored as integer scaled storage to 0.1s
         scriptEventType,
       );
 
