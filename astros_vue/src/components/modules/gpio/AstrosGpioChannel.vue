@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { type PropType } from 'vue';
 import type { GpioChannel } from '@/models/controllers/modules/gpio/gpioChannel';
 
+const channel = defineModel<GpioChannel>('channel', { required: true });
+
 // Props
-const props = defineProps({
-  channel: {
-    type: Object as PropType<GpioChannel>,
-    required: true,
-  },
+defineProps({
   parentTestId: {
     type: String,
     required: true,

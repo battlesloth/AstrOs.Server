@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, type PropType, type Component } from 'vue';
+import { computed, type PropType, type Component } from 'vue';
 import { ModuleType } from '@/enums/modules/ModuleType';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import type { I2cModule } from '@/models/controllers/modules/i2c/i2cModule';
@@ -8,11 +8,9 @@ import { Location } from '@/enums/modules/Location';
 import AstrosGenericI2cModule from './submodules/AstrosGenericI2cModule.vue';
 import AstrosPca9685Module from './submodules/AstrosPca9685Module.vue';
 
+const module = defineModel<I2cModule>('module', { required: true });
+
 const props = defineProps({
-  module: {
-    type: Object as PropType<I2cModule>,
-    required: true,
-  },
   locationId: {
     type: String as PropType<Location>,
     required: true,
@@ -33,10 +31,10 @@ const emit = defineEmits<{
   toggleModule: [moduleId: string];
 }>();
 
-const isOpen = computed(() => props.openModuleId === props.module.id);
+const isOpen = computed(() => props.openModuleId === module.value.id);
 
 const subtypeName = computed(() => {
-  switch (props.module.moduleSubType) {
+  switch (module.value.moduleSubType) {
     case ModuleSubType.GENERIC_I2C:
       return 'i2c.generic';
     case ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C:
@@ -49,7 +47,7 @@ const subtypeName = computed(() => {
 });
 
 const subModuleComponent = computed<Component | null>(() => {
-  switch (props.module.moduleSubType) {
+  switch (module.value.moduleSubType) {
     case ModuleSubType.GENERIC_I2C:
       return AstrosGenericI2cModule;
     case ModuleSubType.HUMAN_CYBORG_RELATIONS_I2C:
@@ -60,26 +58,26 @@ const subModuleComponent = computed<Component | null>(() => {
   }
 });
 
-const nameClicked = (evt: MouseEvent) => {
-  evt.stopPropagation();
-};
+//const nameClicked = (evt: MouseEvent) => {
+//  evt.stopPropagation();
+//};
 
 const removeModule = (event: Event) => {
   event.stopPropagation();
   emit('removeModule', {
     locationId: props.locationId,
-    id: props.module.id,
+    id: module.value.id,
     moduleType: ModuleType.I2C,
   });
 };
 
 const toggleCollapse = () => {
-  emit('toggleModule', props.module.id);
+  emit('toggleModule', module.value.id);
 };
 
 const onI2cAddressChanged = (value: string) => {
   emit('i2cAddressChanged', {
-    old: props.module.i2cAddress,
+    old: module.value.i2cAddress,
     new: parseInt(value, 10),
   });
 };

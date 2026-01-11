@@ -67,6 +67,7 @@ export function useWebsocket() {
   function handleMessage(message: string) {
     const parsedMessage = JSON.parse(message) as BaseWsMessage;
 
+    console.log('WebSocket message received:', parsedMessage.type);
     switch (parsedMessage.type) {
       case WebsocketMessageType.CONTROLLERS_SYNC:
         handleSyncMessage(parsedMessage);
@@ -76,6 +77,7 @@ export function useWebsocket() {
         break;
       case WebsocketMessageType.SCRIPT:
         handleScriptMessage(parsedMessage);
+        break;
       default:
         console.warn('Unhandled message type:', message);
         break;

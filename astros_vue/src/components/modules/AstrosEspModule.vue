@@ -116,7 +116,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
     >
       <div
         :data-testid="`${parentTestId}-serial-header`"
-        class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
+        class="collapse-title flex items-center justify-between pr-12 cursor-pointer bg-blue-200"
         @click="openPanel = openPanel === 'uart' ? null : 'uart'"
       >
         <h3 class="font-medium">{{ $t('esp.serial_modules') }}</h3>
@@ -129,7 +129,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
           <span class="text-lg">+</span>
         </button>
       </div>
-      <div class="collapse-content">
+      <div class="collapse-content bg-blue-200">
         <ul
           v-if="location?.uartModules"
           class="space-y-2 max-h-96 overflow-y-scroll p-0"
@@ -160,7 +160,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
     >
       <div
         :data-testid="`${parentTestId}-i2c-header`"
-        class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
+        class="collapse-title flex items-center justify-between pr-12 cursor-pointer bg-blue-200"
         @click="openPanel = openPanel === 'i2c' ? null : 'i2c'"
       >
         <h3 class="font-medium">{{ $t('esp.i2c_modules') }}</h3>
@@ -173,20 +173,20 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
           <span class="text-lg">+</span>
         </button>
       </div>
-      <div class="collapse-content">
+      <div class="collapse-content bg-blue-200">
         <ul
           v-if="location?.i2cModules"
           class="space-y-2 max-h-96 overflow-y-scroll p-0"
         >
           <li
-            v-for="module in location.i2cModules"
+            v-for="(module, index) in location.i2cModules"
             :key="module.id"
           >
             <AstrosI2cModule
+              v-model:module="location.i2cModules[index]!"
               @remove-module="removeModule"
               @i2c-address-changed="i2cAddressChanged"
               @toggle-module="toggleI2cModule"
-              :module="module"
               :location-id="props.locationEnum"
               :parent-test-id="parentTestId"
               :open-module-id="openI2cModuleId"
@@ -203,26 +203,28 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
     >
       <div
         :data-testid="`${parentTestId}-gpio-header`"
-        class="collapse-title cursor-pointer"
+        class="collapse-title cursor-pointer bg-blue-200"
         @click="openPanel = openPanel === 'gpio' ? null : 'gpio'"
       >
         <h3 class="font-medium">{{ $t('esp.gpio_config') }}</h3>
       </div>
-      <div class="collapse-content">
-        <ul
+      <div class="collapse-content bg-blue-200">
+        <div
           v-if="location?.gpioModule"
-          class="space-y-2 max-h-96 overflow-y-scroll p-0"
+          class="p-5 bg-white rounded-3xl border border-base-300"
         >
-          <li
-            v-for="channel in location.gpioModule.channels"
-            :key="channel.id"
-          >
-            <AstrosGpioChannel
-              :channel="channel"
-              :parent-test-id="parentTestId"
-            />
-          </li>
-        </ul>
+          <ul class="space-y-2 max-h-98 overflow-y-scroll p-0">
+            <li
+              v-for="(channel, index) in location.gpioModule.channels"
+              :key="channel.id"
+            >
+              <AstrosGpioChannel
+                v-model:channel="location.gpioModule.channels[index]!"
+                :parent-test-id="parentTestId"
+              />
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>

@@ -1,5 +1,5 @@
-import type { ScriptChannelType } from "@/enums";
-import type { ScriptEvent } from "../scripts/scriptEvent";
+import type { ScriptChannelType } from '@/enums';
+import type { ScriptEvent } from '../scripts/scriptEvent';
 
 export interface Channel {
   //chNum: number;

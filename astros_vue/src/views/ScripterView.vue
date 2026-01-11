@@ -168,7 +168,10 @@ function doRemoveEvent() {
 }
 
 function testChannel() {}
-function scriptTest() {}
+
+function scriptTest() {
+  showModal.value = ModalType.SCRIPT_TEST;
+}
 
 async function saveScript() {
   const result = await scripterStore.saveScript();
@@ -314,9 +317,9 @@ onMounted(async () => {
       />
 
       <AstrosScriptTestModal
-        v-if="showModal === ModalType.SCRIPT_TEST"
+        v-if="showModal === ModalType.SCRIPT_TEST && scripterStore.script"
         @close="showModal = ModalType.CLOSE_ALL"
-        :script-id="''"
+        :script-id="scripterStore.script.id"
       />
       <AstrosChannelTestModal
         v-if="showModal === ModalType.CHANNEL_TEST"

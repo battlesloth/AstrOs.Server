@@ -3,7 +3,6 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { AstrosLayout, AstrosScriptRow } from '@/components';
 import { useToast } from '@/composables/useToast';
-import type { Script } from '@/models';
 import { useScriptsStore } from '@/stores/scripts';
 import { UploadStatus } from '@/enums';
 
@@ -87,54 +86,6 @@ const setUploadingStatus = (scriptId: string) => {
       status.value = UploadStatus.UPLOADING;
     }
   }
-};
-
-const getUploadStatus = (script: Script, locationId: string) => {
-  let dateString = 'Not Uploaded';
-  let statusClass = 'bg-red-900 text-white';
-
-  console.log('scrip', script);
-
-  const status = script.deploymentStatus[locationId];
-
-  if (!status) {
-    return { class: statusClass, text: dateString };
-  }
-
-  let uploadStatus = status.value;
-
-  if (status.value) {
-    const uploaddate = new Date(status.date || '1970-01-01T00:00:00Z');
-    const scriptdate = new Date(script.lastSaved);
-    if (uploaddate < scriptdate) {
-      uploadStatus = UploadStatus.NOT_UPLOADED;
-      dateString = 'Out of date';
-    } else {
-      dateString = uploaddate.toLocaleDateString(navigator.language, {
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: 'numeric',
-      });
-    }
-  }
-
-  switch (uploadStatus) {
-    case UploadStatus.UPLOADED:
-      statusClass = 'bg-green-600 text-white';
-      break;
-    case UploadStatus.UPLOADING:
-      statusClass = 'bg-yellow-600 text-black';
-      dateString = 'Uploading...';
-      break;
-    case UploadStatus.NOT_UPLOADED:
-    default:
-      statusClass = 'bg-red-900 text-white';
-      break;
-  }
-
-  return { class: statusClass, text: dateString };
 };
 
 const editScript = (id: string) => {

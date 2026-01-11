@@ -1,35 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { TransmissionStatus } from '@/enums/transmissionStatus';
-import type { DeploymentLocation, ScriptResponse } from '@/models/scripts/scriptTest';
-import { AstrOsConstants } from '@/models/scripts/scriptTest';
+import { UploadStatus, Location } from '@/enums';
+import { useScriptsStore } from '@/stores/scripts';
+import { useLocationStore } from '@/stores/location';
 
 interface Caption {
   str: string;
 }
 
-const locations = ref<DeploymentLocation[]>([]);
-
-async function onUploadScript(scriptId: string): Promise<void> {
-  // Placeholder function for uploading script
-  console.log(`Uploading script with ID: ${scriptId}`);
-}
-
-async function onRunScript(scriptId: string): Promise<void> {
-  // Placeholder function for running script
-  console.log(`Running script with ID: ${scriptId}`);
-}
-
 const props = defineProps<{
-  scriptId: string;
-  //locations: DeploymentLocation[];
-  //onUploadScript?: (scriptId: string) => Promise<void>;
-  //onRunScript?: (scriptId: string) => Promise<void>;
-  //websocketMessages?: any; // Observable or event emitter for websocket messages
+  scriptId: string | undefined;
 }>();
 
 const emit = defineEmits<{
-  (e: 'run', scriptId: string): void;
   (e: 'close'): void;
 }>();
 
@@ -46,11 +30,77 @@ const coreCaption = ref<Caption>({ str: 'Uploading' });
 const domeCaption = ref<Caption>({ str: 'Uploading' });
 const bodyCaption = ref<Caption>({ str: 'Uploading' });
 
-const websocketSubscription: any = null;
+const locationsStore = useLocationStore();
+const scriptStore = useScriptsStore();
+
+const script = computed(() => scriptStore.scripts.find((s) => s.id === props.scriptId));
 
 const canRun = computed(() => {
   return !uploadInProgress.value && !runDisabled.value;
 });
+
+const convertUploadStatusToTransmission = (
+  uploadStatus: UploadStatus | undefined,
+): TransmissionStatus => {
+  if (uploadStatus === undefined) return TransmissionStatus.FAILED;
+
+  switch (uploadStatus) {
+    case UploadStatus.NOT_UPLOADED:
+      return TransmissionStatus.FAILED;
+    case UploadStatus.UPLOADING:
+      return TransmissionStatus.SENDING;
+    case UploadStatus.UPLOADED:
+      return TransmissionStatus.SUCCESS;
+    default:
+      return TransmissionStatus.FAILED;
+  }
+};
+
+// Watch the script's deployment status and update UI accordingly
+watch(
+  () => script.value?.deploymentStatus,
+  (deploymentStatus) => {
+    if (!deploymentStatus) return;
+
+    // Update Body status
+    const bodyStatus = deploymentStatus[Location.BODY];
+    if (bodyStatus) {
+      bodyUpload.value = convertUploadStatusToTransmission(bodyStatus.value);
+      setCaption(bodyCaption.value, bodyUpload.value);
+    }
+
+    // Update Core status
+    const coreStatus = deploymentStatus[Location.CORE];
+    if (coreStatus) {
+      coreUpload.value = convertUploadStatusToTransmission(coreStatus.value);
+      setCaption(coreCaption.value, coreUpload.value);
+    }
+
+    // Update Dome status
+    const domeStatus = deploymentStatus[Location.DOME];
+    if (domeStatus) {
+      domeUpload.value = convertUploadStatusToTransmission(domeStatus.value);
+      setCaption(domeCaption.value, domeUpload.value);
+    }
+
+    // Check if all uploads are complete
+    if (
+      coreUpload.value > TransmissionStatus.SENDING &&
+      domeUpload.value > TransmissionStatus.SENDING &&
+      bodyUpload.value > TransmissionStatus.SENDING
+    ) {
+      status.value = 'Upload Complete.';
+      uploadInProgress.value = false;
+      if (
+        coreUpload.value + domeUpload.value + bodyUpload.value >=
+        TransmissionStatus.SUCCESS * 3
+      ) {
+        runDisabled.value = false;
+      }
+    }
+  },
+  { deep: true },
+);
 
 const setInitialUploadStatus = (hasBody: boolean, hasCore: boolean, hasDome: boolean) => {
   if (hasBody) {
@@ -86,86 +136,22 @@ const setCaption = (caption: Caption, uploadStatus: TransmissionStatus) => {
     case TransmissionStatus.FAILED:
       caption.str = 'Failed';
       break;
-  }
-};
-
-const statusUpdate = (msg: ScriptResponse) => {
-  console.log('message', msg);
-
-  const location = locations.value.find((loc) => loc.id === msg.locationId);
-
-  if (!location) {
-    console.warn(`Location with ID ${msg.locationId} not found.`);
-    return;
-  }
-
-  switch (location.id) {
-    case AstrOsConstants.BODY:
-      bodyUpload.value = msg.status;
-      setCaption(bodyCaption.value, msg.status);
+    case TransmissionStatus.SENDING:
+      caption.str = 'Uploading';
       break;
-    case AstrOsConstants.CORE:
-      coreUpload.value = msg.status;
-      setCaption(coreCaption.value, msg.status);
-      break;
-    case AstrOsConstants.DOME:
-      domeUpload.value = msg.status;
-      setCaption(domeCaption.value, msg.status);
-      break;
-  }
-
-  if (
-    coreUpload.value > TransmissionStatus.SENDING &&
-    domeUpload.value > TransmissionStatus.SENDING &&
-    bodyUpload.value > TransmissionStatus.SENDING
-  ) {
-    status.value = 'Upload Complete.';
-    uploadInProgress.value = false;
-    if (coreUpload.value + domeUpload.value + bodyUpload.value >= TransmissionStatus.SUCCESS * 3) {
-      runDisabled.value = false;
-    }
   }
 };
 
 onMounted(async () => {
-  let hasBody = false;
-  let hasCore = false;
-  let hasDome = false;
-
-  locations.value.forEach((location: DeploymentLocation) => {
-    switch (location.name) {
-      case AstrOsConstants.BODY:
-        hasBody = true;
-        break;
-      case AstrOsConstants.CORE:
-        hasCore = true;
-        break;
-      case AstrOsConstants.DOME:
-        hasDome = true;
-        break;
-    }
-  });
+  const hasBody = !!locationsStore.bodyLocation?.controller.address;
+  const hasCore = !!locationsStore.coreLocation?.controller.address;
+  const hasDome = !!locationsStore.domeLocation?.controller.address;
 
   setInitialUploadStatus(hasBody, hasCore, hasDome);
 
-  // Subscribe to websocket messages if provided
-  /*if (websocketMessages) {
-    websocketSubscription = props.websocketMessages.subscribe((msg: any) => {
-      if (msg && typeof msg === 'object' && 'type' in msg) {
-        // Assuming TransmissionType.script is 0
-        if (msg.type === 0) {
-          statusUpdate(msg as ScriptResponse);
-        }
-      }
-    
-    
-   });
-  }
-  */
-  // Upload the script
   if (props.scriptId) {
     try {
-      await onUploadScript(props.scriptId);
+      await scriptStore.uploadScript(props.scriptId);
     } catch (err) {
       console.error(err);
       status.value = 'Error requesting Script Upload';
@@ -181,17 +167,9 @@ onMounted(async () => {
   }
 });
 
-onUnmounted(() => {
-  if (websocketSubscription) {
-    websocketSubscription.unsubscribe();
-  }
-});
-
 const runClicked = async () => {
   console.log(`Running script: ${props.scriptId}`);
-  await onRunScript(props.scriptId);
-
-  emit('run', props.scriptId);
+  await scriptStore.runScript(props.scriptId!);
   closeModal();
 };
 
