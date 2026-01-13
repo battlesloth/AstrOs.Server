@@ -105,6 +105,10 @@ const removeChannel = (chId: string) => {
   doRemoveChannel(chId);
 };
 
+const swapChannel = (chA: Channel, chB: Channel) => {
+  doSwapChannel(chA, chB);
+};
+
 const addEvent = (event: ScriptEvent, scriptChannelType: ScriptChannelType) => {
   doAddEvent(event, scriptChannelType);
 };
@@ -122,6 +126,7 @@ defineExpose({
   initializePixi,
   addChannel,
   removeChannel,
+  swapChannel,
   addEvent,
   removeEvent,
   updateEvent,
@@ -134,7 +139,7 @@ defineExpose({
 const emit = defineEmits<{
   (e: 'addChannel'): void;
   (e: 'removeChannel', chId: string, name: string): void;
-  (e: 'swapChannel', chId: string): void;
+  (e: 'swapChannel', chId: string, type: ScriptChannelType): void;
   (e: 'testChannel', chId: string): void;
   (e: 'addEvent', chlId: string, time: number): void;
   (e: 'removeEvent', chlId: string, eventId: number): void;
@@ -148,8 +153,8 @@ function emitChannelDelete(chId: string, name: string) {
   emit('removeChannel', chId, name);
 }
 
-function emitChannelSwap(chId: string) {
-  emit('swapChannel', chId);
+function emitChannelSwap(chId: string, type: ScriptChannelType) {
+  emit('swapChannel', chId, type);
 }
 
 function emitChannelTest(chId: string) {
@@ -664,6 +669,29 @@ function doRemoveChannel(chId: string) {
       background.clear().rect(0, 0, CHANNEL_LIST_WIDTH, app.value.screen.height).fill(0x2a2a2a);
     }
   }
+}
+
+function doSwapChannel(chA: Channel, chB: Channel) {
+  const indexA = channels.value.findIndex((ch) => ch.id === chA.id);
+  const indexB = channels.value.findIndex((ch) => ch.id === chB.id);
+
+  if (indexA === -1) {
+    console.error('Channels not found for swap:', chA.id, chB.id);
+    return;
+  }
+
+  channels.value[indexA]!.name = chB.name;
+
+  channelListContainer.value?.updateChannel(chA.id, chB.name);
+
+  if (indexB === -1) {
+    console.log('swapped Channel A out for Channel B');
+    return;
+  }
+
+  channels.value[indexB]!.name = chA.name;
+
+  channelListContainer.value?.updateChannel(chB.id, chA.name);
 }
 
 function doAddEvent(event: ScriptEvent, scriptChannelType: ScriptChannelType) {

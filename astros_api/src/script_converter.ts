@@ -128,6 +128,7 @@ export class ScriptConverter {
     const result = new Map<string, string>();
     const eventMap = new Map<string, Map<number, Array<ScriptEvent>>>();
 
+    this.scriptChannerlGpioChannelMap.clear();
     this.scriptChannelModuleMap.clear();
     this.modulesMap.clear();
 
@@ -135,6 +136,8 @@ export class ScriptConverter {
       this.locationIds = await this.scriptRepo.getLocationIds();
       this.modulesMap = await this.scriptRepo.getModules();
       const script = await this.scriptRepo.getScript(scriptId);
+
+      this.scriptChannerlGpioChannelMap = await this.scriptRepo.getGpioChannelMap();
 
       // sort events by the location id and time
       for (const ch of script.scriptChannels) {

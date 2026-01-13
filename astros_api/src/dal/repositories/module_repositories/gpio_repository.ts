@@ -1,22 +1,44 @@
-import { Kysely } from "kysely";
-import { Database } from "../../types.js";
-import { logger } from "../../../logger.js";
-import { GpioModule, GpioChannel } from "astros-common";
+import { Kysely } from 'kysely';
+import { Database } from '../../types.js';
+import { logger } from '../../../logger.js';
+import { GpioModule, GpioChannel } from 'astros-common';
 
-export async function getGpioModule(
-  db: Kysely<Database>,
-  locationId: string,
-): Promise<GpioModule> {
+export async function getAllActiveGpioChannels(db: Kysely<Database>): Promise<GpioChannel[]> {
+  const gpioData = await db
+    .selectFrom('gpio_channels')
+    .selectAll()
+    .where('enabled', '=', 1)
+    .orderBy('location_id')
+    .execute()
+    .catch((err) => {
+      logger.error('GpioRepository.getAllActiveGpioChannels', err);
+      throw err;
+    });
+
+  return gpioData.map(
+    (m: any) =>
+      new GpioChannel(
+        m.id,
+        m.location_id,
+        m.channel_number,
+        m.enabled > 0,
+        m.name,
+        m.default_high > 0,
+      ),
+  );
+}
+
+export async function getGpioModule(db: Kysely<Database>, locationId: string): Promise<GpioModule> {
   const module = new GpioModule(locationId);
 
   const gpioData = await db
-    .selectFrom("gpio_channels")
+    .selectFrom('gpio_channels')
     .selectAll()
-    .where("location_id", "=", locationId)
-    .orderBy("channel_number")
+    .where('location_id', '=', locationId)
+    .orderBy('channel_number')
     .execute()
     .catch((err) => {
-      logger.error("GpioRepository.getGpioModule", err);
+      logger.error('GpioRepository.getGpioModule', err);
       throw err;
     });
 
@@ -34,13 +56,10 @@ export async function getGpioModule(
   return module;
 }
 
-export async function upsertGpioModule(
-  db: Kysely<Database>,
-  module: GpioModule,
-) {
+export async function upsertGpioModule(db: Kysely<Database>, module: GpioModule) {
   for (const gpio of module.channels) {
     await db
-      .insertInto("gpio_channels")
+      .insertInto('gpio_channels')
       .values({
         id: gpio.id,
         location_id: module.locationId,
@@ -50,33 +69,30 @@ export async function upsertGpioModule(
         enabled: gpio.enabled ? 1 : 0,
       })
       .onConflict((c) =>
-        c.column("id").doUpdateSet((eb) => ({
-          location_id: eb.ref("excluded.location_id"),
-          channel_number: eb.ref("excluded.channel_number"),
-          name: eb.ref("excluded.name"),
-          default_high: eb.ref("excluded.default_high"),
-          enabled: eb.ref("excluded.enabled"),
+        c.column('id').doUpdateSet((eb) => ({
+          location_id: eb.ref('excluded.location_id'),
+          channel_number: eb.ref('excluded.channel_number'),
+          name: eb.ref('excluded.name'),
+          default_high: eb.ref('excluded.default_high'),
+          enabled: eb.ref('excluded.enabled'),
         })),
       )
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error("GpioRepository.upsertGpioModule", err);
+        logger.error('GpioRepository.upsertGpioModule', err);
         throw err;
       });
   }
 }
 
-export async function readGpioChannel(
-  db: Kysely<Database>,
-  id: string,
-): Promise<GpioChannel> {
+export async function readGpioChannel(db: Kysely<Database>, id: string): Promise<GpioChannel> {
   const ch = await db
-    .selectFrom("gpio_channels")
+    .selectFrom('gpio_channels')
     .selectAll()
-    .where("id", "=", id)
+    .where('id', '=', id)
     .executeTakeFirstOrThrow()
     .catch((err) => {
-      logger.error("GpioRepository.readGpioChannel", err);
+      logger.error('GpioRepository.readGpioChannel', err);
       throw err;
     });
 

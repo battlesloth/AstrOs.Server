@@ -11,7 +11,7 @@ export interface PixiChannelDataOptions {
   width: number;
   rowColor?: number;
   borderColor?: number;
-  onSwap?: (id: string) => void;
+  onSwap?: (id: string, type: ScriptChannelType) => void;
   onTest?: (id: string) => void;
   onDelete?: (id: string, name: string) => void;
 }
@@ -36,6 +36,7 @@ export class PixiChannelData extends Container {
   options: PixiChannelDataOptions;
 
   background: Graphics | null = null;
+  nameText: Container | null = null;
 
   constructor(options: PixiChannelDataOptions) {
     super();
@@ -47,14 +48,11 @@ export class PixiChannelData extends Container {
     this.options = options;
 
     this.background = new Graphics();
+
     this.setBackground();
     this.addChild(this.background);
 
-    const rowText = getTruncatedText(this.channelName, 0x000000, options.width - 20, 20);
-
-    rowText.x = 10;
-    rowText.y = 10;
-    this.addChild(rowText);
+    this.setNameText();
 
     const typeText = getText(this.getTypeName(this.channelType), 0x666666, 16);
     typeText.x = 10;
@@ -64,9 +62,9 @@ export class PixiChannelData extends Container {
     let xOffset = this.buttonXstart;
     const deleteButton = this.createButton(xOffset, (id, name) => options.onDelete?.(id, name));
     xOffset += this.buttonSize + this.buttonXspacing;
-    const testButton = this.createButton(xOffset, options.onTest);
+    const testButton = this.createButton(xOffset, (id) => options.onTest?.(id));
     xOffset += this.buttonSize + this.buttonXspacing;
-    const swapButton = this.createButton(xOffset, options.onSwap);
+    const swapButton = this.createButton(xOffset, (id) => options.onSwap?.(id, this.channelType));
 
     Assets.load('swapIcon').then((texture) => {
       this.addIcon(swapButton, texture);
@@ -82,6 +80,26 @@ export class PixiChannelData extends Container {
       this.addIcon(testButton, texture);
       this.addChild(testButton);
     });
+  }
+
+  updateChannel(name: string) {
+    this.channelName = name;
+
+    this.setNameText();
+  }
+
+  setNameText() {
+    if (this.nameText) {
+      this.removeChild(this.nameText);
+    }
+
+    this.nameText = new Container();
+    this.nameText.x = 10;
+    this.nameText.y = 10;
+
+    const text = getTruncatedText(this.channelName, 0x000000, this.options.width - 20, 20);
+    this.nameText.addChild(text);
+    this.addChild(this.nameText);
   }
 
   createButton(xOffset: number, callback?: (id: string, name: string) => void) {

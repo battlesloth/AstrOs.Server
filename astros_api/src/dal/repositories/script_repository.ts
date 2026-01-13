@@ -17,7 +17,11 @@ import { logger } from '../../logger.js';
 import { Guid } from 'guid-typescript';
 import { Database, ScriptsTable } from '../types.js';
 import { Kysely, Transaction } from 'kysely';
-import { getGpioModule, readGpioChannel } from './module_repositories/gpio_repository.js';
+import {
+  getAllActiveGpioChannels,
+  getGpioModule,
+  readGpioChannel,
+} from './module_repositories/gpio_repository.js';
 import {
   getUartModules,
   readKangarooChannel,
@@ -324,6 +328,17 @@ export class ScriptRepository {
     return channel;
   }
 
+  async getGpioChannelMap(): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+
+    const gpioChannels = await getAllActiveGpioChannels(this.db);
+
+    for (const gpio of gpioChannels) {
+      result.set(gpio.id, gpio.channelNumber);
+    }
+
+    return result;
+  }
   //#endregion
 
   //#region Channels Delete

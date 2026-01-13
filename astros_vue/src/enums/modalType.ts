@@ -14,8 +14,9 @@ export enum ModalType {
 
   // scripter view
   ADD_CHANNEL = 'addChannel',
-  SCRIPT_TEST = 'scriptTestModal',
   CHANNEL_TEST = 'channelTestModal',
+  SWAP_CHANNEL = 'swapChannelModal',
+  SCRIPT_TEST = 'scriptTestModal',
   GPIO_EVENT = 'gpioEventModal',
   HCR_EVENT = 'hcrEventModal',
   I2C_EVENT = 'i2cEventModal',

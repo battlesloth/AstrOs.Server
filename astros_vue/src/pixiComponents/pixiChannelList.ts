@@ -114,6 +114,13 @@ export class PixiChannelList extends Container {
     }
   }
 
+  updateChannel(chId: string, name: string) {
+    const row = this.channels.get(chId);
+    if (row) {
+      row.updateChannel(name);
+    }
+  }
+
   updateChannelIndex(channelId: string, newIdx: number) {
     const row = this.channels.get(channelId);
     if (row) {

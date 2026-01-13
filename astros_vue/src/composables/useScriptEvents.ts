@@ -5,7 +5,9 @@ import type {
   HumanCyborgRelationsEvent,
   I2cEvent,
   KangarooEvent,
+  MaestroChannel,
   MaestroEvent,
+  ModuleChannelType,
 } from '@/models';
 
 export function useScriptEvents() {
@@ -28,14 +30,16 @@ export function useScriptEvents() {
     }
   }
 
-  function getDefaultScriptEvent(moduleType: ModuleType, moduleSubType: ModuleSubType) {
+  function getDefaultScriptEvent(channel: ModuleChannelType) {
+    const moduleType: ModuleType = channel.moduleType;
+
     switch (moduleType) {
       case ModuleType.GPIO:
         return generateGpioEvent();
       case ModuleType.I2C:
         return generateI2cEvent();
       case ModuleType.UART:
-        return generateUartEvent(moduleSubType);
+        return generateUartEvent(channel);
     }
   }
 
@@ -52,8 +56,10 @@ export function useScriptEvents() {
   }
 
   function generateUartEvent(
-    moduleSubType: ModuleSubType,
+    channel: ModuleChannelType,
   ): GenericSerialEvent | HumanCyborgRelationsEvent | KangarooEvent | MaestroEvent {
+    const moduleSubType = channel.moduleSubType;
+
     switch (moduleSubType) {
       case ModuleSubType.GENERIC_SERIAL:
         return {
@@ -73,9 +79,11 @@ export function useScriptEvents() {
           ch2Position: 0,
         } as KangarooEvent;
       case ModuleSubType.MAESTRO:
+        const ch = channel as MaestroChannel;
+
         return {
-          channel: 0,
-          isServo: false,
+          channel: ch.channelNumber,
+          isServo: ch.isServo,
           position: 0,
           speed: 0,
           acceleration: 0,

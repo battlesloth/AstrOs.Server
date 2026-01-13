@@ -13,18 +13,9 @@ test.describe('Login Page', () => {
     await page.goto('/');
 
     await authenticateUser(page);
-    /*await page.getByRole('textbox', { name: 'username' }).click();
-    await page.getByRole('textbox', { name: 'username' }).fill('admin');
-    await page.getByRole('textbox', { name: 'password' }).click();
-    await page.getByRole('textbox', { name: 'password' }).fill('password');
-    await page.getByRole('button', { name: 'login' }).click();
-    await page.getByText('AstrOs').click();
-*/
 
     expect(page.url()).toBe('http://localhost:5173/');
     await expect(page).toHaveTitle('AstrOs');
     await expect(page.locator('[data-v-app]')).toBeVisible();
-
   });
-
 });

@@ -4,10 +4,11 @@ import { useScriptResources } from '@/composables/useScriptResources';
 import { useLocationStore } from './location';
 import apiService from '@/api/apiService';
 import { SCRIPTS } from '@/api/endpoints';
-import type { Script, ScriptChannel, ScriptEvent } from '@/models';
+import type { Channel, Script, ScriptChannel, ScriptChannelResource, ScriptEvent } from '@/models';
 import { ScriptChannelType, Location, UploadStatus } from '@/enums';
 import { v4 as uuid } from 'uuid';
 import { moduleChannelTypeFromSubType } from '@/models';
+import { useEventConverter } from '@/composables/useEventConverter';
 
 export const useScripterStore = defineStore('scripter', () => {
   const isLoading = ref(false);
@@ -15,6 +16,8 @@ export const useScripterStore = defineStore('scripter', () => {
   const script = ref<Script | null>(null);
 
   const locationsStore = useLocationStore();
+
+  const { convertEventsForChannelType } = useEventConverter();
 
   const {
     loadResources,
@@ -114,14 +117,14 @@ export const useScripterStore = defineStore('scripter', () => {
   }
 
   function addChannel(
-    id: string,
+    resourceId: string,
     channelType: ScriptChannelType,
   ): {
     success: boolean;
     id: string;
     name: string;
   } {
-    const resource = getScriptChannelResource(id, channelType);
+    const resource = getScriptChannelResource(resourceId, channelType);
     if (!resource || !script.value) return { success: false, id: '', name: '' };
 
     const newChannel: ScriptChannel = {
@@ -137,7 +140,7 @@ export const useScripterStore = defineStore('scripter', () => {
     };
 
     script.value.scriptChannels.push(newChannel);
-    setChannelAvailability(id, channelType, false);
+    setChannelAvailability(resourceId, channelType, false);
 
     return { success: true, id: newChannel.id, name: resource.name };
   }
@@ -159,6 +162,123 @@ export const useScripterStore = defineStore('scripter', () => {
     const resourceId = script.value.scriptChannels[index]!.moduleChannelId;
     script.value.scriptChannels.splice(index, 1);
     setChannelAvailability(resourceId, channelType, true);
+  }
+
+  function swapChannels(
+    chAResourceId: string,
+    chBResourceId: string,
+    chType: ScriptChannelType,
+  ): { success: boolean; error?: string; chA?: Channel; chB?: Channel } {
+    if (!script.value) {
+      return { success: false, error: 'No script loaded.' };
+    }
+
+    const resourceA = getScriptChannelResource(chAResourceId, chType);
+    const resourceB = getScriptChannelResource(chBResourceId, chType);
+
+    if (!resourceA || !resourceB) {
+      return {
+        success: false,
+        error: `Channel resource not found: ${resourceA ? `chBResourceId:${chBResourceId}` : resourceB ? `chAResourceId:${chAResourceId}` : `chAResourceId:${chAResourceId}, chBResourceId:${chBResourceId}`}`,
+      };
+    }
+
+    const idxA = script.value.scriptChannels.findIndex(
+      (ch) => ch.moduleChannel.id === resourceA.channel.id,
+    );
+    const idxB = script.value?.scriptChannels.findIndex(
+      (ch) => ch.moduleChannel.id === resourceB.channel.id,
+    );
+
+    if (idxA === undefined || idxA === -1) {
+      return { success: false, error: `Channel with id ${chAResourceId} not found in script.` };
+    }
+
+    if (idxB === undefined || idxB === -1) {
+      console.warn(
+        `Channel with id ${chBResourceId} not found in script. Assume we are swapping for an unused channel.`,
+      );
+      setChannelAvailability(chAResourceId, chType, true);
+      setChannelAvailability(chBResourceId, chType, false);
+      swapToUnusedChannel(idxA, resourceA, resourceB);
+    } else {
+      swapTwoChannels(idxA, resourceA, idxB, resourceB);
+    }
+
+    const chAId = script.value.scriptChannels[idxA]!.id;
+    let chBId: string = '';
+    if (idxB !== -1) {
+      chBId = script.value.scriptChannels[idxB]!.id;
+    }
+
+    return {
+      success: true,
+      chA: {
+        id: chAId,
+        name: resourceA.name,
+        channelType: resourceA.scriptChannelType,
+        events: [],
+      },
+      chB: {
+        id: chBId,
+        name: resourceB.name,
+        channelType: resourceB.scriptChannelType,
+        events: [],
+      },
+    };
+  }
+
+  function swapToUnusedChannel(
+    index: number,
+    original: ScriptChannelResource,
+    replacement: ScriptChannelResource,
+  ) {
+    updateChannelValues(index, original, replacement);
+  }
+
+  function swapTwoChannels(
+    idxA: number,
+    resourceA: ScriptChannelResource,
+    idxB: number,
+    resourceB: ScriptChannelResource,
+  ) {
+    updateChannelValues(idxA, resourceA, resourceB);
+    updateChannelValues(idxB, resourceB, resourceA);
+  }
+
+  function updateChannelValues(
+    index: number,
+    original: ScriptChannelResource,
+    replacement: ScriptChannelResource,
+  ) {
+    const events = script.value!.scriptChannels[index]!.events;
+
+    script.value!.scriptChannels[index]!.parentModuleId = replacement.parentModuleId;
+    script.value!.scriptChannels[index]!.moduleChannelId = replacement.channel.id;
+    script.value!.scriptChannels[index]!.channelType = replacement.scriptChannelType;
+    script.value!.scriptChannels[index]!.moduleChannelType = moduleChannelTypeFromSubType(
+      replacement.channel.moduleSubType,
+    );
+    script.value!.scriptChannels[index]!.moduleChannel = replacement.channel;
+
+    script.value!.scriptChannels[index]!.events = convertEventsForChannelType(
+      events,
+      original.channel.moduleSubType,
+      replacement.channel,
+    );
+  }
+
+  function getResourceIdByChannelId(channelId: string): { success: boolean; resourceId?: string } {
+    if (!script.value) {
+      return { success: false };
+    }
+
+    const channel = script.value.scriptChannels.find((ch) => ch.id === channelId);
+    if (!channel) {
+      return { success: false };
+    }
+
+    return { success: true, resourceId: channel.moduleChannel.id };
   }
 
   function addEventToChannel(
@@ -233,8 +353,10 @@ export const useScripterStore = defineStore('scripter', () => {
     getScriptChannelResource,
     addChannel,
     removeChannel,
+    swapChannels,
     getChannel,
     addEventToChannel,
     removeEventFromChannel,
+    getResourceIdByChannelId,
   };
 });

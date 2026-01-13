@@ -24,6 +24,7 @@ import type { AddChannelModalResponse, ScriptEvent, Channel } from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
 import { useToast } from '@/composables/useToast';
 import { v4 as uuid } from 'uuid';
+import AstrosChannelSwapModal from '@/components/modals/scripter/AstrosChannelSwapModal.vue';
 
 const scripter = useTemplateRef('scripter');
 
@@ -32,6 +33,8 @@ const modalAction = ref<() => void>(() => {});
 const modalMessage = ref<string>('Loading...');
 const scriptLoadFailed = ref<boolean>(false);
 
+const selectedChannelId = ref<string>('');
+const selectedChannelType = ref<ScriptChannelType>(ScriptChannelType.NONE);
 const selectedScriptEvent = ref<ScriptEvent | null>(null);
 const modalMode = ref<ModalMode>(ModalMode.ADD);
 
@@ -80,8 +83,38 @@ function doRemoveChannel(chId: string) {
   scripter.value?.removeChannel(chId);
 }
 
-function swapChannel() {}
-//function doSwapChannel() {}
+function swapChannel(id: string, chType: ScriptChannelType) {
+  const result = scripterStore.getResourceIdByChannelId(id);
+
+  if (!result.success) {
+    console.log(`Failed to get resource ID for channel ID ${id}`);
+    modalMessage.value = `Failed to get resource ID for channel. Open a bug report.`;
+    showModal.value = ModalType.ERROR;
+    return;
+  }
+
+  selectedChannelId.value = result.resourceId!;
+  selectedChannelType.value = chType;
+  showModal.value = ModalType.SWAP_CHANNEL;
+}
+
+function doSwapChannel(payload: { oldId: string; newId: string; chType: ScriptChannelType }) {
+  console.log(payload);
+  modalMessage.value = 'Swapping Channels...';
+  showModal.value = ModalType.INTERRUPT;
+
+  const result = scripterStore.swapChannels(payload.oldId, payload.newId, payload.chType);
+  if (!result.success) {
+    modalMessage.value = `Failed to swap channel: ${result.error}`;
+    showModal.value = ModalType.ERROR;
+    return;
+  }
+
+  scripter.value?.swapChannel(result.chA!, result.chB!);
+
+  showModal.value = ModalType.CLOSE_ALL;
+  modalMessage.value = '';
+}
 
 function addEvent(chId: string, time: number) {
   modalMode.value = ModalMode.ADD;
@@ -98,10 +131,7 @@ function addEvent(chId: string, time: number) {
     moduleType: channel.moduleChannel.moduleType,
     moduleSubType: channel.moduleChannel.moduleSubType,
     time: time,
-    event: getDefaultScriptEvent(
-      channel.moduleChannel.moduleType,
-      channel.moduleChannel.moduleSubType,
-    ),
+    event: getDefaultScriptEvent(channel.moduleChannel),
   };
 
   showModal.value = eventTypeToModalType(channel.channelType);
@@ -314,6 +344,13 @@ onMounted(async () => {
         v-if="showModal === ModalType.ADD_CHANNEL"
         @close="showModal = ModalType.CLOSE_ALL"
         @add-channel="doAddChannel"
+      />
+      <AstrosChannelSwapModal
+        v-if="showModal === ModalType.SWAP_CHANNEL"
+        @close="showModal = ModalType.CLOSE_ALL"
+        @confirm="doSwapChannel"
+        :current-channel="selectedChannelId"
+        :channel-type="selectedChannelType"
       />
 
       <AstrosScriptTestModal

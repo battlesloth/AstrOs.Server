@@ -160,53 +160,53 @@ export function useScriptResources() {
   }
 
   function getScriptChannelResource(
-    id: string,
+    resourceId: string,
     scriptChannelType: ScriptChannelType,
   ): ScriptChannelResource | undefined {
     switch (scriptChannelType) {
       case ScriptChannelType.GENERIC_I2C:
-        return genericI2cChannels.value.get(id);
+        return genericI2cChannels.value.get(resourceId);
       case ScriptChannelType.GENERIC_UART:
-        return genericSerialChannels.value.get(id);
+        return genericSerialChannels.value.get(resourceId);
       case ScriptChannelType.SERVO:
-        return servoChannels.value.get(id);
+        return servoChannels.value.get(resourceId);
       case ScriptChannelType.GPIO:
-        return gpioChannels.value.get(id);
+        return gpioChannels.value.get(resourceId);
       case ScriptChannelType.KANGAROO:
-        return kangarooChannels.value.get(id);
+        return kangarooChannels.value.get(resourceId);
       case ScriptChannelType.AUDIO:
-        return audioChannels.value.get(id);
+        return audioChannels.value.get(resourceId);
       default:
         return undefined;
     }
   }
 
   function setChannelAvailability(
-    id: string,
+    resourceId: string,
     scriptChannelType: ScriptChannelType,
     available: boolean,
   ) {
     console.log(
-      `Setting availability of channel ${id} of type ${ScriptChannelType[scriptChannelType]} to ${available}`,
+      `Setting availability of channel ${resourceId} of type ${ScriptChannelType[scriptChannelType]} to ${available}`,
     );
     switch (scriptChannelType) {
       case ScriptChannelType.GENERIC_I2C:
-        genericI2cChannels.value.get(id)!.available = available;
+        genericI2cChannels.value.get(resourceId)!.available = available;
         break;
       case ScriptChannelType.GENERIC_UART:
-        genericSerialChannels.value.get(id)!.available = available;
+        genericSerialChannels.value.get(resourceId)!.available = available;
         break;
       case ScriptChannelType.SERVO:
-        servoChannels.value.get(id)!.available = available;
+        servoChannels.value.get(resourceId)!.available = available;
         break;
       case ScriptChannelType.GPIO:
-        gpioChannels.value.get(id)!.available = available;
+        gpioChannels.value.get(resourceId)!.available = available;
         break;
       case ScriptChannelType.KANGAROO:
-        kangarooChannels.value.get(id)!.available = available;
+        kangarooChannels.value.get(resourceId)!.available = available;
         break;
       case ScriptChannelType.AUDIO:
-        audioChannels.value.get(id)!.available = available;
+        audioChannels.value.get(resourceId)!.available = available;
         break;
     }
   }
