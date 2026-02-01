@@ -1,5 +1,4 @@
 export { default as AstrosAddChannelModal } from './AstrosAddChannelModal.vue';
-export { default as AstrosChannelTestModal } from './AstrosChannelTestModal.vue';
 export { default as AstrosGpioEventModal } from './AstrosGpioEventModal.vue';
 export { default as AstrosHumanCyborgModal } from './AstrosHumanCyborgModal.vue';
 export { default as AstrosI2cEventModal } from './AstrosI2cEventModal.vue';

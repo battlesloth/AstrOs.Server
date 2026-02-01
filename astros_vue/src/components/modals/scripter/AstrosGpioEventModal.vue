@@ -100,7 +100,10 @@ const closeModal = () => {
       <div class="py-4 flex flex-row">
         <div class="grow"></div>
         <div class="w-75">
-          <div class="mb-2">
+          <div
+            class="mb-2"
+            v-if="mode !== ModalMode.TEST"
+          >
             <label
               for="time"
               class="block w-full mb-0.5 text-lg"
@@ -149,7 +152,7 @@ const closeModal = () => {
           data-testid="save-button"
           @click="addEvent"
         >
-          Save
+          {{ mode !== ModalMode.TEST ? $t('Save') : $t('Test') }}
         </button>
         <button
           v-if="showRemoveButton"
@@ -157,14 +160,14 @@ const closeModal = () => {
           data-testid="remove-button"
           @click="removeEvent"
         >
-          Remove
+          {{ $t('Remove') }}
         </button>
         <button
           class="btn w-24 text-lg"
           data-testid="close-button"
           @click="closeModal"
         >
-          Close
+          {{ $t('Close') }}
         </button>
       </div>
     </div>
@@ -173,7 +176,7 @@ const closeModal = () => {
       class="modal-backdrop"
       @click="closeModal"
     >
-      <button>Close</button>
+      <button>{{ $t('Close') }}</button>
     </form>
   </dialog>
 </template>

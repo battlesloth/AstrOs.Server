@@ -6,3 +6,4 @@ export * from './scriptChannelResource';
 export * from './scriptChannelValue';
 export * from './scriptEventModalResponse';
 export * from './channel';
+export * from './channelTestValue';

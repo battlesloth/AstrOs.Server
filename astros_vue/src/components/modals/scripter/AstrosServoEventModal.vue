@@ -112,12 +112,12 @@ const closeModal = () => {
 </script>
 
 <template>
-  <div class="modal modal-open">
+  <dialog class="modal modal-open">
     <div class="modal-box max-w-md">
       <h3 class="text-lg font-bold mb-4">Servo Event</h3>
 
       <div class="space-y-4">
-        <div>
+        <div v-if="mode !== ModalMode.TEST">
           <label
             for="time"
             class="label"
@@ -204,22 +204,29 @@ const closeModal = () => {
           class="btn btn-primary"
           @click="saveEvent"
         >
-          Save
+          {{ mode !== ModalMode.TEST ? $t('Save') : $t('Test') }}
         </button>
         <button
           v-if="mode === ModalMode.EDIT"
           class="btn btn-error"
           @click="removeEvent"
         >
-          Remove
+          {{ $t('Remove') }}
         </button>
         <button
           class="btn"
           @click="closeModal"
         >
-          Close
+          {{ $t('Close') }}
         </button>
       </div>
     </div>
-  </div>
+    <form
+      method="dialog"
+      class="modal-backdrop"
+      @click="closeModal"
+    >
+      <button>{{ $t('Close') }}</button>
+    </form>
+  </dialog>
 </template>

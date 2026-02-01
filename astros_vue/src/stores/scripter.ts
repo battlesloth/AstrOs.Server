@@ -9,6 +9,7 @@ import { ScriptChannelType, Location, UploadStatus } from '@/enums';
 import { v4 as uuid } from 'uuid';
 import { moduleChannelTypeFromSubType } from '@/models';
 import { useEventConverter } from '@/composables/useEventConverter';
+import type { ChannelTestValue } from '@/models/scripter/channelTestValue';
 
 export const useScripterStore = defineStore('scripter', () => {
   const isLoading = ref(false);
@@ -330,6 +331,25 @@ export const useScripterStore = defineStore('scripter', () => {
     }
   }
 
+  function getChannelTestValue(chId: string): ChannelTestValue | null {
+    if (!script.value) return null;
+    const channel = script.value.scriptChannels.find((ch) => ch.id === chId);
+    if (!channel) return null;
+
+    const resource = getScriptChannelResource(channel.moduleChannelId, channel.channelType);
+    if (!resource) return null;
+
+    return {
+      locationId: resource.locationId,
+      moduleId: resource.parentModuleId,
+      moduleChannel: channel.moduleChannel,
+      moduleType: resource.channel.moduleType,
+      moduleSubType: resource.channel.moduleSubType,
+      channelId: channel.moduleChannelId,
+      channelType: channel.channelType,
+    };
+  }
+
   function generateScriptId(length: number): string {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = `s${Math.floor(Date.now() / 1000)}`;
@@ -358,5 +378,6 @@ export const useScripterStore = defineStore('scripter', () => {
     addEventToChannel,
     removeEventFromChannel,
     getResourceIdByChannelId,
+    getChannelTestValue,
   };
 });

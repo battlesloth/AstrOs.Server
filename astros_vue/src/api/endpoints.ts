@@ -16,5 +16,6 @@ export const SCRIPTS_ALL = 'api/scripts/all';
 export const SCRIPTS_COPY = 'api/scripts/copy';
 export const SCRIPTS_UPLOAD = 'api/scripts/upload';
 export const SCRIPTS_RUN = 'api/scripts/run';
+export const SCRIPTS_TEST_CHANNEL = 'api/directcommand';
 
 export const REMOTE_CONFIG = 'api/remoteConfig';

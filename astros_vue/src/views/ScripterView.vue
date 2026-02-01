@@ -8,7 +8,6 @@ import {
   AstrosPixiView,
   AstrosAddChannelModal,
   AstrosScriptTestModal,
-  AstrosChannelTestModal,
   AstrosGpioEventModal,
   AstrosHumanCyborgModal,
   AstrosI2cEventModal,
@@ -20,11 +19,13 @@ import {
   AstrosConfirmModal,
 } from '@/components';
 import router from '@/router';
-import type { AddChannelModalResponse, ScriptEvent, Channel } from '@/models';
+import type { AddChannelModalResponse, ScriptEvent, Channel, ChannelTestValue } from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
 import { useToast } from '@/composables/useToast';
 import { v4 as uuid } from 'uuid';
 import AstrosChannelSwapModal from '@/components/modals/scripter/AstrosChannelSwapModal.vue';
+import apiService from '@/api/apiService';
+import { SCRIPTS_TEST_CHANNEL } from '@/api/endpoints';
 
 const scripter = useTemplateRef('scripter');
 
@@ -37,13 +38,14 @@ const selectedChannelId = ref<string>('');
 const selectedChannelType = ref<ScriptChannelType>(ScriptChannelType.NONE);
 const selectedScriptEvent = ref<ScriptEvent | null>(null);
 const modalMode = ref<ModalMode>(ModalMode.ADD);
+const channelTestValue = ref<ChannelTestValue | null>(null);
 
 const route = useRoute();
 const scripterStore = useScripterStore();
 
 const { eventTypeToModalType, getDefaultScriptEvent } = useScriptEvents();
 
-const { success } = useToast();
+const { success, error } = useToast();
 
 function addChannel() {
   showModal.value = ModalType.ADD_CHANNEL;
@@ -57,6 +59,7 @@ function doAddChannel(response: AddChannelModalResponse) {
 
       if (!result.success) {
         console.log(`Failed to add channel for ID ${detail.id} and type ${channelType}`);
+        error(`Failed to add channel for ID ${detail.id} and type ${channelType}`);
         continue;
       }
 
@@ -137,13 +140,21 @@ function addEvent(chId: string, time: number) {
   showModal.value = eventTypeToModalType(channel.channelType);
 }
 
-function doAddEvent() {
+async function doAddEvent() {
   if (!selectedScriptEvent.value) {
     console.log('No selected script event to add.');
     return;
   }
 
-  if (modalMode.value === ModalMode.ADD) {
+  if (modalMode.value === ModalMode.TEST) {
+    const ok = await doChannelTest();
+    console.log(`Test command sent: ${ok}`);
+    if (ok) {
+      success('Test command sent successfully.');
+    } else {
+      error('Failed to send test command.');
+    }
+  } else if (modalMode.value === ModalMode.ADD) {
     const result = scripterStore.addEventToChannel(
       selectedScriptEvent.value.scriptChannel,
       selectedScriptEvent.value,
@@ -158,6 +169,7 @@ function doAddEvent() {
     );
   }
 
+  channelTestValue.value = null;
   selectedScriptEvent.value = null;
   showModal.value = ModalType.CLOSE_ALL;
 }
@@ -197,7 +209,57 @@ function doRemoveEvent() {
   showModal.value = ModalType.CLOSE_ALL;
 }
 
-function testChannel() {}
+function testChannel(chId: string) {
+  const ch = scripterStore.getChannel(chId);
+
+  if (!ch) {
+    console.log(`Channel with ID ${chId} not found for testing.`);
+    error(`Channel with ID ${chId} not found for testing.`);
+    return;
+  }
+
+  const val = scripterStore.getChannelTestValue(chId);
+
+  if (!val) {
+    console.log(`Failed to get test value for channel ID ${chId}`);
+    error(`Failed to get values for channel.`);
+    return;
+  }
+
+  modalMode.value = ModalMode.TEST;
+
+  channelTestValue.value = val;
+
+  selectedScriptEvent.value = {
+    id: '',
+    scriptChannel: chId,
+    moduleType: val.moduleType,
+    moduleSubType: val.moduleSubType,
+    time: 0,
+    event: getDefaultScriptEvent(val.moduleChannel),
+  };
+
+  showModal.value = eventTypeToModalType(val.channelType);
+}
+
+async function doChannelTest(): Promise<boolean> {
+  return await apiService
+    .post(SCRIPTS_TEST_CHANNEL, {
+      locationId: channelTestValue.value!.locationId,
+      moduleId: channelTestValue.value!.moduleId,
+      moduleType: channelTestValue.value!.moduleType,
+      moduleSubType: channelTestValue.value!.moduleSubType,
+      channelId: channelTestValue.value!.channelId,
+      event: selectedScriptEvent.value!.event,
+    })
+    .then(() => {
+      return true;
+    })
+    .catch((err) => {
+      console.error('Error sending test command:', err);
+      return false;
+    });
+}
 
 function scriptTest() {
   showModal.value = ModalType.SCRIPT_TEST;
@@ -357,13 +419,6 @@ onMounted(async () => {
         v-if="showModal === ModalType.SCRIPT_TEST && scripterStore.script"
         @close="showModal = ModalType.CLOSE_ALL"
         :script-id="scripterStore.script.id"
-      />
-      <AstrosChannelTestModal
-        v-if="showModal === ModalType.CHANNEL_TEST"
-        @close="showModal = ModalType.CLOSE_ALL"
-        :controller-id="0"
-        :script-channel-type="ScriptChannelType.NONE"
-        :channel-id="0"
       />
 
       <AstrosGpioEventModal

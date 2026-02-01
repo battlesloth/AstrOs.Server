@@ -1,5 +1,8 @@
 {
   "astros": "AstrOs",
+  "save": "Save",
+  "close": "Close",
+  "test": "Test",
   "error": {
     "invalid_email": "Enter valid email address",
     "invalid_password": "Password must be at least 8 characters long and include a number, a lowercase letter, and an uppercase letter",

@@ -1,19 +1,22 @@
-import { Kysely, Transaction } from 'kysely';
-import { logger } from '../../logger.js';
-import { inserted } from '../database.js';
-import { Database } from '../types.js';
-import { ControlModule, ControllerLocation } from 'astros-common';
-import { getGpioModule, upsertGpioModule } from './module_repositories/gpio_repository.js';
+import { Kysely, Transaction } from "kysely";
+import { logger } from "../../logger.js";
+import { inserted } from "../database.js";
+import { Database } from "../types.js";
+import { ControlModule, ControllerLocation } from "astros-common";
+import {
+  getGpioModule,
+  upsertGpioModule,
+} from "./module_repositories/gpio_repository.js";
 import {
   getUartModules,
   upsertUartModules,
   removeStaleUartModules,
-} from './module_repositories/uart_repository.js';
+} from "./module_repositories/uart_repository.js";
 import {
   getI2cModules,
   removeStaleI2CModules,
   upsertI2cModules,
-} from './module_repositories/i2c_repository.js';
+} from "./module_repositories/i2c_repository.js";
 
 export class LocationsRepository {
   constructor(private readonly db: Kysely<Database>) {}
@@ -22,31 +25,36 @@ export class LocationsRepository {
     const result = new Array<ControllerLocation>();
 
     const data = await this.db
-      .selectFrom('locations')
-      .leftJoin('controller_locations as cl', 'cl.location_id', 'locations.id')
-      .leftJoin('controllers as c', 'c.id', 'cl.controller_id')
+      .selectFrom("locations")
+      .leftJoin("controller_locations as cl", "cl.location_id", "locations.id")
+      .leftJoin("controllers as c", "c.id", "cl.controller_id")
       .select([
-        'locations.id as loc_id',
-        'locations.name as loc_name',
-        'locations.description as loc_desc',
-        'locations.config_fingerprint as loc_fingerprint',
-        'c.id as ctrl_id',
-        'c.name as ctrl_name',
-        'c.address as ctrl_address',
+        "locations.id as loc_id",
+        "locations.name as loc_name",
+        "locations.description as loc_desc",
+        "locations.config_fingerprint as loc_fingerprint",
+        "c.id as ctrl_id",
+        "c.name as ctrl_name",
+        "c.address as ctrl_address",
       ])
       .execute()
       .catch((err) => {
-        logger.error('LocationsRepository.getLocations', err);
+        logger.error("LocationsRepository.getLocations", err);
         throw err;
       });
 
     for (const c of data) {
-      const location = new ControllerLocation(c.loc_id, c.loc_name, c.loc_desc, c.loc_fingerprint);
+      const location = new ControllerLocation(
+        c.loc_id,
+        c.loc_name,
+        c.loc_desc,
+        c.loc_fingerprint,
+      );
 
       location.controller = new ControlModule(
-        c.ctrl_id ?? '0',
-        c.ctrl_name ?? '',
-        c.ctrl_address ?? '',
+        c.ctrl_id ?? "0",
+        c.ctrl_name ?? "",
+        c.ctrl_address ?? "",
       );
 
       result.push(location);
@@ -55,24 +63,26 @@ export class LocationsRepository {
     return result;
   }
 
-  public async getLocationByController(id: string): Promise<ControllerLocation> {
+  public async getLocationByController(
+    id: string,
+  ): Promise<ControllerLocation> {
     const data = await this.db
-      .selectFrom('locations')
-      .leftJoin('controller_locations as cl', 'cl.location_id', 'locations.id')
-      .leftJoin('controllers as c', 'c.id', 'cl.controller_id')
+      .selectFrom("locations")
+      .leftJoin("controller_locations as cl", "cl.location_id", "locations.id")
+      .leftJoin("controllers as c", "c.id", "cl.controller_id")
       .select([
-        'locations.id as loc_id',
-        'locations.name as loc_name',
-        'locations.description as loc_desc',
-        'locations.config_fingerprint as loc_fingerprint',
-        'c.id as ctrl_id',
-        'c.name as ctrl_name',
-        'c.address as ctrl_address',
+        "locations.id as loc_id",
+        "locations.name as loc_name",
+        "locations.description as loc_desc",
+        "locations.config_fingerprint as loc_fingerprint",
+        "c.id as ctrl_id",
+        "c.name as ctrl_name",
+        "c.address as ctrl_address",
       ])
-      .where('c.id', '=', id)
+      .where("c.id", "=", id)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error('LocationsRepository.getLocationByController', err);
+        logger.error("LocationsRepository.getLocationByController", err);
         throw err;
       });
 
@@ -84,9 +94,9 @@ export class LocationsRepository {
     );
 
     location.controller = new ControlModule(
-      data.ctrl_id ?? '0',
-      data.ctrl_name ?? '',
-      data.ctrl_address ?? '',
+      data.ctrl_id ?? "0",
+      data.ctrl_name ?? "",
+      data.ctrl_address ?? "",
     );
 
     return location;
@@ -94,13 +104,17 @@ export class LocationsRepository {
 
   public async getLocationIdByControllerByMac(mac: string): Promise<string> {
     const data = await this.db
-      .selectFrom('controller_locations')
-      .select('location_id')
-      .innerJoin('controllers', 'controllers.id', 'controller_locations.controller_id')
-      .where('controllers.address', '=', mac)
+      .selectFrom("controller_locations")
+      .select("location_id")
+      .innerJoin(
+        "controllers",
+        "controllers.id",
+        "controller_locations.controller_id",
+      )
+      .where("controllers.address", "=", mac)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error('LocationsRepository.getLocationIdByControllerMac', err);
+        logger.error("LocationsRepository.getLocationIdByControllerMac", err);
         throw err;
       });
 
@@ -108,14 +122,22 @@ export class LocationsRepository {
   }
   public async getLocationNameByMac(mac: string): Promise<string> {
     const data = await this.db
-      .selectFrom('locations')
-      .select('locations.name as loc_name')
-      .innerJoin('controller_locations', 'controller_locations.location_id', 'locations.id')
-      .innerJoin('controllers', 'controllers.id', 'controller_locations.controller_id')
-      .where('controllers.address', '=', mac)
+      .selectFrom("locations")
+      .select("locations.name as loc_name")
+      .innerJoin(
+        "controller_locations",
+        "controller_locations.location_id",
+        "locations.id",
+      )
+      .innerJoin(
+        "controllers",
+        "controllers.id",
+        "controller_locations.controller_id",
+      )
+      .where("controllers.address", "=", mac)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error('LocationsRepository.getLocationNameByMac', err);
+        logger.error("LocationsRepository.getLocationNameByMac", err);
         throw err;
       });
 
@@ -152,19 +174,23 @@ export class LocationsRepository {
 
     await this.db.transaction().execute(async (trx) => {
       await trx
-        .updateTable('locations')
+        .updateTable("locations")
         .set({
-          config_fingerprint: 'outofdate',
+          config_fingerprint: "outofdate",
         })
-        .where('id', '=', location.id)
+        .where("id", "=", location.id)
         .executeTakeFirstOrThrow()
         .catch((err) => {
-          logger.error('LocationsRepository.updateLocation', err);
+          logger.error("LocationsRepository.updateLocation", err);
           throw err;
         });
 
       if (location.controller !== undefined && location.controller !== null) {
-        await this.setLocationController(trx, location.id, location.controller.id);
+        await this.setLocationController(
+          trx,
+          location.id,
+          location.controller.id,
+        );
       }
 
       await removeStaleUartModules(
@@ -200,23 +226,23 @@ export class LocationsRepository {
     controllerId: string,
   ): Promise<boolean> {
     await trx
-      .deleteFrom('controller_locations')
-      .where('location_id', '=', locationId)
+      .deleteFrom("controller_locations")
+      .where("location_id", "=", locationId)
       .execute()
       .catch((err) => {
-        logger.error('LocationsRepository.setLocationController', err);
+        logger.error("LocationsRepository.setLocationController", err);
         throw err;
       });
 
     const result = await trx
-      .insertInto('controller_locations')
+      .insertInto("controller_locations")
       .values({
         location_id: locationId,
         controller_id: controllerId,
       })
       .executeTakeFirst()
       .catch((err) => {
-        logger.error('LocationsRepository.setLocationController', err);
+        logger.error("LocationsRepository.setLocationController", err);
         throw err;
       });
 
@@ -232,14 +258,14 @@ export class LocationsRepository {
     fingerprint: string,
   ): Promise<boolean> {
     const result = await trx
-      .updateTable('locations')
+      .updateTable("locations")
       .set({
         config_fingerprint: fingerprint,
       })
-      .where('id', '=', locationId)
+      .where("id", "=", locationId)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error('LocationsRepository.updateLocationFingerprintTrx', err);
+        logger.error("LocationsRepository.updateLocationFingerprintTrx", err);
         throw err;
       });
 
@@ -251,14 +277,14 @@ export class LocationsRepository {
     fingerprint: string,
   ): Promise<boolean> {
     const result = await this.db
-      .updateTable('locations')
+      .updateTable("locations")
       .set({
         config_fingerprint: fingerprint,
       })
-      .where('id', '=', locationId)
+      .where("id", "=", locationId)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error('LocationsRepository.updateLocationFingerprint', err);
+        logger.error("LocationsRepository.updateLocationFingerprint", err);
         throw err;
       });
 
