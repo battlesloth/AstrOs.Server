@@ -103,6 +103,11 @@ const closeAlert = () => {
 <template>
   <AstrosLayout>
     <template v-slot:main>
+      <!-- Header with buttons -->
+      <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0 mb-4">
+        <h1 class="text-2xl font-bold">{{ $t('utility_view.title') }}</h1>
+        <div class="grow"></div>
+      </div>
       <div class="max-w-3xl mx-auto">
         <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
           <div class="text-2xl w-45">API Key</div>

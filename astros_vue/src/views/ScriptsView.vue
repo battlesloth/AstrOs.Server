@@ -113,35 +113,33 @@ const editScript = (id: string) => {
 <template>
   <AstrosLayout>
     <template v-slot:main>
+      <!-- Header with buttons -->
+      <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0 mb-4">
+        <h1 class="text-2xl font-bold">{{ $t('scripts_view.title') }}</h1>
+        <div class="grow flex justify-center">
+          <AstrosFieldFilter
+            class="max-w-200"
+            v-model="filterText"
+          />
+        </div>
+        <button
+          data-testid="save_module_settings"
+          class="btn btn-primary w-24"
+          @click="newScript"
+        >
+          {{ $t('scripts_view.new') }}
+        </button>
+      </div>
       <div class="flex flex-row flex-nowrap">
         <div class="grow"></div>
         <div class="px-5 max-w-250 grow-20">
-          <!-- Header Bar -->
-          <div class="flex flex-row h-13.5 leading-13.5 items-center mb-4">
-            <div class="w-50 text-3xl font-bold">Scripts</div>
-            <div class="grow flex justify-center">
-              <AstrosFieldFilter
-                class="max-w-200"
-                v-model="filterText"
-              />
-            </div>
-            <div class="w-50 flex justify-end">
-              <button
-                class="btn btn-primary text-xl"
-                @click="newScript"
-              >
-                New
-              </button>
-            </div>
-          </div>
-
           <table class="table w-full">
-            <thead class="text-2xl">
+            <thead class="text-2xl bg-primary text-white rounded-t-lg">
               <tr>
-                <th class="w-1/3">Script Name</th>
+                <th class="w-1/3 first:rounded-tl-lg">Script Name</th>
                 <th class="w-2/3">Description</th>
                 <th class="text-center">Status</th>
-                <th class="text-center">Actions</th>
+                <th class="text-center last:rounded-tr-lg">Actions</th>
               </tr>
             </thead>
             <tbody>

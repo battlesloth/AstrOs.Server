@@ -130,6 +130,17 @@ async function saveConfig() {
 
 <template>
   <div class="w-full">
+    <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0">
+      <h1 class="text-2xl font-bold">{{ $t('remote_view.title') }}</h1>
+      <div class="grow"></div>
+      <button
+        data-testid="save_module_settings"
+        class="btn btn-primary w-24"
+        @click="saveConfig"
+      >
+        {{ $t('remote_view.save') }}
+      </button>
+    </div>
     <!-- Page Navigation -->
     <div class="flex flex-nowrap w-full my-5 items-center">
       <div class="grow-3"></div>
@@ -214,15 +225,6 @@ async function saveConfig() {
         :scripts="scripts"
         @changed="(value) => selectionChange(9, value)"
       />
-    </div>
-    <!-- Save Button -->
-    <div class="flex justify-center mt-8">
-      <button
-        class="btn btn-primary btn-wide"
-        @click="saveConfig"
-      >
-        Save Configuration
-      </button>
     </div>
   </div>
 </template>

@@ -146,18 +146,18 @@ function controllerSelectChanged(location: string) {
         style="height: calc(100vh - 64px)"
       >
         <!-- Header with buttons -->
-        <div class="flex items-center gap-4 p-4 bg-base-200 shrink-0">
+        <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0 mb-4">
           <h1 class="text-2xl font-bold">{{ $t('module_view.modules') }}</h1>
           <div class="grow"></div>
           <button
             data-testid="save_module_settings"
-            class="btn btn-primary"
+            class="btn btn-primary w-24"
             @click="saveModuleSettings"
           >
             {{ $t('module_view.save') }}
           </button>
           <button
-            class="btn btn-primary"
+            class="btn btn-primary w-24"
             @click="syncModuleSettings"
           >
             {{ $t('module_view.sync') }}
@@ -177,7 +177,7 @@ function controllerSelectChanged(location: string) {
             >
               <div
                 data-testid="body-module-header"
-                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
+                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer bg-r2-xlight"
                 @click="openAccordion = openAccordion === 'body' ? null : 'body'"
               >
                 <span>{{ $t('module_view.body') }}</span>
@@ -193,7 +193,7 @@ function controllerSelectChanged(location: string) {
                 />
               </div>
               <div
-                class="collapse-content"
+                class="collapse-content bg-r2-xlight"
                 v-if="bodyLocation"
               >
                 <div class="mb-4">
@@ -223,7 +223,7 @@ function controllerSelectChanged(location: string) {
 
             <!-- Core Module -->
             <div
-              class="collapse collapse-arrow bg-base-200 border border-base-300"
+              class="collapse collapse-arrow bg-r2-xlight border border-base-300"
               :class="{
                 'collapse-open': openAccordion === 'core',
                 'collapse-close': openAccordion !== 'core',
@@ -231,7 +231,7 @@ function controllerSelectChanged(location: string) {
             >
               <div
                 data-testid="core-module-header"
-                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
+                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer bg-r2-xlight"
                 @click="openAccordion = openAccordion === 'core' ? null : 'core'"
               >
                 <span>{{ $t('module_view.core') }}</span>
@@ -285,7 +285,7 @@ function controllerSelectChanged(location: string) {
 
             <!-- Dome Module -->
             <div
-              class="collapse collapse-arrow bg-base-200 border border-base-300"
+              class="collapse collapse-arrow bg-r2-xlight border border-base-300"
               :class="{
                 'collapse-open': openAccordion === 'dome',
                 'collapse-close': openAccordion !== 'dome',
@@ -293,7 +293,7 @@ function controllerSelectChanged(location: string) {
             >
               <div
                 data-testid="dome-module-header"
-                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer"
+                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer bg-r2-xlight"
                 @click="openAccordion = openAccordion === 'dome' ? null : 'dome'"
               >
                 <span>{{ $t('module_view.dome') }}</span>

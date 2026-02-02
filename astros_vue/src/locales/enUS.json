@@ -144,5 +144,16 @@
     "master": "Master Controller",
     "sync_successful": "Controllers sync queued!",
     "sync_failed": "Controllers sync failed."
+  },
+  "remote_view": {
+    "title": "Remote Control",
+    "save": "Save"
+  },
+  "utility_view": {
+    "title": "Utility"
+  },
+  "scripts_view": {
+    "title": "Scripts",
+    "new": "New"
   }
 }
