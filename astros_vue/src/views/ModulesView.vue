@@ -157,7 +157,7 @@ function controllerSelectChanged(location: string) {
             {{ $t('module_view.save') }}
           </button>
           <button
-            class="btn btn-secondary"
+            class="btn btn-primary"
             @click="syncModuleSettings"
           >
             {{ $t('module_view.sync') }}

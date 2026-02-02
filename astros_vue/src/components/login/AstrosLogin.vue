@@ -61,7 +61,7 @@ defineEmits<{
           />
           <div class="flex justify-center w-full mt-4">
             <button
-              class="btn btn-secondary w-1/2"
+              class="btn btn-primary w-1/2"
               @click="$emit('login')"
             >
               {{ $t('astrosLogin.login') }}

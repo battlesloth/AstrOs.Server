@@ -116,7 +116,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
     >
       <div
         :data-testid="`${parentTestId}-serial-header`"
-        class="collapse-title flex items-center justify-between pr-12 cursor-pointer bg-blue-200"
+        class="collapse-title flex items-center justify-between pr-12 cursor-pointer bg-r2-light"
         @click="openPanel = openPanel === 'uart' ? null : 'uart'"
       >
         <h3 class="font-medium">{{ $t('esp.serial_modules') }}</h3>
@@ -129,7 +129,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
           <span class="text-lg">+</span>
         </button>
       </div>
-      <div class="collapse-content bg-blue-200">
+      <div class="collapse-content bg-r2-light">
         <ul
           v-if="location?.uartModules"
           class="space-y-2 max-h-96 overflow-y-scroll p-0"
@@ -160,7 +160,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
     >
       <div
         :data-testid="`${parentTestId}-i2c-header`"
-        class="collapse-title flex items-center justify-between pr-12 cursor-pointer bg-blue-200"
+        class="collapse-title flex items-center justify-between pr-12 cursor-pointer bg-r2-light"
         @click="openPanel = openPanel === 'i2c' ? null : 'i2c'"
       >
         <h3 class="font-medium">{{ $t('esp.i2c_modules') }}</h3>
@@ -173,7 +173,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
           <span class="text-lg">+</span>
         </button>
       </div>
-      <div class="collapse-content bg-blue-200">
+      <div class="collapse-content bg-r2-light">
         <ul
           v-if="location?.i2cModules"
           class="space-y-2 max-h-96 overflow-y-scroll p-0"
@@ -203,12 +203,12 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
     >
       <div
         :data-testid="`${parentTestId}-gpio-header`"
-        class="collapse-title cursor-pointer bg-blue-200"
+        class="collapse-title cursor-pointer bg-r2-light"
         @click="openPanel = openPanel === 'gpio' ? null : 'gpio'"
       >
         <h3 class="font-medium">{{ $t('esp.gpio_config') }}</h3>
       </div>
-      <div class="collapse-content bg-blue-200">
+      <div class="collapse-content bg-r2-light">
         <div
           v-if="location?.gpioModule"
           class="p-5 bg-white rounded-3xl border border-base-300"
