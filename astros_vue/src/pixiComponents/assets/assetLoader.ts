@@ -11,6 +11,8 @@ import serial from '@/pixiComponents/assets/serial.svg';
 import dial from '@/pixiComponents/assets/dial.svg';
 import pointer from '@/pixiComponents/assets/pointer.svg';
 import none from '@/pixiComponents/assets/none.svg';
+import servo from '@/pixiComponents/assets/servo.svg';
+import servo_arm from '@/pixiComponents/assets/servo_arm.svg';
 
 export async function loadAssets() {
   Assets.addBundle('assets', [
@@ -26,6 +28,8 @@ export async function loadAssets() {
     { alias: 'dial', src: dial },
     { alias: 'pointer', src: pointer },
     { alias: 'none', src: none },
+    { alias: 'servo', src: servo },
+    { alias: 'servo_arm', src: servo_arm },
   ]);
 
   await Assets.loadBundle('assets');

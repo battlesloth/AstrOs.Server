@@ -83,7 +83,7 @@ function logout() {
       ></label>
       <div class="bg-base-200 min-h-full w-80">
         <nav aria-label="Main menu">
-          <ul class="menu w-80 p-4">
+          <ul class="menu w-80 p-4 text-2xl">
             <li>
               <router-link to="/status">{{ $t('nav.status') }}</router-link>
             </li>

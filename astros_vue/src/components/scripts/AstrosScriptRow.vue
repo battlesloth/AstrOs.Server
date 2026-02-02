@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { UploadStatus } from '@/enums';
 import type { DeploymentStatus } from '@/models';
+import type { Location } from '@/enums';
 
 const props = defineProps<{
   script: {
     id: string;
     scriptName: string;
     description: string;
-    deploymentStatus: Record<string, DeploymentStatus>;
+    deploymentStatus: Record<Location, DeploymentStatus>;
   };
-  locations: string[];
+  locations: Location[];
 }>();
 
 defineEmits<{
@@ -20,7 +21,7 @@ defineEmits<{
   (e: 'delete', id: string, name: string): void;
 }>();
 
-function getUploadStatus(location: string): { class: string; text: string } {
+function getUploadStatus(location: Location): { class: string; text: string } {
   const status = props.script.deploymentStatus[location];
   if (!status) {
     return { class: 'bg-gray-200', text: 'Not uploaded' };

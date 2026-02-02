@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { AstrosLayout, AstrosScriptRow } from '@/components';
 import { useToast } from '@/composables/useToast';
 import { useScriptsStore } from '@/stores/scripts';
-import { UploadStatus } from '@/enums';
+import { UploadStatus, Location } from '@/enums';
+import AstrosFieldFilter from '@/components/common/fields/AstrosFieldFilter.vue';
 
 const router = useRouter();
 const { success, error } = useToast();
@@ -14,8 +15,24 @@ const scriptStore = useScriptsStore();
 const showDeleteModal = ref(false);
 const deleteScriptId = ref('');
 const deleteScriptName = ref('');
+const filterText = ref('');
 
-const locations = ['body', 'core', 'dome'];
+const locations: Location[] = [Location.BODY, Location.CORE, Location.DOME];
+
+const filteredScripts = computed(() => {
+  let scripts = scriptStore.scripts;
+
+  if (filterText.value) {
+    const lowerFilter = filterText.value.toLowerCase();
+    scripts = scripts.filter(
+      (script) =>
+        script.scriptName.toLowerCase().includes(lowerFilter) ||
+        script.description.toLowerCase().includes(lowerFilter),
+    );
+  }
+
+  return [...scripts].sort((a, b) => a.scriptName.localeCompare(b.scriptName));
+});
 
 // Load scripts on mount
 onMounted(async () => {
@@ -100,10 +117,15 @@ const editScript = (id: string) => {
         <div class="grow"></div>
         <div class="px-5 max-w-250 grow-20">
           <!-- Header Bar -->
-          <div class="flex flex-row h-13.5 leading-13.5">
+          <div class="flex flex-row h-13.5 leading-13.5 items-center mb-4">
             <div class="w-50 text-3xl font-bold">Scripts</div>
-            <div class="grow"></div>
-            <div class="float-right">
+            <div class="grow flex justify-center">
+              <AstrosFieldFilter
+                class="max-w-200"
+                v-model="filterText"
+              />
+            </div>
+            <div class="w-50 flex justify-end">
               <button
                 class="btn btn-primary text-xl"
                 @click="newScript"
@@ -114,7 +136,7 @@ const editScript = (id: string) => {
           </div>
 
           <table class="table w-full">
-            <thead>
+            <thead class="text-2xl">
               <tr>
                 <th class="w-1/3">Script Name</th>
                 <th class="w-2/3">Description</th>
@@ -124,7 +146,7 @@ const editScript = (id: string) => {
             </thead>
             <tbody>
               <AstrosScriptRow
-                v-for="script in scriptStore.scripts"
+                v-for="script in filteredScripts"
                 :key="script.id"
                 :script="script"
                 :locations="locations"

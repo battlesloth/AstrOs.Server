@@ -11,6 +11,7 @@ import {
   IoCheckmarkCircle,
   IoTrashBin,
   IoPlay,
+  IoSearch,
 } from 'oh-vue-icons/icons';
 import App from './App.vue';
 import router from './router';
@@ -25,6 +26,7 @@ addIcons(
   IoKeyOutline,
   IoWarning,
   IoCheckmarkCircle,
+  IoSearch,
 );
 
 const app = createApp(App);

@@ -1,9 +1,9 @@
-import { Preview, setup } from '@storybook/vue3-vite'
+import { Preview, setup } from '@storybook/vue3-vite';
 import './preview.css';
 import type { ThemeConfig } from 'storybook-addon-data-theme-switcher';
 import i18n from '../src/i18n.ts';
 import { initialize, mswLoader } from 'msw-storybook-addon';
-import { OhVueIcon, addIcons } from 'oh-vue-icons'
+import { OhVueIcon, addIcons } from 'oh-vue-icons';
 import {
   IoCloudUpload,
   IoCopy,
@@ -12,7 +12,8 @@ import {
   IoWarning,
   IoCheckmarkCircle,
   IoTrashBin,
-  IoPlay
+  IoPlay,
+  IoSearch,
 } from 'oh-vue-icons/icons';
 
 initialize();
@@ -28,10 +29,11 @@ setup((app) => {
     IoPlay,
     IoKeyOutline,
     IoWarning,
-    IoCheckmarkCircle
+    IoCheckmarkCircle,
+    IoSearch,
   );
 
-  app.component('v-icon', OhVueIcon)
+  app.component('v-icon', OhVueIcon);
 });
 
 export const initialGlobals = {

@@ -25,7 +25,8 @@
   "placeholder": {
     "username": "username",
     "email": "mail{'@'}site.com",
-    "password": "password"
+    "password": "password",
+    "filter": "Filter..."
   },
   "astrosLogin": {
     "login": "Login"

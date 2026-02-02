@@ -105,12 +105,12 @@ export class PixiChannelEvent extends Container {
 
     const speedColor = this.getSpeedToColor(evt.speed);
 
-    Assets.load('dial').then((texture) => {
-      this.setIcon(texture, speedColor);
+    Assets.load('servo').then((texture) => {
+      this.setIcon(texture, speedColor, 0.45, 2);
     });
 
-    // Map position 0-100 to angle -94 to 94 degrees, then convert to radians
-    const degrees = ((evt.position - 50) / 50) * 120;
+    // Map position 0-100 to angle -90 to 90 degrees, then convert to radians
+    const degrees = ((evt.position - 50) / 50) * 90;
     const angle = (degrees * Math.PI) / 180;
     this.setPinIcon(angle);
   }
@@ -253,13 +253,13 @@ export class PixiChannelEvent extends Container {
   }
 
   setPinIcon(rotation: number, scale?: number, offsetY?: number) {
-    Assets.load('pointer').then((texture) => {
+    Assets.load('servo_arm').then((texture) => {
       const icon = new Sprite(texture);
-      icon.anchor.set(0.5, 0.6);
+      icon.anchor.set(0.5, 0.4);
       icon.rotation = rotation ?? 0;
-      icon.scale.set(scale ?? 0.33, scale ?? 0.33);
+      icon.scale.set(scale ?? 0.45, scale ?? 0.45);
       icon.x = this.boxWidth / 2;
-      icon.y = this.boxHeight / 2 + 5 + (offsetY ?? 0);
+      icon.y = this.boxHeight / 2 - 8 + (offsetY ?? 0);
       this.addChild(icon);
     });
   }
