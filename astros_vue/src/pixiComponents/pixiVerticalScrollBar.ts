@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js';
+/*import { Graphics } from 'pixi.js';
 import type { PixiScrollBarOptions } from './pixiScrollBarOptions';
 import { PixiScrollBarThumb } from './pixiScrollBarThumb';
 
@@ -44,3 +44,4 @@ export class VerticalScrollBar extends Graphics {
     this.addChild(this.scrollThumb);
   }
 }
+*/

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { fn } from 'storybook/test';
 import AstrosScriptRow from './AstrosScriptRow.vue';
-import { UploadStatus } from '@/enums';
+import { UploadStatus, Location } from '@/enums';
 
 const meta = {
   title: 'Components/Scripts/ScriptRow',
@@ -41,7 +41,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const defaultLocations = ['body', 'core', 'dome'];
+const defaultLocations = [Location.BODY, Location.CORE, Location.DOME];
 
 export const Default: Story = {
   args: {
@@ -50,9 +50,9 @@ export const Default: Story = {
       scriptName: 'Open Dome',
       description: 'Opens the observatory dome',
       deploymentStatus: {
-        body: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
-        core: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
-        dome: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.BODY]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.CORE]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.DOME]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
       },
     },
     locations: defaultLocations,
@@ -66,9 +66,9 @@ export const NotUploaded: Story = {
       scriptName: 'Close Dome',
       description: 'Closes the observatory dome',
       deploymentStatus: {
-        body: { value: UploadStatus.NOT_UPLOADED, date: undefined },
-        core: { value: UploadStatus.NOT_UPLOADED, date: undefined },
-        dome: { value: UploadStatus.NOT_UPLOADED, date: undefined },
+        [Location.BODY]: { value: UploadStatus.NOT_UPLOADED, date: undefined },
+        [Location.CORE]: { value: UploadStatus.NOT_UPLOADED, date: undefined },
+        [Location.DOME]: { value: UploadStatus.NOT_UPLOADED, date: undefined },
       },
     },
     locations: defaultLocations,
@@ -82,9 +82,9 @@ export const Uploading: Story = {
       scriptName: 'Start Tracking',
       description: 'Begin telescope tracking',
       deploymentStatus: {
-        body: { value: UploadStatus.UPLOADING, date: undefined },
-        core: { value: UploadStatus.UPLOADED, date: new Date('2025-12-15T14:20:00') },
-        dome: { value: UploadStatus.UPLOADED, date: new Date('2025-12-15T14:20:00') },
+        [Location.BODY]: { value: UploadStatus.UPLOADING, date: undefined },
+        [Location.CORE]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-15T14:20:00') },
+        [Location.DOME]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-15T14:20:00') },
       },
     },
     locations: defaultLocations,
@@ -98,9 +98,9 @@ export const MixedStatus: Story = {
       scriptName: 'Emergency Stop',
       description: 'Emergency stop all motors',
       deploymentStatus: {
-        body: { value: UploadStatus.UPLOADED, date: new Date('2025-12-18T09:15:00') },
-        core: { value: UploadStatus.NOT_UPLOADED, date: undefined },
-        dome: { value: UploadStatus.UPLOADING, date: undefined },
+        [Location.BODY]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-18T09:15:00') },
+        [Location.CORE]: { value: UploadStatus.NOT_UPLOADED, date: undefined },
+        [Location.DOME]: { value: UploadStatus.UPLOADING, date: undefined },
       },
     },
     locations: defaultLocations,
@@ -115,9 +115,9 @@ export const LongName: Story = {
       description:
         'This is a very long description that should also truncate when it exceeds the available space',
       deploymentStatus: {
-        body: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
-        core: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
-        dome: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.BODY]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.CORE]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.DOME]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
       },
     },
     locations: defaultLocations,
@@ -131,9 +131,9 @@ export const ShortDescription: Story = {
       scriptName: 'Calibrate',
       description: 'Cal',
       deploymentStatus: {
-        body: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
-        core: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
-        dome: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.BODY]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.CORE]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.DOME]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
       },
     },
     locations: defaultLocations,
@@ -147,9 +147,9 @@ export const NoDescription: Story = {
       scriptName: 'Test Script',
       description: '',
       deploymentStatus: {
-        body: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
-        core: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
-        dome: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.BODY]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.CORE]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.DOME]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
       },
     },
     locations: defaultLocations,
@@ -163,7 +163,7 @@ export const PartialDeployment: Story = {
       scriptName: 'Park Telescope',
       description: 'Parks the telescope in home position',
       deploymentStatus: {
-        body: { value: UploadStatus.UPLOADED, date: new Date('2025-12-19T16:45:00') },
+        [Location.BODY]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-19T16:45:00') },
       },
     },
     locations: defaultLocations,
@@ -177,9 +177,9 @@ export const AllUploading: Story = {
       scriptName: 'System Update',
       description: 'Updates all system components',
       deploymentStatus: {
-        body: { value: UploadStatus.UPLOADING, date: undefined },
-        core: { value: UploadStatus.UPLOADING, date: undefined },
-        dome: { value: UploadStatus.UPLOADING, date: undefined },
+        [Location.BODY]: { value: UploadStatus.UPLOADING, date: undefined },
+        [Location.CORE]: { value: UploadStatus.UPLOADING, date: undefined },
+        [Location.DOME]: { value: UploadStatus.UPLOADING, date: undefined },
       },
     },
     locations: defaultLocations,
@@ -193,9 +193,9 @@ export const Interactive: Story = {
       scriptName: 'Interactive Script',
       description: 'Click buttons to see events fired',
       deploymentStatus: {
-        body: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
-        core: { value: UploadStatus.NOT_UPLOADED, date: undefined },
-        dome: { value: UploadStatus.UPLOADING, date: undefined },
+        [Location.BODY]: { value: UploadStatus.UPLOADED, date: new Date('2025-12-20T10:30:00') },
+        [Location.CORE]: { value: UploadStatus.NOT_UPLOADED, date: undefined },
+        [Location.DOME]: { value: UploadStatus.UPLOADING, date: undefined },
       },
     },
     locations: defaultLocations,

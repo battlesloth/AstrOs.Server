@@ -8,7 +8,7 @@ const props = defineProps<{
     id: string;
     scriptName: string;
     description: string;
-    deploymentStatus: Record<Location, DeploymentStatus>;
+    deploymentStatus: Partial<Record<Location, DeploymentStatus>>;
   };
   locations: Location[];
 }>();
