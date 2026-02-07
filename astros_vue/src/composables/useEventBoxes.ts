@@ -99,6 +99,23 @@ export function useEventBoxes(
   }
 
   /**
+   * Rebuilds an event box to reflect updated event data
+   */
+  function rebuildEventBox(channelId: string, eventId: string) {
+    const eventBoxes = channelEventBoxes.value.get(channelId);
+    if (!eventBoxes) return;
+
+    const eventBox = eventBoxes.find((box) => box.scriptEvent.id === eventId);
+    if (!eventBox) {
+      console.warn(`Event box with id ${eventId} not found in channel ${channelId}.`);
+      return;
+    }
+
+    // Rebuild the visual content in place
+    eventBox.rebuild();
+  }
+
+  /**
    * Updates positions of event boxes for a specific channel
    */
   function updateEventBoxPositions(channelId: string) {
@@ -174,6 +191,7 @@ export function useEventBoxes(
     // Methods
     addEventBox,
     removeEventBox,
+    rebuildEventBox,
     updateEventBoxPositions,
     updateAllEventBoxPositions,
     handleEventBoxDrag,

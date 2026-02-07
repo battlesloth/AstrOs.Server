@@ -82,10 +82,15 @@ export const useScriptsStore = defineStore('scripts', () => {
     const script = scripts.value.find((s) => s.id === status.scriptId);
     if (script) {
       // Update the script's deployment status based on the incoming status
-      script.deploymentStatus[status.locationId] = {
-        date: status.date,
-        value: status.status,
+      script.deploymentStatus = {
+        ...script.deploymentStatus,
+        [status.locationId]: {
+          date: status.date,
+          value: status.status,
+        },
       };
+    } else {
+      console.warn(`Script status update skipped: script ${status.scriptId} not found in store`);
     }
   }
 

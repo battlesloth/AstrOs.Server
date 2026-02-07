@@ -3,6 +3,7 @@ import type { BaseWsMessage, LocationStatus, ControllerSync, ScriptStatus } from
 import { WebsocketMessageType, Location, ControllerStatus } from '@/enums';
 import { useControllerStore } from '@/stores/controller';
 import { useScriptsStore } from '@/stores/scripts';
+import { useScripterStore } from '@/stores/scripter';
 
 const ws = ref<WebSocket | null>(null);
 const wsIsConnected = ref(false);
@@ -127,6 +128,12 @@ export function useWebsocket() {
       const data = message as ScriptStatus;
       const scriptStore = useScriptsStore();
       scriptStore.updateScriptStatus(data);
+
+      // Also update scripter store if it has the same script loaded
+      const scripterStore = useScripterStore();
+      if (scripterStore.script && scripterStore.script.id === data.scriptId) {
+        scripterStore.updateScriptStatus(data);
+      }
     } catch (error) {
       console.error('Error handling script message:', error);
     }
