@@ -1,24 +1,20 @@
 services:
-  web:
+  astros:
     platform: linux/arm64
-    image: "dirtknap/astros-web:latest"
+    image: 'dirtknap/astros-server:latest'
     restart: unless-stopped
     ports:
       - 80:80
       - 5000:5000
-    networks:
-      - astronet
-  api:
-    platform: linux/arm64
-    image: "dirtknap/astros-api:latest"
-    restart: unless-stopped
-    hostname: astros-api
+      - 3000:3000
     volumes:
       - /home/astros/.config/astrosserver:/root/.config/astrosserver
+    environment:
+      - CORS_ORIGIN=http://<ip_address>:5173
     networks:
       - astronet
     devices:
-      - "/dev/ttyAMA0:/dev/ttyS0"
+      - '/dev/ttyAMA0:/dev/ttyS0'
 
 networks:
   astronet:

@@ -120,6 +120,29 @@ export class LocationsRepository {
 
     return data.location_id;
   }
+  public async getLocationNameByMac(mac: string): Promise<string> {
+    const data = await this.db
+      .selectFrom("locations")
+      .select("locations.name as loc_name")
+      .innerJoin(
+        "controller_locations",
+        "controller_locations.location_id",
+        "locations.id",
+      )
+      .innerJoin(
+        "controllers",
+        "controllers.id",
+        "controller_locations.controller_id",
+      )
+      .where("controllers.address", "=", mac)
+      .executeTakeFirstOrThrow()
+      .catch((err) => {
+        logger.error("LocationsRepository.getLocationNameByMac", err);
+        throw err;
+      });
+
+    return data.loc_name;
+  }
 
   public async loadLocations(): Promise<Array<ControllerLocation>> {
     const result = await this.getLocations();

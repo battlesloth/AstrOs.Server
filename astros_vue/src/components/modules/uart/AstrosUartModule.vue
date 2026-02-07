@@ -1,0 +1,133 @@
+<script setup lang="ts">
+import { computed, type Component } from 'vue';
+import { ModuleType } from '@/enums/modules/ModuleType';
+import { ModuleSubType } from '@/enums/modules/ModuleSubType';
+import type { UartModule } from '@/models/controllers/modules/uart/uartModule';
+import type { RemoveModuleEvent, ServoTestEvent } from '@/models/events';
+import { Location } from '@/enums/modules/Location';
+import AstrosGenericSerialModule from './submodules/AstrosGenericSerialModule.vue';
+import AstrosKangarooModule from './submodules/AstrosKangarooModule.vue';
+import AstrosHcrSerialModule from './submodules/AstrosHcrSerialModule.vue';
+import AstrosMaestroModule from './submodules/AstrosMaestroModule.vue';
+
+const module = defineModel<UartModule>('module', { required: true });
+
+// Props
+const props = defineProps<{
+  locationId: Location;
+  parentTestId: string;
+  isMaster?: boolean;
+  openModuleId?: string | null;
+}>();
+
+// Emits
+const emit = defineEmits<{
+  removeModule: [event: RemoveModuleEvent];
+  servoTest: [event: ServoTestEvent];
+  toggleModule: [moduleId: string];
+}>();
+
+// Computed
+const isOpen = computed(() => props.openModuleId === module.value.id);
+
+// Computed properties
+const subtypeName = computed(() => {
+  switch (module.value.moduleSubType) {
+    case ModuleSubType.GENERIC_SERIAL:
+      return 'uart.module_types.generic';
+    case ModuleSubType.KANGAROO:
+      return 'uart.module_types.kangaroo';
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
+      return 'uart.module_types.hcr';
+    case ModuleSubType.MAESTRO:
+      return 'uart.module_types.maestro';
+    default:
+      return '';
+  }
+});
+
+const subModuleComponent = computed<Component | null>(() => {
+  switch (module.value.moduleSubType) {
+    case ModuleSubType.GENERIC_SERIAL:
+      return AstrosGenericSerialModule;
+    case ModuleSubType.KANGAROO:
+      return AstrosKangarooModule;
+    case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
+      return AstrosHcrSerialModule;
+    case ModuleSubType.MAESTRO:
+      return AstrosMaestroModule;
+    default:
+      return null;
+  }
+});
+
+// Methods
+const removeModule = (event: Event) => {
+  event.stopPropagation();
+  emit('removeModule', {
+    locationId: props.locationId,
+    id: module.value.id,
+    moduleType: ModuleType.UART,
+  });
+};
+
+const onServoTestEvent = (evt: ServoTestEvent) => {
+  console.log('AstrosMaestroModule received servo test event:', evt);
+  emit('servoTest', evt);
+};
+
+const toggleCollapse = () => {
+  emit('toggleModule', module.value.id);
+};
+</script>
+
+<template>
+  <div
+    class="collapse collapse-arrow bg-base-100 border border-base-300"
+    :class="{ 'collapse-open': isOpen, 'collapse-close': !isOpen }"
+  >
+    <div
+      :data-testid="`${parentTestId}-serial-${module.moduleSubType}-header`"
+      class="collapse-title flex items-center justify-between pr-12 cursor-pointer"
+      @click="toggleCollapse"
+    >
+      <div class="shrink-0 min-w-0">
+        <input
+          :data-testid="`${parentTestId}-serial-${module.moduleSubType}-name`"
+          v-model="module.name"
+          @click.stop
+          @keydown.space.stop
+          placeholder="Name"
+          class="input input-bordered input-sm w-full max-w-xs"
+        />
+      </div>
+      <div class="flex items-center gap-2 ml-4">
+        <p class="text-sm text-base-content/60">{{ $t(subtypeName) }}</p>
+        <button
+          @click.stop="removeModule"
+          @keydown.enter.prevent="removeModule"
+          @keydown.space.prevent="removeModule"
+          class="btn btn-sm btn-circle btn-ghost"
+        >
+          <span class="text-lg">×</span>
+        </button>
+      </div>
+    </div>
+    <div class="collapse-content">
+      <div
+        v-if="!subModuleComponent"
+        class="p-4 bg-base-200 rounded border border-dashed border-base-300"
+      >
+        <p class="text-sm text-base-content/60 italic">{{ $t('uart.unsupported_module') }}</p>
+      </div>
+      <component
+        v-else
+        :is="subModuleComponent"
+        v-model:module="module"
+        :parent-test-id="parentTestId"
+        :is-master="isMaster"
+        @servo-test="onServoTestEvent"
+      />
+    </div>
+  </div>
+</template>

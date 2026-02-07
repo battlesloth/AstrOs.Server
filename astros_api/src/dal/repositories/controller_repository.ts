@@ -126,4 +126,25 @@ export class ControllerRepository {
 
     return new ControlModule(data.id, data.name, data.address);
   }
+
+  public async getControllerByLocationId(
+    locationId: string,
+  ): Promise<ControlModule> {
+    const data = await this.db
+      .selectFrom("controllers")
+      .leftJoin(
+        "controller_locations as cl",
+        "cl.controller_id",
+        "controllers.id",
+      )
+      .selectAll()
+      .where("cl.location_id", "=", locationId)
+      .executeTakeFirstOrThrow()
+      .catch((err) => {
+        logger.error("ControllerRepository.getControllerByLocationId", err);
+        throw err;
+      });
+
+    return new ControlModule(data.id, data.name, data.address);
+  }
 }

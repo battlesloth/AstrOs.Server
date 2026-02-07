@@ -14,9 +14,10 @@ import {
   ModuleClassType,
   UartModule,
   I2cModule,
-  ScriptEventTypes,
+  GpioChannel,
+  GpioModule,
 } from "astros-common";
-
+import { v4 as uuid } from "uuid";
 import { logger } from "./logger.js";
 import { ScriptRepository } from "./dal/repositories/script_repository.js";
 
@@ -27,10 +28,12 @@ interface IUartValues {
 }
 
 export interface ISingleCommand {
+  controllerId: string;
+  moduleId: string;
+  moduleType: ModuleType;
   moduleSubType: ModuleSubType;
-  event: ScriptEventTypes;
-  channel: number;
-  baud: number;
+  channelId: string;
+  event: unknown;
 }
 
 export enum CommandType {
@@ -62,50 +65,80 @@ export class ScriptConverter {
    * @param command
    * @returns
    */
-  public static convertCommand(command: unknown): string {
+  public async convertCommand(command: unknown): Promise<string> {
     let script = "";
 
     if (command === undefined || command === null) {
       return "";
     }
 
+    this.modulesMap.clear();
+    this.modulesMap = await this.scriptRepo.getModules();
+
     const cmd = command as ISingleCommand;
 
     switch (cmd.moduleSubType) {
-      case ModuleSubType.genericSerial:
+      case ModuleSubType.genericSerial: {
+        const mod = this.modulesMap.get(cmd.moduleId) as UartModule;
         script = this.genericSerialAsString(
           cmd.event as GenericSerialEvent,
-          { idx: 0, ch: cmd.channel, baud: cmd.baud },
+          { idx: mod.idx, ch: mod.uartChannel, baud: mod.baudRate },
           0,
         );
         break;
-      case ModuleSubType.humanCyborgRelationsSerial:
+      }
+      case ModuleSubType.humanCyborgRelationsSerial: {
+        const mod = this.modulesMap.get(cmd.moduleId) as UartModule;
         script = this.hcrAsString(
           cmd.event as HumanCyborgRelationsEvent,
-          { idx: 0, ch: cmd.channel, baud: cmd.baud },
+          { idx: mod.idx, ch: mod.uartChannel, baud: mod.baudRate },
           0,
         );
         break;
-      case ModuleSubType.kangaroo:
+      }
+      case ModuleSubType.kangaroo: {
+        const mod = this.modulesMap.get(cmd.moduleId) as UartModule;
         script = this.kangarooAsString(
           cmd.event as KangarooEvent,
-          { idx: 0, ch: cmd.channel, baud: cmd.baud },
+          { idx: mod.idx, ch: mod.uartChannel, baud: mod.baudRate },
           0,
         );
         break;
-      case ModuleSubType.maestro:
+      }
+      case ModuleSubType.maestro: {
+        const mod = this.modulesMap.get(cmd.moduleId) as UartModule;
         script = this.masetroAsToString(
           cmd.event as MaestroEvent,
-          { idx: cmd.channel, ch: 0, baud: cmd.baud },
+          { idx: mod.idx, ch: mod.uartChannel, baud: mod.baudRate },
           0,
         );
         break;
-      case ModuleSubType.genericI2C:
-        script = this.i2cAsString(cmd.event as I2cEvent, cmd.channel, 0);
+      }
+      case ModuleSubType.genericI2C: {
+        const mod = this.modulesMap.get(cmd.moduleId) as I2cModule;
+        script = this.i2cAsString(cmd.event as I2cEvent, mod.i2cAddress, 0);
         break;
-      case ModuleSubType.genericGpio:
-        script = this.gpioEvtAsString(cmd.event as GpioEvent, cmd.channel, 0);
+      }
+      case ModuleSubType.genericGpio: {
+        const mod = this.modulesMap.get(cmd.moduleId) as GpioModule;
+
+        const idx = mod.channels.findIndex(
+          (ch: GpioChannel) => ch.id === cmd.channelId,
+        );
+        if (idx < 0) {
+          logger.error(
+            `No GPIO channel found for command channel id: ${cmd.channelId} in module: ${cmd.moduleId}`,
+          );
+          return "";
+        }
+
+        script = this.gpioEvtAsString(
+          cmd.event as GpioEvent,
+          mod.channels[idx].channelNumber,
+          0,
+        );
         break;
+      }
       default:
         logger.error(`No module found for test command: ${cmd.moduleSubType}`);
         return "";
@@ -128,6 +161,7 @@ export class ScriptConverter {
     const result = new Map<string, string>();
     const eventMap = new Map<string, Map<number, Array<ScriptEvent>>>();
 
+    this.scriptChannerlGpioChannelMap.clear();
     this.scriptChannelModuleMap.clear();
     this.modulesMap.clear();
 
@@ -135,6 +169,9 @@ export class ScriptConverter {
       this.locationIds = await this.scriptRepo.getLocationIds();
       this.modulesMap = await this.scriptRepo.getModules();
       const script = await this.scriptRepo.getScript(scriptId);
+
+      this.scriptChannerlGpioChannelMap =
+        await this.scriptRepo.getGpioChannelMap();
 
       // sort events by the location id and time
       for (const ch of script.scriptChannels) {
@@ -186,11 +223,11 @@ export class ScriptConverter {
 
     this.scriptChannelModuleMap.set(channel.id, module.id);
 
-    for (const kvp of channel.eventsKvpArray) {
-      const evt = kvp.value as ScriptEvent;
+    for (const key in channel.events) {
+      const evt = channel.events[key] as ScriptEvent;
 
-      // convert from 10ths of a second to ms
-      evt.time = evt.time * 100;
+      // convert from seconds to ms
+      evt.time = evt.time * 1000;
 
       if (map.has(locationId)) {
         if (map.get(locationId)?.has(evt.time)) {
@@ -280,6 +317,7 @@ export class ScriptConverter {
     }
 
     const bufferEvent = new ScriptEvent(
+      uuid(),
       "buffer",
       ModuleType.none,
       ModuleSubType.none,
@@ -387,14 +425,10 @@ export class ScriptConverter {
       );
     }
 
-    return ScriptConverter.genericSerialAsString(
-      serial,
-      uart,
-      timeTillNextEvent,
-    );
+    return this.genericSerialAsString(serial, uart, timeTillNextEvent);
   }
 
-  static genericSerialAsString(
+  genericSerialAsString(
     val: GenericSerialEvent,
     uart: IUartValues,
     timeTillNextEvent: number,
@@ -421,10 +455,10 @@ export class ScriptConverter {
       );
     }
 
-    return ScriptConverter.hcrAsString(hcr, uart, timeTillNextEvent);
+    return this.hcrAsString(hcr, uart, timeTillNextEvent);
   }
 
-  static hcrAsString(
+  hcrAsString(
     hcr: HumanCyborgRelationsEvent,
     uart: IUartValues,
     timeTillNextEvent: number,
@@ -474,10 +508,10 @@ export class ScriptConverter {
 
     const kangaroo = evt.event as KangarooEvent;
 
-    return ScriptConverter.kangarooAsString(kangaroo, uart, timeTillNextEvent);
+    return this.kangarooAsString(kangaroo, uart, timeTillNextEvent);
   }
 
-  static kangarooAsString(
+  kangarooAsString(
     evt: KangarooEvent,
     uart: IUartValues,
     timeTillNextEvent: number,
@@ -528,10 +562,10 @@ export class ScriptConverter {
       );
     }
 
-    return ScriptConverter.masetroAsToString(maestro, uart, timeTillNextEvent);
+    return this.masetroAsToString(maestro, uart, timeTillNextEvent);
   }
 
-  static masetroAsToString(
+  masetroAsToString(
     evt: MaestroEvent,
     uart: IUartValues,
     next: number,
@@ -557,10 +591,10 @@ export class ScriptConverter {
       );
     }
 
-    return ScriptConverter.i2cAsString(i2c, i2cAddress, timeTillNextEvent);
+    return this.i2cAsString(i2c, i2cAddress, timeTillNextEvent);
   }
 
-  static i2cAsString(
+  i2cAsString(
     evt: I2cEvent,
     i2cAddress: number,
     timeTillNextEvent: number,
@@ -588,14 +622,10 @@ export class ScriptConverter {
       );
     }
 
-    return ScriptConverter.gpioEvtAsString(
-      gpio,
-      gpioChannel,
-      timeTillNextEvent,
-    );
+    return this.gpioEvtAsString(gpio, gpioChannel, timeTillNextEvent);
   }
 
-  static gpioEvtAsString(
+  gpioEvtAsString(
     evt: GpioEvent,
     gpioChannel: number,
     timeTillNextEvent: number,

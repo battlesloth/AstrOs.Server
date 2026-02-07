@@ -3,6 +3,33 @@ import { Database } from "../../types.js";
 import { logger } from "../../../logger.js";
 import { GpioModule, GpioChannel } from "astros-common";
 
+export async function getAllActiveGpioChannels(
+  db: Kysely<Database>,
+): Promise<GpioChannel[]> {
+  const gpioData = await db
+    .selectFrom("gpio_channels")
+    .selectAll()
+    .where("enabled", "=", 1)
+    .orderBy("location_id")
+    .execute()
+    .catch((err) => {
+      logger.error("GpioRepository.getAllActiveGpioChannels", err);
+      throw err;
+    });
+
+  return gpioData.map(
+    (m: any) =>
+      new GpioChannel(
+        m.id,
+        m.location_id,
+        m.channel_number,
+        m.enabled > 0,
+        m.name,
+        m.default_high > 0,
+      ),
+  );
+}
+
 export async function getGpioModule(
   db: Kysely<Database>,
   locationId: string,

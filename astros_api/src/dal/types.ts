@@ -115,6 +115,7 @@ export type ScriptChannelUpdate = Updateable<ScriptChannelsTable>;
 //#region ScriptEvents
 
 export interface ScriptEventsTable {
+  id: string;
   script_id: string;
   script_channel_id: string;
   module_type: number;

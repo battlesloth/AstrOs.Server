@@ -8,16 +8,36 @@ import {
   Migrator,
   SqliteDialect,
 } from "kysely";
+import Dotenv from "dotenv";
+import { fileURLToPath } from "url";
+import path from "path";
 import { logger } from "../logger.js";
 import { Database } from "./types.js";
 import { migration_0 } from "./migrations/migration_0.js";
+import { migration_1 } from "./migrations/migration_1.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+Dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 const appdataPath = appdata("astrosserver");
 const databaseFile = "/database.sqlite3";
 
-const dialect = new SqliteDialect({
-  database: new SQLite(`${appdataPath}${databaseFile}`),
-});
+let dialect = null;
+
+console.log(`NODE_ENV is set to: ${process.env.NODE_ENV}`);
+
+if (process.env.NODE_ENV?.toLocaleLowerCase() === "test") {
+  console.warn("Using in-memory database for tests");
+  dialect = new SqliteDialect({
+    database: new SQLite(":memory:"),
+  });
+} else {
+  console.log(`Using database file at ${appdataPath}${databaseFile}`);
+  dialect = new SqliteDialect({
+    database: new SQLite(`${appdataPath}${databaseFile}`),
+  });
+}
 
 export const db = new Kysely<Database>({
   dialect,
@@ -27,6 +47,7 @@ const migrationProvider = new (class implements MigrationProvider {
   async getMigrations(): Promise<Record<string, Migration>> {
     return {
       "0_initial": migration_0,
+      "1_add_script_evt_id": migration_1,
     };
   }
 })();

@@ -1,0 +1,72 @@
+{
+  "name": "astros_vue",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "run-p type-check \"build-only {@}\" --",
+    "preview": "vite preview",
+    "test:unit": "vitest",
+    "test:e2e": "playwright test",
+    "build-only": "vite build",
+    "type-check": "vue-tsc --build",
+    "lint": "eslint . --fix",
+    "format": "prettier --write --experimental-cli src/",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "start:server": "cd ../astros_api &&  npm run-script start"
+  },
+  "dependencies": {
+    "@headlessui/vue": "^1.7.23",
+    "axios": "^1.13.2",
+    "oh-vue-icons": "^1.0.0-rc3",
+    "pinia": "^3.0.4",
+    "pixi.js": "^8.14.3",
+    "uuid": "^13.0.0",
+    "vue": "^3.5.25",
+    "vue-i18n": "^11.2.2",
+    "vue-router": "^4.6.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@storybook/vue3-vite": "^10.1.8",
+    "@tailwindcss/vite": "^4.1.17",
+    "@tsconfig/node24": "^24.0.3",
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^24.10.1",
+    "@vitejs/plugin-vue": "^6.0.2",
+    "@vitest/eslint-plugin": "^1.5.0",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.6.0",
+    "@vue/test-utils": "^2.4.6",
+    "@vue/tsconfig": "^0.8.1",
+    "daisyui": "^5.5.5",
+    "eslint": "^9.39.1",
+    "eslint-plugin-playwright": "^2.3.0",
+    "eslint-plugin-storybook": "^10.1.8",
+    "eslint-plugin-vue": "~10.5.1",
+    "jiti": "^2.6.1",
+    "jsdom": "^27.2.0",
+    "msw": "^2.12.4",
+    "msw-storybook-addon": "^2.0.6",
+    "npm-run-all2": "^8.0.4",
+    "prettier": "3.6.2",
+    "storybook": "^10.1.8",
+    "storybook-addon-data-theme-switcher": "^3.0.1",
+    "tailwindcss": "^4.1.17",
+    "typescript": "~5.9.0",
+    "vite": "^7.2.4",
+    "vite-plugin-vue-devtools": "^8.0.5",
+    "vitest": "^4.0.14",
+    "vue-tsc": "^3.1.5"
+  },
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
+}

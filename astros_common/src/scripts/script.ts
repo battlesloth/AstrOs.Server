@@ -7,7 +7,7 @@ export class Script {
   description: string;
   lastSaved: Date;
 
-  deploymentStatusKvp: Array<DeploymentStatus>;
+  deploymentStatus: Record<string, DeploymentStatus>;
 
   scriptChannels: Array<ScriptChannel>;
 
@@ -21,7 +21,7 @@ export class Script {
     this.scriptName = scriptName;
     this.description = description;
     this.lastSaved = lastSaved;
-    this.deploymentStatusKvp = new Array<DeploymentStatus>();
+    this.deploymentStatus = {};
     this.scriptChannels = new Array<ScriptChannel>();
   }
 }

@@ -1,38 +1,48 @@
 {
-    "compilerOptions": {
-        "baseUrl": ".",
-        "outDir": "dist",
-        "rootDir": "./src",
-        "module": "ESNext",
-        "moduleResolution": "node",
-        "allowJs": true,
-        "esModuleInterop": true,
-        "target": "es6",
-        "noImplicitAny": true,
-        "sourceMap": true,       
-        "strict": true,
-        "forceConsistentCasingInFileNames": true,
-        "importHelpers": true,
-        "types": ["node", "jest"],
-        "paths": {
-            "src/*":[
-                "src/*"
-            ]
-        },
-        "plugins": [
-            {
-                "transform": "@zerollup/ts-transform-paths",
-                "exclude": ["*"]
-            }
-        ]
+  "compilerOptions": {
+    "baseUrl": ".",
+    "outDir": "dist",
+    "rootDir": "./src",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "allowJs": true,
+    "esModuleInterop": true,
+    "target": "es6",
+    "noImplicitAny": true,
+    "sourceMap": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "importHelpers": true,
+    "skipLibCheck": true,
+    "types": [
+      "node",
+      "jest"
+    ],
+    "paths": {
+      "src/*": [
+        "src/*"
+      ]
     },
-    "typeAcquisition": { "include": ["jest"] },
-    "exclude": [ 
-        "./vitest.config.ts",
-        "./vitest.config.js",
-        "./webpack.config.js",
-        "dist",
-        "**/*.test.ts",
-        "**/*.mock.ts",
+    "plugins": [
+      {
+        "transform": "@zerollup/ts-transform-paths",
+        "exclude": [
+          "*"
+        ]
+      }
     ]
+  },
+  "typeAcquisition": {
+    "include": [
+      "jest"
+    ]
+  },
+  "exclude": [
+    "./vitest.config.ts",
+    "./vitest.config.js",
+    "./webpack.config.js",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }

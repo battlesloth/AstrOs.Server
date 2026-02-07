@@ -1,0 +1,57 @@
+import type { Meta, StoryObj } from '@storybook/vue3';
+import { fn } from 'storybook/test';
+import { v4 as uuid } from 'uuid';
+import AstrosI2cEventModal from './AstrosI2cEventModal.vue';
+import { ModuleSubType, ModuleType, ModalMode } from '@/enums';
+import type { I2cEvent, ScriptEvent } from '@/models';
+
+const meta = {
+  title: 'Components/Modals/Scripter/I2cEventModal',
+  component: AstrosI2cEventModal,
+  parameters: {
+    layout: 'centered',
+  },
+  args: {
+    onSave: fn(),
+    onRemove: fn(),
+    onClose: fn(),
+  },
+  tags: ['autodocs'],
+} satisfies Meta<typeof AstrosI2cEventModal>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {
+  args: {
+    scriptEvent: getScriptEvent(),
+    mode: ModalMode.ADD,
+  },
+};
+
+export const UndefinedEvent: Story = {
+  args: {
+    scriptEvent: getScriptEvent(true),
+    mode: ModalMode.ADD,
+  },
+};
+
+export const EditMode: Story = {
+  args: {
+    scriptEvent: getScriptEvent(),
+    mode: ModalMode.EDIT,
+  },
+};
+
+function getScriptEvent(undefinedEvt = false): ScriptEvent {
+  const i2cEvent: I2cEvent = { message: 'test message' };
+
+  return {
+    id: uuid(),
+    scriptChannel: uuid(),
+    moduleType: ModuleType.I2C,
+    moduleSubType: ModuleSubType.GENERIC_I2C,
+    time: 5000,
+    event: undefinedEvt ? undefined : i2cEvent,
+  };
+}

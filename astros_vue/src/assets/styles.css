@@ -1,0 +1,48 @@
+@import 'tailwindcss';
+@plugin "daisyui" {
+  themes: winter;
+}
+
+@font-face {
+  font-family: 'distant_galaxyregular';
+  src: url('./fonts/DISTGRG_-webfont.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-family-starwars: 'distant_galaxyregular', sans-serif;
+}
+
+.font-starwars {
+  font-family: var(--font-family-starwars);
+}
+
+.btn-primary {
+  background-color: #2a5a97 !important;
+  color: white !important;
+  border-color: #2a5a97 !important;
+}
+
+.btn-primary:hover {
+  background-color: #2f445c !important;
+  border-color: #2f445c !important;
+}
+
+.bg-primary {
+  background-color: #2a5a97 !important;
+}
+
+.bg-r2-light {
+  background-color: #548c9c !important;
+}
+
+.bg-r2-xlight {
+  background-color: #cbdce1 !important;
+}
+
+.bg-r2-complement {
+  background-color: #f49446 !important;
+  color: black !important;
+}

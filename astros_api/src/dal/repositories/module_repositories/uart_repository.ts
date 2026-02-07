@@ -261,10 +261,26 @@ export async function readKangarooChannel(
       throw err;
     });
 
+  let name = "";
+
+  const result = await db
+    .selectFrom("uart_modules")
+    .select("name")
+    .where("id", "=", channel.parent_id)
+    .executeTakeFirstOrThrow()
+    .catch((err) => {
+      logger.error("UartRepository.readKangarooChannel", err);
+      name = "error";
+    });
+
+  if (result) {
+    name = result.name;
+  }
+
   return new KangarooX2Channel(
     channel.id,
     channel.parent_id,
-    "",
+    name,
     channel.ch1_name,
     channel.ch2_name,
   );
@@ -301,8 +317,6 @@ async function upsertMaestroModule(
       });
 
     for (const channel of board.channels) {
-      console.log("Upserting maestro channel", channel);
-
       await trx
         .insertInto("maestro_channels")
         .values({

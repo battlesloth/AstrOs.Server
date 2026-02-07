@@ -4,10 +4,11 @@ import {
   ScriptConverter,
   ISingleCommand,
   CommandType,
-} from "../src/script_converter.js";
+} from "./script_converter.js";
 import { ScriptRepository } from "./dal/repositories/script_repository.js";
 import {
   GenericSerialEvent,
+  GpioChannel,
   GpioEvent,
   GpioModule,
   HcrCommand,
@@ -42,6 +43,7 @@ const coreKangarooModId = "c6e4e295-1b62-43cf-b430-e2ff0fc91740";
 const coreHCRModId = "ef9ffa30-7486-4aac-80d2-a3096163665b";
 const coreMaestroModId = "29521c55-2603-4a70-bb1f-a47a8c938417";
 const coreI2cModId = "f903d2fd-eb59-48de-aeac-55b72d06d1a3";
+const coreGpioChannelId = "a4f5c8e2-3d6b-4f4e-9f1e-2b8f4e5c6d7a";
 
 const domeGenSerialModId = "4af17fad-7cca-4d25-a140-667e4ade4ccd";
 const domeKangarooModId = "c4bd126f-7947-4e1c-b501-6788d11c8d65";
@@ -188,16 +190,26 @@ describe("Script Converter Tests", () => {
 //#region Commands
 
 describe("script commands", () => {
-  it("should create generic serial command", () => {
+  const mockRepo = mock<ScriptRepository>();
+
+  beforeEach(() => {
+    mockReset(mockRepo);
+    mockRepo.getModules.calledWith().mockResolvedValue(getModules());
+  });
+
+  it("should create generic serial command", async () => {
     const event = new GenericSerialEvent("test val");
     const cmd = {
+      controllerId: coreLocId,
+      moduleId: coreGenSerialModId,
+      moduleType: ModuleType.uart,
       moduleSubType: ModuleSubType.genericSerial,
+      channelId: uuid(),
       event: event,
-      channel: 1,
-      baud: 9600,
     } as ISingleCommand;
 
-    const result = ScriptConverter.convertCommand(cmd);
+    const converter = new ScriptConverter(mockRepo);
+    const result = await converter.convertCommand(cmd);
 
     expect(result).toBeDefined();
 
@@ -206,12 +218,12 @@ describe("script commands", () => {
     expect(parts.length).toBe(5);
     expect(parts[0]).toBe(CommandType.genericSerial.toString());
     expect(parts[1]).toBe("0");
-    expect(parts[2]).toBe(cmd.channel.toString());
-    expect(parts[3]).toBe(cmd.baud.toString());
+    expect(parts[2]).toBe("1");
+    expect(parts[3]).toBe("9600");
     expect(parts[4]).toBe(event.value);
   });
 
-  it("should create HCR command", () => {
+  it("should create HCR command", async () => {
     const commands = Array<HcrCommand>(3);
     commands[0] = new HcrCommand(
       uuid(),
@@ -239,13 +251,16 @@ describe("script commands", () => {
 
     const event = new HumanCyborgRelationsEvent(commands);
     const cmd = {
+      controllerId: coreLocId,
+      moduleId: coreHCRModId,
+      moduleType: ModuleType.uart,
       moduleSubType: ModuleSubType.humanCyborgRelationsSerial,
+      channelId: uuid(),
       event: event,
-      channel: 2,
-      baud: 115200,
     } as ISingleCommand;
 
-    const result = ScriptConverter.convertCommand(cmd);
+    const converter = new ScriptConverter(mockRepo);
+    const result = await converter.convertCommand(cmd);
 
     expect(result).toBeDefined();
 
@@ -254,12 +269,12 @@ describe("script commands", () => {
     expect(parts.length).toBe(5);
     expect(parts[0]).toBe(CommandType.genericSerial.toString());
     expect(parts[1]).toBe("0");
-    expect(parts[2]).toBe(cmd.channel.toString());
-    expect(parts[3]).toBe(cmd.baud.toString());
+    expect(parts[2]).toBe("1");
+    expect(parts[3]).toBe("38400");
     expect(parts[4]).toBe("<CA5,SH1,PVV8>");
   });
 
-  it("should create Kangaroo X2 command", () => {
+  it("should create Kangaroo X2 command", async () => {
     const event = new KangarooEvent(
       KangarooAction.start,
       0,
@@ -270,13 +285,16 @@ describe("script commands", () => {
     );
 
     const cmd = {
+      controllerId: coreLocId,
+      moduleId: coreKangarooModId,
+      moduleType: ModuleType.uart,
       moduleSubType: ModuleSubType.kangaroo,
+      channelId: uuid(),
       event: event,
-      channel: 1,
-      baud: 9600,
     } as ISingleCommand;
 
-    const result = ScriptConverter.convertCommand(cmd);
+    const converter = new ScriptConverter(mockRepo);
+    const result = await converter.convertCommand(cmd);
 
     expect(result).toBeDefined();
 
@@ -289,8 +307,8 @@ describe("script commands", () => {
     expect(cmd1Parts.length).toBe(8);
     expect(cmd1Parts[0]).toBe(CommandType.kangaroo.toString());
     expect(cmd1Parts[1]).toBe("0");
-    expect(cmd1Parts[2]).toBe(cmd.channel.toString());
-    expect(cmd1Parts[3]).toBe(cmd.baud.toString());
+    expect(cmd1Parts[2]).toBe("1");
+    expect(cmd1Parts[3]).toBe("19600");
     expect(cmd1Parts[4]).toBe("1");
     expect(cmd1Parts[5]).toBe(KangarooAction.start.toString());
     expect(cmd1Parts[6]).toBe("0");
@@ -301,24 +319,27 @@ describe("script commands", () => {
     expect(cmd2Parts.length).toBe(8);
     expect(cmd2Parts[0]).toBe(CommandType.kangaroo.toString());
     expect(cmd2Parts[1]).toBe("0");
-    expect(cmd2Parts[2]).toBe(cmd.channel.toString());
-    expect(cmd2Parts[3]).toBe(cmd.baud.toString());
+    expect(cmd2Parts[2]).toBe("1");
+    expect(cmd2Parts[3]).toBe("19600");
     expect(cmd2Parts[4]).toBe("2");
     expect(cmd2Parts[5]).toBe(KangarooAction.position.toString());
     expect(cmd2Parts[6]).toBe("5");
     expect(cmd2Parts[7]).toBe("10");
   });
 
-  it("should create Maestro command", () => {
+  it("should create Maestro command", async () => {
     const event = new MaestroEvent(5, false, 1000, 5, 10);
     const cmd = {
+      controllerId: coreLocId,
+      moduleId: coreMaestroModId,
+      moduleType: ModuleType.uart,
       moduleSubType: ModuleSubType.maestro,
+      channelId: uuid(),
       event: event,
-      channel: 4,
-      baud: 0,
     } as ISingleCommand;
 
-    const result = ScriptConverter.convertCommand(cmd);
+    const converter = new ScriptConverter(mockRepo);
+    const result = await converter.convertCommand(cmd);
 
     expect(result).toBeDefined();
 
@@ -327,23 +348,26 @@ describe("script commands", () => {
     expect(parts.length).toBe(7);
     expect(parts[0]).toBe(CommandType.maestro.toString());
     expect(parts[1]).toBe("0");
-    expect(parts[2]).toBe(cmd.channel.toString());
+    expect(parts[2]).toBe("3");
     expect(parts[3]).toBe(event.channel.toString());
     expect(parts[4]).toBe(event.position.toString());
     expect(parts[5]).toBe(event.speed.toString());
     expect(parts[6]).toBe(event.acceleration.toString());
   });
 
-  it("should create generic I2C command", () => {
+  it("should create generic I2C command", async () => {
     const event = new I2cEvent("test val");
     const cmd = {
+      controllerId: coreLocId,
+      moduleId: coreI2cModId,
+      moduleType: ModuleType.i2c,
       moduleSubType: ModuleSubType.genericI2C,
+      channelId: uuid(),
       event: event,
-      channel: 27,
-      baud: 0,
     } as ISingleCommand;
 
-    const result = ScriptConverter.convertCommand(cmd);
+    const converter = new ScriptConverter(mockRepo);
+    const result = await converter.convertCommand(cmd);
 
     expect(result).toBeDefined();
 
@@ -352,20 +376,23 @@ describe("script commands", () => {
     expect(parts.length).toBe(4);
     expect(parts[0]).toBe(CommandType.i2c.toString());
     expect(parts[1]).toBe("0");
-    expect(parts[2]).toBe(cmd.channel.toString());
+    expect(parts[2]).toBe("27");
     expect(parts[3]).toBe(event.message);
   });
 
-  it("should create generic GPIO command", () => {
+  it("should create generic GPIO command", async () => {
     const event = new GpioEvent(true);
     const cmd = {
+      controllerId: coreLocId,
+      moduleId: coreLocId,
+      moduleType: ModuleType.gpio,
       moduleSubType: ModuleSubType.genericGpio,
+      channelId: coreGpioChannelId,
       event: event,
-      channel: 5,
-      baud: 0,
     } as ISingleCommand;
 
-    const result = ScriptConverter.convertCommand(cmd);
+    const converter = new ScriptConverter(mockRepo);
+    const result = await converter.convertCommand(cmd);
 
     expect(result).toBeDefined();
 
@@ -374,7 +401,7 @@ describe("script commands", () => {
     expect(parts.length).toBe(4);
     expect(parts[0]).toBe(CommandType.gpio.toString());
     expect(parts[1]).toBe("0");
-    expect(parts[2]).toBe(cmd.channel.toString());
+    expect(parts[2]).toBe("5");
     expect(parts[3]).toBe("1");
   });
 });
@@ -428,13 +455,14 @@ function coreGenericSeriaScriptCh(scriptId: string): ScriptChannel {
   for (let i = 0; i < 3; i++) {
     const evt = new GenericSerialEvent(`test ${i}`);
     const sevt = new ScriptEvent(
+      uuid(),
       scriptCh.id,
       ModuleType.uart,
       ModuleSubType.genericSerial,
-      i * 10,
+      i,
       evt,
     );
-    scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
+    scriptCh.events[uuid()] = sevt;
   }
 
   return scriptCh;
@@ -464,13 +492,14 @@ function domeGenericSerialScriptCh(scriptId: string): ScriptChannel {
     if (i % 2 === 0) {
       const evt = new GenericSerialEvent(`UART ${i}`);
       const sevt = new ScriptEvent(
+        uuid(),
         scriptCh.id,
         ModuleType.uart,
         ModuleSubType.genericSerial,
-        i * 10,
+        i,
         evt,
       );
-      scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
+      scriptCh.events[uuid()] = sevt;
     }
   }
 
@@ -495,13 +524,14 @@ function domeI2cScriptCh(scriptId: string): ScriptChannel {
     if (i % 2 !== 0) {
       const evt = new I2cEvent(`I2C ${i}`);
       const sevt = new ScriptEvent(
+        uuid(),
         scriptCh.id,
         ModuleType.i2c,
         ModuleSubType.genericI2C,
-        i * 10,
+        i,
         evt,
       );
-      scriptCh.eventsKvpArray.push({ key: i * 1000, value: sevt });
+      scriptCh.events[uuid()] = sevt;
     }
   }
 
@@ -571,7 +601,12 @@ function getModules() {
       ModuleSubType.genericI2C,
     ),
   );
-  map.set(coreLocId, new GpioModule(coreLocId));
+  const coreGpioModule = new GpioModule(coreLocId);
+
+  coreGpioModule.channels.push(
+    new GpioChannel(coreGpioChannelId, coreLocId, 5, true, "GPIO 5", false),
+  );
+  map.set(coreLocId, coreGpioModule);
 
   // dome
   map.set(
@@ -633,7 +668,8 @@ function getModules() {
       ModuleSubType.genericI2C,
     ),
   );
-  map.set(domeLocId, new GpioModule(domeLocId));
+  const domeGpioModule = new GpioModule(domeLocId);
+  map.set(domeLocId, domeGpioModule);
 
   // body
   map.set(
@@ -695,7 +731,8 @@ function getModules() {
       ModuleSubType.genericI2C,
     ),
   );
-  map.set(bodyLocId, new GpioModule(bodyLocId));
+  const bodyGpioModule = new GpioModule(bodyLocId);
+  map.set(bodyLocId, bodyGpioModule);
 
   return map;
 }

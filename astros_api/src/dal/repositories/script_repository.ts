@@ -18,6 +18,7 @@ import { Guid } from "guid-typescript";
 import { Database, ScriptsTable } from "../types.js";
 import { Kysely, Transaction } from "kysely";
 import {
+  getAllActiveGpioChannels,
   getGpioModule,
   readGpioChannel,
 } from "./module_repositories/gpio_repository.js";
@@ -89,15 +90,23 @@ export class ScriptRepository {
     script.scriptName = script.scriptName + " - copy";
     for (const ch of script.scriptChannels) {
       ch.id = Guid.create().toString();
-      for (const kvp of ch.eventsKvpArray) {
-        kvp.value.scriptChannel = ch.id;
+
+      const events = [...Object.values(ch.events)];
+
+      ch.events = {};
+      for (const evt of events) {
+        evt.id = Guid.create().toString();
+        evt.scriptChannel = ch.id;
+        ch.events[evt.id] = evt;
       }
     }
-    script.deploymentStatusKvp = new Array<DeploymentStatus>();
+
+    script.deploymentStatus = {};
     script.lastSaved = new Date();
 
     await this.upsertScript(script).catch((err: any) => {
       logger.error(`Exception saving copy script for ${id} => ${err}`);
+      throw err;
     });
 
     result = new Script(
@@ -151,12 +160,12 @@ export class ScriptRepository {
         });
 
       for (const dep of deployments) {
-        const status = new DeploymentStatus(dep.location_id, {
-          date: new Date(dep.last_deployed),
-          value: UploadStatus.uploaded,
-          locationName: dep.location_name || "",
-        });
-        scr.deploymentStatusKvp.push(status);
+        const status = new DeploymentStatus(
+          new Date(dep.last_deployed),
+          UploadStatus.uploaded,
+          dep.location_name || "",
+        );
+        scr.deploymentStatus[dep.location_id] = status;
       }
     }
 
@@ -199,13 +208,12 @@ export class ScriptRepository {
       });
 
     for (const dep of deployments) {
-      const status = new DeploymentStatus(dep.location_id, {
-        date: new Date(dep.last_deployed),
-        value: UploadStatus.uploaded,
-        locationName: dep.location_name || "",
-      });
-
-      result.deploymentStatusKvp.push(status);
+      const status = new DeploymentStatus(
+        new Date(dep.last_deployed),
+        UploadStatus.uploaded,
+        dep.location_name || "",
+      );
+      result.deploymentStatus[dep.location_id] = status;
     }
 
     result.scriptChannels = await this.readScriptChannels(id);
@@ -255,8 +263,8 @@ export class ScriptRepository {
         throw err;
       });
 
-    for (const kvp of ch.eventsKvpArray) {
-      const evt = kvp.value;
+    for (const key in ch.events) {
+      const evt = ch.events[key] as ScriptEvent;
 
       // set the channel number for Maestro events
       // we do this here because the channel can be changed in the UI
@@ -305,7 +313,7 @@ export class ScriptRepository {
 
       await this.configScriptChannel(channel);
 
-      channel.eventsKvpArray = await this.readScriptEvents(scriptId, ch.id);
+      channel.events = await this.readScriptEvents(scriptId, ch.id);
 
       result.push(channel);
     }
@@ -352,6 +360,17 @@ export class ScriptRepository {
     return channel;
   }
 
+  async getGpioChannelMap(): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+
+    const gpioChannels = await getAllActiveGpioChannels(this.db);
+
+    for (const gpio of gpioChannels) {
+      result.set(gpio.id, gpio.channelNumber);
+    }
+
+    return result;
+  }
   //#endregion
 
   //#region Channels Delete
@@ -383,11 +402,12 @@ export class ScriptRepository {
     await tx
       .insertInto("script_events")
       .values({
+        id: evt.id,
         script_id: scriptId,
         script_channel_id: channelId,
         module_type: evt.moduleType,
         module_sub_type: evt.moduleSubType,
-        time: evt.time,
+        time: Math.round(evt.time * 10), // stored as integer scaled storage to 0.1s
         data: JSON.stringify(evt.event),
       })
       .execute()
@@ -404,8 +424,8 @@ export class ScriptRepository {
   private async readScriptEvents(
     scriptId: string,
     channelId: string,
-  ): Promise<Array<{ key: number; value: ScriptEvent }>> {
-    const result = new Array<{ key: number; value: ScriptEvent }>();
+  ): Promise<Record<string, ScriptEvent>> {
+    const result = {} as Record<string, ScriptEvent>;
 
     const events = await this.db
       .selectFrom("script_events")
@@ -428,14 +448,15 @@ export class ScriptRepository {
       );
 
       const event = new ScriptEvent(
+        evt.id,
         evt.script_channel_id,
         evt.module_type,
         subtype,
-        evt.time,
+        evt.time / 10, // stored as integer scaled storage to 0.1s
         scriptEventType,
       );
 
-      result.push({ key: event.time, value: event });
+      result[event.id] = event;
     }
 
     return result;

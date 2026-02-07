@@ -1,0 +1,385 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue';
+import type { AddModuleEvent, RemoveModuleEvent, ServoTestEvent } from '@/models/events';
+import { useLocationStore } from '@/stores/location';
+import { useControllerStore } from '@/stores/controller';
+import { Location, ModalType, ControllerStatus } from '@/enums';
+import { useModuleManagement } from '@/composables/useModuleManagement';
+import {
+  AstrosLayout,
+  AstrosEspModule,
+  AstrosAlertModal,
+  AstrosConfirmModal,
+  AstrosInterruptModal,
+  AstrosLoadingModal,
+  AstrosAddModuleModal,
+  AstrosServoTestModal,
+} from '@/components';
+import apiService from '@/api/apiService';
+import { SYNC_CONFIG } from '@/api/endpoints';
+import { useToast } from '@/composables/useToast';
+import { useI18n } from 'vue-i18n';
+import { storeToRefs } from 'pinia';
+
+const { t } = useI18n();
+
+const showModal = ref<ModalType>(ModalType.LOADING);
+const modalMessage = ref<string>('');
+
+const selectedLocationId = ref<Location>(Location.UNKNOWN);
+const selectedModuleId = ref<string>('');
+const selectedModuleType = ref<number>(0);
+
+const servoTestProps = ref<ServoTestEvent | null>(null);
+
+const openAccordion = ref<string | null>(null);
+
+const locationStore = useLocationStore();
+const controllerStore = useControllerStore();
+
+const { success, error } = useToast();
+
+const { addModule, removeModule } = useModuleManagement();
+
+const bodyLocation = storeToRefs(locationStore).bodyLocation;
+const bodyStatus = storeToRefs(controllerStore).bodyStatus;
+const coreLocation = storeToRefs(locationStore).coreLocation;
+const coreStatus = storeToRefs(controllerStore).coreStatus;
+const domeLocation = storeToRefs(locationStore).domeLocation;
+const domeStatus = storeToRefs(controllerStore).domeStatus;
+
+const availableCoreControllers = computed(() =>
+  controllerStore.controllers.filter(
+    (c) => c.id !== domeLocation.value?.controller?.id && c.address !== '00:00:00:00:00:00',
+  ),
+);
+
+const availableDomeControllers = computed(() =>
+  controllerStore.controllers.filter(
+    (c) => c.id !== coreLocation.value?.controller?.id && c.address !== '00:00:00:00:00:00',
+  ),
+);
+
+function onLocationsLoaded() {
+  showModal.value = ModalType.CLOSE_ALL;
+}
+
+async function saveModuleSettings() {
+  modalMessage.value = 'module_view.saving';
+  showModal.value = ModalType.INTERRUPT;
+  const result = await locationStore.saveLocationsToApi();
+
+  // wait 1 second so it's not so abrupt
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  if (result.success) {
+    showModal.value = ModalType.CLOSE_ALL;
+    modalMessage.value = '';
+  } else {
+    modalMessage.value = result.error ?? 'module_view.save_failed';
+    showModal.value = ModalType.ERROR;
+  }
+}
+
+async function syncModuleSettings() {
+  const result = await apiService.get(SYNC_CONFIG);
+
+  if (result.message === 'success') {
+    success(t('module_view.sync_successful'));
+  } else {
+    error(t('module_view.sync_failed'));
+  }
+}
+
+function openAddModuleModal(evt: AddModuleEvent) {
+  selectedLocationId.value = evt.locationId;
+  selectedModuleType.value = evt.moduleType;
+  showModal.value = ModalType.ADD_MODULE;
+}
+
+function handleAddModule(event: AddModuleEvent) {
+  try {
+    addModule(event.locationId, event.moduleType, event.moduleSubType);
+    showModal.value = ModalType.CLOSE_ALL;
+  } catch (error) {
+    console.error('Error adding module:', error);
+    modalMessage.value = (error as Error).message;
+    showModal.value = ModalType.ERROR;
+  }
+}
+
+function openConfirmRemoveModuleModal(event: RemoveModuleEvent) {
+  selectedLocationId.value = event.locationId;
+  selectedModuleId.value = event.id;
+  selectedModuleType.value = event.moduleType;
+  showModal.value = ModalType.CONFIRM;
+}
+
+function handleRemoveModule() {
+  try {
+    removeModule(selectedLocationId.value, selectedModuleId.value, selectedModuleType.value);
+    showModal.value = ModalType.CLOSE_ALL;
+  } catch (error) {
+    console.error('Error removing module:', error);
+    modalMessage.value = (error as Error).message;
+    showModal.value = ModalType.ERROR;
+  }
+}
+
+function handleServoTest(event: ServoTestEvent) {
+  console.log('Handling servo test event:', event);
+  servoTestProps.value = event;
+  showModal.value = ModalType.SERVO_TEST;
+}
+
+function controllerSelectChanged(location: string) {
+  // TODO: Implement controller select change
+  console.log('Controller select changed:', location);
+}
+</script>
+
+<template>
+  <AstrosLayout>
+    <template v-slot:main>
+      <div
+        class="flex flex-col overflow-hidden"
+        style="height: calc(100vh - 64px)"
+      >
+        <!-- Header with buttons -->
+        <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0 mb-4">
+          <h1 class="text-2xl font-bold">{{ $t('module_view.modules') }}</h1>
+          <div class="grow"></div>
+          <button
+            data-testid="save_module_settings"
+            class="btn btn-primary w-24"
+            @click="saveModuleSettings"
+          >
+            {{ $t('module_view.save') }}
+          </button>
+          <button
+            class="btn btn-primary w-24"
+            @click="syncModuleSettings"
+          >
+            {{ $t('module_view.sync') }}
+          </button>
+        </div>
+
+        <!-- Module Accordions -->
+        <div class="flex-1 overflow-y-scroll p-4 pb-8 flex justify-center">
+          <div class="space-y-2 pb-4 w-full max-w-5xl">
+            <!-- Body Module -->
+            <div
+              class="collapse collapse-arrow bg-base-200 border border-base-300"
+              :class="{
+                'collapse-open': openAccordion === 'body',
+                'collapse-close': openAccordion !== 'body',
+              }"
+            >
+              <div
+                data-testid="body-module-header"
+                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer bg-r2-xlight"
+                @click="openAccordion = openAccordion === 'body' ? null : 'body'"
+              >
+                <span>{{ $t('module_view.body') }}</span>
+                <div class="grow"></div>
+                <v-icon
+                  :name="bodyStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
+                  :class="[
+                    { 'text-green-500': bodyStatus === ControllerStatus.UP },
+                    { 'text-yellow-500': bodyStatus === ControllerStatus.NEEDS_SYNCED },
+                    { 'text-red-500': bodyStatus === ControllerStatus.DOWN },
+                  ]"
+                  scale="1.5"
+                />
+              </div>
+              <div
+                class="collapse-content bg-r2-xlight"
+                v-if="bodyLocation"
+              >
+                <div class="mb-4">
+                  <select
+                    class="select select-bordered w-full"
+                    title="Controller Select"
+                    disabled
+                  >
+                    <option
+                      value="0"
+                      selected
+                    >
+                      {{ $t('module_view.master') }}
+                    </option>
+                  </select>
+                </div>
+                <AstrosEspModule
+                  :is-master="true"
+                  :location-enum="Location.BODY"
+                  :parent-test-id="'body'"
+                  @add-module="openAddModuleModal"
+                  @remove-module="openConfirmRemoveModuleModal"
+                  @open-servo-test-modal="handleServoTest"
+                />
+              </div>
+            </div>
+
+            <!-- Core Module -->
+            <div
+              class="collapse collapse-arrow bg-r2-xlight border border-base-300"
+              :class="{
+                'collapse-open': openAccordion === 'core',
+                'collapse-close': openAccordion !== 'core',
+              }"
+            >
+              <div
+                data-testid="core-module-header"
+                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer bg-r2-xlight"
+                @click="openAccordion = openAccordion === 'core' ? null : 'core'"
+              >
+                <span>{{ $t('module_view.core') }}</span>
+                <div class="grow"></div>
+                <v-icon
+                  :name="coreStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
+                  :class="[
+                    { 'text-green-500': coreStatus === ControllerStatus.UP },
+                    { 'text-yellow-500': coreStatus === ControllerStatus.NEEDS_SYNCED },
+                    { 'text-red-500': coreStatus === ControllerStatus.DOWN },
+                  ]"
+                  scale="1.5"
+                />
+              </div>
+              <div
+                class="collapse-content"
+                v-if="coreLocation"
+              >
+                <div class="mb-4">
+                  <select
+                    id="core-controller-select"
+                    class="select select-bordered w-full"
+                    title="Controller Select"
+                    v-model="coreLocation.controller.id"
+                    @change="controllerSelectChanged('core')"
+                  >
+                    <option
+                      value="0"
+                      selected
+                    >
+                      {{ $t('module_view.disabled') }}
+                    </option>
+                    <option
+                      v-for="controller in availableCoreControllers"
+                      :key="controller.id"
+                      :value="controller.id"
+                    >
+                      {{ controller.name }}
+                    </option>
+                  </select>
+                </div>
+                <AstrosEspModule
+                  :location-enum="Location.CORE"
+                  :parent-test-id="'core'"
+                  @add-module="openAddModuleModal"
+                  @remove-module="openConfirmRemoveModuleModal"
+                  @open-servo-test-modal="handleServoTest"
+                />
+              </div>
+            </div>
+
+            <!-- Dome Module -->
+            <div
+              class="collapse collapse-arrow bg-r2-xlight border border-base-300"
+              :class="{
+                'collapse-open': openAccordion === 'dome',
+                'collapse-close': openAccordion !== 'dome',
+              }"
+            >
+              <div
+                data-testid="dome-module-header"
+                class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer bg-r2-xlight"
+                @click="openAccordion = openAccordion === 'dome' ? null : 'dome'"
+              >
+                <span>{{ $t('module_view.dome') }}</span>
+                <div class="grow"></div>
+                <v-icon
+                  :name="domeStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
+                  :class="[
+                    { 'text-green-500': domeStatus === ControllerStatus.UP },
+                    { 'text-yellow-500': domeStatus === ControllerStatus.NEEDS_SYNCED },
+                    { 'text-red-500': domeStatus === ControllerStatus.DOWN },
+                  ]"
+                  scale="1.5"
+                />
+              </div>
+              <div
+                class="collapse-content"
+                v-if="domeLocation"
+              >
+                <div class="mb-4">
+                  <select
+                    id="dome-controller-select"
+                    class="select select-bordered w-full"
+                    title="Controller Select"
+                    v-model="domeLocation.controller.id"
+                    @change="controllerSelectChanged('dome')"
+                  >
+                    <option
+                      value="0"
+                      selected
+                    >
+                      {{ $t('module_view.disabled') }}
+                    </option>
+                    <option
+                      v-for="controller in availableDomeControllers"
+                      :key="controller.id"
+                      :value="controller.id"
+                    >
+                      {{ controller.name }}
+                    </option>
+                  </select>
+                </div>
+                <AstrosEspModule
+                  :location-enum="Location.DOME"
+                  :parent-test-id="'dome'"
+                  @add-module="openAddModuleModal"
+                  @remove-module="openConfirmRemoveModuleModal"
+                  @open-servo-test-modal="handleServoTest"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <AstrosInterruptModal
+        v-if="showModal === ModalType.INTERRUPT"
+        :message="modalMessage"
+      />
+      <AstrosAlertModal
+        v-if="showModal === ModalType.ERROR"
+        :message="modalMessage"
+        @close="showModal = ModalType.CLOSE_ALL"
+      />
+      <AstrosConfirmModal
+        v-if="showModal === ModalType.CONFIRM"
+        :message="$t('module_view.confirm_remove')"
+        @confirm="handleRemoveModule"
+        @close="showModal = ModalType.CLOSE_ALL"
+      />
+      <AstrosLoadingModal
+        v-if="showModal === ModalType.LOADING"
+        @loaded="onLocationsLoaded"
+      />
+      <AstrosAddModuleModal
+        v-if="showModal === ModalType.ADD_MODULE"
+        :is-open="showModal === ModalType.ADD_MODULE"
+        :location-id="selectedLocationId"
+        :module-type="selectedModuleType"
+        @add="handleAddModule"
+        @close="showModal = ModalType.CLOSE_ALL"
+      />
+      <AstrosServoTestModal
+        v-if="showModal === ModalType.SERVO_TEST && servoTestProps !== null"
+        v-bind="servoTestProps as Required<ServoTestEvent>"
+        @close="showModal = ModalType.CLOSE_ALL"
+      />
+    </template>
+  </AstrosLayout>
+</template>

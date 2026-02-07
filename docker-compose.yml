@@ -1,32 +1,21 @@
 services:
-  web:
+  astros:
+    hostname: astros
     platform: linux/arm64
     build:
       context: .
-      dockerfile: ./astros_client/Dockerfile
+      dockerfile: ./Dockerfile
       tags:
-        - dirtknap/astros-web:1.2.7
-        - dirtknap/astros-web:latest
+        - dirtknap/astros-server:1.3.0
+        - dirtknap/astros-server:latest
     ports:
       - 8080:80
+      - 3000:3000
       - 5000:5000
-    networks:
-      - astronet
-  api:
-    hostname: astros-api
-    platform: linux/arm64
-    build:
-      context: .
-      dockerfile: ./astros_api/Dockerfile
-      tags:
-        - dirtknap/astros-api:1.2.7
-        - dirtknap/astros-api:latest
     volumes:
       - C:/Test:/root/.config/astrosserver
     networks:
       - astronet
-    devices:
-      - "/dev/ttyUSB0:/dev/ttyS0"
 
 networks:
   astronet:

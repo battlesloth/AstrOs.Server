@@ -26,7 +26,7 @@ export class RemoteConfigRepository {
       .onConflict((c) =>
         c.column("type").doUpdateSet({
           value: json,
-        })
+        }),
       )
       .execute()
       .catch((err) => {
