@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { TransmissionStatus } from '@/enums/transmissionStatus';
 import { UploadStatus, Location } from '@/enums';
 import { useScriptsStore } from '@/stores/scripts';
+import { useScripterStore } from '@/stores/scripter';
 import { useLocationStore } from '@/stores/location';
 
 interface Caption {
@@ -32,8 +33,7 @@ const bodyCaption = ref<Caption>({ str: 'Uploading' });
 
 const locationsStore = useLocationStore();
 const scriptStore = useScriptsStore();
-
-const script = computed(() => scriptStore.scripts.find((s) => s.id === props.scriptId));
+const scripterStore = useScripterStore();
 
 const canRun = computed(() => {
   return !uploadInProgress.value && !runDisabled.value;
@@ -56,9 +56,9 @@ const convertUploadStatusToTransmission = (
   }
 };
 
-// Watch the script's deployment status and update UI accordingly
+// Watch the scripter's script deployment status and update UI accordingly
 watch(
-  () => script.value?.deploymentStatus,
+  () => scripterStore.script?.deploymentStatus,
   (deploymentStatus) => {
     if (!deploymentStatus) return;
 
@@ -99,7 +99,7 @@ watch(
       }
     }
   },
-  { deep: true },
+  { deep: true, immediate: true },
 );
 
 const setInitialUploadStatus = (hasBody: boolean, hasCore: boolean, hasDome: boolean) => {
@@ -223,12 +223,6 @@ const closeModal = () => {
         </button>
       </div>
     </div>
-    <form
-      method="dialog"
-      class="modal-backdrop"
-      @click="closeModal"
-    >
-      <button>Close</button>
-    </form>
+    <div class="modal-backdrop"></div>
   </dialog>
 </template>

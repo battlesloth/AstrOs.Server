@@ -119,6 +119,11 @@ const removeEvent = (chlId: string, eventId: string) => {
 
 const updateEvent = (chlId: string, eventId: string) => {
   console.log('updating event', eventId, 'from channel', chlId);
+
+  // Rebuild the event box to reflect updated visual properties
+  rebuildEventBox(chlId, eventId);
+
+  // Also update positions in case time changed
   updateEventBoxPositions(chlId);
 };
 
@@ -207,6 +212,7 @@ const {
   hasEventBoxDragged,
   addEventBox,
   removeEventBox,
+  rebuildEventBox,
   updateEventBoxPositions,
   updateAllEventBoxPositions,
   handleEventBoxDrag,

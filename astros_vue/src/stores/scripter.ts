@@ -4,7 +4,14 @@ import { useScriptResources } from '@/composables/useScriptResources';
 import { useLocationStore } from './location';
 import apiService from '@/api/apiService';
 import { SCRIPTS } from '@/api/endpoints';
-import type { Channel, Script, ScriptChannel, ScriptChannelResource, ScriptEvent } from '@/models';
+import type {
+  Channel,
+  Script,
+  ScriptChannel,
+  ScriptChannelResource,
+  ScriptEvent,
+  ScriptStatus,
+} from '@/models';
 import { ScriptChannelType, Location, UploadStatus } from '@/enums';
 import { v4 as uuid } from 'uuid';
 import { moduleChannelTypeFromSubType } from '@/models';
@@ -360,6 +367,20 @@ export const useScripterStore = defineStore('scripter', () => {
     return result;
   }
 
+  function updateScriptStatus(status: ScriptStatus) {
+    console.log('Updating scripter script status:', status);
+    if (script.value) {
+      // Update the script's deployment status based on the incoming status
+      script.value.deploymentStatus = {
+        ...script.value.deploymentStatus,
+        [status.locationId]: {
+          date: status.date,
+          value: status.status,
+        },
+      };
+    }
+  }
+
   return {
     isLoading,
     isSaving,
@@ -379,5 +400,6 @@ export const useScripterStore = defineStore('scripter', () => {
     removeEventFromChannel,
     getResourceIdByChannelId,
     getChannelTestValue,
+    updateScriptStatus,
   };
 });
