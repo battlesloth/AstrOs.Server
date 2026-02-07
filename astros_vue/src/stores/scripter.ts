@@ -368,7 +368,6 @@ export const useScripterStore = defineStore('scripter', () => {
   }
 
   function updateScriptStatus(status: ScriptStatus) {
-    console.log('Updating scripter script status:', status);
     if (script.value) {
       // Update the script's deployment status based on the incoming status
       script.value.deploymentStatus = {

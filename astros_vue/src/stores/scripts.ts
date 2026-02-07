@@ -79,7 +79,6 @@ export const useScriptsStore = defineStore('scripts', () => {
   }
 
   async function updateScriptStatus(status: ScriptStatus) {
-    console.log('Updating script status:', status);
     const script = scripts.value.find((s) => s.id === status.scriptId);
     if (script) {
       // Update the script's deployment status based on the incoming status
@@ -91,11 +90,7 @@ export const useScriptsStore = defineStore('scripts', () => {
         },
       };
     } else {
-      console.warn('Script status update skipped: script not found in store', {
-        scriptId: status.scriptId,
-        storeSize: scripts.value.length,
-        storeIds: scripts.value.map((s) => s.id),
-      });
+      console.warn(`Script status update skipped: script ${status.scriptId} not found in store`);
     }
   }
 

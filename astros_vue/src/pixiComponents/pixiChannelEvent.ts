@@ -303,8 +303,13 @@ export class PixiChannelEvent extends Container {
    * Call this after updating scriptEvent data to refresh the display
    */
   rebuild() {
-    // Remove all children
-    this.removeChildren();
+    // Destroy and remove all existing children to avoid leaking Pixi objects
+    while (this.children.length > 0) {
+      const child = this.removeChildAt(0);
+      if (child && 'destroy' in child && typeof child.destroy === 'function') {
+        child.destroy({ children: true });
+      }
+    }
 
     // Redraw with updated data
     this.setContainerContent();
