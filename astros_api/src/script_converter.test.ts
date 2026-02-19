@@ -91,16 +91,16 @@ describe("Script Converter Tests", () => {
     const coreSegs = coreScript?.split(";");
 
     expect(coreSegs?.length).toBe(3);
-    expect(coreSegs?.[0]).toBe("3|1000|1|9600|test 0");
-    expect(coreSegs?.[1]).toBe("3|1000|1|9600|test 1");
+    expect(coreSegs?.[0]).toBe("3|100|1|9600|test 0");
+    expect(coreSegs?.[1]).toBe("3|100|1|9600|test 1");
     expect(coreSegs?.[2]).toBe("3|0|1|9600|test 2");
 
     // buffer events on dome and body
     expect(domeScript).toBeDefined();
     expect(bodyScript).toBeDefined();
 
-    expect(domeScript).toBe("0|2000|0;0|0|0");
-    expect(bodyScript).toBe("0|2000|0;0|0|0");
+    expect(domeScript).toBe("0|200|0;0|0|0");
+    expect(bodyScript).toBe("0|200|0;0|0|0");
   });
 
   it("two channels on one location", async () => {
@@ -125,19 +125,19 @@ describe("Script Converter Tests", () => {
     const domeSegs = domeScript?.split(";");
 
     expect(domeSegs?.length).toBe(6);
-    expect(domeSegs?.[0]).toBe("3|1000|2|9602|UART 0");
-    expect(domeSegs?.[1]).toBe("2|1000|37|I2C 1");
-    expect(domeSegs?.[2]).toBe("3|1000|2|9602|UART 2");
-    expect(domeSegs?.[3]).toBe("2|1000|37|I2C 3");
-    expect(domeSegs?.[4]).toBe("3|1000|2|9602|UART 4");
+    expect(domeSegs?.[0]).toBe("3|100|2|9602|UART 0");
+    expect(domeSegs?.[1]).toBe("2|100|37|I2C 1");
+    expect(domeSegs?.[2]).toBe("3|100|2|9602|UART 2");
+    expect(domeSegs?.[3]).toBe("2|100|37|I2C 3");
+    expect(domeSegs?.[4]).toBe("3|100|2|9602|UART 4");
     expect(domeSegs?.[5]).toBe("2|0|37|I2C 5");
 
     // buffer events on core and body
     expect(coreScript).toBeDefined();
     expect(bodyScript).toBeDefined();
 
-    expect(coreScript).toBe("0|5000|0;0|0|0");
-    expect(bodyScript).toBe("0|5000|0;0|0|0");
+    expect(coreScript).toBe("0|500|0;0|0|0");
+    expect(bodyScript).toBe("0|500|0;0|0|0");
   });
 
   it("dome and core scipt", async () => {
@@ -162,11 +162,11 @@ describe("Script Converter Tests", () => {
     const domeSegs = domeScript?.split(";");
 
     expect(domeSegs?.length).toBe(6);
-    expect(domeSegs?.[0]).toBe("3|1000|2|9602|UART 0");
-    expect(domeSegs?.[1]).toBe("2|1000|37|I2C 1");
-    expect(domeSegs?.[2]).toBe("3|1000|2|9602|UART 2");
-    expect(domeSegs?.[3]).toBe("2|1000|37|I2C 3");
-    expect(domeSegs?.[4]).toBe("3|1000|2|9602|UART 4");
+    expect(domeSegs?.[0]).toBe("3|100|2|9602|UART 0");
+    expect(domeSegs?.[1]).toBe("2|100|37|I2C 1");
+    expect(domeSegs?.[2]).toBe("3|100|2|9602|UART 2");
+    expect(domeSegs?.[3]).toBe("2|100|37|I2C 3");
+    expect(domeSegs?.[4]).toBe("3|100|2|9602|UART 4");
     expect(domeSegs?.[5]).toBe("2|0|37|I2C 5");
 
     expect(coreScript).toBeDefined();
@@ -174,15 +174,62 @@ describe("Script Converter Tests", () => {
     const coreSegs = coreScript?.split(";");
 
     expect(coreSegs?.length).toBe(4);
-    expect(coreSegs?.[0]).toBe("3|1000|1|9600|test 0");
-    expect(coreSegs?.[1]).toBe("3|1000|1|9600|test 1");
-    expect(coreSegs?.[2]).toBe("3|3000|1|9600|test 2");
+    expect(coreSegs?.[0]).toBe("3|100|1|9600|test 0");
+    expect(coreSegs?.[1]).toBe("3|100|1|9600|test 1");
+    expect(coreSegs?.[2]).toBe("3|300|1|9600|test 2");
     expect(coreSegs?.[3]).toBe("0|0|0");
 
     // buffer events on body
     expect(bodyScript).toBeDefined();
 
-    expect(bodyScript).toBe("0|5000|0;0|0|0");
+    expect(bodyScript).toBe("0|500|0;0|0|0");
+  });
+
+  it("test script times", async () => {
+    const scriptId = "testScriptTimes";
+
+    // script event times should be in tenths of seconds, so 10 = 1 second
+    // events should be ordered by time, not by order in channel
+    const evt1Time = 5; // 0.5 seconds
+    const evt2Time = 12; // 1.2 seconds
+    const evt3Time = 24; // 2.4 seconds
+    const evt4Time = 362; // 36.2 seconds
+
+    const ttevt1ms = 500; // 0.5 seconds till event 1
+    const ttevt2ms = 700; // 0.7 seconds between event 1 and event 2
+    const ttevt3ms = 1200; // 1.2 seconds between event 2 and event 3
+    const ttevt4ms = 33800; // 34.2 seconds between event 3 and event 4
+
+    const script = new Script(scriptId, "test", "test", new Date());
+    const scriptCh = generateSerialScriptChannel(scriptId);
+    const sevt1 = generateCoreScriptSerialEventByDecSec(evt1Time, scriptCh.id);
+    const sevt2 = generateCoreScriptSerialEventByDecSec(evt2Time, scriptCh.id);
+    const sevt3 = generateCoreScriptSerialEventByDecSec(evt3Time, scriptCh.id);
+    const sevt4 = generateCoreScriptSerialEventByDecSec(evt4Time, scriptCh.id);
+
+    scriptCh.events[uuid()] = sevt1;
+    scriptCh.events[uuid()] = sevt3;
+    scriptCh.events[uuid()] = sevt4;
+    scriptCh.events[uuid()] = sevt2;
+
+    script.scriptChannels.push(scriptCh);
+    mockRepo.getScript.calledWith(scriptId).mockResolvedValue(script);
+
+    const converter = new ScriptConverter(mockRepo);
+    const result = await converter.convertScript(scriptId);
+
+    expect(result).toBeDefined();
+
+    const coreScript = result?.get(coreLocId);
+    expect(coreScript).toBeDefined();
+
+    const coreSegs = coreScript?.split(";");
+    expect(coreSegs?.length).toBe(5);
+    expect(coreSegs?.[0]).toBe(`0|${ttevt1ms}|0`);
+    expect(coreSegs?.[1]).toBe(`3|${ttevt2ms}|1|9600|test ${evt1Time}`);
+    expect(coreSegs?.[2]).toBe(`3|${ttevt3ms}|1|9600|test ${evt2Time}`);
+    expect(coreSegs?.[3]).toBe(`3|${ttevt4ms}|1|9600|test ${evt3Time}`);
+    expect(coreSegs?.[4]).toBe(`3|0|1|9600|test ${evt4Time}`);
   });
 });
 
@@ -430,6 +477,47 @@ function generateScript(id: string): Script {
     default:
       return script;
   }
+}
+
+function generateSerialScriptChannel(scriptId: string): ScriptChannel {
+  const uartChannel = new UartChannel(
+    uuid(),
+    coreGenSerialModId,
+    "",
+    ModuleSubType.genericSerial,
+    true,
+  );
+
+  const scriptCh = new ScriptChannel(
+    uuid(),
+    scriptId,
+    ScriptChannelType.GENERIC_UART,
+    coreGenSerialModId,
+    uartChannel.id,
+    ModuleChannelTypes.UartChannel,
+    uartChannel,
+    3000,
+  );
+
+  return scriptCh;
+}
+
+function generateCoreScriptSerialEventByDecSec(
+  tenthOfSeconds: number,
+  chId: string,
+): ScriptEvent {
+  const evt = new GenericSerialEvent(`test ${tenthOfSeconds}`);
+
+  const sevt = new ScriptEvent(
+    uuid(),
+    chId,
+    ModuleType.uart,
+    ModuleSubType.genericSerial,
+    tenthOfSeconds,
+    evt,
+  );
+
+  return sevt;
 }
 
 function coreGenericSeriaScriptCh(scriptId: string): ScriptChannel {
