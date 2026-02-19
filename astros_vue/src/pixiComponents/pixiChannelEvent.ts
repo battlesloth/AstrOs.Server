@@ -265,7 +265,13 @@ export class PixiChannelEvent extends Container {
   }
 
   getSpeedToColor(speed: number) {
-    // Map speed 0-255: Green (0) -> Yellow (127.5/50%) -> Orange (191/75%) -> Red (255)
+    // if speed is 0, return red
+    // as speed 0 means unlimited speed for Maestro
+    if (speed === 0) {
+      return 0xff0000;
+    }
+
+    // Map speed 1-255: Green (1) -> Yellow (127.5/50%) -> Orange (191/75%) -> Red (255)
     let r, g, b;
     const b_base = 60;
 
