@@ -1,4 +1,4 @@
-import { ControlModule } from "astros-common";
+import { ControlModule } from 'astros-common';
 
 export class ScriptConfig {
   id: string;
@@ -10,6 +10,6 @@ export class ScriptConfig {
     this.id = controller.id;
     this.name = controller.name;
     this.address = controller.address;
-    this.script = script === undefined ? "" : script;
+    this.script = script === undefined ? '' : script;
   }
 }

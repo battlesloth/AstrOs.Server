@@ -1,19 +1,19 @@
-import { Kysely } from "kysely";
-import { logger } from "../../logger.js";
-import { User } from "../../models/users.js";
-import { Database } from "../types.js";
+import { Kysely } from 'kysely';
+import { logger } from '../../logger.js';
+import { User } from '../../models/users.js';
+import { Database } from '../types.js';
 
 export class UserRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
   async getByUsername(name: string) {
     const user = await this.db
-      .selectFrom("users")
+      .selectFrom('users')
       .selectAll()
-      .where("user", "=", name)
+      .where('user', '=', name)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error("UserRepository.getByUsername", err);
+        logger.error('UserRepository.getByUsername', err);
         throw err;
       });
 

@@ -1,45 +1,37 @@
-import { expect, describe, it } from "vitest";
-import { MessageHandler } from "./message_handler.js";
-import { MessageHelper } from "./message_helper.js";
-import { SerialMessageType } from "./serial_message.js";
-import { SerialWorkerResponseType } from "./serial_worker_response.js";
+import { expect, describe, it } from 'vitest';
+import { MessageHandler } from './message_handler.js';
+import { MessageHelper } from './message_helper.js';
+import { SerialMessageType } from './serial_message.js';
+import { SerialWorkerResponseType } from './serial_worker_response.js';
 
 const RS = MessageHelper.RS;
 const GS = MessageHelper.GS;
 const US = MessageHelper.US;
 
-function createMessage(
-  type: SerialMessageType,
-  id: string,
-  payload: string,
-): string {
+function createMessage(type: SerialMessageType, id: string, payload: string): string {
   const valString = MessageHelper.ValidationMap.get(type);
 
   return `${type}${RS}${valString}${RS}${id}${GS}${payload}`;
 }
 
-describe("Serial Message Handler Tests", () => {
-  it("validateMessage should return true for valid message", () => {
+describe('Serial Message Handler Tests', () => {
+  it('validateMessage should return true for valid message', () => {
     const messageHandler = new MessageHandler();
 
-    const message = createMessage(
-      SerialMessageType.REGISTRATION_SYNC,
-      "123",
-      "payload",
-    );
+    const message = createMessage(SerialMessageType.REGISTRATION_SYNC, '123', 'payload');
 
     const result = messageHandler.validateMessage(message);
 
     expect(result.valid).toBe(true);
     expect(result.type).toBe(SerialMessageType.REGISTRATION_SYNC);
-    expect(result.id).toBe("123");
-    expect(result.data).toBe("payload");
+    expect(result.id).toBe('123');
+    expect(result.data).toBe('payload');
   });
 
-  it("validateMessage should return false for invalid message", () => {
+  it('validateMessage should return false for invalid message', () => {
     const messageHandler = new MessageHandler();
 
-    const message = "invalid message";
+    const message = 'invalid message';
 
     const result = messageHandler.validateMessage(message);
 
@@ -47,10 +39,10 @@ describe("Serial Message Handler Tests", () => {
     expect(result.type).toBe(SerialMessageType.UNKNOWN);
   });
 
-  it("validateMessage should return false for invalid header", () => {
+  it('validateMessage should return false for invalid header', () => {
     const messageHandler = new MessageHandler();
 
-    const message = "invalid header" + GS + "payload";
+    const message = 'invalid header' + GS + 'payload';
 
     const result = messageHandler.validateMessage(message);
 
@@ -58,10 +50,10 @@ describe("Serial Message Handler Tests", () => {
     expect(result.type).toBe(SerialMessageType.UNKNOWN);
   });
 
-  it("validateMessage should return false for invalid type", () => {
+  it('validateMessage should return false for invalid type', () => {
     const messageHandler = new MessageHandler();
 
-    const message = "invalid" + RS + "invalid" + RS + "123" + GS + "payload";
+    const message = 'invalid' + RS + 'invalid' + RS + '123' + GS + 'payload';
 
     const result = messageHandler.validateMessage(message);
 
@@ -69,13 +61,13 @@ describe("Serial Message Handler Tests", () => {
     expect(result.type).toBe(SerialMessageType.UNKNOWN);
   });
 
-  it("handlePollAck should return valid response", () => {
+  it('handlePollAck should return valid response', () => {
     const messageHandler = new MessageHandler();
 
     const message = createMessage(
       SerialMessageType.POLL_ACK,
-      "123",
-      "mac" + US + "name" + US + "fingerprint",
+      '123',
+      'mac' + US + 'name' + US + 'fingerprint',
     );
 
     const validation = messageHandler.validateMessage(message);
@@ -83,19 +75,15 @@ describe("Serial Message Handler Tests", () => {
     const response = messageHandler.handlePollAck(validation.data);
 
     expect(response.type).toBe(SerialWorkerResponseType.POLL);
-    expect(response.controller.name).toBe("name");
-    expect(response.controller.address).toBe("mac");
-    expect(response.controller.fingerprint).toBe("fingerprint");
+    expect(response.controller.name).toBe('name');
+    expect(response.controller.address).toBe('mac');
+    expect(response.controller.fingerprint).toBe('fingerprint');
   });
 
-  it("handlePollAck should return valid response with invalid data", () => {
+  it('handlePollAck should return valid response with invalid data', () => {
     const messageHandler = new MessageHandler();
 
-    const message = createMessage(
-      SerialMessageType.POLL_ACK,
-      "123",
-      "mac" + US + "name",
-    );
+    const message = createMessage(SerialMessageType.POLL_ACK, '123', 'mac' + US + 'name');
 
     const validation = messageHandler.validateMessage(message);
 
@@ -104,13 +92,13 @@ describe("Serial Message Handler Tests", () => {
     expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
   });
 
-  it("handleRegistraionSyncAck should return valid response", () => {
+  it('handleRegistraionSyncAck should return valid response', () => {
     const messageHandler = new MessageHandler();
 
     const message = createMessage(
       SerialMessageType.REGISTRATION_SYNC_ACK,
-      "123",
-      "mac1" + US + "name1" + RS + "mac2" + US + "name2",
+      '123',
+      'mac1' + US + 'name1' + RS + 'mac2' + US + 'name2',
     );
 
     const validation = messageHandler.validateMessage(message);
@@ -119,19 +107,19 @@ describe("Serial Message Handler Tests", () => {
 
     expect(response.type).toBe(SerialWorkerResponseType.REGISTRATION_SYNC);
     expect(response.registrations.length).toBe(2);
-    expect(response.registrations[0].name).toBe("name1");
-    expect(response.registrations[0].address).toBe("mac1");
-    expect(response.registrations[1].name).toBe("name2");
-    expect(response.registrations[1].address).toBe("mac2");
+    expect(response.registrations[0].name).toBe('name1');
+    expect(response.registrations[0].address).toBe('mac1');
+    expect(response.registrations[1].name).toBe('name2');
+    expect(response.registrations[1].address).toBe('mac2');
   });
 
-  it("handleRegistraionSyncAck should return valid response with invalid records", () => {
+  it('handleRegistraionSyncAck should return valid response with invalid records', () => {
     const messageHandler = new MessageHandler();
 
     const message = createMessage(
       SerialMessageType.REGISTRATION_SYNC_ACK,
-      "123",
-      "mac1" + US + "name1" + RS + "name2",
+      '123',
+      'mac1' + US + 'name1' + RS + 'name2',
     );
 
     const validation = messageHandler.validateMessage(message);
@@ -140,7 +128,7 @@ describe("Serial Message Handler Tests", () => {
 
     expect(response.type).toBe(SerialWorkerResponseType.REGISTRATION_SYNC);
     expect(response.registrations.length).toBe(1);
-    expect(response.registrations[0].name).toBe("name1");
-    expect(response.registrations[0].address).toBe("mac1");
+    expect(response.registrations[0].name).toBe('name1');
+    expect(response.registrations[0].address).toBe('mac1');
   });
 });

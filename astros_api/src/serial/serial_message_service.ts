@@ -1,27 +1,24 @@
-import { v4 } from "uuid";
-import { logger } from "../logger.js";
-import { MessageGenerator } from "./message_generator.js";
-import { MessageHandler } from "./message_handler.js";
-import { SerialMessageType } from "./serial_message.js";
+import { v4 } from 'uuid';
+import { logger } from '../logger.js';
+import { MessageGenerator } from './message_generator.js';
+import { MessageHandler } from './message_handler.js';
+import { SerialMessageType } from './serial_message.js';
 import {
   ConfigSyncResponse,
   ISerialWorkerResponse,
   RegistrationResponse,
   ScriptDeployResponse,
   SerialWorkerResponseType,
-} from "./serial_worker_response.js";
-import { SerialMessageTracker } from "./serial_message_tracker.js";
-import { MessageHelper } from "./message_helper.js";
-import { ControlModule } from "astros-common";
+} from './serial_worker_response.js';
+import { SerialMessageTracker } from './serial_message_tracker.js';
+import { MessageHelper } from './message_helper.js';
+import { ControlModule } from 'astros-common';
 
 export class SerialMessageService {
   messageHandler: MessageHandler = new MessageHandler();
   messageGererator: MessageGenerator = new MessageGenerator();
 
-  messageTracker: Map<string, SerialMessageTracker> = new Map<
-    string,
-    SerialMessageTracker
-  >();
+  messageTracker: Map<string, SerialMessageTracker> = new Map<string, SerialMessageTracker>();
 
   messageTimeoutCallback: (msg: ISerialWorkerResponse) => void;
 
@@ -29,10 +26,7 @@ export class SerialMessageService {
     this.messageTimeoutCallback = messageTimeoutCallback;
   }
 
-  public generateMessage(
-    type: SerialMessageType,
-    data: any,
-  ): ISerialWorkerResponse {
+  public generateMessage(type: SerialMessageType, data: any): ISerialWorkerResponse {
     const result: ISerialWorkerResponse = {
       type: SerialWorkerResponseType.SEND_SERIAL_MESSAGE,
     };
@@ -53,17 +47,15 @@ export class SerialMessageService {
     };
 
     if (msg === null || msg === undefined) {
-      logger.error("Received null or undefined message");
+      logger.error('Received null or undefined message');
       return result;
     }
     if (msg.length === 0) {
-      logger.error("Received empty message");
+      logger.error('Received empty message');
       return result;
     }
 
-    const validationResult = this.messageHandler.validateMessage(
-      msg.toString(),
-    );
+    const validationResult = this.messageHandler.validateMessage(msg.toString());
 
     if (!validationResult.valid) {
       logger.error(`Invalid message: ${msg}`);
@@ -79,14 +71,10 @@ export class SerialMessageService {
         result = this.messageHandler.handlePollAck(validationResult.data);
         break;
       case SerialMessageType.REGISTRATION_SYNC_ACK:
-        result = this.messageHandler.handleRegistraionSyncAck(
-          validationResult.data,
-        );
+        result = this.messageHandler.handleRegistraionSyncAck(validationResult.data);
         break;
       case SerialMessageType.DEPLOY_CONFIG_ACK:
-        result = this.messageHandler.handleDeployConfigAck(
-          validationResult.data,
-        );
+        result = this.messageHandler.handleDeployConfigAck(validationResult.data);
         break;
       case SerialMessageType.DEPLOY_SCRIPT_ACK:
       case SerialMessageType.DEPLOY_SCRIPT_NAK:
@@ -124,7 +112,7 @@ export class SerialMessageService {
 
     switch (result.type) {
       case SerialWorkerResponseType.REGISTRATION_SYNC:
-        tracker.controllerStatus.set("00:00:00:00:00:00", true);
+        tracker.controllerStatus.set('00:00:00:00:00:00', true);
         break;
       case SerialWorkerResponseType.CONFIG_SYNC:
       case SerialWorkerResponseType.SCRIPT_DEPLOY:
@@ -153,10 +141,7 @@ export class SerialMessageService {
     if (MessageHelper.MessageTimeouts.has(type)) {
       const timeout = MessageHelper.MessageTimeouts.get(type);
 
-      this.messageTracker.set(
-        msgId,
-        new SerialMessageTracker(msgId, type, controllers, metaData),
-      );
+      this.messageTracker.set(msgId, new SerialMessageTracker(msgId, type, controllers, metaData));
 
       setTimeout(() => {
         this.handleTimeout(msgId);
@@ -168,9 +153,7 @@ export class SerialMessageService {
     const tracker = this.messageTracker.get(msgId);
 
     if (tracker === undefined) {
-      logger.debug(
-        `No tracker found for message id: ${msgId}, assume completed`,
-      );
+      logger.debug(`No tracker found for message id: ${msgId}, assume completed`);
       return;
     }
 
@@ -185,9 +168,7 @@ export class SerialMessageService {
     }
   }
 
-  generateFailureResponse(
-    tracker: SerialMessageTracker,
-  ): ISerialWorkerResponse[] {
+  generateFailureResponse(tracker: SerialMessageTracker): ISerialWorkerResponse[] {
     const result = new Array<ISerialWorkerResponse>();
     const failed = new Array<string>();
 
@@ -204,14 +185,14 @@ export class SerialMessageService {
       case SerialMessageType.DEPLOY_CONFIG:
         for (const controller of failed) {
           const csr = new ConfigSyncResponse(false);
-          csr.controller = new ControlModule("", "", controller);
+          csr.controller = new ControlModule('', '', controller);
           result.push(csr);
         }
         break;
       case SerialMessageType.DEPLOY_SCRIPT:
         for (const controller of failed) {
           const sdr = new ScriptDeployResponse(false, tracker.metaData);
-          sdr.controller = new ControlModule("", "", controller);
+          sdr.controller = new ControlModule('', '', controller);
           result.push(sdr);
         }
         break;

@@ -1,4 +1,4 @@
-import { SerialMessageType } from "./serial_message.js";
+import { SerialMessageType } from './serial_message.js';
 
 export class SerialMessageTracker {
   id: string;
@@ -6,12 +6,7 @@ export class SerialMessageTracker {
   metaData: any;
   controllerStatus: Map<string, boolean> = new Map<string, boolean>();
 
-  constructor(
-    id: string,
-    type: SerialMessageType,
-    controllers: string[],
-    metaData: any,
-  ) {
+  constructor(id: string, type: SerialMessageType, controllers: string[], metaData: any) {
     this.id = id;
     this.type = type;
     this.metaData = metaData;

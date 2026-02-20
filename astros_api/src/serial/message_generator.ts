@@ -1,14 +1,14 @@
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
 //|--int---RS---string----RS--string---GS--val--US--val--RS--val--US--val--|
 
-import { ConfigSync } from "src/models/config/config_sync";
-import { logger } from "../logger.js";
-import { MessageHelper } from "./message_helper.js";
-import { SerialMessageType } from "./serial_message.js";
-import { ScriptUpload } from "src/models/scripts/script_upload";
-import { ScriptRun } from "src/models/scripts/script_run";
-import { ServoTest } from "src/models/servo_test";
-import { MaestroModule } from "astros-common";
+import { ConfigSync } from 'src/models/config/config_sync';
+import { logger } from '../logger.js';
+import { MessageHelper } from './message_helper.js';
+import { SerialMessageType } from './serial_message.js';
+import { ScriptUpload } from 'src/models/scripts/script_upload';
+import { ScriptRun } from 'src/models/scripts/script_run';
+import { ServoTest } from 'src/models/servo_test';
+import { MaestroModule } from 'astros-common';
 
 export enum EspModuleType {
   NONE = 0,
@@ -24,11 +24,7 @@ export class MessageGenerator {
   RS = MessageHelper.RS;
   US = MessageHelper.US;
 
-  generateMessage(
-    type: SerialMessageType,
-    id: string,
-    data: any,
-  ): MessageGeneratorResponse {
+  generateMessage(type: SerialMessageType, id: string, data: any): MessageGeneratorResponse {
     const header = this.generateHeader(type, id);
     let result: MessageGeneratorResponse;
 
@@ -59,7 +55,7 @@ export class MessageGenerator {
         break;
       default:
         logger.error(`Unknown message type: ${type}`);
-        return new MessageGeneratorResponse("\n", []);
+        return new MessageGeneratorResponse('\n', []);
     }
 
     return result;
@@ -82,38 +78,36 @@ export class MessageGenerator {
 
       controllers.push(config.address);
 
-      logger.debug(
-        `Generating deploy config message: ${JSON.stringify(config)}`,
-      );
+      logger.debug(`Generating deploy config message: ${JSON.stringify(config)}`);
 
       const configs = [];
 
       configs.push(EspModuleType.GPIO);
-      configs.push("@");
+      configs.push('@');
 
       // add onbaoard GPIO config
       for (const ch of config.gpioChannels) {
         if (ch.enabled) {
-          configs.push(ch.defaultHigh ? "1" : "0");
+          configs.push(ch.defaultHigh ? '1' : '0');
         } else {
-          configs.push("0");
+          configs.push('0');
         }
-        configs.push("|");
+        configs.push('|');
       }
 
       // remove trailing pipe
       configs.pop();
-      configs.push(";");
+      configs.push(';');
 
       for (const ch of config.maestroModules) {
         configs.push(EspModuleType.MAESTRO);
-        configs.push("@");
+        configs.push('@');
         configs.push(ch.idx);
-        configs.push(":");
+        configs.push(':');
         configs.push(ch.uartChannel);
-        configs.push(":");
+        configs.push(':');
         configs.push(ch.baudRate);
-        configs.push("@");
+        configs.push('@');
 
         const subModule = ch.subModule as MaestroModule;
 
@@ -121,32 +115,32 @@ export class MessageGenerator {
 
         for (const ch of channels) {
           configs.push(ch.channelNumber);
-          configs.push(":");
-          configs.push(ch.enabled ? "1" : "0");
-          configs.push(":");
-          configs.push(ch.isServo ? "1" : "0");
-          configs.push(":");
+          configs.push(':');
+          configs.push(ch.enabled ? '1' : '0');
+          configs.push(':');
+          configs.push(ch.isServo ? '1' : '0');
+          configs.push(':');
           configs.push(ch.minPos);
-          configs.push(":");
+          configs.push(':');
           configs.push(ch.maxPos);
-          configs.push(":");
+          configs.push(':');
           configs.push(ch.homePos);
-          configs.push(":");
-          configs.push(ch.inverted ? "1" : "0");
-          configs.push("|");
+          configs.push(':');
+          configs.push(ch.inverted ? '1' : '0');
+          configs.push('|');
         }
 
         // remove trailing pipe
         configs.pop();
-        configs.push(";");
+        configs.push(';');
       }
 
-      let cfigString = configs.join("");
+      let cfigString = configs.join('');
 
-      if (cfigString.endsWith(";")) {
+      if (cfigString.endsWith(';')) {
         cfigString = cfigString.slice(0, -1);
       }
-      if (cfigString.endsWith("|")) {
+      if (cfigString.endsWith('|')) {
         cfigString = cfigString.slice(0, -1);
       }
 
@@ -162,12 +156,9 @@ export class MessageGenerator {
       result.pop();
     }
 
-    const msg = result.join("");
+    const msg = result.join('');
 
-    return new MessageGeneratorResponse(
-      `${header}${msg}${MessageHelper.MessageEOL}`,
-      controllers,
-    );
+    return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers);
   }
 
   generateDeployScript(header: string, data: any) {
@@ -184,9 +175,7 @@ export class MessageGenerator {
 
       controllers.push(config.address);
 
-      logger.debug(
-        `Generating deploy script message: ${JSON.stringify(config)}`,
-      );
+      logger.debug(`Generating deploy script message: ${JSON.stringify(config)}`);
 
       result.push(config.address);
       result.push(this.US);
@@ -202,7 +191,7 @@ export class MessageGenerator {
       result.pop();
     }
 
-    const msg = result.join("");
+    const msg = result.join('');
 
     return new MessageGeneratorResponse(
       `${header}${msg}${MessageHelper.MessageEOL}`,
@@ -239,7 +228,7 @@ export class MessageGenerator {
       result.pop();
     }
 
-    const msg = result.join("");
+    const msg = result.join('');
 
     return new MessageGeneratorResponse(
       `${header}${msg}${MessageHelper.MessageEOL}`,
@@ -267,7 +256,7 @@ export class MessageGenerator {
       result.push(this.US);
       result.push(config.name);
       result.push(this.US);
-      result.push("PANIC");
+      result.push('PANIC');
       result.push(this.RS);
     }
 
@@ -275,20 +264,14 @@ export class MessageGenerator {
       result.pop();
     }
 
-    const msg = result.join("");
+    const msg = result.join('');
 
-    return new MessageGeneratorResponse(
-      `${header}${msg}${MessageHelper.MessageEOL}`,
-      controllers,
-    );
+    return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers);
   }
 
   generateRunCommand(header: string, data: any) {
     if (!data.contoller.address) {
-      return new MessageGeneratorResponse(
-        `${header}${MessageHelper.MessageEOL}`,
-        [],
-      );
+      return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
     }
 
     const result = [this.GS];
@@ -299,22 +282,18 @@ export class MessageGenerator {
     result.push(this.US);
     result.push(data.command);
 
-    const msg = result.join("");
+    const msg = result.join('');
 
-    return new MessageGeneratorResponse(
-      `${header}${msg}${MessageHelper.MessageEOL}`,
-      [data.contoller.address],
-    );
+    return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, [
+      data.contoller.address,
+    ]);
   }
 
   generateServoTestCommand(header: string, data: any) {
     const cmd = data as ServoTest;
 
     if (!cmd.controllerAddress) {
-      return new MessageGeneratorResponse(
-        `${header}${MessageHelper.MessageEOL}`,
-        [],
-      );
+      return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
     }
 
     const result = [this.GS];
@@ -323,22 +302,18 @@ export class MessageGenerator {
     result.push(this.US);
     result.push(cmd.controllerName);
     result.push(this.US);
-    result.push(
-      `${cmd.moduleSubType}:${cmd.moduleIdx}:${cmd.channelNumber}:${data.msValue}`,
-    );
-    const msg = result.join("");
+    result.push(`${cmd.moduleSubType}:${cmd.moduleIdx}:${cmd.channelNumber}:${data.msValue}`);
+    const msg = result.join('');
 
-    return new MessageGeneratorResponse(
-      `${header}${msg}${MessageHelper.MessageEOL}`,
-      [cmd.controllerAddress],
-    );
+    return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, [
+      cmd.controllerAddress,
+    ]);
   }
 
   generateRegistrationSync(header: string) {
-    return new MessageGeneratorResponse(
-      `${header}${MessageHelper.MessageEOL}`,
-      ["00:00:00:00:00:00"],
-    );
+    return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, [
+      '00:00:00:00:00:00',
+    ]);
   }
 
   generateFormatSD(header: string, data: any) {
@@ -359,7 +334,7 @@ export class MessageGenerator {
       result.push(this.US);
       result.push(controller.name);
       result.push(this.US);
-      result.push("FORMAT");
+      result.push('FORMAT');
       result.push(this.RS);
     }
 
@@ -367,12 +342,9 @@ export class MessageGenerator {
       result.pop();
     }
 
-    const msg = result.join("");
+    const msg = result.join('');
 
-    return new MessageGeneratorResponse(
-      `${header}${msg}${MessageHelper.MessageEOL}`,
-      controllers,
-    );
+    return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, controllers);
   }
 }
 
@@ -381,7 +353,7 @@ export class MessageGeneratorResponse {
   controllers: string[];
   metaData: any;
 
-  constructor(msg: string, controllers: string[], metaData: any = "") {
+  constructor(msg: string, controllers: string[], metaData: any = '') {
     this.msg = msg;
     this.controllers = controllers;
     this.metaData = metaData;

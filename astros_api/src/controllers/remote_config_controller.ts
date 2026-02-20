@@ -1,21 +1,21 @@
-import { M5Page, M5ScriptList, M5Button } from "astros-common";
-import { RemoteConfigRepository } from "../dal/repositories/remote_config_repository.js";
-import { logger } from "../logger.js";
-import { db } from "../dal/database.js";
+import { M5Page, M5ScriptList, M5Button } from 'astros-common';
+import { RemoteConfigRepository } from '../dal/repositories/remote_config_repository.js';
+import { logger } from '../logger.js';
+import { db } from '../dal/database.js';
 
 export class RemoteConfigController {
-  public static getRoute = "/remoteConfig/";
-  public static putRoute = "/remoteConfig/";
+  public static getRoute = '/remoteConfig/';
+  public static putRoute = '/remoteConfig/';
 
   public static async syncRemoteConfig(req: any, res: any, next: any) {
-    logger.info("Syncing remote config to device");
+    logger.info('Syncing remote config to device');
 
     try {
       const repo = new RemoteConfigRepository(db);
 
-      const scripts = await repo.getConfig("astrOsScreen");
+      const scripts = await repo.getConfig('astrOsScreen');
 
-      const val = JSON.parse(scripts?.value || "[]") as Array<M5Page>;
+      const val = JSON.parse(scripts?.value || '[]') as Array<M5Page>;
 
       if (!val || val.length === 0) {
         res.status(200);
@@ -45,7 +45,7 @@ export class RemoteConfigController {
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }
@@ -54,16 +54,16 @@ export class RemoteConfigController {
     try {
       const repo = new RemoteConfigRepository(db);
 
-      const scripts = await repo.getConfig("astrOsScreen");
+      const scripts = await repo.getConfig('astrOsScreen');
 
       res.status(200);
-      res.json(scripts?.value || { value: "[]" });
+      res.json(scripts?.value || { value: '[]' });
     } catch (error) {
       logger.error(error);
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }
@@ -72,13 +72,13 @@ export class RemoteConfigController {
     try {
       const repo = new RemoteConfigRepository(db);
 
-      if (await repo.saveConfig("astrOsScreen", req.body.config)) {
+      if (await repo.saveConfig('astrOsScreen', req.body.config)) {
         res.status(200);
-        res.json({ message: "success" });
+        res.json({ message: 'success' });
       } else {
         res.status(500);
         res.json({
-          message: "failed",
+          message: 'failed',
         });
       }
     } catch (error) {
@@ -86,7 +86,7 @@ export class RemoteConfigController {
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }

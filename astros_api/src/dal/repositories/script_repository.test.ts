@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import SQLite from "better-sqlite3";
-import { Kysely, SqliteDialect } from "kysely";
-import { Database } from "../types.js";
-import { migrateToLatest } from "../database.js";
-import { ScriptRepository } from "./script_repository.js";
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import SQLite from 'better-sqlite3';
+import { Kysely, SqliteDialect } from 'kysely';
+import { Database } from '../types.js';
+import { migrateToLatest } from '../database.js';
+import { ScriptRepository } from './script_repository.js';
 import {
   Script,
   ScriptChannel,
@@ -25,19 +25,19 @@ import {
   HcrCommand,
   HumanCyborgRelationsCmd,
   HcrCommandCategory,
-} from "astros-common";
-import { upsertGpioModule } from "./module_repositories/gpio_repository.js";
-import { upsertUartModules } from "./module_repositories/uart_repository.js";
+} from 'astros-common';
+import { upsertGpioModule } from './module_repositories/gpio_repository.js';
+import { upsertUartModules } from './module_repositories/uart_repository.js';
 
-import { v4 as uuid } from "uuid";
+import { v4 as uuid } from 'uuid';
 
-describe("Script Repository", () => {
+describe('Script Repository', () => {
   let db: Kysely<Database>;
   let locationId: string;
 
   beforeEach(async () => {
     const dialect = new SqliteDialect({
-      database: new SQLite(":memory:"),
+      database: new SQLite(':memory:'),
     });
 
     db = new Kysely<Database>({
@@ -49,12 +49,12 @@ describe("Script Repository", () => {
     // Create a test location
     locationId = uuid();
     await db
-      .insertInto("locations")
+      .insertInto('locations')
       .values({
         id: locationId,
-        name: "Test Location",
-        description: "Test Location Description",
-        config_fingerprint: "test-fingerprint",
+        name: 'Test Location',
+        description: 'Test Location Description',
+        config_fingerprint: 'test-fingerprint',
       })
       .execute();
   });
@@ -63,15 +63,10 @@ describe("Script Repository", () => {
     await db.destroy();
   });
 
-  it("should save script", async () => {
+  it('should save script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(
-      scriptId,
-      "Test Script",
-      "Test Description",
-      new Date(Date.now()),
-    );
+    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
 
     const repo = new ScriptRepository(db);
 
@@ -81,20 +76,15 @@ describe("Script Repository", () => {
 
     expect(savedScripts.length).toBe(1);
     expect(savedScripts[0].id).toBe(scriptId);
-    expect(savedScripts[0].scriptName).toBe("Test Script");
-    expect(savedScripts[0].description).toBe("Test Description");
+    expect(savedScripts[0].scriptName).toBe('Test Script');
+    expect(savedScripts[0].description).toBe('Test Description');
     expect(savedScripts[0].deploymentStatus).toEqual({});
   });
 
-  it("should update script", async () => {
+  it('should update script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(
-      scriptId,
-      "Test Script",
-      "Test Description",
-      new Date(Date.now()),
-    );
+    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
 
     const repo = new ScriptRepository(db);
 
@@ -104,12 +94,12 @@ describe("Script Repository", () => {
 
     expect(savedScripts.length).toBe(1);
     expect(savedScripts[0].id).toBe(scriptId);
-    expect(savedScripts[0].scriptName).toBe("Test Script");
-    expect(savedScripts[0].description).toBe("Test Description");
+    expect(savedScripts[0].scriptName).toBe('Test Script');
+    expect(savedScripts[0].description).toBe('Test Description');
     expect(savedScripts[0].deploymentStatus).toEqual({});
 
-    script.scriptName = "Updated Script";
-    script.description = "Updated Description";
+    script.scriptName = 'Updated Script';
+    script.description = 'Updated Description';
 
     await repo.upsertScript(script);
 
@@ -117,20 +107,15 @@ describe("Script Repository", () => {
 
     expect(updatedScripts.length).toBe(1);
     expect(updatedScripts[0].id).toBe(scriptId);
-    expect(updatedScripts[0].scriptName).toBe("Updated Script");
-    expect(updatedScripts[0].description).toBe("Updated Description");
+    expect(updatedScripts[0].scriptName).toBe('Updated Script');
+    expect(updatedScripts[0].description).toBe('Updated Description');
     expect(updatedScripts[0].deploymentStatus).toEqual({});
   });
 
-  it("should delete script", async () => {
+  it('should delete script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(
-      scriptId,
-      "Test Script",
-      "Test Description",
-      new Date(Date.now()),
-    );
+    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
 
     const repo = new ScriptRepository(db);
 
@@ -140,8 +125,8 @@ describe("Script Repository", () => {
 
     expect(savedScripts.length).toBe(1);
     expect(savedScripts[0].id).toBe(scriptId);
-    expect(savedScripts[0].scriptName).toBe("Test Script");
-    expect(savedScripts[0].description).toBe("Test Description");
+    expect(savedScripts[0].scriptName).toBe('Test Script');
+    expect(savedScripts[0].description).toBe('Test Description');
     expect(savedScripts[0].deploymentStatus).toEqual({});
 
     await repo.deleteScript(scriptId);
@@ -151,29 +136,23 @@ describe("Script Repository", () => {
     expect(updatedScripts.length).toBe(0);
   });
 
-  it("should save and retrieve script with GPIO channel", async () => {
+  it('should save and retrieve script with GPIO channel', async () => {
     const scriptId = uuid();
     const channelId = uuid();
 
     // Create a GPIO channel in the database
     const gpioModule = new GpioModule(locationId);
-    const gpioChannel = new GpioChannel(
-      channelId,
-      locationId,
-      0,
-      true,
-      "Test GPIO Channel",
-      false,
-    );
+    const gpioChannel = new GpioChannel(channelId, locationId, 0, true, 'Test GPIO Channel', false);
     gpioModule.channels.push(gpioChannel);
     await upsertGpioModule(db, gpioModule);
 
     // Create a script with a GPIO channel
     const script = new Script(
       scriptId,
-      "GPIO Test Script",
-      "Script with GPIO channel",
+      'GPIO Test Script',
+      'Script with GPIO channel',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -196,18 +175,12 @@ describe("Script Repository", () => {
     const savedScript = await repo.getScript(scriptId);
 
     expect(savedScript.scriptChannels.length).toBe(1);
-    expect(savedScript.scriptChannels[0].channelType).toBe(
-      ScriptChannelType.GPIO,
-    );
-    expect(savedScript.scriptChannels[0].moduleChannelType).toBe(
-      ModuleChannelTypes.GpioChannel,
-    );
-    expect(savedScript.scriptChannels[0].moduleChannel.channelName).toBe(
-      "Test GPIO Channel",
-    );
+    expect(savedScript.scriptChannels[0].channelType).toBe(ScriptChannelType.GPIO);
+    expect(savedScript.scriptChannels[0].moduleChannelType).toBe(ModuleChannelTypes.GpioChannel);
+    expect(savedScript.scriptChannels[0].moduleChannel.channelName).toBe('Test GPIO Channel');
   });
 
-  it("should save and retrieve script with Maestro channel", async () => {
+  it('should save and retrieve script with Maestro channel', async () => {
     const scriptId = uuid();
     const maestroModuleId = uuid();
     const maestroChannelId = uuid();
@@ -215,14 +188,12 @@ describe("Script Repository", () => {
     // Create a Maestro module and channel in the database
     const maestroModule = new MaestroModule();
 
-    maestroModule.boards.push(
-      new MaestroBoard(maestroModuleId, locationId, 0, "Test Board", 24),
-    );
+    maestroModule.boards.push(new MaestroBoard(maestroModuleId, locationId, 0, 'Test Board', 24));
 
     const maestroChannel = new MaestroChannel(
       maestroChannelId,
       maestroModuleId,
-      "Servo Channel 1",
+      'Servo Channel 1',
       true,
       0,
       true,
@@ -238,7 +209,7 @@ describe("Script Repository", () => {
     const uartModule = new UartModule(
       0,
       maestroModuleId,
-      "Test Maestro",
+      'Test Maestro',
       locationId,
       ModuleSubType.maestro,
       0,
@@ -253,9 +224,10 @@ describe("Script Repository", () => {
     // Create a script with a Maestro channel
     const script = new Script(
       scriptId,
-      "Maestro Test Script",
-      "Script with Maestro channel",
+      'Maestro Test Script',
+      'Script with Maestro channel',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -278,41 +250,29 @@ describe("Script Repository", () => {
     const savedScript = await repo.getScript(scriptId);
 
     expect(savedScript.scriptChannels.length).toBe(1);
-    expect(savedScript.scriptChannels[0].channelType).toBe(
-      ScriptChannelType.SERVO,
-    );
-    expect(savedScript.scriptChannels[0].moduleChannelType).toBe(
-      ModuleChannelTypes.MaestroChannel,
-    );
-    expect(savedScript.scriptChannels[0].moduleChannel.channelName).toBe(
-      "Servo Channel 1",
-    );
+    expect(savedScript.scriptChannels[0].channelType).toBe(ScriptChannelType.SERVO);
+    expect(savedScript.scriptChannels[0].moduleChannelType).toBe(ModuleChannelTypes.MaestroChannel);
+    expect(savedScript.scriptChannels[0].moduleChannel.channelName).toBe('Servo Channel 1');
   });
 
-  it("should save and retrieve script with events", async () => {
+  it('should save and retrieve script with events', async () => {
     const scriptId = uuid();
     const channelId = uuid();
     const eventId = uuid();
 
     // Create a GPIO channel
     const gpioModule = new GpioModule(locationId);
-    const gpioChannel = new GpioChannel(
-      channelId,
-      locationId,
-      0,
-      true,
-      "Test GPIO",
-      false,
-    );
+    const gpioChannel = new GpioChannel(channelId, locationId, 0, true, 'Test GPIO', false);
     gpioModule.channels.push(gpioChannel);
     await upsertGpioModule(db, gpioModule);
 
     // Create a script with a channel and event
     const script = new Script(
       scriptId,
-      "Event Test Script",
-      "Script with events",
+      'Event Test Script',
+      'Script with events',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -354,7 +314,7 @@ describe("Script Repository", () => {
     expect(savedEvent.moduleSubType).toBe(ModuleSubType.genericGpio);
   });
 
-  it("should update Maestro channel number in events", async () => {
+  it('should update Maestro channel number in events', async () => {
     const scriptId = uuid();
     const maestroModuleId = uuid();
     const maestroChannelId = uuid();
@@ -363,14 +323,12 @@ describe("Script Repository", () => {
     // Create Maestro module and channel
     const maestroModule = new MaestroModule();
 
-    maestroModule.boards.push(
-      new MaestroBoard(maestroModuleId, locationId, 0, "Test Board", 24),
-    );
+    maestroModule.boards.push(new MaestroBoard(maestroModuleId, locationId, 0, 'Test Board', 24));
 
     const maestroChannel = new MaestroChannel(
       maestroChannelId,
       maestroModuleId,
-      "Servo Channel 5",
+      'Servo Channel 5',
       true,
       5, // Channel number
       true, // isServo
@@ -385,7 +343,7 @@ describe("Script Repository", () => {
     const uartModule = new UartModule(
       0,
       maestroModuleId,
-      "Test Maestro",
+      'Test Maestro',
       locationId,
       ModuleSubType.maestro,
       0,
@@ -400,9 +358,10 @@ describe("Script Repository", () => {
     // Create script with Maestro event
     const script = new Script(
       scriptId,
-      "Maestro Event Test",
-      "Test Maestro event channel update",
+      'Maestro Event Test',
+      'Test Maestro event channel update',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -434,16 +393,14 @@ describe("Script Repository", () => {
 
     // Retrieve and verify channel number was updated
     const savedScript = await repo.getScript(scriptId);
-    const savedEvent = savedScript.scriptChannels[0].events[
-      eventId
-    ] as ScriptEvent;
+    const savedEvent = savedScript.scriptChannels[0].events[eventId] as ScriptEvent;
 
     expect(savedEvent).toBeDefined();
     const savedMaestroEvent = savedEvent.event as MaestroEvent;
     expect(savedMaestroEvent.channel).toBe(5); // Should be updated to match the channel
   });
 
-  it("should save and retrieve script with Human Cyborg Relations channel", async () => {
+  it('should save and retrieve script with Human Cyborg Relations channel', async () => {
     const scriptId = uuid();
     const hcrModuleId = uuid();
 
@@ -452,7 +409,7 @@ describe("Script Repository", () => {
     const uartChannel = new UartChannel(
       hcrModuleId,
       hcrModuleId,
-      "HCR Channel 1",
+      'HCR Channel 1',
       ModuleSubType.humanCyborgRelationsSerial,
       true,
     );
@@ -460,7 +417,7 @@ describe("Script Repository", () => {
     const uartModule = new UartModule(
       0,
       hcrModuleId,
-      "Test HCR",
+      'Test HCR',
       locationId,
       ModuleSubType.humanCyborgRelationsSerial,
       0,
@@ -474,9 +431,10 @@ describe("Script Repository", () => {
     // Create a script with an HCR channel
     const script = new Script(
       scriptId,
-      "HCR Test Script",
-      "Script with HCR channel",
+      'HCR Test Script',
+      'Script with HCR channel',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -499,19 +457,13 @@ describe("Script Repository", () => {
     const savedScript = await repo.getScript(scriptId);
 
     expect(savedScript.scriptChannels.length).toBe(1);
-    expect(savedScript.scriptChannels[0].channelType).toBe(
-      ScriptChannelType.GENERIC_UART,
-    );
-    expect(savedScript.scriptChannels[0].moduleChannelType).toBe(
-      ModuleChannelTypes.UartChannel,
-    );
+    expect(savedScript.scriptChannels[0].channelType).toBe(ScriptChannelType.GENERIC_UART);
+    expect(savedScript.scriptChannels[0].moduleChannelType).toBe(ModuleChannelTypes.UartChannel);
     // For generic UART channels, the channel name comes from the module name
-    expect(savedScript.scriptChannels[0].moduleChannel.channelName).toBe(
-      "Test HCR",
-    );
+    expect(savedScript.scriptChannels[0].moduleChannel.channelName).toBe('Test HCR');
   });
 
-  it("should save and retrieve script with HCR events", async () => {
+  it('should save and retrieve script with HCR events', async () => {
     const scriptId = uuid();
     const hcrModuleId = uuid();
     const eventId = uuid();
@@ -521,7 +473,7 @@ describe("Script Repository", () => {
     const uartChannel = new UartChannel(
       hcrModuleId,
       hcrModuleId,
-      "HCR Channel 1",
+      'HCR Channel 1',
       ModuleSubType.humanCyborgRelationsSerial,
       true,
     );
@@ -529,7 +481,7 @@ describe("Script Repository", () => {
     const uartModule = new UartModule(
       0,
       hcrModuleId,
-      "Test HCR",
+      'Test HCR',
       locationId,
       ModuleSubType.humanCyborgRelationsSerial,
       0,
@@ -543,9 +495,10 @@ describe("Script Repository", () => {
     // Create a script with an HCR channel and event
     const script = new Script(
       scriptId,
-      "HCR Event Test Script",
-      "Script with HCR events",
+      'HCR Event Test Script',
+      'Script with HCR events',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -561,13 +514,7 @@ describe("Script Repository", () => {
 
     // Create HCR commands
     const hcrCommands = [
-      new HcrCommand(
-        uuid(),
-        HcrCommandCategory.stimuli,
-        HumanCyborgRelationsCmd.mildHappy,
-        0,
-        0,
-      ),
+      new HcrCommand(uuid(), HcrCommandCategory.stimuli, HumanCyborgRelationsCmd.mildHappy, 0, 0),
       new HcrCommand(
         uuid(),
         HcrCommandCategory.volume,
@@ -603,21 +550,15 @@ describe("Script Repository", () => {
     expect(savedEvent).toBeDefined();
     expect(savedEvent.time).toBe(3.5);
     expect(savedEvent.moduleType).toBe(ModuleType.uart);
-    expect(savedEvent.moduleSubType).toBe(
-      ModuleSubType.humanCyborgRelationsSerial,
-    );
+    expect(savedEvent.moduleSubType).toBe(ModuleSubType.humanCyborgRelationsSerial);
 
     const savedHcrEvent = savedEvent.event as HumanCyborgRelationsEvent;
     expect(savedHcrEvent.commands).toBeDefined();
     expect(savedHcrEvent.commands.length).toBe(2);
     expect(savedHcrEvent.commands[0].category).toBe(HcrCommandCategory.stimuli);
-    expect(savedHcrEvent.commands[0].command).toBe(
-      HumanCyborgRelationsCmd.mildHappy,
-    );
+    expect(savedHcrEvent.commands[0].command).toBe(HumanCyborgRelationsCmd.mildHappy);
     expect(savedHcrEvent.commands[1].category).toBe(HcrCommandCategory.volume);
-    expect(savedHcrEvent.commands[1].command).toBe(
-      HumanCyborgRelationsCmd.vocalizerVolume,
-    );
+    expect(savedHcrEvent.commands[1].command).toBe(HumanCyborgRelationsCmd.vocalizerVolume);
     expect(savedHcrEvent.commands[1].valueA).toBe(75);
   });
 });

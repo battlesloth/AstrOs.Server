@@ -29,28 +29,28 @@ export enum SerialMessageType {
 }
 
 export class SerialMsgConst {
-  static readonly REGISTRATION_SYNC = "REGISTRATION_SYNC";
-  static readonly REGISTRATION_SYNC_ACK = "REGISTRATION_SYNC_ACK";
-  static readonly POLL_ACK = "POLL_ACK";
-  static readonly POLL_NAK = "POLL_NAK";
-  static readonly DEPLOY_CONFIG = "DEPLOY_CONFIG";
-  static readonly DEPLOY_CONFIG_ACK = "DEPLOY_CONFIG_ACK";
-  static readonly DEPLOY_CONFIG_NAK = "DEPLOY_CONFIG_NAK";
-  static readonly DEPLOY_SCRIPT = "DEPLOY_SCRIPT";
-  static readonly DEPLOY_SCRIPT_ACK = "DEPLOY_SCRIPT_ACK";
-  static readonly DEPLOY_SCRIPT_NAK = "DEPLOY_SCRIPT_NAK";
-  static readonly RUN_SCRIPT = "RUN_SCRIPT";
-  static readonly RUN_SCRIPT_ACK = "RUN_SCRIPT_ACK";
-  static readonly RUN_SCRIPT_NAK = "RUN_SCRIPT_NAK";
-  static readonly PANIC_STOP = "PANIC_STOP";
-  static readonly RUN_COMMAND = "RUN_COMMAND";
-  static readonly RUN_COMMAND_ACK = "RUN_COMMAND_ACK";
-  static readonly RUN_COMMAND_NAK = "RUN_COMMAND_NAK";
-  static readonly FORMAT_SD = "FORMAT_SD";
-  static readonly FORMAT_SD_ACK = "FORMAT_SD_ACK";
-  static readonly FORMAT_SD_NAK = "FORMAT_SD_NAK";
-  static readonly SERVO_TEST = "SERVO_TEST";
-  static readonly SERVO_TEST_ACK = "SERVO_TEST_ACK";
+  static readonly REGISTRATION_SYNC = 'REGISTRATION_SYNC';
+  static readonly REGISTRATION_SYNC_ACK = 'REGISTRATION_SYNC_ACK';
+  static readonly POLL_ACK = 'POLL_ACK';
+  static readonly POLL_NAK = 'POLL_NAK';
+  static readonly DEPLOY_CONFIG = 'DEPLOY_CONFIG';
+  static readonly DEPLOY_CONFIG_ACK = 'DEPLOY_CONFIG_ACK';
+  static readonly DEPLOY_CONFIG_NAK = 'DEPLOY_CONFIG_NAK';
+  static readonly DEPLOY_SCRIPT = 'DEPLOY_SCRIPT';
+  static readonly DEPLOY_SCRIPT_ACK = 'DEPLOY_SCRIPT_ACK';
+  static readonly DEPLOY_SCRIPT_NAK = 'DEPLOY_SCRIPT_NAK';
+  static readonly RUN_SCRIPT = 'RUN_SCRIPT';
+  static readonly RUN_SCRIPT_ACK = 'RUN_SCRIPT_ACK';
+  static readonly RUN_SCRIPT_NAK = 'RUN_SCRIPT_NAK';
+  static readonly PANIC_STOP = 'PANIC_STOP';
+  static readonly RUN_COMMAND = 'RUN_COMMAND';
+  static readonly RUN_COMMAND_ACK = 'RUN_COMMAND_ACK';
+  static readonly RUN_COMMAND_NAK = 'RUN_COMMAND_NAK';
+  static readonly FORMAT_SD = 'FORMAT_SD';
+  static readonly FORMAT_SD_ACK = 'FORMAT_SD_ACK';
+  static readonly FORMAT_SD_NAK = 'FORMAT_SD_NAK';
+  static readonly SERVO_TEST = 'SERVO_TEST';
+  static readonly SERVO_TEST_ACK = 'SERVO_TEST_ACK';
 }
 
 export class SerialMsgValidationResult {
@@ -62,8 +62,8 @@ export class SerialMsgValidationResult {
   constructor() {
     this.valid = false;
     this.type = SerialMessageType.UNKNOWN;
-    this.id = "";
-    this.data = "";
+    this.id = '';
+    this.data = '';
   }
 }
 
@@ -79,7 +79,7 @@ export class SerialMessage {
   }
 
   public static fromString(message: string): SerialMessage {
-    const parts = message.split("|");
+    const parts = message.split('|');
     if (parts.length !== 2) throw new Error(`Invalid message: ${message}`);
     const type = SerialMessageType[parts[0] as keyof typeof SerialMessageType];
     return new SerialMessage(type, parts[1], parts[2]);

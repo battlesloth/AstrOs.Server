@@ -1,4 +1,4 @@
-import { Generated, Insertable, Selectable, Updateable } from "kysely";
+import { Generated, Insertable, Selectable, Updateable } from 'kysely';
 
 export interface Database {
   settings: SettingsTable;
@@ -10,6 +10,9 @@ export interface Database {
   script_channels: ScriptChannelsTable;
   script_events: ScriptEventsTable;
   script_deployments: ScriptDeploymentsTable;
+
+  playlists: PlaylistsTable;
+  playlist_tracks: PlaylistTracksTable;
 
   controllers: ControllersTable;
   locations: LocationsTable;
@@ -89,6 +92,7 @@ export interface ScriptsTable {
   description: string;
   last_modified: number;
   enabled: number;
+  duration_ds: number;
 }
 
 export type Script = Selectable<ScriptsTable>;
@@ -140,6 +144,35 @@ export interface ScriptDeploymentsTable {
 export type ScriptDeployment = Selectable<ScriptDeploymentsTable>;
 export type NewScriptDeployment = Insertable<ScriptDeploymentsTable>;
 export type ScriptDeploymentUpdate = Updateable<ScriptDeploymentsTable>;
+
+//#endregion
+//#region Playlists
+
+export interface PlaylistsTable {
+  id: string;
+  playlist_name: string;
+  description: string;
+  last_modified: number;
+  enabled: number;
+}
+
+export type Playlist = Selectable<PlaylistsTable>;
+export type NewPlaylist = Insertable<PlaylistsTable>;
+export type PlaylistUpdate = Updateable<PlaylistsTable>;
+
+export interface PlaylistTracksTable {
+  id: string;
+  playlist_id: string;
+  idx: number;
+  duration_ds: number;
+  track_type: string;
+  track_id: string;
+  track_name: string;
+}
+
+export type PlaylistTrack = Selectable<PlaylistTracksTable>;
+export type NewPlaylistTrack = Insertable<PlaylistTracksTable>;
+export type PlaylistTrackUpdate = Updateable<PlaylistTracksTable>;
 
 //#endregion
 //#region Controllers

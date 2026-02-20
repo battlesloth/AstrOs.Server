@@ -1,13 +1,13 @@
-import { SettingsRepository } from "../dal/repositories/settings_repository.js";
-import { logger } from "../logger.js";
-import { ControllerRepository } from "../dal/repositories/controller_repository.js";
-import { db } from "../dal/database.js";
+import { SettingsRepository } from '../dal/repositories/settings_repository.js';
+import { logger } from '../logger.js';
+import { ControllerRepository } from '../dal/repositories/controller_repository.js';
+import { db } from '../dal/database.js';
 
 export class SettingsController {
-  public static getRoute = "/settings/";
-  public static putRoute = "/settings/";
-  public static formatSDRoute = "/settings/formatSD";
-  public static controllersRoute = "/settings/controllers";
+  public static getRoute = '/settings/';
+  public static putRoute = '/settings/';
+  public static formatSDRoute = '/settings/formatSD';
+  public static controllersRoute = '/settings/controllers';
 
   public static async getSetting(req: any, res: any, next: any) {
     try {
@@ -22,7 +22,7 @@ export class SettingsController {
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }
@@ -33,11 +33,11 @@ export class SettingsController {
 
       if (await repo.saveSetting(req.body.key, req.body.value)) {
         res.status(200);
-        res.json({ message: "success" });
+        res.json({ message: 'success' });
       } else {
         res.status(500);
         res.json({
-          message: "failed",
+          message: 'failed',
         });
       }
     } catch (error) {
@@ -45,7 +45,7 @@ export class SettingsController {
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }
@@ -63,7 +63,7 @@ export class SettingsController {
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }

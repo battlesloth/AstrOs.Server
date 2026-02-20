@@ -1,8 +1,8 @@
-import { AudioFile } from "astros-common";
-import { logger } from "../../logger.js";
-import { inserted } from "../database.js";
-import { Kysely } from "kysely";
-import { Database } from "../types.js";
+import { AudioFile } from 'astros-common';
+import { logger } from '../../logger.js';
+import { inserted } from '../database.js';
+import { Kysely } from 'kysely';
+import { Database } from '../types.js';
 
 export class AudioFileRepository {
   constructor(private readonly db: Kysely<Database>) {}
@@ -11,21 +11,16 @@ export class AudioFileRepository {
     const result = new Array<AudioFile>();
 
     const data = await this.db
-      .selectFrom("audio_files")
+      .selectFrom('audio_files')
       .selectAll()
       .execute()
       .catch((err) => {
-        logger.error("AudioFileRepository.getAudioFiles", err);
+        logger.error('AudioFileRepository.getAudioFiles', err);
         throw err;
       });
 
     for (const af of data) {
-      const file = new AudioFile(
-        af.id,
-        af.file_name,
-        af.description,
-        af.duration,
-      );
+      const file = new AudioFile(af.id, af.file_name, af.description, af.duration);
       result.push(file);
     }
 
@@ -34,16 +29,16 @@ export class AudioFileRepository {
 
   async insertFile(id: string, fileName: string): Promise<boolean> {
     const data = await this.db
-      .insertInto("audio_files")
+      .insertInto('audio_files')
       .values({
         id: id,
         file_name: fileName,
-        description: "",
+        description: '',
         duration: 0,
       })
       .executeTakeFirst()
       .catch((err) => {
-        logger.error("AudioFileRepository.insertFile", err);
+        logger.error('AudioFileRepository.insertFile', err);
         throw err;
       });
 
@@ -54,12 +49,12 @@ export class AudioFileRepository {
     const result = new Array<string>();
 
     const data = await this.db
-      .selectFrom("audio_files")
-      .select("id")
-      .where("duration", "=", 0)
+      .selectFrom('audio_files')
+      .select('id')
+      .where('duration', '=', 0)
       .execute()
       .catch((err) => {
-        logger.error("AudioFileRepository.filesNeedingDuration", err);
+        logger.error('AudioFileRepository.filesNeedingDuration', err);
         throw err;
       });
 
@@ -72,12 +67,12 @@ export class AudioFileRepository {
 
   async updateFileDuration(id: string, duration: number) {
     const result = await this.db
-      .updateTable("audio_files")
+      .updateTable('audio_files')
       .set({ duration: duration })
-      .where("id", "=", id)
+      .where('id', '=', id)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error("AudioFileRepository.updateFileDuration", err);
+        logger.error('AudioFileRepository.updateFileDuration', err);
         throw err;
       });
 
@@ -86,11 +81,11 @@ export class AudioFileRepository {
 
   async deleteFile(id: string): Promise<boolean> {
     const result = await this.db
-      .deleteFrom("audio_files")
-      .where("id", "=", id)
+      .deleteFrom('audio_files')
+      .where('id', '=', id)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error("AudioFileRepository.deleteFile", err);
+        logger.error('AudioFileRepository.deleteFile', err);
         throw err;
       });
 
