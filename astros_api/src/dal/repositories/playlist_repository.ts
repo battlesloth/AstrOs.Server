@@ -1,8 +1,8 @@
 import { Kysely } from 'kysely';
 import { Database } from '../types.js';
-import { Playlist } from 'src/models/playlists/playlist.js';
-import { logger } from 'src/logger.js';
-import { TrackType } from 'src/models/playlists/trackType.js';
+import { Playlist } from '../../models/playlists/playlist.js';
+import { logger } from '../../logger.js';
+import { TrackType } from '../../models/playlists/trackType.js';
 import { v4 as uuid } from 'uuid';
 
 export class PlaylistRepository {
