@@ -1,9 +1,6 @@
-import { logger } from ".././logger.js";
-import {
-  SerialMessageType,
-  SerialMsgValidationResult,
-} from "./serial_message.js";
-import { MessageHelper } from "./message_helper.js";
+import { logger } from '.././logger.js';
+import { SerialMessageType, SerialMsgValidationResult } from './serial_message.js';
+import { MessageHelper } from './message_helper.js';
 import {
   ConfigSyncResponse,
   PollRepsonse,
@@ -11,8 +8,8 @@ import {
   ScriptDeployResponse,
   ScriptRunResponse,
   SerialWorkerResponseType,
-} from "./serial_worker_response.js";
-import { ControlModule } from "astros-common";
+} from './serial_worker_response.js';
+import { ControlModule } from 'astros-common';
 
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
 //|--int---RS---string----RS--string---GS--val--US--val--RS--val--US--val--|
@@ -66,7 +63,7 @@ export class MessageHandler {
       return response;
     }
 
-    const module = new ControlModule("", parts[1], parts[0]);
+    const module = new ControlModule('', parts[1], parts[0]);
     module.fingerprint = parts[2];
     response.controller = module;
 
@@ -86,7 +83,7 @@ export class MessageHandler {
         continue;
       }
 
-      const module = new ControlModule("", units[1], units[0]);
+      const module = new ControlModule('', units[1], units[0]);
 
       response.registrations.push(module);
     }
@@ -105,17 +102,14 @@ export class MessageHandler {
       return response;
     }
 
-    const module = new ControlModule("", parts[1], parts[0]);
+    const module = new ControlModule('', parts[1], parts[0]);
     module.fingerprint = parts[2];
     response.controller = module;
 
     return response;
   }
 
-  handleDeployScriptAckNak(
-    type: SerialMessageType,
-    msg: string,
-  ): ScriptDeployResponse {
+  handleDeployScriptAckNak(type: SerialMessageType, msg: string): ScriptDeployResponse {
     const parts = msg.split(MessageHelper.US);
 
     if (parts.length < 3) {
@@ -131,16 +125,13 @@ export class MessageHandler {
 
     const response = new ScriptDeployResponse(success, parts[2]);
 
-    const module = new ControlModule("", parts[1], parts[0]);
+    const module = new ControlModule('', parts[1], parts[0]);
     response.controller = module;
 
     return response;
   }
 
-  handleRunScriptAckNak(
-    type: SerialMessageType,
-    msg: string,
-  ): ScriptRunResponse {
+  handleRunScriptAckNak(type: SerialMessageType, msg: string): ScriptRunResponse {
     const parts = msg.split(MessageHelper.US);
 
     if (parts.length < 3) {
@@ -156,7 +147,7 @@ export class MessageHandler {
 
     const response = new ScriptRunResponse(success, parts[2]);
 
-    const module = new ControlModule("", parts[1], parts[0]);
+    const module = new ControlModule('', parts[1], parts[0]);
     response.controller = module;
 
     return response;

@@ -56,6 +56,24 @@ const generateApiKey = async () => {
   }
 };
 
+// Download logs
+const downloadLogs = async () => {
+  try {
+    const blob = await apiService.getBlob('/api/settings/logs');
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'astros_logs.zip');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (error) {
+    console.error('Error downloading logs:', error);
+    showAlert.value = true;
+    alertMessage.value = 'Error downloading logs. Check logs.';
+  }
+};
+
 // Format SD card modal
 const openFormatModal = () => {
   selectedControllers.value = controllers.value.map((ctrl) => ({
@@ -139,6 +157,22 @@ const closeAlert = () => {
                   @click="openFormatModal"
                 >
                   Format
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
+          <div class="text-2xl w-45">Log Files</div>
+          <div class="grow">
+            <div class="flex flex-row flex-nowrap">
+              <div class="grow"></div>
+              <div class="float-right">
+                <button
+                  class="btn btn-primary w-35 px-5 py-0.75"
+                  @click="downloadLogs"
+                >
+                  Download
                 </button>
               </div>
             </div>

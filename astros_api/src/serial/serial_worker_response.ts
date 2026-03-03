@@ -1,4 +1,4 @@
-import { ControlModule } from "astros-common";
+import { ControlModule } from 'astros-common';
 
 export enum SerialWorkerResponseType {
   UNKNOWN,

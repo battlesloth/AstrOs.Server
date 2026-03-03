@@ -1,21 +1,28 @@
-import pino from "pino";
-import appdata from "appdata-path";
+import pino from 'pino';
+import appdata from 'appdata-path';
+import fs from 'fs';
 
-function timestamp(): string {
-  const date_ob = new Date();
-  const day = ("0" + date_ob.getDate()).slice(-2);
-  const month = ("0" + (date_ob.getMonth() + 1)).slice(-2);
-  const year = date_ob.getFullYear();
-  const hours = date_ob.getHours();
-  const minutes = date_ob.getMinutes();
-  const seconds = date_ob.getSeconds();
+const logDir = `${appdata('astrosserver')}/logs`;
+fs.mkdirSync(logDir, { recursive: true });
 
-  return `${year}_${month}_${day}_${hours}_${minutes}_${seconds}`;
-}
-
-export const logger = pino(
-  {
-    level: "debug",
+export const logger = pino({
+  level: 'debug',
+  transport: {
+    targets: [
+      {
+        target: 'pino-roll',
+        options: {
+          file: `${logDir}/astros`,
+          frequency: 'daily',
+          dateFormat: 'yyyy-MM-dd',
+          mkdir: true,
+          limit: { count: 10 },
+        },
+      },
+      {
+        target: 'pino/file',
+        options: { destination: 1 },
+      },
+    ],
   },
-  //pino.destination(`${appdata("astrosserver")}/astros_${timestamp()}.log`)
-);
+});

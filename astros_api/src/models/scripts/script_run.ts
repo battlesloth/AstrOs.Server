@@ -1,5 +1,5 @@
-import { ControllerLocation, TransmissionType } from "astros-common";
-import { ScriptConfig } from "./script_config.js";
+import { ControllerLocation, TransmissionType } from 'astros-common';
+import { ScriptConfig } from './script_config.js';
 
 export class ScriptRun {
   type: TransmissionType = TransmissionType.run;
@@ -12,7 +12,7 @@ export class ScriptRun {
     this.configs = new Array<ScriptConfig>();
 
     locations.forEach((loc) => {
-      const cfig = new ScriptConfig(loc.controller, "");
+      const cfig = new ScriptConfig(loc.controller, '');
       this.configs.push(cfig);
     });
   }

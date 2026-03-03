@@ -1,14 +1,14 @@
-import passport from "passport";
-import jsonwebtoken from "jsonwebtoken";
-import { logger } from "../logger.js";
-import { User } from "../models/users.js";
+import passport from 'passport';
+import jsonwebtoken from 'jsonwebtoken';
+import { logger } from '../logger.js';
+import { User } from '../models/users.js';
 
 export class AuthContoller {
-  public static route = "/login";
-  public static reauthRoute = "/reauth";
+  public static route = '/login';
+  public static reauthRoute = '/reauth';
 
   public static login(req: any, res: any, next: any) {
-    passport.authenticate("local", (err: any, user: any, info: any) => {
+    passport.authenticate('local', (err: any, user: any, info: any) => {
       // If Passport throws/catches an error
       if (err) {
         res.status(404).json(err);
@@ -48,13 +48,13 @@ export class AuthContoller {
         } else {
           res.status(401);
           res.json({
-            message: "token expired",
+            message: 'token expired',
           });
         }
       } else {
         res.status(401);
         res.json({
-          message: "token not valid",
+          message: 'token not valid',
         });
       }
     } catch (error) {
@@ -62,7 +62,7 @@ export class AuthContoller {
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }

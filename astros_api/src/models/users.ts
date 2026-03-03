@@ -1,28 +1,24 @@
-import crypto from "crypto";
-import jsonwebtoken from "jsonwebtoken";
+import crypto from 'crypto';
+import jsonwebtoken from 'jsonwebtoken';
 
 export class User {
   name: string;
   hash: string;
   salt: string;
 
-  constructor(name: string, hash = "", salt = "") {
+  constructor(name: string, hash = '', salt = '') {
     this.name = name;
     this.hash = hash;
     this.salt = salt;
   }
 
   public setPassword(password: string): void {
-    this.salt = crypto.randomBytes(16).toString("hex");
-    this.hash = crypto
-      .pbkdf2Sync(password, this.salt, 1000, 64, "sha512")
-      .toString("hex");
+    this.salt = crypto.randomBytes(16).toString('hex');
+    this.hash = crypto.pbkdf2Sync(password, this.salt, 1000, 64, 'sha512').toString('hex');
   }
 
   public validatePassword(password: string): boolean {
-    const hash = crypto
-      .pbkdf2Sync(password, this.salt, 1000, 64, "sha512")
-      .toString("hex");
+    const hash = crypto.pbkdf2Sync(password, this.salt, 1000, 64, 'sha512').toString('hex');
     return this.hash === hash;
   }
 

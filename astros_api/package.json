@@ -17,9 +17,11 @@
     "prettier:write": "prettier --write \"src/**/*.ts\""
   },
   "dependencies": {
+    "@types/archiver": "^7.0.0",
     "@types/better-sqlite3": "^7.6.12",
     "@types/serialport": "^8.0.5",
     "appdata-path": "^1.0.0",
+    "archiver": "^7.0.1",
     "astros-common": "file:../astros_common",
     "better-sqlite3": "^12.5.0",
     "cookie-parser": "~1.4.4",
@@ -38,6 +40,7 @@
     "passport-local": "^1.0.0",
     "pino": "^8.8.0",
     "pino-http": "^8.3.1",
+    "pino-roll": "^4.0.0",
     "pug": "^3.0.2",
     "serialport": "^12.0.0",
     "sqlite3": "^5.0.2",

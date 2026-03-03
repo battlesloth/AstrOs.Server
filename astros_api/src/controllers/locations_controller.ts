@@ -1,13 +1,13 @@
-import { AstrOsConstants, AstrOsLocationCollection } from "astros-common";
-import { logger } from "../logger.js";
-import { LocationsRepository } from "../dal/repositories/locations_repository.js";
-import { db } from "../dal/database.js";
+import { AstrOsConstants, AstrOsLocationCollection } from 'astros-common';
+import { logger } from '../logger.js';
+import { LocationsRepository } from '../dal/repositories/locations_repository.js';
+import { db } from '../dal/database.js';
 
 export class LocationsController {
-  public static route = "/locations/";
-  public static syncConfigRoute = "/locations/syncconfig";
-  public static syncControllersRoute = "/locations/synccontrollers";
-  public static loadRoute = "/locations/load";
+  public static route = '/locations/';
+  public static syncConfigRoute = '/locations/syncconfig';
+  public static syncControllersRoute = '/locations/synccontrollers';
+  public static loadRoute = '/locations/load';
 
   public static async getLocations(req: any, res: any, next: any) {
     try {
@@ -41,7 +41,7 @@ export class LocationsController {
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }
@@ -68,11 +68,11 @@ export class LocationsController {
 
       if (success) {
         res.status(200);
-        res.json({ message: "success" });
+        res.json({ message: 'success' });
       } else {
         res.status(500);
         res.json({
-          message: "failed",
+          message: 'failed',
         });
       }
     } catch (error) {
@@ -80,7 +80,7 @@ export class LocationsController {
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }
@@ -119,7 +119,7 @@ export class LocationsController {
 
       res.status(500);
       res.json({
-        message: "Internal server error",
+        message: 'Internal server error',
       });
     }
   }

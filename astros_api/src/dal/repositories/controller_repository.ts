@@ -1,36 +1,34 @@
-import { inserted } from "../../dal/database.js";
-import { ControlModule } from "astros-common";
-import { logger } from "../../logger.js";
-import { v4 as uuid } from "uuid";
-import { Kysely } from "kysely";
-import { Database } from "../types.js";
+import { inserted } from '../../dal/database.js';
+import { ControlModule } from 'astros-common';
+import { logger } from '../../logger.js';
+import { v4 as uuid } from 'uuid';
+import { Kysely } from 'kysely';
+import { Database } from '../types.js';
 
 export class ControllerRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
-  public async insertControllers(
-    controllers: ControlModule[],
-  ): Promise<boolean> {
+  public async insertControllers(controllers: ControlModule[]): Promise<boolean> {
     const wasInserted: boolean[] = [];
 
     for (let i = 0; i < controllers.length; i++) {
       const result = await this.db
-        .insertInto("controllers")
+        .insertInto('controllers')
         .values({
           id: uuid(),
           name: controllers[i].name,
-          description: "",
+          description: '',
           address: controllers[i].address,
         })
         .onConflict((c) =>
-          c.column("name").doUpdateSet((eb) => ({
-            description: eb.ref("excluded.description"),
-            address: eb.ref("excluded.address"),
+          c.column('name').doUpdateSet((eb) => ({
+            description: eb.ref('excluded.description'),
+            address: eb.ref('excluded.address'),
           })),
         )
         .executeTakeFirst()
         .catch((err) => {
-          logger.error("ControllerRepository.insertControllers", err);
+          logger.error('ControllerRepository.insertControllers', err);
           throw err;
         });
 
@@ -46,33 +44,33 @@ export class ControllerRepository {
     const id = uuid();
 
     const result = await this.db
-      .insertInto("controllers")
+      .insertInto('controllers')
       .values({
         id: id,
         name: controller.name,
-        description: "",
+        description: '',
         address: controller.address,
       })
       .executeTakeFirst()
       .catch((err) => {
-        logger.error("ControllerRepository.insertController", err);
+        logger.error('ControllerRepository.insertController', err);
         throw err;
       });
 
-    return inserted(result) ? id : "";
+    return inserted(result) ? id : '';
   }
 
   public async updateController(controller: ControlModule): Promise<boolean> {
     const result = await this.db
-      .updateTable("controllers")
+      .updateTable('controllers')
       .set({
         name: controller.name,
         address: controller.address,
       })
-      .where("id", "=", controller.id)
+      .where('id', '=', controller.id)
       .executeTakeFirst()
       .catch((err) => {
-        logger.error("ControllerRepository.updateController", err);
+        logger.error('ControllerRepository.updateController', err);
         throw err;
       });
 
@@ -83,11 +81,11 @@ export class ControllerRepository {
     const result = new Array<ControlModule>();
 
     const data = await this.db
-      .selectFrom("controllers")
+      .selectFrom('controllers')
       .selectAll()
       .execute()
       .catch((err) => {
-        logger.error("ControllerRepository.getControllers", err);
+        logger.error('ControllerRepository.getControllers', err);
         throw err;
       });
 
@@ -101,12 +99,12 @@ export class ControllerRepository {
 
   public async getControllerById(id: string): Promise<ControlModule> {
     const data = await this.db
-      .selectFrom("controllers")
+      .selectFrom('controllers')
       .selectAll()
-      .where("id", "=", id)
+      .where('id', '=', id)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error("ControllerRepository.getControllerById", err);
+        logger.error('ControllerRepository.getControllerById', err);
         throw err;
       });
 
@@ -115,33 +113,27 @@ export class ControllerRepository {
 
   public async getControllerByAddress(address: string): Promise<ControlModule> {
     const data = await this.db
-      .selectFrom("controllers")
+      .selectFrom('controllers')
       .selectAll()
-      .where("address", "=", address)
+      .where('address', '=', address)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error("ControllerRepository.getControllerByAddress", err);
+        logger.error('ControllerRepository.getControllerByAddress', err);
         throw err;
       });
 
     return new ControlModule(data.id, data.name, data.address);
   }
 
-  public async getControllerByLocationId(
-    locationId: string,
-  ): Promise<ControlModule> {
+  public async getControllerByLocationId(locationId: string): Promise<ControlModule> {
     const data = await this.db
-      .selectFrom("controllers")
-      .leftJoin(
-        "controller_locations as cl",
-        "cl.controller_id",
-        "controllers.id",
-      )
+      .selectFrom('controllers')
+      .leftJoin('controller_locations as cl', 'cl.controller_id', 'controllers.id')
       .selectAll()
-      .where("cl.location_id", "=", locationId)
+      .where('cl.location_id', '=', locationId)
       .executeTakeFirstOrThrow()
       .catch((err) => {
-        logger.error("ControllerRepository.getControllerByLocationId", err);
+        logger.error('ControllerRepository.getControllerByLocationId', err);
         throw err;
       });
 
