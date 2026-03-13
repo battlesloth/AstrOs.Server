@@ -476,6 +476,8 @@ class ApiServer {
 
   async handleResgistraionResponse(msg: ISerialWorkerResponse) {
     try {
+      logger.info(`Handling registration response: ${JSON.stringify(msg)}`);
+
       const val = msg as RegistrationResponse;
 
       const controllerRepo = new ControllerRepository(db);
@@ -483,6 +485,8 @@ class ApiServer {
       await controllerRepo.insertControllers(val.registrations);
 
       const contollers = await controllerRepo.getControllers();
+
+      logger.info(`Controllers after registration sync: ${JSON.stringify(contollers)}`);
 
       const update = new ControllersResponse(val.success, contollers);
       this.updateClients(update);
