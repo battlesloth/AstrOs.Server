@@ -1,19 +1,19 @@
 services:
   astros:
     hostname: astros
-    platform: linux/arm64
+    platform: linux/arm64/v8
     build:
       context: .
       dockerfile: ./Dockerfile
       tags:
-        - dirtknap/astros-server:1.3.8
+        - dirtknap/astros-server:1.3.9
         - dirtknap/astros-server:latest
     ports:
       - 8080:80
       - 3000:3000
       - 5000:5000
     volumes:
-      - C:/Test:/root/.config/astrosserver
+      - /home/jeff/build:/root/.config/astrosserver
     networks:
       - astronet
 

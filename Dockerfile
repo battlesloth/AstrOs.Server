@@ -1,5 +1,5 @@
 # Build astros_common
-FROM --platform=linux/arm64 arm64v8/node:20 as build-common
+FROM --platform=linux/arm64/v8 docker.io/arm64v8/node:20 as build-common
 
 WORKDIR /usr/src/commons
 
@@ -53,7 +53,7 @@ RUN npm install utf-8-validate
 RUN npm install serialport
 
 # Final stage: nginx + node
-FROM --platform=linux/arm64 arm64v8/node:20
+FROM --platform=linux/arm64/v8 docker.io/arm64v8/node:20
 
 # Install nginx
 RUN apt-get update && \

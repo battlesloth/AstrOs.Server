@@ -447,7 +447,7 @@ class ApiServer {
   handleSerialWorkerMessage(msg: ISerialWorkerResponse): void {
     switch (msg.type) {
       case SerialWorkerResponseType.UNKNOWN:
-        logger.error('Invalid message received');
+        logger.error(`Invalid message received: ${JSON.stringify(msg)}`);
         break;
       case SerialWorkerResponseType.SEND_SERIAL_MESSAGE:
         this.serialPort.write(msg.data, (err: any) => {
