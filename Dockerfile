@@ -1,38 +1,23 @@
-# Build astros_common
-FROM --platform=linux/arm64/v8 docker.io/arm64v8/node:20 as build-common
-
-WORKDIR /usr/src/commons
-
-RUN npm install typescript -g
-
-COPY ./astros_common/package*.json ./
-RUN npm ci --production && npm cache clean --force
-
-COPY ./astros_common/ .
-RUN tsc
-
-# Build Vue frontend
-FROM build-common as build-vue
+# Build Vue client
+FROM --platform=linux/arm64/v8 docker.io/arm64v8/node:20 as build-vue
 
 WORKDIR /usr/src/vue
 
 COPY ./astros_vue/package*.json ./
 RUN npm install
 
-COPY --from=build-common /usr/src/commons/dist /usr/src/vue/node_modules/astros-common
-
 COPY ./astros_vue/ .
 RUN npm run build
 
 # Build API backend
-FROM build-common as build-api
+FROM build-vue as build-api
 
 WORKDIR /usr/src/app
 
 COPY ./astros_api/package*.json ./
-RUN npm install --python=/usr/bin/python3
 
-COPY --from=build-common /usr/src/commons/dist ./node_modules/astros-common
+RUN npm install --python=/usr/bin/python3
+RUN npm install typescript -g
 
 COPY ./astros_api/ .
 RUN tsc
@@ -74,7 +59,6 @@ RUN ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 WORKDIR /app
 
 COPY --from=build-api-prod /usr/src/temp .
-COPY --from=build-common /usr/src/commons/dist ./node_modules/astros-common
 
 # Create start script
 RUN echo '#!/bin/bash' > /start.sh && \
