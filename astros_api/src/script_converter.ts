@@ -16,7 +16,7 @@ import {
   I2cModule,
   GpioChannel,
   GpioModule,
-} from 'astros-common';
+} from './models/index.js';
 import { v4 as uuid } from 'uuid';
 import { logger } from './logger.js';
 import { ScriptRepository } from './dal/repositories/script_repository.js';
@@ -107,7 +107,7 @@ export class ScriptConverter {
       }
       case ModuleSubType.maestro: {
         const mod = this.modulesMap.get(cmd.moduleId) as UartModule;
-        script = this.masetroAsToString(
+        script = this.maestroAsToString(
           cmd.event as MaestroEvent,
           { idx: mod.idx, ch: mod.uartChannel, baud: mod.baudRate },
           0,
@@ -522,10 +522,10 @@ export class ScriptConverter {
       throw new Error(`No UART module found for script channel ${evt.scriptChannel}`);
     }
 
-    return this.masetroAsToString(maestro, uart, timeTillNextEvent);
+    return this.maestroAsToString(maestro, uart, timeTillNextEvent);
   }
 
-  masetroAsToString(evt: MaestroEvent, uart: IUartValues, next: number): string {
+  maestroAsToString(evt: MaestroEvent, uart: IUartValues, next: number): string {
     return `${CommandType.maestro}|${this.toMsStr(next)}|${uart.idx}|${evt.channel}|${evt.position}|${evt.speed}|${evt.acceleration};`;
   }
 

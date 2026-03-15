@@ -1,14 +1,14 @@
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
 //|--int---RS---string----RS--string---GS--val--US--val--RS--val--US--val--|
 
-import { ConfigSync } from 'src/models/config/config_sync';
+import { ConfigSync } from '../models/config/config_sync.js';
 import { logger } from '../logger.js';
 import { MessageHelper } from './message_helper.js';
 import { SerialMessageType } from './serial_message.js';
-import { ScriptUpload } from 'src/models/scripts/script_upload';
-import { ScriptRun } from 'src/models/scripts/script_run';
-import { ServoTest } from 'src/models/servo_test';
-import { MaestroModule } from 'astros-common';
+import { ScriptUpload } from '../models/scripts/script_upload.js';
+import { ScriptRun } from '../models/scripts/script_run.js';
+import { ServoTest } from '../models/servo_test.js';
+import { MaestroModule } from '../models/index.js';
 
 export enum EspModuleType {
   NONE = 0,

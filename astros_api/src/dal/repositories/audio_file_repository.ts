@@ -1,4 +1,4 @@
-import { AudioFile } from 'astros-common';
+import { AudioFile } from '../../models/index.js';
 import { logger } from '../../logger.js';
 import { inserted } from '../database.js';
 import { Kysely } from 'kysely';

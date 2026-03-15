@@ -3,13 +3,13 @@ import SQLite from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';
 import { Database } from '../../types.js';
 import { migrateToLatest } from '../../database.js';
-import { AstrOsConstants, I2cModule, ModuleSubType } from 'astros-common';
+import { Constants, I2cModule, ModuleSubType } from '../../../models/index.js';
 import { getI2cModules, upsertI2cModules } from './i2c_repository.js';
 import { v4 as uuid } from 'uuid';
 
 describe('I2cRepository', () => {
   let db: Kysely<Database>;
-  const location = AstrOsConstants.BODY;
+  const location = Constants.BODY;
 
   beforeEach(async () => {
     const dialect = new SqliteDialect({

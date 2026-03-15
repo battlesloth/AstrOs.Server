@@ -1,5 +1,5 @@
 import { inserted } from '../../dal/database.js';
-import { ControlModule } from 'astros-common';
+import { ControlModule } from '../../models/index.js';
 import { logger } from '../../logger.js';
 import { v4 as uuid } from 'uuid';
 import { Kysely } from 'kysely';

@@ -25,7 +25,7 @@ import {
   HcrCommand,
   HumanCyborgRelationsCmd,
   HcrCommandCategory,
-} from 'astros-common';
+} from '../../models/index.js';
 import { upsertGpioModule } from './module_repositories/gpio_repository.js';
 import { upsertUartModules } from './module_repositories/uart_repository.js';
 

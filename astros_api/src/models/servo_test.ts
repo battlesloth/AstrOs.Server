@@ -1,4 +1,4 @@
-import { ModuleSubType } from 'astros-common';
+import { ModuleSubType } from '../models/index.js';
 
 export class ServoTest {
   controllerAddress: string;

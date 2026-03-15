@@ -1,4 +1,5 @@
-import { ControllerLocation, TransmissionType } from 'astros-common';
+import { TransmissionType } from '../enums.js';
+import { ControllerLocation } from '../control_module/controller_location.js';
 import { ScriptConfig } from './script_config.js';
 
 export class ScriptUpload {

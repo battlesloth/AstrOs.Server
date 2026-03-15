@@ -12,7 +12,7 @@ import {
   ModuleClassType,
   MaestroEvent,
   MaestroChannel,
-} from 'astros-common';
+} from '../../models/index.js';
 import { logger } from '../../logger.js';
 import { Guid } from 'guid-typescript';
 import { Database, ScriptsTable } from '../types.js';

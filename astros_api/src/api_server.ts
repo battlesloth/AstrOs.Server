@@ -32,7 +32,7 @@ import {
   ScriptResponse,
   TransmissionStatus,
   ModuleSubType,
-} from 'astros-common';
+} from './models/index.js';
 import { ControllerRepository } from './dal/repositories/controller_repository.js';
 import { ConfigSync } from './models/config/config_sync.js';
 import { ScriptRun } from './models/scripts/script_run.js';

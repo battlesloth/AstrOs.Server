@@ -1,8 +1,7 @@
 import { Kysely, Transaction } from 'kysely';
 import { Database, I2CModule as I2CModuleRow } from '../../types.js';
 import { logger } from '../../../logger.js';
-import { I2cModule } from 'astros-common';
-import { I2cChannel } from 'astros-common';
+import { I2cModule, I2cChannel } from '../../../models/index.js';
 
 //#region I2C Modules
 

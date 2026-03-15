@@ -9,7 +9,7 @@ import {
 } from '../types.js';
 import { v4 as uuid } from 'uuid';
 import * as crypto from 'crypto';
-import { AstrOsConstants } from 'astros-common';
+import { Constants } from '../../models/index.js';
 
 export const migration_0: Migration = {
   up: async (db: Kysely<any>): Promise<void> => {
@@ -200,19 +200,19 @@ export const migration_0: Migration = {
 
     await db.insertInto('controllers').values(masterController).execute();
 
-    const locations = [AstrOsConstants.BODY, AstrOsConstants.CORE, AstrOsConstants.DOME];
+    const locations = [Constants.BODY, Constants.CORE, Constants.DOME];
 
     const nameMap = new Map();
-    nameMap.set(AstrOsConstants.BODY, 'Body Controller');
-    nameMap.set(AstrOsConstants.CORE, 'Dome Core Controller');
-    nameMap.set(AstrOsConstants.DOME, 'Dome Surface Controller');
+    nameMap.set(Constants.BODY, 'Body Controller');
+    nameMap.set(Constants.CORE, 'Dome Core Controller');
+    nameMap.set(Constants.DOME, 'Dome Surface Controller');
 
     const bodyId = uuid();
 
     for await (const loc of locations) {
       let id = '';
 
-      if (loc === AstrOsConstants.BODY) {
+      if (loc === Constants.BODY) {
         id = bodyId;
       } else {
         id = uuid();

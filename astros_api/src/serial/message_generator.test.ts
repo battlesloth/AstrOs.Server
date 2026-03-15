@@ -12,7 +12,7 @@ import {
   MaestroModule,
   ModuleSubType,
   UartModule,
-} from 'astros-common';
+} from '../models/index.js';
 import { v4 as uuid } from 'uuid';
 
 const RS = MessageHelper.RS;

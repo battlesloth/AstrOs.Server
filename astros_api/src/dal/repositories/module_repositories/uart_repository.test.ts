@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import SQLite from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';
 import { Database } from '../../types.js';
 import { migrateToLatest } from '../../database.js';
 import {
-  AstrOsConstants,
+  Constants,
   UartModule,
   ModuleSubType,
   ModuleType,
@@ -12,13 +13,13 @@ import {
   MaestroModule,
   MaestroBoard,
   MaestroChannel,
-} from 'astros-common';
+} from '../../../models/index.js';
 import { getUartModules, upsertUartModules } from './uart_repository.js';
 import { v4 as uuid } from 'uuid';
 
-describe('I2cRepository', () => {
+describe('UartRepository', () => {
   let db: Kysely<Database>;
-  const location = AstrOsConstants.BODY;
+  const location = Constants.BODY;
 
   beforeEach(async () => {
     const dialect = new SqliteDialect({

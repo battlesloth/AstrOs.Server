@@ -22,7 +22,6 @@
     "@types/serialport": "^8.0.5",
     "appdata-path": "^1.0.0",
     "archiver": "^7.0.1",
-    "astros-common": "file:../astros_common",
     "better-sqlite3": "^12.5.0",
     "cookie-parser": "~1.4.4",
     "cors": "^2.8.5",

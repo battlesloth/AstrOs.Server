@@ -27,7 +27,7 @@ import {
   ScriptEvent,
   UartChannel,
   UartModule,
-} from 'astros-common';
+} from './models/index.js';
 import { v4 as uuid } from 'uuid';
 
 const coreLocId = '07e5047a-32b3-4c6a-95c1-a97bebe1b0bd';

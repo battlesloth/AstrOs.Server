@@ -11,7 +11,7 @@ import {
   ModuleSubType,
   UartModule,
   UartChannel,
-} from 'astros-common';
+} from '../../../models/index.js';
 
 //#region Uart Modules
 export async function getUartModules(
