@@ -29,6 +29,7 @@ import {
   readUartChannel,
 } from './module_repositories/uart_repository.js';
 import { getI2cModules, readI2cChannel } from './module_repositories/i2c_repository.js';
+import { calculateLengthDS, updateScriptDuration } from '../../utility.js';
 
 export class ScriptRepository {
   private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -143,7 +144,13 @@ export class ScriptRepository {
     }
 
     const result = scripts.map((scr: ScriptsTable) => {
-      return new Script(scr.id, scr.name, scr.description, new Date(scr.last_modified));
+      return new Script(
+        scr.id,
+        scr.name,
+        scr.description,
+        new Date(scr.last_modified),
+        scr.duration_ds,
+      );
     });
 
     for (const scr of result) {

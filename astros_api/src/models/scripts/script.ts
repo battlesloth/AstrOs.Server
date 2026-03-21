@@ -12,7 +12,13 @@ export class Script {
 
   scriptChannels: Array<ScriptChannel>;
 
-  constructor(id: string, scriptName: string, description: string, lastSaved: Date) {
+  constructor(
+    id: string,
+    scriptName: string,
+    description: string,
+    lastSaved: Date,
+    durationDS: number,
+  ) {
     this.id = id;
     this.scriptName = scriptName;
     this.description = description;

@@ -1,4 +1,4 @@
-import { Script } from 'astros-common';
+import { Script } from './models/index.js';
 
 /**
  * Updates the duration of a script if it is undefined, null, NaN, or less than 0.

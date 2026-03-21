@@ -49,14 +49,6 @@
       "webRoot": "${workspaceFolder}/astros_client",
       "userDataDir": "${workspaceRoot}/.vscode/edge"
     },
-    {
-      "name": "vue_browser",
-      "type": "msedge",
-      "request": "launch",
-      "url": "http://localhost:5173",
-      "webRoot": "${workspaceFolder}/astros_vue",
-      "userDataDir": "${workspaceRoot}/.vscode/edge"
-    },
   ],
   "compounds": [
     {
@@ -71,8 +63,7 @@
       "name": "server/vue",
       "configurations": [
         "nodejs",
-        "vue",
-        "vue_browser"
+        "vue"
       ]
     }
   ]

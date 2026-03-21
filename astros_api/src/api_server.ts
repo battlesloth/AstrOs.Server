@@ -61,6 +61,7 @@ const __dirname = path.dirname(__filename);
 
 import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
+import { PlaylistController } from './controllers/playlist_controller.js';
 
 //const { SerialPort } = eval("require('serialport')");
 //const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
