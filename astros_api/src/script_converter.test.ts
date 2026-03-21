@@ -27,7 +27,7 @@ import {
   ScriptEvent,
   UartChannel,
   UartModule,
-} from 'astros-common';
+} from './models/index.js';
 import { v4 as uuid } from 'uuid';
 
 const coreLocId = '07e5047a-32b3-4c6a-95c1-a97bebe1b0bd';
@@ -83,16 +83,16 @@ describe('Script Converter Tests', () => {
     const coreSegs = coreScript?.split(';');
 
     expect(coreSegs?.length).toBe(3);
-    expect(coreSegs?.[0]).toBe('3|100|1|9600|test 0');
-    expect(coreSegs?.[1]).toBe('3|100|1|9600|test 1');
+    expect(coreSegs?.[0]).toBe('3|1000|1|9600|test 0');
+    expect(coreSegs?.[1]).toBe('3|1000|1|9600|test 1');
     expect(coreSegs?.[2]).toBe('3|0|1|9600|test 2');
 
     // buffer events on dome and body
     expect(domeScript).toBeDefined();
     expect(bodyScript).toBeDefined();
 
-    expect(domeScript).toBe('0|200|0;0|0|0');
-    expect(bodyScript).toBe('0|200|0;0|0|0');
+    expect(domeScript).toBe('0|2000|0;0|0|0');
+    expect(bodyScript).toBe('0|2000|0;0|0|0');
   });
 
   it('two channels on one location', async () => {
@@ -115,19 +115,19 @@ describe('Script Converter Tests', () => {
     const domeSegs = domeScript?.split(';');
 
     expect(domeSegs?.length).toBe(6);
-    expect(domeSegs?.[0]).toBe('3|100|2|9602|UART 0');
-    expect(domeSegs?.[1]).toBe('2|100|37|I2C 1');
-    expect(domeSegs?.[2]).toBe('3|100|2|9602|UART 2');
-    expect(domeSegs?.[3]).toBe('2|100|37|I2C 3');
-    expect(domeSegs?.[4]).toBe('3|100|2|9602|UART 4');
+    expect(domeSegs?.[0]).toBe('3|1000|2|9602|UART 0');
+    expect(domeSegs?.[1]).toBe('2|1000|37|I2C 1');
+    expect(domeSegs?.[2]).toBe('3|1000|2|9602|UART 2');
+    expect(domeSegs?.[3]).toBe('2|1000|37|I2C 3');
+    expect(domeSegs?.[4]).toBe('3|1000|2|9602|UART 4');
     expect(domeSegs?.[5]).toBe('2|0|37|I2C 5');
 
     // buffer events on core and body
     expect(coreScript).toBeDefined();
     expect(bodyScript).toBeDefined();
 
-    expect(coreScript).toBe('0|500|0;0|0|0');
-    expect(bodyScript).toBe('0|500|0;0|0|0');
+    expect(coreScript).toBe('0|5000|0;0|0|0');
+    expect(bodyScript).toBe('0|5000|0;0|0|0');
   });
 
   it('dome and core scipt', async () => {
@@ -150,11 +150,11 @@ describe('Script Converter Tests', () => {
     const domeSegs = domeScript?.split(';');
 
     expect(domeSegs?.length).toBe(6);
-    expect(domeSegs?.[0]).toBe('3|100|2|9602|UART 0');
-    expect(domeSegs?.[1]).toBe('2|100|37|I2C 1');
-    expect(domeSegs?.[2]).toBe('3|100|2|9602|UART 2');
-    expect(domeSegs?.[3]).toBe('2|100|37|I2C 3');
-    expect(domeSegs?.[4]).toBe('3|100|2|9602|UART 4');
+    expect(domeSegs?.[0]).toBe('3|1000|2|9602|UART 0');
+    expect(domeSegs?.[1]).toBe('2|1000|37|I2C 1');
+    expect(domeSegs?.[2]).toBe('3|1000|2|9602|UART 2');
+    expect(domeSegs?.[3]).toBe('2|1000|37|I2C 3');
+    expect(domeSegs?.[4]).toBe('3|1000|2|9602|UART 4');
     expect(domeSegs?.[5]).toBe('2|0|37|I2C 5');
 
     expect(coreScript).toBeDefined();
@@ -162,33 +162,32 @@ describe('Script Converter Tests', () => {
     const coreSegs = coreScript?.split(';');
 
     expect(coreSegs?.length).toBe(4);
-    expect(coreSegs?.[0]).toBe('3|100|1|9600|test 0');
-    expect(coreSegs?.[1]).toBe('3|100|1|9600|test 1');
-    expect(coreSegs?.[2]).toBe('3|300|1|9600|test 2');
+    expect(coreSegs?.[0]).toBe('3|1000|1|9600|test 0');
+    expect(coreSegs?.[1]).toBe('3|1000|1|9600|test 1');
+    expect(coreSegs?.[2]).toBe('3|3000|1|9600|test 2');
     expect(coreSegs?.[3]).toBe('0|0|0');
 
     // buffer events on body
     expect(bodyScript).toBeDefined();
 
-    expect(bodyScript).toBe('0|500|0;0|0|0');
+    expect(bodyScript).toBe('0|5000|0;0|0|0');
   });
 
   it('test script times', async () => {
     const scriptId = 'testScriptTimes';
 
-    // script event times should be in tenths of seconds, so 10 = 1 second
     // events should be ordered by time, not by order in channel
-    const evt1Time = 5; // 0.5 seconds
-    const evt2Time = 12; // 1.2 seconds
-    const evt3Time = 24; // 2.4 seconds
-    const evt4Time = 362; // 36.2 seconds
+    const evt1Time = 0.5; // 0.5 seconds
+    const evt2Time = 1.2; // 1.2 seconds
+    const evt3Time = 2.4; // 2.4 seconds
+    const evt4Time = 36.2; // 36.2 seconds
 
     const ttevt1ms = 500; // 0.5 seconds till event 1
     const ttevt2ms = 700; // 0.7 seconds between event 1 and event 2
     const ttevt3ms = 1200; // 1.2 seconds between event 2 and event 3
     const ttevt4ms = 33800; // 34.2 seconds between event 3 and event 4
 
-    const script = new Script(scriptId, 'test', 'test', new Date(), 33800);
+    const script = new Script(scriptId, 'test', 'test', new Date());
     const scriptCh = generateSerialScriptChannel(scriptId);
     const sevt1 = generateCoreScriptSerialEventByDecSec(evt1Time, scriptCh.id);
     const sevt2 = generateCoreScriptSerialEventByDecSec(evt2Time, scriptCh.id);
@@ -437,7 +436,7 @@ describe('script commands', () => {
 //#region Helpers
 
 function generateScript(id: string): Script {
-  const script = new Script(id, 'test', 'test', new Date(), 0);
+  const script = new Script(id, 'test', 'test', new Date());
 
   switch (id) {
     case 'coreGenericSerial': {

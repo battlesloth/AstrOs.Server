@@ -25,7 +25,7 @@ import {
   HcrCommand,
   HumanCyborgRelationsCmd,
   HcrCommandCategory,
-} from 'astros-common';
+} from '../../models/index.js';
 import { upsertGpioModule } from './module_repositories/gpio_repository.js';
 import { upsertUartModules } from './module_repositories/uart_repository.js';
 
@@ -66,7 +66,7 @@ describe('Script Repository', () => {
   it('should save script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
+    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()));
 
     const repo = new ScriptRepository(db);
 
@@ -84,7 +84,7 @@ describe('Script Repository', () => {
   it('should update script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
+    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()));
 
     const repo = new ScriptRepository(db);
 
@@ -115,7 +115,7 @@ describe('Script Repository', () => {
   it('should delete script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
+    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()));
 
     const repo = new ScriptRepository(db);
 

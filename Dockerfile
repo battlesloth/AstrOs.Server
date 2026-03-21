@@ -1,38 +1,27 @@
-# Build astros_common
-FROM --platform=linux/arm64 arm64v8/node:20 as build-common
-
-WORKDIR /usr/src/commons
-
-RUN npm install typescript -g
-
-COPY ./astros_common/package*.json ./
-RUN npm ci --production && npm cache clean --force
-
-COPY ./astros_common/ .
-RUN tsc
-
-# Build Vue frontend
-FROM build-common as build-vue
+# Build Vue client
+FROM --platform=linux/arm64/v8 docker.io/arm64v8/node:20-slim as build-vue
 
 WORKDIR /usr/src/vue
 
-COPY ./astros_vue/package*.json ./
-RUN npm install
+# Needed for node-gyp when native modules are installed on slim images.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends python3 make g++ && \
+    rm -rf /var/lib/apt/lists/*
 
-COPY --from=build-common /usr/src/commons/dist /usr/src/vue/node_modules/astros-common
+COPY ./astros_vue/package*.json ./
+RUN npm ci
 
 COPY ./astros_vue/ .
 RUN npm run build
 
 # Build API backend
-FROM build-common as build-api
+FROM build-vue as build-api
 
 WORKDIR /usr/src/app
 
 COPY ./astros_api/package*.json ./
-RUN npm install --python=/usr/bin/python3
 
-COPY --from=build-common /usr/src/commons/dist ./node_modules/astros-common
+RUN npm ci --python=/usr/bin/python3 && npm install typescript -g
 
 COPY ./astros_api/ .
 RUN tsc
@@ -47,21 +36,16 @@ WORKDIR /usr/src/temp/
 COPY --from=build-api /usr/src/app/dist /usr/src/temp/
 COPY --from=build-api /usr/src/app/package*.json /usr/src/temp/
 
-RUN npm install sqlite3 --python=/usr/bin/python3
-RUN npm install bufferutil
-RUN npm install utf-8-validate
-RUN npm install serialport
+RUN npm ci --omit=dev --python=/usr/bin/python3 && npm cache clean --force
 
 # Final stage: nginx + node
-FROM --platform=linux/arm64 arm64v8/node:20
+FROM --platform=linux/arm64/v8 docker.io/arm64v8/node:20-slim
 
 # Install nginx
 RUN apt-get update && \
-    apt-get install -y nginx && \
-    rm -rf /var/lib/apt/lists/*
-
-# Set up nginx
-RUN rm -f /etc/nginx/sites-enabled/default
+    apt-get install -y --no-install-recommends nginx && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -f /etc/nginx/sites-enabled/default
 
 # Copy Vue build to nginx html directory
 COPY --from=build-vue /usr/src/vue/dist /usr/share/nginx/html
@@ -74,7 +58,6 @@ RUN ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 WORKDIR /app
 
 COPY --from=build-api-prod /usr/src/temp .
-COPY --from=build-common /usr/src/commons/dist ./node_modules/astros-common
 
 # Create start script
 RUN echo '#!/bin/bash' > /start.sh && \

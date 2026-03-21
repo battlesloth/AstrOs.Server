@@ -4,12 +4,12 @@ import { Kysely, SqliteDialect } from 'kysely';
 import { migrateToLatest } from '../../database.js';
 import { Database } from '../../types.js';
 import { getGpioModule, upsertGpioModule } from './gpio_repository.js';
-import { AstrOsConstants } from 'astros-common';
+import { Constants } from '../../../models/index.js';
 
 describe('GpioRepository', () => {
   let db: Kysely<Database>;
 
-  const location = AstrOsConstants.BODY;
+  const location = Constants.BODY;
 
   beforeEach(async () => {
     const dialect = new SqliteDialect({

@@ -1,4 +1,3 @@
-import { PlaylistRepository } from '../dal/repositories/playlist_repository.js';
 import { db } from '../dal/database.js';
 import { ScriptRepository } from '../dal/repositories/script_repository.js';
 import { logger } from '../logger.js';

@@ -1,4 +1,4 @@
-import { AstrOsConstants, AstrOsLocationCollection } from 'astros-common';
+import { Constants, LocationCollection } from '../models/index.js';
 import { logger } from '../logger.js';
 import { LocationsRepository } from '../dal/repositories/locations_repository.js';
 import { db } from '../dal/database.js';
@@ -13,19 +13,19 @@ export class LocationsController {
     try {
       const repo = new LocationsRepository(db);
 
-      const response = new AstrOsLocationCollection();
+      const response = new LocationCollection();
 
       const modules = await repo.getLocations();
 
       for (const mod of modules) {
         switch (mod.locationName) {
-          case AstrOsConstants.BODY:
+          case Constants.BODY:
             response.bodyModule = mod;
             break;
-          case AstrOsConstants.CORE:
+          case Constants.CORE:
             response.coreModule = mod;
             break;
-          case AstrOsConstants.DOME:
+          case Constants.DOME:
             response.domeModule = mod;
             break;
           default:
@@ -50,7 +50,7 @@ export class LocationsController {
     try {
       const repo = new LocationsRepository(db);
 
-      const modules = req.body as AstrOsLocationCollection;
+      const modules = req.body as LocationCollection;
 
       let success = true;
 
@@ -91,19 +91,19 @@ export class LocationsController {
 
       const locations = await repo.loadLocations();
 
-      const response = new AstrOsLocationCollection();
+      const response = new LocationCollection();
 
       logger.info(`loaded locations: ${locations.length}`);
 
       for (const location of locations) {
         switch (location.locationName) {
-          case AstrOsConstants.BODY:
+          case Constants.BODY:
             response.bodyModule = location;
             break;
-          case AstrOsConstants.CORE:
+          case Constants.CORE:
             response.coreModule = location;
             break;
-          case AstrOsConstants.DOME:
+          case Constants.DOME:
             response.domeModule = location;
             break;
           default:

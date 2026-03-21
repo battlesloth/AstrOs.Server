@@ -1,4 +1,4 @@
-import { M5Page, M5ScriptList, M5Button } from 'astros-common';
+import { M5Page, M5ScriptList, M5Button } from '../models/index.js';
 import { RemoteConfigRepository } from '../dal/repositories/remote_config_repository.js';
 import { logger } from '../logger.js';
 import { db } from '../dal/database.js';

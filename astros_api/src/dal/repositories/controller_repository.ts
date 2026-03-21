@@ -1,5 +1,5 @@
 import { inserted } from '../../dal/database.js';
-import { ControlModule } from 'astros-common';
+import { ControlModule } from '../../models/index.js';
 import { logger } from '../../logger.js';
 import { v4 as uuid } from 'uuid';
 import { Kysely } from 'kysely';
@@ -12,20 +12,49 @@ export class ControllerRepository {
     const wasInserted: boolean[] = [];
 
     for (let i = 0; i < controllers.length; i++) {
+      const controller = controllers[i];
+
+      // Remove any stale row whose address or name matches but not both,
+      // then upsert cleanly.
+      const existing = await this.db
+        .selectFrom('controllers')
+        .selectAll()
+        .where((eb) =>
+          eb.or([eb('address', '=', controller.address), eb('name', '=', controller.name)]),
+        )
+        .execute()
+        .catch((err) => {
+          logger.error('ControllerRepository.insertControllers', err);
+          throw err;
+        });
+
+      if (existing.length > 0) {
+        // Delete all rows matching either address or name
+        await this.db
+          .deleteFrom('controllers')
+          .where((eb) =>
+            eb.or([eb('address', '=', controller.address), eb('name', '=', controller.name)]),
+          )
+          .execute()
+          .catch((err) => {
+            logger.error('ControllerRepository.insertControllers', err);
+            throw err;
+          });
+      }
+
+      // Insert with the id from an existing match (if any) to preserve references
+      const existingId = existing.find(
+        (e) => e.address === controller.address || e.name === controller.name,
+      )?.id;
+
       const result = await this.db
         .insertInto('controllers')
         .values({
-          id: uuid(),
-          name: controllers[i].name,
-          description: '',
-          address: controllers[i].address,
+          id: existingId ?? uuid(),
+          name: controller.name,
+          description: existing.length > 0 ? existing[0].description : '',
+          address: controller.address,
         })
-        .onConflict((c) =>
-          c.column('name').doUpdateSet((eb) => ({
-            description: eb.ref('excluded.description'),
-            address: eb.ref('excluded.address'),
-          })),
-        )
         .executeTakeFirst()
         .catch((err) => {
           logger.error('ControllerRepository.insertControllers', err);

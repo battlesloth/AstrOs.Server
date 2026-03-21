@@ -1,4 +1,5 @@
-import { ControllerLocation, TransmissionType } from 'astros-common';
+import { ControllerLocation } from '../control_module/controller_location.js';
+import { TransmissionType } from '../enums.js';
 import { ControllerConfig } from './controller_config.js';
 
 export class ConfigSync {

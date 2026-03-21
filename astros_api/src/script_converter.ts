@@ -16,7 +16,7 @@ import {
   I2cModule,
   GpioChannel,
   GpioModule,
-} from 'astros-common';
+} from './models/index.js';
 import { v4 as uuid } from 'uuid';
 import { logger } from './logger.js';
 import { ScriptRepository } from './dal/repositories/script_repository.js';
@@ -107,7 +107,7 @@ export class ScriptConverter {
       }
       case ModuleSubType.maestro: {
         const mod = this.modulesMap.get(cmd.moduleId) as UartModule;
-        script = this.masetroAsToString(
+        script = this.maestroAsToString(
           cmd.event as MaestroEvent,
           { idx: mod.idx, ch: mod.uartChannel, baud: mod.baudRate },
           0,
@@ -217,8 +217,8 @@ export class ScriptConverter {
     for (const key in channel.events) {
       const evt = channel.events[key] as ScriptEvent;
 
-      // convert from dec seconds to ms
-      evt.time = evt.time * 100;
+      // convert from seconds to ms
+      evt.time = evt.time * 1000;
 
       if (map.has(locationId)) {
         if (map.get(locationId)?.has(evt.time)) {
@@ -410,7 +410,7 @@ export class ScriptConverter {
     uart: IUartValues,
     timeTillNextEvent: number,
   ): string {
-    return `${CommandType.genericSerial}|${timeTillNextEvent}|${uart.ch}|${uart.baud}|${val.value};`;
+    return `${CommandType.genericSerial}|${this.toMsStr(timeTillNextEvent)}|${uart.ch}|${uart.baud}|${val.value};`;
   }
 
   //#endregion
@@ -459,7 +459,7 @@ export class ScriptConverter {
 
     val += '>';
 
-    return `${CommandType.genericSerial}|${timeTillNextEvent}|${uart.ch}|${uart.baud}|${val};`;
+    return `${CommandType.genericSerial}|${this.toMsStr(timeTillNextEvent)}|${uart.ch}|${uart.baud}|${val};`;
   }
 
   //#endregion
@@ -488,12 +488,12 @@ export class ScriptConverter {
 
       // if the ch2 action is none, use timeTill. Otherwise we have 2 actions for the
       // same time period, so don't delay untill after second action is done.
-      command = `${CommandType.kangaroo}|${evtTime}|${uart.ch}|${uart.baud}|1|${evt.ch1Action}|${evt.ch1Speed}|${evt.ch1Position};`;
+      command = `${CommandType.kangaroo}|${this.toMsStr(evtTime)}|${uart.ch}|${uart.baud}|1|${evt.ch1Action}|${evt.ch1Speed}|${evt.ch1Position};`;
     }
     if (evt.ch2Action != KangarooAction.none) {
       command =
         command +
-        `${CommandType.kangaroo}|${timeTillNextEvent}|${uart.ch}|${uart.baud}|2|${evt.ch2Action}|${evt.ch2Speed}|${evt.ch2Position};`;
+        `${CommandType.kangaroo}|${this.toMsStr(timeTillNextEvent)}|${uart.ch}|${uart.baud}|2|${evt.ch2Action}|${evt.ch2Speed}|${evt.ch2Position};`;
     }
 
     return command;
@@ -522,11 +522,11 @@ export class ScriptConverter {
       throw new Error(`No UART module found for script channel ${evt.scriptChannel}`);
     }
 
-    return this.masetroAsToString(maestro, uart, timeTillNextEvent);
+    return this.maestroAsToString(maestro, uart, timeTillNextEvent);
   }
 
-  masetroAsToString(evt: MaestroEvent, uart: IUartValues, next: number): string {
-    return `${CommandType.maestro}|${next}|${uart.idx}|${evt.channel}|${evt.position}|${evt.speed}|${evt.acceleration};`;
+  maestroAsToString(evt: MaestroEvent, uart: IUartValues, next: number): string {
+    return `${CommandType.maestro}|${this.toMsStr(next)}|${uart.idx}|${evt.channel}|${evt.position}|${evt.speed}|${evt.acceleration};`;
   }
 
   //#endregion
@@ -547,7 +547,7 @@ export class ScriptConverter {
   }
 
   i2cAsString(evt: I2cEvent, i2cAddress: number, timeTillNextEvent: number): string {
-    return `${CommandType.i2c}|${timeTillNextEvent}|${i2cAddress}|${evt.message};`;
+    return `${CommandType.i2c}|${this.toMsStr(timeTillNextEvent)}|${i2cAddress}|${evt.message};`;
   }
 
   //#endregion
@@ -568,7 +568,7 @@ export class ScriptConverter {
   }
 
   gpioEvtAsString(evt: GpioEvent, gpioChannel: number, timeTillNextEvent: number): string {
-    return `${CommandType.gpio}|${timeTillNextEvent}|${gpioChannel}|${evt.setHigh ? 1 : 0};`;
+    return `${CommandType.gpio}|${this.toMsStr(timeTillNextEvent)}|${gpioChannel}|${evt.setHigh ? 1 : 0};`;
   }
 
   //#endregion
@@ -586,7 +586,7 @@ export class ScriptConverter {
       );
     }
 
-    return `${CommandType.none}|${timeTillNextEvent}|0;`;
+    return `${CommandType.none}|${this.toMsStr(timeTillNextEvent)}|0;`;
   }
 
   //#endregion
@@ -632,5 +632,10 @@ export class ScriptConverter {
     const val = module as unknown as I2cModule;
 
     return val.i2cAddress;
+  }
+
+  toMsStr(time: number): string {
+    // remove any decimal places and convert to string
+    return time.toFixed(0);
   }
 }

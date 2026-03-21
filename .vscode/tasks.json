@@ -31,13 +31,13 @@
     {
       "label": "move commons to api",
       "type": "shell",
-      "command": "",
+      "command": "rm -rf ${workspaceFolder}/astros_api/node_modules/astros-common && mkdir -p ${workspaceFolder}/astros_api/node_modules/astros-common && cp -r ${workspaceFolder}/astros_common/dist ${workspaceFolder}/astros_api/node_modules/astros-common/dist && cp ${workspaceFolder}/astros_common/package.json ${workspaceFolder}/astros_api/node_modules/astros-common/package.json",
       "windows": {
         "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_api/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/dist -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_api/node_modules/astros-common/package.json",
-      },
-      "options": {
-        "shell": {
-          "executable": "powershell.exe"
+        "options": {
+          "shell": {
+            "executable": "powershell.exe"
+          }
         }
       },
       "dependsOn": "build commons"
@@ -45,13 +45,13 @@
     {
       "label": "move commons to client",
       "type": "shell",
-      "command": "",
+      "command": "rm -rf ${workspaceFolder}/astros_client/node_modules/astros-common && mkdir -p ${workspaceFolder}/astros_client/node_modules/astros-common && cp -r ${workspaceFolder}/astros_common/dist ${workspaceFolder}/astros_client/node_modules/astros-common/dist && cp ${workspaceFolder}/astros_common/package.json ${workspaceFolder}/astros_client/node_modules/astros-common/package.json",
       "windows": {
         "command": "Remove-Item -Recurse -Force ${workspaceFolder}/astros_client/node_modules/astros-common -ErrorAction SilentlyContinue; Copy-Item -Path ${workspaceFolder}/astros_common/dist -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/dist -Recurse -Force; Copy-Item -Path ${workspaceFolder}/astros_common/package.json -Destination ${workspaceFolder}/astros_client/node_modules/astros-common/package.json",
-      },
-      "options": {
-        "shell": {
-          "executable": "powershell.exe"
+        "options": {
+          "shell": {
+            "executable": "powershell.exe"
+          }
         }
       },
       "dependsOn": "build commons"

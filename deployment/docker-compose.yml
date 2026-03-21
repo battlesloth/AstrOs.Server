@@ -1,6 +1,6 @@
 services:
   astros:
-    platform: linux/arm64
+    platform: linux/arm64/v8
     image: 'dirtknap/astros-server:latest'
     restart: unless-stopped
     ports:

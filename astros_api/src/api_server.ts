@@ -2,7 +2,6 @@ import Dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import passport from 'passport';
-import morgan from 'morgan';
 import { expressjwt as jwt } from 'express-jwt';
 import cors from 'cors';
 import fileUpload from 'express-fileupload';
@@ -33,7 +32,7 @@ import {
   ScriptResponse,
   TransmissionStatus,
   ModuleSubType,
-} from 'astros-common';
+} from './models/index.js';
 import { ControllerRepository } from './dal/repositories/controller_repository.js';
 import { ConfigSync } from './models/config/config_sync.js';
 import { ScriptRun } from './models/scripts/script_run.js';
@@ -62,7 +61,9 @@ const __dirname = path.dirname(__filename);
 
 import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
-import { PlaylistController } from './controllers/playlist_controller.js';
+
+//const { SerialPort } = eval("require('serialport')");
+//const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
 
 interface IWebSocketMessage {
   msgType: string;
@@ -187,10 +188,31 @@ class ApiServer {
     const loggerMiddleware = pinoHttp({
       logger: logger,
       autoLogging: true,
+      serializers: {
+        req(req) {
+          return { method: req.method, url: req.url };
+        },
+        res(res) {
+          return { statusCode: res.statusCode };
+        },
+      },
+      customSuccessMessage(req, res) {
+        return `${req.method} ${req.url} ${res.statusCode}`;
+      },
+      customErrorMessage(req, res, error) {
+        return `${req.method} ${req.url} ${res.statusCode} - ${error.message}`;
+      },
+      customLogLevel(req, res, error) {
+        if (res.statusCode >= 400 && res.statusCode < 500) {
+          return 'warn';
+        } else if (res.statusCode >= 500 || error) {
+          return 'error';
+        }
+        return 'info';
+      },
     });
 
     this.app.use(loggerMiddleware);
-    this.app.use(morgan('dev'));
 
     const allowedOrigins = process.env.CORS_ORIGIN
       ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
@@ -223,7 +245,9 @@ class ApiServer {
     this.app.use((err: any, req: any, res: any, next: any) => {
       res.locals.message = err.message;
       res.locals.error = req.app.get('env') === 'development' ? err : {};
-      res.status(err.status || 500);
+      res.status(err.status || 500).json({
+        message: err.message || 'Internal server error',
+      });
     });
 
     const jwtKey: string = process.env.JWT_KEY as string;
@@ -345,6 +369,12 @@ class ApiServer {
     this.router.get(SettingsController.getRoute, this.authHandler, SettingsController.getSetting);
     this.router.put(SettingsController.putRoute, this.authHandler, SettingsController.saveSetting);
     this.router.get(
+      SettingsController.logDownloadRoute,
+      this.authHandler,
+      SettingsController.downloadLogs,
+    );
+
+    this.router.get(
       SettingsController.controllersRoute,
       this.authHandler,
       SettingsController.getControllers,
@@ -418,7 +448,7 @@ class ApiServer {
         this.handelWebsocketMessage(msg.toString());
       });
 
-      logger.info(`${conn.url}:${id} connected`);
+      logger.info(`websocket connected: id=${id}`);
     });
   }
 
@@ -445,7 +475,7 @@ class ApiServer {
   handleSerialWorkerMessage(msg: ISerialWorkerResponse): void {
     switch (msg.type) {
       case SerialWorkerResponseType.UNKNOWN:
-        logger.error('Invalid message received');
+        logger.error(`Invalid message received: ${JSON.stringify(msg)}`);
         break;
       case SerialWorkerResponseType.SEND_SERIAL_MESSAGE:
         this.serialPort.write(msg.data, (err: any) => {
@@ -474,6 +504,8 @@ class ApiServer {
 
   async handleResgistraionResponse(msg: ISerialWorkerResponse) {
     try {
+      logger.info(`Handling registration response: ${JSON.stringify(msg)}`);
+
       const val = msg as RegistrationResponse;
 
       const controllerRepo = new ControllerRepository(db);
@@ -481,6 +513,8 @@ class ApiServer {
       await controllerRepo.insertControllers(val.registrations);
 
       const contollers = await controllerRepo.getControllers();
+
+      logger.info(`Controllers after registration sync: ${JSON.stringify(contollers)}`);
 
       const update = new ControllersResponse(val.success, contollers);
       this.updateClients(update);

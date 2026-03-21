@@ -1,4 +1,7 @@
-import { ControllerLocation, GpioChannel, ModuleSubType, UartModule } from 'astros-common';
+import { ControllerLocation } from '../control_module/controller_location.js';
+import { GpioChannel } from '../control_module/gpio/gpio_channel.js';
+import { UartModule } from '../control_module/uart/uart_module.js';
+import { ModuleSubType } from '../enums.js';
 
 export class ControllerConfig {
   id: string;

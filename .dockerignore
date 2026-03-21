@@ -1,23 +1,28 @@
-**/.git
-**/node_modules
-.editorconfig
-.vscode/*
-
-astros_client/.angular
-astros_client/.angular/**/*
-
-astros_client/dist
-astros_client/dist/**/*
-
-astros_api/dist
-astros_api/dist/**/*
-
-astros_common/dist/
-astros_common/dist/**/*
-
+.git
 .gitignore
+.gitattributes
 
+.vscode/
+.idea/
+.editorconfig
+
+# Dependencies and build outputs
+**/node_modules/
+**/dist/
+**/coverage/
+**/.cache/
+**/.vite/
+**/storybook-static/
+**/.nyc_output/
+
+# Local artifacts
+test-results/
+*.log
+
+# Not used by the current Dockerfile build context
+astros_common/
+deployment/
+
+# Docs and local root env files are not needed in image builds
 *.md
-
-package-lock.json
 .env

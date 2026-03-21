@@ -1,4 +1,4 @@
-import { ControlModule } from 'astros-common';
+import { ControlModule } from '../control_module/control_module.js';
 
 export class ScriptConfig {
   id: string;

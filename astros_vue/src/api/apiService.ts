@@ -1,4 +1,5 @@
 import axios from 'axios';
+import router from '@/router';
 
 const apiClient = axios.create({
   baseURL: import.meta.env.BACKEND_API || 'http://localhost:3000',
@@ -28,6 +29,10 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       // Clear token on auth failure
       localStorage.removeItem('jwt_token');
+      // Redirect to auth page if not already there
+      if (router.currentRoute.value.path !== '/auth') {
+        router.push('/auth');
+      }
     }
     return Promise.reject(error);
   },

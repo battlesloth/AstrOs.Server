@@ -12,7 +12,7 @@ import {
   ModuleClassType,
   MaestroEvent,
   MaestroChannel,
-} from 'astros-common';
+} from '../../models/index.js';
 import { logger } from '../../logger.js';
 import { Guid } from 'guid-typescript';
 import { Database, ScriptsTable } from '../types.js';
@@ -29,7 +29,6 @@ import {
   readUartChannel,
 } from './module_repositories/uart_repository.js';
 import { getI2cModules, readI2cChannel } from './module_repositories/i2c_repository.js';
-import { calculateLengthDS, updateScriptDuration } from '../../utility.js';
 
 export class ScriptRepository {
   private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -90,7 +89,7 @@ export class ScriptRepository {
     const script = await this.getScript(id);
 
     script.id = this.generateScriptId(5);
-    script.scriptName = `${script.scriptName} (Copy)`;
+    script.scriptName = script.scriptName + ' - copy';
     for (const ch of script.scriptChannels) {
       ch.id = Guid.create().toString();
 
@@ -144,17 +143,7 @@ export class ScriptRepository {
     }
 
     const result = scripts.map((scr: ScriptsTable) => {
-      const script = new Script(
-        scr.id,
-        scr.name,
-        scr.description,
-        new Date(scr.last_modified),
-        scr.duration_ds,
-      );
-
-      updateScriptDuration(script);
-
-      return script;
+      return new Script(scr.id, scr.name, scr.description, new Date(scr.last_modified));
     });
 
     for (const scr of result) {
