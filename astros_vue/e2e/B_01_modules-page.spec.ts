@@ -1,16 +1,9 @@
 import { test, expect, Page } from '@playwright/test';
-import { authenticateUser } from './utility/auth_helper';
+import { openModulesPage } from './utility/modules_helper';
 
 test.describe('Modules Page - Body', () => {
   test.beforeEach(async ({ page }) => {
-    await authenticateUser(page);
-
-    await page.click('label[for="nav-menu-drawer"]');
-    await page.getByRole('link', { name: /modules/i }).click();
-
-    await page.waitForLoadState('networkidle');
-
-    await page.getByTestId(`loading-modal-close`).click();
+    await openModulesPage(page);
   });
 
   // Body tests
@@ -40,12 +33,14 @@ test.describe('Modules Page - Body', () => {
     for (let i = 0; i < 23; i++) {
       const option = i % 2 === 0 ? '2' : '1';
       await page.getByTestId(`body-maestro-ch-${i}-type`).selectOption(option);
-      await page.getByTestId(`body-maestro-ch-${i}-name`).waitFor({ state: 'visible', timeout: 3000 });
+      await page
+        .getByTestId(`body-maestro-ch-${i}-name`)
+        .waitFor({ state: 'visible', timeout: 3000 });
 
       if (i % 2 === 0) {
-        validateMaestroDigitalCH(page, 'body', i.toString());
+        await validateMaestroDigitalCH(page, 'body', i.toString());
       } else {
-        validateMaestroServoCH(page, 'body', i.toString());
+        await validateMaestroServoCH(page, 'body', i.toString());
       }
     }
 
@@ -70,14 +65,7 @@ test.describe('Modules Page - Body', () => {
 
 test.describe('Modules Page - Core', () => {
   test.beforeEach(async ({ page }) => {
-    await authenticateUser(page);
-
-    await page.click('label[for="nav-menu-drawer"]');
-    await page.getByRole('link', { name: /modules/i }).click();
-
-    await page.waitForLoadState('networkidle');
-
-    await page.getByTestId(`loading-modal-close`).click();
+    await openModulesPage(page);
   });
 
   test('Add Generic Serial Module to Core', async ({ page }) => {
@@ -108,9 +96,9 @@ test.describe('Modules Page - Core', () => {
       await page.getByTestId(`core-maestro-ch-${i}-type`).selectOption(option);
 
       if (i % 2 === 0) {
-        validateMaestroDigitalCH(page, 'core', i.toString());
+        await validateMaestroDigitalCH(page, 'core', i.toString());
       } else {
-        validateMaestroServoCH(page, 'core', i.toString());
+        await validateMaestroServoCH(page, 'core', i.toString());
       }
     }
 
@@ -135,14 +123,7 @@ test.describe('Modules Page - Core', () => {
 
 test.describe('Modules Page - Dome', () => {
   test.beforeEach(async ({ page }) => {
-    await authenticateUser(page);
-
-    await page.click('label[for="nav-menu-drawer"]');
-    await page.getByRole('link', { name: /modules/i }).click();
-
-    await page.waitForLoadState('networkidle');
-
-    await page.getByTestId(`loading-modal-close`).click();
+    await openModulesPage(page);
   });
 
   test('Add Generic Serial Module to Dome', async ({ page }) => {
@@ -173,9 +154,9 @@ test.describe('Modules Page - Dome', () => {
       await page.getByTestId(`dome-maestro-ch-${i}-type`).selectOption(option);
 
       if (i % 2 === 0) {
-        validateMaestroDigitalCH(page, 'dome', i.toString());
+        await validateMaestroDigitalCH(page, 'dome', i.toString());
       } else {
-        validateMaestroServoCH(page, 'dome', i.toString());
+        await validateMaestroServoCH(page, 'dome', i.toString());
       }
     }
 
@@ -198,7 +179,6 @@ test.describe('Modules Page - Dome', () => {
   });
 });
 
-
 async function addSerialModule(page: Page, location: string, moduleId: string) {
   await page.getByTestId(`${location}-module-header`).click();
   await page.getByTestId(`${location}-serial-header`).click();
@@ -210,28 +190,58 @@ async function addSerialModule(page: Page, location: string, moduleId: string) {
   await page.getByTestId(`${location}-serial-${moduleId}-header`).click();
 }
 
-async function validateGenericSerialModule(page: Page, location: string, moduleId: string, uartChannel: string) {
+async function validateGenericSerialModule(
+  page: Page,
+  location: string,
+  moduleId: string,
+  uartChannel: string,
+) {
   await expect(page.getByTestId(`${location}-generic-serial-baud`)).toHaveValue('9600');
-  await expect(page.getByTestId(`${location}-generic-serial-uart-channel`)).toHaveValue(uartChannel);
-  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue('New Serial Module');
+  await expect(page.getByTestId(`${location}-generic-serial-uart-channel`)).toHaveValue(
+    uartChannel,
+  );
+  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(
+    'New Serial Module',
+  );
 }
 
-async function validateKangarooModule(page: Page, location: string, moduleId: string, uartChannel: string) {
-  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue('New Kangaroo Module');
+async function validateKangarooModule(
+  page: Page,
+  location: string,
+  moduleId: string,
+  uartChannel: string,
+) {
+  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(
+    'New Kangaroo Module',
+  );
   await expect(page.getByTestId(`${location}-kangaroo-uart-channel`)).toHaveValue(uartChannel);
   await expect(page.getByTestId(`${location}-kangaroo-baud`)).toHaveValue('9600');
   await expect(page.getByTestId(`${location}-kangaroo-ch1Name`)).toHaveValue('Channel 1');
   await expect(page.getByTestId(`${location}-kangaroo-ch2Name`)).toHaveValue('Channel 2');
 }
 
-async function validateHcrSerialModule(page: Page, location: string, moduleId: string, uartChannel: string) {
+async function validateHcrSerialModule(
+  page: Page,
+  location: string,
+  moduleId: string,
+  uartChannel: string,
+) {
   await expect(page.getByTestId(`${location}-hcr-serial-baud`)).toHaveValue('9600');
   await expect(page.getByTestId(`${location}-hcr-serial-uart-channel`)).toHaveValue(uartChannel);
-  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue('New HCR Module');
+  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(
+    'New HCR Module',
+  );
 }
 
-async function validateMaestroModule(page: Page, location: string, moduleId: string, uartChannel: string) {
-  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue('New Maestro Module');
+async function validateMaestroModule(
+  page: Page,
+  location: string,
+  moduleId: string,
+  uartChannel: string,
+) {
+  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(
+    'New Maestro Module',
+  );
   await expect(page.getByTestId(`${location}-maestro-uart-channel`)).toHaveValue(uartChannel);
   await expect(page.getByTestId(`${location}-maestro-baud`)).toHaveValue('9600');
   await expect(page.getByTestId(`${location}-maestro-channel-count`)).toHaveValue('24');
@@ -240,7 +250,10 @@ async function validateMaestroModule(page: Page, location: string, moduleId: str
 async function validateMaestroServoCH(page: Page, location: string, ch: string) {
   await expect(page.getByTestId(`${location}-maestro-ch-${ch}-type`)).toHaveValue('1');
   await expect(page.getByTestId(`${location}-maestro-ch-${ch}-name`)).toHaveValue(`Channel ${ch}`);
-  const label = page.getByTestId(`${location}-maestro-ch-${ch}-invert-cbx`).locator('..').locator('.label-text');
+  const label = page
+    .getByTestId(`${location}-maestro-ch-${ch}-invert-cbx`)
+    .locator('..')
+    .locator('.label-text');
   await expect(label).toHaveText('Inverted?');
   await expect(page.getByTestId(`${location}-maestro-ch-${ch}-invert-cbx`)).not.toBeChecked();
   await expect(page.getByTestId(`${location}-maestro-ch-${ch}-minPulse`)).toHaveValue('500');
@@ -251,7 +264,10 @@ async function validateMaestroServoCH(page: Page, location: string, ch: string) 
 async function validateMaestroDigitalCH(page: Page, location: string, ch: string) {
   await expect(page.getByTestId(`${location}-maestro-ch-${ch}-type`)).toHaveValue('2');
   await expect(page.getByTestId(`${location}-maestro-ch-${ch}-name`)).toHaveValue(`Channel ${ch}`);
-  const label = page.getByTestId(`${location}-maestro-ch-${ch}-invert-cbx`).locator('..').locator('.label-text');
+  const label = page
+    .getByTestId(`${location}-maestro-ch-${ch}-invert-cbx`)
+    .locator('..')
+    .locator('.label-text');
   await expect(label).toHaveText('Default High');
   await expect(page.getByTestId(`${location}-maestro-ch-${ch}-invert-cbx`)).not.toBeChecked();
 }

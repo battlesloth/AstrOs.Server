@@ -9,7 +9,7 @@ import {
   ModuleType,
   ModuleChannelTypes,
   GenericSerialEvent,
-} from 'astros-common';
+} from './models/index.js';
 import { calculateLengthDS } from './utility.js';
 import { v4 as uuid } from 'uuid';
 

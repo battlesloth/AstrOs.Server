@@ -5,6 +5,8 @@ export async function clickAndFillInput(
     selector: string,
     text: string
 ): Promise<void> {
-    await page.getByTestId(selector).click();
-    await page.getByTestId(selector).fill(text);
+    const input = page.getByTestId(selector);
+
+    await input.scrollIntoViewIfNeeded();
+    await input.fill(text);
 }

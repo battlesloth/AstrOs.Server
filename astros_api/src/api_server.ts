@@ -98,6 +98,27 @@ class ApiServer {
 
   upload!: any;
 
+  private isSerialWorkerAvailable(): boolean {
+    return this.serialWorker !== undefined;
+  }
+
+  private sendSerialUnavailable(res?: any): boolean {
+    if (this.isSerialWorkerAvailable()) {
+      return false;
+    }
+
+    logger.warn('Serial services unavailable; serial port setup was skipped or failed');
+
+    if (res) {
+      res.status(503);
+      res.json({
+        message: 'Serial services unavailable',
+      });
+    }
+
+    return true;
+  }
+
   constructor() {
     Dotenv.config({ path: __dirname + '/.env' });
 
@@ -613,6 +634,10 @@ class ApiServer {
 
   private async syncControllers(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('syncing controllers');
       this.serialWorker.postMessage({
         type: SerialMessageType.REGISTRATION_SYNC,
@@ -632,6 +657,10 @@ class ApiServer {
 
   private async syncControllerConfig(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('syncing controller config');
 
       const repo = new LocationsRepository(db);
@@ -673,6 +702,10 @@ class ApiServer {
 
   private async uploadScript(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('uploading script');
 
       const id = req.query.id;
@@ -715,6 +748,10 @@ class ApiServer {
 
   private async runScript(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('running script');
 
       const id = req.query.id;
@@ -750,6 +787,10 @@ class ApiServer {
 
   private async directCommand(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('sending direct command');
 
       const repo = new ControllerRepository(db);
@@ -780,6 +821,10 @@ class ApiServer {
 
   private async servoMoveCommand(data: IServoTestData) {
     try {
+      if (this.sendSerialUnavailable()) {
+        return;
+      }
+
       // this will hammer logs
       //logger.debug(`sending servo command: ${data.controllerId}:${data.servoId}:${data.value}`);
 
@@ -803,6 +848,10 @@ class ApiServer {
 
   private async formatSD(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('formatting SD card');
 
       const controllers = req.body.controllers;
