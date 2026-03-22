@@ -31,7 +31,7 @@ const filteredPlaylists = computed(() => {
 
 // Load playlists on mount
 onMounted(async () => {
-  await playlistStore.loadPlaylists();
+  await playlistStore.loadData();
 });
 
 const newPlaylist = () => {
