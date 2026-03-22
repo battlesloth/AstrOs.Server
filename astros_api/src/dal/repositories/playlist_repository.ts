@@ -139,6 +139,7 @@ export class PlaylistRepository {
       tracks: tracks.map((track) => ({
         id: track.id,
         idx: track.idx,
+        playlistId: track.playlist_id,
         durationDS: track.duration_ds,
         trackType: track.track_type as TrackType,
         trackId: track.track_id,
