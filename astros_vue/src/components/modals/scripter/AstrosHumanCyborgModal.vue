@@ -191,16 +191,16 @@ const addCommand = () => {
   let missingB = false;
 
   if (hcrHasBValue(cmdNum)) {
-    if (!valueA.value) {
+    if (valueA.value === '' || valueA.value == null) {
       missingA = true;
     }
-    if (!valueB.value) {
+    if (valueB.value === '' || valueB.value == null) {
       missingB = true;
     }
   }
 
   if (hcrHasAValue(cmdNum)) {
-    if (!valueA.value) {
+    if (valueA.value === '' || valueA.value == null) {
       missingA = true;
     }
   }

@@ -305,7 +305,7 @@ describe('script commands', () => {
     expect(parts[1]).toBe('0');
     expect(parts[2]).toBe('1');
     expect(parts[3]).toBe('38400');
-    expect(parts[4]).toBe('<CA5,SH1,PVV8>');
+    expect(parts[4]).toBe('<CA0005,SH1,PVV8>');
   });
 
   it('should create Kangaroo X2 command', async () => {
