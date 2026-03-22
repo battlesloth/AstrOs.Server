@@ -15,7 +15,7 @@ import { logger } from '../logger.js';
 import { Database } from './types.js';
 import { migration_0 } from './migrations/migration_0.js';
 import { migration_1 } from './migrations/migration_1.js';
-//import { migration_2 } from './migrations/migration_2.js';
+import { migration_2 } from './migrations/migration_2.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,7 +49,7 @@ const migrationProvider = new (class implements MigrationProvider {
     return {
       '0_initial': migration_0,
       '1_add_script_evt_id': migration_1,
-      //'2_add_playlists': migration_2, SKIP - Playlist support is not fully implemented yet, so this migration is being held back to avoid complications during development
+      '2_add_script_duration': migration_2,
     };
   }
 })();
