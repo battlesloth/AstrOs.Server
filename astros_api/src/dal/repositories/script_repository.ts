@@ -29,6 +29,7 @@ import {
   readUartChannel,
 } from './module_repositories/uart_repository.js';
 import { getI2cModules, readI2cChannel } from './module_repositories/i2c_repository.js';
+import { calculateLengthDS, updateScriptDuration } from '../../utility.js';
 
 export class ScriptRepository {
   private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -38,6 +39,10 @@ export class ScriptRepository {
   //#region Script Create
 
   async upsertScript(script: Script): Promise<boolean> {
+    // always calculate duration on save to ensure it is up
+    // to date with any changes to events or channels
+    script.durationDS = calculateLengthDS(script);
+
     await this.db.transaction().execute(async (tx) => {
       await tx
         .insertInto('scripts')
@@ -47,6 +52,7 @@ export class ScriptRepository {
           description: script.description,
           last_modified: new Date(script.lastSaved).getTime(),
           enabled: 1,
+          duration_ds: script.durationDS,
         })
         .onConflict((c) =>
           c.columns(['id']).doUpdateSet((eb) => ({
@@ -54,6 +60,7 @@ export class ScriptRepository {
             description: eb.ref('excluded.description'),
             last_modified: Date.now(),
             enabled: 1,
+            duration_ds: eb.ref('excluded.duration_ds'),
           })),
         )
         .execute()
@@ -100,6 +107,8 @@ export class ScriptRepository {
     script.deploymentStatus = {};
     script.lastSaved = new Date();
 
+    updateScriptDuration(script);
+
     await this.upsertScript(script).catch((err: any) => {
       logger.error(`Exception saving copy script for ${id} => ${err}`);
       throw err;
@@ -110,6 +119,7 @@ export class ScriptRepository {
       script.scriptName,
       script.description,
       new Date(script.lastSaved),
+      script.durationDS,
     );
 
     return result;
@@ -134,7 +144,13 @@ export class ScriptRepository {
     }
 
     const result = scripts.map((scr: ScriptsTable) => {
-      return new Script(scr.id, scr.name, scr.description, new Date(scr.last_modified));
+      return new Script(
+        scr.id,
+        scr.name,
+        scr.description,
+        new Date(scr.last_modified),
+        scr.duration_ds,
+      );
     });
 
     for (const scr of result) {
@@ -184,7 +200,10 @@ export class ScriptRepository {
       script.name,
       script.description,
       new Date(script.last_modified),
+      script.duration_ds,
     );
+
+    updateScriptDuration(result);
 
     const deployments = await this.db
       .selectFrom('script_deployments')

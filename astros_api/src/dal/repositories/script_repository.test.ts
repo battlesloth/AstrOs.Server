@@ -66,7 +66,7 @@ describe('Script Repository', () => {
   it('should save script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()));
+    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
 
     const repo = new ScriptRepository(db);
 
@@ -84,7 +84,7 @@ describe('Script Repository', () => {
   it('should update script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()));
+    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
 
     const repo = new ScriptRepository(db);
 
@@ -115,7 +115,7 @@ describe('Script Repository', () => {
   it('should delete script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()));
+    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
 
     const repo = new ScriptRepository(db);
 
@@ -152,6 +152,7 @@ describe('Script Repository', () => {
       'GPIO Test Script',
       'Script with GPIO channel',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -226,6 +227,7 @@ describe('Script Repository', () => {
       'Maestro Test Script',
       'Script with Maestro channel',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -270,6 +272,7 @@ describe('Script Repository', () => {
       'Event Test Script',
       'Script with events',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -358,6 +361,7 @@ describe('Script Repository', () => {
       'Maestro Event Test',
       'Test Maestro event channel update',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -430,6 +434,7 @@ describe('Script Repository', () => {
       'HCR Test Script',
       'Script with HCR channel',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(
@@ -493,6 +498,7 @@ describe('Script Repository', () => {
       'HCR Event Test Script',
       'Script with HCR events',
       new Date(Date.now()),
+      0,
     );
 
     const scriptChannel = new ScriptChannel(

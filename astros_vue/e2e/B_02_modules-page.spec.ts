@@ -1,44 +1,56 @@
 import { test, expect, Page } from '@playwright/test';
 import { clickAndFillInput } from './utility/input_helper';
-import { authenticateUser } from './utility/auth_helper';
+import { openModulesPage } from './utility/modules_helper';
 
 test.describe('Modules Page - Body', () => {
   test.beforeEach(async ({ page }) => {
-    await authenticateUser(page);
-
-    await page.click('label[for="nav-menu-drawer"]');
-    await page.getByRole('link', { name: /modules/i }).click();
-
-    await page.waitForLoadState('networkidle');
-
-    await page.getByTestId(`loading-modal-close`).click();
+    await openModulesPage(page);
   });
 
-  // populate all modules
-  test('Populate all modules', async ({ page }) => {
+  test('Saves modules and reloads in a fresh browser session', async ({
+    page,
+    browser,
+  }, testInfo) => {
+    test.setTimeout(120000);
 
     await setLocation(page, 'body');
     await setLocation(page, 'core');
     await setLocation(page, 'dome');
 
-    await page.getByTestId('save_module_settings').click();
-  });
+    await saveModuleSettings(page);
 
-  test('Validate all loaded modules', async ({ page }) => {
-    await validateLocation(page, 'body');
-    await validateLocation(page, 'core');
-    await validateLocation(page, 'dome');
+    const freshContext = await browser.newContext({
+      baseURL: testInfo.project.use.baseURL,
+    });
+    const freshPage = await freshContext.newPage();
+
+    try {
+      await openModulesPage(freshPage);
+
+      await validateLocation(freshPage, 'body');
+      await validateLocation(freshPage, 'core');
+      await validateLocation(freshPage, 'dome');
+    } finally {
+      await freshContext.close();
+    }
   });
 });
+
+async function saveModuleSettings(page: Page) {
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/locations/') &&
+        response.request().method() === 'PUT' &&
+        response.status() === 200,
+    ),
+    page.getByTestId('save_module_settings').click(),
+  ]);
+}
 
 async function setLocation(page: Page, location: string) {
   await page.getByTestId(`${location}-module-header`).click();
   await page.getByTestId(`${location}-serial-header`).click();
-
-  if (await page.getByTestId(`${location}-serial-101-name`).count() > 0) {
-    expect(true).toBe(true);
-    return;
-  }
 
   await addSerialModule(page, location, '101');
   await setGenericSerialModuleValues(page, location, '101');
@@ -135,11 +147,12 @@ async function validateGenericSerialModule(page: Page, location: string, moduleI
   await expect(page.getByTestId(`${location}-generic-serial-baud`)).toBeVisible();
 
   await expect(page.getByTestId(`${location}-generic-serial-baud`)).toHaveValue('19200');
-  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(`${location} GSM`);
+  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(
+    `${location} GSM`,
+  );
 }
 
 async function setKangarooModuleValues(page: Page, location: string, moduleId: string) {
-
   await expect(page.getByTestId(`${location}-kangaroo-ch1Name`)).toBeVisible();
 
   await clickAndFillInput(page, `${location}-serial-${moduleId}-name`, `${location} Kx2`);
@@ -152,7 +165,9 @@ async function validateKangarooModule(page: Page, location: string, moduleId: st
   await page.getByTestId(`${location}-serial-${moduleId}-header`).click();
   await expect(page.getByTestId(`${location}-kangaroo-baud`)).toBeVisible();
 
-  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(`${location} Kx2`);
+  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(
+    `${location} Kx2`,
+  );
   await expect(page.getByTestId(`${location}-kangaroo-baud`)).toHaveValue('38400');
   await expect(page.getByTestId(`${location}-kangaroo-ch1Name`)).toHaveValue(`${location} Kx2 Ch1`);
   await expect(page.getByTestId(`${location}-kangaroo-ch2Name`)).toHaveValue(`${location} Kx2 Ch2`);
@@ -167,10 +182,11 @@ async function validateHCRModule(page: Page, location: string, moduleId: string)
   await page.getByTestId(`${location}-serial-${moduleId}-header`).click();
   await expect(page.getByTestId(`${location}-hcr-serial-baud`)).toBeVisible();
 
-  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(`${location} HCR`);
+  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(
+    `${location} HCR`,
+  );
   await expect(page.getByTestId(`${location}-hcr-serial-baud`)).toHaveValue('57600');
 }
-
 
 async function setMaestroModuleValues(page: Page, location: string, moduleId: string) {
   await clickAndFillInput(page, `${location}-serial-${moduleId}-name`, `${location} Maestro`);
@@ -187,9 +203,21 @@ async function setMaestroModuleValues(page: Page, location: string, moduleId: st
 
     if (option === '1') {
       await clickAndFillInput(page, `${location}-maestro-ch-${i}-name`, `${location} MCHS ${i}`);
-      await clickAndFillInput(page, `${location}-maestro-ch-${i}-minPulse`, (500 + i * 10).toString());
-      await clickAndFillInput(page, `${location}-maestro-ch-${i}-maxPulse`, (2500 - i * 10).toString());
-      await clickAndFillInput(page, `${location}-maestro-ch-${i}-homePosition`, (1250 + i * 5).toString());
+      await clickAndFillInput(
+        page,
+        `${location}-maestro-ch-${i}-minPulse`,
+        (500 + i * 10).toString(),
+      );
+      await clickAndFillInput(
+        page,
+        `${location}-maestro-ch-${i}-maxPulse`,
+        (2500 - i * 10).toString(),
+      );
+      await clickAndFillInput(
+        page,
+        `${location}-maestro-ch-${i}-homePosition`,
+        (1250 + i * 5).toString(),
+      );
 
       if (invert) {
         await page.getByTestId(`${location}-maestro-ch-${i}-invert-cbx`).check();
@@ -207,7 +235,9 @@ async function validateMaestroModule(page: Page, location: string, moduleId: str
   await page.getByTestId(`${location}-serial-${moduleId}-header`).click();
   await expect(page.getByTestId(`${location}-maestro-baud`)).toBeVisible();
 
-  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(`${location} Maestro`);
+  await expect(page.getByTestId(`${location}-serial-${moduleId}-name`)).toHaveValue(
+    `${location} Maestro`,
+  );
   await expect(page.getByTestId(`${location}-maestro-baud`)).toHaveValue('115200');
   await expect(page.getByTestId(`${location}-maestro-channel-count`)).toHaveValue('12');
 
@@ -220,17 +250,27 @@ async function validateMaestroModule(page: Page, location: string, moduleId: str
     await expect(page.getByTestId(`${location}-maestro-ch-${i}-type`)).toHaveValue(option);
 
     if (option === '1') {
-      await expect(page.getByTestId(`${location}-maestro-ch-${i}-name`)).toHaveValue(`${location} MCHS ${i}`);
-      await expect(page.getByTestId(`${location}-maestro-ch-${i}-minPulse`)).toHaveValue((500 + i * 10).toString());
-      await expect(page.getByTestId(`${location}-maestro-ch-${i}-maxPulse`)).toHaveValue((2500 - i * 10).toString());
-      await expect(page.getByTestId(`${location}-maestro-ch-${i}-homePosition`)).toHaveValue((1250 + i * 5).toString());
+      await expect(page.getByTestId(`${location}-maestro-ch-${i}-name`)).toHaveValue(
+        `${location} MCHS ${i}`,
+      );
+      await expect(page.getByTestId(`${location}-maestro-ch-${i}-minPulse`)).toHaveValue(
+        (500 + i * 10).toString(),
+      );
+      await expect(page.getByTestId(`${location}-maestro-ch-${i}-maxPulse`)).toHaveValue(
+        (2500 - i * 10).toString(),
+      );
+      await expect(page.getByTestId(`${location}-maestro-ch-${i}-homePosition`)).toHaveValue(
+        (1250 + i * 5).toString(),
+      );
       if (invert) {
         await expect(page.getByTestId(`${location}-maestro-ch-${i}-invert-cbx`)).toBeChecked();
       } else {
         await expect(page.getByTestId(`${location}-maestro-ch-${i}-invert-cbx`)).not.toBeChecked();
       }
     } else {
-      await expect(page.getByTestId(`${location}-maestro-ch-${i}-name`)).toHaveValue(`${location} MCHO ${i}`);
+      await expect(page.getByTestId(`${location}-maestro-ch-${i}-name`)).toHaveValue(
+        `${location} MCHO ${i}`,
+      );
       if (invert) {
         await expect(page.getByTestId(`${location}-maestro-ch-${i}-invert-cbx`)).toBeChecked();
       } else {
@@ -241,7 +281,6 @@ async function validateMaestroModule(page: Page, location: string, moduleId: str
 }
 
 async function addI2cModule(page: Page, location: string, moduleId: string) {
-
   await page.getByTestId(`${location}-add-i2c`).click();
 
   await page.getByTestId('modal-module-select').selectOption(moduleId);
@@ -266,7 +305,6 @@ async function setGpioChannelValues(page: Page, location: string) {
   await page.getByTestId(`${location}-gpio-header`).click();
 
   for (let i = 0; i < 10; i++) {
-
     const even = i % 2 === 0;
 
     await clickAndFillInput(page, `${location}-gpio-ch-${i}-name`, `${location} GPIO ${i}`);
@@ -282,10 +320,11 @@ async function validateGpioChannel(page: Page, location: string) {
   await page.getByTestId(`${location}-gpio-header`).click();
 
   for (let i = 0; i < 10; i++) {
-
     const even = i % 2 === 0;
 
-    await expect(page.getByTestId(`${location}-gpio-ch-${i}-name`)).toHaveValue(`${location} GPIO ${i}`);
+    await expect(page.getByTestId(`${location}-gpio-ch-${i}-name`)).toHaveValue(
+      `${location} GPIO ${i}`,
+    );
     await expect(page.getByTestId(`${location}-gpio-ch-${i}-enabled`)).toBeChecked();
 
     if (even) {

@@ -12,6 +12,9 @@ import {
   IoTrashBin,
   IoPlay,
   IoSearch,
+  IoChevronUp,
+  IoChevronDown,
+  IoAdd,
 } from 'oh-vue-icons/icons';
 import App from './App.vue';
 import router from './router';
@@ -27,6 +30,9 @@ addIcons(
   IoWarning,
   IoCheckmarkCircle,
   IoSearch,
+  IoChevronUp,
+  IoChevronDown,
+  IoAdd,
 );
 
 const app = createApp(App);
