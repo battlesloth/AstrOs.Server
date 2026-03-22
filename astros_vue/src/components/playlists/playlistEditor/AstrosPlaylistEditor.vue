@@ -142,6 +142,14 @@ function setTrack(track: PlaylistTrack, value: PlaylistTrack) {
       </div>
       <div class="flex gap-2 ml-4">
         <button
+          data-testid="playlist-add-track"
+          class="btn btn-outline btn-sm self-start"
+          @click="addTrack"
+        >
+          <v-icon name="io-add" />
+          {{ $t('playlists_view.add_track') }}
+        </button>
+        <button
           data-testid="playlist-save"
           class="btn btn-primary btn-sm"
           @click="$emit('save')"
@@ -213,15 +221,5 @@ function setTrack(track: PlaylistTrack, value: PlaylistTrack) {
         {{ $t('playlists_view.no_tracks') }}
       </div>
     </div>
-
-    <!-- Add Track -->
-    <button
-      data-testid="playlist-add-track"
-      class="btn btn-outline btn-sm self-start"
-      @click="addTrack"
-    >
-      <v-icon name="io-add" />
-      {{ $t('playlists_view.add_track') }}
-    </button>
   </div>
 </template>
