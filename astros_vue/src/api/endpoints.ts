@@ -13,6 +13,7 @@ export const SETTINGS_FORMAT_SD = 'api/settings/formatSD';
 
 export const SCRIPTS = 'api/scripts';
 export const SCRIPTS_ALL = 'api/scripts/all';
+export const SCRIPTS_ALL_NAMES = 'api/scripts/all-names';
 export const SCRIPTS_COPY = 'api/scripts/copy';
 export const SCRIPTS_UPLOAD = 'api/scripts/upload';
 export const SCRIPTS_RUN = 'api/scripts/run';

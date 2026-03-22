@@ -326,6 +326,11 @@ class ApiServer {
       this.authHandler,
       ScriptsController.getAllScripts,
     );
+    this.router.get(
+      ScriptsController.getAllScriptNamesRoute,
+      this.authHandler,
+      ScriptsController.getAllScriptNames,
+    );
     this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
     this.router.delete(
       ScriptsController.deleteRoute,

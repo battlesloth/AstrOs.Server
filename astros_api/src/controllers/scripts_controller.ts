@@ -9,6 +9,7 @@ export class ScriptsController {
   public static deleteRoute = '/scripts/';
   public static copyRoute = '/scripts/copy';
   public static getAllRoute = '/scripts/all';
+  public static getAllScriptNamesRoute = '/scripts/all-names';
   public static uploadRoute = '/scripts/upload';
   public static runRoute = '/scripts/run';
 
@@ -20,6 +21,29 @@ export class ScriptsController {
 
       res.status(200);
       res.json(scripts);
+    } catch (error) {
+      logger.error(error);
+
+      res.status(500);
+      res.json({
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  public static async getAllScriptNames(req: any, res: any, next: any) {
+    try {
+      const repo = new ScriptRepository(db);
+
+      const scripts = await repo.getScripts();
+      const scriptNames = scripts.map((s) => ({
+        id: s.id,
+        scriptName: s.scriptName,
+        description: s.description,
+      }));
+
+      res.status(200);
+      res.json(scriptNames);
     } catch (error) {
       logger.error(error);
 

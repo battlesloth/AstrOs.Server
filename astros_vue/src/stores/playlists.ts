@@ -1,20 +1,24 @@
 import apiService from '@/api/apiService';
-import { PLAYLISTS, PLAYLISTS_ALL, PLAYLISTS_COPY } from '@/api/endpoints';
+import { PLAYLISTS, PLAYLISTS_ALL, PLAYLISTS_COPY, SCRIPTS_ALL_NAMES } from '@/api/endpoints';
 import type { Playlist } from '@/models/playlists/playlist';
+import type { ScriptData } from '@/models/playlists/scriptData';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
 export const usePlaylistsStore = defineStore('playlists', () => {
   const playlists = ref<Playlist[]>([]);
+  const scripts = ref<ScriptData[]>([]);
   const isLoading = ref(false);
   const isSaving = ref(false);
 
-  async function loadPlaylists() {
+  async function loadData() {
     isLoading.value = true;
     try {
-      const response = (await apiService.get(PLAYLISTS_ALL)) as Playlist[];
-      playlists.value = [...response];
-      return { success: true, data: response };
+      const playlistResponse = (await apiService.get(PLAYLISTS_ALL)) as Playlist[];
+      playlists.value = [...playlistResponse];
+      const scriptResponse = (await apiService.get(SCRIPTS_ALL_NAMES)) as ScriptData[];
+      scripts.value = [...scriptResponse];
+      return { success: true };
     } catch (error) {
       console.error('Failed to load playlists:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -60,9 +64,10 @@ export const usePlaylistsStore = defineStore('playlists', () => {
 
   return {
     playlists,
+    scripts,
     isLoading,
     isSaving,
-    loadPlaylists,
+    loadData,
     savePlaylist,
     copyPlaylist,
     deletePlaylist,

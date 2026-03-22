@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import AstrosRemoteControl from './AstrosRemoteControl.vue';
 import {
-  handlers,
+  defaultHandlers,
   noScriptsHandlers,
   withScriptsHandlers,
   multiplePagesHandlers,
   fullyConfiguredHandlers,
-} from '@/mocks/handler';
+} from '@/mocks/handlers';
 
 const meta = {
   title: 'Components/RemoteControl/RemoteControl',
@@ -14,7 +14,7 @@ const meta = {
   parameters: {
     layout: 'padded',
     msw: {
-      handlers: handlers,
+      handlers: defaultHandlers,
     },
   },
   tags: ['autodocs'],
@@ -26,7 +26,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   parameters: {
     msw: {
-      handlers: handlers,
+      handlers: defaultHandlers,
     },
   },
 };
