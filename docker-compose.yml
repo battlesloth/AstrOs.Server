@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
       tags:
-        - docker.io/dirtknap/astros-server:1.3.9
+        - docker.io/dirtknap/astros-server:1.3.11
         - docker.io/dirtknap/astros-server:latest
     ports:
       - 8080:80

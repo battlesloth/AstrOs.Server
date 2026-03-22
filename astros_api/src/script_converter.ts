@@ -16,6 +16,7 @@ import {
   I2cModule,
   GpioChannel,
   GpioModule,
+  HumanCyborgRelationsCmd,
 } from './models/index.js';
 import { v4 as uuid } from 'uuid';
 import { logger } from './logger.js';
@@ -449,9 +450,9 @@ export class ScriptConverter {
 
       let cmdS = HumanCyborgRelationsModule.getCommandString(cmd.command);
       let re = /#/;
-      cmdS = cmdS.replace(re, cmd.valueA.toString());
+      cmdS = cmdS.replace(re, this.hcrValueAsString(cmd.command, cmd.valueA));
       re = /\*/;
-      cmdS = cmdS.replace(re, cmd.valueB.toString());
+      cmdS = cmdS.replace(re, this.hcrValueAsString(cmd.command, cmd.valueB));
       val += cmdS + ',';
     }
 
@@ -460,6 +461,21 @@ export class ScriptConverter {
     val += '>';
 
     return `${CommandType.genericSerial}|${this.toMsStr(timeTillNextEvent)}|${uart.ch}|${uart.baud}|${val};`;
+  }
+
+  hcrValueAsString(cmd: HumanCyborgRelationsCmd, val: number): string {
+    if (
+      cmd === HumanCyborgRelationsCmd.playWavOnA ||
+      cmd === HumanCyborgRelationsCmd.playWavOnB ||
+      cmd === HumanCyborgRelationsCmd.playSdRandomOnA ||
+      cmd === HumanCyborgRelationsCmd.playSdRandomOnB
+    ) {
+      // for these commands the value is 4 positions with leading zeros, so pad the value with leading zeros if needed
+      const valStr = val.toString().padStart(4, '0');
+      return valStr;
+    }
+
+    return val.toString();
   }
 
   //#endregion
