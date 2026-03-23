@@ -61,7 +61,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build container
-        run: docker compose build
+        run: JWT_KEY=${{ secrets.JWT_KEY }} docker compose build
 
       - name: Push to GHCR
         run: docker compose push

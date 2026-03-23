@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: ./Dockerfile
+      args:
+        JWT_KEY: ${JWT_KEY}
       tags:
         - ghcr.io/battlesloth/astros-server-dev:1.0.0-dev.1
         - ghcr.io/battlesloth/astros-server:latest
