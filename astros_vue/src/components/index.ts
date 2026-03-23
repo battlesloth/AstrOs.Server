@@ -7,3 +7,4 @@ export * from './remoteControl';
 export * from './scripter';
 export * from './scripts';
 export * from './status';
+export * from './playlists';

@@ -32,6 +32,16 @@ const router = createRouter({
       component: () => import('../views/ScripterView.vue'),
     },
     {
+      path: '/playlists',
+      name: 'playlists',
+      component: () => import('../views/PlaylistsView.vue'),
+    },
+    {
+      path: '/playlist/:id',
+      name: 'playlist',
+      component: () => import('../views/PlaylistEditorView.vue'),
+    },
+    {
       path: '/remote',
       name: 'remote',
       component: () => import('../views/RemoteView.vue'),

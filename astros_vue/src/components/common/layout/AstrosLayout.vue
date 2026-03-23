@@ -91,6 +91,9 @@ function logout() {
               <router-link to="/scripts">{{ $t('nav.scripts') }}</router-link>
             </li>
             <li>
+              <router-link to="/playlists">{{ $t('nav.playlists') }}</router-link>
+            </li>
+            <li>
               <router-link to="/remote">{{ $t('nav.remote') }}</router-link>
             </li>
             <li>

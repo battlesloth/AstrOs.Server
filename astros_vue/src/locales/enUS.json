@@ -18,6 +18,7 @@
   "nav": {
     "status": "Status",
     "scripts": "Scripts",
+    "playlists": "Playlists",
     "remote": "Remote",
     "modules": "Modules",
     "utility": "Utility",
