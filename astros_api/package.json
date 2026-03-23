@@ -1,6 +1,6 @@
 {
   "name": "astrosserver",
-  "version": "1.0.0-dev.1",
+  "version": "1.0.0-dev.2",
   "type": "module",
   "main": "api_server.js",
   "private": true,
