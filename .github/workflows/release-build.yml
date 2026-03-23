@@ -43,7 +43,7 @@ jobs:
           GHCR_REPO="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/astros-server"
           cd astros_api && npm version "$VERSION" --no-git-tag-version && cd ..
           cd astros_vue && npm version "$VERSION" --no-git-tag-version && cd ..
-          sed -i -E "s|ghcr\.io/[^:]+:([0-9][^ ]*)|${GHCR_REPO}:\1|" docker-compose.yml
+          sed -i -E "s|ghcr\.io/[^:]+:|${GHCR_REPO}:|g" docker-compose.yml
           sed -i -E "s|(astros-server[^:]*:)[0-9][^ ]*|\1${VERSION}|" docker-compose.yml
 
       - name: Commit version bump
