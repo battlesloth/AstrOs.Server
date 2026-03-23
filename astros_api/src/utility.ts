@@ -1,5 +1,15 @@
 import { Script } from './models/index.js';
 
+export function generateShortId(prefix: string): string {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  let result = `${prefix}${Math.floor(Date.now() / 1000000)}`;
+  const charactersLength = characters.length;
+  for (let i = 0; i < 3; i++) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+  }
+  return result;
+}
+
 /**
  * Updates the duration of a script if it is undefined, null, NaN, or less than 0.
  * Modifies the script object in place.

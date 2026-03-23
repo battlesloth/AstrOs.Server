@@ -67,9 +67,9 @@ jobs:
         working-directory: astros_vue
         run: npm run build
 
-      #- name: Unit tests
-      #  working-directory: astros_vue
-      #  run: npm run test:unit -- --run
+      - name: Unit tests
+        working-directory: astros_vue
+        run: npm run test:unit -- --run
 
   playwright:
     name: Vue – Playwright E2E Tests

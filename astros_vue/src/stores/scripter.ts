@@ -17,6 +17,7 @@ import { v4 as uuid } from 'uuid';
 import { moduleChannelTypeFromSubType } from '@/models';
 import { useEventConverter } from '@/composables/useEventConverter';
 import type { ChannelTestValue } from '@/models/scripter/channelTestValue';
+import { generateShortId } from '@/utils/shortId';
 
 export const useScripterStore = defineStore('scripter', () => {
   const isLoading = ref(false);
@@ -49,7 +50,7 @@ export const useScripterStore = defineStore('scripter', () => {
       loadResources(locationsStore.getLocationCollection());
 
       script.value = {
-        id: generateScriptId(5),
+        id: generateShortId('s'),
         scriptName: 'New Script',
         description: '',
         lastSaved: new Date('1970-01-01T00:00:00Z'),
@@ -355,16 +356,6 @@ export const useScripterStore = defineStore('scripter', () => {
       channelId: channel.moduleChannelId,
       channelType: channel.channelType,
     };
-  }
-
-  function generateScriptId(length: number): string {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = `s${Math.floor(Date.now() / 1000)}`;
-    const charactersLength = characters.length;
-    for (let i = 0; i < length; i++) {
-      result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
   }
 
   function updateScriptStatus(status: ScriptStatus) {

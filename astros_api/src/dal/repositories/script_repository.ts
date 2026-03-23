@@ -29,11 +29,9 @@ import {
   readUartChannel,
 } from './module_repositories/uart_repository.js';
 import { getI2cModules, readI2cChannel } from './module_repositories/i2c_repository.js';
-import { calculateLengthDS, updateScriptDuration } from '../../utility.js';
+import { calculateLengthDS, generateShortId, updateScriptDuration } from '../../utility.js';
 
 export class ScriptRepository {
-  private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-
   constructor(private readonly db: Kysely<Database>) {}
 
   //#region Script Create
@@ -89,8 +87,8 @@ export class ScriptRepository {
 
     const script = await this.getScript(id);
 
-    script.id = this.generateScriptId(5);
-    script.scriptName = script.scriptName + ' - copy';
+    script.id = generateShortId('s');
+    script.scriptName = script.scriptName + ' (Copy)';
     for (const ch of script.scriptChannels) {
       ch.id = Guid.create().toString();
 
@@ -552,15 +550,6 @@ export class ScriptRepository {
       });
 
     return locations.map((loc) => loc.id);
-  }
-
-  private generateScriptId(length: number): string {
-    let result = `s${Math.floor(Date.now() / 1000)}`;
-    const charactersLength = this.characters.length;
-    for (let i = 0; i < length; i++) {
-      result += this.characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
   }
 
   //#endregion

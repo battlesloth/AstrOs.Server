@@ -152,8 +152,10 @@ export interface PlaylistsTable {
   id: string;
   playlist_name: string;
   description: string;
+  playlist_type: string;
   last_modified: number;
   enabled: number;
+  settings: string;
 }
 
 export type Playlist = Selectable<PlaylistsTable>;

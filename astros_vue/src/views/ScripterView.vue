@@ -261,7 +261,17 @@ async function doChannelTest(): Promise<boolean> {
     });
 }
 
-function scriptTest() {
+async function scriptTest() {
+  modalMessage.value = 'Saving script...';
+  showModal.value = ModalType.INTERRUPT;
+
+  const result = await scripterStore.saveScript();
+  if (!result.success) {
+    modalMessage.value = `Failed to save script: ${result.error}`;
+    showModal.value = ModalType.ERROR;
+    return;
+  }
+
   showModal.value = ModalType.SCRIPT_TEST;
 }
 

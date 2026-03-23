@@ -1,13 +1,13 @@
 import { Kysely } from 'kysely';
 import { Database } from '../types.js';
-import { Playlist } from '../../models/playlists/playlist.js';
+import { Playlist, PlaylistSettings } from '../../models/playlists/playlist.js';
 import { logger } from '../../logger.js';
 import { TrackType } from '../../models/playlists/trackType.js';
 import { v4 as uuid } from 'uuid';
+import { PlaylistType } from 'src/models/playlists/playlistType.js';
+import { generateShortId } from 'src/utility.js';
 
 export class PlaylistRepository {
-  private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-
   constructor(private db: Kysely<Database>) {}
 
   async upsertPlaylist(playlist: Playlist): Promise<boolean> {
@@ -18,8 +18,10 @@ export class PlaylistRepository {
           id: playlist.id,
           playlist_name: playlist.playlistName,
           description: playlist.description,
+          playlist_type: playlist.playlistType,
           last_modified: Date.now(),
           enabled: 1,
+          settings: JSON.stringify(playlist.settings),
         })
         .onConflict((c) =>
           c.column('id').doUpdateSet((eb) => ({
@@ -27,6 +29,8 @@ export class PlaylistRepository {
             description: eb.ref('excluded.description'),
             last_modified: eb.ref('excluded.last_modified'),
             enabled: eb.ref('excluded.enabled'),
+            playlist_type: eb.ref('excluded.playlist_type'),
+            settings: eb.ref('excluded.settings'),
           })),
         )
         .execute()
@@ -75,7 +79,7 @@ export class PlaylistRepository {
       return false;
     }
 
-    const newPlaylistId = this.generatePlaylistId(5);
+    const newPlaylistId = generateShortId('p');
     const newPlaylist: Playlist = {
       ...playlist,
       id: newPlaylistId,
@@ -109,6 +113,8 @@ export class PlaylistRepository {
       id: result.id,
       playlistName: result.playlist_name,
       description: result.description,
+      playlistType: result.playlist_type as PlaylistType,
+      settings: JSON.parse(result.settings) as PlaylistSettings,
       tracks: [], // Tracks are not included in this query
     }));
   }
@@ -136,6 +142,8 @@ export class PlaylistRepository {
       id: result.id,
       playlistName: result.playlist_name,
       description: result.description,
+      playlistType: result.playlist_type as PlaylistType,
+      settings: JSON.parse(result.settings) as PlaylistSettings,
       tracks: tracks.map((track) => ({
         id: track.id,
         idx: track.idx,
@@ -190,14 +198,5 @@ export class PlaylistRepository {
       });
 
     return true;
-  }
-
-  private generatePlaylistId(length: number): string {
-    let result = `p${Math.floor(Date.now() / 1000)}`;
-    const charactersLength = this.characters.length;
-    for (let i = 0; i < length; i++) {
-      result += this.characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
   }
 }

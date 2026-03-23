@@ -1,15 +1,17 @@
 import { Kysely, Migration } from 'kysely';
 import { Database } from '../types.js';
 
-export const migration_2: Migration = {
+export const migration_3: Migration = {
   up: async (db: Kysely<Database>): Promise<void> => {
     await db.schema
       .createTable('playlists')
       .addColumn('id', 'varchar(36)', (col) => col.primaryKey())
       .addColumn('playlist_name', 'varchar(255)', (col) => col.notNull())
       .addColumn('description', 'varchar(255)', (col) => col.notNull())
+      .addColumn('playlist_type', 'varchar(50)', (col) => col.notNull())
       .addColumn('last_modified', 'integer', (col) => col.notNull())
       .addColumn('enabled', 'integer', (col) => col.notNull().defaultTo(1))
+      .addColumn('settings', 'text', (col) => col.notNull().defaultTo('{}'))
       .execute();
 
     await db.schema

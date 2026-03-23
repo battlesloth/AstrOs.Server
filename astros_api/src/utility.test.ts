@@ -10,10 +10,16 @@ import {
   ModuleChannelTypes,
   GenericSerialEvent,
 } from './models/index.js';
-import { calculateLengthDS } from './utility.js';
+import { calculateLengthDS, generateShortId } from './utility.js';
 import { v4 as uuid } from 'uuid';
 
 describe('Utility functions', () => {
+  it('should generate a short ID with the correct format', () => {
+    const prefix = 's';
+    const shortId = generateShortId(prefix);
+    expect(shortId).toMatch(/^s[0-9]{7}[A-Za-z]{3}$/);
+  });
+
   it('should calculate the correct length in DS', () => {
     const scriptId = 'testScriptTimes';
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import SQLite from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';
@@ -134,6 +135,66 @@ describe('Script Repository', () => {
     const updatedScripts = await repo.getScripts();
 
     expect(updatedScripts.length).toBe(0);
+  });
+
+  it('should copy script', async () => {
+    const scriptId = uuid();
+    const channelId = uuid();
+
+    // Create a GPIO channel in the database
+    const gpioModule = new GpioModule(locationId);
+    const gpioChannel = new GpioChannel(channelId, locationId, 0, true, 'Test GPIO Channel', false);
+    gpioModule.channels.push(gpioChannel);
+    await upsertGpioModule(db, gpioModule);
+
+    // Create a script with a GPIO channel
+    const script = new Script(
+      scriptId,
+      'Original Script',
+      'Original Description',
+      new Date(Date.now()),
+      0,
+    );
+
+    const scriptChannel = new ScriptChannel(
+      uuid(),
+      scriptId,
+      ScriptChannelType.GPIO,
+      locationId,
+      channelId,
+      ModuleChannelTypes.GpioChannel,
+      gpioChannel,
+      0,
+    );
+
+    script.scriptChannels.push(scriptChannel);
+
+    const repo = new ScriptRepository(db);
+
+    await repo.upsertScript(script);
+    const copyResult = await repo.copyScript(scriptId);
+
+    const allScripts = await repo.getScripts();
+
+    expect(allScripts.length).toBe(2);
+
+    const originalScript = allScripts.find((s) => s.id === scriptId);
+    expect(originalScript).toBeDefined();
+    expect(originalScript!.scriptName).toBe('Original Script');
+    expect(originalScript!.description).toBe('Original Description');
+
+    const copiedScript = allScripts.find((s) => s.id === copyResult.id);
+    expect(copiedScript).toBeDefined();
+    expect(copiedScript!.id).toMatch(/^s[0-9]{7}[A-Za-z]{3}$/);
+    expect(copiedScript!.scriptName).toBe('Original Script (Copy)');
+    expect(copiedScript!.description).toBe('Original Description');
+
+    // Verify channels of copy
+    const fullCopy = await repo.getScript(copyResult.id);
+    expect(fullCopy.scriptChannels.length).toBe(1);
+    expect(fullCopy.scriptChannels[0].channelType).toBe(ScriptChannelType.GPIO);
+    expect(fullCopy.scriptChannels[0].moduleChannelType).toBe(ModuleChannelTypes.GpioChannel);
+    expect(fullCopy.scriptChannels[0].moduleChannel.channelName).toBe('Test GPIO Channel');
   });
 
   it('should save and retrieve script with GPIO channel', async () => {

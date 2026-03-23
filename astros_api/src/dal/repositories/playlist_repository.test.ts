@@ -9,8 +9,9 @@ import { Playlist } from '../../models/playlists/playlist.js';
 import { TrackType } from '../../models/playlists/trackType.js';
 import { v4 as uuid } from 'uuid';
 import { PlaylistTrack } from '../../models/playlists/playlistTrack.js';
+import { PlaylistType } from '../../models/playlists/playlistType.js';
 
-describe.skip('Playlist Repository', () => {
+describe('Playlist Repository', () => {
   let db: Kysely<Database>;
 
   beforeEach(async () => {
@@ -50,6 +51,12 @@ describe.skip('Playlist Repository', () => {
       id: playlistId,
       playlistName: 'Test Playlist',
       description: 'Test Description',
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
       tracks: tracks,
     };
 
@@ -66,6 +73,10 @@ describe.skip('Playlist Repository', () => {
     expect(savedPlaylist!.tracks.length).toBe(1);
     expect(savedPlaylist!.tracks[0].id).toBe(trackId1);
     expect(savedPlaylist!.tracks[0].trackType).toBe(TrackType.Script);
+    expect(savedPlaylist!.playlistType).toBe(PlaylistType.Sequential);
+    expect(savedPlaylist!.settings.randomDelay).toBe(false);
+    expect(savedPlaylist!.settings.delayMin).toBe(0);
+    expect(savedPlaylist!.settings.delayMax).toBe(0);
   });
 
   it('should update playlist', async () => {
@@ -74,6 +85,12 @@ describe.skip('Playlist Repository', () => {
       id: playlistId,
       playlistName: 'Test Playlist',
       description: 'Test Description',
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
       tracks: [],
     };
 
@@ -83,14 +100,26 @@ describe.skip('Playlist Repository', () => {
     const savedPlaylist = await repo.getPlaylist(playlistId);
     expect(savedPlaylist).not.toBeNull();
     expect(savedPlaylist!.playlistName).toBe('Test Playlist');
+    expect(savedPlaylist!.playlistType).toBe(PlaylistType.Sequential);
+    expect(savedPlaylist!.settings.randomDelay).toBe(false);
+    expect(savedPlaylist!.settings.delayMin).toBe(0);
+    expect(savedPlaylist!.settings.delayMax).toBe(0);
 
     // Update
     playlist.playlistName = 'Updated Playlist';
+    playlist.playlistType = PlaylistType.Shuffle;
+    playlist.settings.randomDelay = true;
+    playlist.settings.delayMin = 5;
+    playlist.settings.delayMax = 10;
     await repo.upsertPlaylist(playlist);
 
     const updatedPlaylist = await repo.getPlaylist(playlistId);
     expect(updatedPlaylist).not.toBeNull();
     expect(updatedPlaylist!.playlistName).toBe('Updated Playlist');
+    expect(updatedPlaylist!.playlistType).toBe(PlaylistType.Shuffle);
+    expect(updatedPlaylist!.settings.randomDelay).toBe(true);
+    expect(updatedPlaylist!.settings.delayMin).toBe(5);
+    expect(updatedPlaylist!.settings.delayMax).toBe(10);
   });
 
   it('should get all playlists', async () => {
@@ -102,6 +131,12 @@ describe.skip('Playlist Repository', () => {
       id: p1Id,
       playlistName: 'P1',
       description: 'D1',
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
       tracks: [],
     });
 
@@ -109,6 +144,12 @@ describe.skip('Playlist Repository', () => {
       id: p2Id,
       playlistName: 'P2',
       description: 'D2',
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
       tracks: [],
     });
 
@@ -128,6 +169,12 @@ describe.skip('Playlist Repository', () => {
       id: playlistId,
       playlistName: 'Original',
       description: 'Original Desc',
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
       tracks: [
         {
           id: trackId,
@@ -152,6 +199,7 @@ describe.skip('Playlist Repository', () => {
     const copiedPlaylist = allPlaylists.find((p) => p.id !== playlistId);
     expect(copiedPlaylist).toBeDefined();
     expect(copiedPlaylist!.playlistName).toBe('Original (Copy)');
+    expect(copiedPlaylist!.id).toMatch(/^p[0-9]{7}[A-Za-z]{3}$/);
 
     // Verify tracks of copy
     const fullCopy = await repo.getPlaylist(copiedPlaylist!.id);
@@ -168,6 +216,12 @@ describe.skip('Playlist Repository', () => {
       id: playlistId,
       playlistName: 'To Delete',
       description: 'Desc',
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
       tracks: [],
     });
 
@@ -183,15 +237,21 @@ describe.skip('Playlist Repository', () => {
 
   it('should get playlist names that use a script', async () => {
     const repo = new PlaylistRepository(db);
-    const scriptId = uuid();
+    const script1Id = uuid();
+    const script2Id = uuid();
     const p1Id = uuid();
     const p2Id = uuid();
 
-    // Playlist 1 uses script
     await repo.upsertPlaylist({
       id: p1Id,
       playlistName: 'Playlist One',
       description: 'd1',
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
       tracks: [
         {
           id: uuid(),
@@ -199,34 +259,57 @@ describe.skip('Playlist Repository', () => {
           playlistId: p1Id,
           durationDS: 10,
           trackType: TrackType.Script,
-          trackId: scriptId,
+          trackId: script1Id,
           trackName: 'The Script',
         },
       ],
     });
 
-    // Playlist 2 doesn't use script
     await repo.upsertPlaylist({
       id: p2Id,
       playlistName: 'Playlist Two',
       description: 'd2',
-      tracks: [],
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId: p2Id,
+          durationDS: 10,
+          trackType: TrackType.Script,
+          trackId: script2Id,
+          trackName: 'Another Script',
+        },
+      ],
     });
 
-    const names = await repo.getPlaylistNamesThatUseScript(scriptId);
+    const names = await repo.getPlaylistNamesThatUseScript(script1Id);
     expect(names.length).toBe(1);
     expect(names[0]).toBe('Playlist One');
   });
 
   it('should delete tracks by script id', async () => {
     const repo = new PlaylistRepository(db);
-    const scriptId = uuid();
+    const script1Id = uuid();
+    const script2Id = uuid();
     const p1Id = uuid();
+    const p2Id = uuid();
 
     await repo.upsertPlaylist({
       id: p1Id,
       playlistName: 'Playlist One',
       description: 'd1',
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
       tracks: [
         {
           id: uuid(),
@@ -234,7 +317,7 @@ describe.skip('Playlist Repository', () => {
           playlistId: p1Id,
           durationDS: 10,
           trackType: TrackType.Script,
-          trackId: scriptId,
+          trackId: script1Id,
           trackName: 'The Script',
         },
         {
@@ -249,12 +332,41 @@ describe.skip('Playlist Repository', () => {
       ],
     });
 
-    await repo.deleteTracksByScriptId(scriptId);
+    await repo.upsertPlaylist({
+      id: p2Id,
+      playlistName: 'Playlist Two',
+      description: 'd2',
+      playlistType: PlaylistType.Sequential,
+      settings: {
+        randomDelay: false,
+        delayMin: 0,
+        delayMax: 0,
+      },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId: p1Id,
+          durationDS: 10,
+          trackType: TrackType.Script,
+          trackId: script2Id,
+          trackName: 'Another Script',
+        },
+      ],
+    });
 
-    const playlist = await repo.getPlaylist(p1Id);
-    expect(playlist).not.toBeNull();
+    await repo.deleteTracksByScriptId(script1Id);
+
+    const playlist1 = await repo.getPlaylist(p1Id);
+    expect(playlist1).not.toBeNull();
     // Only the Wait track should remain
-    expect(playlist!.tracks.length).toBe(1);
-    expect(playlist!.tracks[0].trackType).toBe(TrackType.Wait);
+    expect(playlist1!.tracks.length).toBe(1);
+    expect(playlist1!.tracks[0].trackType).toBe(TrackType.Wait);
+
+    const playlist2 = await repo.getPlaylist(p2Id);
+    expect(playlist2).not.toBeNull();
+    // Playlist 2 should be unaffected
+    expect(playlist2!.tracks.length).toBe(1);
+    expect(playlist2!.tracks[0].trackType).toBe(TrackType.Script);
   });
 });
