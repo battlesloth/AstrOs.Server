@@ -14,6 +14,9 @@ import {
   IoTrashBin,
   IoPlay,
   IoSearch,
+  IoChevronUp,
+  IoChevronDown,
+  IoAdd,
 } from 'oh-vue-icons/icons';
 
 initialize();
@@ -31,6 +34,9 @@ setup((app) => {
     IoWarning,
     IoCheckmarkCircle,
     IoSearch,
+    IoChevronUp,
+    IoChevronDown,
+    IoAdd,
   );
 
   app.component('v-icon', OhVueIcon);

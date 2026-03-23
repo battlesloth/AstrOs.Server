@@ -13,9 +13,14 @@ export const SETTINGS_FORMAT_SD = 'api/settings/formatSD';
 
 export const SCRIPTS = 'api/scripts';
 export const SCRIPTS_ALL = 'api/scripts/all';
+export const SCRIPTS_ALL_NAMES = 'api/scripts/all-names';
 export const SCRIPTS_COPY = 'api/scripts/copy';
 export const SCRIPTS_UPLOAD = 'api/scripts/upload';
 export const SCRIPTS_RUN = 'api/scripts/run';
 export const SCRIPTS_TEST_CHANNEL = 'api/directcommand';
+
+export const PLAYLISTS = 'api/playlists';
+export const PLAYLISTS_ALL = 'api/playlists/all';
+export const PLAYLISTS_COPY = 'api/playlists/copy';
 
 export const REMOTE_CONFIG = 'api/remoteConfig';

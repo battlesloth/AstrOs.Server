@@ -61,6 +61,7 @@ const __dirname = path.dirname(__filename);
 
 import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
+import { PlaylistController } from './controllers/playlist_controller.js';
 
 //const { SerialPort } = eval("require('serialport')");
 //const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
@@ -96,6 +97,27 @@ class ApiServer {
   private apiKeyValidator!: ReqHandler;
 
   upload!: any;
+
+  private isSerialWorkerAvailable(): boolean {
+    return this.serialWorker !== undefined;
+  }
+
+  private sendSerialUnavailable(res?: any): boolean {
+    if (this.isSerialWorkerAvailable()) {
+      return false;
+    }
+
+    logger.warn('Serial services unavailable; serial port setup was skipped or failed');
+
+    if (res) {
+      res.status(503);
+      res.json({
+        message: 'Serial services unavailable',
+      });
+    }
+
+    return true;
+  }
 
   constructor() {
     Dotenv.config({ path: __dirname + '/.env' });
@@ -304,6 +326,11 @@ class ApiServer {
       this.authHandler,
       ScriptsController.getAllScripts,
     );
+    this.router.get(
+      ScriptsController.getAllScriptNamesRoute,
+      this.authHandler,
+      ScriptsController.getAllScriptNames,
+    );
     this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
     this.router.delete(
       ScriptsController.deleteRoute,
@@ -325,6 +352,34 @@ class ApiServer {
       (req: any, res: any, next: any) => {
         this.runScript(req, res, next);
       },
+    );
+
+    this.router.get(PlaylistController.getRoute, this.authHandler, PlaylistController.getPlaylist);
+
+    this.router.get(
+      PlaylistController.getAllRoute,
+      this.authHandler,
+      PlaylistController.getAllPlaylists,
+    );
+
+    this.router.put(PlaylistController.putRoute, this.authHandler, PlaylistController.savePlaylist);
+
+    this.router.delete(
+      PlaylistController.deleteRoute,
+      this.authHandler,
+      PlaylistController.deletePlaylist,
+    );
+
+    this.router.get(
+      PlaylistController.copyRoute,
+      this.authHandler,
+      PlaylistController.copyPlaylist,
+    );
+
+    this.router.get(
+      PlaylistController.getPlaylistNamesThatUseScriptRoute,
+      this.authHandler,
+      PlaylistController.getPlaylistNamesThatUseScript,
     );
 
     this.router.get(
@@ -584,6 +639,10 @@ class ApiServer {
 
   private async syncControllers(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('syncing controllers');
       this.serialWorker.postMessage({
         type: SerialMessageType.REGISTRATION_SYNC,
@@ -603,6 +662,10 @@ class ApiServer {
 
   private async syncControllerConfig(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('syncing controller config');
 
       const repo = new LocationsRepository(db);
@@ -644,6 +707,10 @@ class ApiServer {
 
   private async uploadScript(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('uploading script');
 
       const id = req.query.id;
@@ -686,6 +753,10 @@ class ApiServer {
 
   private async runScript(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('running script');
 
       const id = req.query.id;
@@ -721,6 +792,10 @@ class ApiServer {
 
   private async directCommand(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('sending direct command');
 
       const repo = new ControllerRepository(db);
@@ -751,6 +826,10 @@ class ApiServer {
 
   private async servoMoveCommand(data: IServoTestData) {
     try {
+      if (this.sendSerialUnavailable()) {
+        return;
+      }
+
       // this will hammer logs
       //logger.debug(`sending servo command: ${data.controllerId}:${data.servoId}:${data.value}`);
 
@@ -774,6 +853,10 @@ class ApiServer {
 
   private async formatSD(req: any, res: any, next: any) {
     try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
       logger.info('formatting SD card');
 
       const controllers = req.body.controllers;

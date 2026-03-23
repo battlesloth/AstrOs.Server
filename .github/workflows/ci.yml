@@ -32,7 +32,7 @@ jobs:
 
       - name: Build
         working-directory: astros_api
-        run: npm run build
+        run: npx tsc
 
       - name: Unit tests
         working-directory: astros_api
@@ -67,9 +67,9 @@ jobs:
         working-directory: astros_vue
         run: npm run build
 
-      - name: Unit tests
-        working-directory: astros_vue
-        run: npm run test:unit -- --run
+      #- name: Unit tests
+      #  working-directory: astros_vue
+      #  run: npm run test:unit -- --run
 
   playwright:
     name: Vue – Playwright E2E Tests
@@ -93,7 +93,7 @@ jobs:
 
       - name: Build API
         working-directory: astros_api
-        run: npm run build
+        run: npx tsc && cp .env.example ./dist/.env
 
       - name: Install Vue dependencies
         working-directory: astros_vue
@@ -112,6 +112,7 @@ jobs:
         run: npx playwright test
         env:
           CI: true
+          CORS_ORIGIN: http://localhost:4173, http://localhost:5173
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

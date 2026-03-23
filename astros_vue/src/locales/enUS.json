@@ -2,6 +2,7 @@
   "astros": "AstrOs",
   "save": "Save",
   "close": "Close",
+  "remove": "Remove",
   "test": "Test",
   "error": {
     "invalid_email": "Enter valid email address",
@@ -155,5 +156,16 @@
   "scripts_view": {
     "title": "Scripts",
     "new": "New"
+  },
+  "playlists_view": {
+    "title": "Playlists",
+    "new": "New",
+    "add_track": "Add Track",
+    "no_tracks": "No tracks added yet.",
+    "track_types": {
+      "script": "Script",
+      "playlist": "Playlist",
+      "wait": "Wait"
+    }
   }
 }
