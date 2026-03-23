@@ -1,9 +1,10 @@
 name: Release Build
 
 on:
+  workflow_dispatch:
   push:
     branches:
-      - 'rel/release_*'
+      - 'release'
 
 permissions:
   contents: write
