@@ -17,9 +17,9 @@ defineEmits<{
         $emit('changed', ($event.target && ($event.target as HTMLSelectElement).value) || '')
       "
       class="select select-bordered w-full text-lg"
-      title="Script"
+      :aria-label="$t('remote_view.script_select')"
     >
-      <option value="0">None</option>
+      <option value="0">{{ $t('none') }}</option>
       <option
         v-for="script in scripts"
         :key="script.id"

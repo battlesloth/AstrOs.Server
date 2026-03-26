@@ -4,6 +4,23 @@
   "close": "Close",
   "remove": "Remove",
   "test": "Test",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "confirm": "Confirm",
+  "add": "Add",
+  "ok": "OK",
+  "run": "Run",
+  "generate": "Generate",
+  "format": "Format",
+  "download": "Download",
+  "copy": "Copy",
+  "upload": "Upload",
+  "play": "Play",
+  "none": "None",
+  "name": "Name",
+  "description": "Description",
+  "actions": "Actions",
+  "status": "Status",
   "error": {
     "invalid_email": "Enter valid email address",
     "invalid_password": "Password must be at least 8 characters long and include a number, a lowercase letter, and an uppercase letter",
@@ -73,12 +90,91 @@
       "enable_test": "Enable",
       "disable_test": "Disable",
       "close": "Close"
+    },
+    "add_channel": {
+      "title": "Select Channel",
+      "any_channel_type": "Any Channel Type",
+      "audio_channels": "Audio Channels",
+      "gpio_channels": "GPIO Channels",
+      "i2c_channels": "I2C Channels",
+      "kangaroo_channels": "KangarooX2 Channels",
+      "serial_channels": "Serial Channels",
+      "servo_channels": "Servo Channels",
+      "any_controller": "Any Controller",
+      "select_channel": "Select Channel",
+      "controller": "Controller",
+      "channel_type": "Channel Type"
+    },
+    "uart_event": {
+      "title": "Serial Event",
+      "event_time": "Event Time (seconds)",
+      "serial_command": "Serial Command"
+    },
+    "i2c_event": {
+      "title": "I2C Event",
+      "event_time": "Event Time (seconds)",
+      "i2c_message": "I2C Message"
+    },
+    "gpio_event": {
+      "title": "GPIO Event",
+      "event_time": "Event Time (seconds)",
+      "state": "State",
+      "low": "Low",
+      "high": "High"
+    },
+    "servo_event": {
+      "title": "Servo Event",
+      "event_time": "Event Time (seconds)",
+      "position": "Position (0 to 100%, -1 for Home)",
+      "speed": "Speed (0 to 255, 0 is unlimited)",
+      "acceleration": "Accel. (0 to 255, 0 is unlimited)"
+    },
+    "kangaroo_event": {
+      "title": "Kangaroo Event",
+      "event_time": "Event Time (seconds)",
+      "speed": "Speed",
+      "position": "Position",
+      "start": "Start",
+      "home": "Home"
+    },
+    "hcr_event": {
+      "title": "Human Cyborg Relations Event",
+      "event_time": "Event Time (seconds)",
+      "command_category": "Command Category",
+      "command": "Command",
+      "value_a": "Value A",
+      "value_b": "Value B",
+      "stimuli": "Stimuli",
+      "muse": "Muse",
+      "sd_wav": "SD Wav",
+      "stop": "Stop",
+      "volume": "Volume",
+      "override": "Override"
+    },
+    "channel_swap": {
+      "title": "Swap Channel",
+      "no_channels": "No eligible channels available to swap.",
+      "select_channel": "Select a Channel"
+    },
+    "script_test": {
+      "title": "Script Test",
+      "uploading": "Uploading script...",
+      "upload_complete": "Upload Complete.",
+      "not_assigned": "Not Assigned",
+      "success": "Success",
+      "failed": "Failed",
+      "uploading_status": "Uploading",
+      "body": "Body",
+      "core": "Core",
+      "dome": "Dome"
     }
   },
   "esp": {
     "serial_modules": "Serial Modules",
     "i2c_modules": "I2C Modules",
-    "gpio_config": "GPIO Configuration"
+    "gpio_config": "GPIO Configuration",
+    "add_serial_module": "Add serial module",
+    "add_i2c_module": "Add I2C module"
   },
   "gpio": {
     "channel": "Channel",
@@ -145,22 +241,72 @@
     "core": "Core Module",
     "master": "Master Controller",
     "sync_successful": "Controllers sync queued!",
-    "sync_failed": "Controllers sync failed."
+    "sync_failed": "Controllers sync failed.",
+    "controller_select": "Controller Select"
   },
   "remote_view": {
     "title": "Remote Control",
-    "save": "Save"
+    "save": "Save",
+    "page": "Page",
+    "backward": "Previous page",
+    "forward": "Next page",
+    "save_success": "Remote control configuration saved successfully.",
+    "save_error": "Failed to save remote control configuration.",
+    "script_select": "Script selection"
   },
   "utility_view": {
-    "title": "Utility"
+    "title": "Utility",
+    "api_key": "API Key",
+    "format_sd": "Format SD Card",
+    "log_files": "Log Files",
+    "format_modal_title": "Format Module SD Card",
+    "select_controller_error": "Please select at least one controller to format.",
+    "format_queued": "Format queued!",
+    "format_error": "Error requesting format. Check logs.",
+    "download_error": "Error downloading logs. Check logs."
   },
   "scripts_view": {
     "title": "Scripts",
-    "new": "New"
+    "new": "New",
+    "script_name": "Script Name",
+    "delete_title": "Delete Script",
+    "delete_confirm": "Are you sure you want to delete script \"{name}\"?",
+    "delete_success": "Script deleted successfully",
+    "delete_error": "Failed to delete script",
+    "run_success": "Script run queued!",
+    "run_error": "Error requesting upload. Check logs.",
+    "copy_success": "Script copied successfully!",
+    "copy_error": "Error copying script. Check logs.",
+    "upload_success": "Script upload started!",
+    "upload_error": "Error requesting upload. Check logs."
   },
   "playlists_view": {
     "title": "Playlists",
-    "new": "New"
+    "new": "New",
+    "playlist_name": "Playlist Name",
+    "delete_title": "Delete Playlist",
+    "delete_confirm": "Are you sure you want to delete playlist \"{name}\"?",
+    "delete_success": "Playlist deleted successfully",
+    "delete_error": "Failed to delete playlist",
+    "run_success": "Playlist run queued!",
+    "run_error": "Error starting playlist. Check logs.",
+    "copy_success": "Playlist copied successfully!",
+    "copy_error": "Error copying playlist. Check logs."
+  },
+  "scripter_view": {
+    "script_name": "Script Name",
+    "save_success": "Script saved successfully.",
+    "save_error": "Failed to save script"
+  },
+  "playlist_settings": {
+    "random_delay": "Random Delay",
+    "delay": "Delay",
+    "min_delay": "Min Delay",
+    "max_delay": "Max Delay",
+    "repeat_none": "Repeat - None",
+    "repeat_count": "Repeat - Count",
+    "repeat_infinite": "Repeat - Infinite",
+    "count": "Count"
   },
   "playlist_editor_view": {
     "title": "Playlist Editor",

@@ -123,6 +123,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         <button
           type="button"
           :data-testid="`${parentTestId}-add-serial`"
+          :aria-label="$t('esp.add_serial_module')"
           @click.stop="addUartModule"
           class="btn btn-sm btn-circle btn-ghost"
         >
@@ -167,6 +168,7 @@ const onServoTestEvent = (evt: ServoTestEvent) => {
         <button
           type="button"
           :data-testid="`${parentTestId}-add-i2c`"
+          :aria-label="$t('esp.add_i2c_module')"
           @click.stop="addI2cModule"
           class="btn btn-sm btn-circle btn-ghost"
         >

@@ -86,28 +86,32 @@ function getUploadStatus(location: Location): { class: string; text: string } {
       <div class="flex flex-row justify-end">
         <button
           class="btn btn-ghost btn-xs"
-          title="Copy"
+          :title="$t('copy')"
+          :aria-label="$t('copy')"
           @click="$emit('copy', props.script.id)"
         >
           <v-icon name="io-copy" />
         </button>
         <button
           class="btn btn-ghost btn-xs"
-          title="Upload"
+          :title="$t('upload')"
+          :aria-label="$t('upload')"
           @click="$emit('upload', props.script.id)"
         >
           <v-icon name="io-cloud-upload" />
         </button>
         <button
           class="btn btn-ghost btn-xs"
-          title="Run"
+          :title="$t('run')"
+          :aria-label="$t('run')"
           @click="$emit('run', props.script.id)"
         >
           <v-icon name="io-play" />
         </button>
         <button
           class="btn btn-ghost btn-xs"
-          title="Delete"
+          :title="$t('delete')"
+          :aria-label="$t('delete')"
           @click="$emit('delete', props.script.id, props.script.scriptName)"
         >
           <v-icon name="io-trash-bin" />

@@ -6,8 +6,10 @@ import { useToast } from '@/composables/useToast';
 import { useScriptsStore } from '@/stores/scripts';
 import { UploadStatus, Location } from '@/enums';
 import AstrosFieldFilter from '@/components/common/fields/AstrosFieldFilter.vue';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
+const { t } = useI18n();
 const { success, error } = useToast();
 
 const scriptStore = useScriptsStore();
@@ -58,9 +60,9 @@ const closeDeleteModal = () => {
 const confirmDelete = async () => {
   const result = await scriptStore.deleteScript(deleteScriptId.value);
   if (result.success) {
-    success('Script deleted successfully');
+    success(t('scripts_view.delete_success'));
   } else {
-    error('Failed to delete script');
+    error(t('scripts_view.delete_error'));
   }
   closeDeleteModal();
 };
@@ -68,18 +70,18 @@ const confirmDelete = async () => {
 const runScript = async (id: string) => {
   const result = await scriptStore.runScript(id);
   if (result.success) {
-    success('Script run queued!');
+    success(t('scripts_view.run_success'));
   } else {
-    error('Error requesting upload. Check logs.');
+    error(t('scripts_view.run_error'));
   }
 };
 
 const copyScript = async (id: string) => {
   const result = await scriptStore.copyScript(id);
   if (result.success) {
-    success('Script copied successfully!');
+    success(t('scripts_view.copy_success'));
   } else {
-    error('Error copying script. Check logs.');
+    error(t('scripts_view.copy_error'));
   }
 };
 
@@ -87,9 +89,9 @@ const uploadScript = async (id: string) => {
   const result = await scriptStore.uploadScript(id);
   if (result.success) {
     setUploadingStatus(id);
-    success('Script upload started!');
+    success(t('scripts_view.upload_success'));
   } else {
-    error('Error requesting upload. Check logs.');
+    error(t('scripts_view.upload_error'));
   }
 };
 
@@ -136,10 +138,10 @@ const editScript = (id: string) => {
           <table class="table w-full">
             <thead class="text-2xl bg-primary text-white rounded-t-lg">
               <tr>
-                <th class="w-1/3 first:rounded-tl-lg">Script Name</th>
-                <th class="w-2/3">Description</th>
-                <th class="text-center">Status</th>
-                <th class="text-center last:rounded-tr-lg">Actions</th>
+                <th class="w-1/3 first:rounded-tl-lg">{{ $t('scripts_view.script_name') }}</th>
+                <th class="w-2/3">{{ $t('description') }}</th>
+                <th class="text-center">{{ $t('status') }}</th>
+                <th class="text-center last:rounded-tr-lg">{{ $t('actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -167,20 +169,20 @@ const editScript = (id: string) => {
         class="modal modal-open"
       >
         <div class="modal-box">
-          <h3 class="font-bold text-lg">Delete Script</h3>
-          <p class="py-4">Are you sure you want to delete script "{{ deleteScriptName }}"?</p>
+          <h3 class="font-bold text-lg">{{ $t('scripts_view.delete_title') }}</h3>
+          <p class="py-4">{{ $t('scripts_view.delete_confirm', { name: deleteScriptName }) }}</p>
           <div class="modal-action">
             <button
               class="btn btn-error"
               @click="confirmDelete"
             >
-              Delete
+              {{ $t('delete') }}
             </button>
             <button
               class="btn"
               @click="closeDeleteModal"
             >
-              Cancel
+              {{ $t('cancel') }}
             </button>
           </div>
         </div>
@@ -189,7 +191,7 @@ const editScript = (id: string) => {
           class="modal-backdrop"
           @click="closeDeleteModal"
         >
-          <button>Close</button>
+          <button>{{ $t('close') }}</button>
         </form>
       </dialog>
     </template>

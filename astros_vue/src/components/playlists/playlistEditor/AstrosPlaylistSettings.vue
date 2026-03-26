@@ -80,7 +80,7 @@ function setDelayMax(e: Event) {
   <div class="flex flex-row justify-between gap-2">
     <div class="flex flex-row flex-wrap items-center gap-2">
       <label class="label cursor-pointer gap-2">
-        <span class="label-text whitespace-nowrap">Random Delay</span>
+        <span class="label-text whitespace-nowrap">{{ $t('playlist_settings.random_delay') }}</span>
         <input
           type="checkbox"
           v-model="modelValue.randomDelay"
@@ -91,7 +91,9 @@ function setDelayMax(e: Event) {
       <div class="flex flex-row items-center gap-2">
         <label class="label">
           <span class="label-text whitespace-nowrap">{{
-            modelValue.randomDelay ? 'Min Delay' : 'Delay'
+            modelValue.randomDelay
+              ? $t('playlist_settings.min_delay')
+              : $t('playlist_settings.delay')
           }}</span>
         </label>
         <input
@@ -107,7 +109,7 @@ function setDelayMax(e: Event) {
           v-if="modelValue.randomDelay"
           class="label"
         >
-          <span class="label-text whitespace-nowrap">Max Delay</span>
+          <span class="label-text whitespace-nowrap">{{ $t('playlist_settings.max_delay') }}</span>
         </label>
         <input
           v-if="modelValue.randomDelay"
@@ -132,9 +134,9 @@ function setDelayMax(e: Event) {
         :disabled="!repeatEnabled"
         class="select select-sm select-bordered w-40"
       >
-        <option value="none">Repeat - None</option>
-        <option value="count">Repeat - Count</option>
-        <option value="infinite">Repeat - Infinite</option>
+        <option value="none">{{ $t('playlist_settings.repeat_none') }}</option>
+        <option value="count">{{ $t('playlist_settings.repeat_count') }}</option>
+        <option value="infinite">{{ $t('playlist_settings.repeat_infinite') }}</option>
       </select>
       <input
         type="number"

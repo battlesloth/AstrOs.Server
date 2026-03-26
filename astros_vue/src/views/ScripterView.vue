@@ -22,6 +22,7 @@ import router from '@/router';
 import type { AddChannelModalResponse, ScriptEvent, Channel, ChannelTestValue } from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
 import { useToast } from '@/composables/useToast';
+import { useI18n } from 'vue-i18n';
 import { v4 as uuid } from 'uuid';
 import AstrosChannelSwapModal from '@/components/modals/scripter/AstrosChannelSwapModal.vue';
 import apiService from '@/api/apiService';
@@ -46,6 +47,7 @@ const scripterStore = useScripterStore();
 const { eventTypeToModalType, getDefaultScriptEvent } = useScriptEvents();
 
 const { success, error } = useToast();
+const { t } = useI18n();
 
 function addChannel() {
   showModal.value = ModalType.ADD_CHANNEL;
@@ -281,7 +283,7 @@ async function saveScript() {
     modalMessage.value = `Failed to save script: ${result.error}`;
     showModal.value = ModalType.ERROR;
   } else {
-    success('Script saved successfully.');
+    success(t('scripter_view.save_success'));
   }
 }
 
@@ -361,13 +363,15 @@ onMounted(async () => {
             <input
               v-model="scripterStore.script.scriptName"
               class="bg-transparent border border-gray-400 focus:outline-none w-full"
-              placeholder="Script Name"
+              :placeholder="$t('scripter_view.script_name')"
+              :aria-label="$t('scripter_view.script_name')"
             />
           </div>
           <div class="grow text-2xl flex items-center gap-2">
             <input
               v-model.number="scripterStore.script.description"
               class="bg-transparent border border-gray-400 focus:outline-none w-full"
+              :aria-label="$t('description')"
               min="0"
             />
           </div>
@@ -375,13 +379,13 @@ onMounted(async () => {
             class="btn w-24 btn-primary"
             @click="saveScript"
           >
-            Save
+            {{ $t('save') }}
           </button>
           <button
             class="btn w-24 btn-primary"
             @click="scriptTest"
           >
-            Test
+            {{ $t('test') }}
           </button>
         </div>
       </div>

@@ -3,10 +3,12 @@ import { useToast } from '@/composables/useToast';
 import { usePlaylistsStore } from '@/stores/playlists';
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { AstrosLayout, AstrosPlaylistRow } from '@/components';
 import AstrosFieldFilter from '@/components/common/fields/AstrosFieldFilter.vue';
 
 const router = useRouter();
+const { t } = useI18n();
 const { success, error } = useToast();
 
 const playlistStore = usePlaylistsStore();
@@ -55,9 +57,9 @@ const closeDeleteModal = () => {
 const confirmDelete = async () => {
   const result = await playlistStore.deletePlaylist(deletePlaylistId.value);
   if (result.success) {
-    success('Playlist deleted successfully');
+    success(t('playlists_view.delete_success'));
   } else {
-    error('Failed to delete playlist');
+    error(t('playlists_view.delete_error'));
   }
   closeDeleteModal();
 };
@@ -66,18 +68,18 @@ const runPlaylist = async (id: string) => {
   console.log('Running playlist with id:', id);
   const result = await playlistStore.runPlaylist(id);
   if (result.success) {
-    success('Playlist run queued!');
+    success(t('playlists_view.run_success'));
   } else {
-    error('Error starting playlist. Check logs.');
+    error(t('playlists_view.run_error'));
   }
 };
 
 const copyPlaylist = async (id: string) => {
   const result = await playlistStore.copyPlaylist(id);
   if (result.success) {
-    success('Playlist copied successfully!');
+    success(t('playlists_view.copy_success'));
   } else {
-    error('Error copying playlist. Check logs.');
+    error(t('playlists_view.copy_error'));
   }
 };
 
@@ -101,6 +103,7 @@ const editPlaylist = (id: string) => {
         <button
           data-testid="save_module_settings"
           class="btn btn-primary w-24"
+          aria-label="$t('playlists_view.new')"
           @click="newPlaylist"
         >
           {{ $t('playlists_view.new') }}
@@ -112,9 +115,9 @@ const editPlaylist = (id: string) => {
           <table class="table w-full">
             <thead class="text-2xl bg-primary text-white rounded-t-lg">
               <tr>
-                <th class="w-1/3 first:rounded-tl-lg">Playlist Name</th>
-                <th class="w-2/3">Description</th>
-                <th class="text-center last:rounded-tr-lg">Actions</th>
+                <th class="w-1/3 first:rounded-tl-lg">{{ $t('playlists_view.playlist_name') }}</th>
+                <th class="w-2/3">{{ $t('description') }}</th>
+                <th class="text-center last:rounded-tr-lg">{{ $t('actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -140,20 +143,22 @@ const editPlaylist = (id: string) => {
         class="modal modal-open"
       >
         <div class="modal-box">
-          <h3 class="font-bold text-lg">Delete Playlist</h3>
-          <p class="py-4">Are you sure you want to delete playlist "{{ deletePlaylistName }}"?</p>
+          <h3 class="font-bold text-lg">{{ $t('playlists_view.delete_title') }}</h3>
+          <p class="py-4">
+            {{ $t('playlists_view.delete_confirm', { name: deletePlaylistName }) }}
+          </p>
           <div class="modal-action">
             <button
               class="btn btn-error"
               @click="confirmDelete"
             >
-              Delete
+              {{ $t('delete') }}
             </button>
             <button
               class="btn"
               @click="closeDeleteModal"
             >
-              Cancel
+              {{ $t('cancel') }}
             </button>
           </div>
         </div>
@@ -162,7 +167,7 @@ const editPlaylist = (id: string) => {
           class="modal-backdrop"
           @click="closeDeleteModal"
         >
-          <button>Close</button>
+          <button>{{ $t('close') }}</button>
         </form>
       </dialog>
     </template>

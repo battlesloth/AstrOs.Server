@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue';
 import { AstrosLayout } from '@/components';
 import apiService from '@/api/apiService';
 import type { ControllerModule } from '@/models';
+import { useI18n } from 'vue-i18n';
 
 interface SelectedControllerModule extends ControllerModule {
   selected: boolean;
@@ -17,6 +18,8 @@ const showAlert = ref(false);
 const alertMessage = ref('');
 
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+const { t } = useI18n();
 
 // Load data on mount
 onMounted(async () => {
@@ -70,7 +73,7 @@ const downloadLogs = async () => {
   } catch (error) {
     console.error('Error downloading logs:', error);
     showAlert.value = true;
-    alertMessage.value = 'Error downloading logs. Check logs.';
+    alertMessage.value = t('utility_view.download_error');
   }
 };
 
@@ -97,19 +100,19 @@ const confirmFormat = async () => {
 
   if (controllersToFormat.length === 0) {
     showAlert.value = true;
-    alertMessage.value = 'Please select at least one controller to format.';
+    alertMessage.value = t('utility_view.select_controller_error');
     return;
   }
 
   try {
     await apiService.post('/api/settings/formatSD', { controllers: controllersToFormat });
     showAlert.value = true;
-    alertMessage.value = 'Format queued!';
+    alertMessage.value = t('utility_view.format_queued');
     closeFormatModal();
   } catch (error) {
     console.error('Error requesting format:', error);
     showAlert.value = true;
-    alertMessage.value = 'Error requesting format. Check logs.';
+    alertMessage.value = t('utility_view.format_error');
   }
 };
 
@@ -128,7 +131,7 @@ const closeAlert = () => {
       </div>
       <div class="max-w-3xl mx-auto">
         <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
-          <div class="text-2xl w-45">API Key</div>
+          <div class="text-2xl w-45">{{ $t('utility_view.api_key') }}</div>
           <div class="grow">
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
@@ -138,41 +141,44 @@ const closeAlert = () => {
               <div class="float-right">
                 <button
                   class="btn btn-primary w-35 px-5 py-0.75"
+                  aria-label="$t('generate')"
                   @click="generateApiKey"
                 >
-                  Generate
+                  {{ $t('generate') }}
                 </button>
               </div>
             </div>
           </div>
         </div>
         <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
-          <div class="text-2xl w-45">Format SD Card</div>
+          <div class="text-2xl w-45">{{ $t('utility_view.format_sd') }}</div>
           <div class="grow">
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
               <div class="float-right">
                 <button
                   class="btn btn-primary w-35 px-5 py-0.75"
+                  aria-label="$t('format')"
                   @click="openFormatModal"
                 >
-                  Format
+                  {{ $t('format') }}
                 </button>
               </div>
             </div>
           </div>
         </div>
         <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
-          <div class="text-2xl w-45">Log Files</div>
+          <div class="text-2xl w-45">{{ $t('utility_view.log_files') }}</div>
           <div class="grow">
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
               <div class="float-right">
                 <button
                   class="btn btn-primary w-35 px-5 py-0.75"
+                  aria-label="$t('download')"
                   @click="downloadLogs"
                 >
-                  Download
+                  {{ $t('download') }}
                 </button>
               </div>
             </div>
@@ -186,7 +192,7 @@ const closeAlert = () => {
         class="modal modal-open"
       >
         <div class="modal-box">
-          <h3 class="font-bold text-lg mb-4">Format Module SD Card</h3>
+          <h3 class="font-bold text-lg mb-4">{{ $t('utility_view.format_modal_title') }}</h3>
           <div class="py-5">
             <div class="max-h-96 overflow-y-auto">
               <div
@@ -210,13 +216,13 @@ const closeAlert = () => {
               class="btn btn-primary"
               @click="confirmFormat"
             >
-              OK
+              {{ $t('ok') }}
             </button>
             <button
               class="btn"
               @click="closeFormatModal"
             >
-              Close
+              {{ $t('close') }}
             </button>
           </div>
         </div>
@@ -225,7 +231,7 @@ const closeAlert = () => {
           class="modal-backdrop"
           @click="closeFormatModal"
         >
-          <button>Close</button>
+          <button>{{ $t('close') }}</button>
         </form>
       </dialog>
 
@@ -235,14 +241,14 @@ const closeAlert = () => {
         class="modal modal-open"
       >
         <div class="modal-box">
-          <h3 class="font-bold text-lg">Alert</h3>
+          <h3 class="font-bold text-lg">{{ $t('modals.alert.title') }}</h3>
           <p class="py-4">{{ alertMessage }}</p>
           <div class="modal-action">
             <button
               class="btn"
               @click="closeAlert"
             >
-              Close
+              {{ $t('close') }}
             </button>
           </div>
         </div>
@@ -251,7 +257,7 @@ const closeAlert = () => {
           class="modal-backdrop"
           @click="closeAlert"
         >
-          <button>Close</button>
+          <button>{{ $t('close') }}</button>
         </form>
       </dialog>
     </template>

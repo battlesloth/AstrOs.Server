@@ -5,7 +5,10 @@ import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage
 import { useScriptsStore } from '@/stores/scripts';
 import { useRemoteControlStore } from '@/stores/remoteControl';
 import { useToast } from '@/composables/useToast';
+import { useI18n } from 'vue-i18n';
 import type { PageButton } from '@/models/remoteControl/pageButton';
+
+const { t } = useI18n();
 
 interface ScriptSelection {
   id: string;
@@ -120,10 +123,10 @@ function setButtonScripts() {
 
 async function saveConfig() {
   try {
-    success('Remote control configuration saved successfully.');
+    success(t('remote_view.save_success'));
   } catch (err) {
     console.error('Error saving remote control configuration:', err);
-    error('Failed to save remote control configuration.');
+    error(t('remote_view.save_error'));
   }
 }
 </script>
@@ -147,17 +150,19 @@ async function saveConfig() {
       <div>
         <button
           class="btn btn-circle btn-ghost text-2xl"
-          title="Backward"
+          :title="$t('remote_view.backward')"
+          :aria-label="$t('remote_view.backward')"
           @click="pageBackward"
         >
           &#8249;
         </button>
       </div>
-      <div class="text-3xl mx-3 font-bold">Page {{ pageNumber }}</div>
+      <div class="text-3xl mx-3 font-bold">{{ $t('remote_view.page') }} {{ pageNumber }}</div>
       <div>
         <button
           class="btn btn-circle btn-ghost text-2xl"
-          title="Forward"
+          :title="$t('remote_view.forward')"
+          :aria-label="$t('remote_view.forward')"
           @click="pageForward"
         >
           &#8250;

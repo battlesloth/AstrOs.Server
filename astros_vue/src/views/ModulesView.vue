@@ -178,6 +178,8 @@ function controllerSelectChanged(location: string) {
               <div
                 data-testid="body-module-header"
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer bg-r2-xlight"
+                role="button"
+                :aria-expanded="openAccordion === 'body'"
                 @click="openAccordion = openAccordion === 'body' ? null : 'body'"
               >
                 <span>{{ $t('module_view.body') }}</span>
@@ -199,7 +201,7 @@ function controllerSelectChanged(location: string) {
                 <div class="mb-4">
                   <select
                     class="select select-bordered w-full"
-                    title="Controller Select"
+                    :aria-label="$t('module_view.controller_select')"
                     disabled
                   >
                     <option
@@ -232,6 +234,8 @@ function controllerSelectChanged(location: string) {
               <div
                 data-testid="core-module-header"
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer bg-r2-xlight"
+                role="button"
+                :aria-expanded="openAccordion === 'core'"
                 @click="openAccordion = openAccordion === 'core' ? null : 'core'"
               >
                 <span>{{ $t('module_view.core') }}</span>
@@ -254,7 +258,7 @@ function controllerSelectChanged(location: string) {
                   <select
                     id="core-controller-select"
                     class="select select-bordered w-full"
-                    title="Controller Select"
+                    :aria-label="$t('module_view.controller_select')"
                     v-model="coreLocation.controller.id"
                     @change="controllerSelectChanged('core')"
                   >
@@ -294,6 +298,8 @@ function controllerSelectChanged(location: string) {
               <div
                 data-testid="dome-module-header"
                 class="collapse-title text-xl font-medium flex items-center gap-2 cursor-pointer bg-r2-xlight"
+                role="button"
+                :aria-expanded="openAccordion === 'dome'"
                 @click="openAccordion = openAccordion === 'dome' ? null : 'dome'"
               >
                 <span>{{ $t('module_view.dome') }}</span>
@@ -316,7 +322,7 @@ function controllerSelectChanged(location: string) {
                   <select
                     id="dome-controller-select"
                     class="select select-bordered w-full"
-                    title="Controller Select"
+                    :aria-label="$t('module_view.controller_select')"
                     v-model="domeLocation.controller.id"
                     @change="controllerSelectChanged('dome')"
                   >

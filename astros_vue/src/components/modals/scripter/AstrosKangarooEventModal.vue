@@ -142,7 +142,7 @@ const closeModal = () => {
 <template>
   <dialog class="modal modal-open">
     <div class="modal-box w-100 max-w-md">
-      <h1 class="text-2xl font-bold mb-4">Kangaroo Event</h1>
+      <h1 class="text-2xl font-bold mb-4">{{ $t('modals.kangaroo_event.title') }}</h1>
 
       <div class="py-4 flex flex-row">
         <div class="grow"></div>
@@ -154,7 +154,7 @@ const closeModal = () => {
             <label
               for="time"
               class="block w-full mb-0.5 text-lg"
-              >Event Time (seconds)</label
+              >{{ $t('modals.kangaroo_event.event_time') }}</label
             >
             <input
               id="time"
@@ -179,14 +179,14 @@ const closeModal = () => {
             <select
               id="ch1select"
               v-model="ch1Action"
-              title="channel 1"
+              :aria-label="kangaroo.ch1Name"
               class="select select-bordered w-full text-lg mt-2"
             >
-              <option value="0">None</option>
-              <option value="1">Start</option>
-              <option value="2">Home</option>
-              <option value="3">Speed</option>
-              <option value="4">Position</option>
+              <option value="0">{{ $t('none') }}</option>
+              <option value="1">{{ $t('modals.kangaroo_event.start') }}</option>
+              <option value="2">{{ $t('modals.kangaroo_event.home') }}</option>
+              <option value="3">{{ $t('modals.kangaroo_event.speed') }}</option>
+              <option value="4">{{ $t('modals.kangaroo_event.position') }}</option>
             </select>
           </div>
 
@@ -195,7 +195,7 @@ const closeModal = () => {
               <label
                 for="ch1spd"
                 class="block mb-0.5 text-lg"
-                >Speed</label
+                >{{ $t('modals.kangaroo_event.speed') }}</label
               >
               <input
                 id="ch1spd"
@@ -210,7 +210,7 @@ const closeModal = () => {
               <label
                 for="ch1pos"
                 class="block mb-0.5 text-lg"
-                >Position</label
+                >{{ $t('modals.kangaroo_event.position') }}</label
               >
               <input
                 id="ch1pos"
@@ -236,14 +236,14 @@ const closeModal = () => {
             <select
               id="ch2select"
               v-model="ch2Action"
-              title="channel 2"
+              :aria-label="kangaroo.ch2Name"
               class="select select-bordered w-full text-lg mt-2"
             >
-              <option value="0">None</option>
-              <option value="1">Start</option>
-              <option value="2">Home</option>
-              <option value="3">Speed</option>
-              <option value="4">Position</option>
+              <option value="0">{{ $t('none') }}</option>
+              <option value="1">{{ $t('modals.kangaroo_event.start') }}</option>
+              <option value="2">{{ $t('modals.kangaroo_event.home') }}</option>
+              <option value="3">{{ $t('modals.kangaroo_event.speed') }}</option>
+              <option value="4">{{ $t('modals.kangaroo_event.position') }}</option>
             </select>
           </div>
 
@@ -252,7 +252,7 @@ const closeModal = () => {
               <label
                 for="ch2spd"
                 class="block mb-0.5 text-lg"
-                >Speed</label
+                >{{ $t('modals.kangaroo_event.speed') }}</label
               >
               <input
                 id="ch2spd"
@@ -267,7 +267,7 @@ const closeModal = () => {
               <label
                 for="ch2pos"
                 class="block mb-0.5 text-lg"
-                >Position</label
+                >{{ $t('modals.kangaroo_event.position') }}</label
               >
               <input
                 id="ch2pos"
@@ -296,7 +296,7 @@ const closeModal = () => {
           data-testid="save-button"
           @click="addEvent"
         >
-          {{ mode !== ModalMode.TEST ? $t('Save') : $t('Test') }}
+          {{ mode !== ModalMode.TEST ? $t('save') : $t('test') }}
         </button>
         <button
           v-if="showRemoveButton"
@@ -304,14 +304,14 @@ const closeModal = () => {
           data-testid="remove-button"
           @click="removeEvent"
         >
-          {{ $t('Remove') }}
+          {{ $t('remove') }}
         </button>
         <button
           class="btn w-24 text-lg"
           data-testid="close-button"
           @click="closeModal"
         >
-          {{ $t('Close') }}
+          {{ $t('close') }}
         </button>
       </div>
     </div>
@@ -320,7 +320,7 @@ const closeModal = () => {
       class="modal-backdrop"
       @click="closeModal"
     >
-      <button>{{ $t('Close') }}</button>
+      <button>{{ $t('close') }}</button>
     </form>
   </dialog>
 </template>

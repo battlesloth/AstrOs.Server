@@ -224,6 +224,7 @@ async function save() {
                 </select>
                 <button
                   data-testid="playlist-help"
+                  :aria-label="$t('playlist_editor_view.help_title')"
                   @click="showHelp()"
                   class=""
                 >
