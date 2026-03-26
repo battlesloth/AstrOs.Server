@@ -1,11 +1,6 @@
 import type { PlaylistType } from '@/enums/playlists/playlistType';
 import type { PlaylistTrack } from './playlistTrack';
-
-export interface PlaylistSettings {
-  randomDelay: boolean;
-  delayMin: number;
-  delayMax: number;
-}
+import type { PlaylistSettings } from './playlistSettings';
 
 export interface Playlist {
   id: string;

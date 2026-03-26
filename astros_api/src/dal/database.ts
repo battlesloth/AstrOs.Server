@@ -13,7 +13,7 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import { logger } from '../logger.js';
 import { Database } from './types.js';
-import { migration_0, migration_1, migration_2, migration_3 } from './migrations/index.js';
+import { migration_0, migration_1, migration_2, migration_3, migration_4 } from './migrations/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,6 +49,7 @@ const migrationProvider = new (class implements MigrationProvider {
       '1_add_script_evt_id': migration_1,
       '2_add_script_duration': migration_2,
       '3_add_playlists': migration_3,
+      '4_add_random_wait': migration_4,
     };
   }
 })();

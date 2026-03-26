@@ -15,7 +15,9 @@ import {
   IoChevronUp,
   IoChevronDown,
   IoAdd,
+  IoHelpCircleOutline,
 } from 'oh-vue-icons/icons';
+import { MdDraghandle } from 'oh-vue-icons/icons/md';
 import App from './App.vue';
 import router from './router';
 import i18n from './i18n';
@@ -33,6 +35,8 @@ addIcons(
   IoChevronUp,
   IoChevronDown,
   IoAdd,
+  IoHelpCircleOutline,
+  MdDraghandle,
 );
 
 const app = createApp(App);

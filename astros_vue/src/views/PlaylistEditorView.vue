@@ -1,8 +1,12 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import AstrosLayout from '@/components/common/layout/AstrosLayout.vue';
+import AstrosPlaylistEditor from '@/components/playlists/playlistEditor/AstrosPlaylistEditor.vue';
+</script>
 
 <template>
-  <div class="p-4">
-    <h1 class="text-2xl font-bold mb-4">Playlist Editor</h1>
-    <p>This is a placeholder for the playlist editor view.</p>
-  </div>
+  <AstrosLayout>
+    <template v-slot:main>
+      <AstrosPlaylistEditor />
+    </template>
+  </AstrosLayout>
 </template>

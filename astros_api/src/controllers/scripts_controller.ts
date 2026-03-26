@@ -11,7 +11,6 @@ export class ScriptsController {
   public static getAllRoute = '/scripts/all';
   public static getAllScriptNamesRoute = '/scripts/all-names';
   public static uploadRoute = '/scripts/upload';
-  public static runRoute = '/scripts/run';
 
   public static async getAllScripts(req: any, res: any, next: any) {
     try {

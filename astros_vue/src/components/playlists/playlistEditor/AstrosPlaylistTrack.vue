@@ -20,6 +20,31 @@ const playlistOptions = computed<SearchSelectOption[]>(() =>
 const scriptOptions = computed<SearchSelectOption[]>(() =>
   playlistsStore.scripts.map((s) => ({ id: s.id, label: s.scriptName })),
 );
+
+const durationDisplay = computed(() => (Math.round(track.value.durationDS) / 10).toFixed(1));
+
+const durationMaxDisplay = computed(() => (Math.round(track.value.durationMaxDS) / 10).toFixed(1));
+
+function setDuration(e: Event) {
+  const val = parseFloat((e.target as HTMLInputElement).value);
+  if (!isNaN(val) && val >= 0) {
+    track.value.durationDS = Math.round(val * 10);
+    if (track.value.durationMaxDS < track.value.durationDS) {
+      track.value.durationMaxDS = track.value.durationDS;
+    }
+  }
+}
+
+function setDurationMax(e: Event) {
+  const val = parseFloat((e.target as HTMLInputElement).value);
+  if (!isNaN(val) && val >= 0) {
+    let ds = Math.round(val * 10);
+    if (ds < track.value.durationDS) {
+      ds = track.value.durationDS;
+    }
+    track.value.durationMaxDS = ds;
+  }
+}
 </script>
 
 <template>
@@ -36,7 +61,7 @@ const scriptOptions = computed<SearchSelectOption[]>(() =>
             :key="type"
             :value="type"
           >
-            {{ $t(`playlists_view.track_types.${type.toLowerCase()}`) }}
+            {{ $t(`playlist_editor_view.track_types.${type.toLowerCase()}`) }}
           </option>
         </select>
       </div>
@@ -45,7 +70,7 @@ const scriptOptions = computed<SearchSelectOption[]>(() =>
         @click="$emit('remove')"
         class="btn btn-error btn-sm"
       >
-        {{ $t('remove') }}
+        {{ $t('playlist_editor_view.remove') }}
       </button>
     </div>
     <div
@@ -72,20 +97,50 @@ const scriptOptions = computed<SearchSelectOption[]>(() =>
       v-else
       class="mt-3"
     >
-      <input
-        v-model="track.trackName"
-        :data-testid="`playlist-track-name`"
-        type="text"
-        placeholder="Track Name"
-        class="input input-bordered input-sm w-full"
-      />
-      <input
-        v-model="track.durationDS"
-        :data-testid="`playlist-track-duration`"
-        type="text"
-        placeholder="Track Duration (seconds)"
-        class="input input-bordered input-sm w-full mt-3"
-      />
+      <div class="flex items-center gap-4">
+        <label class="cursor-pointer flex items-center gap-2 shrink-0">
+          <span class="label-text shrink-0">{{ $t('playlist_editor_view.random_wait') }}</span>
+          <input
+            v-model="track.randomWait"
+            type="checkbox"
+            class="checkbox checkbox-sm"
+            data-testid="playlist-track-random-wait"
+          />
+        </label>
+        <div class="flex items-center gap-2">
+          <span
+            v-if="track.randomWait"
+            class="label-text shrink-0"
+            >{{ $t('playlist_editor_view.min') }}</span
+          >
+          <input
+            :value="durationDisplay"
+            @change="setDuration"
+            :data-testid="`playlist-track-duration`"
+            type="number"
+            step="0.1"
+            min="0"
+            :placeholder="$t('playlist_editor_view.track_duration')"
+            class="input input-bordered input-sm w-24"
+          />
+        </div>
+        <div
+          v-if="track.randomWait"
+          class="flex items-center gap-2"
+        >
+          <span class="label-text shrink-0">{{ $t('playlist_editor_view.max') }}</span>
+          <input
+            :value="durationMaxDisplay"
+            @change="setDurationMax"
+            data-testid="playlist-track-duration-max"
+            type="number"
+            step="0.1"
+            min="0"
+            :placeholder="$t('playlist_editor_view.track_duration_max')"
+            class="input input-bordered input-sm w-24"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>

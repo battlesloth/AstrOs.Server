@@ -17,6 +17,7 @@ import {
   IoChevronUp,
   IoChevronDown,
   IoAdd,
+  IoHelpCircleOutline,
 } from 'oh-vue-icons/icons';
 
 initialize();
@@ -37,6 +38,7 @@ setup((app) => {
     IoChevronUp,
     IoChevronDown,
     IoAdd,
+    IoHelpCircleOutline,
   );
 
   app.component('v-icon', OhVueIcon);

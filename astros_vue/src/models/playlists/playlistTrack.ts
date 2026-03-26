@@ -5,6 +5,8 @@ export interface PlaylistTrack {
   playlistId: string;
   idx: number;
   durationDS: number;
+  randomWait: boolean;
+  durationMaxDS: number;
   trackType: TrackType;
   trackId: string;
   trackName: string;

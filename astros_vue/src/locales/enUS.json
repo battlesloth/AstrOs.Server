@@ -160,13 +160,43 @@
   },
   "playlists_view": {
     "title": "Playlists",
-    "new": "New",
+    "new": "New"
+  },
+  "playlist_editor_view": {
+    "title": "Playlist Editor",
+    "save": "Save",
+    "remove": "Remove",
+    "track_name": "Track Name",
+    "description": "Description",
+    "track_duration": "Track Duration (seconds)",
+    "track_duration_max": "Max Duration (seconds)",
+    "random_wait": "Random",
+    "min": "Min",
+    "max": "Max",
     "add_track": "Add Track",
     "no_tracks": "No tracks added yet.",
+    "save_success": "Playlist saved successfully.",
+    "save_error": "Error saving playlist.",
     "track_types": {
       "script": "Script",
       "playlist": "Playlist",
       "wait": "Wait"
-    }
+    },
+    "sequential": "Sequential",
+    "sequentialinterruptible": "Sequential, Interruptible",
+    "sequentialrepeatable": "Sequential, Repeatable",
+    "shuffle": "Shuffle",
+    "shufflewithrepeat": "Shuffle with Repeat",
+    "shufflewithdelay": "Shuffle with Delay",
+    "shufflewithdelayandrepeat": "Shuffle with Delay and Repeat",
+    "help_title": "Playlist Editor Help",
+    "help_body": "Here's a breakdown of the different playlist types you can choose from:",
+    "help_sequential": "Plays tracks in the order they were added. Once the end of the playlist is reached, it stops. If another playlist or a script is sent to the server while a sequential playlist is playing, it will wait until the current playlist finishes before starting.",
+    "help_sequentialinterruptible": "Similar to Sequential. If a new playlist or script is sent to the server, it will interrupt the current playlist and start the new script or playlist as soon as the current track finishes.",
+    "help_sequentialrepeatable": "Plays tracks in the order they were added. Once the end of the playlist is reached, it starts over from the beginning. This type is always interruptible.",
+    "help_shuffle": "Plays tracks in a random order. Each track is played once until all tracks have been played, then it stops. This type is always interruptible.",
+    "help_shufflewithrepeat": "Similar to Shuffle, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible.",
+    "help_shufflewithdelay": "Similar to Shuffle, but after each track is played, it waits for a specified delay before playing the next track. This type is always interruptible.",
+    "help_shufflewithdelayandrepeat": "Similar to Shuffle With Delay, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible."
   }
 }

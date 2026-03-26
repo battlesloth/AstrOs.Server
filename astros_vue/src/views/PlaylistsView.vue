@@ -62,6 +62,16 @@ const confirmDelete = async () => {
   closeDeleteModal();
 };
 
+const runPlaylist = async (id: string) => {
+  console.log('Running playlist with id:', id);
+  const result = await playlistStore.runPlaylist(id);
+  if (result.success) {
+    success('Playlist run queued!');
+  } else {
+    error('Error starting playlist. Check logs.');
+  }
+};
+
 const copyPlaylist = async (id: string) => {
   const result = await playlistStore.copyPlaylist(id);
   if (result.success) {
@@ -113,6 +123,7 @@ const editPlaylist = (id: string) => {
                 :key="playlist.id"
                 :playlist="playlist"
                 @edit="editPlaylist"
+                @play="runPlaylist"
                 @copy="copyPlaylist"
                 @delete="openDeleteModal"
               >

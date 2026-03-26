@@ -22,5 +22,6 @@ export const SCRIPTS_TEST_CHANNEL = 'api/directcommand';
 export const PLAYLISTS = 'api/playlists';
 export const PLAYLISTS_ALL = 'api/playlists/all';
 export const PLAYLISTS_COPY = 'api/playlists/copy';
+export const PLAYLISTS_RUN = 'api/playlists/run';
 
 export const REMOTE_CONFIG = 'api/remoteConfig';

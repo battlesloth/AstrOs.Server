@@ -38,7 +38,7 @@ import { ConfigSync } from './models/config/config_sync.js';
 import { ScriptRun } from './models/scripts/script_run.js';
 import { logger } from './logger.js';
 import { RemoteConfigController } from './controllers/remote_config_controller.js';
-import { SettingsController } from './controllers/settings_controller.js';
+import { registerSettingsRoutes } from './controllers/settings_controller.js';
 import { ApiKeyValidator } from './api_key_validator.js';
 import { SerialMessageType } from './serial/serial_message.js';
 import {
@@ -61,7 +61,7 @@ const __dirname = path.dirname(__filename);
 
 import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
-import { PlaylistController } from './controllers/playlist_controller.js';
+import { registerPlaylistRoutes } from './controllers/playlist_controller.js';
 
 //const { SerialPort } = eval("require('serialport')");
 //const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
@@ -346,41 +346,16 @@ class ApiServer {
         this.uploadScript(req, res, next);
       },
     );
-    this.router.get(
-      ScriptsController.runRoute,
-      this.authHandler,
-      (req: any, res: any, next: any) => {
-        this.runScript(req, res, next);
-      },
-    );
 
-    this.router.get(PlaylistController.getRoute, this.authHandler, PlaylistController.getPlaylist);
+    this.router.get('/scripts/run', this.authHandler, (req: any, res: any, next: any) => {
+      this.runScript(req, res, next);
+    });
 
-    this.router.get(
-      PlaylistController.getAllRoute,
-      this.authHandler,
-      PlaylistController.getAllPlaylists,
-    );
+    registerPlaylistRoutes(this.router, this.authHandler);
 
-    this.router.put(PlaylistController.putRoute, this.authHandler, PlaylistController.savePlaylist);
-
-    this.router.delete(
-      PlaylistController.deleteRoute,
-      this.authHandler,
-      PlaylistController.deletePlaylist,
-    );
-
-    this.router.get(
-      PlaylistController.copyRoute,
-      this.authHandler,
-      PlaylistController.copyPlaylist,
-    );
-
-    this.router.get(
-      PlaylistController.getPlaylistNamesThatUseScriptRoute,
-      this.authHandler,
-      PlaylistController.getPlaylistNamesThatUseScript,
-    );
+    this.router.get('/playlists/run', this.authHandler, (req: any, res: any, next: any) => {
+      this.runPlaylist(req, res, next);
+    });
 
     this.router.get(
       RemoteConfigController.getRoute,
@@ -393,26 +368,11 @@ class ApiServer {
       RemoteConfigController.saveRemoteConfig,
     );
 
-    this.router.get(SettingsController.getRoute, this.authHandler, SettingsController.getSetting);
-    this.router.put(SettingsController.putRoute, this.authHandler, SettingsController.saveSetting);
-    this.router.get(
-      SettingsController.logDownloadRoute,
-      this.authHandler,
-      SettingsController.downloadLogs,
-    );
+    registerSettingsRoutes(this.router, this.authHandler);
 
-    this.router.get(
-      SettingsController.controllersRoute,
-      this.authHandler,
-      SettingsController.getControllers,
-    );
-    this.router.post(
-      SettingsController.formatSDRoute,
-      this.authHandler,
-      (req: any, res: any, next: any) => {
-        this.formatSD(req, res, next);
-      },
-    );
+    this.router.post('/settings/formatSD', this.authHandler, (req: any, res: any, next: any) => {
+      this.formatSD(req, res, next);
+    });
 
     this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
     this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
@@ -738,6 +698,26 @@ class ApiServer {
         type: SerialMessageType.DEPLOY_SCRIPT,
         data: msg,
       });
+
+      res.status(200);
+      res.json({ message: 'success' });
+    } catch (error) {
+      logger.error(error);
+
+      res.status(500);
+      res.json({
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  private async runPlaylist(req: any, res: any, next: any) {
+    try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
+      logger.info('running playlist');
 
       res.status(200);
       res.json({ message: 'success' });

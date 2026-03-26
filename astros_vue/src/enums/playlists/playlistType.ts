@@ -1,5 +1,5 @@
 /*
- * Sequtial: Plays tracks in the order they were added. Once the end
+ * Sequential: Plays tracks in the order they were added. Once the end
  *     of the playlist is reached, it stops.
  *
  * SequentialInterruptible: Similar to Sequential, but if a new playlist

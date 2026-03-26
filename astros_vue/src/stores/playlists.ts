@@ -1,5 +1,11 @@
 import apiService from '@/api/apiService';
-import { PLAYLISTS, PLAYLISTS_ALL, PLAYLISTS_COPY, SCRIPTS_ALL_NAMES } from '@/api/endpoints';
+import {
+  PLAYLISTS,
+  PLAYLISTS_ALL,
+  PLAYLISTS_COPY,
+  PLAYLISTS_RUN,
+  SCRIPTS_ALL_NAMES,
+} from '@/api/endpoints';
 import { PlaylistType } from '@/enums/playlists/playlistType';
 import type { Playlist } from '@/models/playlists/playlist';
 import type { ScriptData } from '@/models/playlists/scriptData';
@@ -24,6 +30,8 @@ export const usePlaylistsStore = defineStore('playlists', () => {
         playlistType: PlaylistType.Sequential,
         tracks: [],
         settings: {
+          repeat: false,
+          repeatCount: 0,
           randomDelay: false,
           delayMin: 0,
           delayMax: 0,
@@ -39,7 +47,7 @@ export const usePlaylistsStore = defineStore('playlists', () => {
   async function loadPlaylist(playlistId: string) {
     isLoading.value = true;
     try {
-      const response = (await apiService.get(`${PLAYLISTS}/${playlistId}`)) as Playlist;
+      const response = (await apiService.get(`${PLAYLISTS}/?id=${playlistId}`)) as Playlist;
       selectedPlaylist.value = response;
       return { success: true };
     } catch (error) {
@@ -72,7 +80,7 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     }
     isSaving.value = true;
     try {
-      await apiService.post(PLAYLISTS, selectedPlaylist.value);
+      await apiService.put(PLAYLISTS, selectedPlaylist.value);
       return { success: true };
     } catch (error) {
       console.error('Failed to save playlist:', error);
@@ -84,7 +92,7 @@ export const usePlaylistsStore = defineStore('playlists', () => {
 
   async function copyPlaylist(playlistId: string) {
     try {
-      const response = (await apiService.get(PLAYLISTS_COPY, { id: playlistId })) as Playlist;
+      const response = (await apiService.post(PLAYLISTS_COPY, { id: playlistId })) as Playlist;
       playlists.value.push(response);
       return { success: true, data: response };
     } catch (error) {
@@ -104,7 +112,18 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     }
   }
 
+  async function runPlaylist(playlistId: string) {
+    try {
+      await apiService.get(PLAYLISTS_RUN, { id: playlistId });
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to run playlist:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   return {
+    selectedPlaylist,
     playlists,
     scripts,
     isLoading,
@@ -115,5 +134,6 @@ export const usePlaylistsStore = defineStore('playlists', () => {
     saveSelectedPlaylist,
     copyPlaylist,
     deletePlaylist,
+    runPlaylist,
   };
 });

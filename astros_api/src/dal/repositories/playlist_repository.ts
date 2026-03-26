@@ -56,6 +56,8 @@ export class PlaylistRepository {
             playlist_id: playlist.id,
             idx: track.idx,
             duration_ds: track.durationDS,
+            random_wait: track.randomWait ? 1 : 0,
+            duration_max_ds: track.durationMaxDS,
             track_type: track.trackType,
             track_id: track.trackId,
             track_name: track.trackName,
@@ -71,12 +73,12 @@ export class PlaylistRepository {
     return true;
   }
 
-  async copyPlaylist(id: string): Promise<boolean> {
+  async copyPlaylist(id: string): Promise<Playlist | null> {
     const playlist = await this.getPlaylist(id);
 
     if (!playlist) {
       logger.error(`Playlist with id ${id} not found for copy`);
-      return false;
+      return null;
     }
 
     const newPlaylistId = generateShortId('p');
@@ -95,7 +97,7 @@ export class PlaylistRepository {
       throw err;
     });
 
-    return true;
+    return newPlaylist;
   }
 
   async getAllPlaylists(): Promise<Playlist[]> {
@@ -149,6 +151,8 @@ export class PlaylistRepository {
         idx: track.idx,
         playlistId: track.playlist_id,
         durationDS: track.duration_ds,
+        randomWait: track.random_wait === 1,
+        durationMaxDS: track.duration_max_ds,
         trackType: track.track_type as TrackType,
         trackId: track.track_id,
         trackName: track.track_name,
