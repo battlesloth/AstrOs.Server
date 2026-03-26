@@ -2,125 +2,128 @@ import { Constants, LocationCollection } from '../models/index.js';
 import { logger } from '../logger.js';
 import { LocationsRepository } from '../dal/repositories/locations_repository.js';
 import { db } from '../dal/database.js';
+import { Router } from 'express';
 
-export class LocationsController {
-  public static route = '/locations/';
-  public static syncConfigRoute = '/locations/syncconfig';
-  public static syncControllersRoute = '/locations/synccontrollers';
-  public static loadRoute = '/locations/load';
+const route = '/locations/';
+const loadRoute = '/locations/load';
 
-  public static async getLocations(req: any, res: any, next: any) {
-    try {
-      const repo = new LocationsRepository(db);
+export function registerLocationRoutes(router: Router, authHandler: any) {
+  router.get(route, authHandler, getLocations);
+  router.post(route, authHandler, saveLocations);
+  router.get(loadRoute, authHandler, loadLocations);
+}
 
-      const response = new LocationCollection();
+export async function getLocations(req: any, res: any, next: any) {
+  try {
+    const repo = new LocationsRepository(db);
 
-      const modules = await repo.getLocations();
+    const response = new LocationCollection();
 
-      for (const mod of modules) {
-        switch (mod.locationName) {
-          case Constants.BODY:
-            response.bodyModule = mod;
-            break;
-          case Constants.CORE:
-            response.coreModule = mod;
-            break;
-          case Constants.DOME:
-            response.domeModule = mod;
-            break;
-          default:
-            logger.error(`invalid module type: ${mod.locationName}`);
-            break;
-        }
+    const modules = await repo.getLocations();
+
+    for (const mod of modules) {
+      switch (mod.locationName) {
+        case Constants.BODY:
+          response.bodyModule = mod;
+          break;
+        case Constants.CORE:
+          response.coreModule = mod;
+          break;
+        case Constants.DOME:
+          response.domeModule = mod;
+          break;
+        default:
+          logger.error(`invalid module type: ${mod.locationName}`);
+          break;
       }
-
-      res.status(200);
-      res.json(response);
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
     }
+
+    res.status(200);
+    res.json(response);
+  } catch (error) {
+    logger.error(error);
+
+    res.status(500);
+    res.json({
+      message: 'Internal server error',
+    });
   }
+}
 
-  public static async saveLocations(req: any, res: any, next: any) {
-    try {
-      const repo = new LocationsRepository(db);
+async function saveLocations(req: any, res: any, next: any) {
+  try {
+    const repo = new LocationsRepository(db);
 
-      const modules = req.body as LocationCollection;
+    const modules = req.body as LocationCollection;
 
-      let success = true;
+    let success = true;
 
-      if (modules.domeModule) {
-        success = (await repo.updateLocation(modules.domeModule)) && success;
-      }
-
-      if (modules.coreModule) {
-        success = (await repo.updateLocation(modules.coreModule)) && success;
-      }
-
-      if (modules.bodyModule) {
-        success = (await repo.updateLocation(modules.bodyModule)) && success;
-      }
-
-      if (success) {
-        res.status(200);
-        res.json({ message: 'success' });
-      } else {
-        res.status(500);
-        res.json({
-          message: 'failed',
-        });
-      }
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
+    if (modules.domeModule) {
+      success = (await repo.updateLocation(modules.domeModule)) && success;
     }
-  }
 
-  public static async loadLocations(req: any, res: any, next: any) {
-    try {
-      const repo = new LocationsRepository(db);
+    if (modules.coreModule) {
+      success = (await repo.updateLocation(modules.coreModule)) && success;
+    }
 
-      const locations = await repo.loadLocations();
+    if (modules.bodyModule) {
+      success = (await repo.updateLocation(modules.bodyModule)) && success;
+    }
 
-      const response = new LocationCollection();
-
-      logger.info(`loaded locations: ${locations.length}`);
-
-      for (const location of locations) {
-        switch (location.locationName) {
-          case Constants.BODY:
-            response.bodyModule = location;
-            break;
-          case Constants.CORE:
-            response.coreModule = location;
-            break;
-          case Constants.DOME:
-            response.domeModule = location;
-            break;
-          default:
-            logger.error(`invalid module type: ${location.locationName}`);
-            break;
-        }
-      }
-
+    if (success) {
       res.status(200);
-      res.json(response);
-    } catch (error) {
-      logger.error(error);
-
+      res.json({ message: 'success' });
+    } else {
       res.status(500);
       res.json({
-        message: 'Internal server error',
+        message: 'failed',
       });
     }
+  } catch (error) {
+    logger.error(error);
+
+    res.status(500);
+    res.json({
+      message: 'Internal server error',
+    });
+  }
+}
+
+async function loadLocations(req: any, res: any, next: any) {
+  try {
+    const repo = new LocationsRepository(db);
+
+    const locations = await repo.loadLocations();
+
+    const response = new LocationCollection();
+
+    logger.info(`loaded locations: ${locations.length}`);
+
+    for (const location of locations) {
+      switch (location.locationName) {
+        case Constants.BODY:
+          response.bodyModule = location;
+          break;
+        case Constants.CORE:
+          response.coreModule = location;
+          break;
+        case Constants.DOME:
+          response.domeModule = location;
+          break;
+        default:
+          logger.error(`invalid module type: ${location.locationName}`);
+          break;
+      }
+    }
+
+    res.status(200);
+    res.json(response);
+  } catch (error) {
+    logger.error(error);
+
+    res.status(500);
+    res.json({
+      message: 'Internal server error',
+    });
   }
 }

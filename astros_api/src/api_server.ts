@@ -15,11 +15,11 @@ import { Worker } from 'worker_threads';
 import { pinoHttp } from 'pino-http';
 
 import { UserRepository } from './dal/repositories/user_repository.js';
-import { LocationsController } from './controllers/locations_controller.js';
-import { AuthContoller } from './controllers/authentication_controller.js';
-import { ScriptsController } from './controllers/scripts_controller.js';
-import { AudioController } from './controllers/audio_controller.js';
-import { FileController } from './controllers/file_controller.js';
+import { registerLocationRoutes } from './controllers/locations_controller.js';
+import { registerAuthRoutes } from './controllers/authentication_controller.js';
+import { registerScriptRoutes } from './controllers/scripts_controller.js';
+import { registerAudioRoutes } from './controllers/audio_controller.js';
+import { registerFileRoutes } from './controllers/file_controller.js';
 import { ScriptUpload } from './models/scripts/script_upload.js';
 import { ScriptRepository } from './dal/repositories/script_repository.js';
 
@@ -37,7 +37,7 @@ import { ControllerRepository } from './dal/repositories/controller_repository.j
 import { ConfigSync } from './models/config/config_sync.js';
 import { ScriptRun } from './models/scripts/script_run.js';
 import { logger } from './logger.js';
-import { RemoteConfigController } from './controllers/remote_config_controller.js';
+import { registerRemoteConfigRoutes } from './controllers/remote_config_controller.js';
 import { registerSettingsRoutes } from './controllers/settings_controller.js';
 import { ApiKeyValidator } from './api_key_validator.js';
 import { SerialMessageType } from './serial/serial_message.js';
@@ -137,9 +137,6 @@ class ApiServer {
     logger.info('Setting up API server');
     await this.configApi();
 
-    logger.info('Setting up file handler');
-    this.configFileHandler();
-
     logger.info('Setting up routes');
     this.setRoutes();
 
@@ -203,9 +200,6 @@ class ApiServer {
       logger.error('Error migrating database', error);
       process.exit(1);
     }
-
-    //const da = new DataAccess();
-    //await da.setup();
 
     const loggerMiddleware = pinoHttp({
       logger: logger,
@@ -283,99 +277,48 @@ class ApiServer {
     this.apiKeyValidator = ApiKeyValidator();
   }
 
-  private configFileHandler() {
-    this.router.route(FileController.audioUploadRoute).post((req, res) => {
-      FileController.HandleFile(req, res);
-    });
-  }
-
   private setRoutes(): void {
-    this.router.post(AuthContoller.route, AuthContoller.login);
-    this.router.post(AuthContoller.reauthRoute, AuthContoller.reauth);
+    registerAuthRoutes(this.router);
+    registerLocationRoutes(this.router, this.authHandler);
+    registerScriptRoutes(this.router, this.authHandler);
+    registerPlaylistRoutes(this.router, this.authHandler);
+    registerRemoteConfigRoutes(this.router, this.authHandler, this.apiKeyValidator);
+    registerSettingsRoutes(this.router, this.authHandler);
+    registerAudioRoutes(this.router, this.authHandler);
+    registerFileRoutes(this.router, this.authHandler);
 
     this.router.get('/check-session', this.authHandler, (req: any, res: any, next: any) => {
       res.status(200);
       res.json({ isAuthenticated: true });
     });
 
-    this.router.get(LocationsController.route, this.authHandler, LocationsController.getLocations);
-    this.router.put(LocationsController.route, this.authHandler, LocationsController.saveLocations);
+    this.router.get('/locations/syncconfig', this.authHandler, (req: any, res: any, next: any) => {
+      this.syncControllerConfig(req, res, next);
+    });
+
     this.router.get(
-      LocationsController.loadRoute,
-      this.authHandler,
-      LocationsController.loadLocations,
-    );
-    this.router.get(
-      LocationsController.syncConfigRoute,
-      this.authHandler,
-      (req: any, res: any, next: any) => {
-        this.syncControllerConfig(req, res, next);
-      },
-    );
-    this.router.get(
-      LocationsController.syncControllersRoute,
+      '/locations/synccontrollers',
       this.authHandler,
       (req: any, res: any, next: any) => {
         this.syncControllers(req, res, next);
       },
     );
 
-    this.router.get(ScriptsController.getRoute, this.authHandler, ScriptsController.getScript);
-    this.router.get(
-      ScriptsController.getAllRoute,
-      this.authHandler,
-      ScriptsController.getAllScripts,
-    );
-    this.router.get(
-      ScriptsController.getAllScriptNamesRoute,
-      this.authHandler,
-      ScriptsController.getAllScriptNames,
-    );
-    this.router.put(ScriptsController.putRoute, this.authHandler, ScriptsController.saveScript);
-    this.router.delete(
-      ScriptsController.deleteRoute,
-      this.authHandler,
-      ScriptsController.deleteScript,
-    );
-    this.router.get(ScriptsController.copyRoute, this.authHandler, ScriptsController.copyScript);
-
-    this.router.get(
-      ScriptsController.uploadRoute,
-      this.authHandler,
-      (req: any, res: any, next: any) => {
-        this.uploadScript(req, res, next);
-      },
-    );
+    this.router.get('/scripts/upload', this.authHandler, (req: any, res: any, next: any) => {
+      this.uploadScript(req, res, next);
+    });
 
     this.router.get('/scripts/run', this.authHandler, (req: any, res: any, next: any) => {
       this.runScript(req, res, next);
     });
 
-    registerPlaylistRoutes(this.router, this.authHandler);
-
     this.router.get('/playlists/run', this.authHandler, (req: any, res: any, next: any) => {
       this.runPlaylist(req, res, next);
     });
 
-    this.router.get(
-      RemoteConfigController.getRoute,
-      this.authHandler,
-      RemoteConfigController.getRemoteConfig,
-    );
-    this.router.put(
-      RemoteConfigController.putRoute,
-      this.authHandler,
-      RemoteConfigController.saveRemoteConfig,
-    );
-
-    registerSettingsRoutes(this.router, this.authHandler);
-
     this.router.post('/settings/formatSD', this.authHandler, (req: any, res: any, next: any) => {
       this.formatSD(req, res, next);
     });
-
-    this.router.get(AudioController.getAll, this.authHandler, AudioController.getAllAudioFiles);
-    this.router.get(AudioController.deleteRoute, this.authHandler, AudioController.deleteAudioFile);
 
     this.router.post('/directcommand', this.authHandler, (req: any, res: any, next: any) => {
       this.directCommand(req, res, next);
@@ -385,11 +328,6 @@ class ApiServer {
     this.router.get('/remotecontrol', this.apiKeyValidator, (req: any, res: any, next: any) => {
       this.runScript(req, res, next);
     });
-    this.router.get(
-      '/remotecontrolsync',
-      this.apiKeyValidator,
-      RemoteConfigController.syncRemoteConfig,
-    );
   }
 
   private setupSerialPort(): void {

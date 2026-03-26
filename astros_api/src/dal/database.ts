@@ -13,7 +13,13 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 import { logger } from '../logger.js';
 import { Database } from './types.js';
-import { migration_0, migration_1, migration_2, migration_3, migration_4 } from './migrations/index.js';
+import {
+  migration_0,
+  migration_1,
+  migration_2,
+  migration_3,
+  migration_4,
+} from './migrations/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

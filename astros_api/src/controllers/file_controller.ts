@@ -4,60 +4,55 @@ import { v4 as uuid_v4 } from 'uuid';
 import { UploadedFile } from 'express-fileupload';
 import { logger } from '../logger.js';
 import { db } from '../dal/database.js';
+import { Router } from 'express';
 
 // https://github.com/expressjs/multer/blob/master/StorageEngine.md
-export class FileController {
-  public static audioUploadRoute = '/audio/savefile';
+const audioUploadRoute = '/audio/savefile';
 
-  public static StoragePath() {
-    return `${appdata('astrosserver')}/files/`;
-  }
+function StoragePath() {
+  return `${appdata('astrosserver')}/files/`;
+}
 
-  public static async HandleFile(req: any, res: any) {
-    try {
-      if (!req.files) {
-        return res.status(400).send('No files uploaded');
-      }
+export function registerFileRoutes(router: Router, authHandler: any) {
+  router.post(audioUploadRoute, authHandler, HandleFile);
+}
 
-      const file = req.files.file as UploadedFile;
-      let filename = 'error';
-
-      logger.info('File Uploaded:');
-      logger.info(`file: ${file.name}, mimetype: ${file.mimetype}`);
-
-      const extensionMap = new Map<string, string>([
-        ['audio/ogg', 'ogg'],
-        ['audio/mpeg', 'mp3'],
-        ['audio/wav', 'wav'],
-      ]);
-
-      filename = `${uuid_v4()}.${extensionMap.get(file.mimetype)}`;
-
-      const path = `${FileController.StoragePath()}/${filename}`;
-
-      file.mv(path, (err) => {
-        if (err) {
-          logger.error(err);
-          return res.status(500).send('Internal server error');
-        }
-      });
-
-      const repo = new AudioFileRepository(db);
-
-      await repo.insertFile(filename, file.name);
-
-      return res.status(200).send();
-    } catch (err) {
-      logger.error(err);
-      return res.status(500).send('Internal server error');
+async function HandleFile(req: any, res: any) {
+  try {
+    if (!req.files) {
+      return res.status(400).send('No files uploaded');
     }
-  }
 
-  public static async UpdateFileDurations() {
+    const file = req.files.file as UploadedFile;
+    let filename = 'error';
+
+    logger.info('File Uploaded:');
+    logger.info(`file: ${file.name}, mimetype: ${file.mimetype}`);
+
+    const extensionMap = new Map<string, string>([
+      ['audio/ogg', 'ogg'],
+      ['audio/mpeg', 'mp3'],
+      ['audio/wav', 'wav'],
+    ]);
+
+    filename = `${uuid_v4()}.${extensionMap.get(file.mimetype)}`;
+
+    const path = `${StoragePath()}/${filename}`;
+
+    file.mv(path, (err) => {
+      if (err) {
+        logger.error(err);
+        return res.status(500).send('Internal server error');
+      }
+    });
+
     const repo = new AudioFileRepository(db);
 
-    const files = await repo.filesNeedingDuration();
+    await repo.insertFile(filename, file.name);
 
-    logger.info(`Testing: ${JSON.stringify(files)}`);
+    return res.status(200).send();
+  } catch (err) {
+    logger.error(err);
+    return res.status(500).send('Internal server error');
   }
 }
