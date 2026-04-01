@@ -248,15 +248,27 @@ export class ScriptRepository {
   //#region Script Delete
 
   async deleteScript(id: string): Promise<boolean> {
-    this.db
-      .updateTable('scripts')
-      .set('enabled', 0)
-      .where('id', '=', id)
-      .executeTakeFirstOrThrow()
-      .catch((err) => {
-        logger.error('ScriptRepository.deleteScript', err);
-        throw err;
-      });
+    await this.db.transaction().execute(async (tx) => {
+      await tx
+        .updateTable('scripts')
+        .set('enabled', 0)
+        .where('id', '=', id)
+        .executeTakeFirstOrThrow()
+        .catch((err) => {
+          logger.error('ScriptRepository.deleteScript', err);
+          throw err;
+        });
+
+      await tx
+        .deleteFrom('playlist_tracks')
+        .where('track_type', '=', 'Script')
+        .where('track_id', '=', id)
+        .execute()
+        .catch((err) => {
+          logger.error('ScriptRepository.deleteScript.playlistTracks', err);
+          throw err;
+        });
+    });
 
     return true;
   }
