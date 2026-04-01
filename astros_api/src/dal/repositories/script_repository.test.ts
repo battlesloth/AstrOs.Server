@@ -29,6 +29,10 @@ import {
 } from '../../models/index.js';
 import { upsertGpioModule } from './module_repositories/gpio_repository.js';
 import { upsertUartModules } from './module_repositories/uart_repository.js';
+import { PlaylistRepository } from './playlist_repository.js';
+import { Playlist } from '../../models/playlists/playlist.js';
+import { TrackType } from '../../models/playlists/trackType.js';
+import { PlaylistType } from '../../models/playlists/playlistType.js';
 
 import { v4 as uuid } from 'uuid';
 
@@ -621,5 +625,191 @@ describe('Script Repository', () => {
     expect(savedHcrEvent.commands[1].category).toBe(HcrCommandCategory.volume);
     expect(savedHcrEvent.commands[1].command).toBe(HumanCyborgRelationsCmd.vocalizerVolume);
     expect(savedHcrEvent.commands[1].valueA).toBe(75);
+  });
+
+  it('should remove playlist tracks referencing deleted script', async () => {
+    const scriptId = uuid();
+    const playlistId = uuid();
+
+    const script = new Script(scriptId, 'Test Script', 'Description', new Date(), 0);
+    const scriptRepo = new ScriptRepository(db);
+    await scriptRepo.upsertScript(script);
+
+    const playlist: Playlist = {
+      id: playlistId,
+      playlistName: 'Test Playlist',
+      description: '',
+      playlistType: PlaylistType.Sequential,
+      settings: { randomDelay: false, delayMin: 0, delayMax: 0, repeat: false, repeatCount: 0 },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId,
+          trackName: 'Test Script',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+      ],
+    };
+
+    const playlistRepo = new PlaylistRepository(db);
+    await playlistRepo.upsertPlaylist(playlist);
+
+    // Verify track exists
+    const before = await playlistRepo.getPlaylist(playlistId);
+    expect(before!.tracks.length).toBe(1);
+
+    await scriptRepo.deleteScript(scriptId);
+
+    // Playlist track should be removed
+    const after = await playlistRepo.getPlaylist(playlistId);
+    expect(after!.tracks.length).toBe(0);
+  });
+
+  it('should only remove playlist tracks for the deleted script', async () => {
+    const scriptId1 = uuid();
+    const scriptId2 = uuid();
+    const playlistId = uuid();
+
+    const scriptRepo = new ScriptRepository(db);
+    await scriptRepo.upsertScript(new Script(scriptId1, 'Script 1', '', new Date(), 0));
+    await scriptRepo.upsertScript(new Script(scriptId2, 'Script 2', '', new Date(), 0));
+
+    const playlist: Playlist = {
+      id: playlistId,
+      playlistName: 'Test Playlist',
+      description: '',
+      playlistType: PlaylistType.Sequential,
+      settings: { randomDelay: false, delayMin: 0, delayMax: 0, repeat: false, repeatCount: 0 },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId1,
+          trackName: 'Script 1',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+        {
+          id: uuid(),
+          idx: 1,
+          playlistId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId2,
+          trackName: 'Script 2',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+      ],
+    };
+
+    const playlistRepo = new PlaylistRepository(db);
+    await playlistRepo.upsertPlaylist(playlist);
+
+    await scriptRepo.deleteScript(scriptId1);
+
+    const after = await playlistRepo.getPlaylist(playlistId);
+    expect(after!.tracks.length).toBe(1);
+    expect(after!.tracks[0].trackId).toBe(scriptId2);
+  });
+
+  it('should remove tracks from multiple playlists when script is deleted', async () => {
+    const scriptId = uuid();
+    const playlistId1 = uuid();
+    const playlistId2 = uuid();
+
+    const scriptRepo = new ScriptRepository(db);
+    await scriptRepo.upsertScript(new Script(scriptId, 'Test Script', '', new Date(), 0));
+
+    const makePlaylist = (plId: string, name: string): Playlist => ({
+      id: plId,
+      playlistName: name,
+      description: '',
+      playlistType: PlaylistType.Sequential,
+      settings: { randomDelay: false, delayMin: 0, delayMax: 0, repeat: false, repeatCount: 0 },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId: plId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId,
+          trackName: 'Test Script',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+      ],
+    });
+
+    const playlistRepo = new PlaylistRepository(db);
+    await playlistRepo.upsertPlaylist(makePlaylist(playlistId1, 'Playlist 1'));
+    await playlistRepo.upsertPlaylist(makePlaylist(playlistId2, 'Playlist 2'));
+
+    await scriptRepo.deleteScript(scriptId);
+
+    const after1 = await playlistRepo.getPlaylist(playlistId1);
+    const after2 = await playlistRepo.getPlaylist(playlistId2);
+    expect(after1!.tracks.length).toBe(0);
+    expect(after2!.tracks.length).toBe(0);
+  });
+
+  it('should not remove non-Script track types when script is deleted', async () => {
+    const scriptId = uuid();
+    const playlistId = uuid();
+    const waitTrackId = uuid();
+
+    const scriptRepo = new ScriptRepository(db);
+    await scriptRepo.upsertScript(new Script(scriptId, 'Test Script', '', new Date(), 0));
+
+    const playlist: Playlist = {
+      id: playlistId,
+      playlistName: 'Test Playlist',
+      description: '',
+      playlistType: PlaylistType.Shuffle,
+      settings: { randomDelay: false, delayMin: 0, delayMax: 0, repeat: false, repeatCount: 0 },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId,
+          trackName: 'Test Script',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+        {
+          id: waitTrackId,
+          idx: 1,
+          playlistId,
+          durationDS: 50,
+          trackType: TrackType.Wait,
+          trackId: '',
+          trackName: 'Wait',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+      ],
+    };
+
+    const playlistRepo = new PlaylistRepository(db);
+    await playlistRepo.upsertPlaylist(playlist);
+
+    await scriptRepo.deleteScript(scriptId);
+
+    const after = await playlistRepo.getPlaylist(playlistId);
+    expect(after!.tracks.length).toBe(1);
+    expect(after!.tracks[0].id).toBe(waitTrackId);
+    expect(after!.tracks[0].trackType).toBe(TrackType.Wait);
   });
 });
