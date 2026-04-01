@@ -5,6 +5,11 @@ import type { PlaylistTrack } from '@/models/playlists/playlistTrack';
 import { usePlaylistsStore } from '@/stores/playlists';
 import AstrosSearchSelect from '@/components/common/searchableSelect/AstrosSearchSelect.vue';
 import type { SearchSelectOption } from '@/components/common/searchableSelect/AstrosSearchSelect.vue';
+import { PlaylistType } from '@/enums/playlists/playlistType';
+
+defineProps({
+  playlistType: { type: String as () => PlaylistType, required: true },
+});
 
 const track = defineModel<PlaylistTrack>('track', { required: true });
 const playlistsStore = usePlaylistsStore();
@@ -13,9 +18,13 @@ defineEmits<{
   remove: [];
 }>();
 
-const playlistOptions = computed<SearchSelectOption[]>(() =>
-  playlistsStore.playlists.map((p) => ({ id: p.id, label: p.playlistName })),
-);
+const playlistOptions = computed<SearchSelectOption[]>(() => {
+  // only allow sequential playlists to be selected as tracks, since nested random playlists could script execution
+  const availablePlaylists = playlistsStore.playlists.filter(
+    (p) => p.playlistType === PlaylistType.Sequential,
+  );
+  return availablePlaylists.map((p) => ({ id: p.id, label: p.playlistName }));
+});
 
 const scriptOptions = computed<SearchSelectOption[]>(() =>
   playlistsStore.scripts.map((s) => ({ id: s.id, label: s.scriptName })),
@@ -57,11 +66,24 @@ function setDurationMax(e: Event) {
           class="select select-bordered select-sm w-full"
         >
           <option
-            v-for="type in Object.values(TrackType)"
-            :key="type"
-            :value="type"
+            :key="TrackType.Script"
+            :value="TrackType.Script"
           >
-            {{ $t(`playlist_editor_view.track_types.${type.toLowerCase()}`) }}
+            {{ $t(`playlist_editor_view.track_types.script`) }}
+          </option>
+          <!-- Sequential Playlist can't have nested playlists -->
+          <option
+            v-if="playlistType !== PlaylistType.Sequential"
+            :key="TrackType.Playlist"
+            :value="TrackType.Playlist"
+          >
+            {{ $t(`playlist_editor_view.track_types.playlist`) }}
+          </option>
+          <option
+            :key="TrackType.Wait"
+            :value="TrackType.Wait"
+          >
+            {{ $t(`playlist_editor_view.track_types.wait`) }}
           </option>
         </select>
       </div>

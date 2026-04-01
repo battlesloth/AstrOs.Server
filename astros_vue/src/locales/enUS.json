@@ -73,7 +73,7 @@
     "confirm": {
       "title": "Confirm",
       "confirm": "Confirm",
-      "close": "Close"
+      "close": "Cancel"
     },
     "loading": {
       "title": "Loading",
@@ -343,6 +343,8 @@
     "help_shuffle": "Plays tracks in a random order. Each track is played once until all tracks have been played, then it stops. This type is always interruptible.",
     "help_shufflewithrepeat": "Similar to Shuffle, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible.",
     "help_shufflewithdelay": "Similar to Shuffle, but after each track is played, it waits for a specified delay before playing the next track. This type is always interruptible.",
-    "help_shufflewithdelayandrepeat": "Similar to Shuffle With Delay, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible."
+    "help_shufflewithdelayandrepeat": "Similar to Shuffle With Delay, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible.",
+    "sequential_nested_confirm_title": "Remove Nested Playlists",
+    "sequential_nested_warning": "Sequential playlists cannot contain nested playlists. {count} track(s) will be removed."
   }
 }

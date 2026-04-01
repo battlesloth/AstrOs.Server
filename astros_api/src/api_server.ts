@@ -63,9 +63,6 @@ import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
 import { registerPlaylistRoutes } from './controllers/playlist_controller.js';
 
-//const { SerialPort } = eval("require('serialport')");
-//const { DelimiterParser } = eval("require('@serialport/parser-delimiter')");
-
 interface IWebSocketMessage {
   msgType: string;
   data: any;
@@ -426,6 +423,7 @@ class ApiServer {
         break;
     }
   }
+  //#region FROM SERIAL
 
   async handleResgistraionResponse(msg: ISerialWorkerResponse) {
     try {
@@ -534,6 +532,10 @@ class ApiServer {
       logger.error(`Error handling script deploy response: ${error}`);
     }
   }
+
+  //#region
+
+  //#region TO SERIAL WORKER
 
   private async syncControllers(req: any, res: any, next: any) {
     try {
@@ -796,6 +798,10 @@ class ApiServer {
     }
   }
 
+  //#endregion
+
+  //#region WEBSOCKET
+
   private updateClients(msg: any): void {
     const str = JSON.stringify(msg);
     for (const client of this.clients.values()) {
@@ -806,6 +812,8 @@ class ApiServer {
       }
     }
   }
+
+  //#endregion
 }
 
 ApiServer.bootstrap().catch((err) => {

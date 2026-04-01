@@ -44,6 +44,8 @@ describe('Playlist Repository', () => {
         trackType: TrackType.Script,
         trackId: scriptId1,
         trackName: 'Test Script',
+        randomWait: false,
+        durationMaxDS: 0,
       },
     ];
 
@@ -56,6 +58,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: tracks,
     };
@@ -90,6 +94,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: [],
     };
@@ -136,6 +142,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: [],
     });
@@ -149,6 +157,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: [],
     });
@@ -174,6 +184,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: [
         {
@@ -184,6 +196,8 @@ describe('Playlist Repository', () => {
           trackType: TrackType.Wait,
           trackId: 'wait-1',
           trackName: 'Wait 1',
+          randomWait: false,
+          durationMaxDS: 0,
         },
       ],
     };
@@ -191,7 +205,14 @@ describe('Playlist Repository', () => {
     await repo.upsertPlaylist(originalPlaylist);
 
     const result = await repo.copyPlaylist(playlistId);
-    expect(result).toBe(true);
+    expect(result).not.toBeNull();
+    expect(result?.id).not.toBe(playlistId); // New ID
+    expect(result?.playlistName).toBe('Original (Copy)');
+    expect(result?.description).toBe('Original Desc');
+    expect(result?.playlistType).toBe(PlaylistType.Sequential);
+    expect(result?.settings.randomDelay).toBe(false);
+    expect(result?.settings.delayMin).toBe(0);
+    expect(result?.settings.delayMax).toBe(0);
 
     const allPlaylists = await repo.getAllPlaylists();
     expect(allPlaylists.length).toBe(2);
@@ -221,6 +242,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: [],
     });
@@ -251,6 +274,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: [
         {
@@ -261,6 +286,8 @@ describe('Playlist Repository', () => {
           trackType: TrackType.Script,
           trackId: script1Id,
           trackName: 'The Script',
+          randomWait: false,
+          durationMaxDS: 0,
         },
       ],
     });
@@ -274,6 +301,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: [
         {
@@ -284,6 +313,8 @@ describe('Playlist Repository', () => {
           trackType: TrackType.Script,
           trackId: script2Id,
           trackName: 'Another Script',
+          randomWait: false,
+          durationMaxDS: 0,
         },
       ],
     });
@@ -309,6 +340,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: [
         {
@@ -319,6 +352,8 @@ describe('Playlist Repository', () => {
           trackType: TrackType.Script,
           trackId: script1Id,
           trackName: 'The Script',
+          randomWait: false,
+          durationMaxDS: 0,
         },
         {
           id: uuid(),
@@ -328,6 +363,8 @@ describe('Playlist Repository', () => {
           trackType: TrackType.Wait,
           trackId: 'wait-id',
           trackName: 'Wait',
+          randomWait: false,
+          durationMaxDS: 0,
         },
       ],
     });
@@ -341,6 +378,8 @@ describe('Playlist Repository', () => {
         randomDelay: false,
         delayMin: 0,
         delayMax: 0,
+        repeat: false,
+        repeatCount: 0,
       },
       tracks: [
         {
@@ -351,6 +390,8 @@ describe('Playlist Repository', () => {
           trackType: TrackType.Script,
           trackId: script2Id,
           trackName: 'Another Script',
+          randomWait: false,
+          durationMaxDS: 0,
         },
       ],
     });

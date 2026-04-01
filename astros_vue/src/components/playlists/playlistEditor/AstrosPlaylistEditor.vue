@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import type { PlaylistTrack } from '@/models/playlists/playlistTrack';
 import { TrackType } from '@/enums/playlists/trackType';
 import { PlaylistType } from '@/enums/playlists/playlistType';
@@ -9,7 +9,7 @@ import AstrosPlaylistTrack from './AstrosPlaylistTrack.vue';
 import { usePlaylistsStore } from '@/stores/playlists';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
-import { AstrosHtmlModal } from '@/components/modals';
+import { AstrosConfirmModal, AstrosHtmlModal } from '@/components/modals';
 import { ModalType } from '@/enums';
 import { useI18n } from 'vue-i18n';
 import { useToast } from '@/composables/useToast';
@@ -26,6 +26,8 @@ const playlist = computed(() => selectedPlaylist.value!);
 onMounted(async () => {
   const id = route.params.id as string;
 
+  await playlistStore.loadData();
+
   if (id === '0') {
     await playlistStore.createNewPlaylist();
   } else {
@@ -41,6 +43,47 @@ const sortedTracks = computed(() => [...playlist.value.tracks].sort((a, b) => a.
 const dragFromIdx = ref<number | null>(null);
 const dragOverIdx = ref<number | null>(null);
 const showModal = ref(ModalType.CLOSE_ALL);
+
+const confirmMessage = ref('');
+const previousPlaylistType = ref<PlaylistType | null>(null);
+
+watch(
+  () => playlist.value?.playlistType,
+  (newType, oldType) => {
+    if (
+      newType === PlaylistType.Sequential &&
+      oldType !== undefined &&
+      oldType !== PlaylistType.Sequential
+    ) {
+      const playlistTracks = playlist.value.tracks.filter(
+        (t) => t.trackType === TrackType.Playlist,
+      );
+      if (playlistTracks.length > 0) {
+        previousPlaylistType.value = oldType;
+        confirmMessage.value = t('playlist_editor_view.sequential_nested_warning', {
+          count: playlistTracks.length,
+        });
+        showModal.value = ModalType.CONFIRM;
+      }
+    }
+  },
+);
+
+function confirmRemovePlaylistTracks() {
+  playlist.value.tracks = playlist.value.tracks
+    .filter((t) => t.trackType !== TrackType.Playlist)
+    .map((t, i) => ({ ...t, idx: i }));
+  previousPlaylistType.value = null;
+  showModal.value = ModalType.CLOSE_ALL;
+}
+
+function cancelRemovePlaylistTracks() {
+  if (previousPlaylistType.value) {
+    playlist.value.playlistType = previousPlaylistType.value;
+    previousPlaylistType.value = null;
+  }
+  showModal.value = ModalType.CLOSE_ALL;
+}
 
 function showHelp() {
   showModal.value = ModalType.HELP;
@@ -313,6 +356,7 @@ async function save() {
 
             <!-- Track component -->
             <AstrosPlaylistTrack
+              :playlist-type="selectedPlaylist.playlistType"
               :track="getTrack(track)"
               @update:track="setTrack(track, $event)"
               @remove="removeTrack(track.id)"
@@ -336,6 +380,13 @@ async function save() {
     :title="$t('playlist_editor_view.help_title')"
     :content="generateHelpMessage()"
     @close="showModal = ModalType.CLOSE_ALL"
+  />
+  <AstrosConfirmModal
+    v-if="showModal === ModalType.CONFIRM"
+    :title="'playlist_editor_view.sequential_nested_confirm_title'"
+    :message="confirmMessage"
+    :on-confirm="confirmRemovePlaylistTracks"
+    :on-close="cancelRemovePlaylistTracks"
   />
 </template>
 
