@@ -138,9 +138,10 @@ const editScript = (id: string) => {
           <table class="table w-full">
             <thead class="text-2xl bg-primary text-white rounded-t-lg">
               <tr>
-                <th class="w-1/3 first:rounded-tl-lg">{{ $t('scripts_view.script_name') }}</th>
-                <th class="w-2/3">{{ $t('description') }}</th>
+                <th class="w-1/4 first:rounded-tl-lg">{{ $t('scripts_view.script_name') }}</th>
+                <th class="w-2/4">{{ $t('description') }}</th>
                 <th class="text-center">{{ $t('status') }}</th>
+                <th class="text-center">{{ $t('scripts_view.playlists') }}</th>
                 <th class="text-center last:rounded-tr-lg">{{ $t('actions') }}</th>
               </tr>
             </thead>
@@ -150,6 +151,7 @@ const editScript = (id: string) => {
                 :key="script.id"
                 :script="script"
                 :locations="locations"
+                :playlist-count="script.playlistCount"
                 @edit="editScript"
                 @copy="copyScript"
                 @upload="uploadScript"
@@ -170,7 +172,19 @@ const editScript = (id: string) => {
       >
         <div class="modal-box">
           <h3 class="font-bold text-lg">{{ $t('scripts_view.delete_title') }}</h3>
-          <p class="py-4">{{ $t('scripts_view.delete_confirm', { name: deleteScriptName }) }}</p>
+          <p class="py-4">
+            <template v-if="filteredScripts.find((s) => s.id === deleteScriptId)?.playlistCount">
+              {{
+                $t('scripts_view.delete_confirm_with_playlists', {
+                  name: deleteScriptName,
+                  count: filteredScripts.find((s) => s.id === deleteScriptId)!.playlistCount,
+                })
+              }}
+            </template>
+            <template v-else>
+              {{ $t('scripts_view.delete_confirm', { name: deleteScriptName }) }}
+            </template>
+          </p>
           <div class="modal-action">
             <button
               class="btn btn-error"

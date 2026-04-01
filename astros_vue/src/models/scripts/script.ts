@@ -7,6 +7,7 @@ export interface Script {
   scriptName: string;
   description: string;
   lastSaved: Date;
+  playlistCount: number;
 
   deploymentStatus: Partial<Record<Location, DeploymentStatus>>;
 

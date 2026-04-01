@@ -15,7 +15,7 @@ import {
 } from '../../models/index.js';
 import { logger } from '../../logger.js';
 import { Guid } from 'guid-typescript';
-import { Database, ScriptsTable } from '../types.js';
+import { Database } from '../types.js';
 import { Kysely, Transaction } from 'kysely';
 import {
   getAllActiveGpioChannels,
@@ -128,9 +128,23 @@ export class ScriptRepository {
 
   async getScripts(): Promise<Array<Script>> {
     const scripts = await this.db
+      .with('playlist_counts', (qb) =>
+        qb
+          .selectFrom('playlist_tracks')
+          .innerJoin('playlists', 'playlists.id', 'playlist_tracks.playlist_id')
+          .select([
+            'playlist_tracks.track_id',
+            (eb) => eb.fn.count<number>('playlists.id').distinct().as('playlist_count'),
+          ])
+          .where('playlist_tracks.track_type', '=', 'Script')
+          .where('playlists.enabled', '=', 1)
+          .groupBy('playlist_tracks.track_id'),
+      )
       .selectFrom('scripts')
-      .selectAll()
-      .where('enabled', '=', 1)
+      .leftJoin('playlist_counts', 'playlist_counts.track_id', 'scripts.id')
+      .selectAll('scripts')
+      .select('playlist_counts.playlist_count')
+      .where('scripts.enabled', '=', 1)
       .execute()
       .catch((err) => {
         logger.error('ScriptRepository.getScripts', err);
@@ -141,13 +155,14 @@ export class ScriptRepository {
       throw 'error';
     }
 
-    const result = scripts.map((scr: ScriptsTable) => {
+    const result = scripts.map((scr) => {
       return new Script(
         scr.id,
         scr.name,
         scr.description,
         new Date(scr.last_modified),
         scr.duration_ds,
+        scr.playlist_count ?? 0,
       );
     });
 

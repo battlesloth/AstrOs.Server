@@ -11,6 +11,7 @@ const props = defineProps<{
     deploymentStatus: Partial<Record<Location, DeploymentStatus>>;
   };
   locations: Location[];
+  playlistCount: number;
 }>();
 
 defineEmits<{
@@ -79,6 +80,20 @@ function getUploadStatus(location: Location): { class: string; text: string } {
           {{ location.charAt(0).toUpperCase() + location.slice(1) }}
         </div>
       </div>
+    </td>
+
+    <!-- Playlist Count -->
+    <td class="text-center">
+      <span
+        v-if="props.playlistCount > 0"
+        class="badge badge-info"
+        >{{ props.playlistCount }}</span
+      >
+      <span
+        v-else
+        class="opacity-40"
+        >0</span
+      >
     </td>
 
     <!-- Action Buttons -->
