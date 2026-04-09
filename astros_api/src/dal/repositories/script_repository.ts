@@ -12,10 +12,10 @@ import {
   ModuleClassType,
   MaestroEvent,
   MaestroChannel,
-} from '../../models/index.js';
-import { logger } from '../../logger.js';
+} from 'src/models/index.js';
+import { logger } from 'src/logger.js';
 import { Guid } from 'guid-typescript';
-import { Database } from '../types.js';
+import { Database } from 'src/dal/types.js';
 import { Kysely, Transaction } from 'kysely';
 import {
   getAllActiveGpioChannels,
@@ -29,7 +29,7 @@ import {
   readUartChannel,
 } from './module_repositories/uart_repository.js';
 import { getI2cModules, readI2cChannel } from './module_repositories/i2c_repository.js';
-import { calculateLengthDS, generateShortId, updateScriptDuration } from '../../utility.js';
+import { calculateLengthDS, generateShortId, updateScriptDuration } from 'src/utility.js';
 
 export class ScriptRepository {
   constructor(private readonly db: Kysely<Database>) {}

@@ -1,5 +1,5 @@
-import { PlaylistType } from 'src/models/playlists/playlistType';
-import { ControllerLocation } from 'src/models/control_module/controller_location';
+import { PlaylistType } from 'src/models/playlists/playlistType.js';
+import { ControllerLocation } from 'src/models/control_module/controller_location.js';
 
 export interface QueueTrack {
   id: string;

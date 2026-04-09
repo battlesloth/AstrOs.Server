@@ -1,4 +1,4 @@
-import { ModuleSubType } from '../models/index.js';
+import { ModuleSubType } from 'src/models/index.js';
 
 export interface ServoTest {
   controllerAddress: string;

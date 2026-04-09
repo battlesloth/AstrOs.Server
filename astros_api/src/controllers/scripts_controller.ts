@@ -1,8 +1,8 @@
-import { PlaylistRepository } from '../dal/repositories/playlist_repository.js';
+import { PlaylistRepository } from 'src/dal/repositories/playlist_repository.js';
 import { Kysely } from 'kysely';
-import { Database } from '../dal/types.js';
-import { ScriptRepository } from '../dal/repositories/script_repository.js';
-import { logger } from '../logger.js';
+import { Database } from 'src/dal/types.js';
+import { ScriptRepository } from 'src/dal/repositories/script_repository.js';
+import { logger } from 'src/logger.js';
 import { Router } from 'express';
 
 const getRoute = '/scripts/';

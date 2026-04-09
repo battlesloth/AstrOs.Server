@@ -1,8 +1,8 @@
-import { AudioFile } from '../../models/index.js';
-import { logger } from '../../logger.js';
-import { inserted } from '../database.js';
+import { AudioFile } from 'src/models/index.js';
+import { logger } from 'src/logger.js';
+import { inserted } from 'src/dal/database.js';
 import { Kysely } from 'kysely';
-import { Database } from '../types.js';
+import { Database } from 'src/dal/types.js';
 
 export class AudioFileRepository {
   constructor(private readonly db: Kysely<Database>) {}

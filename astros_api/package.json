@@ -6,7 +6,7 @@
   "private": true,
   "scripts": {
     "prebuild": "rm -rf dist && eslint . --ext .js,.jsx,.ts,.tsx",
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "postbuild": "cp .env ./dist/.env",
     "postbuild:test": "cp .env.test ./dist/.env",
     "start": "node ./dist/api_server.js",
@@ -70,6 +70,7 @@
     "prettier": "^3.4.2",
     "ts-loader": "^9.4.2",
     "ts-node": "^10.4.0",
+    "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^3.12.0",
     "tsx": "^4.19.3",
     "ttypescript": "^1.5.13",

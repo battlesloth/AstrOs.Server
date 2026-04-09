@@ -1,8 +1,8 @@
 import { Kysely, Transaction } from 'kysely';
-import { logger } from '../../logger.js';
-import { inserted } from '../database.js';
-import { Database } from '../types.js';
-import { ControlModule, ControllerLocation } from '../../models/index.js';
+import { logger } from 'src/logger.js';
+import { inserted } from 'src/dal/database.js';
+import { Database } from 'src/dal/types.js';
+import { ControlModule, ControllerLocation } from 'src/models/index.js';
 import { getGpioModule, upsertGpioModule } from './module_repositories/gpio_repository.js';
 import {
   getUartModules,

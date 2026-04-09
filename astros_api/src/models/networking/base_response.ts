@@ -1,4 +1,4 @@
-import { TransmissionType } from '../enums.js';
+import { TransmissionType } from 'src/models/enums.js';
 
 export interface BaseResponse {
   type: TransmissionType;

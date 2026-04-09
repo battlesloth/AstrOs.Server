@@ -1,7 +1,7 @@
-import { ControllerLocation } from '../control_module/controller_location.js';
-import { GpioChannel } from '../control_module/gpio/gpio_channel.js';
-import { UartModule } from '../control_module/uart/uart_module.js';
-import { ModuleSubType } from '../enums.js';
+import { ControllerLocation } from 'src/models/control_module/controller_location.js';
+import { GpioChannel } from 'src/models/control_module/gpio/gpio_channel.js';
+import { UartModule } from 'src/models/control_module/uart/uart_module.js';
+import { ModuleSubType } from 'src/models/enums.js';
 
 export class ControllerConfig {
   id: string;

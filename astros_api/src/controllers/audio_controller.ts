@@ -1,9 +1,9 @@
-import { AudioFileRepository } from '../dal/repositories/audio_file_repository.js';
+import { AudioFileRepository } from 'src/dal/repositories/audio_file_repository.js';
 import { unlink } from 'fs';
 import appdata from 'appdata-path';
-import { logger } from '../logger.js';
+import { logger } from 'src/logger.js';
 import { Kysely } from 'kysely';
-import { Database } from '../dal/types.js';
+import { Database } from 'src/dal/types.js';
 import { Router } from 'express';
 
 const getAll = '/audio/all';

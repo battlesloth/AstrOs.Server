@@ -1,6 +1,6 @@
 import { Kysely } from 'kysely';
-import { Database } from '../types.js';
-import { logger } from '../../logger.js';
+import { Database } from 'src/dal/types.js';
+import { logger } from 'src/logger.js';
 
 export class SettingsRepository {
   constructor(private readonly db: Kysely<Database>) {}

@@ -1,6 +1,6 @@
-import { ModuleSubType, ModuleType, ScriptChannelType } from '../../enums.js';
-import { ScriptChannelResource } from '../../scripts/script_channel_resource.js';
-import { BaseModule } from '../base_module.js';
+import { ModuleSubType, ModuleType, ScriptChannelType } from 'src/models/enums.js';
+import { ScriptChannelResource } from 'src/models/scripts/script_channel_resource.js';
+import { BaseModule } from 'src/models/control_module/base_module.js';
 import { KangarooX2 } from './sub_modules/kangarooX2/kangaroo_x2.js';
 import { KangarooX2Channel } from './sub_modules/kangarooX2/kangaroo_x2_channel.js';
 import { MaestroModule } from './sub_modules/maestro/maestro_module.js';

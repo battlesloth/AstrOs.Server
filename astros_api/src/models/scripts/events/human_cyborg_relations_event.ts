@@ -1,4 +1,4 @@
-import { HcrCommandCategory, HumanCyborgRelationsCmd } from '../../enums.js';
+import { HcrCommandCategory, HumanCyborgRelationsCmd } from 'src/models/enums.js';
 
 export interface HcrCommand {
   id: string;

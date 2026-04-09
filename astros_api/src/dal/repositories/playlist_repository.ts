@@ -1,11 +1,11 @@
 import { Kysely } from 'kysely';
-import { Database } from '../types.js';
-import { Playlist, PlaylistSettings } from '../../models/playlists/playlist.js';
-import { logger } from '../../logger.js';
-import { TrackType } from '../../models/playlists/trackType.js';
+import { Database } from 'src/dal/types.js';
+import { Playlist, PlaylistSettings } from 'src/models/playlists/playlist.js';
+import { logger } from 'src/logger.js';
+import { TrackType } from 'src/models/playlists/trackType.js';
 import { v4 as uuid } from 'uuid';
-import { PlaylistType } from '../../models/playlists/playlistType.js';
-import { generateShortId } from '../../utility.js';
+import { PlaylistType } from 'src/models/playlists/playlistType.js';
+import { generateShortId } from 'src/utility.js';
 
 export class PlaylistRepository {
   constructor(private db: Kysely<Database>) {}

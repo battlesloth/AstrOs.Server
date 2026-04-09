@@ -42,6 +42,7 @@
     "./vitest.config.js",
     "./webpack.config.js",
     "dist",
+    "coverage",
     "**/*.test.ts",
     "**/*.spec.ts"
   ]

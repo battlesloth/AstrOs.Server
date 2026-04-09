@@ -1,4 +1,4 @@
-import { ModuleType, ModuleSubType } from '../enums.js';
+import { ModuleType, ModuleSubType } from 'src/models/enums.js';
 import { GenericSerialEvent } from './events/generic_serial_event.js';
 import { GpioEvent } from './events/gpio_event.js';
 import { HumanCyborgRelationsEvent } from './events/human_cyborg_relations_event.js';

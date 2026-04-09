@@ -1,8 +1,8 @@
-import { SettingsRepository } from '../dal/repositories/settings_repository.js';
-import { logger } from '../logger.js';
-import { ControllerRepository } from '../dal/repositories/controller_repository.js';
+import { SettingsRepository } from 'src/dal/repositories/settings_repository.js';
+import { logger } from 'src/logger.js';
+import { ControllerRepository } from 'src/dal/repositories/controller_repository.js';
 import { Kysely } from 'kysely';
-import { Database } from '../dal/types.js';
+import { Database } from 'src/dal/types.js';
 import appdata from 'appdata-path';
 import fs from 'fs';
 import archiver from 'archiver';

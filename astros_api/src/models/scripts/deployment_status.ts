@@ -1,4 +1,4 @@
-import { UploadStatus } from '../enums.js';
+import { UploadStatus } from 'src/models/enums.js';
 
 export interface DeploymentStatus {
   date: Date;

@@ -11,7 +11,7 @@ import {
 import Dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import { logger } from '../logger.js';
+import { logger } from 'src/logger.js';
 import { Database } from './types.js';
 import {
   migration_0,

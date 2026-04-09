@@ -1,6 +1,6 @@
-import { ModuleSubType, ModuleType, ScriptChannelType } from '../../enums.js';
-import { ScriptChannelResource } from '../../scripts/script_channel_resource.js';
-import { BaseModule } from '../base_module.js';
+import { ModuleSubType, ModuleType, ScriptChannelType } from 'src/models/enums.js';
+import { ScriptChannelResource } from 'src/models/scripts/script_channel_resource.js';
+import { BaseModule } from 'src/models/control_module/base_module.js';
 import { GpioChannel } from './gpio_channel.js';
 
 export class GpioModule extends BaseModule {

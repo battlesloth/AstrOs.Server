@@ -1,5 +1,5 @@
 import { BaseResponse } from './base_response.js';
-import { TransmissionStatus } from '../enums.js';
+import { TransmissionStatus } from 'src/models/enums.js';
 
 export interface ScriptResponse extends BaseResponse {
   scriptId: string;

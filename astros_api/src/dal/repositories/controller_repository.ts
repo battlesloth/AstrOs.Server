@@ -1,9 +1,9 @@
-import { inserted } from '../../dal/database.js';
-import { ControlModule } from '../../models/index.js';
-import { logger } from '../../logger.js';
+import { inserted } from 'src/dal/database.js';
+import { ControlModule } from 'src/models/index.js';
+import { logger } from 'src/logger.js';
 import { v4 as uuid } from 'uuid';
 import { Kysely } from 'kysely';
-import { Database } from '../types.js';
+import { Database } from 'src/dal/types.js';
 
 export class ControllerRepository {
   constructor(private readonly db: Kysely<Database>) {}

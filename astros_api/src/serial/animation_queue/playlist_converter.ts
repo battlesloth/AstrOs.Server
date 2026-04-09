@@ -1,10 +1,10 @@
-import { Playlist } from '../../models/playlists/playlist.js';
-import { PlaylistTrack } from '../../models/playlists/playlistTrack.js';
-import { TrackType } from '../../models/playlists/trackType.js';
-import { PlaylistRepository } from '../../dal/repositories/playlist_repository.js';
-import { ControllerLocation } from '../../models/control_module/controller_location.js';
+import { Playlist } from 'src/models/playlists/playlist.js';
+import { PlaylistTrack } from 'src/models/playlists/playlistTrack.js';
+import { TrackType } from 'src/models/playlists/trackType.js';
+import { PlaylistRepository } from 'src/dal/repositories/playlist_repository.js';
+import { ControllerLocation } from 'src/models/control_module/controller_location.js';
 import { AnimationQueuePlaylist, QueueTrack } from './queue_item/animation_queue_item.js';
-import { logger } from '../../logger.js';
+import { logger } from 'src/logger.js';
 
 function dsToMs(ds: number): number {
   return ds * 100;

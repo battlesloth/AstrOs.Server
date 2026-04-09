@@ -1,10 +1,10 @@
 import appdata from 'appdata-path';
-import { AudioFileRepository } from '../dal/repositories/audio_file_repository.js';
+import { AudioFileRepository } from 'src/dal/repositories/audio_file_repository.js';
 import { v4 as uuid_v4 } from 'uuid';
 import { UploadedFile } from 'express-fileupload';
-import { logger } from '../logger.js';
+import { logger } from 'src/logger.js';
 import { Kysely } from 'kysely';
-import { Database } from '../dal/types.js';
+import { Database } from 'src/dal/types.js';
 import { Router } from 'express';
 
 // https://github.com/expressjs/multer/blob/master/StorageEngine.md

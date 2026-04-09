@@ -1,4 +1,4 @@
-import { logger } from '.././logger.js';
+import { logger } from 'src/logger.js';
 import { SerialMessageType, SerialMsgValidationResult } from './serial_message.js';
 import { MessageHelper } from './message_helper.js';
 import {
@@ -9,7 +9,7 @@ import {
   ScriptRunResponse,
   SerialWorkerResponseType,
 } from './serial_worker_response.js';
-import { ControlModule } from '../models/index.js';
+import { ControlModule } from 'src/models/index.js';
 
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
 //|--int---RS---string----RS--string---GS--val--US--val--RS--val--US--val--|

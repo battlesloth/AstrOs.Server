@@ -1,9 +1,9 @@
-import { Constants, LocationCollection } from '../models/index.js';
-import { logger } from '../logger.js';
-import { LocationsRepository } from '../dal/repositories/locations_repository.js';
+import { Constants, LocationCollection } from 'src/models/index.js';
+import { logger } from 'src/logger.js';
+import { LocationsRepository } from 'src/dal/repositories/locations_repository.js';
 import { Router } from 'express';
 import { Kysely } from 'kysely';
-import { Database } from '../dal/types.js';
+import { Database } from 'src/dal/types.js';
 
 const route = '/locations/';
 const loadRoute = '/locations/load';

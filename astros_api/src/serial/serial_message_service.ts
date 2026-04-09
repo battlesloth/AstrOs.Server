@@ -1,5 +1,5 @@
 import { v4 } from 'uuid';
-import { logger } from '../logger.js';
+import { logger } from 'src/logger.js';
 import { MessageGenerator } from './message_generator.js';
 import { MessageHandler } from './message_handler.js';
 import { SerialMessageType } from './serial_message.js';
@@ -12,7 +12,7 @@ import {
 } from './serial_worker_response.js';
 import { SerialMessageTracker } from './serial_message_tracker.js';
 import { MessageHelper } from './message_helper.js';
-import { ControlModule } from '../models/index.js';
+import { ControlModule } from 'src/models/index.js';
 
 export class SerialMessageService {
   messageHandler: MessageHandler = new MessageHandler();

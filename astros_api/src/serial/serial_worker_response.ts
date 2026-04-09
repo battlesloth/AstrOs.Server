@@ -1,4 +1,4 @@
-import { ControlModule } from '../models/index.js';
+import { ControlModule } from 'src/models/index.js';
 
 export enum SerialWorkerResponseType {
   UNKNOWN,

@@ -1,7 +1,7 @@
 import passport from 'passport';
 import jsonwebtoken from 'jsonwebtoken';
-import { logger } from '../logger.js';
-import { User } from '../models/users.js';
+import { logger } from 'src/logger.js';
+import { User } from 'src/models/users.js';
 import { Router } from 'express';
 
 const route = '/login';

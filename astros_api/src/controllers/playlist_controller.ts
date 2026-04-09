@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
-import { Database } from '../dal/types.js';
-import { PlaylistRepository } from '../dal/repositories/playlist_repository.js';
-import { logger } from '../logger.js';
+import { Database } from 'src/dal/types.js';
+import { PlaylistRepository } from 'src/dal/repositories/playlist_repository.js';
+import { logger } from 'src/logger.js';
 
 const route = '/playlists/';
 const getAllRoute = '/playlists/all';

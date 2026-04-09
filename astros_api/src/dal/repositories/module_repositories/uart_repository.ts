@@ -1,6 +1,6 @@
 import { Kysely, Transaction } from 'kysely';
-import { Database, UartModule as UartModuleRow } from '../../types.js';
-import { logger } from '../../../logger.js';
+import { Database, UartModule as UartModuleRow } from 'src/dal/types.js';
+import { logger } from 'src/logger.js';
 import {
   HumanCyborgRelationsModule,
   KangarooX2,
@@ -11,7 +11,7 @@ import {
   ModuleSubType,
   UartModule,
   UartChannel,
-} from '../../../models/index.js';
+} from 'src/models/index.js';
 
 //#region Uart Modules
 export async function getUartModules(

@@ -1,5 +1,5 @@
-import { ScriptChannelType } from '../enums.js';
-import { ModuleChannelType } from '../control_module/base_channel.js';
+import { ScriptChannelType } from 'src/models/enums.js';
+import { ModuleChannelType } from 'src/models/control_module/base_channel.js';
 
 export class ScriptChannelResource {
   channelId: string;

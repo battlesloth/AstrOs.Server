@@ -1,5 +1,5 @@
-import { TransmissionType } from '../enums.js';
-import { ControllerLocation } from '../control_module/controller_location.js';
+import { TransmissionType } from 'src/models/enums.js';
+import { ControllerLocation } from 'src/models/control_module/controller_location.js';
 import { ScriptConfig } from './script_config.js';
 
 export class ScriptUpload {

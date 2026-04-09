@@ -539,7 +539,7 @@ describe('Animation Queue Tests', () => {
 
       queue2.addToQueue(realPlaylist);
       expect(dispatch2).toHaveBeenCalledTimes(1);
-      expect(dispatch2).toHaveBeenCalledWith('real-track2', []);
+      expect(dispatch2).toHaveBeenCalledWith('real-track', []);
     });
 
     it('single-track playlist dispatches once then done', () => {

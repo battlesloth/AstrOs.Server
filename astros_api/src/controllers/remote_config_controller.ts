@@ -1,8 +1,8 @@
-import { M5Page, M5ScriptList, M5Button } from '../models/index.js';
-import { RemoteConfigRepository } from '../dal/repositories/remote_config_repository.js';
-import { logger } from '../logger.js';
+import { M5Page, M5ScriptList, M5Button } from 'src/models/index.js';
+import { RemoteConfigRepository } from 'src/dal/repositories/remote_config_repository.js';
+import { logger } from 'src/logger.js';
 import { Kysely } from 'kysely';
-import { Database } from '../dal/types.js';
+import { Database } from 'src/dal/types.js';
 import { Router } from 'express';
 
 const getRoute = '/remoteConfig/';

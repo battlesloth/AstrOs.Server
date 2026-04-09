@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
-import { logger } from '../../logger.js';
-import { User } from '../../models/users.js';
-import { Database } from '../types.js';
+import { logger } from 'src/logger.js';
+import { User } from 'src/models/users.js';
+import { Database } from 'src/dal/types.js';
 
 export class UserRepository {
   constructor(private readonly db: Kysely<Database>) {}
