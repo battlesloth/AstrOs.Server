@@ -328,7 +328,14 @@ describe('script commands', () => {
   });
 
   it('should create Kangaroo X2 command', async () => {
-    const event = { ch1Action: KangarooAction.start, ch1Speed: 0, ch1Position: 0, ch2Action: KangarooAction.position, ch2Speed: 5, ch2Position: 10 } as KangarooEvent;
+    const event = {
+      ch1Action: KangarooAction.start,
+      ch1Speed: 0,
+      ch1Position: 0,
+      ch2Action: KangarooAction.position,
+      ch2Speed: 5,
+      ch2Position: 10,
+    } as KangarooEvent;
 
     const cmd = {
       controllerId: coreLocId,
@@ -374,7 +381,13 @@ describe('script commands', () => {
   });
 
   it('should create Maestro command', async () => {
-    const event = { channel: 5, isServo: false, position: 1000, speed: 5, acceleration: 10 } as MaestroEvent;
+    const event = {
+      channel: 5,
+      isServo: false,
+      position: 1000,
+      speed: 5,
+      acceleration: 10,
+    } as MaestroEvent;
     const cmd = {
       controllerId: coreLocId,
       moduleId: coreMaestroModId,

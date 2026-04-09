@@ -16,8 +16,12 @@ const logDownloadRoute = '/settings/logs';
 export function registerSettingsRoutes(router: Router, auth: any, db: Kysely<Database>) {
   router.get(getRoute, auth, (req: any, res: any, next: any) => getSetting(db, req, res, next));
   router.put(putRoute, auth, (req: any, res: any, next: any) => saveSetting(db, req, res, next));
-  router.get(controllersRoute, auth, (req: any, res: any, next: any) => getControllers(db, req, res, next));
-  router.get(logDownloadRoute, auth, (req: any, res: any, next: any) => downloadLogs(db, req, res, next));
+  router.get(controllersRoute, auth, (req: any, res: any, next: any) =>
+    getControllers(db, req, res, next),
+  );
+  router.get(logDownloadRoute, auth, (req: any, res: any, next: any) =>
+    downloadLogs(db, req, res, next),
+  );
 }
 
 async function getSetting(db: Kysely<Database>, req: any, res: any, next: any) {

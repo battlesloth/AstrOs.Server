@@ -9,10 +9,21 @@ const getRoute = '/remoteConfig/';
 const putRoute = '/remoteConfig/';
 const syncRoute = '/remotecontrolsync';
 
-export function registerRemoteConfigRoutes(router: Router, authHandler: any, tokenValidator: any, db: Kysely<Database>) {
-  router.get(getRoute, authHandler, (req: any, res: any, next: any) => getRemoteConfig(db, req, res, next));
-  router.put(putRoute, authHandler, (req: any, res: any, next: any) => saveRemoteConfig(db, req, res, next));
-  router.get(syncRoute, tokenValidator, (req: any, res: any, next: any) => syncRemoteConfig(db, req, res, next));
+export function registerRemoteConfigRoutes(
+  router: Router,
+  authHandler: any,
+  tokenValidator: any,
+  db: Kysely<Database>,
+) {
+  router.get(getRoute, authHandler, (req: any, res: any, next: any) =>
+    getRemoteConfig(db, req, res, next),
+  );
+  router.put(putRoute, authHandler, (req: any, res: any, next: any) =>
+    saveRemoteConfig(db, req, res, next),
+  );
+  router.get(syncRoute, tokenValidator, (req: any, res: any, next: any) =>
+    syncRemoteConfig(db, req, res, next),
+  );
 }
 
 async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {

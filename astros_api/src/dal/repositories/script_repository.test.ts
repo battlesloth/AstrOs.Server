@@ -440,7 +440,13 @@ describe('Script Repository', () => {
       0,
     );
 
-    const maestroEvent = { channel: 0, isServo: true, position: 1500, speed: 0, acceleration: 0 } as MaestroEvent; // Channel is 0 initially
+    const maestroEvent = {
+      channel: 0,
+      isServo: true,
+      position: 1500,
+      speed: 0,
+      acceleration: 0,
+    } as MaestroEvent; // Channel is 0 initially
     const scriptEvent = new ScriptEvent(
       eventId,
       scriptChannel.id,
@@ -579,7 +585,13 @@ describe('Script Repository', () => {
 
     // Create HCR commands
     const hcrCommands = [
-      { id: uuid(), category: HcrCommandCategory.stimuli, command: HumanCyborgRelationsCmd.mildHappy, valueA: 0, valueB: 0 } as HcrCommand,
+      {
+        id: uuid(),
+        category: HcrCommandCategory.stimuli,
+        command: HumanCyborgRelationsCmd.mildHappy,
+        valueA: 0,
+        valueB: 0,
+      } as HcrCommand,
       {
         id: uuid(),
         category: HcrCommandCategory.volume,

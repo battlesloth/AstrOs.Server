@@ -11,7 +11,9 @@ const deleteRoute = '/audio/delete';
 
 export function registerAudioRoutes(router: Router, auth: any, db: Kysely<Database>) {
   router.get(getAll, auth, (req: any, res: any, next: any) => getAllAudioFiles(db, req, res, next));
-  router.delete(deleteRoute, auth, (req: any, res: any, next: any) => deleteAudioFile(db, req, res, next));
+  router.delete(deleteRoute, auth, (req: any, res: any, next: any) =>
+    deleteAudioFile(db, req, res, next),
+  );
 }
 
 export async function getAllAudioFiles(db: Kysely<Database>, req: any, res: any, next: any) {

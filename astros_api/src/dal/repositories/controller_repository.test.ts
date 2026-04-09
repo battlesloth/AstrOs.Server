@@ -117,9 +117,7 @@ describe('ControllerRepository', () => {
       );
 
       // Bulk insert with same address but different name (simulating re-registration)
-      await repo.insertControllers([
-        new ControlModule('', 'dome-renamed', 'AA:BB:CC:DD:EE:01'),
-      ]);
+      await repo.insertControllers([new ControlModule('', 'dome-renamed', 'AA:BB:CC:DD:EE:01')]);
 
       const result = await repo.getControllerByAddress('AA:BB:CC:DD:EE:01');
       expect(result.id).toBe(originalId);
@@ -134,9 +132,7 @@ describe('ControllerRepository', () => {
       );
 
       // Bulk insert with same name but different address (controller got new MAC)
-      await repo.insertControllers([
-        new ControlModule('', 'dome', 'FF:FF:FF:FF:FF:FF'),
-      ]);
+      await repo.insertControllers([new ControlModule('', 'dome', 'FF:FF:FF:FF:FF:FF')]);
 
       const result = await repo.getControllerByAddress('FF:FF:FF:FF:FF:FF');
       expect(result.id).toBe(originalId);
@@ -153,9 +149,7 @@ describe('ControllerRepository', () => {
       await repo.insertController(new ControlModule('', 'body', 'AA:BB:CC:DD:EE:02'));
 
       // Insert new controller that takes dome's address — should replace dome
-      await repo.insertControllers([
-        new ControlModule('', 'new-dome', 'AA:BB:CC:DD:EE:01'),
-      ]);
+      await repo.insertControllers([new ControlModule('', 'new-dome', 'AA:BB:CC:DD:EE:01')]);
 
       const all = await repo.getControllers();
       expect(all).toHaveLength(seedCount + 2);

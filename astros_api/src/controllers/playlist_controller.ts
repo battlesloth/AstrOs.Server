@@ -9,12 +9,16 @@ const copyRoute = '/playlists/copy';
 const getPlaylistNamesThatUseScriptRoute = '/playlists/usedByScript';
 
 export function registerPlaylistRoutes(router: any, auth: any, db: Kysely<Database>) {
-  router.get(getAllRoute, auth, (req: any, res: any, next: any) => getAllPlaylists(db, req, res, next));
+  router.get(getAllRoute, auth, (req: any, res: any, next: any) =>
+    getAllPlaylists(db, req, res, next),
+  );
   router.get(route, auth, (req: any, res: any, next: any) => getPlaylist(db, req, res, next));
   router.put(route, auth, (req: any, res: any, next: any) => savePlaylist(db, req, res, next));
   router.delete(route, auth, (req: any, res: any, next: any) => deletePlaylist(db, req, res, next));
   router.post(copyRoute, auth, (req: any, res: any, next: any) => copyPlaylist(db, req, res, next));
-  router.get(getPlaylistNamesThatUseScriptRoute, auth, (req: any, res: any, next: any) => getPlaylistNamesThatUseScript(db, req, res, next));
+  router.get(getPlaylistNamesThatUseScriptRoute, auth, (req: any, res: any, next: any) =>
+    getPlaylistNamesThatUseScript(db, req, res, next),
+  );
 }
 
 async function getAllPlaylists(db: Kysely<Database>, req: any, res: any, next: any) {

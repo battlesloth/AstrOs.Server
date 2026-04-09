@@ -461,11 +461,21 @@ class ApiServer {
 
       logger.info(`Controllers after registration sync: ${JSON.stringify(controllers)}`);
 
-      const update: ControllersResponse = { type: TransmissionType.controllers, success: val.success, message: '', controllers };
+      const update: ControllersResponse = {
+        type: TransmissionType.controllers,
+        success: val.success,
+        message: '',
+        controllers,
+      };
       this.updateClients(update);
     } catch (error) {
       logger.error(`Error handling registration response: ${error}`);
-      this.updateClients({ type: TransmissionType.controllers, success: false, message: '', controllers: [] } as ControllersResponse);
+      this.updateClients({
+        type: TransmissionType.controllers,
+        success: false,
+        message: '',
+        controllers: [],
+      } as ControllersResponse);
     }
   }
 
@@ -539,12 +549,28 @@ class ApiServer {
 
         await scriptRepo.updateScriptControllerUploaded(val.scriptId, locId, now);
 
-        const update: ScriptResponse = { type: TransmissionType.script, success: true, message: '', scriptId: val.scriptId, locationId: locId, status: TransmissionStatus.success, date: now };
+        const update: ScriptResponse = {
+          type: TransmissionType.script,
+          success: true,
+          message: '',
+          scriptId: val.scriptId,
+          locationId: locId,
+          status: TransmissionStatus.success,
+          date: now,
+        };
 
         this.updateClients(update);
       } else {
         const deployDate = await scriptRepo.getLastScriptUploadedDate(val.scriptId, locId);
-        const update: ScriptResponse = { type: TransmissionType.script, success: true, message: '', scriptId: val.scriptId, locationId: locId, status: TransmissionStatus.failed, date: deployDate };
+        const update: ScriptResponse = {
+          type: TransmissionType.script,
+          success: true,
+          message: '',
+          scriptId: val.scriptId,
+          locationId: locId,
+          status: TransmissionStatus.failed,
+          date: deployDate,
+        };
 
         this.updateClients(update);
       }

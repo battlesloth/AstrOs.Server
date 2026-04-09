@@ -20,7 +20,12 @@ export class AudioFileRepository {
       });
 
     for (const af of data) {
-      const file: AudioFile = { id: af.id, fileName: af.file_name, description: af.description, duration: af.duration };
+      const file: AudioFile = {
+        id: af.id,
+        fileName: af.file_name,
+        description: af.description,
+        duration: af.duration,
+      };
       result.push(file);
     }
 

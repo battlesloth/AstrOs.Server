@@ -9,9 +9,15 @@ const route = '/locations/';
 const loadRoute = '/locations/load';
 
 export function registerLocationRoutes(router: Router, authHandler: any, db: Kysely<Database>) {
-  router.get(route, authHandler, (req: any, res: any, next: any) => getLocations(db, req, res, next));
-  router.post(route, authHandler, (req: any, res: any, next: any) => saveLocations(db, req, res, next));
-  router.get(loadRoute, authHandler, (req: any, res: any, next: any) => loadLocations(db, req, res, next));
+  router.get(route, authHandler, (req: any, res: any, next: any) =>
+    getLocations(db, req, res, next),
+  );
+  router.post(route, authHandler, (req: any, res: any, next: any) =>
+    saveLocations(db, req, res, next),
+  );
+  router.get(loadRoute, authHandler, (req: any, res: any, next: any) =>
+    loadLocations(db, req, res, next),
+  );
 }
 
 export async function getLocations(db: Kysely<Database>, req: any, res: any, next: any) {

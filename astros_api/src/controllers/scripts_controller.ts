@@ -13,12 +13,24 @@ const getAllRoute = '/scripts/all';
 const getAllScriptNamesRoute = '/scripts/all-names';
 
 export function registerScriptRoutes(router: Router, authHandler: any, db: Kysely<Database>) {
-  router.get(getRoute, authHandler, (req: any, res: any, next: any) => getScript(db, req, res, next));
-  router.get(getAllRoute, authHandler, (req: any, res: any, next: any) => getAllScripts(db, req, res, next));
-  router.get(getAllScriptNamesRoute, authHandler, (req: any, res: any, next: any) => getAllScriptNames(db, req, res, next));
-  router.put(putRoute, authHandler, (req: any, res: any, next: any) => saveScript(db, req, res, next));
-  router.delete(deleteRoute, authHandler, (req: any, res: any, next: any) => deleteScript(db, req, res, next));
-  router.post(copyRoute, authHandler, (req: any, res: any, next: any) => copyScript(db, req, res, next));
+  router.get(getRoute, authHandler, (req: any, res: any, next: any) =>
+    getScript(db, req, res, next),
+  );
+  router.get(getAllRoute, authHandler, (req: any, res: any, next: any) =>
+    getAllScripts(db, req, res, next),
+  );
+  router.get(getAllScriptNamesRoute, authHandler, (req: any, res: any, next: any) =>
+    getAllScriptNames(db, req, res, next),
+  );
+  router.put(putRoute, authHandler, (req: any, res: any, next: any) =>
+    saveScript(db, req, res, next),
+  );
+  router.delete(deleteRoute, authHandler, (req: any, res: any, next: any) =>
+    deleteScript(db, req, res, next),
+  );
+  router.post(copyRoute, authHandler, (req: any, res: any, next: any) =>
+    copyScript(db, req, res, next),
+  );
 }
 
 async function getAllScripts(db: Kysely<Database>, req: any, res: any, next: any) {

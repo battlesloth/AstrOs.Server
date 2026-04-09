@@ -66,7 +66,9 @@ describe('Message Generator Tests', () => {
     expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
     expect(message.metaData).toBe('script-xyz');
     expect(message.msg).toContain(`${RS}DEPLOY_SCRIPT${RS}msg-1`);
-    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}script-xyz${US}script-content-here`);
+    expect(message.msg).toContain(
+      `AA:BB:CC:DD:EE:01${US}dome${US}script-xyz${US}script-content-here`,
+    );
   });
 
   it('generate Panic Stop', () => {
@@ -86,12 +88,21 @@ describe('Message Generator Tests', () => {
   it('generate Servo Test', () => {
     const generator = new MessageGenerator();
 
-    const cmd: ServoTest = { controllerAddress: 'AA:BB:CC:DD:EE:01', controllerName: 'dome', moduleSubType: ModuleSubType.maestro, moduleIdx: 3, channelNumber: 5, msValue: 1500 };
+    const cmd: ServoTest = {
+      controllerAddress: 'AA:BB:CC:DD:EE:01',
+      controllerName: 'dome',
+      moduleSubType: ModuleSubType.maestro,
+      moduleIdx: 3,
+      channelNumber: 5,
+      msValue: 1500,
+    };
 
     const message = generator.generateMessage(SerialMessageType.SERVO_TEST, 'msg-1', cmd);
 
     expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
-    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}${ModuleSubType.maestro}:3:5:1500`);
+    expect(message.msg).toContain(
+      `AA:BB:CC:DD:EE:01${US}dome${US}${ModuleSubType.maestro}:3:5:1500`,
+    );
   });
 
   it('generate Format SD', () => {

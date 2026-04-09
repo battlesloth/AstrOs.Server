@@ -65,9 +65,7 @@ describe('Playlist Converter', () => {
       playlistName: 'Test',
       description: '',
       playlistType: PlaylistType.Sequential,
-      tracks: [
-        makeTrack({ idx: 0, trackType: TrackType.Wait, trackId: 'wait-1', durationDS: 20 }),
-      ],
+      tracks: [makeTrack({ idx: 0, trackType: TrackType.Wait, trackId: 'wait-1', durationDS: 20 })],
       settings: makeSettings(),
     };
 
@@ -176,10 +174,12 @@ describe('Playlist Converter', () => {
       settings: makeSettings(),
     };
 
-    const repo = makeMockRepo(new Map([
-      ['mid-p', midPlaylist],
-      ['deep-p', deepPlaylist],
-    ]));
+    const repo = makeMockRepo(
+      new Map([
+        ['mid-p', midPlaylist],
+        ['deep-p', deepPlaylist],
+      ]),
+    );
 
     const playlist: Playlist = {
       id: 'top',
@@ -215,9 +215,7 @@ describe('Playlist Converter', () => {
       playlistName: 'Test',
       description: '',
       playlistType: PlaylistType.Sequential,
-      tracks: [
-        makeTrack({ idx: 0, trackType: TrackType.Playlist, trackId: 'missing-playlist' }),
-      ],
+      tracks: [makeTrack({ idx: 0, trackType: TrackType.Playlist, trackId: 'missing-playlist' })],
       settings: makeSettings(),
     };
 
