@@ -1,20 +1,17 @@
 import { TransmissionType } from 'src/models/enums.js';
 import { ControllerLocation } from 'src/models/control_module/controller_location.js';
-import { ScriptConfig } from './script_config.js';
+import { ScriptConfig, createScriptConfig } from './script_config.js';
 
-export class ScriptRun {
-  type: TransmissionType = TransmissionType.run;
+export interface ScriptRun {
+  type: TransmissionType;
   scriptId: string;
   configs: Array<ScriptConfig>;
+}
 
-  constructor(scriptId: string, locations: Array<ControllerLocation>) {
-    this.scriptId = scriptId;
-
-    this.configs = new Array<ScriptConfig>();
-
-    locations.forEach((loc) => {
-      const cfig = new ScriptConfig(loc.controller, '');
-      this.configs.push(cfig);
-    });
-  }
+export function createScriptRun(scriptId: string, locations: Array<ControllerLocation>): ScriptRun {
+  return {
+    type: TransmissionType.run,
+    scriptId,
+    configs: locations.map((loc) => createScriptConfig(loc.controller, '')),
+  };
 }

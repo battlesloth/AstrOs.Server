@@ -21,11 +21,11 @@ export { UartModule, getUartScriptResources } from './control_module/uart/uart_m
 export { UartChannel } from './control_module/uart/uart_channel.js';
 export { GpioChannel } from './control_module/gpio/gpio_channel.js';
 export { GpioModule, getGpioScriptResources } from './control_module/gpio/gpio_module.js';
-export { Script } from './scripts/script.js';
-export { ScriptChannel } from './scripts/script_channel.js';
-export { ScriptChannelResource } from './scripts/script_channel_resource.js';
-export { ScriptEvent, moduleSubTypeToScriptEventTypes } from './scripts/script_event.js';
-export type { ScriptEventTypes } from './scripts/script_event.js';
+export type { Script } from './scripts/script.js';
+export type { ScriptChannel } from './scripts/script_channel.js';
+export type { ScriptChannelResource } from './scripts/script_channel_resource.js';
+export { moduleSubTypeToScriptEventTypes } from './scripts/script_event.js';
+export type { ScriptEvent, ScriptEventTypes } from './scripts/script_event.js';
 export { KangarooAction } from './scripts/events/kangaroo_event.js';
 export type { KangarooEvent } from './scripts/events/kangaroo_event.js';
 export type {

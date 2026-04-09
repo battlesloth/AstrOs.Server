@@ -52,7 +52,15 @@ function generateGenericSerialResources(m: UartModule): ScriptChannelResource[] 
   const ch = new UartChannel(m.id, m.id, m.name, m.moduleSubType, true);
 
   return [
-    new ScriptChannelResource(m.id, ScriptChannelType.GENERIC_UART, m.name, m.id, m.locationId, ch),
+    {
+      channelId: m.id,
+      scriptChannelType: ScriptChannelType.GENERIC_UART,
+      name: m.name,
+      parentModuleId: m.id,
+      locationId: m.locationId,
+      channel: ch,
+      available: true,
+    },
   ];
 }
 
@@ -62,7 +70,15 @@ function generateKangarooResources(m: UartModule): ScriptChannelResource[] {
   const ch = new KangarooX2Channel(mod.id, m.id, m.name, mod.ch1Name, mod.ch2Name);
 
   return [
-    new ScriptChannelResource(mod.id, ScriptChannelType.KANGAROO, m.name, m.id, m.locationId, ch),
+    {
+      channelId: mod.id,
+      scriptChannelType: ScriptChannelType.KANGAROO,
+      name: m.name,
+      parentModuleId: m.id,
+      locationId: m.locationId,
+      channel: ch,
+      available: true,
+    },
   ];
 }
 
@@ -75,16 +91,15 @@ function generateMaestroResources(m: UartModule): ScriptChannelResource[] {
     for (const ch of board.channels) {
       if (!ch.enabled) continue;
 
-      resources.push(
-        new ScriptChannelResource(
-          ch.id,
-          ch.isServo ? ScriptChannelType.SERVO : ScriptChannelType.GPIO,
-          ch.channelName,
-          m.id,
-          m.locationId,
-          ch,
-        ),
-      );
+      resources.push({
+        channelId: ch.id,
+        scriptChannelType: ch.isServo ? ScriptChannelType.SERVO : ScriptChannelType.GPIO,
+        name: ch.channelName,
+        parentModuleId: m.id,
+        locationId: m.locationId,
+        channel: ch,
+        available: true,
+      });
     }
   }
 
@@ -94,5 +109,15 @@ function generateMaestroResources(m: UartModule): ScriptChannelResource[] {
 function generateHCRResources(m: UartModule): ScriptChannelResource[] {
   const ch = new UartChannel(m.id, m.id, m.name, m.moduleSubType, true);
 
-  return [new ScriptChannelResource(m.id, ScriptChannelType.AUDIO, m.name, m.id, m.locationId, ch)];
+  return [
+    {
+      channelId: m.id,
+      scriptChannelType: ScriptChannelType.AUDIO,
+      name: m.name,
+      parentModuleId: m.id,
+      locationId: m.locationId,
+      channel: ch,
+      available: true,
+    },
+  ];
 }

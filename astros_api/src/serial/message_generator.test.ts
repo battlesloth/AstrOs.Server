@@ -3,8 +3,8 @@ import { MessageGenerator } from './message_generator.js';
 import { MessageHelper } from './message_helper.js';
 import { SerialMessageType } from './serial_message.js';
 import { ConfigSync } from '../models/config/config_sync.js';
-import { ScriptRun } from '../models/scripts/script_run.js';
-import { ScriptUpload } from '../models/scripts/script_upload.js';
+import { createScriptRun } from '../models/scripts/script_run.js';
+import { createScriptUpload } from '../models/scripts/script_upload.js';
 import { ServoTest } from '../models/servo_test.js';
 import {
   ControlModule,
@@ -42,7 +42,7 @@ describe('Message Generator Tests', () => {
 
     const loc = new ControllerLocation(uuid(), 'dome', '', '');
     loc.controller = new ControlModule(uuid(), 'dome', 'AA:BB:CC:DD:EE:01');
-    const scriptRun = new ScriptRun('script-xyz', [loc]);
+    const scriptRun = createScriptRun('script-xyz', [loc]);
 
     const message = generator.generateMessage(SerialMessageType.RUN_SCRIPT, 'msg-1', scriptRun);
 
@@ -59,7 +59,7 @@ describe('Message Generator Tests', () => {
     loc.controller = new ControlModule(uuid(), 'dome', 'AA:BB:CC:DD:EE:01');
     const scripts = new Map<string, string>();
     scripts.set(loc.id, 'script-content-here');
-    const upload = new ScriptUpload('script-xyz', scripts, [loc]);
+    const upload = createScriptUpload('script-xyz', scripts, [loc]);
 
     const message = generator.generateMessage(SerialMessageType.DEPLOY_SCRIPT, 'msg-1', upload);
 
@@ -76,7 +76,7 @@ describe('Message Generator Tests', () => {
 
     const loc = new ControllerLocation(uuid(), 'dome', '', '');
     loc.controller = new ControlModule(uuid(), 'dome', 'AA:BB:CC:DD:EE:01');
-    const scriptRun = new ScriptRun('panic', [loc]);
+    const scriptRun = createScriptRun('panic', [loc]);
 
     const message = generator.generateMessage(SerialMessageType.PANIC_STOP, 'msg-1', scriptRun);
 

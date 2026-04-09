@@ -18,16 +18,15 @@ export function getGpioScriptResources(m: GpioModule): ScriptChannelResource[] {
   for (const ch of m.channels) {
     if (!ch.enabled) continue;
 
-    resources.push(
-      new ScriptChannelResource(
-        ch.id,
-        ScriptChannelType.GPIO,
-        ch.channelName,
-        m.id,
-        m.locationId,
-        ch,
-      ),
-    );
+    resources.push({
+      channelId: ch.id,
+      scriptChannelType: ScriptChannelType.GPIO,
+      name: ch.channelName,
+      parentModuleId: m.id,
+      locationId: m.locationId,
+      channel: ch,
+      available: true,
+    });
   }
 
   return resources;

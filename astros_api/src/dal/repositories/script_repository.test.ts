@@ -71,7 +71,16 @@ describe('Script Repository', () => {
   it('should save script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: 'Test Description',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
     const repo = new ScriptRepository(db);
 
@@ -89,7 +98,16 @@ describe('Script Repository', () => {
   it('should update script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: 'Test Description',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
     const repo = new ScriptRepository(db);
 
@@ -120,7 +138,16 @@ describe('Script Repository', () => {
   it('should delete script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()), 0);
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: 'Test Description',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
     const repo = new ScriptRepository(db);
 
@@ -152,24 +179,28 @@ describe('Script Repository', () => {
     await upsertGpioModule(db, gpioModule);
 
     // Create a script with a GPIO channel
-    const script = new Script(
-      scriptId,
-      'Original Script',
-      'Original Description',
-      new Date(Date.now()),
-      0,
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Original Script',
+      description: 'Original Description',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.GPIO,
-      locationId,
-      channelId,
-      ModuleChannelTypes.GpioChannel,
-      gpioChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GPIO,
+      parentModuleId: locationId,
+      moduleChannelId: channelId,
+      moduleChannelType: ModuleChannelTypes.GpioChannel,
+      moduleChannel: gpioChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     script.scriptChannels.push(scriptChannel);
 
@@ -212,24 +243,28 @@ describe('Script Repository', () => {
     await upsertGpioModule(db, gpioModule);
 
     // Create a script with a GPIO channel
-    const script = new Script(
-      scriptId,
-      'GPIO Test Script',
-      'Script with GPIO channel',
-      new Date(Date.now()),
-      0,
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'GPIO Test Script',
+      description: 'Script with GPIO channel',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.GPIO,
-      locationId,
-      channelId,
-      ModuleChannelTypes.GpioChannel,
-      gpioChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GPIO,
+      parentModuleId: locationId,
+      moduleChannelId: channelId,
+      moduleChannelType: ModuleChannelTypes.GpioChannel,
+      moduleChannel: gpioChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     script.scriptChannels.push(scriptChannel);
 
@@ -287,24 +322,28 @@ describe('Script Repository', () => {
     });
 
     // Create a script with a Maestro channel
-    const script = new Script(
-      scriptId,
-      'Maestro Test Script',
-      'Script with Maestro channel',
-      new Date(Date.now()),
-      0,
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Maestro Test Script',
+      description: 'Script with Maestro channel',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.SERVO,
-      maestroModuleId,
-      maestroChannelId,
-      ModuleChannelTypes.MaestroChannel,
-      maestroChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.SERVO,
+      parentModuleId: maestroModuleId,
+      moduleChannelId: maestroChannelId,
+      moduleChannelType: ModuleChannelTypes.MaestroChannel,
+      moduleChannel: maestroChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     script.scriptChannels.push(scriptChannel);
 
@@ -332,33 +371,37 @@ describe('Script Repository', () => {
     await upsertGpioModule(db, gpioModule);
 
     // Create a script with a channel and event
-    const script = new Script(
-      scriptId,
-      'Event Test Script',
-      'Script with events',
-      new Date(Date.now()),
-      0,
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Event Test Script',
+      description: 'Script with events',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.GPIO,
-      locationId,
-      channelId,
-      ModuleChannelTypes.GpioChannel,
-      gpioChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GPIO,
+      parentModuleId: locationId,
+      moduleChannelId: channelId,
+      moduleChannelType: ModuleChannelTypes.GpioChannel,
+      moduleChannel: gpioChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
-    const scriptEvent = new ScriptEvent(
-      eventId,
-      scriptChannel.id,
-      ModuleType.gpio,
-      ModuleSubType.genericGpio,
-      5.5,
-      { setHigh: true } as GpioEvent,
-    );
+    const scriptEvent: ScriptEvent = {
+      id: eventId,
+      scriptChannel: scriptChannel.id,
+      moduleType: ModuleType.gpio,
+      moduleSubType: ModuleSubType.genericGpio,
+      time: 5.5,
+      event: { setHigh: true } as GpioEvent,
+    };
 
     scriptChannel.events[eventId] = scriptEvent;
     script.scriptChannels.push(scriptChannel);
@@ -421,24 +464,28 @@ describe('Script Repository', () => {
     });
 
     // Create script with Maestro event
-    const script = new Script(
-      scriptId,
-      'Maestro Event Test',
-      'Test Maestro event channel update',
-      new Date(Date.now()),
-      0,
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Maestro Event Test',
+      description: 'Test Maestro event channel update',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.SERVO,
-      maestroModuleId,
-      maestroChannelId,
-      ModuleChannelTypes.MaestroChannel,
-      maestroChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.SERVO,
+      parentModuleId: maestroModuleId,
+      moduleChannelId: maestroChannelId,
+      moduleChannelType: ModuleChannelTypes.MaestroChannel,
+      moduleChannel: maestroChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     const maestroEvent = {
       channel: 0,
@@ -447,14 +494,14 @@ describe('Script Repository', () => {
       speed: 0,
       acceleration: 0,
     } as MaestroEvent; // Channel is 0 initially
-    const scriptEvent = new ScriptEvent(
-      eventId,
-      scriptChannel.id,
-      ModuleType.uart,
-      ModuleSubType.maestro,
-      2.0,
-      maestroEvent,
-    );
+    const scriptEvent: ScriptEvent = {
+      id: eventId,
+      scriptChannel: scriptChannel.id,
+      moduleType: ModuleType.uart,
+      moduleSubType: ModuleSubType.maestro,
+      time: 2.0,
+      event: maestroEvent,
+    };
 
     scriptChannel.events[eventId] = scriptEvent;
     script.scriptChannels.push(scriptChannel);
@@ -500,24 +547,28 @@ describe('Script Repository', () => {
     });
 
     // Create a script with an HCR channel
-    const script = new Script(
-      scriptId,
-      'HCR Test Script',
-      'Script with HCR channel',
-      new Date(Date.now()),
-      0,
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'HCR Test Script',
+      description: 'Script with HCR channel',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.GENERIC_UART,
-      hcrModuleId,
-      hcrModuleId,
-      ModuleChannelTypes.UartChannel,
-      uartChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GENERIC_UART,
+      parentModuleId: hcrModuleId,
+      moduleChannelId: hcrModuleId,
+      moduleChannelType: ModuleChannelTypes.UartChannel,
+      moduleChannel: uartChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     script.scriptChannels.push(scriptChannel);
 
@@ -564,24 +615,28 @@ describe('Script Repository', () => {
     });
 
     // Create a script with an HCR channel and event
-    const script = new Script(
-      scriptId,
-      'HCR Event Test Script',
-      'Script with HCR events',
-      new Date(Date.now()),
-      0,
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'HCR Event Test Script',
+      description: 'Script with HCR events',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.GENERIC_UART,
-      hcrModuleId,
-      hcrModuleId,
-      ModuleChannelTypes.UartChannel,
-      uartChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GENERIC_UART,
+      parentModuleId: hcrModuleId,
+      moduleChannelId: hcrModuleId,
+      moduleChannelType: ModuleChannelTypes.UartChannel,
+      moduleChannel: uartChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     // Create HCR commands
     const hcrCommands = [
@@ -602,14 +657,14 @@ describe('Script Repository', () => {
     ];
 
     const hcrEvent = { commands: hcrCommands } as HumanCyborgRelationsEvent;
-    const scriptEvent = new ScriptEvent(
-      eventId,
-      scriptChannel.id,
-      ModuleType.uart,
-      ModuleSubType.humanCyborgRelationsSerial,
-      3.5,
-      hcrEvent,
-    );
+    const scriptEvent: ScriptEvent = {
+      id: eventId,
+      scriptChannel: scriptChannel.id,
+      moduleType: ModuleType.uart,
+      moduleSubType: ModuleSubType.humanCyborgRelationsSerial,
+      time: 3.5,
+      event: hcrEvent,
+    };
 
     scriptChannel.events[eventId] = scriptEvent;
     script.scriptChannels.push(scriptChannel);
@@ -643,7 +698,16 @@ describe('Script Repository', () => {
     const scriptId = uuid();
     const playlistId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Description', new Date(), 0);
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: 'Description',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
     const scriptRepo = new ScriptRepository(db);
     await scriptRepo.upsertScript(script);
 
@@ -688,8 +752,26 @@ describe('Script Repository', () => {
     const playlistId = uuid();
 
     const scriptRepo = new ScriptRepository(db);
-    await scriptRepo.upsertScript(new Script(scriptId1, 'Script 1', '', new Date(), 0));
-    await scriptRepo.upsertScript(new Script(scriptId2, 'Script 2', '', new Date(), 0));
+    await scriptRepo.upsertScript({
+      id: scriptId1,
+      scriptName: 'Script 1',
+      description: '',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    });
+    await scriptRepo.upsertScript({
+      id: scriptId2,
+      scriptName: 'Script 2',
+      description: '',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    });
 
     const playlist: Playlist = {
       id: playlistId,
@@ -739,7 +821,16 @@ describe('Script Repository', () => {
     const playlistId2 = uuid();
 
     const scriptRepo = new ScriptRepository(db);
-    await scriptRepo.upsertScript(new Script(scriptId, 'Test Script', '', new Date(), 0));
+    await scriptRepo.upsertScript({
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: '',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    });
 
     const makePlaylist = (plId: string, name: string): Playlist => ({
       id: plId,
@@ -780,7 +871,16 @@ describe('Script Repository', () => {
     const waitTrackId = uuid();
 
     const scriptRepo = new ScriptRepository(db);
-    await scriptRepo.upsertScript(new Script(scriptId, 'Test Script', '', new Date(), 0));
+    await scriptRepo.upsertScript({
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: '',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    });
 
     const playlist: Playlist = {
       id: playlistId,

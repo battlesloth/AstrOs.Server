@@ -83,8 +83,6 @@ export class ScriptRepository {
   //#region Script Copy
 
   async copyScript(id: string): Promise<Script> {
-    let result = Script.prototype;
-
     const script = await this.getScript(id);
 
     script.id = generateShortId('s');
@@ -112,13 +110,16 @@ export class ScriptRepository {
       throw err;
     });
 
-    result = new Script(
-      script.id,
-      script.scriptName,
-      script.description,
-      new Date(script.lastSaved),
-      script.durationDS,
-    );
+    const result: Script = {
+      id: script.id,
+      scriptName: script.scriptName,
+      description: script.description,
+      lastSaved: new Date(script.lastSaved),
+      durationDS: script.durationDS,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
     return result;
   }
@@ -156,14 +157,16 @@ export class ScriptRepository {
     }
 
     const result = scripts.map((scr) => {
-      return new Script(
-        scr.id,
-        scr.name,
-        scr.description,
-        new Date(scr.last_modified),
-        scr.duration_ds,
-        scr.playlist_count ?? 0,
-      );
+      return {
+        id: scr.id,
+        scriptName: scr.name,
+        description: scr.description,
+        lastSaved: new Date(scr.last_modified),
+        durationDS: scr.duration_ds,
+        playlistCount: scr.playlist_count ?? 0,
+        deploymentStatus: {},
+        scriptChannels: [],
+      } as Script;
     });
 
     for (const scr of result) {
@@ -208,13 +211,16 @@ export class ScriptRepository {
         throw err;
       });
 
-    const result = new Script(
-      script.id,
-      script.name,
-      script.description,
-      new Date(script.last_modified),
-      script.duration_ds,
-    );
+    const result: Script = {
+      id: script.id,
+      scriptName: script.name,
+      description: script.description,
+      lastSaved: new Date(script.last_modified),
+      durationDS: script.duration_ds,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
     updateScriptDuration(result);
 
@@ -329,16 +335,17 @@ export class ScriptRepository {
       });
 
     for (const ch of channels) {
-      const channel = new ScriptChannel(
-        ch.id,
-        ch.script_id,
-        ch.channel_type,
-        ch.parent_module_id,
-        ch.module_channel_id,
-        ch.module_channel_type,
-        new BaseChannel('', '', '', ModuleType.none, ModuleSubType.none, false),
-        0,
-      );
+      const channel: ScriptChannel = {
+        id: ch.id,
+        scriptId: ch.script_id,
+        channelType: ch.channel_type,
+        parentModuleId: ch.parent_module_id,
+        moduleChannelId: ch.module_channel_id,
+        moduleChannelType: ch.module_channel_type,
+        moduleChannel: new BaseChannel('', '', '', ModuleType.none, ModuleSubType.none, false),
+        maxDuration: 0,
+        events: {},
+      };
 
       await this.configScriptChannel(channel);
 
@@ -452,14 +459,14 @@ export class ScriptRepository {
 
       const scriptEventType = moduleSubTypeToScriptEventTypes(subtype, evt.data);
 
-      const event = new ScriptEvent(
-        evt.id,
-        evt.script_channel_id,
-        evt.module_type,
-        subtype,
-        evt.time / 10, // stored as integer scaled storage to 0.1s
-        scriptEventType,
-      );
+      const event: ScriptEvent = {
+        id: evt.id,
+        scriptChannel: evt.script_channel_id,
+        moduleType: evt.module_type,
+        moduleSubType: subtype,
+        time: evt.time / 10, // stored as integer scaled storage to 0.1s
+        event: scriptEventType,
+      };
 
       result[event.id] = event;
     }

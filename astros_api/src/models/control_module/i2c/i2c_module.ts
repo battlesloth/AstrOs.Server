@@ -26,16 +26,15 @@ export function getI2cScriptResources(m: I2cModule): ScriptChannelResource[] {
 
   switch (m.moduleSubType) {
     case ModuleSubType.genericI2C:
-      resources.push(
-        new ScriptChannelResource(
-          m.id,
-          ScriptChannelType.GENERIC_I2C,
-          m.name,
-          m.id,
-          m.locationId,
-          new I2cChannel(m.id, m.locationId, m.name, true),
-        ),
-      );
+      resources.push({
+        channelId: m.id,
+        scriptChannelType: ScriptChannelType.GENERIC_I2C,
+        name: m.name,
+        parentModuleId: m.id,
+        locationId: m.locationId,
+        channel: new I2cChannel(m.id, m.locationId, m.name, true),
+        available: true,
+      });
       break;
   }
 

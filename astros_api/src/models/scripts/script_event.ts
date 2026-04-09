@@ -38,27 +38,11 @@ export function moduleSubTypeToScriptEventTypes(
   }
 }
 
-export class ScriptEvent {
+export interface ScriptEvent {
   id: string;
   scriptChannel: string;
   moduleType: ModuleType;
   moduleSubType: ModuleSubType;
   time: number;
   event: ScriptEventTypes;
-
-  constructor(
-    id: string,
-    scriptChannel: string,
-    moduleType: ModuleType,
-    moduleSubType: ModuleSubType,
-    time: number,
-    event: ScriptEventTypes,
-  ) {
-    this.id = id;
-    this.scriptChannel = scriptChannel;
-    this.moduleType = moduleType;
-    this.moduleSubType = moduleSubType;
-    this.time = time;
-    this.event = event;
-  }
 }

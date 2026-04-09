@@ -187,7 +187,16 @@ describe('Script Converter Tests', () => {
     const ttevt3ms = 1200; // 1.2 seconds between event 2 and event 3
     const ttevt4ms = 33800; // 34.2 seconds between event 3 and event 4
 
-    const script = new Script(scriptId, 'test', 'test', new Date());
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'test',
+      description: 'test',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
     const scriptCh = generateSerialScriptChannel(scriptId);
     const sevt1 = generateCoreScriptSerialEventByDecSec(evt1Time, scriptCh.id);
     const sevt2 = generateCoreScriptSerialEventByDecSec(evt2Time, scriptCh.id);
@@ -222,7 +231,16 @@ describe('Script Converter Tests', () => {
   it('empty script with no channels should return buffer-only scripts for all locations', async () => {
     const scriptId = 'emptyScript';
 
-    const script = new Script(scriptId, 'empty', 'empty', new Date());
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'empty',
+      description: 'empty',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
     // No channels added
     mockRepo.getScript.calledWith(scriptId).mockResolvedValue(script);
 
@@ -468,7 +486,16 @@ describe('script commands', () => {
 //#region Helpers
 
 function generateScript(id: string): Script {
-  const script = new Script(id, 'test', 'test', new Date());
+  const script: Script = {
+    id,
+    scriptName: 'test',
+    description: 'test',
+    lastSaved: new Date(),
+    durationDS: 0,
+    playlistCount: 0,
+    deploymentStatus: {},
+    scriptChannels: [],
+  };
 
   switch (id) {
     case 'coreGenericSerial': {
@@ -500,16 +527,17 @@ function generateSerialScriptChannel(scriptId: string): ScriptChannel {
     true,
   );
 
-  const scriptCh = new ScriptChannel(
-    uuid(),
+  const scriptCh: ScriptChannel = {
+    id: uuid(),
     scriptId,
-    ScriptChannelType.GENERIC_UART,
-    coreGenSerialModId,
-    uartChannel.id,
-    ModuleChannelTypes.UartChannel,
-    uartChannel,
-    3000,
-  );
+    channelType: ScriptChannelType.GENERIC_UART,
+    parentModuleId: coreGenSerialModId,
+    moduleChannelId: uartChannel.id,
+    moduleChannelType: ModuleChannelTypes.UartChannel,
+    moduleChannel: uartChannel,
+    maxDuration: 3000,
+    events: {},
+  };
 
   return scriptCh;
 }
@@ -517,14 +545,14 @@ function generateSerialScriptChannel(scriptId: string): ScriptChannel {
 function generateCoreScriptSerialEventByDecSec(tenthOfSeconds: number, chId: string): ScriptEvent {
   const evt = { value: `test ${tenthOfSeconds}` } as GenericSerialEvent;
 
-  const sevt = new ScriptEvent(
-    uuid(),
-    chId,
-    ModuleType.uart,
-    ModuleSubType.genericSerial,
-    tenthOfSeconds,
-    evt,
-  );
+  const sevt: ScriptEvent = {
+    id: uuid(),
+    scriptChannel: chId,
+    moduleType: ModuleType.uart,
+    moduleSubType: ModuleSubType.genericSerial,
+    time: tenthOfSeconds,
+    event: evt,
+  };
 
   return sevt;
 }
@@ -538,27 +566,28 @@ function coreGenericSeriaScriptCh(scriptId: string): ScriptChannel {
     true,
   );
 
-  const scriptCh = new ScriptChannel(
-    uuid(),
+  const scriptCh: ScriptChannel = {
+    id: uuid(),
     scriptId,
-    ScriptChannelType.GENERIC_UART,
-    coreGenSerialModId,
-    uartChannel.id,
-    ModuleChannelTypes.UartChannel,
-    uartChannel,
-    3000,
-  );
+    channelType: ScriptChannelType.GENERIC_UART,
+    parentModuleId: coreGenSerialModId,
+    moduleChannelId: uartChannel.id,
+    moduleChannelType: ModuleChannelTypes.UartChannel,
+    moduleChannel: uartChannel,
+    maxDuration: 3000,
+    events: {},
+  };
 
   for (let i = 0; i < 3; i++) {
     const evt = { value: `test ${i}` } as GenericSerialEvent;
-    const sevt = new ScriptEvent(
-      uuid(),
-      scriptCh.id,
-      ModuleType.uart,
-      ModuleSubType.genericSerial,
-      i,
-      evt,
-    );
+    const sevt: ScriptEvent = {
+      id: uuid(),
+      scriptChannel: scriptCh.id,
+      moduleType: ModuleType.uart,
+      moduleSubType: ModuleSubType.genericSerial,
+      time: i,
+      event: evt,
+    };
     scriptCh.events[uuid()] = sevt;
   }
 
@@ -574,28 +603,29 @@ function domeGenericSerialScriptCh(scriptId: string): ScriptChannel {
     true,
   );
 
-  const scriptCh = new ScriptChannel(
-    uuid(),
+  const scriptCh: ScriptChannel = {
+    id: uuid(),
     scriptId,
-    ScriptChannelType.GENERIC_UART,
-    domeGenSerialModId,
-    uartChannel.id,
-    ModuleChannelTypes.UartChannel,
-    uartChannel,
-    3000,
-  );
+    channelType: ScriptChannelType.GENERIC_UART,
+    parentModuleId: domeGenSerialModId,
+    moduleChannelId: uartChannel.id,
+    moduleChannelType: ModuleChannelTypes.UartChannel,
+    moduleChannel: uartChannel,
+    maxDuration: 3000,
+    events: {},
+  };
 
   for (let i = 0; i < 6; i++) {
     if (i % 2 === 0) {
       const evt = { value: `UART ${i}` } as GenericSerialEvent;
-      const sevt = new ScriptEvent(
-        uuid(),
-        scriptCh.id,
-        ModuleType.uart,
-        ModuleSubType.genericSerial,
-        i,
-        evt,
-      );
+      const sevt: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptCh.id,
+        moduleType: ModuleType.uart,
+        moduleSubType: ModuleSubType.genericSerial,
+        time: i,
+        event: evt,
+      };
       scriptCh.events[uuid()] = sevt;
     }
   }
@@ -606,28 +636,29 @@ function domeGenericSerialScriptCh(scriptId: string): ScriptChannel {
 function domeI2cScriptCh(scriptId: string): ScriptChannel {
   const i2cChannel = new I2cChannel(uuid(), domeI2cModId, '', true);
 
-  const scriptCh = new ScriptChannel(
-    uuid(),
+  const scriptCh: ScriptChannel = {
+    id: uuid(),
     scriptId,
-    ScriptChannelType.GENERIC_I2C,
-    domeI2cModId,
-    i2cChannel.id,
-    ModuleChannelTypes.I2cChannel,
-    i2cChannel,
-    3000,
-  );
+    channelType: ScriptChannelType.GENERIC_I2C,
+    parentModuleId: domeI2cModId,
+    moduleChannelId: i2cChannel.id,
+    moduleChannelType: ModuleChannelTypes.I2cChannel,
+    moduleChannel: i2cChannel,
+    maxDuration: 3000,
+    events: {},
+  };
 
   for (let i = 0; i < 6; i++) {
     if (i % 2 !== 0) {
       const evt = { message: `I2C ${i}` } as I2cEvent;
-      const sevt = new ScriptEvent(
-        uuid(),
-        scriptCh.id,
-        ModuleType.i2c,
-        ModuleSubType.genericI2C,
-        i,
-        evt,
-      );
+      const sevt: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptCh.id,
+        moduleType: ModuleType.i2c,
+        moduleSubType: ModuleSubType.genericI2C,
+        time: i,
+        event: evt,
+      };
       scriptCh.events[uuid()] = sevt;
     }
   }

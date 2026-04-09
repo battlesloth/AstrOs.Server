@@ -20,7 +20,7 @@ import { registerAuthRoutes } from './controllers/authentication_controller.js';
 import { registerScriptRoutes } from './controllers/scripts_controller.js';
 import { registerAudioRoutes } from './controllers/audio_controller.js';
 import { registerFileRoutes } from './controllers/file_controller.js';
-import { ScriptUpload } from './models/scripts/script_upload.js';
+import { createScriptUpload } from './models/scripts/script_upload.js';
 import { ScriptRepository } from './dal/repositories/script_repository.js';
 
 import { ScriptConverter } from './script_converter.js';
@@ -35,7 +35,7 @@ import {
 } from './models/index.js';
 import { ControllerRepository } from './dal/repositories/controller_repository.js';
 import { ConfigSync } from './models/config/config_sync.js';
-import { ScriptRun } from './models/scripts/script_run.js';
+import { createScriptRun } from './models/scripts/script_run.js';
 import { logger } from './logger.js';
 import { registerRemoteConfigRoutes } from './controllers/remote_config_controller.js';
 import { registerSettingsRoutes } from './controllers/settings_controller.js';
@@ -676,7 +676,7 @@ class ApiServer {
 
       logger.debug(`scripts: ${JSON.stringify(messages)}`);
 
-      const msg = new ScriptUpload(id, messages, locations);
+      const msg = createScriptUpload(id, messages, locations);
 
       logger.debug(`msg: ${JSON.stringify(msg)}`);
 
@@ -785,7 +785,7 @@ class ApiServer {
 
       const ctlRepo = new LocationsRepository(db);
       const locations = await ctlRepo.loadLocations();
-      const msg = new ScriptRun('panic', locations);
+      const msg = createScriptRun('panic', locations);
       msg.type = TransmissionType.panic;
 
       this.serialWorker.postMessage({
@@ -829,7 +829,7 @@ class ApiServer {
 
       logger.info(`dispatching script ${scriptId} from animation queue`);
 
-      const msg = new ScriptRun(scriptId, locations);
+      const msg = createScriptRun(scriptId, locations);
 
       this.serialWorker.postMessage({
         type: SerialMessageType.RUN_SCRIPT,
