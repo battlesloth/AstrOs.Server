@@ -63,6 +63,8 @@ import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
 import { registerPlaylistRoutes } from './controllers/playlist_controller.js';
 import { AnimationQueue } from './serial/animation_queue/animation_queue.js';
+import { AnimationQueuePlaylist } from './serial/animation_queue/queue_item/animation_queue_item.js';
+import { PlaylistType } from './models/playlists/playlistType.js';
 import { convertPlaylistToQueueItem } from './serial/animation_queue/playlist_converter.js';
 import { PlaylistRepository } from './dal/repositories/playlist_repository.js';
 
@@ -331,6 +333,10 @@ class ApiServer {
       this.directCommand(req, res, next);
     });
 
+    this.router.post('/panicStop', this.authHandler, (req: any, res: any, next: any) => {
+      this.panicStop(req, res, next);
+    });
+
     this.router.post('/panicClear', this.authHandler, (req: any, res: any, next: any) => {
       this.animationQueue.clearPanicStop();
       res.status(200);
@@ -339,7 +345,7 @@ class ApiServer {
 
     // API key secured routes
     this.router.get('/remotecontrol', this.apiKeyValidator, (req: any, res: any, next: any) => {
-      this.runScript(req, res, next);
+      this.remoteControl(req, res, next);
     });
   }
 
@@ -709,27 +715,27 @@ class ApiServer {
         return;
       }
 
-      logger.info('running script');
-
       const id = req.query.id;
+      logger.info(`running script ${id}`);
 
-      const ctlRepo = new LocationsRepository(db);
+      const scriptRepo = new ScriptRepository(db);
+      const locationsRepo = new LocationsRepository(db);
 
-      const locations = await ctlRepo.loadLocations();
+      const script = await scriptRepo.getScript(id);
+      const locations = await locationsRepo.loadLocations();
 
-      const msg = new ScriptRun(id, locations);
+      const queueItem: AnimationQueuePlaylist = {
+        id: `script-${id}`,
+        playlistType: PlaylistType.Sequential,
+        locations,
+        tracks: [{ id: script.id, duration: script.durationDS * 100, isWait: false }],
+        repeatsLeft: 0,
+        shuffleWaitMin: 0,
+        shuffleWaitMax: 0,
+        tracksRemaining: [],
+      };
 
-      let msgType = SerialMessageType.RUN_SCRIPT;
-
-      if (id === 'panic') {
-        msg.type = TransmissionType.panic;
-        msgType = SerialMessageType.PANIC_STOP;
-        this.animationQueue.panicStop();
-      }
-
-      logger.debug(`msg: ${JSON.stringify(msg)}`);
-
-      this.serialWorker.postMessage({ type: msgType, data: msg });
+      this.animationQueue.addToQueue(queueItem);
 
       res.status(200);
       res.json({ message: 'success' });
@@ -740,6 +746,54 @@ class ApiServer {
       res.json({
         message: 'Internal server error',
       });
+    }
+  }
+
+  private async panicStop(req: any, res: any, next: any) {
+    try {
+      if (this.sendSerialUnavailable(res)) {
+        return;
+      }
+
+      logger.info('panic stop');
+
+      this.animationQueue.panicStop();
+
+      const ctlRepo = new LocationsRepository(db);
+      const locations = await ctlRepo.loadLocations();
+      const msg = new ScriptRun('panic', locations);
+      msg.type = TransmissionType.panic;
+
+      this.serialWorker.postMessage({
+        type: SerialMessageType.PANIC_STOP,
+        data: msg,
+      });
+
+      res.status(200);
+      res.json({ message: 'success' });
+    } catch (error) {
+      logger.error(error);
+
+      res.status(500);
+      res.json({
+        message: 'Internal server error',
+      });
+    }
+  }
+
+  private async remoteControl(req: any, res: any, next: any) {
+    const id = req.query.id;
+
+    if (!id) {
+      res.status(400);
+      res.json({ message: 'Missing id parameter' });
+      return;
+    }
+
+    if (id.startsWith('p')) {
+      this.runPlaylist(req, res, next);
+    } else {
+      this.runScript(req, res, next);
     }
   }
 
