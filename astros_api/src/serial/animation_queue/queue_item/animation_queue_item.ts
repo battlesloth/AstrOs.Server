@@ -3,6 +3,7 @@ import { PlaylistType } from 'src/models/playlists/playlistType';
 export interface QueueTrack {
   id: string;
   duration: number;
+  isWait: boolean;
 }
 
 export interface AnimationQueuePlaylist {
@@ -10,7 +11,7 @@ export interface AnimationQueuePlaylist {
   playlistType: PlaylistType;
 
   // Script and wait tracks are single QueueTrack, Sequential
-  // playlist tracks area and array of QueueTrack ids played
+  // playlist tracks are an array of QueueTrack ids played
   // in order. Only the top level of playlist track is supported,
   // so nested playlists are decomposed into a flat list of tracks.
   tracks: Array<QueueTrack | QueueTrack[]>;
