@@ -12,6 +12,7 @@ function makePlaylist(
 ): AnimationQueuePlaylist {
   return {
     id: 'playlist-1',
+    locations: [],
     tracks: [],
     repeatsLeft: 0,
     shuffleWaitMin: 0,
@@ -46,13 +47,13 @@ describe('Animation Queue Tests', () => {
 
       // track1 dispatched immediately
       expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(dispatch).toHaveBeenCalledWith('track1');
+      expect(dispatch).toHaveBeenCalledWith('track1', []);
 
       // advance past track1 duration
       vi.advanceTimersByTime(1000);
 
       expect(dispatch).toHaveBeenCalledTimes(2);
-      expect(dispatch).toHaveBeenCalledWith('track2');
+      expect(dispatch).toHaveBeenCalledWith('track2', []);
 
       // advance past track2 duration — no more dispatches
       vi.advanceTimersByTime(500);
@@ -75,7 +76,7 @@ describe('Animation Queue Tests', () => {
       queue.addToQueue(playlist);
 
       expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(dispatch).toHaveBeenCalledWith('track1');
+      expect(dispatch).toHaveBeenCalledWith('track1', []);
 
       // after track1: wait track starts (no dispatch)
       vi.advanceTimersByTime(1000);
@@ -84,7 +85,7 @@ describe('Animation Queue Tests', () => {
       // after wait: track2 dispatched
       vi.advanceTimersByTime(2000);
       expect(dispatch).toHaveBeenCalledTimes(2);
-      expect(dispatch).toHaveBeenCalledWith('track2');
+      expect(dispatch).toHaveBeenCalledWith('track2', []);
     });
 
     it('should dispatch nested QueueTrack[] sub-tracks in order', () => {
@@ -108,22 +109,22 @@ describe('Animation Queue Tests', () => {
       queue.addToQueue(playlist);
 
       expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(dispatch).toHaveBeenCalledWith('track1');
+      expect(dispatch).toHaveBeenCalledWith('track1', []);
 
       // after track1: sub1 dispatched
       vi.advanceTimersByTime(1000);
       expect(dispatch).toHaveBeenCalledTimes(2);
-      expect(dispatch).toHaveBeenCalledWith('sub1');
+      expect(dispatch).toHaveBeenCalledWith('sub1', []);
 
       // after sub1: sub2 dispatched
       vi.advanceTimersByTime(500);
       expect(dispatch).toHaveBeenCalledTimes(3);
-      expect(dispatch).toHaveBeenCalledWith('sub2');
+      expect(dispatch).toHaveBeenCalledWith('sub2', []);
 
       // after sub2: track3 dispatched
       vi.advanceTimersByTime(300);
       expect(dispatch).toHaveBeenCalledTimes(4);
-      expect(dispatch).toHaveBeenCalledWith('track3');
+      expect(dispatch).toHaveBeenCalledWith('track3', []);
     });
   });
 
@@ -154,13 +155,13 @@ describe('Animation Queue Tests', () => {
       queue.addToQueue(playlist);
 
       // Shuffled order: track2, track1, track3
-      expect(dispatch).toHaveBeenCalledWith('track2');
+      expect(dispatch).toHaveBeenCalledWith('track2', []);
 
       vi.advanceTimersByTime(100);
-      expect(dispatch).toHaveBeenCalledWith('track1');
+      expect(dispatch).toHaveBeenCalledWith('track1', []);
 
       vi.advanceTimersByTime(100);
-      expect(dispatch).toHaveBeenCalledWith('track3');
+      expect(dispatch).toHaveBeenCalledWith('track3', []);
 
       expect(dispatch).toHaveBeenCalledTimes(3);
 
@@ -194,7 +195,7 @@ describe('Animation Queue Tests', () => {
       // Shuffled order: track2, track1
       // track2 dispatched immediately (no delay before first track)
       expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(dispatch).toHaveBeenCalledWith('track2');
+      expect(dispatch).toHaveBeenCalledWith('track2', []);
 
       // after track2 duration, delay starts (not dispatched yet)
       vi.advanceTimersByTime(200);
@@ -203,7 +204,7 @@ describe('Animation Queue Tests', () => {
       // after shuffle delay (1000ms), track1 dispatched
       vi.advanceTimersByTime(1000);
       expect(dispatch).toHaveBeenCalledTimes(2);
-      expect(dispatch).toHaveBeenCalledWith('track1');
+      expect(dispatch).toHaveBeenCalledWith('track1', []);
 
       randomSpy.mockRestore();
     });
@@ -284,18 +285,18 @@ describe('Animation Queue Tests', () => {
 
       // Cycle 1: shuffled to [track2, track1]
       expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(dispatch).toHaveBeenLastCalledWith('track2');
+      expect(dispatch).toHaveBeenLastCalledWith('track2', []);
       vi.advanceTimersByTime(100);
       expect(dispatch).toHaveBeenCalledTimes(2);
-      expect(dispatch).toHaveBeenLastCalledWith('track1');
+      expect(dispatch).toHaveBeenLastCalledWith('track1', []);
       vi.advanceTimersByTime(100);
 
       // Cycle 2: reshuffled to [track1, track2]
       expect(dispatch).toHaveBeenCalledTimes(3);
-      expect(dispatch).toHaveBeenLastCalledWith('track1');
+      expect(dispatch).toHaveBeenLastCalledWith('track1', []);
       vi.advanceTimersByTime(100);
       expect(dispatch).toHaveBeenCalledTimes(4);
-      expect(dispatch).toHaveBeenLastCalledWith('track2');
+      expect(dispatch).toHaveBeenLastCalledWith('track2', []);
       vi.advanceTimersByTime(100);
 
       // Done
@@ -325,7 +326,7 @@ describe('Animation Queue Tests', () => {
       });
 
       queue.addToQueue(playlist1);
-      expect(dispatch).toHaveBeenCalledWith('old1');
+      expect(dispatch).toHaveBeenCalledWith('old1', []);
 
       // Add replacement while old1 is playing
       queue.addToQueue(playlist2);
@@ -336,8 +337,8 @@ describe('Animation Queue Tests', () => {
       // old1 finishes — new playlist starts (not old2)
       vi.advanceTimersByTime(1000);
       expect(dispatch).toHaveBeenCalledTimes(2);
-      expect(dispatch).toHaveBeenCalledWith('new1');
-      expect(dispatch).not.toHaveBeenCalledWith('old2');
+      expect(dispatch).toHaveBeenCalledWith('new1', []);
+      expect(dispatch).not.toHaveBeenCalledWith('old2', []);
     });
 
     it('non-interruptible active, interruptible queued, then replaced by another', () => {
@@ -363,7 +364,7 @@ describe('Animation Queue Tests', () => {
       });
 
       queue.addToQueue(seqPlaylist);
-      expect(dispatch).toHaveBeenCalledWith('seq1');
+      expect(dispatch).toHaveBeenCalledWith('seq1', []);
 
       // Queue interruptible — goes to back of queue
       queue.addToQueue(interruptible1);
@@ -374,8 +375,8 @@ describe('Animation Queue Tests', () => {
       // seq finishes → interruptible2 should start (not interruptible1)
       vi.advanceTimersByTime(500);
       expect(dispatch).toHaveBeenCalledTimes(2);
-      expect(dispatch).toHaveBeenCalledWith('int2-track');
-      expect(dispatch).not.toHaveBeenCalledWith('int1-track');
+      expect(dispatch).toHaveBeenCalledWith('int2-track', []);
+      expect(dispatch).not.toHaveBeenCalledWith('int1-track', []);
     });
   });
 
@@ -408,13 +409,13 @@ describe('Animation Queue Tests', () => {
       queue.addToQueue(playlist2);
       queue.addToQueue(playlist3);
 
-      expect(dispatch).toHaveBeenCalledWith('p1-track');
+      expect(dispatch).toHaveBeenCalledWith('p1-track', []);
 
       vi.advanceTimersByTime(100);
-      expect(dispatch).toHaveBeenCalledWith('p2-track');
+      expect(dispatch).toHaveBeenCalledWith('p2-track', []);
 
       vi.advanceTimersByTime(100);
-      expect(dispatch).toHaveBeenCalledWith('p3-track');
+      expect(dispatch).toHaveBeenCalledWith('p3-track', []);
 
       expect(dispatch).toHaveBeenCalledTimes(3);
     });
@@ -447,8 +448,8 @@ describe('Animation Queue Tests', () => {
       queue.addToQueue(intB); // replaces intA in queue
 
       vi.advanceTimersByTime(500);
-      expect(dispatch).toHaveBeenCalledWith('b-track');
-      expect(dispatch).not.toHaveBeenCalledWith('a-track');
+      expect(dispatch).toHaveBeenCalledWith('b-track', []);
+      expect(dispatch).not.toHaveBeenCalledWith('a-track', []);
     });
   });
 
@@ -505,7 +506,7 @@ describe('Animation Queue Tests', () => {
 
       queue.addToQueue(playlist);
       expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(dispatch).toHaveBeenCalledWith('track1');
+      expect(dispatch).toHaveBeenCalledWith('track1', []);
     });
   });
 
@@ -549,7 +550,7 @@ describe('Animation Queue Tests', () => {
       });
       queue2.addToQueue(realPlaylist2);
       expect(dispatch2).toHaveBeenCalledTimes(1);
-      expect(dispatch2).toHaveBeenCalledWith('real-track2');
+      expect(dispatch2).toHaveBeenCalledWith('real-track2', []);
     });
 
     it('single-track playlist dispatches once then done', () => {

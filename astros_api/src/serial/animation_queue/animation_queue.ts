@@ -1,4 +1,5 @@
 import { PlaylistType } from 'src/models/playlists/playlistType.js';
+import { ControllerLocation } from 'src/models/control_module/controller_location.js';
 import { AnimationQueuePlaylist, QueueTrack } from './queue_item/animation_queue_item.js';
 import { logger } from 'src/logger.js';
 
@@ -11,9 +12,9 @@ export class AnimationQueue {
   private currentTimeout: ReturnType<typeof setTimeout> | null = null;
   private playlistReplaced = false;
 
-  dispatchCallback: (id: string) => void;
+  dispatchCallback: (id: string, locations: Array<ControllerLocation>) => void;
 
-  constructor(dispatchCallback: (id: string) => void) {
+  constructor(dispatchCallback: (id: string, locations: Array<ControllerLocation>) => void) {
     this.dispatchCallback = dispatchCallback;
   }
 
@@ -127,7 +128,11 @@ export class AnimationQueue {
     }
 
     // Step C — finish sequential sub-track array
-    if (this.currentTrack !== null && Array.isArray(this.currentTrack) && this.currentTrack.length > 0) {
+    if (
+      this.currentTrack !== null &&
+      Array.isArray(this.currentTrack) &&
+      this.currentTrack.length > 0
+    ) {
       const nextSubTrack = this.currentTrack.shift()!;
       this.dispatchTrack(nextSubTrack);
       return;
@@ -173,8 +178,8 @@ export class AnimationQueue {
   }
 
   dispatchTrack(track: QueueTrack) {
-    if (!track.isWait) {
-      this.dispatchCallback(track.id);
+    if (!track.isWait && this.activePlaylist) {
+      this.dispatchCallback(track.id, this.activePlaylist.locations);
     }
     this.currentTimeout = setTimeout(() => {
       this.playNextTrack();

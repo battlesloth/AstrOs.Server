@@ -1,4 +1,5 @@
 import { PlaylistType } from 'src/models/playlists/playlistType';
+import { ControllerLocation } from 'src/models/control_module/controller_location';
 
 export interface QueueTrack {
   id: string;
@@ -9,6 +10,7 @@ export interface QueueTrack {
 export interface AnimationQueuePlaylist {
   id: string;
   playlistType: PlaylistType;
+  locations: Array<ControllerLocation>;
 
   // Script and wait tracks are single QueueTrack, Sequential
   // playlist tracks are an array of QueueTrack ids played

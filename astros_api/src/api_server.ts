@@ -62,6 +62,9 @@ const __dirname = path.dirname(__filename);
 import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
 import { registerPlaylistRoutes } from './controllers/playlist_controller.js';
+import { AnimationQueue } from './serial/animation_queue/animation_queue.js';
+import { convertPlaylistToQueueItem } from './serial/animation_queue/playlist_converter.js';
+import { PlaylistRepository } from './dal/repositories/playlist_repository.js';
 
 interface IWebSocketMessage {
   msgType: string;
@@ -89,6 +92,8 @@ class ApiServer {
   private serialWorker!: Worker;
   private serialPort: any;
   private serialParser: any;
+
+  private animationQueue!: AnimationQueue;
 
   private authHandler!: any;
   private apiKeyValidator!: ReqHandler;
@@ -133,6 +138,11 @@ class ApiServer {
 
     logger.info('Setting up API server');
     await this.configApi();
+
+    logger.info('Setting up animation queue');
+    this.animationQueue = new AnimationQueue((scriptId, locations) => {
+      this.dispatchScriptFromQueue(scriptId, locations);
+    });
 
     logger.info('Setting up routes');
     this.setRoutes();
@@ -319,6 +329,12 @@ class ApiServer {
 
     this.router.post('/directcommand', this.authHandler, (req: any, res: any, next: any) => {
       this.directCommand(req, res, next);
+    });
+
+    this.router.post('/panicClear', this.authHandler, (req: any, res: any, next: any) => {
+      this.animationQueue.clearPanicStop();
+      res.status(200);
+      res.json({ message: 'success' });
     });
 
     // API key secured routes
@@ -657,7 +673,23 @@ class ApiServer {
         return;
       }
 
-      logger.info('running playlist');
+      const id = req.query.id;
+      logger.info(`running playlist ${id}`);
+
+      const playlistRepo = new PlaylistRepository(db);
+      const locationsRepo = new LocationsRepository(db);
+
+      const playlist = await playlistRepo.getPlaylist(id);
+
+      if (!playlist) {
+        res.status(404);
+        res.json({ message: 'Playlist not found' });
+        return;
+      }
+
+      const locations = await locationsRepo.loadLocations();
+      const queueItem = await convertPlaylistToQueueItem(playlist, playlistRepo, locations);
+      this.animationQueue.addToQueue(queueItem);
 
       res.status(200);
       res.json({ message: 'success' });
@@ -692,6 +724,7 @@ class ApiServer {
       if (id === 'panic') {
         msg.type = TransmissionType.panic;
         msgType = SerialMessageType.PANIC_STOP;
+        this.animationQueue.panicStop();
       }
 
       logger.debug(`msg: ${JSON.stringify(msg)}`);
@@ -707,6 +740,25 @@ class ApiServer {
       res.json({
         message: 'Internal server error',
       });
+    }
+  }
+
+  private dispatchScriptFromQueue(scriptId: string, locations: Array<ControllerLocation>) {
+    try {
+      if (this.sendSerialUnavailable()) {
+        return;
+      }
+
+      logger.info(`dispatching script ${scriptId} from animation queue`);
+
+      const msg = new ScriptRun(scriptId, locations);
+
+      this.serialWorker.postMessage({
+        type: SerialMessageType.RUN_SCRIPT,
+        data: msg,
+      });
+    } catch (error) {
+      logger.error(`Error dispatching script from animation queue: ${error}`);
     }
   }
 
