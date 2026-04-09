@@ -251,7 +251,7 @@ describe('script commands', () => {
   });
 
   it('should create generic serial command', async () => {
-    const event = new GenericSerialEvent('test val');
+    const event = { value: 'test val' } as GenericSerialEvent;
     const cmd = {
       controllerId: coreLocId,
       moduleId: coreGenSerialModId,
@@ -278,31 +278,31 @@ describe('script commands', () => {
 
   it('should create HCR command', async () => {
     const commands = Array<HcrCommand>(3);
-    commands[0] = new HcrCommand(
-      uuid(),
-      HcrCommandCategory.sdWav,
-      HumanCyborgRelationsCmd.playWavOnA,
-      5,
-      0,
-    );
+    commands[0] = {
+      id: uuid(),
+      category: HcrCommandCategory.sdWav,
+      command: HumanCyborgRelationsCmd.playWavOnA,
+      valueA: 5,
+      valueB: 0,
+    } as HcrCommand;
 
-    commands[1] = new HcrCommand(
-      uuid(),
-      HcrCommandCategory.stimuli,
-      HumanCyborgRelationsCmd.extremeHappy,
-      0,
-      0,
-    );
+    commands[1] = {
+      id: uuid(),
+      category: HcrCommandCategory.stimuli,
+      command: HumanCyborgRelationsCmd.extremeHappy,
+      valueA: 0,
+      valueB: 0,
+    } as HcrCommand;
 
-    commands[2] = new HcrCommand(
-      uuid(),
-      HcrCommandCategory.volume,
-      HumanCyborgRelationsCmd.vocalizerVolume,
-      8,
-      0,
-    );
+    commands[2] = {
+      id: uuid(),
+      category: HcrCommandCategory.volume,
+      command: HumanCyborgRelationsCmd.vocalizerVolume,
+      valueA: 8,
+      valueB: 0,
+    } as HcrCommand;
 
-    const event = new HumanCyborgRelationsEvent(commands);
+    const event = { commands } as HumanCyborgRelationsEvent;
     const cmd = {
       controllerId: coreLocId,
       moduleId: coreHCRModId,
@@ -328,7 +328,7 @@ describe('script commands', () => {
   });
 
   it('should create Kangaroo X2 command', async () => {
-    const event = new KangarooEvent(KangarooAction.start, 0, 0, KangarooAction.position, 5, 10);
+    const event = { ch1Action: KangarooAction.start, ch1Speed: 0, ch1Position: 0, ch2Action: KangarooAction.position, ch2Speed: 5, ch2Position: 10 } as KangarooEvent;
 
     const cmd = {
       controllerId: coreLocId,
@@ -374,7 +374,7 @@ describe('script commands', () => {
   });
 
   it('should create Maestro command', async () => {
-    const event = new MaestroEvent(5, false, 1000, 5, 10);
+    const event = { channel: 5, isServo: false, position: 1000, speed: 5, acceleration: 10 } as MaestroEvent;
     const cmd = {
       controllerId: coreLocId,
       moduleId: coreMaestroModId,
@@ -402,7 +402,7 @@ describe('script commands', () => {
   });
 
   it('should create generic I2C command', async () => {
-    const event = new I2cEvent('test val');
+    const event = { message: 'test val' } as I2cEvent;
     const cmd = {
       controllerId: coreLocId,
       moduleId: coreI2cModId,
@@ -427,7 +427,7 @@ describe('script commands', () => {
   });
 
   it('should create generic GPIO command', async () => {
-    const event = new GpioEvent(true);
+    const event = { setHigh: true } as GpioEvent;
     const cmd = {
       controllerId: coreLocId,
       moduleId: coreLocId,
@@ -502,7 +502,7 @@ function generateSerialScriptChannel(scriptId: string): ScriptChannel {
 }
 
 function generateCoreScriptSerialEventByDecSec(tenthOfSeconds: number, chId: string): ScriptEvent {
-  const evt = new GenericSerialEvent(`test ${tenthOfSeconds}`);
+  const evt = { value: `test ${tenthOfSeconds}` } as GenericSerialEvent;
 
   const sevt = new ScriptEvent(
     uuid(),
@@ -537,7 +537,7 @@ function coreGenericSeriaScriptCh(scriptId: string): ScriptChannel {
   );
 
   for (let i = 0; i < 3; i++) {
-    const evt = new GenericSerialEvent(`test ${i}`);
+    const evt = { value: `test ${i}` } as GenericSerialEvent;
     const sevt = new ScriptEvent(
       uuid(),
       scriptCh.id,
@@ -574,7 +574,7 @@ function domeGenericSerialScriptCh(scriptId: string): ScriptChannel {
 
   for (let i = 0; i < 6; i++) {
     if (i % 2 === 0) {
-      const evt = new GenericSerialEvent(`UART ${i}`);
+      const evt = { value: `UART ${i}` } as GenericSerialEvent;
       const sevt = new ScriptEvent(
         uuid(),
         scriptCh.id,
@@ -606,7 +606,7 @@ function domeI2cScriptCh(scriptId: string): ScriptChannel {
 
   for (let i = 0; i < 6; i++) {
     if (i % 2 !== 0) {
-      const evt = new I2cEvent(`I2C ${i}`);
+      const evt = { message: `I2C ${i}` } as I2cEvent;
       const sevt = new ScriptEvent(
         uuid(),
         scriptCh.id,

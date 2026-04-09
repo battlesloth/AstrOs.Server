@@ -18,7 +18,7 @@ export async function getLocations(db: Kysely<Database>, req: any, res: any, nex
   try {
     const repo = new LocationsRepository(db);
 
-    const response = new LocationCollection();
+    const response = {} as LocationCollection;
 
     const modules = await repo.getLocations();
 
@@ -96,7 +96,7 @@ async function loadLocations(db: Kysely<Database>, req: any, res: any, next: any
 
     const locations = await repo.loadLocations();
 
-    const response = new LocationCollection();
+    const response = {} as LocationCollection;
 
     logger.info(`loaded locations: ${locations.length}`);
 

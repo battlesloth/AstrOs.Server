@@ -180,11 +180,11 @@ export class ScriptRepository {
         });
 
       for (const dep of deployments) {
-        const status = new DeploymentStatus(
-          new Date(dep.last_deployed),
-          UploadStatus.uploaded,
-          dep.location_name || '',
-        );
+        const status: DeploymentStatus = {
+          date: new Date(dep.last_deployed),
+          value: UploadStatus.uploaded,
+          locationName: dep.location_name || '',
+        };
         scr.deploymentStatus[dep.location_id] = status;
       }
     }
@@ -231,11 +231,11 @@ export class ScriptRepository {
       });
 
     for (const dep of deployments) {
-      const status = new DeploymentStatus(
-        new Date(dep.last_deployed),
-        UploadStatus.uploaded,
-        dep.location_name || '',
-      );
+      const status: DeploymentStatus = {
+        date: new Date(dep.last_deployed),
+        value: UploadStatus.uploaded,
+        locationName: dep.location_name || '',
+      };
       result.deploymentStatus[dep.location_id] = status;
     }
 

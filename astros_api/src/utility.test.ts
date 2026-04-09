@@ -71,7 +71,7 @@ function generateSerialScriptChannel(scriptId: string): ScriptChannel {
 }
 
 function generateCoreScriptSerialEventByDecSec(tenthOfSeconds: number, chId: string): ScriptEvent {
-  const evt = new GenericSerialEvent(`test ${tenthOfSeconds}`);
+  const evt = { value: `test ${tenthOfSeconds}` } as GenericSerialEvent;
 
   const sevt = new ScriptEvent(
     uuid(),

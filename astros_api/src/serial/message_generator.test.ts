@@ -86,7 +86,7 @@ describe('Message Generator Tests', () => {
   it('generate Servo Test', () => {
     const generator = new MessageGenerator();
 
-    const cmd = new ServoTest('AA:BB:CC:DD:EE:01', 'dome', ModuleSubType.maestro, 3, 5, 1500);
+    const cmd: ServoTest = { controllerAddress: 'AA:BB:CC:DD:EE:01', controllerName: 'dome', moduleSubType: ModuleSubType.maestro, moduleIdx: 3, channelNumber: 5, msValue: 1500 };
 
     const message = generator.generateMessage(SerialMessageType.SERVO_TEST, 'msg-1', cmd);
 

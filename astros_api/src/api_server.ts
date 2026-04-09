@@ -461,11 +461,11 @@ class ApiServer {
 
       logger.info(`Controllers after registration sync: ${JSON.stringify(controllers)}`);
 
-      const update = new ControllersResponse(val.success, controllers);
+      const update: ControllersResponse = { type: TransmissionType.controllers, success: val.success, message: '', controllers };
       this.updateClients(update);
     } catch (error) {
       logger.error(`Error handling registration response: ${error}`);
-      this.updateClients(new ControllersResponse(false, []));
+      this.updateClients({ type: TransmissionType.controllers, success: false, message: '', controllers: [] } as ControllersResponse);
     }
   }
 
@@ -490,12 +490,15 @@ class ApiServer {
         return;
       }
 
-      const update = new StatusResponse(
-        controller.id,
-        location.locationName,
-        true,
-        val.controller.fingerprint === location.configFingerprint,
-      );
+      const update: StatusResponse = {
+        type: TransmissionType.status,
+        success: true,
+        message: '',
+        controllerId: controller.id,
+        controllerLocation: location.locationName,
+        up: true,
+        synced: val.controller.fingerprint === location.configFingerprint,
+      };
 
       this.updateClients(update);
     } catch (error) {
@@ -536,17 +539,12 @@ class ApiServer {
 
         await scriptRepo.updateScriptControllerUploaded(val.scriptId, locId, now);
 
-        const update = new ScriptResponse(val.scriptId, locId, TransmissionStatus.success, now);
+        const update: ScriptResponse = { type: TransmissionType.script, success: true, message: '', scriptId: val.scriptId, locationId: locId, status: TransmissionStatus.success, date: now };
 
         this.updateClients(update);
       } else {
         const deployDate = await scriptRepo.getLastScriptUploadedDate(val.scriptId, locId);
-        const update = new ScriptResponse(
-          val.scriptId,
-          locId,
-          TransmissionStatus.failed,
-          deployDate,
-        );
+        const update: ScriptResponse = { type: TransmissionType.script, success: true, message: '', scriptId: val.scriptId, locationId: locId, status: TransmissionStatus.failed, date: deployDate };
 
         this.updateClients(update);
       }
@@ -859,14 +857,14 @@ class ApiServer {
       // this will hammer logs
       //logger.debug(`sending servo command: ${data.controllerId}:${data.servoId}:${data.value}`);
 
-      const cmd = new ServoTest(
-        data.controllerAddress,
-        data.controllerName,
-        data.moduleSubType,
-        data.moduleIdx,
-        data.channelNumber,
-        data.value,
-      );
+      const cmd: ServoTest = {
+        controllerAddress: data.controllerAddress,
+        controllerName: data.controllerName,
+        moduleSubType: data.moduleSubType,
+        moduleIdx: data.moduleIdx,
+        channelNumber: data.channelNumber,
+        msValue: data.value,
+      };
 
       this.serialWorker.postMessage({
         type: SerialMessageType.SERVO_TEST,

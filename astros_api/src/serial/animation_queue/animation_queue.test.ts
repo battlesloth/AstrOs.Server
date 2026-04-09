@@ -92,10 +92,7 @@ describe('Animation Queue Tests', () => {
       const dispatch = vi.fn();
       const queue = new AnimationQueue(dispatch);
 
-      const subTracks: QueueTrack[] = [
-        makeTrack('sub1', 500),
-        makeTrack('sub2', 300),
-      ];
+      const subTracks: QueueTrack[] = [makeTrack('sub1', 500), makeTrack('sub2', 300)];
 
       const playlist = makePlaylist({
         playlistType: PlaylistType.Sequential,
@@ -141,15 +138,11 @@ describe('Animation Queue Tests', () => {
       const randomSpy = vi.spyOn(Math, 'random');
       randomSpy
         .mockReturnValueOnce(0.99) // i=2: j=2
-        .mockReturnValueOnce(0.0);  // i=1: j=0
+        .mockReturnValueOnce(0.0); // i=1: j=0
 
       const playlist = makePlaylist({
         playlistType: PlaylistType.Shuffle,
-        tracks: [
-          makeTrack('track1', 100),
-          makeTrack('track2', 100),
-          makeTrack('track3', 100),
-        ],
+        tracks: [makeTrack('track1', 100), makeTrack('track2', 100), makeTrack('track3', 100)],
       });
 
       queue.addToQueue(playlist);
@@ -543,12 +536,8 @@ describe('Animation Queue Tests', () => {
       expect(dispatch2).toHaveBeenCalledTimes(0);
 
       // Now add a real playlist — it should start immediately since queue is idle
-      const realPlaylist2 = makePlaylist({
-        id: 'real2',
-        playlistType: PlaylistType.Sequential,
-        tracks: [makeTrack('real-track2', 100)],
-      });
-      queue2.addToQueue(realPlaylist2);
+
+      queue2.addToQueue(realPlaylist);
       expect(dispatch2).toHaveBeenCalledTimes(1);
       expect(dispatch2).toHaveBeenCalledWith('real-track2', []);
     });

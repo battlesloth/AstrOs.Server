@@ -5,7 +5,6 @@ import { SerialMessageType } from './serial_message.js';
 import { MessageHelper } from './message_helper.js';
 import {
   ConfigSyncResponse,
-  ISerialWorkerResponse,
   RegistrationResponse,
   ScriptDeployResponse,
   SerialWorkerResponseType,
@@ -157,12 +156,7 @@ describe('SerialMessageService', () => {
       const service = new SerialMessageService(vi.fn());
 
       // SERVO_TEST is not in MessageTimeouts
-      service.setMessageTimeout(
-        SerialMessageType.SERVO_TEST,
-        'msg-1',
-        ['AA:BB:CC:DD:EE:01'],
-        null,
-      );
+      service.setMessageTimeout(SerialMessageType.SERVO_TEST, 'msg-1', ['AA:BB:CC:DD:EE:01'], null);
 
       expect(service.messageTracker.has('msg-1')).toBe(false);
     });
@@ -170,19 +164,9 @@ describe('SerialMessageService', () => {
     it('should not create duplicate tracker for same msgId', () => {
       const service = new SerialMessageService(vi.fn());
 
-      service.setMessageTimeout(
-        SerialMessageType.RUN_SCRIPT,
-        'msg-1',
-        ['AA:BB:CC:DD:EE:01'],
-        null,
-      );
+      service.setMessageTimeout(SerialMessageType.RUN_SCRIPT, 'msg-1', ['AA:BB:CC:DD:EE:01'], null);
 
-      service.setMessageTimeout(
-        SerialMessageType.RUN_SCRIPT,
-        'msg-1',
-        ['AA:BB:CC:DD:EE:02'],
-        null,
-      );
+      service.setMessageTimeout(SerialMessageType.RUN_SCRIPT, 'msg-1', ['AA:BB:CC:DD:EE:02'], null);
 
       // Should still have original tracker with first controller
       const tracker = service.messageTracker.get('msg-1')!;

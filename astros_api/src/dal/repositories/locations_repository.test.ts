@@ -6,7 +6,6 @@ import { migrateToLatest } from '../database.js';
 import { LocationsRepository } from './locations_repository.js';
 import { ControllerRepository } from './controller_repository.js';
 import { ControlModule } from '../../models/control_module/control_module.js';
-import { ControllerLocation } from '../../models/control_module/controller_location.js';
 import { UartModule } from '../../models/control_module/uart/uart_module.js';
 import { I2cModule } from '../../models/control_module/i2c/i2c_module.js';
 import { ModuleSubType } from '../../models/enums.js';
@@ -187,7 +186,14 @@ describe('LocationsRepository', () => {
       const body = locations.find((l) => l.locationName === 'body')!;
 
       const moduleId = uuid();
-      const i2cModule = new I2cModule(1, moduleId, 'PCA9685', body.id, 0x40, ModuleSubType.genericI2C);
+      const i2cModule = new I2cModule(
+        1,
+        moduleId,
+        'PCA9685',
+        body.id,
+        0x40,
+        ModuleSubType.genericI2C,
+      );
       body.i2cModules = [i2cModule];
 
       await repo.updateLocation(body);

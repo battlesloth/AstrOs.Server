@@ -357,7 +357,7 @@ describe('Script Repository', () => {
       ModuleType.gpio,
       ModuleSubType.genericGpio,
       5.5,
-      new GpioEvent(true),
+      { setHigh: true } as GpioEvent,
     );
 
     scriptChannel.events[eventId] = scriptEvent;
@@ -440,7 +440,7 @@ describe('Script Repository', () => {
       0,
     );
 
-    const maestroEvent = new MaestroEvent(0, true, 1500, 0, 0); // Channel is 0 initially
+    const maestroEvent = { channel: 0, isServo: true, position: 1500, speed: 0, acceleration: 0 } as MaestroEvent; // Channel is 0 initially
     const scriptEvent = new ScriptEvent(
       eventId,
       scriptChannel.id,
@@ -579,17 +579,17 @@ describe('Script Repository', () => {
 
     // Create HCR commands
     const hcrCommands = [
-      new HcrCommand(uuid(), HcrCommandCategory.stimuli, HumanCyborgRelationsCmd.mildHappy, 0, 0),
-      new HcrCommand(
-        uuid(),
-        HcrCommandCategory.volume,
-        HumanCyborgRelationsCmd.vocalizerVolume,
-        75,
-        0,
-      ),
+      { id: uuid(), category: HcrCommandCategory.stimuli, command: HumanCyborgRelationsCmd.mildHappy, valueA: 0, valueB: 0 } as HcrCommand,
+      {
+        id: uuid(),
+        category: HcrCommandCategory.volume,
+        command: HumanCyborgRelationsCmd.vocalizerVolume,
+        valueA: 75,
+        valueB: 0,
+      } as HcrCommand,
     ];
 
-    const hcrEvent = new HumanCyborgRelationsEvent(hcrCommands);
+    const hcrEvent = { commands: hcrCommands } as HumanCyborgRelationsEvent;
     const scriptEvent = new ScriptEvent(
       eventId,
       scriptChannel.id,
