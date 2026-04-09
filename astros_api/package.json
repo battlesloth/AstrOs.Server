@@ -63,6 +63,7 @@
     "@types/ws": "^8.2.2",
     "@typescript-eslint/eslint-plugin": "^5.8.0",
     "@typescript-eslint/parser": "^5.8.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "@zerollup/ts-transform-paths": "^1.7.18",
     "eslint": "^8.5.0",
     "eslint-plugin-require-extensions": "^0.1.3",

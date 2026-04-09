@@ -1,5 +1,6 @@
 import { PlaylistRepository } from '../dal/repositories/playlist_repository.js';
-import { db } from '../dal/database.js';
+import { Kysely } from 'kysely';
+import { Database } from '../dal/types.js';
 import { ScriptRepository } from '../dal/repositories/script_repository.js';
 import { logger } from '../logger.js';
 import { Router } from 'express';
@@ -11,16 +12,16 @@ const copyRoute = '/scripts/copy';
 const getAllRoute = '/scripts/all';
 const getAllScriptNamesRoute = '/scripts/all-names';
 
-export function registerScriptRoutes(router: Router, authHandler: any) {
-  router.get(getRoute, authHandler, getScript);
-  router.get(getAllRoute, authHandler, getAllScripts);
-  router.get(getAllScriptNamesRoute, authHandler, getAllScriptNames);
-  router.put(putRoute, authHandler, saveScript);
-  router.delete(deleteRoute, authHandler, deleteScript);
-  router.post(copyRoute, authHandler, copyScript);
+export function registerScriptRoutes(router: Router, authHandler: any, db: Kysely<Database>) {
+  router.get(getRoute, authHandler, (req: any, res: any, next: any) => getScript(db, req, res, next));
+  router.get(getAllRoute, authHandler, (req: any, res: any, next: any) => getAllScripts(db, req, res, next));
+  router.get(getAllScriptNamesRoute, authHandler, (req: any, res: any, next: any) => getAllScriptNames(db, req, res, next));
+  router.put(putRoute, authHandler, (req: any, res: any, next: any) => saveScript(db, req, res, next));
+  router.delete(deleteRoute, authHandler, (req: any, res: any, next: any) => deleteScript(db, req, res, next));
+  router.post(copyRoute, authHandler, (req: any, res: any, next: any) => copyScript(db, req, res, next));
 }
 
-async function getAllScripts(req: any, res: any, next: any) {
+async function getAllScripts(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ScriptRepository(db);
 
@@ -38,7 +39,7 @@ async function getAllScripts(req: any, res: any, next: any) {
   }
 }
 
-async function getAllScriptNames(req: any, res: any, next: any) {
+async function getAllScriptNames(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ScriptRepository(db);
 
@@ -61,7 +62,7 @@ async function getAllScriptNames(req: any, res: any, next: any) {
   }
 }
 
-async function getScript(req: any, res: any, next: any) {
+async function getScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ScriptRepository(db);
 
@@ -79,7 +80,7 @@ async function getScript(req: any, res: any, next: any) {
   }
 }
 
-async function saveScript(req: any, res: any, next: any) {
+async function saveScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ScriptRepository(db);
 
@@ -102,7 +103,7 @@ async function saveScript(req: any, res: any, next: any) {
   }
 }
 
-async function deleteScript(req: any, res: any, next: any) {
+export async function deleteScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const scriptRepo = new ScriptRepository(db);
     const playlistRepo = new PlaylistRepository(db);
@@ -122,7 +123,7 @@ async function deleteScript(req: any, res: any, next: any) {
   }
 }
 
-async function copyScript(req: any, res: any, next: any) {
+async function copyScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ScriptRepository(db);
 

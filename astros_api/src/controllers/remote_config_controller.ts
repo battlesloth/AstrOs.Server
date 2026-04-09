@@ -1,20 +1,21 @@
 import { M5Page, M5ScriptList, M5Button } from '../models/index.js';
 import { RemoteConfigRepository } from '../dal/repositories/remote_config_repository.js';
 import { logger } from '../logger.js';
-import { db } from '../dal/database.js';
+import { Kysely } from 'kysely';
+import { Database } from '../dal/types.js';
 import { Router } from 'express';
 
 const getRoute = '/remoteConfig/';
 const putRoute = '/remoteConfig/';
 const syncRoute = '/remotecontrolsync';
 
-export function registerRemoteConfigRoutes(router: Router, authHandler: any, tokenValidator: any) {
-  router.get(getRoute, authHandler, getRemoteConfig);
-  router.put(putRoute, authHandler, saveRemoteConfig);
-  router.get(syncRoute, tokenValidator, syncRemoteConfig);
+export function registerRemoteConfigRoutes(router: Router, authHandler: any, tokenValidator: any, db: Kysely<Database>) {
+  router.get(getRoute, authHandler, (req: any, res: any, next: any) => getRemoteConfig(db, req, res, next));
+  router.put(putRoute, authHandler, (req: any, res: any, next: any) => saveRemoteConfig(db, req, res, next));
+  router.get(syncRoute, tokenValidator, (req: any, res: any, next: any) => syncRemoteConfig(db, req, res, next));
 }
 
-async function syncRemoteConfig(req: any, res: any, next: any) {
+async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
   logger.info('Syncing remote config to device');
 
   try {
@@ -57,7 +58,7 @@ async function syncRemoteConfig(req: any, res: any, next: any) {
   }
 }
 
-async function getRemoteConfig(req: any, res: any, next: any) {
+async function getRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new RemoteConfigRepository(db);
 
@@ -75,7 +76,7 @@ async function getRemoteConfig(req: any, res: any, next: any) {
   }
 }
 
-async function saveRemoteConfig(req: any, res: any, next: any) {
+async function saveRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new RemoteConfigRepository(db);
 

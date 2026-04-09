@@ -283,18 +283,18 @@ class ApiServer {
       //userProperty: 'payload'
     });
 
-    this.apiKeyValidator = ApiKeyValidator();
+    this.apiKeyValidator = ApiKeyValidator(db);
   }
 
   private setRoutes(): void {
     registerAuthRoutes(this.router);
-    registerLocationRoutes(this.router, this.authHandler);
-    registerScriptRoutes(this.router, this.authHandler);
-    registerPlaylistRoutes(this.router, this.authHandler);
-    registerRemoteConfigRoutes(this.router, this.authHandler, this.apiKeyValidator);
-    registerSettingsRoutes(this.router, this.authHandler);
-    registerAudioRoutes(this.router, this.authHandler);
-    registerFileRoutes(this.router, this.authHandler);
+    registerLocationRoutes(this.router, this.authHandler, db);
+    registerScriptRoutes(this.router, this.authHandler, db);
+    registerPlaylistRoutes(this.router, this.authHandler, db);
+    registerRemoteConfigRoutes(this.router, this.authHandler, this.apiKeyValidator, db);
+    registerSettingsRoutes(this.router, this.authHandler, db);
+    registerAudioRoutes(this.router, this.authHandler, db);
+    registerFileRoutes(this.router, this.authHandler, db);
 
     this.router.get('/check-session', this.authHandler, (req: any, res: any, next: any) => {
       res.status(200);

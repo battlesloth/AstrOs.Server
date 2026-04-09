@@ -1,7 +1,8 @@
 import { SettingsRepository } from '../dal/repositories/settings_repository.js';
 import { logger } from '../logger.js';
 import { ControllerRepository } from '../dal/repositories/controller_repository.js';
-import { db } from '../dal/database.js';
+import { Kysely } from 'kysely';
+import { Database } from '../dal/types.js';
 import appdata from 'appdata-path';
 import fs from 'fs';
 import archiver from 'archiver';
@@ -12,14 +13,14 @@ const putRoute = '/settings/';
 const controllersRoute = '/settings/controllers';
 const logDownloadRoute = '/settings/logs';
 
-export function registerSettingsRoutes(router: Router, auth: any) {
-  router.get(getRoute, auth, getSetting);
-  router.put(putRoute, auth, saveSetting);
-  router.get(controllersRoute, auth, getControllers);
-  router.get(logDownloadRoute, auth, downloadLogs);
+export function registerSettingsRoutes(router: Router, auth: any, db: Kysely<Database>) {
+  router.get(getRoute, auth, (req: any, res: any, next: any) => getSetting(db, req, res, next));
+  router.put(putRoute, auth, (req: any, res: any, next: any) => saveSetting(db, req, res, next));
+  router.get(controllersRoute, auth, (req: any, res: any, next: any) => getControllers(db, req, res, next));
+  router.get(logDownloadRoute, auth, (req: any, res: any, next: any) => downloadLogs(db, req, res, next));
 }
 
-async function getSetting(req: any, res: any, next: any) {
+async function getSetting(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new SettingsRepository(db);
 
@@ -37,7 +38,7 @@ async function getSetting(req: any, res: any, next: any) {
   }
 }
 
-async function saveSetting(req: any, res: any, next: any) {
+async function saveSetting(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new SettingsRepository(db);
 
@@ -60,7 +61,7 @@ async function saveSetting(req: any, res: any, next: any) {
   }
 }
 
-async function getControllers(req: any, res: any, next: any) {
+async function getControllers(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ControllerRepository(db);
 
@@ -78,7 +79,7 @@ async function getControllers(req: any, res: any, next: any) {
   }
 }
 
-async function downloadLogs(req: any, res: any, next: any) {
+async function downloadLogs(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const logDir = `${appdata('astrosserver')}/logs/`;
     const files = await fs.promises.readdir(logDir);

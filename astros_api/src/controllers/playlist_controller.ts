@@ -1,4 +1,5 @@
-import { db } from '../dal/database.js';
+import { Kysely } from 'kysely';
+import { Database } from '../dal/types.js';
 import { PlaylistRepository } from '../dal/repositories/playlist_repository.js';
 import { logger } from '../logger.js';
 
@@ -7,16 +8,16 @@ const getAllRoute = '/playlists/all';
 const copyRoute = '/playlists/copy';
 const getPlaylistNamesThatUseScriptRoute = '/playlists/usedByScript';
 
-export function registerPlaylistRoutes(router: any, auth: any) {
-  router.get(getAllRoute, auth, getAllPlaylists);
-  router.get(route, auth, getPlaylist);
-  router.put(route, auth, savePlaylist);
-  router.delete(route, auth, deletePlaylist);
-  router.post(copyRoute, auth, copyPlaylist);
-  router.get(getPlaylistNamesThatUseScriptRoute, auth, getPlaylistNamesThatUseScript);
+export function registerPlaylistRoutes(router: any, auth: any, db: Kysely<Database>) {
+  router.get(getAllRoute, auth, (req: any, res: any, next: any) => getAllPlaylists(db, req, res, next));
+  router.get(route, auth, (req: any, res: any, next: any) => getPlaylist(db, req, res, next));
+  router.put(route, auth, (req: any, res: any, next: any) => savePlaylist(db, req, res, next));
+  router.delete(route, auth, (req: any, res: any, next: any) => deletePlaylist(db, req, res, next));
+  router.post(copyRoute, auth, (req: any, res: any, next: any) => copyPlaylist(db, req, res, next));
+  router.get(getPlaylistNamesThatUseScriptRoute, auth, (req: any, res: any, next: any) => getPlaylistNamesThatUseScript(db, req, res, next));
 }
 
-async function getAllPlaylists(req: any, res: any, next: any) {
+async function getAllPlaylists(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new PlaylistRepository(db);
     const playlists = await repo.getAllPlaylists();
@@ -30,7 +31,7 @@ async function getAllPlaylists(req: any, res: any, next: any) {
   }
 }
 
-async function getPlaylist(req: any, res: any, next: any) {
+export async function getPlaylist(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new PlaylistRepository(db);
     const playlist = await repo.getPlaylist(req.query.id);
@@ -49,7 +50,7 @@ async function getPlaylist(req: any, res: any, next: any) {
   }
 }
 
-async function savePlaylist(req: any, res: any, next: any) {
+async function savePlaylist(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new PlaylistRepository(db);
     if (await repo.upsertPlaylist(req.body)) {
@@ -66,7 +67,7 @@ async function savePlaylist(req: any, res: any, next: any) {
   }
 }
 
-async function deletePlaylist(req: any, res: any, next: any) {
+async function deletePlaylist(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new PlaylistRepository(db);
     if (await repo.deletePlaylist(req.query.id)) {
@@ -83,7 +84,7 @@ async function deletePlaylist(req: any, res: any, next: any) {
   }
 }
 
-async function copyPlaylist(req: any, res: any, next: any) {
+async function copyPlaylist(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new PlaylistRepository(db);
     const copiedPlaylist = await repo.copyPlaylist(req.body.id);
@@ -102,7 +103,7 @@ async function copyPlaylist(req: any, res: any, next: any) {
   }
 }
 
-async function getPlaylistNamesThatUseScript(req: any, res: any, next: any) {
+async function getPlaylistNamesThatUseScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new PlaylistRepository(db);
     const names = await repo.getPlaylistNamesThatUseScript(req.query.scriptId);

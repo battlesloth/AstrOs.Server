@@ -1,9 +1,10 @@
 import { RequestHandler } from 'express';
 import { SettingsRepository } from './dal/repositories/settings_repository.js';
 import { logger } from './logger.js';
-import { db } from './dal/database.js';
+import { Kysely } from 'kysely';
+import { Database } from './dal/types.js';
 
-export function ApiKeyValidator(): RequestHandler {
+export function ApiKeyValidator(db: Kysely<Database>): RequestHandler {
   return async (req, res, next) => {
     logger.info('Validating API key', req);
 

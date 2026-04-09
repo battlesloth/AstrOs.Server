@@ -1,19 +1,20 @@
 import { Constants, LocationCollection } from '../models/index.js';
 import { logger } from '../logger.js';
 import { LocationsRepository } from '../dal/repositories/locations_repository.js';
-import { db } from '../dal/database.js';
 import { Router } from 'express';
+import { Kysely } from 'kysely';
+import { Database } from '../dal/types.js';
 
 const route = '/locations/';
 const loadRoute = '/locations/load';
 
-export function registerLocationRoutes(router: Router, authHandler: any) {
-  router.get(route, authHandler, getLocations);
-  router.post(route, authHandler, saveLocations);
-  router.get(loadRoute, authHandler, loadLocations);
+export function registerLocationRoutes(router: Router, authHandler: any, db: Kysely<Database>) {
+  router.get(route, authHandler, (req: any, res: any, next: any) => getLocations(db, req, res, next));
+  router.post(route, authHandler, (req: any, res: any, next: any) => saveLocations(db, req, res, next));
+  router.get(loadRoute, authHandler, (req: any, res: any, next: any) => loadLocations(db, req, res, next));
 }
 
-export async function getLocations(req: any, res: any, next: any) {
+export async function getLocations(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new LocationsRepository(db);
 
@@ -50,7 +51,7 @@ export async function getLocations(req: any, res: any, next: any) {
   }
 }
 
-async function saveLocations(req: any, res: any, next: any) {
+async function saveLocations(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new LocationsRepository(db);
 
@@ -89,7 +90,7 @@ async function saveLocations(req: any, res: any, next: any) {
   }
 }
 
-async function loadLocations(req: any, res: any, next: any) {
+async function loadLocations(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new LocationsRepository(db);
 

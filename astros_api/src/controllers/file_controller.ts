@@ -3,7 +3,8 @@ import { AudioFileRepository } from '../dal/repositories/audio_file_repository.j
 import { v4 as uuid_v4 } from 'uuid';
 import { UploadedFile } from 'express-fileupload';
 import { logger } from '../logger.js';
-import { db } from '../dal/database.js';
+import { Kysely } from 'kysely';
+import { Database } from '../dal/types.js';
 import { Router } from 'express';
 
 // https://github.com/expressjs/multer/blob/master/StorageEngine.md
@@ -13,11 +14,11 @@ function StoragePath() {
   return `${appdata('astrosserver')}/files/`;
 }
 
-export function registerFileRoutes(router: Router, authHandler: any) {
-  router.post(audioUploadRoute, authHandler, HandleFile);
+export function registerFileRoutes(router: Router, authHandler: any, db: Kysely<Database>) {
+  router.post(audioUploadRoute, authHandler, (req: any, res: any) => HandleFile(db, req, res));
 }
 
-async function HandleFile(req: any, res: any) {
+async function HandleFile(db: Kysely<Database>, req: any, res: any) {
   try {
     if (!req.files) {
       return res.status(400).send('No files uploaded');
