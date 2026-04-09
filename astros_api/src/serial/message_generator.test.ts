@@ -3,6 +3,9 @@ import { MessageGenerator } from './message_generator.js';
 import { MessageHelper } from './message_helper.js';
 import { SerialMessageType } from './serial_message.js';
 import { ConfigSync } from '../models/config/config_sync.js';
+import { ScriptRun } from '../models/scripts/script_run.js';
+import { ScriptUpload } from '../models/scripts/script_upload.js';
+import { ServoTest } from '../models/servo_test.js';
 import {
   ControlModule,
   ControllerLocation,
@@ -32,6 +35,87 @@ describe('Message Generator Tests', () => {
     expect(message.controllers.length).toBe(1);
     expect(message.controllers[0]).toBe('00:00:00:00:00:00');
     expect(message.msg).toBe(`1${RS}REGISTRATION_SYNC${RS}123\n`);
+  });
+
+  it('generate Run Script', () => {
+    const generator = new MessageGenerator();
+
+    const loc = new ControllerLocation(uuid(), 'dome', '', '');
+    loc.controller = new ControlModule(uuid(), 'dome', 'AA:BB:CC:DD:EE:01');
+    const scriptRun = new ScriptRun('script-xyz', [loc]);
+
+    const message = generator.generateMessage(SerialMessageType.RUN_SCRIPT, 'msg-1', scriptRun);
+
+    expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
+    expect(message.metaData).toBe('script-xyz');
+    expect(message.msg).toContain(`${RS}RUN_SCRIPT${RS}msg-1`);
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}script-xyz`);
+  });
+
+  it('generate Deploy Script', () => {
+    const generator = new MessageGenerator();
+
+    const loc = new ControllerLocation(uuid(), 'dome', '', '');
+    loc.controller = new ControlModule(uuid(), 'dome', 'AA:BB:CC:DD:EE:01');
+    const scripts = new Map<string, string>();
+    scripts.set(loc.id, 'script-content-here');
+    const upload = new ScriptUpload('script-xyz', scripts, [loc]);
+
+    const message = generator.generateMessage(SerialMessageType.DEPLOY_SCRIPT, 'msg-1', upload);
+
+    expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
+    expect(message.metaData).toBe('script-xyz');
+    expect(message.msg).toContain(`${RS}DEPLOY_SCRIPT${RS}msg-1`);
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}script-xyz${US}script-content-here`);
+  });
+
+  it('generate Panic Stop', () => {
+    const generator = new MessageGenerator();
+
+    const loc = new ControllerLocation(uuid(), 'dome', '', '');
+    loc.controller = new ControlModule(uuid(), 'dome', 'AA:BB:CC:DD:EE:01');
+    const scriptRun = new ScriptRun('panic', [loc]);
+
+    const message = generator.generateMessage(SerialMessageType.PANIC_STOP, 'msg-1', scriptRun);
+
+    expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
+    expect(message.msg).toContain(`${RS}PANIC_STOP${RS}msg-1`);
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}PANIC`);
+  });
+
+  it('generate Servo Test', () => {
+    const generator = new MessageGenerator();
+
+    const cmd = new ServoTest('AA:BB:CC:DD:EE:01', 'dome', ModuleSubType.maestro, 3, 5, 1500);
+
+    const message = generator.generateMessage(SerialMessageType.SERVO_TEST, 'msg-1', cmd);
+
+    expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}${ModuleSubType.maestro}:3:5:1500`);
+  });
+
+  it('generate Format SD', () => {
+    const generator = new MessageGenerator();
+
+    const controllers = [
+      { address: 'AA:BB:CC:DD:EE:01', name: 'dome' },
+      { address: 'AA:BB:CC:DD:EE:02', name: 'body' },
+    ];
+
+    const message = generator.generateMessage(SerialMessageType.FORMAT_SD, 'msg-1', controllers);
+
+    expect(message.msg).toContain(`${RS}FORMAT_SD${RS}msg-1`);
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}FORMAT`);
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:02${US}body${US}FORMAT`);
+  });
+
+  it('should return empty message for unknown type', () => {
+    const generator = new MessageGenerator();
+
+    const message = generator.generateMessage(999 as SerialMessageType, 'msg-1', null);
+
+    expect(message.msg).toBe('\n');
+    expect(message.controllers).toHaveLength(0);
   });
 
   it('generate Deploy Config', () => {

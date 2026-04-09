@@ -113,6 +113,118 @@ describe('Serial Message Handler Tests', () => {
     expect(response.registrations[1].address).toBe('mac2');
   });
 
+  // ── Deploy Config ACK ──────────────────────────────────────
+
+  it('handleDeployConfigAck should return valid response', () => {
+    const messageHandler = new MessageHandler();
+
+    const payload = 'mac1' + US + 'name1' + US + 'fingerprint1';
+    const response = messageHandler.handleDeployConfigAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.CONFIG_SYNC);
+    expect(response.success).toBe(true);
+    expect(response.controller.address).toBe('mac1');
+    expect(response.controller.name).toBe('name1');
+    expect(response.controller.fingerprint).toBe('fingerprint1');
+  });
+
+  it('handleDeployConfigAck should return UNKNOWN for invalid data', () => {
+    const messageHandler = new MessageHandler();
+
+    const payload = 'mac1' + US + 'name1'; // missing fingerprint
+    const response = messageHandler.handleDeployConfigAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  // ── Deploy Script ACK/NAK ────────────────────────────────
+
+  it('handleDeployScriptAckNak should return success for ACK', () => {
+    const messageHandler = new MessageHandler();
+
+    const payload = 'mac1' + US + 'name1' + US + 'script-xyz';
+    const response = messageHandler.handleDeployScriptAckNak(
+      SerialMessageType.DEPLOY_SCRIPT_ACK,
+      payload,
+    );
+
+    expect(response.type).toBe(SerialWorkerResponseType.SCRIPT_DEPLOY);
+    expect(response.success).toBe(true);
+    expect(response.scriptId).toBe('script-xyz');
+    expect(response.controller.address).toBe('mac1');
+  });
+
+  it('handleDeployScriptAckNak should return failure for NAK', () => {
+    const messageHandler = new MessageHandler();
+
+    const payload = 'mac1' + US + 'name1' + US + 'script-xyz';
+    const response = messageHandler.handleDeployScriptAckNak(
+      SerialMessageType.DEPLOY_SCRIPT_NAK,
+      payload,
+    );
+
+    expect(response.success).toBe(false);
+    expect(response.scriptId).toBe('script-xyz');
+  });
+
+  it('handleDeployScriptAckNak should return UNKNOWN for invalid data', () => {
+    const messageHandler = new MessageHandler();
+
+    const payload = 'mac1' + US + 'name1'; // missing scriptId
+    const response = messageHandler.handleDeployScriptAckNak(
+      SerialMessageType.DEPLOY_SCRIPT_ACK,
+      payload,
+    );
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+    expect(response.success).toBe(false);
+  });
+
+  // ── Run Script ACK/NAK ───────────────────────────────────
+
+  it('handleRunScriptAckNak should return success for ACK', () => {
+    const messageHandler = new MessageHandler();
+
+    const payload = 'mac1' + US + 'name1' + US + 'script-abc';
+    const response = messageHandler.handleRunScriptAckNak(
+      SerialMessageType.RUN_SCRIPT_ACK,
+      payload,
+    );
+
+    expect(response.type).toBe(SerialWorkerResponseType.SCRIPT_RUN);
+    expect(response.success).toBe(true);
+    expect(response.scriptId).toBe('script-abc');
+    expect(response.controller.address).toBe('mac1');
+  });
+
+  it('handleRunScriptAckNak should return failure for NAK', () => {
+    const messageHandler = new MessageHandler();
+
+    const payload = 'mac1' + US + 'name1' + US + 'script-abc';
+    const response = messageHandler.handleRunScriptAckNak(
+      SerialMessageType.RUN_SCRIPT_NAK,
+      payload,
+    );
+
+    expect(response.success).toBe(false);
+    expect(response.scriptId).toBe('script-abc');
+  });
+
+  it('handleRunScriptAckNak should return UNKNOWN for invalid data', () => {
+    const messageHandler = new MessageHandler();
+
+    const payload = 'mac1'; // missing name and scriptId
+    const response = messageHandler.handleRunScriptAckNak(
+      SerialMessageType.RUN_SCRIPT_ACK,
+      payload,
+    );
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+    expect(response.success).toBe(false);
+  });
+
+  // ── Registration (existing tests below) ──────────────────
+
   it('handleRegistraionSyncAck should return valid response with invalid records', () => {
     const messageHandler = new MessageHandler();
 

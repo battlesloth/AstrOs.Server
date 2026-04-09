@@ -218,6 +218,25 @@ describe('Script Converter Tests', () => {
     expect(coreSegs?.[3]).toBe(`3|${ttevt4ms}|1|9600|test ${evt3Time}`);
     expect(coreSegs?.[4]).toBe(`3|0|1|9600|test ${evt4Time}`);
   });
+
+  it('empty script with no channels should return buffer-only scripts for all locations', async () => {
+    const scriptId = 'emptyScript';
+
+    const script = new Script(scriptId, 'empty', 'empty', new Date());
+    // No channels added
+    mockRepo.getScript.calledWith(scriptId).mockResolvedValue(script);
+
+    const converter = new ScriptConverter(mockRepo);
+    const result = await converter.convertScript(scriptId);
+
+    expect(result).toBeDefined();
+    expect(result.size).toBe(3); // all 3 locations
+
+    // Each location gets a no-op buffer terminator
+    for (const [, value] of result) {
+      expect(value).toBe('0|0|0');
+    }
+  });
 });
 
 //#endregion

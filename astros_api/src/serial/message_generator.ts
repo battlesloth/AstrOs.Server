@@ -270,7 +270,7 @@ export class MessageGenerator {
   }
 
   generateRunCommand(header: string, data: any) {
-    if (!data.contoller.address) {
+    if (!data.controller.address) {
       return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
     }
 
@@ -285,7 +285,7 @@ export class MessageGenerator {
     const msg = result.join('');
 
     return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, [
-      data.contoller.address,
+      data.controller.address,
     ]);
   }
 

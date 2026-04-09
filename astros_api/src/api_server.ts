@@ -457,11 +457,11 @@ class ApiServer {
 
       await controllerRepo.insertControllers(val.registrations);
 
-      const contollers = await controllerRepo.getControllers();
+      const controllers = await controllerRepo.getControllers();
 
-      logger.info(`Controllers after registration sync: ${JSON.stringify(contollers)}`);
+      logger.info(`Controllers after registration sync: ${JSON.stringify(controllers)}`);
 
-      const update = new ControllersResponse(val.success, contollers);
+      const update = new ControllersResponse(val.success, controllers);
       this.updateClients(update);
     } catch (error) {
       logger.error(`Error handling registration response: ${error}`);
