@@ -4,12 +4,13 @@ import { SerialMessageTracker } from './serial_message_tracker.js';
 import { SerialMessageType } from './serial_message.js';
 import { MessageHelper } from './message_helper.js';
 import {
+  SerialWorkerResponseType,
+} from './serial_worker_response.js';
+import type {
   ConfigSyncResponse,
   RegistrationResponse,
   ScriptDeployResponse,
-  SerialWorkerResponseType,
 } from './serial_worker_response.js';
-import { ControlModule } from '../models/control_module/control_module.js';
 
 const GS = MessageHelper.GS;
 const RS = MessageHelper.RS;
@@ -20,7 +21,7 @@ const US = MessageHelper.US;
  * Format: type{RS}validationString{RS}msgId{GS}payload
  */
 function buildMessage(type: SerialMessageType, msgId: string, payload: string): string {
-  const validationStr = MessageHelper.ValidationMap.get(type)!;
+  const validationStr = MessageHelper.ValidationMap.get(type) as string;
   return `${type}${RS}${validationStr}${RS}${msgId}${GS}${payload}`;
 }
 
@@ -148,8 +149,9 @@ describe('SerialMessageService', () => {
       );
 
       expect(service.messageTracker.has('msg-1')).toBe(true);
-      const tracker = service.messageTracker.get('msg-1')!;
-      expect(tracker.controllerStatus.size).toBe(2);
+      const tracker = service.messageTracker.get('msg-1');
+      expect(tracker).toBeDefined();
+      expect(tracker?.controllerStatus.size).toBe(2);
     });
 
     it('should not create tracker for untracked message types', () => {
@@ -169,9 +171,10 @@ describe('SerialMessageService', () => {
       service.setMessageTimeout(SerialMessageType.RUN_SCRIPT, 'msg-1', ['AA:BB:CC:DD:EE:02'], null);
 
       // Should still have original tracker with first controller
-      const tracker = service.messageTracker.get('msg-1')!;
-      expect(tracker.controllerStatus.has('AA:BB:CC:DD:EE:01')).toBe(true);
-      expect(tracker.controllerStatus.has('AA:BB:CC:DD:EE:02')).toBe(false);
+      const tracker = service.messageTracker.get('msg-1');
+      expect(tracker).toBeDefined();
+      expect(tracker?.controllerStatus.has('AA:BB:CC:DD:EE:01')).toBe(true);
+      expect(tracker?.controllerStatus.has('AA:BB:CC:DD:EE:02')).toBe(false);
     });
 
     it('should remove tracker when all controllers ACK', () => {
@@ -186,16 +189,14 @@ describe('SerialMessageService', () => {
       );
 
       // ACK from first controller
-      const ack1 = new ScriptDeployResponse(true, 'script-1');
-      ack1.controller = new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01');
+      const ack1 = { type: SerialWorkerResponseType.SCRIPT_DEPLOY, success: true, scriptId: 'script-1', controller: { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' } } as ScriptDeployResponse;
       service.updateTracker('msg-1', ack1);
 
       // Tracker should still exist (one pending)
       expect(service.messageTracker.has('msg-1')).toBe(true);
 
       // ACK from second controller
-      const ack2 = new ScriptDeployResponse(true, 'script-1');
-      ack2.controller = new ControlModule('', 'body', 'AA:BB:CC:DD:EE:02');
+      const ack2 = { type: SerialWorkerResponseType.SCRIPT_DEPLOY, success: true, scriptId: 'script-1', controller: { id: '', name: 'body', address: 'AA:BB:CC:DD:EE:02' } } as ScriptDeployResponse;
       service.updateTracker('msg-1', ack2);
 
       // Tracker should be deleted
@@ -212,7 +213,7 @@ describe('SerialMessageService', () => {
         null,
       );
 
-      const ack = new RegistrationResponse(true);
+      const ack: RegistrationResponse = { type: SerialWorkerResponseType.REGISTRATION_SYNC, success: true, registrations: [] };
       service.updateTracker('msg-1', ack);
 
       expect(service.messageTracker.has('msg-1')).toBe(false);
@@ -221,8 +222,7 @@ describe('SerialMessageService', () => {
     it('should ignore updateTracker for unknown msgId', () => {
       const service = new SerialMessageService(vi.fn());
 
-      const ack = new ConfigSyncResponse(true);
-      ack.controller = new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01');
+      const ack: ConfigSyncResponse = { type: SerialWorkerResponseType.CONFIG_SYNC, success: true, controller: { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' } };
 
       // Should not throw
       service.updateTracker('nonexistent', ack);
@@ -270,8 +270,7 @@ describe('SerialMessageService', () => {
       );
 
       // ACK from first controller before timeout
-      const ack = new ScriptDeployResponse(true, 'script-1');
-      ack.controller = new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01');
+      const ack = { type: SerialWorkerResponseType.SCRIPT_DEPLOY, success: true, scriptId: 'script-1', controller: { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' } } as ScriptDeployResponse;
       service.updateTracker('msg-1', ack);
 
       vi.advanceTimersByTime(5000);
@@ -294,8 +293,7 @@ describe('SerialMessageService', () => {
       );
 
       // ACK before timeout
-      const ack = new ConfigSyncResponse(true);
-      ack.controller = new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01');
+      const ack: ConfigSyncResponse = { type: SerialWorkerResponseType.CONFIG_SYNC, success: true, controller: { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' } };
       service.updateTracker('msg-1', ack);
 
       vi.advanceTimersByTime(5000);

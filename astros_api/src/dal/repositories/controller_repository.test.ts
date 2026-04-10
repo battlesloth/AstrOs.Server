@@ -4,7 +4,6 @@ import { Kysely, SqliteDialect } from 'kysely';
 import { Database } from '../types.js';
 import { migrateToLatest } from '../database.js';
 import { ControllerRepository } from './controller_repository.js';
-import { ControlModule } from '../../models/control_module/control_module.js';
 
 describe('ControllerRepository', () => {
   let db: Kysely<Database>;
@@ -24,7 +23,7 @@ describe('ControllerRepository', () => {
     it('should insert a controller and return its id', async () => {
       const repo = new ControllerRepository(db);
 
-      const controller = new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01');
+      const controller = { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' };
       const id = await repo.insertController(controller);
 
       expect(id).toBeTruthy();
@@ -44,8 +43,8 @@ describe('ControllerRepository', () => {
       const before = await repo.getControllers();
       const seedCount = before.length;
 
-      await repo.insertController(new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01'));
-      await repo.insertController(new ControlModule('', 'body', 'AA:BB:CC:DD:EE:02'));
+      await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
+      await repo.insertController({ id: '', name: 'body', address: 'AA:BB:CC:DD:EE:02' });
 
       const controllers = await repo.getControllers();
 
@@ -59,7 +58,7 @@ describe('ControllerRepository', () => {
     it('should find controller by MAC address', async () => {
       const repo = new ControllerRepository(db);
 
-      await repo.insertController(new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01'));
+      await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
 
       const result = await repo.getControllerByAddress('AA:BB:CC:DD:EE:01');
       expect(result.name).toBe('dome');
@@ -76,10 +75,10 @@ describe('ControllerRepository', () => {
     it('should update controller name and address', async () => {
       const repo = new ControllerRepository(db);
 
-      const id = await repo.insertController(new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01'));
+      const id = await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
 
       const updated = await repo.updateController(
-        new ControlModule(id, 'dome-v2', 'AA:BB:CC:DD:EE:FF'),
+        { id, name: 'dome-v2', address: 'AA:BB:CC:DD:EE:FF' },
       );
       expect(updated).toBe(true);
 
@@ -97,8 +96,8 @@ describe('ControllerRepository', () => {
       const seedCount = before.length;
 
       const controllers = [
-        new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01'),
-        new ControlModule('', 'body', 'AA:BB:CC:DD:EE:02'),
+        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
+        { id: '', name: 'body', address: 'AA:BB:CC:DD:EE:02' },
       ];
 
       const result = await repo.insertControllers(controllers);
@@ -113,11 +112,11 @@ describe('ControllerRepository', () => {
 
       // Insert initial controller
       const originalId = await repo.insertController(
-        new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01'),
+        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
       );
 
       // Bulk insert with same address but different name (simulating re-registration)
-      await repo.insertControllers([new ControlModule('', 'dome-renamed', 'AA:BB:CC:DD:EE:01')]);
+      await repo.insertControllers([{ id: '', name: 'dome-renamed', address: 'AA:BB:CC:DD:EE:01' }]);
 
       const result = await repo.getControllerByAddress('AA:BB:CC:DD:EE:01');
       expect(result.id).toBe(originalId);
@@ -128,11 +127,11 @@ describe('ControllerRepository', () => {
       const repo = new ControllerRepository(db);
 
       const originalId = await repo.insertController(
-        new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01'),
+        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
       );
 
       // Bulk insert with same name but different address (controller got new MAC)
-      await repo.insertControllers([new ControlModule('', 'dome', 'FF:FF:FF:FF:FF:FF')]);
+      await repo.insertControllers([{ id: '', name: 'dome', address: 'FF:FF:FF:FF:FF:FF' }]);
 
       const result = await repo.getControllerByAddress('FF:FF:FF:FF:FF:FF');
       expect(result.id).toBe(originalId);
@@ -145,11 +144,11 @@ describe('ControllerRepository', () => {
       const before = await repo.getControllers();
       const seedCount = before.length;
 
-      await repo.insertController(new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01'));
-      await repo.insertController(new ControlModule('', 'body', 'AA:BB:CC:DD:EE:02'));
+      await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
+      await repo.insertController({ id: '', name: 'body', address: 'AA:BB:CC:DD:EE:02' });
 
       // Insert new controller that takes dome's address — should replace dome
-      await repo.insertControllers([new ControlModule('', 'new-dome', 'AA:BB:CC:DD:EE:01')]);
+      await repo.insertControllers([{ id: '', name: 'new-dome', address: 'AA:BB:CC:DD:EE:01' }]);
 
       const all = await repo.getControllers();
       expect(all).toHaveLength(seedCount + 2);
@@ -164,7 +163,7 @@ describe('ControllerRepository', () => {
       const repo = new ControllerRepository(db);
 
       const controllerId = await repo.insertController(
-        new ControlModule('', 'dome', 'AA:BB:CC:DD:EE:01'),
+        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
       );
 
       // Seed location and controller_locations relationship

@@ -5,7 +5,6 @@ import { Database } from '../types.js';
 import { migrateToLatest } from '../database.js';
 import { LocationsRepository } from './locations_repository.js';
 import { ControllerRepository } from './controller_repository.js';
-import { ControlModule } from '../../models/control_module/control_module.js';
 import { UartModule } from '../../models/control_module/uart/uart_module.js';
 import { I2cModule } from '../../models/control_module/i2c/i2c_module.js';
 import { ModuleSubType } from '../../models/enums.js';
@@ -42,14 +41,16 @@ describe('LocationsRepository', () => {
       expect(names).toContain('dome');
 
       // Body has the master controller mapped
-      const body = locations.find((l) => l.locationName === 'body')!;
-      expect(body.controller.name).toBe('master');
-      expect(body.controller.address).toBe('00:00:00:00:00:00');
+      const body = locations.find((l) => l.locationName === 'body');
+      expect(body).toBeDefined();
+      expect(body?.controller.name).toBe('master');
+      expect(body?.controller.address).toBe('00:00:00:00:00:00');
 
       // Core and dome have no controller mapped — should get defaults
-      const core = locations.find((l) => l.locationName === 'core')!;
-      expect(core.controller.id).toBe('0');
-      expect(core.controller.name).toBe('');
+      const core = locations.find((l) => l.locationName === 'core');
+      expect(core).toBeDefined();
+      expect(core?.controller.id).toBe('0');
+      expect(core?.controller.name).toBe('');
     });
   });
 
@@ -62,9 +63,10 @@ describe('LocationsRepository', () => {
 
       // Get the master controller that's mapped to body
       const controllers = await ctlRepo.getControllers();
-      const master = controllers.find((c) => c.name === 'master')!;
+      const master = controllers.find((c) => c.name === 'master');
+      expect(master).toBeDefined();
 
-      const location = await repo.getLocationByController(master.id);
+      const location = await repo.getLocationByController(master?.id as string);
 
       expect(location.locationName).toBe('body');
       expect(location.controller.name).toBe('master');
@@ -88,8 +90,9 @@ describe('LocationsRepository', () => {
 
       // Verify it's the body location
       const locations = await repo.getLocations();
-      const body = locations.find((l) => l.locationName === 'body')!;
-      expect(locationId).toBe(body.id);
+      const body = locations.find((l) => l.locationName === 'body');
+      expect(body).toBeDefined();
+      expect(locationId).toBe(body?.id);
     });
 
     it('should get location name by controller MAC', async () => {
@@ -140,19 +143,22 @@ describe('LocationsRepository', () => {
       const repo = new LocationsRepository(db);
 
       const locations = await repo.getLocations();
-      const body = locations.find((l) => l.locationName === 'body')!;
+      const body = locations.find((l) => l.locationName === 'body');
+      expect(body).toBeDefined();
 
       // Set a fingerprint first
-      await repo.updateLocationFingerprint(body.id, 'abc123');
+      await repo.updateLocationFingerprint(body?.id as string, 'abc123');
 
       // Load full location for update
-      const fullBody = (await repo.loadLocations()).find((l) => l.locationName === 'body')!;
+      const fullBody = (await repo.loadLocations()).find((l) => l.locationName === 'body');
+      expect(fullBody).toBeDefined();
 
-      await repo.updateLocation(fullBody);
+      await repo.updateLocation(fullBody as NonNullable<typeof fullBody>);
 
       // Fingerprint should be 'outofdate' after update
-      const updated = (await repo.getLocations()).find((l) => l.locationName === 'body')!;
-      expect(updated.configFingerprint).toBe('outofdate');
+      const updated = (await repo.getLocations()).find((l) => l.locationName === 'body');
+      expect(updated).toBeDefined();
+      expect(updated?.configFingerprint).toBe('outofdate');
     });
 
     it('should swap the controller for a location', async () => {
@@ -161,99 +167,116 @@ describe('LocationsRepository', () => {
 
       // Insert a new controller
       const newCtlId = await ctlRepo.insertController(
-        new ControlModule('', 'dome-ctl', 'AA:BB:CC:DD:EE:01'),
+        { id: '', name: 'dome-ctl', address: 'AA:BB:CC:DD:EE:01' },
       );
 
       // Get the core location (currently has no controller)
       const locations = await repo.loadLocations();
-      const core = locations.find((l) => l.locationName === 'core')!;
+      const core = locations.find((l) => l.locationName === 'core');
+      expect(core).toBeDefined();
 
       // Assign the new controller
-      core.controller = new ControlModule(newCtlId, 'dome-ctl', 'AA:BB:CC:DD:EE:01');
-      await repo.updateLocation(core);
+      if (core) {
+        core.controller = { id: newCtlId, name: 'dome-ctl', address: 'AA:BB:CC:DD:EE:01' };
+        await repo.updateLocation(core);
+      }
 
       // Verify the controller is now mapped
       const updatedLocations = await repo.getLocations();
-      const updatedCore = updatedLocations.find((l) => l.locationName === 'core')!;
-      expect(updatedCore.controller.name).toBe('dome-ctl');
-      expect(updatedCore.controller.id).toBe(newCtlId);
+      const updatedCore = updatedLocations.find((l) => l.locationName === 'core');
+      expect(updatedCore).toBeDefined();
+      expect(updatedCore?.controller.name).toBe('dome-ctl');
+      expect(updatedCore?.controller.id).toBe(newCtlId);
     });
 
     it('should upsert I2C modules', async () => {
       const repo = new LocationsRepository(db);
 
       const locations = await repo.loadLocations();
-      const body = locations.find((l) => l.locationName === 'body')!;
+      const body = locations.find((l) => l.locationName === 'body');
+      expect(body).toBeDefined();
 
       const moduleId = uuid();
       const i2cModule = new I2cModule(
         1,
         moduleId,
         'PCA9685',
-        body.id,
+        body?.id as string,
         0x40,
         ModuleSubType.genericI2C,
       );
-      body.i2cModules = [i2cModule];
-
-      await repo.updateLocation(body);
+      if (body) {
+        body.i2cModules = [i2cModule];
+        await repo.updateLocation(body);
+      }
 
       // Reload and verify
-      const updated = (await repo.loadLocations()).find((l) => l.locationName === 'body')!;
-      expect(updated.i2cModules).toHaveLength(1);
-      expect(updated.i2cModules[0].name).toBe('PCA9685');
-      expect(updated.i2cModules[0].i2cAddress).toBe(0x40);
+      const updated = (await repo.loadLocations()).find((l) => l.locationName === 'body');
+      expect(updated).toBeDefined();
+      expect(updated?.i2cModules).toHaveLength(1);
+      expect(updated?.i2cModules[0].name).toBe('PCA9685');
+      expect(updated?.i2cModules[0].i2cAddress).toBe(0x40);
     });
 
     it('should remove stale I2C modules', async () => {
       const repo = new LocationsRepository(db);
 
       const locations = await repo.loadLocations();
-      const body = locations.find((l) => l.locationName === 'body')!;
+      const body = locations.find((l) => l.locationName === 'body');
+      expect(body).toBeDefined();
 
       // Add two modules
       const mod1Id = uuid();
       const mod2Id = uuid();
-      body.i2cModules = [
-        new I2cModule(1, mod1Id, 'Module1', body.id, 0x40, ModuleSubType.genericI2C),
-        new I2cModule(2, mod2Id, 'Module2', body.id, 0x41, ModuleSubType.genericI2C),
-      ];
-      await repo.updateLocation(body);
+      if (body) {
+        body.i2cModules = [
+          new I2cModule(1, mod1Id, 'Module1', body.id, 0x40, ModuleSubType.genericI2C),
+          new I2cModule(2, mod2Id, 'Module2', body.id, 0x41, ModuleSubType.genericI2C),
+        ];
+        await repo.updateLocation(body);
+      }
 
       // Now update with only mod1 — mod2 should be removed
-      const reloaded = (await repo.loadLocations()).find((l) => l.locationName === 'body')!;
-      reloaded.i2cModules = reloaded.i2cModules.filter((m) => m.id === mod1Id);
-      await repo.updateLocation(reloaded);
+      const reloaded = (await repo.loadLocations()).find((l) => l.locationName === 'body');
+      expect(reloaded).toBeDefined();
+      if (reloaded) {
+        reloaded.i2cModules = reloaded.i2cModules.filter((m) => m.id === mod1Id);
+        await repo.updateLocation(reloaded);
+      }
 
-      const final = (await repo.loadLocations()).find((l) => l.locationName === 'body')!;
-      expect(final.i2cModules).toHaveLength(1);
-      expect(final.i2cModules[0].id).toBe(mod1Id);
+      const final_ = (await repo.loadLocations()).find((l) => l.locationName === 'body');
+      expect(final_).toBeDefined();
+      expect(final_?.i2cModules).toHaveLength(1);
+      expect(final_?.i2cModules[0].id).toBe(mod1Id);
     });
 
     it('should upsert UART modules', async () => {
       const repo = new LocationsRepository(db);
 
       const locations = await repo.loadLocations();
-      const body = locations.find((l) => l.locationName === 'body')!;
+      const body = locations.find((l) => l.locationName === 'body');
+      expect(body).toBeDefined();
 
       const moduleId = uuid();
       const uartModule = new UartModule(
         1,
         moduleId,
         'HCR Serial',
-        body.id,
+        body?.id as string,
         ModuleSubType.humanCyborgRelationsSerial,
         0,
         9600,
       );
-      body.uartModules = [uartModule];
+      if (body) {
+        body.uartModules = [uartModule];
+        await repo.updateLocation(body);
+      }
 
-      await repo.updateLocation(body);
-
-      const updated = (await repo.loadLocations()).find((l) => l.locationName === 'body')!;
-      expect(updated.uartModules).toHaveLength(1);
-      expect(updated.uartModules[0].name).toBe('HCR Serial');
-      expect(updated.uartModules[0].baudRate).toBe(9600);
+      const updated = (await repo.loadLocations()).find((l) => l.locationName === 'body');
+      expect(updated).toBeDefined();
+      expect(updated?.uartModules).toHaveLength(1);
+      expect(updated?.uartModules[0].name).toBe('HCR Serial');
+      expect(updated?.uartModules[0].baudRate).toBe(9600);
     });
   });
 
@@ -264,13 +287,15 @@ describe('LocationsRepository', () => {
       const repo = new LocationsRepository(db);
 
       const locations = await repo.getLocations();
-      const body = locations.find((l) => l.locationName === 'body')!;
+      const body = locations.find((l) => l.locationName === 'body');
+      expect(body).toBeDefined();
 
-      const result = await repo.updateLocationFingerprint(body.id, 'new-fingerprint');
+      const result = await repo.updateLocationFingerprint(body?.id as string, 'new-fingerprint');
       expect(result).toBe(true);
 
-      const updated = (await repo.getLocations()).find((l) => l.locationName === 'body')!;
-      expect(updated.configFingerprint).toBe('new-fingerprint');
+      const updated = (await repo.getLocations()).find((l) => l.locationName === 'body');
+      expect(updated).toBeDefined();
+      expect(updated?.configFingerprint).toBe('new-fingerprint');
     });
 
     it('should return false for nonexistent location', async () => {

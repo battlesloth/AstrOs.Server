@@ -26,8 +26,8 @@ describe('RemoteConfigRepository', () => {
     const result = await repo.getConfig('m5stick');
 
     expect(result).toBeDefined();
-    expect(result!.type).toBe('m5stick');
-    expect(result!.value).toBe('{"buttons":[]}');
+    expect(result?.type).toBe('m5stick');
+    expect(result?.value).toBe('{"buttons":[]}');
   });
 
   it('should update an existing config', async () => {
@@ -37,7 +37,7 @@ describe('RemoteConfigRepository', () => {
     await repo.saveConfig('m5stick', '{"buttons":["A"]}');
     const result = await repo.getConfig('m5stick');
 
-    expect(result!.value).toBe('{"buttons":["A"]}');
+    expect(result?.value).toBe('{"buttons":["A"]}');
   });
 
   it('should return undefined for missing config', async () => {

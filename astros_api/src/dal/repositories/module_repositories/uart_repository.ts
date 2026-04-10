@@ -3,15 +3,13 @@ import { Database, UartModule as UartModuleRow } from 'src/dal/types.js';
 import { logger } from 'src/logger.js';
 import {
   HumanCyborgRelationsModule,
-  KangarooX2,
   KangarooX2Channel,
-  MaestroBoard,
   MaestroChannel,
-  MaestroModule,
   ModuleSubType,
   UartModule,
   UartChannel,
 } from 'src/models/index.js';
+import type { KangarooX2, MaestroModule } from 'src/models/index.js';
 
 //#region Uart Modules
 export async function getUartModules(
@@ -204,7 +202,7 @@ async function loadKangarooModule(db: Kysely<Database>, uartId: string): Promise
       throw err;
     });
 
-  return new KangarooX2(data.id, data.ch1_name, data.ch2_name);
+  return { id: data.id, ch1Name: data.ch1_name, ch2Name: data.ch2_name };
 }
 
 async function deleteKangarooModule(trx: Transaction<Database>, parentId: string): Promise<void> {
@@ -333,7 +331,7 @@ async function loadMaestroModule(
   db: Kysely<Database>,
   uartMod: UartModule,
 ): Promise<MaestroModule> {
-  const module = new MaestroModule();
+  const module: MaestroModule = { boards: [] };
 
   const boards = await db
     .selectFrom('maestro_boards')
@@ -347,7 +345,7 @@ async function loadMaestroModule(
     });
 
   for (const b of boards) {
-    module.boards.push(new MaestroBoard(b.id, b.parent_id, b.board_id, b.name, b.channel_count));
+    module.boards.push({ id: b.id, parentId: b.parent_id, boardId: b.board_id, name: b.name, channelCount: b.channel_count, channels: [] });
   }
 
   for (const board of module.boards) {

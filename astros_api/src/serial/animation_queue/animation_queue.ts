@@ -133,8 +133,10 @@ export class AnimationQueue {
       Array.isArray(this.currentTrack) &&
       this.currentTrack.length > 0
     ) {
-      const nextSubTrack = this.currentTrack.shift()!;
-      this.dispatchTrack(nextSubTrack);
+      const nextSubTrack = this.currentTrack.shift();
+      if (nextSubTrack) {
+        this.dispatchTrack(nextSubTrack);
+      }
       return;
     }
 
@@ -168,9 +170,11 @@ export class AnimationQueue {
         this.playNextTrack();
         return;
       }
-      const firstSubTrack = track.shift()!;
+      const firstSubTrack = track.shift();
       this.currentTrack = track;
-      this.dispatchTrack(firstSubTrack);
+      if (firstSubTrack) {
+        this.dispatchTrack(firstSubTrack);
+      }
     } else {
       this.currentTrack = track;
       this.dispatchTrack(track);
@@ -199,7 +203,7 @@ export class AnimationQueue {
       return null;
     }
 
-    return this.activePlaylist.tracksRemaining.shift()!;
+    return this.activePlaylist.tracksRemaining.shift() ?? null;
   }
 
   private isShufflePlaylistType(playlistType: PlaylistType): boolean {

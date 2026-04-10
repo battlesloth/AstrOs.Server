@@ -34,7 +34,7 @@ import {
   ModuleSubType,
 } from './models/index.js';
 import { ControllerRepository } from './dal/repositories/controller_repository.js';
-import { ConfigSync } from './models/config/config_sync.js';
+import { createConfigSync } from './models/config/config_sync.js';
 import { createScriptRun } from './models/scripts/script_run.js';
 import { logger } from './logger.js';
 import { registerRemoteConfigRoutes } from './controllers/remote_config_controller.js';
@@ -529,7 +529,7 @@ class ApiServer {
         return;
       }
 
-      await locationRepo.updateLocationFingerprint(locationId, val.controller.fingerprint);
+      await locationRepo.updateLocationFingerprint(locationId, val.controller.fingerprint ?? '');
     } catch (error) {
       logger.error(`Error handling config sync response: ${error}`);
     }
@@ -632,7 +632,7 @@ class ApiServer {
         }
       }
 
-      const configSync = new ConfigSync(toSync);
+      const configSync = createConfigSync(toSync);
 
       this.serialWorker.postMessage({
         type: SerialMessageType.DEPLOY_CONFIG,

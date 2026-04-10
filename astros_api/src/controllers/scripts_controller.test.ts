@@ -80,7 +80,8 @@ describe('Scripts Controller', () => {
 
       // Verify the playlist has the track
       const before = await playlistRepo.getPlaylist(playlistId);
-      expect(before!.tracks).toHaveLength(1);
+      expect(before).toBeDefined();
+      expect(before?.tracks).toHaveLength(1);
 
       // Delete the script via controller
       const req: any = { query: { id: scriptId } };
@@ -92,7 +93,8 @@ describe('Scripts Controller', () => {
 
       // Playlist should still exist but track referencing the script should be removed
       const after = await playlistRepo.getPlaylist(playlistId);
-      expect(after!.tracks).toHaveLength(0);
+      expect(after).toBeDefined();
+      expect(after?.tracks).toHaveLength(0);
     });
   });
 });

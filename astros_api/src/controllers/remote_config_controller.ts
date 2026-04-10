@@ -1,4 +1,4 @@
-import { M5Page, M5ScriptList, M5Button } from 'src/models/index.js';
+import type { M5Page, M5ScriptList, M5Button } from 'src/models/index.js';
 import { RemoteConfigRepository } from 'src/dal/repositories/remote_config_repository.js';
 import { logger } from 'src/logger.js';
 import { Kysely } from 'kysely';
@@ -38,22 +38,22 @@ async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any, next: 
 
     if (!val || val.length === 0) {
       res.status(200);
-      res.json(new M5ScriptList());
+      res.json({ pages: [] } as M5ScriptList);
       return;
     }
 
-    const response = new M5ScriptList();
+    const response: M5ScriptList = { pages: [] };
     val.forEach((x) => {
       const list = new Array<M5Button>();
-      list.push(new M5Button(x.button1.name, x.button1.id));
-      list.push(new M5Button(x.button2.name, x.button2.id));
-      list.push(new M5Button(x.button3.name, x.button3.id));
-      list.push(new M5Button(x.button4.name, x.button4.id));
-      list.push(new M5Button(x.button5.name, x.button5.id));
-      list.push(new M5Button(x.button6.name, x.button6.id));
-      list.push(new M5Button(x.button7.name, x.button7.id));
-      list.push(new M5Button(x.button8.name, x.button8.id));
-      list.push(new M5Button(x.button9.name, x.button9.id));
+      list.push({ name: x.button1.name, command: x.button1.id });
+      list.push({ name: x.button2.name, command: x.button2.id });
+      list.push({ name: x.button3.name, command: x.button3.id });
+      list.push({ name: x.button4.name, command: x.button4.id });
+      list.push({ name: x.button5.name, command: x.button5.id });
+      list.push({ name: x.button6.name, command: x.button6.id });
+      list.push({ name: x.button7.name, command: x.button7.id });
+      list.push({ name: x.button8.name, command: x.button8.id });
+      list.push({ name: x.button9.name, command: x.button9.id });
       response.pages.push(list);
     });
 

@@ -1,9 +1,5 @@
 import { MaestroBoard } from './maestro_board.js';
 
-export class MaestroModule {
+export interface MaestroModule {
   boards: MaestroBoard[];
-
-  constructor() {
-    this.boards = new Array<MaestroBoard>();
-  }
 }

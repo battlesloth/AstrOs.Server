@@ -53,18 +53,20 @@ export class SerialMsgConst {
   static readonly SERVO_TEST_ACK = 'SERVO_TEST_ACK';
 }
 
-export class SerialMsgValidationResult {
-  public valid: boolean;
-  public type: SerialMessageType;
-  public id: string;
-  public data: string;
+export interface SerialMsgValidationResult {
+  valid: boolean;
+  type: SerialMessageType;
+  id: string;
+  data: string;
+}
 
-  constructor() {
-    this.valid = false;
-    this.type = SerialMessageType.UNKNOWN;
-    this.id = '';
-    this.data = '';
-  }
+export function createValidationResult(): SerialMsgValidationResult {
+  return {
+    valid: false,
+    type: SerialMessageType.UNKNOWN,
+    id: '',
+    data: '',
+  };
 }
 
 export class SerialMessage {

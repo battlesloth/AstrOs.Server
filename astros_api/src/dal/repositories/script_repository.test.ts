@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import SQLite from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';
@@ -11,14 +10,12 @@ import {
   ScriptEvent,
   GpioModule,
   GpioChannel,
-  MaestroModule,
   MaestroChannel,
   ScriptChannelType,
   ModuleChannelTypes,
   ModuleType,
   ModuleSubType,
   MaestroEvent,
-  MaestroBoard,
   GpioEvent,
   UartModule,
   UartChannel,
@@ -27,6 +24,7 @@ import {
   HumanCyborgRelationsCmd,
   HcrCommandCategory,
 } from '../../models/index.js';
+import type { MaestroModule } from '../../models/index.js';
 import { upsertGpioModule } from './module_repositories/gpio_repository.js';
 import { upsertUartModules } from './module_repositories/uart_repository.js';
 import { PlaylistRepository } from './playlist_repository.js';
@@ -215,14 +213,14 @@ describe('Script Repository', () => {
 
     const originalScript = allScripts.find((s) => s.id === scriptId);
     expect(originalScript).toBeDefined();
-    expect(originalScript!.scriptName).toBe('Original Script');
-    expect(originalScript!.description).toBe('Original Description');
+    expect(originalScript?.scriptName).toBe('Original Script');
+    expect(originalScript?.description).toBe('Original Description');
 
     const copiedScript = allScripts.find((s) => s.id === copyResult.id);
     expect(copiedScript).toBeDefined();
-    expect(copiedScript!.id).toMatch(/^s[0-9]{7}[A-Za-z]{3}$/);
-    expect(copiedScript!.scriptName).toBe('Original Script (Copy)');
-    expect(copiedScript!.description).toBe('Original Description');
+    expect(copiedScript?.id).toMatch(/^s[0-9]{7}[A-Za-z]{3}$/);
+    expect(copiedScript?.scriptName).toBe('Original Script (Copy)');
+    expect(copiedScript?.description).toBe('Original Description');
 
     // Verify channels of copy
     const fullCopy = await repo.getScript(copyResult.id);
@@ -286,9 +284,9 @@ describe('Script Repository', () => {
     const maestroChannelId = uuid();
 
     // Create a Maestro module and channel in the database
-    const maestroModule = new MaestroModule();
+    const maestroModule: MaestroModule = { boards: [] };
 
-    maestroModule.boards.push(new MaestroBoard(maestroModuleId, locationId, 0, 'Test Board', 24));
+    maestroModule.boards.push({ id: maestroModuleId, parentId: locationId, boardId: 0, name: 'Test Board', channelCount: 24, channels: [] });
 
     const maestroChannel = new MaestroChannel(
       maestroChannelId,
@@ -429,9 +427,9 @@ describe('Script Repository', () => {
     const eventId = uuid();
 
     // Create Maestro module and channel
-    const maestroModule = new MaestroModule();
+    const maestroModule: MaestroModule = { boards: [] };
 
-    maestroModule.boards.push(new MaestroBoard(maestroModuleId, locationId, 0, 'Test Board', 24));
+    maestroModule.boards.push({ id: maestroModuleId, parentId: locationId, boardId: 0, name: 'Test Board', channelCount: 24, channels: [] });
 
     const maestroChannel = new MaestroChannel(
       maestroChannelId,
@@ -737,13 +735,15 @@ describe('Script Repository', () => {
 
     // Verify track exists
     const before = await playlistRepo.getPlaylist(playlistId);
-    expect(before!.tracks.length).toBe(1);
+    expect(before).toBeDefined();
+    expect(before?.tracks.length).toBe(1);
 
     await scriptRepo.deleteScript(scriptId);
 
     // Playlist track should be removed
     const after = await playlistRepo.getPlaylist(playlistId);
-    expect(after!.tracks.length).toBe(0);
+    expect(after).toBeDefined();
+    expect(after?.tracks.length).toBe(0);
   });
 
   it('should only remove playlist tracks for the deleted script', async () => {
@@ -811,8 +811,9 @@ describe('Script Repository', () => {
     await scriptRepo.deleteScript(scriptId1);
 
     const after = await playlistRepo.getPlaylist(playlistId);
-    expect(after!.tracks.length).toBe(1);
-    expect(after!.tracks[0].trackId).toBe(scriptId2);
+    expect(after).toBeDefined();
+    expect(after?.tracks.length).toBe(1);
+    expect(after?.tracks[0].trackId).toBe(scriptId2);
   });
 
   it('should remove tracks from multiple playlists when script is deleted', async () => {
@@ -861,8 +862,10 @@ describe('Script Repository', () => {
 
     const after1 = await playlistRepo.getPlaylist(playlistId1);
     const after2 = await playlistRepo.getPlaylist(playlistId2);
-    expect(after1!.tracks.length).toBe(0);
-    expect(after2!.tracks.length).toBe(0);
+    expect(after1).toBeDefined();
+    expect(after2).toBeDefined();
+    expect(after1?.tracks.length).toBe(0);
+    expect(after2?.tracks.length).toBe(0);
   });
 
   it('should not remove non-Script track types when script is deleted', async () => {
@@ -920,8 +923,9 @@ describe('Script Repository', () => {
     await scriptRepo.deleteScript(scriptId);
 
     const after = await playlistRepo.getPlaylist(playlistId);
-    expect(after!.tracks.length).toBe(1);
-    expect(after!.tracks[0].id).toBe(waitTrackId);
-    expect(after!.tracks[0].trackType).toBe(TrackType.Wait);
+    expect(after).toBeDefined();
+    expect(after?.tracks.length).toBe(1);
+    expect(after?.tracks[0].id).toBe(waitTrackId);
+    expect(after?.tracks[0].trackType).toBe(TrackType.Wait);
   });
 });
