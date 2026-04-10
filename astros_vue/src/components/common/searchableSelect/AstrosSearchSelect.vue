@@ -10,6 +10,7 @@ const props = defineProps<{
   options: SearchSelectOption[];
   placeholder?: string;
   dataTestid?: string;
+  size?: 'sm' | 'md';
 }>();
 
 const modelValue = defineModel<string>({ required: true });
@@ -103,7 +104,10 @@ function handleBlur() {
       v-if="!isOpen"
       type="button"
       :data-testid="dataTestid ? `${dataTestid}-trigger` : undefined"
-      class="select select-bordered select-sm w-full text-left"
+      :class="[
+        'select select-bordered w-full text-left',
+        size === 'md' ? 'select-md' : 'select-sm',
+      ]"
       @click="open"
     >
       {{ selectedLabel || placeholder || '' }}
@@ -118,7 +122,7 @@ function handleBlur() {
         type="text"
         :data-testid="dataTestid ? `${dataTestid}-search` : undefined"
         :placeholder="$t('placeholder.filter')"
-        class="input input-bordered input-sm w-full"
+        :class="['input input-bordered w-full', size === 'md' ? 'input-md' : 'input-sm']"
         @keydown="handleKeydown"
         @blur="handleBlur"
       />
@@ -133,7 +137,7 @@ function handleBlur() {
           <a
             :data-testid="dataTestid ? `${dataTestid}-option-${option.id}` : undefined"
             :class="[
-              'block w-full px-3 py-1 rounded cursor-pointer text-sm hover:bg-base-300',
+              `block w-full px-3 rounded cursor-pointer hover:bg-base-300 ${size === 'md' ? 'py-2 text-base' : 'py-1 text-sm'}`,
               {
                 'bg-base-300 font-semibold': option.id === modelValue && index !== highlightedIndex,
                 'bg-primary text-primary-content': index === highlightedIndex,

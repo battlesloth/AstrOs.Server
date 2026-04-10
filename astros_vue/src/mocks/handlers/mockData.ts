@@ -42,6 +42,43 @@ export const mockScripts = [
   },
 ];
 
+// Mock playlists data
+export const mockPlaylists = [
+  {
+    id: 'p_1',
+    playlistName: 'Parade Mode',
+    description: 'Parade animation sequence',
+    playlistType: 0,
+    tracks: [],
+    settings: { repeat: false, repeatCount: 0, randomDelay: false, delayMin: 0, delayMax: 0 },
+  },
+  {
+    id: 'p_2',
+    playlistName: 'Idle Animations',
+    description: 'Random idle movements',
+    playlistType: 1,
+    tracks: [],
+    settings: { repeat: true, repeatCount: 0, randomDelay: true, delayMin: 5, delayMax: 15 },
+  },
+  {
+    id: 'p_3',
+    playlistName: 'Photo Op',
+    description: 'Photo opportunity poses',
+    playlistType: 0,
+    tracks: [],
+    settings: { repeat: false, repeatCount: 0, randomDelay: false, delayMin: 0, delayMax: 0 },
+  },
+];
+
+// Mock scripts used by playlists store
+export const mockScriptNames = [
+  { id: '1', scriptName: 'Open Dome' },
+  { id: '2', scriptName: 'Close Dome' },
+  { id: '3', scriptName: 'Start Tracking' },
+  { id: '4', scriptName: 'Stop Tracking' },
+  { id: '5', scriptName: 'Emergency Stop' },
+];
+
 // Mock remote control configurations
 export const mockRemoteControlEmpty = [
   {

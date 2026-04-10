@@ -1,9 +1,15 @@
 import { http, HttpResponse } from 'msw';
-import { mockScripts } from './mockData';
+import { mockScripts, mockPlaylists, mockScriptNames } from './mockData';
 
 export const multiplePagesHandlers = [
   http.get('/api/scripts/all', () => {
     return HttpResponse.json(mockScripts);
+  }),
+  http.get('/api/playlists/all', () => {
+    return HttpResponse.json(mockPlaylists);
+  }),
+  http.get('/api/scripts/all-names', () => {
+    return HttpResponse.json(mockScriptNames);
   }),
   http.get('/api/remoteConfig', () => {
     return HttpResponse.json(

@@ -252,7 +252,14 @@
     "forward": "Next page",
     "save_success": "Remote control configuration saved successfully.",
     "save_error": "Failed to save remote control configuration.",
-    "script_select": "Script selection"
+    "script_select": "Script selection",
+    "tab_scripts": "Script",
+    "tab_playlists": "Playlist",
+    "search_placeholder": "Search...",
+    "type_script": "SCR",
+    "type_playlist": "PL",
+    "button_label": "Button {number}",
+    "button_select": "Button assignment"
   },
   "utility_view": {
     "title": "Utility",

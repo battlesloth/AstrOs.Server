@@ -1,8 +1,41 @@
 import apiService from '@/api/apiService';
 import { REMOTE_CONFIG } from '@/api/endpoints';
 import type { RemoteControlPage } from '@/models';
+import type { PageButton, PageButtonType } from '@/models/remoteControl/pageButton';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+
+function defaultButton(name: string): PageButton {
+  return { id: '0', name, type: 'none' };
+}
+
+function createDefaultPage(): RemoteControlPage {
+  return {
+    button1: defaultButton('Button 1'),
+    button2: defaultButton('Button 2'),
+    button3: defaultButton('Button 3'),
+    button4: defaultButton('Button 4'),
+    button5: defaultButton('Button 5'),
+    button6: defaultButton('Button 6'),
+    button7: defaultButton('Button 7'),
+    button8: defaultButton('Button 8'),
+    button9: defaultButton('Button 9'),
+  };
+}
+
+function migrateButton(btn: PageButton): PageButton {
+  if (btn.type) return btn;
+  const type: PageButtonType = btn.id === '0' ? 'none' : 'script';
+  return { ...btn, type };
+}
+
+function migratePage(page: RemoteControlPage): RemoteControlPage {
+  const migrated = {} as RemoteControlPage;
+  for (const key of Object.keys(page) as (keyof RemoteControlPage)[]) {
+    migrated[key] = migrateButton(page[key]);
+  }
+  return migrated;
+}
 
 export const useRemoteControlStore = defineStore('remoteControl', () => {
   const remoteControlPages = ref<RemoteControlPage[]>([]);
@@ -20,21 +53,9 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
       }
 
       if (result.length > 0) {
-        remoteControlPages.value = [...result];
+        remoteControlPages.value = result.map(migratePage);
       } else {
-        remoteControlPages.value = [
-          {
-            button1: { id: '0', name: 'Button 1' },
-            button2: { id: '0', name: 'Button 2' },
-            button3: { id: '0', name: 'Button 3' },
-            button4: { id: '0', name: 'Button 4' },
-            button5: { id: '0', name: 'Button 5' },
-            button6: { id: '0', name: 'Button 6' },
-            button7: { id: '0', name: 'Button 7' },
-            button8: { id: '0', name: 'Button 8' },
-            button9: { id: '0', name: 'Button 9' },
-          },
-        ];
+        remoteControlPages.value = [createDefaultPage()];
       }
       return { success: true, data: result };
     } catch (error) {

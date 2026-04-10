@@ -2,53 +2,49 @@
 import { ref, onMounted } from 'vue';
 import AstrosRemoteButton from './AstrosRemoteButton.vue';
 import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
+import type { PageButton } from '@/models/remoteControl/pageButton';
 import { useScriptsStore } from '@/stores/scripts';
+import { usePlaylistsStore } from '@/stores/playlists';
 import { useRemoteControlStore } from '@/stores/remoteControl';
 import { useToast } from '@/composables/useToast';
 import { useI18n } from 'vue-i18n';
-import type { PageButton } from '@/models/remoteControl/pageButton';
 
 const { t } = useI18n();
 
-interface ScriptSelection {
+interface SelectionItem {
   id: string;
   name: string;
 }
 
 const scriptStore = useScriptsStore();
+const playlistStore = usePlaylistsStore();
 const remoteControlStore = useRemoteControlStore();
 const { success, error } = useToast();
 
-// State
 const pageNumber = ref(1);
-const scripts = ref<ScriptSelection[]>([]);
+const scripts = ref<SelectionItem[]>([]);
+const playlists = ref<SelectionItem[]>([]);
 const currentPage = ref<RemoteControlPage | null>(null);
 const currentIndex = ref(0);
 
-const currentButton1Script = ref('0');
-const currentButton2Script = ref('0');
-const currentButton3Script = ref('0');
-const currentButton4Script = ref('0');
-const currentButton5Script = ref('0');
-const currentButton6Script = ref('0');
-const currentButton7Script = ref('0');
-const currentButton8Script = ref('0');
-const currentButton9Script = ref('0');
-
 onMounted(async () => {
-  await scriptStore.loadScripts();
-  await remoteControlStore.loadRemoteControl();
+  await Promise.all([
+    scriptStore.loadScripts(),
+    playlistStore.loadData(),
+    remoteControlStore.loadRemoteControl(),
+  ]);
+
   scripts.value = scriptStore.scripts.map((s) => ({ id: s.id, name: s.scriptName }));
-  console.log('Loaded scripts for remote control:', scripts.value);
+  playlists.value = playlistStore.playlists.map((p) => ({ id: p.id, name: p.playlistName }));
+
   if (remoteControlStore.remoteControlPages.length === 0) {
     remoteControlStore.remoteControlPages.push(createEmptyPage());
   }
   currentPage.value = remoteControlStore.remoteControlPages[0]!;
-  setButtonScripts();
 });
 
 function createEmptyButton(): PageButton {
-  return { id: '0', name: 'None' };
+  return { id: '0', name: 'None', type: 'none' };
 }
 
 function createEmptyPage(): RemoteControlPage {
@@ -65,24 +61,10 @@ function createEmptyPage(): RemoteControlPage {
   };
 }
 
-function selectionChange(button: number, newId: string) {
-  let id = newId;
-  let scriptName = 'None';
-
-  if (id !== '0') {
-    const sIdx = scripts.value.findIndex((s) => s.id === id);
-    if (sIdx === -1) {
-      console.error(`Script ID ${id} not found in scripts list.`);
-      id = '0';
-      scriptName = 'None';
-    } else {
-      scriptName = scripts.value[sIdx]!.name;
-    }
-  }
-
+function selectionChange(button: number, value: PageButton) {
   const buttonKey = `button${button}` as keyof RemoteControlPage;
   if (!currentPage.value) return;
-  currentPage.value[buttonKey] = { id, name: scriptName };
+  currentPage.value[buttonKey] = value;
 }
 
 function pageForward() {
@@ -90,10 +72,8 @@ function pageForward() {
   if (remoteControlStore.remoteControlPages.length < currentIndex.value + 1) {
     remoteControlStore.remoteControlPages.push(createEmptyPage());
   }
-
   currentPage.value = remoteControlStore.remoteControlPages[currentIndex.value]!;
   pageNumber.value = currentIndex.value + 1;
-  setButtonScripts();
 }
 
 function pageBackward() {
@@ -102,33 +82,21 @@ function pageBackward() {
     currentIndex.value = 0;
     return;
   }
-
   currentPage.value = remoteControlStore.remoteControlPages[currentIndex.value]!;
   pageNumber.value = currentIndex.value + 1;
-  setButtonScripts();
-}
-
-// Set button scripts from current page
-function setButtonScripts() {
-  currentButton1Script.value = currentPage.value?.button1?.id || '0';
-  currentButton2Script.value = currentPage.value?.button2?.id || '0';
-  currentButton3Script.value = currentPage.value?.button3?.id || '0';
-  currentButton4Script.value = currentPage.value?.button4?.id || '0';
-  currentButton5Script.value = currentPage.value?.button5?.id || '0';
-  currentButton6Script.value = currentPage.value?.button6?.id || '0';
-  currentButton7Script.value = currentPage.value?.button7?.id || '0';
-  currentButton8Script.value = currentPage.value?.button8?.id || '0';
-  currentButton9Script.value = currentPage.value?.button9?.id || '0';
 }
 
 async function saveConfig() {
   try {
+    await remoteControlStore.saveRemoteControl();
     success(t('remote_view.save_success'));
   } catch (err) {
     console.error('Error saving remote control configuration:', err);
     error(t('remote_view.save_error'));
   }
 }
+
+const buttonNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 </script>
 
 <template>
@@ -144,6 +112,7 @@ async function saveConfig() {
         {{ $t('remote_view.save') }}
       </button>
     </div>
+
     <!-- Page Navigation -->
     <div class="flex flex-nowrap w-full my-5 items-center">
       <div class="grow-3"></div>
@@ -174,61 +143,16 @@ async function saveConfig() {
     <!-- Grid of Button Selects -->
     <div
       v-if="currentPage"
-      class="grid grid-cols-3 gap-5 w-full max-w-6xl mx-auto"
+      class="grid grid-cols-3 gap-5 w-full max-w-6xl mx-auto px-4"
     >
-      <!-- Button 1 -->
       <AstrosRemoteButton
-        :currentScript="currentButton1Script"
+        v-for="n in buttonNumbers"
+        :key="n"
+        :buttonNumber="n"
+        :currentValue="currentPage[`button${n}` as keyof RemoteControlPage]"
         :scripts="scripts"
-        @changed="(value) => selectionChange(1, value)"
-      />
-      <!-- Button 2 -->
-      <AstrosRemoteButton
-        :currentScript="currentButton2Script"
-        :scripts="scripts"
-        @changed="(value) => selectionChange(2, value)"
-      />
-      <!-- Button 3 -->
-      <AstrosRemoteButton
-        :currentScript="currentButton3Script"
-        :scripts="scripts"
-        @changed="(value) => selectionChange(3, value)"
-      />
-      <!-- Button 4 -->
-      <AstrosRemoteButton
-        :currentScript="currentButton4Script"
-        :scripts="scripts"
-        @changed="(value) => selectionChange(4, value)"
-      />
-      <!-- Button 5 -->
-      <AstrosRemoteButton
-        :currentScript="currentButton5Script"
-        :scripts="scripts"
-        @changed="(value) => selectionChange(5, value)"
-      />
-      <!-- Button 6 -->
-      <AstrosRemoteButton
-        :currentScript="currentButton6Script"
-        :scripts="scripts"
-        @changed="(value) => selectionChange(6, value)"
-      />
-      <!-- Button 7 -->
-      <AstrosRemoteButton
-        :currentScript="currentButton7Script"
-        :scripts="scripts"
-        @changed="(value) => selectionChange(7, value)"
-      />
-      <!-- Button 8 -->
-      <AstrosRemoteButton
-        :currentScript="currentButton8Script"
-        :scripts="scripts"
-        @changed="(value) => selectionChange(8, value)"
-      />
-      <!-- Button 9 -->
-      <AstrosRemoteButton
-        :currentScript="currentButton9Script"
-        :scripts="scripts"
-        @changed="(value) => selectionChange(9, value)"
+        :playlists="playlists"
+        @changed="(value) => selectionChange(n, value)"
       />
     </div>
   </div>
