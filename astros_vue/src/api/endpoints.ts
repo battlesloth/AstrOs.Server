@@ -5,7 +5,7 @@ export const LOGOUT = 'api/logout';
 export const LOCATIONS = 'api/locations/';
 export const LOCATIONS_LOAD = 'api/locations/load';
 export const SYNC_CONTROLLERS = 'api/locations/synccontrollers';
-export const SYNC_CONFIG = '/api/locations/syncconfig';
+export const SYNC_CONFIG = 'api/locations/syncconfig';
 
 export const SETTINGS = 'api/settings';
 export const SETTINGS_CONTROLLERS = 'api/settings/controllers';

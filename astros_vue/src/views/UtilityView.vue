@@ -70,6 +70,7 @@ const downloadLogs = async () => {
     document.body.appendChild(link);
     link.click();
     link.remove();
+    window.URL.revokeObjectURL(url);
   } catch (error) {
     console.error('Error downloading logs:', error);
     showAlert.value = true;

@@ -16,7 +16,7 @@ async function login(req: any, res: any, next: any) {
   passport.authenticate('local', (err: any, user: any, info: any) => {
     // If Passport throws/catches an error
     if (err) {
-      res.status(404).json(err);
+      res.status(500).json(err);
       return;
     }
 

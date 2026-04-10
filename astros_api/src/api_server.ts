@@ -389,14 +389,14 @@ class ApiServer {
       this.clients.set(id, conn);
 
       conn.on('message', (msg) => {
-        this.handelWebsocketMessage(msg.toString());
+        this.handleWebsocketMessage(msg.toString());
       });
 
       logger.info(`websocket connected: id=${id}`);
     });
   }
 
-  async handelWebsocketMessage(msg: string): Promise<void> {
+  async handleWebsocketMessage(msg: string): Promise<void> {
     return new Promise((resolve, _) => {
       try {
         const parsed = JSON.parse(msg) as IWebSocketMessage;
