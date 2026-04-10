@@ -305,7 +305,8 @@
   "scripter_view": {
     "script_name": "Script Name",
     "save_success": "Script saved successfully.",
-    "save_error": "Failed to save script"
+    "save_error": "Failed to save script",
+    "unsaved_changes": "You have unsaved changes. Discard them?"
   },
   "playlist_settings": {
     "random_delay": "Random Delay",

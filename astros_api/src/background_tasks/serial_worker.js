@@ -8,6 +8,7 @@ const msgService = new SerialMessageService(messageTimeoutCallBack);
 parentPort.on('message', (msg) => {
   if (isNaN(msg.type)) {
     logger.error(`Message type not defined: ${msg.type}`);
+    parentPort.postMessage({ type: 0, error: `Message type not defined: ${msg.type}` });
     return;
   }
 
@@ -26,6 +27,7 @@ parentPort.on('message', (msg) => {
     }
   } catch (e) {
     logger.error(`Unhandled error in serial worker: ${e.message}`);
+    parentPort.postMessage({ type: 0, error: e.message });
   }
 });
 

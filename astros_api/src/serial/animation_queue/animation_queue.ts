@@ -145,6 +145,9 @@ export class AnimationQueue {
     if (track !== null) {
       if (this.hasShuffleDelay()) {
         const delay = this.getShuffleDelay();
+        if (this.currentTimeout) {
+          clearTimeout(this.currentTimeout);
+        }
         this.currentTimeout = setTimeout(() => {
           this.beginTrack(track);
         }, delay);
@@ -184,6 +187,9 @@ export class AnimationQueue {
   dispatchTrack(track: QueueTrack) {
     if (!track.isWait && this.activePlaylist) {
       this.dispatchCallback(track.id, this.activePlaylist.locations);
+    }
+    if (this.currentTimeout) {
+      clearTimeout(this.currentTimeout);
     }
     this.currentTimeout = setTimeout(() => {
       this.playNextTrack();

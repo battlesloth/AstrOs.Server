@@ -286,7 +286,14 @@ describe('Script Repository', () => {
     // Create a Maestro module and channel in the database
     const maestroModule: MaestroModule = { boards: [] };
 
-    maestroModule.boards.push({ id: maestroModuleId, parentId: locationId, boardId: 0, name: 'Test Board', channelCount: 24, channels: [] });
+    maestroModule.boards.push({
+      id: maestroModuleId,
+      parentId: locationId,
+      boardId: 0,
+      name: 'Test Board',
+      channelCount: 24,
+      channels: [],
+    });
 
     const maestroChannel = new MaestroChannel(
       maestroChannelId,
@@ -429,7 +436,14 @@ describe('Script Repository', () => {
     // Create Maestro module and channel
     const maestroModule: MaestroModule = { boards: [] };
 
-    maestroModule.boards.push({ id: maestroModuleId, parentId: locationId, boardId: 0, name: 'Test Board', channelCount: 24, channels: [] });
+    maestroModule.boards.push({
+      id: maestroModuleId,
+      parentId: locationId,
+      boardId: 0,
+      name: 'Test Board',
+      channelCount: 24,
+      channels: [],
+    });
 
     const maestroChannel = new MaestroChannel(
       maestroChannelId,

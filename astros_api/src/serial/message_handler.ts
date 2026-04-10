@@ -72,7 +72,11 @@ export class MessageHandler {
   }
 
   public handleRegistraionSyncAck(msg: string): RegistrationResponse {
-    const response: RegistrationResponse = { type: SerialWorkerResponseType.REGISTRATION_SYNC, success: true, registrations: [] };
+    const response: RegistrationResponse = {
+      type: SerialWorkerResponseType.REGISTRATION_SYNC,
+      success: true,
+      registrations: [],
+    };
 
     const records = msg.split(MessageHelper.RS);
 
@@ -93,7 +97,10 @@ export class MessageHandler {
   }
 
   handleDeployConfigAck(msg: string): ConfigSyncResponse {
-    const response = { type: SerialWorkerResponseType.CONFIG_SYNC, success: true } as ConfigSyncResponse;
+    const response = {
+      type: SerialWorkerResponseType.CONFIG_SYNC,
+      success: true,
+    } as ConfigSyncResponse;
 
     const parts = msg.split(MessageHelper.US);
 
@@ -124,7 +131,11 @@ export class MessageHandler {
 
     const success = type === SerialMessageType.DEPLOY_SCRIPT_ACK;
 
-    const response = { type: SerialWorkerResponseType.SCRIPT_DEPLOY, success, scriptId: parts[2] } as ScriptDeployResponse;
+    const response = {
+      type: SerialWorkerResponseType.SCRIPT_DEPLOY,
+      success,
+      scriptId: parts[2],
+    } as ScriptDeployResponse;
 
     const module: ControlModule = { id: '', name: parts[1], address: parts[0] };
     response.controller = module;
@@ -146,7 +157,11 @@ export class MessageHandler {
 
     const success = type === SerialMessageType.RUN_SCRIPT_ACK;
 
-    const response = { type: SerialWorkerResponseType.SCRIPT_RUN, success, scriptId: parts[2] } as ScriptRunResponse;
+    const response = {
+      type: SerialWorkerResponseType.SCRIPT_RUN,
+      success,
+      scriptId: parts[2],
+    } as ScriptRunResponse;
 
     const module: ControlModule = { id: '', name: parts[1], address: parts[0] };
     response.controller = module;

@@ -75,11 +75,17 @@ describe('ControllerRepository', () => {
     it('should update controller name and address', async () => {
       const repo = new ControllerRepository(db);
 
-      const id = await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
+      const id = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
 
-      const updated = await repo.updateController(
-        { id, name: 'dome-v2', address: 'AA:BB:CC:DD:EE:FF' },
-      );
+      const updated = await repo.updateController({
+        id,
+        name: 'dome-v2',
+        address: 'AA:BB:CC:DD:EE:FF',
+      });
       expect(updated).toBe(true);
 
       const result = await repo.getControllerById(id);
@@ -111,12 +117,16 @@ describe('ControllerRepository', () => {
       const repo = new ControllerRepository(db);
 
       // Insert initial controller
-      const originalId = await repo.insertController(
-        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
-      );
+      const originalId = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
 
       // Bulk insert with same address but different name (simulating re-registration)
-      await repo.insertControllers([{ id: '', name: 'dome-renamed', address: 'AA:BB:CC:DD:EE:01' }]);
+      await repo.insertControllers([
+        { id: '', name: 'dome-renamed', address: 'AA:BB:CC:DD:EE:01' },
+      ]);
 
       const result = await repo.getControllerByAddress('AA:BB:CC:DD:EE:01');
       expect(result.id).toBe(originalId);
@@ -126,9 +136,11 @@ describe('ControllerRepository', () => {
     it('should preserve ID when re-inserting with same name', async () => {
       const repo = new ControllerRepository(db);
 
-      const originalId = await repo.insertController(
-        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
-      );
+      const originalId = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
 
       // Bulk insert with same name but different address (controller got new MAC)
       await repo.insertControllers([{ id: '', name: 'dome', address: 'FF:FF:FF:FF:FF:FF' }]);
@@ -162,9 +174,11 @@ describe('ControllerRepository', () => {
     it('should find controller via location join', async () => {
       const repo = new ControllerRepository(db);
 
-      const controllerId = await repo.insertController(
-        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
-      );
+      const controllerId = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
 
       // Seed location and controller_locations relationship
       await db

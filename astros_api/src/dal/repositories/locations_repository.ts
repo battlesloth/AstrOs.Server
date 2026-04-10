@@ -42,7 +42,12 @@ export class LocationsRepository {
       });
 
     for (const c of data) {
-      const location = createControllerLocation(c.loc_id, c.loc_name, c.loc_desc, c.loc_fingerprint);
+      const location = createControllerLocation(
+        c.loc_id,
+        c.loc_name,
+        c.loc_desc,
+        c.loc_fingerprint,
+      );
 
       location.controller = {
         id: c.ctrl_id ?? '0',

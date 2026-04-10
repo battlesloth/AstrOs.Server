@@ -228,7 +228,14 @@ function generateMaestroModule(idx: number, name: string, location: string): Uar
 }
 
 function generateMaestroBoard(parentId: string): MaestroBoard {
-  const board: MaestroBoard = { id: uuid(), parentId, boardId: 0, name: 'board', channelCount: 24, channels: [] };
+  const board: MaestroBoard = {
+    id: uuid(),
+    parentId,
+    boardId: 0,
+    name: 'board',
+    channelCount: 24,
+    channels: [],
+  };
 
   board.channels.push(
     new MaestroChannel(uuid(), board.id, `channel 1`, true, 1, true, 800, 2000, 1400, false),

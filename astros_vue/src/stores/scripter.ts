@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useScriptResources } from '@/composables/useScriptResources';
 import { useLocationStore } from './location';
 import apiService from '@/api/apiService';
@@ -23,8 +23,32 @@ export const useScripterStore = defineStore('scripter', () => {
   const isLoading = ref(false);
   const isSaving = ref(false);
   const script = ref<Script | null>(null);
+  const savedSnapshot = ref<string>('');
 
   const locationsStore = useLocationStore();
+
+  function editableSnapshot(s: Script): string {
+    return JSON.stringify({
+      id: s.id,
+      scriptName: s.scriptName,
+      description: s.description,
+      lastSaved: s.lastSaved,
+      scriptChannels: s.scriptChannels,
+    });
+  }
+
+  function takeSnapshot() {
+    if (!script.value) {
+      savedSnapshot.value = '';
+      return;
+    }
+    savedSnapshot.value = editableSnapshot(script.value);
+  }
+
+  const isDirty = computed(() => {
+    if (!script.value || !savedSnapshot.value) return false;
+    return editableSnapshot(script.value) !== savedSnapshot.value;
+  });
 
   const { convertEventsForChannelType } = useEventConverter();
 
@@ -64,6 +88,7 @@ export const useScripterStore = defineStore('scripter', () => {
       };
 
       applyScript(script.value);
+      takeSnapshot();
       return { success: true };
     } catch (error) {
       console.error('Failed to create new script:', error);
@@ -95,6 +120,7 @@ export const useScripterStore = defineStore('scripter', () => {
       console.log('loaded script channels:', script.value.scriptChannels);
 
       applyScript(script.value);
+      takeSnapshot();
 
       return { success: true };
     } catch (error) {
@@ -116,6 +142,7 @@ export const useScripterStore = defineStore('scripter', () => {
         throw new Error('Failed to save script');
       }
 
+      takeSnapshot();
       return { success: true };
     } catch (error) {
       console.error('Failed to save script:', error);
@@ -374,6 +401,7 @@ export const useScripterStore = defineStore('scripter', () => {
   return {
     isLoading,
     isSaving,
+    isDirty,
     script,
     createNewScript,
     loadScripterData,

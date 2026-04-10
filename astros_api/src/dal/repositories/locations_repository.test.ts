@@ -166,9 +166,11 @@ describe('LocationsRepository', () => {
       const ctlRepo = new ControllerRepository(db);
 
       // Insert a new controller
-      const newCtlId = await ctlRepo.insertController(
-        { id: '', name: 'dome-ctl', address: 'AA:BB:CC:DD:EE:01' },
-      );
+      const newCtlId = await ctlRepo.insertController({
+        id: '',
+        name: 'dome-ctl',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
 
       // Get the core location (currently has no controller)
       const locations = await repo.loadLocations();

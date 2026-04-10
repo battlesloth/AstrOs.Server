@@ -345,7 +345,14 @@ async function loadMaestroModule(
     });
 
   for (const b of boards) {
-    module.boards.push({ id: b.id, parentId: b.parent_id, boardId: b.board_id, name: b.name, channelCount: b.channel_count, channels: [] });
+    module.boards.push({
+      id: b.id,
+      parentId: b.parent_id,
+      boardId: b.board_id,
+      name: b.name,
+      channelCount: b.channel_count,
+      channels: [],
+    });
   }
 
   for (const board of module.boards) {

@@ -1,4 +1,3 @@
-import { PlaylistRepository } from 'src/dal/repositories/playlist_repository.js';
 import { Kysely } from 'kysely';
 import { Database } from 'src/dal/types.js';
 import { ScriptRepository } from 'src/dal/repositories/script_repository.js';
@@ -118,10 +117,8 @@ async function saveScript(db: Kysely<Database>, req: any, res: any, next: any) {
 export async function deleteScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const scriptRepo = new ScriptRepository(db);
-    const playlistRepo = new PlaylistRepository(db);
 
     await scriptRepo.deleteScript(req.query.id);
-    await playlistRepo.deleteTracksByScriptId(req.query.id);
 
     res.status(200);
     res.json({ message: 'success' });

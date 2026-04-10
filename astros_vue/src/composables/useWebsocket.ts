@@ -9,10 +9,16 @@ const ws = ref<WebSocket | null>(null);
 const wsIsConnected = ref(false);
 const retryInterval = 3000;
 let retryTimeout: number | null = null;
+let intentionallyClosed = false;
+
+function getWsUrl(): string {
+  return import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:5000/ws`;
+}
 
 export function useWebsocket() {
   function wsConnect() {
-    ws.value = new WebSocket('ws://localhost:5000/ws');
+    intentionallyClosed = false;
+    ws.value = new WebSocket(getWsUrl());
 
     ws.value.onopen = () => {
       wsIsConnected.value = true;
@@ -25,8 +31,10 @@ export function useWebsocket() {
 
     ws.value.onclose = () => {
       wsIsConnected.value = false;
-      console.log('WebSocket disconnected, retrying in 3 seconds...');
-      attemptReconnect();
+      if (!intentionallyClosed) {
+        console.log('WebSocket disconnected, retrying in 3 seconds...');
+        attemptReconnect();
+      }
     };
 
     ws.value.onerror = (error) => {
@@ -40,18 +48,20 @@ export function useWebsocket() {
   }
 
   function attemptReconnect() {
-    if (!wsIsConnected.value) {
+    if (!wsIsConnected.value && !intentionallyClosed) {
       retryTimeout = window.setTimeout(wsConnect, retryInterval);
     }
   }
 
   function wsDisconnect() {
+    intentionallyClosed = true;
+    if (retryTimeout) {
+      window.clearTimeout(retryTimeout);
+      retryTimeout = null;
+    }
     if (ws.value) {
       ws.value.close();
       ws.value = null;
-    }
-    if (retryTimeout) {
-      window.clearTimeout(retryTimeout);
     }
   }
 
@@ -66,7 +76,13 @@ export function useWebsocket() {
   }
 
   function handleMessage(message: string) {
-    const parsedMessage = JSON.parse(message) as BaseWsMessage;
+    let parsedMessage: BaseWsMessage;
+    try {
+      parsedMessage = JSON.parse(message) as BaseWsMessage;
+    } catch (error) {
+      console.error('Failed to parse WebSocket message:', error);
+      return;
+    }
 
     console.log('WebSocket message received:', parsedMessage.type);
     switch (parsedMessage.type) {

@@ -2,7 +2,7 @@
 import { onMounted, ref, useTemplateRef } from 'vue';
 import { ModalMode, ModalType, ScriptChannelType } from '@/enums';
 import { useScripterStore } from '@/stores/scripter';
-import { useRoute } from 'vue-router';
+import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import {
   AstrosLayout,
   AstrosPixiView,
@@ -48,6 +48,15 @@ const { eventTypeToModalType, getDefaultScriptEvent } = useScriptEvents();
 
 const { success, error } = useToast();
 const { t } = useI18n();
+
+onBeforeRouteLeave((_to, _from, next) => {
+  if (scripterStore.isDirty) {
+    const confirmed = window.confirm(t('scripter_view.unsaved_changes'));
+    next(confirmed);
+  } else {
+    next();
+  }
+});
 
 function addChannel() {
   showModal.value = ModalType.ADD_CHANNEL;

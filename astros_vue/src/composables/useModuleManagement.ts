@@ -77,6 +77,9 @@ export function useModuleManagement() {
     };
 
     switch (moduleSubType) {
+      case ModuleSubType.GENERIC_SERIAL:
+        module.name = 'New Serial Module';
+        break;
       case ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL:
         module.name = 'New HCR Module';
         break;

@@ -233,7 +233,14 @@ describe('UartRepository', () => {
     );
 
     const maestroModule: MaestroModule = { boards: [] };
-    const board: MaestroBoard = { id: boardId, parentId: modId, boardId: 0, name: 'Board 1', channelCount: 3, channels: [] };
+    const board: MaestroBoard = {
+      id: boardId,
+      parentId: modId,
+      boardId: 0,
+      name: 'Board 1',
+      channelCount: 3,
+      channels: [],
+    };
 
     // Create channels with various invalid position values
     // Channel 1: undefined values (simulating disabled channel cleared by user)
