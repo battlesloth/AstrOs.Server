@@ -16,42 +16,31 @@ Note: `Assets.load()` is internally cached by PixiJS, so the performance concern
 
 ### Vue C-2: Lifecycle guard in AstrosPixiView.vue
 
-- [ ] Add `let isDestroyed = false` flag in the component setup
-- [ ] Set `isDestroyed = true` at the start of `onUnmounted`
-- [ ] Guard after each `await` in `init()`:
-  ```
-  await loadAssets();
-  if (isDestroyed) return;
-
-  await app.value.init({...});
-  if (isDestroyed) return;
-  ```
-- [ ] Guard in `initializePixi()` before the `addChannel` loop:
-  ```
-  await init();
-  if (isDestroyed) return;
-  ```
-- [ ] Guard in `addChannel` / `addEvent` — early return if `isDestroyed`
+- [x] Add `let isDestroyed = false` flag in the component setup
+- [x] Set `isDestroyed = true` at the start of `onUnmounted`
+- [x] Guard after each `await` in `init()` (loadAssets + app.init)
+- [x] Guard in `initializePixi()` before the `addChannel` loop
+- [x] Guard in `addChannel` / `addEvent` — early return if `isDestroyed`
 
 ### Vue H-5: Destroy methods for PixiChannelEvent and PixiChannelData
 
 #### pixiChannelEvent.ts
-- [ ] Add `private isDestroyed = false` property
-- [ ] Add `destroy()` method that:
-  - Sets `isDestroyed = true`
-  - Calls `this.removeAllListeners()` (Pixi Container method — removes pointerdown, pointertap, etc.)
-  - Calls `super.destroy({ children: true })` to clean up display objects
-- [ ] Guard all `Assets.load().then()` callbacks: check `if (this.isDestroyed) return` before `this.addChild(sprite)`
-- [ ] Update `rebuild()` to also check `isDestroyed`
+- [x] Add `private isDestroyed = false` property
+- [x] Add `destroy()` override (idempotent) that sets `isDestroyed`, calls `removeAllListeners()`, calls `super.destroy({ children: true })`
+- [x] Guard all `Assets.load().then()` callbacks via a new `loadAsset(asset, cb)` helper that checks `isDestroyed` before applying the texture — 14 call sites now funnel through it
+- [x] Update `rebuild()` to early-return on `isDestroyed`
 
 #### pixiChannelData.ts
-- [ ] Same pattern: `isDestroyed` flag, `destroy()` method with `removeAllListeners()` + `super.destroy()`
-- [ ] Guard `Assets.load().then()` callbacks for swapIcon, deleteIcon, playIcon
-- [ ] Guard button `pointerdown` listeners in `addButton()`
+- [x] Same pattern: `isDestroyed` flag, `destroy()` override, `loadIcon(asset, button)` helper that guards the callback
+- [x] Guarded `Assets.load` callbacks for swapIcon, deleteIcon, playIcon
+- [x] Button pointerdown listeners explicitly removed in `destroy()` (tracked via a `buttons` array) in addition to the parent's `removeAllListeners()`
 
 #### AstrosPixiView.vue — cleanup integration
-- [ ] In `doRemoveChannel()`, call `destroy()` on the removed `PixiChannelData` and each `PixiChannelEvent` in that channel before removing from the display tree
-- [ ] In `onUnmounted`, the existing `app.value?.destroy(true, { children: true, ... })` should cascade to children, but explicitly calling `destroy()` on tracked containers ensures listeners are cleaned up before the Pixi app teardown
+- [x] `useEventBoxes.removeEventBox` now destroys the removed box (so single-event removal is clean too)
+- [x] Added `removeAllEventBoxesForChannel(channelId)` helper to `useEventBoxes`, which is called from `doRemoveChannel` to destroy every PixiChannelEvent for that channel before the row container is torn down
+- [x] `pixiChannelList.removeChannelRow` now calls `destroy({ children: true })` on the PixiChannelData after detaching it
+- [x] `doRemoveChannel` explicitly destroys the row container (`PixiChannelEventRow`) after removing it from the display tree
+- [x] `onUnmounted` destroys every tracked row container before calling `app.destroy()`, so our custom destroy methods run even if Pixi's cascade behavior changes
 
 ## Key files
 

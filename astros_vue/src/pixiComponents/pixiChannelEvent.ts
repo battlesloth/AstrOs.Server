@@ -33,6 +33,7 @@ export class PixiChannelEvent extends Container {
   options: PixiChannelEventOptions;
   boxWidth: number;
   boxHeight: number;
+  private isDestroyed = false;
 
   constructor(options: PixiChannelEventOptions) {
     super();
@@ -91,13 +92,26 @@ export class PixiChannelEvent extends Container {
     }
   }
 
+  /**
+   * Loads a texture asynchronously and applies it via the callback, but
+   * aborts if the container has been destroyed in the meantime. This guards
+   * against `.then()` callbacks firing after unmount, which would add
+   * children to a destroyed container.
+   */
+  private loadAsset(asset: string, apply: (texture: Texture) => void) {
+    Assets.load(asset).then((texture: Texture) => {
+      if (this.isDestroyed) return;
+      apply(texture);
+    });
+  }
+
   setServoBackground() {
     this.setBackground(this.getBackgroundColor(), this.getBorderColor());
 
     const evt = this.scriptEvent.event as MaestroEvent;
 
     if (evt.position === -1) {
-      Assets.load('home').then((texture) => {
+      this.loadAsset('home', (texture) => {
         this.setIcon(texture, this.getTextColor());
       });
       return;
@@ -105,7 +119,7 @@ export class PixiChannelEvent extends Container {
 
     const speedColor = this.getSpeedToColor(evt.speed);
 
-    Assets.load('servo').then((texture) => {
+    this.loadAsset('servo', (texture) => {
       this.setIcon(texture, speedColor, 0.45, 2);
     });
 
@@ -132,11 +146,11 @@ export class PixiChannelEvent extends Container {
     }
 
     if (isHigh) {
-      Assets.load('arrowUp').then((texture) => {
+      this.loadAsset('arrowUp', (texture) => {
         this.setIcon(texture, 0x00e500);
       });
     } else {
-      Assets.load('arrowDown').then((texture) => {
+      this.loadAsset('arrowDown', (texture) => {
         this.setIcon(texture, 0xbbbbbb);
       });
     }
@@ -144,14 +158,14 @@ export class PixiChannelEvent extends Container {
 
   setAudioBackground() {
     this.setBackground(this.getBackgroundColor(), this.getBorderColor());
-    Assets.load('start').then((texture) => {
+    this.loadAsset('start', (texture) => {
       this.setIcon(texture, this.getTextColor());
     });
   }
 
   setI2CBackground() {
     this.setBackground(this.getBackgroundColor(), this.getBorderColor());
-    Assets.load('i2c').then((texture) => {
+    this.loadAsset('i2c', (texture) => {
       this.setIcon(texture, this.getTextColor(), 0.28, -10);
     });
 
@@ -165,7 +179,7 @@ export class PixiChannelEvent extends Container {
 
   setSerialBackground() {
     this.setBackground(this.getBackgroundColor(), this.getBorderColor());
-    Assets.load('serial').then((texture) => {
+    this.loadAsset('serial', (texture) => {
       this.setIcon(texture, this.getTextColor(), 0.33, -10);
     });
 
@@ -199,25 +213,25 @@ export class PixiChannelEvent extends Container {
 
     switch (action) {
       case KangarooAction.HOME:
-        Assets.load('home').then((texture) => {
+        this.loadAsset('home', (texture) => {
           this.setIcon(texture, this.getTextColor(), scale, offsetY);
         });
         break;
       case KangarooAction.START:
-        Assets.load('start').then((texture) => {
+        this.loadAsset('start', (texture) => {
           this.setIcon(texture, this.getTextColor(), scale, offsetY);
         });
         break;
       case KangarooAction.NONE:
-        Assets.load('none').then((texture) => {
+        this.loadAsset('none', (texture) => {
           this.setIcon(texture, 0xbbbbbb, scale, offsetY);
         });
         break;
       default:
-        Assets.load('dial').then((texture) => {
+        this.loadAsset('dial', (texture) => {
           this.setIcon(texture, this.getTextColor(), scale, offsetY);
         });
-        Assets.load('pointer').then((texture) => {
+        this.loadAsset('pointer', (texture) => {
           this.setIcon(texture, this.getTextColor(), scale, offsetY);
         });
         break;
@@ -253,7 +267,7 @@ export class PixiChannelEvent extends Container {
   }
 
   setPinIcon(rotation: number, scale?: number, offsetY?: number) {
-    Assets.load('servo_arm').then((texture) => {
+    this.loadAsset('servo_arm', (texture) => {
       const icon = new Sprite(texture);
       icon.anchor.set(0.5, 0.4);
       icon.rotation = rotation ?? 0;
@@ -309,6 +323,8 @@ export class PixiChannelEvent extends Container {
    * Call this after updating scriptEvent data to refresh the display
    */
   rebuild() {
+    if (this.isDestroyed) return;
+
     // Destroy and remove all existing children to avoid leaking Pixi objects
     while (this.children.length > 0) {
       const child = this.removeChildAt(0);
@@ -319,5 +335,19 @@ export class PixiChannelEvent extends Container {
 
     // Redraw with updated data
     this.setContainerContent();
+  }
+
+  /**
+   * Override of Pixi's Container.destroy so we can mark the instance as
+   * destroyed (which short-circuits any in-flight Assets.load callbacks) and
+   * explicitly detach pointer listeners before the normal teardown runs.
+   *
+   * Idempotent — safe to call more than once.
+   */
+  override destroy(options?: Parameters<Container['destroy']>[0]): void {
+    if (this.isDestroyed) return;
+    this.isDestroyed = true;
+    this.removeAllListeners();
+    super.destroy(options ?? { children: true });
   }
 }

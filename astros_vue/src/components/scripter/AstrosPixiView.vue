@@ -86,12 +86,14 @@ const minusButton = ref<Container | null>(null);
 
 const initializePixi = async (scriptChannels: Channel[]) => {
   await init();
+  if (isDestroyed) return;
   for (const channel of scriptChannels) {
     addChannel(channel);
   }
 };
 
 const addChannel = (channel: Channel) => {
+  if (isDestroyed) return;
   console.log('adding channel', channel);
   doAddChannel(channel);
   if (channel.events.length > 0) {
@@ -110,6 +112,7 @@ const swapChannel = (chA: Channel, chB: Channel) => {
 };
 
 const addEvent = (event: ScriptEvent, scriptChannelType: ScriptChannelType) => {
+  if (isDestroyed) return;
   doAddEvent(event, scriptChannelType);
 };
 
@@ -212,6 +215,7 @@ const {
   hasEventBoxDragged,
   addEventBox,
   removeEventBox,
+  removeAllEventBoxesForChannel,
   rebuildEventBox,
   updateEventBoxPositions,
   updateAllEventBoxPositions,
@@ -223,6 +227,11 @@ const {
 
 // Other
 let resizeObserver: ResizeObserver | null = null;
+
+// Tracks whether the component has been unmounted. Set in onUnmounted and
+// checked after every await in init() / initializePixi() to prevent adding
+// children to destroyed containers if the user navigates away mid-load.
+let isDestroyed = false;
 
 // ============================================================================
 // WATCHERS
@@ -288,6 +297,7 @@ async function init() {
   app.value = new Application();
 
   await loadAssets();
+  if (isDestroyed) return;
 
   await app.value.init({
     width: pixiContainer.value.clientWidth || 800,
@@ -296,6 +306,7 @@ async function init() {
     antialias: true,
     resolution: window.devicePixelRatio || 1,
   });
+  if (isDestroyed || !pixiContainer.value) return;
 
   pixiContainer.value.appendChild(app.value.canvas);
 
@@ -383,6 +394,10 @@ async function init() {
 }
 
 onUnmounted(() => {
+  // Flip the destroy flag first so any in-flight awaits or pending
+  // Assets.load callbacks short-circuit before touching torn-down state.
+  isDestroyed = true;
+
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
@@ -393,6 +408,15 @@ onUnmounted(() => {
   if (pixiContainer.value) {
     pixiContainer.value.removeEventListener('wheel', handleWheel);
   }
+
+  // Explicitly destroy any tracked PixiChannelData / PixiChannelEvent
+  // containers before the Pixi app tears down. This ensures our custom
+  // destroy methods run (clearing listeners) even if Pixi's cascading
+  // destroy path changes in a future release.
+  for (const rowContainer of channelRowContainers.value.values()) {
+    rowContainer.destroy({ children: true });
+  }
+  channelRowContainers.value.clear();
 
   app.value?.destroy(true, {
     children: true,
@@ -409,7 +433,6 @@ onUnmounted(() => {
   horizontalScrollBar.value = null;
   timeline.value = null;
   verticalScrollBar.value = null;
-  channelRowContainers.value.clear();
 });
 
 function addAppStageListeners() {
@@ -646,13 +669,20 @@ function doRemoveChannel(chId: string) {
 
   channels.value.splice(channelIndex, 1);
 
+  // Destroy all PixiChannelEvent instances for this channel before tearing
+  // down the row container. This short-circuits any in-flight Assets.load
+  // callbacks on the events and removes their pointer listeners.
+  removeAllEventBoxesForChannel(chId);
+
   // Remove the corresponding row container under the timeline
   const rowContainer = channelRowContainers.value.get(chId);
   if (rowContainer && scrollableContentContainer.value) {
     scrollableContentContainer.value.removeChild(rowContainer as unknown as Container);
     channelRowContainers.value.delete(chId);
+    rowContainer.destroy({ children: true });
   }
 
+  // Destroys the PixiChannelData inside the list as a side effect.
   channelListContainer.value?.removeChannelRow(chId);
 
   // Update remaining row indices to match their position in the channels array

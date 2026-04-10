@@ -111,6 +111,9 @@ export class PixiChannelList extends Container {
     if (row && this.channelListScrollableContainer) {
       this.channelListScrollableContainer.removeChild(row);
       this.channels.delete(channelId);
+      // Destroy after detaching so listeners and sprite children are cleaned
+      // up — prevents leaked pointer handlers and stale Assets.load callbacks.
+      row.destroy({ children: true });
     }
   }
 
