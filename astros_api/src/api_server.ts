@@ -275,12 +275,15 @@ class ApiServer {
       });
     });
 
-    const jwtKey: string = process.env.JWT_KEY as string;
+    const jwtKey = process.env.JWT_KEY;
+    if (!jwtKey) {
+      logger.error('JWT_KEY environment variable is required');
+      process.exit(1);
+    }
 
     this.authHandler = jwt({
       secret: jwtKey,
       algorithms: ['HS256'],
-      //userProperty: 'payload'
     });
 
     this.apiKeyValidator = ApiKeyValidator(db);
@@ -363,18 +366,31 @@ class ApiServer {
       this.handleSerialWorkerMessage(msg);
     });
 
-    this.serialPort = new SerialPort({
-      path: process.env.SERIAL_PORT || '/dev/ttyS0',
-      baudRate: Number.parseInt(process.env.BAUD_RATE || '9600'),
-    });
-    this.serialParser = this.serialPort
-      .pipe(new DelimiterParser({ delimiter: '\n' }))
-      .on('data', (data: any) => {
-        this.serialWorker.postMessage({
-          type: SerialMessageType.SERIAL_MSG_RECEIVED,
-          data: data.toString(),
-        });
+    try {
+      this.serialPort = new SerialPort({
+        path: process.env.SERIAL_PORT || '/dev/ttyS0',
+        baudRate: Number.parseInt(process.env.BAUD_RATE || '9600'),
       });
+
+      this.serialPort.on('error', (err: any) => {
+        logger.error(`Serial port error: ${err}`);
+      });
+
+      this.serialPort.on('close', () => {
+        logger.warn('Serial port closed');
+      });
+
+      this.serialParser = this.serialPort
+        .pipe(new DelimiterParser({ delimiter: '\n' }))
+        .on('data', (data: any) => {
+          this.serialWorker.postMessage({
+            type: SerialMessageType.SERIAL_MSG_RECEIVED,
+            data: data.toString(),
+          });
+        });
+    } catch (err) {
+      logger.error(`Failed to open serial port: ${err}`);
+    }
   }
 
   private runWebServices(): void {
@@ -390,6 +406,16 @@ class ApiServer {
 
       conn.on('message', (msg) => {
         this.handleWebsocketMessage(msg.toString());
+      });
+
+      conn.on('close', () => {
+        this.clients.delete(id);
+        logger.info(`websocket disconnected: id=${id}`);
+      });
+
+      conn.on('error', (err) => {
+        logger.error(`websocket client error: id=${id}, ${err}`);
+        this.clients.delete(id);
       });
 
       logger.info(`websocket connected: id=${id}`);
@@ -934,19 +960,34 @@ class ApiServer {
 
   private updateClients(msg: any): void {
     const str = JSON.stringify(msg);
-    for (const client of this.clients.values()) {
+    for (const [id, client] of this.clients.entries()) {
       try {
         client.send(str);
       } catch (err) {
         logger.error(`websocket send error: ${err}`);
+        this.clients.delete(id);
       }
     }
   }
 
   //#endregion
+
+  shutdown(): void {
+    logger.info('Shutting down...');
+    this.animationQueue?.panicStop();
+    this.serialPort?.close();
+    this.serialWorker?.terminate();
+    this.websocket?.close();
+    process.exit(0);
+  }
 }
 
-ApiServer.bootstrap().catch((err) => {
-  console.error(err.stack);
-  process.exit(1);
-});
+ApiServer.bootstrap()
+  .then((server) => {
+    process.on('SIGTERM', () => server.shutdown());
+    process.on('SIGINT', () => server.shutdown());
+  })
+  .catch((err) => {
+    console.error(err.stack);
+    process.exit(1);
+  });

@@ -40,11 +40,8 @@ async function HandleFile(db: Kysely<Database>, req: any, res: any) {
 
     const path = `${StoragePath()}/${filename}`;
 
-    file.mv(path, (err) => {
-      if (err) {
-        logger.error(err);
-        return res.status(500).send('Internal server error');
-      }
+    await new Promise<void>((resolve, reject) => {
+      file.mv(path, (err) => (err ? reject(err) : resolve()));
     });
 
     const repo = new AudioFileRepository(db);

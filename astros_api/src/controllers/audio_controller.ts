@@ -1,6 +1,7 @@
 import { AudioFileRepository } from 'src/dal/repositories/audio_file_repository.js';
-import { unlink } from 'fs';
+import { unlink } from 'fs/promises';
 import appdata from 'appdata-path';
+import path from 'path';
 import { logger } from 'src/logger.js';
 import { Kysely } from 'kysely';
 import { Database } from 'src/dal/types.js';
@@ -41,11 +42,13 @@ export async function deleteAudioFile(db: Kysely<Database>, req: any, res: any, 
     const result = await repo.deleteFile(req.query.id);
 
     if (result) {
-      await unlink(`${appdata('astrosserver')}/files/${req.query.id}`, (err) => {
-        if (err) {
-          console.error(err);
-        }
-      });
+      const storageDir = `${appdata('astrosserver')}/files`;
+      const filePath = path.resolve(storageDir, req.query.id);
+      if (!filePath.startsWith(path.resolve(storageDir))) {
+        logger.error(`Path traversal attempt blocked: ${req.query.id}`);
+      } else {
+        await unlink(filePath);
+      }
     }
 
     res.status(200);
