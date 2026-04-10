@@ -1,5 +1,18 @@
 # Code Review Phase 4b: Database Migrations
 
+> **⚠️ SUPERSEDED 2026-04-10** — During planning, this scope grew into a full
+> feature covering backup + read-only mode infrastructure, the schema
+> migrations themselves, and a Vue UI for read-only state. It has been split
+> into three phase plans:
+>
+> - `20260410-0807-db-safety-phase1-backup-readonly.md`
+> - `20260410-0807-db-safety-phase2-schema-migrations.md`
+> - `20260410-0807-db-safety-phase3-vue-readonly-ui.md`
+>
+> Follow those plans for execution. The text below is preserved for history.
+
+---
+
 Full plan — schema fixes that require a pre-migration backup system.
 
 ## Context
