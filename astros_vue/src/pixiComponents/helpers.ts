@@ -1,14 +1,10 @@
 import { CanvasTextMetrics, FillGradient, TextStyle, Text } from 'pixi.js';
 
 export function getText(text: string, color: number, size: number): Text {
-  const fill = new FillGradient(0, 0, 1, 1);
-  fill.addColorStop(0, color);
-  fill.addColorStop(1, color);
-
   const style = new TextStyle({
     fontFamily: 'Arial',
     fontSize: size,
-    fill: fill,
+    fill: color,
   });
 
   const rowText = new Text({

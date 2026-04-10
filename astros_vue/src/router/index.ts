@@ -64,13 +64,23 @@ const router = createRouter({
   ],
 });
 
+const SESSION_CHECK_TTL_MS = 60_000;
+let lastSessionCheckAt = 0;
+
 router.beforeEach(async (to, from, next) => {
   if (!to.meta.public && to.path !== '/auth') {
     // Check if we have a token first
     const token = api.getToken();
     if (!token) {
       console.log('No token found, redirecting to auth');
+      lastSessionCheckAt = 0;
       next('/auth');
+      return;
+    }
+
+    // Skip the API round-trip if we recently verified the session
+    if (Date.now() - lastSessionCheckAt < SESSION_CHECK_TTL_MS) {
+      next();
       return;
     }
 
@@ -79,12 +89,15 @@ router.beforeEach(async (to, from, next) => {
       const response = await api.get(CHECK_SESSION);
       console.log('Session check response:', response);
       if (response.isAuthenticated) {
+        lastSessionCheckAt = Date.now();
         next();
       } else {
+        lastSessionCheckAt = 0;
         next('/auth');
       }
     } catch (error) {
       console.error('Session check failed:', error);
+      lastSessionCheckAt = 0;
       next('/auth');
     }
   } else {

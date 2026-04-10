@@ -85,4 +85,43 @@ describe('ApiKeyValidator', () => {
     expect(res.sendStatus).toHaveBeenCalledWith(500);
     expect(next).not.toHaveBeenCalled();
   });
+
+  it('should cache the apikey between requests', async () => {
+    const settings = new SettingsRepository(db);
+    await settings.saveSetting('apikey', 'secret-token-123');
+
+    const spy = vi.spyOn(SettingsRepository.prototype, 'getSetting');
+    const validator = ApiKeyValidator(db);
+
+    const req: any = { headers: { 'x-token': 'secret-token-123' } };
+
+    // First call — should hit DB
+    await validator(req, mockRes(), vi.fn());
+    // Second call — should use cache
+    await validator(req, mockRes(), vi.fn());
+    // Third call — still cached
+    await validator(req, mockRes(), vi.fn());
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it('should retry DB lookup after a fetch failure clears the cache', async () => {
+    // No apikey initially — first call will fail and reset cache
+    const validator = ApiKeyValidator(db);
+    const req: any = { headers: { 'x-token': 'secret-token-123' } };
+
+    await validator(req, mockRes(), vi.fn()); // fails, cache cleared
+
+    // Now save the key and verify the next call refetches
+    const settings = new SettingsRepository(db);
+    await settings.saveSetting('apikey', 'secret-token-123');
+
+    const res = mockRes();
+    const next = vi.fn();
+    await validator(req, res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(res.sendStatus).not.toHaveBeenCalled();
+  });
 });

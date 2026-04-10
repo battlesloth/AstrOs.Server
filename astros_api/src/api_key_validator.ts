@@ -4,20 +4,30 @@ import { logger } from './logger.js';
 import { Kysely } from 'kysely';
 import { Database } from './dal/types.js';
 
+const API_KEY_CACHE_TTL_MS = 60_000;
+
 export function ApiKeyValidator(db: Kysely<Database>): RequestHandler {
+  let cachedKey: string | null = null;
+  let cachedAt = 0;
+
   return async (req, res, next) => {
     logger.info('Validating API key', req);
 
-    const settings = new SettingsRepository(db);
+    let token: string | null = cachedKey;
+    const now = Date.now();
 
-    let token: string | null = null;
-
-    try {
-      token = await settings.getSetting('apikey');
-    } catch (error) {
-      logger.error('Error retrieving API key from settings', error);
-      res.sendStatus(500);
-      return;
+    if (token === null || now - cachedAt >= API_KEY_CACHE_TTL_MS) {
+      try {
+        token = await new SettingsRepository(db).getSetting('apikey');
+        cachedKey = token;
+        cachedAt = now;
+      } catch (error) {
+        cachedKey = null;
+        cachedAt = 0;
+        logger.error('Error retrieving API key from settings', error);
+        res.sendStatus(500);
+        return;
+      }
     }
 
     if (req.headers['x-token'] === undefined) {

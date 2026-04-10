@@ -123,6 +123,31 @@ class ApiServer {
     return true;
   }
 
+  /**
+   * Wraps a serial route handler with the standard boilerplate:
+   * - short-circuits with 503 when the serial worker is unavailable
+   * - catches thrown errors and responds with 500
+   *
+   * The wrapped handler is responsible for sending its own success response,
+   * so handlers can still return 404 or other status codes when appropriate.
+   */
+  private withSerialGuard(
+    handler: (req: any, res: any, next: any) => Promise<void> | void,
+  ): (req: any, res: any, next: any) => Promise<void> {
+    return async (req, res, next) => {
+      if (this.sendSerialUnavailable(res)) return;
+      try {
+        await handler(req, res, next);
+      } catch (error) {
+        logger.error(error);
+        res.status(500);
+        res.json({
+          message: 'Internal server error',
+        });
+      }
+    };
+  }
+
   constructor() {
     Dotenv.config({ path: __dirname + '/.env' });
 
@@ -304,41 +329,53 @@ class ApiServer {
       res.json({ isAuthenticated: true });
     });
 
-    this.router.get('/locations/syncconfig', this.authHandler, (req: any, res: any, next: any) => {
-      this.syncControllerConfig(req, res, next);
-    });
+    this.router.get(
+      '/locations/syncconfig',
+      this.authHandler,
+      this.withSerialGuard((req, res, next) => this.syncControllerConfig(req, res, next)),
+    );
 
     this.router.get(
       '/locations/synccontrollers',
       this.authHandler,
-      (req: any, res: any, next: any) => {
-        this.syncControllers(req, res, next);
-      },
+      this.withSerialGuard((req, res, next) => this.syncControllers(req, res, next)),
     );
 
-    this.router.get('/scripts/upload', this.authHandler, (req: any, res: any, next: any) => {
-      this.uploadScript(req, res, next);
-    });
+    this.router.get(
+      '/scripts/upload',
+      this.authHandler,
+      this.withSerialGuard((req, res, next) => this.uploadScript(req, res, next)),
+    );
 
-    this.router.get('/scripts/run', this.authHandler, (req: any, res: any, next: any) => {
-      this.runScript(req, res, next);
-    });
+    this.router.get(
+      '/scripts/run',
+      this.authHandler,
+      this.withSerialGuard((req, res, next) => this.runScript(req, res, next)),
+    );
 
-    this.router.get('/playlists/run', this.authHandler, (req: any, res: any, next: any) => {
-      this.runPlaylist(req, res, next);
-    });
+    this.router.get(
+      '/playlists/run',
+      this.authHandler,
+      this.withSerialGuard((req, res, next) => this.runPlaylist(req, res, next)),
+    );
 
-    this.router.post('/settings/formatSD', this.authHandler, (req: any, res: any, next: any) => {
-      this.formatSD(req, res, next);
-    });
+    this.router.post(
+      '/settings/formatSD',
+      this.authHandler,
+      this.withSerialGuard((req, res, next) => this.formatSD(req, res, next)),
+    );
 
-    this.router.post('/directcommand', this.authHandler, (req: any, res: any, next: any) => {
-      this.directCommand(req, res, next);
-    });
+    this.router.post(
+      '/directcommand',
+      this.authHandler,
+      this.withSerialGuard((req, res, next) => this.directCommand(req, res, next)),
+    );
 
-    this.router.post('/panicStop', this.authHandler, (req: any, res: any, next: any) => {
-      this.panicStop(req, res, next);
-    });
+    this.router.post(
+      '/panicStop',
+      this.authHandler,
+      this.withSerialGuard((req, res, next) => this.panicStop(req, res, next)),
+    );
 
     this.router.post('/panicClear', this.authHandler, (req: any, res: any, next: any) => {
       this.animationQueue.clearPanicStop();
@@ -347,9 +384,11 @@ class ApiServer {
     });
 
     // API key secured routes
-    this.router.get('/remotecontrol', this.apiKeyValidator, (req: any, res: any, next: any) => {
-      this.remoteControl(req, res, next);
-    });
+    this.router.get(
+      '/remotecontrol',
+      this.apiKeyValidator,
+      this.withSerialGuard((req, res, next) => this.remoteControl(req, res, next)),
+    );
   }
 
   private setupSerialPort(): void {
@@ -422,24 +461,21 @@ class ApiServer {
     });
   }
 
-  async handleWebsocketMessage(msg: string): Promise<void> {
-    return new Promise((resolve, _) => {
-      try {
-        const parsed = JSON.parse(msg) as IWebSocketMessage;
+  handleWebsocketMessage(msg: string): void {
+    try {
+      const parsed = JSON.parse(msg) as IWebSocketMessage;
 
-        switch (parsed.msgType) {
-          case 'SERVO_TEST':
-            this.servoMoveCommand(parsed.data as IServoTestData);
-            break;
-          default:
-            logger.error(`Unknown websocket message type: ${parsed.msgType}`);
-            break;
-        }
-      } catch (error) {
-        logger.error(`Error parsing websocket message: ${error}`);
+      switch (parsed.msgType) {
+        case 'SERVO_TEST':
+          this.servoMoveCommand(parsed.data as IServoTestData);
+          break;
+        default:
+          logger.error(`Unknown websocket message type: ${parsed.msgType}`);
+          break;
       }
-      resolve();
-    });
+    } catch (error) {
+      logger.error(`Error parsing websocket message: ${error}`);
+    }
   }
 
   handleSerialWorkerMessage(msg: ISerialWorkerResponse): void {
@@ -610,225 +646,147 @@ class ApiServer {
   //#region TO SERIAL WORKER
 
   private async syncControllers(req: any, res: any, next: any) {
-    try {
-      if (this.sendSerialUnavailable(res)) {
-        return;
-      }
-
-      logger.info('syncing controllers');
-      this.serialWorker.postMessage({
-        type: SerialMessageType.REGISTRATION_SYNC,
-        data: null,
-      });
-      res.status(200);
-      res.json({ message: 'success' });
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
-    }
+    logger.info('syncing controllers');
+    this.serialWorker.postMessage({
+      type: SerialMessageType.REGISTRATION_SYNC,
+      data: null,
+    });
+    res.status(200);
+    res.json({ message: 'success' });
   }
 
   private async syncControllerConfig(req: any, res: any, next: any) {
-    try {
-      if (this.sendSerialUnavailable(res)) {
-        return;
+    logger.info('syncing controller config');
+
+    const repo = new LocationsRepository(db);
+
+    const locations = await repo.loadLocations();
+
+    const toSync = new Array<ControllerLocation>();
+
+    for (let i = 0; i < locations.length; i++) {
+      if (!locations[i].controller.address) {
+        continue;
       }
 
-      logger.info('syncing controller config');
+      const ctl = await repo.loadLocationConfiguration(locations[i]);
 
-      const repo = new LocationsRepository(db);
-
-      const locations = await repo.loadLocations();
-
-      const toSync = new Array<ControllerLocation>();
-
-      for (let i = 0; i < locations.length; i++) {
-        if (!locations[i].controller.address) {
-          continue;
-        }
-
-        const ctl = await repo.loadLocationConfiguration(locations[i]);
-
-        if (ctl) {
-          toSync.push(ctl);
-        }
+      if (ctl) {
+        toSync.push(ctl);
       }
-
-      const configSync = createConfigSync(toSync);
-
-      this.serialWorker.postMessage({
-        type: SerialMessageType.DEPLOY_CONFIG,
-        data: configSync,
-      });
-
-      res.status(200);
-      res.json({ message: 'success' });
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
     }
+
+    const configSync = createConfigSync(toSync);
+
+    this.serialWorker.postMessage({
+      type: SerialMessageType.DEPLOY_CONFIG,
+      data: configSync,
+    });
+
+    res.status(200);
+    res.json({ message: 'success' });
   }
 
   private async uploadScript(req: any, res: any, next: any) {
-    try {
-      if (this.sendSerialUnavailable(res)) {
-        return;
-      }
+    logger.info('uploading script');
 
-      logger.info('uploading script');
+    const id = req.query.id;
 
-      const id = req.query.id;
+    const scriptRepo = new ScriptRepository(db);
+    const locationsRepo = new LocationsRepository(db);
 
-      const scriptRepo = new ScriptRepository(db);
-      const locationsRepo = new LocationsRepository(db);
+    const cvtr = new ScriptConverter(scriptRepo);
 
-      const cvtr = new ScriptConverter(scriptRepo);
+    const messages = await cvtr.convertScript(id);
 
-      const messages = await cvtr.convertScript(id);
-
-      if (messages.size < 1) {
-        logger.warn(`No locations script values returned for ${id}`);
-      }
-
-      const locations = await locationsRepo.loadLocations();
-
-      logger.debug(`scripts: ${JSON.stringify(messages)}`);
-
-      const msg = createScriptUpload(id, messages, locations);
-
-      logger.debug(`msg: ${JSON.stringify(msg)}`);
-
-      this.serialWorker.postMessage({
-        type: SerialMessageType.DEPLOY_SCRIPT,
-        data: msg,
-      });
-
-      res.status(200);
-      res.json({ message: 'success' });
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
+    if (messages.size < 1) {
+      logger.warn(`No locations script values returned for ${id}`);
     }
+
+    const locations = await locationsRepo.loadLocations();
+
+    logger.debug(`scripts: ${JSON.stringify(messages)}`);
+
+    const msg = createScriptUpload(id, messages, locations);
+
+    logger.debug(`msg: ${JSON.stringify(msg)}`);
+
+    this.serialWorker.postMessage({
+      type: SerialMessageType.DEPLOY_SCRIPT,
+      data: msg,
+    });
+
+    res.status(200);
+    res.json({ message: 'success' });
   }
 
   private async runPlaylist(req: any, res: any, next: any) {
-    try {
-      if (this.sendSerialUnavailable(res)) {
-        return;
-      }
+    const id = req.query.id;
+    logger.info(`running playlist ${id}`);
 
-      const id = req.query.id;
-      logger.info(`running playlist ${id}`);
+    const playlistRepo = new PlaylistRepository(db);
+    const locationsRepo = new LocationsRepository(db);
 
-      const playlistRepo = new PlaylistRepository(db);
-      const locationsRepo = new LocationsRepository(db);
+    const playlist = await playlistRepo.getPlaylist(id);
 
-      const playlist = await playlistRepo.getPlaylist(id);
-
-      if (!playlist) {
-        res.status(404);
-        res.json({ message: 'Playlist not found' });
-        return;
-      }
-
-      const locations = await locationsRepo.loadLocations();
-      const queueItem = await convertPlaylistToQueueItem(playlist, playlistRepo, locations);
-      this.animationQueue.addToQueue(queueItem);
-
-      res.status(200);
-      res.json({ message: 'success' });
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
+    if (!playlist) {
+      res.status(404);
+      res.json({ message: 'Playlist not found' });
+      return;
     }
+
+    const locations = await locationsRepo.loadLocations();
+    const queueItem = await convertPlaylistToQueueItem(playlist, playlistRepo, locations);
+    this.animationQueue.addToQueue(queueItem);
+
+    res.status(200);
+    res.json({ message: 'success' });
   }
 
   private async runScript(req: any, res: any, next: any) {
-    try {
-      if (this.sendSerialUnavailable(res)) {
-        return;
-      }
+    const id = req.query.id;
+    logger.info(`running script ${id}`);
 
-      const id = req.query.id;
-      logger.info(`running script ${id}`);
+    const scriptRepo = new ScriptRepository(db);
+    const locationsRepo = new LocationsRepository(db);
 
-      const scriptRepo = new ScriptRepository(db);
-      const locationsRepo = new LocationsRepository(db);
+    const script = await scriptRepo.getScript(id);
+    const locations = await locationsRepo.loadLocations();
 
-      const script = await scriptRepo.getScript(id);
-      const locations = await locationsRepo.loadLocations();
+    const queueItem: AnimationQueuePlaylist = {
+      id: `script-${id}`,
+      playlistType: PlaylistType.Sequential,
+      locations,
+      tracks: [{ id: script.id, duration: script.durationDS * 100, isWait: false }],
+      repeatsLeft: 0,
+      shuffleWaitMin: 0,
+      shuffleWaitMax: 0,
+      tracksRemaining: [],
+    };
 
-      const queueItem: AnimationQueuePlaylist = {
-        id: `script-${id}`,
-        playlistType: PlaylistType.Sequential,
-        locations,
-        tracks: [{ id: script.id, duration: script.durationDS * 100, isWait: false }],
-        repeatsLeft: 0,
-        shuffleWaitMin: 0,
-        shuffleWaitMax: 0,
-        tracksRemaining: [],
-      };
+    this.animationQueue.addToQueue(queueItem);
 
-      this.animationQueue.addToQueue(queueItem);
-
-      res.status(200);
-      res.json({ message: 'success' });
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
-    }
+    res.status(200);
+    res.json({ message: 'success' });
   }
 
   private async panicStop(req: any, res: any, next: any) {
-    try {
-      if (this.sendSerialUnavailable(res)) {
-        return;
-      }
+    logger.info('panic stop');
 
-      logger.info('panic stop');
+    this.animationQueue.panicStop();
 
-      this.animationQueue.panicStop();
+    const ctlRepo = new LocationsRepository(db);
+    const locations = await ctlRepo.loadLocations();
+    const msg = createScriptRun('panic', locations);
+    msg.type = TransmissionType.panic;
 
-      const ctlRepo = new LocationsRepository(db);
-      const locations = await ctlRepo.loadLocations();
-      const msg = createScriptRun('panic', locations);
-      msg.type = TransmissionType.panic;
+    this.serialWorker.postMessage({
+      type: SerialMessageType.PANIC_STOP,
+      data: msg,
+    });
 
-      this.serialWorker.postMessage({
-        type: SerialMessageType.PANIC_STOP,
-        data: msg,
-      });
-
-      res.status(200);
-      res.json({ message: 'success' });
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
-    }
+    res.status(200);
+    res.json({ message: 'success' });
   }
 
   private async remoteControl(req: any, res: any, next: any) {
@@ -841,9 +799,9 @@ class ApiServer {
     }
 
     if (id.startsWith('p')) {
-      this.runPlaylist(req, res, next);
+      await this.runPlaylist(req, res, next);
     } else {
-      this.runScript(req, res, next);
+      await this.runScript(req, res, next);
     }
   }
 
@@ -867,37 +825,24 @@ class ApiServer {
   }
 
   private async directCommand(req: any, res: any, next: any) {
-    try {
-      if (this.sendSerialUnavailable(res)) {
-        return;
-      }
+    logger.info('sending direct command');
 
-      logger.info('sending direct command');
+    const repo = new ControllerRepository(db);
+    const controller = await repo.getControllerByLocationId(req.body.locationId);
 
-      const repo = new ControllerRepository(db);
-      const controller = await repo.getControllerByLocationId(req.body.locationId);
+    logger.debug(`controller: ${JSON.stringify(controller)}`);
+    logger.debug(`req: ${JSON.stringify(req.body)}`);
 
-      logger.debug(`controller: ${JSON.stringify(controller)}`);
-      logger.debug(`req: ${JSON.stringify(req.body)}`);
+    const converter = new ScriptConverter(new ScriptRepository(db));
+    const cmd = await converter.convertCommand(req.body);
 
-      const converter = new ScriptConverter(new ScriptRepository(db));
-      const cmd = await converter.convertCommand(req.body);
+    this.serialWorker.postMessage({
+      type: SerialMessageType.RUN_COMMAND,
+      data: { controller: controller, command: cmd },
+    });
 
-      this.serialWorker.postMessage({
-        type: SerialMessageType.RUN_COMMAND,
-        data: { controller: controller, command: cmd },
-      });
-
-      res.status(200);
-      res.json({ message: 'success' });
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
-    }
+    res.status(200);
+    res.json({ message: 'success' });
   }
 
   private async servoMoveCommand(data: IServoTestData) {
@@ -928,30 +873,17 @@ class ApiServer {
   }
 
   private async formatSD(req: any, res: any, next: any) {
-    try {
-      if (this.sendSerialUnavailable(res)) {
-        return;
-      }
+    logger.info('formatting SD card');
 
-      logger.info('formatting SD card');
+    const controllers = req.body.controllers;
 
-      const controllers = req.body.controllers;
+    this.serialWorker.postMessage({
+      type: SerialMessageType.FORMAT_SD,
+      data: controllers,
+    });
 
-      this.serialWorker.postMessage({
-        type: SerialMessageType.FORMAT_SD,
-        data: controllers,
-      });
-
-      res.status(200);
-      res.json({ message: 'success' });
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
-    }
+    res.status(200);
+    res.json({ message: 'success' });
   }
 
   //#endregion
