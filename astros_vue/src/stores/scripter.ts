@@ -73,7 +73,7 @@ export const useScripterStore = defineStore('scripter', () => {
 
       loadResources(locationsStore.getLocationCollection());
 
-      script.value = {
+      const newScript: Script = {
         id: generateShortId('s'),
         scriptName: 'New Script',
         description: '',
@@ -85,9 +85,12 @@ export const useScripterStore = defineStore('scripter', () => {
           [Location.UNKNOWN]: { date: undefined, value: UploadStatus.NOT_UPLOADED },
         },
         scriptChannels: [],
+        durationDS: 0,
+        playlistCount: 0,
       };
 
-      applyScript(script.value);
+      script.value = newScript;
+      applyScript(newScript);
       takeSnapshot();
       return { success: true };
     } catch (error) {
@@ -115,13 +118,11 @@ export const useScripterStore = defineStore('scripter', () => {
         throw new Error('Script not found');
       }
 
-      script.value = response as Script;
+      const loadedScript = response as Script;
 
-      console.log('loaded script channels:', script.value.scriptChannels);
-
-      applyScript(script.value);
+      script.value = loadedScript;
+      applyScript(loadedScript);
       takeSnapshot();
-
       return { success: true };
     } catch (error) {
       console.error('Failed to load scripter data:', error);

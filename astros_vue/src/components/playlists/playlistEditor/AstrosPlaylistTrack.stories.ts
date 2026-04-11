@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import AstrosPlaylistTrack from './AstrosPlaylistTrack.vue';
 import { TrackType } from '@/enums/playlists/trackType';
+import { PlaylistType } from '@/enums/playlists/playlistType';
 import { v4 as uuid } from 'uuid';
 import type { PlaylistTrack } from '@/models/playlists/playlistTrack';
 import { createPinia } from 'pinia';
@@ -20,6 +21,8 @@ function createPlaylistTrack(
     playlistId: playlistId,
     idx: idx,
     durationDS: durationDS,
+    durationMaxDS: 0,
+    randomWait: false,
     trackType: trackType,
     trackId: uuid(),
     trackName: trackName,
@@ -42,6 +45,7 @@ const meta = {
   }),
   args: {
     track: createPlaylistTrack('Open Dome'),
+    playlistType: PlaylistType.Sequential,
   },
   tags: ['autodocs'],
 } satisfies Meta<typeof AstrosPlaylistTrack>;

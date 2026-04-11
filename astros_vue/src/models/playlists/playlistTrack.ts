@@ -1,4 +1,4 @@
-import type { TrackType } from './trackType';
+import type { TrackType } from '@/enums/playlists/trackType';
 
 export interface PlaylistTrack {
   id: string;
