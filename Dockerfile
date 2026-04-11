@@ -21,10 +21,10 @@ WORKDIR /usr/src/app
 
 COPY ./astros_api/package*.json ./
 
-RUN npm ci --python=/usr/bin/python3 && npm install typescript -g
+RUN npm ci --python=/usr/bin/python3
 
 COPY ./astros_api/ .
-RUN tsc
+RUN npx tsc && npx tsc-alias
 
 ARG JWT_KEY
 RUN printf '%s\n' \
