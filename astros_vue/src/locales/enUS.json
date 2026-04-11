@@ -333,6 +333,7 @@
     "no_tracks": "No tracks added yet.",
     "save_success": "Playlist saved successfully.",
     "save_error": "Error saving playlist.",
+    "cycle_error": "Cannot save: track \"{trackName}\" at position {position} creates an infinite loop. Remove or replace this track and try again.",
     "track_types": {
       "script": "Script",
       "playlist": "Playlist",

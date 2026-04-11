@@ -67,6 +67,10 @@ import { AnimationQueuePlaylist } from './serial/animation_queue/queue_item/anim
 import { PlaylistType } from './models/playlists/playlistType.js';
 import { convertPlaylistToQueueItem } from './serial/animation_queue/playlist_converter.js';
 import { PlaylistRepository } from './dal/repositories/playlist_repository.js';
+// Imported via `src/*` alias to match the converter's import path. Using a
+// relative path here would create two separate class instances under
+// esbuild-based runtimes (tsx/vitest) and break `instanceof` checks.
+import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
 
 interface IWebSocketMessage {
   msgType: string;
@@ -727,20 +731,38 @@ class ApiServer {
     const playlistRepo = new PlaylistRepository(db);
     const locationsRepo = new LocationsRepository(db);
 
-    const playlist = await playlistRepo.getPlaylist(id);
+    try {
+      const playlist = await playlistRepo.getPlaylist(id);
 
-    if (!playlist) {
-      res.status(404);
-      res.json({ message: 'Playlist not found' });
-      return;
+      if (!playlist) {
+        res.status(404);
+        res.json({ message: 'Playlist not found' });
+        return;
+      }
+
+      const locations = await locationsRepo.loadLocations();
+      const queueItem = await convertPlaylistToQueueItem(playlist, playlistRepo, locations);
+      this.animationQueue.addToQueue(queueItem);
+
+      res.status(200);
+      res.json({ message: 'success' });
+    } catch (error) {
+      if (error instanceof PlaylistCycleError) {
+        logger.warn(
+          `Refusing to run cyclic playlist ${error.playlistId} via track ${error.offendingTrack.id}`,
+        );
+        res.status(409);
+        res.json({
+          error: 'playlist_cycle',
+          message: error.message,
+          offendingTrack: error.offendingTrack,
+        });
+        return;
+      }
+      logger.error(`Failed to run playlist ${id}`, error);
+      res.status(500);
+      res.json({ error: 'Internal Server Error' });
     }
-
-    const locations = await locationsRepo.loadLocations();
-    const queueItem = await convertPlaylistToQueueItem(playlist, playlistRepo, locations);
-    this.animationQueue.addToQueue(queueItem);
-
-    res.status(200);
-    res.json({ message: 'success' });
   }
 
   private async runScript(req: any, res: any, next: any) {

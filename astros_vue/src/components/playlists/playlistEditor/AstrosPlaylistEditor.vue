@@ -211,7 +211,16 @@ async function save() {
     const result = await playlistStore.saveSelectedPlaylist();
 
     if (!result.success) {
-      error(t('playlist_editor_view.save_error'));
+      if ('errorCode' in result && result.errorCode === 'playlist_cycle') {
+        error(
+          t('playlist_editor_view.cycle_error', {
+            trackName: result.offendingTrack.trackName,
+            position: result.offendingTrack.idx + 1,
+          }),
+        );
+      } else {
+        error(t('playlist_editor_view.save_error'));
+      }
       return;
     }
 

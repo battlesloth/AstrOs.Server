@@ -10,6 +10,10 @@ import { TrackType } from '../../models/playlists/trackType.js';
 import { v4 as uuid } from 'uuid';
 import { PlaylistTrack } from '../../models/playlists/playlistTrack.js';
 import { PlaylistType } from '../../models/playlists/playlistType.js';
+// Imported via `src/*` alias to match the repository's own import path.
+// Using a relative path here would create two separate class instances at
+// runtime (dual-module) and break `instanceof` checks in the assertions.
+import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
 
 describe('Playlist Repository', () => {
   let db: Kysely<Database>;
@@ -409,5 +413,173 @@ describe('Playlist Repository', () => {
     // Playlist 2 should be unaffected
     expect(playlist2!.tracks.length).toBe(1);
     expect(playlist2!.tracks[0].trackType).toBe(TrackType.Script);
+  });
+
+  describe('cycle detection on save', () => {
+    function makePlaylist(id: string, name: string, tracks: PlaylistTrack[]): Playlist {
+      return {
+        id,
+        playlistName: name,
+        description: '',
+        playlistType: PlaylistType.Sequential,
+        settings: {
+          randomDelay: false,
+          delayMin: 0,
+          delayMax: 0,
+          repeat: false,
+          repeatCount: 0,
+        },
+        tracks,
+      };
+    }
+
+    function makePlaylistTrack(
+      playlistId: string,
+      idx: number,
+      targetPlaylistId: string,
+      trackName: string,
+    ): PlaylistTrack {
+      return {
+        id: uuid(),
+        playlistId,
+        idx,
+        durationDS: 0,
+        durationMaxDS: 0,
+        randomWait: false,
+        trackType: TrackType.Playlist,
+        trackId: targetPlaylistId,
+        trackName,
+      };
+    }
+
+    it('should throw PlaylistCycleError on direct self-reference', async () => {
+      const repo = new PlaylistRepository(db);
+      const playlistId = uuid();
+
+      const selfRef = makePlaylist(playlistId, 'Self Loop', [
+        makePlaylistTrack(playlistId, 0, playlistId, 'Points To Self'),
+      ]);
+
+      await expect(repo.upsertPlaylist(selfRef)).rejects.toThrow(PlaylistCycleError);
+    });
+
+    it('should identify the offending top-level track on direct self-reference', async () => {
+      const repo = new PlaylistRepository(db);
+      const playlistId = uuid();
+      const offendingTrack = makePlaylistTrack(playlistId, 2, playlistId, 'Recursive Entry');
+
+      const selfRef = makePlaylist(playlistId, 'Self Loop', [
+        {
+          id: uuid(),
+          playlistId,
+          idx: 0,
+          durationDS: 10,
+          durationMaxDS: 0,
+          randomWait: false,
+          trackType: TrackType.Script,
+          trackId: uuid(),
+          trackName: 'Safe Script 1',
+        },
+        {
+          id: uuid(),
+          playlistId,
+          idx: 1,
+          durationDS: 10,
+          durationMaxDS: 0,
+          randomWait: false,
+          trackType: TrackType.Script,
+          trackId: uuid(),
+          trackName: 'Safe Script 2',
+        },
+        offendingTrack,
+      ]);
+
+      await expect(repo.upsertPlaylist(selfRef)).rejects.toMatchObject({
+        name: 'PlaylistCycleError',
+        offendingTrack: {
+          id: offendingTrack.id,
+          trackName: 'Recursive Entry',
+          idx: 2,
+          trackId: playlistId,
+        },
+      });
+    });
+
+    it('should throw PlaylistCycleError on transitive cycle A → B → A and identify the A-level track', async () => {
+      const repo = new PlaylistRepository(db);
+      const aId = uuid();
+      const bId = uuid();
+
+      // Save B first, with a dangling reference to A (A doesn't exist yet).
+      const playlistB = makePlaylist(bId, 'Playlist B', [
+        makePlaylistTrack(bId, 0, aId, 'Points Back To A'),
+      ]);
+      await repo.upsertPlaylist(playlistB);
+
+      // Now try to save A with a track pointing to B. This creates A → B → A.
+      const offendingTrack = makePlaylistTrack(aId, 0, bId, 'Points To B');
+      const playlistA = makePlaylist(aId, 'Playlist A', [offendingTrack]);
+
+      await expect(repo.upsertPlaylist(playlistA)).rejects.toMatchObject({
+        name: 'PlaylistCycleError',
+        offendingTrack: {
+          id: offendingTrack.id,
+          trackName: 'Points To B',
+          idx: 0,
+          trackId: bId,
+        },
+      });
+    });
+
+    it('should allow sibling duplicates of the same sub-playlist (not a cycle)', async () => {
+      const repo = new PlaylistRepository(db);
+      const childId = uuid();
+      const parentId = uuid();
+
+      // Save child with a simple script track (no cycle).
+      const child = makePlaylist(childId, 'Child', [
+        {
+          id: uuid(),
+          playlistId: childId,
+          idx: 0,
+          durationDS: 10,
+          durationMaxDS: 0,
+          randomWait: false,
+          trackType: TrackType.Script,
+          trackId: uuid(),
+          trackName: 'Child Script',
+        },
+      ]);
+      await repo.upsertPlaylist(child);
+
+      // Parent contains two references to the same child — not a cycle.
+      const parent = makePlaylist(parentId, 'Parent', [
+        makePlaylistTrack(parentId, 0, childId, 'First Child Ref'),
+        makePlaylistTrack(parentId, 1, childId, 'Second Child Ref'),
+      ]);
+
+      await expect(repo.upsertPlaylist(parent)).resolves.toBe(true);
+    });
+
+    it('should allow legitimate nested playlists (no cycle)', async () => {
+      const repo = new PlaylistRepository(db);
+      const grandchildId = uuid();
+      const childId = uuid();
+      const parentId = uuid();
+
+      const grandchild = makePlaylist(grandchildId, 'Grandchild', []);
+      await repo.upsertPlaylist(grandchild);
+
+      const child = makePlaylist(childId, 'Child', [
+        makePlaylistTrack(childId, 0, grandchildId, 'Points To Grandchild'),
+      ]);
+      await repo.upsertPlaylist(child);
+
+      const parent = makePlaylist(parentId, 'Parent', [
+        makePlaylistTrack(parentId, 0, childId, 'Points To Child'),
+      ]);
+
+      await expect(repo.upsertPlaylist(parent)).resolves.toBe(true);
+    });
   });
 });

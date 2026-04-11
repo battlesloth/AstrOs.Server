@@ -5,6 +5,7 @@ import { PlaylistTrack } from '../../models/playlists/playlistTrack.js';
 import { PlaylistType } from '../../models/playlists/playlistType.js';
 import { TrackType } from '../../models/playlists/trackType.js';
 import { PlaylistRepository } from '../../dal/repositories/playlist_repository.js';
+import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
 
 function makeSettings(overrides: Partial<PlaylistSettings> = {}): PlaylistSettings {
   return {
@@ -32,9 +33,23 @@ function makeTrack(overrides: Partial<PlaylistTrack>): PlaylistTrack {
   };
 }
 
-function makeMockRepo(playlists: Map<string, Playlist> = new Map()): PlaylistRepository {
+function makeMockRepo(
+  playlists: Map<string, Playlist> = new Map(),
+  callLimit = 1000,
+): PlaylistRepository {
+  let callCount = 0;
   return {
-    getPlaylist: vi.fn(async (id: string) => playlists.get(id) ?? null),
+    getPlaylist: vi.fn(async (id: string) => {
+      callCount += 1;
+      if (callCount > callLimit) {
+        // Test safety net: prevents infinite recursion from hanging vitest
+        // if the production code fails to detect a cycle.
+        throw new Error(
+          `Test safety: getPlaylist called more than ${callLimit} times (likely infinite recursion in playlist converter)`,
+        );
+      }
+      return playlists.get(id) ?? null;
+    }),
   } as unknown as PlaylistRepository;
 }
 
@@ -307,5 +322,117 @@ describe('Playlist Converter', () => {
 
     const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
     expect(result.tracksRemaining).toEqual([]);
+  });
+
+  describe('cycle detection', () => {
+    it('should throw PlaylistCycleError on direct self-reference', async () => {
+      const selfReferencing: Playlist = {
+        id: 'p1',
+        playlistName: 'Self Loop',
+        description: '',
+        playlistType: PlaylistType.Sequential,
+        tracks: [
+          makeTrack({
+            idx: 0,
+            trackType: TrackType.Playlist,
+            trackId: 'p1',
+            trackName: 'Points To Self',
+          }),
+        ],
+        settings: makeSettings(),
+      };
+
+      const repo = makeMockRepo(new Map([['p1', selfReferencing]]));
+
+      await expect(convertPlaylistToQueueItem(selfReferencing, repo, [])).rejects.toThrow(
+        PlaylistCycleError,
+      );
+    });
+
+    it('should throw PlaylistCycleError on transitive cycle A → B → A', async () => {
+      const playlistA: Playlist = {
+        id: 'a',
+        playlistName: 'Playlist A',
+        description: '',
+        playlistType: PlaylistType.Sequential,
+        tracks: [
+          makeTrack({
+            idx: 0,
+            trackType: TrackType.Playlist,
+            trackId: 'b',
+            trackName: 'Points To B',
+          }),
+        ],
+        settings: makeSettings(),
+      };
+      const playlistB: Playlist = {
+        id: 'b',
+        playlistName: 'Playlist B',
+        description: '',
+        playlistType: PlaylistType.Sequential,
+        tracks: [
+          makeTrack({
+            idx: 0,
+            trackType: TrackType.Playlist,
+            trackId: 'a',
+            trackName: 'Points Back To A',
+          }),
+        ],
+        settings: makeSettings(),
+      };
+
+      const repo = makeMockRepo(
+        new Map([
+          ['a', playlistA],
+          ['b', playlistB],
+        ]),
+      );
+
+      await expect(convertPlaylistToQueueItem(playlistA, repo, [])).rejects.toThrow(
+        PlaylistCycleError,
+      );
+    });
+
+    it('should allow sibling duplicates of the same sub-playlist (not a cycle)', async () => {
+      const sharedSub: Playlist = {
+        id: 'shared',
+        playlistName: 'Shared Sub',
+        description: '',
+        playlistType: PlaylistType.Sequential,
+        tracks: [makeTrack({ idx: 0, trackId: 'script-1', durationDS: 10 })],
+        settings: makeSettings(),
+      };
+
+      const parent: Playlist = {
+        id: 'parent',
+        playlistName: 'Parent',
+        description: '',
+        playlistType: PlaylistType.Sequential,
+        tracks: [
+          makeTrack({
+            idx: 0,
+            trackType: TrackType.Playlist,
+            trackId: 'shared',
+            trackName: 'First Shared',
+          }),
+          makeTrack({
+            idx: 1,
+            trackType: TrackType.Playlist,
+            trackId: 'shared',
+            trackName: 'Second Shared',
+          }),
+        ],
+        settings: makeSettings(),
+      };
+
+      const repo = makeMockRepo(new Map([['shared', sharedSub]]));
+
+      const result = await convertPlaylistToQueueItem(parent, repo, []);
+
+      // Both sibling references to 'shared' should flatten successfully
+      expect(result.tracks).toHaveLength(2);
+      expect(Array.isArray(result.tracks[0])).toBe(true);
+      expect(Array.isArray(result.tracks[1])).toBe(true);
+    });
   });
 });

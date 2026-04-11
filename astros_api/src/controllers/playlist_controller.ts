@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { Database } from 'src/dal/types.js';
 import { PlaylistRepository } from 'src/dal/repositories/playlist_repository.js';
+import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
 import { logger } from 'src/logger.js';
 
 const route = '/playlists/';
@@ -54,7 +55,7 @@ export async function getPlaylist(db: Kysely<Database>, req: any, res: any, next
   }
 }
 
-async function savePlaylist(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function savePlaylist(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new PlaylistRepository(db);
     if (await repo.upsertPlaylist(req.body)) {
@@ -65,6 +66,18 @@ async function savePlaylist(db: Kysely<Database>, req: any, res: any, next: any)
       res.json({ message: 'failed' });
     }
   } catch (error) {
+    if (error instanceof PlaylistCycleError) {
+      logger.warn(
+        `Rejected cyclic playlist save: ${error.playlistId} via track ${error.offendingTrack.id}`,
+      );
+      res.status(400);
+      res.json({
+        error: 'playlist_cycle',
+        message: error.message,
+        offendingTrack: error.offendingTrack,
+      });
+      return;
+    }
     logger.error(error);
     res.status(500);
     res.json({ error: 'Internal Server Error' });

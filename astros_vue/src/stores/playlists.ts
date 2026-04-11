@@ -76,15 +76,34 @@ export const usePlaylistsStore = defineStore('playlists', () => {
 
   async function saveSelectedPlaylist() {
     if (!selectedPlaylist.value) {
-      return { success: false, error: 'No playlist selected' };
+      return { success: false as const, error: 'No playlist selected' };
     }
     isSaving.value = true;
     try {
       await apiService.put(PLAYLISTS, selectedPlaylist.value);
-      return { success: true };
-    } catch (error) {
+      return { success: true as const };
+    } catch (error: unknown) {
       console.error('Failed to save playlist:', error);
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
+      // If the backend returned a structured playlist_cycle error, surface
+      // the offending track so the caller can show a specific toast telling
+      // the user which top-level track to remove.
+      const responseData = (error as { response?: { data?: unknown } })?.response?.data as
+        | {
+            error?: string;
+            offendingTrack?: { id: string; trackName: string; idx: number; trackId: string };
+          }
+        | undefined;
+      if (responseData?.error === 'playlist_cycle' && responseData.offendingTrack) {
+        return {
+          success: false as const,
+          errorCode: 'playlist_cycle' as const,
+          offendingTrack: responseData.offendingTrack,
+        };
+      }
+      return {
+        success: false as const,
+        error: error instanceof Error ? error.message : String(error),
+      };
     } finally {
       isSaving.value = false;
     }

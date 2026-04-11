@@ -46,24 +46,26 @@ The converter guard (runtime play) can throw the same error class but with a sim
 
 ## Tasks
 
-- [ ] **PlaylistCycleError class** — add the shared error class somewhere both the converter and the repository can import from (likely `astros_api/src/models/playlists/playlist_cycle_error.ts` or similar). Has `playlistId`, `offendingTrack`, and a message field.
+- [x] **PlaylistCycleError class** — added at `astros_api/src/models/playlists/playlist_cycle_error.ts` with `playlistId`, `offendingTrack: OffendingTrackInfo`, and a default message format.
 
-- [ ] **Converter guard** — TDD `flattenPlaylistTrack` cycle detection
-  - Write failing tests in `playlist_converter.test.ts`: direct self-reference throws `PlaylistCycleError`, transitive cycle (A→B→A) throws, sibling duplicates (A→[B,C,B]) does NOT throw
-  - Implement DFS path tracking in `playlist_converter.ts`; seed visited set in `convertPlaylistToQueueItem`; throw `PlaylistCycleError` carrying the offending sub-track
-  - Verify all three new tests pass + existing 23 test files still green
+- [x] **Converter guard** — TDD `flattenPlaylistTrack` cycle detection
+  - 3 new tests in `playlist_converter.test.ts`: direct self-reference throws, transitive cycle A→B→A throws, sibling duplicates allowed
+  - DFS path tracking with `try/finally` cleanup in `playlist_converter.ts`; visited set seeded with top-level playlist ID in `convertPlaylistToQueueItem`; re-throws `PlaylistCycleError` with the top-level track as offender
+  - `makeMockRepo` got a call-count safety net so the RED state fails cleanly instead of hanging the runner
+  - All 15 converter tests pass, full suite 180/180
 
-- [ ] **Save-time validation** — TDD `upsertPlaylist` cycle rejection with per-track identification
-  - Write failing tests in `playlist_repository.test.ts`: save with direct self-reference throws and reports the correct top-level track, save with transitive cycle throws and reports the correct top-level track, save with sibling duplicate sub-playlists (no cycle) succeeds, save with legitimate nested playlists succeeds
-  - Implement `validateNoCycles(playlist)` on `PlaylistRepository`. For each top-level `Playlist`-type track, walk the graph of referenced playlists (in-memory for the one being saved, DB-fetched for others) using DFS with visited set. If the walk reaches `playlist.id`, throw `PlaylistCycleError` carrying **the current top-level track** as the offending track (not the deep one where the cycle closed — the user needs the top-level reference they can actually remove in the UI).
-  - Call `validateNoCycles` at the top of `upsertPlaylist` before any DB writes
-  - Verify tests pass + no regressions
+- [x] **Save-time validation** — TDD `upsertPlaylist` cycle rejection with per-track identification
+  - 5 new tests in `playlist_repository.test.ts`: direct self-reference throws, direct self-reference identifies the correct offending track, transitive cycle A→B→A throws with the A-level track reported, sibling duplicates (not a cycle) save successfully, legitimate nested playlists save successfully
+  - `validateNoCycles` + `isPlaylistReachable` helpers on `PlaylistRepository`; fresh visited set per top-level track walk (so sibling duplicates are not false-positives); called at the top of `upsertPlaylist` before any DB writes
 
-- [ ] **Controller error surfacing**
-  - Trace the caller paths: `api_server.ts:739` calls `convertPlaylistToQueueItem` (runtime play), and the playlist save route calls `upsertPlaylist`. Add `PlaylistCycleError` handling at each route boundary that returns a structured JSON error: `{ error: 'playlist_cycle', message: <formatted string>, offendingTrack: { id, trackName, idx, trackId } }` with HTTP 400 for save and HTTP 409 (or 400) for play.
-  - Confirm the frontend's axios error path surfaces the `message` field to a toast — if not already, wire up minimal handling in the playlist store.
+- [x] **Controller error surfacing**
+  - `playlist_controller.ts` `savePlaylist`: catches `PlaylistCycleError`, returns HTTP 400 with `{ error: 'playlist_cycle', message, offendingTrack }`. `savePlaylist` exported for test access. 2 new tests (cyclic → 400 + structured body, valid → 200).
+  - `api_server.ts` `runPlaylist`: wrapped in try/catch; `PlaylistCycleError` → HTTP 409 with same structured body. Imports `PlaylistCycleError` via `src/*` alias to match converter's import path (avoids dual-module `instanceof` breakage in esbuild-based runtimes).
+  - Frontend `playlists.ts` store `saveSelectedPlaylist`: extracts `error.response.data` on axios failure; on `playlist_cycle` response returns `{ success: false, errorCode: 'playlist_cycle', offendingTrack }` instead of the generic error.
+  - Frontend `AstrosPlaylistEditor.vue` `save()`: checks for `errorCode === 'playlist_cycle'` and shows a localized toast with `trackName` + `position + 1` via the new i18n key.
+  - New i18n key `playlist_editor_view.cycle_error` in `enUS.json`.
 
-- [ ] **Green checklist** — `npm run prettier:check`, `npm run lint:fix`, `npm run test -- --run` all pass, then commit the implementation
+- [x] **Green checklist** — `npm run prettier:check` clean, `npm run lint` clean, `npm run test -- --run` 180/180 passing, Vue `npm run build` + `npm run test:unit -- --run` 1/1 passing, Vue lint + format clean. Ready to commit.
 
 ## Critical files
 

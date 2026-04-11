@@ -6,11 +6,79 @@ import { TrackType } from 'src/models/playlists/trackType.js';
 import { v4 as uuid } from 'uuid';
 import { PlaylistType } from 'src/models/playlists/playlistType.js';
 import { generateShortId } from 'src/utility.js';
+import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
 
 export class PlaylistRepository {
   constructor(private db: Kysely<Database>) {}
 
+  /**
+   * Walks the playlist reference graph starting from each top-level
+   * Playlist-type track in the playlist being saved. If any path leads back
+   * to the playlist's own ID (direct or transitive cycle), throws
+   * PlaylistCycleError identifying which top-level track is responsible so
+   * the UI can tell the user exactly which entry to remove.
+   *
+   * The playlist being saved uses its in-memory state; all other playlists
+   * are fetched from the DB.
+   */
+  private async validateNoCycles(playlist: Playlist): Promise<void> {
+    for (const track of playlist.tracks) {
+      if (track.trackType !== TrackType.Playlist) continue;
+
+      // Fresh visited set per top-level track — two sibling references to
+      // the same sub-playlist are not a cycle.
+      const visited = new Set<string>();
+      const reachesSelf = await this.isPlaylistReachable(track.trackId, playlist.id, visited);
+
+      if (reachesSelf) {
+        throw new PlaylistCycleError(
+          playlist.id,
+          {
+            id: track.id,
+            trackName: track.trackName,
+            idx: track.idx,
+            trackId: track.trackId,
+          },
+          `Cannot save playlist "${playlist.playlistName}": track "${track.trackName}" at position ${track.idx + 1} creates an infinite loop. Remove or replace this track and try again.`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Standard DFS reachability on the playlist-reference graph. Returns true
+   * if `targetId` is reachable from `fromId` by traversing Playlist-type
+   * tracks. The `visited` set prevents infinite loops if the DB already
+   * contains a pre-existing cycle among playlists other than the one being
+   * validated.
+   */
+  private async isPlaylistReachable(
+    fromId: string,
+    targetId: string,
+    visited: Set<string>,
+  ): Promise<boolean> {
+    if (fromId === targetId) return true;
+    if (visited.has(fromId)) return false;
+    visited.add(fromId);
+
+    const playlist = await this.getPlaylist(fromId);
+    if (!playlist) return false;
+
+    for (const track of playlist.tracks) {
+      if (track.trackType !== TrackType.Playlist) continue;
+      if (await this.isPlaylistReachable(track.trackId, targetId, visited)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   async upsertPlaylist(playlist: Playlist): Promise<boolean> {
+    // Validate BEFORE opening the transaction so a rejected save doesn't
+    // touch the DB at all.
+    await this.validateNoCycles(playlist);
+
     await this.db.transaction().execute(async (tx) => {
       await tx
         .insertInto('playlists')
