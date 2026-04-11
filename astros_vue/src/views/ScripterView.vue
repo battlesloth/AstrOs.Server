@@ -378,10 +378,9 @@ onMounted(async () => {
           </div>
           <div class="grow text-2xl flex items-center gap-2">
             <input
-              v-model.number="scripterStore.script.description"
+              v-model="scripterStore.script.description"
               class="bg-transparent border border-gray-400 focus:outline-none w-full"
               :aria-label="$t('description')"
-              min="0"
             />
           </div>
           <button

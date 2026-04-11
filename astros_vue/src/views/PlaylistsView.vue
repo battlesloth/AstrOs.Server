@@ -65,7 +65,6 @@ const confirmDelete = async () => {
 };
 
 const runPlaylist = async (id: string) => {
-  console.log('Running playlist with id:', id);
   const result = await playlistStore.runPlaylist(id);
   if (result.success) {
     success(t('playlists_view.run_success'));

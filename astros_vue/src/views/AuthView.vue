@@ -33,7 +33,6 @@ function login() {
       console.error('Login failed', error);
       errorMessage.value = 'error.invalid_credentials';
     });
-  console.log('Login clicked', credentials.value);
 }
 </script>
 

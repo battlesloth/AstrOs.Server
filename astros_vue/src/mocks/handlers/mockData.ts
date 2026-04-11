@@ -1,3 +1,4 @@
+import { PlaylistType } from '@/enums/playlists/playlistType';
 import type { Script } from '@/models/scripts/script';
 
 // Mock scripts data
@@ -60,7 +61,7 @@ export const mockPlaylists = [
     id: 'p_1',
     playlistName: 'Parade Mode',
     description: 'Parade animation sequence',
-    playlistType: 0,
+    playlistType: PlaylistType.Sequential,
     tracks: [],
     settings: { repeat: false, repeatCount: 0, randomDelay: false, delayMin: 0, delayMax: 0 },
   },
@@ -68,7 +69,7 @@ export const mockPlaylists = [
     id: 'p_2',
     playlistName: 'Idle Animations',
     description: 'Random idle movements',
-    playlistType: 1,
+    playlistType: PlaylistType.ShuffleWithDelayAndRepeat,
     tracks: [],
     settings: { repeat: true, repeatCount: 0, randomDelay: true, delayMin: 5, delayMax: 15 },
   },
@@ -76,7 +77,7 @@ export const mockPlaylists = [
     id: 'p_3',
     playlistName: 'Photo Op',
     description: 'Photo opportunity poses',
-    playlistType: 0,
+    playlistType: PlaylistType.Sequential,
     tracks: [],
     settings: { repeat: false, repeatCount: 0, randomDelay: false, delayMin: 0, delayMax: 0 },
   },
