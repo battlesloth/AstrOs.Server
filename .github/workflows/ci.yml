@@ -32,7 +32,7 @@ jobs:
 
       - name: Build
         working-directory: astros_api
-        run: npx tsc
+        run: npx tsc && tsc-alias
 
       - name: Unit tests
         working-directory: astros_api
@@ -93,7 +93,7 @@ jobs:
 
       - name: Build API
         working-directory: astros_api
-        run: npx tsc && cp .env.example ./dist/.env
+        run: npx tsc && tsc-alias && cp .env.example ./dist/.env
 
       - name: Install Vue dependencies
         working-directory: astros_vue
