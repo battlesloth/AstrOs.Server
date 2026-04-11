@@ -32,7 +32,7 @@ jobs:
 
       - name: Build
         working-directory: astros_api
-        run: npx tsc
+        run: npx tsc && npx tsc-alias
 
       - name: Unit tests
         working-directory: astros_api
@@ -67,9 +67,9 @@ jobs:
         working-directory: astros_vue
         run: npm run build
 
-      #- name: Unit tests
-      #  working-directory: astros_vue
-      #  run: npm run test:unit -- --run
+      - name: Unit tests
+        working-directory: astros_vue
+        run: npm run test:unit -- --run
 
   playwright:
     name: Vue – Playwright E2E Tests
@@ -93,7 +93,7 @@ jobs:
 
       - name: Build API
         working-directory: astros_api
-        run: npx tsc && cp .env.example ./dist/.env
+        run: npx tsc && npx tsc-alias && cp .env.example ./dist/.env
 
       - name: Install Vue dependencies
         working-directory: astros_vue

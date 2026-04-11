@@ -24,14 +24,39 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const demoScripts = [
-  { id: '1', name: 'Script 1' },
-  { id: '2', name: 'Script 2' },
-  { id: '3', name: 'Script 3' },
+  { id: '1', name: 'Open Dome' },
+  { id: '2', name: 'Close Dome' },
+  { id: '3', name: 'Start Tracking' },
 ];
 
-export const Primary: Story = {
+const demoPlaylists = [
+  { id: 'p_1', name: 'Parade Mode' },
+  { id: 'p_2', name: 'Idle Animations' },
+];
+
+export const Empty: Story = {
   args: {
-    currentScript: '1',
+    buttonNumber: 1,
+    currentValue: { id: '0', name: 'None', type: 'none' },
     scripts: demoScripts,
+    playlists: demoPlaylists,
+  },
+};
+
+export const WithScript: Story = {
+  args: {
+    buttonNumber: 2,
+    currentValue: { id: '1', name: 'Open Dome', type: 'script' },
+    scripts: demoScripts,
+    playlists: demoPlaylists,
+  },
+};
+
+export const WithPlaylist: Story = {
+  args: {
+    buttonNumber: 3,
+    currentValue: { id: 'p_1', name: 'Parade Mode', type: 'playlist' },
+    scripts: demoScripts,
+    playlists: demoPlaylists,
   },
 };

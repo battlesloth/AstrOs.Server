@@ -1,8 +1,8 @@
-import { AudioFile } from '../../models/index.js';
-import { logger } from '../../logger.js';
-import { inserted } from '../database.js';
+import { AudioFile } from 'src/models/index.js';
+import { logger } from 'src/logger.js';
+import { inserted } from 'src/dal/database.js';
 import { Kysely } from 'kysely';
-import { Database } from '../types.js';
+import { Database } from 'src/dal/types.js';
 
 export class AudioFileRepository {
   constructor(private readonly db: Kysely<Database>) {}
@@ -20,7 +20,12 @@ export class AudioFileRepository {
       });
 
     for (const af of data) {
-      const file = new AudioFile(af.id, af.file_name, af.description, af.duration);
+      const file: AudioFile = {
+        id: af.id,
+        fileName: af.file_name,
+        description: af.description,
+        duration: af.duration,
+      };
       result.push(file);
     }
 

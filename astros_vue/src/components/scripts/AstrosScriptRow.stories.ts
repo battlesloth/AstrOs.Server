@@ -34,6 +34,7 @@ const meta = {
     onUpload: fn(),
     onRun: fn(),
     onDelete: fn(),
+    playlistCount: 0,
   },
   tags: ['autodocs'],
 } satisfies Meta<typeof AstrosScriptRow>;

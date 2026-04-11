@@ -1,4 +1,4 @@
-import { ModuleType, ModuleSubType } from '../enums.js';
+import { ModuleType, ModuleSubType } from 'src/models/enums.js';
 import { GenericSerialEvent } from './events/generic_serial_event.js';
 import { GpioEvent } from './events/gpio_event.js';
 import { HumanCyborgRelationsEvent } from './events/human_cyborg_relations_event.js';
@@ -38,27 +38,11 @@ export function moduleSubTypeToScriptEventTypes(
   }
 }
 
-export class ScriptEvent {
+export interface ScriptEvent {
   id: string;
   scriptChannel: string;
   moduleType: ModuleType;
   moduleSubType: ModuleSubType;
   time: number;
   event: ScriptEventTypes;
-
-  constructor(
-    id: string,
-    scriptChannel: string,
-    moduleType: ModuleType,
-    moduleSubType: ModuleSubType,
-    time: number,
-    event: ScriptEventTypes,
-  ) {
-    this.id = id;
-    this.scriptChannel = scriptChannel;
-    this.moduleType = moduleType;
-    this.moduleSubType = moduleSubType;
-    this.time = time;
-    this.event = event;
-  }
 }

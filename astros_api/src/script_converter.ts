@@ -303,14 +303,14 @@ export class ScriptConverter {
       }
     }
 
-    const bufferEvent = new ScriptEvent(
-      uuid(),
-      'buffer',
-      ModuleType.none,
-      ModuleSubType.none,
+    const bufferEvent: ScriptEvent = {
+      id: uuid(),
+      scriptChannel: 'buffer',
+      moduleType: ModuleType.none,
+      moduleSubType: ModuleSubType.none,
       time,
-      undefined,
-    );
+      event: undefined,
+    };
     map.set(time, new Array<ScriptEvent>());
     map.get(time)?.push(bufferEvent);
   }

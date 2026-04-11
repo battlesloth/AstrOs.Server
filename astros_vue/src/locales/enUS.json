@@ -4,6 +4,23 @@
   "close": "Close",
   "remove": "Remove",
   "test": "Test",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "confirm": "Confirm",
+  "add": "Add",
+  "ok": "OK",
+  "run": "Run",
+  "generate": "Generate",
+  "format": "Format",
+  "download": "Download",
+  "copy": "Copy",
+  "upload": "Upload",
+  "play": "Play",
+  "none": "None",
+  "name": "Name",
+  "description": "Description",
+  "actions": "Actions",
+  "status": "Status",
   "error": {
     "invalid_email": "Enter valid email address",
     "invalid_password": "Password must be at least 8 characters long and include a number, a lowercase letter, and an uppercase letter",
@@ -18,6 +35,7 @@
   "nav": {
     "status": "Status",
     "scripts": "Scripts",
+    "playlists": "Playlists",
     "remote": "Remote",
     "modules": "Modules",
     "utility": "Utility",
@@ -55,7 +73,7 @@
     "confirm": {
       "title": "Confirm",
       "confirm": "Confirm",
-      "close": "Close"
+      "close": "Cancel"
     },
     "loading": {
       "title": "Loading",
@@ -72,12 +90,91 @@
       "enable_test": "Enable",
       "disable_test": "Disable",
       "close": "Close"
+    },
+    "add_channel": {
+      "title": "Select Channel",
+      "any_channel_type": "Any Channel Type",
+      "audio_channels": "Audio Channels",
+      "gpio_channels": "GPIO Channels",
+      "i2c_channels": "I2C Channels",
+      "kangaroo_channels": "KangarooX2 Channels",
+      "serial_channels": "Serial Channels",
+      "servo_channels": "Servo Channels",
+      "any_controller": "Any Controller",
+      "select_channel": "Select Channel",
+      "controller": "Controller",
+      "channel_type": "Channel Type"
+    },
+    "uart_event": {
+      "title": "Serial Event",
+      "event_time": "Event Time (seconds)",
+      "serial_command": "Serial Command"
+    },
+    "i2c_event": {
+      "title": "I2C Event",
+      "event_time": "Event Time (seconds)",
+      "i2c_message": "I2C Message"
+    },
+    "gpio_event": {
+      "title": "GPIO Event",
+      "event_time": "Event Time (seconds)",
+      "state": "State",
+      "low": "Low",
+      "high": "High"
+    },
+    "servo_event": {
+      "title": "Servo Event",
+      "event_time": "Event Time (seconds)",
+      "position": "Position (0 to 100%, -1 for Home)",
+      "speed": "Speed (0 to 255, 0 is unlimited)",
+      "acceleration": "Accel. (0 to 255, 0 is unlimited)"
+    },
+    "kangaroo_event": {
+      "title": "Kangaroo Event",
+      "event_time": "Event Time (seconds)",
+      "speed": "Speed",
+      "position": "Position",
+      "start": "Start",
+      "home": "Home"
+    },
+    "hcr_event": {
+      "title": "Human Cyborg Relations Event",
+      "event_time": "Event Time (seconds)",
+      "command_category": "Command Category",
+      "command": "Command",
+      "value_a": "Value A",
+      "value_b": "Value B",
+      "stimuli": "Stimuli",
+      "muse": "Muse",
+      "sd_wav": "SD Wav",
+      "stop": "Stop",
+      "volume": "Volume",
+      "override": "Override"
+    },
+    "channel_swap": {
+      "title": "Swap Channel",
+      "no_channels": "No eligible channels available to swap.",
+      "select_channel": "Select a Channel"
+    },
+    "script_test": {
+      "title": "Script Test",
+      "uploading": "Uploading script...",
+      "upload_complete": "Upload Complete.",
+      "not_assigned": "Not Assigned",
+      "success": "Success",
+      "failed": "Failed",
+      "uploading_status": "Uploading",
+      "body": "Body",
+      "core": "Core",
+      "dome": "Dome"
     }
   },
   "esp": {
     "serial_modules": "Serial Modules",
     "i2c_modules": "I2C Modules",
-    "gpio_config": "GPIO Configuration"
+    "gpio_config": "GPIO Configuration",
+    "add_serial_module": "Add serial module",
+    "add_i2c_module": "Add I2C module"
   },
   "gpio": {
     "channel": "Channel",
@@ -144,28 +241,121 @@
     "core": "Core Module",
     "master": "Master Controller",
     "sync_successful": "Controllers sync queued!",
-    "sync_failed": "Controllers sync failed."
+    "sync_failed": "Controllers sync failed.",
+    "controller_select": "Controller Select"
   },
   "remote_view": {
     "title": "Remote Control",
-    "save": "Save"
+    "save": "Save",
+    "page": "Page",
+    "backward": "Previous page",
+    "forward": "Next page",
+    "save_success": "Remote control configuration saved successfully.",
+    "save_error": "Failed to save remote control configuration.",
+    "script_select": "Script selection",
+    "tab_scripts": "Script",
+    "tab_playlists": "Playlist",
+    "search_placeholder": "Search...",
+    "type_script": "SCR",
+    "type_playlist": "PL",
+    "button_label": "Button {number}",
+    "button_select": "Button assignment"
   },
   "utility_view": {
-    "title": "Utility"
+    "title": "Utility",
+    "api_key": "API Key",
+    "format_sd": "Format SD Card",
+    "log_files": "Log Files",
+    "format_modal_title": "Format Module SD Card",
+    "select_controller_error": "Please select at least one controller to format.",
+    "format_queued": "Format queued!",
+    "format_error": "Error requesting format. Check logs.",
+    "download_error": "Error downloading logs. Check logs."
   },
   "scripts_view": {
     "title": "Scripts",
-    "new": "New"
+    "new": "New",
+    "script_name": "Script Name",
+    "playlists": "Playlists",
+    "delete_title": "Delete Script",
+    "delete_confirm": "Are you sure you want to delete script \"{name}\"?",
+    "delete_confirm_with_playlists": "Are you sure you want to delete script \"{name}\"? This script is used in {count} playlist. | Are you sure you want to delete script \"{name}\"? This script is used in {count} playlists.",
+    "delete_success": "Script deleted successfully",
+    "delete_error": "Failed to delete script",
+    "run_success": "Script run queued!",
+    "run_error": "Error requesting upload. Check logs.",
+    "copy_success": "Script copied successfully!",
+    "copy_error": "Error copying script. Check logs.",
+    "upload_success": "Script upload started!",
+    "upload_error": "Error requesting upload. Check logs."
   },
   "playlists_view": {
     "title": "Playlists",
     "new": "New",
+    "playlist_name": "Playlist Name",
+    "delete_title": "Delete Playlist",
+    "delete_confirm": "Are you sure you want to delete playlist \"{name}\"?",
+    "delete_success": "Playlist deleted successfully",
+    "delete_error": "Failed to delete playlist",
+    "run_success": "Playlist run queued!",
+    "run_error": "Error starting playlist. Check logs.",
+    "copy_success": "Playlist copied successfully!",
+    "copy_error": "Error copying playlist. Check logs."
+  },
+  "scripter_view": {
+    "script_name": "Script Name",
+    "save_success": "Script saved successfully.",
+    "save_error": "Failed to save script",
+    "unsaved_changes": "You have unsaved changes. Discard them?"
+  },
+  "playlist_settings": {
+    "random_delay": "Random Delay",
+    "delay": "Delay",
+    "min_delay": "Min Delay",
+    "max_delay": "Max Delay",
+    "repeat_none": "Repeat - None",
+    "repeat_count": "Repeat - Count",
+    "repeat_infinite": "Repeat - Infinite",
+    "count": "Count"
+  },
+  "playlist_editor_view": {
+    "title": "Playlist Editor",
+    "save": "Save",
+    "remove": "Remove",
+    "track_name": "Track Name",
+    "description": "Description",
+    "track_duration": "Track Duration (seconds)",
+    "track_duration_max": "Max Duration (seconds)",
+    "random_wait": "Random",
+    "min": "Min",
+    "max": "Max",
     "add_track": "Add Track",
     "no_tracks": "No tracks added yet.",
+    "save_success": "Playlist saved successfully.",
+    "save_error": "Error saving playlist.",
+    "cycle_error": "Cannot save: track \"{trackName}\" at position {position} creates an infinite loop. Remove or replace this track and try again.",
     "track_types": {
       "script": "Script",
       "playlist": "Playlist",
       "wait": "Wait"
-    }
+    },
+    "sequential": "Sequential",
+    "sequentialinterruptible": "Sequential, Interruptible",
+    "sequentialrepeatable": "Sequential, Repeatable",
+    "shuffle": "Shuffle",
+    "shufflewithrepeat": "Shuffle with Repeat",
+    "shufflewithdelay": "Shuffle with Delay",
+    "shufflewithdelayandrepeat": "Shuffle with Delay and Repeat",
+    "help_title": "Playlist Editor Help",
+    "help_body": "Here's a breakdown of the different playlist types you can choose from:",
+    "help_sequential": "Plays tracks in the order they were added. Once the end of the playlist is reached, it stops. If another playlist or a script is sent to the server while a sequential playlist is playing, it will wait until the current playlist finishes before starting.",
+    "help_sequentialinterruptible": "Similar to Sequential. If a new playlist or script is sent to the server, it will interrupt the current playlist and start the new script or playlist as soon as the current track finishes.",
+    "help_sequentialrepeatable": "Plays tracks in the order they were added. Once the end of the playlist is reached, it starts over from the beginning. This type is always interruptible.",
+    "help_shuffle": "Plays tracks in a random order. Each track is played once until all tracks have been played, then it stops. This type is always interruptible.",
+    "help_shufflewithrepeat": "Similar to Shuffle, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible.",
+    "help_shufflewithdelay": "Similar to Shuffle, but after each track is played, it waits for a specified delay before playing the next track. This type is always interruptible.",
+    "help_shufflewithdelayandrepeat": "Similar to Shuffle With Delay, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible.",
+    "sequential_nested_confirm_title": "Remove Nested Playlists",
+    "sequential_nested_warning": "Sequential playlists cannot contain nested playlists. {count} track will be removed. | Sequential playlists cannot contain nested playlists. {count} tracks will be removed."
   }
 }

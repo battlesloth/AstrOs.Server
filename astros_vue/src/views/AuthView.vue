@@ -7,8 +7,8 @@ import { ref } from 'vue';
 
 const errorMessage = ref('');
 
-const credentials = defineModel<{ email: string; password: string }>({
-  default: () => ({ email: '', password: '' }),
+const credentials = defineModel<{ password: string }>({
+  default: () => ({ password: '' }),
   type: Object,
 });
 
@@ -16,7 +16,7 @@ function login() {
   // Logic to handle login
   apiService
     .post(LOGIN, {
-      username: credentials.value.email,
+      username: 'admin',
       password: credentials.value.password,
     })
     .then((response) => {
@@ -33,7 +33,6 @@ function login() {
       console.error('Login failed', error);
       errorMessage.value = 'error.invalid_credentials';
     });
-  console.log('Login clicked', credentials.value);
 }
 </script>
 

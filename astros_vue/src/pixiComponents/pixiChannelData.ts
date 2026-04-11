@@ -38,6 +38,9 @@ export class PixiChannelData extends Container {
   background: Graphics | null = null;
   nameText: Container | null = null;
 
+  private isDestroyed = false;
+  private buttons: Container[] = [];
+
   constructor(options: PixiChannelDataOptions) {
     super();
     this.channelId = options.channelId;
@@ -65,20 +68,23 @@ export class PixiChannelData extends Container {
     const testButton = this.createButton(xOffset, (id) => options.onTest?.(id));
     xOffset += this.buttonSize + this.buttonXspacing;
     const swapButton = this.createButton(xOffset, (id) => options.onSwap?.(id, this.channelType));
+    this.buttons.push(deleteButton, testButton, swapButton);
 
-    Assets.load('swapIcon').then((texture) => {
-      this.addIcon(swapButton, texture);
-      this.addChild(swapButton);
-    });
+    this.loadIcon('swapIcon', swapButton);
+    this.loadIcon('deleteIcon', deleteButton);
+    this.loadIcon('playIcon', testButton);
+  }
 
-    Assets.load('deleteIcon').then((texture) => {
-      this.addIcon(deleteButton, texture);
-      this.addChild(deleteButton);
-    });
-
-    Assets.load('playIcon').then((texture) => {
-      this.addIcon(testButton, texture);
-      this.addChild(testButton);
+  /**
+   * Loads a button icon asynchronously and attaches the button to the display
+   * tree, but aborts if the container has been destroyed in the meantime.
+   * Guards against `.then()` callbacks firing after unmount.
+   */
+  private loadIcon(asset: string, button: Container) {
+    Assets.load(asset).then((texture) => {
+      if (this.isDestroyed) return;
+      this.addIcon(button, texture);
+      this.addChild(button);
     });
   }
 
@@ -185,5 +191,24 @@ export class PixiChannelData extends Container {
         .rect(0, this.options.height - 1, this.options.width, 1)
         .fill(this.getBorderColor());
     }
+  }
+
+  /**
+   * Override of Pixi's Container.destroy so we can mark the instance as
+   * destroyed (which short-circuits any in-flight Assets.load callbacks),
+   * remove our own pointer listeners, and explicitly detach button listeners
+   * before the normal teardown runs.
+   *
+   * Idempotent — safe to call more than once.
+   */
+  override destroy(options?: Parameters<Container['destroy']>[0]): void {
+    if (this.isDestroyed) return;
+    this.isDestroyed = true;
+    this.removeAllListeners();
+    for (const button of this.buttons) {
+      button.removeAllListeners();
+    }
+    this.buttons = [];
+    super.destroy(options ?? { children: true });
   }
 }

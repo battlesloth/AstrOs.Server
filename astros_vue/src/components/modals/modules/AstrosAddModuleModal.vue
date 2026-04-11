@@ -95,7 +95,7 @@ const closeModal = () => {
             data-testid="modal-module-select"
             v-model="selectedSubType"
             class="select select-bordered w-full"
-            title="Module"
+            :aria-label="$t('modals.add_module.select_type')"
           >
             <option
               :value="ModuleSubType.NONE"

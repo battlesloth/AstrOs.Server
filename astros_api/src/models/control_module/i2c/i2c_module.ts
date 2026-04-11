@@ -1,6 +1,6 @@
-import { ModuleSubType, ModuleType, ScriptChannelType } from '../../enums.js';
-import { ScriptChannelResource } from '../../scripts/script_channel_resource.js';
-import { BaseModule } from '../base_module.js';
+import { ModuleSubType, ModuleType, ScriptChannelType } from 'src/models/enums.js';
+import { ScriptChannelResource } from 'src/models/scripts/script_channel_resource.js';
+import { BaseModule } from 'src/models/control_module/base_module.js';
 import { I2cChannel } from './i2c_channel.js';
 
 export class I2cModule extends BaseModule {
@@ -26,16 +26,15 @@ export function getI2cScriptResources(m: I2cModule): ScriptChannelResource[] {
 
   switch (m.moduleSubType) {
     case ModuleSubType.genericI2C:
-      resources.push(
-        new ScriptChannelResource(
-          m.id,
-          ScriptChannelType.GENERIC_I2C,
-          m.name,
-          m.id,
-          m.locationId,
-          new I2cChannel(m.id, m.locationId, m.name, true),
-        ),
-      );
+      resources.push({
+        channelId: m.id,
+        scriptChannelType: ScriptChannelType.GENERIC_I2C,
+        name: m.name,
+        parentModuleId: m.id,
+        locationId: m.locationId,
+        channel: new I2cChannel(m.id, m.locationId, m.name, true),
+        available: true,
+      });
       break;
   }
 

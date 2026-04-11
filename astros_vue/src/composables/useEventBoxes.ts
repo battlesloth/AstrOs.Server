@@ -95,7 +95,29 @@ export function useEventBoxes(
       if (removedBox.parent) {
         removedBox.parent.removeChild(removedBox as unknown as ContainerChild);
       }
+      // Destroy so any pending Assets.load callbacks short-circuit and
+      // pointer listeners are cleaned up.
+      removedBox.destroy({ children: true });
     }
+  }
+
+  /**
+   * Removes and destroys every event box for a channel. Called when the
+   * channel itself is being removed — ensures all PixiChannelEvent instances
+   * for that channel have their listeners cleaned up and their in-flight
+   * Assets.load callbacks short-circuited.
+   */
+  function removeAllEventBoxesForChannel(channelId: string) {
+    const eventBoxes = channelEventBoxes.value.get(channelId);
+    if (!eventBoxes) return;
+
+    for (const box of eventBoxes) {
+      if (box.parent) {
+        box.parent.removeChild(box as unknown as ContainerChild);
+      }
+      box.destroy({ children: true });
+    }
+    channelEventBoxes.value.delete(channelId);
   }
 
   /**
@@ -191,6 +213,7 @@ export function useEventBoxes(
     // Methods
     addEventBox,
     removeEventBox,
+    removeAllEventBoxesForChannel,
     rebuildEventBox,
     updateEventBoxPositions,
     updateAllEventBoxPositions,

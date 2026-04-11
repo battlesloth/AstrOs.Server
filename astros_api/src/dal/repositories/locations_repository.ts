@@ -1,8 +1,9 @@
 import { Kysely, Transaction } from 'kysely';
-import { logger } from '../../logger.js';
-import { inserted } from '../database.js';
-import { Database } from '../types.js';
-import { ControlModule, ControllerLocation } from '../../models/index.js';
+import { logger } from 'src/logger.js';
+import { inserted } from 'src/dal/database.js';
+import { Database } from 'src/dal/types.js';
+import { ControllerLocation } from 'src/models/index.js';
+import { createControllerLocation } from 'src/models/control_module/controller_location.js';
 import { getGpioModule, upsertGpioModule } from './module_repositories/gpio_repository.js';
 import {
   getUartModules,
@@ -41,13 +42,18 @@ export class LocationsRepository {
       });
 
     for (const c of data) {
-      const location = new ControllerLocation(c.loc_id, c.loc_name, c.loc_desc, c.loc_fingerprint);
-
-      location.controller = new ControlModule(
-        c.ctrl_id ?? '0',
-        c.ctrl_name ?? '',
-        c.ctrl_address ?? '',
+      const location = createControllerLocation(
+        c.loc_id,
+        c.loc_name,
+        c.loc_desc,
+        c.loc_fingerprint,
       );
+
+      location.controller = {
+        id: c.ctrl_id ?? '0',
+        name: c.ctrl_name ?? '',
+        address: c.ctrl_address ?? '',
+      };
 
       result.push(location);
     }
@@ -76,18 +82,18 @@ export class LocationsRepository {
         throw err;
       });
 
-    const location = new ControllerLocation(
+    const location = createControllerLocation(
       data.loc_id,
       data.loc_name,
       data.loc_desc,
       data.loc_fingerprint,
     );
 
-    location.controller = new ControlModule(
-      data.ctrl_id ?? '0',
-      data.ctrl_name ?? '',
-      data.ctrl_address ?? '',
-    );
+    location.controller = {
+      id: data.ctrl_id ?? '0',
+      name: data.ctrl_name ?? '',
+      address: data.ctrl_address ?? '',
+    };
 
     return location;
   }

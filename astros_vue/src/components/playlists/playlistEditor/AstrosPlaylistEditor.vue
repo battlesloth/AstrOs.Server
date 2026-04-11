@@ -1,22 +1,107 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import type { Playlist } from '@/models/playlists/playlist';
+import { computed, onMounted, ref, watch } from 'vue';
 import type { PlaylistTrack } from '@/models/playlists/playlistTrack';
 import { TrackType } from '@/enums/playlists/trackType';
+import { PlaylistType } from '@/enums/playlists/playlistType';
 import { v4 as uuid } from 'uuid';
+import AstrosPlaylistSettings from './AstrosPlaylistSettings.vue';
 import AstrosPlaylistTrack from './AstrosPlaylistTrack.vue';
+import { usePlaylistsStore } from '@/stores/playlists';
+import { useRoute, useRouter } from 'vue-router';
+import { storeToRefs } from 'pinia';
+import { AstrosConfirmModal, AstrosHtmlModal } from '@/components/modals';
+import { ModalType } from '@/enums';
+import { useI18n } from 'vue-i18n';
+import { useToast } from '@/composables/useToast';
 
-const playlist = defineModel<Playlist>('playlist', { required: true });
+const { t } = useI18n();
+const { success, error } = useToast();
 
-defineEmits<{
-  save: [];
-  cancel: [];
-}>();
+const route = useRoute();
+const router = useRouter();
+const playlistStore = usePlaylistsStore();
+const { selectedPlaylist } = storeToRefs(playlistStore);
+const playlist = computed(() => selectedPlaylist.value!);
+
+onMounted(async () => {
+  const id = route.params.id as string;
+
+  await playlistStore.loadData();
+
+  if (id === '0') {
+    await playlistStore.createNewPlaylist();
+  } else {
+    const result = await playlistStore.loadPlaylist(id);
+    if (!result.success) {
+      router.push('/playlists');
+    }
+  }
+});
 
 const sortedTracks = computed(() => [...playlist.value.tracks].sort((a, b) => a.idx - b.idx));
 
 const dragFromIdx = ref<number | null>(null);
 const dragOverIdx = ref<number | null>(null);
+const showModal = ref(ModalType.CLOSE_ALL);
+
+const confirmMessage = ref('');
+const previousPlaylistType = ref<PlaylistType | null>(null);
+
+watch(
+  () => playlist.value?.playlistType,
+  (newType, oldType) => {
+    if (
+      newType === PlaylistType.Sequential &&
+      oldType !== undefined &&
+      oldType !== PlaylistType.Sequential
+    ) {
+      const playlistTracks = playlist.value.tracks.filter(
+        (t) => t.trackType === TrackType.Playlist,
+      );
+      if (playlistTracks.length > 0) {
+        previousPlaylistType.value = oldType;
+        confirmMessage.value = t('playlist_editor_view.sequential_nested_warning', {
+          count: playlistTracks.length,
+        });
+        showModal.value = ModalType.CONFIRM;
+      }
+    }
+  },
+);
+
+function confirmRemovePlaylistTracks() {
+  playlist.value.tracks = playlist.value.tracks
+    .filter((t) => t.trackType !== TrackType.Playlist)
+    .map((t, i) => ({ ...t, idx: i }));
+  previousPlaylistType.value = null;
+  showModal.value = ModalType.CLOSE_ALL;
+}
+
+function cancelRemovePlaylistTracks() {
+  if (previousPlaylistType.value) {
+    playlist.value.playlistType = previousPlaylistType.value;
+    previousPlaylistType.value = null;
+  }
+  showModal.value = ModalType.CLOSE_ALL;
+}
+
+function showHelp() {
+  showModal.value = ModalType.HELP;
+}
+
+function generateHelpMessage(): string {
+  return `<div class="flex flex-col gap-4 min-h-30 max-h-100 overflow-y-scroll overflow-x-hidden">
+    <p>${t('playlist_editor_view.help_body')}</p>
+    <div><span class="text-lg font-semibold">${t('playlist_editor_view.sequential')}</span><br/>${t('playlist_editor_view.help_sequential')}</div>
+    <div><span class="text-lg font-semibold">${t('playlist_editor_view.sequentialinterruptible')}</span><br/>${t('playlist_editor_view.help_sequentialinterruptible')}</div>
+    <div><span class="text-lg font-semibold">${t('playlist_editor_view.sequentialrepeatable')}</span><br/>${t('playlist_editor_view.help_sequentialrepeatable')}</div>
+    <div><span class="text-lg font-semibold">${t('playlist_editor_view.shuffle')}</span><br/>${t('playlist_editor_view.help_shuffle')}</div>
+    <div><span class="text-lg font-semibold">${t('playlist_editor_view.shufflewithrepeat')}</span><br/>${t('playlist_editor_view.help_shufflewithrepeat')}</div>
+    <div><span class="text-lg font-semibold">${t('playlist_editor_view.shufflewithdelay')}</span><br/>${t('playlist_editor_view.help_shufflewithdelay')}</div>
+    <div><span class="text-lg font-semibold">${t('playlist_editor_view.shufflewithdelayandrepeat')}</span><br/>${t('playlist_editor_view.help_shufflewithdelayandrepeat')}</div>
+    </div>
+    `;
+}
 
 function addTrack() {
   const newTrack: PlaylistTrack = {
@@ -24,6 +109,8 @@ function addTrack() {
     playlistId: playlist.value.id,
     idx: playlist.value.tracks.length,
     durationDS: 0,
+    randomWait: false,
+    durationMaxDS: 0,
     trackType: TrackType.Script,
     trackId: '',
     trackName: '',
@@ -118,108 +205,202 @@ function setTrack(track: PlaylistTrack, value: PlaylistTrack) {
   const idx = trackIndex(track);
   if (idx >= 0) playlist.value.tracks[idx] = value;
 }
+
+async function save() {
+  try {
+    const result = await playlistStore.saveSelectedPlaylist();
+
+    if (!result.success) {
+      if ('errorCode' in result && result.errorCode === 'playlist_cycle') {
+        error(
+          t('playlist_editor_view.cycle_error', {
+            trackName: result.offendingTrack.trackName,
+            position: result.offendingTrack.idx + 1,
+          }),
+        );
+      } else {
+        error(t('playlist_editor_view.save_error'));
+      }
+      return;
+    }
+
+    success(t('playlist_editor_view.save_success'));
+  } catch (e: unknown) {
+    console.error('Error saving playlist:', e);
+    error(t('playlist_editor_view.save_error'));
+  }
+}
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div class="grow flex flex-col gap-2">
-        <input
-          v-model="playlist.playlistName"
-          data-testid="playlist-name"
-          type="text"
-          :placeholder="$t('playlists_view.title')"
-          class="input input-bordered input-sm w-full text-lg font-semibold"
-        />
-        <input
-          v-model="playlist.description"
-          data-testid="playlist-description"
-          type="text"
-          placeholder="Description"
-          class="input input-bordered input-sm w-full"
-        />
-      </div>
-      <div class="flex gap-2 ml-4">
-        <button
-          data-testid="playlist-add-track"
-          class="btn btn-outline btn-sm self-start"
-          @click="addTrack"
-        >
-          <v-icon name="io-add" />
-          {{ $t('playlists_view.add_track') }}
-        </button>
-        <button
-          data-testid="playlist-save"
-          class="btn btn-primary btn-sm"
-          @click="$emit('save')"
-        >
-          {{ $t('save') }}
-        </button>
-        <button
-          data-testid="playlist-cancel"
-          class="btn btn-ghost btn-sm"
-          @click="$emit('cancel')"
-        >
-          {{ $t('close') }}
-        </button>
-      </div>
-    </div>
-
-    <div class="divider my-0"></div>
-
-    <!-- Track List -->
-    <div class="flex flex-col gap-3">
-      <div
-        v-for="track in sortedTracks"
-        :key="track.id"
-        draggable="true"
-        :class="[
-          'flex items-start gap-2 rounded-lg border border-base-300 p-3 transition-colors cursor-grab',
-          {
-            'opacity-50 cursor-grabbing!': dragFromIdx === track.idx,
-            'border-primary': dragOverIdx === track.idx && dragFromIdx !== track.idx,
-          },
-        ]"
-        @dragstart="onDragStart($event, track.idx)"
-        @dragover="onDragOver($event, track.idx)"
-        @drop="onDrop($event, track.idx)"
-        @dragend="onDragEnd"
+  <div
+    v-if="selectedPlaylist"
+    class="flex flex-col w-full h-full overflow-hidden"
+  >
+    <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0">
+      <h1 class="text-2xl font-bold">{{ $t('playlist_editor_view.title') }}</h1>
+      <div class="grow"></div>
+      <button
+        data-testid="save_module_settings"
+        class="btn btn-primary w-24"
+        @click="save"
       >
-        <!-- Reorder buttons -->
-        <div class="flex flex-col justify-between self-stretch">
-          <button
-            :data-testid="`playlist-track-${track.idx}-up`"
-            class="btn btn-ghost btn-xs btn-square"
-            :disabled="track.idx === 0"
-            @click="moveUp(track.idx)"
-          >
-            <v-icon name="io-chevron-up" />
-          </button>
-          <button
-            :data-testid="`playlist-track-${track.idx}-down`"
-            class="btn btn-ghost btn-xs btn-square"
-            :disabled="track.idx === sortedTracks.length - 1"
-            @click="moveDown(track.idx)"
-          >
-            <v-icon name="io-chevron-down" />
-          </button>
+        {{ $t('playlist_editor_view.save') }}
+      </button>
+    </div>
+    <div class="min-h-0 flex-1 flex">
+      <div class="grow"></div>
+      <div class="px-5 max-w-250 grow-20 flex flex-col border border-base-300 rounded-lg">
+        <div class="shrink-0 p-4">
+          <div class="flex items-center justify-between">
+            <div class="grow flex flex-col gap-2">
+              <div class="flex items-center gap-4">
+                <input
+                  v-model="playlist.playlistName"
+                  data-testid="playlist-name"
+                  type="text"
+                  :placeholder="$t('playlist_editor_view.title')"
+                  class="input input-bordered input-sm w-full text-lg font-semibold"
+                />
+                <select
+                  v-model="playlist.playlistType"
+                  class="select select-sm w-86"
+                >
+                  <option
+                    v-for="type in Object.values(PlaylistType)"
+                    :key="type"
+                    :value="type"
+                  >
+                    {{ $t(`playlist_editor_view.${type.toLowerCase()}`) }}
+                  </option>
+                </select>
+                <button
+                  data-testid="playlist-help"
+                  :aria-label="$t('playlist_editor_view.help_title')"
+                  @click="showHelp()"
+                  class=""
+                >
+                  <v-icon
+                    name="io-help-circle-outline"
+                    scale="1.75"
+                    class="cursor-pointer opacity-70 hover:opacity-100 transition-opacity"
+                  />
+                </button>
+                <button
+                  data-testid="playlist-add-track"
+                  class="btn btn-primary btn-sm"
+                  @click="addTrack"
+                >
+                  <v-icon
+                    name="io-add"
+                    class="icon-white"
+                  />
+                  {{ $t('playlist_editor_view.add_track') }}
+                </button>
+              </div>
+              <div class="flex items-center gap-2">
+                <input
+                  v-model="playlist.description"
+                  data-testid="playlist-description"
+                  type="text"
+                  :placeholder="$t('playlist_editor_view.description')"
+                  class="input input-bordered input-sm w-full"
+                />
+              </div>
+              <!-- playlist settings-->
+              <div>
+                <AstrosPlaylistSettings
+                  v-model="playlist.settings"
+                  :playlist-type="playlist.playlistType"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="divider my-0"></div>
         </div>
 
-        <!-- Track component -->
-        <AstrosPlaylistTrack
-          :track="getTrack(track)"
-          @update:track="setTrack(track, $event)"
-          @remove="removeTrack(track.id)"
-        />
-      </div>
+        <!-- Track List -->
+        <div class="flex flex-col gap-3 overflow-y-auto min-h-0 flex-1 p-4 pt-0">
+          <div
+            v-for="track in sortedTracks"
+            :key="track.id"
+            :class="[
+              'flex items-start gap-2 rounded-lg border border-base-300 p-3 transition-colors',
+              {
+                'opacity-50': dragFromIdx === track.idx,
+                'border-primary': dragOverIdx === track.idx && dragFromIdx !== track.idx,
+              },
+            ]"
+            @dragover="onDragOver($event, track.idx)"
+            @drop="onDrop($event, track.idx)"
+            @dragend="onDragEnd"
+          >
+            <!-- Reorder buttons -->
+            <div class="flex flex-col items-center justify-between self-stretch">
+              <button
+                :data-testid="`playlist-track-${track.idx}-up`"
+                class="btn btn-ghost btn-xs btn-square"
+                :disabled="track.idx === 0"
+                @click="moveUp(track.idx)"
+              >
+                <v-icon name="io-chevron-up" />
+              </button>
+              <div
+                draggable="true"
+                class="cursor-grab active:cursor-grabbing px-1"
+                @dragstart="onDragStart($event, track.idx)"
+              >
+                <v-icon name="md-draghandle" />
+              </div>
+              <button
+                :data-testid="`playlist-track-${track.idx}-down`"
+                class="btn btn-ghost btn-xs btn-square"
+                :disabled="track.idx === sortedTracks.length - 1"
+                @click="moveDown(track.idx)"
+              >
+                <v-icon name="io-chevron-down" />
+              </button>
+            </div>
 
-      <div
-        v-if="sortedTracks.length === 0"
-        class="text-center text-sm opacity-50 py-4"
-      >
-        {{ $t('playlists_view.no_tracks') }}
+            <!-- Track component -->
+            <AstrosPlaylistTrack
+              :playlist-type="selectedPlaylist.playlistType"
+              :track="getTrack(track)"
+              @update:track="setTrack(track, $event)"
+              @remove="removeTrack(track.id)"
+            />
+          </div>
+
+          <div
+            v-if="sortedTracks.length === 0"
+            class="text-center text-sm opacity-50 py-4"
+          >
+            {{ $t('playlist_editor_view.no_tracks') }}
+          </div>
+        </div>
       </div>
+      <div class="grow"></div>
     </div>
+    <div class="shrink-0 h-9"></div>
   </div>
+  <AstrosHtmlModal
+    v-if="showModal === ModalType.HELP"
+    :title="$t('playlist_editor_view.help_title')"
+    :content="generateHelpMessage()"
+    @close="showModal = ModalType.CLOSE_ALL"
+  />
+  <AstrosConfirmModal
+    v-if="showModal === ModalType.CONFIRM"
+    :title="'playlist_editor_view.sequential_nested_confirm_title'"
+    :message="confirmMessage"
+    :on-confirm="confirmRemovePlaylistTracks"
+    :on-close="cancelRemovePlaylistTracks"
+  />
 </template>
+
+<style scoped>
+.icon-white :deep(path) {
+  stroke: white !important;
+}
+</style>

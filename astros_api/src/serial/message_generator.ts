@@ -1,14 +1,14 @@
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
 //|--int---RS---string----RS--string---GS--val--US--val--RS--val--US--val--|
 
-import { ConfigSync } from '../models/config/config_sync.js';
-import { logger } from '../logger.js';
+import { ConfigSync } from 'src/models/config/config_sync.js';
+import { logger } from 'src/logger.js';
 import { MessageHelper } from './message_helper.js';
 import { SerialMessageType } from './serial_message.js';
-import { ScriptUpload } from '../models/scripts/script_upload.js';
-import { ScriptRun } from '../models/scripts/script_run.js';
-import { ServoTest } from '../models/servo_test.js';
-import { MaestroModule } from '../models/index.js';
+import { ScriptUpload } from 'src/models/scripts/script_upload.js';
+import { ScriptRun } from 'src/models/scripts/script_run.js';
+import { ServoTest } from 'src/models/servo_test.js';
+import { MaestroModule } from 'src/models/index.js';
 
 export enum EspModuleType {
   NONE = 0,
@@ -270,7 +270,7 @@ export class MessageGenerator {
   }
 
   generateRunCommand(header: string, data: any) {
-    if (!data.contoller.address) {
+    if (!data.controller.address) {
       return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, []);
     }
 
@@ -285,7 +285,7 @@ export class MessageGenerator {
     const msg = result.join('');
 
     return new MessageGeneratorResponse(`${header}${msg}${MessageHelper.MessageEOL}`, [
-      data.contoller.address,
+      data.controller.address,
     ]);
   }
 

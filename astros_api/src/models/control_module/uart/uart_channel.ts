@@ -1,5 +1,5 @@
-import { ModuleSubType, ModuleType } from '../../enums.js';
-import { BaseChannel } from '../base_channel.js';
+import { ModuleSubType, ModuleType } from 'src/models/enums.js';
+import { BaseChannel } from 'src/models/control_module/base_channel.js';
 
 export class UartChannel extends BaseChannel {
   constructor(

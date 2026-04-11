@@ -33,6 +33,7 @@ export class MessageHelper {
 
   public static readonly MessageTimeouts: Map<SerialMessageType, number> = new Map([
     [SerialMessageType.REGISTRATION_SYNC, 5000],
+    [SerialMessageType.DEPLOY_CONFIG, 5000],
     [SerialMessageType.DEPLOY_SCRIPT, 5000],
     [SerialMessageType.RUN_SCRIPT, 5000],
     [SerialMessageType.RUN_COMMAND, 5000],

@@ -1,22 +1,23 @@
-import { logger } from '.././logger.js';
-import { SerialMessageType, SerialMsgValidationResult } from './serial_message.js';
+import { logger } from 'src/logger.js';
+import { SerialMessageType, createValidationResult } from './serial_message.js';
 import { MessageHelper } from './message_helper.js';
-import {
+import { SerialWorkerResponseType } from './serial_worker_response.js';
+import type {
   ConfigSyncResponse,
   PollRepsonse,
   RegistrationResponse,
   ScriptDeployResponse,
   ScriptRunResponse,
-  SerialWorkerResponseType,
 } from './serial_worker_response.js';
-import { ControlModule } from '../models/index.js';
+import type { SerialMsgValidationResult } from './serial_message.js';
+import type { ControlModule } from 'src/models/index.js';
 
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
 //|--int---RS---string----RS--string---GS--val--US--val--RS--val--US--val--|
 
 export class MessageHandler {
   public validateMessage(msg: string): SerialMsgValidationResult {
-    const result = new SerialMsgValidationResult();
+    const result = createValidationResult();
 
     const groups = msg.split(MessageHelper.GS);
     if (groups.length !== 2) {
@@ -53,7 +54,7 @@ export class MessageHandler {
   }
 
   public handlePollAck(msg: string): PollRepsonse {
-    const response = new PollRepsonse();
+    const response = { type: SerialWorkerResponseType.POLL } as PollRepsonse;
 
     const parts = msg.split(MessageHelper.US);
 
@@ -63,7 +64,7 @@ export class MessageHandler {
       return response;
     }
 
-    const module = new ControlModule('', parts[1], parts[0]);
+    const module: ControlModule = { id: '', name: parts[1], address: parts[0] };
     module.fingerprint = parts[2];
     response.controller = module;
 
@@ -71,7 +72,11 @@ export class MessageHandler {
   }
 
   public handleRegistraionSyncAck(msg: string): RegistrationResponse {
-    const response = new RegistrationResponse(true);
+    const response: RegistrationResponse = {
+      type: SerialWorkerResponseType.REGISTRATION_SYNC,
+      success: true,
+      registrations: [],
+    };
 
     const records = msg.split(MessageHelper.RS);
 
@@ -83,7 +88,7 @@ export class MessageHandler {
         continue;
       }
 
-      const module = new ControlModule('', units[1], units[0]);
+      const module: ControlModule = { id: '', name: units[1], address: units[0] };
 
       response.registrations.push(module);
     }
@@ -92,7 +97,10 @@ export class MessageHandler {
   }
 
   handleDeployConfigAck(msg: string): ConfigSyncResponse {
-    const response = new ConfigSyncResponse(true);
+    const response = {
+      type: SerialWorkerResponseType.CONFIG_SYNC,
+      success: true,
+    } as ConfigSyncResponse;
 
     const parts = msg.split(MessageHelper.US);
 
@@ -102,7 +110,7 @@ export class MessageHandler {
       return response;
     }
 
-    const module = new ControlModule('', parts[1], parts[0]);
+    const module: ControlModule = { id: '', name: parts[1], address: parts[0] };
     module.fingerprint = parts[2];
     response.controller = module;
 
@@ -123,9 +131,13 @@ export class MessageHandler {
 
     const success = type === SerialMessageType.DEPLOY_SCRIPT_ACK;
 
-    const response = new ScriptDeployResponse(success, parts[2]);
+    const response = {
+      type: SerialWorkerResponseType.SCRIPT_DEPLOY,
+      success,
+      scriptId: parts[2],
+    } as ScriptDeployResponse;
 
-    const module = new ControlModule('', parts[1], parts[0]);
+    const module: ControlModule = { id: '', name: parts[1], address: parts[0] };
     response.controller = module;
 
     return response;
@@ -145,9 +157,13 @@ export class MessageHandler {
 
     const success = type === SerialMessageType.RUN_SCRIPT_ACK;
 
-    const response = new ScriptRunResponse(success, parts[2]);
+    const response = {
+      type: SerialWorkerResponseType.SCRIPT_RUN,
+      success,
+      scriptId: parts[2],
+    } as ScriptRunResponse;
 
-    const module = new ControlModule('', parts[1], parts[0]);
+    const module: ControlModule = { id: '', name: parts[1], address: parts[0] };
     response.controller = module;
 
     return response;

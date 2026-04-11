@@ -29,6 +29,7 @@ const getAlertClass = (type: string) => {
       <span>{{ toast.message }}</span>
       <button
         class="btn btn-sm btn-circle btn-ghost"
+        :aria-label="$t('close')"
         @click="removeToast(toast.id)"
       >
         ✕

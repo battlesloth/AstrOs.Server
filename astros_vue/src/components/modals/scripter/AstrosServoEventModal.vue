@@ -114,7 +114,7 @@ const closeModal = () => {
 <template>
   <dialog class="modal modal-open">
     <div class="modal-box max-w-md">
-      <h3 class="text-lg font-bold mb-4">Servo Event</h3>
+      <h3 class="text-lg font-bold mb-4">{{ $t('modals.servo_event.title') }}</h3>
 
       <div class="space-y-4">
         <div v-if="mode !== ModalMode.TEST">
@@ -122,7 +122,7 @@ const closeModal = () => {
             for="time"
             class="label"
           >
-            <span class="label-text">Event Time (seconds)</span>
+            <span class="label-text">{{ $t('modals.servo_event.event_time') }}</span>
           </label>
           <input
             id="time"
@@ -139,7 +139,7 @@ const closeModal = () => {
             for="position"
             class="label"
           >
-            <span class="label-text">Position (0 to 100%, -1 for Home)</span>
+            <span class="label-text">{{ $t('modals.servo_event.position') }}</span>
           </label>
           <input
             id="position"
@@ -158,7 +158,7 @@ const closeModal = () => {
             for="speed"
             class="label"
           >
-            <span class="label-text">Speed (0 to 255, 0 is unlimited)</span>
+            <span class="label-text">{{ $t('modals.servo_event.speed') }}</span>
           </label>
           <input
             id="speed"
@@ -177,7 +177,7 @@ const closeModal = () => {
             for="acceleration"
             class="label"
           >
-            <span class="label-text">Accel. (0 to 255, 0 is unlimited)</span>
+            <span class="label-text">{{ $t('modals.servo_event.acceleration') }}</span>
           </label>
           <input
             id="acceleration"
@@ -204,20 +204,20 @@ const closeModal = () => {
           class="btn btn-primary"
           @click="saveEvent"
         >
-          {{ mode !== ModalMode.TEST ? $t('Save') : $t('Test') }}
+          {{ mode !== ModalMode.TEST ? $t('save') : $t('test') }}
         </button>
         <button
           v-if="mode === ModalMode.EDIT"
           class="btn btn-error"
           @click="removeEvent"
         >
-          {{ $t('Remove') }}
+          {{ $t('remove') }}
         </button>
         <button
           class="btn"
           @click="closeModal"
         >
-          {{ $t('Close') }}
+          {{ $t('close') }}
         </button>
       </div>
     </div>
@@ -226,7 +226,7 @@ const closeModal = () => {
       class="modal-backdrop"
       @click="closeModal"
     >
-      <button>{{ $t('Close') }}</button>
+      <button>{{ $t('close') }}</button>
     </form>
   </dialog>
 </template>

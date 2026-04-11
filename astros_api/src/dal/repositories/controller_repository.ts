@@ -1,9 +1,9 @@
-import { inserted } from '../../dal/database.js';
-import { ControlModule } from '../../models/index.js';
-import { logger } from '../../logger.js';
+import { inserted } from 'src/dal/database.js';
+import type { ControlModule } from 'src/models/index.js';
+import { logger } from 'src/logger.js';
 import { v4 as uuid } from 'uuid';
 import { Kysely } from 'kysely';
-import { Database } from '../types.js';
+import { Database } from 'src/dal/types.js';
 
 export class ControllerRepository {
   constructor(private readonly db: Kysely<Database>) {}
@@ -119,8 +119,7 @@ export class ControllerRepository {
       });
 
     for (const c of data) {
-      const control = new ControlModule(c.id, c.name, c.address);
-      result.push(control);
+      result.push({ id: c.id, name: c.name, address: c.address });
     }
 
     return result;
@@ -137,7 +136,7 @@ export class ControllerRepository {
         throw err;
       });
 
-    return new ControlModule(data.id, data.name, data.address);
+    return { id: data.id, name: data.name, address: data.address };
   }
 
   public async getControllerByAddress(address: string): Promise<ControlModule> {
@@ -151,7 +150,7 @@ export class ControllerRepository {
         throw err;
       });
 
-    return new ControlModule(data.id, data.name, data.address);
+    return { id: data.id, name: data.name, address: data.address };
   }
 
   public async getControllerByLocationId(locationId: string): Promise<ControlModule> {
@@ -166,6 +165,6 @@ export class ControllerRepository {
         throw err;
       });
 
-    return new ControlModule(data.id, data.name, data.address);
+    return { id: data.id, name: data.name, address: data.address };
   }
 }

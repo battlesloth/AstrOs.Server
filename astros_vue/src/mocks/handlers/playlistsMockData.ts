@@ -26,6 +26,8 @@ function createMockTrack(playlistId: string, name: string, idx: number): Playlis
     trackType: type,
     trackId: type === TrackType.Script ? scriptIds[idx]! : `playlist-${playlistId}`,
     durationDS: 10,
+    durationMaxDS: 0,
+    randomWait: false,
     idx: idx,
   };
 }

@@ -1,43 +1,59 @@
 import { http, HttpResponse } from 'msw';
-import { mockScripts } from './mockData';
+import { mockScripts, mockPlaylists, mockScriptNames } from './mockData';
+import type { Script } from '@/models/scripts/script';
+
+const additionalScripts: Script[] = [
+  {
+    id: '6',
+    scriptName: 'Focus Camera',
+    description: 'Auto-focus the camera',
+    lastSaved: new Date(),
+    durationDS: 0,
+    playlistCount: 0,
+    deploymentStatus: {},
+    scriptChannels: [],
+  },
+  {
+    id: '7',
+    scriptName: 'Calibrate',
+    description: 'Run calibration routine',
+    lastSaved: new Date(),
+    durationDS: 0,
+    playlistCount: 0,
+    deploymentStatus: {},
+    scriptChannels: [],
+  },
+  {
+    id: '8',
+    scriptName: 'Park Telescope',
+    description: 'Park the telescope',
+    lastSaved: new Date(),
+    durationDS: 0,
+    playlistCount: 0,
+    deploymentStatus: {},
+    scriptChannels: [],
+  },
+  {
+    id: '9',
+    scriptName: 'Unpark Telescope',
+    description: 'Unpark the telescope',
+    lastSaved: new Date(),
+    durationDS: 0,
+    playlistCount: 0,
+    deploymentStatus: {},
+    scriptChannels: [],
+  },
+];
 
 export const fullyConfiguredHandlers = [
+  http.get('/api/playlists/all', () => {
+    return HttpResponse.json(mockPlaylists);
+  }),
+  http.get('/api/scripts/all-names', () => {
+    return HttpResponse.json(mockScriptNames);
+  }),
   http.get('/api/scripts/all', () => {
-    return HttpResponse.json([
-      ...mockScripts,
-      {
-        id: '6',
-        scriptName: 'Focus Camera',
-        description: 'Auto-focus the camera',
-        lastSaved: new Date().toISOString(),
-        deploymentStatus: {},
-        scriptChannels: [],
-      },
-      {
-        id: '7',
-        scriptName: 'Calibrate',
-        description: 'Run calibration routine',
-        lastSaved: new Date().toISOString(),
-        deploymentStatus: {},
-        scriptChannels: [],
-      },
-      {
-        id: '8',
-        scriptName: 'Park Telescope',
-        description: 'Park the telescope',
-        lastSaved: new Date().toISOString(),
-        deploymentStatus: {},
-        scriptChannels: [],
-      },
-      {
-        id: '9',
-        scriptName: 'Unpark Telescope',
-        description: 'Unpark the telescope',
-        lastSaved: new Date().toISOString(),
-        deploymentStatus: {},
-        scriptChannels: [],
-      },
-    ]);
+    return HttpResponse.json([...mockScripts, ...additionalScripts]);
   }),
   http.get('/api/remoteConfig', () => {
     return HttpResponse.json(

@@ -2,7 +2,7 @@
 import { onMounted, ref, useTemplateRef } from 'vue';
 import { ModalMode, ModalType, ScriptChannelType } from '@/enums';
 import { useScripterStore } from '@/stores/scripter';
-import { useRoute } from 'vue-router';
+import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import {
   AstrosLayout,
   AstrosPixiView,
@@ -22,6 +22,7 @@ import router from '@/router';
 import type { AddChannelModalResponse, ScriptEvent, Channel, ChannelTestValue } from '@/models';
 import { useScriptEvents } from '@/composables/useScriptEvents';
 import { useToast } from '@/composables/useToast';
+import { useI18n } from 'vue-i18n';
 import { v4 as uuid } from 'uuid';
 import AstrosChannelSwapModal from '@/components/modals/scripter/AstrosChannelSwapModal.vue';
 import apiService from '@/api/apiService';
@@ -46,6 +47,16 @@ const scripterStore = useScripterStore();
 const { eventTypeToModalType, getDefaultScriptEvent } = useScriptEvents();
 
 const { success, error } = useToast();
+const { t } = useI18n();
+
+onBeforeRouteLeave((_to, _from, next) => {
+  if (scripterStore.isDirty) {
+    const confirmed = window.confirm(t('scripter_view.unsaved_changes'));
+    next(confirmed);
+  } else {
+    next();
+  }
+});
 
 function addChannel() {
   showModal.value = ModalType.ADD_CHANNEL;
@@ -261,7 +272,17 @@ async function doChannelTest(): Promise<boolean> {
     });
 }
 
-function scriptTest() {
+async function scriptTest() {
+  modalMessage.value = 'Saving script...';
+  showModal.value = ModalType.INTERRUPT;
+
+  const result = await scripterStore.saveScript();
+  if (!result.success) {
+    modalMessage.value = `Failed to save script: ${result.error}`;
+    showModal.value = ModalType.ERROR;
+    return;
+  }
+
   showModal.value = ModalType.SCRIPT_TEST;
 }
 
@@ -271,7 +292,7 @@ async function saveScript() {
     modalMessage.value = `Failed to save script: ${result.error}`;
     showModal.value = ModalType.ERROR;
   } else {
-    success('Script saved successfully.');
+    success(t('scripter_view.save_success'));
   }
 }
 
@@ -351,27 +372,28 @@ onMounted(async () => {
             <input
               v-model="scripterStore.script.scriptName"
               class="bg-transparent border border-gray-400 focus:outline-none w-full"
-              placeholder="Script Name"
+              :placeholder="$t('scripter_view.script_name')"
+              :aria-label="$t('scripter_view.script_name')"
             />
           </div>
           <div class="grow text-2xl flex items-center gap-2">
             <input
-              v-model.number="scripterStore.script.description"
+              v-model="scripterStore.script.description"
               class="bg-transparent border border-gray-400 focus:outline-none w-full"
-              min="0"
+              :aria-label="$t('description')"
             />
           </div>
           <button
             class="btn w-24 btn-primary"
             @click="saveScript"
           >
-            Save
+            {{ $t('save') }}
           </button>
           <button
             class="btn w-24 btn-primary"
             @click="scriptTest"
           >
-            Test
+            {{ $t('test') }}
           </button>
         </div>
       </div>

@@ -6,10 +6,10 @@ import {
   NewLocation,
   NewRemoteConfig,
   NewUser,
-} from '../types.js';
+} from 'src/dal/types.js';
 import { v4 as uuid } from 'uuid';
 import * as crypto from 'crypto';
-import { Constants } from '../../models/index.js';
+import { Constants } from 'src/models/index.js';
 
 export const migration_0: Migration = {
   up: async (db: Kysely<any>): Promise<void> => {

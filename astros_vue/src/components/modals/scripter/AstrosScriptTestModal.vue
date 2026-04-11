@@ -5,6 +5,9 @@ import { UploadStatus, Location } from '@/enums';
 import { useScriptsStore } from '@/stores/scripts';
 import { useScripterStore } from '@/stores/scripter';
 import { useLocationStore } from '@/stores/location';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 interface Caption {
   str: string;
@@ -21,15 +24,15 @@ const emit = defineEmits<{
 // Local state
 const uploadInProgress = ref(true);
 const runDisabled = ref(true);
-const status = ref('Uploading script...');
+const status = ref(t('modals.script_test.uploading'));
 
 const coreUpload = ref<TransmissionStatus>(TransmissionStatus.SENDING);
 const domeUpload = ref<TransmissionStatus>(TransmissionStatus.SENDING);
 const bodyUpload = ref<TransmissionStatus>(TransmissionStatus.SENDING);
 
-const coreCaption = ref<Caption>({ str: 'Uploading' });
-const domeCaption = ref<Caption>({ str: 'Uploading' });
-const bodyCaption = ref<Caption>({ str: 'Uploading' });
+const coreCaption = ref<Caption>({ str: t('modals.script_test.uploading_status') });
+const domeCaption = ref<Caption>({ str: t('modals.script_test.uploading_status') });
+const bodyCaption = ref<Caption>({ str: t('modals.script_test.uploading_status') });
 
 const locationsStore = useLocationStore();
 const scriptStore = useScriptsStore();
@@ -89,7 +92,7 @@ watch(
       domeUpload.value > TransmissionStatus.SENDING &&
       bodyUpload.value > TransmissionStatus.SENDING
     ) {
-      status.value = 'Upload Complete.';
+      status.value = t('modals.script_test.upload_complete');
       uploadInProgress.value = false;
       if (
         coreUpload.value + domeUpload.value + bodyUpload.value >=
@@ -105,39 +108,39 @@ watch(
 const setInitialUploadStatus = (hasBody: boolean, hasCore: boolean, hasDome: boolean) => {
   if (hasBody) {
     bodyUpload.value = TransmissionStatus.SENDING;
-    bodyCaption.value.str = 'Uploading';
+    bodyCaption.value.str = t('modals.script_test.uploading_status');
   } else {
     bodyUpload.value = TransmissionStatus.SUCCESS;
-    bodyCaption.value.str = 'Not Assigned';
+    bodyCaption.value.str = t('modals.script_test.not_assigned');
   }
 
   if (hasCore) {
     coreUpload.value = TransmissionStatus.SENDING;
-    coreCaption.value.str = 'Uploading';
+    coreCaption.value.str = t('modals.script_test.uploading_status');
   } else {
     coreUpload.value = TransmissionStatus.SUCCESS;
-    coreCaption.value.str = 'Not Assigned';
+    coreCaption.value.str = t('modals.script_test.not_assigned');
   }
 
   if (hasDome) {
     domeUpload.value = TransmissionStatus.SENDING;
-    domeCaption.value.str = 'Uploading';
+    domeCaption.value.str = t('modals.script_test.uploading_status');
   } else {
     domeUpload.value = TransmissionStatus.SUCCESS;
-    domeCaption.value.str = 'Not Assigned';
+    domeCaption.value.str = t('modals.script_test.not_assigned');
   }
 };
 
 const setCaption = (caption: Caption, uploadStatus: TransmissionStatus) => {
   switch (uploadStatus) {
     case TransmissionStatus.SUCCESS:
-      caption.str = 'Success';
+      caption.str = t('modals.script_test.success');
       break;
     case TransmissionStatus.FAILED:
-      caption.str = 'Failed';
+      caption.str = t('modals.script_test.failed');
       break;
     case TransmissionStatus.SENDING:
-      caption.str = 'Uploading';
+      caption.str = t('modals.script_test.uploading_status');
       break;
   }
 };
@@ -154,16 +157,16 @@ onMounted(async () => {
       await scriptStore.uploadScript(props.scriptId);
     } catch (err) {
       console.error(err);
-      status.value = 'Error requesting Script Upload';
+      status.value = t('modals.script_test.failed');
       coreUpload.value = TransmissionStatus.FAILED;
-      coreCaption.value.str = 'Failed';
+      coreCaption.value.str = t('modals.script_test.failed');
       domeUpload.value = TransmissionStatus.FAILED;
-      domeCaption.value.str = 'Failed';
+      domeCaption.value.str = t('modals.script_test.failed');
       bodyUpload.value = TransmissionStatus.FAILED;
-      bodyCaption.value.str = 'Failed';
+      bodyCaption.value.str = t('modals.script_test.failed');
     }
   } else {
-    status.value = 'Script ID missing, close dialog to continue.';
+    status.value = t('modals.script_test.failed');
   }
 });
 
@@ -181,7 +184,7 @@ const closeModal = () => {
 <template>
   <dialog class="modal modal-open">
     <div class="modal-box w-100 max-w-md">
-      <h1 class="text-2xl font-bold mb-4">Script Test</h1>
+      <h1 class="text-2xl font-bold mb-4">{{ $t('modals.script_test.title') }}</h1>
 
       <div class="py-4 flex flex-row">
         <div class="grow"></div>
@@ -191,15 +194,15 @@ const closeModal = () => {
           </div>
 
           <div class="mb-2 text-lg">
-            <span>Body: {{ bodyCaption.str }}</span>
+            <span>{{ $t('modals.script_test.body') }}: {{ bodyCaption.str }}</span>
           </div>
 
           <div class="mb-2 text-lg">
-            <span>Core: {{ coreCaption.str }}</span>
+            <span>{{ $t('modals.script_test.core') }}: {{ coreCaption.str }}</span>
           </div>
 
           <div class="mb-2 text-lg">
-            <span>Dome: {{ domeCaption.str }}</span>
+            <span>{{ $t('modals.script_test.dome') }}: {{ domeCaption.str }}</span>
           </div>
         </div>
         <div class="grow"></div>
@@ -212,14 +215,14 @@ const closeModal = () => {
           :disabled="!canRun"
           @click="runClicked"
         >
-          Run
+          {{ $t('run') }}
         </button>
         <button
           class="btn w-24 text-lg"
           data-testid="cancel-button"
           @click="closeModal"
         >
-          Cancel
+          {{ $t('cancel') }}
         </button>
       </div>
     </div>

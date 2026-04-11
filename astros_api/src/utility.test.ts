@@ -10,10 +10,16 @@ import {
   ModuleChannelTypes,
   GenericSerialEvent,
 } from './models/index.js';
-import { calculateLengthDS } from './utility.js';
+import { calculateLengthDS, generateShortId } from './utility.js';
 import { v4 as uuid } from 'uuid';
 
 describe('Utility functions', () => {
+  it('should generate a short ID with the correct format', () => {
+    const prefix = 's';
+    const shortId = generateShortId(prefix);
+    expect(shortId).toMatch(/^s[0-9]{7}[A-Za-z]{3}$/);
+  });
+
   it('should calculate the correct length in DS', () => {
     const scriptId = 'testScriptTimes';
 
@@ -22,7 +28,16 @@ describe('Utility functions', () => {
     const evt3Time = 24; // 2.4 seconds
     const evt4Time = 362; // 36.2 seconds
 
-    const script = new Script(scriptId, 'test', 'test', new Date(), 362);
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'test',
+      description: 'test',
+      lastSaved: new Date(),
+      durationDS: 362,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
     const scriptCh1 = generateSerialScriptChannel(scriptId);
     const sevt1 = generateCoreScriptSerialEventByDecSec(evt1Time, scriptCh1.id);
     const sevt2 = generateCoreScriptSerialEventByDecSec(evt2Time, scriptCh1.id);
@@ -50,31 +65,32 @@ function generateSerialScriptChannel(scriptId: string): ScriptChannel {
 
   const uartChannel = new UartChannel(uuid(), moduleId, '', ModuleSubType.genericSerial, true);
 
-  const scriptCh = new ScriptChannel(
-    uuid(),
+  const scriptCh: ScriptChannel = {
+    id: uuid(),
     scriptId,
-    ScriptChannelType.GENERIC_UART,
-    moduleId,
-    uartChannel.id,
-    ModuleChannelTypes.UartChannel,
-    uartChannel,
-    3000,
-  );
+    channelType: ScriptChannelType.GENERIC_UART,
+    parentModuleId: moduleId,
+    moduleChannelId: uartChannel.id,
+    moduleChannelType: ModuleChannelTypes.UartChannel,
+    moduleChannel: uartChannel,
+    maxDuration: 3000,
+    events: {},
+  };
 
   return scriptCh;
 }
 
 function generateCoreScriptSerialEventByDecSec(tenthOfSeconds: number, chId: string): ScriptEvent {
-  const evt = new GenericSerialEvent(`test ${tenthOfSeconds}`);
+  const evt = { value: `test ${tenthOfSeconds}` } as GenericSerialEvent;
 
-  const sevt = new ScriptEvent(
-    uuid(),
-    chId,
-    ModuleType.uart,
-    ModuleSubType.genericSerial,
-    tenthOfSeconds,
-    evt,
-  );
+  const sevt: ScriptEvent = {
+    id: uuid(),
+    scriptChannel: chId,
+    moduleType: ModuleType.uart,
+    moduleSubType: ModuleSubType.genericSerial,
+    time: tenthOfSeconds,
+    event: evt,
+  };
 
   return sevt;
 }

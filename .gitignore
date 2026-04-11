@@ -43,11 +43,13 @@ chrome-profiler-events*.json
 /.sass-cache
 /connect.lock
 /coverage
+/astros_api/coverage
 /libpeerconnection.log
 npm-debug.log
 yarn-error.log
 testem.log
 /typings
+
 
 # System Files
 .DS_Store

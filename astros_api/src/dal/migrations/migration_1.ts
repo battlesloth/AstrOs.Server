@@ -1,5 +1,5 @@
 import { Kysely, Migration, sql } from 'kysely';
-import { Database } from '../types.js';
+import { Database } from 'src/dal/types.js';
 import { v4 as uuidv4 } from 'uuid';
 export const migration_1: Migration = {
   up: async (db: Kysely<Database>): Promise<void> => {

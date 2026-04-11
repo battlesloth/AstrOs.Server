@@ -95,7 +95,7 @@ const closeModal = () => {
 <template>
   <dialog class="modal modal-open">
     <div class="modal-box w-100 max-w-md">
-      <h1 class="text-2xl font-bold mb-4">GPIO Event</h1>
+      <h1 class="text-2xl font-bold mb-4">{{ $t('modals.gpio_event.title') }}</h1>
 
       <div class="py-4 flex flex-row">
         <div class="grow"></div>
@@ -107,7 +107,7 @@ const closeModal = () => {
             <label
               for="time"
               class="block w-full mb-0.5 text-lg"
-              >Event Time (seconds)</label
+              >{{ $t('modals.gpio_event.event_time') }}</label
             >
             <input
               id="time"
@@ -123,16 +123,16 @@ const closeModal = () => {
             <label
               for="state-select"
               class="block w-full mb-0.5 text-lg"
-              >State</label
+              >{{ $t('modals.gpio_event.state') }}</label
             >
             <select
               id="state-select"
               v-model.number="state"
-              title="State"
+              :aria-label="$t('modals.gpio_event.state')"
               class="select select-bordered w-full text-2xl mt-2"
             >
-              <option :value="0">Low</option>
-              <option :value="1">High</option>
+              <option :value="0">{{ $t('modals.gpio_event.low') }}</option>
+              <option :value="1">{{ $t('modals.gpio_event.high') }}</option>
             </select>
           </div>
 
@@ -152,7 +152,7 @@ const closeModal = () => {
           data-testid="save-button"
           @click="addEvent"
         >
-          {{ mode !== ModalMode.TEST ? $t('Save') : $t('Test') }}
+          {{ mode !== ModalMode.TEST ? $t('save') : $t('test') }}
         </button>
         <button
           v-if="showRemoveButton"
@@ -160,14 +160,14 @@ const closeModal = () => {
           data-testid="remove-button"
           @click="removeEvent"
         >
-          {{ $t('Remove') }}
+          {{ $t('remove') }}
         </button>
         <button
           class="btn w-24 text-lg"
           data-testid="close-button"
           @click="closeModal"
         >
-          {{ $t('Close') }}
+          {{ $t('close') }}
         </button>
       </div>
     </div>
@@ -176,7 +176,7 @@ const closeModal = () => {
       class="modal-backdrop"
       @click="closeModal"
     >
-      <button>{{ $t('Close') }}</button>
+      <button>{{ $t('close') }}</button>
     </form>
   </dialog>
 </template>

@@ -2,17 +2,18 @@ import { expect, describe, it } from 'vitest';
 import { MessageGenerator } from './message_generator.js';
 import { MessageHelper } from './message_helper.js';
 import { SerialMessageType } from './serial_message.js';
-import { ConfigSync } from '../models/config/config_sync.js';
+import { createConfigSync } from '../models/config/config_sync.js';
+import { createScriptRun } from '../models/scripts/script_run.js';
+import { createScriptUpload } from '../models/scripts/script_upload.js';
+import { ServoTest } from '../models/servo_test.js';
 import {
-  ControlModule,
-  ControllerLocation,
+  createControllerLocation,
   GpioChannel,
-  MaestroBoard,
   MaestroChannel,
-  MaestroModule,
   ModuleSubType,
   UartModule,
 } from '../models/index.js';
+import type { ControllerLocation, MaestroBoard, MaestroModule } from '../models/index.js';
 import { v4 as uuid } from 'uuid';
 
 const RS = MessageHelper.RS;
@@ -32,6 +33,98 @@ describe('Message Generator Tests', () => {
     expect(message.controllers.length).toBe(1);
     expect(message.controllers[0]).toBe('00:00:00:00:00:00');
     expect(message.msg).toBe(`1${RS}REGISTRATION_SYNC${RS}123\n`);
+  });
+
+  it('generate Run Script', () => {
+    const generator = new MessageGenerator();
+
+    const loc = createControllerLocation(uuid(), 'dome', '', '');
+    loc.controller = { id: uuid(), name: 'dome', address: 'AA:BB:CC:DD:EE:01' };
+    const scriptRun = createScriptRun('script-xyz', [loc]);
+
+    const message = generator.generateMessage(SerialMessageType.RUN_SCRIPT, 'msg-1', scriptRun);
+
+    expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
+    expect(message.metaData).toBe('script-xyz');
+    expect(message.msg).toContain(`${RS}RUN_SCRIPT${RS}msg-1`);
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}script-xyz`);
+  });
+
+  it('generate Deploy Script', () => {
+    const generator = new MessageGenerator();
+
+    const loc = createControllerLocation(uuid(), 'dome', '', '');
+    loc.controller = { id: uuid(), name: 'dome', address: 'AA:BB:CC:DD:EE:01' };
+    const scripts = new Map<string, string>();
+    scripts.set(loc.id, 'script-content-here');
+    const upload = createScriptUpload('script-xyz', scripts, [loc]);
+
+    const message = generator.generateMessage(SerialMessageType.DEPLOY_SCRIPT, 'msg-1', upload);
+
+    expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
+    expect(message.metaData).toBe('script-xyz');
+    expect(message.msg).toContain(`${RS}DEPLOY_SCRIPT${RS}msg-1`);
+    expect(message.msg).toContain(
+      `AA:BB:CC:DD:EE:01${US}dome${US}script-xyz${US}script-content-here`,
+    );
+  });
+
+  it('generate Panic Stop', () => {
+    const generator = new MessageGenerator();
+
+    const loc = createControllerLocation(uuid(), 'dome', '', '');
+    loc.controller = { id: uuid(), name: 'dome', address: 'AA:BB:CC:DD:EE:01' };
+    const scriptRun = createScriptRun('panic', [loc]);
+
+    const message = generator.generateMessage(SerialMessageType.PANIC_STOP, 'msg-1', scriptRun);
+
+    expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
+    expect(message.msg).toContain(`${RS}PANIC_STOP${RS}msg-1`);
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}PANIC`);
+  });
+
+  it('generate Servo Test', () => {
+    const generator = new MessageGenerator();
+
+    const cmd: ServoTest = {
+      controllerAddress: 'AA:BB:CC:DD:EE:01',
+      controllerName: 'dome',
+      moduleSubType: ModuleSubType.maestro,
+      moduleIdx: 3,
+      channelNumber: 5,
+      msValue: 1500,
+    };
+
+    const message = generator.generateMessage(SerialMessageType.SERVO_TEST, 'msg-1', cmd);
+
+    expect(message.controllers).toContain('AA:BB:CC:DD:EE:01');
+    expect(message.msg).toContain(
+      `AA:BB:CC:DD:EE:01${US}dome${US}${ModuleSubType.maestro}:3:5:1500`,
+    );
+  });
+
+  it('generate Format SD', () => {
+    const generator = new MessageGenerator();
+
+    const controllers = [
+      { address: 'AA:BB:CC:DD:EE:01', name: 'dome' },
+      { address: 'AA:BB:CC:DD:EE:02', name: 'body' },
+    ];
+
+    const message = generator.generateMessage(SerialMessageType.FORMAT_SD, 'msg-1', controllers);
+
+    expect(message.msg).toContain(`${RS}FORMAT_SD${RS}msg-1`);
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:01${US}dome${US}FORMAT`);
+    expect(message.msg).toContain(`AA:BB:CC:DD:EE:02${US}body${US}FORMAT`);
+  });
+
+  it('should return empty message for unknown type', () => {
+    const generator = new MessageGenerator();
+
+    const message = generator.generateMessage(999 as SerialMessageType, 'msg-1', null);
+
+    expect(message.msg).toBe('\n');
+    expect(message.controllers).toHaveLength(0);
   });
 
   it('generate Deploy Config', () => {
@@ -61,7 +154,7 @@ describe('Message Generator Tests', () => {
       idx3,
     );
 
-    const configSync = new ConfigSync(locations);
+    const configSync = createConfigSync(locations);
 
     const message = generator.generateMessage(SerialMessageType.DEPLOY_CONFIG, '123', configSync);
 
@@ -101,9 +194,9 @@ function generateControllerLocation(
   address: string,
   maestroIdx: number,
 ): ControllerLocation {
-  const location = new ControllerLocation(uuid(), name, '', '');
+  const location = createControllerLocation(uuid(), name, '', '');
 
-  location.controller = new ControlModule(uuid(), name, address);
+  location.controller = { id: uuid(), name, address };
 
   for (let i = 0; i < 4; i++) {
     location.gpioModule?.channels.push(
@@ -127,7 +220,7 @@ function generateMaestroModule(idx: number, name: string, location: string): Uar
     9600,
   );
 
-  const subModule = new MaestroModule();
+  const subModule: MaestroModule = { boards: [] };
   subModule.boards.push(generateMaestroBoard(module.id));
 
   module.subModule = subModule;
@@ -135,7 +228,14 @@ function generateMaestroModule(idx: number, name: string, location: string): Uar
 }
 
 function generateMaestroBoard(parentId: string): MaestroBoard {
-  const board = new MaestroBoard(uuid(), parentId, 0, 'board', 24);
+  const board: MaestroBoard = {
+    id: uuid(),
+    parentId,
+    boardId: 0,
+    name: 'board',
+    channelCount: 24,
+    channels: [],
+  };
 
   board.channels.push(
     new MaestroChannel(uuid(), board.id, `channel 1`, true, 1, true, 800, 2000, 1400, false),

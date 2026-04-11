@@ -275,7 +275,7 @@ const closeModal = () => {
 <template>
   <dialog class="modal modal-open">
     <div class="modal-box w-100 max-w-md">
-      <h1 class="text-2xl font-bold mb-4">Human Cyborg Relations Event</h1>
+      <h1 class="text-2xl font-bold mb-4">{{ $t('modals.hcr_event.title') }}</h1>
 
       <div class="py-4 flex flex-row">
         <div class="grow"></div>
@@ -287,7 +287,7 @@ const closeModal = () => {
             <label
               for="time"
               class="block w-full mb-0.5 text-lg"
-              >Event Time (seconds)</label
+              >{{ $t('modals.hcr_event.event_time') }}</label
             >
             <input
               id="time"
@@ -312,7 +312,8 @@ const closeModal = () => {
                 </div>
                 <button
                   class="btn btn-ghost btn-xs mx-1"
-                  title="remove"
+                  :title="$t('remove')"
+                  :aria-label="$t('remove')"
                   @click="removeCommand(cmd.id)"
                 >
                   ✕
@@ -328,21 +329,29 @@ const closeModal = () => {
             <label
               for="commandCategory"
               class="block w-full mb-0.5 text-lg font-medium"
-              >Command Category</label
+              >{{ $t('modals.hcr_event.command_category') }}</label
             >
             <select
               id="commandCategory"
               v-model="commandCategory"
-              title="Command Category"
+              :aria-label="$t('modals.hcr_event.command_category')"
               class="select select-bordered w-full text-lg mt-2"
               @change="categoryChange"
             >
-              <option :value="HcrCommandCategory.STIMULI">Stimuli</option>
-              <option :value="HcrCommandCategory.MUSE">Muse</option>
-              <option :value="HcrCommandCategory.SD_WAV">SD Wav</option>
-              <option :value="HcrCommandCategory.STOP">Stop</option>
-              <option :value="HcrCommandCategory.VOLUME">Volume</option>
-              <option :value="HcrCommandCategory.OVERRIDE">Override</option>
+              <option :value="HcrCommandCategory.STIMULI">
+                {{ $t('modals.hcr_event.stimuli') }}
+              </option>
+              <option :value="HcrCommandCategory.MUSE">{{ $t('modals.hcr_event.muse') }}</option>
+              <option :value="HcrCommandCategory.SD_WAV">
+                {{ $t('modals.hcr_event.sd_wav') }}
+              </option>
+              <option :value="HcrCommandCategory.STOP">{{ $t('modals.hcr_event.stop') }}</option>
+              <option :value="HcrCommandCategory.VOLUME">
+                {{ $t('modals.hcr_event.volume') }}
+              </option>
+              <option :value="HcrCommandCategory.OVERRIDE">
+                {{ $t('modals.hcr_event.override') }}
+              </option>
             </select>
           </div>
 
@@ -351,12 +360,12 @@ const closeModal = () => {
             <label
               for="command"
               class="block w-full mb-0.5 text-lg font-medium"
-              >Command</label
+              >{{ $t('modals.hcr_event.command') }}</label
             >
             <select
               id="command"
               v-model="command"
-              title="Command"
+              :aria-label="$t('modals.hcr_event.command')"
               class="select select-bordered w-full text-lg mt-2"
               @change="commandChange"
             >
@@ -375,7 +384,7 @@ const closeModal = () => {
             <label
               for="value-a"
               class="block w-full mb-0.5 text-lg"
-              >Value A</label
+              >{{ $t('modals.hcr_event.value_a') }}</label
             >
             <input
               id="value-a"
@@ -393,7 +402,7 @@ const closeModal = () => {
             <label
               for="value-b"
               class="block w-full mb-0.5 text-lg"
-              >Value B</label
+              >{{ $t('modals.hcr_event.value_b') }}</label
             >
             <input
               id="value-b"
@@ -412,7 +421,7 @@ const closeModal = () => {
               class="btn btn-sm btn-primary h-7 text-lg w-15 px-0"
               @click="addCommand"
             >
-              Add
+              {{ $t('add') }}
             </button>
           </div>
 
@@ -432,7 +441,7 @@ const closeModal = () => {
           data-testid="save-button"
           @click="addEvent"
         >
-          {{ mode !== ModalMode.TEST ? $t('Save') : $t('Test') }}
+          {{ mode !== ModalMode.TEST ? $t('save') : $t('test') }}
         </button>
         <button
           v-if="showRemoveButton"
@@ -440,14 +449,14 @@ const closeModal = () => {
           data-testid="remove-button"
           @click="removeEvent"
         >
-          {{ $t('Remove') }}
+          {{ $t('remove') }}
         </button>
         <button
           class="btn w-24 text-lg"
           data-testid="close-button"
           @click="closeModal"
         >
-          {{ $t('Close') }}
+          {{ $t('close') }}
         </button>
       </div>
     </div>
@@ -456,7 +465,7 @@ const closeModal = () => {
       class="modal-backdrop"
       @click="closeModal"
     >
-      <button>{{ $t('Close') }}</button>
+      <button>{{ $t('close') }}</button>
     </form>
   </dialog>
 </template>

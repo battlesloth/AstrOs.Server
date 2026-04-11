@@ -11,7 +11,7 @@ defineEmits<{
   (e: 'edit', id: string): void;
   (e: 'copy', id: string): void;
   (e: 'play', id: string): void;
-  (e: 'delete', id: string): void;
+  (e: 'delete', id: string, name: string): void;
 }>();
 </script>
 
@@ -36,22 +36,25 @@ defineEmits<{
     <td class="flex flex-row justify-end">
       <button
         class="btn btn-ghost btn-xs"
-        title="Copy"
+        :title="$t('copy')"
+        :aria-label="$t('copy')"
         @click="$emit('copy', props.playlist.id)"
       >
         <v-icon name="io-copy" />
       </button>
       <button
         class="btn btn-ghost btn-xs"
-        title="Play"
+        :title="$t('play')"
+        :aria-label="$t('play')"
         @click="$emit('play', props.playlist.id)"
       >
         <v-icon name="io-play" />
       </button>
       <button
         class="btn btn-ghost btn-xs"
-        title="Delete"
-        @click="$emit('delete', props.playlist.id)"
+        :title="$t('delete')"
+        :aria-label="$t('delete')"
+        @click="$emit('delete', props.playlist.id, props.playlist.playlistName)"
       >
         <v-icon name="io-trash-bin" />
       </button>

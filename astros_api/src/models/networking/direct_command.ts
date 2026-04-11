@@ -1,13 +1,7 @@
-import { DirectCommnandType } from '../enums.js';
+import { DirectCommnandType } from 'src/models/enums.js';
 
-export class DirectCommand {
+export interface DirectCommand {
   type: DirectCommnandType;
   controllerId: number;
   command: unknown;
-
-  constructor(type: DirectCommnandType, controllerId: number, command: unknown) {
-    this.type = type;
-    this.controllerId = controllerId;
-    this.command = command;
-  }
 }
