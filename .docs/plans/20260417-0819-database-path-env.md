@@ -60,10 +60,10 @@ Using vitest (already the project's test runner — see `astros_api/package.json
 
 ## Task checklist
 
-- [ ] Add `resolveDatabaseDir` helper + `fs.mkdirSync` call in `astros_api/src/dal/database.ts`
-- [ ] Add unit tests in `astros_api/src/dal/database.test.ts`
-- [ ] Run lint + prettier + build + test (per CLAUDE.md pre-commit rule)
-- [ ] Commit
+- [x] Add `resolveDatabaseDir` helper + `fs.mkdirSync` call in `astros_api/src/dal/database.ts`
+- [x] Add unit tests in `astros_api/src/dal/database.test.ts`
+- [x] Run lint + prettier + build + test (per CLAUDE.md pre-commit rule)
+- [x] Commit
 
 ## Verification
 
