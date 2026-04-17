@@ -72,6 +72,17 @@ The system manages **Locations** (physical positions on the droid) that contain 
 
 Always run lint and prettier before making a commit to ensure consistent formatting.
 
+## Branching & PRs
+
+All implementation work goes on a feature branch that merges into `develop` via pull request. Never commit directly to `develop` or `main`. `develop` is the integration branch for contributor work; `main` is production.
+
+- Branch naming: `feature/<slug>` (e.g., `feature/database-path-env`).
+- Branch off the latest `origin/develop` at the start of each task.
+- Plan files commit to the feature branch too — the "commit the plan first" rule in the Planning section still applies.
+- Open the PR with `gh pr create --base develop` when the work is ready.
+
+**Exception — doc-only changes:** Edits limited to `CLAUDE.md`, `README.md`, or `.docs/` (with no code or config impact) may be committed directly to `develop`. PR overhead isn't justified for pure meta edits.
+
 ## Planning (MANDATORY)
 
 **NEVER write implementation code without a written, committed plan.** This is a hard rule, with the exceptions below.
