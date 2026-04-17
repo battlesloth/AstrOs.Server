@@ -2,8 +2,10 @@ name: Pull Request CI
 
 on:
   pull_request:
-    branches: [main]
-
+    branches:
+      - 'main'
+      - 'develop'
+      - 'release'
 jobs:
   api:
     name: API – Lint, Build & Test
