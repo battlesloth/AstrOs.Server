@@ -57,3 +57,4 @@ testem.log
 
 *storybook.log
 .cache
+.data
