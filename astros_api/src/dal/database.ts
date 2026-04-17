@@ -9,6 +9,7 @@ import {
   SqliteDialect,
 } from 'kysely';
 import Dotenv from 'dotenv';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { logger } from 'src/logger.js';
@@ -25,8 +26,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 Dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
-const appdataPath = appdata('astrosserver');
-const databaseFile = '/database.sqlite3';
+export function resolveDatabaseDir(envValue: string | undefined): string {
+  if (!envValue || envValue.toLowerCase() === '%appdata%') {
+    return appdata('astrosserver');
+  }
+  return envValue;
+}
+
+const databaseDir = resolveDatabaseDir(process.env.DATABASE_PATH);
+const databaseFile = path.join(databaseDir, 'database.sqlite3');
 
 let dialect = null;
 
@@ -38,9 +46,10 @@ if (process.env.NODE_ENV?.toLocaleLowerCase() === 'test') {
     database: new SQLite(':memory:'),
   });
 } else {
-  console.log(`Using database file at ${appdataPath}${databaseFile}`);
+  fs.mkdirSync(databaseDir, { recursive: true });
+  console.log(`Using database file at ${databaseFile}`);
   dialect = new SqliteDialect({
-    database: new SQLite(`${appdataPath}${databaseFile}`),
+    database: new SQLite(databaseFile),
   });
 }
 
