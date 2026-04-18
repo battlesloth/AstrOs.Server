@@ -18,8 +18,8 @@ This is Phase 1 of the ESP32 smoke-test tool designed during the brainstorm capt
 
 ## Task checklist
 
-- [ ] **1. Workspace + skeleton**
-  Add top-level `package.json` with npm workspaces for `astros_api`, `astros_vue`, `astros_smoke_test`. Scaffold `astros_smoke_test/` with `package.json`, `tsconfig.json` (path alias `@api/*` → `../astros_api/src/*`), `.eslintrc`, `.prettierrc` (matching existing projects), and an empty `src/index.ts`. Verify `cd astros_api && npm run build` and `cd astros_vue && npm run build` still succeed unchanged.
+- [x] **1. Skeleton** *(revised: no workspaces — standalone project)*
+  Scaffold `astros_smoke_test/` as a standalone npm project with its own `package.json`, `tsconfig.json` (path aliases `@api/*` and `src/*` both → `../astros_api/src/*` so transitive imports from pulled-in `astros_api` source files resolve), `.eslintrc.cjs` + `.eslintignore` + `.prettierrc.json` + `vitest.config.ts` all matching `astros_api`'s conventions, and an empty `src/index.ts`. No changes at the repo root, no Docker impact. Verify `cd astros_smoke_test && npm install && npm run build` succeeds and `cd astros_api && npm run build` / `cd astros_vue && npm run build` still succeed.
 
 - [ ] **2. Transport + runner**
   Implement `src/core/transport.ts` (opens serial port, reads lines delimited by `\n`, writes framed messages) and `src/core/runner.ts` (`ScenarioRunner` class — loads scenario, walks phases `setup → arrange → act → verify → teardown`, emits events: `stepStart`, `stepOk`, `stepFail`, `stepTimeout`, `txBytes`, `rxBytes`). Unit-test the phase-ordering and failure-shortcircuit logic with a fake transport.
@@ -52,9 +52,8 @@ Run on a machine with an ESP32 master physically connected.
 
 ## Critical files
 
-**New** (all under `astros_smoke_test/` except the root):
-- `/package.json` (repo root — new, minimal, workspaces only)
-- `astros_smoke_test/package.json`, `tsconfig.json`, `.eslintrc`, `.prettierrc`
+**New** (all under `astros_smoke_test/`):
+- `astros_smoke_test/package.json`, `tsconfig.json`, `.eslintrc.cjs`, `.eslintignore`, `.prettierrc.json`, `vitest.config.ts`
 - `astros_smoke_test/src/index.ts` (barrel)
 - `astros_smoke_test/src/core/transport.ts`, `runner.ts`
 - `astros_smoke_test/src/core/operations/{formatSd,registrationSync,deployConfig,deployScript,runScript,directCommand,servoTest,panicStop}.ts`
