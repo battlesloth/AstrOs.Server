@@ -4,3 +4,4 @@ export * from './core/transport.js';
 export * from './core/runner.js';
 export * from './core/operations/index.js';
 export * from './core/fixtures/index.js';
+export * from './core/scenarios/index.js';
