@@ -24,7 +24,7 @@ This is Phase 1 of the ESP32 smoke-test tool designed during the brainstorm capt
 - [x] **2. Transport + runner**
   Implement `src/core/transport.ts` (opens serial port, reads lines delimited by `\n`, writes framed messages) and `src/core/runner.ts` (`ScenarioRunner` class — loads scenario, walks phases `setup → arrange → act → verify → teardown`, emits events: `stepStart`, `stepOk`, `stepFail`, `stepTimeout`, `txBytes`, `rxBytes`). Unit-test the phase-ordering and failure-shortcircuit logic with a fake transport.
 
-- [ ] **3. Atomic operations**
+- [x] **3. Atomic operations**
   Implement one operation per serial message type in `src/core/operations/`: `formatSd.ts`, `registrationSync.ts`, `deployConfig.ts`, `deployScript.ts`, `runScript.ts`, `directCommand.ts`, `servoTest.ts`, `panicStop.ts`. Each wraps `MessageGenerator` from `@api/serial/message_generator`, sends over the transport, awaits ACK via `MessageHandler` parsing (with the 5s timeout from `MessageHelper.MessageTimeouts`), returns `{ ok, messageId, ackType, durationMs, rawResponse }`.
 
 - [ ] **4. Fixtures + factory helpers**
