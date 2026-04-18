@@ -27,8 +27,9 @@ This is Phase 1 of the ESP32 smoke-test tool designed during the brainstorm capt
 - [x] **3. Atomic operations**
   Implement one operation per serial message type in `src/core/operations/`: `formatSd.ts`, `registrationSync.ts`, `deployConfig.ts`, `deployScript.ts`, `runScript.ts`, `directCommand.ts`, `servoTest.ts`, `panicStop.ts`. Each wraps `MessageGenerator` from `@api/serial/message_generator`, sends over the transport, awaits ACK via `MessageHandler` parsing (with the 5s timeout from `MessageHelper.MessageTimeouts`), returns `{ ok, messageId, ackType, durationMs, rawResponse }`.
 
-- [ ] **4. Fixtures + factory helpers**
+- [x] **4. Fixtures + factory helpers**
   `src/core/fixtures/demo-location.ts` — one `ConfigSync` matching Jeff's bench wiring (master + any padawans, GPIO / Maestro modules). `src/core/fixtures/scripts/wave-hello.ts`, `multi-channel.ts`, `long-runner.ts`. `src/core/fixtures/helpers.ts` with `makeServoPulse(ch, from, to, ms)` and `makeGpioToggle(ch, durMs)`. `src/core/fixtures/index.ts` registry mapping string ID → object.
+  *Note: padawan MAC is discovered once at CLI startup (not per-scenario) — `buildBenchConfigSync({ padawanAddress })` accepts the resolved address so the session can pass it in once.*
 
 - [ ] **5. MVP scenarios**
   All seven scenarios in `src/core/scenarios/`: `sync-only`, `format-and-sync`, `config-only`, `full-happy-path`, `direct-command-sweep`, `servo-test-sweep`, `panic-drill`. Each marks its `requiresConfirmation` flag where destructive. `src/core/scenarios/index.ts` auto-discovers exports.
