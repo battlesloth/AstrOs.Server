@@ -9,6 +9,7 @@
     "build": "eslint . --ext .js,.jsx,.ts,.tsx && tsc --noEmit",
     "test": "vitest",
     "smoke": "tsx ./src/cli/index.ts",
+    "smoke:list": "tsx ./src/cli/index.ts list",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "prettier:check": "prettier --check \"src/**/*.ts\"",
     "prettier:write": "prettier --write \"src/**/*.ts\""

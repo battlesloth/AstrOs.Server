@@ -34,8 +34,9 @@ This is Phase 1 of the ESP32 smoke-test tool designed during the brainstorm capt
 - [x] **5. MVP scenarios**
   All seven scenarios in `src/core/scenarios/`: `sync-only`, `format-and-sync`, `config-only`, `full-happy-path`, `direct-command-sweep`, `servo-test-sweep`, `panic-drill`. Each marks its `requiresConfirmation` flag where destructive. `src/core/scenarios/index.ts` auto-discovers exports.
 
-- [ ] **6. CLI wrapper**
+- [x] **6. CLI wrapper**
   `src/cli/index.ts` parsing argv (no heavy framework — hand-rolled is enough for five flags). Commands: `list`, `<scenario>`. Flags: `--confirm`, `--port`, `--baud`, `--json`. Plain output streams runner events to stdout one line per step with `[phase] opName  ok/fail/timeout  msg=<id>  <durationMs>ms`; `--json` emits one JSON object per event. Non-zero exit on any step failure. Wire `npm run smoke` and `npm run smoke:list` scripts in `astros_smoke_test/package.json`.
+  *Discovery happens once at CLI startup via `src/cli/discovery.ts` (registrationSync + handleRegistraionSyncAck) and the resolved padawan MAC feeds into the shared `SessionContext`. SIGINT best-effort panics the hardware before exit.*
 
 ## Verification (end-to-end)
 
