@@ -52,7 +52,11 @@ export class SerialTransport extends EventEmitter implements Transport {
         port.on('close', () => this.emit('close'));
 
         port.pipe(new DelimiterParser({ delimiter: '\n' })).on('data', (chunk: Buffer) => {
-          this.emit('line', chunk.toString('utf8'));
+          const line = chunk.toString('utf8');
+          // Drop empty / NUL-only lines (UART startup artifacts before the real
+          // first message arrives — otherwise MessageHandler logs them as errors).
+          if (line.replace(/\0/g, '').trim().length === 0) return;
+          this.emit('line', line);
         });
 
         this.port = port;
