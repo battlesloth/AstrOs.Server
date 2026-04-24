@@ -31,9 +31,11 @@ export const BENCH = {
   hcrUartChannel: 2,
   hcrBaud: 9600,
 
-  // Padawan: GPIO 1 → relay → LED. Four GPIO slots reported to firmware.
-  padawanGpioRelayChannel: 1,
-  padawanGpioSlots: 4,
+  // Padawan: GPIO 0 → relay → LED. Firmware receives all 10 channels (0-9),
+  // matching the DB seed in astros_api migration_0.ts. Unused channels are
+  // marked disabled; the wire format still carries a bit for each.
+  padawanGpioRelayChannel: 0,
+  gpioSlotsPerController: 10,
 
   // Padawan generic serial on ch 1 (placeholder for future hardware).
   padawanGenericSerialUartChannel: 1,
@@ -117,17 +119,29 @@ function buildMasterMaestro(servoConfig: ServoConfig[]): UartModule {
   return module;
 }
 
-function buildPadawanGpio(): GpioChannel[] {
+interface GpioEnabledChannel {
+  ch: number;
+  name: string;
+}
+
+// Matches the production DB seed (astros_api migration_0.ts:230-241):
+// 10 GPIO channels per controller, 0-indexed (0..9), all disabled by default
+// and then enabled individually via the UI. Scripts address channels by their
+// 0-indexed channel_number.
+function buildGpioChannels(
+  ownerId: string,
+  enabledChannel?: GpioEnabledChannel,
+): GpioChannel[] {
   const channels: GpioChannel[] = [];
-  for (let i = 1; i <= BENCH.padawanGpioSlots; i++) {
-    const enabled = i === BENCH.padawanGpioRelayChannel;
+  for (let i = 0; i < BENCH.gpioSlotsPerController; i++) {
+    const enabled = enabledChannel?.ch === i;
     channels.push(
       new GpioChannel(
-        `bench-padawan-gpio-${i}`,
-        'bench-padawan',
+        `${ownerId}-gpio-${i}`,
+        ownerId,
         i,
         enabled,
-        enabled ? 'relay-led' : `gpio-${i}`,
+        enabled ? enabledChannel.name : `gpio-${i}`,
         false,
       ),
     );
@@ -145,7 +159,7 @@ export function buildBenchConfigSync(overrides: BenchConfigOverrides = {}): Conf
     location: BENCH.locationId,
     name: BENCH.masterName,
     address: BENCH.masterAddress,
-    gpioChannels: [],
+    gpioChannels: buildGpioChannels('bench-master'),
     maestroModules: [buildMasterMaestro(servoConfigs)],
   };
 
@@ -154,7 +168,10 @@ export function buildBenchConfigSync(overrides: BenchConfigOverrides = {}): Conf
     location: BENCH.locationId,
     name: padawanName,
     address: padawanAddress,
-    gpioChannels: buildPadawanGpio(),
+    gpioChannels: buildGpioChannels('bench-padawan', {
+      ch: BENCH.padawanGpioRelayChannel,
+      name: 'relay-led',
+    }),
     maestroModules: [],
   };
 

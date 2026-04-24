@@ -40,15 +40,24 @@ describe('buildBenchConfigSync', () => {
 
     const [master, padawan] = sync.configs;
     expect(master.address).toBe(BENCH.masterAddress);
-    expect(master.gpioChannels).toHaveLength(0);
+    // Production seeds 10 channels per controller in astros_api migration_0;
+    // the fixture models the same shape so DEPLOY_CONFIG wire format matches.
+    expect(master.gpioChannels).toHaveLength(BENCH.gpioSlotsPerController);
+    expect(master.gpioChannels.every((ch) => !ch.enabled)).toBe(true);
+    expect(master.gpioChannels.map((ch) => ch.channelNumber)).toEqual(
+      Array.from({ length: BENCH.gpioSlotsPerController }, (_, i) => i),
+    );
     expect(master.maestroModules).toHaveLength(1);
     expect(master.maestroModules[0].uartChannel).toBe(BENCH.maestroUartChannel);
 
     expect(padawan.address).toBe('');
     expect(padawan.maestroModules).toHaveLength(0);
-    expect(padawan.gpioChannels).toHaveLength(BENCH.padawanGpioSlots);
-    const relay = padawan.gpioChannels.find((ch) => ch.channelNumber === BENCH.padawanGpioRelayChannel);
+    expect(padawan.gpioChannels).toHaveLength(BENCH.gpioSlotsPerController);
+    const relay = padawan.gpioChannels.find(
+      (ch) => ch.channelNumber === BENCH.padawanGpioRelayChannel,
+    );
     expect(relay?.enabled).toBe(true);
+    expect(padawan.gpioChannels.filter((ch) => ch.enabled)).toHaveLength(1);
   });
 
   it('accepts overrides for padawan address and per-channel servo configs', () => {
