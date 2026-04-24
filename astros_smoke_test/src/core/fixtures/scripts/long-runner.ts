@@ -10,11 +10,12 @@ import {
   makeServoPulse,
 } from '../helpers.js';
 
-// ~6s script: servo sweeps four times while padawan LED pulses twice.
-// Used by panic-drill so the panic arrives mid-run.
+// ~6.2s script: seed home, then servo sweeps four times while padawan LED
+// pulses twice. Used by panic-drill so the panic arrives mid-run.
 export function longRunner(sync: ConfigSync, scriptId: string = uuidv4()): ScriptUpload {
   const servo = getServoConfig(1);
   const master = joinEvents([
+    makeServoPulse({ channel: servo.ch, position: servo.homePos, timeTillMs: 200 }),
     makeServoPulse({ channel: servo.ch, position: servo.maxPos, timeTillMs: 750 }),
     makeServoPulse({ channel: servo.ch, position: servo.minPos, timeTillMs: 750 }),
     makeServoPulse({ channel: servo.ch, position: servo.maxPos, timeTillMs: 750 }),
@@ -25,6 +26,7 @@ export function longRunner(sync: ConfigSync, scriptId: string = uuidv4()): Scrip
     makeServoPulse({ channel: servo.ch, position: servo.homePos, timeTillMs: 0 }),
   ]);
   const padawan = joinEvents([
+    makeBuffer(200),
     makeGpioToggle({ channel: BENCH.padawanGpioRelayChannel, durMs: 1000 }),
     makeBuffer(1000),
     makeGpioToggle({ channel: BENCH.padawanGpioRelayChannel, durMs: 1000 }),

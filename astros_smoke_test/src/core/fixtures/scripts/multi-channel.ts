@@ -10,16 +10,19 @@ import {
   makeServoPulse,
 } from '../helpers.js';
 
-// Master servo sweeps while padawan pulses the relay LED, concurrent, ~2s total.
+// Master servo sweeps home → max → home while padawan pulses the relay LED,
+// concurrent, ~2.2s total. Seed at home for deterministic starting state.
 export function multiChannel(sync: ConfigSync, scriptId: string = uuidv4()): ScriptUpload {
   const servo = getServoConfig(1);
   const master = joinEvents([
+    makeServoPulse({ channel: servo.ch, position: servo.homePos, timeTillMs: 200 }),
     makeServoPulse({ channel: servo.ch, position: servo.maxPos, timeTillMs: 1000 }),
     makeServoPulse({ channel: servo.ch, position: servo.homePos, timeTillMs: 0 }),
     makeBuffer(1000),
     makeBuffer(0),
   ]);
   const padawan = joinEvents([
+    makeBuffer(200),
     makeGpioToggle({ channel: BENCH.padawanGpioRelayChannel, durMs: 500 }),
     makeBuffer(1500),
     makeBuffer(0),

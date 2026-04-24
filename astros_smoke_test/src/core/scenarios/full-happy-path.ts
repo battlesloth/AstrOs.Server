@@ -23,7 +23,7 @@ export const fullHappyPath: ScenarioFactory = (session: SessionContext): Scenari
     requiresConfirmation: true,
     setup: [formatSd(benchControllers(session.configSync))],
     arrange: [registrationSync(), deployConfig(session.configSync), deployScript(upload)],
-    act: [runScript(run), waitStep(1800, 'let-servo-move')],
+    act: [runScript(run), waitStep(2000, 'let-servo-move')],
     teardown: [panicStop(run)],
   };
 };
