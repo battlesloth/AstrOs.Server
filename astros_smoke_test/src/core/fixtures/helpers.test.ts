@@ -51,11 +51,10 @@ describe('buildBenchConfigSync', () => {
     expect(relay?.enabled).toBe(true);
   });
 
-  it('accepts overrides for padawan address and servo pulse bounds', () => {
+  it('accepts overrides for padawan address and per-channel servo configs', () => {
     const sync = buildBenchConfigSync({
       padawanAddress: 'aa:bb:cc:dd:ee:ff',
-      servoMinPos: 700,
-      servoMaxPos: 2300,
+      servoConfigs: [{ ch: 1, minPos: 700, maxPos: 2300, homePos: 1500 }],
     });
     expect(sync.configs[1].address).toBe('aa:bb:cc:dd:ee:ff');
 
@@ -64,6 +63,7 @@ describe('buildBenchConfigSync', () => {
     };
     expect(servoCh.boards[0].channels[0].minPos).toBe(700);
     expect(servoCh.boards[0].channels[0].maxPos).toBe(2300);
+    expect(servoCh.boards[0].channels).toHaveLength(1);
   });
 });
 

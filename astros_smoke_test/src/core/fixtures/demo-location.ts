@@ -17,8 +17,14 @@ export const BENCH = {
   // Master: one Pololu Maestro on UART 2, servos on channels 1–6.
   maestroIdx: 0,
   maestroUartChannel: 2,
-  maestroBaud: 9600,
-  maestroServoChannels: [1, 2, 3, 4, 5, 6] as const,
+  maestroBaud: 115200,
+
+  maestroServoChannels: [
+    { ch: 1, minPos: 500, maxPos: 2500, homePos: 1588 },
+    { ch: 2, minPos: 1105, maxPos: 2300, homePos: 2150 },
+    { ch: 3, minPos: 1100, maxPos: 2370, homePos: 2167 },
+    { ch: 4, minPos: 500, maxPos: 2500, homePos: 1471 },
+  ] as ServoConfig[],
 
   // HCR on master UART 2 — not part of DEPLOY_CONFIG (firmware config covers
   // GPIO + Maestro only). Recorded here so future scenarios can address it.
@@ -32,30 +38,44 @@ export const BENCH = {
   // Padawan generic serial on ch 1 (placeholder for future hardware).
   padawanGenericSerialUartChannel: 1,
   padawanGenericSerialBaud: 9600,
-
-  // Servo pulse bounds in microseconds. Override once real servos are mounted.
-  servoMinPos: 500,
-  servoMaxPos: 2500,
-  servoHomePos: 1500,
 } as const;
+
+export interface ServoConfig {
+  ch: number;
+  minPos: number;
+  maxPos: number;
+  homePos: number;
+}
+
+export function getServoConfig(ch: number, overrides?: ServoConfig[]): ServoConfig {
+  const source = overrides ?? BENCH.maestroServoChannels;
+  const cfg = source.find((c) => c.ch === ch);
+  if (!cfg) {
+    throw new Error(
+      `No servo config for channel ${ch}. Configured channels: ${source.map((c) => c.ch).join(', ')}`,
+    );
+  }
+  return cfg;
+}
 
 export interface BenchConfigOverrides {
   padawanAddress?: string;
   padawanName?: string;
-  servoMinPos?: number;
-  servoMaxPos?: number;
-  servoHomePos?: number;
+  servoConfigs?: ServoConfig[];
 }
 
 export function buildMasterControlModule(): ControlModule {
   return { id: 'bench-master', name: BENCH.masterName, address: BENCH.masterAddress };
 }
 
-export function buildPadawanControlModule(address: string, name = BENCH.padawanName): ControlModule {
+export function buildPadawanControlModule(
+  address: string,
+  name = BENCH.padawanName,
+): ControlModule {
   return { id: 'bench-padawan', name, address };
 }
 
-function buildMasterMaestro(minPos: number, maxPos: number, homePos: number): UartModule {
+function buildMasterMaestro(servoConfig: ServoConfig[]): UartModule {
   const module = new UartModule(
     BENCH.maestroIdx,
     'bench-master-maestro',
@@ -74,18 +94,18 @@ function buildMasterMaestro(minPos: number, maxPos: number, homePos: number): Ua
         boardId: 0,
         name: 'board-0',
         channelCount: 24,
-        channels: BENCH.maestroServoChannels.map(
+        channels: servoConfig.map(
           (ch) =>
             new MaestroChannel(
-              `bench-master-maestro-ch-${ch}`,
+              `bench-master-maestro-ch-${ch.ch}`,
               module.id,
-              `servo ${ch}`,
+              `servo ${ch.ch}`,
               true,
-              ch,
+              ch.ch,
               true,
-              minPos,
-              maxPos,
-              homePos,
+              ch.minPos,
+              ch.maxPos,
+              ch.homePos,
               false,
             ),
         ),
@@ -118,9 +138,7 @@ function buildPadawanGpio(): GpioChannel[] {
 export function buildBenchConfigSync(overrides: BenchConfigOverrides = {}): ConfigSync {
   const padawanAddress = overrides.padawanAddress ?? '';
   const padawanName = overrides.padawanName ?? BENCH.padawanName;
-  const minPos = overrides.servoMinPos ?? BENCH.servoMinPos;
-  const maxPos = overrides.servoMaxPos ?? BENCH.servoMaxPos;
-  const homePos = overrides.servoHomePos ?? BENCH.servoHomePos;
+  const servoConfigs = overrides.servoConfigs ?? BENCH.maestroServoChannels;
 
   const master: ControllerConfig = {
     id: 'bench-master',
@@ -128,7 +146,7 @@ export function buildBenchConfigSync(overrides: BenchConfigOverrides = {}): Conf
     name: BENCH.masterName,
     address: BENCH.masterAddress,
     gpioChannels: [],
-    maestroModules: [buildMasterMaestro(minPos, maxPos, homePos)],
+    maestroModules: [buildMasterMaestro(servoConfigs)],
   };
 
   const padawan: ControllerConfig = {

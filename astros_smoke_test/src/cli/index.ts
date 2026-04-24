@@ -13,7 +13,7 @@ import { discover } from './discovery.js';
 import { formatJsonLine, formatPlainLine } from './output.js';
 
 const DEFAULT_PORT = process.env.SMOKE_SERIAL_PORT ?? '/dev/ttyUSB0';
-const DEFAULT_BAUD = Number.parseInt(process.env.SMOKE_SERIAL_BAUD ?? '9600', 10);
+const DEFAULT_BAUD = Number.parseInt(process.env.SMOKE_SERIAL_BAUD ?? '115200', 10);
 
 async function listCommand(json: boolean): Promise<number> {
   // Fake transport suffices — listCommand only reads scenario metadata.
@@ -83,7 +83,9 @@ async function scenarioCommand(opts: {
   try {
     await transport.open();
   } catch (err) {
-    process.stderr.write(`Failed to open ${opts.port} @ ${opts.baud}: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(
+      `Failed to open ${opts.port} @ ${opts.baud}: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
     return 1;
   }
 
@@ -162,7 +164,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   main(process.argv.slice(2))
     .then((code) => process.exit(code))
     .catch((err) => {
-      process.stderr.write(`fatal: ${err instanceof Error ? err.stack ?? err.message : String(err)}\n`);
+      process.stderr.write(
+        `fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+      );
       process.exit(1);
     });
 }
