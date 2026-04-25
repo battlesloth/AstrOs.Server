@@ -536,7 +536,7 @@ This adds a permanent QA reference for the cockpit's severity-rendering and moda
 Update this checklist in this file as tasks complete; commit the update each time.
 
 - [x] Task 1 — Atomic severity tag migration *(commit `8a3b9d3`; 11 files including a plan-omitted call site — see addendum)*
-- [ ] Task 2 — Add cockpit manual QA documentation
+- [x] Task 2 — Add cockpit manual QA documentation *(commits: comment crumb in api.ts + new .docs/qa/cockpit.md)*
 
 ### Addendum to Task 1 (post-implementation)
 
