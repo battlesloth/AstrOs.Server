@@ -61,6 +61,7 @@ export async function panic(): Promise<void> {
 
 // Mirrors ScenarioSeverity in core/runner.ts; kept in sync by hand
 // because the cockpit UI is built by Vite, not the same tsc pass.
+// If you change the union here, update core/runner.ts to match (and vice versa).
 export type ScenarioSeverity = 'safe' | 'caution' | 'destructive';
 
 export interface ScenarioInfo {

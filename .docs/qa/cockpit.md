@@ -14,12 +14,13 @@ Tests for the smoke-test cockpit's UI behavior. Run before merging cockpit chang
 1. **Badge colors and presence**
    - `format-and-sync`, `full-happy-path` → red `destructive` badge, name in orange
    - `panic-drill`, `servo-test-sweep` → yellow `caution` badge, name in amber
-   - `config-only`, `sync-only`, `direct-command-sweep` → no badge, name in default blue
+   - `config-only`, `sync-only`, `direct-command-sweep` → no badge, name in the same color as other unbadged controls
 
 2. **Caution name color sanity check**
-   - The destructive rule uses an orange name (`#f0883e`) with a red badge (`#f85149`) — name and badge are intentionally different shades for contrast.
-   - The caution rule uses the same amber (`#d29922`) for both name and badge.
-   - Visual check: does the caution row read clearly? If the matching name+badge looks washed out or the destructive asymmetry feels like the right pattern to follow, file a follow-up to give caution its own slightly different name shade.
+   - The destructive rule intentionally uses different shades for name and badge (warmer name vs. red badge) for contrast.
+   - The caution rule uses the same amber for both name and badge.
+   - **Pass:** the caution row's name reads clearly against the dark background and the matching name+badge does not look washed out.
+   - **If fail:** file a follow-up to give caution its own slightly different name shade, matching the destructive asymmetry. Current values live in `astros_smoke_test/src/web/ui/components/ScenarioList.vue` (search for `.badge-caution` and `.scenario.caution`).
 
 3. **Click behavior — safe scenarios**
    - Click `config-only`. The scenario fires immediately. No modal appears.
