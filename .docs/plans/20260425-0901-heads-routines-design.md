@@ -1,6 +1,8 @@
 # Design: smoke-test "robot heads" demo routines
 
 > **Note:** This is the design doc, not the implementation plan. The implementation plan will be written separately via `superpowers:writing-plans` and saved alongside this file.
+>
+> **Phase B of two.** Phase A is `.docs/plans/20260425-1240-scenario-severity-tag-design.md` — the scenario severity tag refactor that introduces the `'safe' | 'caution' | 'destructive'` enum used here. Phase A ships first so this work uses the new tag from day one.
 
 ## Context
 
@@ -213,7 +215,7 @@ export const headsCuriousDuet: ScenarioFactory = (session: SessionContext): Scen
   return {
     id: 'heads-curious-duet',
     description: '...',
-    requiresConfirmation: false,
+    severity: 'caution',
     arrange: [
       registrationSync(),
       deployConfig(session.configSync),
@@ -227,7 +229,7 @@ export const headsCuriousDuet: ScenarioFactory = (session: SessionContext): Scen
 };
 ```
 
-The 200ms padding absorbs scheduler/wall-clock skew between the smoke-test side and firmware playback.
+The 200ms padding absorbs scheduler/wall-clock skew between the smoke-test side and firmware playback. `severity: 'caution'` (per Phase A) shows a yellow badge in the cockpit and runs with a single click — no modal — but signals that the rig will move.
 
 ### Reel mechanics
 
@@ -242,7 +244,7 @@ export const headsDemoReel: ScenarioFactory = (session: SessionContext): Scenari
   return {
     id: 'heads-demo-reel',
     description: 'Plays all four head routines back-to-back, sequenced like a Sequential Playlist.',
-    requiresConfirmation: false,
+    severity: 'caution',
     arrange: [
       registrationSync(),
       deployConfig(session.configSync),
@@ -261,7 +263,7 @@ export const headsDemoReel: ScenarioFactory = (session: SessionContext): Scenari
 };
 ```
 
-`requiresConfirmation` is `false` for all five scenarios — they're additive servo demos, none destructive.
+All five scenarios are tagged `severity: 'caution'` (per Phase A) — they move servos but don't destroy data. Yellow badge in the cockpit list, single-click run, no confirmation modal.
 
 ### Registry wiring
 
@@ -289,7 +291,7 @@ export const headsDemoReel: ScenarioFactory = (session: SessionContext): Scenari
 - `listScenarioIds()` includes all five new scenarios
 - Each of `heads-curious-duet`, `heads-disagreement`, `heads-hide-and-seek`, `heads-sync-swim` has 3 arrange steps + 2 act steps with names `runScript` and `let-script-play` (or scenario-specific wait names)
 - `heads-demo-reel` has 6 arrange steps (sync + config + 4 deployScript) + 8 act steps (4 runScript + 4 waitStep)
-- `requiresConfirmation` is `false` for all five
+- `severity` is `'caution'` for all five
 - The four single-routine scripts use distinct `scriptId` values from the reel's deploys (no collision)
 
 ### Manual QA
