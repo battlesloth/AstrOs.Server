@@ -10,10 +10,7 @@ export function formatPlainLine(ev: RunnerEvent): string | null {
       const step = ev.step.padEnd(22);
       const msg = ev.result.messageId ? `msg=${ev.result.messageId.slice(0, 8)}` : 'msg=-';
       const dur = `${ev.result.durationMs}ms`;
-      const detail =
-        ev.kind === 'stepOk'
-          ? ''
-          : `  ${ev.result.detail ?? ''}`.trimEnd();
+      const detail = ev.kind === 'stepOk' ? '' : `  ${ev.result.detail ?? ''}`.trimEnd();
       return `${phase} ${step} ${status.padEnd(8)} ${msg.padEnd(14)} ${dur}${detail}`;
     }
     case 'scenarioDone':

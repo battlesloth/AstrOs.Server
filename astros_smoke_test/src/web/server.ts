@@ -105,8 +105,17 @@ async function main(): Promise<void> {
     // Build a fake session purely so factories can produce metadata for the list.
     // The transport is never touched — these scenarios are only inspected, not run.
     const fakeSession: SessionContext = {
-      transport: { open: async () => undefined, close: async () => undefined,
-        write: async () => undefined, on() { return this; }, off() { return this; } } as never,
+      transport: {
+        open: async () => undefined,
+        close: async () => undefined,
+        write: async () => undefined,
+        on() {
+          return this;
+        },
+        off() {
+          return this;
+        },
+      } as never,
       configSync: buildBenchConfigSync(),
       master: buildMasterControlModule(),
       padawan: buildPadawanControlModule(''),
