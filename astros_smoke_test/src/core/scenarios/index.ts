@@ -10,6 +10,7 @@ import { headsCuriousDuet } from './heads-curious-duet.js';
 import { headsDisagreement } from './heads-disagreement.js';
 import { headsHideAndSeek } from './heads-hide-and-seek.js';
 import { headsSyncSwim } from './heads-sync-swim.js';
+import { headsDemoReel } from './heads-demo-reel.js';
 
 export * from './_shared.js';
 export {
@@ -24,6 +25,7 @@ export {
   headsDisagreement,
   headsHideAndSeek,
   headsSyncSwim,
+  headsDemoReel,
 };
 
 export const scenarios: Record<string, ScenarioFactory> = {
@@ -38,6 +40,7 @@ export const scenarios: Record<string, ScenarioFactory> = {
   'heads-disagreement': headsDisagreement,
   'heads-hide-and-seek': headsHideAndSeek,
   'heads-sync-swim': headsSyncSwim,
+  'heads-demo-reel': headsDemoReel,
 };
 
 export function listScenarioIds(): string[] {
