@@ -535,8 +535,18 @@ This adds a permanent QA reference for the cockpit's severity-rendering and moda
 
 Update this checklist in this file as tasks complete; commit the update each time.
 
-- [ ] Task 1 — Atomic severity tag migration
+- [x] Task 1 — Atomic severity tag migration *(commit `8a3b9d3`; 11 files including a plan-omitted call site — see addendum)*
 - [ ] Task 2 — Add cockpit manual QA documentation
+
+### Addendum to Task 1 (post-implementation)
+
+During execution the implementer found a third call site of `requiresConfirmation` that this plan did not enumerate: `astros_smoke_test/src/cli/index.ts` had three references (the `listCommand` JSON shape, the `[destructive]` tag in plain output, and the `scenarioCommand` confirmation gate). The implementer migrated these in the same commit, parallel to `web/server.ts`:
+
+- `listCommand` now exposes `severity: sc.severity ?? 'safe'` instead of the boolean
+- The plain-output tag became `it.severity !== 'safe' ? \` [${it.severity}]\` : ''` (so `caution` scenarios now show a `[caution]` tag in `npm run smoke list`, matching the cockpit list UX)
+- `scenarioCommand` gates only when `scenario.severity === 'destructive' && !opts.confirm`
+
+This is the correct extension — leaving the CLI on the boolean would have left it inconsistent with the cockpit and the type. Filed as a plan gap, not a deviation. Total files touched: 11 instead of 10.
 
 ---
 
