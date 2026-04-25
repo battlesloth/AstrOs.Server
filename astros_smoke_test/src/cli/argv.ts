@@ -53,7 +53,8 @@ export function parseArgv(argv: readonly string[]): ParsedArgs {
       case '--baud': {
         const v = argv[++i];
         const n = v ? Number.parseInt(v, 10) : NaN;
-        if (!Number.isFinite(n) || n <= 0) errors.push(`--baud requires a positive integer, got: ${v ?? '(missing)'}`);
+        if (!Number.isFinite(n) || n <= 0)
+          errors.push(`--baud requires a positive integer, got: ${v ?? '(missing)'}`);
         else result.baud = n;
         break;
       }

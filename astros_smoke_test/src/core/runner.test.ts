@@ -153,8 +153,9 @@ describe('ScenarioRunner', () => {
 
     expect(result.ok).toBe(false);
     expect(trace).toEqual(['act1', 't-bad', 't-good']);
-    expect(events.filter((e) => e.kind === 'stepFail').map((e) => e.kind === 'stepFail' && e.step))
-      .toEqual(['t-bad']);
+    expect(
+      events.filter((e) => e.kind === 'stepFail').map((e) => e.kind === 'stepFail' && e.step),
+    ).toEqual(['t-bad']);
   });
 
   it('forwards transport tx and rx as txBytes / rxBytes events', async () => {

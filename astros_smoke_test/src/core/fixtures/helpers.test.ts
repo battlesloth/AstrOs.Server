@@ -79,7 +79,10 @@ describe('buildBenchConfigSync', () => {
 describe('buildScriptConfigs', () => {
   it('routes the master script to the master address and padawan script to the padawan', () => {
     const sync = buildBenchConfigSync({ padawanAddress: 'aa:bb' });
-    const configs = buildScriptConfigs(sync, { master: 'MASTER_SCRIPT', padawan: 'PADAWAN_SCRIPT' });
+    const configs = buildScriptConfigs(sync, {
+      master: 'MASTER_SCRIPT',
+      padawan: 'PADAWAN_SCRIPT',
+    });
 
     expect(configs).toHaveLength(2);
     const byAddr = Object.fromEntries(configs.map((c) => [c.address, c.script]));

@@ -5,12 +5,7 @@ import {
   buildMasterControlModule,
   buildPadawanControlModule,
 } from '../fixtures/demo-location.js';
-import {
-  getScenarioFactory,
-  listScenarioIds,
-  scenarios,
-  type SessionContext,
-} from './index.js';
+import { getScenarioFactory, listScenarioIds, scenarios, type SessionContext } from './index.js';
 
 function makeSession(): SessionContext {
   const transport = new FakeTransport();

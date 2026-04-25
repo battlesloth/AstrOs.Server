@@ -34,7 +34,15 @@ describe('parseArgv', () => {
 
   it('accepts --confirm, --port, --baud, --json together', () => {
     expect(
-      parseArgv(['full-happy-path', '--confirm', '--port', '/dev/ttyUSB0', '--baud', '115200', '--json']),
+      parseArgv([
+        'full-happy-path',
+        '--confirm',
+        '--port',
+        '/dev/ttyUSB0',
+        '--baud',
+        '115200',
+        '--json',
+      ]),
     ).toMatchObject({
       command: 'scenario',
       scenarioId: 'full-happy-path',

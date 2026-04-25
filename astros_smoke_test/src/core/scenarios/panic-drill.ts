@@ -16,7 +16,8 @@ export const panicDrill: ScenarioFactory = (session: SessionContext): Scenario =
 
   return {
     id: 'panic-drill',
-    description: 'Deploy long-runner, start it, panic-stop mid-run — servo should halt immediately.',
+    description:
+      'Deploy long-runner, start it, panic-stop mid-run — servo should halt immediately.',
     requiresConfirmation: true,
     arrange: [registrationSync(), deployConfig(session.configSync), deployScript(upload)],
     act: [runScript(run), waitStep(1500, 'let-it-run'), panicStop(run)],

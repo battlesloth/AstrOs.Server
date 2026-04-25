@@ -128,10 +128,7 @@ interface GpioEnabledChannel {
 // 10 GPIO channels per controller, 0-indexed (0..9), all disabled by default
 // and then enabled individually via the UI. Scripts address channels by their
 // 0-indexed channel_number.
-function buildGpioChannels(
-  ownerId: string,
-  enabledChannel?: GpioEnabledChannel,
-): GpioChannel[] {
+function buildGpioChannels(ownerId: string, enabledChannel?: GpioEnabledChannel): GpioChannel[] {
   const channels: GpioChannel[] = [];
   for (let i = 0; i < BENCH.gpioSlotsPerController; i++) {
     const enabled = enabledChannel?.ch === i;
