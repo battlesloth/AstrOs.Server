@@ -84,9 +84,20 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: astros_smoke_test/package-lock.json
+          cache-dependency-path: |
+            astros_api/package-lock.json
+            astros_smoke_test/package-lock.json
 
-      - name: Install dependencies
+      # The smoke-test typechecks against astros_api source via the @api/* path
+      # alias. Files like logger.ts import pino + appdata-path, which tsc must
+      # resolve from astros_api's node_modules (it walks up from each file's
+      # location, not the project root). Without this install step the CI
+      # typecheck fails with TS2307 on api dep imports.
+      - name: Install API dependencies
+        working-directory: astros_api
+        run: npm ci
+
+      - name: Install smoke-test dependencies
         working-directory: astros_smoke_test
         run: npm ci
 
