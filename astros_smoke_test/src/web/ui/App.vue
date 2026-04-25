@@ -1,46 +1,76 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed } from 'vue';
+import TopBar from './components/TopBar.vue';
+import { useEventStream } from './composables/useEventStream';
 
-interface CockpitState {
-  connected: boolean;
-  port: string | null;
-  baud: number | null;
-  activeRunId: string | null;
+const { events, sseConnected } = useEventStream();
+
+// Show most recent first; cap at 200 to keep DOM small until Task 3
+// replaces this with proper tabs.
+const recent = computed(() => events.value.slice(-200).slice().reverse());
+
+function eventLabel(kind: string): string {
+  switch (kind) {
+    case 'connected':
+      return 'connect';
+    case 'disconnected':
+      return 'disconnect';
+    case 'error':
+      return 'error';
+    case 'txBytes':
+      return 'TX';
+    case 'rxBytes':
+      return 'RX';
+    default:
+      return kind;
+  }
 }
 
-const state = ref<CockpitState | null>(null);
-const error = ref<string | null>(null);
-
-onMounted(async () => {
-  try {
-    const res = await fetch('/api/state');
-    state.value = await res.json();
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err);
+function eventDetail(ev: { kind: string; [k: string]: unknown }): string {
+  if (ev.kind === 'txBytes' || ev.kind === 'rxBytes') {
+    return String(ev.bytes ?? '');
   }
-});
+  if (ev.kind === 'error') {
+    return String(ev.message ?? '');
+  }
+  if (ev.kind === 'connected') {
+    return `${ev.port} @ ${ev.baud}` + (ev.padawan ? ` · padawan ${(ev.padawan as { address: string }).address}` : '');
+  }
+  return '';
+}
 </script>
 
 <template>
+  <TopBar :events="events" />
   <main>
-    <h1>AstrOs Smoke Test Cockpit</h1>
-    <p class="muted">Phase 2 scaffold — placeholder</p>
-
     <section>
-      <h2>Server state</h2>
-      <pre v-if="state">{{ JSON.stringify(state, null, 2) }}</pre>
+      <header class="section-header">
+        <h2>Background</h2>
+        <span
+          class="sse-pill"
+          :data-tone="sseConnected ? 'green' : 'gray'"
+          >SSE {{ sseConnected ? 'live' : 'offline' }}</span
+        >
+      </header>
       <p
-        v-else-if="error"
-        class="error"
-      >
-        Failed to fetch /api/state: {{ error }}
-      </p>
-      <p
-        v-else
+        v-if="events.length === 0"
         class="muted"
       >
-        Loading...
+        No events yet. Click Connect to start a serial session.
       </p>
+      <ul
+        v-else
+        class="event-log"
+      >
+        <li
+          v-for="(ev, i) in recent"
+          :key="recent.length - i"
+          :class="`event-${ev.kind}`"
+        >
+          <span class="kind">{{ eventLabel(ev.kind) }}</span>
+          <span class="detail">{{ eventDetail(ev) }}</span>
+        </li>
+      </ul>
     </section>
   </main>
 </template>
@@ -48,7 +78,6 @@ onMounted(async () => {
 <style>
   body {
     margin: 0;
-    padding: 2rem;
     font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
     background: #0d1117;
     color: #e6edf3;
@@ -56,18 +85,24 @@ onMounted(async () => {
   }
 
   main {
-    max-width: 720px;
-    margin: 0 auto;
+    padding: 1rem;
   }
 
-  h1 {
-    color: #58a6ff;
-    margin-top: 0;
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+
+  h1,
+  h2 {
+    margin: 0;
   }
 
   h2 {
+    font-size: 0.85rem;
     color: #7ee787;
-    font-size: 1rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -76,15 +111,62 @@ onMounted(async () => {
     color: #8b949e;
   }
 
-  .error {
-    color: #f85149;
+  .sse-pill {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+  }
+  .sse-pill[data-tone='green'] {
+    background: #238636;
+    color: #fff;
+  }
+  .sse-pill[data-tone='gray'] {
+    background: #30363d;
+    color: #8b949e;
   }
 
-  pre {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 1rem;
-    overflow-x: auto;
+  .event-log {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-top: 1px solid #30363d;
+  }
+  .event-log li {
+    display: grid;
+    grid-template-columns: 7ch 1fr;
+    gap: 0.75rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid #21262d;
+    font-size: 0.85rem;
+  }
+
+  .kind {
+    color: #58a6ff;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.75rem;
+    padding-top: 0.15rem;
+  }
+  .event-log li.event-error .kind {
+    color: #f85149;
+  }
+  .event-log li.event-rxBytes .kind {
+    color: #d2a8ff;
+  }
+  .event-log li.event-txBytes .kind {
+    color: #79c0ff;
+  }
+  .event-log li.event-connected .kind {
+    color: #7ee787;
+  }
+  .event-log li.event-disconnected .kind {
+    color: #8b949e;
+  }
+
+  .detail {
+    word-break: break-all;
+    color: #c9d1d9;
+    white-space: pre-wrap;
   }
 </style>
