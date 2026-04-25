@@ -65,13 +65,19 @@ async function scenarioCommand(opts: {
     if (line !== null) process.stdout.write(line + '\n');
   };
 
+  // Hoisted so the SIGINT handler can address the discovered padawan in
+  // PANIC_STOP. Before discover() returns, configSync has no padawan address
+  // and PANIC targets master only — same as today. After discover() succeeds,
+  // we reassign and a subsequent SIGINT will fan out to padawan too.
+  let configSync = buildBenchConfigSync();
+
   const sigintHandler = async () => {
     process.stderr.write('\n[SIGINT] attempting PANIC_STOP before exit...\n');
     try {
       const { panicStop } = await import('../core/operations/panicStop.js');
       const { buildScriptRun } = await import('../core/fixtures/helpers.js');
-      const emptyRun = buildScriptRun(buildBenchConfigSync(), 'interrupt');
-      await panicStop(emptyRun).run({ transport });
+      const interruptRun = buildScriptRun(configSync, 'interrupt');
+      await panicStop(interruptRun).run({ transport });
     } catch {
       /* best effort */
     }
@@ -101,7 +107,7 @@ async function scenarioCommand(opts: {
       `[discover] master=${BENCH.masterAddress} padawan=${padawanAddr || '(none)'} (${disc.durationMs}ms)\n`,
     );
 
-    const configSync = buildBenchConfigSync({ padawanAddress: padawanAddr });
+    configSync = buildBenchConfigSync({ padawanAddress: padawanAddr });
     const session: SessionContext = {
       transport,
       configSync,
