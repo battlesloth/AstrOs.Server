@@ -42,6 +42,18 @@ let currentState: CockpitState = {
   padawan: null,
 };
 
+function resetToDisconnected(): void {
+  transport = null;
+  currentRunId = null;
+  currentState = {
+    connected: false,
+    port: null,
+    baud: null,
+    activeRunId: null,
+    padawan: null,
+  };
+}
+
 export function getState(): CockpitState {
   return { ...currentState };
 }
@@ -85,6 +97,18 @@ export async function connect(port: string, baud: number): Promise<CockpitState>
   t.on('error', (err) =>
     broadcast({ kind: 'error', message: err.message, runId: currentRunId ?? undefined }),
   );
+  t.on('close', () => {
+    // Distinguish unexpected close (USB unplug, OS closed FD) from the echo
+    // of a user-initiated disconnect(). disconnect() nulls the module-level
+    // `transport` *before* awaiting close, so when the close event arrives
+    // for an explicit disconnect the captured local `t` no longer matches —
+    // bail to avoid double-broadcasting `disconnected`.
+    if (transport !== t) return;
+    log.warn('serial port closed unexpectedly');
+    resetToDisconnected();
+    broadcast({ kind: 'error', message: 'Serial port closed unexpectedly' });
+    broadcast({ kind: 'disconnected' });
+  });
 
   transport = t;
 
@@ -113,17 +137,14 @@ export async function connect(port: string, baud: number): Promise<CockpitState>
 }
 
 export async function disconnect(): Promise<void> {
-  if (!transport) throw new NotConnectedError();
+  const t = transport;
+  if (!t) throw new NotConnectedError();
   log.debug('disconnect: closing transport');
-  await transport.close();
-  transport = null;
-  currentState = {
-    connected: false,
-    port: null,
-    baud: null,
-    activeRunId: null,
-    padawan: null,
-  };
+  // Reset state synchronously *before* awaiting close so the close handler
+  // (which compares its captured `t` to module-level `transport`) treats this
+  // as user-initiated and bails — no double `disconnected` broadcast.
+  resetToDisconnected();
+  await t.close();
   log.info('disconnected');
   broadcast({ kind: 'disconnected' });
 }
