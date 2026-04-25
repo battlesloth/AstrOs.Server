@@ -73,6 +73,43 @@ jobs:
         working-directory: astros_vue
         run: npm run test:unit -- --run
 
+  smoke-test:
+    name: Smoke Test – Lint, Typecheck, Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: astros_smoke_test/package-lock.json
+
+      - name: Install dependencies
+        working-directory: astros_smoke_test
+        run: npm ci
+
+      - name: Prettier check
+        working-directory: astros_smoke_test
+        run: npm run prettier:check
+
+      - name: Lint
+        working-directory: astros_smoke_test
+        run: npx eslint . --ext .js,.jsx,.ts,.tsx,.vue
+
+      - name: Typecheck (server + cockpit UI)
+        working-directory: astros_smoke_test
+        run: npm run typecheck
+
+      - name: Cockpit Vite build
+        working-directory: astros_smoke_test
+        run: npm run web:build
+
+      - name: Unit tests
+        working-directory: astros_smoke_test
+        run: npm run test -- --run
+
   playwright:
     name: Vue – Playwright E2E Tests
     runs-on: ubuntu-latest
