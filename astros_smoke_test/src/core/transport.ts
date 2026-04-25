@@ -58,6 +58,11 @@ export class SerialTransport extends EventEmitter implements Transport {
         });
         port.on('close', () => {
           log.debug('port closed');
+          // Drop our reference so write() rejects cleanly with "Transport not
+          // open" instead of leaking a lower-level "port is not open" error
+          // from serialport. Covers both user-initiated close() and OS-side
+          // closes (USB unplug, FD revoked, etc.).
+          this.port = null;
           this.emit('close');
         });
 
@@ -87,7 +92,11 @@ export class SerialTransport extends EventEmitter implements Transport {
 
   write(msg: string): Promise<void> {
     const port = this.port;
-    if (!port) return Promise.reject(new Error('Transport not open'));
+    // Defensive: this.port is nulled by the 'close' handler, but a sufficiently
+    // unlucky race (close fires after we capture `port` but before write runs)
+    // can still hand us a closed port — the isOpen check makes the rejection
+    // consistent in either case.
+    if (!port || !port.isOpen) return Promise.reject(new Error('Transport not open'));
     return new Promise((resolve, reject) => {
       port.write(msg, (err) => {
         if (err) {
