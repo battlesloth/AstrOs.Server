@@ -1,13 +1,32 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import TopBar from './components/TopBar.vue';
-import { useEventStream } from './composables/useEventStream';
+import { useEventStream, type CockpitEvent } from './composables/useEventStream';
 
 const { events, sseConnected } = useEventStream();
 
+// POLL_ACK fires every ~2s while connected (master polls each padawan via
+// ESP-NOW and forwards the ack to the host). Filtering only affects display;
+// the underlying events array is preserved so the toggle is reversible.
+const POLL_ACK_HEADER = '\u001ePOLL_ACK\u001e';
+const hidePollAck = ref<boolean>(localStorage.getItem('smoke.hidePollAck') === 'true');
+watch(hidePollAck, (v) => {
+  localStorage.setItem('smoke.hidePollAck', String(v));
+});
+
+function isPollAck(ev: CockpitEvent): boolean {
+  if (ev.kind !== 'txBytes' && ev.kind !== 'rxBytes') return false;
+  return ev.bytes.includes(POLL_ACK_HEADER);
+}
+
+const visible = computed(() =>
+  hidePollAck.value ? events.value.filter((ev) => !isPollAck(ev)) : events.value,
+);
+
 // Show most recent first; cap at 200 to keep DOM small until Task 3
 // replaces this with proper tabs.
-const recent = computed(() => events.value.slice(-200).slice().reverse());
+const recent = computed(() => visible.value.slice(-200).slice().reverse());
+const hiddenCount = computed(() => events.value.length - visible.value.length);
 
 function eventLabel(kind: string): string {
   switch (kind) {
@@ -51,6 +70,18 @@ function eventDetail(ev: { kind: string; [k: string]: unknown }): string {
           :data-tone="sseConnected ? 'green' : 'gray'"
           >SSE {{ sseConnected ? 'live' : 'offline' }}</span
         >
+        <label class="filter-toggle">
+          <input
+            v-model="hidePollAck"
+            type="checkbox"
+          />
+          hide POLL_ACK
+          <span
+            v-if="hidePollAck && hiddenCount > 0"
+            class="muted"
+            >({{ hiddenCount }} hidden)</span
+          >
+        </label>
       </header>
       <p
         v-if="events.length === 0"
@@ -123,6 +154,19 @@ function eventDetail(ev: { kind: string; [k: string]: unknown }): string {
   .sse-pill[data-tone='gray'] {
     background: #30363d;
     color: #8b949e;
+  }
+
+  .filter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    color: #c9d1d9;
+    cursor: pointer;
+    user-select: none;
+  }
+  .filter-toggle input {
+    cursor: pointer;
   }
 
   .event-log {
