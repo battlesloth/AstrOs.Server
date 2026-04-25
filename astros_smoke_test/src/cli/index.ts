@@ -29,7 +29,7 @@ async function listCommand(json: boolean): Promise<number> {
     return {
       id: sc.id,
       description: sc.description,
-      requiresConfirmation: sc.requiresConfirmation === true,
+      severity: sc.severity ?? 'safe',
     };
   });
 
@@ -37,7 +37,7 @@ async function listCommand(json: boolean): Promise<number> {
     process.stdout.write(JSON.stringify(items, null, 2) + '\n');
   } else {
     for (const it of items) {
-      const tag = it.requiresConfirmation ? ' [destructive]' : '';
+      const tag = it.severity !== 'safe' ? ` [${it.severity}]` : '';
       process.stdout.write(`${it.id}${tag}\n    ${it.description}\n`);
     }
   }
@@ -110,7 +110,7 @@ async function scenarioCommand(opts: {
     };
 
     const scenario = factory(session);
-    if (scenario.requiresConfirmation && !opts.confirm) {
+    if (scenario.severity === 'destructive' && !opts.confirm) {
       process.stderr.write(
         `Scenario '${scenario.id}' is destructive. Re-run with --confirm to proceed.\n`,
       );

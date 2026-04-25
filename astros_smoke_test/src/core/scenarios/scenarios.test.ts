@@ -37,17 +37,18 @@ describe('scenario registry', () => {
     expect(() => getScenarioFactory('nope')).toThrow(/Unknown scenario/);
   });
 
-  it('marks exactly the four hardware-risky scenarios as requiring confirmation', () => {
+  it('tags scenarios with the right severity', () => {
     const session = makeSession();
-    const destructive = Object.values(scenarios)
-      .map((f) => f(session))
-      .filter((s) => s.requiresConfirmation)
-      .map((s) => s.id)
-      .sort();
+    const bySeverity = (level: 'safe' | 'caution' | 'destructive') =>
+      Object.values(scenarios)
+        .map((f) => f(session))
+        .filter((s) => (s.severity ?? 'safe') === level)
+        .map((s) => s.id)
+        .sort();
 
-    expect(destructive).toEqual(
-      ['format-and-sync', 'full-happy-path', 'panic-drill', 'servo-test-sweep'].sort(),
-    );
+    expect(bySeverity('destructive')).toEqual(['format-and-sync', 'full-happy-path'].sort());
+    expect(bySeverity('caution')).toEqual(['panic-drill', 'servo-test-sweep'].sort());
+    expect(bySeverity('safe')).toEqual(['config-only', 'direct-command-sweep', 'sync-only'].sort());
   });
 });
 

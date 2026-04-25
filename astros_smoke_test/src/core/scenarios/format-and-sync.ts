@@ -7,7 +7,7 @@ import type { ScenarioFactory, SessionContext } from './_shared.js';
 export const formatAndSync: ScenarioFactory = (session: SessionContext): Scenario => ({
   id: 'format-and-sync',
   description: 'Wipe SD on all controllers then registration sync.',
-  requiresConfirmation: true,
+  severity: 'destructive',
   setup: [formatSd(benchControllers(session.configSync))],
   act: [registrationSync()],
 });

@@ -137,7 +137,7 @@ async function main(): Promise<void> {
       return {
         id: sc.id,
         description: sc.description,
-        requiresConfirmation: sc.requiresConfirmation === true,
+        severity: sc.severity ?? 'safe',
       };
     });
     res.json({ scenarios: list });
@@ -176,7 +176,7 @@ async function main(): Promise<void> {
     const scenario = factory(session);
 
     const body = (req.body ?? {}) as { confirm?: boolean };
-    if (scenario.requiresConfirmation && !body.confirm) {
+    if (scenario.severity === 'destructive' && !body.confirm) {
       res.status(409).json({
         message: `Scenario '${id}' is destructive — re-send with { "confirm": true }.`,
       });

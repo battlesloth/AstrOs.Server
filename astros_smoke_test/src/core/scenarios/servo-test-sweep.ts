@@ -19,7 +19,7 @@ export const servoTestSweep: ScenarioFactory = (session: SessionContext): Scenar
   return {
     id: 'servo-test-sweep',
     description: `Master maestro ch ${servo.ch}: min → max → home via SERVO_TEST messages.`,
-    requiresConfirmation: true,
+    severity: 'caution',
     // Hold windows give the servo time to physically traverse to the target
     // pulse width. SERVO_TEST is fire-and-forget on the wire (returns in <10ms),
     // so without an explicit pause the next pulse arrives before the previous

@@ -24,10 +24,12 @@ export interface Step {
   run: (ctx: StepContext) => Promise<StepResult>;
 }
 
+export type ScenarioSeverity = 'safe' | 'caution' | 'destructive';
+
 export interface Scenario {
   id: string;
   description: string;
-  requiresConfirmation?: boolean;
+  severity?: ScenarioSeverity;
   setup?: Step[];
   arrange?: Step[];
   act?: Step[];

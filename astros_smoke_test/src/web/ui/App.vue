@@ -43,7 +43,7 @@ async function fireRun(scenario: ScenarioInfo, confirm: boolean): Promise<void> 
 }
 
 function onScenarioRun(scenario: ScenarioInfo): void {
-  if (scenario.requiresConfirmation) {
+  if (scenario.severity === 'destructive') {
     pendingScenario.value = scenario;
     return;
   }

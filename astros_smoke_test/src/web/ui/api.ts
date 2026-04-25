@@ -59,10 +59,12 @@ export async function panic(): Promise<void> {
   await unwrap<{ ok: boolean }>(res, 'Panic failed');
 }
 
+export type ScenarioSeverity = 'safe' | 'caution' | 'destructive';
+
 export interface ScenarioInfo {
   id: string;
   description: string;
-  requiresConfirmation: boolean;
+  severity: ScenarioSeverity;
 }
 
 export async function getScenarios(): Promise<ScenarioInfo[]> {

@@ -20,7 +20,7 @@ export const fullHappyPath: ScenarioFactory = (session: SessionContext): Scenari
     id: 'full-happy-path',
     description:
       'Format SD → registration sync → deploy config → deploy script → run (wave-hello) → panic.',
-    requiresConfirmation: true,
+    severity: 'destructive',
     setup: [formatSd(benchControllers(session.configSync))],
     arrange: [registrationSync(), deployConfig(session.configSync), deployScript(upload)],
     act: [runScript(run), waitStep(2000, 'let-servo-move')],

@@ -49,15 +49,20 @@ function clickRun(scenario: ScenarioInfo): void {
         <button
           class="scenario"
           :disabled="!runEnabled"
-          :class="{ destructive: s.requiresConfirmation }"
+          :class="{ destructive: s.severity === 'destructive', caution: s.severity === 'caution' }"
           :title="s.description"
           @click="clickRun(s)"
         >
           <span class="name">{{ s.id }}</span>
           <span
-            v-if="s.requiresConfirmation"
-            class="badge"
+            v-if="s.severity === 'destructive'"
+            class="badge badge-destructive"
             >destructive</span
+          >
+          <span
+            v-else-if="s.severity === 'caution'"
+            class="badge badge-caution"
+            >caution</span
           >
           <span class="desc">{{ s.description }}</span>
         </button>
@@ -137,14 +142,23 @@ function clickRun(scenario: ScenarioInfo): void {
     font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    background: #4a1c1c;
-    color: #f85149;
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
     align-self: center;
   }
+  .badge-destructive {
+    background: #4a1c1c;
+    color: #f85149;
+  }
+  .badge-caution {
+    background: #3a2a08;
+    color: #d29922;
+  }
   .scenario.destructive .name {
     color: #f0883e;
+  }
+  .scenario.caution .name {
+    color: #d29922;
   }
   .desc {
     grid-area: desc;
