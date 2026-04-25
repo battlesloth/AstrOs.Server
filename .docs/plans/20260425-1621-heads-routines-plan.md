@@ -1516,13 +1516,13 @@ EOF
 
 Update this checklist as tasks complete; commit the update each time.
 
-- [ ] Task 1 — Primitives library + tests
-- [ ] Task 2 — heads-curious-duet routine
-- [ ] Task 3 — heads-disagreement routine
-- [ ] Task 4 — heads-hide-and-seek routine
-- [ ] Task 5 — heads-sync-swim routine
-- [ ] Task 6 — heads-demo-reel scenario
-- [ ] Task 7 — Manual QA documentation
+- [x] Task 1 — Primitives library + tests *(commits `585e178` + `7642be5` validator hardening)*
+- [x] Task 2 — heads-curious-duet routine *(commit `6529cc1`)*
+- [x] Task 3 — heads-disagreement routine *(commit `02f3fb8`)*
+- [x] Task 4 — heads-hide-and-seek routine *(commit `3fa08a9`)*
+- [x] Task 5 — heads-sync-swim routine *(commit `92e939b`)*
+- [x] Task 6 — heads-demo-reel scenario *(commit `f6c536e`)*
+- [x] Task 7 — Manual QA documentation *(commit `e32345e`)*
 
 ---
 
