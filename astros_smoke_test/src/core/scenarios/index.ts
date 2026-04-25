@@ -9,6 +9,7 @@ import { panicDrill } from './panic-drill.js';
 import { headsCuriousDuet } from './heads-curious-duet.js';
 import { headsDisagreement } from './heads-disagreement.js';
 import { headsHideAndSeek } from './heads-hide-and-seek.js';
+import { headsSyncSwim } from './heads-sync-swim.js';
 
 export * from './_shared.js';
 export {
@@ -22,6 +23,7 @@ export {
   headsCuriousDuet,
   headsDisagreement,
   headsHideAndSeek,
+  headsSyncSwim,
 };
 
 export const scenarios: Record<string, ScenarioFactory> = {
@@ -35,6 +37,7 @@ export const scenarios: Record<string, ScenarioFactory> = {
   'heads-curious-duet': headsCuriousDuet,
   'heads-disagreement': headsDisagreement,
   'heads-hide-and-seek': headsHideAndSeek,
+  'heads-sync-swim': headsSyncSwim,
 };
 
 export function listScenarioIds(): string[] {

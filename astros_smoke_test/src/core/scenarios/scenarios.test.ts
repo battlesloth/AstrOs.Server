@@ -19,7 +19,7 @@ function makeSession(): SessionContext {
 }
 
 describe('scenario registry', () => {
-  it('exposes all ten scenarios by id', () => {
+  it('exposes all eleven scenarios by id', () => {
     expect(listScenarioIds().sort()).toEqual(
       [
         'sync-only',
@@ -32,6 +32,7 @@ describe('scenario registry', () => {
         'heads-curious-duet',
         'heads-disagreement',
         'heads-hide-and-seek',
+        'heads-sync-swim',
       ].sort(),
     );
   });
@@ -57,6 +58,7 @@ describe('scenario registry', () => {
         'heads-curious-duet',
         'heads-disagreement',
         'heads-hide-and-seek',
+        'heads-sync-swim',
       ].sort(),
     );
     expect(bySeverity('safe')).toEqual(['config-only', 'direct-command-sweep', 'sync-only'].sort());
@@ -131,6 +133,16 @@ describe('scenario composition', () => {
 
   it('heads-hide-and-seek has the standard single-script shape', () => {
     const s = scenarios['heads-hide-and-seek'](session);
+    expect(s.arrange?.map((x) => x.name)).toEqual([
+      'registrationSync',
+      'deployConfig',
+      'deployScript',
+    ]);
+    expect(s.act?.map((x) => x.name)).toEqual(['runScript', 'let-script-play']);
+  });
+
+  it('heads-sync-swim has the standard single-script shape', () => {
+    const s = scenarios['heads-sync-swim'](session);
     expect(s.arrange?.map((x) => x.name)).toEqual([
       'registrationSync',
       'deployConfig',
