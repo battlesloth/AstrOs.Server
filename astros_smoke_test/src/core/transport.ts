@@ -1,6 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
+import { createLogger } from './log.js';
+
+const log = createLogger('transport');
 
 export interface TransportEvents {
   line: (line: string) => void;
@@ -44,22 +47,31 @@ export class SerialTransport extends EventEmitter implements Transport {
 
       port.open((err) => {
         if (err) {
+          log.error('open failed', err);
           reject(err);
           return;
         }
 
-        port.on('error', (e: Error) => this.emit('error', e));
-        port.on('close', () => this.emit('close'));
+        port.on('error', (e: Error) => {
+          log.error('port error', e);
+          this.emit('error', e);
+        });
+        port.on('close', () => {
+          log.debug('port closed');
+          this.emit('close');
+        });
 
         port.pipe(new DelimiterParser({ delimiter: '\n' })).on('data', (chunk: Buffer) => {
           const line = chunk.toString('utf8');
           // Drop empty / NUL-only lines (UART startup artifacts before the real
           // first message arrives — otherwise MessageHandler logs them as errors).
           if (line.replace(/\0/g, '').trim().length === 0) return;
+          log.debug('rx line', { bytes: line.length });
           this.emit('line', line);
         });
 
         this.port = port;
+        log.debug('port opened', { path: this.path, baud: this.baudRate });
         resolve();
       });
     });
@@ -79,14 +91,17 @@ export class SerialTransport extends EventEmitter implements Transport {
     return new Promise((resolve, reject) => {
       port.write(msg, (err) => {
         if (err) {
+          log.error('write failed', err);
           reject(err);
           return;
         }
         port.drain((drainErr) => {
           if (drainErr) {
+            log.error('drain failed', drainErr);
             reject(drainErr);
             return;
           }
+          log.debug('tx', { bytes: msg.length });
           this.emit('tx', msg);
           resolve();
         });

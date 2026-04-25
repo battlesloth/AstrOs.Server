@@ -1,6 +1,9 @@
 import { SerialTransport } from '../core/transport.js';
 import { discover } from '../cli/discovery.js';
 import { broadcast, type PadawanInfo } from './sse.js';
+import { createLogger } from '../core/log.js';
+
+const log = createLogger('state');
 
 export interface CockpitState {
   connected: boolean;
@@ -60,6 +63,7 @@ export function clearActiveRun(): void {
 export async function connect(port: string, baud: number): Promise<CockpitState> {
   if (currentState.connected) throw new AlreadyConnectedError();
 
+  log.debug('connect: opening transport', { port, baud });
   const t = new SerialTransport({ path: port, baudRate: baud });
   try {
     await t.open();
@@ -74,9 +78,7 @@ export async function connect(port: string, baud: number): Promise<CockpitState>
   // Wire transport events to SSE before any traffic flows so discovery is visible.
   // Closures capture the `currentRunId` binding so events emitted while a run
   // is active get tagged with that run's id and bucket into its transcript tab.
-  t.on('tx', (bytes) =>
-    broadcast({ kind: 'txBytes', bytes, runId: currentRunId ?? undefined }),
-  );
+  t.on('tx', (bytes) => broadcast({ kind: 'txBytes', bytes, runId: currentRunId ?? undefined }));
   t.on('line', (line) =>
     broadcast({ kind: 'rxBytes', bytes: line, runId: currentRunId ?? undefined }),
   );
@@ -89,21 +91,30 @@ export async function connect(port: string, baud: number): Promise<CockpitState>
   // Run discovery (best effort — port stays open even if no padawan responds).
   let padawan: PadawanInfo | null = null;
   try {
+    log.debug('discovery starting');
     const disc = await discover(t);
     if (disc.padawan) {
       padawan = { address: disc.padawan.address, name: disc.padawan.name };
+      log.debug('discovery found padawan', { address: padawan.address, name: padawan.name });
+    } else {
+      log.debug('discovery completed with no padawan');
     }
-  } catch {
+  } catch (err) {
     // discovery failure is non-fatal
+    log.debug('discovery failed (non-fatal)', {
+      err: err instanceof Error ? err.message : String(err),
+    });
   }
 
   currentState = { connected: true, port, baud, activeRunId: null, padawan };
+  log.info('connected', { port, baud, padawan: padawan?.address ?? null });
   broadcast({ kind: 'connected', port, baud, padawan });
   return getState();
 }
 
 export async function disconnect(): Promise<void> {
   if (!transport) throw new NotConnectedError();
+  log.debug('disconnect: closing transport');
   await transport.close();
   transport = null;
   currentState = {
@@ -113,5 +124,6 @@ export async function disconnect(): Promise<void> {
     activeRunId: null,
     padawan: null,
   };
+  log.info('disconnected');
   broadcast({ kind: 'disconnected' });
 }

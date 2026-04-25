@@ -25,6 +25,9 @@ import {
 import { buildScriptRun } from '../core/fixtures/helpers.js';
 import { ScenarioRunner, type RunnerEvent } from '../core/runner.js';
 import { listScenarioIds, scenarios, type SessionContext } from '../core/scenarios/index.js';
+import { createLogger } from '../core/log.js';
+
+const log = createLogger('server');
 
 const PORT = 5174;
 const HOST = '127.0.0.1';
@@ -55,6 +58,7 @@ async function main(): Promise<void> {
 
   app.post('/api/connect', async (req, res) => {
     const body = req.body as { port?: string; baud?: number };
+    log.debug('POST /api/connect', { port: body.port, baud: body.baud });
     if (!body.port || !body.baud) {
       res.status(400).json({ message: 'port and baud are required' });
       return;
@@ -64,10 +68,13 @@ async function main(): Promise<void> {
       res.json(state);
     } catch (err) {
       if (err instanceof PortInUseError) {
+        log.warn('connect refused: port in use', { port: body.port });
         res.status(409).json({ message: err.message });
       } else if (err instanceof AlreadyConnectedError) {
+        log.warn('connect refused: already connected');
         res.status(409).json({ message: err.message });
       } else {
+        log.error('connect failed', err instanceof Error ? err : { err: String(err) });
         const message = err instanceof Error ? err.message : String(err);
         res.status(500).json({ message });
       }
@@ -75,13 +82,16 @@ async function main(): Promise<void> {
   });
 
   app.post('/api/disconnect', async (_req, res) => {
+    log.debug('POST /api/disconnect');
     try {
       await disconnect();
       res.json({ ok: true });
     } catch (err) {
       if (err instanceof NotConnectedError) {
+        log.warn('disconnect refused: not connected');
         res.status(409).json({ message: err.message });
       } else {
+        log.error('disconnect failed', err instanceof Error ? err : { err: String(err) });
         const message = err instanceof Error ? err.message : String(err);
         res.status(500).json({ message });
       }
@@ -89,6 +99,7 @@ async function main(): Promise<void> {
   });
 
   app.post('/api/panic', async (_req, res) => {
+    log.debug('POST /api/panic');
     const t = getTransport();
     if (!t) {
       res.status(409).json({ message: 'Not connected' });
@@ -98,6 +109,7 @@ async function main(): Promise<void> {
     const sync = buildBenchConfigSync({ padawanAddress: state.padawan?.address ?? '' });
     const run = buildScriptRun(sync, `cockpit-panic-${uuidv4().slice(0, 8)}`);
     const result = await panicStop(run).run({ transport: t });
+    log.info('panic stop fired', { ok: result.ok, durationMs: result.durationMs });
     res.json({ ok: result.ok, durationMs: result.durationMs });
   });
 
@@ -133,19 +145,23 @@ async function main(): Promise<void> {
 
   app.post('/api/run/:id', async (req, res) => {
     const id = req.params.id;
+    log.debug('POST /api/run/:id', { id });
     const factory = scenarios[id];
     if (!factory) {
+      log.warn('run refused: unknown scenario', { id });
       res.status(404).json({ message: `Unknown scenario: ${id}` });
       return;
     }
 
     const t = getTransport();
     if (!t) {
+      log.warn('run refused: not connected', { id });
       res.status(409).json({ message: 'Not connected' });
       return;
     }
 
     if (getState().activeRunId !== null) {
+      log.warn('run refused: another run in progress', { id });
       res.status(409).json({ message: 'Another run is in progress' });
       return;
     }
@@ -169,6 +185,7 @@ async function main(): Promise<void> {
 
     const runId = uuidv4();
     setActiveRun(runId);
+    log.info('scenario started', { id, runId });
     broadcast({ kind: 'runStarted', runId, scenarioId: id, description: scenario.description });
 
     res.json({ runId });
@@ -184,7 +201,9 @@ async function main(): Promise<void> {
 
     try {
       await runner.run(scenario);
+      log.info('scenario finished', { id, runId });
     } catch (err) {
+      log.error('scenario threw', err instanceof Error ? err : { err: String(err) });
       const message = err instanceof Error ? err.message : String(err);
       broadcast({ kind: 'error', message, runId });
       broadcast({ kind: 'scenarioDone', runId, ok: false });
@@ -210,9 +229,7 @@ async function main(): Promise<void> {
     app.use(vite.middlewares);
   } else {
     if (!existsSync(distWebPath)) {
-      console.error(
-        `[smoke-cockpit] No build found at ${distWebPath}. Run 'npm run web:build' first.`,
-      );
+      log.error('no build found; run "npm run web:build" first', { path: distWebPath });
       process.exit(1);
     }
     app.use(express.static(distWebPath));
@@ -222,11 +239,14 @@ async function main(): Promise<void> {
   }
 
   app.listen(PORT, HOST, () => {
-    console.log(`[smoke-cockpit] http://localhost:${PORT}  (${isDev ? 'dev' : 'prod'})`);
+    log.info('cockpit listening', {
+      url: `http://localhost:${PORT}`,
+      mode: isDev ? 'dev' : 'prod',
+    });
   });
 }
 
 main().catch((err) => {
-  console.error('[smoke-cockpit] failed to start:', err);
+  log.error('failed to start', err instanceof Error ? err : { err: String(err) });
   process.exit(1);
 });

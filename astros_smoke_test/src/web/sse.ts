@@ -1,5 +1,8 @@
 import type { Response } from 'express';
 import type { StepResult } from '../core/runner.js';
+import { createLogger } from '../core/log.js';
+
+const log = createLogger('sse');
 
 // Single SSE channel: every connected /api/events client receives every event.
 // The client buckets events into transcript tabs by runId; events without a
@@ -36,14 +39,17 @@ export function addSubscriber(res: Response): void {
   // Immediate flush so the EventSource readyState transitions to OPEN.
   res.write(': hello\n\n');
   subscribers.add(res);
+  log.debug('subscriber added', { count: subscribers.size });
 }
 
 export function removeSubscriber(res: Response): void {
   subscribers.delete(res);
+  log.debug('subscriber removed', { count: subscribers.size });
 }
 
 export function broadcast(event: CockpitEvent): void {
   const data = `data: ${JSON.stringify(event)}\n\n`;
+  log.debug('broadcast', { kind: event.kind, subscribers: subscribers.size });
   for (const res of subscribers) {
     try {
       res.write(data);
