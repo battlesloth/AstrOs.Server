@@ -1,11 +1,18 @@
 import { defineConfig } from 'vitest/config';
+import { fileURLToPath, URL } from 'node:url';
 
 export default defineConfig({
   test: {},
   resolve: {
     alias: [
-      { find: /^@api\/(.*)$/, replacement: new URL('../astros_api/src/$1', import.meta.url).pathname },
-      { find: /^src\/(.*)$/, replacement: new URL('../astros_api/src/$1', import.meta.url).pathname },
+      {
+        find: /^@api\/(.*)$/,
+        replacement: fileURLToPath(new URL('../astros_api/src/$1', import.meta.url)),
+      },
+      {
+        find: /^src\/(.*)$/,
+        replacement: fileURLToPath(new URL('../astros_api/src/$1', import.meta.url)),
+      },
     ],
   },
 });
