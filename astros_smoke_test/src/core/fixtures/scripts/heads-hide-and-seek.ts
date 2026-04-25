@@ -1,5 +1,8 @@
 import { getServoConfig } from '../demo-location.js';
 import {
+  POS_HOME,
+  POS_MAX,
+  POS_MIN,
   bothLookUp,
   bothNodSubtle,
   bothPanForward,
@@ -7,14 +10,14 @@ import {
   meetEyes,
   pose,
   settleHome,
-  tiltDownPos,
+  tiltDownPercent,
   withLedFlash,
   withLedSolid,
   type Beat,
 } from './_heads-primitives.js';
 
-const rPan = getServoConfig(1);
-const lPan = getServoConfig(4);
+// tiltDownPercent needs the per-channel home/max ratio; the rest of this
+// fixture uses POS_* percent constants directly.
 const rTilt = getServoConfig(2);
 const lTilt = getServoConfig(3);
 
@@ -44,19 +47,17 @@ const lTilt = getServoConfig(3);
 export function hideAndSeekBeats(): Beat[] {
   return [
     settleHome(500),
-    pose(1200, { rPan: rPan.maxPos, rTilt: tiltDownPos(rTilt) }),
+    pose(1200, { rPan: POS_MAX, rTilt: tiltDownPercent(rTilt) }),
     hold(800),
-    pose(800, { lPan: lPan.minPos }),
+    pose(800, { lPan: POS_MIN }),
     hold(600),
-    pose(1000, { lPan: lPan.maxPos }),
+    pose(1000, { lPan: POS_MAX }),
     withLedFlash(hold(600), [{ atMs: 200, durMs: 200 }]),
-    pose(600, { lTilt: lTilt.minPos }),
+    pose(600, { lTilt: POS_MIN }),
     hold(600),
-    withLedFlash(pose(600, { rTilt: rTilt.homePos, rPan: rPan.homePos }), [
-      { atMs: 0, durMs: 200 },
-    ]),
-    pose(100, { lTilt: tiltDownPos(lTilt) }),
-    pose(100, { lTilt: lTilt.minPos }),
+    withLedFlash(pose(600, { rTilt: POS_HOME, rPan: POS_HOME }), [{ atMs: 0, durMs: 200 }]),
+    pose(100, { lTilt: tiltDownPercent(lTilt) }),
+    pose(100, { lTilt: POS_MIN }),
     hold(800),
     meetEyes(800),
     withLedFlash(bothNodSubtle(1500, 2), [

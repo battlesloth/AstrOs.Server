@@ -1,5 +1,5 @@
-import { getServoConfig } from '../demo-location.js';
 import {
+  POS_MAX,
   bothPanForward,
   bothPanLeft,
   hold,
@@ -11,9 +11,6 @@ import {
   withLedSolid,
   type Beat,
 } from './_heads-primitives.js';
-
-const rPan = getServoConfig(1);
-const lPan = getServoConfig(4);
 
 // Beat-by-beat per the design doc (heads-disagreement, ~13200ms):
 //   t=0     settle home (500ms)
@@ -40,14 +37,14 @@ export function disagreementBeats(): Beat[] {
     hold(500),
     bothPanLeft(800),
     hold(600),
-    withLedFlash(pose(1000, { rPan: rPan.maxPos }), [
+    withLedFlash(pose(1000, { rPan: POS_MAX }), [
       { atMs: 0, durMs: 100 },
       { atMs: 200, durMs: 100 },
       { atMs: 400, durMs: 100 },
       { atMs: 600, durMs: 100 },
     ]),
     hold(800),
-    pose(1500, { lPan: lPan.maxPos }),
+    pose(1500, { lPan: POS_MAX }),
     withLedSolid(hold(600), 0, 600),
     bothPanForward(800),
     hold(500),

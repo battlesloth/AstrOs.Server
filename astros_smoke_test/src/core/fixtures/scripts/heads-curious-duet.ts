@@ -1,19 +1,21 @@
 import { getServoConfig } from '../demo-location.js';
 import {
+  POS_MAX,
+  POS_MIN,
   bothNodSubtle,
   bothPanForward,
   hold,
   meetEyes,
   pose,
   settleHome,
-  tiltDownPos,
+  tiltDownPercent,
   withLedFlash,
   withLedSolid,
   type Beat,
 } from './_heads-primitives.js';
 
-const rPan = getServoConfig(1);
-const lPan = getServoConfig(4);
+// tiltDownPercent needs the per-channel home/max ratio; the rest of this
+// fixture uses POS_* percent constants directly.
 const rTilt = getServoConfig(2);
 const lTilt = getServoConfig(3);
 
@@ -36,17 +38,17 @@ export function curiousDuetBeats(): Beat[] {
   return [
     settleHome(500),
     pose(1000, {
-      rPan: rPan.minPos,
-      lPan: lPan.minPos,
-      rTilt: tiltDownPos(rTilt),
-      lTilt: tiltDownPos(lTilt),
+      rPan: POS_MIN,
+      lPan: POS_MIN,
+      rTilt: tiltDownPercent(rTilt),
+      lTilt: tiltDownPercent(lTilt),
     }),
     hold(800),
     pose(1000, {
-      rPan: rPan.maxPos,
-      lPan: lPan.maxPos,
-      rTilt: rTilt.minPos,
-      lTilt: lTilt.minPos,
+      rPan: POS_MAX,
+      lPan: POS_MAX,
+      rTilt: POS_MIN,
+      lTilt: POS_MIN,
     }),
     hold(800),
     settleHome(800),
@@ -55,7 +57,7 @@ export function curiousDuetBeats(): Beat[] {
     withLedFlash(hold(800), [{ atMs: 300, durMs: 200 }]),
     bothNodSubtle(1400, 1),
     bothPanForward(700),
-    withLedSolid(pose(1400, { rTilt: rTilt.minPos, lTilt: lTilt.minPos }), 0, 800),
+    withLedSolid(pose(1400, { rTilt: POS_MIN, lTilt: POS_MIN }), 0, 800),
     settleHome(800),
     hold(500),
   ];

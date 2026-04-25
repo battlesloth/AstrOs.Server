@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildBenchConfigSync, getServoConfig, BENCH } from '../demo-location.js';
 import {
+  POS_HOME,
+  POS_MAX,
+  POS_MIN,
   TILT_DOWN_SUBTLE,
   bothLookUp,
   bothNodSubtle,
@@ -10,27 +13,39 @@ import {
   meetEyes,
   pose,
   settleHome,
-  tiltDownPos,
+  tiltDownPercent,
   withLedFlash,
   withLedSolid,
   type Beat,
 } from './_heads-primitives.js';
 
-describe('tiltDownPos', () => {
-  it('returns home + 30% of home→max delta', () => {
+describe('position constants', () => {
+  it('match the firmware percent convention (0=min, 100=max, -1=home)', () => {
+    expect(POS_MIN).toBe(0);
+    expect(POS_MAX).toBe(100);
+    expect(POS_HOME).toBe(-1);
+  });
+});
+
+describe('tiltDownPercent', () => {
+  it('returns home% + 30% of (100% - home%) for the given servo', () => {
     const ch2 = getServoConfig(2);
-    const expected = Math.round(ch2.homePos + (ch2.maxPos - ch2.homePos) * TILT_DOWN_SUBTLE);
-    expect(tiltDownPos(ch2)).toBe(expected);
+    const homePct = ((ch2.homePos - ch2.minPos) / (ch2.maxPos - ch2.minPos)) * 100;
+    const expected = Math.round(homePct + (100 - homePct) * TILT_DOWN_SUBTLE);
+    expect(tiltDownPercent(ch2)).toBe(expected);
+    // Sanity: should land between home% and 100%.
+    expect(tiltDownPercent(ch2)).toBeGreaterThan(homePct);
+    expect(tiltDownPercent(ch2)).toBeLessThan(100);
   });
 });
 
 describe('pose', () => {
   it('emits one servo pulse per specified channel + closing buffer', () => {
-    const beat = pose(1000, { rPan: 1500, lTilt: 2000 });
+    const beat = pose(1000, { rPan: 50, lTilt: 75 });
     // Two pulses (rPan, lTilt) + buffer(1000)
     expect(beat.master).toHaveLength(3);
-    expect(beat.master[0]).toMatch(/^1\|0\|0\|1\|1500\|/);
-    expect(beat.master[1]).toMatch(/^1\|0\|0\|3\|2000\|/);
+    expect(beat.master[0]).toBe('1|0|0|1|50|0|0');
+    expect(beat.master[1]).toBe('1|0|0|3|75|0|0');
     expect(beat.master[2]).toBe('0|1000|0');
     expect(beat.padawan).toEqual(['0|1000|0']);
     expect(beat.durMs).toBe(1000);
@@ -41,38 +56,39 @@ describe('pose', () => {
     expect(beat.master).toEqual(['0|500|0']);
     expect(beat.padawan).toEqual(['0|500|0']);
   });
+
+  it('accepts POS_HOME (-1) for home position', () => {
+    const beat = pose(200, { rPan: POS_HOME });
+    expect(beat.master[0]).toBe('1|0|0|1|-1|0|0');
+  });
 });
 
 describe('named primitives', () => {
-  it('bothPanLeft puts R-pan and L-pan at minPos', () => {
+  it('bothPanLeft puts R-pan and L-pan at percent 0 (POS_MIN)', () => {
     const beat = bothPanLeft(800);
-    const r = getServoConfig(1);
-    const l = getServoConfig(4);
-    expect(beat.master[0]).toBe(`1|0|0|1|${r.minPos}|0|0`);
-    expect(beat.master[1]).toBe(`1|0|0|4|${l.minPos}|0|0`);
+    expect(beat.master[0]).toBe('1|0|0|1|0|0|0');
+    expect(beat.master[1]).toBe('1|0|0|4|0|0|0');
   });
 
-  it('meetEyes puts R-pan at minPos AND L-pan at maxPos (cross-direction)', () => {
+  it('meetEyes puts R-pan at POS_MIN AND L-pan at POS_MAX (cross-direction)', () => {
     const beat = meetEyes(800);
-    const r = getServoConfig(1);
-    const l = getServoConfig(4);
-    expect(beat.master[0]).toBe(`1|0|0|1|${r.minPos}|0|0`);
-    expect(beat.master[1]).toBe(`1|0|0|4|${l.maxPos}|0|0`);
+    expect(beat.master[0]).toBe('1|0|0|1|0|0|0');
+    expect(beat.master[1]).toBe('1|0|0|4|100|0|0');
   });
 
-  it('bothLookUp puts both tilts at minPos (the dramatic up direction)', () => {
+  it('bothLookUp puts both tilts at POS_MIN (the dramatic up direction)', () => {
     const beat = bothLookUp(600);
-    const r = getServoConfig(2);
-    const l = getServoConfig(3);
-    // pose() ordering: rPan, lPan, rTilt, lTilt — only the tilt entries are emitted
-    expect(beat.master[0]).toBe(`1|0|0|2|${r.minPos}|0|0`);
-    expect(beat.master[1]).toBe(`1|0|0|3|${l.minPos}|0|0`);
+    expect(beat.master[0]).toBe('1|0|0|2|0|0|0');
+    expect(beat.master[1]).toBe('1|0|0|3|0|0|0');
   });
 
-  it('settleHome touches all four channels', () => {
+  it('settleHome touches all four channels at POS_HOME (-1)', () => {
     const beat = settleHome(500);
     // 4 pulses + 1 buffer
     expect(beat.master).toHaveLength(5);
+    for (let i = 0; i < 4; i++) {
+      expect(beat.master[i]).toMatch(/^1\|0\|0\|\d\|-1\|0\|0$/);
+    }
   });
 
   it('hold emits only buffers', () => {
@@ -87,6 +103,18 @@ describe('multi-phase primitives', () => {
     const beat = bothNodSubtle(1200, 2);
     const pulses = beat.master.filter((e) => e.startsWith('1|'));
     expect(pulses).toHaveLength(8);
+  });
+
+  it('bothNodSubtle dips use tiltDownPercent and returns use POS_HOME', () => {
+    const beat = bothNodSubtle(1200, 1);
+    const ch2 = getServoConfig(2);
+    const ch3 = getServoConfig(3);
+    // First two pulses: tilts down to tiltDownPercent
+    expect(beat.master[0]).toBe(`1|0|0|2|${tiltDownPercent(ch2)}|0|0`);
+    expect(beat.master[1]).toBe(`1|0|0|3|${tiltDownPercent(ch3)}|0|0`);
+    // After phase buffer, return-to-home pulses use POS_HOME
+    expect(beat.master[3]).toBe('1|0|0|2|-1|0|0');
+    expect(beat.master[4]).toBe('1|0|0|3|-1|0|0');
   });
 
   it('bothNodSubtle: master timeline sums to durMs even when not evenly divisible', () => {
@@ -182,7 +210,6 @@ describe('buildScript', () => {
 
   it('stitches beat lists into the master/padawan timelines with closing buffer', () => {
     const built = buildScript(sync, [hold(100), hold(200)]);
-    // Master and padawan timelines: each beat's events joined by ';' + final '0|0|0'
     const expected = '0|100|0;0|200|0;0|0|0';
     const masterCfg = built.upload.configs.find((c) => c.address === '00:00:00:00:00:00');
     const padawanCfg = built.upload.configs.find((c) => c.address === 'aa:bb:cc:dd:ee:ff');

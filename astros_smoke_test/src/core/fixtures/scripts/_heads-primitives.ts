@@ -17,17 +17,32 @@ const RIGHT_TILT = 2;
 const LEFT_TILT = 3;
 const LEFT_PAN = 4;
 
-const rPan: ServoConfig = getServoConfig(RIGHT_PAN);
-const rTilt: ServoConfig = getServoConfig(RIGHT_TILT);
-const lTilt: ServoConfig = getServoConfig(LEFT_TILT);
-const lPan: ServoConfig = getServoConfig(LEFT_PAN);
+// Script timeline events (cmdType 1) carry PERCENT positions, not raw ms.
+// The firmware looks up the configured min/max/home ms (from DEPLOY_CONFIG)
+// and interpolates. SERVO_TEST direct commands use raw ms; those go through
+// a different operation, not these primitives.
+export const POS_MIN = 0;
+export const POS_MAX = 100;
+export const POS_HOME = -1;
 
 // Tilt-max is mechanically constrained by the servo stand. Never tilt fully
 // to maxPos; use this fraction of the home→max delta for "subtle nod down".
 export const TILT_DOWN_SUBTLE = 0.3;
 
-export function tiltDownPos(servo: ServoConfig): number {
-  return Math.round(servo.homePos + (servo.maxPos - servo.homePos) * TILT_DOWN_SUBTLE);
+// Only the tilt configs are still needed at module level — the multi-phase
+// primitives compute tiltDownPercent() per channel. Pan-side primitives use
+// the POS_* constants directly.
+const rTilt: ServoConfig = getServoConfig(RIGHT_TILT);
+const lTilt: ServoConfig = getServoConfig(LEFT_TILT);
+
+// Compute the percent-equivalent of "home + 30% toward max" for a given tilt
+// servo. Home doesn't sit at a fixed percent (it varies per channel), so we
+// project home into [0, 100] and walk 30% of the remaining distance toward
+// max (100%). The firmware will translate this percent back to ms using the
+// channel's deployed bounds.
+export function tiltDownPercent(servo: ServoConfig): number {
+  const homePct = ((servo.homePos - servo.minPos) / (servo.maxPos - servo.minPos)) * 100;
+  return Math.round(homePct + (100 - homePct) * TILT_DOWN_SUBTLE);
 }
 
 export interface Beat {
@@ -46,6 +61,8 @@ export interface PoseOpts {
 // Layer 1: pose() — emits a servo pulse for any specified channel at t=0,
 // then a closing buffer of durMs. Channels not specified retain prior position.
 // Padawan stays idle for the full duration.
+//
+// Position values are PERCENT: 0 = min, 100 = max, -1 = home. See POS_*.
 export function pose(durMs: number, opts: PoseOpts = {}): Beat {
   const master: string[] = [];
   if (opts.rPan !== undefined) {
@@ -67,42 +84,38 @@ export function pose(durMs: number, opts: PoseOpts = {}): Beat {
 // Layer 2: named single-pose primitives.
 
 export function settleHome(durMs: number): Beat {
-  return pose(durMs, {
-    rPan: rPan.homePos,
-    lPan: lPan.homePos,
-    rTilt: rTilt.homePos,
-    lTilt: lTilt.homePos,
-  });
+  return pose(durMs, { rPan: POS_HOME, lPan: POS_HOME, rTilt: POS_HOME, lTilt: POS_HOME });
 }
 
 export function bothPanLeft(durMs: number): Beat {
-  return pose(durMs, { rPan: rPan.minPos, lPan: lPan.minPos });
+  return pose(durMs, { rPan: POS_MIN, lPan: POS_MIN });
 }
 
 export function bothPanRight(durMs: number): Beat {
-  return pose(durMs, { rPan: rPan.maxPos, lPan: lPan.maxPos });
+  return pose(durMs, { rPan: POS_MAX, lPan: POS_MAX });
 }
 
 export function bothPanForward(durMs: number): Beat {
-  return pose(durMs, { rPan: rPan.homePos, lPan: lPan.homePos });
+  return pose(durMs, { rPan: POS_HOME, lPan: POS_HOME });
 }
 
+// Tilt-min in ms = look UP per bench geometry, which translates to percent 0.
 export function bothLookUp(durMs: number): Beat {
-  return pose(durMs, { rTilt: rTilt.minPos, lTilt: lTilt.minPos });
+  return pose(durMs, { rTilt: POS_MIN, lTilt: POS_MIN });
 }
 
 export function bothLookLevel(durMs: number): Beat {
-  return pose(durMs, { rTilt: rTilt.homePos, lTilt: lTilt.homePos });
+  return pose(durMs, { rTilt: POS_HOME, lTilt: POS_HOME });
 }
 
 export function meetEyes(durMs: number): Beat {
   // R-pan to min (R faces left, toward L); L-pan to max (L faces right, toward R)
-  return pose(durMs, { rPan: rPan.minPos, lPan: lPan.maxPos });
+  return pose(durMs, { rPan: POS_MIN, lPan: POS_MAX });
 }
 
 export function lookOutward(durMs: number): Beat {
   // R-pan to max (R faces right, away); L-pan to min (L faces left, away)
-  return pose(durMs, { rPan: rPan.maxPos, lPan: lPan.minPos });
+  return pose(durMs, { rPan: POS_MAX, lPan: POS_MIN });
 }
 
 export function hold(durMs: number): Beat {
@@ -120,15 +133,15 @@ export function bothNodSubtle(durMs: number, count = 1): Beat {
   const trailingPad = durMs - phaseMs * count * 2;
 
   const master: string[] = [];
-  const downR = tiltDownPos(rTilt);
-  const downL = tiltDownPos(lTilt);
+  const downR = tiltDownPercent(rTilt);
+  const downL = tiltDownPercent(lTilt);
 
   for (let i = 0; i < count; i++) {
     master.push(makeServoPulse({ channel: RIGHT_TILT, position: downR, timeTillMs: 0 }));
     master.push(makeServoPulse({ channel: LEFT_TILT, position: downL, timeTillMs: 0 }));
     master.push(makeBuffer(phaseMs));
-    master.push(makeServoPulse({ channel: RIGHT_TILT, position: rTilt.homePos, timeTillMs: 0 }));
-    master.push(makeServoPulse({ channel: LEFT_TILT, position: lTilt.homePos, timeTillMs: 0 }));
+    master.push(makeServoPulse({ channel: RIGHT_TILT, position: POS_HOME, timeTillMs: 0 }));
+    master.push(makeServoPulse({ channel: LEFT_TILT, position: POS_HOME, timeTillMs: 0 }));
     master.push(makeBuffer(phaseMs));
   }
   if (trailingPad > 0) master.push(makeBuffer(trailingPad));
@@ -145,11 +158,11 @@ export function rightShakeNo(durMs: number, count = 4): Beat {
 
   const master: string[] = [];
   for (let i = 0; i < count; i++) {
-    const pos = i % 2 === 0 ? rPan.minPos : rPan.maxPos;
+    const pos = i % 2 === 0 ? POS_MIN : POS_MAX;
     master.push(makeServoPulse({ channel: RIGHT_PAN, position: pos, timeTillMs: 0 }));
     master.push(makeBuffer(phaseMs));
   }
-  master.push(makeServoPulse({ channel: RIGHT_PAN, position: rPan.homePos, timeTillMs: 0 }));
+  master.push(makeServoPulse({ channel: RIGHT_PAN, position: POS_HOME, timeTillMs: 0 }));
   master.push(makeBuffer(phaseMs));
   if (trailingPad > 0) master.push(makeBuffer(trailingPad));
 
@@ -162,13 +175,13 @@ export function leftNodYes(durMs: number, count = 4): Beat {
   const phaseMs = Math.floor(durMs / (count * 2));
   const trailingPad = durMs - phaseMs * count * 2;
 
-  const downL = tiltDownPos(lTilt);
+  const downL = tiltDownPercent(lTilt);
   const master: string[] = [];
 
   for (let i = 0; i < count; i++) {
     master.push(makeServoPulse({ channel: LEFT_TILT, position: downL, timeTillMs: 0 }));
     master.push(makeBuffer(phaseMs));
-    master.push(makeServoPulse({ channel: LEFT_TILT, position: lTilt.homePos, timeTillMs: 0 }));
+    master.push(makeServoPulse({ channel: LEFT_TILT, position: POS_HOME, timeTillMs: 0 }));
     master.push(makeBuffer(phaseMs));
   }
   if (trailingPad > 0) master.push(makeBuffer(trailingPad));
@@ -215,6 +228,9 @@ export function withLedSolid(beat: Beat, atMs: number, durMs: number): Beat {
 // makeServoPulse: '1|t|maestroIdx|ch|pos|speed|accel'
 // makeBuffer:     '0|t|0'
 // makeGpioToggle: '5|t|ch|1;5|0|ch|0'  — two events joined by ';'
+// Strict: rejects malformed duration fields so authoring drift surfaces here.
+// Note: position (field index 4) may be -1 (POS_HOME) — that never reaches
+// this regex because we only inspect field index 1 (timeTillMs).
 function sumEventDurations(events: string[]): number {
   let total = 0;
   for (const ev of events) {
@@ -222,8 +238,6 @@ function sumEventDurations(events: string[]): number {
       if (!piece) continue;
       const fields = piece.split('|');
       const raw = fields[1] ?? '';
-      // Strict numeric: '100abc' should fail, not silently parse to 100.
-      // Negative durations are also invalid (helpers never produce them).
       if (!/^\d+$/.test(raw)) {
         throw new Error(`sumEventDurations: malformed duration field "${raw}" in event "${piece}"`);
       }
