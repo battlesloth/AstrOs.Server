@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import type { CockpitEvent } from '../composables/useEventStream';
-import { useConnection } from '../composables/useConnection';
+import { computed, inject, ref, watch } from 'vue';
+import { ConnectionKey } from '../composables/useConnection';
 
-const props = defineProps<{ events: CockpitEvent[] }>();
-
-const { state, ports, error, busy, connect, disconnect, panic, refreshState, refreshPorts } =
-  useConnection();
+// Inject the connection context provided by App.vue. The throw guards an
+// app-tree invariant: TopBar must mount under a provider; failure is a
+// developer error, not a runtime condition users would ever hit.
+const connection = inject(ConnectionKey);
+if (!connection) {
+  throw new Error('TopBar requires a ConnectionKey provider (mount inside App.vue).');
+}
+const { state, ports, error, busy, connect, disconnect, panic, refreshPorts } = connection;
 
 const selectedPort = ref<string>('');
 const baud = ref<number>(115200);
@@ -21,18 +24,9 @@ watch(
   { immediate: true },
 );
 
-// Whenever a connection-shape event lands, re-pull state from the server so
-// pill text reflects discovered padawan / disconnected status etc.
-watch(
-  () => props.events.length,
-  () => {
-    const last = props.events[props.events.length - 1];
-    if (!last) return;
-    if (last.kind === 'connected' || last.kind === 'disconnected') {
-      void refreshState();
-    }
-  },
-);
+// No events watcher here — App.vue already calls refreshState() on
+// connection-shape events, and `state` is now the shared ref so the pill
+// updates automatically.
 
 const statusPill = computed(() => {
   if (!state.value) return { text: 'loading...', tone: 'gray' };

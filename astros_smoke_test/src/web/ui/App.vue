@@ -1,18 +1,24 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, provide, ref, watch } from 'vue';
 import TopBar from './components/TopBar.vue';
 import ScenarioList from './components/ScenarioList.vue';
 import TabbedTranscript from './components/TabbedTranscript.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
 import { useEventStream } from './composables/useEventStream';
 import { useRuns } from './composables/useRuns';
-import { useConnection } from './composables/useConnection';
+import { ConnectionKey, useConnection } from './composables/useConnection';
 import * as api from './api';
 import type { ScenarioInfo } from './api';
 
 const { events, sseConnected } = useEventStream();
 const { tabs } = useRuns(events);
-const { state, refreshState } = useConnection();
+
+// Single source of truth for connection state. Provided to descendants
+// (TopBar, etc.) via ConnectionKey so they don't instantiate their own
+// useConnection() with duplicate refs and onMounted fetches.
+const connection = useConnection();
+provide(ConnectionKey, connection);
+const { state, refreshState } = connection;
 
 watch(
   () => events.value.length,
@@ -65,7 +71,7 @@ const activeRunId = computed<string | null>(() => state.value?.activeRunId ?? nu
 </script>
 
 <template>
-  <TopBar :events="events" />
+  <TopBar />
   <p
     v-if="runError"
     class="run-error"

@@ -1,6 +1,13 @@
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, type InjectionKey } from 'vue';
 import * as api from '../api';
 import type { CockpitState, SerialPortInfo } from '../api';
+
+export type ConnectionContext = ReturnType<typeof useConnection>;
+
+// Inject key for descendant components (TopBar, etc.) to consume the same
+// connection context the root App.vue creates. Avoids two independent
+// useConnection() instances with their own state/error/onMounted fetches.
+export const ConnectionKey: InjectionKey<ConnectionContext> = Symbol('connection');
 
 export function useConnection() {
   const state = ref<CockpitState | null>(null);
