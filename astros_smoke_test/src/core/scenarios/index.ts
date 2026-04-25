@@ -7,6 +7,7 @@ import { directCommandSweep } from './direct-command-sweep.js';
 import { servoTestSweep } from './servo-test-sweep.js';
 import { panicDrill } from './panic-drill.js';
 import { headsCuriousDuet } from './heads-curious-duet.js';
+import { headsDisagreement } from './heads-disagreement.js';
 
 export * from './_shared.js';
 export {
@@ -18,6 +19,7 @@ export {
   servoTestSweep,
   panicDrill,
   headsCuriousDuet,
+  headsDisagreement,
 };
 
 export const scenarios: Record<string, ScenarioFactory> = {
@@ -29,6 +31,7 @@ export const scenarios: Record<string, ScenarioFactory> = {
   'servo-test-sweep': servoTestSweep,
   'panic-drill': panicDrill,
   'heads-curious-duet': headsCuriousDuet,
+  'heads-disagreement': headsDisagreement,
 };
 
 export function listScenarioIds(): string[] {
