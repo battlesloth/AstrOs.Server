@@ -6,6 +6,7 @@ import { fullHappyPath } from './full-happy-path.js';
 import { directCommandSweep } from './direct-command-sweep.js';
 import { servoTestSweep } from './servo-test-sweep.js';
 import { panicDrill } from './panic-drill.js';
+import { headsCuriousDuet } from './heads-curious-duet.js';
 
 export * from './_shared.js';
 export {
@@ -16,6 +17,7 @@ export {
   directCommandSweep,
   servoTestSweep,
   panicDrill,
+  headsCuriousDuet,
 };
 
 export const scenarios: Record<string, ScenarioFactory> = {
@@ -26,6 +28,7 @@ export const scenarios: Record<string, ScenarioFactory> = {
   'direct-command-sweep': directCommandSweep,
   'servo-test-sweep': servoTestSweep,
   'panic-drill': panicDrill,
+  'heads-curious-duet': headsCuriousDuet,
 };
 
 export function listScenarioIds(): string[] {

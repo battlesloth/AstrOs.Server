@@ -19,7 +19,7 @@ function makeSession(): SessionContext {
 }
 
 describe('scenario registry', () => {
-  it('exposes all seven MVP scenarios by id', () => {
+  it('exposes all eight scenarios by id', () => {
     expect(listScenarioIds().sort()).toEqual(
       [
         'sync-only',
@@ -29,6 +29,7 @@ describe('scenario registry', () => {
         'direct-command-sweep',
         'servo-test-sweep',
         'panic-drill',
+        'heads-curious-duet',
       ].sort(),
     );
   });
@@ -47,7 +48,9 @@ describe('scenario registry', () => {
         .sort();
 
     expect(bySeverity('destructive')).toEqual(['format-and-sync', 'full-happy-path'].sort());
-    expect(bySeverity('caution')).toEqual(['panic-drill', 'servo-test-sweep'].sort());
+    expect(bySeverity('caution')).toEqual(
+      ['panic-drill', 'servo-test-sweep', 'heads-curious-duet'].sort(),
+    );
     expect(bySeverity('safe')).toEqual(['config-only', 'direct-command-sweep', 'sync-only'].sort());
   });
 });
@@ -96,5 +99,15 @@ describe('scenario composition', () => {
     const names = s.act?.map((x) => x.name) ?? [];
     expect(names.filter((n) => n === 'servoTest')).toHaveLength(3);
     expect(names.filter((n) => n.startsWith('hold'))).toHaveLength(2);
+  });
+
+  it('heads-curious-duet has the standard single-script shape', () => {
+    const s = scenarios['heads-curious-duet'](session);
+    expect(s.arrange?.map((x) => x.name)).toEqual([
+      'registrationSync',
+      'deployConfig',
+      'deployScript',
+    ]);
+    expect(s.act?.map((x) => x.name)).toEqual(['runScript', 'let-script-play']);
   });
 });
