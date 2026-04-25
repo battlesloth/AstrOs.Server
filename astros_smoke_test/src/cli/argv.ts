@@ -72,7 +72,7 @@ export const USAGE = `Usage:
 
 Flags:
   --port <path>   Serial port (default: /dev/ttyUSB0 or $SMOKE_SERIAL_PORT)
-  --baud <n>      Baud rate (default: 9600 or $SMOKE_SERIAL_BAUD)
+  --baud <n>      Baud rate (default: 115200 or $SMOKE_SERIAL_BAUD)
   --confirm       Required for scenarios that wipe SD or move hardware
   --json          Emit one JSON object per runner event (otherwise pretty-print)
 `;
