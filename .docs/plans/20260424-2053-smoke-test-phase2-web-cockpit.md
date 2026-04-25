@@ -107,7 +107,7 @@ Four discrete tasks, each independently commit-worthy:
 - [x] **2. Connect flow + state endpoints + SSE channel**
   Implement `/api/ports`, `/api/connect`, `/api/disconnect`, `/api/state`, `/api/events` (SSE). Server-side `SerialTransport` + `discover()` call on connect. Top-bar Vue component with port picker, Connect/Disconnect, status pill, panic button. SSE client subscribes; `connected`/`disconnected`/`error`/`txBytes`/`rxBytes` events flow end-to-end into a Background-tab placeholder. `/api/panic` plumbed.
 
-- [ ] **3. Scenario list, run flow, tabbed transcript**
+- [x] **3. Scenario list, run flow, tabbed transcript**
   Implement `/api/scenarios`, `/api/run/:id`. Left panel renders the list; destructive scenarios show a confirmation modal. Tabbed transcript center panel: tab created on `runStarted`, populated by step + TX/RX events, finalized on `scenarioDone`. Run-related TX/RX is filtered by `runId` into its tab; un-tagged bytes land in Background. Single concurrent run enforced server-side.
 
 - [ ] **4. Transport inspector**

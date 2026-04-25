@@ -1,20 +1,27 @@
 import type { Response } from 'express';
+import type { StepResult } from '../core/runner.js';
 
 // Single SSE channel: every connected /api/events client receives every event.
-// Filtering by runId / kind is the client's job (Task 3+ uses runId to bucket
-// events into per-run transcript tabs).
-
-export type CockpitEvent =
-  | { kind: 'connected'; port: string; baud: number; padawan: PadawanInfo | null }
-  | { kind: 'disconnected' }
-  | { kind: 'error'; message: string }
-  | { kind: 'txBytes'; bytes: string; runId?: string }
-  | { kind: 'rxBytes'; bytes: string; runId?: string };
+// The client buckets events into transcript tabs by runId; events without a
+// runId belong to the Background tab (connection events, between-run bytes).
 
 export interface PadawanInfo {
   address: string;
   name: string;
 }
+
+export type CockpitEvent =
+  | { kind: 'connected'; port: string; baud: number; padawan: PadawanInfo | null }
+  | { kind: 'disconnected' }
+  | { kind: 'error'; message: string; runId?: string }
+  | { kind: 'txBytes'; bytes: string; runId?: string }
+  | { kind: 'rxBytes'; bytes: string; runId?: string }
+  | { kind: 'runStarted'; runId: string; scenarioId: string; description: string }
+  | { kind: 'scenarioDone'; runId: string; ok: boolean }
+  | { kind: 'stepStart'; runId: string; phase: string; step: string }
+  | { kind: 'stepOk'; runId: string; phase: string; step: string; result: StepResult }
+  | { kind: 'stepFail'; runId: string; phase: string; step: string; result: StepResult }
+  | { kind: 'stepTimeout'; runId: string; phase: string; step: string; result: StepResult };
 
 const subscribers = new Set<Response>();
 

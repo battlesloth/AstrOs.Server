@@ -58,3 +58,24 @@ export async function panic(): Promise<void> {
   const res = await fetch('/api/panic', { method: 'POST' });
   await unwrap<{ ok: boolean }>(res, 'Panic failed');
 }
+
+export interface ScenarioInfo {
+  id: string;
+  description: string;
+  requiresConfirmation: boolean;
+}
+
+export async function getScenarios(): Promise<ScenarioInfo[]> {
+  const res = await fetch('/api/scenarios');
+  const data = await unwrap<{ scenarios: ScenarioInfo[] }>(res, 'Failed to list scenarios');
+  return data.scenarios;
+}
+
+export async function runScenario(id: string, confirm = false): Promise<{ runId: string }> {
+  const res = await fetch(`/api/run/${encodeURIComponent(id)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirm }),
+  });
+  return unwrap<{ runId: string }>(res, 'Run failed');
+}

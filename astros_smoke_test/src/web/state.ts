@@ -30,6 +30,7 @@ export class NotConnectedError extends Error {
 }
 
 let transport: SerialTransport | null = null;
+let currentRunId: string | null = null;
 let currentState: CockpitState = {
   connected: false,
   port: null,
@@ -44,6 +45,16 @@ export function getState(): CockpitState {
 
 export function getTransport(): SerialTransport | null {
   return transport;
+}
+
+export function setActiveRun(runId: string): void {
+  currentRunId = runId;
+  currentState = { ...currentState, activeRunId: runId };
+}
+
+export function clearActiveRun(): void {
+  currentRunId = null;
+  currentState = { ...currentState, activeRunId: null };
 }
 
 export async function connect(port: string, baud: number): Promise<CockpitState> {
@@ -61,9 +72,17 @@ export async function connect(port: string, baud: number): Promise<CockpitState>
   }
 
   // Wire transport events to SSE before any traffic flows so discovery is visible.
-  t.on('tx', (bytes) => broadcast({ kind: 'txBytes', bytes }));
-  t.on('line', (line) => broadcast({ kind: 'rxBytes', bytes: line }));
-  t.on('error', (err) => broadcast({ kind: 'error', message: err.message }));
+  // Closures capture the `currentRunId` binding so events emitted while a run
+  // is active get tagged with that run's id and bucket into its transcript tab.
+  t.on('tx', (bytes) =>
+    broadcast({ kind: 'txBytes', bytes, runId: currentRunId ?? undefined }),
+  );
+  t.on('line', (line) =>
+    broadcast({ kind: 'rxBytes', bytes: line, runId: currentRunId ?? undefined }),
+  );
+  t.on('error', (err) =>
+    broadcast({ kind: 'error', message: err.message, runId: currentRunId ?? undefined }),
+  );
 
   transport = t;
 

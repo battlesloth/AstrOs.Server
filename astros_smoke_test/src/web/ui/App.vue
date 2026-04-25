@@ -1,109 +1,115 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import TopBar from './components/TopBar.vue';
-import { useEventStream, type CockpitEvent } from './composables/useEventStream';
+import ScenarioList from './components/ScenarioList.vue';
+import TabbedTranscript from './components/TabbedTranscript.vue';
+import ConfirmModal from './components/ConfirmModal.vue';
+import { useEventStream } from './composables/useEventStream';
+import { useRuns } from './composables/useRuns';
+import { useConnection } from './composables/useConnection';
+import * as api from './api';
+import type { ScenarioInfo } from './api';
 
 const { events, sseConnected } = useEventStream();
+const { tabs } = useRuns(events);
+const { state, refreshState } = useConnection();
 
-// POLL_ACK fires every ~2s while connected (master polls each padawan via
-// ESP-NOW and forwards the ack to the host). Filtering only affects display;
-// the underlying events array is preserved so the toggle is reversible.
-const POLL_ACK_HEADER = '\u001ePOLL_ACK\u001e';
+watch(
+  () => events.value.length,
+  () => {
+    const last = events.value[events.value.length - 1];
+    if (!last) return;
+    if (last.kind === 'connected' || last.kind === 'disconnected' || last.kind === 'scenarioDone' || last.kind === 'runStarted') {
+      void refreshState();
+    }
+  },
+);
+
 const hidePollAck = ref<boolean>(localStorage.getItem('smoke.hidePollAck') === 'true');
 watch(hidePollAck, (v) => {
   localStorage.setItem('smoke.hidePollAck', String(v));
 });
 
-function isPollAck(ev: CockpitEvent): boolean {
-  if (ev.kind !== 'txBytes' && ev.kind !== 'rxBytes') return false;
-  return ev.bytes.includes(POLL_ACK_HEADER);
-}
+const pendingScenario = ref<ScenarioInfo | null>(null);
+const runError = ref<string | null>(null);
 
-const visible = computed(() =>
-  hidePollAck.value ? events.value.filter((ev) => !isPollAck(ev)) : events.value,
-);
-
-// Show most recent first; cap at 200 to keep DOM small until Task 3
-// replaces this with proper tabs.
-const recent = computed(() => visible.value.slice(-200).slice().reverse());
-const hiddenCount = computed(() => events.value.length - visible.value.length);
-
-function eventLabel(kind: string): string {
-  switch (kind) {
-    case 'connected':
-      return 'connect';
-    case 'disconnected':
-      return 'disconnect';
-    case 'error':
-      return 'error';
-    case 'txBytes':
-      return 'TX';
-    case 'rxBytes':
-      return 'RX';
-    default:
-      return kind;
+async function fireRun(scenario: ScenarioInfo, confirm: boolean): Promise<void> {
+  runError.value = null;
+  try {
+    await api.runScenario(scenario.id, confirm);
+  } catch (err) {
+    runError.value = err instanceof Error ? err.message : String(err);
   }
 }
 
-function eventDetail(ev: { kind: string; [k: string]: unknown }): string {
-  if (ev.kind === 'txBytes' || ev.kind === 'rxBytes') {
-    return String(ev.bytes ?? '');
+function onScenarioRun(scenario: ScenarioInfo): void {
+  if (scenario.requiresConfirmation) {
+    pendingScenario.value = scenario;
+    return;
   }
-  if (ev.kind === 'error') {
-    return String(ev.message ?? '');
-  }
-  if (ev.kind === 'connected') {
-    return `${ev.port} @ ${ev.baud}` + (ev.padawan ? ` · padawan ${(ev.padawan as { address: string }).address}` : '');
-  }
-  return '';
+  void fireRun(scenario, false);
 }
+
+function onConfirmRun(): void {
+  const s = pendingScenario.value;
+  pendingScenario.value = null;
+  if (s) void fireRun(s, true);
+}
+
+function onCancelRun(): void {
+  pendingScenario.value = null;
+}
+
+const isConnected = computed<boolean>(() => state.value?.connected === true);
+const activeRunId = computed<string | null>(() => state.value?.activeRunId ?? null);
 </script>
 
 <template>
   <TopBar :events="events" />
-  <main>
-    <section>
+  <p
+    v-if="runError"
+    class="run-error"
+    role="alert"
+  >
+    {{ runError }}
+  </p>
+  <div class="layout">
+    <ScenarioList
+      :connected="isConnected"
+      :active-run-id="activeRunId"
+      @run="onScenarioRun"
+    />
+    <TabbedTranscript
+      :tabs="tabs"
+      :hide-poll-ack="hidePollAck"
+    />
+    <aside class="inspector">
       <header class="section-header">
-        <h2>Background</h2>
+        <h2>Inspector</h2>
         <span
           class="sse-pill"
           :data-tone="sseConnected ? 'green' : 'gray'"
           >SSE {{ sseConnected ? 'live' : 'offline' }}</span
         >
-        <label class="filter-toggle">
-          <input
-            v-model="hidePollAck"
-            type="checkbox"
-          />
-          hide POLL_ACK
-          <span
-            v-if="hidePollAck && hiddenCount > 0"
-            class="muted"
-            >({{ hiddenCount }} hidden)</span
-          >
-        </label>
       </header>
-      <p
-        v-if="events.length === 0"
-        class="muted"
-      >
-        No events yet. Click Connect to start a serial session.
-      </p>
-      <ul
-        v-else
-        class="event-log"
-      >
-        <li
-          v-for="(ev, i) in recent"
-          :key="recent.length - i"
-          :class="`event-${ev.kind}`"
-        >
-          <span class="kind">{{ eventLabel(ev.kind) }}</span>
-          <span class="detail">{{ eventDetail(ev) }}</span>
-        </li>
-      </ul>
-    </section>
-  </main>
+      <label class="filter-toggle">
+        <input
+          v-model="hidePollAck"
+          type="checkbox"
+        />
+        hide POLL_ACK
+      </label>
+      <p class="muted placeholder">Transport inspector lands in Task 4.</p>
+    </aside>
+  </div>
+
+  <ConfirmModal
+    :open="pendingScenario !== null"
+    :scenario-id="pendingScenario?.id ?? ''"
+    :description="pendingScenario?.description ?? ''"
+    @confirm="onConfirmRun"
+    @cancel="onCancelRun"
+  />
 </template>
 
 <style>
@@ -113,10 +119,24 @@ function eventDetail(ev: { kind: string; [k: string]: unknown }): string {
     background: #0d1117;
     color: #e6edf3;
     line-height: 1.5;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #app {
+    display: grid;
+    grid-template-rows: auto auto 1fr;
+    height: 100vh;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 240px 1fr 280px;
+    overflow: hidden;
   }
 
-  main {
+  .inspector {
     padding: 1rem;
+    border-left: 1px solid #30363d;
+    overflow-y: auto;
   }
 
   .section-header {
@@ -125,12 +145,10 @@ function eventDetail(ev: { kind: string; [k: string]: unknown }): string {
     gap: 0.75rem;
     margin-bottom: 0.5rem;
   }
-
   h1,
   h2 {
     margin: 0;
   }
-
   h2 {
     font-size: 0.85rem;
     color: #7ee787;
@@ -140,6 +158,10 @@ function eventDetail(ev: { kind: string; [k: string]: unknown }): string {
 
   .muted {
     color: #8b949e;
+  }
+  .placeholder {
+    font-size: 0.8rem;
+    margin: 0.5rem 0;
   }
 
   .sse-pill {
@@ -169,48 +191,12 @@ function eventDetail(ev: { kind: string; [k: string]: unknown }): string {
     cursor: pointer;
   }
 
-  .event-log {
-    list-style: none;
-    padding: 0;
+  .run-error {
     margin: 0;
-    border-top: 1px solid #30363d;
-  }
-  .event-log li {
-    display: grid;
-    grid-template-columns: 7ch 1fr;
-    gap: 0.75rem;
-    padding: 0.3rem 0;
-    border-bottom: 1px solid #21262d;
+    padding: 0.5rem 1rem;
+    background: #4a1c1c;
+    color: #ffa198;
     font-size: 0.85rem;
-  }
-
-  .kind {
-    color: #58a6ff;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    font-size: 0.75rem;
-    padding-top: 0.15rem;
-  }
-  .event-log li.event-error .kind {
-    color: #f85149;
-  }
-  .event-log li.event-rxBytes .kind {
-    color: #d2a8ff;
-  }
-  .event-log li.event-txBytes .kind {
-    color: #79c0ff;
-  }
-  .event-log li.event-connected .kind {
-    color: #7ee787;
-  }
-  .event-log li.event-disconnected .kind {
-    color: #8b949e;
-  }
-
-  .detail {
-    word-break: break-all;
-    color: #c9d1d9;
-    white-space: pre-wrap;
+    border-bottom: 1px solid #f85149;
   }
 </style>

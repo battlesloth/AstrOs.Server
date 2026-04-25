@@ -8,15 +8,23 @@ import {
   AlreadyConnectedError,
   NotConnectedError,
   PortInUseError,
+  clearActiveRun,
   connect,
   disconnect,
   getState,
   getTransport,
+  setActiveRun,
 } from './state.js';
-import { addSubscriber, removeSubscriber } from './sse.js';
+import { addSubscriber, broadcast, removeSubscriber } from './sse.js';
 import { panicStop } from '../core/operations/panicStop.js';
-import { buildBenchConfigSync } from '../core/fixtures/demo-location.js';
+import {
+  buildBenchConfigSync,
+  buildMasterControlModule,
+  buildPadawanControlModule,
+} from '../core/fixtures/demo-location.js';
 import { buildScriptRun } from '../core/fixtures/helpers.js';
+import { ScenarioRunner, type RunnerEvent } from '../core/runner.js';
+import { listScenarioIds, scenarios, type SessionContext } from '../core/scenarios/index.js';
 
 const PORT = 5174;
 const HOST = '127.0.0.1';
@@ -91,6 +99,91 @@ async function main(): Promise<void> {
     const run = buildScriptRun(sync, `cockpit-panic-${uuidv4().slice(0, 8)}`);
     const result = await panicStop(run).run({ transport: t });
     res.json({ ok: result.ok, durationMs: result.durationMs });
+  });
+
+  app.get('/api/scenarios', (_req, res) => {
+    // Build a fake session purely so factories can produce metadata for the list.
+    // The transport is never touched — these scenarios are only inspected, not run.
+    const fakeSession: SessionContext = {
+      transport: { open: async () => undefined, close: async () => undefined,
+        write: async () => undefined, on() { return this; }, off() { return this; } } as never,
+      configSync: buildBenchConfigSync(),
+      master: buildMasterControlModule(),
+      padawan: buildPadawanControlModule(''),
+    };
+    const list = listScenarioIds().map((id) => {
+      const sc = scenarios[id](fakeSession);
+      return {
+        id: sc.id,
+        description: sc.description,
+        requiresConfirmation: sc.requiresConfirmation === true,
+      };
+    });
+    res.json({ scenarios: list });
+  });
+
+  app.post('/api/run/:id', async (req, res) => {
+    const id = req.params.id;
+    const factory = scenarios[id];
+    if (!factory) {
+      res.status(404).json({ message: `Unknown scenario: ${id}` });
+      return;
+    }
+
+    const t = getTransport();
+    if (!t) {
+      res.status(409).json({ message: 'Not connected' });
+      return;
+    }
+
+    if (getState().activeRunId !== null) {
+      res.status(409).json({ message: 'Another run is in progress' });
+      return;
+    }
+
+    const padawanAddr = getState().padawan?.address ?? '';
+    const session: SessionContext = {
+      transport: t,
+      configSync: buildBenchConfigSync({ padawanAddress: padawanAddr }),
+      master: buildMasterControlModule(),
+      padawan: buildPadawanControlModule(padawanAddr),
+    };
+    const scenario = factory(session);
+
+    const body = (req.body ?? {}) as { confirm?: boolean };
+    if (scenario.requiresConfirmation && !body.confirm) {
+      res.status(409).json({
+        message: `Scenario '${id}' is destructive — re-send with { "confirm": true }.`,
+      });
+      return;
+    }
+
+    const runId = uuidv4();
+    setActiveRun(runId);
+    broadcast({ kind: 'runStarted', runId, scenarioId: id, description: scenario.description });
+
+    res.json({ runId });
+
+    const runner = new ScenarioRunner(t);
+    const onEvent = (ev: RunnerEvent) => {
+      // state.ts already broadcasts tx/rx events tagged with the active runId.
+      // Skip duplicates from the runner's own event channel here.
+      if (ev.kind === 'txBytes' || ev.kind === 'rxBytes') return;
+      broadcast({ ...ev, runId } as never);
+    };
+    runner.on('event', onEvent);
+
+    try {
+      await runner.run(scenario);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      broadcast({ kind: 'error', message, runId });
+      broadcast({ kind: 'scenarioDone', runId, ok: false });
+    } finally {
+      runner.off('event', onEvent);
+      runner.detach();
+      clearActiveRun();
+    }
   });
 
   app.get('/api/events', (req, res) => {
