@@ -9,6 +9,7 @@ export function useConnection() {
   const busy = ref(false);
 
   async function refreshState(): Promise<void> {
+    error.value = null;
     try {
       state.value = await api.getState();
     } catch (err) {
@@ -17,6 +18,7 @@ export function useConnection() {
   }
 
   async function refreshPorts(): Promise<void> {
+    error.value = null;
     try {
       ports.value = await api.getPorts();
     } catch (err) {
