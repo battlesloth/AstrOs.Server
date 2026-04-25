@@ -63,14 +63,14 @@ The startup banner (`[smoke-cockpit] http://localhost:5174`) becomes a `log.info
 
 ## Task checklist
 
-- [ ] **1. Add deps and create logger module**
+- [x] **1. Add deps and create logger module**
   - `package.json`: add `pino-pretty` to `devDependencies`, remove `pino-roll` from `dependencies`.
   - Run `npm install` to update lockfile.
   - Create `src/core/log.ts` per the architecture above.
   - Create `src/core/log.test.ts` covering: namespace gating (debug suppressed when `SMOKE_LOG` unset, fires when namespace listed, fires for `*`), levels above debug always fire, error objects get serialized.
   - Run `npm test` — all tests pass.
 
-- [ ] **2. Wire logger into transport, server, sse, state**
+- [x] **2. Wire logger into transport, server, sse, state**
   - Replace ad-hoc `console.log`/`console.error` calls in the four files listed above.
   - Add request-lifecycle debug calls in `web/server.ts` and subscriber-lifecycle in `web/sse.ts`.
   - Run `npm run lint:fix` and `npm run prettier:write`.
