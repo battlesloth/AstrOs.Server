@@ -221,8 +221,13 @@ function sumEventDurations(events: string[]): number {
     for (const piece of ev.split(';')) {
       if (!piece) continue;
       const fields = piece.split('|');
-      const t = Number.parseInt(fields[1] ?? '0', 10);
-      if (Number.isFinite(t)) total += t;
+      const raw = fields[1] ?? '';
+      // Strict numeric: '100abc' should fail, not silently parse to 100.
+      // Negative durations are also invalid (helpers never produce them).
+      if (!/^\d+$/.test(raw)) {
+        throw new Error(`sumEventDurations: malformed duration field "${raw}" in event "${piece}"`);
+      }
+      total += Number.parseInt(raw, 10);
     }
   }
   return total;

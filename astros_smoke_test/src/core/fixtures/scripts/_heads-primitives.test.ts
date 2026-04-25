@@ -170,4 +170,23 @@ describe('buildScript', () => {
       /padawan events sum to 100ms, expected 200/,
     );
   });
+
+  it('throws when an event has a malformed duration field', () => {
+    const malformed: Beat = {
+      master: ['0|100abc|0'],
+      padawan: ['0|100|0'],
+      durMs: 100,
+    };
+    expect(() => buildScript(sync, [malformed])).toThrow(/malformed duration field "100abc"/);
+  });
+
+  it('stitches beat lists into the master/padawan timelines with closing buffer', () => {
+    const built = buildScript(sync, [hold(100), hold(200)]);
+    // Master and padawan timelines: each beat's events joined by ';' + final '0|0|0'
+    const expected = '0|100|0;0|200|0;0|0|0';
+    const masterCfg = built.upload.configs.find((c) => c.address === '00:00:00:00:00:00');
+    const padawanCfg = built.upload.configs.find((c) => c.address === 'aa:bb:cc:dd:ee:ff');
+    expect(masterCfg?.script).toBe(expected);
+    expect(padawanCfg?.script).toBe(expected);
+  });
 });
