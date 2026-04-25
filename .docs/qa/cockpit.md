@@ -59,3 +59,12 @@ The smoke-test CLI (`npm run smoke list`, `npm run smoke scenario <id>`) was upd
 - **Active run blocks clicks.** While a run is in progress (`activeRunId` set in state), clicking any scenario is no-op (button disabled). Verify by starting `panic-drill` and immediately clicking `config-only` — the second click is ignored.
 - **Browser refresh.** Refresh the page during a run. The scenario list re-loads from `/api/scenarios`; badges render correctly.
 - **Unexpected serial-port close.** Connect to the bench, then physically unplug the USB cable (or otherwise force the OS to close the FD). The cockpit should: (a) surface a "Serial port closed unexpectedly" error in the run-error banner, (b) flip the connection pill back to disconnected, (c) re-enable the port picker and Connect button. Re-plugging the cable and clicking Connect should succeed without restarting the cockpit. **Server-side log check** (with `SMOKE_LOG=state`): you should see one `serial port closed unexpectedly` warn line, not a duplicate of the user-disconnect path.
+
+## Transcript tabs — keyboard accessibility
+
+After at least one scenario has run (so there are multiple tabs):
+
+1. **Tab into the tabstrip.** Press Tab repeatedly until focus lands on the active transcript tab. Only the *active* tab should be reachable via Tab — the others have `tabindex="-1"` (roving tabindex pattern).
+2. **Arrow navigation.** With focus on the tablist, press ArrowRight / ArrowLeft. Focus should move to the next/previous tab AND that tab should become active (the panel content updates). Wraps at both ends.
+3. **Home / End.** Pressing Home jumps focus + activation to the first tab; End to the last.
+4. **Screen-reader announcement.** With NVDA/VoiceOver enabled, focusing a tab should announce the tab name plus its selected state (e.g., "Background, tab, selected, 1 of 3"). The associated panel should be announced when focused, labelled by the tab id.

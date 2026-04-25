@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import type { CockpitEvent } from '../composables/useEventStream';
 import type { Tab } from '../composables/useRuns';
 
@@ -30,6 +30,46 @@ const activeTab = computed<Tab | undefined>(() => {
   if (activeId.value === 'background') return props.tabs.find((t) => t.kind === 'background');
   return props.tabs.find((t) => t.kind === 'run' && t.runId === activeId.value);
 });
+
+// Stable per-tab id used for both the activeId comparison and the ARIA
+// id/aria-controls/aria-labelledby triples that link tab → panel.
+function tabId(t: Tab): string {
+  return t.kind === 'background' ? 'background' : t.runId;
+}
+
+function isActive(t: Tab): boolean {
+  return tabId(t) === activeId.value;
+}
+
+// Roving-tabindex focus management: only the active tab is in the tab order;
+// arrow / Home / End move focus AND activation between tabs (automatic-
+// activation pattern per WAI-ARIA APG).
+const tabRefs = new Map<string, HTMLButtonElement>();
+function setTabRef(id: string, el: Element | unknown): void {
+  if (el instanceof HTMLButtonElement) tabRefs.set(id, el);
+  else tabRefs.delete(id);
+}
+function focusTab(id: string): void {
+  tabRefs.get(id)?.focus();
+}
+function onTabKeydown(e: KeyboardEvent): void {
+  const ids = props.tabs.map(tabId);
+  const i = ids.indexOf(activeId.value);
+  if (i === -1) return;
+
+  let nextId: string | null = null;
+  if (e.key === 'ArrowRight') nextId = ids[(i + 1) % ids.length];
+  else if (e.key === 'ArrowLeft') nextId = ids[(i - 1 + ids.length) % ids.length];
+  else if (e.key === 'Home') nextId = ids[0];
+  else if (e.key === 'End') nextId = ids[ids.length - 1];
+
+  if (nextId !== null && nextId !== activeId.value) {
+    e.preventDefault();
+    const target = nextId;
+    activeId.value = target;
+    void nextTick(() => focusTab(target));
+  }
+}
 
 function isPollAck(ev: CockpitEvent): boolean {
   if (ev.kind !== 'txBytes' && ev.kind !== 'rxBytes') return false;
@@ -125,19 +165,22 @@ function eventDetail(ev: CockpitEvent): string {
     <nav
       class="tabstrip"
       role="tablist"
+      aria-label="Transcript tabs"
+      @keydown="onTabKeydown"
     >
       <button
         v-for="t in props.tabs"
-        :key="t.kind === 'background' ? 'background' : t.runId"
+        :key="tabId(t)"
+        :ref="(el) => setTabRef(tabId(t), el)"
+        :id="`tab-${tabId(t)}`"
         role="tab"
         class="tab"
-        :class="{
-          active:
-            (t.kind === 'background' && activeId === 'background') ||
-            (t.kind === 'run' && t.runId === activeId),
-        }"
+        :class="{ active: isActive(t) }"
         :data-tone="tabStatusTone(t)"
-        @click="activeId = t.kind === 'background' ? 'background' : t.runId"
+        :aria-selected="isActive(t)"
+        :aria-controls="`panel-${tabId(t)}`"
+        :tabindex="isActive(t) ? 0 : -1"
+        @click="activeId = tabId(t)"
       >
         <span class="tab-label">{{ tabLabel(t) }}</span>
         <span
@@ -149,7 +192,13 @@ function eventDetail(ev: CockpitEvent): string {
       </button>
     </nav>
 
-    <div class="content">
+    <div
+      class="content"
+      role="tabpanel"
+      :id="`panel-${activeId}`"
+      :aria-labelledby="`tab-${activeId}`"
+      tabindex="0"
+    >
       <p
         v-if="visibleEvents.length === 0"
         class="muted empty"
