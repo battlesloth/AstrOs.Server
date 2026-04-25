@@ -57,18 +57,29 @@ async function main(): Promise<void> {
   });
 
   app.post('/api/connect', async (req, res) => {
-    const body = req.body as { port?: string; baud?: number };
+    const body = (req.body ?? {}) as { port?: unknown; baud?: unknown };
     log.debug('POST /api/connect', { port: body.port, baud: body.baud });
-    if (!body.port || !body.baud) {
-      res.status(400).json({ message: 'port and baud are required' });
+
+    const port = typeof body.port === 'string' ? body.port.trim() : '';
+    if (!port) {
+      res.status(400).json({ message: 'port is required (non-empty string)' });
       return;
     }
+    // Accept baud as either a number or a numeric string ("115200") so curl /
+    // form clients work; reject anything that doesn't coerce to a positive
+    // finite number (NaN, 0, negatives, true, objects).
+    const baud = typeof body.baud === 'number' ? body.baud : Number(body.baud);
+    if (!Number.isFinite(baud) || baud <= 0) {
+      res.status(400).json({ message: 'baud is required (positive number)' });
+      return;
+    }
+
     try {
-      const state = await connect(body.port, body.baud);
+      const state = await connect(port, baud);
       res.json(state);
     } catch (err) {
       if (err instanceof PortInUseError) {
-        log.warn('connect refused: port in use', { port: body.port });
+        log.warn('connect refused: port in use', { port });
         res.status(409).json({ message: err.message });
       } else if (err instanceof AlreadyConnectedError) {
         log.warn('connect refused: already connected');
