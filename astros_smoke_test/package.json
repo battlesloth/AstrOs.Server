@@ -5,8 +5,10 @@
   "private": true,
   "description": "Smoke test harness for AstrOs ESP32 master/padawan hardware",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build": "eslint . --ext .js,.jsx,.ts,.tsx && tsc --noEmit",
+    "typecheck:server": "tsc --noEmit",
+    "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "npm run typecheck:server && npm run typecheck:web",
+    "build": "eslint . --ext .js,.jsx,.ts,.tsx && npm run typecheck",
     "test": "vitest",
     "smoke": "tsx ./src/cli/index.ts",
     "smoke:list": "tsx ./src/cli/index.ts list",
@@ -40,6 +42,7 @@
     "tsx": "^4.19.3",
     "typescript": "~5.1.6",
     "vite": "^7.2.4",
-    "vitest": "^3.0.8"
+    "vitest": "^3.0.8",
+    "vue-tsc": "^1.8.27"
   }
 }
