@@ -101,7 +101,7 @@ Bytes outside an active run carry no `runId` and land in the Background tab.
 
 Four discrete tasks, each independently commit-worthy:
 
-- [ ] **1. Express + Vite middleware scaffold**
+- [x] **1. Express + Vite middleware scaffold**
   Create `src/web/server.ts`, `src/web/ui/{index.html,main.ts,App.vue}`, `vite.web.config.ts`. Add `vue`, `vite`, `@vitejs/plugin-vue` to deps. Wire dev mode (Express imports Vite middleware) and prod mode (Express serves built `dist/web/`). Add npm scripts `web:dev`, `web:build`, `web`. Healthcheck endpoint `/api/state` returns hardcoded `disconnected`. Verify `npm run web:dev` opens `http://localhost:5174` and renders a placeholder Vue page.
 
 - [ ] **2. Connect flow + state endpoints + SSE channel**

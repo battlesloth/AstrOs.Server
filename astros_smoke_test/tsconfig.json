@@ -25,6 +25,7 @@
     "**/*.spec.ts",
     "../astros_api/src/**/*.test.ts",
     "../astros_api/src/**/*.spec.ts",
-    "../astros_api/src/background_tasks/**"
+    "../astros_api/src/background_tasks/**",
+    "src/web/ui/**"
   ]
 }
