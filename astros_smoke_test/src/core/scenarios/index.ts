@@ -8,6 +8,7 @@ import { servoTestSweep } from './servo-test-sweep.js';
 import { panicDrill } from './panic-drill.js';
 import { headsCuriousDuet } from './heads-curious-duet.js';
 import { headsDisagreement } from './heads-disagreement.js';
+import { headsHideAndSeek } from './heads-hide-and-seek.js';
 
 export * from './_shared.js';
 export {
@@ -20,6 +21,7 @@ export {
   panicDrill,
   headsCuriousDuet,
   headsDisagreement,
+  headsHideAndSeek,
 };
 
 export const scenarios: Record<string, ScenarioFactory> = {
@@ -32,6 +34,7 @@ export const scenarios: Record<string, ScenarioFactory> = {
   'panic-drill': panicDrill,
   'heads-curious-duet': headsCuriousDuet,
   'heads-disagreement': headsDisagreement,
+  'heads-hide-and-seek': headsHideAndSeek,
 };
 
 export function listScenarioIds(): string[] {
