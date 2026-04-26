@@ -172,9 +172,7 @@ describe('LocationsRepository', () => {
       expect(core?.controller.id).toBe('');
 
       // Save without modifying the controller — exactly what the E2E flow does.
-      await expect(
-        repo.updateLocation(core as NonNullable<typeof core>),
-      ).resolves.toBe(true);
+      await expect(repo.updateLocation(core as NonNullable<typeof core>)).resolves.toBe(true);
 
       // Still no controller link for core.
       const reloaded = (await repo.loadLocations()).find((l) => l.locationName === 'core');
