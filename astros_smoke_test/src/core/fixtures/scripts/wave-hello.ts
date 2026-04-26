@@ -3,17 +3,21 @@ import type { ConfigSync } from '@api/models/config/config_sync.js';
 import type { ScriptUpload } from '@api/models/scripts/script_upload.js';
 import { getServoConfig } from '../demo-location.js';
 import { buildScriptUpload, joinEvents, makeBuffer, makeServoPulse } from '../helpers.js';
+import { POS_HOME, POS_MAX, POS_MIN } from './_heads-primitives.js';
 
 // Seed at home, sweep max → min → home over ~1.7s. The leading home pulse
 // normalizes the starting position so subsequent runs are always visibly
 // different from the final resting state of the previous run.
+//
+// Positions are PERCENT (0=min, 100=max, -1=home); ESP interpolates against
+// the configured ms bounds from DEPLOY_CONFIG.
 export function waveHello(sync: ConfigSync, scriptId: string = uuidv4()): ScriptUpload {
   const servo = getServoConfig(1);
   const master = joinEvents([
-    makeServoPulse({ channel: servo.ch, position: servo.homePos, timeTillMs: 200 }),
-    makeServoPulse({ channel: servo.ch, position: servo.maxPos, timeTillMs: 500 }),
-    makeServoPulse({ channel: servo.ch, position: servo.minPos, timeTillMs: 500 }),
-    makeServoPulse({ channel: servo.ch, position: servo.homePos, timeTillMs: 0 }),
+    makeServoPulse({ channel: servo.ch, position: POS_HOME, timeTillMs: 200 }),
+    makeServoPulse({ channel: servo.ch, position: POS_MAX, timeTillMs: 500 }),
+    makeServoPulse({ channel: servo.ch, position: POS_MIN, timeTillMs: 500 }),
+    makeServoPulse({ channel: servo.ch, position: POS_HOME, timeTillMs: 0 }),
   ]);
   const padawan = joinEvents([makeBuffer(1200), makeBuffer(0)]);
   return buildScriptUpload(sync, { master, padawan }, scriptId);
