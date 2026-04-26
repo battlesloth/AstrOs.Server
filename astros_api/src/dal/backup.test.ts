@@ -142,10 +142,11 @@ describe('backup module', () => {
 
   describe('pruneOldBackups', () => {
     it('keeps the 5 newest backups by mtime, deletes older', () => {
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
       const names = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7'];
       const baseTime = Date.now() - 60_000;
       names.forEach((n, i) => {
-        const p = path.join(tmpDir, `database.sqlite3.backup-${n}`);
+        const p = `${dbPath}.backup-${n}`;
         fs.writeFileSync(p, `data-${n}`);
         const t = (baseTime + i * 1000) / 1000;
         fs.utimesSync(p, t, t);
@@ -154,7 +155,7 @@ describe('backup module', () => {
       // Decoy: a non-backup file should not be touched
       fs.writeFileSync(path.join(tmpDir, 'not-a-backup.txt'), 'keep me');
 
-      pruneOldBackups(tmpDir, 5);
+      pruneOldBackups(dbPath, 5);
 
       const remaining = fs
         .readdirSync(tmpDir)
@@ -172,15 +173,49 @@ describe('backup module', () => {
     });
 
     it('is a no-op when there are fewer backups than the keep count', () => {
-      fs.writeFileSync(path.join(tmpDir, 'database.sqlite3.backup-a'), 'a');
-      fs.writeFileSync(path.join(tmpDir, 'database.sqlite3.backup-b'), 'b');
+      const dbPath = path.join(tmpDir, 'database.sqlite3');
+      fs.writeFileSync(`${dbPath}.backup-a`, 'a');
+      fs.writeFileSync(`${dbPath}.backup-b`, 'b');
 
-      pruneOldBackups(tmpDir, 5);
+      pruneOldBackups(dbPath, 5);
 
       const remaining = fs
         .readdirSync(tmpDir)
         .filter((f) => f.startsWith('database.sqlite3.backup-'));
       expect(remaining.length).toBe(2);
+    });
+
+    it('prunes correctly with a custom dbPath basename (regression: prefix derived from dbPath)', () => {
+      const dbPath = path.join(tmpDir, 'custom.sqlite3');
+      const names = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+      const baseTime = Date.now() - 60_000;
+      names.forEach((n, i) => {
+        const p = `${dbPath}.backup-${n}`;
+        fs.writeFileSync(p, `data-${n}`);
+        const t = (baseTime + i * 1000) / 1000;
+        fs.utimesSync(p, t, t);
+      });
+
+      // Unrelated backup file from a different db basename in the same dir
+      // must be left alone.
+      fs.writeFileSync(path.join(tmpDir, 'database.sqlite3.backup-x'), 'untouched');
+
+      pruneOldBackups(dbPath, 5);
+
+      const customRemaining = fs
+        .readdirSync(tmpDir)
+        .filter((f) => f.startsWith('custom.sqlite3.backup-'))
+        .sort();
+      expect(customRemaining).toEqual([
+        'custom.sqlite3.backup-c',
+        'custom.sqlite3.backup-d',
+        'custom.sqlite3.backup-e',
+        'custom.sqlite3.backup-f',
+        'custom.sqlite3.backup-g',
+      ]);
+
+      // Different-basename backup is not pruned
+      expect(fs.existsSync(path.join(tmpDir, 'database.sqlite3.backup-x'))).toBe(true);
     });
   });
 

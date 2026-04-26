@@ -135,7 +135,7 @@ export async function initializeDatabase(
 
   try {
     await migrateToLatest(conn.db);
-    pruneOldBackups(dbDir, 5);
+    pruneOldBackups(dbFile, 5);
     return conn.db;
   } catch (err) {
     logger.error(`Migration failed: ${(err as Error).message}`);

@@ -14,7 +14,6 @@ export const ALL_MIGRATION_NAMES = [
 ];
 
 const KYSELY_MIGRATION_TABLE = 'kysely_migration';
-const BACKUP_PREFIX = 'database.sqlite3.backup-';
 
 async function migrationTableExists(db: Kysely<Database>): Promise<boolean> {
   const result = await sql<{ name: string }>`
@@ -81,14 +80,16 @@ export async function createBackup(
   return destPath;
 }
 
-export function pruneOldBackups(appdataDir: string, keep = 5): void {
-  if (!fs.existsSync(appdataDir)) return;
+export function pruneOldBackups(dbPath: string, keep = 5): void {
+  const dir = path.dirname(dbPath);
+  const prefix = `${path.basename(dbPath)}.backup-`;
+  if (!fs.existsSync(dir)) return;
 
   const entries = fs
-    .readdirSync(appdataDir)
-    .filter((f) => f.startsWith(BACKUP_PREFIX))
+    .readdirSync(dir)
+    .filter((f) => f.startsWith(prefix))
     .map((name) => {
-      const full = path.join(appdataDir, name);
+      const full = path.join(dir, name);
       const mtimeMs = fs.statSync(full).mtimeMs;
       return { name, full, mtimeMs };
     })
