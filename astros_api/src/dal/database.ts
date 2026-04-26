@@ -116,7 +116,15 @@ export async function initializeDatabase(
 
   if (useMemory) {
     const conn = openConnection(':memory:');
-    await migrateToLatest(conn.db);
+    // Mirror the file-backed path's pragma bracket so migration_6 (and any
+    // future migration that needs FK enforcement off during apply) behaves
+    // identically across paths.
+    conn.raw.pragma('foreign_keys = OFF');
+    try {
+      await migrateToLatest(conn.db);
+    } finally {
+      conn.raw.pragma('foreign_keys = ON');
+    }
     return conn.db;
   }
 

@@ -9,9 +9,12 @@ import { logger } from 'src/logger.js';
 //   4. DROP TABLE <table>
 //   5. ALTER TABLE <table>_new RENAME TO <table>
 //
-// FK enforcement is OFF during this migration (set by initializeDatabase
-// in dal/database.ts) so the DROP/RENAME doesn't trip the existing playlist
-// FK from migration_3 or RESTRICT-itself when controllers are dropped.
+// CONTRACT: callers must run this migration with `PRAGMA foreign_keys = OFF`.
+// SQLite cannot toggle the pragma inside a transaction, so the toggle has to
+// happen at the call site, before invoking the migrator. The production
+// startup wrapper (initializeDatabase in dal/database.ts) handles this for
+// both the file-backed and in-memory paths. Test code that constructs a
+// Kysely Migrator directly must toggle explicitly — see migration_6.test.ts.
 //
 // `down` throws — recovery is via Phase 1 backup-restore. See plan
 // `.docs/plans/20260410-0807-db-safety-phase2-schema-migrations.md`.
