@@ -321,6 +321,41 @@ export const migration_6: Migration = {
       )
       .execute();
     await renameDanceCopyAndSwap(db, 'maestro_channels');
+
+    // ---- 3. Index FK columns ----
+    //
+    // SQLite does not auto-index FK columns. Without an index on the child's
+    // FK column, every CASCADE delete on the parent becomes a full scan of
+    // the child table, and every parent-side INSERT/UPDATE/DELETE has to
+    // scan child tables to enforce RESTRICT. Add explicit indexes for every
+    // FK column that doesn't already have one through:
+    //   - kangaroo_x2.parent_id (covered by NOT NULL UNIQUE → implicit index)
+    //   - script_deployments.script_id (covered by composite PK leftmost
+    //     column — composite PK index can be used for left-prefix lookups)
+    //
+    // location_id on script_deployments is part of the PK but as the
+    // *rightmost* column, the PK index can't satisfy a location_id-only
+    // lookup, so it still needs its own index.
+    const fkIndexes: Array<{ table: string; column: string }> = [
+      { table: 'controller_locations', column: 'location_id' },
+      { table: 'controller_locations', column: 'controller_id' },
+      { table: 'script_channels', column: 'script_id' },
+      { table: 'script_events', column: 'script_id' },
+      { table: 'script_events', column: 'script_channel_id' },
+      { table: 'script_deployments', column: 'location_id' },
+      { table: 'gpio_channels', column: 'location_id' },
+      { table: 'i2c_modules', column: 'location_id' },
+      { table: 'uart_modules', column: 'location_id' },
+      { table: 'maestro_boards', column: 'parent_id' },
+      { table: 'maestro_channels', column: 'board_id' },
+    ];
+    for (const { table, column } of fkIndexes) {
+      await db.schema
+        .createIndex(`idx_${table}_${column}`)
+        .on(table)
+        .column(column)
+        .execute();
+    }
   },
   down: async (): Promise<void> => {
     throw new Error('Recovery is via Phase 1 backup-restore; no manual down');

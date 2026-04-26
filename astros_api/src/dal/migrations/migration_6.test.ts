@@ -316,4 +316,43 @@ describe('migration_6: foreign keys + orphan cleanup', () => {
     const probe = await sql<{ one: number }>`SELECT 1 AS one`.execute(db);
     expect(probe.rows).toEqual([{ one: 1 }]);
   });
+
+  it('creates indexes on FK columns to avoid full table scans', async () => {
+    // Without explicit indexes on FK columns, CASCADE deletes and RESTRICT
+    // checks degrade to full child-table scans. Verify all expected indexes
+    // exist after migration_6.
+    await applyV6();
+
+    const indexNames = (
+      raw
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_%' ORDER BY name",
+        )
+        .all() as Array<{ name: string }>
+    ).map((r) => r.name);
+
+    expect(indexNames).toEqual([
+      'idx_controller_locations_controller_id',
+      'idx_controller_locations_location_id',
+      'idx_gpio_channels_location_id',
+      'idx_i2c_modules_location_id',
+      'idx_maestro_boards_parent_id',
+      'idx_maestro_channels_board_id',
+      'idx_script_channels_script_id',
+      'idx_script_deployments_location_id',
+      'idx_script_events_script_channel_id',
+      'idx_script_events_script_id',
+      'idx_uart_modules_location_id',
+    ]);
+
+    // Confirm the planner actually uses one of the new indexes for a
+    // representative FK-column lookup (the kind that runs during CASCADE).
+    const plan = raw
+      .prepare(
+        'EXPLAIN QUERY PLAN SELECT 1 FROM script_channels WHERE script_id = ?',
+      )
+      .all('any') as Array<{ detail: string }>;
+    const planText = plan.map((r) => r.detail).join(' ');
+    expect(planText).toMatch(/USING (COVERING )?INDEX idx_script_channels_script_id/i);
+  });
 });
