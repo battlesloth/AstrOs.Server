@@ -229,4 +229,21 @@ describe('initializeDatabase safety flow', () => {
     const probe = await sql<{ one: number }>`SELECT 1 AS one`.execute(db);
     expect(probe.rows).toEqual([{ one: 1 }]);
   });
+
+  it('initial open failure → enters read-only with STARTUP_OPEN_FAILED and returns a usable in-memory db', async () => {
+    // Create a directory at the dbPath so better-sqlite3 fails to open it
+    // as a database file.
+    const blockingDir = path.join(tmpDir, 'database.sqlite3');
+    fs.mkdirSync(blockingDir);
+
+    const status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath: blockingDir });
+
+    expect(status.isReadOnly()).toBe(true);
+    expect(status.getState().reasonCode).toBe('STARTUP_OPEN_FAILED');
+
+    // The returned connection must be functional (an in-memory fallback).
+    const probe = await sql<{ one: number }>`SELECT 1 AS one`.execute(db);
+    expect(probe.rows).toEqual([{ one: 1 }]);
+  });
 });

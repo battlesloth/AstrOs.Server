@@ -122,10 +122,21 @@ export async function initializeDatabase(
   fs.mkdirSync(dbDir, { recursive: true });
   logger.info(`Using database file at ${dbFile}`);
 
-  let conn = openConnection(dbFile);
-
-  const pending = await checkPendingMigrations(conn.db, activeMigrationProvider);
-  const lastApplied = await getLastAppliedMigrationName(conn.db, activeMigrationProvider);
+  let conn: OpenConnection;
+  let pending: string[];
+  let lastApplied: string | null;
+  try {
+    conn = openConnection(dbFile);
+    pending = await checkPendingMigrations(conn.db, activeMigrationProvider);
+    lastApplied = await getLastAppliedMigrationName(conn.db, activeMigrationProvider);
+  } catch (err) {
+    // Initial open or introspection failed (perms, directory-as-file,
+    // corrupted DB, etc.). Degrade to a bare in-memory connection so the
+    // process still comes up and /api/system/status is reachable.
+    logger.error(`Could not open database at startup: ${(err as Error).message}`);
+    systemStatus.enterReadOnly('STARTUP_OPEN_FAILED', err);
+    return openConnection(':memory:').db;
+  }
 
   if (pending.length === 0) {
     return conn.db;

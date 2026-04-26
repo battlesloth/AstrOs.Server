@@ -1,6 +1,7 @@
 import { logger } from './logger.js';
 
 export type ReadOnlyReasonCode =
+  | 'STARTUP_OPEN_FAILED'
   | 'BACKUP_FAILED'
   | 'MIGRATION_FAILED_NO_BACKUP'
   | 'MIGRATION_FAILED_RESTORE_FAILED';
