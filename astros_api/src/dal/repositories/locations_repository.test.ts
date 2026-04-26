@@ -43,10 +43,11 @@ describe('LocationsRepository', () => {
       expect(body?.controller.name).toBe('master');
       expect(body?.controller.address).toBe('00:00:00:00:00:00');
 
-      // Core and dome have no controller mapped — should get defaults
+      // Core and dome have no controller mapped — getLocations should return
+      // the empty-string sentinel that updateLocation/createControllerLocation use.
       const core = locations.find((l) => l.locationName === 'core');
       expect(core).toBeDefined();
-      expect(core?.controller.id).toBe('0');
+      expect(core?.controller.id).toBe('');
       expect(core?.controller.name).toBe('');
     });
   });
@@ -156,6 +157,28 @@ describe('LocationsRepository', () => {
       const updated = (await repo.getLocations()).find((l) => l.locationName === 'body');
       expect(updated).toBeDefined();
       expect(updated?.configFingerprint).toBe('outofdate');
+    });
+
+    it('saves a location without an assigned controller without raising FK violation', async () => {
+      // Regression: under migration_6's RESTRICT FK on
+      // controller_locations.controller_id, saving a location whose loaded
+      // `controller` field carried the synthesized empty/sentinel id used to
+      // throw `FOREIGN KEY constraint failed` on INSERT into controller_locations.
+      // Reproduces the E2E "save modules" flow for CORE/DOME (no seeded controller).
+      const repo = new LocationsRepository(db);
+
+      const core = (await repo.loadLocations()).find((l) => l.locationName === 'core');
+      expect(core).toBeDefined();
+      expect(core?.controller.id).toBe('');
+
+      // Save without modifying the controller — exactly what the E2E flow does.
+      await expect(
+        repo.updateLocation(core as NonNullable<typeof core>),
+      ).resolves.toBe(true);
+
+      // Still no controller link for core.
+      const reloaded = (await repo.loadLocations()).find((l) => l.locationName === 'core');
+      expect(reloaded?.controller.id).toBe('');
     });
 
     it('should swap the controller for a location', async () => {

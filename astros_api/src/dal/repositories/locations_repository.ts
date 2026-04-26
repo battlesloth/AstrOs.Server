@@ -49,8 +49,13 @@ export class LocationsRepository {
         c.loc_fingerprint,
       );
 
+      // Empty-string id means "no controller assigned to this location" — same
+      // sentinel the createControllerLocation factory uses. The write path
+      // (updateLocation) treats an empty id as "skip setLocationController",
+      // which avoids violating migration_6's RESTRICT FK on
+      // controller_locations.controller_id by trying to INSERT a non-existent id.
       location.controller = {
-        id: c.ctrl_id ?? '0',
+        id: c.ctrl_id ?? '',
         name: c.ctrl_name ?? '',
         address: c.ctrl_address ?? '',
       };
@@ -90,7 +95,7 @@ export class LocationsRepository {
     );
 
     location.controller = {
-      id: data.ctrl_id ?? '0',
+      id: data.ctrl_id ?? '',
       name: data.ctrl_name ?? '',
       address: data.ctrl_address ?? '',
     };
@@ -169,7 +174,12 @@ export class LocationsRepository {
           throw err;
         });
 
-      if (location.controller !== undefined && location.controller !== null) {
+      // Only set the controller link when there's a real controller id.
+      // Empty id is the "no controller" sentinel (set by getLocations and the
+      // createControllerLocation factory). Calling setLocationController with
+      // an empty/non-existent id would violate migration_6's RESTRICT FK on
+      // controller_locations.controller_id.
+      if (location.controller && location.controller.id) {
         await this.setLocationController(trx, location.id, location.controller.id);
       }
 
