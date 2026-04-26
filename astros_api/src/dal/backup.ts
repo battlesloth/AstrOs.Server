@@ -5,14 +5,6 @@ import path from 'path';
 import { Database } from './types.js';
 import { logger } from '../logger.js';
 
-export const ALL_MIGRATION_NAMES = [
-  '0_initial',
-  '1_add_script_evt_id',
-  '2_add_script_duration',
-  '3_add_playlists',
-  '4_add_random_wait',
-];
-
 const KYSELY_MIGRATION_TABLE = 'kysely_migration';
 
 async function migrationTableExists(db: Kysely<Database>): Promise<boolean> {

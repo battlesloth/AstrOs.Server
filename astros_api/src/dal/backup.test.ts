@@ -19,8 +19,11 @@ import {
   createBackup,
   pruneOldBackups,
   restoreBackup,
-  ALL_MIGRATION_NAMES,
 } from './backup.js';
+
+async function expectedMigrationNames(): Promise<string[]> {
+  return Object.keys(await provider.getMigrations()).sort();
+}
 
 const provider: MigrationProvider = new (class implements MigrationProvider {
   async getMigrations(): Promise<Record<string, Migration>> {
@@ -52,7 +55,7 @@ describe('backup module', () => {
       });
 
       const pending = await checkPendingMigrations(db, provider);
-      expect(pending).toEqual(ALL_MIGRATION_NAMES);
+      expect(pending).toEqual(await expectedMigrationNames());
 
       await db.destroy();
     });
@@ -89,7 +92,8 @@ describe('backup module', () => {
       await migrateToLatest(db);
 
       const last = await getLastAppliedMigrationName(db, provider);
-      expect(last).toBe(ALL_MIGRATION_NAMES[ALL_MIGRATION_NAMES.length - 1]);
+      const all = await expectedMigrationNames();
+      expect(last).toBe(all[all.length - 1]);
 
       await db.destroy();
     });
