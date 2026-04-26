@@ -166,6 +166,26 @@ describe('ControllerRepository', () => {
       expect(all.map((c) => c.name)).not.toContain('dome');
     });
 
+    it('returns true when re-registering with identical name and address (no-op UPDATE)', async () => {
+      // Regression: the keeper-UPDATE return value should not depend on
+      // SQLite's change-count semantics for no-op updates. Success means
+      // "the controller is in the DB with these values," not "the UPDATE
+      // statement reported a row change."
+      const repo = new ControllerRepository(db);
+
+      await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
+
+      // Re-register with exactly the same name and address — UPDATE is a no-op.
+      const result = await repo.insertControllers([
+        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
+      ]);
+
+      expect(result).toBe(true);
+
+      const found = await repo.getControllerByAddress('AA:BB:CC:DD:EE:01');
+      expect(found.name).toBe('dome');
+    });
+
     it('handles two existing matches without UNIQUE collision (one by address, one by name)', async () => {
       // Regression: if matches include row A (matches by name) and row B
       // (matches by address), updating A's name+address would conflict with

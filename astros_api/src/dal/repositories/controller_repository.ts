@@ -58,12 +58,16 @@ export class ControllerRepository {
             await tx.deleteFrom('controllers').where('id', 'in', duplicateIds).execute();
           }
 
-          const update = await tx
+          await tx
             .updateTable('controllers')
             .set({ name: controller.name, address: controller.address })
             .where('id', '=', keeper.id)
-            .executeTakeFirst();
-          return update.numUpdatedRows >= 1;
+            .execute();
+          // The keeper exists (we just selected it), the transaction committed
+          // (otherwise we'd have thrown), so the controller is correctly
+          // persisted. Avoid making success depend on SQLite's change-count
+          // semantics — a no-op UPDATE (identical values) shouldn't be a failure.
+          return true;
         });
 
         if (!written) allWritten = false;
