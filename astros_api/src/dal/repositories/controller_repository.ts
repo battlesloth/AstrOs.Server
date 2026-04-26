@@ -9,64 +9,72 @@ export class ControllerRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
   public async insertControllers(controllers: ControlModule[]): Promise<boolean> {
-    const wasInserted: boolean[] = [];
+    let allWritten = true;
 
-    for (let i = 0; i < controllers.length; i++) {
-      const controller = controllers[i];
-
-      // Remove any stale row whose address or name matches but not both,
-      // then upsert cleanly.
+    for (const controller of controllers) {
+      // Find rows matching by address OR name. Deterministic order so the
+      // "keeper" choice is stable.
       const existing = await this.db
         .selectFrom('controllers')
         .selectAll()
         .where((eb) =>
           eb.or([eb('address', '=', controller.address), eb('name', '=', controller.name)]),
         )
+        .orderBy('id')
         .execute()
         .catch((err) => {
           logger.error('ControllerRepository.insertControllers', err);
           throw err;
         });
 
-      if (existing.length > 0) {
-        // Delete all rows matching either address or name
+      if (existing.length === 0) {
+        const result = await this.db
+          .insertInto('controllers')
+          .values({
+            id: uuid(),
+            name: controller.name,
+            description: '',
+            address: controller.address,
+          })
+          .executeTakeFirst()
+          .catch((err) => {
+            logger.error('ControllerRepository.insertControllers', err);
+            throw err;
+          });
+        if (!inserted(result)) allWritten = false;
+        continue;
+      }
+
+      // UPDATE-in-place on the first match to preserve its id (and any
+      // controller_locations FK rows that point at it). Then drop any
+      // additional partial-match duplicates.
+      const keeper = existing[0];
+      const duplicateIds = existing.slice(1).map((row) => row.id);
+
+      const update = await this.db
+        .updateTable('controllers')
+        .set({ name: controller.name, address: controller.address })
+        .where('id', '=', keeper.id)
+        .executeTakeFirst()
+        .catch((err) => {
+          logger.error('ControllerRepository.insertControllers', err);
+          throw err;
+        });
+      if (update.numUpdatedRows < 1) allWritten = false;
+
+      if (duplicateIds.length > 0) {
         await this.db
           .deleteFrom('controllers')
-          .where((eb) =>
-            eb.or([eb('address', '=', controller.address), eb('name', '=', controller.name)]),
-          )
+          .where('id', 'in', duplicateIds)
           .execute()
           .catch((err) => {
             logger.error('ControllerRepository.insertControllers', err);
             throw err;
           });
       }
-
-      // Insert with the id from an existing match (if any) to preserve references
-      const existingId = existing.find(
-        (e) => e.address === controller.address || e.name === controller.name,
-      )?.id;
-
-      const result = await this.db
-        .insertInto('controllers')
-        .values({
-          id: existingId ?? uuid(),
-          name: controller.name,
-          description: existing.length > 0 ? existing[0].description : '',
-          address: controller.address,
-        })
-        .executeTakeFirst()
-        .catch((err) => {
-          logger.error('ControllerRepository.insertControllers', err);
-          throw err;
-        });
-
-      if (inserted(result)) {
-        wasInserted.push(true);
-      }
     }
 
-    return wasInserted.length === controllers.length;
+    return allWritten;
   }
 
   public async insertController(controller: ControlModule): Promise<string> {

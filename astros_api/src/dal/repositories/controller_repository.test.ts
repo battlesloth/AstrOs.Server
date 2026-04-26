@@ -165,6 +165,47 @@ describe('ControllerRepository', () => {
       expect(all.map((c) => c.name)).toContain('body');
       expect(all.map((c) => c.name)).not.toContain('dome');
     });
+
+    it('preserves controller_locations FK rows when re-registering an existing controller', async () => {
+      // Regression: this is the invariant migration_6's RESTRICT FK will enforce.
+      // The controller_locations row must survive insertControllers without being
+      // deleted-then-reinserted, otherwise a future RESTRICT FK would block the delete.
+      const repo = new ControllerRepository(db);
+
+      const originalId = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
+
+      await db
+        .insertInto('locations')
+        .values({ id: 'loc-1', name: 'Dome Location', description: '', config_fingerprint: '' })
+        .execute();
+
+      await db
+        .insertInto('controller_locations')
+        .values({ location_id: 'loc-1', controller_id: originalId })
+        .execute();
+
+      // Re-register the same controller via the bulk path (typical serial-worker behavior).
+      await repo.insertControllers([
+        { id: '', name: 'dome-renamed', address: 'AA:BB:CC:DD:EE:01' },
+      ]);
+
+      // The controller_locations row must still exist with the same controller_id.
+      const link = await db
+        .selectFrom('controller_locations')
+        .selectAll()
+        .where('location_id', '=', 'loc-1')
+        .executeTakeFirstOrThrow();
+      expect(link.controller_id).toBe(originalId);
+
+      // And the controller itself is still queryable via that location.
+      const found = await repo.getControllerByLocationId('loc-1');
+      expect(found.id).toBe(originalId);
+      expect(found.name).toBe('dome-renamed');
+    });
   });
 
   describe('getControllerByLocationId', () => {
