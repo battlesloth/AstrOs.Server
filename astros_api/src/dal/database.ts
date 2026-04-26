@@ -162,12 +162,18 @@ export async function initializeDatabase(
       return conn.db;
     } catch (restoreErr) {
       systemStatus.enterReadOnly('MIGRATION_FAILED_RESTORE_FAILED', restoreErr);
-      // Restore failed; the original connection was already closed.
-      // Best-effort reopen so read-only endpoints still respond.
+      // The original handles were destroyed by closeConnection(). Reopen the
+      // file; if that also fails, fall back to a bare in-memory DB so the
+      // process still comes up and the read-only status endpoint stays
+      // reachable. (The fallback is unmigrated — DB-backed queries will fail,
+      // but /api/system/status doesn't query the DB.)
       try {
         conn = openConnection(dbFile);
-      } catch {
-        // If even reopening fails, fall through with the (now-null) module connection.
+      } catch (reopenErr) {
+        logger.error(
+          `Could not reopen DB after failed restore: ${(reopenErr as Error).message}; falling back to in-memory`,
+        );
+        conn = openConnection(':memory:');
       }
       return conn.db;
     }

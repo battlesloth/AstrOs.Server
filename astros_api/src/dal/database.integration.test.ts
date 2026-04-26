@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import SQLite from 'better-sqlite3';
-import { Migration, MigrationProvider } from 'kysely';
+import { Migration, MigrationProvider, sql } from 'kysely';
 import { SystemStatus } from '../system_status.js';
 import {
   initializeDatabase,
@@ -214,13 +214,19 @@ describe('initializeDatabase safety flow', () => {
     });
 
     status = new SystemStatus();
+    let db;
     try {
-      await initializeDatabase(status, { dbPath });
+      db = await initializeDatabase(status, { dbPath });
     } finally {
       spy.mockRestore();
     }
 
     expect(status.isReadOnly()).toBe(true);
     expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORE_FAILED');
+
+    // Returned connection must be a *fresh* one, not the destroyed handle.
+    // A query against a destroyed Kysely throws; SELECT 1 is the simplest probe.
+    const probe = await sql<{ one: number }>`SELECT 1 AS one`.execute(db);
+    expect(probe.rows).toEqual([{ one: 1 }]);
   });
 });
