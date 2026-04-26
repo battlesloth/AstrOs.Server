@@ -36,7 +36,7 @@ export class SystemStatus {
     this.reasonCode = code;
     this.enteredAt = new Date().toISOString();
 
-    const detailText = detail instanceof Error ? detail.stack ?? detail.message : String(detail);
+    const detailText = detail instanceof Error ? (detail.stack ?? detail.message) : String(detail);
     logger.error(`Entering read-only mode (${code}): ${detailText}`);
 
     const snapshot = this.getState();
