@@ -174,12 +174,11 @@ export class LocationsRepository {
           throw err;
         });
 
-      // Only set the controller link when there's a real controller id.
-      // Empty id is the "no controller" sentinel (set by getLocations and the
-      // createControllerLocation factory). Calling setLocationController with
-      // an empty/non-existent id would violate migration_6's RESTRICT FK on
-      // controller_locations.controller_id.
-      if (location.controller && location.controller.id) {
+      // Always reconcile the controller mapping when the client sent a
+      // controller field. setLocationController handles both the "set to
+      // real id" and "clear" cases (sentinels '' and '0' both mean "no
+      // controller" — see that method for the full rationale).
+      if (location.controller !== undefined && location.controller !== null) {
         await this.setLocationController(trx, location.id, location.controller.id);
       }
 
@@ -215,6 +214,11 @@ export class LocationsRepository {
     locationId: string,
     controllerId: string,
   ): Promise<boolean> {
+    // Always clear the existing assignment first. This handles three cases
+    // uniformly:
+    //   - Setting a new/different controller (delete-then-insert).
+    //   - Clearing an existing controller (delete only — see sentinel check below).
+    //   - Re-asserting the same controller (idempotent delete-then-insert).
     await trx
       .deleteFrom('controller_locations')
       .where('location_id', '=', locationId)
@@ -223,6 +227,14 @@ export class LocationsRepository {
         logger.error('LocationsRepository.setLocationController', err);
         throw err;
       });
+
+    // Treat both '' (current sentinel from getLocations / createControllerLocation)
+    // and '0' (historical sentinel from older clients) as "no controller" and
+    // skip the INSERT. Without this, a client sending '0' would trip
+    // migration_6's RESTRICT FK on controller_locations.controller_id.
+    if (!controllerId || controllerId === '0') {
+      return true;
+    }
 
     const result = await trx
       .insertInto('controller_locations')

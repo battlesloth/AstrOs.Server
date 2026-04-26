@@ -179,6 +179,58 @@ describe('LocationsRepository', () => {
       expect(reloaded?.controller.id).toBe('');
     });
 
+    it("clears an existing controller mapping when controller.id is the '' sentinel", async () => {
+      // Body has the master controller mapped at seed. Clearing should remove
+      // that controller_locations row without trying to INSERT a replacement.
+      const repo = new LocationsRepository(db);
+
+      const body = (await repo.loadLocations()).find((l) => l.locationName === 'body');
+      expect(body).toBeDefined();
+      expect(body?.controller.id).not.toBe('');
+
+      // Clear the assignment by setting the sentinel.
+      if (body) {
+        body.controller = { id: '', name: '', address: '' };
+        await repo.updateLocation(body);
+      }
+
+      // No controller_locations row remains for body.
+      const remaining = await db
+        .selectFrom('controller_locations')
+        .selectAll()
+        .where('location_id', '=', body?.id as string)
+        .execute();
+      expect(remaining).toHaveLength(0);
+
+      // And getLocations re-reads body with the empty sentinel.
+      const reloaded = (await repo.getLocations()).find((l) => l.locationName === 'body');
+      expect(reloaded?.controller.id).toBe('');
+    });
+
+    it("normalizes the historical '0' sentinel as 'no controller' (no FK violation, clears existing)", async () => {
+      // An older client may still send controller.id = '0'. The API should
+      // treat that the same as '' — clear any existing assignment without
+      // trying to INSERT a row that would trip migration_6's RESTRICT FK.
+      const repo = new LocationsRepository(db);
+
+      const body = (await repo.loadLocations()).find((l) => l.locationName === 'body');
+      expect(body).toBeDefined();
+      const bodyId = body?.id as string;
+
+      if (body) {
+        body.controller = { id: '0', name: '', address: '' };
+        // Should not throw FOREIGN KEY constraint failed.
+        await expect(repo.updateLocation(body)).resolves.toBe(true);
+      }
+
+      const remaining = await db
+        .selectFrom('controller_locations')
+        .selectAll()
+        .where('location_id', '=', bodyId)
+        .execute();
+      expect(remaining).toHaveLength(0);
+    });
+
     it('should swap the controller for a location', async () => {
       const repo = new LocationsRepository(db);
       const ctlRepo = new ControllerRepository(db);
