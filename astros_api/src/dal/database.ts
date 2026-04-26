@@ -88,6 +88,26 @@ function openConnection(dbFile: string): OpenConnection {
   return conn;
 }
 
+// Migrations apply with FKs off (rename dances need it). After turning FKs
+// back on, SQLite does NOT retroactively re-validate existing rows — so any
+// gap in a migration's orphan cleanup would leave dangling FK violators
+// invisible to runtime checks. PRAGMA foreign_key_check scans every FK
+// constraint and reports violators; we throw on any so the existing
+// restore-from-backup path can revert to the pre-migration version.
+function assertNoFkViolations(raw: SQLite.Database): void {
+  const violations = raw.prepare('PRAGMA foreign_key_check').all() as Array<{
+    table: string;
+    rowid: number | bigint;
+    parent: string;
+    fkid: number;
+  }>;
+  if (violations.length > 0) {
+    throw new Error(
+      `Post-migration foreign_key_check found ${violations.length} violator(s): ${JSON.stringify(violations)}`,
+    );
+  }
+}
+
 async function closeConnection(): Promise<void> {
   if (_db) {
     try {
@@ -125,6 +145,7 @@ export async function initializeDatabase(
     } finally {
       conn.raw.pragma('foreign_keys = ON');
     }
+    assertNoFkViolations(conn.raw);
     return conn.db;
   }
 
@@ -177,6 +198,9 @@ export async function initializeDatabase(
     } finally {
       conn.raw.pragma('foreign_keys = ON');
     }
+    // Verify the migration left no FK violators (orphan-cleanup gap, etc.).
+    // Throws into the catch below, where the restore-from-backup path runs.
+    assertNoFkViolations(conn.raw);
     pruneOldBackups(dbFile, 5);
     return conn.db;
   } catch (err) {

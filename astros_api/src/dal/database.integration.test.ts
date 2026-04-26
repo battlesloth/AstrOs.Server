@@ -230,6 +230,66 @@ describe('initializeDatabase safety flow', () => {
     expect(probe.rows).toEqual([{ one: 1 }]);
   });
 
+  it('post-migration foreign_key_check catches FK violators → restores from backup', async () => {
+    // Regression for the orphan-cleanup-gap concern: migrations apply with
+    // FKs off, so INSERT INTO _new SELECT * FROM old does not validate the
+    // new constraints during the rename dance. If a future migration's
+    // orphan cleanup misses a case, the migration would succeed silently
+    // and leave dangling references invisible to runtime FK checks.
+    //
+    // Simulate that scenario: inject a migration that successfully inserts
+    // a script_channels row whose script_id does not exist in `scripts`
+    // (allowed because FKs are off during apply). The post-migrate
+    // foreign_key_check must detect it, throw, and Phase 1's
+    // restore-from-backup must revert to the pre-migration state.
+
+    // Bring DB to v6 (current latest, with FKs on script_channels.script_id).
+    let status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    await closeDatabaseForTest();
+
+    __setMigrationProviderForTest(
+      buildProvider({
+        '7_introduces_orphan': {
+          async up(db) {
+            // Insert a script_channels row with a fabricated script_id —
+            // valid SQL because FKs are off during the migration window.
+            await sql`
+              INSERT INTO script_channels
+                (id, script_id, channel_type, parent_module_id, module_channel_id, module_channel_type)
+              VALUES
+                ('bad-orphan', 'no-such-script', 1, 'pm', 'mc', 'mct')
+            `.execute(db);
+          },
+          async down() {
+            return;
+          },
+        },
+      }),
+    );
+
+    status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+
+    // Phase 1's restore brought us back to v6. The bad migration is reverted.
+    expect(status.isReadOnly()).toBe(false);
+
+    // The orphan is gone — the bad migration's INSERT was rolled back via the
+    // file restore.
+    const survivors = await db
+      .selectFrom('script_channels')
+      .selectAll()
+      .where('id', '=', 'bad-orphan')
+      .execute();
+    expect(survivors).toHaveLength(0);
+
+    // And the migration history shows v6 as the latest, not v7.
+    const result = await sql<{ name: string }>`
+      SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
+    `.execute(db);
+    expect(result.rows[0]?.name).toBe('6_add_foreign_keys');
+  });
+
   it('initial open failure → enters read-only with STARTUP_OPEN_FAILED and returns a usable in-memory db', async () => {
     // Create a directory at the dbPath so better-sqlite3 fails to open it
     // as a database file.
