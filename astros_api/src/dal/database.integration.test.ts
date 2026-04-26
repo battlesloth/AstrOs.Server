@@ -17,8 +17,15 @@ import {
   migration_2,
   migration_3,
   migration_4,
+  migration_5,
+  migration_6,
 } from './migrations/index.js';
 
+// Mirrors the production provider so injected test migrations layer on top of
+// the real baseline rather than truncating it. Without this, kysely sees
+// migrations 5/6 in kysely_migration but missing from the provider and throws
+// "corrupted migrations" before any extra migration runs — which would short-
+// circuit tests that intend to exercise post-migration paths.
 function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider {
   return new (class implements MigrationProvider {
     async getMigrations(): Promise<Record<string, Migration>> {
@@ -28,6 +35,8 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
         '2_add_script_duration': migration_2,
         '3_add_playlists': migration_3,
         '4_add_random_wait': migration_4,
+        '5_fix_controller_locations_type': migration_5,
+        '6_add_foreign_keys': migration_6,
         ...extra,
       };
     }
@@ -85,10 +94,10 @@ describe('initializeDatabase safety flow', () => {
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a 5th migration so we have something pending
+    // Inject a new migration on top of the real v6 baseline.
     __setMigrationProviderForTest(
       buildProvider({
-        '5_safe_addition': {
+        '7_safe_addition': {
           async up(db) {
             await db.schema.createTable('safe_addition').addColumn('id', 'integer').execute();
           },
@@ -102,11 +111,11 @@ describe('initializeDatabase safety flow', () => {
     status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
 
-    // Backup file named after the previous last-applied migration should exist
+    // Backup file named after the previous last-applied migration (v6) should exist.
     const backupFiles = fs
       .readdirSync(tmpDir)
       .filter((f) => f.startsWith('database.sqlite3.backup-'));
-    expect(backupFiles).toEqual(['database.sqlite3.backup-4_add_random_wait']);
+    expect(backupFiles).toEqual(['database.sqlite3.backup-6_add_foreign_keys']);
     expect(status.isReadOnly()).toBe(false);
   });
 
@@ -124,10 +133,10 @@ describe('initializeDatabase safety flow', () => {
       sqlite.close();
     }
 
-    // Inject a migration that throws
+    // Inject a migration on top of the real v6 baseline that throws.
     __setMigrationProviderForTest(
       buildProvider({
-        '5_will_fail': {
+        '7_will_fail': {
           async up() {
             throw new Error('intentional migration failure');
           },
@@ -158,10 +167,10 @@ describe('initializeDatabase safety flow', () => {
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a pending migration so a backup attempt happens
+    // Inject a pending migration on top of v6 so a backup attempt happens.
     __setMigrationProviderForTest(
       buildProvider({
-        '5_pending': {
+        '7_pending': {
           async up(db) {
             await db.schema.createTable('pending_table').addColumn('id', 'integer').execute();
           },
@@ -188,15 +197,15 @@ describe('initializeDatabase safety flow', () => {
   });
 
   it('failed migration + failed restore → enters read-only', async () => {
-    // Migrate to v4
+    // Migrate baseline to current latest (v6)
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a migration that throws
+    // Inject a migration on top of v6 that throws
     __setMigrationProviderForTest(
       buildProvider({
-        '5_will_fail': {
+        '7_will_fail': {
           async up() {
             throw new Error('intentional migration failure');
           },
