@@ -21,10 +21,12 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
   ```
 
 - [ ] Create `astros_vue/src/stores/systemStatus.ts`:
-  - Pinia store with `readOnly: Ref<boolean>`, `reason: Ref<string | null>`, `enteredAt: Ref<string | null>`.
+  - Pinia store with `readOnly: Ref<boolean>`, `reasonCode: Ref<ReadOnlyReasonCode | null>`, `enteredAt: Ref<string | null>`.
+  - `ReadOnlyReasonCode` is the same string-union type as the API:
+    `'STARTUP_OPEN_FAILED' | 'BACKUP_FAILED' | 'MIGRATION_FAILED_NO_BACKUP' | 'MIGRATION_FAILED_RESTORE_FAILED'`.
   - `fetchStatus()` — GET `/system/status`, updates refs.
   - `setStatus(state)` — used by WebSocket message handler and by the API interceptor.
-  - Expose `readOnly`, `reason`, `enteredAt`, `fetchStatus`, `setStatus`.
+  - Expose `readOnly`, `reasonCode`, `enteredAt`, `fetchStatus`, `setStatus`.
 
 - [ ] Update `astros_vue/src/composables/useWebsocket.ts` (or wherever `handleMessage` dispatches) to handle `SYSTEM_STATUS` messages and forward them to `systemStatusStore.setStatus()`. Add the new type to the existing discriminator.
 
@@ -41,11 +43,13 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
     >
       <span class="font-bold">{{ $t('systemStatus.readOnly.title') }}</span>
       <span>
-        {{ systemStatusStore.reason || $t('systemStatus.readOnly.unknownReason') }}
+        {{ $t(`systemStatus.reasonCode.${systemStatusStore.reasonCode || 'UNKNOWN'}`) }}
       </span>
     </div>
   </template>
   ```
+  - Map the API's structured `reasonCode` to a human-readable, localized
+    string at render time. Unknown codes fall back to `UNKNOWN`.
   - DaisyUI `alert-warning` matches existing toast patterns.
   - `role="status"` + `aria-live="polite"` for screen readers (per CLAUDE.md a11y rules).
   - Full-width, `rounded-none` so it reads as chrome, not a card.
@@ -53,8 +57,8 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
 
 - [ ] Mount `SystemStatusBanner` at the top of `astros_vue/src/components/common/layout/AstrosLayout.vue`, above the navbar. It should push content down when visible without layout jank.
 
-- [ ] Update `astros_vue/src/api/apiService.ts` axios response interceptor to detect `503` responses that carry a read-only payload (`{ reason: '...' }` shape from `write_guard.ts`):
-  - Call `systemStatusStore.setStatus({ readOnly: true, reason })`.
+- [ ] Update `astros_vue/src/api/apiService.ts` axios response interceptor to detect `503` responses that carry a read-only payload (`{ message, reasonCode }` shape from `write_guard.ts`):
+  - Call `systemStatusStore.setStatus({ readOnly: true, reasonCode })`.
   - Surface a toast: `useToast().warning(t('systemStatus.readOnly.requestBlocked'))`.
   - Reject the promise so the calling code sees the failure and can bail out cleanly.
 
@@ -75,14 +79,20 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
   "systemStatus": {
     "readOnly": {
       "title": "Read-only mode",
-      "unknownReason": "The database is currently unavailable for writes.",
       "disabled": "This action is disabled while the system is in read-only mode.",
       "requestBlocked": "The server is in read-only mode. Your change was not saved."
+    },
+    "reasonCode": {
+      "STARTUP_OPEN_FAILED": "The database could not be opened at startup. The server is running on a temporary in-memory database with no data.",
+      "BACKUP_FAILED": "A pre-migration backup could not be written. The schema upgrade was skipped.",
+      "MIGRATION_FAILED_NO_BACKUP": "A schema migration failed and there was no prior backup to restore from. The database may be in a partially-migrated state.",
+      "MIGRATION_FAILED_RESTORE_FAILED": "A schema migration failed and the automatic restore also failed. Manual recovery is required.",
+      "UNKNOWN": "The database is currently unavailable for writes."
     }
   }
   ```
 
-- [ ] Write a Storybook story for `SystemStatusBanner` showing the hidden and visible states (default + short reason + long reason variants).
+- [ ] Write a Storybook story for `SystemStatusBanner` showing the hidden state and visible variants for each `reasonCode` (plus the `UNKNOWN` fallback).
 
 ## Tests
 
@@ -93,8 +103,8 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
   - `setStatus` correctly handles partial payloads.
 - [ ] `astros_vue/src/components/common/__tests__/SystemStatusBanner.spec.ts`:
   - Renders nothing when `readOnly === false`.
-  - Renders alert with reason when `readOnly === true`.
-  - Renders fallback i18n string when reason is null.
+  - Renders alert with the localized reasonCode message when `readOnly === true`.
+  - Renders fallback (`UNKNOWN`) i18n string when `reasonCode` is null or unrecognized.
   - Has `role="status"` and `aria-live="polite"` attributes.
 - [ ] Integration/snapshot: verify `AstrosLayout` mounts the banner above the navbar.
 
@@ -108,7 +118,7 @@ Create `docs/qa/system-readonly-mode.md`:
 1. Force read-only mode. Verify the banner appears within ≤1s via WebSocket push.
 2. Refresh the page. Verify banner still appears (from `fetchStatus` on mount).
 3. Navigate to Scripts view. Verify all save/delete/copy buttons are disabled with tooltip.
-4. Attempt to save a script via direct API call (devtools). Verify 503 response with `reason` field and a toast surfaces.
+4. Attempt to save a script via direct API call (devtools). Verify 503 response with `reasonCode` field and a toast surfaces.
 5. Log out, log back in. Verify login works and banner reappears after login.
 6. Verify `POST /panicStop` still succeeds (Utility view panic button).
 7. Verify `GET /settings/logs` still works (log download).
@@ -134,6 +144,26 @@ Create `docs/qa/system-readonly-mode.md`:
 - `cd astros_vue && npx vue-tsc --noEmit` — clean.
 - `cd astros_vue && npx eslint src/...` on modified files — clean.
 - Manual QA: follow the plan in `docs/qa/system-readonly-mode.md`.
+
+## Plan amendment (Phase 3 startup, 2026-04-26)
+
+The plan was authored before Phase 1 went through PR review. During that
+review, the API's read-only payload was sanitized: the free-form
+`reason: string` (which would have leaked filesystem paths and SQL
+fragments to an unauthenticated `/api/system/status` endpoint) was replaced
+with `reasonCode: ReadOnlyReasonCode` — a discriminated string union
+(`STARTUP_OPEN_FAILED | BACKUP_FAILED | MIGRATION_FAILED_NO_BACKUP |
+MIGRATION_FAILED_RESTORE_FAILED`). Full error details are logged
+server-side only.
+
+This amendment updates Phase 3 to consume the structured code:
+
+  - Store holds `reasonCode`, not `reason`.
+  - Banner template renders `$t(\`systemStatus.reasonCode.${code || 'UNKNOWN'}\`)`.
+  - 503 interceptor reads `reasonCode` from the response body.
+  - i18n keys are reorganized into `systemStatus.reasonCode.*` (one per
+    code, plus `UNKNOWN` fallback) and `systemStatus.readOnly.*` (UI
+    strings: title, disabled tooltip, request-blocked toast).
 
 ## Notes
 
