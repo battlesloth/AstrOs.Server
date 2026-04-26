@@ -76,16 +76,20 @@ function openConnection(dbFile: string): OpenConnection {
   return { db, raw };
 }
 
-function closeConnection(): void {
-  try {
-    _db?.destroy();
-  } catch {
-    // ignore
+async function closeConnection(): Promise<void> {
+  if (_db) {
+    try {
+      await _db.destroy();
+    } catch (err) {
+      logger.warn(`Error destroying Kysely connection: ${(err as Error).message}`);
+    }
   }
-  try {
-    _rawSqlite?.close();
-  } catch {
-    // ignore
+  if (_rawSqlite) {
+    try {
+      _rawSqlite.close();
+    } catch (err) {
+      logger.warn(`Error closing raw sqlite handle: ${(err as Error).message}`);
+    }
   }
   _db = null;
   _rawSqlite = null;
@@ -146,7 +150,7 @@ export async function initializeDatabase(
     }
 
     try {
-      closeConnection();
+      await closeConnection();
       restoreBackup(backupPath, dbFile);
       conn = openConnection(dbFile);
       logger.warn(`Restored database from backup ${backupPath} after failed migration`);
@@ -173,14 +177,7 @@ export function getDb(): Kysely<Database> {
 }
 
 export async function closeDatabaseForTest(): Promise<void> {
-  if (_db) {
-    await _db.destroy();
-  }
-  if (_rawSqlite) {
-    _rawSqlite.close();
-  }
-  _db = null;
-  _rawSqlite = null;
+  await closeConnection();
 }
 
 export function __setMigrationProviderForTest(provider: MigrationProvider): void {
