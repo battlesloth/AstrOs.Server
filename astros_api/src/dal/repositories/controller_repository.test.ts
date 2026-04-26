@@ -166,6 +166,95 @@ describe('ControllerRepository', () => {
       expect(all.map((c) => c.name)).not.toContain('dome');
     });
 
+    it('handles two existing matches without UNIQUE collision (one by address, one by name)', async () => {
+      // Regression: if matches include row A (matches by name) and row B
+      // (matches by address), updating A's name+address would conflict with
+      // B's UNIQUE values before B is deleted. Fix: drop duplicates first.
+      const repo = new ControllerRepository(db);
+
+      await repo.insertController({ id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0A' });
+      await repo.insertController({ id: '', name: 'beta', address: 'AA:BB:CC:DD:EE:0B' });
+
+      // name=alpha matches first row; address=...0B matches second row.
+      await repo.insertControllers([
+        { id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0B' },
+      ]);
+
+      const all = await repo.getControllers();
+      const alpha = all.find((c) => c.name === 'alpha');
+      expect(alpha).toBeDefined();
+      expect(alpha?.address).toBe('AA:BB:CC:DD:EE:0B');
+      // beta should be gone — its address was taken
+      expect(all.find((c) => c.name === 'beta')).toBeUndefined();
+    });
+
+    it('re-points controller_locations from duplicates to keeper before deleting them', async () => {
+      // Regression: under migration_6's RESTRICT FK on
+      // controller_locations.controller_id, deleting a duplicate controller
+      // that still has controller_locations rows would be rejected. Re-point
+      // the dependent rows to the keeper first.
+      // Insert directly so we control the ids (the keeper is selected by
+      // lex order on id; UUID-generated ids are non-deterministic).
+      await db
+        .insertInto('controllers')
+        .values({
+          id: 'ctl-a',
+          name: 'alpha',
+          description: '',
+          address: 'AA:BB:CC:DD:EE:0A',
+        })
+        .execute();
+      await db
+        .insertInto('controllers')
+        .values({
+          id: 'ctl-b',
+          name: 'beta',
+          description: '',
+          address: 'AA:BB:CC:DD:EE:0B',
+        })
+        .execute();
+
+      await db
+        .insertInto('locations')
+        .values({ id: 'loc-A', name: 'A-loc', description: '', config_fingerprint: '' })
+        .execute();
+      await db
+        .insertInto('locations')
+        .values({ id: 'loc-B', name: 'B-loc', description: '', config_fingerprint: '' })
+        .execute();
+
+      await db
+        .insertInto('controller_locations')
+        .values({ location_id: 'loc-A', controller_id: 'ctl-a' })
+        .execute();
+      await db
+        .insertInto('controller_locations')
+        .values({ location_id: 'loc-B', controller_id: 'ctl-b' })
+        .execute();
+
+      // Two-match merge: name=alpha hits ctl-a, address=...0B hits ctl-b.
+      const repo = new ControllerRepository(db);
+      await repo.insertControllers([
+        { id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0B' },
+      ]);
+
+      // The keeper is ctl-a (lex-first id). Both controller_locations rows
+      // must now point at it.
+      const links = await db
+        .selectFrom('controller_locations')
+        .selectAll()
+        .where('location_id', 'in', ['loc-A', 'loc-B'])
+        .execute();
+      expect(links).toHaveLength(2);
+      links.forEach((l) => expect(l.controller_id).toBe('ctl-a'));
+
+      // The duplicate is gone; the keeper has the merged values.
+      const all = await repo.getControllers();
+      expect(all.find((c) => c.name === 'beta')).toBeUndefined();
+      const keeper = all.find((c) => c.id === 'ctl-a');
+      expect(keeper?.address).toBe('AA:BB:CC:DD:EE:0B');
+    });
+
     it('preserves controller_locations FK rows when re-registering an existing controller', async () => {
       // Regression: this is the invariant migration_6's RESTRICT FK will enforce.
       // The controller_locations row must survive insertControllers without being

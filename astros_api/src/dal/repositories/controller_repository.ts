@@ -12,65 +12,67 @@ export class ControllerRepository {
     let allWritten = true;
 
     for (const controller of controllers) {
-      // Find rows matching by address OR name. Deterministic order so the
-      // "keeper" choice is stable.
-      const existing = await this.db
-        .selectFrom('controllers')
-        .selectAll()
-        .where((eb) =>
-          eb.or([eb('address', '=', controller.address), eb('name', '=', controller.name)]),
-        )
-        .orderBy('id')
-        .execute()
-        .catch((err) => {
-          logger.error('ControllerRepository.insertControllers', err);
-          throw err;
+      try {
+        const written = await this.db.transaction().execute(async (tx) => {
+          // Find rows matching by address OR name. Deterministic order so the
+          // "keeper" choice is stable.
+          const existing = await tx
+            .selectFrom('controllers')
+            .selectAll()
+            .where((eb) =>
+              eb.or([eb('address', '=', controller.address), eb('name', '=', controller.name)]),
+            )
+            .orderBy('id')
+            .execute();
+
+          if (existing.length === 0) {
+            const result = await tx
+              .insertInto('controllers')
+              .values({
+                id: uuid(),
+                name: controller.name,
+                description: '',
+                address: controller.address,
+              })
+              .executeTakeFirst();
+            return inserted(result);
+          }
+
+          // Keep the first match (preserves its id and any controller_locations
+          // rows pointing at it). Re-point dependent rows from duplicates to
+          // the keeper, then delete duplicates BEFORE updating the keeper —
+          // otherwise the keeper's UPDATE could collide with a duplicate's
+          // UNIQUE-constrained name/address, and the duplicate's DELETE would
+          // be rejected by migration_6's RESTRICT FK on
+          // controller_locations.controller_id.
+          const keeper = existing[0];
+          const duplicateIds = existing.slice(1).map((row) => row.id);
+
+          if (duplicateIds.length > 0) {
+            await tx
+              .updateTable('controller_locations')
+              .set({ controller_id: keeper.id })
+              .where('controller_id', 'in', duplicateIds)
+              .execute();
+
+            await tx
+              .deleteFrom('controllers')
+              .where('id', 'in', duplicateIds)
+              .execute();
+          }
+
+          const update = await tx
+            .updateTable('controllers')
+            .set({ name: controller.name, address: controller.address })
+            .where('id', '=', keeper.id)
+            .executeTakeFirst();
+          return update.numUpdatedRows >= 1;
         });
 
-      if (existing.length === 0) {
-        const result = await this.db
-          .insertInto('controllers')
-          .values({
-            id: uuid(),
-            name: controller.name,
-            description: '',
-            address: controller.address,
-          })
-          .executeTakeFirst()
-          .catch((err) => {
-            logger.error('ControllerRepository.insertControllers', err);
-            throw err;
-          });
-        if (!inserted(result)) allWritten = false;
-        continue;
-      }
-
-      // UPDATE-in-place on the first match to preserve its id (and any
-      // controller_locations FK rows that point at it). Then drop any
-      // additional partial-match duplicates.
-      const keeper = existing[0];
-      const duplicateIds = existing.slice(1).map((row) => row.id);
-
-      const update = await this.db
-        .updateTable('controllers')
-        .set({ name: controller.name, address: controller.address })
-        .where('id', '=', keeper.id)
-        .executeTakeFirst()
-        .catch((err) => {
-          logger.error('ControllerRepository.insertControllers', err);
-          throw err;
-        });
-      if (update.numUpdatedRows < 1) allWritten = false;
-
-      if (duplicateIds.length > 0) {
-        await this.db
-          .deleteFrom('controllers')
-          .where('id', 'in', duplicateIds)
-          .execute()
-          .catch((err) => {
-            logger.error('ControllerRepository.insertControllers', err);
-            throw err;
-          });
+        if (!written) allWritten = false;
+      } catch (err) {
+        logger.error('ControllerRepository.insertControllers', err);
+        throw err;
       }
     }
 
