@@ -85,7 +85,7 @@ describe('backup module', () => {
       await db.destroy();
     });
 
-    it('returns the most recent migration name by timestamp', async () => {
+    it('returns the latest applied migration in provider order', async () => {
       const db = new Kysely<Database>({
         dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
       });

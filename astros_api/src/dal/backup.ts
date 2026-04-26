@@ -50,6 +50,8 @@ export async function getLastAppliedMigrationName(
   `.execute(db);
   if (result.rows.length === 0) return null;
 
+  // Provider order is canonical. Kysely's stored timestamp ties at ms resolution
+  // when migrations run in quick succession (e.g. fresh DBs in tests).
   const all = await getProviderMigrationNames(provider);
   const applied = new Set(result.rows.map((r) => r.name));
   for (let i = all.length - 1; i >= 0; i--) {
