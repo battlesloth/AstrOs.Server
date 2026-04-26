@@ -18,7 +18,8 @@ async function migrationTableExists(db: Kysely<Database>): Promise<boolean> {
 // Compare migration names by their leading numeric prefix (`<n>_<slug>`),
 // falling back to lexicographic order on the slug or for non-conforming names.
 // Plain .sort() would put '10_foo' before '2_foo' because '1' < '2'.
-function compareMigrationNames(a: string, b: string): number {
+// Exported so tests can derive expected ordering without duplicating the rule.
+export function compareMigrationNames(a: string, b: string): number {
   const matchA = a.match(/^(\d+)_(.*)$/);
   const matchB = b.match(/^(\d+)_(.*)$/);
   if (matchA && matchB) {

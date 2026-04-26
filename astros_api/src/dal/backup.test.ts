@@ -14,6 +14,7 @@ import path from 'path';
 import { createKyselyConnection, migrateToLatest } from './database.js';
 import {
   checkPendingMigrations,
+  compareMigrationNames,
   getLastAppliedMigrationName,
   createBackup,
   pruneOldBackups,
@@ -21,7 +22,7 @@ import {
 } from './backup.js';
 
 async function expectedMigrationNames(): Promise<string[]> {
-  return Object.keys(await provider.getMigrations()).sort();
+  return Object.keys(await provider.getMigrations()).sort(compareMigrationNames);
 }
 
 const provider: MigrationProvider = new (class implements MigrationProvider {
