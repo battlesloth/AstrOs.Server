@@ -43,7 +43,7 @@ This is a small edit to phase 1's `initializeDatabase()` flow — the pragma tog
 
 - [ ] Create `astros_api/src/dal/migrations/migration_5.ts`:
   - `up`: read all rows, drop the table, recreate with both columns as `text`, re-insert rows. **No FKs yet** — that's migration_6.
-  - `down`: reverse — drop, recreate with `controller_id integer`, re-insert. (SQLite's loose typing means the data survives round-trip even though the declared type differs.)
+  - `down`: throws `Error('Recovery is via Phase 1 backup-restore; no manual down')`. See "Down migration policy" below.
 - [ ] Register in `astros_api/src/dal/migrations/index.ts` and add to the migration provider in `database.ts`.
 
 ### Part C — migration_6: foreign-key constraints + orphan cleanup
@@ -80,7 +80,7 @@ Reference: `migration_1.ts` for the rename-dance pattern, Kysely's `addForeignKe
 
 - [ ] Create `astros_api/src/dal/migrations/migration_6.ts`:
   - `up`: iterate through the table list above, performing orphan cleanup + rename dance per table.
-  - `down`: **full symmetric down** — for each table, rename dance in reverse, recreating the table without FK constraints. Verbose (~13 tables × reverse dance) but keeps the down path honest.
+  - `down`: throws `Error('Recovery is via Phase 1 backup-restore; no manual down')`. See "Down migration policy" below.
 - [ ] Register in `astros_api/src/dal/migrations/index.ts` and `database.ts`.
 
 ### Part D — FK pragma toggle in phase 1's `initializeDatabase`
@@ -92,7 +92,7 @@ Reference: `migration_1.ts` for the rename-dance pattern, Kysely's `addForeignKe
 - [ ] `astros_api/src/dal/migrations/migration_5.test.ts`:
   - Apply migrations 0–4, insert a `controller_locations` row, apply migration_5, verify the row is still there with the same values.
   - Verify declared column type via `PRAGMA table_info(controller_locations)` → `controller_id` is `TEXT`.
-  - Round-trip: apply migration_5 then its `down`, verify structure returns.
+  - Verify `down` throws (asserts the policy below is in force).
 
 - [ ] `astros_api/src/dal/migrations/migration_6.test.ts`:
   - Apply all migrations through migration_6 on a fresh DB.
@@ -100,7 +100,7 @@ Reference: `migration_1.ts` for the rename-dance pattern, Kysely's `addForeignKe
   - Verify CASCADE works: delete a `scripts` row, assert `script_channels` and `script_events` for that script are gone.
   - Verify RESTRICT works: for `controllers` with an existing `controller_locations` link, attempt to delete the controller, expect the delete to be rejected.
   - Orphan cleanup: seed a pre-migration DB with known orphans (e.g. a `script_channels` row whose `script_id` doesn't exist), apply migration_6, assert the orphan is gone and no other rows are affected.
-  - Round-trip: apply, then down, then apply again — tables round-trip.
+  - Verify `down` throws.
 
 - [ ] `astros_api/src/dal/repositories/controller_repository.test.ts` — add the regression test from Part A.
 
@@ -122,6 +122,15 @@ Reference: `migration_1.ts` for the rename-dance pattern, Kysely's `addForeignKe
   - Attempt an orphan insert via the sqlite3 CLI; expect rejection.
   - Simulate a controller re-registration via the existing serial test harness and verify `insertControllers` does not throw under FK enforcement.
 - **Safety net test (relies on phase 1):** deliberately break migration_6 with a `throw`, restart, verify the backup is taken, the migration fails, the restore succeeds, and the system returns to usable state at v4.
+
+## Down migration policy (Phase 2 onwards)
+
+Phase 1's backup-and-restore is the official rollback mechanism. `migrateToLatest()` (the only migrator call we make) only runs `up`s; `down` is never invoked in production. Two options for new migrations' `down`:
+
+- **Full symmetric down** — duplicates the recovery story. Verbose for migration_6 (~13 reverse rename dances).
+- **Throwing down** — `down` throws an `Error` directing operators to Phase 1's backup-restore. Single source of truth for rollback; less code to maintain.
+
+This phase commits to **throwing `down`** for migration_5 and migration_6. The migrations 0–4 that already have working `down` implementations are left as-is (no scope creep). The implication: forward migration safety is handled by Kysely's per-migration transaction wrapper *plus* Phase 1's restore; manual `migrateDown()` calls will fail loudly, which is what we want.
 
 ## Notes
 
