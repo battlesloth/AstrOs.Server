@@ -17,8 +17,15 @@ import {
   migration_2,
   migration_3,
   migration_4,
+  migration_5,
+  migration_6,
 } from './migrations/index.js';
 
+// Mirrors the production provider so injected test migrations layer on top of
+// the real baseline rather than truncating it. Without this, kysely sees
+// migrations 5/6 in kysely_migration but missing from the provider and throws
+// "corrupted migrations" before any extra migration runs — which would short-
+// circuit tests that intend to exercise post-migration paths.
 function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider {
   return new (class implements MigrationProvider {
     async getMigrations(): Promise<Record<string, Migration>> {
@@ -28,6 +35,8 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
         '2_add_script_duration': migration_2,
         '3_add_playlists': migration_3,
         '4_add_random_wait': migration_4,
+        '5_fix_controller_locations_type': migration_5,
+        '6_add_foreign_keys': migration_6,
         ...extra,
       };
     }
@@ -85,10 +94,10 @@ describe('initializeDatabase safety flow', () => {
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a 5th migration so we have something pending
+    // Inject a new migration on top of the real v6 baseline.
     __setMigrationProviderForTest(
       buildProvider({
-        '5_safe_addition': {
+        '7_safe_addition': {
           async up(db) {
             await db.schema.createTable('safe_addition').addColumn('id', 'integer').execute();
           },
@@ -102,11 +111,11 @@ describe('initializeDatabase safety flow', () => {
     status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
 
-    // Backup file named after the previous last-applied migration should exist
+    // Backup file named after the previous last-applied migration (v6) should exist.
     const backupFiles = fs
       .readdirSync(tmpDir)
       .filter((f) => f.startsWith('database.sqlite3.backup-'));
-    expect(backupFiles).toEqual(['database.sqlite3.backup-4_add_random_wait']);
+    expect(backupFiles).toEqual(['database.sqlite3.backup-6_add_foreign_keys']);
     expect(status.isReadOnly()).toBe(false);
   });
 
@@ -124,10 +133,10 @@ describe('initializeDatabase safety flow', () => {
       sqlite.close();
     }
 
-    // Inject a migration that throws
+    // Inject a migration on top of the real v6 baseline that throws.
     __setMigrationProviderForTest(
       buildProvider({
-        '5_will_fail': {
+        '7_will_fail': {
           async up() {
             throw new Error('intentional migration failure');
           },
@@ -158,10 +167,10 @@ describe('initializeDatabase safety flow', () => {
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a pending migration so a backup attempt happens
+    // Inject a pending migration on top of v6 so a backup attempt happens.
     __setMigrationProviderForTest(
       buildProvider({
-        '5_pending': {
+        '7_pending': {
           async up(db) {
             await db.schema.createTable('pending_table').addColumn('id', 'integer').execute();
           },
@@ -188,15 +197,15 @@ describe('initializeDatabase safety flow', () => {
   });
 
   it('failed migration + failed restore → enters read-only', async () => {
-    // Migrate to v4
+    // Migrate baseline to current latest (v6)
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a migration that throws
+    // Inject a migration on top of v6 that throws
     __setMigrationProviderForTest(
       buildProvider({
-        '5_will_fail': {
+        '7_will_fail': {
           async up() {
             throw new Error('intentional migration failure');
           },
@@ -228,6 +237,66 @@ describe('initializeDatabase safety flow', () => {
     // A query against a destroyed Kysely throws; SELECT 1 is the simplest probe.
     const probe = await sql<{ one: number }>`SELECT 1 AS one`.execute(db);
     expect(probe.rows).toEqual([{ one: 1 }]);
+  });
+
+  it('post-migration foreign_key_check catches FK violators → restores from backup', async () => {
+    // Regression for the orphan-cleanup-gap concern: migrations apply with
+    // FKs off, so INSERT INTO _new SELECT * FROM old does not validate the
+    // new constraints during the rename dance. If a future migration's
+    // orphan cleanup misses a case, the migration would succeed silently
+    // and leave dangling references invisible to runtime FK checks.
+    //
+    // Simulate that scenario: inject a migration that successfully inserts
+    // a script_channels row whose script_id does not exist in `scripts`
+    // (allowed because FKs are off during apply). The post-migrate
+    // foreign_key_check must detect it, throw, and Phase 1's
+    // restore-from-backup must revert to the pre-migration state.
+
+    // Bring DB to v6 (current latest, with FKs on script_channels.script_id).
+    let status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    await closeDatabaseForTest();
+
+    __setMigrationProviderForTest(
+      buildProvider({
+        '7_introduces_orphan': {
+          async up(db) {
+            // Insert a script_channels row with a fabricated script_id —
+            // valid SQL because FKs are off during the migration window.
+            await sql`
+              INSERT INTO script_channels
+                (id, script_id, channel_type, parent_module_id, module_channel_id, module_channel_type)
+              VALUES
+                ('bad-orphan', 'no-such-script', 1, 'pm', 'mc', 'mct')
+            `.execute(db);
+          },
+          async down() {
+            return;
+          },
+        },
+      }),
+    );
+
+    status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+
+    // Phase 1's restore brought us back to v6. The bad migration is reverted.
+    expect(status.isReadOnly()).toBe(false);
+
+    // The orphan is gone — the bad migration's INSERT was rolled back via the
+    // file restore.
+    const survivors = await db
+      .selectFrom('script_channels')
+      .selectAll()
+      .where('id', '=', 'bad-orphan')
+      .execute();
+    expect(survivors).toHaveLength(0);
+
+    // And the migration history shows v6 as the latest, not v7.
+    const result = await sql<{ name: string }>`
+      SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
+    `.execute(db);
+    expect(result.rows[0]?.name).toBe('6_add_foreign_keys');
   });
 
   it('initial open failure → enters read-only with STARTUP_OPEN_FAILED and returns a usable in-memory db', async () => {

@@ -20,6 +20,8 @@ import {
   migration_2,
   migration_3,
   migration_4,
+  migration_5,
+  migration_6,
 } from './migrations/index.js';
 import { SystemStatus } from '../system_status.js';
 import {
@@ -49,6 +51,8 @@ const defaultMigrationProvider: MigrationProvider = new (class implements Migrat
       '2_add_script_duration': migration_2,
       '3_add_playlists': migration_3,
       '4_add_random_wait': migration_4,
+      '5_fix_controller_locations_type': migration_5,
+      '6_add_foreign_keys': migration_6,
     };
   }
 })();
@@ -84,6 +88,33 @@ function openConnection(dbFile: string): OpenConnection {
   return conn;
 }
 
+// Migrations apply with FKs off (rename dances need it). After turning FKs
+// back on, SQLite does NOT retroactively re-validate existing rows — so any
+// gap in a migration's orphan cleanup would leave dangling FK violators
+// invisible to runtime checks. PRAGMA foreign_key_check scans every FK
+// constraint and reports violators; we throw on any so the existing
+// restore-from-backup path can revert to the pre-migration version.
+//
+// Exported for test use; no test-only-prefix because this is a generally
+// useful FK-integrity check, not test scaffolding.
+export function assertNoFkViolations(raw: SQLite.Database): void {
+  const violations = raw.prepare('PRAGMA foreign_key_check').all() as Array<{
+    table: string;
+    rowid: number | bigint;
+    parent: string;
+    fkid: number;
+  }>;
+  if (violations.length > 0) {
+    // rowid can be a bigint when the connection has safeIntegers enabled.
+    // JSON.stringify throws TypeError on bigints by default, which would
+    // mask the real violation details behind a serialization error.
+    const detail = JSON.stringify(violations, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
+    throw new Error(
+      `Post-migration foreign_key_check found ${violations.length} violator(s): ${detail}`,
+    );
+  }
+}
+
 async function closeConnection(): Promise<void> {
   if (_db) {
     try {
@@ -112,7 +143,16 @@ export async function initializeDatabase(
 
   if (useMemory) {
     const conn = openConnection(':memory:');
-    await migrateToLatest(conn.db);
+    // Mirror the file-backed path's pragma bracket so migration_6 (and any
+    // future migration that needs FK enforcement off during apply) behaves
+    // identically across paths.
+    conn.raw.pragma('foreign_keys = OFF');
+    try {
+      await migrateToLatest(conn.db);
+    } finally {
+      conn.raw.pragma('foreign_keys = ON');
+    }
+    assertNoFkViolations(conn.raw);
     return conn.db;
   }
 
@@ -154,7 +194,20 @@ export async function initializeDatabase(
   }
 
   try {
-    await migrateToLatest(conn.db);
+    // Toggle FKs OFF for the migrate window so rename-dance migrations can
+    // drop/recreate referenced tables without RESTRICT/CASCADE side-effects.
+    // The pragma cannot be changed inside a transaction, so it must wrap
+    // migrateToLatest() — Kysely opens a transaction per migration internally.
+    // The finally guarantees FKs are re-enabled even if migrate throws.
+    conn.raw.pragma('foreign_keys = OFF');
+    try {
+      await migrateToLatest(conn.db);
+    } finally {
+      conn.raw.pragma('foreign_keys = ON');
+    }
+    // Verify the migration left no FK violators (orphan-cleanup gap, etc.).
+    // Throws into the catch below, where the restore-from-backup path runs.
+    assertNoFkViolations(conn.raw);
     pruneOldBackups(dbFile, 5);
     return conn.db;
   } catch (err) {

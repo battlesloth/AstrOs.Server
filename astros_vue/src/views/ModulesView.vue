@@ -205,7 +205,7 @@ function controllerSelectChanged(location: string) {
                     disabled
                   >
                     <option
-                      value="0"
+                      value=""
                       selected
                     >
                       {{ $t('module_view.master') }}
@@ -263,7 +263,7 @@ function controllerSelectChanged(location: string) {
                     @change="controllerSelectChanged('core')"
                   >
                     <option
-                      value="0"
+                      value=""
                       selected
                     >
                       {{ $t('module_view.disabled') }}
@@ -327,7 +327,7 @@ function controllerSelectChanged(location: string) {
                     @change="controllerSelectChanged('dome')"
                   >
                     <option
-                      value="0"
+                      value=""
                       selected
                     >
                       {{ $t('module_view.disabled') }}

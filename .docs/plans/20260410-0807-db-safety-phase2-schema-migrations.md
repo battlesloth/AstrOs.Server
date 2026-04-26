@@ -29,22 +29,22 @@ This is a small edit to phase 1's `initializeDatabase()` flow — the pragma tog
 
 ### Part A — refactor `insertControllers` (blocks migration_6)
 
-- [ ] Rewrite `insertControllers` in `astros_api/src/dal/repositories/controller_repository.ts:11-70` to UPDATE-in-place:
+- [x] Rewrite `insertControllers` in `astros_api/src/dal/repositories/controller_repository.ts:11-70` to UPDATE-in-place:
   - Find all rows matching by `address` OR `name`.
   - If 0 matches → `INSERT` with a fresh UUID.
   - If ≥1 matches → keep the first row (stable id), `UPDATE` its `name`/`address` fields, `DELETE` any additional duplicates.
   - The keeper row is **never** deleted-then-reinserted, so any `controller_locations` FK pointing at it stays valid throughout.
 
-- [ ] Revisit `astros_api/src/dal/repositories/controller_repository.test.ts` — existing tests cover "new controller", "duplicate address", "duplicate name", and "update existing". Verify they pass against the new implementation; tweak only if the refactor legitimately changes behavior (e.g. duplicate-merge semantics).
+- [x] Revisit `astros_api/src/dal/repositories/controller_repository.test.ts` — existing tests cover "new controller", "duplicate address", "duplicate name", and "update existing". Verify they pass against the new implementation; tweak only if the refactor legitimately changes behavior (e.g. duplicate-merge semantics).
 
-- [ ] **Regression guard test:** insert a `controller_locations` row pointing at an existing controller, call `insertControllers` for that controller, assert the `controller_locations` row still exists afterward with the same `controller_id`. This is the specific behavior migration_6's FK will enforce.
+- [x] **Regression guard test:** insert a `controller_locations` row pointing at an existing controller, call `insertControllers` for that controller, assert the `controller_locations` row still exists afterward with the same `controller_id`. This is the specific behavior migration_6's FK will enforce.
 
 ### Part B — migration_5: fix `controller_locations.controller_id` type
 
-- [ ] Create `astros_api/src/dal/migrations/migration_5.ts`:
+- [x] Create `astros_api/src/dal/migrations/migration_5.ts`:
   - `up`: read all rows, drop the table, recreate with both columns as `text`, re-insert rows. **No FKs yet** — that's migration_6.
-  - `down`: reverse — drop, recreate with `controller_id integer`, re-insert. (SQLite's loose typing means the data survives round-trip even though the declared type differs.)
-- [ ] Register in `astros_api/src/dal/migrations/index.ts` and add to the migration provider in `database.ts`.
+  - `down`: throws `Error('Recovery is via Phase 1 backup-restore; no manual down')`. See "Down migration policy" below.
+- [x] Register in `astros_api/src/dal/migrations/index.ts` and add to the migration provider in `database.ts`.
 
 ### Part C — migration_6: foreign-key constraints + orphan cleanup
 
@@ -78,31 +78,31 @@ Target tables and FK actions:
 
 Reference: `migration_1.ts` for the rename-dance pattern, Kysely's `addForeignKeyConstraint(name, columns, targetTable, targetColumns)` builder. Kysely also supports `.onDelete('cascade'|'restrict')`.
 
-- [ ] Create `astros_api/src/dal/migrations/migration_6.ts`:
+- [x] Create `astros_api/src/dal/migrations/migration_6.ts`:
   - `up`: iterate through the table list above, performing orphan cleanup + rename dance per table.
-  - `down`: **full symmetric down** — for each table, rename dance in reverse, recreating the table without FK constraints. Verbose (~13 tables × reverse dance) but keeps the down path honest.
-- [ ] Register in `astros_api/src/dal/migrations/index.ts` and `database.ts`.
+  - `down`: throws `Error('Recovery is via Phase 1 backup-restore; no manual down')`. See "Down migration policy" below.
+- [x] Register in `astros_api/src/dal/migrations/index.ts` and `database.ts`.
 
 ### Part D — FK pragma toggle in phase 1's `initializeDatabase`
 
-- [ ] In `astros_api/src/dal/database.ts` `initializeDatabase()`, bracket the migrator call with `PRAGMA foreign_keys = OFF` before and `PRAGMA foreign_keys = ON` after. The default at open is already ON (from phase 1), so this only adds the off/on wrapping during the migrate step.
+- [x] In `astros_api/src/dal/database.ts` `initializeDatabase()`, bracket the migrator call with `PRAGMA foreign_keys = OFF` before and `PRAGMA foreign_keys = ON` after. The default at open is already ON (from phase 1), so this only adds the off/on wrapping during the migrate step.
 
 ## Tests
 
-- [ ] `astros_api/src/dal/migrations/migration_5.test.ts`:
+- [x] `astros_api/src/dal/migrations/migration_5.test.ts`:
   - Apply migrations 0–4, insert a `controller_locations` row, apply migration_5, verify the row is still there with the same values.
   - Verify declared column type via `PRAGMA table_info(controller_locations)` → `controller_id` is `TEXT`.
-  - Round-trip: apply migration_5 then its `down`, verify structure returns.
+  - Verify `down` throws (asserts the policy below is in force).
 
-- [ ] `astros_api/src/dal/migrations/migration_6.test.ts`:
+- [x] `astros_api/src/dal/migrations/migration_6.test.ts`:
   - Apply all migrations through migration_6 on a fresh DB.
   - Verify each FK is enforced: attempt to insert an orphan row for each constrained table, expect `FOREIGN KEY constraint failed`.
   - Verify CASCADE works: delete a `scripts` row, assert `script_channels` and `script_events` for that script are gone.
   - Verify RESTRICT works: for `controllers` with an existing `controller_locations` link, attempt to delete the controller, expect the delete to be rejected.
   - Orphan cleanup: seed a pre-migration DB with known orphans (e.g. a `script_channels` row whose `script_id` doesn't exist), apply migration_6, assert the orphan is gone and no other rows are affected.
-  - Round-trip: apply, then down, then apply again — tables round-trip.
+  - Verify `down` throws.
 
-- [ ] `astros_api/src/dal/repositories/controller_repository.test.ts` — add the regression test from Part A.
+- [x] `astros_api/src/dal/repositories/controller_repository.test.ts` — add the regression test from Part A.
 
 ## Critical files
 
@@ -122,6 +122,15 @@ Reference: `migration_1.ts` for the rename-dance pattern, Kysely's `addForeignKe
   - Attempt an orphan insert via the sqlite3 CLI; expect rejection.
   - Simulate a controller re-registration via the existing serial test harness and verify `insertControllers` does not throw under FK enforcement.
 - **Safety net test (relies on phase 1):** deliberately break migration_6 with a `throw`, restart, verify the backup is taken, the migration fails, the restore succeeds, and the system returns to usable state at v4.
+
+## Down migration policy (Phase 2 onwards)
+
+Phase 1's backup-and-restore is the official rollback mechanism. `migrateToLatest()` (the only migrator call we make) only runs `up`s; `down` is never invoked in production. Two options for new migrations' `down`:
+
+- **Full symmetric down** — duplicates the recovery story. Verbose for migration_6 (~13 reverse rename dances).
+- **Throwing down** — `down` throws an `Error` directing operators to Phase 1's backup-restore. Single source of truth for rollback; less code to maintain.
+
+This phase commits to **throwing `down`** for migration_5 and migration_6. The migrations 0–4 that already have working `down` implementations are left as-is (no scope creep). The implication: forward migration safety is handled by Kysely's per-migration transaction wrapper *plus* Phase 1's restore; manual `migrateDown()` calls will fail loudly, which is what we want.
 
 ## Notes
 

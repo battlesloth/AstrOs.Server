@@ -9,64 +9,75 @@ export class ControllerRepository {
   constructor(private readonly db: Kysely<Database>) {}
 
   public async insertControllers(controllers: ControlModule[]): Promise<boolean> {
-    const wasInserted: boolean[] = [];
+    let allWritten = true;
 
-    for (let i = 0; i < controllers.length; i++) {
-      const controller = controllers[i];
+    for (const controller of controllers) {
+      try {
+        const written = await this.db.transaction().execute(async (tx) => {
+          // Find rows matching by address OR name. Deterministic order so the
+          // "keeper" choice is stable.
+          const existing = await tx
+            .selectFrom('controllers')
+            .selectAll()
+            .where((eb) =>
+              eb.or([eb('address', '=', controller.address), eb('name', '=', controller.name)]),
+            )
+            .orderBy('id')
+            .execute();
 
-      // Remove any stale row whose address or name matches but not both,
-      // then upsert cleanly.
-      const existing = await this.db
-        .selectFrom('controllers')
-        .selectAll()
-        .where((eb) =>
-          eb.or([eb('address', '=', controller.address), eb('name', '=', controller.name)]),
-        )
-        .execute()
-        .catch((err) => {
-          logger.error('ControllerRepository.insertControllers', err);
-          throw err;
+          if (existing.length === 0) {
+            const result = await tx
+              .insertInto('controllers')
+              .values({
+                id: uuid(),
+                name: controller.name,
+                description: '',
+                address: controller.address,
+              })
+              .executeTakeFirst();
+            return inserted(result);
+          }
+
+          // Keep the first match (preserves its id and any controller_locations
+          // rows pointing at it). Re-point dependent rows from duplicates to
+          // the keeper, then delete duplicates BEFORE updating the keeper —
+          // otherwise the keeper's UPDATE could collide with a duplicate's
+          // UNIQUE-constrained name/address, and the duplicate's DELETE would
+          // be rejected by migration_6's RESTRICT FK on
+          // controller_locations.controller_id.
+          const keeper = existing[0];
+          const duplicateIds = existing.slice(1).map((row) => row.id);
+
+          if (duplicateIds.length > 0) {
+            await tx
+              .updateTable('controller_locations')
+              .set({ controller_id: keeper.id })
+              .where('controller_id', 'in', duplicateIds)
+              .execute();
+
+            await tx.deleteFrom('controllers').where('id', 'in', duplicateIds).execute();
+          }
+
+          await tx
+            .updateTable('controllers')
+            .set({ name: controller.name, address: controller.address })
+            .where('id', '=', keeper.id)
+            .execute();
+          // The keeper exists (we just selected it), the transaction committed
+          // (otherwise we'd have thrown), so the controller is correctly
+          // persisted. Avoid making success depend on SQLite's change-count
+          // semantics — a no-op UPDATE (identical values) shouldn't be a failure.
+          return true;
         });
 
-      if (existing.length > 0) {
-        // Delete all rows matching either address or name
-        await this.db
-          .deleteFrom('controllers')
-          .where((eb) =>
-            eb.or([eb('address', '=', controller.address), eb('name', '=', controller.name)]),
-          )
-          .execute()
-          .catch((err) => {
-            logger.error('ControllerRepository.insertControllers', err);
-            throw err;
-          });
-      }
-
-      // Insert with the id from an existing match (if any) to preserve references
-      const existingId = existing.find(
-        (e) => e.address === controller.address || e.name === controller.name,
-      )?.id;
-
-      const result = await this.db
-        .insertInto('controllers')
-        .values({
-          id: existingId ?? uuid(),
-          name: controller.name,
-          description: existing.length > 0 ? existing[0].description : '',
-          address: controller.address,
-        })
-        .executeTakeFirst()
-        .catch((err) => {
-          logger.error('ControllerRepository.insertControllers', err);
-          throw err;
-        });
-
-      if (inserted(result)) {
-        wasInserted.push(true);
+        if (!written) allWritten = false;
+      } catch (err) {
+        logger.error('ControllerRepository.insertControllers', err);
+        throw err;
       }
     }
 
-    return wasInserted.length === controllers.length;
+    return allWritten;
   }
 
   public async insertController(controller: ControlModule): Promise<string> {
