@@ -20,6 +20,8 @@ import {
   migration_2,
   migration_3,
   migration_4,
+  migration_5,
+  migration_6,
 } from './migrations/index.js';
 import { SystemStatus } from '../system_status.js';
 import {
@@ -49,6 +51,8 @@ const defaultMigrationProvider: MigrationProvider = new (class implements Migrat
       '2_add_script_duration': migration_2,
       '3_add_playlists': migration_3,
       '4_add_random_wait': migration_4,
+      '5_fix_controller_locations_type': migration_5,
+      '6_add_foreign_keys': migration_6,
     };
   }
 })();
@@ -154,7 +158,17 @@ export async function initializeDatabase(
   }
 
   try {
-    await migrateToLatest(conn.db);
+    // Toggle FKs OFF for the migrate window so rename-dance migrations can
+    // drop/recreate referenced tables without RESTRICT/CASCADE side-effects.
+    // The pragma cannot be changed inside a transaction, so it must wrap
+    // migrateToLatest() — Kysely opens a transaction per migration internally.
+    // The finally guarantees FKs are re-enabled even if migrate throws.
+    conn.raw.pragma('foreign_keys = OFF');
+    try {
+      await migrateToLatest(conn.db);
+    } finally {
+      conn.raw.pragma('foreign_keys = ON');
+    }
     pruneOldBackups(dbFile, 5);
     return conn.db;
   } catch (err) {
