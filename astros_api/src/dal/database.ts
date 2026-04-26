@@ -94,7 +94,10 @@ function openConnection(dbFile: string): OpenConnection {
 // invisible to runtime checks. PRAGMA foreign_key_check scans every FK
 // constraint and reports violators; we throw on any so the existing
 // restore-from-backup path can revert to the pre-migration version.
-function assertNoFkViolations(raw: SQLite.Database): void {
+//
+// Exported for test use; no test-only-prefix because this is a generally
+// useful FK-integrity check, not test scaffolding.
+export function assertNoFkViolations(raw: SQLite.Database): void {
   const violations = raw.prepare('PRAGMA foreign_key_check').all() as Array<{
     table: string;
     rowid: number | bigint;
@@ -102,8 +105,12 @@ function assertNoFkViolations(raw: SQLite.Database): void {
     fkid: number;
   }>;
   if (violations.length > 0) {
+    // rowid can be a bigint when the connection has safeIntegers enabled.
+    // JSON.stringify throws TypeError on bigints by default, which would
+    // mask the real violation details behind a serialization error.
+    const detail = JSON.stringify(violations, (_, v) => (typeof v === 'bigint' ? v.toString() : v));
     throw new Error(
-      `Post-migration foreign_key_check found ${violations.length} violator(s): ${JSON.stringify(violations)}`,
+      `Post-migration foreign_key_check found ${violations.length} violator(s): ${detail}`,
     );
   }
 }

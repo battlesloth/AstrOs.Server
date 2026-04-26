@@ -50,10 +50,13 @@ export class LocationsRepository {
       );
 
       // Empty-string id means "no controller assigned to this location" — same
-      // sentinel the createControllerLocation factory uses. The write path
-      // (updateLocation) treats an empty id as "skip setLocationController",
-      // which avoids violating migration_6's RESTRICT FK on
-      // controller_locations.controller_id by trying to INSERT a non-existent id.
+      // sentinel the createControllerLocation factory uses. setLocationController
+      // (called by updateLocation whenever a controller field is present) treats
+      // both '' and the historical '0' sentinel as "no controller": it deletes
+      // any existing controller_locations row for the location and skips the
+      // INSERT. This both avoids violating migration_6's RESTRICT FK on
+      // controller_locations.controller_id and lets clients clear an existing
+      // assignment by sending the sentinel.
       location.controller = {
         id: c.ctrl_id ?? '',
         name: c.ctrl_name ?? '',
