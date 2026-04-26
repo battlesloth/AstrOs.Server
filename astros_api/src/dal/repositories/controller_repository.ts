@@ -55,10 +55,7 @@ export class ControllerRepository {
               .where('controller_id', 'in', duplicateIds)
               .execute();
 
-            await tx
-              .deleteFrom('controllers')
-              .where('id', 'in', duplicateIds)
-              .execute();
+            await tx.deleteFrom('controllers').where('id', 'in', duplicateIds).execute();
           }
 
           const update = await tx

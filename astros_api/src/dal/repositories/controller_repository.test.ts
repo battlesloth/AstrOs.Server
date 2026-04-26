@@ -176,9 +176,7 @@ describe('ControllerRepository', () => {
       await repo.insertController({ id: '', name: 'beta', address: 'AA:BB:CC:DD:EE:0B' });
 
       // name=alpha matches first row; address=...0B matches second row.
-      await repo.insertControllers([
-        { id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0B' },
-      ]);
+      await repo.insertControllers([{ id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0B' }]);
 
       const all = await repo.getControllers();
       const alpha = all.find((c) => c.name === 'alpha');
@@ -234,9 +232,7 @@ describe('ControllerRepository', () => {
 
       // Two-match merge: name=alpha hits ctl-a, address=...0B hits ctl-b.
       const repo = new ControllerRepository(db);
-      await repo.insertControllers([
-        { id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0B' },
-      ]);
+      await repo.insertControllers([{ id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0B' }]);
 
       // The keeper is ctl-a (lex-first id). Both controller_locations rows
       // must now point at it.
