@@ -350,11 +350,7 @@ export const migration_6: Migration = {
       { table: 'maestro_channels', column: 'board_id' },
     ];
     for (const { table, column } of fkIndexes) {
-      await db.schema
-        .createIndex(`idx_${table}_${column}`)
-        .on(table)
-        .column(column)
-        .execute();
+      await db.schema.createIndex(`idx_${table}_${column}`).on(table).column(column).execute();
     }
   },
   down: async (): Promise<void> => {

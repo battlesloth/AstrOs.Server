@@ -348,9 +348,7 @@ describe('migration_6: foreign keys + orphan cleanup', () => {
     // Confirm the planner actually uses one of the new indexes for a
     // representative FK-column lookup (the kind that runs during CASCADE).
     const plan = raw
-      .prepare(
-        'EXPLAIN QUERY PLAN SELECT 1 FROM script_channels WHERE script_id = ?',
-      )
+      .prepare('EXPLAIN QUERY PLAN SELECT 1 FROM script_channels WHERE script_id = ?')
       .all('any') as Array<{ detail: string }>;
     const planText = plan.map((r) => r.detail).join(' ');
     expect(planText).toMatch(/USING (COVERING )?INDEX idx_script_channels_script_id/i);
