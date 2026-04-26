@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
+import { Kysely } from 'kysely';
 import { Database } from './dal/types.js';
-import { migrateToLatest } from './dal/database.js';
+import { createKyselyConnection, migrateToLatest } from './dal/database.js';
 import { SettingsRepository } from './dal/repositories/settings_repository.js';
 import { ApiKeyValidator } from './api_key_validator.js';
 
@@ -18,9 +17,7 @@ describe('ApiKeyValidator', () => {
   let db: Kysely<Database>;
 
   beforeEach(async () => {
-    db = new Kysely<Database>({
-      dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-    });
+    db = createKyselyConnection().db;
     await migrateToLatest(db);
   });
 

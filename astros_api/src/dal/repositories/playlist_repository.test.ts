@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
+import { Kysely } from 'kysely';
 import { Database } from '../types.js';
-import { migrateToLatest } from '../database.js';
+import { createKyselyConnection, migrateToLatest } from '../database.js';
 import { PlaylistRepository } from './playlist_repository.js';
 import { Playlist } from '../../models/playlists/playlist.js';
 import { TrackType } from '../../models/playlists/trackType.js';
@@ -19,13 +18,7 @@ describe('Playlist Repository', () => {
   let db: Kysely<Database>;
 
   beforeEach(async () => {
-    const dialect = new SqliteDialect({
-      database: new SQLite(':memory:'),
-    });
-
-    db = new Kysely<Database>({
-      dialect,
-    });
+    db = createKyselyConnection().db;
 
     await migrateToLatest(db);
   });

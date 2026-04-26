@@ -89,6 +89,7 @@ export enum TransmissionType {
   directCommand,
   formatSD,
   servoTest,
+  systemStatus,
 }
 
 export enum TransmissionStatus {

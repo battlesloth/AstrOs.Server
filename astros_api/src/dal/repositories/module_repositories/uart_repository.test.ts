@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
+import { Kysely } from 'kysely';
 import { Database } from '../../types.js';
-import { migrateToLatest } from '../../database.js';
+import { createKyselyConnection, migrateToLatest } from '../../database.js';
 import {
   Constants,
   UartModule,
@@ -20,13 +19,7 @@ describe('UartRepository', () => {
   const location = Constants.BODY;
 
   beforeEach(async () => {
-    const dialect = new SqliteDialect({
-      database: new SQLite(':memory:'),
-    });
-
-    db = new Kysely<Database>({
-      dialect,
-    });
+    db = createKyselyConnection().db;
 
     await migrateToLatest(db);
   });
