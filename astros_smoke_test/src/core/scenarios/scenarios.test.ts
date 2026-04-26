@@ -19,7 +19,7 @@ function makeSession(): SessionContext {
 }
 
 describe('scenario registry', () => {
-  it('exposes all seven MVP scenarios by id', () => {
+  it('exposes all twelve scenarios by id', () => {
     expect(listScenarioIds().sort()).toEqual(
       [
         'sync-only',
@@ -29,6 +29,11 @@ describe('scenario registry', () => {
         'direct-command-sweep',
         'servo-test-sweep',
         'panic-drill',
+        'heads-curious-duet',
+        'heads-disagreement',
+        'heads-hide-and-seek',
+        'heads-sync-swim',
+        'heads-demo-reel',
       ].sort(),
     );
   });
@@ -47,7 +52,17 @@ describe('scenario registry', () => {
         .sort();
 
     expect(bySeverity('destructive')).toEqual(['format-and-sync', 'full-happy-path'].sort());
-    expect(bySeverity('caution')).toEqual(['panic-drill', 'servo-test-sweep'].sort());
+    expect(bySeverity('caution')).toEqual(
+      [
+        'panic-drill',
+        'servo-test-sweep',
+        'heads-curious-duet',
+        'heads-disagreement',
+        'heads-hide-and-seek',
+        'heads-sync-swim',
+        'heads-demo-reel',
+      ].sort(),
+    );
     expect(bySeverity('safe')).toEqual(['config-only', 'direct-command-sweep', 'sync-only'].sort());
   });
 });
@@ -96,5 +111,64 @@ describe('scenario composition', () => {
     const names = s.act?.map((x) => x.name) ?? [];
     expect(names.filter((n) => n === 'servoTest')).toHaveLength(3);
     expect(names.filter((n) => n.startsWith('hold'))).toHaveLength(2);
+  });
+
+  it('heads-curious-duet has the standard single-script shape', () => {
+    const s = scenarios['heads-curious-duet'](session);
+    expect(s.arrange?.map((x) => x.name)).toEqual([
+      'registrationSync',
+      'deployConfig',
+      'deployScript',
+    ]);
+    expect(s.act?.map((x) => x.name)).toEqual(['runScript', 'let-script-play']);
+  });
+
+  it('heads-disagreement has the standard single-script shape', () => {
+    const s = scenarios['heads-disagreement'](session);
+    expect(s.arrange?.map((x) => x.name)).toEqual([
+      'registrationSync',
+      'deployConfig',
+      'deployScript',
+    ]);
+    expect(s.act?.map((x) => x.name)).toEqual(['runScript', 'let-script-play']);
+  });
+
+  it('heads-hide-and-seek has the standard single-script shape', () => {
+    const s = scenarios['heads-hide-and-seek'](session);
+    expect(s.arrange?.map((x) => x.name)).toEqual([
+      'registrationSync',
+      'deployConfig',
+      'deployScript',
+    ]);
+    expect(s.act?.map((x) => x.name)).toEqual(['runScript', 'let-script-play']);
+  });
+
+  it('heads-sync-swim has the standard single-script shape', () => {
+    const s = scenarios['heads-sync-swim'](session);
+    expect(s.arrange?.map((x) => x.name)).toEqual([
+      'registrationSync',
+      'deployConfig',
+      'deployScript',
+    ]);
+    expect(s.act?.map((x) => x.name)).toEqual(['runScript', 'let-script-play']);
+  });
+
+  it('heads-demo-reel deploys 4 scripts and runs them in sequence', () => {
+    const s = scenarios['heads-demo-reel'](session);
+    expect(s.arrange?.map((x) => x.name)).toEqual([
+      'registrationSync',
+      'deployConfig',
+      'deployScript',
+      'deployScript',
+      'deployScript',
+      'deployScript',
+    ]);
+    const actNames = s.act?.map((x) => x.name) ?? [];
+    expect(actNames.filter((n) => n === 'runScript')).toHaveLength(4);
+    expect(
+      actNames.filter((n) =>
+        ['curious-duet', 'disagreement', 'hide-and-seek', 'sync-swim'].includes(n),
+      ),
+    ).toHaveLength(4);
   });
 });

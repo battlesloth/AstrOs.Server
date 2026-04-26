@@ -9,21 +9,25 @@ import {
   makeGpioToggle,
   makeServoPulse,
 } from '../helpers.js';
+import { POS_HOME, POS_MAX, POS_MIN } from './_heads-primitives.js';
 
 // ~6.2s script: seed home, then servo sweeps four times while padawan LED
 // pulses twice. Used by panic-drill so the panic arrives mid-run.
+//
+// Positions are PERCENT (0=min, 100=max, -1=home); ESP interpolates against
+// the configured ms bounds from DEPLOY_CONFIG.
 export function longRunner(sync: ConfigSync, scriptId: string = uuidv4()): ScriptUpload {
   const servo = getServoConfig(1);
   const master = joinEvents([
-    makeServoPulse({ channel: servo.ch, position: servo.homePos, timeTillMs: 200 }),
-    makeServoPulse({ channel: servo.ch, position: servo.maxPos, timeTillMs: 750 }),
-    makeServoPulse({ channel: servo.ch, position: servo.minPos, timeTillMs: 750 }),
-    makeServoPulse({ channel: servo.ch, position: servo.maxPos, timeTillMs: 750 }),
-    makeServoPulse({ channel: servo.ch, position: servo.minPos, timeTillMs: 750 }),
-    makeServoPulse({ channel: servo.ch, position: servo.maxPos, timeTillMs: 750 }),
-    makeServoPulse({ channel: servo.ch, position: servo.minPos, timeTillMs: 750 }),
-    makeServoPulse({ channel: servo.ch, position: servo.maxPos, timeTillMs: 750 }),
-    makeServoPulse({ channel: servo.ch, position: servo.homePos, timeTillMs: 0 }),
+    makeServoPulse({ channel: servo.ch, position: POS_HOME, timeTillMs: 200 }),
+    makeServoPulse({ channel: servo.ch, position: POS_MAX, timeTillMs: 750 }),
+    makeServoPulse({ channel: servo.ch, position: POS_MIN, timeTillMs: 750 }),
+    makeServoPulse({ channel: servo.ch, position: POS_MAX, timeTillMs: 750 }),
+    makeServoPulse({ channel: servo.ch, position: POS_MIN, timeTillMs: 750 }),
+    makeServoPulse({ channel: servo.ch, position: POS_MAX, timeTillMs: 750 }),
+    makeServoPulse({ channel: servo.ch, position: POS_MIN, timeTillMs: 750 }),
+    makeServoPulse({ channel: servo.ch, position: POS_MAX, timeTillMs: 750 }),
+    makeServoPulse({ channel: servo.ch, position: POS_HOME, timeTillMs: 0 }),
   ]);
   const padawan = joinEvents([
     makeBuffer(200),

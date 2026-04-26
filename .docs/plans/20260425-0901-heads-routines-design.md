@@ -308,7 +308,7 @@ All five scenarios are tagged `severity: 'caution'` (per Phase A) — they move 
 ## Risks
 
 - **Beat timing drift between author and firmware playback.** If the firmware scheduler runs slow under load, the smoke-test waits could end before the script finishes, leading to early next-track dispatch. Mitigation: 200ms padding per track in the reel. If observed drift exceeds 200ms, bump padding or compute padding as a percentage of script duration.
-- **`buildScript` duration validation false positives.** If a primitive's master/padawan durations are misaligned by 1ms due to rounding (`Math.round` on `timeTillMs`), the validator could throw. Mitigation: validator uses an integer-millisecond tolerance of ±1 per beat.
+- **`buildScript` duration validation false positives.** Originally planned mitigation was a ±1ms tolerance. During implementation we found this unnecessary: helpers always `Math.round` to integer milliseconds, and the multi-phase primitives use a `trailingPad` mechanism to absorb the remainder of any `floor` divisions. The validator therefore uses strict `!==` for clarity. Future primitives that compose at fractional millisecond resolution would need to revisit this — but no such primitive currently exists.
 - **Choreography looks janky on physical servos.** Default hardware speed varies between SG90/MG90/etc. If servos are visibly slow and overshoot beat boundaries, the sub-second beats (200–800ms) may need to be lengthened. Tuning is bench-only; no design changes needed if observed.
 
 ## Out of scope (future work)

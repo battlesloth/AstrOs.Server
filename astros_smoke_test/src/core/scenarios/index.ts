@@ -6,6 +6,11 @@ import { fullHappyPath } from './full-happy-path.js';
 import { directCommandSweep } from './direct-command-sweep.js';
 import { servoTestSweep } from './servo-test-sweep.js';
 import { panicDrill } from './panic-drill.js';
+import { headsCuriousDuet } from './heads-curious-duet.js';
+import { headsDisagreement } from './heads-disagreement.js';
+import { headsHideAndSeek } from './heads-hide-and-seek.js';
+import { headsSyncSwim } from './heads-sync-swim.js';
+import { headsDemoReel } from './heads-demo-reel.js';
 
 export * from './_shared.js';
 export {
@@ -16,6 +21,11 @@ export {
   directCommandSweep,
   servoTestSweep,
   panicDrill,
+  headsCuriousDuet,
+  headsDisagreement,
+  headsHideAndSeek,
+  headsSyncSwim,
+  headsDemoReel,
 };
 
 export const scenarios: Record<string, ScenarioFactory> = {
@@ -26,6 +36,11 @@ export const scenarios: Record<string, ScenarioFactory> = {
   'direct-command-sweep': directCommandSweep,
   'servo-test-sweep': servoTestSweep,
   'panic-drill': panicDrill,
+  'heads-curious-duet': headsCuriousDuet,
+  'heads-disagreement': headsDisagreement,
+  'heads-hide-and-seek': headsHideAndSeek,
+  'heads-sync-swim': headsSyncSwim,
+  'heads-demo-reel': headsDemoReel,
 };
 
 export function listScenarioIds(): string[] {
