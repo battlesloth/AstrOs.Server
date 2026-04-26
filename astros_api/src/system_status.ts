@@ -1,8 +1,13 @@
 import { logger } from './logger.js';
 
+export type ReadOnlyReasonCode =
+  | 'BACKUP_FAILED'
+  | 'MIGRATION_FAILED_NO_BACKUP'
+  | 'MIGRATION_FAILED_RESTORE_FAILED';
+
 export interface SystemStatusState {
   readOnly: boolean;
-  reason?: string;
+  reasonCode?: ReadOnlyReasonCode;
   enteredAt?: string;
 }
 
@@ -10,7 +15,7 @@ export type SystemStatusSubscriber = (state: SystemStatusState) => void;
 
 export class SystemStatus {
   private readOnly = false;
-  private reason: string | undefined;
+  private reasonCode: ReadOnlyReasonCode | undefined;
   private enteredAt: string | undefined;
   private subscribers = new Set<SystemStatusSubscriber>();
 
@@ -20,15 +25,19 @@ export class SystemStatus {
 
   getState(): SystemStatusState {
     if (!this.readOnly) return { readOnly: false };
-    return { readOnly: true, reason: this.reason, enteredAt: this.enteredAt };
+    return { readOnly: true, reasonCode: this.reasonCode, enteredAt: this.enteredAt };
   }
 
-  enterReadOnly(reason: string): void {
+  // detail (full error message, paths, stack) is logged server-side only.
+  // The public state exposes only the structured code.
+  enterReadOnly(code: ReadOnlyReasonCode, detail?: unknown): void {
     if (this.readOnly) return;
     this.readOnly = true;
-    this.reason = reason;
+    this.reasonCode = code;
     this.enteredAt = new Date().toISOString();
-    logger.error(`Entering read-only mode: ${reason}`);
+
+    const detailText = detail instanceof Error ? detail.stack ?? detail.message : String(detail);
+    logger.error(`Entering read-only mode (${code}): ${detailText}`);
 
     const snapshot = this.getState();
     for (const cb of this.subscribers) {

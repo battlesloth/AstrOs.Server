@@ -43,22 +43,36 @@ describe('writeGuard', () => {
   });
 
   describe('when in read-only mode', () => {
-    function readOnly(reason = 'test reason'): SystemStatus {
+    function readOnly(code: 'BACKUP_FAILED' = 'BACKUP_FAILED'): SystemStatus {
       const s = new SystemStatus();
-      s.enterReadOnly(reason);
+      s.enterReadOnly(code);
       return s;
     }
 
-    it('blocks POST/PUT/PATCH/DELETE with 503 and includes reason', () => {
-      const status = readOnly('migration failed');
+    it('blocks POST/PUT/PATCH/DELETE with 503 and includes reasonCode', () => {
+      const status = readOnly('BACKUP_FAILED');
       for (const m of ['POST', 'PUT', 'PATCH', 'DELETE']) {
         const { res, next } = call(m, '/scripts', status);
         expect(next).not.toHaveBeenCalled();
         expect(res.status).toHaveBeenCalledWith(503);
         expect(res.json).toHaveBeenCalledWith(
-          expect.objectContaining({ reason: 'migration failed' }),
+          expect.objectContaining({ reasonCode: 'BACKUP_FAILED' }),
         );
       }
+    });
+
+    it('does not leak raw error details into the 503 body', () => {
+      const status = new SystemStatus();
+      status.enterReadOnly(
+        'BACKUP_FAILED',
+        new Error('ENOENT: /home/user/.config/astrosserver/database.sqlite3'),
+      );
+
+      const { res } = call('POST', '/scripts', status);
+      const payload = res.json.mock.calls[0][0];
+      expect(JSON.stringify(payload)).not.toContain('ENOENT');
+      expect(JSON.stringify(payload)).not.toContain('astrosserver');
+      expect(payload).not.toHaveProperty('reason');
     });
 
     it('allows allowlisted POSTs (login, reauth, panicStop, panicClear)', () => {
@@ -79,7 +93,7 @@ describe('writeGuard', () => {
     });
 
     it('blocks the five serial-write GET paths with 503', () => {
-      const status = readOnly('boom');
+      const status = readOnly('BACKUP_FAILED');
       const blockedGets = [
         '/locations/syncconfig',
         '/locations/synccontrollers',
@@ -91,7 +105,9 @@ describe('writeGuard', () => {
         const { res, next } = call('GET', p, status);
         expect(next).not.toHaveBeenCalled();
         expect(res.status).toHaveBeenCalledWith(503);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reason: 'boom' }));
+        expect(res.json).toHaveBeenCalledWith(
+          expect.objectContaining({ reasonCode: 'BACKUP_FAILED' }),
+        );
       }
     });
   });

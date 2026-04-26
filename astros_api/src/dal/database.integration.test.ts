@@ -184,7 +184,7 @@ describe('initializeDatabase safety flow', () => {
     }
 
     expect(status.isReadOnly()).toBe(true);
-    expect(status.getState().reason).toMatch(/backup failed/i);
+    expect(status.getState().reasonCode).toBe('BACKUP_FAILED');
   });
 
   it('failed migration + failed restore → enters read-only', async () => {
@@ -221,6 +221,6 @@ describe('initializeDatabase safety flow', () => {
     }
 
     expect(status.isReadOnly()).toBe(true);
-    expect(status.getState().reason).toMatch(/migration failed.*restore failed/i);
+    expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORE_FAILED');
   });
 });

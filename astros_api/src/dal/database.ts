@@ -128,7 +128,7 @@ export async function initializeDatabase(
       backupPath = await createBackup(conn.raw, dbFile, lastApplied);
       logger.info(`Created pre-migration backup at ${backupPath}`);
     } catch (err) {
-      systemStatus.enterReadOnly(`backup failed: ${(err as Error).message}`);
+      systemStatus.enterReadOnly('BACKUP_FAILED', err);
       return conn.db;
     }
   }
@@ -141,9 +141,7 @@ export async function initializeDatabase(
     logger.error(`Migration failed: ${(err as Error).message}`);
 
     if (!backupPath) {
-      systemStatus.enterReadOnly(
-        `migration failed and no backup available: ${(err as Error).message}`,
-      );
+      systemStatus.enterReadOnly('MIGRATION_FAILED_NO_BACKUP', err);
       return conn.db;
     }
 
@@ -154,9 +152,7 @@ export async function initializeDatabase(
       logger.warn(`Restored database from backup ${backupPath} after failed migration`);
       return conn.db;
     } catch (restoreErr) {
-      systemStatus.enterReadOnly(
-        `migration failed and restore failed: ${(restoreErr as Error).message}`,
-      );
+      systemStatus.enterReadOnly('MIGRATION_FAILED_RESTORE_FAILED', restoreErr);
       // Restore failed; the original connection was already closed.
       // Best-effort reopen so read-only endpoints still respond.
       try {

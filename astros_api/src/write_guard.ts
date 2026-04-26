@@ -40,7 +40,7 @@ export function writeGuard(systemStatus: SystemStatus): RequestHandler {
       const state = systemStatus.getState();
       res.status(503).json({
         message: 'Server is in read-only mode',
-        reason: state.reason,
+        reasonCode: state.reasonCode,
       });
       return;
     }
