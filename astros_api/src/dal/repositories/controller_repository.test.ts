@@ -1,17 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
+import { Kysely } from 'kysely';
 import { Database } from '../types.js';
-import { migrateToLatest } from '../database.js';
+import { createKyselyConnection, migrateToLatest } from '../database.js';
 import { ControllerRepository } from './controller_repository.js';
 
 describe('ControllerRepository', () => {
   let db: Kysely<Database>;
 
   beforeEach(async () => {
-    db = new Kysely<Database>({
-      dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-    });
+    db = createKyselyConnection().db;
     await migrateToLatest(db);
   });
 

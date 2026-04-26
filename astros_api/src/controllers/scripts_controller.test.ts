@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
+import { Kysely } from 'kysely';
 import { Database } from '../dal/types.js';
-import { migrateToLatest } from '../dal/database.js';
+import { createKyselyConnection, migrateToLatest } from '../dal/database.js';
 import { deleteScript } from './scripts_controller.js';
 import { ScriptRepository } from '../dal/repositories/script_repository.js';
 import { PlaylistRepository } from '../dal/repositories/playlist_repository.js';
@@ -21,9 +20,7 @@ describe('Scripts Controller', () => {
   let db: Kysely<Database>;
 
   beforeEach(async () => {
-    db = new Kysely<Database>({
-      dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-    });
+    db = createKyselyConnection().db;
     await migrateToLatest(db);
   });
 

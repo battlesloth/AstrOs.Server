@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import SQLite from 'better-sqlite3';
-import { Kysely, Migration, MigrationProvider, SqliteDialect } from 'kysely';
+import { Migration, MigrationProvider } from 'kysely';
 import {
   migration_0,
   migration_1,
@@ -11,8 +11,7 @@ import {
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { Database } from './types.js';
-import { migrateToLatest } from './database.js';
+import { createKyselyConnection, migrateToLatest } from './database.js';
 import {
   checkPendingMigrations,
   getLastAppliedMigrationName,
@@ -50,9 +49,7 @@ describe('backup module', () => {
 
   describe('checkPendingMigrations', () => {
     it('returns all migrations on a fresh DB with no kysely_migration table', async () => {
-      const db = new Kysely<Database>({
-        dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-      });
+      const { db } = createKyselyConnection();
 
       const pending = await checkPendingMigrations(db, provider);
       expect(pending).toEqual(await expectedMigrationNames());
@@ -61,9 +58,7 @@ describe('backup module', () => {
     });
 
     it('returns [] on a fully migrated DB', async () => {
-      const db = new Kysely<Database>({
-        dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-      });
+      const { db } = createKyselyConnection();
       await migrateToLatest(db);
 
       const pending = await checkPendingMigrations(db, provider);
@@ -75,9 +70,7 @@ describe('backup module', () => {
 
   describe('getLastAppliedMigrationName', () => {
     it('returns null on a DB with no kysely_migration table', async () => {
-      const db = new Kysely<Database>({
-        dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-      });
+      const { db } = createKyselyConnection();
 
       const last = await getLastAppliedMigrationName(db, provider);
       expect(last).toBeNull();
@@ -86,9 +79,7 @@ describe('backup module', () => {
     });
 
     it('returns the latest applied migration in provider order', async () => {
-      const db = new Kysely<Database>({
-        dialect: new SqliteDialect({ database: new SQLite(':memory:') }),
-      });
+      const { db } = createKyselyConnection();
       await migrateToLatest(db);
 
       const last = await getLastAppliedMigrationName(db, provider);

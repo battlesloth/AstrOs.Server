@@ -67,13 +67,21 @@ interface OpenConnection {
   raw: SQLite.Database;
 }
 
-function openConnection(dbFile: string): OpenConnection {
-  const raw = new SQLite(dbFile);
+// Build a properly-configured Kysely + raw SQLite handle pair. Single source
+// of truth for connection options (PRAGMA foreign_keys = ON) so tests and
+// prod can never diverge. Exported so test setups don't roll their own.
+export function createKyselyConnection(dbPath = ':memory:'): OpenConnection {
+  const raw = new SQLite(dbPath);
   raw.pragma('foreign_keys = ON');
   const db = new Kysely<Database>({ dialect: new SqliteDialect({ database: raw }) });
-  _db = db;
-  _rawSqlite = raw;
   return { db, raw };
+}
+
+function openConnection(dbFile: string): OpenConnection {
+  const conn = createKyselyConnection(dbFile);
+  _db = conn.db;
+  _rawSqlite = conn.raw;
+  return conn;
 }
 
 async function closeConnection(): Promise<void> {
@@ -103,12 +111,9 @@ export async function initializeDatabase(
   const useMemory = !explicitPath && process.env.NODE_ENV?.toLocaleLowerCase() === 'test';
 
   if (useMemory) {
-    const raw = new SQLite(':memory:');
-    const db = new Kysely<Database>({ dialect: new SqliteDialect({ database: raw }) });
-    _db = db;
-    _rawSqlite = raw;
-    await migrateToLatest(db);
-    return db;
+    const conn = openConnection(':memory:');
+    await migrateToLatest(conn.db);
+    return conn.db;
   }
 
   const dbFile =
