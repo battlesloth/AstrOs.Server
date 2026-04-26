@@ -88,6 +88,44 @@ describe('backup module', () => {
 
       await db.destroy();
     });
+
+    it('orders migrations by numeric prefix, not lexicographically', async () => {
+      // Regression: lexicographic sort places '10_foo' before '2_foo'.
+      // We use a custom provider with mixed single- and double-digit names,
+      // pre-seed the kysely_migration table to mark them all applied, and
+      // assert getLastAppliedMigrationName returns '10_late_addition'.
+      const numericProvider: MigrationProvider = new (class implements MigrationProvider {
+        async getMigrations(): Promise<Record<string, Migration>> {
+          const noop: Migration = {
+            async up() {
+              return;
+            },
+          };
+          return {
+            '0_initial': noop,
+            '2_second': noop,
+            '10_late_addition': noop,
+          };
+        }
+      })();
+
+      const { db, raw } = createKyselyConnection();
+      raw
+        .prepare('CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT NOT NULL)')
+        .run();
+      const insertMig = raw.prepare('INSERT INTO kysely_migration VALUES (?, ?)');
+      insertMig.run('0_initial', '2026-01-01T00:00:00.000Z');
+      insertMig.run('2_second', '2026-01-02T00:00:00.000Z');
+      insertMig.run('10_late_addition', '2026-01-03T00:00:00.000Z');
+
+      const last = await getLastAppliedMigrationName(db, numericProvider);
+      expect(last).toBe('10_late_addition');
+
+      const pending = await checkPendingMigrations(db, numericProvider);
+      expect(pending).toEqual([]);
+
+      await db.destroy();
+    });
   });
 
   describe('createBackup', () => {

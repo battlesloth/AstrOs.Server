@@ -15,9 +15,24 @@ async function migrationTableExists(db: Kysely<Database>): Promise<boolean> {
   return result.rows.length > 0;
 }
 
+// Compare migration names by their leading numeric prefix (`<n>_<slug>`),
+// falling back to lexicographic order on the slug or for non-conforming names.
+// Plain .sort() would put '10_foo' before '2_foo' because '1' < '2'.
+function compareMigrationNames(a: string, b: string): number {
+  const matchA = a.match(/^(\d+)_(.*)$/);
+  const matchB = b.match(/^(\d+)_(.*)$/);
+  if (matchA && matchB) {
+    const numA = parseInt(matchA[1], 10);
+    const numB = parseInt(matchB[1], 10);
+    if (numA !== numB) return numA - numB;
+    return matchA[2].localeCompare(matchB[2]);
+  }
+  return a.localeCompare(b);
+}
+
 async function getProviderMigrationNames(provider: MigrationProvider): Promise<string[]> {
   const map = await provider.getMigrations();
-  return Object.keys(map).sort();
+  return Object.keys(map).sort(compareMigrationNames);
 }
 
 export async function checkPendingMigrations(
