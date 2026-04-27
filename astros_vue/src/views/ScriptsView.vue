@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { AstrosLayout, AstrosScriptRow } from '@/components';
 import { useToast } from '@/composables/useToast';
 import { useScriptsStore } from '@/stores/scripts';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 import { UploadStatus, Location } from '@/enums';
 import AstrosFieldFilter from '@/components/common/fields/AstrosFieldFilter.vue';
 import { useI18n } from 'vue-i18n';
@@ -13,6 +14,7 @@ const { t } = useI18n();
 const { success, error } = useToast();
 
 const scriptStore = useScriptsStore();
+const systemStatusStore = useSystemStatusStore();
 
 const showDeleteModal = ref(false);
 const deleteScriptId = ref('');
@@ -127,6 +129,8 @@ const editScript = (id: string) => {
         <button
           data-testid="save_module_settings"
           class="btn btn-primary w-24"
+          :disabled="systemStatusStore.readOnly"
+          :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
           @click="newScript"
         >
           {{ $t('scripts_view.new') }}
@@ -188,6 +192,8 @@ const editScript = (id: string) => {
           <div class="modal-action">
             <button
               class="btn btn-error"
+              :disabled="systemStatusStore.readOnly"
+              :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
               @click="confirmDelete"
             >
               {{ $t('delete') }}

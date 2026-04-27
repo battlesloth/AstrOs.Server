@@ -2,6 +2,7 @@
 import { onMounted, ref, useTemplateRef } from 'vue';
 import { ModalMode, ModalType, ScriptChannelType } from '@/enums';
 import { useScripterStore } from '@/stores/scripter';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import {
   AstrosLayout,
@@ -43,6 +44,7 @@ const channelTestValue = ref<ChannelTestValue | null>(null);
 
 const route = useRoute();
 const scripterStore = useScripterStore();
+const systemStatusStore = useSystemStatusStore();
 
 const { eventTypeToModalType, getDefaultScriptEvent } = useScriptEvents();
 
@@ -385,12 +387,16 @@ onMounted(async () => {
           </div>
           <button
             class="btn w-24 btn-primary"
+            :disabled="systemStatusStore.readOnly"
+            :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
             @click="saveScript"
           >
             {{ $t('save') }}
           </button>
           <button
             class="btn w-24 btn-primary"
+            :disabled="systemStatusStore.readOnly"
+            :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
             @click="scriptTest"
           >
             {{ $t('test') }}

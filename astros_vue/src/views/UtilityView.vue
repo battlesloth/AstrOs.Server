@@ -4,6 +4,9 @@ import { AstrosLayout } from '@/components';
 import apiService from '@/api/apiService';
 import type { ControllerModule } from '@/models';
 import { useI18n } from 'vue-i18n';
+import { useSystemStatusStore } from '@/stores/systemStatus';
+
+const systemStatusStore = useSystemStatusStore();
 
 interface SelectedControllerModule extends ControllerModule {
   selected: boolean;
@@ -143,6 +146,8 @@ const closeAlert = () => {
                 <button
                   class="btn btn-primary w-35 px-5 py-0.75"
                   aria-label="$t('generate')"
+                  :disabled="systemStatusStore.readOnly"
+                  :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
                   @click="generateApiKey"
                 >
                   {{ $t('generate') }}
@@ -160,6 +165,8 @@ const closeAlert = () => {
                 <button
                   class="btn btn-primary w-35 px-5 py-0.75"
                   aria-label="$t('format')"
+                  :disabled="systemStatusStore.readOnly"
+                  :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
                   @click="openFormatModal"
                 >
                   {{ $t('format') }}
@@ -215,6 +222,8 @@ const closeAlert = () => {
           <div class="modal-action">
             <button
               class="btn btn-primary"
+              :disabled="systemStatusStore.readOnly"
+              :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
               @click="confirmFormat"
             >
               {{ $t('ok') }}

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast';
 import { usePlaylistsStore } from '@/stores/playlists';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -12,6 +13,7 @@ const { t } = useI18n();
 const { success, error } = useToast();
 
 const playlistStore = usePlaylistsStore();
+const systemStatusStore = useSystemStatusStore();
 
 const showDeleteModal = ref(false);
 const deletePlaylistId = ref('');
@@ -103,6 +105,8 @@ const editPlaylist = (id: string) => {
           data-testid="save_module_settings"
           class="btn btn-primary w-24"
           aria-label="$t('playlists_view.new')"
+          :disabled="systemStatusStore.readOnly"
+          :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
           @click="newPlaylist"
         >
           {{ $t('playlists_view.new') }}
@@ -149,6 +153,8 @@ const editPlaylist = (id: string) => {
           <div class="modal-action">
             <button
               class="btn btn-error"
+              :disabled="systemStatusStore.readOnly"
+              :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
               @click="confirmDelete"
             >
               {{ $t('delete') }}

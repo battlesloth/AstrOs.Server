@@ -7,6 +7,7 @@ import { v4 as uuid } from 'uuid';
 import AstrosPlaylistSettings from './AstrosPlaylistSettings.vue';
 import AstrosPlaylistTrack from './AstrosPlaylistTrack.vue';
 import { usePlaylistsStore } from '@/stores/playlists';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { AstrosConfirmModal, AstrosHtmlModal } from '@/components/modals';
@@ -20,6 +21,7 @@ const { success, error } = useToast();
 const route = useRoute();
 const router = useRouter();
 const playlistStore = usePlaylistsStore();
+const systemStatusStore = useSystemStatusStore();
 const { selectedPlaylist } = storeToRefs(playlistStore);
 const playlist = computed(() => selectedPlaylist.value!);
 
@@ -243,6 +245,8 @@ async function save() {
       <button
         data-testid="save_module_settings"
         class="btn btn-primary w-24"
+        :disabled="systemStatusStore.readOnly"
+        :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
         @click="save"
       >
         {{ $t('playlist_editor_view.save') }}

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import type { AddModuleEvent, RemoveModuleEvent, ServoTestEvent } from '@/models/events';
 import { useLocationStore } from '@/stores/location';
 import { useControllerStore } from '@/stores/controller';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 import { Location, ModalType, ControllerStatus } from '@/enums';
 import { useModuleManagement } from '@/composables/useModuleManagement';
 import {
@@ -36,6 +37,7 @@ const openAccordion = ref<string | null>(null);
 
 const locationStore = useLocationStore();
 const controllerStore = useControllerStore();
+const systemStatusStore = useSystemStatusStore();
 
 const { success, error } = useToast();
 
@@ -152,12 +154,16 @@ function controllerSelectChanged(location: string) {
           <button
             data-testid="save_module_settings"
             class="btn btn-primary w-24"
+            :disabled="systemStatusStore.readOnly"
+            :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
             @click="saveModuleSettings"
           >
             {{ $t('module_view.save') }}
           </button>
           <button
             class="btn btn-primary w-24"
+            :disabled="systemStatusStore.readOnly"
+            :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
             @click="syncModuleSettings"
           >
             {{ $t('module_view.sync') }}
