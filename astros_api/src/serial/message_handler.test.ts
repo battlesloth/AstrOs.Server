@@ -61,7 +61,7 @@ describe('Serial Message Handler Tests', () => {
     expect(result.type).toBe(SerialMessageType.UNKNOWN);
   });
 
-  it('handlePollAck should return valid response', () => {
+  it('handlePollAck should return valid response (legacy 3-field)', () => {
     const messageHandler = new MessageHandler();
 
     const message = createMessage(
@@ -78,6 +78,74 @@ describe('Serial Message Handler Tests', () => {
     expect(response.controller.name).toBe('name');
     expect(response.controller.address).toBe('mac');
     expect(response.controller.fingerprint).toBe('fingerprint');
+    expect(response.controller.firmwareVersion).toBeUndefined();
+  });
+
+  it('handlePollAck should parse firmware version (4-field)', () => {
+    const messageHandler = new MessageHandler();
+
+    const message = createMessage(
+      SerialMessageType.POLL_ACK,
+      '123',
+      'mac' + US + 'name' + US + 'fingerprint' + US + '1.2.0-dev.102',
+    );
+
+    const validation = messageHandler.validateMessage(message);
+
+    const response = messageHandler.handlePollAck(validation.data);
+
+    expect(response.type).toBe(SerialWorkerResponseType.POLL);
+    expect(response.controller.firmwareVersion).toBe('1.2.0-dev.102');
+  });
+
+  it('handlePollAck should treat empty firmware field as undefined', () => {
+    const messageHandler = new MessageHandler();
+
+    const message = createMessage(
+      SerialMessageType.POLL_ACK,
+      '123',
+      'mac' + US + 'name' + US + 'fingerprint' + US + '',
+    );
+
+    const validation = messageHandler.validateMessage(message);
+
+    const response = messageHandler.handlePollAck(validation.data);
+
+    expect(response.type).toBe(SerialWorkerResponseType.POLL);
+    expect(response.controller.firmwareVersion).toBeUndefined();
+  });
+
+  it('handlePollAck should treat whitespace-only firmware field as undefined', () => {
+    const messageHandler = new MessageHandler();
+
+    const message = createMessage(
+      SerialMessageType.POLL_ACK,
+      '123',
+      'mac' + US + 'name' + US + 'fingerprint' + US + '   ',
+    );
+
+    const validation = messageHandler.validateMessage(message);
+
+    const response = messageHandler.handlePollAck(validation.data);
+
+    expect(response.type).toBe(SerialWorkerResponseType.POLL);
+    expect(response.controller.firmwareVersion).toBeUndefined();
+  });
+
+  it('handlePollAck should reject 5-field payload as UNKNOWN', () => {
+    const messageHandler = new MessageHandler();
+
+    const message = createMessage(
+      SerialMessageType.POLL_ACK,
+      '123',
+      'mac' + US + 'name' + US + 'fingerprint' + US + '1.2.0' + US + 'extra',
+    );
+
+    const validation = messageHandler.validateMessage(message);
+
+    const response = messageHandler.handlePollAck(validation.data);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
   });
 
   it('handlePollAck should return valid response with invalid data', () => {

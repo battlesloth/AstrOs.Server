@@ -58,7 +58,8 @@ export class MessageHandler {
 
     const parts = msg.split(MessageHelper.US);
 
-    if (parts.length !== 3) {
+    // Legacy firmware sends 3 fields (mac, name, fingerprint); 1.2.0+ adds version as the 4th.
+    if (parts.length < 3 || parts.length > 4) {
       logger.error(`Invalid poll ack: ${msg}`);
       response.type = SerialWorkerResponseType.UNKNOWN;
       return response;
@@ -66,6 +67,12 @@ export class MessageHandler {
 
     const module: ControlModule = { id: '', name: parts[1], address: parts[0] };
     module.fingerprint = parts[2];
+    if (parts.length === 4) {
+      const version = parts[3].trim();
+      if (version.length > 0) {
+        module.firmwareVersion = version;
+      }
+    }
     response.controller = module;
 
     return response;

@@ -3,4 +3,5 @@ export interface ControlModule {
   name: string;
   address: string;
   fingerprint?: string;
+  firmwareVersion?: string;
 }

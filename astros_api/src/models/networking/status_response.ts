@@ -5,4 +5,6 @@ export interface StatusResponse extends BaseResponse {
   controllerLocation: string;
   up: boolean;
   synced: boolean;
+  firmwareVersion?: string;
+  firmwareCompatible: boolean;
 }

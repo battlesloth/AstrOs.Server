@@ -244,6 +244,25 @@
     "sync_failed": "Controllers sync failed.",
     "controller_select": "Controller Select"
   },
+  "modules": {
+    "firmware": {
+      "unknown": "unknown",
+      "tooltip": {
+        "ok": "Firmware {version}",
+        "incompatible": "Firmware {version} (minimum {minimum} required)",
+        "disconnected": "Module not connected"
+      }
+    }
+  },
+  "statusPage": {
+    "base_alt": "Astromech base",
+    "alt": {
+      "up": "{location} connected",
+      "needsSynced": "{location} needs sync",
+      "firmwareIncompatible": "{location} firmware out of date",
+      "down": "{location} disconnected"
+    }
+  },
   "remote_view": {
     "title": "Remote Control",
     "save": "Save",

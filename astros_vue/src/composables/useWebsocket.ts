@@ -125,23 +125,32 @@ export function useWebsocket() {
     try {
       const data = message as LocationStatus;
       const controllerStore = useControllerStore();
-      let status = ControllerStatus.DOWN;
 
-      if (data.synced) {
-        status = ControllerStatus.UP;
-      } else if (data.up) {
-        status = ControllerStatus.NEEDS_SYNCED;
+      // Order matters: a stale config on incompatible firmware should still
+      // surface as FIRMWARE_INCOMPATIBLE, not NEEDS_SYNCED.
+      let status = ControllerStatus.DOWN;
+      if (data.up) {
+        if (!data.firmwareCompatible) {
+          status = ControllerStatus.FIRMWARE_INCOMPATIBLE;
+        } else if (data.synced) {
+          status = ControllerStatus.UP;
+        } else {
+          status = ControllerStatus.NEEDS_SYNCED;
+        }
       }
 
       switch (data.controllerLocation) {
         case Location.DOME:
           controllerStore.domeStatus = status;
+          controllerStore.domeFirmware = data.firmwareVersion;
           break;
         case Location.CORE:
           controllerStore.coreStatus = status;
+          controllerStore.coreFirmware = data.firmwareVersion;
           break;
         case Location.BODY:
           controllerStore.bodyStatus = status;
+          controllerStore.bodyFirmware = data.firmwareVersion;
           break;
       }
     } catch (error) {
