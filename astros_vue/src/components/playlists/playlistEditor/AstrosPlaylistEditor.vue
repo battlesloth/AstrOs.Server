@@ -6,8 +6,8 @@ import { PlaylistType } from '@/enums/playlists/playlistType';
 import { v4 as uuid } from 'uuid';
 import AstrosPlaylistSettings from './AstrosPlaylistSettings.vue';
 import AstrosPlaylistTrack from './AstrosPlaylistTrack.vue';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import { usePlaylistsStore } from '@/stores/playlists';
-import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import { AstrosConfirmModal, AstrosHtmlModal } from '@/components/modals';
@@ -21,7 +21,6 @@ const { success, error } = useToast();
 const route = useRoute();
 const router = useRouter();
 const playlistStore = usePlaylistsStore();
-const systemStatusStore = useSystemStatusStore();
 const { selectedPlaylist } = storeToRefs(playlistStore);
 const playlist = computed(() => selectedPlaylist.value!);
 
@@ -242,19 +241,13 @@ async function save() {
     <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0">
       <h1 class="text-2xl font-bold">{{ $t('playlist_editor_view.title') }}</h1>
       <div class="grow"></div>
-      <div
-        :class="systemStatusStore.readOnly ? 'tooltip' : ''"
-        :data-tip="$t('systemStatus.readOnly.disabled')"
+      <AstrosWriteButton
+        data-testid="save_module_settings"
+        class="btn btn-primary w-24"
+        @click="save"
       >
-        <button
-          data-testid="save_module_settings"
-          class="btn btn-primary w-24"
-          :disabled="systemStatusStore.readOnly"
-          @click="save"
-        >
-          {{ $t('playlist_editor_view.save') }}
-        </button>
-      </div>
+        {{ $t('playlist_editor_view.save') }}
+      </AstrosWriteButton>
     </div>
     <div class="min-h-0 flex-1 flex">
       <div class="grow"></div>

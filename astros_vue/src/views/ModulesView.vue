@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import type { AddModuleEvent, RemoveModuleEvent, ServoTestEvent } from '@/models/events';
 import { useLocationStore } from '@/stores/location';
 import { useControllerStore } from '@/stores/controller';
-import { useSystemStatusStore } from '@/stores/systemStatus';
 import { Location, ModalType, ControllerStatus } from '@/enums';
 import { useModuleManagement } from '@/composables/useModuleManagement';
 import {
@@ -16,6 +15,7 @@ import {
   AstrosAddModuleModal,
   AstrosServoTestModal,
 } from '@/components';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import apiService from '@/api/apiService';
 import { SYNC_CONFIG } from '@/api/endpoints';
 import { useToast } from '@/composables/useToast';
@@ -37,7 +37,6 @@ const openAccordion = ref<string | null>(null);
 
 const locationStore = useLocationStore();
 const controllerStore = useControllerStore();
-const systemStatusStore = useSystemStatusStore();
 
 const { success, error } = useToast();
 
@@ -151,31 +150,19 @@ function controllerSelectChanged(location: string) {
         <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0 mb-4">
           <h1 class="text-2xl font-bold">{{ $t('module_view.modules') }}</h1>
           <div class="grow"></div>
-          <div
-            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
-            :data-tip="$t('systemStatus.readOnly.disabled')"
+          <AstrosWriteButton
+            data-testid="save_module_settings"
+            class="btn btn-primary w-24"
+            @click="saveModuleSettings"
           >
-            <button
-              data-testid="save_module_settings"
-              class="btn btn-primary w-24"
-              :disabled="systemStatusStore.readOnly"
-              @click="saveModuleSettings"
-            >
-              {{ $t('module_view.save') }}
-            </button>
-          </div>
-          <div
-            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
-            :data-tip="$t('systemStatus.readOnly.disabled')"
+            {{ $t('module_view.save') }}
+          </AstrosWriteButton>
+          <AstrosWriteButton
+            class="btn btn-primary w-24"
+            @click="syncModuleSettings"
           >
-            <button
-              class="btn btn-primary w-24"
-              :disabled="systemStatusStore.readOnly"
-              @click="syncModuleSettings"
-            >
-              {{ $t('module_view.sync') }}
-            </button>
-          </div>
+            {{ $t('module_view.sync') }}
+          </AstrosWriteButton>
         </div>
 
         <!-- Module Accordions -->
