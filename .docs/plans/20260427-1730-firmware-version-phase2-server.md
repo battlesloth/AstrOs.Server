@@ -96,14 +96,14 @@ Body / core / dome header blocks (~lines 188+, 244+, 308+). Replaced the 3-state
 
 ### Backend
 
-- [ ] `npm run test` in `astros_api/` (covers semver util + handlePollAck both forms).
-- [ ] `npm run build` in `astros_api/` (type-check passes).
+- [x] `npm run test` in `astros_api/` (covers semver util + handlePollAck both forms). 258/258 passed.
+- [x] `npm run build` in `astros_api/` (type-check passes).
 
 ### Frontend
 
-- [ ] `npm run test:unit` in `astros_vue/`.
-- [ ] `npm run build` in `astros_vue/`.
-- [ ] `npm run lint` and `npm run prettier:write` in both packages before commit.
+- [x] `npm run test:unit` in `astros_vue/`. 24/24 passed.
+- [x] `npm run build` in `astros_vue/`.
+- [x] `npm run lint` and `npm run prettier:write` in both packages before commit.
 
 ### End-to-end QA (manual; aligns with TDD-exception rule for UI / serial code)
 
