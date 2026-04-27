@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { createPinia, setActivePinia } from 'pinia';
 import SystemStatusBanner from './SystemStatusBanner.vue';
-import { useSystemStatusStore, type ReadOnlyReasonCode } from '@/stores/systemStatus';
+import { useSystemStatusStore } from '@/stores/systemStatus';
+import type { ReadOnlyReasonCode } from '@/types/systemStatus';
 
 const meta = {
   title: 'Components/Common/SystemStatusBanner',

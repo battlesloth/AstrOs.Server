@@ -1,5 +1,5 @@
 import type { WebsocketMessageType } from '@/enums/WebsocketMessageType';
-import type { ReadOnlyReasonCode } from '@/stores/systemStatus';
+import type { ReadOnlyReasonCode } from '@/types/systemStatus';
 
 // The server's systemStatus broadcast (api_server.ts) sends
 //   { type: TransmissionType.systemStatus, data: state }

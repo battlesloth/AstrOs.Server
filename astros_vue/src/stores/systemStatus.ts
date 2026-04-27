@@ -2,19 +2,7 @@ import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import apiService from '@/api/apiService';
 import { SYSTEM_STATUS } from '@/api/endpoints';
-
-export type ReadOnlyReasonCode =
-  | 'STARTUP_OPEN_FAILED'
-  | 'BACKUP_FAILED'
-  | 'MIGRATION_FAILED_NO_BACKUP'
-  | 'MIGRATION_FAILED_RESTORED'
-  | 'MIGRATION_FAILED_RESTORE_FAILED';
-
-export interface SystemStatusPayload {
-  readOnly: boolean;
-  reasonCode?: ReadOnlyReasonCode | null;
-  enteredAt?: string | null;
-}
+import type { ReadOnlyReasonCode, SystemStatusPayload } from '@/types/systemStatus';
 
 export const useSystemStatusStore = defineStore('systemStatus', () => {
   const readOnly = ref(false);

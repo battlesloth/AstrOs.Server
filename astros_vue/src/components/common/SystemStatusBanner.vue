@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useSystemStatusStore, type ReadOnlyReasonCode } from '@/stores/systemStatus';
+import { useSystemStatusStore } from '@/stores/systemStatus';
+import type { ReadOnlyReasonCode } from '@/types/systemStatus';
 
 const { t } = useI18n();
 const systemStatusStore = useSystemStatusStore();

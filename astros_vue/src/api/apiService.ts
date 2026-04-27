@@ -1,10 +1,10 @@
-import axios, { type AxiosError } from 'axios';
+import axios from 'axios';
 import router from '@/router';
-import i18n from '@/i18n';
-import { useToast } from '@/composables/useToast';
-import { useSystemStatusStore, type ReadOnlyReasonCode } from '@/stores/systemStatus';
 
-const apiClient = axios.create({
+// Exported so app-level wiring (main.ts) can attach additional interceptors
+// after Pinia is created — keeps this module dependency-free of stores and
+// avoids the circular-dep trap (apiService → store → apiService).
+export const apiClient = axios.create({
   baseURL: import.meta.env.BACKEND_API || 'http://localhost:3000',
   headers: {
     'Content-Type': 'application/json',
@@ -25,20 +25,13 @@ apiClient.interceptors.request.use(
   },
 );
 
-// Recognize a 503 read-only response by its body shape: { message, reasonCode }
-// per write_guard.ts on the API. Treating "any 503 with a reasonCode field"
-// as the signal keeps us robust if a future server adds 503s for unrelated
-// reasons without that envelope.
-function readOnlyReasonCodeFrom(error: AxiosError): ReadOnlyReasonCode | null {
-  if (error.response?.status !== 503) return null;
-  const body = error.response.data as { reasonCode?: string } | undefined;
-  return (body?.reasonCode as ReadOnlyReasonCode | undefined) ?? null;
-}
-
-// Add response interceptor to handle 401 + 503 read-only
+// Add response interceptor to handle 401 errors. The 503 read-only handler
+// lives in `@/api/readOnlyInterceptor` and is installed from main.ts after
+// Pinia is created — installing it here would require importing the store,
+// which itself imports apiService, creating a circular module dependency.
 apiClient.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  (error) => {
     if (error.response?.status === 401) {
       // Clear token on auth failure
       localStorage.removeItem('jwt_token');
@@ -46,30 +39,7 @@ apiClient.interceptors.response.use(
       if (router.currentRoute.value.path !== '/auth') {
         router.push('/auth');
       }
-      return Promise.reject(error);
     }
-
-    const reasonCode = readOnlyReasonCodeFrom(error);
-    if (reasonCode !== null) {
-      // Sync local state with the server's view of itself — the WebSocket
-      // push would catch up eventually, but updating here makes the banner
-      // and disabled-button bindings flip immediately.
-      try {
-        const systemStatusStore = useSystemStatusStore();
-        systemStatusStore.setStatus({ readOnly: true, reasonCode });
-      } catch (storeErr) {
-        // Pinia not initialized (e.g., setup-time error); state will catch
-        // up via the WebSocket push on next handshake.
-        console.warn('Could not update systemStatus store from 503:', storeErr);
-      }
-
-      try {
-        useToast().warning(i18n.global.t('systemStatus.readOnly.requestBlocked'));
-      } catch (toastErr) {
-        console.warn('Could not surface read-only toast:', toastErr);
-      }
-    }
-
     return Promise.reject(error);
   },
 );
