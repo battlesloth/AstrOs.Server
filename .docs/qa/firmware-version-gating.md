@@ -84,5 +84,4 @@ Restore: revert the `MINIMUM_FIRMWARE_VERSION` change (case a) or re-flash 1.2.0
 
 ## Notes
 
-- The `body_grey.png` / `dome_grey.png` / `core_grey.png` assets are currently byte-identical to the red overlays as a placeholder. Visual differentiation is only correct once actual greyscale artwork replaces them.
 - Phase 1 firmware does not include the version in `REGISTRATION_SYNC_ACK`; only `POLL_ACK` carries it. There is therefore a brief window after a controller registers but before its first poll arrives where the version is unknown — during that window the controller will appear DOWN (correct: not yet confirmed responsive).
