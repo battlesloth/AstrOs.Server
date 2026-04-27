@@ -107,14 +107,7 @@ Body / core / dome header blocks (~lines 188+, 244+, 308+). Replaced the 3-state
 
 ### End-to-end QA (manual; aligns with TDD-exception rule for UI / serial code)
 
-- [ ] Add `astros_vue/.docs/qa/firmware-version-gating.md` covering:
-  - **Preconditions**: ESP firmware 1.2.0 flashed, server running, controllers powered.
-  - **Case 1 — happy path**: green check + tooltip `Firmware 1.2.0`.
-  - **Case 2 — sync needed**: yellow pulse + yellow warning.
-  - **Case 3 — firmware incompatible**: bump server min to `1.3.0` (or flash older firmware) → red pulse + red exclamation + tooltip `Firmware 1.2.0 (minimum 1.3.0 required)`.
-  - **Case 4 — disconnected**: power off controller → gray static image + dark-grey `?` icon + tooltip `Module not connected`.
-  - **Case 5 — recovery**: restore power → returns to UP after next poll.
-  - **Case 6 — a11y**: keyboard focus on icon → aria-label announced; image alt text descriptive.
+- [x] Added `.docs/qa/firmware-version-gating.md` (8 cases: happy path, needs-sync, firmware-incompatible, disconnected, recovery, mixed states, a11y, dev-build acceptance). Lives at the repo root `.docs/qa/`, matching the convention from `system-readonly-mode.md`, not under `astros_vue/`.
 
 ## Critical files reference
 
