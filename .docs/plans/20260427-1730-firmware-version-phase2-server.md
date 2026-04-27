@@ -51,65 +51,46 @@ The parser should still tolerate the legacy 3-field format (no version) so the s
 
 ### F1. Enum and websocket reducer
 
-- [ ] Add `FIRMWARE_INCOMPATIBLE = 'firmwareIncompatible'` to `astros_vue/src/enums/controllerStatus.ts`.
-- [ ] Extend `astros_vue/src/models/websocket/locationStatus.ts` with the two new fields.
-- [ ] Update `astros_vue/src/composables/useWebsocket.ts:124–150` to a 4-state collapse:
-  ```ts
-  let status = ControllerStatus.DOWN;
-  if (data.up) {
-    if (!data.firmwareCompatible) status = ControllerStatus.FIRMWARE_INCOMPATIBLE;
-    else if (data.synced) status = ControllerStatus.UP;
-    else status = ControllerStatus.NEEDS_SYNCED;
-  }
-  ```
-  Order matters: firmware check beats sync check (a stale config on incompatible firmware should still show as incompatible).
+- [x] Add `FIRMWARE_INCOMPATIBLE = 'firmwareIncompatible'` to `astros_vue/src/enums/controllerStatus.ts`.
+- [x] Extend `astros_vue/src/models/websocket/locationStatus.ts` with the two new fields.
+- [x] Update `astros_vue/src/composables/useWebsocket.ts:124–150` to a 4-state collapse. Order: firmware check beats sync check.
 
 ### F2. Controller store
 
-- [ ] Add `bodyFirmware`, `domeFirmware`, `coreFirmware` refs (`string | undefined`) to `astros_vue/src/stores/controller.ts` and write `data.firmwareVersion` into them in `handleStatusMessage`.
-- [ ] Hard-code `MINIMUM_FIRMWARE_VERSION` in `astros_vue/src/constants/firmware.ts` with a comment pointing at `astros_api/src/models/firmware_config.ts` as the source of truth.
+- [x] Add `bodyFirmware`, `domeFirmware`, `coreFirmware` refs (`string | undefined`) to `astros_vue/src/stores/controller.ts` and write `data.firmwareVersion` into them in `handleStatusMessage`.
+- [x] Hard-code `MINIMUM_FIRMWARE_VERSION` in `astros_vue/src/constants/firmware.ts` with a comment pointing at `astros_api/src/models/firmware_config.ts` as the source of truth.
 
 ### F3. Status page visuals (`astros_vue/src/components/status/AstrosStatus.vue`)
 
-- [ ] DOWN → `body_gray.png` / `dome_gray.png` / `core_gray.png` (new assets, see F6), **static, no `animate-pulse`**.
-- [ ] FIRMWARE_INCOMPATIBLE → existing red overlays (`body.png`, `dome.png`, `core.png`), `animate-pulse`.
-- [ ] NEEDS_SYNCED → existing yellow overlays, `animate-pulse`.
-- [ ] State-specific i18n alt text on each `<img>`.
+- [x] DOWN → `body_grey.png` / `dome_grey.png` / `core_grey.png`, **static, no `animate-pulse`**. (Asset filenames use British "grey" spelling, matching what the user provided.)
+- [x] FIRMWARE_INCOMPATIBLE → existing red overlays (renamed to `body_red.png` / `dome_red.png` / `core_red.png` for clarity), `animate-pulse`.
+- [x] NEEDS_SYNCED → existing yellow overlays, `animate-pulse`.
+- [x] State-specific i18n alt text on each `<img>` via `statusPage.alt.*` keys (had to use `statusPage` namespace rather than `status` because `status` is already a top-level string).
 
 ### F4. Modules page visuals (`astros_vue/src/views/ModulesView.vue`)
 
-Body / core / dome header blocks (~lines 188+, 244+, dome equivalent). Replace the 3-state ternary with a per-state map:
+Body / core / dome header blocks (~lines 188+, 244+, 308+). Replaced the 3-state ternary with a `statusIcon(status, firmware)` helper returning `{ name, colorClass, tooltip }`:
 
-| Status                  | Icon                  | Color             |
-| ----------------------- | --------------------- | ----------------- |
-| `UP`                    | `io-checkmark-circle` | `text-green-500`  |
-| `NEEDS_SYNCED`          | `io-warning`          | `text-yellow-500` |
-| `FIRMWARE_INCOMPATIBLE` | `io-warning`          | `text-red-500`    |
-| `DOWN`                  | `io-help-circle`      | `text-gray-600`   |
+| Status                  | Icon                     | Color             |
+| ----------------------- | ------------------------ | ----------------- |
+| `UP`                    | `io-checkmark-circle`    | `text-green-500`  |
+| `NEEDS_SYNCED`          | `io-warning`             | `text-yellow-500` |
+| `FIRMWARE_INCOMPATIBLE` | `io-warning`             | `text-red-500`    |
+| `DOWN`                  | `io-help-circle-outline` | `text-gray-600`   |
 
-- [ ] Verify the OhVueIcon name for the question-circle (fallback: `bi-question-circle`); register the icon if not already imported.
-- [ ] Wrap with the DaisyUI tooltip pattern used in `system-status` (per recent `AstrosWriteButton` work, commits `f87ad06` / `61fa2f8`). Tooltip text per state (`modules.firmware.tooltip.ok`, `.incompatible`, `.disconnected`).
-- [ ] Mirror tooltip text into `aria-label` on the icon for screen-reader accessibility.
+- [x] `IoHelpCircleOutline` was already registered in `main.ts` (used in `AstrosPlaylistEditor.vue`); no new icon registration needed.
+- [x] Wrapped with DaisyUI `tooltip tooltip-left` + `data-tip`, matching the `AstrosWriteButton` pattern.
+- [x] Mirrored tooltip text into `aria-label` on the icon for screen-reader accessibility.
 
 ### F5. i18n (`astros_vue/src/locales/enUS.json`)
 
-- [ ] Add keys:
-  ```json
-  "modules.firmware.unknown": "unknown",
-  "modules.firmware.tooltip.ok": "Firmware {version}",
-  "modules.firmware.tooltip.incompatible": "Firmware {version} (minimum {minimum} required)",
-  "modules.firmware.tooltip.disconnected": "Module not connected",
-  "status.alt.up": "{location} module connected",
-  "status.alt.needsSynced": "{location} module needs sync",
-  "status.alt.firmwareIncompatible": "{location} module firmware out of date",
-  "status.alt.down": "{location} module disconnected"
-  ```
-- [ ] No hardcoded user-facing strings in templates (per CLAUDE.md).
+- [x] Added `modules.firmware.*` (tooltip + unknown) and `statusPage.*` (alt text + base_alt). The status-page alt namespace had to be `statusPage` rather than `status` because `status` is already a top-level string used as a column header in `ScriptsView.vue`. Alt strings drop "module" since the location key (e.g., `module_view.body` = "Body Module") already includes the word.
+- [x] No hardcoded user-facing strings in templates (per CLAUDE.md).
 
 ### F6. New image assets
 
-- [ ] User to provide `body_gray.png`, `dome_gray.png`, `core_gray.png` in `astros_vue/src/assets/images/status/`.
-- [ ] Sizing should match existing red overlays (~24KB / 15KB / 15KB).
+- [x] User provided `body_grey.png`, `dome_grey.png`, `core_grey.png` (note: British "grey" spelling).
+- [x] Existing red overlays renamed `body.png` → `body_red.png` (and similar for dome / core) for clarity.
 
 ## Verification
 

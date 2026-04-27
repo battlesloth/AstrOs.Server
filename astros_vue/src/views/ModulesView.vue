@@ -21,6 +21,7 @@ import { SYNC_CONFIG } from '@/api/endpoints';
 import { useToast } from '@/composables/useToast';
 import { useI18n } from 'vue-i18n';
 import { storeToRefs } from 'pinia';
+import { MINIMUM_FIRMWARE_VERSION } from '@/constants/firmware';
 
 const { t } = useI18n();
 
@@ -44,10 +45,56 @@ const { addModule, removeModule } = useModuleManagement();
 
 const bodyLocation = storeToRefs(locationStore).bodyLocation;
 const bodyStatus = storeToRefs(controllerStore).bodyStatus;
+const bodyFirmware = storeToRefs(controllerStore).bodyFirmware;
 const coreLocation = storeToRefs(locationStore).coreLocation;
 const coreStatus = storeToRefs(controllerStore).coreStatus;
+const coreFirmware = storeToRefs(controllerStore).coreFirmware;
 const domeLocation = storeToRefs(locationStore).domeLocation;
 const domeStatus = storeToRefs(controllerStore).domeStatus;
+const domeFirmware = storeToRefs(controllerStore).domeFirmware;
+
+interface StatusIcon {
+  name: string;
+  colorClass: string;
+  tooltip: string;
+}
+
+function statusIcon(status: ControllerStatus, firmware: string | undefined): StatusIcon {
+  const version = firmware ?? t('modules.firmware.unknown');
+  switch (status) {
+    case ControllerStatus.UP:
+      return {
+        name: 'io-checkmark-circle',
+        colorClass: 'text-green-500',
+        tooltip: t('modules.firmware.tooltip.ok', { version }),
+      };
+    case ControllerStatus.NEEDS_SYNCED:
+      return {
+        name: 'io-warning',
+        colorClass: 'text-yellow-500',
+        tooltip: t('modules.firmware.tooltip.ok', { version }),
+      };
+    case ControllerStatus.FIRMWARE_INCOMPATIBLE:
+      return {
+        name: 'io-warning',
+        colorClass: 'text-red-500',
+        tooltip: t('modules.firmware.tooltip.incompatible', {
+          version,
+          minimum: MINIMUM_FIRMWARE_VERSION,
+        }),
+      };
+    case ControllerStatus.DOWN:
+      return {
+        name: 'io-help-circle-outline',
+        colorClass: 'text-gray-600',
+        tooltip: t('modules.firmware.tooltip.disconnected'),
+      };
+  }
+}
+
+const bodyIcon = computed(() => statusIcon(bodyStatus.value, bodyFirmware.value));
+const coreIcon = computed(() => statusIcon(coreStatus.value, coreFirmware.value));
+const domeIcon = computed(() => statusIcon(domeStatus.value, domeFirmware.value));
 
 const availableCoreControllers = computed(() =>
   controllerStore.controllers.filter(
@@ -185,15 +232,17 @@ function controllerSelectChanged(location: string) {
               >
                 <span>{{ $t('module_view.body') }}</span>
                 <div class="grow"></div>
-                <v-icon
-                  :name="bodyStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
-                  :class="[
-                    { 'text-green-500': bodyStatus === ControllerStatus.UP },
-                    { 'text-yellow-500': bodyStatus === ControllerStatus.NEEDS_SYNCED },
-                    { 'text-red-500': bodyStatus === ControllerStatus.DOWN },
-                  ]"
-                  scale="1.5"
-                />
+                <div
+                  class="tooltip tooltip-left"
+                  :data-tip="bodyIcon.tooltip"
+                >
+                  <v-icon
+                    :name="bodyIcon.name"
+                    :class="bodyIcon.colorClass"
+                    :aria-label="bodyIcon.tooltip"
+                    scale="1.5"
+                  />
+                </div>
               </div>
               <div
                 class="collapse-content bg-r2-xlight"
@@ -241,15 +290,17 @@ function controllerSelectChanged(location: string) {
               >
                 <span>{{ $t('module_view.core') }}</span>
                 <div class="grow"></div>
-                <v-icon
-                  :name="coreStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
-                  :class="[
-                    { 'text-green-500': coreStatus === ControllerStatus.UP },
-                    { 'text-yellow-500': coreStatus === ControllerStatus.NEEDS_SYNCED },
-                    { 'text-red-500': coreStatus === ControllerStatus.DOWN },
-                  ]"
-                  scale="1.5"
-                />
+                <div
+                  class="tooltip tooltip-left"
+                  :data-tip="coreIcon.tooltip"
+                >
+                  <v-icon
+                    :name="coreIcon.name"
+                    :class="coreIcon.colorClass"
+                    :aria-label="coreIcon.tooltip"
+                    scale="1.5"
+                  />
+                </div>
               </div>
               <div
                 class="collapse-content"
@@ -305,15 +356,17 @@ function controllerSelectChanged(location: string) {
               >
                 <span>{{ $t('module_view.dome') }}</span>
                 <div class="grow"></div>
-                <v-icon
-                  :name="domeStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
-                  :class="[
-                    { 'text-green-500': domeStatus === ControllerStatus.UP },
-                    { 'text-yellow-500': domeStatus === ControllerStatus.NEEDS_SYNCED },
-                    { 'text-red-500': domeStatus === ControllerStatus.DOWN },
-                  ]"
-                  scale="1.5"
-                />
+                <div
+                  class="tooltip tooltip-left"
+                  :data-tip="domeIcon.tooltip"
+                >
+                  <v-icon
+                    :name="domeIcon.name"
+                    :class="domeIcon.colorClass"
+                    :aria-label="domeIcon.tooltip"
+                    scale="1.5"
+                  />
+                </div>
               </div>
               <div
                 class="collapse-content"
