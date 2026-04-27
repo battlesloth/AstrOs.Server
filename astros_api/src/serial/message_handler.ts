@@ -68,7 +68,10 @@ export class MessageHandler {
     const module: ControlModule = { id: '', name: parts[1], address: parts[0] };
     module.fingerprint = parts[2];
     if (parts.length === 4) {
-      module.firmwareVersion = parts[3];
+      const version = parts[3].trim();
+      if (version.length > 0) {
+        module.firmwareVersion = version;
+      }
     }
     response.controller = module;
 
