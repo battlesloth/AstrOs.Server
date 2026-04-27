@@ -32,20 +32,20 @@ The parser should still tolerate the legacy 3-field format (no version) so the s
 
 ### B1. Hard-coded constants and semver compare
 
-- [ ] Create `astros_api/src/models/firmware_config.ts` with `MINIMUM_FIRMWARE_VERSION = '1.2.0'`.
-- [ ] Add a small semver compare util at `astros_api/src/utilities/semver.ts` exporting `compareVersions(a, b)` and `meetsMinimum(actual, minimum)`. Treat undefined / empty / malformed as below minimum. Plain `x.y.z` parsing — no dependency.
-- [ ] Unit test the util in `astros_api/src/utilities/semver.test.ts` — covers `1.1.9 < 1.2.0`, `1.2.0 == 1.2.0`, `1.10.0 > 1.2.0`, undefined → false, empty → false, malformed → false.
+- [x] Create `astros_api/src/models/firmware_config.ts` with `MINIMUM_FIRMWARE_VERSION = '1.2.0'`.
+- [x] Add a small semver compare util at `astros_api/src/semver.ts` exporting `compareVersions(a, b)` and `meetsMinimum(actual, minimum)`. Treat undefined / empty / malformed as below minimum. Plain `x.y.z` parsing — no dependency. **Strips prerelease suffix (`-dev.N`, `-RC.N`) so local dev builds count as meeting the minimum.** (Path is `src/semver.ts` at root, not `src/utilities/`, matching the existing flat layout.)
+- [x] Unit test the util in `astros_api/src/semver.test.ts` — covers `1.1.9 < 1.2.0`, `1.2.0 == 1.2.0`, `1.10.0 > 1.2.0`, dev/RC suffixes accepted, undefined → false, empty → false, malformed → false.
 
 ### B2. Serial message parsing
 
-- [ ] Update `astros_api/src/serial/message_handler.ts:56–72` (`handlePollAck`) to accept either 3 or 4 `<US>`-delimited fields; set `module.firmwareVersion = parts[3]` when present.
-- [ ] Extend `astros_api/src/models/control_module/control_module.ts` with optional `firmwareVersion?: string`.
-- [ ] Add a unit test for `handlePollAck` covering both forms.
+- [x] Update `astros_api/src/serial/message_handler.ts:56–72` (`handlePollAck`) to accept either 3 or 4 `<US>`-delimited fields; set `module.firmwareVersion = parts[3]` when present.
+- [x] Extend `astros_api/src/models/control_module/control_module.ts` with optional `firmwareVersion?: string`.
+- [x] Add a unit test for `handlePollAck` covering both forms (and a 5-field-rejection negative test).
 
 ### B3. Status emission
 
-- [ ] Extend `astros_api/src/models/networking/status_response.ts` with `firmwareVersion?: string` and `firmwareCompatible: boolean`.
-- [ ] Update `astros_api/src/api_server.ts:569–604` (`handlePollResponse`) to compute `firmwareCompatible = meetsMinimum(...)` and emit both new fields. No DB writes.
+- [x] Extend `astros_api/src/models/networking/status_response.ts` with `firmwareVersion?: string` and `firmwareCompatible: boolean`.
+- [x] Update `astros_api/src/api_server.ts:569–604` (`handlePollResponse`) to compute `firmwareCompatible = meetsMinimum(...)` and emit both new fields. No DB writes.
 
 ## Frontend tasks
 

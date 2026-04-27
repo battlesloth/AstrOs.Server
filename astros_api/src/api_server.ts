@@ -50,6 +50,8 @@ import {
 } from './serial/serial_worker_response.js';
 import { LocationsRepository } from './dal/repositories/locations_repository.js';
 import { ServoTest } from './models/servo_test.js';
+import { FirmwareConfig } from './models/firmware_config.js';
+import { meetsMinimum } from './semver.js';
 
 import { fileURLToPath } from 'url';
 
@@ -587,6 +589,12 @@ class ApiServer {
         return;
       }
 
+      const firmwareVersion = val.controller.firmwareVersion;
+      const firmwareCompatible = meetsMinimum(
+        firmwareVersion,
+        FirmwareConfig.MINIMUM_FIRMWARE_VERSION,
+      );
+
       const update: StatusResponse = {
         type: TransmissionType.status,
         success: true,
@@ -595,6 +603,8 @@ class ApiServer {
         controllerLocation: location.locationName,
         up: true,
         synced: val.controller.fingerprint === location.configFingerprint,
+        firmwareVersion,
+        firmwareCompatible,
       };
 
       this.updateClients(update);
