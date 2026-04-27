@@ -101,16 +101,20 @@ const editPlaylist = (id: string) => {
             v-model="filterText"
           />
         </div>
-        <button
-          data-testid="save_module_settings"
-          class="btn btn-primary w-24"
-          aria-label="$t('playlists_view.new')"
-          :disabled="systemStatusStore.readOnly"
-          :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
-          @click="newPlaylist"
+        <div
+          :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+          :data-tip="$t('systemStatus.readOnly.disabled')"
         >
-          {{ $t('playlists_view.new') }}
-        </button>
+          <button
+            data-testid="save_module_settings"
+            class="btn btn-primary w-24"
+            aria-label="$t('playlists_view.new')"
+            :disabled="systemStatusStore.readOnly"
+            @click="newPlaylist"
+          >
+            {{ $t('playlists_view.new') }}
+          </button>
+        </div>
       </div>
       <div class="flex flex-row flex-nowrap">
         <div class="grow"></div>
@@ -151,14 +155,18 @@ const editPlaylist = (id: string) => {
             {{ $t('playlists_view.delete_confirm', { name: deletePlaylistName }) }}
           </p>
           <div class="modal-action">
-            <button
-              class="btn btn-error"
-              :disabled="systemStatusStore.readOnly"
-              :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
-              @click="confirmDelete"
+            <div
+              :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+              :data-tip="$t('systemStatus.readOnly.disabled')"
             >
-              {{ $t('delete') }}
-            </button>
+              <button
+                class="btn btn-error"
+                :disabled="systemStatusStore.readOnly"
+                @click="confirmDelete"
+              >
+                {{ $t('delete') }}
+              </button>
+            </div>
             <button
               class="btn"
               @click="closeDeleteModal"

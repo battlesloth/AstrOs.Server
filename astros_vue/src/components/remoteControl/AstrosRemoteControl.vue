@@ -106,15 +106,19 @@ const buttonNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
     <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0">
       <h1 class="text-2xl font-bold">{{ $t('remote_view.title') }}</h1>
       <div class="grow"></div>
-      <button
-        data-testid="save_module_settings"
-        class="btn btn-primary w-24"
-        :disabled="systemStatusStore.readOnly"
-        :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
-        @click="saveConfig"
+      <div
+        :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+        :data-tip="$t('systemStatus.readOnly.disabled')"
       >
-        {{ $t('remote_view.save') }}
-      </button>
+        <button
+          data-testid="save_module_settings"
+          class="btn btn-primary w-24"
+          :disabled="systemStatusStore.readOnly"
+          @click="saveConfig"
+        >
+          {{ $t('remote_view.save') }}
+        </button>
+      </div>
     </div>
 
     <!-- Page Navigation -->

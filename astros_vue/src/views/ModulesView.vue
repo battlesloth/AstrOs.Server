@@ -151,23 +151,31 @@ function controllerSelectChanged(location: string) {
         <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0 mb-4">
           <h1 class="text-2xl font-bold">{{ $t('module_view.modules') }}</h1>
           <div class="grow"></div>
-          <button
-            data-testid="save_module_settings"
-            class="btn btn-primary w-24"
-            :disabled="systemStatusStore.readOnly"
-            :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
-            @click="saveModuleSettings"
+          <div
+            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+            :data-tip="$t('systemStatus.readOnly.disabled')"
           >
-            {{ $t('module_view.save') }}
-          </button>
-          <button
-            class="btn btn-primary w-24"
-            :disabled="systemStatusStore.readOnly"
-            :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
-            @click="syncModuleSettings"
+            <button
+              data-testid="save_module_settings"
+              class="btn btn-primary w-24"
+              :disabled="systemStatusStore.readOnly"
+              @click="saveModuleSettings"
+            >
+              {{ $t('module_view.save') }}
+            </button>
+          </div>
+          <div
+            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+            :data-tip="$t('systemStatus.readOnly.disabled')"
           >
-            {{ $t('module_view.sync') }}
-          </button>
+            <button
+              class="btn btn-primary w-24"
+              :disabled="systemStatusStore.readOnly"
+              @click="syncModuleSettings"
+            >
+              {{ $t('module_view.sync') }}
+            </button>
+          </div>
         </div>
 
         <!-- Module Accordions -->

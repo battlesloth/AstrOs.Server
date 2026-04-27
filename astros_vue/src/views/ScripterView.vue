@@ -385,22 +385,30 @@ onMounted(async () => {
               :aria-label="$t('description')"
             />
           </div>
-          <button
-            class="btn w-24 btn-primary"
-            :disabled="systemStatusStore.readOnly"
-            :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
-            @click="saveScript"
+          <div
+            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+            :data-tip="$t('systemStatus.readOnly.disabled')"
           >
-            {{ $t('save') }}
-          </button>
-          <button
-            class="btn w-24 btn-primary"
-            :disabled="systemStatusStore.readOnly"
-            :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
-            @click="scriptTest"
+            <button
+              class="btn w-24 btn-primary"
+              :disabled="systemStatusStore.readOnly"
+              @click="saveScript"
+            >
+              {{ $t('save') }}
+            </button>
+          </div>
+          <div
+            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+            :data-tip="$t('systemStatus.readOnly.disabled')"
           >
-            {{ $t('test') }}
-          </button>
+            <button
+              class="btn w-24 btn-primary"
+              :disabled="systemStatusStore.readOnly"
+              @click="scriptTest"
+            >
+              {{ $t('test') }}
+            </button>
+          </div>
         </div>
       </div>
       <AstrosPixiView

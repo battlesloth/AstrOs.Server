@@ -242,15 +242,19 @@ async function save() {
     <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0">
       <h1 class="text-2xl font-bold">{{ $t('playlist_editor_view.title') }}</h1>
       <div class="grow"></div>
-      <button
-        data-testid="save_module_settings"
-        class="btn btn-primary w-24"
-        :disabled="systemStatusStore.readOnly"
-        :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
-        @click="save"
+      <div
+        :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+        :data-tip="$t('systemStatus.readOnly.disabled')"
       >
-        {{ $t('playlist_editor_view.save') }}
-      </button>
+        <button
+          data-testid="save_module_settings"
+          class="btn btn-primary w-24"
+          :disabled="systemStatusStore.readOnly"
+          @click="save"
+        >
+          {{ $t('playlist_editor_view.save') }}
+        </button>
+      </div>
     </div>
     <div class="min-h-0 flex-1 flex">
       <div class="grow"></div>
