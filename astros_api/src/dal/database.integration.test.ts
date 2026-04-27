@@ -119,8 +119,8 @@ describe('initializeDatabase safety flow', () => {
     expect(status.isReadOnly()).toBe(false);
   });
 
-  it('failed migration triggers restore from backup; system continues at pre-migration state', async () => {
-    // Migrate to v4 first
+  it('failed migration triggers restore from backup AND enters read-only with MIGRATION_FAILED_RESTORED', async () => {
+    // Migrate baseline to v6 first
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
@@ -150,10 +150,15 @@ describe('initializeDatabase safety flow', () => {
     status = new SystemStatus();
     const db = await initializeDatabase(status, { dbPath });
 
-    // Restore should have rolled back to pre-migration state — system is usable, not read-only
-    expect(status.isReadOnly()).toBe(false);
+    // Restore brought the file back to v6, but a migration still failed —
+    // the system enters read-only with MIGRATION_FAILED_RESTORED so operators
+    // notice and investigate before redeploying. Writes against the rolled-
+    // back schema while the migration is broken could compound the problem.
+    expect(status.isReadOnly()).toBe(true);
+    expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORED');
 
-    // Verify our marker survived (proves restore happened)
+    // Verify our marker survived (proves restore happened) — read-only does
+    // not affect SELECTs.
     const marker = await db
       .selectFrom('marker' as never)
       .select('note' as never)
@@ -280,8 +285,11 @@ describe('initializeDatabase safety flow', () => {
     status = new SystemStatus();
     const db = await initializeDatabase(status, { dbPath });
 
-    // Phase 1's restore brought us back to v6. The bad migration is reverted.
-    expect(status.isReadOnly()).toBe(false);
+    // Restore brought us back to v6 AND the system enters read-only with
+    // MIGRATION_FAILED_RESTORED so operators notice — the same end-state as
+    // any other migration failure that successfully recovered.
+    expect(status.isReadOnly()).toBe(true);
+    expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORED');
 
     // The orphan is gone — the bad migration's INSERT was rolled back via the
     // file restore.

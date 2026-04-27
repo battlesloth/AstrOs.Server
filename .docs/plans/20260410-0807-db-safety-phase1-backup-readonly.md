@@ -26,7 +26,7 @@ Wire up a safe startup flow: detect pending migrations → take a hot backup →
 - **Guard rule:** in read-only mode, block any `POST/PUT/PATCH/DELETE` AND the five serial-write GETs (`/locations/syncconfig`, `/locations/synccontrollers`, `/scripts/upload`, `/scripts/run`, `/playlists/run`), **except** the allowlist: `POST /login`, `POST /reauth`, `POST /panicStop`, `POST /panicClear`.
 - **Status exposure:** new `GET /api/system/status` endpoint (no auth). WebSocket pushes a `SYSTEM_STATUS` message on connect and whenever the state changes.
 - **Backup failure = enter read-only**, migrations skipped.
-- **Migration failure → restore backup.** Restore success = server continues at pre-migration version. Restore failure = enter read-only.
+- **Migration failure → restore backup.** Restore success = server enters read-only with `MIGRATION_FAILED_RESTORED` (see Phase 3 amendment, 2026-04-26: silent recovery hid migration failures from operators and risked schema-drift writes against the rolled-back version). Restore failure = enter read-only with `MIGRATION_FAILED_RESTORE_FAILED`.
 - **Do not add a "clear read-only mode" endpoint.** Recovery path is a container restart.
 
 ## Required `database.ts` refactor

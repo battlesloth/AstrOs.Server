@@ -357,5 +357,20 @@
     "help_shufflewithdelayandrepeat": "Similar to Shuffle With Delay, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible.",
     "sequential_nested_confirm_title": "Remove Nested Playlists",
     "sequential_nested_warning": "Sequential playlists cannot contain nested playlists. {count} track will be removed. | Sequential playlists cannot contain nested playlists. {count} tracks will be removed."
+  },
+  "systemStatus": {
+    "readOnly": {
+      "title": "Read-only mode",
+      "disabled": "This action is disabled while the system is in read-only mode.",
+      "requestBlocked": "The server is in read-only mode. Your change was not saved."
+    },
+    "reasonCode": {
+      "STARTUP_OPEN_FAILED": "The database could not be opened at startup. The server is running on a temporary in-memory database with no data.",
+      "BACKUP_FAILED": "A pre-migration backup could not be written. The schema upgrade was skipped.",
+      "MIGRATION_FAILED_NO_BACKUP": "A schema migration failed and there was no prior backup to restore from. The database may be in a partially-migrated state.",
+      "MIGRATION_FAILED_RESTORED": "A schema migration failed but the database was successfully rolled back to the previous version. Investigate the failed migration before redeploying.",
+      "MIGRATION_FAILED_RESTORE_FAILED": "A schema migration failed and the automatic restore also failed. Manual recovery is required.",
+      "UNKNOWN": "The database is currently unavailable for writes."
+    }
   }
 }

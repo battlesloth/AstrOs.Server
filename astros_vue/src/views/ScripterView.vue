@@ -2,6 +2,7 @@
 import { onMounted, ref, useTemplateRef } from 'vue';
 import { ModalMode, ModalType, ScriptChannelType } from '@/enums';
 import { useScripterStore } from '@/stores/scripter';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import {
   AstrosLayout,
@@ -43,6 +44,7 @@ const channelTestValue = ref<ChannelTestValue | null>(null);
 
 const route = useRoute();
 const scripterStore = useScripterStore();
+const systemStatusStore = useSystemStatusStore();
 
 const { eventTypeToModalType, getDefaultScriptEvent } = useScriptEvents();
 
@@ -383,18 +385,30 @@ onMounted(async () => {
               :aria-label="$t('description')"
             />
           </div>
-          <button
-            class="btn w-24 btn-primary"
-            @click="saveScript"
+          <div
+            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+            :data-tip="$t('systemStatus.readOnly.disabled')"
           >
-            {{ $t('save') }}
-          </button>
-          <button
-            class="btn w-24 btn-primary"
-            @click="scriptTest"
+            <button
+              class="btn w-24 btn-primary"
+              :disabled="systemStatusStore.readOnly"
+              @click="saveScript"
+            >
+              {{ $t('save') }}
+            </button>
+          </div>
+          <div
+            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+            :data-tip="$t('systemStatus.readOnly.disabled')"
           >
-            {{ $t('test') }}
-          </button>
+            <button
+              class="btn w-24 btn-primary"
+              :disabled="systemStatusStore.readOnly"
+              @click="scriptTest"
+            >
+              {{ $t('test') }}
+            </button>
+          </div>
         </div>
       </div>
       <AstrosPixiView

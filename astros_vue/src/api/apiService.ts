@@ -1,7 +1,10 @@
 import axios from 'axios';
 import router from '@/router';
 
-const apiClient = axios.create({
+// Exported so app-level wiring (main.ts) can attach additional interceptors
+// after Pinia is created — keeps this module dependency-free of stores and
+// avoids the circular-dep trap (apiService → store → apiService).
+export const apiClient = axios.create({
   baseURL: import.meta.env.BACKEND_API || 'http://localhost:3000',
   headers: {
     'Content-Type': 'application/json',
@@ -22,7 +25,10 @@ apiClient.interceptors.request.use(
   },
 );
 
-// Add response interceptor to handle 401 errors
+// Add response interceptor to handle 401 errors. The 503 read-only handler
+// lives in `@/api/readOnlyInterceptor` and is installed from main.ts after
+// Pinia is created — installing it here would require importing the store,
+// which itself imports apiService, creating a circular module dependency.
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

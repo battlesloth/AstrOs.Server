@@ -223,6 +223,12 @@ export async function initializeDatabase(
       restoreBackup(backupPath, dbFile);
       conn = openConnection(dbFile);
       logger.warn(`Restored database from backup ${backupPath} after failed migration`);
+      // Restore succeeded — DB is at a known-good prior version. Enter read-only
+      // anyway: a migration failed, and silently coming back up "as if nothing
+      // happened" hides that from operators and risks letting writes against the
+      // older schema compound the underlying problem before a fix ships.
+      // Recovery is still a container restart with a fixed migration.
+      systemStatus.enterReadOnly('MIGRATION_FAILED_RESTORED', err);
       return conn.db;
     } catch (restoreErr) {
       systemStatus.enterReadOnly('MIGRATION_FAILED_RESTORE_FAILED', restoreErr);

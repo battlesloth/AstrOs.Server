@@ -4,6 +4,9 @@ import { AstrosLayout } from '@/components';
 import apiService from '@/api/apiService';
 import type { ControllerModule } from '@/models';
 import { useI18n } from 'vue-i18n';
+import { useSystemStatusStore } from '@/stores/systemStatus';
+
+const systemStatusStore = useSystemStatusStore();
 
 interface SelectedControllerModule extends ControllerModule {
   selected: boolean;
@@ -140,13 +143,19 @@ const closeAlert = () => {
                 {{ apiKey }}
               </div>
               <div class="float-right">
-                <button
-                  class="btn btn-primary w-35 px-5 py-0.75"
-                  aria-label="$t('generate')"
-                  @click="generateApiKey"
+                <div
+                  :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+                  :data-tip="$t('systemStatus.readOnly.disabled')"
                 >
-                  {{ $t('generate') }}
-                </button>
+                  <button
+                    class="btn btn-primary w-35 px-5 py-0.75"
+                    aria-label="$t('generate')"
+                    :disabled="systemStatusStore.readOnly"
+                    @click="generateApiKey"
+                  >
+                    {{ $t('generate') }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -157,13 +166,19 @@ const closeAlert = () => {
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
               <div class="float-right">
-                <button
-                  class="btn btn-primary w-35 px-5 py-0.75"
-                  aria-label="$t('format')"
-                  @click="openFormatModal"
+                <div
+                  :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+                  :data-tip="$t('systemStatus.readOnly.disabled')"
                 >
-                  {{ $t('format') }}
-                </button>
+                  <button
+                    class="btn btn-primary w-35 px-5 py-0.75"
+                    aria-label="$t('format')"
+                    :disabled="systemStatusStore.readOnly"
+                    @click="openFormatModal"
+                  >
+                    {{ $t('format') }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -213,12 +228,18 @@ const closeAlert = () => {
             </div>
           </div>
           <div class="modal-action">
-            <button
-              class="btn btn-primary"
-              @click="confirmFormat"
+            <div
+              :class="systemStatusStore.readOnly ? 'tooltip' : ''"
+              :data-tip="$t('systemStatus.readOnly.disabled')"
             >
-              {{ $t('ok') }}
-            </button>
+              <button
+                class="btn btn-primary"
+                :disabled="systemStatusStore.readOnly"
+                @click="confirmFormat"
+              >
+                {{ $t('ok') }}
+              </button>
+            </div>
             <button
               class="btn"
               @click="closeFormatModal"
