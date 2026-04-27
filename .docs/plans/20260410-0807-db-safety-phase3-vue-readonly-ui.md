@@ -15,12 +15,12 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
 
 ## Tasks
 
-- [ ] Add `SYSTEM_STATUS` endpoint to `astros_vue/src/api/endpoints.ts`:
+- [x] Add `SYSTEM_STATUS` endpoint to `astros_vue/src/api/endpoints.ts`:
   ```typescript
   export const SYSTEM_STATUS = '/system/status';
   ```
 
-- [ ] Create `astros_vue/src/stores/systemStatus.ts`:
+- [x] Create `astros_vue/src/stores/systemStatus.ts`:
   - Pinia store with `readOnly: Ref<boolean>`, `reasonCode: Ref<ReadOnlyReasonCode | null>`, `enteredAt: Ref<string | null>`.
   - `ReadOnlyReasonCode` is the same string-union type as the API:
     `'STARTUP_OPEN_FAILED' | 'BACKUP_FAILED' | 'MIGRATION_FAILED_NO_BACKUP' | 'MIGRATION_FAILED_RESTORE_FAILED'`.
@@ -28,11 +28,11 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
   - `setStatus(state)` — used by WebSocket message handler and by the API interceptor.
   - Expose `readOnly`, `reasonCode`, `enteredAt`, `fetchStatus`, `setStatus`.
 
-- [ ] Update `astros_vue/src/composables/useWebsocket.ts` (or wherever `handleMessage` dispatches) to handle `SYSTEM_STATUS` messages and forward them to `systemStatusStore.setStatus()`. Add the new type to the existing discriminator.
+- [x] Update `astros_vue/src/composables/useWebsocket.ts` (or wherever `handleMessage` dispatches) to handle `SYSTEM_STATUS` messages and forward them to `systemStatusStore.setStatus()`. Add the new type to the existing discriminator.
 
-- [ ] Update `astros_vue/src/App.vue` mount hook to call `systemStatusStore.fetchStatus()` once before the WebSocket connects. (The WebSocket will also push initial state on connect — this is belt-and-braces for the window between HTTP load and WS handshake.)
+- [x] Update `astros_vue/src/App.vue` mount hook to call `systemStatusStore.fetchStatus()` once before the WebSocket connects. (The WebSocket will also push initial state on connect — this is belt-and-braces for the window between HTTP load and WS handshake.)
 
-- [ ] Create `astros_vue/src/components/common/SystemStatusBanner.vue`:
+- [x] Create `astros_vue/src/components/common/SystemStatusBanner.vue`:
   ```vue
   <template>
     <div
@@ -55,14 +55,14 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
   - Full-width, `rounded-none` so it reads as chrome, not a card.
   - **Persistent — no dismiss button.** When the banner goes away, the mode really ended (via a container restart).
 
-- [ ] Mount `SystemStatusBanner` at the top of `astros_vue/src/components/common/layout/AstrosLayout.vue`, above the navbar. It should push content down when visible without layout jank.
+- [x] Mount `SystemStatusBanner` at the top of `astros_vue/src/components/common/layout/AstrosLayout.vue`, above the navbar. It should push content down when visible without layout jank.
 
-- [ ] Update `astros_vue/src/api/apiService.ts` axios response interceptor to detect `503` responses that carry a read-only payload (`{ message, reasonCode }` shape from `write_guard.ts`):
+- [x] Update `astros_vue/src/api/apiService.ts` axios response interceptor to detect `503` responses that carry a read-only payload (`{ message, reasonCode }` shape from `write_guard.ts`):
   - Call `systemStatusStore.setStatus({ readOnly: true, reasonCode })`.
   - Surface a toast: `useToast().warning(t('systemStatus.readOnly.requestBlocked'))`.
   - Reject the promise so the calling code sees the failure and can bail out cleanly.
 
-- [ ] Disable write-intent buttons in primary views when `systemStatusStore.readOnly === true`:
+- [x] Disable write-intent buttons in primary views when `systemStatusStore.readOnly === true`:
   - Scripts view (save, delete, copy)
   - Scripter view (save)
   - Playlists view (save, delete, copy, run)
@@ -74,7 +74,7 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
 
   **Pattern:** view imports `useSystemStatusStore`, destructures `readOnly`, binds to button `:disabled="readOnly"`. Add `:title="readOnly ? $t('systemStatus.readOnly.disabled') : ''"` for tooltip.
 
-- [ ] Add i18n keys to `astros_vue/src/locales/enUS.json`:
+- [x] Add i18n keys to `astros_vue/src/locales/enUS.json`:
   ```json
   "systemStatus": {
     "readOnly": {
@@ -92,21 +92,21 @@ A persistent read-only banner at the top of the app, disabled save/delete contro
   }
   ```
 
-- [ ] Write a Storybook story for `SystemStatusBanner` showing the hidden state and visible variants for each `reasonCode` (plus the `UNKNOWN` fallback).
+- [x] Write a Storybook story for `SystemStatusBanner` showing the hidden state and visible variants for each `reasonCode` (plus the `UNKNOWN` fallback).
 
 ## Tests
 
-- [ ] `astros_vue/src/stores/__tests__/systemStatus.spec.ts`:
+- [x] `astros_vue/src/stores/__tests__/systemStatus.spec.ts`:
   - Store state transitions (default → read-only → default on setStatus).
   - `fetchStatus` success updates refs correctly.
   - `fetchStatus` failure leaves refs at previous state, does not throw.
   - `setStatus` correctly handles partial payloads.
-- [ ] `astros_vue/src/components/common/__tests__/SystemStatusBanner.spec.ts`:
+- [x] `astros_vue/src/components/common/__tests__/SystemStatusBanner.spec.ts`:
   - Renders nothing when `readOnly === false`.
   - Renders alert with the localized reasonCode message when `readOnly === true`.
   - Renders fallback (`UNKNOWN`) i18n string when `reasonCode` is null or unrecognized.
   - Has `role="status"` and `aria-live="polite"` attributes.
-- [ ] Integration/snapshot: verify `AstrosLayout` mounts the banner above the navbar.
+- [x] Integration/snapshot: verify `AstrosLayout` mounts the banner above the navbar.
 
 ## QA test plan
 
@@ -164,6 +164,28 @@ This amendment updates Phase 3 to consume the structured code:
   - i18n keys are reorganized into `systemStatus.reasonCode.*` (one per
     code, plus `UNKNOWN` fallback) and `systemStatus.readOnly.*` (UI
     strings: title, disabled tooltip, request-blocked toast).
+
+## Plan amendment 2: restore-success now enters read-only (2026-04-26)
+
+Reviewing Phase 1's "locked" design call ("restore success = server
+continues at pre-migration version") flagged a real issue: silent
+recovery hid migration failures from operators, and writes against the
+rolled-back schema could compound the underlying problem before the
+fixed migration shipped. Phase 2's FK enforcement work made this
+hazard concrete — a migration could fail because of orphans, restore
+could roll back, and operators would never know to investigate.
+
+Add a new `MIGRATION_FAILED_RESTORED` reason code:
+
+  - DB is at a known-good prior version (restore worked).
+  - System enters read-only anyway. Operators see the banner and know
+    to investigate before redeploying.
+  - Distinct from `MIGRATION_FAILED_RESTORE_FAILED` (DB possibly
+    broken) and `MIGRATION_FAILED_NO_BACKUP` (DB possibly partial).
+
+Touches API (`system_status.ts`, `database.ts`, integration test) and
+Vue (store union, banner allowlist, i18n, story, banner test) — all
+in this PR.
 
 ## Notes
 
