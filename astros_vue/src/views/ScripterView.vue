@@ -2,7 +2,6 @@
 import { onMounted, ref, useTemplateRef } from 'vue';
 import { ModalMode, ModalType, ScriptChannelType } from '@/enums';
 import { useScripterStore } from '@/stores/scripter';
-import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import {
   AstrosLayout,
@@ -26,6 +25,7 @@ import { useToast } from '@/composables/useToast';
 import { useI18n } from 'vue-i18n';
 import { v4 as uuid } from 'uuid';
 import AstrosChannelSwapModal from '@/components/modals/scripter/AstrosChannelSwapModal.vue';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import apiService from '@/api/apiService';
 import { SCRIPTS_TEST_CHANNEL } from '@/api/endpoints';
 
@@ -44,7 +44,6 @@ const channelTestValue = ref<ChannelTestValue | null>(null);
 
 const route = useRoute();
 const scripterStore = useScripterStore();
-const systemStatusStore = useSystemStatusStore();
 
 const { eventTypeToModalType, getDefaultScriptEvent } = useScriptEvents();
 
@@ -385,30 +384,18 @@ onMounted(async () => {
               :aria-label="$t('description')"
             />
           </div>
-          <div
-            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
-            :data-tip="$t('systemStatus.readOnly.disabled')"
+          <AstrosWriteButton
+            class="btn w-24 btn-primary"
+            @click="saveScript"
           >
-            <button
-              class="btn w-24 btn-primary"
-              :disabled="systemStatusStore.readOnly"
-              @click="saveScript"
-            >
-              {{ $t('save') }}
-            </button>
-          </div>
-          <div
-            :class="systemStatusStore.readOnly ? 'tooltip' : ''"
-            :data-tip="$t('systemStatus.readOnly.disabled')"
+            {{ $t('save') }}
+          </AstrosWriteButton>
+          <AstrosWriteButton
+            class="btn w-24 btn-primary"
+            @click="scriptTest"
           >
-            <button
-              class="btn w-24 btn-primary"
-              :disabled="systemStatusStore.readOnly"
-              @click="scriptTest"
-            >
-              {{ $t('test') }}
-            </button>
-          </div>
+            {{ $t('test') }}
+          </AstrosWriteButton>
         </div>
       </div>
       <AstrosPixiView

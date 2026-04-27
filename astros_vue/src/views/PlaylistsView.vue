@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast';
 import { usePlaylistsStore } from '@/stores/playlists';
-import { useSystemStatusStore } from '@/stores/systemStatus';
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { AstrosLayout, AstrosPlaylistRow } from '@/components';
 import AstrosFieldFilter from '@/components/common/fields/AstrosFieldFilter.vue';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 
 const router = useRouter();
 const { t } = useI18n();
 const { success, error } = useToast();
 
 const playlistStore = usePlaylistsStore();
-const systemStatusStore = useSystemStatusStore();
 
 const showDeleteModal = ref(false);
 const deletePlaylistId = ref('');
@@ -101,20 +100,14 @@ const editPlaylist = (id: string) => {
             v-model="filterText"
           />
         </div>
-        <div
-          :class="systemStatusStore.readOnly ? 'tooltip' : ''"
-          :data-tip="$t('systemStatus.readOnly.disabled')"
+        <AstrosWriteButton
+          data-testid="save_module_settings"
+          class="btn btn-primary w-24"
+          aria-label="$t('playlists_view.new')"
+          @click="newPlaylist"
         >
-          <button
-            data-testid="save_module_settings"
-            class="btn btn-primary w-24"
-            aria-label="$t('playlists_view.new')"
-            :disabled="systemStatusStore.readOnly"
-            @click="newPlaylist"
-          >
-            {{ $t('playlists_view.new') }}
-          </button>
-        </div>
+          {{ $t('playlists_view.new') }}
+        </AstrosWriteButton>
       </div>
       <div class="flex flex-row flex-nowrap">
         <div class="grow"></div>
@@ -155,18 +148,12 @@ const editPlaylist = (id: string) => {
             {{ $t('playlists_view.delete_confirm', { name: deletePlaylistName }) }}
           </p>
           <div class="modal-action">
-            <div
-              :class="systemStatusStore.readOnly ? 'tooltip' : ''"
-              :data-tip="$t('systemStatus.readOnly.disabled')"
+            <AstrosWriteButton
+              class="btn btn-error"
+              @click="confirmDelete"
             >
-              <button
-                class="btn btn-error"
-                :disabled="systemStatusStore.readOnly"
-                @click="confirmDelete"
-              >
-                {{ $t('delete') }}
-              </button>
-            </div>
+              {{ $t('delete') }}
+            </AstrosWriteButton>
             <button
               class="btn"
               @click="closeDeleteModal"

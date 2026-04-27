@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import AstrosRemoteButton from './AstrosRemoteButton.vue';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import { useScriptsStore } from '@/stores/scripts';
 import { usePlaylistsStore } from '@/stores/playlists';
 import { useRemoteControlStore } from '@/stores/remoteControl';
-import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useToast } from '@/composables/useToast';
 import { useI18n } from 'vue-i18n';
 
@@ -20,7 +20,6 @@ interface SelectionItem {
 const scriptStore = useScriptsStore();
 const playlistStore = usePlaylistsStore();
 const remoteControlStore = useRemoteControlStore();
-const systemStatusStore = useSystemStatusStore();
 const { success, error } = useToast();
 
 const pageNumber = ref(1);
@@ -106,19 +105,13 @@ const buttonNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
     <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0">
       <h1 class="text-2xl font-bold">{{ $t('remote_view.title') }}</h1>
       <div class="grow"></div>
-      <div
-        :class="systemStatusStore.readOnly ? 'tooltip' : ''"
-        :data-tip="$t('systemStatus.readOnly.disabled')"
+      <AstrosWriteButton
+        data-testid="save_module_settings"
+        class="btn btn-primary w-24"
+        @click="saveConfig"
       >
-        <button
-          data-testid="save_module_settings"
-          class="btn btn-primary w-24"
-          :disabled="systemStatusStore.readOnly"
-          @click="saveConfig"
-        >
-          {{ $t('remote_view.save') }}
-        </button>
-      </div>
+        {{ $t('remote_view.save') }}
+      </AstrosWriteButton>
     </div>
 
     <!-- Page Navigation -->
