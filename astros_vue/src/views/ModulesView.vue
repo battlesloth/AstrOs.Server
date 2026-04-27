@@ -89,6 +89,13 @@ function statusIcon(status: ControllerStatus, firmware: string | undefined): Sta
         colorClass: 'text-gray-600',
         tooltip: t('modules.firmware.tooltip.disconnected'),
       };
+    default:
+      status satisfies never;
+      return {
+        name: 'io-help-circle-outline',
+        colorClass: 'text-gray-600',
+        tooltip: t('modules.firmware.tooltip.disconnected'),
+      };
   }
 }
 
@@ -232,17 +239,20 @@ function controllerSelectChanged(location: string) {
               >
                 <span>{{ $t('module_view.body') }}</span>
                 <div class="grow"></div>
-                <div
-                  class="tooltip tooltip-left"
+                <button
+                  type="button"
+                  class="tooltip tooltip-left bg-transparent border-0 p-0 cursor-help"
                   :data-tip="bodyIcon.tooltip"
+                  :aria-label="bodyIcon.tooltip"
+                  @click.stop
                 >
                   <v-icon
                     :name="bodyIcon.name"
                     :class="bodyIcon.colorClass"
-                    :aria-label="bodyIcon.tooltip"
+                    aria-hidden="true"
                     scale="1.5"
                   />
-                </div>
+                </button>
               </div>
               <div
                 class="collapse-content bg-r2-xlight"
@@ -290,17 +300,20 @@ function controllerSelectChanged(location: string) {
               >
                 <span>{{ $t('module_view.core') }}</span>
                 <div class="grow"></div>
-                <div
-                  class="tooltip tooltip-left"
+                <button
+                  type="button"
+                  class="tooltip tooltip-left bg-transparent border-0 p-0 cursor-help"
                   :data-tip="coreIcon.tooltip"
+                  :aria-label="coreIcon.tooltip"
+                  @click.stop
                 >
                   <v-icon
                     :name="coreIcon.name"
                     :class="coreIcon.colorClass"
-                    :aria-label="coreIcon.tooltip"
+                    aria-hidden="true"
                     scale="1.5"
                   />
-                </div>
+                </button>
               </div>
               <div
                 class="collapse-content"
@@ -356,17 +369,20 @@ function controllerSelectChanged(location: string) {
               >
                 <span>{{ $t('module_view.dome') }}</span>
                 <div class="grow"></div>
-                <div
-                  class="tooltip tooltip-left"
+                <button
+                  type="button"
+                  class="tooltip tooltip-left bg-transparent border-0 p-0 cursor-help"
                   :data-tip="domeIcon.tooltip"
+                  :aria-label="domeIcon.tooltip"
+                  @click.stop
                 >
                   <v-icon
                     :name="domeIcon.name"
                     :class="domeIcon.colorClass"
-                    :aria-label="domeIcon.tooltip"
+                    aria-hidden="true"
                     scale="1.5"
                   />
-                </div>
+                </button>
               </div>
               <div
                 class="collapse-content"

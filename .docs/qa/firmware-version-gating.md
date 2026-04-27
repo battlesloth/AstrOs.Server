@@ -73,7 +73,8 @@ Restore: revert the `MINIMUM_FIRMWARE_VERSION` change (case a) or re-flash 1.2.0
 
 1. With the modules page open, press `Tab` to focus the body location's status icon (within the header row).
 2. **Pass:** focus indicator is visible on the icon, and a screen reader announces the same text shown in the tooltip (because we mirror the tooltip into `aria-label`).
-3. Image alt text on the status page (`<img>` `alt` attribute) is descriptive — e.g., `Body Module disconnected` for DOWN, `Dome Module firmware out of date` for FIRMWARE_INCOMPATIBLE — verifiable via devtools or by toggling images off in the browser.
+3. With the icon focused, press `Enter` or `Space`. **Pass:** the body accordion does **not** toggle open/closed (the indicator button stops click propagation so it can't trigger the parent header's accordion toggle).
+4. Image alt text on the status page (`<img>` `alt` attribute) is descriptive — e.g., `Body Module disconnected` for DOWN, `Dome Module firmware out of date` for FIRMWARE_INCOMPATIBLE — verifiable via devtools or by toggling images off in the browser.
 
 ### 8. Dev-build version is accepted
 
