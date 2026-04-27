@@ -6,6 +6,7 @@ import type { PageButton } from '@/models/remoteControl/pageButton';
 import { useScriptsStore } from '@/stores/scripts';
 import { usePlaylistsStore } from '@/stores/playlists';
 import { useRemoteControlStore } from '@/stores/remoteControl';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useToast } from '@/composables/useToast';
 import { useI18n } from 'vue-i18n';
 
@@ -19,6 +20,7 @@ interface SelectionItem {
 const scriptStore = useScriptsStore();
 const playlistStore = usePlaylistsStore();
 const remoteControlStore = useRemoteControlStore();
+const systemStatusStore = useSystemStatusStore();
 const { success, error } = useToast();
 
 const pageNumber = ref(1);
@@ -107,6 +109,8 @@ const buttonNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
       <button
         data-testid="save_module_settings"
         class="btn btn-primary w-24"
+        :disabled="systemStatusStore.readOnly"
+        :title="systemStatusStore.readOnly ? $t('systemStatus.readOnly.disabled') : ''"
         @click="saveConfig"
       >
         {{ $t('remote_view.save') }}
