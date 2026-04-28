@@ -45,7 +45,7 @@ No flash-job code lands in this PR — the lock primitive ships standalone and i
 7. `astros_api/src/api_server.ts` — wire JobLock → updateClients; apply middleware to `/api/panicStop`
 8. `astros_vue/src/enums/WebsocketMessageType.ts` — append `LOCK_STATE_CHANGED = 10`
 9. `astros_vue/src/stores/jobLock.ts` — new composition-style store
-10. `astros_vue/src/stores/__tests__/jobLock.test.ts` — new tests
+10. `astros_vue/src/stores/__tests__/jobLock.spec.ts` — new tests (`.spec.ts` matches the existing `systemStatus.spec.ts` convention)
 11. `astros_vue/src/composables/useWebsocket.ts` — add `handleLockStateChanged`
 
 11 files — one over the soft cap. Justified in the PR description by the typed-model split: keeping `LockState` / `LockStateResponse` / `LockedErrorResponse` in `models/networking/` matches the repo's existing payload-typing convention (e.g., `StatusResponse`, `ControllersResponse`) instead of inlining shapes inside the middleware and the WS broadcast site.

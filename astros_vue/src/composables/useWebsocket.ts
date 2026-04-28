@@ -11,6 +11,7 @@ import { useControllerStore } from '@/stores/controller';
 import { useScriptsStore } from '@/stores/scripts';
 import { useScripterStore } from '@/stores/scripter';
 import { useSystemStatusStore } from '@/stores/systemStatus';
+import { useJobLockStore, type LockState } from '@/stores/jobLock';
 
 const ws = ref<WebSocket | null>(null);
 const wsIsConnected = ref(false);
@@ -105,6 +106,9 @@ export function useWebsocket() {
       case WebsocketMessageType.SYSTEM_STATUS:
         handleSystemStatusMessage(parsedMessage as unknown as SystemStatusWsMessage);
         break;
+      case WebsocketMessageType.LOCK_STATE_CHANGED:
+        handleLockStateChanged(parsedMessage);
+        break;
       default:
         console.warn('Unhandled message type:', message);
         break;
@@ -168,6 +172,20 @@ export function useWebsocket() {
       });
     } catch (error) {
       console.error('Error handling system status message:', error);
+    }
+  }
+
+  function handleLockStateChanged(message: BaseWsMessage) {
+    try {
+      const data = message as unknown as LockState;
+      const jobLockStore = useJobLockStore();
+      jobLockStore.setState({
+        locked: data.locked,
+        owner: data.owner,
+        since: data.since,
+      });
+    } catch (error) {
+      console.error('Error handling lock state change:', error);
     }
   }
 

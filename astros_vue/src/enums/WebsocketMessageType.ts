@@ -9,4 +9,5 @@ export enum WebsocketMessageType {
   FORMAT_SD = 7,
   SERVO_TEST = 8,
   SYSTEM_STATUS = 9,
+  LOCK_STATE_CHANGED = 10,
 }
