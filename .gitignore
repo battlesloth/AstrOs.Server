@@ -61,3 +61,5 @@ testem.log
 
 # Brainstorm/visual-companion session content (local only)
 /.superpowers/
+
+.docs/design_*
