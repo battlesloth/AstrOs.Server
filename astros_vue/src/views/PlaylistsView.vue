@@ -6,6 +6,7 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { AstrosLayout, AstrosPlaylistRow } from '@/components';
 import AstrosFieldFilter from '@/components/common/fields/AstrosFieldFilter.vue';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 
 const router = useRouter();
 const { t } = useI18n();
@@ -99,14 +100,14 @@ const editPlaylist = (id: string) => {
             v-model="filterText"
           />
         </div>
-        <button
+        <AstrosWriteButton
           data-testid="save_module_settings"
           class="btn btn-primary w-24"
           aria-label="$t('playlists_view.new')"
           @click="newPlaylist"
         >
           {{ $t('playlists_view.new') }}
-        </button>
+        </AstrosWriteButton>
       </div>
       <div class="flex flex-row flex-nowrap">
         <div class="grow"></div>
@@ -147,12 +148,12 @@ const editPlaylist = (id: string) => {
             {{ $t('playlists_view.delete_confirm', { name: deletePlaylistName }) }}
           </p>
           <div class="modal-action">
-            <button
+            <AstrosWriteButton
               class="btn btn-error"
               @click="confirmDelete"
             >
               {{ $t('delete') }}
-            </button>
+            </AstrosWriteButton>
             <button
               class="btn"
               @click="closeDeleteModal"

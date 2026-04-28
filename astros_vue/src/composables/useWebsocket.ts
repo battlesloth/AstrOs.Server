@@ -1,9 +1,16 @@
 import { ref } from 'vue';
-import type { BaseWsMessage, LocationStatus, ControllerSync, ScriptStatus } from '@/models';
+import type {
+  BaseWsMessage,
+  LocationStatus,
+  ControllerSync,
+  ScriptStatus,
+  SystemStatusWsMessage,
+} from '@/models';
 import { WebsocketMessageType, Location, ControllerStatus } from '@/enums';
 import { useControllerStore } from '@/stores/controller';
 import { useScriptsStore } from '@/stores/scripts';
 import { useScripterStore } from '@/stores/scripter';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 
 const ws = ref<WebSocket | null>(null);
 const wsIsConnected = ref(false);
@@ -95,6 +102,9 @@ export function useWebsocket() {
       case WebsocketMessageType.SCRIPT:
         handleScriptMessage(parsedMessage);
         break;
+      case WebsocketMessageType.SYSTEM_STATUS:
+        handleSystemStatusMessage(parsedMessage as unknown as SystemStatusWsMessage);
+        break;
       default:
         console.warn('Unhandled message type:', message);
         break;
@@ -115,27 +125,49 @@ export function useWebsocket() {
     try {
       const data = message as LocationStatus;
       const controllerStore = useControllerStore();
-      let status = ControllerStatus.DOWN;
 
-      if (data.synced) {
-        status = ControllerStatus.UP;
-      } else if (data.up) {
-        status = ControllerStatus.NEEDS_SYNCED;
+      // Order matters: a stale config on incompatible firmware should still
+      // surface as FIRMWARE_INCOMPATIBLE, not NEEDS_SYNCED.
+      let status = ControllerStatus.DOWN;
+      if (data.up) {
+        if (!data.firmwareCompatible) {
+          status = ControllerStatus.FIRMWARE_INCOMPATIBLE;
+        } else if (data.synced) {
+          status = ControllerStatus.UP;
+        } else {
+          status = ControllerStatus.NEEDS_SYNCED;
+        }
       }
 
       switch (data.controllerLocation) {
         case Location.DOME:
           controllerStore.domeStatus = status;
+          controllerStore.domeFirmware = data.firmwareVersion;
           break;
         case Location.CORE:
           controllerStore.coreStatus = status;
+          controllerStore.coreFirmware = data.firmwareVersion;
           break;
         case Location.BODY:
           controllerStore.bodyStatus = status;
+          controllerStore.bodyFirmware = data.firmwareVersion;
           break;
       }
     } catch (error) {
       console.error('Error handling status message:', error);
+    }
+  }
+
+  function handleSystemStatusMessage(message: SystemStatusWsMessage) {
+    try {
+      const systemStatusStore = useSystemStatusStore();
+      systemStatusStore.setStatus({
+        readOnly: message.data.readOnly,
+        reasonCode: message.data.reasonCode ?? null,
+        enteredAt: message.data.enteredAt ?? null,
+      });
+    } catch (error) {
+      console.error('Error handling system status message:', error);
     }
   }
 

@@ -6,4 +6,6 @@ export interface LocationStatus extends BaseWsMessage {
   controllerId: string;
   up: boolean;
   synced: boolean;
+  firmwareVersion?: string;
+  firmwareCompatible: boolean;
 }

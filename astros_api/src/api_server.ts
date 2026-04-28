@@ -50,10 +50,17 @@ import {
 } from './serial/serial_worker_response.js';
 import { LocationsRepository } from './dal/repositories/locations_repository.js';
 import { ServoTest } from './models/servo_test.js';
+import { FirmwareConfig } from './models/firmware_config.js';
+import { meetsMinimum } from './semver.js';
 
 import { fileURLToPath } from 'url';
 
-import { db, migrateToLatest } from './dal/database.js';
+import { initializeDatabase } from './dal/database.js';
+import { Kysely } from 'kysely';
+import { Database } from './dal/types.js';
+import { SystemStatus } from './system_status.js';
+import { writeGuard } from './write_guard.js';
+import { registerSystemStatusRoutes } from './controllers/system_status_controller.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -103,6 +110,9 @@ class ApiServer {
 
   private authHandler!: any;
   private apiKeyValidator!: ReqHandler;
+
+  private db!: Kysely<Database>;
+  private systemStatus = new SystemStatus();
 
   upload!: any;
 
@@ -164,6 +174,9 @@ class ApiServer {
   }
 
   public async Init() {
+    logger.info('Initializing database');
+    this.db = await initializeDatabase(this.systemStatus);
+
     logger.info('Setting up authentication strategy');
     this.setAuthStrategy();
 
@@ -208,7 +221,7 @@ class ApiServer {
           usernameField: 'username',
         },
         async (username: string, password: string, done) => {
-          const repository = new UserRepository(db);
+          const repository = new UserRepository(this.db);
 
           const user = await repository.getByUsername(username);
 
@@ -232,13 +245,6 @@ class ApiServer {
   }
 
   private async configApi(): Promise<void> {
-    try {
-      migrateToLatest(db);
-    } catch (error) {
-      logger.error('Error migrating database', error);
-      process.exit(1);
-    }
-
     const loggerMiddleware = pinoHttp({
       logger: logger,
       autoLogging: true,
@@ -284,6 +290,7 @@ class ApiServer {
     this.app.use(cookieParser());
     this.app.use(Express.static(path.join(__dirname, 'public')));
     this.app.use(passport.initialize());
+    this.app.use('/api', writeGuard(this.systemStatus));
     this.app.use('/api', this.router);
 
     this.app.get('/index.html', (req, res) => {
@@ -315,18 +322,19 @@ class ApiServer {
       algorithms: ['HS256'],
     });
 
-    this.apiKeyValidator = ApiKeyValidator(db);
+    this.apiKeyValidator = ApiKeyValidator(this.db);
   }
 
   private setRoutes(): void {
     registerAuthRoutes(this.router);
-    registerLocationRoutes(this.router, this.authHandler, db);
-    registerScriptRoutes(this.router, this.authHandler, db);
-    registerPlaylistRoutes(this.router, this.authHandler, db);
-    registerRemoteConfigRoutes(this.router, this.authHandler, this.apiKeyValidator, db);
-    registerSettingsRoutes(this.router, this.authHandler, db);
-    registerAudioRoutes(this.router, this.authHandler, db);
-    registerFileRoutes(this.router, this.authHandler, db);
+    registerSystemStatusRoutes(this.router, this.systemStatus);
+    registerLocationRoutes(this.router, this.authHandler, this.db);
+    registerScriptRoutes(this.router, this.authHandler, this.db);
+    registerPlaylistRoutes(this.router, this.authHandler, this.db);
+    registerRemoteConfigRoutes(this.router, this.authHandler, this.apiKeyValidator, this.db);
+    registerSettingsRoutes(this.router, this.authHandler, this.db);
+    registerAudioRoutes(this.router, this.authHandler, this.db);
+    registerFileRoutes(this.router, this.authHandler, this.db);
 
     this.router.get('/check-session', this.authHandler, (req: any, res: any, next: any) => {
       res.status(200);
@@ -443,9 +451,24 @@ class ApiServer {
 
     this.websocket = new Server({ port: this.websocketPort });
 
+    this.systemStatus.subscribe((state) => {
+      this.updateClients({ type: TransmissionType.systemStatus, data: state });
+    });
+
     this.websocket.on('connection', (conn) => {
       const id = uuid_v4();
       this.clients.set(id, conn);
+
+      try {
+        conn.send(
+          JSON.stringify({
+            type: TransmissionType.systemStatus,
+            data: this.systemStatus.getState(),
+          }),
+        );
+      } catch (err) {
+        logger.error(`websocket initial systemStatus send error: ${err}`);
+      }
 
       conn.on('message', (msg) => {
         this.handleWebsocketMessage(msg.toString());
@@ -519,7 +542,7 @@ class ApiServer {
 
       const val = msg as RegistrationResponse;
 
-      const controllerRepo = new ControllerRepository(db);
+      const controllerRepo = new ControllerRepository(this.db);
 
       await controllerRepo.insertControllers(val.registrations);
 
@@ -549,8 +572,8 @@ class ApiServer {
     try {
       const val = msg as PollRepsonse;
 
-      const controlerRepo = new ControllerRepository(db);
-      const locationRepo = new LocationsRepository(db);
+      const controlerRepo = new ControllerRepository(this.db);
+      const locationRepo = new LocationsRepository(this.db);
 
       const controller = await controlerRepo.getControllerByAddress(val.controller.address);
 
@@ -566,6 +589,12 @@ class ApiServer {
         return;
       }
 
+      const firmwareVersion = val.controller.firmwareVersion;
+      const firmwareCompatible = meetsMinimum(
+        firmwareVersion,
+        FirmwareConfig.MINIMUM_FIRMWARE_VERSION,
+      );
+
       const update: StatusResponse = {
         type: TransmissionType.status,
         success: true,
@@ -574,6 +603,8 @@ class ApiServer {
         controllerLocation: location.locationName,
         up: true,
         synced: val.controller.fingerprint === location.configFingerprint,
+        firmwareVersion,
+        firmwareCompatible,
       };
 
       this.updateClients(update);
@@ -586,7 +617,7 @@ class ApiServer {
     try {
       const val = msg as ConfigSyncResponse;
 
-      const locationRepo = new LocationsRepository(db);
+      const locationRepo = new LocationsRepository(this.db);
 
       const locationId = await locationRepo.getLocationIdByControllerByMac(val.controller.address);
 
@@ -605,8 +636,8 @@ class ApiServer {
     try {
       const val = msg as ConfigSyncResponse;
 
-      const locationRepo = new LocationsRepository(db);
-      const scriptRepo = new ScriptRepository(db);
+      const locationRepo = new LocationsRepository(this.db);
+      const scriptRepo = new ScriptRepository(this.db);
 
       const locId = await locationRepo.getLocationNameByMac(val.controller.address);
 
@@ -662,7 +693,7 @@ class ApiServer {
   private async syncControllerConfig(req: any, res: any, next: any) {
     logger.info('syncing controller config');
 
-    const repo = new LocationsRepository(db);
+    const repo = new LocationsRepository(this.db);
 
     const locations = await repo.loadLocations();
 
@@ -696,8 +727,8 @@ class ApiServer {
 
     const id = req.query.id;
 
-    const scriptRepo = new ScriptRepository(db);
-    const locationsRepo = new LocationsRepository(db);
+    const scriptRepo = new ScriptRepository(this.db);
+    const locationsRepo = new LocationsRepository(this.db);
 
     const cvtr = new ScriptConverter(scriptRepo);
 
@@ -728,8 +759,8 @@ class ApiServer {
     const id = req.query.id;
     logger.info(`running playlist ${id}`);
 
-    const playlistRepo = new PlaylistRepository(db);
-    const locationsRepo = new LocationsRepository(db);
+    const playlistRepo = new PlaylistRepository(this.db);
+    const locationsRepo = new LocationsRepository(this.db);
 
     try {
       const playlist = await playlistRepo.getPlaylist(id);
@@ -769,8 +800,8 @@ class ApiServer {
     const id = req.query.id;
     logger.info(`running script ${id}`);
 
-    const scriptRepo = new ScriptRepository(db);
-    const locationsRepo = new LocationsRepository(db);
+    const scriptRepo = new ScriptRepository(this.db);
+    const locationsRepo = new LocationsRepository(this.db);
 
     const script = await scriptRepo.getScript(id);
     const locations = await locationsRepo.loadLocations();
@@ -797,7 +828,7 @@ class ApiServer {
 
     this.animationQueue.panicStop();
 
-    const ctlRepo = new LocationsRepository(db);
+    const ctlRepo = new LocationsRepository(this.db);
     const locations = await ctlRepo.loadLocations();
     const msg = createScriptRun('panic', locations);
     msg.type = TransmissionType.panic;
@@ -849,13 +880,13 @@ class ApiServer {
   private async directCommand(req: any, res: any, next: any) {
     logger.info('sending direct command');
 
-    const repo = new ControllerRepository(db);
+    const repo = new ControllerRepository(this.db);
     const controller = await repo.getControllerByLocationId(req.body.locationId);
 
     logger.debug(`controller: ${JSON.stringify(controller)}`);
     logger.debug(`req: ${JSON.stringify(req.body)}`);
 
-    const converter = new ScriptConverter(new ScriptRepository(db));
+    const converter = new ScriptConverter(new ScriptRepository(this.db));
     const cmd = await converter.convertCommand(req.body);
 
     this.serialWorker.postMessage({

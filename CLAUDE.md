@@ -72,6 +72,17 @@ The system manages **Locations** (physical positions on the droid) that contain 
 
 Always run lint and prettier before making a commit to ensure consistent formatting.
 
+## Branching & PRs
+
+All implementation work goes on a feature branch that merges into `develop` via pull request. Never commit directly to `develop` or `main`. `develop` is the integration branch for contributor work; `main` is production.
+
+- Branch naming: `feature/<slug>` (e.g., `feature/database-path-env`).
+- Branch off the latest `origin/develop` at the start of each task.
+- Plan files commit to the feature branch too — the "commit the plan first" rule in the Planning section still applies.
+- Open the PR with `gh pr create --base develop` when the work is ready.
+
+**Exception — doc-only changes:** Edits limited to `CLAUDE.md`, `README.md`, or `.docs/` (with no code or config impact) may be committed directly to `develop`. PR overhead isn't justified for pure meta edits.
+
 ## Planning (MANDATORY)
 
 **NEVER write implementation code without a written, committed plan.** This is a hard rule, with the exceptions below.
@@ -84,7 +95,7 @@ No plan is required for small, minimally invasive changes made while reviewing a
 
 For medium-sized changes that are straightforward but span more than a trivial tweak — e.g., adding a new API endpoint with a store and view, or a self-contained bug fix touching 2-3 files — use a light plan:
 
-1. Write a brief plan (a short description + a checklist of 3-5 tasks) and save to `docs/plans/` with the same naming convention.
+1. Write a brief plan (a short description + a checklist of 3-5 tasks) and save to `.docs/plans/` with the same naming convention.
 2. **Commit the plan file before writing implementation code.**
 3. Check off tasks as completed and commit updates.
 
@@ -95,7 +106,7 @@ Light plans skip the brainstorming skill and don't require a scope guard evaluat
 For larger features or work that spans multiple layers:
 
 1. Brainstorm the feature with the user (using `superpowers:brainstorming`).
-2. Write the plan using `superpowers:writing-plans` and save to `docs/plans/` with a timestamped filename including time (e.g., `20260327-1500-feature-name.md` using `YYYYMMDD-HHmm` format).
+2. Write the plan using `superpowers:writing-plans` and save to `.docs/plans/` with a timestamped filename including time (e.g., `20260327-1500-feature-name.md` using `YYYYMMDD-HHmm` format).
 3. The plan must include a checklist of discrete tasks with checkboxes (`- [ ]`). Each task should be small enough to complete and commit independently.
 4. **Commit the plan file to the repo before writing any implementation code.** This ensures the plan survives crashes, context loss, or session restarts.
 5. As each task is completed, update the plan file to check off the box (`- [x]`) and commit the update. This makes the plan the single source of truth for progress.
@@ -112,7 +123,7 @@ During planning, evaluate the total scope. If a feature involves **more than ~8 
 
 ## QA Test Plans
 
-For each feature, create a manual QA test plan in `docs/qa/` with a descriptive filename (e.g., `auth-login.md`, `setup-wizard.md`). Each plan should include:
+For each feature, create a manual QA test plan in `.docs/qa/` with a descriptive filename (e.g., `auth-login.md`, `setup-wizard.md`). Each plan should include:
 
 - **Preconditions**: required state/setup before testing
 - **Step-by-step test cases**: numbered steps with specific user actions
@@ -126,7 +137,7 @@ QA plans should be committed alongside the feature work they cover.
 Use the following skills and subagents as part of the development workflow:
 
 - **Brainstorming** (`superpowers:brainstorming`): Always brainstorm before building new features. Explore intent, requirements, and design before writing code.
-- **Write Plan** (`superpowers:writing-plans`): Write a plan before any multi-step implementation. Save plans to `docs/plans/`.
+- **Write Plan** (`superpowers:writing-plans`): Write a plan before any multi-step implementation. Save plans to `.docs/plans/`.
 - **Execute Plan** (`superpowers:executing-plans`): Use to execute written implementation plans with review checkpoints.
 - **TDD** (`superpowers:test-driven-development`): Write tests before implementation code for features and bug fixes. **Exceptions**: serial/hardware integration code, PixiJS rendering code, and UI layout work where the feedback loop is inherently manual — for these, write tests after implementation where feasible, or rely on manual QA.
 - **Frontend Design** (`frontend-design:frontend-design`): Use for all Vue component and page work to produce polished, production-grade UI.

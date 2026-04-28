@@ -26,7 +26,7 @@ Wire up a safe startup flow: detect pending migrations → take a hot backup →
 - **Guard rule:** in read-only mode, block any `POST/PUT/PATCH/DELETE` AND the five serial-write GETs (`/locations/syncconfig`, `/locations/synccontrollers`, `/scripts/upload`, `/scripts/run`, `/playlists/run`), **except** the allowlist: `POST /login`, `POST /reauth`, `POST /panicStop`, `POST /panicClear`.
 - **Status exposure:** new `GET /api/system/status` endpoint (no auth). WebSocket pushes a `SYSTEM_STATUS` message on connect and whenever the state changes.
 - **Backup failure = enter read-only**, migrations skipped.
-- **Migration failure → restore backup.** Restore success = server continues at pre-migration version. Restore failure = enter read-only.
+- **Migration failure → restore backup.** Restore success = server enters read-only with `MIGRATION_FAILED_RESTORED` (see Phase 3 amendment, 2026-04-26: silent recovery hid migration failures from operators and risked schema-drift writes against the rolled-back version). Restore failure = enter read-only with `MIGRATION_FAILED_RESTORE_FAILED`.
 - **Do not add a "clear read-only mode" endpoint.** Recovery path is a container restart.
 
 ## Required `database.ts` refactor
@@ -54,21 +54,21 @@ export function getDb(): Kysely<Database> {
 
 ## Tasks
 
-- [ ] Create `astros_api/src/system_status.ts` with a `SystemStatus` class:
+- [x] Create `astros_api/src/system_status.ts` with a `SystemStatus` class:
   - `isReadOnly(): boolean`
   - `enterReadOnly(reason: string): void` — logs at error level, notifies subscribers, sets `enteredAt` timestamp
   - `getState(): { readOnly: boolean; reason?: string; enteredAt?: string }`
   - `subscribe(cb): () => void` — returns unsubscribe fn, used by WebSocket
   - No disk persistence.
 
-- [ ] Create `astros_api/src/dal/backup.ts`:
+- [x] Create `astros_api/src/dal/backup.ts`:
   - `checkPendingMigrations(db, provider): Promise<string[]>` — queries `kysely_migration`, treats "table missing" as "all pending".
   - `getLastAppliedMigrationName(db): Promise<string | null>` — returns the latest row in `kysely_migration` by `timestamp`, or null.
   - `createBackup(rawSqlite, dbPath, lastMigrationName): Promise<string>` — builds `${dbPath}.backup-${lastMigrationName}`, calls `rawSqlite.backup(destPath)` (overwrites same-name), returns path.
   - `pruneOldBackups(appdataPath, keep = 5): void` — globs `database.sqlite3.backup-*`, sorts by mtime desc, unlinks index 5+.
   - `restoreBackup(backupPath, dbPath): void` — `fs.copyFileSync`.
 
-- [ ] Refactor `astros_api/src/dal/database.ts`:
+- [x] Refactor `astros_api/src/dal/database.ts`:
   - Replace `export const db` with `_db` module-local + `initializeDatabase()` and `getDb()`.
   - `initializeDatabase(systemStatus)` flow:
     1. In `NODE_ENV=test`: open `:memory:`, run migrations directly, return (no backup dance).
@@ -80,7 +80,7 @@ export function getDb(): Kysely<Database> {
     7. On migration failure: log, close connection, `restoreBackup()`, re-open connection, log "restored from backup after failed migration". If the restore throws → `systemStatus.enterReadOnly('migration failed and restore failed: ...')`.
   - Export `getDb()` for places that can't receive the connection via constructor.
 
-- [ ] Create `astros_api/src/write_guard.ts`:
+- [x] Create `astros_api/src/write_guard.ts`:
   - Export `writeGuard(systemStatus): RequestHandler`.
   - `BLOCKED_WRITE_METHODS = new Set(['POST','PUT','PATCH','DELETE'])`.
   - `ALLOWED_IN_READONLY: Array<{ method, path }>` = `/login`, `/reauth`, `/panicStop`, `/panicClear` (all POST).
@@ -88,35 +88,35 @@ export function getDb(): Kysely<Database> {
   - Logic: if not read-only, `next()`. Else: if allowlisted, `next()`. Else if method blocked OR (GET ∧ path in BLOCKED_GET_PATHS), send 503 `{ message, reason }`. Else `next()`.
   - `req.path` is relative to the router mount, so comparisons are `/login`, `/scripts/upload`, etc.
 
-- [ ] Create `astros_api/src/controllers/system_status_controller.ts`:
+- [x] Create `astros_api/src/controllers/system_status_controller.ts`:
   - `registerSystemStatusRoutes(router, systemStatus)` — **no authHandler**, public.
   - `GET /system/status` → returns `systemStatus.getState()`.
 
-- [ ] Wire it all up in `astros_api/src/api_server.ts`:
+- [x] Wire it all up in `astros_api/src/api_server.ts`:
   - Construct a `SystemStatus` on the `ApiServer` instance.
   - In `Init()`, call `await initializeDatabase(this.systemStatus)` and hold the connection on `this.db`. Pass it to all `register*Routes` calls.
   - In `configApi()`, install the `writeGuard(this.systemStatus)` middleware **before** `this.app.use('/api', this.router)`.
   - Register the new system status route.
   - In `runWebServices()`, on each WebSocket connection, immediately send `{ type: TransmissionType.systemStatus, data: systemStatus.getState() }`. Subscribe to `systemStatus` changes and broadcast to all connected clients when state changes.
 
-- [ ] Update `astros_api/src/models/index.ts` — add `TransmissionType.systemStatus` constant for the WebSocket message discrimination.
+- [x] Update `astros_api/src/models/index.ts` — add `TransmissionType.systemStatus` constant for the WebSocket message discrimination.
 
 ## Tests
 
-- [ ] `astros_api/src/system_status.test.ts` — state transitions, reason/timestamp capture, subscribe/unsubscribe, notifications.
-- [ ] `astros_api/src/dal/backup.test.ts` (use `os.tmpdir()` + `fs.mkdtempSync()`):
+- [x] `astros_api/src/system_status.test.ts` — state transitions, reason/timestamp capture, subscribe/unsubscribe, notifications.
+- [x] `astros_api/src/dal/backup.test.ts` (use `os.tmpdir()` + `fs.mkdtempSync()`):
   - `checkPendingMigrations` returns all migrations on a fresh DB with no `kysely_migration` table.
   - Returns `[]` on a fully-migrated DB.
   - `createBackup` writes a file with the expected name and byte-for-byte content.
   - Same-version backup overwrites (not duplicated).
   - `pruneOldBackups(5)` keeps the 5 newest by mtime, deletes older.
-- [ ] `astros_api/src/dal/database.integration.test.ts`:
+- [x] `astros_api/src/dal/database.integration.test.ts`:
   - Happy path: no pending migrations → no backup taken.
   - Happy path + pending migrations → backup + migrate succeed → backup retained.
   - Failing migration: inject a bad migration, verify backup taken, restore succeeds, system usable at pre-migration state.
   - Failing migration + failing restore (simulated via permission drop or mock): verify `SystemStatus` is read-only with clear reason.
   - Backup failure (simulated via read-only dir): verify `SystemStatus` is read-only and migration is skipped.
-- [ ] `astros_api/src/write_guard.test.ts`:
+- [x] `astros_api/src/write_guard.test.ts`:
   - Pass-through when not read-only (all methods + paths).
   - Blocks POST/PUT/PATCH/DELETE in read-only.
   - Allows all GETs in read-only EXCEPT the five serial-write paths.

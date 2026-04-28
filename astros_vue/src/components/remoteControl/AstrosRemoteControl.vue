@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import AstrosRemoteButton from './AstrosRemoteButton.vue';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import { useScriptsStore } from '@/stores/scripts';
@@ -104,13 +105,13 @@ const buttonNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
     <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0">
       <h1 class="text-2xl font-bold">{{ $t('remote_view.title') }}</h1>
       <div class="grow"></div>
-      <button
+      <AstrosWriteButton
         data-testid="save_module_settings"
         class="btn btn-primary w-24"
         @click="saveConfig"
       >
         {{ $t('remote_view.save') }}
-      </button>
+      </AstrosWriteButton>
     </div>
 
     <!-- Page Navigation -->

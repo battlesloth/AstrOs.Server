@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
+import { Kysely } from 'kysely';
 import { Database } from '../types.js';
-import { migrateToLatest } from '../database.js';
+import { createKyselyConnection, migrateToLatest } from '../database.js';
 import { ScriptRepository } from './script_repository.js';
 import {
   Script,
@@ -39,13 +38,7 @@ describe('Script Repository', () => {
   let locationId: string;
 
   beforeEach(async () => {
-    const dialect = new SqliteDialect({
-      database: new SQLite(':memory:'),
-    });
-
-    db = new Kysely<Database>({
-      dialect,
-    });
+    db = createKyselyConnection().db;
 
     await migrateToLatest(db);
 

@@ -25,6 +25,7 @@ import { useToast } from '@/composables/useToast';
 import { useI18n } from 'vue-i18n';
 import { v4 as uuid } from 'uuid';
 import AstrosChannelSwapModal from '@/components/modals/scripter/AstrosChannelSwapModal.vue';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import apiService from '@/api/apiService';
 import { SCRIPTS_TEST_CHANNEL } from '@/api/endpoints';
 
@@ -383,18 +384,18 @@ onMounted(async () => {
               :aria-label="$t('description')"
             />
           </div>
-          <button
+          <AstrosWriteButton
             class="btn w-24 btn-primary"
             @click="saveScript"
           >
             {{ $t('save') }}
-          </button>
-          <button
+          </AstrosWriteButton>
+          <AstrosWriteButton
             class="btn w-24 btn-primary"
             @click="scriptTest"
           >
             {{ $t('test') }}
-          </button>
+          </AstrosWriteButton>
         </div>
       </div>
       <AstrosPixiView

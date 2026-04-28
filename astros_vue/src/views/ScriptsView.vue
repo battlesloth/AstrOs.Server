@@ -6,6 +6,7 @@ import { useToast } from '@/composables/useToast';
 import { useScriptsStore } from '@/stores/scripts';
 import { UploadStatus, Location } from '@/enums';
 import AstrosFieldFilter from '@/components/common/fields/AstrosFieldFilter.vue';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
@@ -124,13 +125,13 @@ const editScript = (id: string) => {
             v-model="filterText"
           />
         </div>
-        <button
+        <AstrosWriteButton
           data-testid="save_module_settings"
           class="btn btn-primary w-24"
           @click="newScript"
         >
           {{ $t('scripts_view.new') }}
-        </button>
+        </AstrosWriteButton>
       </div>
       <div class="flex flex-row flex-nowrap">
         <div class="grow"></div>
@@ -186,12 +187,12 @@ const editScript = (id: string) => {
             </template>
           </p>
           <div class="modal-action">
-            <button
+            <AstrosWriteButton
               class="btn btn-error"
               @click="confirmDelete"
             >
               {{ $t('delete') }}
-            </button>
+            </AstrosWriteButton>
             <button
               class="btn"
               @click="closeDeleteModal"

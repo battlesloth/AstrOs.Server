@@ -25,3 +25,5 @@ export const PLAYLISTS_COPY = 'api/playlists/copy';
 export const PLAYLISTS_RUN = 'api/playlists/run';
 
 export const REMOTE_CONFIG = 'api/remoteConfig';
+
+export const SYSTEM_STATUS = 'api/system/status';

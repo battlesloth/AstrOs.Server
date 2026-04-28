@@ -15,6 +15,10 @@ export const useControllerStore = defineStore('controller', () => {
   const coreStatus = ref<ControllerStatus>(ControllerStatus.DOWN);
   const bodyStatus = ref<ControllerStatus>(ControllerStatus.DOWN);
 
+  const domeFirmware = ref<string | undefined>();
+  const coreFirmware = ref<string | undefined>();
+  const bodyFirmware = ref<string | undefined>();
+
   async function syncControllers() {
     isSyncing.value = true;
     syncError.value = null;
@@ -66,6 +70,9 @@ export const useControllerStore = defineStore('controller', () => {
     domeStatus,
     coreStatus,
     bodyStatus,
+    domeFirmware,
+    coreFirmware,
+    bodyFirmware,
     syncControllers,
     setControllers,
     controllerSyncResponse,

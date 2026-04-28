@@ -49,8 +49,16 @@ export class LocationsRepository {
         c.loc_fingerprint,
       );
 
+      // Empty-string id means "no controller assigned to this location" — same
+      // sentinel the createControllerLocation factory uses. setLocationController
+      // (called by updateLocation whenever a controller field is present) treats
+      // both '' and the historical '0' sentinel as "no controller": it deletes
+      // any existing controller_locations row for the location and skips the
+      // INSERT. This both avoids violating migration_6's RESTRICT FK on
+      // controller_locations.controller_id and lets clients clear an existing
+      // assignment by sending the sentinel.
       location.controller = {
-        id: c.ctrl_id ?? '0',
+        id: c.ctrl_id ?? '',
         name: c.ctrl_name ?? '',
         address: c.ctrl_address ?? '',
       };
@@ -90,7 +98,7 @@ export class LocationsRepository {
     );
 
     location.controller = {
-      id: data.ctrl_id ?? '0',
+      id: data.ctrl_id ?? '',
       name: data.ctrl_name ?? '',
       address: data.ctrl_address ?? '',
     };
@@ -169,6 +177,10 @@ export class LocationsRepository {
           throw err;
         });
 
+      // Always reconcile the controller mapping when the client sent a
+      // controller field. setLocationController handles both the "set to
+      // real id" and "clear" cases (sentinels '' and '0' both mean "no
+      // controller" — see that method for the full rationale).
       if (location.controller !== undefined && location.controller !== null) {
         await this.setLocationController(trx, location.id, location.controller.id);
       }
@@ -205,6 +217,11 @@ export class LocationsRepository {
     locationId: string,
     controllerId: string,
   ): Promise<boolean> {
+    // Always clear the existing assignment first. This handles three cases
+    // uniformly:
+    //   - Setting a new/different controller (delete-then-insert).
+    //   - Clearing an existing controller (delete only — see sentinel check below).
+    //   - Re-asserting the same controller (idempotent delete-then-insert).
     await trx
       .deleteFrom('controller_locations')
       .where('location_id', '=', locationId)
@@ -213,6 +230,14 @@ export class LocationsRepository {
         logger.error('LocationsRepository.setLocationController', err);
         throw err;
       });
+
+    // Treat both '' (current sentinel from getLocations / createControllerLocation)
+    // and '0' (historical sentinel from older clients) as "no controller" and
+    // skip the INSERT. Without this, a client sending '0' would trip
+    // migration_6's RESTRICT FK on controller_locations.controller_id.
+    if (!controllerId || controllerId === '0') {
+      return true;
+    }
 
     const result = await trx
       .insertInto('controller_locations')

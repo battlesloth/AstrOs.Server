@@ -57,3 +57,7 @@ testem.log
 
 *storybook.log
 .cache
+.data
+
+# Brainstorm/visual-companion session content (local only)
+/.superpowers/

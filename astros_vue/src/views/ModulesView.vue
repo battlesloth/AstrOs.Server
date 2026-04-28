@@ -15,11 +15,13 @@ import {
   AstrosAddModuleModal,
   AstrosServoTestModal,
 } from '@/components';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import apiService from '@/api/apiService';
 import { SYNC_CONFIG } from '@/api/endpoints';
 import { useToast } from '@/composables/useToast';
 import { useI18n } from 'vue-i18n';
 import { storeToRefs } from 'pinia';
+import { MINIMUM_FIRMWARE_VERSION } from '@/constants/firmware';
 
 const { t } = useI18n();
 
@@ -43,10 +45,63 @@ const { addModule, removeModule } = useModuleManagement();
 
 const bodyLocation = storeToRefs(locationStore).bodyLocation;
 const bodyStatus = storeToRefs(controllerStore).bodyStatus;
+const bodyFirmware = storeToRefs(controllerStore).bodyFirmware;
 const coreLocation = storeToRefs(locationStore).coreLocation;
 const coreStatus = storeToRefs(controllerStore).coreStatus;
+const coreFirmware = storeToRefs(controllerStore).coreFirmware;
 const domeLocation = storeToRefs(locationStore).domeLocation;
 const domeStatus = storeToRefs(controllerStore).domeStatus;
+const domeFirmware = storeToRefs(controllerStore).domeFirmware;
+
+interface StatusIcon {
+  name: string;
+  colorClass: string;
+  tooltip: string;
+}
+
+function statusIcon(status: ControllerStatus, firmware: string | undefined): StatusIcon {
+  const version = firmware ?? t('modules.firmware.unknown');
+  switch (status) {
+    case ControllerStatus.UP:
+      return {
+        name: 'io-checkmark-circle',
+        colorClass: 'text-green-500',
+        tooltip: t('modules.firmware.tooltip.ok', { version }),
+      };
+    case ControllerStatus.NEEDS_SYNCED:
+      return {
+        name: 'io-warning',
+        colorClass: 'text-yellow-500',
+        tooltip: t('modules.firmware.tooltip.ok', { version }),
+      };
+    case ControllerStatus.FIRMWARE_INCOMPATIBLE:
+      return {
+        name: 'io-warning',
+        colorClass: 'text-red-500',
+        tooltip: t('modules.firmware.tooltip.incompatible', {
+          version,
+          minimum: MINIMUM_FIRMWARE_VERSION,
+        }),
+      };
+    case ControllerStatus.DOWN:
+      return {
+        name: 'io-help-circle-outline',
+        colorClass: 'text-gray-600',
+        tooltip: t('modules.firmware.tooltip.disconnected'),
+      };
+    default:
+      status satisfies never;
+      return {
+        name: 'io-help-circle-outline',
+        colorClass: 'text-gray-600',
+        tooltip: t('modules.firmware.tooltip.disconnected'),
+      };
+  }
+}
+
+const bodyIcon = computed(() => statusIcon(bodyStatus.value, bodyFirmware.value));
+const coreIcon = computed(() => statusIcon(coreStatus.value, coreFirmware.value));
+const domeIcon = computed(() => statusIcon(domeStatus.value, domeFirmware.value));
 
 const availableCoreControllers = computed(() =>
   controllerStore.controllers.filter(
@@ -149,19 +204,19 @@ function controllerSelectChanged(location: string) {
         <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0 mb-4">
           <h1 class="text-2xl font-bold">{{ $t('module_view.modules') }}</h1>
           <div class="grow"></div>
-          <button
+          <AstrosWriteButton
             data-testid="save_module_settings"
             class="btn btn-primary w-24"
             @click="saveModuleSettings"
           >
             {{ $t('module_view.save') }}
-          </button>
-          <button
+          </AstrosWriteButton>
+          <AstrosWriteButton
             class="btn btn-primary w-24"
             @click="syncModuleSettings"
           >
             {{ $t('module_view.sync') }}
-          </button>
+          </AstrosWriteButton>
         </div>
 
         <!-- Module Accordions -->
@@ -184,15 +239,20 @@ function controllerSelectChanged(location: string) {
               >
                 <span>{{ $t('module_view.body') }}</span>
                 <div class="grow"></div>
-                <v-icon
-                  :name="bodyStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
-                  :class="[
-                    { 'text-green-500': bodyStatus === ControllerStatus.UP },
-                    { 'text-yellow-500': bodyStatus === ControllerStatus.NEEDS_SYNCED },
-                    { 'text-red-500': bodyStatus === ControllerStatus.DOWN },
-                  ]"
-                  scale="1.5"
-                />
+                <button
+                  type="button"
+                  class="tooltip tooltip-left bg-transparent border-0 p-0 cursor-help"
+                  :data-tip="bodyIcon.tooltip"
+                  :aria-label="bodyIcon.tooltip"
+                  @click.stop
+                >
+                  <v-icon
+                    :name="bodyIcon.name"
+                    :class="bodyIcon.colorClass"
+                    aria-hidden="true"
+                    scale="1.5"
+                  />
+                </button>
               </div>
               <div
                 class="collapse-content bg-r2-xlight"
@@ -205,7 +265,7 @@ function controllerSelectChanged(location: string) {
                     disabled
                   >
                     <option
-                      value="0"
+                      value=""
                       selected
                     >
                       {{ $t('module_view.master') }}
@@ -240,15 +300,20 @@ function controllerSelectChanged(location: string) {
               >
                 <span>{{ $t('module_view.core') }}</span>
                 <div class="grow"></div>
-                <v-icon
-                  :name="coreStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
-                  :class="[
-                    { 'text-green-500': coreStatus === ControllerStatus.UP },
-                    { 'text-yellow-500': coreStatus === ControllerStatus.NEEDS_SYNCED },
-                    { 'text-red-500': coreStatus === ControllerStatus.DOWN },
-                  ]"
-                  scale="1.5"
-                />
+                <button
+                  type="button"
+                  class="tooltip tooltip-left bg-transparent border-0 p-0 cursor-help"
+                  :data-tip="coreIcon.tooltip"
+                  :aria-label="coreIcon.tooltip"
+                  @click.stop
+                >
+                  <v-icon
+                    :name="coreIcon.name"
+                    :class="coreIcon.colorClass"
+                    aria-hidden="true"
+                    scale="1.5"
+                  />
+                </button>
               </div>
               <div
                 class="collapse-content"
@@ -263,7 +328,7 @@ function controllerSelectChanged(location: string) {
                     @change="controllerSelectChanged('core')"
                   >
                     <option
-                      value="0"
+                      value=""
                       selected
                     >
                       {{ $t('module_view.disabled') }}
@@ -304,15 +369,20 @@ function controllerSelectChanged(location: string) {
               >
                 <span>{{ $t('module_view.dome') }}</span>
                 <div class="grow"></div>
-                <v-icon
-                  :name="domeStatus === ControllerStatus.UP ? 'io-checkmark-circle' : 'io-warning'"
-                  :class="[
-                    { 'text-green-500': domeStatus === ControllerStatus.UP },
-                    { 'text-yellow-500': domeStatus === ControllerStatus.NEEDS_SYNCED },
-                    { 'text-red-500': domeStatus === ControllerStatus.DOWN },
-                  ]"
-                  scale="1.5"
-                />
+                <button
+                  type="button"
+                  class="tooltip tooltip-left bg-transparent border-0 p-0 cursor-help"
+                  :data-tip="domeIcon.tooltip"
+                  :aria-label="domeIcon.tooltip"
+                  @click.stop
+                >
+                  <v-icon
+                    :name="domeIcon.name"
+                    :class="domeIcon.colorClass"
+                    aria-hidden="true"
+                    scale="1.5"
+                  />
+                </button>
               </div>
               <div
                 class="collapse-content"
@@ -327,7 +397,7 @@ function controllerSelectChanged(location: string) {
                     @change="controllerSelectChanged('dome')"
                   >
                     <option
-                      value="0"
+                      value=""
                       selected
                     >
                       {{ $t('module_view.disabled') }}

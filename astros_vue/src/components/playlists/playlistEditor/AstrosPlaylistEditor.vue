@@ -6,6 +6,7 @@ import { PlaylistType } from '@/enums/playlists/playlistType';
 import { v4 as uuid } from 'uuid';
 import AstrosPlaylistSettings from './AstrosPlaylistSettings.vue';
 import AstrosPlaylistTrack from './AstrosPlaylistTrack.vue';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import { usePlaylistsStore } from '@/stores/playlists';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
@@ -240,13 +241,13 @@ async function save() {
     <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0">
       <h1 class="text-2xl font-bold">{{ $t('playlist_editor_view.title') }}</h1>
       <div class="grow"></div>
-      <button
+      <AstrosWriteButton
         data-testid="save_module_settings"
         class="btn btn-primary w-24"
         @click="save"
       >
         {{ $t('playlist_editor_view.save') }}
-      </button>
+      </AstrosWriteButton>
     </div>
     <div class="min-h-0 flex-1 flex">
       <div class="grow"></div>

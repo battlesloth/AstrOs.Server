@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { AstrosLayout } from '@/components';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import apiService from '@/api/apiService';
 import type { ControllerModule } from '@/models';
 import { useI18n } from 'vue-i18n';
@@ -140,13 +141,13 @@ const closeAlert = () => {
                 {{ apiKey }}
               </div>
               <div class="float-right">
-                <button
+                <AstrosWriteButton
                   class="btn btn-primary w-35 px-5 py-0.75"
                   aria-label="$t('generate')"
                   @click="generateApiKey"
                 >
                   {{ $t('generate') }}
-                </button>
+                </AstrosWriteButton>
               </div>
             </div>
           </div>
@@ -157,13 +158,13 @@ const closeAlert = () => {
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
               <div class="float-right">
-                <button
+                <AstrosWriteButton
                   class="btn btn-primary w-35 px-5 py-0.75"
                   aria-label="$t('format')"
                   @click="openFormatModal"
                 >
                   {{ $t('format') }}
-                </button>
+                </AstrosWriteButton>
               </div>
             </div>
           </div>
@@ -213,12 +214,12 @@ const closeAlert = () => {
             </div>
           </div>
           <div class="modal-action">
-            <button
+            <AstrosWriteButton
               class="btn btn-primary"
               @click="confirmFormat"
             >
               {{ $t('ok') }}
-            </button>
+            </AstrosWriteButton>
             <button
               class="btn"
               @click="closeFormatModal"
