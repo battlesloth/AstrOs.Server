@@ -34,20 +34,21 @@ No flash-job code lands in this PR — the lock primitive ships standalone and i
 - [ ] Manual smoke: start server with the test harness, acquire lock, `POST /api/panicStop` → expect HTTP 423 with the documented body; release the lock → expect normal behavior. Watch `lockStateChanged` events in browser devtools as the lock toggles.
 - [ ] Run `npm run prettier:write` and `npm run lint:fix` in both `astros_api/` and `astros_vue/` before committing.
 
-## Files in scope (target ≤10)
+## Files in scope (11)
 
 1. `astros_api/src/job_lock.ts` — new singleton
 2. `astros_api/src/job_lock.test.ts` — new tests
 3. `astros_api/src/job_lock_middleware.ts` — new middleware factory
 4. `astros_api/src/job_lock_middleware.test.ts` — new tests
-5. `astros_api/src/models/enums.ts` — append `lockStateChanged`
-6. `astros_api/src/api_server.ts` — wire JobLock → updateClients; apply middleware to `/api/panicStop`
-7. `astros_vue/src/enums/WebsocketMessageType.ts` — append `LOCK_STATE_CHANGED = 10`
-8. `astros_vue/src/stores/jobLock.ts` — new composition-style store
-9. `astros_vue/src/stores/__tests__/jobLock.test.ts` — new tests
-10. `astros_vue/src/composables/useWebsocket.ts` — add `handleLockStateChanged`
+5. `astros_api/src/models/networking/lock_responses.ts` — new typed `LockState` + `LockStateResponse` (WS broadcast) + `LockedErrorResponse` (HTTP 423 body)
+6. `astros_api/src/models/enums.ts` — append `lockStateChanged`
+7. `astros_api/src/api_server.ts` — wire JobLock → updateClients; apply middleware to `/api/panicStop`
+8. `astros_vue/src/enums/WebsocketMessageType.ts` — append `LOCK_STATE_CHANGED = 10`
+9. `astros_vue/src/stores/jobLock.ts` — new composition-style store
+10. `astros_vue/src/stores/__tests__/jobLock.test.ts` — new tests
+11. `astros_vue/src/composables/useWebsocket.ts` — add `handleLockStateChanged`
 
-If the lock-status payload type warrants its own model file under `astros_api/src/models/networking/`, accept the +1 (11 files) and call it out in the PR description.
+11 files — one over the soft cap. Justified in the PR description by the typed-model split: keeping `LockState` / `LockStateResponse` / `LockedErrorResponse` in `models/networking/` matches the repo's existing payload-typing convention (e.g., `StatusResponse`, `ControllersResponse`) instead of inlining shapes inside the middleware and the WS broadcast site.
 
 ## Out of scope
 
