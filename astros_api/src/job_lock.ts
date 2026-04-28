@@ -1,3 +1,4 @@
+import { logger } from './logger.js';
 import type { LockState } from './models/networking/lock_responses.js';
 
 type Listener = (state: LockState) => void;
@@ -51,6 +52,12 @@ export class JobLock {
 
   private notify(): void {
     const state = this.getState();
-    for (const fn of this.listeners) fn(state);
+    for (const fn of this.listeners) {
+      try {
+        fn(state);
+      } catch (error) {
+        logger.error('Error in listener:', error);
+      }
+    }
   }
 }

@@ -13,7 +13,9 @@ describe('JobLock', () => {
   it('acquire on unlocked lock returns true and records owner + timestamp', () => {
     const lock = new JobLock();
 
+    const before = Date.now();
     const acquired = lock.acquire('flashJob:abc');
+    const after = Date.now();
 
     expect(acquired).toBe(true);
     expect(lock.isLocked()).toBe(true);
@@ -25,7 +27,8 @@ describe('JobLock', () => {
     if (since === null) throw new Error('unreachable: since asserted non-null above');
     const sinceMs = new Date(since).getTime();
     expect(Number.isNaN(sinceMs)).toBe(false);
-    expect(Math.abs(Date.now() - sinceMs)).toBeLessThan(1000);
+    expect(sinceMs).toBeGreaterThanOrEqual(before);
+    expect(sinceMs).toBeLessThanOrEqual(after);
   });
 
   it('acquire on locked lock returns false and preserves existing owner', () => {
