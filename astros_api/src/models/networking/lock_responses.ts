@@ -1,3 +1,4 @@
+import { TransmissionType } from '../enums.js';
 import { BaseResponse } from './base_response.js';
 
 // Internal state shape held by the JobLock and exposed to subscribers.
@@ -16,4 +17,16 @@ export interface LockedErrorResponse {
   error: 'flashJobActive';
   lockOwner: string | null;
   since: string | null;
+}
+
+// Single source of truth for the lockStateChanged WS payload, used both for
+// transition broadcasts (jobLock.subscribe handler) and the on-connect snapshot
+// sent to newly-connected clients.
+export function buildLockStateResponse(state: LockState): LockStateResponse {
+  return {
+    type: TransmissionType.lockStateChanged,
+    success: true,
+    message: '',
+    ...state,
+  };
 }

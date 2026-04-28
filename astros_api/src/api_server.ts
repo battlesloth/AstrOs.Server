@@ -42,7 +42,7 @@ import { registerSettingsRoutes } from './controllers/settings_controller.js';
 import { ApiKeyValidator } from './api_key_validator.js';
 import { JobLock } from './job_lock.js';
 import { requireUnlocked } from './job_lock_middleware.js';
-import type { LockStateResponse } from './models/networking/lock_responses.js';
+import { buildLockStateResponse } from './models/networking/lock_responses.js';
 import { SerialMessageType } from './serial/serial_message.js';
 import {
   ConfigSyncResponse,
@@ -182,13 +182,7 @@ class ApiServer {
     // updateClients fan-out path. The clients Map starts empty; updateClients
     // is a no-op until WS connections land.
     this.jobLock.subscribe((state) => {
-      const update: LockStateResponse = {
-        type: TransmissionType.lockStateChanged,
-        success: true,
-        message: '',
-        ...state,
-      };
-      this.updateClients(update);
+      this.updateClients(buildLockStateResponse(state));
     });
   }
 
@@ -488,6 +482,15 @@ class ApiServer {
         );
       } catch (err) {
         logger.error(`websocket initial systemStatus send error: ${err}`);
+      }
+
+      // Late-join snapshot: a client connecting while the lock is held would
+      // otherwise wait until the next acquire/release transition to learn the
+      // current state. Mirrors the systemStatus initial send above.
+      try {
+        conn.send(JSON.stringify(buildLockStateResponse(this.jobLock.getState())));
+      } catch (err) {
+        logger.error(`websocket initial lockState send error: ${err}`);
       }
 
       conn.on('message', (msg) => {
