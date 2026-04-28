@@ -34,21 +34,25 @@ No flash-job code lands in this PR — the lock primitive ships standalone and i
 - [ ] Manual smoke: start server with the test harness, acquire lock, `POST /api/panicStop` → expect HTTP 423 with the documented body; release the lock → expect normal behavior. Watch `lockStateChanged` events in browser devtools as the lock toggles.
 - [ ] Run `npm run prettier:write` and `npm run lint:fix` in both `astros_api/` and `astros_vue/` before committing.
 
-## Files in scope (11)
+## Files in scope (12)
 
 1. `astros_api/src/job_lock.ts` — new singleton
 2. `astros_api/src/job_lock.test.ts` — new tests
 3. `astros_api/src/job_lock_middleware.ts` — new middleware factory
 4. `astros_api/src/job_lock_middleware.test.ts` — new tests
-5. `astros_api/src/models/networking/lock_responses.ts` — new typed `LockState` + `LockStateResponse` (WS broadcast) + `LockedErrorResponse` (HTTP 423 body)
-6. `astros_api/src/models/enums.ts` — append `lockStateChanged`
-7. `astros_api/src/api_server.ts` — wire JobLock → updateClients; apply middleware to `/api/panicStop`
-8. `astros_vue/src/enums/WebsocketMessageType.ts` — append `LOCK_STATE_CHANGED = 10`
-9. `astros_vue/src/stores/jobLock.ts` — new composition-style store
-10. `astros_vue/src/stores/__tests__/jobLock.spec.ts` — new tests (`.spec.ts` matches the existing `systemStatus.spec.ts` convention)
-11. `astros_vue/src/composables/useWebsocket.ts` — add `handleLockStateChanged`
+5. `astros_api/src/job_lock.integration.test.ts` — HTTP-level integration test (real Express + real fetch) covering the requireUnlocked + handler chain end-to-end
+6. `astros_api/src/models/networking/lock_responses.ts` — new typed `LockState` + `LockStateResponse` (WS broadcast) + `LockedErrorResponse` (HTTP 423 body)
+7. `astros_api/src/models/enums.ts` — append `lockStateChanged`
+8. `astros_api/src/api_server.ts` — wire JobLock → updateClients; apply middleware to `/api/panicStop`
+9. `astros_vue/src/enums/WebsocketMessageType.ts` — append `LOCK_STATE_CHANGED = 10`
+10. `astros_vue/src/stores/jobLock.ts` — new composition-style store
+11. `astros_vue/src/stores/__tests__/jobLock.spec.ts` — new tests (`.spec.ts` matches the existing `systemStatus.spec.ts` convention)
+12. `astros_vue/src/composables/useWebsocket.ts` — add `handleLockStateChanged`
 
-11 files — one over the soft cap. Justified in the PR description by the typed-model split: keeping `LockState` / `LockStateResponse` / `LockedErrorResponse` in `models/networking/` matches the repo's existing payload-typing convention (e.g., `StatusResponse`, `ControllersResponse`) instead of inlining shapes inside the middleware and the WS broadcast site.
+12 files — two over the soft cap. Justified by:
+
+1. **Typed-model split.** `LockState` / `LockStateResponse` / `LockedErrorResponse` live in `models/networking/` to match the repo's existing payload-typing convention (e.g., `StatusResponse`, `ControllersResponse`) instead of being inlined inside the middleware and the WS broadcast site.
+2. **HTTP integration test.** Without an external acquire path on the running server, the unit tests can't actually demonstrate the middleware fires through a real HTTP roundtrip. The integration test (Node `http` + global `fetch`, no new deps) closes that verification gap and stays as a regression guard.
 
 ## Out of scope
 
