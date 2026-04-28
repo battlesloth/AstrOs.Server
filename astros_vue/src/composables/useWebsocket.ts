@@ -3,6 +3,7 @@ import type {
   BaseWsMessage,
   LocationStatus,
   ControllerSync,
+  LockStateChanged,
   ScriptStatus,
   SystemStatusWsMessage,
 } from '@/models';
@@ -11,7 +12,7 @@ import { useControllerStore } from '@/stores/controller';
 import { useScriptsStore } from '@/stores/scripts';
 import { useScripterStore } from '@/stores/scripter';
 import { useSystemStatusStore } from '@/stores/systemStatus';
-import { useJobLockStore, type LockState } from '@/stores/jobLock';
+import { useJobLockStore } from '@/stores/jobLock';
 
 const ws = ref<WebSocket | null>(null);
 const wsIsConnected = ref(false);
@@ -177,7 +178,7 @@ export function useWebsocket() {
 
   function handleLockStateChanged(message: BaseWsMessage) {
     try {
-      const data = message as unknown as LockState;
+      const data = message as LockStateChanged;
       const jobLockStore = useJobLockStore();
       jobLockStore.setState({
         locked: data.locked,

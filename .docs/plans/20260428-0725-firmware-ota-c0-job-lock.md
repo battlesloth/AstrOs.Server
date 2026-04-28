@@ -34,25 +34,29 @@ No flash-job code lands in this PR — the lock primitive ships standalone and i
 - [ ] Manual smoke: start server with the test harness, acquire lock, `POST /api/panicStop` → expect HTTP 423 with the documented body; release the lock → expect normal behavior. Watch `lockStateChanged` events in browser devtools as the lock toggles.
 - [ ] Run `npm run prettier:write` and `npm run lint:fix` in both `astros_api/` and `astros_vue/` before committing.
 
-## Files in scope (12)
+## Files in scope (14)
 
 1. `astros_api/src/job_lock.ts` — new singleton
 2. `astros_api/src/job_lock.test.ts` — new tests
 3. `astros_api/src/job_lock_middleware.ts` — new middleware factory
 4. `astros_api/src/job_lock_middleware.test.ts` — new tests
-5. `astros_api/src/job_lock.integration.test.ts` — HTTP-level integration test (real Express + real fetch) covering the requireUnlocked + handler chain end-to-end
-6. `astros_api/src/models/networking/lock_responses.ts` — new typed `LockState` + `LockStateResponse` (WS broadcast) + `LockedErrorResponse` (HTTP 423 body)
+5. `astros_api/src/job_lock.integration.test.ts` — HTTP-level integration test (real Express + real fetch) covering the requireUnlocked + handler chain end-to-end; also covers the WS connect-snapshot handshake
+6. `astros_api/src/models/networking/lock_responses.ts` — new typed `LockState` + `LockStateResponse` (WS broadcast) + `LockedErrorResponse` (HTTP 423 body) + `buildLockStateResponse` factory shared by the JobLock subscribe broadcast and the WS connect-snapshot
 7. `astros_api/src/models/enums.ts` — append `lockStateChanged`
-8. `astros_api/src/api_server.ts` — wire JobLock → updateClients; apply middleware to `/api/panicStop`
+8. `astros_api/src/api_server.ts` — wire JobLock → updateClients; apply middleware to `/api/panicStop`; send lock-state snapshot on each new WS connection
 9. `astros_vue/src/enums/WebsocketMessageType.ts` — append `LOCK_STATE_CHANGED = 10`
-10. `astros_vue/src/stores/jobLock.ts` — new composition-style store
-11. `astros_vue/src/stores/__tests__/jobLock.spec.ts` — new tests (`.spec.ts` matches the existing `systemStatus.spec.ts` convention)
-12. `astros_vue/src/composables/useWebsocket.ts` — add `handleLockStateChanged`
+10. `astros_vue/src/models/websocket/lockStateChanged.ts` — new `LockState` + `LockStateChanged extends BaseWsMessage, LockState`; transport-layer model that the store and `useWebsocket` both depend on
+11. `astros_vue/src/models/websocket/index.ts` — barrel re-export of `lockStateChanged`
+12. `astros_vue/src/stores/jobLock.ts` — new composition-style store; imports `LockState` from `@/models` rather than defining it
+13. `astros_vue/src/stores/__tests__/jobLock.spec.ts` — new tests (`.spec.ts` matches the existing `systemStatus.spec.ts` convention)
+14. `astros_vue/src/composables/useWebsocket.ts` — add `handleLockStateChanged`; casts to `LockStateChanged` from `@/models`
 
-12 files — two over the soft cap. Justified by:
+14 files — four over the soft cap. Justified by:
 
-1. **Typed-model split.** `LockState` / `LockStateResponse` / `LockedErrorResponse` live in `models/networking/` to match the repo's existing payload-typing convention (e.g., `StatusResponse`, `ControllersResponse`) instead of being inlined inside the middleware and the WS broadcast site.
+1. **Typed-model split (server).** `LockState` / `LockStateResponse` / `LockedErrorResponse` live in `models/networking/` to match the repo's existing payload-typing convention (e.g., `StatusResponse`, `ControllersResponse`) instead of being inlined inside the middleware and the WS broadcast site.
 2. **HTTP integration test.** Without an external acquire path on the running server, the unit tests can't actually demonstrate the middleware fires through a real HTTP roundtrip. The integration test (Node `http` + global `fetch`, no new deps) closes that verification gap and stays as a regression guard.
+3. **WS late-join snapshot (PR feedback).** New connections must immediately receive the current lock state, not wait for the next acquire/release transition. Implemented via a `buildLockStateResponse` factory used both for transition broadcasts and the on-connect snapshot, plus a WS-level integration test that verifies the snapshot is delivered on connect.
+4. **Vue WS model split (PR feedback).** Putting `LockState` in the Pinia store and importing it as a WS payload type from `useWebsocket` couples the transport layer to the store. Following the existing `models/websocket/*` pattern (`BaseWsMessage`, `LocationStatus`, etc.), the WS message type lives in its own file alongside the shared `LockState` shape; the store imports `LockState` from there.
 
 ## Out of scope
 

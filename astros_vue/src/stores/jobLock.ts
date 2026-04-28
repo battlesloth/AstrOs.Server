@@ -1,11 +1,6 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
-
-export interface LockState {
-  locked: boolean;
-  owner: string | null;
-  since: string | null;
-}
+import type { LockState } from '@/models';
 
 export const useJobLockStore = defineStore('jobLock', () => {
   const locked = ref(false);
