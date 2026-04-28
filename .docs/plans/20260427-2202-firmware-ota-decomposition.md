@@ -20,6 +20,24 @@ The work is significant because the existing bulk-data transport in firmware is 
 
 **Build order:** **c0** → (**a** in parallel with **c**-stub-against-mock-firmware) → **b** → wire **c** to real **b** → **d** wires to real **c**.
 
+## PR sizing & testability
+
+Every PR in every sub-project must be:
+
+- **≤10 files changed** where possible. If a PR genuinely needs more, document the reason in the PR description and consider whether it should split further. The codebase touches delicate hardware-control surfaces; reviewability is load-bearing.
+- **Independently testable.** Each PR ships a slice that can be exercised end-to-end through some observable surface — a passing test suite, a manually-verifiable endpoint, a UI affordance, or a hardware smoke test. "Half a feature, no observable behavior" is not allowed.
+
+This means each sub-project decomposes into multiple PRs, each with its own light or full plan in `.docs/plans/` per CLAUDE.md. Approximate split (detailed in the Implementation roadmap below):
+
+- **c0** → 2 PRs
+- **a** → 5 PRs (AstrOs.ESP)
+- **b** → 4 PRs (AstrOs.ESP)
+- **c** → 8 PRs
+- **d** → 7 PRs
+- Plus: shared `protocol.md` freeze, real-hardware wire-up, integrated QA = ~3 PRs
+
+Total project ≈ 24 PRs. Each leaves the codebase shippable.
+
 ## Protocol contract
 
 The contract is the durable interface between sub-projects. **No sub-project plan should change these wire formats without amending this document and notifying the other sub-projects.** New `SerialMessageType` integer values are reserved starting at **30** (current last is `SERVO_TEST_ACK = 22`; gap leaves room for in-flight additions like `SERVO_TEST_NAK`).
@@ -318,16 +336,62 @@ The single highest-risk sub-project. Requirements the firmware sub-plan must mee
 - `AstrOs.ESP/src/main.cpp:388, 682–686` — heartbeat producer + version field; OTA reuses for "I'm back on new firmware" signal.
 - `AstrOs.ESP/partition_8mb.csv` and `partition_16mb.csv` — confirmed correct (ota_0 + ota_1 + otadata); no changes needed.
 
-## Implementation roadmap (each line becomes a sub-plan task)
+## Implementation roadmap (each line is a single PR)
 
-- [ ] **c0** ships: `firmware_version` column + heartbeat persistence + `JobLock` + `lockStateChanged` WS event.
-- [ ] Shared `protocol.md` committed to both repos at the same commit, reserving SerialMessageType range 30–40 and `AstrOsPacketType OTA_*` block.
-- [ ] **a** ships: new bulk transport with CRC + ACK + sliding window + streaming-receive callback. Verified on hardware end-to-end with 1.2 MB fixture.
-- [ ] **c** ships against stub firmware (PTY pair): full server orchestrator including GitHub fetch, on-disk cache, upload + `esp_app_desc_t` validation, flash-job state machine, hard-lock middleware, WebSocket fan-out.
-- [ ] **b** ships: OTA receiver (master serial→SD→ESP-NOW forward + padawan ESP-NOW→OTA partition + commit + reboot).
-- [ ] **c** swaps PTY stub for real master, end-to-end smoke on a 3-board droid.
-- [ ] **d** ships: Vue `FirmwareView`, `firmware` Pinia store, design-token additions, lock-aware banner.
-- [ ] Integrated end-to-end QA against a real release on the bench.
+Each PR gets its own light plan in `.docs/plans/` with a `YYYYMMDD-HHmm-firmware-ota-<id>-<slug>.md` filename, committed to its feature branch before implementation begins.
+
+**c0 — Platform prerequisites (server):**
+
+- [ ] **c0.1** `firmware_version` column (migration_7) + repo upsert + POLL_ACK handler call + tests. Testable: heartbeat updates DB; `meetsMinimum` gate continues to work; controllers GET surfaces persisted version.
+- [ ] **c0.2** `JobLock` singleton + `requireUnlocked` middleware + `lockStateChanged` `TransmissionType` + WS broadcast + Vue lock store + handler. Apply middleware to one example route as smoke test (full route set is **c.2**). Testable: unit + integration tests covering 423 response; live UI banner on lock state change.
+
+**Shared protocol freeze:**
+
+- [ ] **proto.1** Shared `protocol.md` checked into both repos at the same commit, reserving `SerialMessageType` range 30–40 and the `AstrOsPacketType OTA_*` block. Single source of truth referenced by every sub-plan.
+
+**a — Bulk transport hardening (firmware, AstrOs.ESP):**
+
+- [ ] **a.1** New `BulkTransport` scaffolding + CRC-16-CCITT + framing + host-buildable tests in `lib_native`.
+- [ ] **a.2** Sliding window + cumulative-ACK / NAK state machine + Go-Back-N retransmit + tests.
+- [ ] **a.3** ESP-NOW integration: hook `BulkReceiver` into ESP-NOW dispatch, replace `PacketTracker` for one packet type as proof. Hardware smoke.
+- [ ] **a.4** Serial integration: same on master side. Hardware smoke with 1.2 MB SHA-verified payload.
+- [ ] **a.5** Migrate remaining `PacketTracker` consumers (script-deploy etc.) onto the new transport. Removes the half-built bulk path.
+
+**c — Server orchestrator (subset shippable before b lands; runs against PTY stub):**
+
+- [ ] **c.1** `SerialMessageType` `FW_*` enum extensions + `message_generator` / `message_handler` paths + tests. Testable: serializer round-trip.
+- [ ] **c.2** Apply `requireUnlocked` middleware to full write-route set + tests.
+- [ ] **c.3** GitHub release service + 5-min in-memory cache + tests with HTTP fixtures.
+- [ ] **c.4** On-disk `.bin` cache + LRU eviction + SHA-256 stream-hash + tests with a 1.2 MB fixture.
+- [ ] **c.5** Upload handler + `esp_app_desc_t` parser + project-name + version validation + tests.
+- [ ] **c.6** `FlashJob` state machine + orchestrator + serial worker integration + PTY-stub end-to-end test through the happy path.
+- [ ] **c.7** WebSocket fan-out for flash events + 4 Hz throttle + late-join snapshot + tests.
+- [ ] **c.8** Firmware routes (`POST /firmware/jobs`, `GET /firmware/releases`, `POST /firmware/upload`) + glue + integration tests against PTY stub.
+
+**b — OTA receiver (firmware, AstrOs.ESP):**
+
+- [ ] **b.1** Padawan OTA receiver, single-padawan happy path: `OTA_BEGIN` → `OTA_DATA` stream → `OTA_END` → `OTA_COMMIT` → reboot. `esp_ota_mark_app_valid_cancel_rollback` heuristic resolved.
+- [ ] **b.2** Master forwarder: serial → SD → ESP-NOW (sequential per padawan).
+- [ ] **b.3** Master self-flash with strict `FW_DEPLOY_DONE`-precedes-commit ordering.
+- [ ] **b.4** Full-fleet integration on a 3-board droid + hardware smoke covering happy path + hash-mismatch + reboot-timeout.
+
+**c-real — Wire orchestrator to real firmware:**
+
+- [ ] **c-real** Swap PTY stub for the real master serial port; end-to-end smoke on the bench.
+
+**d — Vue Firmware view:**
+
+- [ ] **d.1** Chrome (mirror `ModulesView`) + design tokens in `styles.css` + `firmware_view.*` i18n + `nav.firmware` + route + nav entry + placeholder `FirmwareView`. Testable: navigate to `/firmware`, see header.
+- [ ] **d.2** `SourceStrip` (GitHub/Upload toggle, releases dropdown, file picker) + apiService wiring to `c.3` / `c.5`. Testable against running server.
+- [ ] **d.3** Controllers panel + `ControllerRow` + `VersionDelta` + selection store + downgrade detection.
+- [ ] **d.4** `Topology` SVG component + dashed-line animation for flashing phase.
+- [ ] **d.5** `StagesList` + `ConfirmModal` + `FwBtn` + `FwStatusPill`.
+- [ ] **d.6** WebSocket integration + active-job Pinia store + late-join replay + `flashControllerUpdate` throttle handling.
+- [ ] **d.7** Lock-aware UI banner across other views + disable site-wide write actions when `lockStateChanged.locked === true`.
+
+**Final:**
+
+- [ ] **qa** Integrated end-to-end QA against a real GitHub release on the bench. QA test plan in `.docs/qa/firmware-ota.md` per CLAUDE.md.
 
 ## Out of scope (explicit non-goals for v1)
 
