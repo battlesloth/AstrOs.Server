@@ -90,6 +90,7 @@ export enum TransmissionType {
   formatSD,
   servoTest,
   systemStatus,
+  lockStateChanged,
 }
 
 export enum TransmissionStatus {

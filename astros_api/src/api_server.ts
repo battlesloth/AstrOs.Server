@@ -40,6 +40,9 @@ import { logger } from './logger.js';
 import { registerRemoteConfigRoutes } from './controllers/remote_config_controller.js';
 import { registerSettingsRoutes } from './controllers/settings_controller.js';
 import { ApiKeyValidator } from './api_key_validator.js';
+import { JobLock } from './job_lock.js';
+import { requireUnlocked } from './job_lock_middleware.js';
+import { buildLockStateResponse } from './models/networking/lock_responses.js';
 import { SerialMessageType } from './serial/serial_message.js';
 import {
   ConfigSyncResponse,
@@ -113,6 +116,7 @@ class ApiServer {
 
   private db!: Kysely<Database>;
   private systemStatus = new SystemStatus();
+  private readonly jobLock = new JobLock();
 
   upload!: any;
 
@@ -171,6 +175,15 @@ class ApiServer {
     this.clients = new Map<string, WebSocket>();
     this.app = Express();
     this.router = Express.Router();
+
+    // Broadcast lock state to all connected clients on every change. Subscribed
+    // here (rather than in Init) so a state change emitted before Init finishes
+    // — which won't happen today, but is a cheap guarantee — still reaches the
+    // updateClients fan-out path. The clients Map starts empty; updateClients
+    // is a no-op until WS connections land.
+    this.jobLock.subscribe((state) => {
+      this.updateClients(buildLockStateResponse(state));
+    });
   }
 
   public async Init() {
@@ -386,6 +399,7 @@ class ApiServer {
     this.router.post(
       '/panicStop',
       this.authHandler,
+      requireUnlocked(this.jobLock),
       this.withSerialGuard((req, res, next) => this.panicStop(req, res, next)),
     );
 
@@ -468,6 +482,15 @@ class ApiServer {
         );
       } catch (err) {
         logger.error(`websocket initial systemStatus send error: ${err}`);
+      }
+
+      // Late-join snapshot: a client connecting while the lock is held would
+      // otherwise wait until the next acquire/release transition to learn the
+      // current state. Mirrors the systemStatus initial send above.
+      try {
+        conn.send(JSON.stringify(buildLockStateResponse(this.jobLock.getState())));
+      } catch (err) {
+        logger.error(`websocket initial lockState send error: ${err}`);
       }
 
       conn.on('message', (msg) => {

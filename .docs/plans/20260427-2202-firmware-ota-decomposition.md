@@ -12,7 +12,7 @@ The work is significant because the existing bulk-data transport in firmware is 
 
 | # | Name | Repo | Scope | Blocked by | Plan file path | Shippable alone? |
 |---|------|------|-------|------------|----------------|-------------------|
-| **c0** | Platform prerequisites | AstrOs.Server | DB column for `firmware_version` (migration_7), thread heartbeat version into controllers store, `JobLock` singleton with subscribe/notify, new `lockStateChanged` `TransmissionType`. No UI, no OTA. | — | `astros-server/.docs/plans/<date>-firmware-ota-c0-platform.md` | Yes — version persistence is independently useful for compatibility checks. |
+| **c0** | Platform prerequisites | AstrOs.Server | `JobLock` singleton with subscribe/notify, `requireUnlocked` Express middleware, new `lockStateChanged` `TransmissionType`, Vue lock store + WS handler. No firmware-version DB persistence — heartbeats arrive every 2 s and the orchestrator captures starting versions in-memory; persistence would be misleading while a controller is offline. | — | `astros-server/.docs/plans/<date>-firmware-ota-c0-job-lock.md` | Yes — `JobLock` is reusable for any future write-blocking operation. |
 | **a** | Bulk transport hardening | AstrOs.ESP | Replace `PacketTracker` with chunked, CRC-checked, ACK-driven, streaming-receive transport. Works over both serial (master side) and ESP-NOW (padawan side). New `BulkReceiver` callback API. Side-effect: fixes the half-built script-deploy bulk path. | — | `AstrOs.ESP/.docs/plans/<date>-bulk-transport-hardening.md` (create dir; mirror Server convention) | No — only meaningful when consumed by **b**. |
 | **b** | OTA receiver | AstrOs.ESP | Master serial→SD writer; master SD→ESP-NOW forwarder (sequential); padawan ESP-NOW→`esp_ota_*` streaming writer; SHA-256 verify; commit + reboot; version-after-reboot via existing 2 s heartbeat. | **a** | `AstrOs.ESP/.docs/plans/<date>-ota-receiver.md` | No — useless without **c**. |
 | **c** | Server orchestrator | AstrOs.Server | New `SerialMessageType` values; flash-job state machine; GitHub release fetch + 5-min cache + on-disk `.bin` cache (LRU N=5); upload handler with `esp_app_desc_t` validation; SHA-256 stream-hash; per-controller progress tracking; WebSocket fan-out; integrate with `JobLock`. | **c0**, **a** protocol freeze | `astros-server/.docs/plans/<date>-firmware-ota-server.md` | No — needs UI to be useful. |
@@ -29,14 +29,14 @@ Every PR in every sub-project must be:
 
 This means each sub-project decomposes into multiple PRs, each with its own light or full plan in `.docs/plans/` per CLAUDE.md. Approximate split (detailed in the Implementation roadmap below):
 
-- **c0** → 2 PRs
+- **c0** → 1 PR
 - **a** → 5 PRs (AstrOs.ESP)
 - **b** → 4 PRs (AstrOs.ESP)
 - **c** → 8 PRs
 - **d** → 7 PRs
 - Plus: shared `protocol.md` freeze, real-hardware wire-up, integrated QA = ~3 PRs
 
-Total project ≈ 24 PRs. Each leaves the codebase shippable.
+Total project ≈ 23 PRs. Each leaves the codebase shippable.
 
 ## Protocol contract
 
@@ -342,8 +342,7 @@ Each PR gets its own light plan in `.docs/plans/` with a `YYYYMMDD-HHmm-firmware
 
 **c0 — Platform prerequisites (server):**
 
-- [ ] **c0.1** `firmware_version` column (migration_7) + repo upsert + POLL_ACK handler call + tests. Testable: heartbeat updates DB; `meetsMinimum` gate continues to work; controllers GET surfaces persisted version.
-- [ ] **c0.2** `JobLock` singleton + `requireUnlocked` middleware + `lockStateChanged` `TransmissionType` + WS broadcast + Vue lock store + handler. Apply middleware to one example route as smoke test (full route set is **c.2**). Testable: unit + integration tests covering 423 response; live UI banner on lock state change.
+- [ ] **c0** `JobLock` singleton + `requireUnlocked` middleware + `lockStateChanged` `TransmissionType` + WS broadcast + Vue lock store + handler. Apply middleware to one example route as smoke test (full route set is **c.2**). Testable: unit + integration tests covering 423 response; live UI banner on lock-state change. Note: no DB persistence of `firmware_version` — orchestrator captures starting versions in-memory from heartbeats; persisted state would be misleading while a controller is offline.
 
 **Shared protocol freeze:**
 
