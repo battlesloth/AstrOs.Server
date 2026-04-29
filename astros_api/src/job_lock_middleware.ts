@@ -24,8 +24,12 @@ export function rejectIfLocked(msgType: string, conn: WebSocket, lock: JobLock):
     return false;
   }
   const state = lock.getState();
-  conn.send(JSON.stringify(buildLockStateResponse(state)));
-  conn.send(JSON.stringify(buildFlashJobActiveResponse(state, msgType)));
-  logger.warn(`websocket write-class message ${msgType} rejected: lock held by ${state.owner}`);
+  try {
+    conn.send(JSON.stringify(buildLockStateResponse(state)));
+    conn.send(JSON.stringify(buildFlashJobActiveResponse(state, msgType)));
+    logger.warn(`websocket write-class message ${msgType} rejected: lock held by ${state.owner}`);
+  } catch (err) {
+    logger.error(`error sending lock state response for rejected message ${msgType}: ${err}`);
+  }
   return true;
 }
