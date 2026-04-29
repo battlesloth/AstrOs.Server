@@ -3,6 +3,7 @@ import { MessageHandler } from './message_handler.js';
 import { MessageHelper } from './message_helper.js';
 import { SerialMessageType } from './serial_message.js';
 import { SerialWorkerResponseType } from './serial_worker_response.js';
+import { FwStage } from '../models/firmware/firmware_messages.js';
 
 const RS = MessageHelper.RS;
 const GS = MessageHelper.GS;
@@ -310,5 +311,155 @@ describe('Serial Message Handler Tests', () => {
     expect(response.registrations.length).toBe(1);
     expect(response.registrations[0].name).toBe('name1');
     expect(response.registrations[0].address).toBe('mac1');
+  });
+
+  // -------------------------------------------------------------------------
+  // Firmware OTA incoming messages (.docs/protocol.md § A).
+  // -------------------------------------------------------------------------
+
+  it('handle FW_TRANSFER_BEGIN_ACK parses transferId + status', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}OK`;
+
+    const response = handler.handleFwTransferBeginAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.FW_TRANSFER_BEGIN_ACK);
+    expect(response.payload).toEqual({ transferId: 'xfer-1', status: 'OK' });
+  });
+
+  it('handle FW_TRANSFER_BEGIN_ACK preserves rejection codes verbatim', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}sd_full`;
+
+    const response = handler.handleFwTransferBeginAck(payload);
+
+    expect(response.payload.status).toBe('sd_full');
+  });
+
+  it('handle FW_CHUNK_ACK parses cumulative ack window state', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}99${US}100${US}8`;
+
+    const response = handler.handleFwChunkAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.FW_CHUNK_ACK);
+    expect(response.payload).toEqual({
+      transferId: 'xfer-1',
+      highestContiguousSeq: 99,
+      nextExpectedSeq: 100,
+      windowRemaining: 8,
+    });
+  });
+
+  it('handle FW_CHUNK_NAK parses last-good-seq + reason', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}42${US}CRC`;
+
+    const response = handler.handleFwChunkNak(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.FW_CHUNK_NAK);
+    expect(response.payload).toEqual({
+      transferId: 'xfer-1',
+      lastGoodSeq: 42,
+      reasonCode: 'CRC',
+    });
+  });
+
+  it('handle FW_CHUNK_NAK rejects unknown reason codes', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}42${US}NONSENSE`;
+
+    const response = handler.handleFwChunkNak(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handle FW_TRANSFER_END_ACK parses status + computed hash', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}OK${US}${'a'.repeat(64)}`;
+
+    const response = handler.handleFwTransferEndAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.FW_TRANSFER_END_ACK);
+    expect(response.payload).toEqual({
+      transferId: 'xfer-1',
+      status: 'OK',
+      computedSha256Hex: 'a'.repeat(64),
+    });
+  });
+
+  it('handle FW_TRANSFER_END_ACK preserves HASH_MISMATCH status', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}HASH_MISMATCH${US}${'b'.repeat(64)}`;
+
+    const response = handler.handleFwTransferEndAck(payload);
+
+    expect(response.payload.status).toBe('HASH_MISMATCH');
+  });
+
+  it('handle FW_PROGRESS parses controller stage update', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}core${US}SENDING${US}524288${US}1234567${US}ok`;
+
+    const response = handler.handleFwProgress(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.FW_PROGRESS);
+    expect(response.payload).toEqual({
+      transferId: 'xfer-1',
+      controllerId: 'core',
+      stage: FwStage.Sending,
+      bytesSent: 524288,
+      totalBytes: 1234567,
+      detail: 'ok',
+    });
+  });
+
+  it('handle FW_PROGRESS rejects unknown stage values', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}core${US}NONSENSE${US}0${US}0${US}`;
+
+    const response = handler.handleFwProgress(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handle FW_DEPLOY_DONE parses per-controller results', () => {
+    const handler = new MessageHandler();
+    const payload =
+      `xfer-1${US}` +
+      `core${US}OK${US}1.4.0${US}${RS}` +
+      `dome${US}FAILED${US}1.3.2${US}reboot_timeout`;
+
+    const response = handler.handleFwDeployDone(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.FW_DEPLOY_DONE);
+    expect(response.payload.transferId).toBe('xfer-1');
+    expect(response.payload.results).toEqual([
+      { controllerId: 'core', outcome: 'OK', finalVersion: '1.4.0', error: '' },
+      { controllerId: 'dome', outcome: 'FAILED', finalVersion: '1.3.2', error: 'reboot_timeout' },
+    ]);
+  });
+
+  it('handle FW_BACKPRESSURE parses pause/resume + reason', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}PAUSE${US}sd_writing`;
+
+    const response = handler.handleFwBackpressure(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.FW_BACKPRESSURE);
+    expect(response.payload).toEqual({
+      transferId: 'xfer-1',
+      action: 'PAUSE',
+      reason: 'sd_writing',
+    });
+  });
+
+  it('handle FW_BACKPRESSURE rejects unknown action values', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}NONSENSE${US}reason`;
+
+    const response = handler.handleFwBackpressure(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
   });
 });
