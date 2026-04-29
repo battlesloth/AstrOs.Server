@@ -34,7 +34,7 @@ export interface ISerialWorkerResponse extends Record<string, any> {
   type: SerialWorkerResponseType;
 }
 
-export interface PollRepsonse extends ISerialWorkerResponse {
+export interface PollResponse extends ISerialWorkerResponse {
   type: SerialWorkerResponseType;
   controller: ControlModule;
 }

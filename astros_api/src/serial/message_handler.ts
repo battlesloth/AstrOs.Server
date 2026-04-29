@@ -11,7 +11,7 @@ import type {
   FwProgressResponse,
   FwTransferBeginAckResponse,
   FwTransferEndAckResponse,
-  PollRepsonse,
+  PollResponse,
   RegistrationResponse,
   ScriptDeployResponse,
   ScriptRunResponse,
@@ -84,8 +84,8 @@ export class MessageHandler {
     return result;
   }
 
-  public handlePollAck(msg: string): PollRepsonse {
-    const response = { type: SerialWorkerResponseType.POLL } as PollRepsonse;
+  public handlePollAck(msg: string): PollResponse {
+    const response = { type: SerialWorkerResponseType.POLL } as PollResponse;
 
     const parts = msg.split(MessageHelper.US);
 

@@ -47,7 +47,7 @@ import { SerialMessageType } from './serial/serial_message.js';
 import {
   ConfigSyncResponse,
   ISerialWorkerResponse,
-  PollRepsonse,
+  PollResponse,
   RegistrationResponse,
   SerialWorkerResponseType,
 } from './serial/serial_worker_response.js';
@@ -593,7 +593,7 @@ class ApiServer {
 
   async handlePollResponse(msg: ISerialWorkerResponse) {
     try {
-      const val = msg as PollRepsonse;
+      const val = msg as PollResponse;
 
       const controlerRepo = new ControllerRepository(this.db);
       const locationRepo = new LocationsRepository(this.db);
