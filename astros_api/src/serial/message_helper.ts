@@ -78,4 +78,14 @@ export class MessageHelper {
     const n = Number(raw);
     return Number.isSafeInteger(n) ? n : null;
   }
+
+  // Strict SHA-256 hex parser: exactly 64 lowercase hex chars (per the wire
+  // contract in .docs/protocol.md "Shared values"). Lowercase-only matters
+  // because the server's reference digest from crypto.createHash('sha256')
+  // is always lowercase; a permissive parser that allowed uppercase would
+  // produce false-positive HASH_MISMATCH reports later in the flow. Returns
+  // the validated hash unchanged on success, null otherwise.
+  static parseSha256Hex(raw: string): string | null {
+    return /^[0-9a-f]{64}$/.test(raw) ? raw : null;
+  }
 }

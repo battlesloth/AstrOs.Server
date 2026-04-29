@@ -288,10 +288,19 @@ export class MessageHandler {
       return response;
     }
 
+    const computedSha256Hex = MessageHelper.parseSha256Hex(parts[2]);
+    if (computedSha256Hex === null) {
+      logger.error(
+        `FW_TRANSFER_END_ACK has malformed sha256 (expected 64 lowercase hex chars): ${parts[2]}`,
+      );
+      response.type = SerialWorkerResponseType.UNKNOWN;
+      return response;
+    }
+
     response.payload = {
       transferId: parts[0],
       status,
-      computedSha256Hex: parts[2],
+      computedSha256Hex,
     };
     return response;
   }

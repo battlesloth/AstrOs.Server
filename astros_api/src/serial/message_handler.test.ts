@@ -430,6 +430,38 @@ describe('Serial Message Handler Tests', () => {
     expect(response.payload.status).toBe('HASH_MISMATCH');
   });
 
+  it('handle FW_TRANSFER_END_ACK rejects hashes with wrong length', () => {
+    const handler = new MessageHandler();
+    // 63 chars (one short). A sloppy parser would still pass this through and
+    // every later byte-comparison against the server's reference hash would
+    // appear as a hash mismatch, hiding the wire-format corruption.
+    const payload = `xfer-1${US}OK${US}${'a'.repeat(63)}`;
+
+    const response = handler.handleFwTransferEndAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handle FW_TRANSFER_END_ACK rejects hashes with non-hex characters', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}OK${US}${'g'.repeat(64)}`;
+
+    const response = handler.handleFwTransferEndAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handle FW_TRANSFER_END_ACK rejects uppercase hex (contract requires lowercase)', () => {
+    const handler = new MessageHandler();
+    // Lowercase-only matters for byte-equality against crypto.createHash
+    // output, which is always lowercase.
+    const payload = `xfer-1${US}OK${US}${'A'.repeat(64)}`;
+
+    const response = handler.handleFwTransferEndAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
   it('handle FW_PROGRESS parses controller stage update', () => {
     const handler = new MessageHandler();
     const payload = `xfer-1${US}core${US}SENDING${US}524288${US}1234567${US}ok`;
