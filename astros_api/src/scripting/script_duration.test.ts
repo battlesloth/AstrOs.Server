@@ -9,18 +9,12 @@ import {
   ModuleType,
   ModuleChannelTypes,
   GenericSerialEvent,
-} from './models/index.js';
-import { calculateLengthDS, generateShortId } from './utility.js';
+} from '../models/index.js';
+import { calculateLengthDS } from './script_duration.js';
 import { v4 as uuid } from 'uuid';
 
-describe('Utility functions', () => {
-  it('should generate a short ID with the correct format', () => {
-    const prefix = 's';
-    const shortId = generateShortId(prefix);
-    expect(shortId).toMatch(/^s[0-9]{7}[A-Za-z]{3}$/);
-  });
-
-  it('should calculate the correct length in DS', () => {
+describe('calculateLengthDS', () => {
+  it('returns the max event time across all channels', () => {
     const scriptId = 'testScriptTimes';
 
     const evt1Time = 5; // 0.5 seconds
@@ -55,7 +49,6 @@ describe('Utility functions', () => {
 
     const lengthDS = calculateLengthDS(script);
 
-    // The length in DS should be the max time among all events
     expect(lengthDS).toBe(evt4Time);
   });
 });

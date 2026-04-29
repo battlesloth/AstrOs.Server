@@ -1,6 +1,6 @@
 import { RequestHandler } from 'express';
-import { JobLock } from './job_lock.js';
-import { SystemStatus } from './system_status.js';
+import { JobLock } from '../job_lock/job_lock.js';
+import { SystemStatus } from '../system_status.js';
 
 const BLOCKED_WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 

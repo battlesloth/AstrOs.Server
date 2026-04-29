@@ -11,8 +11,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { AddressInfo } from 'net';
 import { WebSocketServer, WebSocket } from 'ws';
 import { JobLock } from './job_lock.js';
-import { buildLockStateResponse } from './models/networking/lock_responses.js';
-import { TransmissionType } from './models/enums.js';
+import { buildLockStateResponse } from '../models/networking/lock_responses.js';
+import { TransmissionType } from '../models/enums.js';
 
 describe('JobLock + WS connect handshake', () => {
   let wsServer: WebSocketServer;

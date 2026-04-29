@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Kysely } from 'kysely';
-import { Database } from './dal/types.js';
-import { createKyselyConnection, migrateToLatest } from './dal/database.js';
-import { SettingsRepository } from './dal/repositories/settings_repository.js';
+import { Database } from '../dal/types.js';
+import { createKyselyConnection, migrateToLatest } from '../dal/database.js';
+import { SettingsRepository } from '../dal/repositories/settings_repository.js';
 import { ApiKeyValidator } from './api_key_validator.js';
 
 function mockRes() {

@@ -23,7 +23,7 @@ import { registerFileRoutes } from './controllers/file_controller.js';
 import { createScriptUpload } from './models/scripts/script_upload.js';
 import { ScriptRepository } from './dal/repositories/script_repository.js';
 
-import { ScriptConverter } from './script_converter.js';
+import { ScriptConverter } from './scripting/script_converter.js';
 import {
   StatusResponse,
   ControllersResponse,
@@ -39,9 +39,9 @@ import { createScriptRun } from './models/scripts/script_run.js';
 import { logger } from './logger.js';
 import { registerRemoteConfigRoutes } from './controllers/remote_config_controller.js';
 import { registerSettingsRoutes } from './controllers/settings_controller.js';
-import { ApiKeyValidator } from './api_key_validator.js';
-import { JobLock } from './job_lock.js';
-import { rejectIfLocked } from './job_lock_middleware.js';
+import { ApiKeyValidator } from './guard/api_key_validator.js';
+import { JobLock } from './job_lock/job_lock.js';
+import { rejectIfLocked } from './guard/ws_lock_guard.js';
 import { buildLockStateResponse } from './models/networking/lock_responses.js';
 import { SerialMessageType } from './serial/serial_message.js';
 import {
@@ -54,7 +54,7 @@ import {
 import { LocationsRepository } from './dal/repositories/locations_repository.js';
 import { ServoTest } from './models/servo_test.js';
 import { FirmwareConfig } from './models/firmware_config.js';
-import { meetsMinimum } from './semver.js';
+import { meetsMinimum } from './utility/semver.js';
 
 import { fileURLToPath } from 'url';
 
@@ -62,7 +62,7 @@ import { initializeDatabase } from './dal/database.js';
 import { Kysely } from 'kysely';
 import { Database } from './dal/types.js';
 import { SystemStatus } from './system_status.js';
-import { writeGuard } from './write_guard.js';
+import { writeGuard } from './guard/write_guard.js';
 import { registerSystemStatusRoutes } from './controllers/system_status_controller.js';
 
 const __filename = fileURLToPath(import.meta.url);

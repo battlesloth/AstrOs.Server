@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { JobLock } from './job_lock.js';
-import { SystemStatus } from './system_status.js';
+import { JobLock } from '../job_lock/job_lock.js';
+import { SystemStatus } from '../system_status.js';
 import { writeGuard } from './write_guard.js';
 
 function mockRes() {
