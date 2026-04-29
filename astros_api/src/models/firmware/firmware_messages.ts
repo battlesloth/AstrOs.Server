@@ -55,7 +55,7 @@ export interface FwDeployBegin {
 
 export interface FwTransferBeginAck {
   transferId: string;
-  // "ready" or a rejection reason like "sd_full". Open-ended string per
+  // "OK" or a rejection reason like "sd_full". Open-ended string per
   // protocol.md so future reasons can be added without enum churn.
   status: string;
 }

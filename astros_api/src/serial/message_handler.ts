@@ -362,11 +362,21 @@ export class MessageHandler {
         return response;
       }
 
+      const error = fields[3];
+      // Cross-field invariant from protocol.md: an OK outcome must have an
+      // empty error. Accepting OK + non-empty error would produce contradictory
+      // downstream state (e.g., a green pill with an error tooltip).
+      if (outcome === 'OK' && error !== '') {
+        logger.error(`FW_DEPLOY_DONE OK result has non-empty error: ${error}`);
+        response.type = SerialWorkerResponseType.UNKNOWN;
+        return response;
+      }
+
       results.push({
         controllerId: fields[0],
         outcome,
         finalVersion: fields[2],
-        error: fields[3],
+        error,
       });
     }
 

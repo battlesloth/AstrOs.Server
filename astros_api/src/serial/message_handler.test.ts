@@ -440,6 +440,17 @@ describe('Serial Message Handler Tests', () => {
     ]);
   });
 
+  it('handle FW_DEPLOY_DONE rejects an OK result that carries a non-empty error', () => {
+    const handler = new MessageHandler();
+    // OK + non-empty error violates the per-result invariant in protocol.md
+    // ("errorOrEmpty"); accepting it would produce inconsistent UI state.
+    const payload = `xfer-1${US}core${US}OK${US}1.4.0${US}stale_data`;
+
+    const response = handler.handleFwDeployDone(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
   it('handle FW_BACKPRESSURE parses pause/resume + reason', () => {
     const handler = new MessageHandler();
     const payload = `xfer-1${US}PAUSE${US}sd_writing`;
