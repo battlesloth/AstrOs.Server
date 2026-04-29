@@ -91,6 +91,7 @@ export enum TransmissionType {
   servoTest,
   systemStatus,
   lockStateChanged,
+  flashJobActive,
 }
 
 export enum TransmissionStatus {

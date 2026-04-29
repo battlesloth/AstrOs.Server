@@ -1,66 +1,57 @@
 import { describe, it, expect, vi } from 'vitest';
 import { JobLock } from './job_lock.js';
-import { requireUnlocked } from './job_lock_middleware.js';
+import { rejectIfLocked } from './job_lock_middleware.js';
+import { TransmissionType } from './models/enums.js';
 
-function mockRes() {
-  const res: any = {};
-  res.status = vi.fn().mockReturnValue(res);
-  res.json = vi.fn().mockReturnValue(res);
-  return res;
+function mockWs() {
+  const ws: any = {};
+  ws.send = vi.fn();
+  return ws;
 }
 
-describe('requireUnlocked', () => {
-  it('calls next() when the lock is not held', () => {
+describe('rejectIfLocked (WebSocket inbound)', () => {
+  it('returns false and sends nothing when lock is not held', () => {
     const lock = new JobLock();
-    const middleware = requireUnlocked(lock);
-    const req: any = {};
-    const res = mockRes();
-    const next = vi.fn();
+    const conn = mockWs();
 
-    middleware(req, res, next);
+    const rejected = rejectIfLocked('SERVO_TEST', conn, lock);
 
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(res.status).not.toHaveBeenCalled();
-    expect(res.json).not.toHaveBeenCalled();
+    expect(rejected).toBe(false);
+    expect(conn.send).not.toHaveBeenCalled();
   });
 
-  it('responds 423 with LockedErrorResponse body when the lock is held', () => {
+  it('returns false for non-write-class msgType even when locked', () => {
     const lock = new JobLock();
     lock.acquire('flashJob:abc');
-    const middleware = requireUnlocked(lock);
-    const req: any = {};
-    const res = mockRes();
-    const next = vi.fn();
+    const conn = mockWs();
 
-    middleware(req, res, next);
+    const rejected = rejectIfLocked('SOMETHING_READ_CLASS', conn, lock);
 
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(423);
-    expect(res.json).toHaveBeenCalledTimes(1);
-    const body = res.json.mock.calls[0][0];
-    expect(body.error).toBe('flashJobActive');
-    expect(body.lockOwner).toBe('flashJob:abc');
-    expect(body.since).not.toBeNull();
+    expect(rejected).toBe(false);
+    expect(conn.send).not.toHaveBeenCalled();
   });
 
-  it('passes again after the lock is released', () => {
+  it('returns true and sends lockStateChanged + flashJobActive when locked + write-class msgType', () => {
     const lock = new JobLock();
     lock.acquire('flashJob:abc');
-    const middleware = requireUnlocked(lock);
+    const conn = mockWs();
 
-    // First request — locked.
-    const blockedRes = mockRes();
-    const blockedNext = vi.fn();
-    middleware({} as any, blockedRes, blockedNext);
-    expect(blockedNext).not.toHaveBeenCalled();
+    const rejected = rejectIfLocked('SERVO_TEST', conn, lock);
 
-    // Release and retry.
-    lock.release('flashJob:abc');
-    const passRes = mockRes();
-    const passNext = vi.fn();
-    middleware({} as any, passRes, passNext);
+    expect(rejected).toBe(true);
+    expect(conn.send).toHaveBeenCalledTimes(2);
 
-    expect(passNext).toHaveBeenCalledTimes(1);
-    expect(passRes.status).not.toHaveBeenCalled();
+    // First frame: lockStateChanged echo with current state.
+    const first = JSON.parse(conn.send.mock.calls[0][0]);
+    expect(first.type).toBe(TransmissionType.lockStateChanged);
+    expect(first.locked).toBe(true);
+    expect(first.owner).toBe('flashJob:abc');
+
+    // Second frame: flashJobActive error with rejected msgType.
+    const second = JSON.parse(conn.send.mock.calls[1][0]);
+    expect(second.type).toBe(TransmissionType.flashJobActive);
+    expect(second.error).toBe('flashJobActive');
+    expect(second.lockOwner).toBe('flashJob:abc');
+    expect(second.rejectedMsgType).toBe('SERVO_TEST');
   });
 });

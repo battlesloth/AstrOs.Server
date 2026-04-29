@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { JobLock } from './job_lock.js';
 import { SystemStatus } from './system_status.js';
 import { writeGuard } from './write_guard.js';
 
@@ -13,8 +14,9 @@ function call(
   method: string,
   path: string,
   status: SystemStatus,
+  jobLock: JobLock = new JobLock(),
 ): { res: any; next: ReturnType<typeof vi.fn> } {
-  const guard = writeGuard(status);
+  const guard = writeGuard(status, jobLock);
   const req: any = { method, path };
   const res = mockRes();
   const next = vi.fn();
@@ -108,6 +110,73 @@ describe('writeGuard', () => {
         expect(res.json).toHaveBeenCalledWith(
           expect.objectContaining({ reasonCode: 'BACKUP_FAILED' }),
         );
+      }
+    });
+  });
+
+  describe('when a flash job is active', () => {
+    function activeFlash(): { status: SystemStatus; lock: JobLock } {
+      const status = new SystemStatus();
+      const lock = new JobLock();
+      lock.acquire('flashJob:test');
+      return { status, lock };
+    }
+
+    it('blocks POST/PUT/PATCH/DELETE with 423 + LockedErrorResponse body', () => {
+      const { status, lock } = activeFlash();
+      for (const m of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+        const { res, next } = call(m, '/scripts', status, lock);
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(423);
+        expect(res.json).toHaveBeenCalledWith(
+          expect.objectContaining({ error: 'flashJobActive', lockOwner: 'flashJob:test' }),
+        );
+      }
+    });
+
+    it('blocks the five serial-write GET paths with 423', () => {
+      const { status, lock } = activeFlash();
+      const blockedGets = [
+        '/locations/syncconfig',
+        '/locations/synccontrollers',
+        '/scripts/upload',
+        '/scripts/run',
+        '/playlists/run',
+      ];
+      for (const p of blockedGets) {
+        const { res, next } = call('GET', p, status, lock);
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(423);
+      }
+    });
+
+    it('allows login and reauth (allowlisted during flash)', () => {
+      const { status, lock } = activeFlash();
+      for (const p of ['/login', '/reauth']) {
+        const { res, next } = call('POST', p, status, lock);
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(res.status).not.toHaveBeenCalled();
+      }
+    });
+
+    it('blocks panicStop and panicClear with 423 (stricter than read-only mode)', () => {
+      // Read-only allows panic so the user can halt motion during a server
+      // outage; flash-active does NOT, because emitting a PANIC_STOP frame
+      // mid-flash would interleave with FW_CHUNK frames on the serial line
+      // and corrupt the in-flight transfer.
+      const { status, lock } = activeFlash();
+      for (const p of ['/panicStop', '/panicClear']) {
+        const { res, next } = call('POST', p, status, lock);
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(423);
+      }
+    });
+
+    it('allows safe reads even when locked', () => {
+      const { status, lock } = activeFlash();
+      for (const p of ['/scripts', '/playlists', '/system/status']) {
+        const { next } = call('GET', p, status, lock);
+        expect(next).toHaveBeenCalledTimes(1);
       }
     });
   });

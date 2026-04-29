@@ -41,7 +41,7 @@ import { registerRemoteConfigRoutes } from './controllers/remote_config_controll
 import { registerSettingsRoutes } from './controllers/settings_controller.js';
 import { ApiKeyValidator } from './api_key_validator.js';
 import { JobLock } from './job_lock.js';
-import { requireUnlocked } from './job_lock_middleware.js';
+import { rejectIfLocked } from './job_lock_middleware.js';
 import { buildLockStateResponse } from './models/networking/lock_responses.js';
 import { SerialMessageType } from './serial/serial_message.js';
 import {
@@ -303,7 +303,7 @@ class ApiServer {
     this.app.use(cookieParser());
     this.app.use(Express.static(path.join(__dirname, 'public')));
     this.app.use(passport.initialize());
-    this.app.use('/api', writeGuard(this.systemStatus));
+    this.app.use('/api', writeGuard(this.systemStatus, this.jobLock));
     this.app.use('/api', this.router);
 
     this.app.get('/index.html', (req, res) => {
@@ -399,7 +399,6 @@ class ApiServer {
     this.router.post(
       '/panicStop',
       this.authHandler,
-      requireUnlocked(this.jobLock),
       this.withSerialGuard((req, res, next) => this.panicStop(req, res, next)),
     );
 
@@ -494,7 +493,7 @@ class ApiServer {
       }
 
       conn.on('message', (msg) => {
-        this.handleWebsocketMessage(msg.toString());
+        this.handleWebsocketMessage(msg.toString(), conn);
       });
 
       conn.on('close', () => {
@@ -511,9 +510,16 @@ class ApiServer {
     });
   }
 
-  handleWebsocketMessage(msg: string): void {
+  handleWebsocketMessage(msg: string, conn: WebSocket): void {
     try {
       const parsed = JSON.parse(msg) as IWebSocketMessage;
+
+      // Lock guard: write-class inbound messages are rejected per-connection
+      // when a flash job is in progress. The originating client receives a
+      // lockStateChanged echo + flashJobActive frame and we skip dispatch.
+      // (HTTP write-class requests are gated separately in writeGuard at the
+      // global /api mount.)
+      if (rejectIfLocked(parsed.msgType, conn, this.jobLock)) return;
 
       switch (parsed.msgType) {
         case 'SERVO_TEST':
