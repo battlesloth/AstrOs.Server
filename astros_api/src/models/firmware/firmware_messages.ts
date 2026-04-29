@@ -4,6 +4,15 @@
 // any change here must be made in lockstep with both.
 
 // ---------------------------------------------------------------------------
+// Protocol numeric constants. Single source of truth for runtime range checks.
+// ---------------------------------------------------------------------------
+
+// Maximum sliding-window size on the serial transport (server↔master), per
+// .docs/protocol.md "Shared values". FW_CHUNK_ACK.windowRemaining must lie in
+// [0, FW_SERIAL_SLIDING_WINDOW]; larger values indicate a malformed frame.
+export const FW_SERIAL_SLIDING_WINDOW = 16;
+
+// ---------------------------------------------------------------------------
 // Stage enum (shared with .docs/protocol.md "Stage enum"). Master emits these
 // in FW_PROGRESS.stage; server forwards them to the UI.
 // ---------------------------------------------------------------------------

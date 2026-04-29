@@ -21,6 +21,7 @@ import type { ControlModule } from 'src/models/index.js';
 import {
   FW_BACKPRESSURE_ACTIONS,
   FW_CHUNK_NAK_REASONS,
+  FW_SERIAL_SLIDING_WINDOW,
   FW_TRANSFER_END_STATUSES,
   FwStage,
   type FwBackpressureAction,
@@ -212,11 +213,19 @@ export class MessageHandler {
       return response;
     }
 
-    const highest = parseInt(parts[1], 10);
-    const next = parseInt(parts[2], 10);
-    const window = parseInt(parts[3], 10);
-    if (Number.isNaN(highest) || Number.isNaN(next) || Number.isNaN(window)) {
-      logger.error(`FW_CHUNK_ACK has non-numeric fields: ${msg}`);
+    const highest = MessageHelper.parseUint(parts[1]);
+    const next = MessageHelper.parseUint(parts[2]);
+    const window = MessageHelper.parseUint(parts[3]);
+    if (highest === null || next === null || window === null) {
+      logger.error(`FW_CHUNK_ACK has non-numeric or malformed fields: ${msg}`);
+      response.type = SerialWorkerResponseType.UNKNOWN;
+      return response;
+    }
+
+    if (window > FW_SERIAL_SLIDING_WINDOW) {
+      logger.error(
+        `FW_CHUNK_ACK windowRemaining ${window} exceeds configured sliding window ${FW_SERIAL_SLIDING_WINDOW}: ${msg}`,
+      );
       response.type = SerialWorkerResponseType.UNKNOWN;
       return response;
     }
@@ -242,9 +251,9 @@ export class MessageHandler {
       return response;
     }
 
-    const lastGoodSeq = parseInt(parts[1], 10);
-    if (Number.isNaN(lastGoodSeq)) {
-      logger.error(`FW_CHUNK_NAK lastGoodSeq is not numeric: ${msg}`);
+    const lastGoodSeq = MessageHelper.parseUint(parts[1]);
+    if (lastGoodSeq === null) {
+      logger.error(`FW_CHUNK_NAK lastGoodSeq is not a valid unsigned integer: ${msg}`);
       response.type = SerialWorkerResponseType.UNKNOWN;
       return response;
     }
@@ -306,10 +315,10 @@ export class MessageHandler {
       return response;
     }
 
-    const bytesSent = parseInt(parts[3], 10);
-    const totalBytes = parseInt(parts[4], 10);
-    if (Number.isNaN(bytesSent) || Number.isNaN(totalBytes)) {
-      logger.error(`FW_PROGRESS has non-numeric byte counts: ${msg}`);
+    const bytesSent = MessageHelper.parseUint(parts[3]);
+    const totalBytes = MessageHelper.parseUint(parts[4]);
+    if (bytesSent === null || totalBytes === null) {
+      logger.error(`FW_PROGRESS has non-numeric or malformed byte counts: ${msg}`);
       response.type = SerialWorkerResponseType.UNKNOWN;
       return response;
     }

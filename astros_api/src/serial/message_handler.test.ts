@@ -351,6 +351,30 @@ describe('Serial Message Handler Tests', () => {
     });
   });
 
+  it('handle FW_CHUNK_ACK rejects numeric fields with trailing garbage', () => {
+    const handler = new MessageHandler();
+    // parseInt would silently truncate '99junk' to 99; the strict validator
+    // must reject the frame entirely so a malformed ack cannot poison
+    // downstream window-tracking state.
+    const payload = `xfer-1${US}99junk${US}100${US}8`;
+
+    const response = handler.handleFwChunkAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handle FW_CHUNK_ACK rejects windowRemaining outside the configured sliding window', () => {
+    const handler = new MessageHandler();
+    // Per .docs/protocol.md the serial sliding window is 16 frames; any
+    // larger value is malformed and must be rejected so the orchestrator
+    // can't end up sending more in-flight chunks than the contract allows.
+    const payload = `xfer-1${US}99${US}100${US}17`;
+
+    const response = handler.handleFwChunkAck(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
   it('handle FW_CHUNK_NAK parses last-good-seq + reason', () => {
     const handler = new MessageHandler();
     const payload = `xfer-1${US}42${US}CRC`;
@@ -368,6 +392,15 @@ describe('Serial Message Handler Tests', () => {
   it('handle FW_CHUNK_NAK rejects unknown reason codes', () => {
     const handler = new MessageHandler();
     const payload = `xfer-1${US}42${US}NONSENSE`;
+
+    const response = handler.handleFwChunkNak(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handle FW_CHUNK_NAK rejects lastGoodSeq with trailing garbage', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}42junk${US}CRC`;
 
     const response = handler.handleFwChunkNak(payload);
 
@@ -417,6 +450,15 @@ describe('Serial Message Handler Tests', () => {
   it('handle FW_PROGRESS rejects unknown stage values', () => {
     const handler = new MessageHandler();
     const payload = `xfer-1${US}core${US}NONSENSE${US}0${US}0${US}`;
+
+    const response = handler.handleFwProgress(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handle FW_PROGRESS rejects byte counts with trailing garbage', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}core${US}SENDING${US}1024junk${US}1234567${US}ok`;
 
     const response = handler.handleFwProgress(payload);
 

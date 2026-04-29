@@ -68,4 +68,14 @@ export class MessageHelper {
 
     return num;
   }
+
+  // Strict unsigned-integer parser for wire-protocol fields. Rejects anything
+  // parseInt would silently accept (e.g. '42junk', '1.5', '-3', leading
+  // whitespace) and guards against precision loss past Number.MAX_SAFE_INTEGER.
+  // Returns null on any rejection so the caller can route the frame to UNKNOWN.
+  static parseUint(raw: string): number | null {
+    if (!/^\d+$/.test(raw)) return null;
+    const n = Number(raw);
+    return Number.isSafeInteger(n) ? n : null;
+  }
 }
