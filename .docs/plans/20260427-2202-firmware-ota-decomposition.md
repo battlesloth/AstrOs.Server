@@ -12,7 +12,7 @@ The work is significant because the existing bulk-data transport in firmware is 
 
 | # | Name | Repo | Scope | Blocked by | Plan file path | Shippable alone? |
 |---|------|------|-------|------------|----------------|-------------------|
-| **c0** | Platform prerequisites | AstrOs.Server | `JobLock` singleton with subscribe/notify, `requireUnlocked` Express middleware, new `lockStateChanged` `TransmissionType`, Vue lock store + WS handler. No firmware-version DB persistence — heartbeats arrive every 2 s and the orchestrator captures starting versions in-memory; persistence would be misleading while a controller is offline. | — | `astros-server/.docs/plans/<date>-firmware-ota-c0-job-lock.md` | Yes — `JobLock` is reusable for any future write-blocking operation. |
+| **c0** | Platform prerequisites | AstrOs.Server | `JobLock` singleton with subscribe/notify, new `lockStateChanged` `TransmissionType`, Vue lock store + WS handler. No firmware-version DB persistence — heartbeats arrive every 2 s and the orchestrator captures starting versions in-memory; persistence would be misleading while a controller is offline. (c0 originally also shipped a per-route `requireUnlocked` middleware applied to `/api/panicStop` as a smoke test; that was superseded in **c.2** by extending the existing `writeGuard`.) | — | `astros-server/.docs/plans/<date>-firmware-ota-c0-job-lock.md` | Yes — `JobLock` is reusable for any future write-blocking operation. |
 | **a** | Bulk transport hardening | AstrOs.ESP | Replace `PacketTracker` with chunked, CRC-checked, ACK-driven, streaming-receive transport. Works over both serial (master side) and ESP-NOW (padawan side). New `BulkReceiver` callback API. Side-effect: fixes the half-built script-deploy bulk path. | — | `AstrOs.ESP/.docs/plans/<date>-bulk-transport-hardening.md` (create dir; mirror Server convention) | No — only meaningful when consumed by **b**. |
 | **b** | OTA receiver | AstrOs.ESP | Master serial→SD writer; master SD→ESP-NOW forwarder (sequential); padawan ESP-NOW→`esp_ota_*` streaming writer; SHA-256 verify; commit + reboot; version-after-reboot via existing 2 s heartbeat. | **a** | `AstrOs.ESP/.docs/plans/<date>-ota-receiver.md` | No — useless without **c**. |
 | **c** | Server orchestrator | AstrOs.Server | New `SerialMessageType` values; flash-job state machine; GitHub release fetch + 5-min cache + on-disk `.bin` cache (LRU N=5); upload handler with `esp_app_desc_t` validation; SHA-256 stream-hash; per-controller progress tracking; WebSocket fan-out; integrate with `JobLock`. | **c0**, **a** protocol freeze | `astros-server/.docs/plans/<date>-firmware-ota-server.md` | No — needs UI to be useful. |
@@ -278,7 +278,7 @@ The single highest-risk sub-project. Requirements the firmware sub-plan must mee
   - `POST /playlists/*`, `POST /panic`
   - `POST /firmware/jobs` (only one flash job at a time)
   - WebSocket inbound write-class messages (`script | run | directCommand | formatSD | servoTest | sync`) → reject with `lockStateChanged` echo + `flashJobActive` error frame.
-- **Server-side enforcement:** `JobLock` singleton (`src/job_lock.ts`) with `acquire(owner): boolean`, `release(owner)`, `isLocked()`, `getOwner()`, `subscribe(fn)`. Express middleware `requireUnlocked` applied to listed routes, **after** `authHandler`.
+- **Server-side enforcement:** `JobLock` singleton (`src/job_lock.ts`) with `acquire(owner): boolean`, `release(owner)`, `isLocked()`, `getOwner()`, `subscribe(fn)`. The existing `writeGuard` (already mounted on `/api`, already centralizes the "is this a write?" decision via `BLOCKED_WRITE_METHODS` + `BLOCKED_GET_PATHS`) is extended to also take a `JobLock` and return 423 when the lock is held; an `ALLOWED_DURING_FLASH` allowlist (login + reauth only — panic is intentionally NOT allowed during flash because emitting `PANIC_STOP` mid-flash would interleave with `FW_CHUNK` frames on the serial line) controls per-route exceptions. WebSocket inbound write-class messages don't pass through Express middleware, so a small `rejectIfLocked` helper in `src/job_lock_middleware.ts` rejects them per-connection with a `lockStateChanged` echo + `flashJobActive` frame.
 - **WebSocket reflection:** every `acquire`/`release` fires `lockStateChanged` to all clients. Other UI views use this to disable write controls site-wide.
 - **Auto-release conditions:**
   1. **Master's post-reboot heartbeat returns with `version === target`** — primary release condition. Lock is held from `Push firmware` confirmation through master's full self-reboot cycle.
@@ -342,7 +342,7 @@ Each PR gets its own light plan in `.docs/plans/` with a `YYYYMMDD-HHmm-firmware
 
 **c0 — Platform prerequisites (server):**
 
-- [ ] **c0** `JobLock` singleton + `requireUnlocked` middleware + `lockStateChanged` `TransmissionType` + WS broadcast + Vue lock store + handler. Apply middleware to one example route as smoke test (full route set is **c.2**). Testable: unit + integration tests covering 423 response; live UI banner on lock-state change. Note: no DB persistence of `firmware_version` — orchestrator captures starting versions in-memory from heartbeats; persisted state would be misleading while a controller is offline.
+- [ ] **c0** `JobLock` singleton + `lockStateChanged` `TransmissionType` + WS broadcast + Vue lock store + handler. (Originally also shipped a per-route `requireUnlocked` middleware applied to `/api/panicStop` as a smoke test; superseded in **c.2** by extending `writeGuard` — full route set inherits the lock automatically.) Testable: unit tests for the JobLock primitive; live UI banner on lock-state change. Note: no DB persistence of `firmware_version` — orchestrator captures starting versions in-memory from heartbeats; persisted state would be misleading while a controller is offline.
 
 **Shared protocol freeze:**
 
@@ -359,7 +359,7 @@ Each PR gets its own light plan in `.docs/plans/` with a `YYYYMMDD-HHmm-firmware
 **c — Server orchestrator (subset shippable before b lands; runs against PTY stub):**
 
 - [ ] **c.1** `SerialMessageType` `FW_*` enum extensions + `message_generator` / `message_handler` paths + tests. Testable: serializer round-trip.
-- [ ] **c.2** Apply `requireUnlocked` middleware to full write-route set + tests.
+- [ ] **c.2** Extend `writeGuard` with a `JobLock` parameter so write-class HTTP routes return 423 during a flash job (single mount on `/api` covers the full route set automatically). Add WS-side `rejectIfLocked` for inbound write-class messages. Remove c0's now-redundant `requireUnlocked`.
 - [ ] **c.3** GitHub release service + 5-min in-memory cache + tests with HTTP fixtures.
 - [ ] **c.4** On-disk `.bin` cache + LRU eviction + SHA-256 stream-hash + tests with a 1.2 MB fixture.
 - [ ] **c.5** Upload handler + `esp_app_desc_t` parser + project-name + version validation + tests.
