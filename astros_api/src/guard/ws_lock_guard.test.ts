@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { JobLock } from './job_lock.js';
-import { rejectIfLocked } from './job_lock_middleware.js';
-import { TransmissionType } from './models/enums.js';
+import { JobLock } from '../job_lock/job_lock.js';
+import { rejectIfLocked } from './ws_lock_guard.js';
+import { TransmissionType } from '../models/enums.js';
 
 function mockWs() {
   const ws: any = {};

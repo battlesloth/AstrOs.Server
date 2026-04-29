@@ -1,8 +1,8 @@
 import { RequestHandler } from 'express';
-import { SettingsRepository } from './dal/repositories/settings_repository.js';
-import { logger } from './logger.js';
+import { SettingsRepository } from '../dal/repositories/settings_repository.js';
+import { logger } from '../logger.js';
 import { Kysely } from 'kysely';
-import { Database } from './dal/types.js';
+import { Database } from '../dal/types.js';
 
 const API_KEY_CACHE_TTL_MS = 60_000;
 

@@ -1,11 +1,11 @@
 import type { WebSocket } from 'ws';
-import type { JobLock } from './job_lock.js';
-import { logger } from './logger.js';
+import type { JobLock } from '../job_lock/job_lock.js';
+import { logger } from '../logger.js';
 import {
   WS_WRITE_CLASS_MESSAGE_TYPES,
   buildFlashJobActiveResponse,
   buildLockStateResponse,
-} from './models/networking/lock_responses.js';
+} from '../models/networking/lock_responses.js';
 
 /**
  * WebSocket-side counterpart to the HTTP gate in writeGuard. When an inbound

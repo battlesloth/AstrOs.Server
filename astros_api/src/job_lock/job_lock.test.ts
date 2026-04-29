@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { JobLock } from './job_lock.js';
-import type { LockState } from './models/networking/lock_responses.js';
+import type { LockState } from '../models/networking/lock_responses.js';
 
 describe('JobLock', () => {
   it('starts unlocked with no owner', () => {

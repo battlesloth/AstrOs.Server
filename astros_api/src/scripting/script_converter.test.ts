@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { mock, mockReset } from 'vitest-mock-extended';
 import { ScriptConverter, ISingleCommand, CommandType } from './script_converter.js';
-import { ScriptRepository } from './dal/repositories/script_repository.js';
+import { ScriptRepository } from '../dal/repositories/script_repository.js';
 import {
   GenericSerialEvent,
   GpioChannel,
@@ -27,7 +27,7 @@ import {
   ScriptEvent,
   UartChannel,
   UartModule,
-} from './models/index.js';
+} from '../models/index.js';
 import { v4 as uuid } from 'uuid';
 
 const coreLocId = '07e5047a-32b3-4c6a-95c1-a97bebe1b0bd';

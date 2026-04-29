@@ -17,10 +17,10 @@ import {
   GpioChannel,
   GpioModule,
   HumanCyborgRelationsCmd,
-} from './models/index.js';
+} from '../models/index.js';
 import { v4 as uuid } from 'uuid';
-import { logger } from './logger.js';
-import { ScriptRepository } from './dal/repositories/script_repository.js';
+import { logger } from '../logger.js';
+import { ScriptRepository } from '../dal/repositories/script_repository.js';
 
 interface IUartValues {
   idx: number;

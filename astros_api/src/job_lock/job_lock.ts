@@ -1,5 +1,5 @@
-import { logger } from './logger.js';
-import type { LockState } from './models/networking/lock_responses.js';
+import { logger } from '../logger.js';
+import type { LockState } from '../models/networking/lock_responses.js';
 
 type Listener = (state: LockState) => void;
 
