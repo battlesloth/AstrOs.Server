@@ -67,7 +67,11 @@ export interface FwChunkAck {
   windowRemaining: number;
 }
 
-export type FwChunkNakReason = 'CRC' | 'SIZE' | 'OUT_OF_ORDER' | 'FLASH_FULL';
+// Single source of truth for the FW_CHUNK_NAK reason codes. The runtime check
+// in MessageHandler derives its lookup set from this same tuple, so adding a
+// new reason here automatically extends both the type and the validator.
+export const FW_CHUNK_NAK_REASONS = ['CRC', 'SIZE', 'OUT_OF_ORDER', 'FLASH_FULL'] as const;
+export type FwChunkNakReason = (typeof FW_CHUNK_NAK_REASONS)[number];
 
 export interface FwChunkNak {
   transferId: string;
@@ -75,7 +79,8 @@ export interface FwChunkNak {
   reasonCode: FwChunkNakReason;
 }
 
-export type FwTransferEndStatus = 'OK' | 'HASH_MISMATCH' | 'IO_ERROR';
+export const FW_TRANSFER_END_STATUSES = ['OK', 'HASH_MISMATCH', 'IO_ERROR'] as const;
+export type FwTransferEndStatus = (typeof FW_TRANSFER_END_STATUSES)[number];
 
 export interface FwTransferEndAck {
   transferId: string;
@@ -104,7 +109,8 @@ export interface FwDeployDone {
   results: FwDeployDoneResult[];
 }
 
-export type FwBackpressureAction = 'PAUSE' | 'RESUME';
+export const FW_BACKPRESSURE_ACTIONS = ['PAUSE', 'RESUME'] as const;
+export type FwBackpressureAction = (typeof FW_BACKPRESSURE_ACTIONS)[number];
 
 export interface FwBackpressure {
   transferId: string;

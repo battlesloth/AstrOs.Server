@@ -19,6 +19,9 @@ import type {
 import type { SerialMsgValidationResult } from './serial_message.js';
 import type { ControlModule } from 'src/models/index.js';
 import {
+  FW_BACKPRESSURE_ACTIONS,
+  FW_CHUNK_NAK_REASONS,
+  FW_TRANSFER_END_STATUSES,
   FwStage,
   type FwBackpressureAction,
   type FwChunkNakReason,
@@ -26,21 +29,17 @@ import {
   type FwTransferEndStatus,
 } from 'src/models/firmware/firmware_messages.js';
 
-const FW_CHUNK_NAK_REASONS: ReadonlySet<FwChunkNakReason> = new Set([
-  'CRC',
-  'SIZE',
-  'OUT_OF_ORDER',
-  'FLASH_FULL',
-]);
-
-const FW_TRANSFER_END_STATUSES: ReadonlySet<FwTransferEndStatus> = new Set([
-  'OK',
-  'HASH_MISMATCH',
-  'IO_ERROR',
-]);
-
-const FW_BACKPRESSURE_ACTIONS: ReadonlySet<FwBackpressureAction> = new Set(['PAUSE', 'RESUME']);
-
+// Runtime validation sets — derived directly from the const tuples in
+// firmware_messages.ts so the type and runtime checks share a single source.
+// Adding a new value to e.g. FW_CHUNK_NAK_REASONS automatically extends both
+// FwChunkNakReason and FW_CHUNK_NAK_REASON_SET below.
+const FW_CHUNK_NAK_REASON_SET: ReadonlySet<FwChunkNakReason> = new Set(FW_CHUNK_NAK_REASONS);
+const FW_TRANSFER_END_STATUS_SET: ReadonlySet<FwTransferEndStatus> = new Set(
+  FW_TRANSFER_END_STATUSES,
+);
+const FW_BACKPRESSURE_ACTION_SET: ReadonlySet<FwBackpressureAction> = new Set(
+  FW_BACKPRESSURE_ACTIONS,
+);
 const FW_STAGE_VALUES: ReadonlySet<FwStage> = new Set(Object.values(FwStage));
 
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
@@ -251,7 +250,7 @@ export class MessageHandler {
     }
 
     const reason = parts[2] as FwChunkNakReason;
-    if (!FW_CHUNK_NAK_REASONS.has(reason)) {
+    if (!FW_CHUNK_NAK_REASON_SET.has(reason)) {
       logger.error(`FW_CHUNK_NAK has unknown reason: ${parts[2]}`);
       response.type = SerialWorkerResponseType.UNKNOWN;
       return response;
@@ -274,7 +273,7 @@ export class MessageHandler {
     }
 
     const status = parts[1] as FwTransferEndStatus;
-    if (!FW_TRANSFER_END_STATUSES.has(status)) {
+    if (!FW_TRANSFER_END_STATUS_SET.has(status)) {
       logger.error(`FW_TRANSFER_END_ACK has unknown status: ${parts[1]}`);
       response.type = SerialWorkerResponseType.UNKNOWN;
       return response;
@@ -397,7 +396,7 @@ export class MessageHandler {
     }
 
     const action = parts[1] as FwBackpressureAction;
-    if (!FW_BACKPRESSURE_ACTIONS.has(action)) {
+    if (!FW_BACKPRESSURE_ACTION_SET.has(action)) {
       logger.error(`FW_BACKPRESSURE has unknown action: ${parts[1]}`);
       response.type = SerialWorkerResponseType.UNKNOWN;
       return response;
