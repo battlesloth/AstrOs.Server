@@ -29,6 +29,19 @@ export class MessageHelper {
     [SerialMessageType.FORMAT_SD_ACK, SerialMsgConst.FORMAT_SD_ACK],
     [SerialMessageType.FORMAT_SD_NAK, SerialMsgConst.FORMAT_SD_NAK],
     [SerialMessageType.SERVO_TEST, SerialMsgConst.SERVO_TEST],
+
+    // Firmware OTA wire protocol — see .docs/protocol.md § A.
+    [SerialMessageType.FW_TRANSFER_BEGIN, SerialMsgConst.FW_TRANSFER_BEGIN],
+    [SerialMessageType.FW_TRANSFER_BEGIN_ACK, SerialMsgConst.FW_TRANSFER_BEGIN_ACK],
+    [SerialMessageType.FW_CHUNK, SerialMsgConst.FW_CHUNK],
+    [SerialMessageType.FW_CHUNK_ACK, SerialMsgConst.FW_CHUNK_ACK],
+    [SerialMessageType.FW_CHUNK_NAK, SerialMsgConst.FW_CHUNK_NAK],
+    [SerialMessageType.FW_TRANSFER_END, SerialMsgConst.FW_TRANSFER_END],
+    [SerialMessageType.FW_TRANSFER_END_ACK, SerialMsgConst.FW_TRANSFER_END_ACK],
+    [SerialMessageType.FW_DEPLOY_BEGIN, SerialMsgConst.FW_DEPLOY_BEGIN],
+    [SerialMessageType.FW_PROGRESS, SerialMsgConst.FW_PROGRESS],
+    [SerialMessageType.FW_DEPLOY_DONE, SerialMsgConst.FW_DEPLOY_DONE],
+    [SerialMessageType.FW_BACKPRESSURE, SerialMsgConst.FW_BACKPRESSURE],
   ]);
 
   public static readonly MessageTimeouts: Map<SerialMessageType, number> = new Map([
@@ -37,6 +50,13 @@ export class MessageHelper {
     [SerialMessageType.DEPLOY_SCRIPT, 5000],
     [SerialMessageType.RUN_SCRIPT, 5000],
     [SerialMessageType.RUN_COMMAND, 5000],
+
+    // Firmware OTA outgoing types. FW_CHUNK uses the protocol's per-frame
+    // ACK timeout (1500 ms); the others are job-level handshakes.
+    [SerialMessageType.FW_TRANSFER_BEGIN, 5000],
+    [SerialMessageType.FW_CHUNK, 1500],
+    [SerialMessageType.FW_TRANSFER_END, 5000],
+    [SerialMessageType.FW_DEPLOY_BEGIN, 5000],
   ]);
 
   static uint8ArrayToNum(arr: Uint8Array): number {
@@ -47,5 +67,25 @@ export class MessageHelper {
     }
 
     return num;
+  }
+
+  // Strict unsigned-integer parser for wire-protocol fields. Rejects anything
+  // parseInt would silently accept (e.g. '42junk', '1.5', '-3', leading
+  // whitespace) and guards against precision loss past Number.MAX_SAFE_INTEGER.
+  // Returns null on any rejection so the caller can route the frame to UNKNOWN.
+  static parseUint(raw: string): number | null {
+    if (!/^\d+$/.test(raw)) return null;
+    const n = Number(raw);
+    return Number.isSafeInteger(n) ? n : null;
+  }
+
+  // Strict SHA-256 hex parser: exactly 64 lowercase hex chars (per the wire
+  // contract in .docs/protocol.md "Shared values"). Lowercase-only matters
+  // because the server's reference digest from crypto.createHash('sha256')
+  // is always lowercase; a permissive parser that allowed uppercase would
+  // produce false-positive HASH_MISMATCH reports later in the flow. Returns
+  // the validated hash unchanged on success, null otherwise.
+  static parseSha256Hex(raw: string): string | null {
+    return /^[0-9a-f]{64}$/.test(raw) ? raw : null;
   }
 }

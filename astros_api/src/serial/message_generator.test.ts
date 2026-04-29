@@ -2,6 +2,12 @@ import { expect, describe, it } from 'vitest';
 import { MessageGenerator } from './message_generator.js';
 import { MessageHelper } from './message_helper.js';
 import { SerialMessageType } from './serial_message.js';
+import type {
+  FwTransferBegin,
+  FwChunk,
+  FwTransferEnd,
+  FwDeployBegin,
+} from '../models/firmware/firmware_messages.js';
 import { createConfigSync } from '../models/config/config_sync.js';
 import { createScriptRun } from '../models/scripts/script_run.js';
 import { createScriptUpload } from '../models/scripts/script_upload.js';
@@ -165,6 +171,87 @@ describe('Message Generator Tests', () => {
         `${addr2}${US}${ctrlName2}${US}5@1|0|1|0;1@${idx2}:1:9600@1:1:1:800:2000:1400:0|2:1:0:500:2500:1500:1` +
         RS +
         `${addr3}${US}${ctrlName3}${US}5@1|0|1|0;1@${idx3}:1:9600@1:1:1:800:2000:1400:0|2:1:0:500:2500:1500:1\n`,
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // Firmware OTA outgoing messages (.docs/protocol.md § A).
+  // -------------------------------------------------------------------------
+
+  it('generate FW_TRANSFER_BEGIN serializes transferId + size + hash + chunk-size + targets', () => {
+    const generator = new MessageGenerator();
+    const payload: FwTransferBegin = {
+      transferId: 'xfer-1',
+      totalSize: 1234567,
+      sha256Hex: 'a'.repeat(64),
+      chunkSize: 4096,
+      targets: ['core', 'dome', 'master'],
+    };
+
+    const message = generator.generateMessage(
+      SerialMessageType.FW_TRANSFER_BEGIN,
+      'msg-1',
+      payload,
+    );
+
+    expect(message.controllers).toEqual(['core', 'dome', 'master']);
+    expect(message.metaData).toBe('xfer-1');
+    expect(message.msg).toBe(
+      `30${RS}FW_TRANSFER_BEGIN${RS}msg-1${GS}` +
+        `xfer-1${US}1234567${US}${'a'.repeat(64)}${US}4096${US}` +
+        `core${RS}dome${RS}master\n`,
+    );
+  });
+
+  it('generate FW_CHUNK serializes seq + len + base64 + crc', () => {
+    const generator = new MessageGenerator();
+    const payload: FwChunk = {
+      transferId: 'xfer-1',
+      seq: 42,
+      payloadLen: 128,
+      base64Bytes: 'aGVsbG8gd29ybGQ=',
+      crc16Hex: 'beef',
+    };
+
+    const message = generator.generateMessage(SerialMessageType.FW_CHUNK, 'msg-2', payload);
+
+    expect(message.metaData).toBe('xfer-1');
+    expect(message.controllers).toEqual([]);
+    expect(message.msg).toBe(
+      `32${RS}FW_CHUNK${RS}msg-2${GS}xfer-1${US}42${US}128${US}aGVsbG8gd29ybGQ=${US}beef\n`,
+    );
+  });
+
+  it('generate FW_TRANSFER_END serializes total-chunks + final-hash', () => {
+    const generator = new MessageGenerator();
+    const payload: FwTransferEnd = {
+      transferId: 'xfer-1',
+      totalChunks: 9376,
+      finalSha256Hex: 'b'.repeat(64),
+    };
+
+    const message = generator.generateMessage(SerialMessageType.FW_TRANSFER_END, 'msg-3', payload);
+
+    expect(message.metaData).toBe('xfer-1');
+    expect(message.controllers).toEqual([]);
+    expect(message.msg).toBe(
+      `35${RS}FW_TRANSFER_END${RS}msg-3${GS}xfer-1${US}9376${US}${'b'.repeat(64)}\n`,
+    );
+  });
+
+  it('generate FW_DEPLOY_BEGIN serializes ordered controller list', () => {
+    const generator = new MessageGenerator();
+    const payload: FwDeployBegin = {
+      transferId: 'xfer-1',
+      order: ['core', 'dome', 'master'],
+    };
+
+    const message = generator.generateMessage(SerialMessageType.FW_DEPLOY_BEGIN, 'msg-4', payload);
+
+    expect(message.metaData).toBe('xfer-1');
+    expect(message.controllers).toEqual(['core', 'dome', 'master']);
+    expect(message.msg).toBe(
+      `37${RS}FW_DEPLOY_BEGIN${RS}msg-4${GS}xfer-1${US}core${RS}dome${RS}master\n`,
     );
   });
 });
