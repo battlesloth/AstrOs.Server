@@ -68,39 +68,57 @@ export interface ScriptRunResponse extends ISerialWorkerResponse {
 // ---------------------------------------------------------------------------
 // Firmware OTA inbound responses. Each wraps the parsed typed payload from
 // .docs/protocol.md § A so the dispatcher (c.6) can route by type.
+//
+// These interfaces deliberately do NOT extend ISerialWorkerResponse: that
+// base carries `Record<string, any>` as an escape hatch for legacy `as`
+// casts elsewhere in this file, and inheriting it would let `.payload`
+// slip through as `any` even on the UnknownSerialResponse branch — defeating
+// the whole point of the discriminated union. Each Fw*Response narrows
+// `type` to a single literal so handlers can return `Fw*Response |
+// UnknownSerialResponse` and force callers to discriminate before reading
+// `payload`. They remain structurally compatible with ISerialWorkerResponse
+// (a `type: SerialWorkerResponseType` field), so the eventual dispatcher in
+// c.6 can accept either family.
 // ---------------------------------------------------------------------------
 
-export interface FwTransferBeginAckResponse extends ISerialWorkerResponse {
-  type: SerialWorkerResponseType;
+// Marker response returned by every FW_* handler when the wire payload fails
+// validation. No `payload` field — callers MUST discriminate against this
+// case before reading payload from the success-shape sibling.
+export interface UnknownSerialResponse {
+  type: SerialWorkerResponseType.UNKNOWN;
+}
+
+export interface FwTransferBeginAckResponse {
+  type: SerialWorkerResponseType.FW_TRANSFER_BEGIN_ACK;
   payload: FwTransferBeginAck;
 }
 
-export interface FwChunkAckResponse extends ISerialWorkerResponse {
-  type: SerialWorkerResponseType;
+export interface FwChunkAckResponse {
+  type: SerialWorkerResponseType.FW_CHUNK_ACK;
   payload: FwChunkAck;
 }
 
-export interface FwChunkNakResponse extends ISerialWorkerResponse {
-  type: SerialWorkerResponseType;
+export interface FwChunkNakResponse {
+  type: SerialWorkerResponseType.FW_CHUNK_NAK;
   payload: FwChunkNak;
 }
 
-export interface FwTransferEndAckResponse extends ISerialWorkerResponse {
-  type: SerialWorkerResponseType;
+export interface FwTransferEndAckResponse {
+  type: SerialWorkerResponseType.FW_TRANSFER_END_ACK;
   payload: FwTransferEndAck;
 }
 
-export interface FwProgressResponse extends ISerialWorkerResponse {
-  type: SerialWorkerResponseType;
+export interface FwProgressResponse {
+  type: SerialWorkerResponseType.FW_PROGRESS;
   payload: FwProgress;
 }
 
-export interface FwDeployDoneResponse extends ISerialWorkerResponse {
-  type: SerialWorkerResponseType;
+export interface FwDeployDoneResponse {
+  type: SerialWorkerResponseType.FW_DEPLOY_DONE;
   payload: FwDeployDone;
 }
 
-export interface FwBackpressureResponse extends ISerialWorkerResponse {
-  type: SerialWorkerResponseType;
+export interface FwBackpressureResponse {
+  type: SerialWorkerResponseType.FW_BACKPRESSURE;
   payload: FwBackpressure;
 }

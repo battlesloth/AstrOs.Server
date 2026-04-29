@@ -15,6 +15,7 @@ import type {
   RegistrationResponse,
   ScriptDeployResponse,
   ScriptRunResponse,
+  UnknownSerialResponse,
 } from './serial_worker_response.js';
 import type { SerialMsgValidationResult } from './serial_message.js';
 import type { ControlModule } from 'src/models/index.js';
@@ -185,32 +186,24 @@ export class MessageHandler {
   // Firmware OTA incoming messages — see .docs/protocol.md § A.
   // ---------------------------------------------------------------------------
 
-  handleFwTransferBeginAck(msg: string): FwTransferBeginAckResponse {
-    const response = {
-      type: SerialWorkerResponseType.FW_TRANSFER_BEGIN_ACK,
-    } as FwTransferBeginAckResponse;
-
+  handleFwTransferBeginAck(msg: string): FwTransferBeginAckResponse | UnknownSerialResponse {
     const parts = msg.split(MessageHelper.US);
     if (parts.length !== 2) {
       logger.error(`Invalid FW_TRANSFER_BEGIN_ACK: ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
-    response.payload = { transferId: parts[0], status: parts[1] };
-    return response;
+    return {
+      type: SerialWorkerResponseType.FW_TRANSFER_BEGIN_ACK,
+      payload: { transferId: parts[0], status: parts[1] },
+    };
   }
 
-  handleFwChunkAck(msg: string): FwChunkAckResponse {
-    const response = {
-      type: SerialWorkerResponseType.FW_CHUNK_ACK,
-    } as FwChunkAckResponse;
-
+  handleFwChunkAck(msg: string): FwChunkAckResponse | UnknownSerialResponse {
     const parts = msg.split(MessageHelper.US);
     if (parts.length !== 4) {
       logger.error(`Invalid FW_CHUNK_ACK: ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     const highest = MessageHelper.parseUint(parts[1]);
@@ -218,74 +211,63 @@ export class MessageHandler {
     const window = MessageHelper.parseUint(parts[3]);
     if (highest === null || next === null || window === null) {
       logger.error(`FW_CHUNK_ACK has non-numeric or malformed fields: ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     if (window > FW_SERIAL_SLIDING_WINDOW) {
       logger.error(
         `FW_CHUNK_ACK windowRemaining ${window} exceeds configured sliding window ${FW_SERIAL_SLIDING_WINDOW}: ${msg}`,
       );
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
-    response.payload = {
-      transferId: parts[0],
-      highestContiguousSeq: highest,
-      nextExpectedSeq: next,
-      windowRemaining: window,
+    return {
+      type: SerialWorkerResponseType.FW_CHUNK_ACK,
+      payload: {
+        transferId: parts[0],
+        highestContiguousSeq: highest,
+        nextExpectedSeq: next,
+        windowRemaining: window,
+      },
     };
-    return response;
   }
 
-  handleFwChunkNak(msg: string): FwChunkNakResponse {
-    const response = {
-      type: SerialWorkerResponseType.FW_CHUNK_NAK,
-    } as FwChunkNakResponse;
-
+  handleFwChunkNak(msg: string): FwChunkNakResponse | UnknownSerialResponse {
     const parts = msg.split(MessageHelper.US);
     if (parts.length !== 3) {
       logger.error(`Invalid FW_CHUNK_NAK: ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     const lastGoodSeq = MessageHelper.parseUint(parts[1]);
     if (lastGoodSeq === null) {
       logger.error(`FW_CHUNK_NAK lastGoodSeq is not a valid unsigned integer: ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     const reason = parts[2] as FwChunkNakReason;
     if (!FW_CHUNK_NAK_REASON_SET.has(reason)) {
       logger.error(`FW_CHUNK_NAK has unknown reason: ${parts[2]}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
-    response.payload = { transferId: parts[0], lastGoodSeq, reasonCode: reason };
-    return response;
+    return {
+      type: SerialWorkerResponseType.FW_CHUNK_NAK,
+      payload: { transferId: parts[0], lastGoodSeq, reasonCode: reason },
+    };
   }
 
-  handleFwTransferEndAck(msg: string): FwTransferEndAckResponse {
-    const response = {
-      type: SerialWorkerResponseType.FW_TRANSFER_END_ACK,
-    } as FwTransferEndAckResponse;
-
+  handleFwTransferEndAck(msg: string): FwTransferEndAckResponse | UnknownSerialResponse {
     const parts = msg.split(MessageHelper.US);
     if (parts.length !== 3) {
       logger.error(`Invalid FW_TRANSFER_END_ACK: ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     const status = parts[1] as FwTransferEndStatus;
     if (!FW_TRANSFER_END_STATUS_SET.has(status)) {
       logger.error(`FW_TRANSFER_END_ACK has unknown status: ${parts[1]}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     const computedSha256Hex = MessageHelper.parseSha256Hex(parts[2]);
@@ -293,61 +275,49 @@ export class MessageHandler {
       logger.error(
         `FW_TRANSFER_END_ACK has malformed sha256 (expected 64 lowercase hex chars): ${parts[2]}`,
       );
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
-    response.payload = {
-      transferId: parts[0],
-      status,
-      computedSha256Hex,
+    return {
+      type: SerialWorkerResponseType.FW_TRANSFER_END_ACK,
+      payload: { transferId: parts[0], status, computedSha256Hex },
     };
-    return response;
   }
 
-  handleFwProgress(msg: string): FwProgressResponse {
-    const response = {
-      type: SerialWorkerResponseType.FW_PROGRESS,
-    } as FwProgressResponse;
-
+  handleFwProgress(msg: string): FwProgressResponse | UnknownSerialResponse {
     const parts = msg.split(MessageHelper.US);
     if (parts.length !== 6) {
       logger.error(`Invalid FW_PROGRESS: ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     const stage = parts[2] as FwStage;
     if (!FW_STAGE_VALUES.has(stage)) {
       logger.error(`FW_PROGRESS has unknown stage: ${parts[2]}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     const bytesSent = MessageHelper.parseUint(parts[3]);
     const totalBytes = MessageHelper.parseUint(parts[4]);
     if (bytesSent === null || totalBytes === null) {
       logger.error(`FW_PROGRESS has non-numeric or malformed byte counts: ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
-    response.payload = {
-      transferId: parts[0],
-      controllerId: parts[1],
-      stage,
-      bytesSent,
-      totalBytes,
-      detail: parts[5],
+    return {
+      type: SerialWorkerResponseType.FW_PROGRESS,
+      payload: {
+        transferId: parts[0],
+        controllerId: parts[1],
+        stage,
+        bytesSent,
+        totalBytes,
+        detail: parts[5],
+      },
     };
-    return response;
   }
 
-  handleFwDeployDone(msg: string): FwDeployDoneResponse {
-    const response = {
-      type: SerialWorkerResponseType.FW_DEPLOY_DONE,
-    } as FwDeployDoneResponse;
-
+  handleFwDeployDone(msg: string): FwDeployDoneResponse | UnknownSerialResponse {
     // Wire format: transfer-id<US>result_1<RS>result_2<RS>...
     // where result = controllerId<US>outcome<US>finalVersion<US>error
     // We split only on the first US to keep the result list intact, then split
@@ -355,8 +325,7 @@ export class MessageHandler {
     const firstUs = msg.indexOf(MessageHelper.US);
     if (firstUs < 0) {
       logger.error(`Invalid FW_DEPLOY_DONE (no transferId separator): ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     const transferId = msg.substring(0, firstUs);
@@ -368,15 +337,13 @@ export class MessageHandler {
       const fields = resultStr.split(MessageHelper.US);
       if (fields.length !== 4) {
         logger.error(`Invalid FW_DEPLOY_DONE result: ${resultStr}`);
-        response.type = SerialWorkerResponseType.UNKNOWN;
-        return response;
+        return { type: SerialWorkerResponseType.UNKNOWN };
       }
 
       const outcome = fields[1];
       if (outcome !== 'OK' && outcome !== 'FAILED') {
         logger.error(`FW_DEPLOY_DONE has unknown outcome: ${outcome}`);
-        response.type = SerialWorkerResponseType.UNKNOWN;
-        return response;
+        return { type: SerialWorkerResponseType.UNKNOWN };
       }
 
       const error = fields[3];
@@ -385,8 +352,7 @@ export class MessageHandler {
       // downstream state (e.g., a green pill with an error tooltip).
       if (outcome === 'OK' && error !== '') {
         logger.error(`FW_DEPLOY_DONE OK result has non-empty error: ${error}`);
-        response.type = SerialWorkerResponseType.UNKNOWN;
-        return response;
+        return { type: SerialWorkerResponseType.UNKNOWN };
       }
 
       results.push({
@@ -397,31 +363,29 @@ export class MessageHandler {
       });
     }
 
-    response.payload = { transferId, results };
-    return response;
+    return {
+      type: SerialWorkerResponseType.FW_DEPLOY_DONE,
+      payload: { transferId, results },
+    };
   }
 
-  handleFwBackpressure(msg: string): FwBackpressureResponse {
-    const response = {
-      type: SerialWorkerResponseType.FW_BACKPRESSURE,
-    } as FwBackpressureResponse;
-
+  handleFwBackpressure(msg: string): FwBackpressureResponse | UnknownSerialResponse {
     const parts = msg.split(MessageHelper.US);
     if (parts.length !== 3) {
       logger.error(`Invalid FW_BACKPRESSURE: ${msg}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     const action = parts[1] as FwBackpressureAction;
     if (!FW_BACKPRESSURE_ACTION_SET.has(action)) {
       logger.error(`FW_BACKPRESSURE has unknown action: ${parts[1]}`);
-      response.type = SerialWorkerResponseType.UNKNOWN;
-      return response;
+      return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
-    response.payload = { transferId: parts[0], action, reason: parts[2] };
-    return response;
+    return {
+      type: SerialWorkerResponseType.FW_BACKPRESSURE,
+      payload: { transferId: parts[0], action, reason: parts[2] },
+    };
   }
 
   handleRunScriptAckNak(type: SerialMessageType, msg: string): ScriptRunResponse {
