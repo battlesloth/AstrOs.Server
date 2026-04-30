@@ -20,6 +20,7 @@ function release(overrides: Partial<GitHubReleaseDto> = {}): GitHubReleaseDto {
   return {
     tag_name: 'v1.0.0',
     published_at: '2026-04-01T00:00:00Z',
+    draft: false,
     assets: [asset()],
     ...overrides,
   };
@@ -346,6 +347,50 @@ describe('GitHubReleaseService', () => {
     const stale2 = await svc.getReleases();
     expect(stale2.staleSince).not.toBeNull();
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('filters out draft releases (even with otherwise-valid assets)', async () => {
+    const published = release();
+    const draft = release({
+      tag_name: 'v0.9.0',
+      draft: true,
+      published_at: null,
+      // Asset is well-formed for v0.9.0 — without the draft filter, this
+      // release would surface in the list. The draft filter must drop it.
+      assets: [
+        asset({
+          name: 'astros-esp-0.9.0-metro_s3-app.bin',
+          browser_download_url: 'https://example.test/astros-esp-0.9.0-metro_s3-app.bin',
+        }),
+      ],
+    });
+    const fetcher = makeFetcherReturning([published, draft]);
+
+    const svc = new GitHubReleaseService('test/dummy', fetcher);
+    const result = await svc.getReleases();
+
+    expect(result.releases.map((r) => r.tag)).toEqual(['v1.0.0']);
+  });
+
+  it('filters out non-draft releases with null published_at (defense in depth)', async () => {
+    const published = release();
+    const weird = release({
+      tag_name: 'v0.9.0',
+      draft: false,
+      published_at: null,
+      assets: [
+        asset({
+          name: 'astros-esp-0.9.0-metro_s3-app.bin',
+          browser_download_url: 'https://example.test/astros-esp-0.9.0-metro_s3-app.bin',
+        }),
+      ],
+    });
+    const fetcher = makeFetcherReturning([published, weird]);
+
+    const svc = new GitHubReleaseService('test/dummy', fetcher);
+    const result = await svc.getReleases();
+
+    expect(result.releases.map((r) => r.tag)).toEqual(['v1.0.0']);
   });
 
   it('filters out releases with zero matched assets', async () => {

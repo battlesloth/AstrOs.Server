@@ -48,6 +48,11 @@ export interface GitHubAssetDto {
 
 export interface GitHubReleaseDto {
   tag_name: string;
-  published_at: string;
+  // Null for drafts and certain unpublished release states. Service filters
+  // those out; downstream `ReleaseInfo.publishedAt` is therefore non-null.
+  published_at: string | null;
+  // True for unpublished drafts. Service filters those out so they don't
+  // appear in the firmware UI's release dropdown.
+  draft: boolean;
   assets: GitHubAssetDto[];
 }

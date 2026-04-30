@@ -162,7 +162,18 @@ export class GitHubReleaseService {
         );
       }
       const dtos = (await response.json()) as GitHubReleaseDto[];
-      const releases = dtos.map(toReleaseInfo).filter((info) => info.assets.length > 0);
+      const releases = dtos
+        // Drop drafts and any release lacking a publish timestamp. Drafts
+        // shouldn't be flashable, and a null published_at would otherwise
+        // leak through the (string-typed) ReleaseInfo.publishedAt. The
+        // type predicate narrows published_at so toReleaseInfo can promise
+        // a non-null string in its return type without an assertion.
+        .filter(
+          (dto): dto is GitHubReleaseDto & { published_at: string } =>
+            !dto.draft && dto.published_at !== null,
+        )
+        .map(toReleaseInfo)
+        .filter((info) => info.assets.length > 0);
       this.cache = { releases, fetchedAt: Date.now() };
       this.nextRetryAt = null;
       return { releases, staleSince: null };
@@ -196,7 +207,7 @@ export class GitHubReleaseService {
   }
 }
 
-function toReleaseInfo(dto: GitHubReleaseDto): ReleaseInfo {
+function toReleaseInfo(dto: GitHubReleaseDto & { published_at: string }): ReleaseInfo {
   return {
     tag: dto.tag_name,
     version: stripLeadingV(dto.tag_name),
