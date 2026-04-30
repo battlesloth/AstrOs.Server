@@ -242,6 +242,26 @@ describe('GitHubReleaseService', () => {
     expect(String(url)).toBe('https://api.github.com/repos/battlesloth/AstrOs.ESP/releases');
   });
 
+  it('sends User-Agent and Accept headers on every fetch (and keeps the abort signal)', async () => {
+    // GitHub's REST API requires a User-Agent on anonymous requests (otherwise
+    // returns 403). Accept: application/vnd.github+json pins the v3 response
+    // shape across runtimes. The signal assertion is a regression guard so a
+    // future header refactor can't silently drop the AbortController wiring.
+    const fetcher = makeFetcherReturning([]);
+    const svc = new GitHubReleaseService('test/dummy', fetcher);
+
+    await svc.getReleases();
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const init = (fetcher as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as
+      | RequestInit
+      | undefined;
+    const headers = new Headers(init?.headers);
+    expect(headers.get('User-Agent')).toMatch(/AstrOs\.Server/);
+    expect(headers.get('Accept')).toBe('application/vnd.github+json');
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('aborts a hanging fetch after the timeout with an error mentioning the URL', async () => {
     // Hanging fetcher: never resolves; only rejects when the AbortController
     // fires. Without the signal-respecting branch, this test would also hang.

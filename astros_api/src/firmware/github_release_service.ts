@@ -39,6 +39,15 @@ const FETCH_TIMEOUT_MS = 10_000;
 // once GitHub recovers without hammering during a sustained outage.
 const RETRY_BACKOFF_MS = 60_000;
 
+// GitHub's REST API rejects anonymous requests without a User-Agent (403).
+// The Accept header pins the v3 response shape so behavior is consistent
+// across runtimes/proxies that might otherwise negotiate a different media
+// type. See: https://docs.github.com/en/rest/overview/resources-in-the-rest-api
+const REQUEST_HEADERS: Readonly<Record<string, string>> = {
+  'User-Agent': 'AstrOs.Server',
+  Accept: 'application/vnd.github+json',
+};
+
 /**
  * Pure helper: walks a GitHub release's assets, extracts the matched
  * `-app.bin` firmware binaries, returns them as typed AssetInfo entries.
@@ -155,7 +164,10 @@ export class GitHubReleaseService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const response = await this.fetcher(this.url, { signal: controller.signal });
+      const response = await this.fetcher(this.url, {
+        signal: controller.signal,
+        headers: REQUEST_HEADERS,
+      });
       if (!response.ok) {
         throw new Error(
           `GitHub releases endpoint ${this.url} returned ${response.status} ${response.statusText}`,
