@@ -21,6 +21,7 @@ function release(overrides: Partial<GitHubReleaseDto> = {}): GitHubReleaseDto {
     tag_name: 'v1.0.0',
     published_at: '2026-04-01T00:00:00Z',
     draft: false,
+    prerelease: false,
     assets: [asset()],
     ...overrides,
   };
@@ -370,6 +371,32 @@ describe('GitHubReleaseService', () => {
     const result = await svc.getReleases();
 
     expect(result.releases.map((r) => r.tag)).toEqual(['v1.0.0']);
+  });
+
+  it('surfaces pre-release releases with prerelease=true (does NOT filter them)', async () => {
+    // Pre-releases (RC builds) are valid OTA targets — the UI's "Pre-release"
+    // pill flags them visually rather than hiding them.
+    const stable = release();
+    const rc = release({
+      tag_name: 'v1.2.0-RC.1',
+      prerelease: true,
+      assets: [
+        asset({
+          name: 'astros-esp-1.2.0-RC.1-metro_s3-app.bin',
+          browser_download_url: 'https://example.test/astros-esp-1.2.0-RC.1-metro_s3-app.bin',
+        }),
+      ],
+    });
+    const fetcher = makeFetcherReturning([stable, rc]);
+
+    const svc = new GitHubReleaseService('test/dummy', fetcher);
+    const result = await svc.getReleases();
+
+    expect(result.releases).toHaveLength(2);
+    const stableInfo = result.releases.find((r) => r.tag === 'v1.0.0');
+    const rcInfo = result.releases.find((r) => r.tag === 'v1.2.0-RC.1');
+    expect(stableInfo?.prerelease).toBe(false);
+    expect(rcInfo?.prerelease).toBe(true);
   });
 
   it('filters out non-draft releases with null published_at (defense in depth)', async () => {

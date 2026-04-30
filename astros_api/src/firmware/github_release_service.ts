@@ -212,6 +212,7 @@ function toReleaseInfo(dto: GitHubReleaseDto & { published_at: string }): Releas
     tag: dto.tag_name,
     version: stripLeadingV(dto.tag_name),
     publishedAt: dto.published_at,
+    prerelease: dto.prerelease,
     assets: extractFirmwareAssets(dto),
   };
 }

@@ -22,6 +22,10 @@ export interface ReleaseInfo {
   tag: string;
   version: string;
   publishedAt: string;
+  // True when GitHub flagged the release as a pre-release (e.g., RC build).
+  // Pre-releases are valid OTA targets — the UI flags them visually rather
+  // than filtering them out. Drafts (a separate concept) ARE filtered.
+  prerelease: boolean;
   assets: AssetInfo[];
 }
 
@@ -54,5 +58,8 @@ export interface GitHubReleaseDto {
   // True for unpublished drafts. Service filters those out so they don't
   // appear in the firmware UI's release dropdown.
   draft: boolean;
+  // True for RC builds and other pre-releases. Surfaced unchanged to
+  // ReleaseInfo.prerelease so the UI can flag them; not filtered.
+  prerelease: boolean;
   assets: GitHubAssetDto[];
 }
