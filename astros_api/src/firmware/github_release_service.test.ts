@@ -302,6 +302,52 @@ describe('GitHubReleaseService', () => {
     await expect(svc.getReleases()).rejects.toThrow(/AstrOs\.ESP.*404.*Not Found/);
   });
 
+  it('does not retry the upstream within the backoff window after a failure', async () => {
+    const fetcher = makeFetcherFailing();
+    const svc = new GitHubReleaseService('test/dummy', fetcher);
+
+    // First call: fetch attempted, fails, throws.
+    await expect(svc.getReleases()).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    // Within the backoff window — caller still gets an error but the
+    // fetcher is NOT invoked again (no upstream hammering).
+    vi.advanceTimersByTime(30_000);
+    await expect(svc.getReleases()).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    // Past the backoff window — retry happens.
+    vi.advanceTimersByTime(31_000); // total 61s past first failure
+    await expect(svc.getReleases()).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('serves stale within the backoff window without re-fetching after a re-fetch fails', async () => {
+    const releases = [release()];
+    let mode: 'fast' | 'fail' = 'fast';
+    const fetcher: typeof fetch = vi.fn(async () => {
+      if (mode === 'fail') throw new Error('network down');
+      return new Response(JSON.stringify(releases), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const svc = new GitHubReleaseService('test/dummy', fetcher);
+    await svc.getReleases(); // warm cache
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    // Expire the cache and switch to a failing upstream.
+    vi.advanceTimersByTime(6 * 60 * 1000);
+    mode = 'fail';
+    const stale1 = await svc.getReleases();
+    expect(stale1.staleSince).not.toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    // Within the backoff window — stale served, NO additional upstream call.
+    vi.advanceTimersByTime(30_000);
+    const stale2 = await svc.getReleases();
+    expect(stale2.staleSince).not.toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it('filters out releases with zero matched assets', async () => {
     const releaseWithMatches = release();
     const releaseWithoutMatches = release({

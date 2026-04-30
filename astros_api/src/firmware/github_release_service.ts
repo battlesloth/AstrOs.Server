@@ -32,6 +32,13 @@ const TTL_MS = 5 * 60 * 1000;
 // fallback (or a fast error) rather than a perceived freeze.
 const FETCH_TIMEOUT_MS = 10_000;
 
+// Retry backoff after a failed fetch. Without this, every call after the
+// cache expires during an outage would re-attempt the upstream — burning
+// the 60 req/hr GitHub rate limit, spamming logs, and making each caller
+// wait the full FETCH_TIMEOUT_MS. 60 seconds keeps the system responsive
+// once GitHub recovers without hammering during a sustained outage.
+const RETRY_BACKOFF_MS = 60_000;
+
 /**
  * Pure helper: walks a GitHub release's assets, extracts the matched
  * `-app.bin` firmware binaries, returns them as typed AssetInfo entries.
@@ -99,6 +106,9 @@ interface CacheEntry {
  */
 export class GitHubReleaseService {
   private cache: CacheEntry | null = null;
+  // Earliest time (ms epoch) we'll re-attempt the upstream after a failure.
+  // Null means "no current backoff." Cleared on successful fetch.
+  private nextRetryAt: number | null = null;
   private inFlight: Promise<ReleaseListResult> | null = null;
   private readonly url: string;
 
@@ -112,8 +122,25 @@ export class GitHubReleaseService {
   async getReleases(): Promise<ReleaseListResult> {
     if (this.inFlight) return this.inFlight;
 
-    if (this.cache && Date.now() - this.cache.fetchedAt < TTL_MS) {
+    const now = Date.now();
+    if (this.cache !== null && now - this.cache.fetchedAt < TTL_MS) {
       return { releases: this.cache.releases, staleSince: null };
+    }
+
+    // Cache expired or empty. If we're inside the post-failure backoff window,
+    // serve stale (when cached) or surface a fast error (cold cache) without
+    // hitting the upstream again. Prevents log/rate-limit hammering during an
+    // outage where many callers ask in succession.
+    if (this.nextRetryAt !== null && now < this.nextRetryAt) {
+      if (this.cache) {
+        return {
+          releases: this.cache.releases,
+          staleSince: new Date(this.cache.fetchedAt).toISOString(),
+        };
+      }
+      throw new Error(
+        `GitHub releases unavailable; next retry at ${new Date(this.nextRetryAt).toISOString()}: ${this.url}`,
+      );
     }
 
     this.inFlight = this.fetchOnce();
@@ -137,6 +164,7 @@ export class GitHubReleaseService {
       const dtos = (await response.json()) as GitHubReleaseDto[];
       const releases = dtos.map(toReleaseInfo).filter((info) => info.assets.length > 0);
       this.cache = { releases, fetchedAt: Date.now() };
+      this.nextRetryAt = null;
       return { releases, staleSince: null };
     } catch (err) {
       // If the abort fired we know the cause; convert the (possibly opaque)
@@ -145,6 +173,10 @@ export class GitHubReleaseService {
       const surfaced = controller.signal.aborted
         ? new Error(`GitHub releases fetch timed out after ${FETCH_TIMEOUT_MS}ms: ${this.url}`)
         : (err as Error);
+
+      // Set the backoff window so future callers within RETRY_BACKOFF_MS
+      // serve stale (or surface the cold-cache error) without re-attempting.
+      this.nextRetryAt = Date.now() + RETRY_BACKOFF_MS;
 
       if (this.cache) {
         logger.warn(
