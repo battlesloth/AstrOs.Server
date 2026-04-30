@@ -8,21 +8,34 @@ Light plan for the next server-orchestrator PR. Builds the source-acquisition la
 
 ## Context
 
-The firmware-OTA UI's "GitHub" source toggle needs an authoritative release list. The decomposition spec calls for:
+The firmware-OTA UI's "GitHub" source toggle needs an authoritative release list. AstrOs.ESP's CI workflows (`rc-build.yml`, `release-build.yml`) currently produce two artifacts per build env per release:
+
+- `astros-esp-${VERSION}-${ENV}-app.bin` — application partition (what OTA flashes).
+- `astros-esp-${VERSION}-${ENV}-flash.bin` — full flash image including bootloader, for first-time USB bootstrap. Out of scope for OTA.
+
+`${ENV}` is the PlatformIO env name (currently `lolin_d32_pro` and `metro_s3`); each is a different chip family + partition layout, so binaries are not interchangeable across variants. `${VERSION}` follows semver and may include pre-release labels (e.g., `1.0.0`, `1.2.0-RC.1`).
+
+c.3 fetches the GitHub release list, picks all `-app.bin` assets per release (one per variant), and exposes them as a typed list with each asset's variant captured. The orchestrator (**c.6**) is what eventually matches each controller's reported variant to the correct asset; c.3 returns the full set of variants without picking.
+
+Service-level spec from the decomposition:
 
 - `GET https://api.github.com/repos/<owner>/AstrOs.ESP/releases` (anonymous, 60 req/hr per IP).
-- Filter assets to `^astros-esp-v\d+\.\d+\.\d+\.bin$`; prefer the asset whose name matches `astros-esp-v${tag_name#v}.bin` exactly.
+- Asset filter: `^astros-esp-(.+)-([a-z][a-z0-9_]*)-app\.bin$` — captures `version` and `variant`. The `-app.bin` suffix anchors against `-flash.bin`. The `[a-z][a-z0-9_]*` variant pattern excludes the hyphens that semver pre-release labels can contain, so the regex backtracks correctly on names like `astros-esp-1.2.0-RC.1-lolin_d32_pro-app.bin`.
 - Reject assets whose `content_type` isn't `application/octet-stream` (or similar).
 - 5-minute in-memory cache; serve stale on fetch error with a `staleSince` warning surfaced in the API response.
 
-c.3 ships the service in isolation. No route, no orchestrator integration. Tests use HTTP fixtures (no live calls in CI). The route comes in **c.8**, the cache becomes a c.6 dependency.
+c.3 ships the service in isolation. No route, no orchestrator integration. Tests use HTTP fixtures (no live calls in CI). The route comes in **c.8**, the cache becomes a **c.6** dependency.
 
 ## Tasks
 
-- [ ] **Typed models** (new `astros_api/src/models/firmware/release.ts`). At minimum: `ReleaseInfo` (the per-release shape we surface — `tag`, `version`, `publishedAt`, `assetName`, `assetUrl`, `sizeBytes`), `ReleaseListResult` (list + `staleSince: string | null` so consumers can distinguish a fresh fetch from a served-stale response), and the GitHub API DTO subset we parse (`GitHubReleaseDto`, `GitHubAssetDto`).
-- [ ] **GitHub release service** (new `astros_api/src/firmware/github_release_service.ts`). Class `GitHubReleaseService` constructor takes `(repoSlug: string, fetcher: typeof fetch = fetch)` for DI / test mocking. Single public method: `getReleases(): Promise<ReleaseListResult>`. Internals: 5-min TTL in-memory cache; on cache miss, call `fetcher` against `https://api.github.com/repos/<repoSlug>/releases`; on success, parse + filter assets + write to cache + return; on fetch error, return last cached value (if any) with `staleSince` set to its fetch timestamp; on cold-cache fetch error, throw.
-- [ ] **Asset selection logic.** Helper `pickFirmwareAsset(release: GitHubReleaseDto): GitHubAssetDto | null`. Filters to assets matching `^astros-esp-v\d+\.\d+\.\d+\.bin$`. Prefers exact match against `astros-esp-v${tag_name#v}.bin`; falls back to first match otherwise; returns null if nothing matches or if the matching asset's content_type isn't `application/octet-stream` / `application/macbinary`. Releases whose pickFirmwareAsset returns null are filtered out of the result.
-- [ ] **Tests** (new `astros_api/src/firmware/github_release_service.test.ts`). Cover: cache miss → fetch → fresh result; cache hit within 5 min → no fetch; cache miss after 5 min → re-fetch; fetch error with cold cache → throws; fetch error with warm cache → returns stale with `staleSince`; asset filtering (exact match preferred, no-match release skipped, wrong content-type skipped); date math is mocked via `vi.useFakeTimers()` so the 5-min TTL is testable without sleep.
+- [ ] **Typed models** (new `astros_api/src/models/firmware/release.ts`). At minimum:
+    - `AssetInfo` — `{ variant: string, version: string, assetName: string, assetUrl: string, sizeBytes: number }` (one per matched `-app.bin`).
+    - `ReleaseInfo` — `{ tag: string, version: string, publishedAt: string, assets: AssetInfo[] }` (one or more matched assets per release).
+    - `ReleaseListResult` — `{ releases: ReleaseInfo[], staleSince: string | null }` so consumers can distinguish a fresh fetch from a served-stale response.
+    - The GitHub API DTO subset we parse (`GitHubReleaseDto`, `GitHubAssetDto`) with only the fields we need (`tag_name`, `published_at`, `assets[].name|browser_download_url|size|content_type`).
+- [ ] **GitHub release service** (new `astros_api/src/firmware/github_release_service.ts`). Class `GitHubReleaseService` constructor takes `(repoSlug: string, fetcher: typeof fetch = fetch)` for DI / test mocking. Single public method: `getReleases(): Promise<ReleaseListResult>`. Internals: 5-min TTL in-memory cache; on cache miss, call `fetcher` against `https://api.github.com/repos/<repoSlug>/releases`; on success, parse + extract per-variant assets + write to cache + return; on fetch error, return last cached value (if any) with `staleSince` set to its fetch timestamp; on cold-cache fetch error, throw. In-flight fetch deduplication so a stampede of `getReleases()` calls during a cold-cache fetch awaits one promise.
+- [ ] **Asset selection logic.** Exported helper `extractFirmwareAssets(release: GitHubReleaseDto): AssetInfo[]`. Walks `release.assets`, applies the regex `^astros-esp-(.+)-([a-z][a-z0-9_]*)-app\.bin$` (capturing version + variant), rejects entries whose `content_type` isn't octet-stream-flavored, returns the array of matched assets. Releases that yield no assets are filtered out of `ReleaseInfo[]` entirely. (Optional sanity check: warn-and-skip if the parsed `version` from the asset name doesn't match the release's `tag_name` minus a leading `v` — catches misnamed assets at parse time rather than at flash time.)
+- [ ] **Tests** (new `astros_api/src/firmware/github_release_service.test.ts`). Cover: cache miss → fetch → fresh result; cache hit within 5 min → no fetch; cache miss after 5 min → re-fetch; fetch error with cold cache → throws; fetch error with warm cache → returns stale with `staleSince`; asset filtering (multi-variant release returns multiple assets, `-flash.bin` excluded, no-match release skipped, wrong content-type skipped, asset whose parsed version disagrees with tag is skipped); pre-release version like `1.2.0-RC.1` parses correctly; date math is mocked via `vi.useFakeTimers()` so the 5-min TTL is testable without sleep.
 
 ## Verification
 
@@ -45,6 +58,7 @@ c.3 ships the service in isolation. No route, no orchestrator integration. Tests
 - On-disk `.bin` cache for downloaded firmware files — **c.4**.
 - Upload mode + `esp_app_desc_t` parsing — **c.5**.
 - FlashJob orchestrator integration — **c.6**.
+- **Heartbeat-variant extension.** c.6 will need POLL_ACK extended from `name<US>fingerprint<US>version` to `name<US>fingerprint<US>version<US>variant` so the orchestrator can match each controller to the correct asset variant. That's a paired cross-repo protocol amendment best done alongside c.6 (where it's actually consumed); doing it in c.3 would ship dead code on both sides. c.3's service returns all matched variants per release without picking; the picker logic + heartbeat amendment land together.
 - Release-list refresh strategy beyond "fetch on getReleases() with 5-min TTL" — no background polling, no manual-refresh endpoint. Cache is lazy.
 - GitHub authentication / PAT support — decomp explicitly chose anonymous fetch. The 60 req/hr limit is fine for this caching strategy (12 fetches/hr worst case, shared across all clients of the running server).
 

@@ -256,7 +256,7 @@ The single highest-risk sub-project. Requirements the firmware sub-plan must mee
 ## Source acquisition + caching (input for sub-plan **c**)
 
 - **GitHub releases endpoint:** `GET https://api.github.com/repos/<owner>/AstrOs.ESP/releases` (anonymous, **60 req/hr per IP** — drives the cache decision).
-- **Asset selection:** match `^astros-esp-v\d+\.\d+\.\d+\.bin$`; prefer exact `astros-esp-v${tag_name#v}.bin`; reject if `content_type` isn't octet-stream.
+- **Asset selection:** match `^astros-esp-(.+)-([a-z][a-z0-9_]*)-app\.bin$`. AstrOs.ESP CI produces one `-app.bin` per build env per release (e.g., `astros-esp-1.0.0-metro_s3-app.bin`, `astros-esp-1.2.0-RC.1-lolin_d32_pro-app.bin`); the regex captures `version` and `variant` (the PlatformIO env name). The `-app.bin` suffix anchors against `-flash.bin` (the full-flash USB-bootstrap image, out of scope for OTA). The `[a-z][a-z0-9_]*` variant pattern excludes the hyphens that semver pre-release labels can contain, so the regex backtracks correctly on names like `astros-esp-1.2.0-RC.1-lolin_d32_pro-app.bin`. Reject if `content_type` isn't octet-stream-flavored. Each release surfaces an array of matched assets (one per variant); orchestrator (c.6) matches each controller's reported variant to the correct asset.
 - **In-memory cache:** 5-min TTL keyed by repo. Serve stale on fetch error with a `staleSince` field surfaced in the API response.
 - **On-disk cache** under `~/.config/astrosserver/firmware-cache/`:
   ```
