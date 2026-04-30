@@ -2,8 +2,8 @@
 // GitHub release shapes — internal "what we surface" types and the API DTO
 // subset we parse. AstrOs.ESP CI produces one `-app.bin` per release per
 // PlatformIO env; each release is therefore ReleaseInfo with one or more
-// AssetInfo entries, one per variant. See .docs/plans/<c.3-plan>.md and the
-// "Source acquisition" section of the decomposition plan for context.
+// AssetInfo entries, one per variant. See the "Source acquisition" section of
+// the decomposition plan for context.
 // ---------------------------------------------------------------------------
 
 // Surfaced per matched `-app.bin` asset on a release. Variant is the
