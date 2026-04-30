@@ -1,0 +1,53 @@
+// ---------------------------------------------------------------------------
+// GitHub release shapes — internal "what we surface" types and the API DTO
+// subset we parse. AstrOs.ESP CI produces one `-app.bin` per release per
+// PlatformIO env; each release is therefore ReleaseInfo with one or more
+// AssetInfo entries, one per variant. See .docs/plans/<c.3-plan>.md and the
+// "Source acquisition" section of the decomposition plan for context.
+// ---------------------------------------------------------------------------
+
+// Surfaced per matched `-app.bin` asset on a release. Variant is the
+// PlatformIO env name (e.g., "lolin_d32_pro", "metro_s3").
+export interface AssetInfo {
+  variant: string;
+  version: string;
+  assetName: string;
+  assetUrl: string;
+  sizeBytes: number;
+}
+
+// Surfaced per release that has at least one matching firmware asset.
+// Releases with zero matched assets are filtered out at the service layer.
+export interface ReleaseInfo {
+  tag: string;
+  version: string;
+  publishedAt: string;
+  assets: AssetInfo[];
+}
+
+// Top-level result of GitHubReleaseService.getReleases(). `staleSince` is
+// null on a fresh fetch and the ISO timestamp of the cache entry's original
+// fetch when the service is serving stale due to a downstream error.
+export interface ReleaseListResult {
+  releases: ReleaseInfo[];
+  staleSince: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// GitHub API DTO subset. Only the fields we actually parse — everything else
+// in the GitHub response is ignored. Reduces surface area for both type
+// maintenance and test-fixture construction.
+// ---------------------------------------------------------------------------
+
+export interface GitHubAssetDto {
+  name: string;
+  browser_download_url: string;
+  size: number;
+  content_type: string;
+}
+
+export interface GitHubReleaseDto {
+  tag_name: string;
+  published_at: string;
+  assets: GitHubAssetDto[];
+}
