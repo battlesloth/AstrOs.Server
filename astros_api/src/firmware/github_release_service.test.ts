@@ -242,6 +242,21 @@ describe('GitHubReleaseService', () => {
     expect(String(url)).toBe('https://api.github.com/repos/battlesloth/AstrOs.ESP/releases');
   });
 
+  it('normalizes a non-Error fetcher rejection into a proper Error', async () => {
+    // Some runtimes / test mocks reject with plain strings or objects. The
+    // catch block previously used `err as Error` (a compile-time-only cast)
+    // and then read `.message`, which would surface `undefined` in logs and
+    // re-throw a non-Error to callers. Normalize at the boundary.
+    const fetcher: typeof fetch = vi.fn(async () => {
+      throw 'string-not-error';
+    }) as unknown as typeof fetch;
+    const svc = new GitHubReleaseService('test/dummy', fetcher);
+
+    const rejection = svc.getReleases();
+    await expect(rejection).rejects.toBeInstanceOf(Error);
+    await expect(rejection).rejects.toThrow(/string-not-error/);
+  });
+
   it('sends User-Agent and Accept headers on every fetch (and keeps the abort signal)', async () => {
     // GitHub's REST API requires a User-Agent on anonymous requests (otherwise
     // returns 403). Accept: application/vnd.github+json pins the v3 response

@@ -193,9 +193,14 @@ export class GitHubReleaseService {
       // If the abort fired we know the cause; convert the (possibly opaque)
       // AbortError into a message that names the URL + timeout duration so
       // logs and error responses point at the right thing to investigate.
+      // Otherwise normalize: a fetcher mock or unusual runtime may reject
+      // with a non-Error value; coerce so logs and re-throws always carry a
+      // usable .message and `instanceof Error` holds for callers.
       const surfaced = controller.signal.aborted
         ? new Error(`GitHub releases fetch timed out after ${FETCH_TIMEOUT_MS}ms: ${this.url}`)
-        : (err as Error);
+        : err instanceof Error
+          ? err
+          : new Error(String(err));
 
       // Set the backoff window so future callers within RETRY_BACKOFF_MS
       // serve stale (or surface the cold-cache error) without re-attempting.
