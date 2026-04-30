@@ -240,6 +240,68 @@ describe('GitHubReleaseService', () => {
     expect(String(url)).toBe('https://api.github.com/repos/battlesloth/AstrOs.ESP/releases');
   });
 
+  it('aborts a hanging fetch after the timeout with an error mentioning the URL', async () => {
+    // Hanging fetcher: never resolves; only rejects when the AbortController
+    // fires. Without the signal-respecting branch, this test would also hang.
+    const hangingFetcher: typeof fetch = vi.fn(async (_url, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          const abortErr = new Error('aborted');
+          abortErr.name = 'AbortError';
+          reject(abortErr);
+        });
+      });
+    }) as unknown as typeof fetch;
+
+    const svc = new GitHubReleaseService('test/dummy', hangingFetcher);
+    const promise = svc.getReleases();
+
+    // Catch unhandled-rejection warning before the assertion runs.
+    const expectation = expect(promise).rejects.toThrow(/timed out.*test\/dummy/i);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await expectation;
+  });
+
+  it('serves stale cache when a re-fetch times out (does not hang)', async () => {
+    let mode: 'fast' | 'hang' = 'fast';
+    const releases = [release()];
+    const fetcher: typeof fetch = vi.fn(async (_url, init?: RequestInit) => {
+      if (mode === 'fast') {
+        return new Response(JSON.stringify(releases), { status: 200 });
+      }
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          const abortErr = new Error('aborted');
+          abortErr.name = 'AbortError';
+          reject(abortErr);
+        });
+      });
+    }) as unknown as typeof fetch;
+
+    const svc = new GitHubReleaseService('test/dummy', fetcher);
+    await svc.getReleases(); // warm cache
+
+    vi.advanceTimersByTime(6 * 60 * 1000); // expire it
+    mode = 'hang';
+
+    const stalePromise = svc.getReleases();
+    await vi.advanceTimersByTimeAsync(15_000); // trip the timeout
+
+    const stale = await stalePromise;
+    expect(stale.releases).toHaveLength(1);
+    expect(stale.staleSince).not.toBeNull();
+  });
+
+  it('includes URL and status text in the non-2xx error', async () => {
+    const fetcher: typeof fetch = vi.fn(
+      async () => new Response('Not Found', { status: 404, statusText: 'Not Found' }),
+    ) as unknown as typeof fetch;
+
+    const svc = new GitHubReleaseService('battlesloth/AstrOs.ESP', fetcher);
+
+    await expect(svc.getReleases()).rejects.toThrow(/AstrOs\.ESP.*404.*Not Found/);
+  });
+
   it('filters out releases with zero matched assets', async () => {
     const releaseWithMatches = release();
     const releaseWithoutMatches = release({

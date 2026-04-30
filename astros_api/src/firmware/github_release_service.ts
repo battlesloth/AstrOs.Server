@@ -25,6 +25,13 @@ const OCTET_CONTENT_TYPES: ReadonlySet<string> = new Set([
 
 const TTL_MS = 5 * 60 * 1000;
 
+// Per-fetch timeout. Without this, a stalled GitHub request would hang
+// indefinitely, leaving `inFlight` unresolved and blocking every future
+// caller until the process restarts. 10 seconds is generous enough for
+// slow networks and tight enough that the UI degrades to stale-cache
+// fallback (or a fast error) rather than a perceived freeze.
+const FETCH_TIMEOUT_MS = 10_000;
+
 /**
  * Pure helper: walks a GitHub release's assets, extracts the matched
  * `-app.bin` firmware binaries, returns them as typed AssetInfo entries.
@@ -118,28 +125,41 @@ export class GitHubReleaseService {
   }
 
   private async fetchOnce(): Promise<ReleaseListResult> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const response = await this.fetcher(this.url);
+      const response = await this.fetcher(this.url, { signal: controller.signal });
       if (!response.ok) {
-        throw new Error(`GitHub releases endpoint returned ${response.status}`);
+        throw new Error(
+          `GitHub releases endpoint ${this.url} returned ${response.status} ${response.statusText}`,
+        );
       }
       const dtos = (await response.json()) as GitHubReleaseDto[];
       const releases = dtos.map(toReleaseInfo).filter((info) => info.assets.length > 0);
       this.cache = { releases, fetchedAt: Date.now() };
       return { releases, staleSince: null };
     } catch (err) {
+      // If the abort fired we know the cause; convert the (possibly opaque)
+      // AbortError into a message that names the URL + timeout duration so
+      // logs and error responses point at the right thing to investigate.
+      const surfaced = controller.signal.aborted
+        ? new Error(`GitHub releases fetch timed out after ${FETCH_TIMEOUT_MS}ms: ${this.url}`)
+        : (err as Error);
+
       if (this.cache) {
         logger.warn(
           `GitHub releases fetch failed; serving stale cache from ${new Date(
             this.cache.fetchedAt,
-          ).toISOString()}: ${(err as Error).message}`,
+          ).toISOString()}: ${surfaced.message}`,
         );
         return {
           releases: this.cache.releases,
           staleSince: new Date(this.cache.fetchedAt).toISOString(),
         };
       }
-      throw err;
+      throw surfaced;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 }
