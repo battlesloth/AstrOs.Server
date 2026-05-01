@@ -50,24 +50,24 @@ Helper `resolveFirmwareCacheDir(envValue: string | undefined): string` parallels
 
 ## Tasks
 
-- [ ] **Typed models** (new `astros_api/src/models/firmware/cache.ts`):
+- [x] **Typed models** (new `astros_api/src/models/firmware/cache.ts`):
     - `CachedAsset` — `{ path: string, sha256: string, sizeBytes: number, meta: CachedAssetMeta }`. Returned by `lookup()` and `fetch()`.
     - `CachedAssetMeta` — `{ tag: string, version: string, variant: string, downloadedAt: string, sourceUrl: string, sizeBytes: number }`. Persisted as `*.meta.json`.
 
-- [ ] **Path-resolution helper** (`resolveFirmwareCacheDir`) in the same file as the cache class. Mirrors `resolveDatabaseDir` semantics so both pieces of state share one mental model.
+- [x] **Path-resolution helper** (`resolveFirmwareCacheDir`) in the same file as the cache class. Mirrors `resolveDatabaseDir` semantics so both pieces of state share one mental model.
 
-- [ ] **`FirmwareCache` class** (new `astros_api/src/firmware/firmware_cache.ts`):
+- [x] **`FirmwareCache` class** (new `astros_api/src/firmware/firmware_cache.ts`):
     - Constructor: `new FirmwareCache(opts?: { rootDir?: string, fetcher?: typeof fetch })`. Defaults: rootDir resolved from `FIRMWARE_CACHE_PATH`, fetcher = global `fetch`.
     - `lookup(tag, variant): Promise<CachedAsset | null>` — stat-based, reads `.sha256` + `.meta.json` if all three files exist; null otherwise.
     - `fetch(asset: AssetInfo): Promise<CachedAsset>` — if `lookup()` hits, return that. Otherwise download to `<name>.tmp` while streaming through `crypto.createHash('sha256')`; on success, write sidecars, atomic-rename `.tmp` → `.bin`, prune to N=5, return. On any I/O or hash error, delete the `.tmp` and re-throw.
     - In-flight dedup: a `Map<string, Promise<CachedAsset>>` keyed by `${tag}::${variant}` — concurrent `fetch()` calls for the same key await the same promise.
     - Bubbles up the same User-Agent + Accept headers c.3 uses (move the constant to a shared spot or duplicate; see "Notes for reviewer").
 
-- [ ] **Eviction** — private `pruneToN(maxReleases = 5)`. Group cached binaries by `tag`, sort tags by semver desc with `published_at` from meta as tie-breaker, drop everything past index 4 (both variants of each evicted tag together). Fire after every successful `fetch()` write.
+- [x] **Eviction** — private `pruneToN(maxReleases = 5)`. Group cached binaries by `tag`, sort tags by semver desc with `published_at` from meta as tie-breaker, drop everything past index 4 (both variants of each evicted tag together). Fire after every successful `fetch()` write.
 
-- [ ] **`.env` update** — add `FIRMWARE_CACHE_PATH=../.data/firmware-cache` so local dev points under the same `.data/` parent as the SQLite DB.
+- [x] **`.env` update** (committed `.env.example` + `.env.test`; local `.env` is gitignored) — add `FIRMWARE_CACHE_PATH=../.data/firmware-cache` so local dev points under the same `.data/` parent as the SQLite DB.
 
-- [ ] **Tests** (new `astros_api/src/firmware/firmware_cache.test.ts`). TDD with mocked fetcher + temp dir per test (`fs.mkdtempSync` in `beforeEach`, `rm -rf` in `afterEach`). Cover:
+- [x] **Tests** (new `astros_api/src/firmware/firmware_cache.test.ts`). TDD with mocked fetcher + temp dir per test (`fs.mkdtempSync` in `beforeEach`, `rm -rf` in `afterEach`). Cover:
     - `lookup` returns null when nothing is cached
     - `lookup` returns the cached asset when all three files exist
     - `lookup` returns null when only some sidecar files exist (defensive: an interrupted write left junk on disk)
@@ -82,10 +82,10 @@ Helper `resolveFirmwareCacheDir(envValue: string | undefined): string` parallels
 
 ## Verification
 
-- [ ] `npm run build` clean (lint + tsc).
-- [ ] `npm run test` green (existing 329 + new c.4 tests).
-- [ ] `npm run prettier:write` and `npm run lint:fix` clean.
-- [ ] Manual smoke: with `FIRMWARE_CACHE_PATH` set to a scratch dir, instantiate the cache from a small script and call `fetch()` against a real GitHub asset URL; verify the three files land on disk and `lookup()` reports them on a second call.
+- [x] `npm run build` clean (lint + tsc).
+- [x] `npm run test` green (329 → 347 passing; +18 new tests).
+- [x] `npm run prettier:write` and `npm run lint:fix` clean.
+- [ ] Manual smoke: with `FIRMWARE_CACHE_PATH` set to a scratch dir, instantiate the cache from a small script and call `fetch()` against a real GitHub asset URL; verify the three files land on disk and `lookup()` reports them on a second call. *(deferred — orchestrator integration in c.6 will exercise this against real assets; unit tests cover the same paths with mocked fetcher + temp dir.)*
 
 ## Files in scope (5)
 
