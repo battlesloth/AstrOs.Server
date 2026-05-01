@@ -69,6 +69,26 @@ interface PathTriple {
   meta: string;
 }
 
+/**
+ * Type predicate for meta.json content read off disk. Validates the
+ * four fields that eviction reads (tag, version, variant, publishedAt) —
+ * other fields aren't load-bearing for the current code paths, so a
+ * partial-but-eviction-safe sidecar is treated as valid. JSON.parse can
+ * legitimately yield arrays, null, primitives, or objects with wrong
+ * shapes; this predicate is the boundary that keeps any of those out of
+ * the sort/group code.
+ */
+function isValidMeta(value: unknown): value is CachedAssetMeta {
+  if (value === null || typeof value !== 'object') return false;
+  const m = value as Record<string, unknown>;
+  return (
+    typeof m.tag === 'string' &&
+    typeof m.version === 'string' &&
+    typeof m.variant === 'string' &&
+    typeof m.publishedAt === 'string'
+  );
+}
+
 function pathsFor(rootDir: string, version: string, variant: string): PathTriple {
   const baseName = `astros-esp-${version}-${variant}-app`;
   const githubDir = path.join(rootDir, GITHUB_SUBDIR);
@@ -240,9 +260,14 @@ export class FirmwareCache {
       if (!entry.isFile() || !entry.name.endsWith('.meta.json')) continue;
       try {
         const text = await fsp.readFile(path.join(githubDir, entry.name), 'utf8');
-        metas.push(JSON.parse(text) as CachedAssetMeta);
+        const parsed: unknown = JSON.parse(text);
+        // Validate the fields that eviction actually consults. JSON.parse('{}')
+        // would otherwise typecast cleanly to CachedAssetMeta but blow up
+        // later in compareVersions/localeCompare on undefined fields. Skip
+        // anything that doesn't carry the four load-bearing strings.
+        if (isValidMeta(parsed)) metas.push(parsed);
       } catch {
-        // Unreadable / malformed sidecar — skip rather than abort.
+        // Unreadable / malformed-JSON sidecar — skip rather than abort.
       }
     }
 

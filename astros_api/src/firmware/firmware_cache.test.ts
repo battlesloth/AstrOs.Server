@@ -362,6 +362,47 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(pathsFor(tmpDir, '1.5.0', 'metro_s3').bin)).toBe(true);
   });
 
+  it('skips structurally-valid-but-malformed meta.json files during eviction', async () => {
+    // JSON.parse({}) yields an object that satisfies the CachedAssetMeta
+    // type assertion at compile time but has all-undefined fields at
+    // runtime. Without explicit validation, eviction would push this entry
+    // into the sort and `b[0].publishedAt.localeCompare(...)` would throw
+    // "Cannot read properties of undefined" — taking the whole prune pass
+    // out and triggering the (now-logging) outer catch on every fetch().
+    //
+    // The 6 well-formed entries plus 1 malformed should evict v1.0.0 (the
+    // oldest of the well-formed ones), the malformed entry should be
+    // ignored entirely, and the just-fetched v1.5.0 should land cleanly.
+    populateCache(tmpDir, '1.0.0', 'metro_s3', '2026-01-01T00:00:00Z');
+    populateCache(tmpDir, '1.1.0', 'metro_s3', '2026-02-01T00:00:00Z');
+    populateCache(tmpDir, '1.2.0', 'metro_s3', '2026-03-01T00:00:00Z');
+    populateCache(tmpDir, '1.3.0', 'metro_s3', '2026-04-01T00:00:00Z');
+    populateCache(tmpDir, '1.4.0', 'metro_s3', '2026-04-15T00:00:00Z');
+    // Drop a `{}` meta into the cache directory — would crash compareVersions
+    // / localeCompare without validation.
+    const githubDir = path.join(tmpDir, 'github');
+    fs.writeFileSync(path.join(githubDir, 'astros-esp-malformed-app.meta.json'), '{}');
+
+    const bytes = Buffer.from('v1.5.0-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    // fetch must succeed; eviction must NOT throw because of the bad file.
+    await cache.fetch(
+      makeRelease({ tag: 'v1.5.0', version: '1.5.0', publishedAt: '2026-04-30T00:00:00Z' }),
+      makeAsset({ version: '1.5.0', sizeBytes: bytes.length }),
+    );
+
+    // The legitimate eviction still happened (oldest well-formed entry gone).
+    expect(fs.existsSync(pathsFor(tmpDir, '1.0.0', 'metro_s3').bin)).toBe(false);
+    expect(fs.existsSync(pathsFor(tmpDir, '1.5.0', 'metro_s3').bin)).toBe(true);
+    // No warn — malformed-file skipping is in-band, not an error condition.
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    vi.restoreAllMocks();
+  });
+
   it('logs a warning when eviction fails so operators can diagnose disk growth', async () => {
     // pruneToN swallows ENOENT (cold-cache, no github/ dir yet) but lets
     // other readdir failures propagate. The fetch() call site catches and
