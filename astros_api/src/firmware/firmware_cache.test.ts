@@ -254,6 +254,27 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(p.meta)).toBe(false);
   });
 
+  it('rejects when the downloaded size does not match AssetInfo.sizeBytes', async () => {
+    // A truncated response that ends cleanly (CDN drops mid-transfer, server
+    // sends fewer bytes than Content-Length declared) would otherwise be
+    // cached as legitimate firmware. Flashing a truncated binary bricks the
+    // controller — this MUST be a hard failure with cleanup, not a warning.
+    const bytes = Buffer.from('shorter-than-claimed');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    await expect(
+      cache.fetch(makeRelease(), makeAsset({ sizeBytes: bytes.length + 100 })),
+    ).rejects.toThrow(/size mismatch/i);
+
+    // .tmp removed; canonical .bin never promoted; sidecars never written.
+    const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    expect(fs.existsSync(p.bin + '.tmp')).toBe(false);
+    expect(fs.existsSync(p.bin)).toBe(false);
+    expect(fs.existsSync(p.sha)).toBe(false);
+    expect(fs.existsSync(p.meta)).toBe(false);
+  });
+
   it('rejects on non-2xx HTTP response', async () => {
     const fetcher: typeof fetch = vi.fn(
       async () => new Response('Not Found', { status: 404, statusText: 'Not Found' }),

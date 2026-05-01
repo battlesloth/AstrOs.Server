@@ -193,8 +193,22 @@ export class FirmwareCache {
     const tmpPath = `${p.bin}.tmp`;
 
     let computedSha: string;
+    let actualSize: number;
     try {
       computedSha = await this.streamDownload(asset.assetUrl, tmpPath);
+      // Verify the body landed at the size GitHub claimed. A truncated
+      // response that ends cleanly (CDN drops mid-transfer, server sends
+      // fewer bytes than Content-Length declared) wouldn't surface as a
+      // stream error — only a stat comparison catches it. Flashing a
+      // truncated firmware would brick the controller, so this is a hard
+      // failure, not a warning.
+      const tmpStat = await fsp.stat(tmpPath);
+      actualSize = tmpStat.size;
+      if (actualSize !== asset.sizeBytes) {
+        throw new Error(
+          `Firmware size mismatch for ${asset.assetName}: expected ${asset.sizeBytes} bytes, got ${actualSize}`,
+        );
+      }
     } catch (err) {
       // Best-effort cleanup. `unlink` may itself ENOENT (e.g., the stream
       // errored before any bytes hit disk) — swallow that.
@@ -209,7 +223,10 @@ export class FirmwareCache {
       downloadedAt: new Date().toISOString(),
       publishedAt: release.publishedAt,
       sourceUrl: asset.assetUrl,
-      sizeBytes: asset.sizeBytes,
+      // Use the stat'd size, not asset.sizeBytes — the size-mismatch check
+      // above guarantees they're equal at this point, so the sidecar always
+      // reflects the bytes actually on disk regardless of input source.
+      sizeBytes: actualSize,
     };
     await fsp.writeFile(p.sha, computedSha);
     await fsp.writeFile(p.meta, JSON.stringify(meta, null, 2));
