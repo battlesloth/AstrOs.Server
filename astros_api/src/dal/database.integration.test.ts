@@ -43,7 +43,12 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
   })();
 }
 
-describe('initializeDatabase safety flow', () => {
+// Each test deliberately drives a real SQLite migration + backup/restore
+// cycle, so ~1.6s isolated baseline is expected. The default 5s vitest
+// timeout leaves only ~3.4s of headroom; under full-suite contention that
+// margin disappears and these tests flake on CI. 15s is well above the
+// observed worst case while still failing fast if a real hang regresses in.
+describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   let tmpDir: string;
   let dbPath: string;
 
