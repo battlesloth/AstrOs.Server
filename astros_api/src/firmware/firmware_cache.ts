@@ -230,6 +230,15 @@ export class FirmwareCache {
     };
     await fsp.writeFile(p.sha, computedSha);
     await fsp.writeFile(p.meta, JSON.stringify(meta, null, 2));
+    // Windows fs.rename throws EEXIST if the destination already exists
+    // (POSIX overwrites atomically). Recover from a stale .bin left by
+    // a crashed earlier write — lookup() would have returned null on
+    // partial state, but the orphaned binary itself still occupies the
+    // canonical path. Unlink it first so the rename always promotes.
+    // ENOENT is the normal case (no stale file); ignore it.
+    await fsp.unlink(p.bin).catch((err: unknown) => {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    });
     await fsp.rename(tmpPath, p.bin);
 
     // Eviction is best-effort and runs after the new entry is fully on disk;

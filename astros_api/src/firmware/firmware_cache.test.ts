@@ -275,6 +275,55 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(p.meta)).toBe(false);
   });
 
+  it('overwrites a stale .bin left by an interrupted earlier write (Windows-rename semantics)', async () => {
+    // Scenario: an earlier fetch wrote the .bin but crashed before sidecars
+    // landed (or sidecars went malformed). lookup() correctly returns null
+    // — partial state is treated as miss — but the leftover .bin is still
+    // on disk. On POSIX, fs.rename overwrites atomically; on Windows it
+    // throws EEXIST. fetch() must recover on either platform.
+    //
+    // The Linux runner can't naturally exhibit the Windows behavior, so
+    // spy on fsp.rename to simulate it: throw EEXIST when the destination
+    // already exists, otherwise delegate to the real rename. This forces
+    // fetch() to either unlink-before-rename or otherwise tolerate the
+    // existing destination — passing on every supported platform.
+    const realRename = fsp.rename.bind(fsp);
+    vi.spyOn(fsp, 'rename').mockImplementation(async (oldPath, newPath) => {
+      let destExists = true;
+      try {
+        await fsp.access(newPath as fs.PathLike);
+      } catch {
+        destExists = false;
+      }
+      if (destExists) {
+        throw Object.assign(
+          new Error(`EEXIST: file exists, rename '${String(oldPath)}' -> '${String(newPath)}'`),
+          { code: 'EEXIST' },
+        );
+      }
+      return realRename(oldPath as fs.PathLike, newPath as fs.PathLike);
+    });
+
+    // Pre-create a stale .bin (no sidecars — lookup returns null).
+    const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    fs.mkdirSync(p.githubDir, { recursive: true });
+    fs.writeFileSync(p.bin, Buffer.from('STALE-CONTENT-FROM-CRASHED-WRITE'));
+
+    const fresh = Buffer.from('fresh-firmware-bytes');
+    const fetcher = makeFetcherReturning(fresh);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    await cache.fetch(makeRelease(), makeAsset({ sizeBytes: fresh.length }));
+
+    // .bin now contains the new bytes; sidecars present; no .tmp leftover.
+    expect(fs.readFileSync(p.bin)).toEqual(fresh);
+    expect(fs.existsSync(p.sha)).toBe(true);
+    expect(fs.existsSync(p.meta)).toBe(true);
+    expect(fs.existsSync(p.bin + '.tmp')).toBe(false);
+
+    vi.restoreAllMocks();
+  });
+
   it('rejects on non-2xx HTTP response', async () => {
     const fetcher: typeof fetch = vi.fn(
       async () => new Response('Not Found', { status: 404, statusText: 'Not Found' }),
