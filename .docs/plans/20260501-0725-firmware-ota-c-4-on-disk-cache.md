@@ -33,7 +33,7 @@ c.4's surface is a single class: `FirmwareCache`. Two methods that callers actua
     └── ...
 ```
 
-Each `.bin` has two sidecar files: `.sha256` (lowercase hex digest, no trailing newline) and `.meta.json` (`{ tag, version, variant, downloadedAt, sourceUrl, sizeBytes }`). The sidecars let `lookup()` answer cheaply without re-hashing on every call, and let an external tool (or future debug endpoint) inspect what's in the cache without parsing filenames.
+Each `.bin` has two sidecar files: `.sha256` (lowercase hex digest, no trailing newline) and `.meta.json` (`{ tag, version, variant, downloadedAt, publishedAt, sourceUrl, sizeBytes }`). `publishedAt` is captured separately from `downloadedAt` so eviction has a stable tie-breaker that doesn't shift on re-download. The sidecars let `lookup()` answer cheaply without re-hashing on every call, and let an external tool (or future debug endpoint) inspect what's in the cache without parsing filenames.
 
 `uploads/` is **not created in c.4** — that subdirectory is c.5's territory.
 
@@ -58,9 +58,9 @@ Helper `resolveFirmwareCacheDir(envValue: string | undefined): string` parallels
 
 - [x] **`FirmwareCache` class** (new `astros_api/src/firmware/firmware_cache.ts`):
     - Constructor: `new FirmwareCache(opts?: { rootDir?: string, fetcher?: typeof fetch })`. Defaults: rootDir resolved from `FIRMWARE_CACHE_PATH`, fetcher = global `fetch`.
-    - `lookup(tag, variant): Promise<CachedAsset | null>` — stat-based, reads `.sha256` + `.meta.json` if all three files exist; null otherwise.
-    - `fetch(asset: AssetInfo): Promise<CachedAsset>` — if `lookup()` hits, return that. Otherwise download to `<name>.tmp` while streaming through `crypto.createHash('sha256')`; on success, write sidecars, atomic-rename `.tmp` → `.bin`, prune to N=5, return. On any I/O or hash error, delete the `.tmp` and re-throw.
-    - In-flight dedup: a `Map<string, Promise<CachedAsset>>` keyed by `${tag}::${variant}` — concurrent `fetch()` calls for the same key await the same promise.
+    - `lookup(version: string, variant: string): Promise<CachedAsset | null>` — stat-based, reads `.sha256` + `.meta.json` if all three files exist; null otherwise. Takes `version` (no `v` prefix) because that's what's encoded in the on-disk filename and what `AssetInfo` already carries; the orchestrator (c.6) will pass `asset.version` directly.
+    - `fetch(release: ReleaseInfo, asset: AssetInfo): Promise<CachedAsset>` — if `lookup()` hits, return that. Otherwise download to `<name>.tmp` while streaming through `crypto.createHash('sha256')`; on success, write sidecars, atomic-rename `.tmp` → `.bin`, prune to N=5, return. On any I/O or hash error, delete the `.tmp` and re-throw. Takes both `release` and `asset` because the meta sidecar needs `tag` and `publishedAt` from the parent release (`AssetInfo` doesn't carry them); the orchestrator naturally has both in scope.
+    - In-flight dedup: a `Map<string, Promise<CachedAsset>>` keyed by `${version}::${variant}` — concurrent `fetch()` calls for the same key await the same promise. The whole `fetch()` (including `lookup()`) is wrapped, not just the download phase, so two callers can't slip past `lookup()` independently and race on the same `.tmp` filename.
     - Bubbles up the same User-Agent + Accept headers c.3 uses (move the constant to a shared spot or duplicate; see "Notes for reviewer").
 
 - [x] **Eviction** — private `pruneToN(maxReleases = 5)`. Group cached binaries by `tag`, sort tags by semver desc with `published_at` from meta as tie-breaker, drop everything past index 4 (both variants of each evicted tag together). Fire after every successful `fetch()` write.
