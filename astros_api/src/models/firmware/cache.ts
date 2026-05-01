@@ -12,12 +12,16 @@ export interface CachedAssetMeta {
   tag: string;
   version: string;
   variant: string;
-  // ISO-8601 timestamp of when this entry was written to disk. Used as the
-  // tie-breaker for eviction when two cached entries share a semver tag.
+  // ISO-8601 timestamp of when this entry was written to disk. Recorded for
+  // operator inspection / debugging only — eviction does NOT consult this
+  // field, since `downloadedAt` shifts on re-download and would make the
+  // sort order unstable across container restarts.
   downloadedAt: string;
-  // GitHub release publish timestamp, threaded through from AssetInfo's
-  // parent release. Primary tie-breaker for ties in semver sort. Stored
-  // separately from downloadedAt because the latter shifts on re-download.
+  // GitHub release publish timestamp, threaded through from the parent
+  // ReleaseInfo. Used as the eviction tie-breaker when two cached entries
+  // compare equal under `compareVersions` (e.g., `1.2.0` vs `1.2.0-RC.1`,
+  // which the semver helper treats as equal because pre-release suffixes
+  // are stripped for gating purposes). Stable across re-downloads.
   publishedAt: string;
   sourceUrl: string;
   sizeBytes: number;
