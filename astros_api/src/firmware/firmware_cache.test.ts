@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import crypto from 'crypto';
-import fs from 'fs';
+import fs, { promises as fsp } from 'fs';
 import os from 'os';
 import path from 'path';
 import appdata from 'appdata-path';
 import { FirmwareCache, resolveFirmwareCacheDir } from './firmware_cache.js';
+import { logger } from '../logger.js';
 import type { CachedAssetMeta } from '../models/firmware/cache.js';
 import type { AssetInfo, ReleaseInfo } from '../models/firmware/release.js';
 
@@ -359,6 +360,35 @@ describe('FirmwareCache.fetch', () => {
     // The just-fetched v1.5.0 only had its metro_s3 variant downloaded —
     // lolin would arrive on a separate fetch() call from the orchestrator.
     expect(fs.existsSync(pathsFor(tmpDir, '1.5.0', 'metro_s3').bin)).toBe(true);
+  });
+
+  it('logs a warning when eviction fails so operators can diagnose disk growth', async () => {
+    // pruneToN swallows ENOENT (cold-cache, no github/ dir yet) but lets
+    // other readdir failures propagate. The fetch() call site catches and
+    // logs without rethrowing, so the just-cached asset is still returned
+    // even though the bookkeeping pass blew up. Without the log, an EACCES
+    // (or anything else preventing pruneToN from running) would silently
+    // let the cache grow past N=5 and the operator would have no signal.
+    const bytes = Buffer.from('test-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    // Force readdir to fail with a non-ENOENT — only fires on the prune
+    // pass after the .bin write completes (lookup uses stat/readFile, not
+    // readdir, so the warm-cache check isn't affected).
+    vi.spyOn(fsp, 'readdir').mockRejectedValueOnce(
+      Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }),
+    );
+
+    // fetch() must STILL succeed — eviction failures are non-fatal.
+    const result = await cache.fetch(makeRelease(), makeAsset({ sizeBytes: bytes.length }));
+    expect(result.path).toBe(pathsFor(tmpDir, '1.0.0', 'metro_s3').bin);
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(String(warnSpy.mock.calls[0][0])).toMatch(/EACCES/);
+
+    vi.restoreAllMocks();
   });
 
   it('breaks semver ties by publishedAt (older publishedAt evicted first)', async () => {

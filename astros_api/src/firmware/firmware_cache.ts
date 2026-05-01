@@ -5,6 +5,7 @@ import { Readable, Transform } from 'stream';
 import { pipeline } from 'stream/promises';
 import type { ReadableStream as NodeWebReadableStream } from 'stream/web';
 import appdata from 'appdata-path';
+import { logger } from '../logger.js';
 import type { CachedAsset, CachedAssetMeta } from '../models/firmware/cache.js';
 import type { AssetInfo, ReleaseInfo } from '../models/firmware/release.js';
 import { compareVersions } from '../utility/semver.js';
@@ -197,8 +198,15 @@ export class FirmwareCache {
     // Eviction is best-effort and runs after the new entry is fully on disk;
     // a failure here doesn't invalidate the just-cached asset, so log-and-go
     // (no rethrow) — the orchestrator that called fetch() shouldn't fail
-    // because of bookkeeping cleanup.
-    await this.pruneToN(MAX_RELEASES).catch(() => undefined);
+    // because of bookkeeping cleanup. The warn surfaces conditions like a
+    // permissions issue on the cache dir that would otherwise let the cache
+    // grow past MAX_RELEASES forever with no operator-visible signal.
+    await this.pruneToN(MAX_RELEASES).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        `firmware-cache eviction failed; cache may exceed ${MAX_RELEASES} releases until next successful fetch: ${message}`,
+      );
+    });
 
     const binStat = await fsp.stat(p.bin);
     return { path: p.bin, sha256: computedSha, sizeBytes: binStat.size, meta };
@@ -218,8 +226,13 @@ export class FirmwareCache {
     let entries: import('fs').Dirent[];
     try {
       entries = await fsp.readdir(githubDir, { withFileTypes: true });
-    } catch {
-      return; // No github/ dir (cold cache) ⇒ nothing to prune.
+    } catch (err) {
+      // ENOENT ⇒ cold cache (no github/ dir yet). Silent return is correct;
+      // there's nothing to evict. Anything else (EACCES, EIO, ENOTDIR ...)
+      // is a real failure that needs operator attention — propagate so the
+      // caller's catch can log it.
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw err;
     }
 
     const metas: CachedAssetMeta[] = [];
