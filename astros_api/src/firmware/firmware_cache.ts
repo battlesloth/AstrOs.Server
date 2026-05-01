@@ -47,6 +47,11 @@ const GITHUB_SUBDIR = 'github';
 // so worst-case footprint is ~12 MB at full cache (5 × 2 × ~1.2 MB).
 const MAX_RELEASES = 5;
 
+// Canonical form of `crypto.createHash('sha256').digest('hex')`: 64 chars
+// of [0-9a-f]. Anything else in a .bin.sha256 sidecar means the file is
+// corrupted or wasn't written by us — lookup() treats it as a cache miss.
+const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
+
 // User-Agent is required by GitHub's CDN-fronted asset endpoints (some
 // proxies reject unidentified clients). Accept is intentionally permissive
 // here — unlike the API endpoint (where v3 negotiation matters), the asset
@@ -70,13 +75,22 @@ interface PathTriple {
 }
 
 /**
- * Type predicate for meta.json content read off disk. Validates the
- * four fields that eviction reads (tag, version, variant, publishedAt) —
- * other fields aren't load-bearing for the current code paths, so a
- * partial-but-eviction-safe sidecar is treated as valid. JSON.parse can
- * legitimately yield arrays, null, primitives, or objects with wrong
- * shapes; this predicate is the boundary that keeps any of those out of
- * the sort/group code.
+ * Type predicate for meta.json content read off disk. Validates every
+ * field of CachedAssetMeta so the predicate is sound: anything narrowed
+ * to `value is CachedAssetMeta` here is safe to pass to any consumer of
+ * the type — pruneToN's eviction sort (uses tag/version/publishedAt),
+ * lookup()'s returned CachedAsset (exposes the whole meta to callers),
+ * and any future code that reads sourceUrl/downloadedAt/sizeBytes —
+ * without runtime undefined-field crashes despite the compile-time
+ * non-null typing. JSON.parse can legitimately yield arrays, null,
+ * primitives, or objects with wrong shapes; this predicate is the
+ * boundary that keeps any of those out of typed code.
+ *
+ * Tightening from a partial check (4 fields) to the full interface also
+ * acts as defense-in-depth against partial-write corruption: a crash
+ * mid-JSON-write that left a truncated-but-parseable object missing
+ * trailing fields fails validation here and triggers a re-download
+ * rather than poisoning the cache.
  */
 function isValidMeta(value: unknown): value is CachedAssetMeta {
   if (value === null || typeof value !== 'object') return false;
@@ -85,7 +99,10 @@ function isValidMeta(value: unknown): value is CachedAssetMeta {
     typeof m.tag === 'string' &&
     typeof m.version === 'string' &&
     typeof m.variant === 'string' &&
-    typeof m.publishedAt === 'string'
+    typeof m.downloadedAt === 'string' &&
+    typeof m.publishedAt === 'string' &&
+    typeof m.sourceUrl === 'string' &&
+    typeof m.sizeBytes === 'number'
   );
 }
 
@@ -139,12 +156,23 @@ export class FirmwareCache {
         fsp.readFile(p.sha, 'utf8'),
         fsp.readFile(p.meta, 'utf8'),
       ]);
-      const meta = JSON.parse(metaText) as CachedAssetMeta;
+
+      // Validate sidecar contents before returning. JSON.parse('{}') would
+      // otherwise typecast cleanly to CachedAssetMeta but leave all fields
+      // undefined, crashing later callers that touch meta.tag / meta.publishedAt.
+      // A malformed .sha256 (wrong length, non-hex, mixed case) would feed
+      // garbage into the protocol layer's hash compare. Treat both cases as
+      // a miss so fetch() re-downloads with a fresh, canonical sidecar pair.
+      const sha256 = shaText.trim();
+      if (!SHA256_HEX_RE.test(sha256)) return null;
+      const parsed: unknown = JSON.parse(metaText);
+      if (!isValidMeta(parsed)) return null;
+
       return {
         path: p.bin,
-        sha256: shaText.trim(),
+        sha256,
         sizeBytes: binStat.size,
-        meta,
+        meta: parsed,
       };
     } catch {
       // ENOENT on any of the three reads ⇒ partial-or-missing state ⇒ miss.
@@ -281,9 +309,18 @@ export class FirmwareCache {
       throw err;
     }
 
-    const metas: CachedAssetMeta[] = [];
+    const META_SUFFIX = '.meta.json';
+
+    // Each entry keeps its source Dirent name alongside the parsed meta.
+    // The Dirent name is guaranteed by Node to be a basename (no path
+    // separators), so deriving sibling .bin / .bin.sha256 paths from it
+    // is safe by construction. JSON content (m.version / m.variant) is
+    // consulted only for sort ordering — never for path construction —
+    // so a meta sidecar with path-traversal payloads in those fields
+    // can't influence which files get unlinked.
+    const metaFiles: Array<{ name: string; meta: CachedAssetMeta }> = [];
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith('.meta.json')) continue;
+      if (!entry.isFile() || !entry.name.endsWith(META_SUFFIX)) continue;
       try {
         const text = await fsp.readFile(path.join(githubDir, entry.name), 'utf8');
         const parsed: unknown = JSON.parse(text);
@@ -291,18 +328,18 @@ export class FirmwareCache {
         // would otherwise typecast cleanly to CachedAssetMeta but blow up
         // later in compareVersions/localeCompare on undefined fields. Skip
         // anything that doesn't carry the four load-bearing strings.
-        if (isValidMeta(parsed)) metas.push(parsed);
+        if (isValidMeta(parsed)) metaFiles.push({ name: entry.name, meta: parsed });
       } catch {
         // Unreadable / malformed-JSON sidecar — skip rather than abort.
       }
     }
 
     // Group by tag so both variants of the same release stay together.
-    const byTag = new Map<string, CachedAssetMeta[]>();
-    for (const m of metas) {
-      const arr = byTag.get(m.tag);
-      if (arr) arr.push(m);
-      else byTag.set(m.tag, [m]);
+    const byTag = new Map<string, Array<{ name: string; meta: CachedAssetMeta }>>();
+    for (const e of metaFiles) {
+      const arr = byTag.get(e.meta.tag);
+      if (arr) arr.push(e);
+      else byTag.set(e.meta.tag, [e]);
     }
 
     if (byTag.size <= maxReleases) return;
@@ -311,20 +348,25 @@ export class FirmwareCache {
     // first member of each group as the representative — all members of a
     // group share the same tag/version/publishedAt by construction.
     const sortedTagGroups = [...byTag.entries()].sort(([, a], [, b]) => {
-      const cmp = compareVersions(a[0].version, b[0].version);
+      const cmp = compareVersions(a[0].meta.version, b[0].meta.version);
       if (!Number.isNaN(cmp) && cmp !== 0) return -cmp; // desc
       // Tied or unparseable: publishedAt desc.
-      return b[0].publishedAt.localeCompare(a[0].publishedAt);
+      return b[0].meta.publishedAt.localeCompare(a[0].meta.publishedAt);
     });
 
-    // Evict everything past the keep-window.
+    // Evict everything past the keep-window. Paths are derived from each
+    // meta file's Dirent name (a guaranteed basename), so unlink targets
+    // always live inside githubDir even if the JSON content is hostile.
     for (const [, members] of sortedTagGroups.slice(maxReleases)) {
-      for (const m of members) {
-        const p = pathsFor(this.rootDir, m.version, m.variant);
+      for (const e of members) {
+        const baseName = e.name.slice(0, -META_SUFFIX.length);
+        const metaPath = path.join(githubDir, e.name);
+        const binPath = path.join(githubDir, `${baseName}.bin`);
+        const shaPath = path.join(githubDir, `${baseName}.bin.sha256`);
         await Promise.all([
-          fsp.unlink(p.bin).catch(() => undefined),
-          fsp.unlink(p.sha).catch(() => undefined),
-          fsp.unlink(p.meta).catch(() => undefined),
+          fsp.unlink(binPath).catch(() => undefined),
+          fsp.unlink(shaPath).catch(() => undefined),
+          fsp.unlink(metaPath).catch(() => undefined),
         ]);
       }
     }

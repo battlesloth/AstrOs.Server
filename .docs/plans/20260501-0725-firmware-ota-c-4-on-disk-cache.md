@@ -1,4 +1,4 @@
-# c.4 — On-disk firmware cache + LRU eviction + SHA-256 stream-hash
+# c.4 — On-disk firmware cache + newest-N retention + SHA-256 stream-hash
 
 Light plan for the next server-orchestrator PR. Builds the on-disk binary cache that the FlashJob orchestrator (c.6) will consume: when a user selects a release to flash, the cache materializes the matched `-app.bin` from GitHub onto local disk, stream-hashes it during download, and prunes older versions to N=5.
 
@@ -10,7 +10,7 @@ Light plan for the next server-orchestrator PR. Builds the on-disk binary cache 
 
 c.3 ships the GitHub release listing (metadata only — no binaries). c.4 ships the layer that actually puts a `.bin` on disk when one is needed. The orchestrator (c.6) is what calls into c.4; the route layer (c.8) doesn't talk to c.4 at all. c.4 is a pure module — no Express wiring, no WebSocket fan-out.
 
-**Population is strictly on-demand.** No prefetch, no background polling. The cache fills up as users actually start flash jobs, so the N=5 LRU reflects "the last 5 versions the user chose to flash." This makes the eviction policy intuitive and keeps the steady-state disk footprint small (~12 MB at full cache: 5 releases × 2 variants × ~1.2 MB).
+**Population is strictly on-demand.** No prefetch, no background polling. The cache fills up as users actually start flash jobs; eviction then keeps only the **newest 5 published releases** out of whatever the user has touched, sorted by semver desc with `published_at` as the tie-breaker. So the steady-state cache reflects "the 5 newest versions you've ever flashed" — not the last 5 you flashed (an older version you reflashed yesterday still drops out once five newer ones have been pulled). This keeps the disk footprint small (~12 MB at full cache: 5 releases × 2 variants × ~1.2 MB) and matches the user mental model that a firmware cache should hold *recent* versions, not *recently-touched* ones.
 
 Asset naming convention from c.3 is preserved:
 - `astros-esp-${VERSION}-${ENV}-app.bin` — what we cache.
@@ -46,7 +46,7 @@ New env var **`FIRMWARE_CACHE_PATH`** (mirrors `DATABASE_PATH` exactly):
 
 Helper `resolveFirmwareCacheDir(envValue: string | undefined): string` parallels `resolveDatabaseDir` in `dal/database.ts`. Tests bypass the env var entirely by passing `new FirmwareCache({ rootDir: <tempdir> })`.
 
-`.env` gets a new line: `FIRMWARE_CACHE_PATH=../.data/firmware-cache`
+`.env` gets a new line: `FIRMWARE_CACHE_PATH=%AppData%` (matches the committed `DATABASE_PATH=%AppData%` default; resolves to `appdata('astrosserver')/firmware-cache` at runtime).
 
 ## Tasks
 
@@ -61,11 +61,11 @@ Helper `resolveFirmwareCacheDir(envValue: string | undefined): string` parallels
     - `lookup(version: string, variant: string): Promise<CachedAsset | null>` — stat-based, reads `.sha256` + `.meta.json` if all three files exist; null otherwise. Takes `version` (no `v` prefix) because that's what's encoded in the on-disk filename and what `AssetInfo` already carries; the orchestrator (c.6) will pass `asset.version` directly.
     - `fetch(release: ReleaseInfo, asset: AssetInfo): Promise<CachedAsset>` — if `lookup()` hits, return that. Otherwise download to `<name>.tmp` while streaming through `crypto.createHash('sha256')`; on success, write sidecars, atomic-rename `.tmp` → `.bin`, prune to N=5, return. On any I/O or hash error, delete the `.tmp` and re-throw. Takes both `release` and `asset` because the meta sidecar needs `tag` and `publishedAt` from the parent release (`AssetInfo` doesn't carry them); the orchestrator naturally has both in scope.
     - In-flight dedup: a `Map<string, Promise<CachedAsset>>` keyed by `${version}::${variant}` — concurrent `fetch()` calls for the same key await the same promise. The whole `fetch()` (including `lookup()`) is wrapped, not just the download phase, so two callers can't slip past `lookup()` independently and race on the same `.tmp` filename.
-    - Bubbles up the same User-Agent + Accept headers c.3 uses (move the constant to a shared spot or duplicate; see "Notes for reviewer").
+    - Sends `User-Agent: AstrOs.Server` only, via a local `DOWNLOAD_HEADERS` constant inlined in `firmware_cache.ts`. The asset endpoint is GitHub's CDN, not the v3 API, so c.3's `Accept: application/vnd.github+json` (which pins API content negotiation) isn't applicable here and is intentionally omitted. See "Notes for reviewer" for the full rationale.
 
 - [x] **Eviction** — private `pruneToN(maxReleases = 5)`. Group cached binaries by `tag`, sort tags by semver desc with `published_at` from meta as tie-breaker, drop everything past index 4 (both variants of each evicted tag together). Fire after every successful `fetch()` write.
 
-- [x] **`.env` update** (committed `.env.example` + `.env.test`; local `.env` is gitignored) — add `FIRMWARE_CACHE_PATH=../.data/firmware-cache` so local dev points under the same `.data/` parent as the SQLite DB.
+- [x] **`.env` update** (committed `.env.example` + `.env.test`; local `.env` is gitignored) — add `FIRMWARE_CACHE_PATH=%AppData%`, matching the existing `DATABASE_PATH=%AppData%` convention. `%AppData%` is a sentinel (case-insensitive) that `resolveFirmwareCacheDir` translates to `appdata('astrosserver')/firmware-cache`, so the cache and the SQLite DB share the same OS-resolved appdata parent on every platform. A literal path (e.g. `../.data/firmware-cache`) is also supported and used as-is — useful for ad-hoc dev runs but not the committed default.
 
 - [x] **Tests** (new `astros_api/src/firmware/firmware_cache.test.ts`). TDD with mocked fetcher + temp dir per test (`fs.mkdtempSync` in `beforeEach`, `rm -rf` in `afterEach`). Cover:
     - `lookup` returns null when nothing is cached
@@ -74,7 +74,6 @@ Helper `resolveFirmwareCacheDir(envValue: string | undefined): string` parallels
     - `fetch` on cold cache downloads, writes all three files atomically (no `.tmp` left behind on success)
     - `fetch` returns from cache without re-downloading when already present
     - `fetch` removes the `.tmp` and re-throws if the download fails mid-stream
-    - `fetch` removes the `.tmp` and throws if the computed SHA-256 differs from the asset's expected hash *(only if the AssetInfo carries an expected hash — open question, see "Notes")*
     - In-flight dedup: two concurrent `fetch()` calls for the same key invoke the fetcher exactly once
     - Eviction: 6th successful `fetch` evicts the oldest release (both variants); newest 5 remain
     - Eviction handles ties by `published_at` (tag-only sort isn't enough — semver-equal tags do exist in dev fixtures)
@@ -102,7 +101,7 @@ Helper `resolveFirmwareCacheDir(envValue: string | undefined): string` parallels
 - Upload mode (`uploads/` subdir + multipart write path + `esp_app_desc_t` parsing) — **c.5**.
 - FlashJob orchestrator wiring — **c.6**.
 - HTTP route exposure (the cache is purely an internal module in c.4) — **c.8**.
-- Cache invalidation on user-initiated "delete" — out of scope for v1; LRU eviction is the only removal mechanism.
+- Cache invalidation on user-initiated "delete" — out of scope for v1; newest-N retention is the only removal mechanism.
 - Resume of partial downloads (HTTP `Range` requests) — `.tmp` is always discarded and re-downloaded on failure.
 - Cross-process safety — single-process server only; no file locks.
 

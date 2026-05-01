@@ -101,7 +101,7 @@ describe('FirmwareCache.lookup', () => {
     const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
     fs.mkdirSync(p.githubDir, { recursive: true });
     const binBytes = Buffer.from('fake-firmware-bytes');
-    const sha = 'abc123def456';
+    const sha = crypto.createHash('sha256').update(binBytes).digest('hex');
     const meta = makeMeta();
     fs.writeFileSync(p.bin, binBytes);
     fs.writeFileSync(p.sha, sha);
@@ -130,6 +130,71 @@ describe('FirmwareCache.lookup', () => {
   it('returns null when only the .meta.json exists (no .bin)', async () => {
     const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
     fs.mkdirSync(p.githubDir, { recursive: true });
+    fs.writeFileSync(p.meta, JSON.stringify(makeMeta()));
+
+    const cache = new FirmwareCache({ rootDir: tmpDir });
+    expect(await cache.lookup('1.0.0', 'metro_s3')).toBeNull();
+  });
+
+  it('returns null when meta.json parses but is missing required fields', async () => {
+    // Defensive: JSON.parse('{}') succeeds and would type-cast cleanly to
+    // CachedAssetMeta, but the resulting object has all-undefined fields.
+    // Returning that to a caller would crash downstream code that touches
+    // meta.tag.localeCompare(...), meta.publishedAt, etc. Treat as a miss
+    // so the orchestrator falls through to fetch() and re-downloads.
+    const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    fs.mkdirSync(p.githubDir, { recursive: true });
+    const binBytes = Buffer.from('fake-firmware-bytes');
+    const sha = crypto.createHash('sha256').update(binBytes).digest('hex');
+    fs.writeFileSync(p.bin, binBytes);
+    fs.writeFileSync(p.sha, sha);
+    fs.writeFileSync(p.meta, '{}');
+
+    const cache = new FirmwareCache({ rootDir: tmpDir });
+    expect(await cache.lookup('1.0.0', 'metro_s3')).toBeNull();
+  });
+
+  it('returns null when meta.json has the eviction fields but is missing other required fields', async () => {
+    // Soundness: isValidMeta's type predicate narrows to the full
+    // CachedAssetMeta interface, so any meta returned from lookup() must
+    // carry every interface field — not just the four the eviction sort
+    // consults. Otherwise callers reading result.meta.sourceUrl /
+    // .sizeBytes / .downloadedAt would get `undefined` despite the type
+    // system promising `string` / `number`. Treating as a miss keeps the
+    // narrowed type honest.
+    const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    fs.mkdirSync(p.githubDir, { recursive: true });
+    const binBytes = Buffer.from('fake-firmware-bytes');
+    const sha = crypto.createHash('sha256').update(binBytes).digest('hex');
+    fs.writeFileSync(p.bin, binBytes);
+    fs.writeFileSync(p.sha, sha);
+    // Has tag/version/variant/publishedAt (the eviction quartet) but
+    // omits downloadedAt, sourceUrl, sizeBytes — would slip past a
+    // 4-field-only predicate.
+    fs.writeFileSync(
+      p.meta,
+      JSON.stringify({
+        tag: 'v1.0.0',
+        version: '1.0.0',
+        variant: 'metro_s3',
+        publishedAt: '2026-04-15T00:00:00Z',
+      }),
+    );
+
+    const cache = new FirmwareCache({ rootDir: tmpDir });
+    expect(await cache.lookup('1.0.0', 'metro_s3')).toBeNull();
+  });
+
+  it('returns null when sha256 sidecar is not a 64-char lowercase hex digest', async () => {
+    // crypto.createHash('sha256').digest('hex') always produces 64 chars
+    // of [0-9a-f], so anything else means the sidecar is corrupted or
+    // wasn't written by us. Returning a malformed digest to the protocol
+    // layer would surface as a far-downstream verify mismatch — better
+    // to treat as a miss and re-download.
+    const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    fs.mkdirSync(p.githubDir, { recursive: true });
+    fs.writeFileSync(p.bin, 'data');
+    fs.writeFileSync(p.sha, 'abc123def456'); // 12 chars — wrong length
     fs.writeFileSync(p.meta, JSON.stringify(makeMeta()));
 
     const cache = new FirmwareCache({ rootDir: tmpDir });
@@ -525,6 +590,63 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(pathsFor(tmpDir, '1.0.0', 'metro_s3').bin)).toBe(false);
     expect(fs.existsSync(pathsFor(tmpDir, '1.2.0-RC.1', 'metro_s3').bin)).toBe(true);
     expect(fs.existsSync(pathsFor(tmpDir, '1.2.0', 'metro_s3').bin)).toBe(true);
+  });
+
+  it('does not unlink files outside github/ even when meta.json carries path-traversal payloads', async () => {
+    // Defense-in-depth: a malicious or corrupted .meta.json containing path
+    // separators in `version` / `variant` must NOT cause eviction to walk
+    // out of the cache subdirectory via path.join's `..` normalization.
+    // pruneToN derives sibling .bin / .bin.sha256 paths from each meta
+    // file's own Dirent name (a guaranteed basename), so JSON content can
+    // only influence sort ordering — never path construction.
+    const githubDir = path.join(tmpDir, 'github');
+    fs.mkdirSync(githubDir, { recursive: true });
+
+    // Sentinel one level above github/ at the path the malicious meta
+    // would target if pruneToN built unlink paths from JSON values.
+    // With version='/../../foo' and variant='bar', the buggy basename
+    // 'astros-esp-/../../foo-bar-app.bin' normalizes (under path.join
+    // from githubDir) to <tmpDir>/foo-bar-app.bin.
+    const sentinelPath = path.join(tmpDir, 'foo-bar-app.bin');
+    fs.writeFileSync(sentinelPath, 'do-not-delete');
+
+    populateCache(tmpDir, '1.0.0', 'metro_s3', '2026-01-01T00:00:00Z');
+    populateCache(tmpDir, '1.1.0', 'metro_s3', '2026-02-01T00:00:00Z');
+    populateCache(tmpDir, '1.2.0', 'metro_s3', '2026-03-01T00:00:00Z');
+    populateCache(tmpDir, '1.3.0', 'metro_s3', '2026-04-01T00:00:00Z');
+    populateCache(tmpDir, '1.4.0', 'metro_s3', '2026-04-15T00:00:00Z');
+
+    // Malicious meta whose tag sorts oldest under semver desc, so its
+    // group is the one chosen for eviction.
+    const maliciousMetaName = 'astros-esp-malicious-app.meta.json';
+    fs.writeFileSync(
+      path.join(githubDir, maliciousMetaName),
+      JSON.stringify(
+        makeMeta({
+          tag: 'v0.0.0',
+          version: '/../../foo',
+          variant: 'bar',
+          publishedAt: '2025-01-01T00:00:00Z',
+        }),
+      ),
+    );
+
+    const bytes = Buffer.from('v1.5.0-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+    await cache.fetch(
+      makeRelease({ tag: 'v1.5.0', version: '1.5.0', publishedAt: '2026-04-30T00:00:00Z' }),
+      makeAsset({ version: '1.5.0', sizeBytes: bytes.length }),
+    );
+
+    // The sentinel outside github/ must still exist — eviction stayed
+    // inside the subdirectory it owns.
+    expect(fs.existsSync(sentinelPath)).toBe(true);
+
+    // The malicious meta itself was correctly removed from its real
+    // on-disk location: pruneToN selected its tag-group for eviction
+    // and unlinked using paths derived from the meta file's Dirent name.
+    expect(fs.existsSync(path.join(githubDir, maliciousMetaName))).toBe(false);
   });
 
   // -------------------------------------------------------------------------
