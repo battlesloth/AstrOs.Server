@@ -54,6 +54,13 @@ const DOWNLOAD_HEADERS: Readonly<Record<string, string>> = {
   'User-Agent': 'AstrOs.Server',
 };
 
+// Wall-clock bound on a single download. Without this, a stalled connection
+// (server accepts but never sends the body, or a CDN that hangs mid-stream)
+// would leave the inFlight entry stuck and hang every subsequent fetch()
+// for the same (version, variant). 60 seconds is generous for a 1.2 MB
+// firmware binary on slow links while still detecting a true stall.
+const DOWNLOAD_TIMEOUT_MS = 60_000;
+
 interface PathTriple {
   githubDir: string;
   bin: string;
@@ -75,11 +82,15 @@ function pathsFor(rootDir: string, version: string, variant: string): PathTriple
 export interface FirmwareCacheOptions {
   rootDir?: string;
   fetcher?: typeof fetch;
+  // Wall-clock bound on a single download. Tests override this to a tiny
+  // value to drive the timeout path in real time without faking timers.
+  downloadTimeoutMs?: number;
 }
 
 export class FirmwareCache {
   private readonly rootDir: string;
   private readonly fetcher: typeof fetch;
+  private readonly downloadTimeoutMs: number;
   // Concurrent fetch() calls for the same key share one underlying download.
   // Keyed by `${version}::${variant}` since those are what determine the
   // on-disk filename triple. Cleared on completion (success or error) so a
@@ -89,6 +100,7 @@ export class FirmwareCache {
   constructor(opts: FirmwareCacheOptions = {}) {
     this.rootDir = opts.rootDir ?? resolveFirmwareCacheDir(process.env.FIRMWARE_CACHE_PATH);
     this.fetcher = opts.fetcher ?? fetch;
+    this.downloadTimeoutMs = opts.downloadTimeoutMs ?? DOWNLOAD_TIMEOUT_MS;
   }
 
   /**
@@ -260,31 +272,58 @@ export class FirmwareCache {
    * with the lowercase hex digest. `pipeline()` propagates errors across
    * all three streams atomically — a mid-stream abort surfaces as a
    * single rejection, after which the caller is responsible for `unlink`.
+   *
+   * Bounded by `DOWNLOAD_TIMEOUT_MS`: an `AbortController` is wired into
+   * both the `fetch()` call and the pipeline, so a stall at *either* the
+   * connection-establishment phase OR mid-body-stream surfaces as a
+   * rejection rather than a hang. The catch normalizes the abort path
+   * into a URL-naming error so logs and ops responses point at the right
+   * thing to investigate.
    */
   private async streamDownload(url: string, dest: string): Promise<string> {
-    const response = await this.fetcher(url, { headers: DOWNLOAD_HEADERS });
-    if (!response.ok) {
-      throw new Error(
-        `Firmware download failed: ${url} returned ${response.status} ${response.statusText}`,
-      );
-    }
-    if (!response.body) {
-      throw new Error(`Firmware download has no body: ${url}`);
-    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.downloadTimeoutMs);
+    try {
+      const response = await this.fetcher(url, {
+        headers: DOWNLOAD_HEADERS,
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(
+          `Firmware download failed: ${url} returned ${response.status} ${response.statusText}`,
+        );
+      }
+      if (!response.body) {
+        throw new Error(`Firmware download has no body: ${url}`);
+      }
 
-    const hash = crypto.createHash('sha256');
-    const hasher = new Transform({
-      transform(chunk: Buffer, _enc, cb) {
-        hash.update(chunk);
-        cb(null, chunk);
-      },
-    });
+      const hash = crypto.createHash('sha256');
+      const hasher = new Transform({
+        transform(chunk: Buffer, _enc, cb) {
+          hash.update(chunk);
+          cb(null, chunk);
+        },
+      });
 
-    // Node's `Readable.fromWeb` types its arg as `stream/web`'s ReadableStream
-    // even though it accepts the global one at runtime. The cast bridges the
-    // nominal mismatch without runtime cost.
-    const webBody = response.body as unknown as NodeWebReadableStream<Uint8Array>;
-    await pipeline(Readable.fromWeb(webBody), hasher, fs.createWriteStream(dest));
-    return hash.digest('hex');
+      // Node's `Readable.fromWeb` types its arg as `stream/web`'s ReadableStream
+      // even though it accepts the global one at runtime. The cast bridges the
+      // nominal mismatch without runtime cost.
+      const webBody = response.body as unknown as NodeWebReadableStream<Uint8Array>;
+      await pipeline(Readable.fromWeb(webBody), hasher, fs.createWriteStream(dest), {
+        signal: controller.signal,
+      });
+      return hash.digest('hex');
+    } catch (err) {
+      // If the abort fired we know the cause; turn the (possibly opaque)
+      // AbortError into a URL-naming error so logs say what stalled.
+      // Otherwise normalize a non-Error rejection (mock fetchers, unusual
+      // runtimes) so callers always get an `instanceof Error`.
+      if (controller.signal.aborted) {
+        throw new Error(`Firmware download timed out after ${this.downloadTimeoutMs}ms: ${url}`);
+      }
+      throw err instanceof Error ? err : new Error(String(err));
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 }

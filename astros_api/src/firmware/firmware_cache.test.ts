@@ -386,6 +386,78 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(pathsFor(tmpDir, '1.2.0', 'metro_s3').bin)).toBe(true);
   });
 
+  // -------------------------------------------------------------------------
+  // Download timeout — without this, a stalled fetch (server accepts the
+  // connection but never sends the body) would leave the inFlight entry
+  // stuck and hang every subsequent fetch() for the same key. The real-prod
+  // timeout is 60s; tests inject a tiny one (50ms) so the timeout path runs
+  // in actual real time without the fragility of fake-timer microtask flushes.
+  // -------------------------------------------------------------------------
+
+  it('aborts a hanging download after the timeout with a URL-naming error', async () => {
+    // Hanging fetcher: only rejects when the AbortController fires. Without
+    // the signal-respecting branch in streamDownload, this test would hit
+    // vitest's default 5s timeout — a generic "test timed out" rather than
+    // the descriptive "Firmware download timed out" we want surfaced to ops.
+    const hangingFetcher: typeof fetch = vi.fn(async (_url, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      });
+    }) as unknown as typeof fetch;
+
+    const cache = new FirmwareCache({
+      rootDir: tmpDir,
+      fetcher: hangingFetcher,
+      downloadTimeoutMs: 50,
+    });
+
+    await expect(cache.fetch(makeRelease(), makeAsset())).rejects.toThrow(
+      /timed out.*example\.test/i,
+    );
+  });
+
+  it('clears the inFlight slot on timeout so a retry can proceed', async () => {
+    // Critical: a stalled download must not poison the inFlight Map. After
+    // the timeout aborts the first fetch, a second fetch for the same key
+    // must invoke the fetcher again rather than awaiting the dead promise.
+    let mode: 'hang' | 'ok' = 'hang';
+    const bytes = Buffer.from('post-retry-bytes');
+    const fetcher: typeof fetch = vi.fn(async (_url, init?: RequestInit) => {
+      if (mode === 'hang') {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        });
+      }
+      return new Response(bytes, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const cache = new FirmwareCache({
+      rootDir: tmpDir,
+      fetcher,
+      downloadTimeoutMs: 50,
+    });
+    const release = makeRelease();
+    const asset = makeAsset({ sizeBytes: bytes.length });
+
+    // First call hangs and times out.
+    await expect(cache.fetch(release, asset)).rejects.toThrow(/timed out/i);
+
+    // Flip to success and retry — this MUST call the fetcher again
+    // (i.e., not be hung on the dead inFlight slot).
+    mode = 'ok';
+    const second = await cache.fetch(release, asset);
+    expect(second.path).toBe(pathsFor(tmpDir, '1.0.0', 'metro_s3').bin);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it('dedups concurrent fetch() calls for the same (version, variant)', async () => {
     // Stampede scenario: two callers race to materialize the same asset on
     // a cold cache. Without dedup, both would download independently — wasting
