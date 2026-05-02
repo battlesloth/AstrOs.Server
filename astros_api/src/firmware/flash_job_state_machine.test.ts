@@ -237,17 +237,20 @@ describe('transitionControllerState — same-stage progress updates', () => {
     FwStage.Sending,
     FwStage.Verifying,
     FwStage.Rebooting,
-  ] as const)('non-terminal %s → %s merges bytesSent', (stage) => {
-    const start: ControllerFlashState =
-      stage === FwStage.Queued
-        ? queued({ bytesSent: 100, totalBytes: 1024, detail: 'mid-flight' })
-        : withStage(stage, { bytesSent: 100, totalBytes: 1024, detail: 'mid-flight' });
-    const next = transitionControllerState(start, stage, { bytesSent: 500 });
-    expect(next.stage).toBe(stage);
-    expect(next.bytesSent).toBe(500);
-    expect(next.totalBytes).toBe(1024);
-    expect(next.detail).toBe('mid-flight');
-  });
+  ] as const)(
+    'FW_PROGRESS during %s updates byte counts without forcing a stage transition',
+    (stage) => {
+      const start: ControllerFlashState =
+        stage === FwStage.Queued
+          ? queued({ bytesSent: 100, totalBytes: 1024, detail: 'mid-flight' })
+          : withStage(stage, { bytesSent: 100, totalBytes: 1024, detail: 'mid-flight' });
+      const next = transitionControllerState(start, stage, { bytesSent: 500 });
+      expect(next.stage).toBe(stage);
+      expect(next.bytesSent).toBe(500);
+      expect(next.totalBytes).toBe(1024);
+      expect(next.detail).toBe('mid-flight');
+    },
+  );
 
   it('same-stage update with no payload is a no-op equivalent', () => {
     const start = withStage(FwStage.Sending, {
