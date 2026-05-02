@@ -143,14 +143,14 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
 |------|-------------------|----------|
 | `fsp.open(tempPath)` / `read(buf, 0, 288)` | ENOENT (temp file vanished) | propagate; route returns 4xx |
 | `fsp.open(tempPath)` | EACCES | propagate; logged at route |
-| `createReadStream(tempPath)` | mid-stream error (truncation, EIO) | hash pipeline rejects; persist-phase catch unlinks any partial state and rethrows |
-| `fsp.mkdir(<uploads>)` | EACCES | propagate; nothing written |
+| `createReadStream(tempPath)` | mid-stream error (truncation, EIO) | post-parse catch unlinks `tempPath` + any partial new triple; rethrow |
+| `fsp.mkdir(<uploads>)` | EACCES | post-parse catch unlinks `tempPath`; rethrow (operator sees the error, route gets a clean failure) |
 | `fsp.unlink(<prior>.*)` (wipe pass) | ENOENT | swallow (expected — first-ever upload) |
 | `fsp.unlink(<prior>.*)` (wipe pass) | EACCES | swallow + log warn; orphan stays until next successful store wipes it |
-| `fsp.rename(tempPath, .bin)` | EXDEV (cross-fs) | propagate; this is a config error (c.8 mounted `tmp/` on a different fs) |
-| `fsp.rename(tempPath, .bin)` | EEXIST (Windows, dest exists) | wipe pass should have unlinked; if not, propagate |
-| `fsp.writeFile(.sha256)` | ENOSPC | persist-phase catch unlinks `.bin` + temp; rethrow |
-| `fsp.writeFile(.meta.json)` | ENOSPC | persist-phase catch unlinks `.bin` + `.sha256` + temp; rethrow |
+| `fsp.rename(tempPath, .bin)` | EXDEV (cross-fs) | post-parse catch unlinks `tempPath`; rethrow (config error — c.8 mounted `tmp/` on a different fs) |
+| `fsp.rename(tempPath, .bin)` | EEXIST (Windows, dest exists) | wipe pass should have unlinked; if not, post-parse catch handles |
+| `fsp.writeFile(.sha256)` | ENOSPC | post-parse catch unlinks `tempPath` + `.bin` (just-renamed); rethrow |
+| `fsp.writeFile(.meta.json)` | ENOSPC | post-parse catch unlinks `tempPath` + `.bin` + `.sha256`; rethrow |
 | `fsp.readdir(<uploads>)` (latest) | ENOENT | return null (cold cache) |
 | `fsp.readdir(<uploads>)` (latest) | EACCES | propagate; operator-visible |
 | `JSON.parse(metaText)` | SyntaxError | return null (malformed; swept by next successful store) |
@@ -221,10 +221,10 @@ The pre-fix anti-pattern that c.4 caught: persisting `.sha` and `.meta` before r
 
 | Resource | Created | Cleanup happy path | If cleanup doesn't run |
 |----------|---------|--------------------|------------------------|
-| Temp file at `tempPath` | upstream (express-fileupload, in c.8 route) | `fs.rename` consumes on success | Persist-fail catch runs `fsp.unlink(tempPath)`; long-lived orphans handled by c.8's startup sweep of `<rootDir>/tmp/` |
+| Temp file at `tempPath` | upstream (express-fileupload, in c.8 route) | `fs.rename` consumes on success; post-parse catch's `fsp.unlink` consumes on any post-parse failure (validation, hash, mkdir, persist) | Pre-parse failures (open, read, parseEspAppDesc throw) leave `tempPath` for the route to clean up; long-lived orphans handled by c.8's startup sweep of `<rootDir>/tmp/` |
 | 288-byte read buffer | `store()` step 2 | GC after function returns | Harmless |
 | `FileHandle` from `fsp.open(tempPath)` | `store()` step 2 | `await fh.close()` in `finally` block (unconditional) | FD leak; bounded by process lifetime |
-| `ReadStream` for stream-hash | `store()` step 6 | `stream/promises.pipeline` closes underlying fd on both end and error | If pipeline rejects mid-stream, error path still closes; **must use `pipeline`, not manual `.on('end')` wiring** |
+| `ReadStream` for stream-hash | `store()` step 6 | for-await loop auto-closes the underlying fd on both end and error | Mid-stream errors trigger the post-parse catch which unlinks `tempPath` + any partial triple |
 | Hash object (`crypto.createHash`) | `store()` step 6 | GC after `digest()` | Harmless |
 | Promoted `.bin` + sidecars | `store()` persist phase | None — these are the durable artifact | N/A |
 | Stale prior `.bin` + sidecars | wiped at start of persist phase | `Promise.all` of best-effort unlinks | Persist of NEW triple still succeeds; old siblings of dead uuids may stay until next successful store wipes them |

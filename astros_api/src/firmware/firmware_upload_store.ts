@@ -131,49 +131,57 @@ export class FirmwareUploadStore {
     }
     const desc = parseEspAppDesc(headBuf);
 
-    if (desc.projectName !== this.expectedProjectName) {
-      throw new Error(
-        `firmware upload project name mismatch: got ${JSON.stringify(desc.projectName)}, expected ${JSON.stringify(this.expectedProjectName)}`,
-      );
-    }
-    // ESP-IDF embeds `git describe --tags --dirty` into esp_app_desc.version
-    // by default. Strip the leading `v` and the trailing `-<N>-g<sha>(-dirty)?`
-    // suffix so the persisted meta.version is a clean semver matching what
-    // the GitHub-release path produces from filename parsing — c.6's
-    // orchestrator can then compare the two without per-source casing.
-    const normalizedVersion = normalizeEspVersion(desc.version);
-    // compareVersions returns NaN for unparseable inputs and 0 for equal;
-    // self-comparison succeeds iff the version is well-formed.
-    if (Number.isNaN(compareVersions(normalizedVersion, normalizedVersion))) {
-      throw new Error(
-        `firmware upload version unparseable: ${JSON.stringify(desc.version)} (normalized: ${JSON.stringify(normalizedVersion)})`,
-      );
-    }
-
-    // Stream-hash the whole file. The for-await loop handles backpressure
-    // and auto-closes the underlying fd on loop exit / error; using
-    // `pipeline` would require a Writable destination we don't need.
-    const hash = crypto.createHash('sha256');
-    let sizeBytes = 0;
-    const readStream = fs.createReadStream(tempPath);
-    for await (const chunk of readStream) {
-      sizeBytes += (chunk as Buffer).length;
-      hash.update(chunk as Buffer);
-    }
-    const sha256 = hash.digest('hex');
-
-    await fsp.mkdir(p.uploadsDir, { recursive: true });
-
-    const meta: StoredUploadMeta = {
-      uploadId,
-      originalFilename,
-      projectName: desc.projectName,
-      version: normalizedVersion,
-      uploadedAt: new Date().toISOString(),
-      sizeBytes,
-    };
-
+    // Once parse succeeds the temp file is "ours" — the store owns the
+    // file's fate from here on. Wrap every post-parse step (validation,
+    // hash, mkdir, persist) so the rollback's blind unlink runs on any
+    // failure, leaving the route layer with a single contract: parse
+    // failures route the temp-file cleanup back to it; everything else
+    // is on the store. Pre-fix scope was just the persist phase, which
+    // leaked the temp file on hash-stream errors (EIO/truncation) and
+    // mkdir EACCES — review feedback caught this.
     try {
+      if (desc.projectName !== this.expectedProjectName) {
+        throw new Error(
+          `firmware upload project name mismatch: got ${JSON.stringify(desc.projectName)}, expected ${JSON.stringify(this.expectedProjectName)}`,
+        );
+      }
+      // ESP-IDF embeds `git describe --tags --dirty` into esp_app_desc.version
+      // by default. Strip the leading `v` and the trailing `-<N>-g<sha>(-dirty)?`
+      // suffix so the persisted meta.version is a clean semver matching what
+      // the GitHub-release path produces from filename parsing — c.6's
+      // orchestrator can then compare the two without per-source casing.
+      const normalizedVersion = normalizeEspVersion(desc.version);
+      // compareVersions returns NaN for unparseable inputs and 0 for equal;
+      // self-comparison succeeds iff the version is well-formed.
+      if (Number.isNaN(compareVersions(normalizedVersion, normalizedVersion))) {
+        throw new Error(
+          `firmware upload version unparseable: ${JSON.stringify(desc.version)} (normalized: ${JSON.stringify(normalizedVersion)})`,
+        );
+      }
+
+      // Stream-hash the whole file. The for-await loop handles backpressure
+      // and auto-closes the underlying fd on loop exit / error; using
+      // `pipeline` would require a Writable destination we don't need.
+      const hash = crypto.createHash('sha256');
+      let sizeBytes = 0;
+      const readStream = fs.createReadStream(tempPath);
+      for await (const chunk of readStream) {
+        sizeBytes += (chunk as Buffer).length;
+        hash.update(chunk as Buffer);
+      }
+      const sha256 = hash.digest('hex');
+
+      await fsp.mkdir(p.uploadsDir, { recursive: true });
+
+      const meta: StoredUploadMeta = {
+        uploadId,
+        originalFilename,
+        projectName: desc.projectName,
+        version: normalizedVersion,
+        uploadedAt: new Date().toISOString(),
+        sizeBytes,
+      };
+
       // Wipe any prior upload triple — best-effort; ENOENT swallowed for
       // first-ever store; non-ENOENT logged but not fatal because the
       // rename below either succeeds (orphan stays, swept by next store)
@@ -185,10 +193,13 @@ export class FirmwareUploadStore {
       await fsp.rename(tempPath, p.bin);
       await fsp.writeFile(p.sha, sha256);
       await fsp.writeFile(p.meta, JSON.stringify(meta, null, 2));
+
+      return { path: p.bin, sha256, sizeBytes, meta };
     } catch (err) {
-      // Symmetric persist-phase rollback. Blind unlink with swallow —
+      // Symmetric post-parse rollback. Blind unlink with swallow —
       // ENOENT for files that weren't created yet is fine. Includes the
-      // tempPath in case rename failed before consuming it.
+      // tempPath, which is unconditionally consumed: success path
+      // consumed it via rename; failure path unlinks it here.
       await Promise.all([
         fsp.unlink(tempPath).catch(() => undefined),
         fsp.unlink(p.bin).catch(() => undefined),
@@ -197,8 +208,6 @@ export class FirmwareUploadStore {
       ]);
       throw err;
     }
-
-    return { path: p.bin, sha256, sizeBytes, meta };
   }
 
   // Returns the most-recent stored upload, or null on cold cache /

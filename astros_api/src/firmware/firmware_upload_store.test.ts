@@ -331,6 +331,63 @@ describe('FirmwareUploadStore.store()', () => {
     expect(fs.existsSync(tempPath)).toBe(false);
   });
 
+  it('unlinks tempPath when the stream-hash phase fails mid-read (EIO simulated)', async () => {
+    // Reviewer-flagged scenario: pre-fix, a createReadStream / for-await
+    // failure exited store() before the rollback block, leaving the temp
+    // file orphaned. Now wrapped in the post-parse try/catch.
+    const bin = makeFirmwareBytes();
+    const tempPath = writeTempBin(tempDir, bin, 'hash-fail.tmp');
+
+    const realCreate = fs.createReadStream.bind(fs);
+    vi.spyOn(fs, 'createReadStream').mockImplementation(((
+      target: Parameters<typeof fs.createReadStream>[0],
+      opts?: Parameters<typeof fs.createReadStream>[1],
+    ) => {
+      const stream = realCreate(target, opts);
+      // Asynchronously emit an error after the stream starts producing data.
+      process.nextTick(() =>
+        stream.destroy(Object.assign(new Error('EIO: simulated'), { code: 'EIO' })),
+      );
+      return stream;
+    }) as typeof fs.createReadStream);
+
+    await expect(store.store(tempPath, 'hash-fail.bin')).rejects.toThrow(/EIO/);
+
+    expect(fs.existsSync(tempPath)).toBe(false);
+    const uploadsDir = path.join(rootDir, 'uploads');
+    if (fs.existsSync(uploadsDir)) {
+      expect(fs.readdirSync(uploadsDir)).toEqual([]);
+    }
+  });
+
+  it('unlinks tempPath when mkdir throws EACCES', async () => {
+    // Reviewer-flagged scenario: pre-fix, mkdir failures bypassed the
+    // persist-phase try/catch and leaked the temp file. Now covered.
+    const bin = makeFirmwareBytes();
+    const tempPath = writeTempBin(tempDir, bin, 'mkdir-fail.tmp');
+
+    vi.spyOn(fsp, 'mkdir').mockImplementation(async () => {
+      throw Object.assign(new Error('EACCES: simulated'), { code: 'EACCES' });
+    });
+
+    await expect(store.store(tempPath, 'mkdir-fail.bin')).rejects.toThrow(/EACCES/);
+
+    expect(fs.existsSync(tempPath)).toBe(false);
+  });
+
+  it('unlinks tempPath on validation failure (project_name mismatch)', async () => {
+    // Post-fix contract: once parse succeeds, store() owns the temp
+    // file's fate regardless of why the rest failed. Validation
+    // rejection consumes the temp file rather than leaving it for the
+    // route layer to clean up.
+    const badBin = makeFirmwareBytes({ projectName: 'evil-esp', version: '1.0.0' });
+    const badTempPath = writeTempBin(tempDir, badBin, 'val-fail.tmp');
+
+    await expect(store.store(badTempPath, 'val-fail.bin')).rejects.toThrow(/project name/i);
+
+    expect(fs.existsSync(badTempPath)).toBe(false);
+  });
+
   it('rolls back cleanly when rename throws EACCES (temp file unlinked, uploads dir empty)', async () => {
     const bin = makeFirmwareBytes();
     const tempPath = writeTempBin(tempDir, bin, 'rename-fail.tmp');
