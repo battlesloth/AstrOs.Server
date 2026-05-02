@@ -113,7 +113,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
 - [x] `npm run prettier:write` and `npm run lint:fix` clean.
 - [ ] Manual smoke deferred to c.8 where the route makes the upload reachable end-to-end.
 
-## Files in scope (6)
+## Files in scope (7)
 
 1. `astros_api/src/firmware/path_safety.ts` — extracted `PATH_SAFE_RE` + `assertPathSafe` (shared with c.4)
 2. `astros_api/src/firmware/firmware_cache.ts` — import from `path_safety.ts` (delete local copies)
