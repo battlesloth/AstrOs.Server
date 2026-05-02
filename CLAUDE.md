@@ -70,7 +70,13 @@ The system manages **Locations** (physical positions on the droid) that contain 
 
 ## Pre-commit
 
-Always run lint and prettier before making a commit to ensure consistent formatting.
+Before each implementation commit, run in order:
+
+1. `npm run prettier:write` and `npm run lint:fix` (formatting + lint).
+2. `npm run build` (type-check) and the test suite (`npx vitest run` for single-run mode).
+3. Invoke `superpowers:requesting-code-review` on the diff against the prior commit (or `origin/<branch>` for a batch of unpushed work). Mechanical checks confirm the code compiles and tests pass; code review catches what tests can't see — comment-vs-code drift, naming-vs-protocol mismatches, missing capabilities, broken test-name format strings, and similar issues that have repeatedly come back as PR feedback when this step is skipped. Address **Critical** and **Important** issues before committing; note **Minor** for later.
+
+**Carve-outs that may skip step 3:** plan-only commits (no source changes), trivial typo / comment-only fixes, and check-off-only updates to a plan file. Everything else — including any change to a `.ts` / `.tsx` / test file with logic — requires the review.
 
 ## Branching & PRs
 
@@ -148,7 +154,7 @@ Use the following skills and subagents as part of the development workflow:
 - **Feature Dev** (`feature-dev:feature-dev`): Use for guided feature development with codebase understanding and architecture focus.
 - **Debugging** (`superpowers:systematic-debugging`): Use systematic debugging for any bug, test failure, or unexpected behavior before proposing fixes.
 - **Verification** (`superpowers:verification-before-completion`): Always verify before claiming work is done or creating a PR. Run tests and confirm output — evidence before assertions.
-- **Code Review** (`superpowers:requesting-code-review`): Request a code review after completing significant features or before merging.
+- **Code Review** (`superpowers:requesting-code-review`): Run **before every implementation commit** (between tests-passing and `git commit`) — same workflow slot as prettier / lint. Mechanical checks miss comment-vs-code drift, missing capabilities, protocol-shape mismatches, and broken test-name format strings; the reviewer subagent catches them. See the Pre-commit section for the carve-outs that may skip it.
 - **Parallel Agents** (`superpowers:dispatching-parallel-agents`): Use parallel agents for independent tasks that can be worked on without shared state or sequential dependencies.
 
 ## Internationalization (i18n)
