@@ -47,8 +47,14 @@ type NonTerminalStage =
   | FwStage.Rebooting;
 
 // Overloaded so the type system enforces stage-specific payloads at the
-// call site. The implementation still validates payload at runtime as
-// belt-and-suspenders for callers who bypass the types.
+// call site. Runtime defense covers two specific things: (a) stage
+// legality (the LEGAL_NEXT_STAGES lookup), and (b) required terminal-
+// state fields (`finalVersion` for VersionConfirmed, `error` for
+// Failed) — a type-bypassing caller still can't construct an invalid
+// terminal state. In-flight field shapes (numeric range on bytesSent /
+// totalBytes, string-ness of detail) are TypeScript-only; a caller
+// that bypasses the types with garbage values would propagate them,
+// but the FSM transition rules themselves still hold.
 export function transitionControllerState(
   current: ControllerFlashState,
   toStage: FwStage.VersionConfirmed,
