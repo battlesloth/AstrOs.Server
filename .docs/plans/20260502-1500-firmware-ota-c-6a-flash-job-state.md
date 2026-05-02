@@ -47,14 +47,14 @@ Queued → UploadingToMaster → Sending → Verifying → Rebooting → Version
 
 ## Tasks
 
-- [ ] **Typed models** (new `astros_api/src/models/firmware/flash_job_state.ts`):
+- [x] **Typed models** (new `astros_api/src/models/firmware/flash_job_state.ts`):
     - `ControllerFlashState` discriminated union (7 variants matching the seven `FwStage` values)
     - `FlashJobState` interface
     - `FlashSource` interface
     - `JobLifecycle` string union
     - All inline comments only where the type's role is non-obvious (mirrors `cache.ts` / `upload.ts` style); no field-by-field narration
 
-- [ ] **State machine functions** (new `astros_api/src/firmware/flash_job_state_machine.ts`):
+- [x] **State machine functions** (new `astros_api/src/firmware/flash_job_state_machine.ts`):
     - `LEGAL_NEXT_STAGES`: `Map<FwStage, ReadonlySet<FwStage>>` — single source of truth for the transition graph. Keeps the validator's logic out of a giant switch.
     - `isControllerStageTerminal(stage)` — `stage === FwStage.VersionConfirmed || stage === FwStage.Failed`
     - `transitionControllerState` — overloaded signatures:
@@ -64,7 +64,7 @@ Queued → UploadingToMaster → Sending → Verifying → Rebooting → Version
     - Implementation throws `Error` with the stage names when transition is illegal; throws when payload doesn't carry the required field (defense for callers that bypass the types).
     - `deriveJobLifecycle` — early-returns `'failed'` on `abortReason`, `'pending'` if all `Queued`, `'done'` if all terminal, else `'in_flight'`.
 
-- [ ] **Tests** (new `astros_api/src/firmware/flash_job_state_machine.test.ts`):
+- [x] **Tests** (new `astros_api/src/firmware/flash_job_state_machine.test.ts`):
     - Happy path: full linear progression Queued→…→VersionConfirmed succeeds; each step preserves immutability of the input state
     - Failed reachable from each non-terminal stage (5 tests, one per source)
     - Illegal transitions throw with informative error messages:
@@ -88,10 +88,10 @@ Queued → UploadingToMaster → Sending → Verifying → Rebooting → Version
 
 ## Verification
 
-- [ ] `npm run build` clean (lint + tsc).
-- [ ] `npm run test` green (post-c.5 baseline + ~25 new tests).
-- [ ] `npm run prettier:write` and `npm run lint:fix` clean.
-- [ ] No new fs / network / serial imports — c.6a's only external deps are `FwStage` and a logger if any.
+- [x] `npm run build` clean (lint + tsc).
+- [x] `npm run test` green (432 → 475, +43 new tests; parameterized `it.each` cases counted individually).
+- [x] `npm run prettier:write` and `npm run lint:fix` clean.
+- [x] No new fs / network / serial imports — c.6a's only external dep is `FwStage`.
 
 ## Files in scope (3)
 
