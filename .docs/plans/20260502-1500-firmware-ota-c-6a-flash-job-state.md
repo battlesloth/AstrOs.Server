@@ -93,13 +93,17 @@ Queued → UploadingToMaster → Sending → Verifying → Rebooting → Version
 - [x] `npm run prettier:write` and `npm run lint:fix` clean.
 - [x] No new fs / network / serial imports — c.6a's only external dep is `FwStage`.
 
-## Files in scope (3)
+## Source files in scope (3)
 
 1. `astros_api/src/models/firmware/flash_job_state.ts` — discriminated union, FlashJobState, FlashSource, JobLifecycle
 2. `astros_api/src/firmware/flash_job_state_machine.ts` — transitions + derivation + terminal-check
 3. `astros_api/src/firmware/flash_job_state_machine.test.ts` — tests
 
-3 files, well under the 10-file cap. **Does not modify** any existing module — the new types reference `FwStage` from c.1 and that's the only inbound dep.
+3 source files, well under the 10-file cap. **Does not modify any existing source module** — the new types reference `FwStage` from c.1 and that's the only inbound dep.
+
+**Also in this PR's diff but out of c.6a's feature scope:**
+- This plan file itself (`.docs/plans/20260502-1500-firmware-ota-c-6a-flash-job-state.md`), per the "plan committed before implementation" rule in CLAUDE.md.
+- A workflow update to `CLAUDE.md` adding `superpowers:requesting-code-review` as a mandatory pre-commit step. Process change driven by accumulated PR-review-round cost across c.5 / c.6a; rides along on this branch for operational simplicity rather than its own PR.
 
 ## Out of scope
 
