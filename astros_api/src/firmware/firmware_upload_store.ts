@@ -46,18 +46,21 @@ function normalizeEspVersion(raw: string): string {
 }
 
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
-// Canonical uuid v4 shape: 8-4-4-4-12 hex with dashes at fixed
-// positions. The earlier `[0-9a-f-]{36}` form was over-permissive —
-// it accepted strings like `upload--abc...` (leading dash) which then
-// failed `assertPathSafe` inside `pathsFor()`, throwing through
-// `latest()`'s outer scope instead of returning null per the
-// "any inconsistent state → null miss" contract. Pinning the
-// positional structure means `latest()` only ever feeds well-shaped
-// uuids to `pathsFor()`. (`ANY_UPLOAD_FILE_RE` below is
-// intentionally broader — wipe should sweep any `upload-*` sibling
-// regardless of shape.)
+// Canonical uuid v4 shape: 8-4-4-4-12 hex with the v4 version nibble
+// (`4` at the start of the third group) and the v4 variant nibble
+// (`[89ab]` at the start of the fourth group). The earlier
+// `[0-9a-f-]{36}` form was over-permissive — it accepted strings
+// like `upload--abc...` (leading dash) which then failed
+// `assertPathSafe` inside `pathsFor()`, throwing through `latest()`'s
+// outer scope instead of returning null per the "any inconsistent
+// state → null miss" contract. The intermediate fix pinned positional
+// structure but still accepted non-v4 version digits; this final
+// form matches exactly what the `uuid` package produces, so manual
+// intervention with non-v4 ids gets filtered as inconsistent state.
+// (`ANY_UPLOAD_FILE_RE` below is intentionally broader — wipe should
+// sweep any `upload-*` sibling regardless of shape.)
 const UPLOAD_META_RE =
-  /^upload-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.meta\.json$/;
+  /^upload-([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.meta\.json$/;
 // Used by the wipe pass to find any prior upload sibling regardless
 // of shape. Intentionally broader than UPLOAD_META_RE: must cover
 // every name that read paths could plausibly reject as malformed

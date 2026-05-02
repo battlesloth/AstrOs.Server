@@ -152,6 +152,25 @@ describe('FirmwareUploadStore.latest()', () => {
     expect(await store.latest()).toBeNull();
   });
 
+  it('returns null for a meta filename whose id has the right shape but wrong v4/variant nibbles', async () => {
+    // The id below has correct 8-4-4-4-12 hex structure but the
+    // version nibble is `1` (not `4`) and the variant nibble is `0`
+    // (not in [8,9,a,b]) — so it's not a uuid v4. UPLOAD_META_RE
+    // enforces the v4-specific nibbles, so latest() filters this
+    // out as inconsistent state rather than treating it as a real
+    // upload.
+    const uploadsDir = path.join(rootDir, 'uploads');
+    fs.mkdirSync(uploadsDir);
+    const nonV4Name = 'upload-12345678-1234-1234-0234-123456789abc.meta.json';
+    fs.writeFileSync(path.join(uploadsDir, nonV4Name), '{}');
+    fs.writeFileSync(
+      path.join(uploadsDir, nonV4Name.replace(/\.meta\.json$/, '.bin')),
+      Buffer.alloc(100),
+    );
+
+    expect(await store.latest()).toBeNull();
+  });
+
   it('returns null (does not throw) for a meta filename whose id starts with a dash', async () => {
     // Regression guard: pre-fix UPLOAD_META_RE accepted `[0-9a-f-]{36}`
     // which matched ids beginning with `-`, then assertPathSafe inside
