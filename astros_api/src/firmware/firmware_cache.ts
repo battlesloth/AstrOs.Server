@@ -9,6 +9,7 @@ import { logger } from '../logger.js';
 import type { CachedAsset, CachedAssetMeta } from '../models/firmware/cache.js';
 import type { AssetInfo, ReleaseInfo } from '../models/firmware/release.js';
 import { compareVersions } from '../utility/semver.js';
+import { assertPathSafe } from './path_safety.js';
 
 // On-disk firmware cache. Materializes -app.bin assets onto local disk,
 // stream-hashes during download, and prunes to N=5 releases. See the c.4
@@ -32,24 +33,6 @@ const MAX_RELEASES = 5;
 // `crypto.createHash('sha256').digest('hex')` is 64 lowercase hex chars.
 // Anything else in a .bin.sha256 means corruption — treat as a miss.
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
-
-// Allowlist for `version`/`variant` interpolated into cache filenames.
-// First char alphanumeric (forbids leading-dot hidden files and
-// leading-hyphen flag lookalikes); body allows the chars real semver and
-// PlatformIO env names use — '.' for version dots, '-' for pre-release
-// labels (1.2.0-RC.1), '+' for build metadata (1.0.0+build.123), '_' for
-// variant underscores (lolin_d32_pro). Excludes path separators, drive
-// letters, parent refs, embedded nulls. Upstream c.3 captures version as
-// `(.+)` so this is the only guard for it; variant is defense-in-depth.
-const PATH_SAFE_RE = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
-
-function assertPathSafe(value: string, kind: 'version' | 'variant'): void {
-  if (!PATH_SAFE_RE.test(value)) {
-    throw new Error(
-      `Invalid firmware ${kind} for cache path: ${JSON.stringify(value)} contains characters that aren't filename-safe`,
-    );
-  }
-}
 
 // User-Agent is required by GitHub's CDN; Accept is omitted because asset
 // download isn't a v3 API call.
