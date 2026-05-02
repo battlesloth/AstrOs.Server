@@ -13,7 +13,7 @@ export const PATH_SAFE_RE = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
 export function assertPathSafe(value: string, kind: string): void {
   if (!PATH_SAFE_RE.test(value)) {
     throw new Error(
-      `Invalid firmware ${kind} for cache path: ${JSON.stringify(value)} contains characters that aren't filename-safe`,
+      `Invalid firmware ${kind}: ${JSON.stringify(value)} contains characters that aren't filename-safe`,
     );
   }
 }
