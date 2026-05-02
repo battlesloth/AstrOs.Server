@@ -58,9 +58,16 @@ const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
 // regardless of shape.)
 const UPLOAD_META_RE =
   /^upload-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.meta\.json$/;
-// Used by the wipe pass to find any prior upload triple regardless of
-// uuid (the new uuid is fresh; the old one is whatever was there).
-const ANY_UPLOAD_FILE_RE = /^upload-[0-9a-f-]+\.(?:bin|bin\.sha256|meta\.json)$/;
+// Used by the wipe pass to find any prior upload sibling regardless
+// of shape. Intentionally broader than UPLOAD_META_RE: must cover
+// every name that read paths could plausibly reject as malformed
+// (uppercase hex from a case-insensitive fs, mixed-case manual
+// rename, non-hex chars from operator intervention) so those files
+// can't orphan forever. `.+` between `upload-` and the extension
+// list accepts any non-empty basename body — readdir guarantees
+// these are basenames, so no path-separator risk. Extension list
+// is case-insensitive (Windows / macOS HFS+ can yield `.BIN` etc.).
+const ANY_UPLOAD_FILE_RE = /^upload-.+\.(?:bin|bin\.sha256|meta\.json)$/i;
 
 export interface FirmwareUploadStoreOptions {
   rootDir?: string;

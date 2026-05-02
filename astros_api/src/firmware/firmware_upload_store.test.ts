@@ -363,6 +363,46 @@ describe('FirmwareUploadStore.store()', () => {
     expect(fs.existsSync(badTempPath)).toBe(false);
   });
 
+  it('wipes malformed siblings whose ids/extensions fall outside the canonical UUID + lowercase shape', async () => {
+    // Regression guard: ANY_UPLOAD_FILE_RE used to be `[0-9a-f-]+`
+    // which left files like `upload-FOOBAR.bin` (non-hex id) or
+    // `upload-abc.BIN` (uppercase extension from a case-insensitive fs)
+    // orphaned forever. Wipe pass must catch these so the documented
+    // "single-slot" guarantee actually holds in operator/manual
+    // intervention scenarios.
+    const uploadsDir = path.join(rootDir, 'uploads');
+    fs.mkdirSync(uploadsDir);
+    const malformedPaths = [
+      'upload-FOOBAR.bin', // non-hex id
+      'upload-FOOBAR.bin.sha256',
+      'upload-FOOBAR.meta.json',
+      'upload-abc123.BIN', // uppercase extension
+      'upload-Mixed-CASE-id.meta.json',
+    ];
+    for (const name of malformedPaths) {
+      fs.writeFileSync(path.join(uploadsDir, name), 'stale content');
+    }
+
+    // A successful store should run the wipe pass and clear everything
+    // matching upload-*.{bin,bin.sha256,meta.json} — including the
+    // malformed siblings.
+    const bin = makeFirmwareBytes({ version: '1.0.0' });
+    const tempPath = writeTempBin(tempDir, bin, 'fresh.tmp');
+    const result = await store.store(tempPath, 'fresh.bin');
+
+    const remaining = fs.readdirSync(uploadsDir).sort();
+    expect(remaining).toEqual(
+      [
+        `upload-${result.meta.uploadId}.bin`,
+        `upload-${result.meta.uploadId}.bin.sha256`,
+        `upload-${result.meta.uploadId}.meta.json`,
+      ].sort(),
+    );
+    for (const name of malformedPaths) {
+      expect(fs.existsSync(path.join(uploadsDir, name))).toBe(false);
+    }
+  });
+
   it('replaces a prior upload triple atomically', async () => {
     // First upload.
     const firstBin = makeFirmwareBytes({ version: '1.0.0' });
