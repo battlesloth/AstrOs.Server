@@ -43,17 +43,25 @@ const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
 
 // Reads one fixed-length string slot at `off`. Rules:
 //   1. The slot must contain at least one 0x00 byte (the null terminator).
-//   2. No byte in the slot may be in [0x01, 0x1F]. Bytes after the null
-//      are normally "don't-care" tail, but ESP-IDF zero-fills these and a
-//      tampered binary that smuggles control chars into the tail is the
-//      kind of thing we want to reject — the trip-on-any-control-char
-//      rule covers both prefix and tail with one scan.
+//   2. No byte in the slot may be a single-byte ASCII control char:
+//      C0 range [0x01, 0x1F] or DEL (0x7F). These are unambiguously
+//      control chars at the byte level — they have no role inside
+//      multi-byte UTF-8 sequences. C1 range [0x80, 0x9F] is NOT
+//      rejected here because those byte values appear naturally inside
+//      legitimate UTF-8 sequences (every continuation byte is 0x80-0xBF,
+//      so e.g. `é` is 0xC3 0xA9); rejecting them at the byte level
+//      would false-positive on every accented character. The strict-
+//      UTF-8 decoder below catches *invalid* sequences containing
+//      those bytes — that's the right tool for the C1 range.
+//      Bytes after the null are normally "don't-care" tail, but ESP-IDF
+//      zero-fills these and a tampered binary that smuggles control
+//      chars into the tail is exactly what this scan defends against.
 //   3. The prefix-before-null must be valid UTF-8 under strict mode.
 function readFixedString(buf: Buffer, off: number, len: number, fieldName: string): string {
   const slot = buf.subarray(off, off + len);
   for (let i = 0; i < slot.length; i += 1) {
     const b = slot[i];
-    if (b > 0 && b < 0x20) {
+    if ((b > 0 && b < 0x20) || b === 0x7f) {
       throw new Error(
         `esp_app_desc ${fieldName}: control byte 0x${b.toString(16).padStart(2, '0')} at slot offset ${i}`,
       );

@@ -155,6 +155,29 @@ describe('parseEspAppDesc', () => {
     expect(() => parseEspAppDesc(buf)).toThrow(/control/i);
   });
 
+  it('throws when a string field has DEL (0x7F)', () => {
+    // DEL is a single-byte ASCII control char that sits outside the
+    // C0 range [0x01, 0x1F] historically. Reject it explicitly so the
+    // tampered-binary defense covers all single-byte control chars,
+    // not just the contiguous low range.
+    const buf = makeAppDescBuffer({ version: '1.4.0' });
+    buf[ESP_APP_DESC_OFFSET + SLOT_OFFSETS.version + 1] = 0x7f;
+
+    expect(() => parseEspAppDesc(buf)).toThrow(/control/i);
+  });
+
+  it('accepts legitimate multi-byte UTF-8 with C1-range continuation bytes', () => {
+    // Regression guard: bytes 0x80-0x9F appear inside valid UTF-8
+    // continuation sequences (e.g. `é` is encoded as 0xC3 0xA9, where
+    // 0xA9 falls in the C1 range). The parser must NOT reject these
+    // at the byte level — only invalid sequences should fail, via the
+    // strict-mode UTF-8 decoder.
+    const buf = makeAppDescBuffer({ idfVer: 'release-é-v5' });
+    const desc = parseEspAppDesc(buf);
+
+    expect(desc.idfVer).toBe('release-é-v5');
+  });
+
   it('throws on non-UTF-8 bytes in a string field', () => {
     const buf = makeAppDescBuffer();
     const off = ESP_APP_DESC_OFFSET + SLOT_OFFSETS.version;

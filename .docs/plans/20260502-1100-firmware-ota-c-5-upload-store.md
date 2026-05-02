@@ -51,7 +51,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
 - [x] **`esp_app_desc_t` parser** (new `astros_api/src/firmware/esp_app_desc.ts`). Pure-compute, no fs/network. Single export `parseEspAppDesc(buf: Buffer): EspAppDesc`. Throws on any structural failure. Constants:
   - `ESP_IMAGE_HEADER_SIZE = 24`, `ESP_IMAGE_SEGMENT_HEADER_SIZE = 8`, `ESP_APP_DESC_OFFSET = 32`, `ESP_APP_DESC_SIZE = 256`, `ESP_APP_DESC_MAGIC = 0xABCD5432`.
   - Field offsets within `esp_app_desc_t`: `magic_word=0`, `secure_version=4`, `reserv1=8..16`, `version=16` (32 B), `project_name=48` (32 B), `time=80` (16 B), `date=96` (16 B), `idf_ver=112` (32 B), `app_elf_sha256=144` (32 B).
-  - Helper `readFixedString(buf, off, len)` slices `len` bytes, finds first `0x00`, throws if no null terminator within slot, decodes prefix as UTF-8, rejects any embedded control char `< 0x20` so a tampered `version` field with `\x00\x01` etc. fails fast.
+  - Helper `readFixedString(buf, off, len)` slices `len` bytes, finds first `0x00`, throws if no null terminator within slot, decodes prefix as UTF-8, rejects any embedded single-byte ASCII control char — C0 range `[0x01, 0x1F]` plus DEL `0x7F` — so a tampered `version` field with `\x00\x01` etc. fails fast. The C1 range `[0x80, 0x9F]` is intentionally NOT rejected at the byte level: those bytes appear naturally inside valid UTF-8 continuation sequences (`é` → `0xC3 0xA9`); the strict-UTF-8 decoder catches *invalid* sequences containing those bytes.
   - Magic word read with `readUInt32LE`. Reject when `!== ESP_APP_DESC_MAGIC`.
   - Up-front length check: throw if `buf.length < 288`. Caller only ever reads the first 288 bytes.
 
@@ -84,6 +84,8 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
   - `project_name` field with no null terminator within its 32-byte slot → throws.
   - `version` field with embedded null mid-string truncates at the null (yields `'1.4'` for `1.4\x00.0`).
   - String field with control chars `\x01..\x1F` after the null → throws.
+  - String field with DEL (`\x7F`) → throws (single-byte ASCII control char outside the C0 range).
+  - String field with legitimate multi-byte UTF-8 (e.g. `release-é-v5`, where `é` is `0xC3 0xA9` and the trailing byte sits in the C1 range `0x80-0x9F`) → parses cleanly. Regression guard against over-broad byte-level rejection of C1 bytes.
   - Non-UTF-8 bytes in string fields → throws.
   - `secureVersion` reads as `uint32_t` little-endian (regression guard against accidental BE).
   - Magic-word constant is exactly `0xABCD5432` (sentinel test).
