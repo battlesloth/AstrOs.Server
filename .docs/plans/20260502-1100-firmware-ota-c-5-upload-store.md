@@ -108,7 +108,8 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
 ## Verification
 
 - [x] `npm run build` clean (lint + tsc).
-- [x] `npm run test` green (380 → 409 passing; +29 new tests = 11 parser + 18 store).
+- [x] `npm run test` green (380 → 416 passing; +36 new tests = 11 parser + 25 store, including 7 added in fixup for embedded-version normalization).
+- [x] **Live verification against real binary:** `firmware_upload_store` accepts the actual `AstrOs.ESP/.pio/build/lolin_d32_pro/firmware.bin` produced by ESP-IDF, captures `projectName: "AstrOs.ESP"` and normalizes `version: "v1.0.0-RC.1-71-g9a55936-dirty"` → `"1.0.0-RC.1"`.
 - [x] `npm run prettier:write` and `npm run lint:fix` clean.
 - [ ] Manual smoke deferred to c.8 where the route makes the upload reachable end-to-end.
 
@@ -234,9 +235,11 @@ The most likely real bug: file-handle leak from `fsp.open` if the parse step thr
 
 - **express-fileupload integration: route-scoped, not global** (decision deferred to c.8 but documented here). Recommend `fileUpload({ useTempFiles: true, tempFileDir: <rootDir>/tmp, limits: { fileSize: 8 * 1024 * 1024 } })` applied only to `POST /firmware/upload`. Justification: smaller blast radius vs. changing global config; different size limit appropriate (firmware ~1.2 MB cap at 8 MB; audio uses defaults); colocated debugging context for EXDEV issues; c.8 also needs to ensure `<rootDir>/tmp/` exists at boot and sweep stale `*.tmp` orphans on startup. **c.5 itself doesn't touch `api_server.ts`.**
 
-- **`expectedProjectName = 'astros-esp'`** resolves decomp Open Item #4. The c.3 asset-name regex (`^astros-esp-…-app\.bin$`) already encodes this prefix. **Verification step:** confirm against `AstrOs.ESP/platformio.ini` or `sdkconfig*` for `CONFIG_APP_PROJECT_NAME`. If verification can't happen before merge, the constant ships with `astros-esp` and a TODO; c.6's PTY-stub end-to-end test will catch a real mismatch.
+- **`expectedProjectName = 'AstrOs.ESP'`** — verified against `AstrOs.ESP/CMakeLists.txt:4` (`project(AstrOs.ESP)`) and against a real built `firmware.bin` parsed by `parseEspAppDesc` during implementation. **Important finding:** the asset-filename prefix `astros-esp-…-app.bin` (set by CI tooling) is NOT the same as the embedded `esp_app_desc_t.project_name` (set by CMake). This was not what decomp Open Item #4 expected — the planning-time guess was `astros-esp`, but ESP-IDF embeds the CMake project name verbatim, dot and capitalization included. The constant lives at `firmware_upload_store.ts:DEFAULT_PROJECT_NAME` for easy adjustment if the firmware repo ever renames its CMake project.
 
-- **`esp_app_desc_t` field offsets** taken from ESP-IDF's stable layout (post-v4.0). **Verification step:** read `AstrOs.ESP/components/.../esp_app_format.h` (or the ESP-IDF vendor copy) to confirm. The struct has been stable for ~5 years; if a future release rearranges, the parser's constants are the single point of change.
+- **`esp_app_desc_t.version` is `git describe --tags --dirty` output, not clean semver.** Real example from a dev build: `"v1.0.0-RC.1-71-g9a55936-dirty"`. ESP-IDF defaults to `git describe` when neither `CONFIG_APP_PROJECT_VER_FROM_CONFIG` nor a `version.txt` is set, and AstrOs.ESP has neither today. The store therefore runs `normalizeEspVersion()` before validation: strips a leading `v` and the trailing `-<N>-g<sha>(-dirty)?` suffix, then validates the result against `compareVersions`. The persisted `meta.version` is the normalized clean semver — c.6's orchestrator can compare it directly against GitHub-release filenames without per-source casing. Six dedicated tests cover the normalization paths.
+
+- **`esp_app_desc_t` field offsets** verified by parsing the real `firmware.bin` (offset 32, magic 0xABCD5432, all string fields decoded correctly). The struct has been stable since ESP-IDF v4.0; if a future release rearranges, the parser's `F_*` constants are the single point of change.
 
 - **Hash on store but not on `latest()`:** symmetric to c.4. The sidecar is the source of truth; re-hashing 1.2 MB on every read costs ~80–100 ms for no semantic gain. The orchestrator and master both re-hash downstream as part of the protocol — corruption between store-time and flash-time surfaces as `HASH_MISMATCH`, not a silent flash of corrupted bytes.
 

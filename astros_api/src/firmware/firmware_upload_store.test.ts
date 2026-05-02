@@ -53,7 +53,7 @@ function makeHeader(opts: AppDescOpts = {}): Buffer {
   const {
     magic = ESP_APP_DESC_MAGIC,
     version = '1.4.0',
-    projectName = 'astros-esp',
+    projectName = 'AstrOs.ESP',
     time = '12:00:00',
     date = '2026-01-01',
     idfVer = 'v5.0.0',
@@ -101,7 +101,10 @@ beforeEach(() => {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fw-upload-test-'));
   rootDir = path.join(tempDir, 'firmware-cache');
   fs.mkdirSync(rootDir, { recursive: true });
-  store = new FirmwareUploadStore({ rootDir, expectedProjectName: 'astros-esp' });
+  // No `expectedProjectName` override — tests verify the real default
+  // (`AstrOs.ESP`, matching what ESP-IDF embeds from CMakeLists.txt's
+  // `project()` call).
+  store = new FirmwareUploadStore({ rootDir });
 });
 
 afterEach(() => {
@@ -166,7 +169,7 @@ describe('FirmwareUploadStore.latest()', () => {
 
 describe('FirmwareUploadStore.store()', () => {
   it('happy path: writes the full triple at expected paths and returns StoredUpload', async () => {
-    const bin = makeFirmwareBytes({ version: '1.4.0', projectName: 'astros-esp' });
+    const bin = makeFirmwareBytes({ version: '1.4.0' });
     const tempPath = writeTempBin(tempDir, bin);
     const expectedSha = sha256Hex(bin);
 
@@ -176,7 +179,7 @@ describe('FirmwareUploadStore.store()', () => {
     expect(result.sizeBytes).toBe(bin.length);
     expect(result.meta.uploadId).toMatch(/^[0-9a-f-]{36}$/);
     expect(result.meta.originalFilename).toBe('firmware-rc1.bin');
-    expect(result.meta.projectName).toBe('astros-esp');
+    expect(result.meta.projectName).toBe('AstrOs.ESP');
     expect(result.meta.version).toBe('1.4.0');
     expect(result.meta.sizeBytes).toBe(bin.length);
 
@@ -428,6 +431,85 @@ describe('FirmwareUploadStore.store()', () => {
   });
 });
 
+describe('FirmwareUploadStore — esp_app_desc.version normalization', () => {
+  // ESP-IDF embeds `git describe --tags --dirty` into esp_app_desc.version
+  // by default. Real example from a dev build: "v1.0.0-RC.1-71-g9a55936-dirty".
+  // The store strips the leading `v` and the trailing `-<N>-g<sha>(-dirty)?`
+  // suffix so the persisted meta.version matches the clean semver shape that
+  // GitHub-release filenames produce — c.6's orchestrator can compare the two
+  // without per-source casing.
+
+  it('normalizes a dirty dev build: v1.0.0-RC.1-71-g9a55936-dirty → 1.0.0-RC.1', async () => {
+    const bin = makeFirmwareBytes({ version: 'v1.0.0-RC.1-71-g9a55936-dirty' });
+    const tempPath = writeTempBin(tempDir, bin);
+
+    const result = await store.store(tempPath, 'dev.bin');
+
+    expect(result.meta.version).toBe('1.0.0-RC.1');
+  });
+
+  it('normalizes a tag-clean off-tag build: v1.0.0-0-gabc12345 → 1.0.0', async () => {
+    const bin = makeFirmwareBytes({ version: 'v1.0.0-0-gabc12345' });
+    const tempPath = writeTempBin(tempDir, bin);
+
+    const result = await store.store(tempPath, 'tag.bin');
+
+    expect(result.meta.version).toBe('1.0.0');
+  });
+
+  it('strips only the v prefix when no git-describe suffix is present: v1.4.0 → 1.4.0', async () => {
+    const bin = makeFirmwareBytes({ version: 'v1.4.0' });
+    const tempPath = writeTempBin(tempDir, bin);
+
+    const result = await store.store(tempPath, 'tag.bin');
+
+    expect(result.meta.version).toBe('1.4.0');
+  });
+
+  it('passes already-clean semver through unchanged: 1.0.0-RC.3 → 1.0.0-RC.3', async () => {
+    const bin = makeFirmwareBytes({ version: '1.0.0-RC.3' });
+    const tempPath = writeTempBin(tempDir, bin);
+
+    const result = await store.store(tempPath, 'clean.bin');
+
+    expect(result.meta.version).toBe('1.0.0-RC.3');
+  });
+
+  it('still rejects a version that remains unparseable after normalization', async () => {
+    // No leading `v`, no git-describe suffix to strip — `garbage` stays
+    // `garbage` and fails the semver check.
+    const bin = makeFirmwareBytes({ version: 'garbage' });
+    const tempPath = writeTempBin(tempDir, bin);
+
+    await expect(store.store(tempPath, 'bad.bin')).rejects.toThrow(/version/i);
+  });
+
+  it('does not strip a pre-release label that resembles a git-describe suffix on its own', async () => {
+    // `1.0.0-dev.71` — the `dev.71` portion has digits but no `-g<sha>`,
+    // so the suffix regex doesn't match. Version passes through cleanly.
+    const bin = makeFirmwareBytes({ version: '1.0.0-dev.71' });
+    const tempPath = writeTempBin(tempDir, bin);
+
+    const result = await store.store(tempPath, 'devN.bin');
+
+    expect(result.meta.version).toBe('1.0.0-dev.71');
+  });
+});
+
+describe('FirmwareUploadStore — project_name', () => {
+  it('rejects a binary whose embedded project_name is `astros-esp` (filename prefix, not the embedded value)', async () => {
+    // c.5 finding: the asset-filename prefix `astros-esp-…-app.bin` is set
+    // by CI tooling, but the EMBEDDED project_name from CMake's project()
+    // call is `AstrOs.ESP`. A binary mistakenly claiming `astros-esp` in
+    // its esp_app_desc must be rejected — it's not what AstrOs.ESP CI
+    // produces.
+    const bin = makeFirmwareBytes({ projectName: 'astros-esp', version: '1.0.0' });
+    const tempPath = writeTempBin(tempDir, bin);
+
+    await expect(store.store(tempPath, 'wrong.bin')).rejects.toThrow(/project name/i);
+  });
+});
+
 describe('FirmwareUploadStore — multiple meta files', () => {
   it('latest() picks the most-recently-mtime`d when multiple meta files exist', async () => {
     const uploadsDir = path.join(rootDir, 'uploads');
@@ -444,7 +526,7 @@ describe('FirmwareUploadStore — multiple meta files', () => {
       const meta: StoredUploadMeta = {
         uploadId: id,
         originalFilename: 'firmware.bin',
-        projectName: 'astros-esp',
+        projectName: 'AstrOs.ESP',
         version: id === oldId ? '1.0.0' : '2.0.0',
         uploadedAt: new Date().toISOString(),
         sizeBytes: bin.length,

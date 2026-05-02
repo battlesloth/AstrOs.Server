@@ -17,7 +17,33 @@ import { assertPathSafe } from './path_safety.js';
 
 const UPLOADS_SUBDIR = 'uploads';
 const PARSE_BUFFER_LEN = ESP_APP_DESC_OFFSET + ESP_APP_DESC_SIZE;
-const DEFAULT_PROJECT_NAME = 'astros-esp';
+// Matches the CMake `project()` call in AstrOs.ESP/CMakeLists.txt —
+// ESP-IDF embeds that name verbatim into esp_app_desc_t.project_name.
+// NOT the asset-filename prefix `astros-esp-…-app.bin`, which is set
+// independently by CI tooling. Verified against a real firmware.bin
+// during c.5 implementation.
+const DEFAULT_PROJECT_NAME = 'AstrOs.ESP';
+
+// `git describe --tags --dirty` suffix that ESP-IDF appends to
+// esp_app_desc_t.version when neither CONFIG_APP_PROJECT_VER_FROM_CONFIG
+// nor a version.txt file is set. Pattern: `-<count>-g<short-sha>(-dirty)?`.
+// Anchored at end so the dash-separated count + sha don't match anywhere
+// inside legitimate pre-release labels like `1.0.0-RC.1`. The 4-hex
+// minimum on <sha> guards against false positives — short pre-release
+// labels like `-1-gA` won't match (and real short SHAs are ≥4 hex).
+const GIT_DESCRIBE_SUFFIX_RE = /-\d+-g[0-9a-f]{4,}(?:-dirty)?$/;
+
+// Strips the leading `v` and trailing git-describe suffix from a raw
+// esp_app_desc_t.version string. Real example from a dev build:
+//   "v1.0.0-RC.1-71-g9a55936-dirty"  →  "1.0.0-RC.1"
+// Already-clean inputs pass through unchanged.
+function normalizeEspVersion(raw: string): string {
+  let v = raw.replace(GIT_DESCRIBE_SUFFIX_RE, '');
+  if (v.startsWith('v') || v.startsWith('V')) {
+    v = v.slice(1);
+  }
+  return v;
+}
 
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
 // uuid v4 is 36 chars: 8-4-4-4-12 hex with dashes.
@@ -110,10 +136,18 @@ export class FirmwareUploadStore {
         `firmware upload project name mismatch: got ${JSON.stringify(desc.projectName)}, expected ${JSON.stringify(this.expectedProjectName)}`,
       );
     }
+    // ESP-IDF embeds `git describe --tags --dirty` into esp_app_desc.version
+    // by default. Strip the leading `v` and the trailing `-<N>-g<sha>(-dirty)?`
+    // suffix so the persisted meta.version is a clean semver matching what
+    // the GitHub-release path produces from filename parsing — c.6's
+    // orchestrator can then compare the two without per-source casing.
+    const normalizedVersion = normalizeEspVersion(desc.version);
     // compareVersions returns NaN for unparseable inputs and 0 for equal;
     // self-comparison succeeds iff the version is well-formed.
-    if (Number.isNaN(compareVersions(desc.version, desc.version))) {
-      throw new Error(`firmware upload version unparseable: ${JSON.stringify(desc.version)}`);
+    if (Number.isNaN(compareVersions(normalizedVersion, normalizedVersion))) {
+      throw new Error(
+        `firmware upload version unparseable: ${JSON.stringify(desc.version)} (normalized: ${JSON.stringify(normalizedVersion)})`,
+      );
     }
 
     // Stream-hash the whole file. The for-await loop handles backpressure
@@ -134,7 +168,7 @@ export class FirmwareUploadStore {
       uploadId,
       originalFilename,
       projectName: desc.projectName,
-      version: desc.version,
+      version: normalizedVersion,
       uploadedAt: new Date().toISOString(),
       sizeBytes,
     };
