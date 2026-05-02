@@ -5,8 +5,11 @@ interface BaseControllerFlashState {
   bytesSent: number;
   totalBytes: number;
   // Required-with-empty-string-default rather than optional. Mirrors
-  // the wire shape (FwProgress.detail is a required field) and prevents
-  // `undefined` from leaking through JSON.stringify into the WS payload.
+  // the wire shape (FwProgress.detail is a required field). With
+  // optional, an `undefined` value would cause `JSON.stringify` to
+  // omit the property entirely from the WS payload — consumers would
+  // see the field missing rather than as `""`. Required ensures
+  // every payload carries `detail` with at least an empty string.
   detail: string;
 }
 
