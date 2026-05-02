@@ -56,7 +56,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
   - Up-front length check: throw if `buf.length < 288`. Caller only ever reads the first 288 bytes.
 
 - [x] **`FirmwareUploadStore` class** (new `astros_api/src/firmware/firmware_upload_store.ts`):
-  - Constructor: `new FirmwareUploadStore(opts?: { rootDir?: string, expectedProjectName?: string })`. `expectedProjectName` defaults to `'astros-esp'` (resolves decomp Open Item #4 — see Notes; verification step against firmware repo's `CONFIG_APP_PROJECT_NAME` is in the open-items list).
+  - Constructor: `new FirmwareUploadStore(opts?: { rootDir?: string, expectedProjectName?: string })`. `expectedProjectName` defaults to `'AstrOs.ESP'` — verified against the CMake `project()` call in the firmware repo and against a real `firmware.bin` during c.5 implementation; resolves decomp Open Item #4 (see Notes for the reviewer for the full finding).
   - **`store(tempPath: string, originalFilename: string): Promise<StoredUpload>`**:
     1. Generate `uploadId = uuid_v4()`. `assertPathSafe(uploadId, 'uploadId')` for defense-in-depth against future regressions where the uuid generator changes.
     2. `fsp.open(tempPath)` → `read(buf, 0, 288, 0)` into a 288-byte Buffer; close handle in a `finally` block (no fd leak on parse failure).
@@ -92,7 +92,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
   - `latest()` returns null on cold cache.
   - `store()` happy path: temp file exists, parser succeeds, all three files at expected paths, returned `StoredUpload` has correct `path`, `sha256` (verified by re-hashing), `sizeBytes`, and meta.
   - `store()` consumes the temp file (no orphan in `tmp/` after success).
-  - `store()` rejects when `projectName !== 'astros-esp'`; pre-existing prior upload preserved (no wipe-on-fail-validation).
+  - `store()` rejects when `projectName !== 'AstrOs.ESP'` (the embedded value from the firmware repo's CMake `project()` call); pre-existing prior upload preserved (no wipe-on-fail-validation).
   - `store()` rejects when `version` is unparseable; prior upload preserved.
   - `store()` rejects when binary is shorter than 288 bytes.
   - `store()` replaces a prior upload: pre-populated old triple is gone, new triple present.
