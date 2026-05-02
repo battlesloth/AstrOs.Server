@@ -107,9 +107,9 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
 
 ## Verification
 
-- [ ] `npm run build` clean (lint + tsc).
-- [ ] `npm run test` green (existing 347 → ~365 passing; +~18 new tests).
-- [ ] `npm run prettier:write` and `npm run lint:fix` clean.
+- [x] `npm run build` clean (lint + tsc).
+- [x] `npm run test` green (380 → 409 passing; +29 new tests = 11 parser + 18 store).
+- [x] `npm run prettier:write` and `npm run lint:fix` clean.
 - [ ] Manual smoke deferred to c.8 where the route makes the upload reachable end-to-end.
 
 ## Files in scope (6)
