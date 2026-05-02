@@ -63,7 +63,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
     3. Call `parseEspAppDesc` on those bytes. Any throw propagates.
     4. Verify `desc.projectName === expectedProjectName`; reject otherwise with the actual value in the error message.
     5. Verify `desc.version` parses under `compareVersions(v, v) === 0` (existing helper at `astros_api/src/utility/semver.ts`). Strict 3-component prefix means `1.2.0-rc.1+build.123` parses but `1.2` and `latest` don't.
-    6. Stream-hash the **whole** temp file via `stream/promises.pipeline(createReadStream(tempPath), hashTransform)`; sum bytes streamed for `sizeBytes`. No buffering.
+    6. Stream-hash the **whole** temp file via `for await (const chunk of fs.createReadStream(tempPath))`, feeding each chunk into a `crypto.createHash('sha256')` and summing chunk lengths into `sizeBytes`. The for-await loop handles backpressure and auto-closes the underlying fd on both clean exit and mid-loop error. Using `stream/promises.pipeline` would require a Writable destination we don't need (the bytes already live at `tempPath`); the for-await form keeps the read-and-discard intent explicit and avoids a no-op sink.
     7. **Atomic promote** with c.4's persist-phase ordering:
        - `fsp.mkdir(<rootDir>/uploads/, { recursive: true })`
        - **Wipe any prior `upload-*.bin`, `upload-*.bin.sha256`, `upload-*.meta.json`** in `<rootDir>/uploads/` (best-effort unlinks; `readdir` + filter + `Promise.all` of unlinks).
@@ -156,7 +156,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
 | `JSON.parse(metaText)` | SyntaxError | return null (malformed; swept by next successful store) |
 
 **Gotchas applying from c.4 experience:**
-- Truncated read on temp file looks like normal close. Mitigation: parser checks length up front (≥288); store also verifies `actualSize > 0` post-stream-hash.
+- Truncated read on temp file looks like normal close. Mitigation: the parse step's `fh.read(buf, 0, 288, 0)` rejects any file that doesn't deliver the full 288-byte header, which is the load-bearing check for the most common truncation source (incomplete upload). A subsequent parse-time-vs-hash-time race (file truncated between the two reads) is not separately guarded — caught only if it shrinks below the 288-byte parse floor before the stream-hash opens its own handle, which would also fail the parse on a retry.
 - `JSON.parse('{}')` succeeds but `isValidUploadMeta` requires every field present-and-correct-type, so malformed-meta path triggers cleanly.
 - macOS HFS+ case-insensitive: UUIDs are lowercase hex by construction; case collisions N/A.
 
