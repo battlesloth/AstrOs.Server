@@ -52,6 +52,36 @@ const MAX_RELEASES = 5;
 // corrupted or wasn't written by us — lookup() treats it as a cache miss.
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
 
+// Allowlist for `version` and `variant` strings interpolated into cache
+// filenames by pathsFor(). The strings flow through string-template
+// concatenation into path.join(), so a path separator ('/' on POSIX,
+// '/' or '\' on Windows), drive letter ('C:'), parent reference
+// ('..'), embedded null, or leading dot would let a hostile or malformed
+// input escape <rootDir>/github/ via path.join's normalization.
+//
+// `variant` is already constrained upstream by c.3's ASSET_PATTERN
+// (`[a-z][a-z0-9_]*`), so this is defense-in-depth there. `version` is
+// captured by ASSET_PATTERN as `(.+)` — completely permissive — so this
+// is the only guard for it. A release asset published with path
+// separators in its version slot (`astros-esp-../../foo-metro_s3-app.bin`)
+// would otherwise parse cleanly into AssetInfo and let the cache write
+// outside its directory.
+//
+// First char must be alphanumeric (forbids leading-dot hidden files and
+// leading-hyphen flag-injection lookalikes). Body allows the characters
+// real semver and PlatformIO env names use: '.' for version dots, '-'
+// for pre-release labels (1.2.0-RC.1), '+' for build metadata
+// (1.0.0+build.123), '_' for variant underscores (lolin_d32_pro).
+const PATH_SAFE_RE = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
+
+function assertPathSafe(value: string, kind: 'version' | 'variant'): void {
+  if (!PATH_SAFE_RE.test(value)) {
+    throw new Error(
+      `Invalid firmware ${kind} for cache path: ${JSON.stringify(value)} contains characters that aren't filename-safe`,
+    );
+  }
+}
+
 // User-Agent is required by GitHub's CDN-fronted asset endpoints (some
 // proxies reject unidentified clients). Accept is intentionally permissive
 // here — unlike the API endpoint (where v3 negotiation matters), the asset
@@ -107,6 +137,13 @@ function isValidMeta(value: unknown): value is CachedAssetMeta {
 }
 
 function pathsFor(rootDir: string, version: string, variant: string): PathTriple {
+  // Validate at the chokepoint, before any string interpolation. Both
+  // public entry points (lookup() and fetch() via fetchInternal → lookup)
+  // call pathsFor before doing any filesystem work, so a single check
+  // here covers both paths and produces a synchronous throw that
+  // propagates as a rejected promise to async callers.
+  assertPathSafe(version, 'version');
+  assertPathSafe(variant, 'variant');
   const baseName = `astros-esp-${version}-${variant}-app`;
   const githubDir = path.join(rootDir, GITHUB_SUBDIR);
   return {
@@ -293,7 +330,14 @@ export class FirmwareCache {
     // because of bookkeeping cleanup. The warn surfaces conditions like a
     // permissions issue on the cache dir that would otherwise let the cache
     // grow past MAX_RELEASES forever with no operator-visible signal.
-    await this.pruneToN(MAX_RELEASES).catch((err: unknown) => {
+    // Pass release.tag as the keep-anchor so pruneToN never evicts the
+    // entry we just wrote. Without this, an older-version fetch into a
+    // full cache of newer versions would sort the just-written .bin as
+    // the "oldest" of N+1 and unlink it — then the stat below would
+    // ENOENT and the entire fetch would reject for a successfully-
+    // downloaded firmware. Affects rollback / regression-hunt flows
+    // most acutely.
+    await this.pruneToN(MAX_RELEASES, release.tag).catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       logger.warn(
         `firmware-cache eviction failed; cache may exceed ${MAX_RELEASES} releases until next successful fetch: ${message}`,
@@ -309,11 +353,19 @@ export class FirmwareCache {
    * desc with `publishedAt` desc as tiebreaker. The unit is the release (=
    * unique tag), so both variants of an evicted release are removed together.
    *
+   * `keepTag`, when supplied, anchors a tag that must NEVER be evicted by
+   * this call — typically the just-fetched release.tag from the calling
+   * fetch(). Without this anchor, an older-version fetch into a full cache
+   * of newer versions would see its own just-written .bin sorted as the
+   * "oldest" of N+1 and unlinked. Eviction still produces a cache of size
+   * `maxReleases`; the keep-anchor just shifts which member is dropped (the
+   * oldest of the *others* rather than the absolute oldest).
+   *
    * Read-side robustness: malformed or unreadable meta.json files are
    * skipped (not crashed-on); the rest of the cache continues to be
    * managed normally.
    */
-  private async pruneToN(maxReleases: number): Promise<void> {
+  private async pruneToN(maxReleases: number, keepTag?: string): Promise<void> {
     const githubDir = path.join(this.rootDir, GITHUB_SUBDIR);
     let entries: import('fs').Dirent[];
     try {
@@ -328,6 +380,43 @@ export class FirmwareCache {
     }
 
     const META_SUFFIX = '.meta.json';
+    const TMP_SUFFIX = '.bin.tmp';
+
+    // Snapshot the .tmp filenames that belong to currently in-flight
+    // fetches so the orphan sweep below can skip them. Synchronous
+    // snapshot taken before any await so a fetch that has already
+    // populated `inFlight` at this point is correctly preserved. The
+    // inFlight key is `${version}::${variant}` — the same tuple that
+    // determines the on-disk filename — so reconstructing the .tmp
+    // filename from the key is a sound mapping.
+    const liveTmpNames = new Set<string>();
+    for (const key of this.inFlight.keys()) {
+      const [version, variant] = key.split('::');
+      liveTmpNames.add(`astros-esp-${version}-${variant}-app.bin.tmp`);
+    }
+
+    // Orphan-tmp sweep targets. A process killed mid-download (OOM,
+    // container kill, host reboot, ungraceful shutdown) leaves
+    // <name>.tmp on disk because the in-process catch and .finally in
+    // fetchInternal/fetch never ran. lookup() doesn't return such files
+    // (no .bin) and the meta-based eviction below doesn't see them
+    // (no .meta.json), so without this sweep they would persist
+    // forever — every aborted fetch leaks ~1.2 MB of disk on
+    // resource-constrained SBC targets. pruneToN() runs after every
+    // successful fetch, so the first fetch in a fresh process catches
+    // up on whatever was left by a prior process. The sweep runs
+    // BEFORE the byTag.size <= maxReleases early-return below so it
+    // happens regardless of release count.
+    //
+    // Residual race: a fetch whose `inFlight.set` runs *after* the
+    // snapshot above but whose .tmp already existed on disk (extreme
+    // case: prior crash, immediate retry on the same key, while
+    // another fetch's pruneToN happens to be running) could see its
+    // .tmp deleted mid-stream. Consequence is bounded — the new
+    // fetch's stream errors and the user retries. Not data corruption:
+    // .bin promotion happens after rename, well after streamDownload
+    // returns, so a deleted .tmp can't be promoted to a partial .bin.
+    const orphanTmpPaths: string[] = [];
 
     // Each entry keeps its source Dirent name alongside the parsed meta.
     // The Dirent name is guaranteed by Node to be a basename (no path
@@ -338,7 +427,14 @@ export class FirmwareCache {
     // can't influence which files get unlinked.
     const metaFiles: Array<{ name: string; meta: CachedAssetMeta }> = [];
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(META_SUFFIX)) continue;
+      if (!entry.isFile()) continue;
+      if (entry.name.endsWith(TMP_SUFFIX)) {
+        if (!liveTmpNames.has(entry.name)) {
+          orphanTmpPaths.push(path.join(githubDir, entry.name));
+        }
+        continue;
+      }
+      if (!entry.name.endsWith(META_SUFFIX)) continue;
       try {
         const text = await fsp.readFile(path.join(githubDir, entry.name), 'utf8');
         const parsed: unknown = JSON.parse(text);
@@ -350,6 +446,13 @@ export class FirmwareCache {
       } catch {
         // Unreadable / malformed-JSON sidecar — skip rather than abort.
       }
+    }
+
+    // Best-effort unlink of orphan .tmp files. Like the eviction
+    // unlinks below, individual failures are non-fatal — the cache
+    // simply re-attempts on the next pruneToN run.
+    if (orphanTmpPaths.length > 0) {
+      await Promise.all(orphanTmpPaths.map((p) => fsp.unlink(p).catch(() => undefined)));
     }
 
     // Group by tag so both variants of the same release stay together.
@@ -372,10 +475,25 @@ export class FirmwareCache {
       return b[0].meta.publishedAt.localeCompare(a[0].meta.publishedAt);
     });
 
-    // Evict everything past the keep-window. Paths are derived from each
+    // Build the keep-window. The just-fetched tag (if specified and
+    // present) is pinned first so it survives even when it sorts oldest;
+    // remaining slots fill from the sorted-desc tags, skipping any
+    // already pinned. Resulting set always has `maxReleases` entries
+    // because we already returned early when byTag.size <= maxReleases.
+    const keepers = new Set<string>();
+    if (keepTag !== undefined && byTag.has(keepTag)) {
+      keepers.add(keepTag);
+    }
+    for (const [tag] of sortedTagGroups) {
+      if (keepers.size >= maxReleases) break;
+      keepers.add(tag); // Set.add is idempotent if `tag` is already keepTag
+    }
+
+    // Evict everything not in the keep set. Paths are derived from each
     // meta file's Dirent name (a guaranteed basename), so unlink targets
     // always live inside githubDir even if the JSON content is hostile.
-    for (const [, members] of sortedTagGroups.slice(maxReleases)) {
+    for (const [tag, members] of sortedTagGroups) {
+      if (keepers.has(tag)) continue;
       for (const e of members) {
         const baseName = e.name.slice(0, -META_SUFFIX.length);
         const metaPath = path.join(githubDir, e.name);

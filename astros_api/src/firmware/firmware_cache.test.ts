@@ -243,6 +243,79 @@ function makeFetcherReturning(body: Buffer | Uint8Array): typeof fetch {
   ) as unknown as typeof fetch;
 }
 
+// ---------------------------------------------------------------------------
+// Filename-safety validation — pathsFor() interpolates `version` and
+// `variant` into cache filenames before passing them to path.join(). The
+// upstream c.3 ASSET_PATTERN constrains variant to [a-z0-9_]+ but captures
+// version as `(.+)` — so a release asset named with path separators or
+// parent-dir refs in the version slot would parse cleanly into AssetInfo
+// and let the cache write outside <rootDir>/github/. The cache must
+// validate both inputs at the chokepoint and fail fast.
+// ---------------------------------------------------------------------------
+
+describe('FirmwareCache filename-safety validation', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fw-cache-test-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  // Each value is something path.join() would happily absorb into an escape
+  // or hidden-file write if the cache didn't validate first. The label is
+  // for test-output readability only.
+  const UNSAFE_INPUTS: Array<[string, string]> = [
+    ['forward slash (POSIX separator)', '1.0.0/../../etc'],
+    ['backslash (Windows separator)', '1.0.0\\..\\..\\etc'],
+    ['parent reference alone', '..'],
+    ['drive letter (Windows)', 'C:foo'],
+    ['empty string', ''],
+    ['leading dot (hidden file)', '.hidden'],
+    ['embedded null byte', '1.0.0\x00.bin'],
+  ];
+
+  for (const [label, unsafeVersion] of UNSAFE_INPUTS) {
+    it(`lookup rejects an unsafe version: ${label}`, async () => {
+      const cache = new FirmwareCache({ rootDir: tmpDir });
+      await expect(cache.lookup(unsafeVersion, 'metro_s3')).rejects.toThrow(/filename-safe/);
+    });
+  }
+
+  it('lookup rejects an unsafe variant for defense-in-depth (upstream regex normally constrains it)', async () => {
+    const cache = new FirmwareCache({ rootDir: tmpDir });
+    await expect(cache.lookup('1.0.0', 'metro/../../foo')).rejects.toThrow(/filename-safe/);
+  });
+
+  it('fetch rejects unsafe input without invoking the fetcher or touching disk', async () => {
+    // Sentinel outside the cache dir to prove validation runs BEFORE any
+    // path.join could normalize the unsafe input into an escape — if
+    // validation fired late, '../foo' would resolve to <tmpDir>/foo and
+    // we'd see a write there.
+    const sentinel = path.join(tmpDir, 'foo');
+    const fetcher = vi.fn() as unknown as typeof fetch;
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    await expect(cache.fetch(makeRelease(), makeAsset({ version: '1.0.0/foo' }))).rejects.toThrow(
+      /filename-safe/,
+    );
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(fs.existsSync(sentinel)).toBe(false);
+  });
+
+  it('lookup accepts a valid semver pre-release with build metadata (regression guard)', async () => {
+    // '.', '-', '+' MUST remain allowed — they appear in legitimate semver
+    // versions (`1.2.0-rc.1+build.123`). A regression here would break
+    // real releases for no security gain.
+    const cache = new FirmwareCache({ rootDir: tmpDir });
+    expect(await cache.lookup('1.2.0-rc.1+build.123', 'metro_s3')).toBeNull();
+  });
+});
+
 describe('FirmwareCache.fetch', () => {
   let tmpDir: string;
 
@@ -568,6 +641,51 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(pathsFor(tmpDir, '1.5.0', 'metro_s3').bin)).toBe(true);
   });
 
+  it('keeps the just-fetched release even when it sorts oldest (older-version fetch into a full cache)', async () => {
+    // Edge case identified in PR review: cache full of NEWER releases,
+    // user fetches an OLDER one (rollback / regression hunt). The
+    // pre-fix pruneToN sorted by semver desc and sliced past
+    // maxReleases, evicting the just-renamed .bin/.sha/.meta because
+    // they were the "oldest" of N+1 — then the post-prune stat(p.bin)
+    // in fetchInternal would ENOENT and the entire fetch would reject
+    // with a misleading stat error. The fix: pruneToN excludes
+    // release.tag from eviction and instead drops the oldest of the
+    // OTHER tags, so the cache holds "the just-fetched + the (N-1)
+    // newest others" rather than "the N newest, period."
+
+    // Pre-populate 5 NEWER releases.
+    populateCache(tmpDir, '2.0.0', 'metro_s3', '2026-02-01T00:00:00Z');
+    populateCache(tmpDir, '2.1.0', 'metro_s3', '2026-02-15T00:00:00Z');
+    populateCache(tmpDir, '2.2.0', 'metro_s3', '2026-03-01T00:00:00Z');
+    populateCache(tmpDir, '2.3.0', 'metro_s3', '2026-03-15T00:00:00Z');
+    populateCache(tmpDir, '2.4.0', 'metro_s3', '2026-04-01T00:00:00Z');
+
+    // Fetch v1.0.0 — older than every cached release.
+    const bytes = Buffer.from('v1.0.0-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+    const result = await cache.fetch(
+      makeRelease({ tag: 'v1.0.0', version: '1.0.0', publishedAt: '2026-01-01T00:00:00Z' }),
+      makeAsset({ version: '1.0.0', sizeBytes: bytes.length }),
+    );
+
+    // Just-fetched v1.0.0 survives — all three sidecars on disk and
+    // the returned CachedAsset.path resolves to the on-disk .bin.
+    const just = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    expect(fs.existsSync(just.bin)).toBe(true);
+    expect(fs.existsSync(just.sha)).toBe(true);
+    expect(fs.existsSync(just.meta)).toBe(true);
+    expect(result.path).toBe(just.bin);
+    expect(fs.readFileSync(just.bin)).toEqual(bytes);
+
+    // Cache size remains at MAX_RELEASES (5). Oldest of the OTHERS
+    // (v2.0.0) was evicted, not the just-fetched v1.0.0.
+    expect(fs.existsSync(pathsFor(tmpDir, '2.0.0', 'metro_s3').bin)).toBe(false);
+    for (const v of ['2.1.0', '2.2.0', '2.3.0', '2.4.0']) {
+      expect(fs.existsSync(pathsFor(tmpDir, v, 'metro_s3').bin)).toBe(true);
+    }
+  });
+
   it('skips structurally-valid-but-malformed meta.json files during eviction', async () => {
     // JSON.parse({}) yields an object that satisfies the CachedAssetMeta
     // type assertion at compile time but has all-undefined fields at
@@ -605,6 +723,145 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(pathsFor(tmpDir, '1.5.0', 'metro_s3').bin)).toBe(true);
     // No warn — malformed-file skipping is in-band, not an error condition.
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('sweeps orphan .tmp files left by a prior crash', async () => {
+    // Process killed mid-download (OOM, container kill, host reboot)
+    // leaves <name>.tmp on disk: the in-process catch/.finally never
+    // ran. lookup() doesn't return it (no .bin) and the meta-based
+    // eviction below doesn't see it (no .meta.json), so without a sweep
+    // it would persist forever — every aborted fetch leaks ~1.2 MB.
+    populateCache(tmpDir, '1.0.0', 'metro_s3', '2026-01-01T00:00:00Z');
+    populateCache(tmpDir, '1.1.0', 'metro_s3', '2026-02-01T00:00:00Z');
+    populateCache(tmpDir, '1.2.0', 'metro_s3', '2026-03-01T00:00:00Z');
+    populateCache(tmpDir, '1.3.0', 'metro_s3', '2026-04-01T00:00:00Z');
+    populateCache(tmpDir, '1.4.0', 'metro_s3', '2026-04-15T00:00:00Z');
+
+    // Two orphans simulating two prior aborted downloads on different keys.
+    const githubDir = path.join(tmpDir, 'github');
+    const orphanA = path.join(githubDir, 'astros-esp-0.5.0-metro_s3-app.bin.tmp');
+    const orphanB = path.join(githubDir, 'astros-esp-0.6.0-lolin_d32_pro-app.bin.tmp');
+    fs.writeFileSync(orphanA, Buffer.from('partial-from-crash-A'));
+    fs.writeFileSync(orphanB, Buffer.from('partial-from-crash-B'));
+
+    // Trigger pruneToN via a 6th fetch (post-rename eviction pathway).
+    const bytes = Buffer.from('v1.5.0-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+    await cache.fetch(
+      makeRelease({ tag: 'v1.5.0', version: '1.5.0', publishedAt: '2026-04-30T00:00:00Z' }),
+      makeAsset({ version: '1.5.0', sizeBytes: bytes.length }),
+    );
+
+    // Orphans gone; legitimate eviction still happened.
+    expect(fs.existsSync(orphanA)).toBe(false);
+    expect(fs.existsSync(orphanB)).toBe(false);
+    expect(fs.existsSync(pathsFor(tmpDir, '1.0.0', 'metro_s3').bin)).toBe(false);
+    expect(fs.existsSync(pathsFor(tmpDir, '1.5.0', 'metro_s3').bin)).toBe(true);
+  });
+
+  it('sweeps orphan .tmp files even when no release eviction is needed', async () => {
+    // The orphan sweep must run BEFORE the byTag.size <= maxReleases
+    // early-return — otherwise a cache with only a few releases would
+    // never clean up orphans. This test pins that ordering: only one
+    // release after the fetch, well below N=5, but the orphan must
+    // still go.
+    const githubDir = path.join(tmpDir, 'github');
+    fs.mkdirSync(githubDir, { recursive: true });
+    const orphan = path.join(githubDir, 'astros-esp-0.9.0-metro_s3-app.bin.tmp');
+    fs.writeFileSync(orphan, Buffer.from('partial'));
+
+    const bytes = Buffer.from('v1.0.0-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+    await cache.fetch(makeRelease(), makeAsset({ sizeBytes: bytes.length }));
+
+    expect(fs.existsSync(orphan)).toBe(false);
+  });
+
+  it('preserves a .tmp file for a fetch currently in flight (concurrency safety)', async () => {
+    // Engineer a fetch that is actively writing to its .tmp (one chunk
+    // landed, body stream paused) while another fetch on a different
+    // key completes and triggers pruneToN. The in-flight fetch's .tmp
+    // MUST NOT be swept — pruneToN consults the inFlight Map for live
+    // .tmp filenames and skips them.
+    populateCache(tmpDir, '1.0.0', 'metro_s3', '2026-01-01T00:00:00Z');
+    populateCache(tmpDir, '1.1.0', 'metro_s3', '2026-02-01T00:00:00Z');
+    populateCache(tmpDir, '1.2.0', 'metro_s3', '2026-03-01T00:00:00Z');
+    populateCache(tmpDir, '1.3.0', 'metro_s3', '2026-04-01T00:00:00Z');
+    populateCache(tmpDir, '1.4.0', 'metro_s3', '2026-04-15T00:00:00Z');
+
+    // Hanging body for key 2.0.0::lolin_d32_pro — emit one chunk to
+    // force the .tmp onto disk, then leave the controller open so the
+    // pipeline pauses indefinitely. Sync fetcher for everything else.
+    let hangingController: ReadableStreamDefaultController<Uint8Array> | null = null;
+    const hangingUrl = 'https://example.test/astros-esp-2.0.0-lolin_d32_pro-app.bin';
+    const fetcher: typeof fetch = vi.fn(async (url: URL | RequestInfo) => {
+      if (String(url) === hangingUrl) {
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            hangingController = controller;
+            controller.enqueue(new Uint8Array([1, 2, 3, 4, 5]));
+            // Don't close — body pauses, .tmp stays on disk mid-stream.
+          },
+        });
+        return new Response(body, { status: 200 });
+      }
+      return new Response(Buffer.from('v1.5.0-bytes'), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    // Start the hanging fetch — populates inFlight, .tmp eventually
+    // appears on disk after the chunk flows through pipeline().
+    // Override assetName + assetUrl so the URL match in the fetcher
+    // routes correctly (makeAsset's defaults are pinned to 1.0.0-metro_s3).
+    const hangingFetch = cache.fetch(
+      makeRelease({ tag: 'v2.0.0', version: '2.0.0', publishedAt: '2026-05-01T00:00:00Z' }),
+      makeAsset({
+        version: '2.0.0',
+        variant: 'lolin_d32_pro',
+        assetName: 'astros-esp-2.0.0-lolin_d32_pro-app.bin',
+        assetUrl: hangingUrl,
+        // Set to 5 (the chunk size) so a successful complete-then-error
+        // wouldn't fail the size check before the cleanup; the test
+        // errors the stream so this fetch always rejects regardless.
+        sizeBytes: 5,
+      }),
+    );
+
+    // Poll for the .tmp to land. The pipeline runs on microtasks — a
+    // few short setTimeout yields are enough; cap iterations so a
+    // regression doesn't spin forever.
+    const hangingTmpPath = path.join(
+      tmpDir,
+      'github',
+      'astros-esp-2.0.0-lolin_d32_pro-app.bin.tmp',
+    );
+    for (let i = 0; i < 50 && !fs.existsSync(hangingTmpPath); i++) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(fs.existsSync(hangingTmpPath)).toBe(true);
+
+    // Successful fetch on a different key — triggers pruneToN, which
+    // now sees the hanging .tmp as a *.bin.tmp candidate but must skip
+    // it because its key is in inFlight.
+    await cache.fetch(
+      makeRelease({ tag: 'v1.5.0', version: '1.5.0', publishedAt: '2026-04-30T00:00:00Z' }),
+      makeAsset({
+        version: '1.5.0',
+        assetName: 'astros-esp-1.5.0-metro_s3-app.bin',
+        assetUrl: 'https://example.test/astros-esp-1.5.0-metro_s3-app.bin',
+        sizeBytes: 'v1.5.0-bytes'.length,
+      }),
+    );
+
+    expect(fs.existsSync(hangingTmpPath)).toBe(true);
+
+    // Cleanup: error the hanging stream so the fetch rejects and the
+    // afterEach rmSync can clean the temp dir.
+    hangingController?.error(new Error('test cleanup: aborting hanging fetch'));
+    await expect(hangingFetch).rejects.toThrow();
   });
 
   it('logs a warning when eviction fails so operators can diagnose disk growth', async () => {
