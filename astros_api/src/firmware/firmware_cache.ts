@@ -256,18 +256,36 @@ export class FirmwareCache {
       // reflects the bytes actually on disk regardless of input source.
       sizeBytes: actualSize,
     };
-    await fsp.writeFile(p.sha, computedSha);
-    await fsp.writeFile(p.meta, JSON.stringify(meta, null, 2));
-    // Windows fs.rename throws EEXIST if the destination already exists
-    // (POSIX overwrites atomically). Recover from a stale .bin left by
-    // a crashed earlier write — lookup() would have returned null on
-    // partial state, but the orphaned binary itself still occupies the
-    // canonical path. Unlink it first so the rename always promotes.
-    // ENOENT is the normal case (no stale file); ignore it.
-    await fsp.unlink(p.bin).catch((err: unknown) => {
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
-    });
-    await fsp.rename(tmpPath, p.bin);
+    try {
+      await fsp.writeFile(p.sha, computedSha);
+      await fsp.writeFile(p.meta, JSON.stringify(meta, null, 2));
+      // Windows fs.rename throws EEXIST if the destination already exists
+      // (POSIX overwrites atomically). Recover from a stale .bin left by
+      // a crashed earlier write — lookup() would have returned null on
+      // partial state, but the orphaned binary itself still occupies the
+      // canonical path. Unlink it first so the rename always promotes.
+      // ENOENT is the normal case (no stale file); ignore it.
+      await fsp.unlink(p.bin).catch((err: unknown) => {
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+      });
+      await fsp.rename(tmpPath, p.bin);
+    } catch (err) {
+      // Persist-phase failure (disk full mid-writeFile, EACCES on rename,
+      // EXDEV across filesystems, ...). Roll back to the same clean state
+      // the download-phase catch produces: no .tmp, no half-written
+      // sidecars. lookup() already treats partial sidecar state as a miss,
+      // so reads aren't broken without this — but a permanently failing
+      // disk would otherwise let .tmp + sidecars accumulate on every
+      // retry with no eviction trigger to remove them. Each unlink is
+      // best-effort and may itself ENOENT (writeFile threw before opening,
+      // rename consumed the .tmp), which is fine.
+      await Promise.all([
+        fsp.unlink(tmpPath).catch(() => undefined),
+        fsp.unlink(p.sha).catch(() => undefined),
+        fsp.unlink(p.meta).catch(() => undefined),
+      ]);
+      throw err;
+    }
 
     // Eviction is best-effort and runs after the new entry is fully on disk;
     // a failure here doesn't invalidate the just-cached asset, so log-and-go

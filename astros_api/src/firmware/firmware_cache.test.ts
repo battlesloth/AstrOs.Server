@@ -90,6 +90,12 @@ describe('FirmwareCache.lookup', () => {
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    // Restore globally so spies set up inside individual tests can't leak
+    // into later tests when an assertion throws before the test reaches
+    // its own restore call. Without this, a single failing test that
+    // spied on fs/logger would mutate live module exports for the rest
+    // of the run, producing misleading downstream failures.
+    vi.restoreAllMocks();
   });
 
   it('returns null when nothing is cached', async () => {
@@ -246,6 +252,12 @@ describe('FirmwareCache.fetch', () => {
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    // Restore globally so spies set up inside individual tests can't leak
+    // into later tests when an assertion throws before the test reaches
+    // its own restore call. Without this, a single failing test that
+    // spied on fs/logger would mutate live module exports for the rest
+    // of the run, producing misleading downstream failures.
+    vi.restoreAllMocks();
   });
 
   it('on cold cache: downloads, writes all three files, returns CachedAsset', async () => {
@@ -319,6 +331,67 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(p.meta)).toBe(false);
   });
 
+  it('cleans up the .tmp and partially-written sidecars when the persist phase fails after a successful download', async () => {
+    // Disk-full or permissions error during writeFile/rename: the download
+    // already succeeded (.tmp on disk, hash computed) but persisting the
+    // sidecars or promoting .tmp → .bin failed. Without cleanup, .tmp plus
+    // any sidecars written before the failure would accumulate — lookup()
+    // treats that as a miss so reads don't break, but the cold-cache dir
+    // grows with junk on every retry against a persistent failure
+    // (permanently full disk, EACCES on the cache dir, ...).
+    //
+    // Simulate ENOSPC on the second writeFile (the meta.json one) so .sha
+    // has already landed when the failure fires. Cleanup must remove all
+    // three: .tmp, .sha, .meta — the same clean slate the download-phase
+    // catch produces.
+    const bytes = Buffer.from('fake-firmware-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    const realWriteFile = fsp.writeFile.bind(fsp);
+    vi.spyOn(fsp, 'writeFile').mockImplementation(async (file, data) => {
+      if (String(file).endsWith('.meta.json')) {
+        throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' });
+      }
+      return realWriteFile(file as fs.PathLike, data as Parameters<typeof realWriteFile>[1]);
+    });
+
+    await expect(
+      cache.fetch(makeRelease(), makeAsset({ sizeBytes: bytes.length })),
+    ).rejects.toThrow(/ENOSPC/);
+
+    const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    expect(fs.existsSync(p.bin + '.tmp')).toBe(false);
+    expect(fs.existsSync(p.bin)).toBe(false);
+    expect(fs.existsSync(p.sha)).toBe(false);
+    expect(fs.existsSync(p.meta)).toBe(false);
+  });
+
+  it('cleans up the .tmp when the rename to .bin fails after sidecars are written', async () => {
+    // Sidecars wrote OK but rename(.tmp → .bin) failed (e.g., EACCES on the
+    // canonical filename, or an EXDEV on a host where someone bind-mounted
+    // a different filesystem under the cache dir). Both sidecars have to
+    // be removed too — they describe a .bin that doesn't exist — so the
+    // retry sees the same clean slate as any other persist-phase failure.
+    const bytes = Buffer.from('fake-firmware-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    vi.spyOn(fsp, 'rename').mockRejectedValueOnce(
+      Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }),
+    );
+
+    await expect(
+      cache.fetch(makeRelease(), makeAsset({ sizeBytes: bytes.length })),
+    ).rejects.toThrow(/EACCES/);
+
+    const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    expect(fs.existsSync(p.bin + '.tmp')).toBe(false);
+    expect(fs.existsSync(p.bin)).toBe(false);
+    expect(fs.existsSync(p.sha)).toBe(false);
+    expect(fs.existsSync(p.meta)).toBe(false);
+  });
+
   it('rejects when the downloaded size does not match AssetInfo.sizeBytes', async () => {
     // A truncated response that ends cleanly (CDN drops mid-transfer, server
     // sends fewer bytes than Content-Length declared) would otherwise be
@@ -385,8 +458,6 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(p.sha)).toBe(true);
     expect(fs.existsSync(p.meta)).toBe(true);
     expect(fs.existsSync(p.bin + '.tmp')).toBe(false);
-
-    vi.restoreAllMocks();
   });
 
   it('rejects on non-2xx HTTP response', async () => {
@@ -534,8 +605,6 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(pathsFor(tmpDir, '1.5.0', 'metro_s3').bin)).toBe(true);
     // No warn — malformed-file skipping is in-band, not an error condition.
     expect(warnSpy).not.toHaveBeenCalled();
-
-    vi.restoreAllMocks();
   });
 
   it('logs a warning when eviction fails so operators can diagnose disk growth', async () => {
@@ -563,8 +632,6 @@ describe('FirmwareCache.fetch', () => {
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(String(warnSpy.mock.calls[0][0])).toMatch(/EACCES/);
-
-    vi.restoreAllMocks();
   });
 
   it('breaks semver ties by publishedAt (older publishedAt evicted first)', async () => {
