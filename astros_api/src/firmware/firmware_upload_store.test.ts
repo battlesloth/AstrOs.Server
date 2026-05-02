@@ -257,17 +257,34 @@ describe('FirmwareUploadStore.store()', () => {
     expect(stillThere?.meta.version).toBe('1.0.0');
   });
 
-  it('rejects when binary is shorter than the esp_app_desc minimum', async () => {
+  it('rejects when binary is shorter than the esp_app_desc minimum and consumes tempPath', async () => {
     const tinyTempPath = writeTempBin(tempDir, Buffer.alloc(100), 'tiny.tmp');
 
     await expect(store.store(tinyTempPath, 'tiny.bin')).rejects.toThrow(/short/i);
+    // Public contract: store() unconditionally consumes tempPath, even
+    // on parse-phase failures.
+    expect(fs.existsSync(tinyTempPath)).toBe(false);
   });
 
-  it('rejects when esp_app_desc magic word is wrong', async () => {
+  it('rejects when esp_app_desc magic word is wrong and consumes tempPath', async () => {
     const badBin = makeFirmwareBytes({ magic: 0x00000000 });
     const badTempPath = writeTempBin(tempDir, badBin, 'badmagic.tmp');
 
     await expect(store.store(badTempPath, 'bad.bin')).rejects.toThrow(/magic/i);
+    expect(fs.existsSync(badTempPath)).toBe(false);
+  });
+
+  it('rejects when parseEspAppDesc throws on a string-slot violation and consumes tempPath', async () => {
+    // Plant a binary whose project_name slot has no null terminator —
+    // parseEspAppDesc throws with a /null terminator/ error. This
+    // exercises the parse-throw path (distinct from the magic-word
+    // mismatch above), confirming the unconditional cleanup contract.
+    const bin = makeFirmwareBytes();
+    bin.fill(0x41, ESP_APP_DESC_OFFSET + 48, ESP_APP_DESC_OFFSET + 48 + 32);
+    const badTempPath = writeTempBin(tempDir, bin, 'unterminated.tmp');
+
+    await expect(store.store(badTempPath, 'bad.bin')).rejects.toThrow(/null terminator/i);
+    expect(fs.existsSync(badTempPath)).toBe(false);
   });
 
   it('replaces a prior upload triple atomically', async () => {

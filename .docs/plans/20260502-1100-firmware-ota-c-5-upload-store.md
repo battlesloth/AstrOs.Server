@@ -141,16 +141,17 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
 
 | Call | Error / condition | Response |
 |------|-------------------|----------|
-| `fsp.open(tempPath)` / `read(buf, 0, 288)` | ENOENT (temp file vanished) | propagate; route returns 4xx |
-| `fsp.open(tempPath)` | EACCES | propagate; logged at route |
-| `createReadStream(tempPath)` | mid-stream error (truncation, EIO) | post-parse catch unlinks `tempPath` + any partial new triple; rethrow |
-| `fsp.mkdir(<uploads>)` | EACCES | post-parse catch unlinks `tempPath`; rethrow (operator sees the error, route gets a clean failure) |
+| `fsp.open(tempPath)` / `read(buf, 0, 288)` | ENOENT (temp file vanished) | rollback runs `fsp.unlink(tempPath)` which itself ENOENTs (swallowed); rethrow to caller |
+| `fsp.open(tempPath)` | EACCES | rollback unlinks tempPath (best-effort; if perms also block unlink, the inner `.catch` swallows it); rethrow |
+| `parseEspAppDesc` | bad magic / no null terminator / control char / non-UTF-8 | rollback unlinks tempPath; rethrow |
+| `createReadStream(tempPath)` | mid-stream error (truncation, EIO) | rollback unlinks `tempPath` + any partial new triple; rethrow |
+| `fsp.mkdir(<uploads>)` | EACCES | rollback unlinks `tempPath`; rethrow (operator sees the error, route gets a clean failure) |
 | `fsp.unlink(<prior>.*)` (wipe pass) | ENOENT | swallow (expected — first-ever upload) |
 | `fsp.unlink(<prior>.*)` (wipe pass) | EACCES | swallow + log warn; orphan stays until next successful store wipes it |
-| `fsp.rename(tempPath, .bin)` | EXDEV (cross-fs) | post-parse catch unlinks `tempPath`; rethrow (config error — c.8 mounted `tmp/` on a different fs) |
-| `fsp.rename(tempPath, .bin)` | EEXIST (Windows, dest exists) | wipe pass should have unlinked; if not, post-parse catch handles |
-| `fsp.writeFile(.sha256)` | ENOSPC | post-parse catch unlinks `tempPath` + `.bin` (just-renamed); rethrow |
-| `fsp.writeFile(.meta.json)` | ENOSPC | post-parse catch unlinks `tempPath` + `.bin` + `.sha256`; rethrow |
+| `fsp.rename(tempPath, .bin)` | EXDEV (cross-fs) | rollback unlinks `tempPath`; rethrow (config error — c.8 mounted `tmp/` on a different fs) |
+| `fsp.rename(tempPath, .bin)` | EEXIST (Windows, dest exists) | wipe pass should have unlinked; if not, rollback handles |
+| `fsp.writeFile(.sha256)` | ENOSPC | rollback unlinks `tempPath` + `.bin` (just-renamed); rethrow |
+| `fsp.writeFile(.meta.json)` | ENOSPC | rollback unlinks `tempPath` + `.bin` + `.sha256`; rethrow |
 | `fsp.readdir(<uploads>)` (latest) | ENOENT | return null (cold cache) |
 | `fsp.readdir(<uploads>)` (latest) | EACCES | propagate; operator-visible |
 | `JSON.parse(metaText)` | SyntaxError | return null (malformed; swept by next successful store) |
@@ -221,7 +222,7 @@ The pre-fix anti-pattern that c.4 caught: persisting `.sha` and `.meta` before r
 
 | Resource | Created | Cleanup happy path | If cleanup doesn't run |
 |----------|---------|--------------------|------------------------|
-| Temp file at `tempPath` | upstream (express-fileupload, in c.8 route) | `fs.rename` consumes on success; post-parse catch's `fsp.unlink` consumes on any post-parse failure (validation, hash, mkdir, persist) | Pre-parse failures (open, read, parseEspAppDesc throw) leave `tempPath` for the route to clean up; long-lived orphans handled by c.8's startup sweep of `<rootDir>/tmp/` |
+| Temp file at `tempPath` | upstream (express-fileupload, in c.8 route) | `fs.rename` consumes on success; the unconditional rollback `fsp.unlink`s on every failure path (open, read, parse, validation, hash, mkdir, wipe, rename, writeFile) | Long-lived orphans only happen if the rollback's unlink itself also fails (e.g., permissions changed mid-call) — handled as a defense-in-depth backstop by c.8's startup sweep of `<rootDir>/tmp/` |
 | 288-byte read buffer | `store()` step 2 | GC after function returns | Harmless |
 | `FileHandle` from `fsp.open(tempPath)` | `store()` step 2 | `await fh.close()` in `finally` block (unconditional) | FD leak; bounded by process lifetime |
 | `ReadStream` for stream-hash | `store()` step 6 | for-await loop auto-closes the underlying fd on both end and error | Mid-stream errors trigger the post-parse catch which unlinks `tempPath` + any partial triple |

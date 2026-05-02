@@ -105,41 +105,40 @@ export class FirmwareUploadStore {
   // Validates the temp file's esp_app_desc header, stream-hashes the
   // full file, then atomically promotes it into the single upload slot.
   // Validation failures (bad project, unparseable version) throw before
-  // touching the prior upload, so a rejected upload never destroys the
+  // the wipe pass runs, so a rejected upload never destroys the
   // previously-stored firmware. Persist-phase failures DO wipe the
-  // prior triple (via the wipe pass) — by design, a half-completed
-  // store leaves the slot empty rather than mixing old and new state.
+  // prior triple — by design, a half-completed store leaves the slot
+  // empty rather than mixing old and new state.
+  //
+  // **Public contract:** `store()` unconditionally consumes `tempPath`.
+  // On success it's renamed into `upload-<uuid>.bin`; on any failure
+  // (open, read, parse, validation, hash, mkdir, persist) the catch
+  // below unlinks it. The route layer (c.8) does not need to clean up
+  // tempPath when store() throws — every code path through this
+  // function either renames or unlinks it.
   async store(tempPath: string, originalFilename: string): Promise<StoredUpload> {
     const uploadId = uuid_v4();
     const p = pathsFor(this.rootDir, uploadId);
 
-    // Read just the header — no need to materialize the whole 1.2 MB
-    // binary in memory to identify it.
-    const headBuf = Buffer.alloc(PARSE_BUFFER_LEN);
-    const fh = await fsp.open(tempPath);
     try {
-      const { bytesRead } = await fh.read(headBuf, 0, PARSE_BUFFER_LEN, 0);
-      if (bytesRead < PARSE_BUFFER_LEN) {
-        throw new Error(
-          `firmware upload too short: read ${bytesRead} bytes, need at least ${PARSE_BUFFER_LEN}`,
-        );
+      // Read just the header — no need to materialize the whole 1.2 MB
+      // binary in memory to identify it.
+      const headBuf = Buffer.alloc(PARSE_BUFFER_LEN);
+      const fh = await fsp.open(tempPath);
+      try {
+        const { bytesRead } = await fh.read(headBuf, 0, PARSE_BUFFER_LEN, 0);
+        if (bytesRead < PARSE_BUFFER_LEN) {
+          throw new Error(
+            `firmware upload too short: read ${bytesRead} bytes, need at least ${PARSE_BUFFER_LEN}`,
+          );
+        }
+      } finally {
+        // Unconditional close — without this a parse-failure path leaks
+        // the fd until process exit.
+        await fh.close();
       }
-    } finally {
-      // Unconditional close — without this a parse-failure path leaks
-      // the fd until process exit.
-      await fh.close();
-    }
-    const desc = parseEspAppDesc(headBuf);
+      const desc = parseEspAppDesc(headBuf);
 
-    // Once parse succeeds the temp file is "ours" — the store owns the
-    // file's fate from here on. Wrap every post-parse step (validation,
-    // hash, mkdir, persist) so the rollback's blind unlink runs on any
-    // failure, leaving the route layer with a single contract: parse
-    // failures route the temp-file cleanup back to it; everything else
-    // is on the store. Pre-fix scope was just the persist phase, which
-    // leaked the temp file on hash-stream errors (EIO/truncation) and
-    // mkdir EACCES — review feedback caught this.
-    try {
       if (desc.projectName !== this.expectedProjectName) {
         throw new Error(
           `firmware upload project name mismatch: got ${JSON.stringify(desc.projectName)}, expected ${JSON.stringify(this.expectedProjectName)}`,
@@ -196,10 +195,12 @@ export class FirmwareUploadStore {
 
       return { path: p.bin, sha256, sizeBytes, meta };
     } catch (err) {
-      // Symmetric post-parse rollback. Blind unlink with swallow —
-      // ENOENT for files that weren't created yet is fine. Includes the
-      // tempPath, which is unconditionally consumed: success path
-      // consumed it via rename; failure path unlinks it here.
+      // Unconditional rollback. Blind unlink with swallow — ENOENT for
+      // files that weren't created (`p.bin`/`p.sha`/`p.meta` on early
+      // failures) or that vanished pre-call (`tempPath` on `fh.open`
+      // ENOENT) is fine. Covers every failure path through store():
+      // open, short read, parseEspAppDesc throw, validation, hash,
+      // mkdir, wipe, rename, writeFile.
       await Promise.all([
         fsp.unlink(tempPath).catch(() => undefined),
         fsp.unlink(p.bin).catch(() => undefined),
