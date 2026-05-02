@@ -1,35 +1,21 @@
-// ---------------------------------------------------------------------------
-// On-disk firmware cache shapes. The cache materializes selected -app.bin
-// assets (from c.3's GitHub release listing) onto local disk during a flash
-// job. Each cached binary has two sidecar files: a hex-digest .sha256 and a
-// JSON .meta describing where it came from. See the c.4 plan for context.
-// ---------------------------------------------------------------------------
+// On-disk firmware cache shapes. See the c.4 plan for context.
 
-// Persisted as `<assetname>.meta.json` next to each cached binary. Captures
-// everything needed for eviction tiebreaks (publishedAt) and external
-// inspection without re-parsing filenames.
+// Persisted as `<assetname>.meta.json` next to each cached binary.
 export interface CachedAssetMeta {
   tag: string;
   version: string;
   variant: string;
-  // ISO-8601 timestamp of when this entry was written to disk. Recorded for
-  // operator inspection / debugging only — eviction does NOT consult this
-  // field, since `downloadedAt` shifts on re-download and would make the
-  // sort order unstable across container restarts.
+  // Operator inspection only — NOT used for eviction, since this shifts
+  // on re-download and would destabilize the sort across restarts.
   downloadedAt: string;
-  // GitHub release publish timestamp, threaded through from the parent
-  // ReleaseInfo. Used as the eviction tie-breaker when two cached entries
-  // compare equal under `compareVersions` (e.g., `1.2.0` vs `1.2.0-RC.1`,
-  // which the semver helper treats as equal because pre-release suffixes
-  // are stripped for gating purposes). Stable across re-downloads.
+  // Eviction tiebreak when two entries compare equal under
+  // `compareVersions` (e.g. `1.2.0` vs `1.2.0-RC.1`, which the semver
+  // helper treats as equal because pre-release suffixes are stripped).
   publishedAt: string;
   sourceUrl: string;
   sizeBytes: number;
 }
 
-// Returned by FirmwareCache.lookup() and .fetch(). `path` is the absolute
-// path to the .bin; `sha256` is the lowercase hex digest computed during
-// the original streaming download.
 export interface CachedAsset {
   path: string;
   sha256: string;
