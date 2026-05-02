@@ -637,6 +637,91 @@ describe('FirmwareUploadStore — project_name', () => {
   });
 });
 
+describe('FirmwareUploadStore — concurrent store() serialization', () => {
+  it('serializes two concurrent store() calls so the final state is deterministic', async () => {
+    // Without the in-flight chain, A.rename followed by B's wipe pass
+    // could unlink A.bin between A's rename and A's writeFile(sha),
+    // leaving A claiming success on a missing bin. With the chain,
+    // A's full sequence completes before B starts, so B's wipe sees
+    // A's complete triple and replaces it cleanly. JS evaluation
+    // order on Promise.all guarantees A's chain link is taken first,
+    // so B = the second writer = wins.
+    const binA = makeFirmwareBytes({ version: '1.0.0' });
+    const binB = makeFirmwareBytes({ version: '2.0.0' });
+    const tempA = writeTempBin(tempDir, binA, 'A.tmp');
+    const tempB = writeTempBin(tempDir, binB, 'B.tmp');
+
+    const [resultA, resultB] = await Promise.all([
+      store.store(tempA, 'A.bin'),
+      store.store(tempB, 'B.bin'),
+    ]);
+
+    // Both calls reported success with their own metadata.
+    expect(resultA.meta.version).toBe('1.0.0');
+    expect(resultB.meta.version).toBe('2.0.0');
+
+    // Final on-disk state is exactly B's triple — A's was wiped by
+    // B's wipe pass after A had fully completed.
+    const uploadsDir = path.join(rootDir, 'uploads');
+    const entries = fs.readdirSync(uploadsDir).sort();
+    expect(entries).toEqual(
+      [
+        `upload-${resultB.meta.uploadId}.bin`,
+        `upload-${resultB.meta.uploadId}.bin.sha256`,
+        `upload-${resultB.meta.uploadId}.meta.json`,
+      ].sort(),
+    );
+
+    // latest() returns B; A's bin and sidecars are gone.
+    const last = await store.latest();
+    expect(last?.meta.uploadId).toBe(resultB.meta.uploadId);
+    expect(last?.meta.version).toBe('2.0.0');
+    expect(fs.existsSync(resultA.path)).toBe(false);
+  });
+
+  it('does not deadlock when a prior store() rejects', async () => {
+    // The in-flight chain swallows rejections on the field pointer so
+    // a single failure can't poison subsequent calls.
+    const badBin = makeFirmwareBytes({ projectName: 'evil-esp', version: '1.0.0' });
+    const badTemp = writeTempBin(tempDir, badBin, 'bad.tmp');
+    await expect(store.store(badTemp, 'bad.bin')).rejects.toThrow(/project name/i);
+
+    // Subsequent store should succeed — chain is unblocked.
+    const goodBin = makeFirmwareBytes({ version: '2.0.0' });
+    const goodTemp = writeTempBin(tempDir, goodBin, 'good.tmp');
+    const result = await store.store(goodTemp, 'good.bin');
+
+    expect(result.meta.version).toBe('2.0.0');
+    const last = await store.latest();
+    expect(last?.meta.uploadId).toBe(result.meta.uploadId);
+  });
+
+  it('does not deadlock when concurrent calls include a rejection', async () => {
+    // A rejects (bad project), B and C are valid. B and C should both
+    // complete. B is queued before C, so C's wipe replaces B; latest
+    // is C.
+    const badBin = makeFirmwareBytes({ projectName: 'evil-esp', version: '0.0.0' });
+    const binB = makeFirmwareBytes({ version: '1.0.0' });
+    const binC = makeFirmwareBytes({ version: '2.0.0' });
+    const badTemp = writeTempBin(tempDir, badBin, 'bad.tmp');
+    const tempB = writeTempBin(tempDir, binB, 'B.tmp');
+    const tempC = writeTempBin(tempDir, binC, 'C.tmp');
+
+    const [aResult, bResult, cResult] = await Promise.allSettled([
+      store.store(badTemp, 'bad.bin'),
+      store.store(tempB, 'B.bin'),
+      store.store(tempC, 'C.bin'),
+    ]);
+
+    expect(aResult.status).toBe('rejected');
+    expect(bResult.status).toBe('fulfilled');
+    expect(cResult.status).toBe('fulfilled');
+
+    const last = await store.latest();
+    expect(last?.meta.version).toBe('2.0.0');
+  });
+});
+
 describe('FirmwareUploadStore — multiple meta files race-safety', () => {
   // Reviewer-flagged scenario: between readdir and stat, a meta file
   // could be deleted (concurrent store()'s wipe pass) or become

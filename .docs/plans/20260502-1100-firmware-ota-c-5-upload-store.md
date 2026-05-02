@@ -74,7 +74,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
     9. Return `StoredUpload`.
   - **`latest(): Promise<StoredUpload | null>`** — `readdir(<rootDir>/uploads)`, filter for files matching `^upload-([0-9a-f-]{36})\.meta\.json$`. If multiple matches (corruption/manual intervention), pick the most-recently-mtime'd one and log a warn. Read all three files for that uuid; return null if any are missing or malformed. Cross-check the triple is internally consistent: `parsed.uploadId === uploadId-from-filename` (corruption / sidecar copy-from-another-upload would mislead the orchestrator about which upload is being flashed) and `parsed.sizeBytes === binStat.size` (cheap proxy for "the bin we have is the one meta describes" — catches partial-write recovery and external truncation; sha re-hashing would be stronger but costs ~80–100 ms per call). Mismatches map to a null miss.
   - **Filename safety:** `pathsFor(rootDir, uploadId)` runs `assertPathSafe(uploadId, 'uploadId')`. UUID v4 is `[0-9a-f-]+` so always passes; the assertion guards future refactors.
-  - **Concurrency:** no in-process mutex. Two concurrent uploads tolerated by last-writer-wins on the wipe-then-rename sequence; `.meta.json` is the durability anchor. The flash-job hard lock from c.0/c.2 ensures uploads never overlap with a flash, so the only race is two browser tabs uploading back-to-back. Per-store atomic rename is the entire concurrency model.
+  - **Concurrency:** in-process serialization via a promise-chain mutex (`inFlightStore`). Two concurrent `store()` calls would otherwise race their wipe passes against each other's just-renamed `.bin` files (A.rename → B.wipe unlinks A.bin → A.writeFile sha → A returns success on a missing bin). Serializing makes last-writer-wins deterministic: the second store sees the first's complete triple, wipes it cleanly, and writes its own. The chain swallows rejections on its tracking pointer so one failure doesn't poison subsequent calls. `latest()` is read-only and not serialized — partial-state windows are already covered by the cross-checks. The flash-job hard lock from c.0/c.2 covers flash-vs-upload races; this mutex covers upload-vs-upload.
 
 - [x] **Tests** (new `astros_api/src/firmware/esp_app_desc.test.ts`). Pure parser tests with constructed fixtures:
   - Helper `makeAppDescBuffer({ projectName, version, ... })` builds a 288-byte Buffer: 32 zero bytes for image+segment header stub, magic word at offset 32, fixed-length string slots populated with `Buffer.from(name, 'utf8').copy(target, 0); target[name.length] = 0`. Rest zero-filled.
@@ -106,6 +106,9 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
   - `latest()` returns null when `.meta.json` `sizeBytes` disagrees with the bin's actual size on disk (partial-write recovery / external truncation).
   - Crash-recovery invariant: snapshotting `.bin` at each sidecar `writeFile` call shows bin contents are either fresh-bytes or absent — never stale (same pinning pattern c.4 used).
   - Sequential interleaving: A.store() completes, B.store() completes, `latest()` returns B's data; pre-A returns null, between returns A.
+  - Serialization: two concurrent `store()` calls (kicked off via `Promise.all`) both complete cleanly; final on-disk state is exactly the second writer's triple; `latest()` returns the second writer.
+  - Mutex non-poisoning: a prior `store()` rejection (validation failure, persist error) doesn't block subsequent stores — they still execute against the now-clean uploads dir.
+  - Concurrent rejection mixed with valid uploads: a failing call alongside two valid calls leaves both valid uploads' chains intact; final state matches the last successful writer.
   - Filename safety: passing a non-UUID `uploadId` (via test seam) trips `assertPathSafe` synchronously without writing.
   - File-handle hygiene: parse-failure path closes the `fsp.open` handle (verify via spy / explicit close-call assertion).
 
@@ -187,9 +190,9 @@ The pre-fix anti-pattern that c.4 caught: persisting `.sha` and `.meta` before r
 
 ### 3. Concurrency state
 
-- **Shared resource: `<rootDir>/uploads/`.** Two callers can race wipe-then-rename sequences. **Sync mechanism:** none in-process; `fs.rename` is atomic. **Miss consequence:** last-writer wins on `.meta.json` (the anchor `latest()` keys on). A reader between A's rename and B's rename sees A's complete triple briefly, then B's complete triple — never a chimera, because the wipe-then-rename pair is the smallest atomic transition `latest()` cares about.
-- **In-process state:** N/A — `FirmwareUploadStore` carries no mutable in-memory state beyond construction-time `rootDir` + `expectedProjectName`. No `inFlight` map, no LRU.
-- The flash-job hard lock from c.0/c.2 makes most of this academic — no concurrent flashes can start while uploads are in flight.
+- **Shared resource: `<rootDir>/uploads/`.** **Sync mechanism:** in-process promise-chain mutex (`inFlightStore`) serializes `store()` calls; `fs.rename` and atomic file writes serialize within a call. **Miss consequence (without the mutex):** A's rename promotes `A.bin`, B's wipe pass unlinks it before A's `writeFile(sha)` runs, A returns success with a missing bin. The mutex closes the gap by guaranteeing B doesn't begin its sequence until A has completed all four persist steps (wipe, rename, writeFile sha, writeFile meta). Last-writer-wins is now deterministic: the second writer sees the first's complete triple and replaces it cleanly.
+- **In-process state:** `inFlightStore: Promise<unknown>` chained through every `store()` call. Each call's chained `.catch()` swallows prior-call rejections on the tracking pointer so a failure (bad project, hash error, etc.) doesn't poison subsequent calls. `latest()` is intentionally NOT serialized — it's read-only, and the partial-state windows are already covered by `latest()`'s null-miss + cross-check defenses.
+- The flash-job hard lock from c.0/c.2 covers flash-vs-upload races; the in-process mutex covers upload-vs-upload races. Together they handle the full concurrency surface that's reachable through the route layer.
 
 ### 4. Cross-platform / cross-environment
 

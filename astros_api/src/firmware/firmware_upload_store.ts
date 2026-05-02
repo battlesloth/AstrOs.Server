@@ -96,6 +96,16 @@ function isValidUploadMeta(value: unknown): value is StoredUploadMeta {
 export class FirmwareUploadStore {
   private readonly rootDir: string;
   private readonly expectedProjectName: string;
+  // Serializes store() calls. Without this, two concurrent stores
+  // would race their wipe passes against each other's just-renamed
+  // .bin files: A.rename → B.wipe (which sees + unlinks A.bin) →
+  // A.writeFile(sha) → A.writeFile(meta) → A returns success but
+  // A.bin is gone, leaving an inconsistent triple. Last-writer-wins
+  // is only meaningful when the second writer can see the first's
+  // completed state, not its mid-promote state. Serializing the
+  // wipe-then-rename-then-writeFiles sequence is the simplest fix.
+  // Per-instance because a single instance is shared by the route.
+  private inFlightStore: Promise<unknown> = Promise.resolve();
 
   constructor(opts: FirmwareUploadStoreOptions = {}) {
     this.rootDir = opts.rootDir ?? resolveFirmwareCacheDir(process.env.FIRMWARE_CACHE_PATH);
@@ -113,10 +123,27 @@ export class FirmwareUploadStore {
   // **Public contract:** `store()` unconditionally consumes `tempPath`.
   // On success it's renamed into `upload-<uuid>.bin`; on any failure
   // (open, read, parse, validation, hash, mkdir, persist) the catch
-  // below unlinks it. The route layer (c.8) does not need to clean up
+  // unlinks it. The route layer (c.8) does not need to clean up
   // tempPath when store() throws — every code path through this
   // function either renames or unlinks it.
+  //
+  // Concurrent calls are serialized via the inFlightStore chain, so
+  // two simultaneous uploads run sequentially rather than racing
+  // their wipe passes against each other's just-renamed .bin files.
   async store(tempPath: string, originalFilename: string): Promise<StoredUpload> {
+    // Chain through the in-flight promise so this call waits for any
+    // prior store() to settle before starting. The .catch() before
+    // .then() prevents a prior call's rejection from cascading into
+    // ours; the outer .catch() on the field pointer prevents *our*
+    // rejection from poisoning subsequent calls.
+    const next = this.inFlightStore
+      .catch(() => undefined)
+      .then(() => this.doStore(tempPath, originalFilename));
+    this.inFlightStore = next.catch(() => undefined);
+    return next;
+  }
+
+  private async doStore(tempPath: string, originalFilename: string): Promise<StoredUpload> {
     const uploadId = uuid_v4();
     const p = pathsFor(this.rootDir, uploadId);
 
