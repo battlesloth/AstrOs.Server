@@ -567,6 +567,76 @@ describe('FirmwareUploadStore — project_name', () => {
   });
 });
 
+describe('FirmwareUploadStore — multiple meta files race-safety', () => {
+  // Reviewer-flagged scenario: between readdir and stat, a meta file
+  // could be deleted (concurrent store()'s wipe pass) or become
+  // unreadable. Per-stat failures must not reject the whole batch —
+  // the contract is "any partial state → null miss" and individual
+  // stats are wrapped so the survivors are still considered.
+
+  function plantTriple(uploadsDir: string, id: string, version: string): Buffer {
+    const bin = makeFirmwareBytes({ version });
+    fs.writeFileSync(path.join(uploadsDir, `upload-${id}.bin`), bin);
+    fs.writeFileSync(path.join(uploadsDir, `upload-${id}.bin.sha256`), sha256Hex(bin));
+    const meta: StoredUploadMeta = {
+      uploadId: id,
+      originalFilename: 'firmware.bin',
+      projectName: 'AstrOs.ESP',
+      version,
+      uploadedAt: new Date().toISOString(),
+      sizeBytes: bin.length,
+    };
+    fs.writeFileSync(path.join(uploadsDir, `upload-${id}.meta.json`), JSON.stringify(meta));
+    return bin;
+  }
+
+  it('skips a meta file whose stat fails and returns the surviving newest', async () => {
+    const uploadsDir = path.join(rootDir, 'uploads');
+    fs.mkdirSync(uploadsDir);
+
+    const goneId = '66666666-6666-4666-8666-666666666666';
+    const liveId = '77777777-7777-4777-8777-777777777777';
+    plantTriple(uploadsDir, goneId, '1.0.0');
+    plantTriple(uploadsDir, liveId, '2.0.0');
+
+    // Mock stat to throw ENOENT for the "gone" meta file (simulating a
+    // race where another process deleted it between readdir and stat).
+    const realStat = fsp.stat.bind(fsp);
+    vi.spyOn(fsp, 'stat').mockImplementation((async (target: Parameters<typeof fsp.stat>[0]) => {
+      if (typeof target === 'string' && target.includes(goneId) && target.endsWith('.meta.json')) {
+        throw Object.assign(new Error('ENOENT: simulated race'), { code: 'ENOENT' });
+      }
+      return realStat(target);
+    }) as typeof fsp.stat);
+
+    const result = await store.latest();
+
+    expect(result).not.toBeNull();
+    expect(result?.meta.uploadId).toBe(liveId);
+    expect(result?.meta.version).toBe('2.0.0');
+  });
+
+  it('returns null when every meta-file stat fails (full wipe race)', async () => {
+    const uploadsDir = path.join(rootDir, 'uploads');
+    fs.mkdirSync(uploadsDir);
+    plantTriple(uploadsDir, '88888888-8888-4888-8888-888888888888', '1.0.0');
+    plantTriple(uploadsDir, '99999999-9999-4999-8999-999999999999', '2.0.0');
+
+    // All stats throw — simulates the dir being wiped between readdir
+    // and the stat batch (or a permissions issue affecting all entries).
+    const realStat = fsp.stat.bind(fsp);
+    vi.spyOn(fsp, 'stat').mockImplementation((async (target: Parameters<typeof fsp.stat>[0]) => {
+      if (typeof target === 'string' && target.endsWith('.meta.json')) {
+        throw Object.assign(new Error('ENOENT: simulated'), { code: 'ENOENT' });
+      }
+      return realStat(target);
+    }) as typeof fsp.stat);
+
+    const result = await store.latest();
+    expect(result).toBeNull();
+  });
+});
+
 describe('FirmwareUploadStore — multiple meta files', () => {
   it('latest() picks the most-recently-mtime`d when multiple meta files exist', async () => {
     const uploadsDir = path.join(rootDir, 'uploads');

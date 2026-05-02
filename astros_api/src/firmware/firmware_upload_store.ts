@@ -239,14 +239,27 @@ export class FirmwareUploadStore {
         { uploadsDir, metaFiles },
         'multiple firmware-upload meta files detected; picking newest by mtime',
       );
+      // Each stat is wrapped individually: a meta file deleted between
+      // readdir and stat (e.g., a concurrent store()'s wipe pass) is
+      // skipped rather than rejecting the whole batch — preserves the
+      // "partial state → null miss" contract the rest of latest() honors.
       const stats = await Promise.all(
-        metaFiles.map(async (name) => ({
-          name,
-          mtimeMs: (await fsp.stat(path.join(uploadsDir, name))).mtimeMs,
-        })),
+        metaFiles.map(async (name) => {
+          try {
+            const st = await fsp.stat(path.join(uploadsDir, name));
+            return { name, mtimeMs: st.mtimeMs };
+          } catch {
+            return null;
+          }
+        }),
       );
-      stats.sort((a, b) => b.mtimeMs - a.mtimeMs);
-      chosenName = stats[0].name;
+      const valid = stats.filter((s): s is { name: string; mtimeMs: number } => s !== null);
+      // All stats failed — likely the dir was wiped between readdir and
+      // here (concurrent store()), or perms changed. Fall through to a
+      // null miss instead of throwing.
+      if (valid.length === 0) return null;
+      valid.sort((a, b) => b.mtimeMs - a.mtimeMs);
+      chosenName = valid[0].name;
     }
 
     const match = chosenName.match(UPLOAD_META_RE);
