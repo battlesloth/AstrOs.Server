@@ -713,6 +713,123 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(ghostMeta)).toBe(false);
   });
 
+  it('sweeps orphan .bin with no .meta.json (process killed after rename, before writeFile sha)', async () => {
+    // Crash window opened by the persist-phase reorder: rename .tmp →
+    // .bin succeeds, then process dies before the .sha sidecar lands.
+    // No .meta.json → invisible to lookup() (sidecar gate) and to the
+    // meta-driven eviction sort. Without an explicit sweep, this leaks
+    // ~1.2 MB per crash forever.
+    const githubDir = path.join(tmpDir, 'github');
+    fs.mkdirSync(githubDir, { recursive: true });
+    const orphanBin = path.join(githubDir, 'astros-esp-0.5.0-metro_s3-app.bin');
+    fs.writeFileSync(orphanBin, Buffer.from('orphan-from-crash-after-rename'));
+
+    const bytes = Buffer.from('v1.0.0-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+    await cache.fetch(makeRelease(), makeAsset({ sizeBytes: bytes.length }));
+
+    expect(fs.existsSync(orphanBin)).toBe(false);
+  });
+
+  it('sweeps orphan .bin + .bin.sha256 with no .meta.json (crash between writeFile sha and writeFile meta)', async () => {
+    // Crash slightly later in the persist phase: .bin and .sha both
+    // landed but the .meta.json never did. Same accumulation hazard;
+    // both siblings must be swept together.
+    const githubDir = path.join(tmpDir, 'github');
+    fs.mkdirSync(githubDir, { recursive: true });
+    const orphanBin = path.join(githubDir, 'astros-esp-0.5.0-metro_s3-app.bin');
+    const orphanSha = path.join(githubDir, 'astros-esp-0.5.0-metro_s3-app.bin.sha256');
+    fs.writeFileSync(orphanBin, Buffer.from('orphan-from-crash-after-sha'));
+    fs.writeFileSync(orphanSha, 'a'.repeat(64));
+
+    const bytes = Buffer.from('v1.0.0-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+    await cache.fetch(makeRelease(), makeAsset({ sizeBytes: bytes.length }));
+
+    expect(fs.existsSync(orphanBin)).toBe(false);
+    expect(fs.existsSync(orphanSha)).toBe(false);
+  });
+
+  it('preserves the .bin of a fetch currently in flight (mid-persist concurrency safety)', async () => {
+    // Race: fetch X has rename'd .tmp → .bin but its writeFile sha
+    // hasn't completed. A concurrent fetch Y completes and triggers
+    // pruneToN, which would naively classify X's .bin as "no
+    // .meta.json → orphan." The in-flight basename skip protects X.
+    populateCache(tmpDir, '1.0.0', 'metro_s3', '2026-01-01T00:00:00Z');
+    populateCache(tmpDir, '1.1.0', 'metro_s3', '2026-02-01T00:00:00Z');
+    populateCache(tmpDir, '1.2.0', 'metro_s3', '2026-03-01T00:00:00Z');
+    populateCache(tmpDir, '1.3.0', 'metro_s3', '2026-04-01T00:00:00Z');
+    populateCache(tmpDir, '1.4.0', 'metro_s3', '2026-04-15T00:00:00Z');
+
+    const githubDir = path.join(tmpDir, 'github');
+    const hangingBin = path.join(githubDir, 'astros-esp-2.0.0-lolin_d32_pro-app.bin');
+    const hangingUrl = 'https://example.test/astros-esp-2.0.0-lolin_d32_pro-app.bin';
+
+    // Hang the .bin.sha256 writeFile for the hanging key so X's
+    // persist phase pauses with .bin promoted but no sidecars yet.
+    let releaseShaWrite!: () => void;
+    const shaHang = new Promise<void>((resolve) => {
+      releaseShaWrite = resolve;
+    });
+    const realWriteFile = fsp.writeFile.bind(fsp);
+    vi.spyOn(fsp, 'writeFile').mockImplementation((async (file: fs.PathLike, data: unknown) => {
+      const fileStr = String(file);
+      if (fileStr.endsWith('.bin.sha256') && fileStr.includes('2.0.0-lolin_d32_pro')) {
+        await shaHang;
+      }
+      return realWriteFile(file, data as Parameters<typeof realWriteFile>[1]);
+    }) as typeof fsp.writeFile);
+
+    const xBytes = Buffer.from('v2.0.0-bytes');
+    const fetcher: typeof fetch = vi.fn(async (url: URL | RequestInfo) => {
+      if (String(url) === hangingUrl) {
+        return new Response(xBytes, { status: 200 });
+      }
+      return new Response(Buffer.from('v1.5.0-bytes'), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    // Start X — populates inFlight, eventually renames .tmp → .bin,
+    // then hangs on writeFile sha.
+    const xPromise = cache.fetch(
+      makeRelease({ tag: 'v2.0.0', version: '2.0.0', publishedAt: '2026-05-01T00:00:00Z' }),
+      makeAsset({
+        version: '2.0.0',
+        variant: 'lolin_d32_pro',
+        assetName: 'astros-esp-2.0.0-lolin_d32_pro-app.bin',
+        assetUrl: hangingUrl,
+        sizeBytes: xBytes.length,
+      }),
+    );
+
+    // Wait for X.bin to appear (rename done). Capped poll.
+    for (let i = 0; i < 50 && !fs.existsSync(hangingBin); i++) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(fs.existsSync(hangingBin)).toBe(true);
+
+    // Y completes on a different key, triggers pruneToN which would
+    // naively sweep X's .bin without the in-flight skip.
+    await cache.fetch(
+      makeRelease({ tag: 'v1.5.0', version: '1.5.0', publishedAt: '2026-04-30T00:00:00Z' }),
+      makeAsset({
+        version: '1.5.0',
+        assetName: 'astros-esp-1.5.0-metro_s3-app.bin',
+        assetUrl: 'https://example.test/astros-esp-1.5.0-metro_s3-app.bin',
+        sizeBytes: 'v1.5.0-bytes'.length,
+      }),
+    );
+
+    expect(fs.existsSync(hangingBin)).toBe(true);
+
+    // Cleanup: release X so it completes.
+    releaseShaWrite();
+    await xPromise;
+  });
+
   it('sweeps orphan .tmp files left by a prior crash', async () => {
     populateCache(tmpDir, '1.0.0', 'metro_s3', '2026-01-01T00:00:00Z');
     populateCache(tmpDir, '1.1.0', 'metro_s3', '2026-02-01T00:00:00Z');

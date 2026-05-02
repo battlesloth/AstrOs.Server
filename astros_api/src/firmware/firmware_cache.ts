@@ -271,64 +271,91 @@ export class FirmwareCache {
     const META_SUFFIX = '.meta.json';
     const TMP_SUFFIX = '.bin.tmp';
 
-    // Sweep two classes of garbage that lookup() can't return AND
-    // meta-based eviction can't see, so neither contributes to the
+    const SHA_SUFFIX = '.bin.sha256';
+    const BIN_SUFFIX = '.bin';
+
+    // Sweep three classes of garbage that lookup() can't return AND
+    // meta-based eviction can't see, so none contribute to the
     // MAX_RELEASES accounting:
-    //   1) orphan .tmp files left by a process killed mid-download
-    //      (OOM, container kill, reboot)
-    //   2) malformed/unreadable meta.json files plus their sibling
-    //      .bin / .bin.sha256 (corruption, partial flush, tampering)
-    // Without explicit cleanup, both classes accumulate indefinitely.
+    //   1) orphan .tmp files (process killed mid-download)
+    //   2) malformed/unreadable meta.json files
+    //   3) orphan .bin / .bin.sha256 with no .meta.json (process
+    //      killed during the persist phase between rename and the
+    //      writeFile of either sidecar)
+    // Without explicit cleanup, all three classes accumulate
+    // indefinitely and defeat the advertised retention policy.
     //
-    // Snapshot in-flight keys synchronously (before any await) so a
-    // concurrent fetch's live .tmp is preserved. Residual race: a
-    // fetch whose `inFlight.set` runs after this snapshot but whose
-    // .tmp existed beforehand could lose its tmp; the consequence is
-    // a stream error and a retry, never a partial .bin (the rename
-    // happens after streamDownload returns).
-    const liveTmpNames = new Set<string>();
+    // Snapshot in-flight basenames synchronously (before any await)
+    // so a concurrent fetch's mid-persist files are preserved.
+    // Protects three distinct races: orphan .tmp during streamDownload,
+    // promoted .bin between rename and sidecar writes, and partially-
+    // written .meta.json mid-writeFile that would otherwise read as
+    // malformed JSON. Residual race: a fetch whose `inFlight.set` runs
+    // after this snapshot could lose any of its files; consequence is
+    // bounded — stream error or hash mismatch on the protocol layer,
+    // user retries succeed, never a partial .bin promoted to canonical.
+    const liveBasenames = new Set<string>();
     for (const key of this.inFlight.keys()) {
       const [version, variant] = key.split('::');
-      liveTmpNames.add(`astros-esp-${version}-${variant}-app.bin.tmp`);
+      liveBasenames.add(`astros-esp-${version}-${variant}-app`);
     }
-    const sweepPaths: string[] = [];
 
     // Dirent.name is guaranteed by Node to be a basename, so paths
     // derived from it stay inside githubDir even if a meta sidecar's
     // JSON content carries path-traversal payloads.
+    const trackedBasenames = new Set<string>();
     const metaFiles: Array<{ name: string; meta: CachedAssetMeta }> = [];
+    const sweepPaths: string[] = [];
+
+    // Pass 1: validate metas. The just-fetched fetch's own meta IS
+    // fully written by the time pruneToN runs (writeFile meta is the
+    // last persist step before this call), so we read every meta —
+    // skipping all in-flight basenames here would lose the just-
+    // fetched entry from trackedBasenames and the eviction sort.
+    // The in-flight skip applies only to the malformed-meta cleanup:
+    // a CONCURRENT fetch's mid-writeFile-meta could read as partial
+    // JSON and fail validation; we mustn't unlink that.
     for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      if (entry.name.endsWith(TMP_SUFFIX)) {
-        if (!liveTmpNames.has(entry.name)) {
-          sweepPaths.push(path.join(githubDir, entry.name));
-        }
-        continue;
-      }
-      if (!entry.name.endsWith(META_SUFFIX)) continue;
+      if (!entry.isFile() || !entry.name.endsWith(META_SUFFIX)) continue;
+      const baseName = entry.name.slice(0, -META_SUFFIX.length);
       let valid = false;
       try {
         const text = await fsp.readFile(path.join(githubDir, entry.name), 'utf8');
         const parsed: unknown = JSON.parse(text);
         if (isValidMeta(parsed)) {
           metaFiles.push({ name: entry.name, meta: parsed });
+          trackedBasenames.add(baseName);
           valid = true;
         }
       } catch {
         // Unreadable / malformed JSON — fall through to cleanup.
       }
-      if (!valid) {
-        // The meta is unusable: lookup() can't serve it (validation
-        // gates the hit) and the eviction sort skips it, so without
-        // explicit cleanup it would sit beyond MAX_RELEASES forever.
-        // Sweep the meta plus any sibling .bin / .bin.sha256.
-        const baseName = entry.name.slice(0, -META_SUFFIX.length);
-        sweepPaths.push(
-          path.join(githubDir, entry.name),
-          path.join(githubDir, `${baseName}.bin`),
-          path.join(githubDir, `${baseName}.bin.sha256`),
-        );
+      if (!valid && !liveBasenames.has(baseName)) {
+        // Sweep the bad meta. Siblings (if any) get caught by the
+        // orphan-by-no-meta pass below since their basename is now
+        // neither tracked nor in-flight.
+        sweepPaths.push(path.join(githubDir, entry.name));
       }
+    }
+
+    // Pass 2: any .tmp / .bin / .bin.sha256 whose basename is neither
+    // tracked (= valid meta exists) nor in-flight is sweep-eligible.
+    for (const entry of entries) {
+      if (!entry.isFile() || entry.name.endsWith(META_SUFFIX)) continue;
+      let baseName: string;
+      // Order matters: .bin.tmp and .bin.sha256 must match before .bin.
+      if (entry.name.endsWith(TMP_SUFFIX)) {
+        baseName = entry.name.slice(0, -TMP_SUFFIX.length);
+      } else if (entry.name.endsWith(SHA_SUFFIX)) {
+        baseName = entry.name.slice(0, -SHA_SUFFIX.length);
+      } else if (entry.name.endsWith(BIN_SUFFIX)) {
+        baseName = entry.name.slice(0, -BIN_SUFFIX.length);
+      } else {
+        continue;
+      }
+      if (liveBasenames.has(baseName)) continue;
+      if (trackedBasenames.has(baseName)) continue;
+      sweepPaths.push(path.join(githubDir, entry.name));
     }
 
     if (sweepPaths.length > 0) {
