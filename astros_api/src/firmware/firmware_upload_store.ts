@@ -116,9 +116,15 @@ export class FirmwareUploadStore {
   // full file, then atomically promotes it into the single upload slot.
   // Validation failures (bad project, unparseable version) throw before
   // the wipe pass runs, so a rejected upload never destroys the
-  // previously-stored firmware. Persist-phase failures DO wipe the
-  // prior triple — by design, a half-completed store leaves the slot
-  // empty rather than mixing old and new state.
+  // previously-stored firmware. Persist-phase failures attempt to
+  // leave the slot empty: the wipe pass runs first, then the rollback
+  // unlinks the new triple. **Both are best-effort.** The wipe pass
+  // logs and swallows non-ENOENT unlink errors (EACCES/EBUSY can
+  // legitimately occur on Windows or under hostile fs perms), so a
+  // failed store() can leave the prior triple, the new triple's
+  // partial state, or both on disk. latest() treats any inconsistent
+  // or orphan combination as a null miss via its uuid + sizeBytes
+  // cross-checks; the next successful store retries the wipe pass.
   //
   // **Public contract:** `store()` unconditionally consumes `tempPath`.
   // On success it's renamed into `upload-<uuid>.bin`; on any failure

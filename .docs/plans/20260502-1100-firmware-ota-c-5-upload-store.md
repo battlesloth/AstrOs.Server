@@ -196,7 +196,7 @@ The pre-fix anti-pattern that c.4 caught: persisting `.sha` and `.meta` before r
 
 ### 4. Cross-platform / cross-environment
 
-- **`fs.rename`:** POSIX overwrites atomically; Windows throws `EEXIST`. Mitigation: wipe pass before rename ensures destination is absent. (c.4's `unlink-before-rename + ENOENT-only catch` not needed because the wipe pass is the load-bearing step — only one slot total.)
+- **`fs.rename`:** POSIX overwrites atomically; Windows throws `EEXIST`. Mitigation: wipe pass before rename targets any prior `upload-*` siblings (different uuid from the about-to-rename target, so EEXIST on the rename target is rare anyway). The wipe is best-effort — a non-ENOENT unlink error is logged and swallowed — so under hostile perms a Windows rename could still hit EEXIST and propagate; the rollback catch handles that. (c.4's `unlink-before-rename + ENOENT-only catch` isn't replicated here because the wipe pass plus the rollback already cover the surface.)
 - **`fs.rename` cross-filesystem (EXDEV):** `tmp/` and `uploads/` MUST live under the same `<rootDir>`. c.8's route mount points `tempFileDir` at `<rootDir>/tmp/`. Bind-mounts and Docker volumes are easy ways to break this; document in c.8's setup notes.
 - **Path separators:** always `path.join`.
 - **`appdata-path`:** delegated to c.4's `resolveFirmwareCacheDir`; no new platform branches.
