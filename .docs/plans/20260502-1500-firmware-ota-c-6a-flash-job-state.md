@@ -20,7 +20,7 @@ c.6a's payoff: by the time c.6c is written, the FSM rules are locked in tests an
 
 **Types** (in `astros_api/src/models/firmware/flash_job_state.ts`):
 
-- `ControllerFlashState` — discriminated union over `FwStage` (existing enum at `models/firmware/firmware_messages.ts`). All variants carry `controllerId`, `bytesSent`, `totalBytes`, `detail?`. Terminal variants add stage-specific fields:
+- `ControllerFlashState` — discriminated union over `FwStage` (existing enum at `models/firmware/firmware_messages.ts`). All variants carry `controllerId`, `bytesSent`, `totalBytes`, `detail` (required string — mirrors the wire shape `FwProgress.detail`; empty string when no message). Terminal variants add stage-specific fields:
     - `VersionConfirmed` adds `finalVersion: string`
     - `Failed` adds `error: string`
 - `FlashJobState` — `{ jobId, source: FlashSource, controllers: ControllerFlashState[], startedAt: string, endedAt?: string, abortReason?: string }`. Ordered array, not Map — keeps JSON serialization (c.7's WS payloads) trivial; ~3 controllers means O(n) lookup is a non-issue.
