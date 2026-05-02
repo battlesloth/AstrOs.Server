@@ -1,12 +1,10 @@
 import type { EspAppDesc } from '../models/firmware/upload.js';
 
-// `esp_app_desc_t` is a fixed-layout struct ESP-IDF embeds at the head of
-// every application image. We use it to identify uploaded firmware
-// binaries: confirm they're for our project, extract the version. The
-// struct sits immediately after the image header (24 B) + first segment
-// header (8 B), so its byte offset inside the .bin is 32. Layout has
-// been stable since ESP-IDF v4.0; if a future release rearranges,
-// adjust the constants below.
+// `esp_app_desc_t` is a fixed-layout struct ESP-IDF embeds at the head
+// of every application image, immediately after the 24-byte image
+// header + 8-byte first-segment header. Layout has been stable since
+// ESP-IDF v4.0; adjust the constants below if a future release
+// rearranges.
 
 export const ESP_IMAGE_HEADER_SIZE = 24;
 export const ESP_IMAGE_SEGMENT_HEADER_SIZE = 8;
@@ -36,27 +34,21 @@ const DATE_LEN = 16;
 const IDF_VER_LEN = 32;
 const APP_ELF_SHA256_LEN = 32;
 
-// Strict-mode UTF-8 decoder rejects invalid byte sequences (e.g.
-// 0xFF 0xFF) instead of silently substituting U+FFFD, which would let
-// a tampered binary pass validation.
+// Strict mode rejects invalid byte sequences (e.g. raw 0xFF 0xFF)
+// instead of silently substituting U+FFFD, which would let a tampered
+// binary pass.
 const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
 
-// Reads one fixed-length string slot at `off`. Rules:
-//   1. The slot must contain at least one 0x00 byte (the null terminator).
-//   2. No byte in the slot may be a single-byte ASCII control char:
-//      C0 range [0x01, 0x1F] or DEL (0x7F). These are unambiguously
-//      control chars at the byte level — they have no role inside
-//      multi-byte UTF-8 sequences. C1 range [0x80, 0x9F] is NOT
-//      rejected here because those byte values appear naturally inside
-//      legitimate UTF-8 sequences (every continuation byte is 0x80-0xBF,
-//      so e.g. `é` is 0xC3 0xA9); rejecting them at the byte level
-//      would false-positive on every accented character. The strict-
-//      UTF-8 decoder below catches *invalid* sequences containing
-//      those bytes — that's the right tool for the C1 range.
-//      Bytes after the null are normally "don't-care" tail, but ESP-IDF
-//      zero-fills these and a tampered binary that smuggles control
-//      chars into the tail is exactly what this scan defends against.
-//   3. The prefix-before-null must be valid UTF-8 under strict mode.
+// Decodes one fixed-length null-terminated string slot. Rejects:
+//   - missing null terminator within the slot
+//   - any single-byte ASCII control char (C0 [0x01-0x1F] or DEL 0x7F)
+//     anywhere in the slot, *including the unused tail* — defends
+//     against tampered binaries that smuggle control bytes after the
+//     null
+//   - invalid UTF-8 in the prefix
+// The C1 range [0x80, 0x9F] is intentionally NOT rejected at the byte
+// level: those values are legitimate UTF-8 continuation bytes (e.g.
+// `é` = 0xC3 0xA9). Strict UTF-8 catches the invalid-sequence case.
 function readFixedString(buf: Buffer, off: number, len: number, fieldName: string): string {
   const slot = buf.subarray(off, off + len);
   for (let i = 0; i < slot.length; i += 1) {
@@ -79,10 +71,8 @@ function readFixedString(buf: Buffer, off: number, len: number, fieldName: strin
   }
 }
 
-// Decodes the `esp_app_desc_t` struct from the head of an ESP-IDF
-// application image. Caller is responsible for reading at least
-// `MIN_BUFFER_LEN` bytes from the file; we don't ever need the whole
-// 1.2 MB binary in memory just to identify it.
+// Caller is responsible for reading at least MIN_BUFFER_LEN bytes —
+// we never need the whole 1.2 MB binary in memory just to identify it.
 export function parseEspAppDesc(buf: Buffer): EspAppDesc {
   if (buf.length < MIN_BUFFER_LEN) {
     throw new Error(
@@ -104,7 +94,7 @@ export function parseEspAppDesc(buf: Buffer): EspAppDesc {
   const time = readFixedString(buf, base + F_TIME, TIME_LEN, 'time');
   const date = readFixedString(buf, base + F_DATE, DATE_LEN, 'date');
   const idfVer = readFixedString(buf, base + F_IDF_VER, IDF_VER_LEN, 'idf_ver');
-  // Copy out so later mutation of `buf` can't silently change the parsed result.
+  // Defensive copy — slicing would alias the input buffer.
   const appElfSha256 = Buffer.from(
     buf.subarray(base + F_APP_ELF_SHA256, base + F_APP_ELF_SHA256 + APP_ELF_SHA256_LEN),
   );

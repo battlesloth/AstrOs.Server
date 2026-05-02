@@ -172,13 +172,10 @@ describe('FirmwareUploadStore.latest()', () => {
   });
 
   it('returns null (does not throw) for a meta filename whose id starts with a dash', async () => {
-    // Regression guard: pre-fix UPLOAD_META_RE accepted `[0-9a-f-]{36}`
-    // which matched ids beginning with `-`, then assertPathSafe inside
-    // pathsFor() rejected the leading dash and threw outside the inner
-    // try/catch — `latest()` would propagate the throw instead of
-    // returning null per the documented contract. Tightened regex now
-    // enforces canonical UUID v4 positional structure (8-4-4-4-12) so
-    // the malformed name is filtered out before pathsFor() runs.
+    // Names matching the meta-file pattern but failing assertPathSafe
+    // (leading dash) must be filtered out by UPLOAD_META_RE — pathsFor
+    // runs outside the inner try/catch, so a throw here would escape
+    // latest()'s null-miss contract.
     const uploadsDir = path.join(rootDir, 'uploads');
     fs.mkdirSync(uploadsDir);
     // 36-char id with leading dash + 35 hex/dashes — would have
@@ -484,9 +481,9 @@ describe('FirmwareUploadStore.store()', () => {
   });
 
   it('unlinks tempPath when the stream-hash phase fails mid-read (EIO simulated)', async () => {
-    // Reviewer-flagged scenario: pre-fix, a createReadStream / for-await
-    // failure exited store() before the rollback block, leaving the temp
-    // file orphaned. Now wrapped in the post-parse try/catch.
+    // Stream errors must trigger the rollback — otherwise the temp
+    // file orphans, since express-fileupload's tempfiles aren't auto-
+    // cleaned on the route layer's failure path.
     const bin = makeFirmwareBytes();
     const tempPath = writeTempBin(tempDir, bin, 'hash-fail.tmp');
 
@@ -513,8 +510,8 @@ describe('FirmwareUploadStore.store()', () => {
   });
 
   it('unlinks tempPath when mkdir throws EACCES', async () => {
-    // Reviewer-flagged scenario: pre-fix, mkdir failures bypassed the
-    // persist-phase try/catch and leaked the temp file. Now covered.
+    // mkdir runs after parse + hash but before the persist sequence;
+    // its failure path must still consume the temp file.
     const bin = makeFirmwareBytes();
     const tempPath = writeTempBin(tempDir, bin, 'mkdir-fail.tmp');
 
@@ -805,11 +802,10 @@ describe('FirmwareUploadStore — concurrent store() serialization', () => {
 });
 
 describe('FirmwareUploadStore — multiple meta files race-safety', () => {
-  // Reviewer-flagged scenario: between readdir and stat, a meta file
-  // could be deleted (concurrent store()'s wipe pass) or become
-  // unreadable. Per-stat failures must not reject the whole batch —
-  // the contract is "any partial state → null miss" and individual
-  // stats are wrapped so the survivors are still considered.
+  // Per-stat failures must not reject the whole batch — between readdir
+  // and stat, a concurrent store()'s wipe pass can delete a meta file.
+  // The contract is "any partial state → null miss"; individual stats
+  // are wrapped so survivors are still considered.
 
   function plantTriple(uploadsDir: string, id: string, version: string): Buffer {
     const bin = makeFirmwareBytes({ version });
