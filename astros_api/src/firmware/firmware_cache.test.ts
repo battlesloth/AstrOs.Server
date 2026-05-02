@@ -369,9 +369,7 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(p.meta)).toBe(false);
   });
 
-  it('cleans up the .tmp when the rename to .bin fails after sidecars are written', async () => {
-    // Sidecars are removed too — they describe a .bin that doesn't
-    // exist after the rename failure.
+  it('cleans up when the rename to .bin fails (no sidecars yet, .bin not promoted)', async () => {
     const bytes = Buffer.from('fake-firmware-bytes');
     const fetcher = makeFetcherReturning(bytes);
     const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
@@ -389,6 +387,49 @@ describe('FirmwareCache.fetch', () => {
     expect(fs.existsSync(p.bin)).toBe(false);
     expect(fs.existsSync(p.sha)).toBe(false);
     expect(fs.existsSync(p.meta)).toBe(false);
+  });
+
+  it('does not leave a mismatched 3-file state if persist is interrupted (sidecars only land after .bin is promoted)', async () => {
+    // Stale .bin from a prior crashed write — lookup() correctly
+    // returns null because there are no sidecars. On the next fetch,
+    // sidecars must NOT be written while the stale .bin is still on
+    // disk: a crash between sidecar-write and rename would leave all
+    // three files present, with the new sidecars describing the OLD
+    // bytes. lookup() would then return a mismatched hit (sha != bytes).
+    //
+    // Invariant: at sidecar-write time, p.bin is either (a) the fresh
+    // bytes already, or (b) absent — never the stale content.
+    const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    fs.mkdirSync(p.githubDir, { recursive: true });
+    const stale = Buffer.from('STALE-CONTENT-FROM-CRASHED-WRITE');
+    fs.writeFileSync(p.bin, stale);
+
+    const fresh = Buffer.from('fresh-firmware-bytes');
+    const fetcher = makeFetcherReturning(fresh);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    const binSnapshotsAtSidecarWrite: Array<Buffer | null> = [];
+    const realWriteFile = fsp.writeFile.bind(fsp);
+    vi.spyOn(fsp, 'writeFile').mockImplementation(async (file, data) => {
+      const fileStr = String(file);
+      if (fileStr.endsWith('.meta.json') || fileStr.endsWith('.bin.sha256')) {
+        try {
+          binSnapshotsAtSidecarWrite.push(fs.readFileSync(p.bin));
+        } catch {
+          binSnapshotsAtSidecarWrite.push(null);
+        }
+      }
+      return realWriteFile(file as fs.PathLike, data as Parameters<typeof realWriteFile>[1]);
+    });
+
+    await cache.fetch(makeRelease(), makeAsset({ sizeBytes: fresh.length }));
+
+    // Both sidecar writes were observed (sha + meta).
+    expect(binSnapshotsAtSidecarWrite).toHaveLength(2);
+    // Neither snapshot is the stale content — fresh or absent are both safe.
+    for (const snap of binSnapshotsAtSidecarWrite) {
+      expect(snap).not.toEqual(stale);
+    }
   });
 
   it('rejects when the downloaded size does not match AssetInfo.sizeBytes', async () => {
@@ -580,17 +621,18 @@ describe('FirmwareCache.fetch', () => {
     }
   });
 
-  it('skips structurally-valid-but-malformed meta.json files during eviction', async () => {
+  it('cleans up structurally-valid-but-malformed meta.json files during eviction', async () => {
     // Without isValidMeta, an empty `{}` would slip into the sort and
-    // crash `localeCompare(undefined)` — taking the whole prune pass
-    // out via the eviction catch on every subsequent fetch.
+    // crash `localeCompare(undefined)`. Without the cleanup pass,
+    // it would also evade MAX_RELEASES accounting forever.
     populateCache(tmpDir, '1.0.0', 'metro_s3', '2026-01-01T00:00:00Z');
     populateCache(tmpDir, '1.1.0', 'metro_s3', '2026-02-01T00:00:00Z');
     populateCache(tmpDir, '1.2.0', 'metro_s3', '2026-03-01T00:00:00Z');
     populateCache(tmpDir, '1.3.0', 'metro_s3', '2026-04-01T00:00:00Z');
     populateCache(tmpDir, '1.4.0', 'metro_s3', '2026-04-15T00:00:00Z');
     const githubDir = path.join(tmpDir, 'github');
-    fs.writeFileSync(path.join(githubDir, 'astros-esp-malformed-app.meta.json'), '{}');
+    const malformedMetaPath = path.join(githubDir, 'astros-esp-malformed-app.meta.json');
+    fs.writeFileSync(malformedMetaPath, '{}');
 
     const bytes = Buffer.from('v1.5.0-bytes');
     const fetcher = makeFetcherReturning(bytes);
@@ -604,8 +646,71 @@ describe('FirmwareCache.fetch', () => {
 
     expect(fs.existsSync(pathsFor(tmpDir, '1.0.0', 'metro_s3').bin)).toBe(false);
     expect(fs.existsSync(pathsFor(tmpDir, '1.5.0', 'metro_s3').bin)).toBe(true);
-    // Skipping malformed sidecars is in-band, not an error condition.
+    // The malformed meta is gone — pruneToN cleaned it up rather than
+    // letting it sit forever evading both lookup and eviction.
+    expect(fs.existsSync(malformedMetaPath)).toBe(false);
+    // Cleanup is in-band, not an error condition.
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('cleans up sibling .bin and .bin.sha256 when a meta.json is malformed', async () => {
+    // Corruption scenario: a complete cached entry on disk (.bin +
+    // .sha256 + .meta.json) where the meta is malformed (truncated
+    // mid-write, partial flush, intentional tampering). lookup() can
+    // never serve it (isValidMeta gates the hit) and the meta-based
+    // eviction can't see it (skipped from metaFiles), so without an
+    // explicit sweep its ~1.2 MB sits forever beyond MAX_RELEASES.
+    const githubDir = path.join(tmpDir, 'github');
+    fs.mkdirSync(githubDir, { recursive: true });
+    const baseName = 'astros-esp-9.9.9-metro_s3-app';
+    const ghostBin = path.join(githubDir, `${baseName}.bin`);
+    const ghostSha = path.join(githubDir, `${baseName}.bin.sha256`);
+    const ghostMeta = path.join(githubDir, `${baseName}.meta.json`);
+    fs.writeFileSync(ghostBin, Buffer.from('orphan-binary-bytes'));
+    fs.writeFileSync(ghostSha, 'a'.repeat(64));
+    fs.writeFileSync(ghostMeta, '{"tag":"v9.9.9",'); // truncated JSON
+
+    const bytes = Buffer.from('v1.0.0-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+    await cache.fetch(makeRelease(), makeAsset({ sizeBytes: bytes.length }));
+
+    expect(fs.existsSync(ghostBin)).toBe(false);
+    expect(fs.existsSync(ghostSha)).toBe(false);
+    expect(fs.existsSync(ghostMeta)).toBe(false);
+  });
+
+  it('cleans up sibling .bin and .bin.sha256 when a meta.json is unreadable', async () => {
+    // EACCES on readFile (different from malformed JSON) — same
+    // outcome: the entry can never be served, so it must be swept.
+    const githubDir = path.join(tmpDir, 'github');
+    fs.mkdirSync(githubDir, { recursive: true });
+    const baseName = 'astros-esp-7.7.7-metro_s3-app';
+    const ghostBin = path.join(githubDir, `${baseName}.bin`);
+    const ghostSha = path.join(githubDir, `${baseName}.bin.sha256`);
+    const ghostMeta = path.join(githubDir, `${baseName}.meta.json`);
+    fs.writeFileSync(ghostBin, Buffer.from('orphan-binary-bytes'));
+    fs.writeFileSync(ghostSha, 'b'.repeat(64));
+    fs.writeFileSync(ghostMeta, JSON.stringify(makeMeta()));
+
+    // Force readFile to throw EACCES specifically for the ghost meta;
+    // delegate everything else to the real readFile.
+    const realReadFile = fsp.readFile.bind(fsp);
+    vi.spyOn(fsp, 'readFile').mockImplementation((async (file: fs.PathLike, ...rest: unknown[]) => {
+      if (String(file) === ghostMeta) {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+      }
+      return realReadFile(file, ...(rest as [BufferEncoding]));
+    }) as typeof fsp.readFile);
+
+    const bytes = Buffer.from('v1.0.0-bytes');
+    const fetcher = makeFetcherReturning(bytes);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+    await cache.fetch(makeRelease(), makeAsset({ sizeBytes: bytes.length }));
+
+    expect(fs.existsSync(ghostBin)).toBe(false);
+    expect(fs.existsSync(ghostSha)).toBe(false);
+    expect(fs.existsSync(ghostMeta)).toBe(false);
   });
 
   it('sweeps orphan .tmp files left by a prior crash', async () => {

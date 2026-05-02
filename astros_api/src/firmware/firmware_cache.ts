@@ -208,22 +208,26 @@ export class FirmwareCache {
       sizeBytes: actualSize,
     };
     try {
-      await fsp.writeFile(p.sha, computedSha);
-      await fsp.writeFile(p.meta, JSON.stringify(meta, null, 2));
-      // Windows fs.rename throws EEXIST if the destination exists (POSIX
-      // overwrites atomically). Unlink any stale .bin from a crashed
-      // earlier write so rename always promotes. ENOENT is the normal case.
+      // Promote .bin BEFORE writing sidecars so any mid-persist crash
+      // yields lookup-miss state, not a mismatched 3-file hit (stale
+      // .bin + new sidecars). Windows fs.rename throws EEXIST if dest
+      // exists; POSIX overwrites atomically. Unlink any stale .bin
+      // first so rename always promotes; ENOENT is the normal case.
       await fsp.unlink(p.bin).catch((err: unknown) => {
         if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       });
       await fsp.rename(tmpPath, p.bin);
+      await fsp.writeFile(p.sha, computedSha);
+      await fsp.writeFile(p.meta, JSON.stringify(meta, null, 2));
     } catch (err) {
       // Persist-phase failure (ENOSPC on writeFile, EACCES on rename,
-      // EXDEV across filesystems...). Roll back to the same clean state
-      // the download-phase catch produces, so a permanently failing
-      // disk doesn't let .tmp + sidecars accumulate on every retry.
+      // EXDEV across filesystems...). Roll back to a clean miss state.
+      // The just-promoted .bin gets unlinked too — without sidecars
+      // it would otherwise sit as a ~1.2 MB orphan until the next
+      // fetch on the same key, since pruneToN's sweep only handles .tmp.
       await Promise.all([
         fsp.unlink(tmpPath).catch(() => undefined),
+        fsp.unlink(p.bin).catch(() => undefined),
         fsp.unlink(p.sha).catch(() => undefined),
         fsp.unlink(p.meta).catch(() => undefined),
       ]);
@@ -267,9 +271,15 @@ export class FirmwareCache {
     const META_SUFFIX = '.meta.json';
     const TMP_SUFFIX = '.bin.tmp';
 
-    // Sweep orphan .tmp files left by a process killed mid-download
-    // (OOM, container kill, reboot) — neither lookup nor meta-based
-    // eviction can see them, so without this they accumulate forever.
+    // Sweep two classes of garbage that lookup() can't return AND
+    // meta-based eviction can't see, so neither contributes to the
+    // MAX_RELEASES accounting:
+    //   1) orphan .tmp files left by a process killed mid-download
+    //      (OOM, container kill, reboot)
+    //   2) malformed/unreadable meta.json files plus their sibling
+    //      .bin / .bin.sha256 (corruption, partial flush, tampering)
+    // Without explicit cleanup, both classes accumulate indefinitely.
+    //
     // Snapshot in-flight keys synchronously (before any await) so a
     // concurrent fetch's live .tmp is preserved. Residual race: a
     // fetch whose `inFlight.set` runs after this snapshot but whose
@@ -281,7 +291,7 @@ export class FirmwareCache {
       const [version, variant] = key.split('::');
       liveTmpNames.add(`astros-esp-${version}-${variant}-app.bin.tmp`);
     }
-    const orphanTmpPaths: string[] = [];
+    const sweepPaths: string[] = [];
 
     // Dirent.name is guaranteed by Node to be a basename, so paths
     // derived from it stay inside githubDir even if a meta sidecar's
@@ -291,22 +301,38 @@ export class FirmwareCache {
       if (!entry.isFile()) continue;
       if (entry.name.endsWith(TMP_SUFFIX)) {
         if (!liveTmpNames.has(entry.name)) {
-          orphanTmpPaths.push(path.join(githubDir, entry.name));
+          sweepPaths.push(path.join(githubDir, entry.name));
         }
         continue;
       }
       if (!entry.name.endsWith(META_SUFFIX)) continue;
+      let valid = false;
       try {
         const text = await fsp.readFile(path.join(githubDir, entry.name), 'utf8');
         const parsed: unknown = JSON.parse(text);
-        if (isValidMeta(parsed)) metaFiles.push({ name: entry.name, meta: parsed });
+        if (isValidMeta(parsed)) {
+          metaFiles.push({ name: entry.name, meta: parsed });
+          valid = true;
+        }
       } catch {
-        // Unreadable / malformed JSON — skip rather than abort.
+        // Unreadable / malformed JSON — fall through to cleanup.
+      }
+      if (!valid) {
+        // The meta is unusable: lookup() can't serve it (validation
+        // gates the hit) and the eviction sort skips it, so without
+        // explicit cleanup it would sit beyond MAX_RELEASES forever.
+        // Sweep the meta plus any sibling .bin / .bin.sha256.
+        const baseName = entry.name.slice(0, -META_SUFFIX.length);
+        sweepPaths.push(
+          path.join(githubDir, entry.name),
+          path.join(githubDir, `${baseName}.bin`),
+          path.join(githubDir, `${baseName}.bin.sha256`),
+        );
       }
     }
 
-    if (orphanTmpPaths.length > 0) {
-      await Promise.all(orphanTmpPaths.map((p) => fsp.unlink(p).catch(() => undefined)));
+    if (sweepPaths.length > 0) {
+      await Promise.all(sweepPaths.map((p) => fsp.unlink(p).catch(() => undefined)));
     }
 
     // Group by tag so both variants of the same release stay together.
