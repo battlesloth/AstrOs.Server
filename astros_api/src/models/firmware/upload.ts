@@ -18,8 +18,9 @@ export interface EspAppDesc {
 }
 
 // Persisted as `upload-<uuid>.meta.json` next to each stored upload.
-// No `tag` (uploads aren't releases) and no `publishedAt` (only
-// `uploadedAt` — the user's clock at upload time).
+// No `tag` (uploads aren't releases) and no `publishedAt` (which would
+// be a release publish timestamp). Time provenance for `uploadedAt` is
+// the server clock — see field comment.
 export interface StoredUploadMeta {
   uploadId: string;
   // User's original filename, kept for operator inspection / UI display.
@@ -28,6 +29,12 @@ export interface StoredUploadMeta {
   originalFilename: string;
   projectName: string;
   version: string;
+  // Server-generated ISO-8601 UTC timestamp captured at the moment
+  // store() persists the upload (`new Date().toISOString()`). NOT a
+  // browser-clock value — there is no client-supplied timestamp on the
+  // upload payload and the server doesn't trust one if there were.
+  // Safe to use for "ordering relative to other server events"; not
+  // safe for "what time did the user think it was".
   uploadedAt: string;
   sizeBytes: number;
 }
