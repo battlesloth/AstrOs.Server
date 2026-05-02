@@ -224,6 +224,57 @@ describe('transitionControllerState — payload validation', () => {
   });
 });
 
+describe('transitionControllerState — same-stage progress updates', () => {
+  // FW_PROGRESS messages arrive multiple times within a single stage
+  // (e.g., bytesSent flowing during Sending). The orchestrator
+  // translates each into `transitionControllerState(state, currentStage,
+  // payload)` — same-stage transitions must merge the payload onto the
+  // current state without throwing.
+
+  it.each([
+    FwStage.Queued,
+    FwStage.UploadingToMaster,
+    FwStage.Sending,
+    FwStage.Verifying,
+    FwStage.Rebooting,
+  ] as const)('non-terminal %s → %s merges bytesSent', (stage) => {
+    const start: ControllerFlashState =
+      stage === FwStage.Queued
+        ? queued({ bytesSent: 100, totalBytes: 1024, detail: 'mid-flight' })
+        : withStage(stage, { bytesSent: 100, totalBytes: 1024, detail: 'mid-flight' });
+    const next = transitionControllerState(start, stage, { bytesSent: 500 });
+    expect(next.stage).toBe(stage);
+    expect(next.bytesSent).toBe(500);
+    expect(next.totalBytes).toBe(1024);
+    expect(next.detail).toBe('mid-flight');
+  });
+
+  it('same-stage update with no payload is a no-op equivalent', () => {
+    const start = withStage(FwStage.Sending, {
+      bytesSent: 256,
+      totalBytes: 1024,
+      detail: 'streaming',
+    });
+    const next = transitionControllerState(start, FwStage.Sending);
+    expect(next).toEqual(start);
+    expect(next).not.toBe(start); // still returns a new object
+  });
+
+  it('terminal-to-self stays illegal: VersionConfirmed → VersionConfirmed throws', () => {
+    expect(() =>
+      transitionControllerState(versionConfirmed(), FwStage.VersionConfirmed, {
+        finalVersion: '1.4.0',
+      }),
+    ).toThrow(/illegal/i);
+  });
+
+  it('terminal-to-self stays illegal: Failed → Failed throws', () => {
+    expect(() =>
+      transitionControllerState(failed(), FwStage.Failed, { error: 'still failed' }),
+    ).toThrow(/illegal/i);
+  });
+});
+
 describe('transitionControllerState — payload merging on legal in-flight transitions', () => {
   it('merges new bytesSent while preserving totalBytes and detail', () => {
     const start = withStage(FwStage.UploadingToMaster, {
