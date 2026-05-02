@@ -121,6 +121,10 @@ During planning, evaluate the total scope. If a feature involves **more than ~8 
 - Each phase should be independently shippable and testable.
 - Get user approval on the phasing before proceeding.
 
+### Failure-mode inventory — for high-stakes modules
+
+For modules involving filesystem state, concurrency, network I/O, crash-recovery, or cross-process state, fill out a **failure-mode inventory** as part of the plan before writing implementation code. Template at [`.docs/templates/failure-mode-inventory.md`](./.docs/templates/failure-mode-inventory.md). The c.4 firmware cache hit ~10 PR-feedback rounds catching real bugs (Windows rename, hung downloads, mismatched-bytes hit, unbounded garbage) that the inventory's error-coverage and crash-recovery sections would have surfaced upfront. Skip for simple CRUD endpoints or pure-compute modules.
+
 ## QA Test Plans
 
 For each feature, create a manual QA test plan in `.docs/qa/` with a descriptive filename (e.g., `auth-login.md`, `setup-wizard.md`). Each plan should include:
