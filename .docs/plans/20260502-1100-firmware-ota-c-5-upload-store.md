@@ -55,7 +55,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
   - Magic word read with `readUInt32LE`. Reject when `!== ESP_APP_DESC_MAGIC`.
   - Up-front length check: throw if `buf.length < 288`. Caller only ever reads the first 288 bytes.
 
-- [ ] **`FirmwareUploadStore` class** (new `astros_api/src/firmware/firmware_upload_store.ts`):
+- [x] **`FirmwareUploadStore` class** (new `astros_api/src/firmware/firmware_upload_store.ts`):
   - Constructor: `new FirmwareUploadStore(opts?: { rootDir?: string, expectedProjectName?: string })`. `expectedProjectName` defaults to `'astros-esp'` (resolves decomp Open Item #4 — see Notes; verification step against firmware repo's `CONFIG_APP_PROJECT_NAME` is in the open-items list).
   - **`store(tempPath: string, originalFilename: string): Promise<StoredUpload>`**:
     1. Generate `uploadId = uuid_v4()`. `assertPathSafe(uploadId, 'uploadId')` for defense-in-depth against future regressions where the uuid generator changes.
@@ -88,7 +88,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
   - `secureVersion` reads as `uint32_t` little-endian (regression guard against accidental BE).
   - Magic-word constant is exactly `0xABCD5432` (sentinel test).
 
-- [ ] **Tests** (new `astros_api/src/firmware/firmware_upload_store.test.ts`). Real temp dir per test (`fs.mkdtempSync` in `beforeEach`, `rm -rf` in `afterEach`):
+- [x] **Tests** (new `astros_api/src/firmware/firmware_upload_store.test.ts`). Real temp dir per test (`fs.mkdtempSync` in `beforeEach`, `rm -rf` in `afterEach`):
   - `latest()` returns null on cold cache.
   - `store()` happy path: temp file exists, parser succeeds, all three files at expected paths, returned `StoredUpload` has correct `path`, `sha256` (verified by re-hashing), `sizeBytes`, and meta.
   - `store()` consumes the temp file (no orphan in `tmp/` after success).
