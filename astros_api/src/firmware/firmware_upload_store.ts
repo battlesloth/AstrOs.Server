@@ -278,6 +278,20 @@ export class FirmwareUploadStore {
       if (!SHA256_HEX_RE.test(sha256)) return null;
       const parsed: unknown = JSON.parse(metaText);
       if (!isValidUploadMeta(parsed)) return null;
+      // Cross-check the triple is internally consistent. Each file is
+      // individually well-formed by this point, but corruption / manual
+      // sidecar copy could leave them describing different uploads:
+      //   - meta.uploadId !== filename-derived uploadId means a sidecar
+      //     was renamed or copied from another entry (would mislead the
+      //     orchestrator about which upload is being flashed).
+      //   - meta.sizeBytes !== binStat.size means meta is stale relative
+      //     to the bin (e.g. external truncate, partial-write recovery
+      //     that left mismatched siblings). Cheap proxy for "the bin we
+      //     have is the bin meta describes" — re-hashing here would be
+      //     stronger but costs ~80–100 ms per call (same trade-off c.4
+      //     made for its sidecar-trust stance).
+      if (parsed.uploadId !== uploadId) return null;
+      if (parsed.sizeBytes !== binStat.size) return null;
       return { path: p.bin, sha256, sizeBytes: binStat.size, meta: parsed };
     } catch {
       // ENOENT, EACCES, malformed JSON — all map to miss so callers

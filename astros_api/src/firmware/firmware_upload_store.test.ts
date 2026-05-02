@@ -152,6 +152,59 @@ describe('FirmwareUploadStore.latest()', () => {
     expect(await store.latest()).toBeNull();
   });
 
+  it('returns null when meta.json uploadId disagrees with the filename uuid', async () => {
+    // Simulates corruption / manual `cp` of a sidecar from another
+    // upload — filename says one uuid, JSON content says another.
+    // Returning the JSON's metadata alongside the filename's bin/sha
+    // would mislead the orchestrator about which upload is being
+    // flashed.
+    const uploadsDir = path.join(rootDir, 'uploads');
+    fs.mkdirSync(uploadsDir);
+    const filenameId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const jsonId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const bin = Buffer.alloc(100);
+    fs.writeFileSync(path.join(uploadsDir, `upload-${filenameId}.bin`), bin);
+    fs.writeFileSync(path.join(uploadsDir, `upload-${filenameId}.bin.sha256`), sha256Hex(bin));
+    const wrongMeta: StoredUploadMeta = {
+      uploadId: jsonId,
+      originalFilename: 'firmware.bin',
+      projectName: 'AstrOs.ESP',
+      version: '1.0.0',
+      uploadedAt: new Date().toISOString(),
+      sizeBytes: bin.length,
+    };
+    fs.writeFileSync(
+      path.join(uploadsDir, `upload-${filenameId}.meta.json`),
+      JSON.stringify(wrongMeta),
+    );
+
+    expect(await store.latest()).toBeNull();
+  });
+
+  it('returns null when meta.json sizeBytes disagrees with the bin size on disk', async () => {
+    // Simulates partial-write recovery or external truncation — the
+    // sidecar describes a 1024-byte upload but the .bin on disk is
+    // only 100 bytes. Returning meta whose sizeBytes contradicts the
+    // actual binary would mislead callers comparing sizes downstream.
+    const uploadsDir = path.join(rootDir, 'uploads');
+    fs.mkdirSync(uploadsDir);
+    const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+    const realBin = Buffer.alloc(100);
+    fs.writeFileSync(path.join(uploadsDir, `upload-${id}.bin`), realBin);
+    fs.writeFileSync(path.join(uploadsDir, `upload-${id}.bin.sha256`), sha256Hex(realBin));
+    const staleMeta: StoredUploadMeta = {
+      uploadId: id,
+      originalFilename: 'firmware.bin',
+      projectName: 'AstrOs.ESP',
+      version: '1.0.0',
+      uploadedAt: new Date().toISOString(),
+      sizeBytes: 1024, // stale — disagrees with realBin.length === 100
+    };
+    fs.writeFileSync(path.join(uploadsDir, `upload-${id}.meta.json`), JSON.stringify(staleMeta));
+
+    expect(await store.latest()).toBeNull();
+  });
+
   it('returns null when meta.json parses but is missing required fields', async () => {
     const uploadsDir = path.join(rootDir, 'uploads');
     fs.mkdirSync(uploadsDir);

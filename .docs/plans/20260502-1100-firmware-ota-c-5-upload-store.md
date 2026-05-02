@@ -72,7 +72,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
        - `writeFile(.meta.json, JSON.stringify(meta, null, 2))`
     8. On any failure in steps 6–7: `Promise.all` of best-effort `unlink` against the temp file, the just-promoted `.bin`, and both sidecars (mirrors c.4's symmetric persist-phase rollback). Rethrow.
     9. Return `StoredUpload`.
-  - **`latest(): Promise<StoredUpload | null>`** — `readdir(<rootDir>/uploads)`, filter for files matching `^upload-([0-9a-f-]{36})\.meta\.json$`. If multiple matches (corruption/manual intervention), pick the most-recently-mtime'd one and log a warn. Read all three files for that uuid; return null if any are missing or malformed (defensive — mirrors c.4's `lookup`).
+  - **`latest(): Promise<StoredUpload | null>`** — `readdir(<rootDir>/uploads)`, filter for files matching `^upload-([0-9a-f-]{36})\.meta\.json$`. If multiple matches (corruption/manual intervention), pick the most-recently-mtime'd one and log a warn. Read all three files for that uuid; return null if any are missing or malformed. Cross-check the triple is internally consistent: `parsed.uploadId === uploadId-from-filename` (corruption / sidecar copy-from-another-upload would mislead the orchestrator about which upload is being flashed) and `parsed.sizeBytes === binStat.size` (cheap proxy for "the bin we have is the one meta describes" — catches partial-write recovery and external truncation; sha re-hashing would be stronger but costs ~80–100 ms per call). Mismatches map to a null miss.
   - **Filename safety:** `pathsFor(rootDir, uploadId)` runs `assertPathSafe(uploadId, 'uploadId')`. UUID v4 is `[0-9a-f-]+` so always passes; the assertion guards future refactors.
   - **Concurrency:** no in-process mutex. Two concurrent uploads tolerated by last-writer-wins on the wipe-then-rename sequence; `.meta.json` is the durability anchor. The flash-job hard lock from c.0/c.2 ensures uploads never overlap with a flash, so the only race is two browser tabs uploading back-to-back. Per-store atomic rename is the entire concurrency model.
 
@@ -100,6 +100,8 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
   - `store()` rolls back cleanly when `rename` throws EACCES: temp file unlinked, uploads dir empty.
   - `latest()` returns null when only some sidecar files exist (interrupted prior write).
   - `latest()` returns null when `.meta.json` is malformed JSON.
+  - `latest()` returns null when `.meta.json` `uploadId` disagrees with the filename uuid (sidecar copied/renamed from another upload).
+  - `latest()` returns null when `.meta.json` `sizeBytes` disagrees with the bin's actual size on disk (partial-write recovery / external truncation).
   - Crash-recovery invariant: snapshotting `.bin` at each sidecar `writeFile` call shows bin contents are either fresh-bytes or absent — never stale (same pinning pattern c.4 used).
   - Sequential interleaving: A.store() completes, B.store() completes, `latest()` returns B's data; pre-A returns null, between returns A.
   - Filename safety: passing a non-UUID `uploadId` (via test seam) trips `assertPathSafe` synchronously without writing.
@@ -155,6 +157,8 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
 | `fsp.readdir(<uploads>)` (latest) | ENOENT | return null (cold cache) |
 | `fsp.readdir(<uploads>)` (latest) | EACCES | propagate; operator-visible |
 | `JSON.parse(metaText)` | SyntaxError | return null (malformed; swept by next successful store) |
+| `latest()` cross-check | `parsed.uploadId !== uploadId-from-filename` | return null — sidecar mis-copy / corruption; the next successful `store()` will wipe the inconsistent triple |
+| `latest()` cross-check | `parsed.sizeBytes !== binStat.size` | return null — meta stale relative to bin (truncate / partial-write); next successful `store()` clears it |
 
 **Gotchas applying from c.4 experience:**
 - Truncated read on temp file looks like normal close. Mitigation: the parse step's `fh.read(buf, 0, 288, 0)` rejects any file that doesn't deliver the full 288-byte header, which is the load-bearing check for the most common truncation source (incomplete upload). A subsequent parse-time-vs-hash-time race (file truncated between the two reads) is not separately guarded — caught only if it shrinks below the 288-byte parse floor before the stream-hash opens its own handle, which would also fail the parse on a retry.
