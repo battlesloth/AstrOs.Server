@@ -4,7 +4,10 @@ interface BaseControllerFlashState {
   controllerId: string;
   bytesSent: number;
   totalBytes: number;
-  detail?: string;
+  // Required-with-empty-string-default rather than optional. Mirrors
+  // the wire shape (FwProgress.detail is a required field) and prevents
+  // `undefined` from leaking through JSON.stringify into the WS payload.
+  detail: string;
 }
 
 export type ControllerFlashState =

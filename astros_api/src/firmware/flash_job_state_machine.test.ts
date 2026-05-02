@@ -21,6 +21,7 @@ function queued(
     controllerId: C_ID,
     bytesSent: 0,
     totalBytes: 0,
+    detail: '',
     ...overrides,
   };
 }
@@ -34,6 +35,7 @@ function withStage(
     controllerId: C_ID,
     bytesSent: 0,
     totalBytes: 0,
+    detail: '',
     ...overrides,
   };
 }
@@ -44,6 +46,7 @@ function versionConfirmed(finalVersion = '1.4.0'): ControllerFlashState {
     controllerId: C_ID,
     bytesSent: 1024,
     totalBytes: 1024,
+    detail: '',
     finalVersion,
   };
 }
@@ -54,6 +57,7 @@ function failed(error = 'simulated'): ControllerFlashState {
     controllerId: C_ID,
     bytesSent: 0,
     totalBytes: 0,
+    detail: '',
     error,
   };
 }
