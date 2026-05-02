@@ -432,6 +432,65 @@ describe('FirmwareCache.fetch', () => {
     }
   });
 
+  it('wipes stale sidecars before promoting .bin (no mismatched hit when .bin was deleted but sidecars survived)', async () => {
+    // Inverse of the prior test: stale .sha and .meta on disk but no
+    // .bin (could be: user deleted the .bin, an external sweep removed
+    // .bin but missed sidecars, partial-failure of a prior eviction).
+    // lookup() correctly returns null because .bin is missing.
+    //
+    // On the next fetch, the stale sidecars must be wiped BEFORE the
+    // rename promotes the new .bin. Otherwise a crash between rename
+    // and writeFile sha would leave new .bin + STALE .sha + STALE
+    // .meta — lookup() would return a 3-file hit with bytes ≠ hash
+    // (and meta describing a different version).
+    //
+    // Invariant: at every sidecar-writeFile call, neither .sha nor
+    // .meta on disk is the stale value. (Absent or fresh are both safe.)
+    const p = pathsFor(tmpDir, '1.0.0', 'metro_s3');
+    fs.mkdirSync(p.githubDir, { recursive: true });
+    const staleSha = 'a'.repeat(64);
+    const staleMeta = JSON.stringify(makeMeta({ tag: 'v0.1.0', version: '0.1.0' }));
+    fs.writeFileSync(p.sha, staleSha);
+    fs.writeFileSync(p.meta, staleMeta);
+    // Note: no .bin
+
+    const fresh = Buffer.from('fresh-firmware-bytes');
+    const fetcher = makeFetcherReturning(fresh);
+    const cache = new FirmwareCache({ rootDir: tmpDir, fetcher });
+
+    const sidecarSnapshots: Array<{ sha: string | null; meta: string | null }> = [];
+    const realWriteFile = fsp.writeFile.bind(fsp);
+    vi.spyOn(fsp, 'writeFile').mockImplementation(async (file, data) => {
+      const fileStr = String(file);
+      if (fileStr.endsWith('.bin.sha256') || fileStr.endsWith('.meta.json')) {
+        let sha: string | null;
+        let meta: string | null;
+        try {
+          sha = fs.readFileSync(p.sha, 'utf8');
+        } catch {
+          sha = null;
+        }
+        try {
+          meta = fs.readFileSync(p.meta, 'utf8');
+        } catch {
+          meta = null;
+        }
+        sidecarSnapshots.push({ sha, meta });
+      }
+      return realWriteFile(file as fs.PathLike, data as Parameters<typeof realWriteFile>[1]);
+    });
+
+    await cache.fetch(makeRelease(), makeAsset({ sizeBytes: fresh.length }));
+
+    // Both writeFile calls observed (one for sha, one for meta).
+    expect(sidecarSnapshots).toHaveLength(2);
+    // At every snapshot point, neither sidecar is the stale value.
+    for (const snap of sidecarSnapshots) {
+      expect(snap.sha).not.toBe(staleSha);
+      expect(snap.meta).not.toBe(staleMeta);
+    }
+  });
+
   it('rejects when the downloaded size does not match AssetInfo.sizeBytes', async () => {
     // A cleanly-closed but truncated response would cache as legitimate
     // firmware otherwise; flashing a truncated binary bricks the

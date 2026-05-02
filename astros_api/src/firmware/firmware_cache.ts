@@ -208,14 +208,19 @@ export class FirmwareCache {
       sizeBytes: actualSize,
     };
     try {
-      // Promote .bin BEFORE writing sidecars so any mid-persist crash
-      // yields lookup-miss state, not a mismatched 3-file hit (stale
-      // .bin + new sidecars). Windows fs.rename throws EEXIST if dest
-      // exists; POSIX overwrites atomically. Unlink any stale .bin
-      // first so rename always promotes; ENOENT is the normal case.
+      // Wipe all three files (.bin + sidecars) before promoting the
+      // new .bin so any mid-persist crash yields lookup-miss state,
+      // never a mismatched 3-file hit. Closes two crash windows:
+      // stale-bin-with-new-sidecars (sidecars-after-bin guarantees
+      // this won't happen now) and stale-sidecars-with-new-bin (this
+      // pre-rename wipe). Strict ENOENT-only catch on .bin since
+      // Windows rename needs a clean destination; sidecars use silent
+      // best-effort because the writeFiles below overwrite anyway.
       await fsp.unlink(p.bin).catch((err: unknown) => {
         if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
       });
+      await fsp.unlink(p.sha).catch(() => undefined);
+      await fsp.unlink(p.meta).catch(() => undefined);
       await fsp.rename(tmpPath, p.bin);
       await fsp.writeFile(p.sha, computedSha);
       await fsp.writeFile(p.meta, JSON.stringify(meta, null, 2));
