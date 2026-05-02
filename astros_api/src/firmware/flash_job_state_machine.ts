@@ -5,12 +5,16 @@ import type {
   JobLifecycle,
 } from '../models/firmware/flash_job_state.js';
 
+// Shared empty-set marker for terminal stages — typed so the Map's
+// value side stays uniformly ReadonlySet<FwStage>.
+const EMPTY_STAGE_SET: ReadonlySet<FwStage> = new Set<FwStage>();
+
 // Single source of truth for the per-controller transition graph.
 // Each entry maps a stage to the set of legal next stages. Non-terminal
 // stages include themselves so within-stage progress updates (e.g.,
 // bytesSent flowing during Sending as FW_PROGRESS messages arrive) are
-// expressed as same-stage transitions. Terminal stages map to empty
-// sets — once a controller reaches them, it stays.
+// expressed as same-stage transitions. Terminal stages map to
+// EMPTY_STAGE_SET — once a controller reaches them, it stays.
 const LEGAL_NEXT_STAGES: ReadonlyMap<FwStage, ReadonlySet<FwStage>> = new Map<
   FwStage,
   ReadonlySet<FwStage>
@@ -23,8 +27,8 @@ const LEGAL_NEXT_STAGES: ReadonlyMap<FwStage, ReadonlySet<FwStage>> = new Map<
   [FwStage.Sending, new Set([FwStage.Sending, FwStage.Verifying, FwStage.Failed])],
   [FwStage.Verifying, new Set([FwStage.Verifying, FwStage.Rebooting, FwStage.Failed])],
   [FwStage.Rebooting, new Set([FwStage.Rebooting, FwStage.VersionConfirmed, FwStage.Failed])],
-  [FwStage.VersionConfirmed, new Set()],
-  [FwStage.Failed, new Set()],
+  [FwStage.VersionConfirmed, EMPTY_STAGE_SET],
+  [FwStage.Failed, EMPTY_STAGE_SET],
 ]);
 
 export function isControllerStageTerminal(stage: FwStage): boolean {
