@@ -31,6 +31,12 @@ export class WorkerSerialBus implements SerialBus {
   send(payload: string, _opts: { kind: 'firmware' | 'normal' }): void {
     // c.6b: forward unconditionally regardless of kind. The drop-when-locked
     // policy lands in c.6c — see SerialBus.send doc-comment in chunk_streamer.ts.
+    //
+    // NOTE: payload is the wire string built by MessageGenerator. The
+    // existing serial worker accepts the legacy { type, data } envelope
+    // for non-FW traffic; routing string payloads through the worker is
+    // c.6c's wire-up work. The literal forward here matches Task 2's
+    // spec and is unit-testable against the mock-Worker EventEmitter.
     this.worker.postMessage(payload);
   }
 
@@ -64,7 +70,13 @@ function mapToFwInboundAck(msg: ISerialWorkerResponse): FwInboundAck | null {
       return { kind: 'transferEndAck', ...msg.payload };
     case SerialWorkerResponseType.FW_BACKPRESSURE:
       return { kind: 'backpressure', ...msg.payload };
-    default:
+    default: {
+      // Intentional: non-FW types + FW_PROGRESS / FW_DEPLOY_DONE drop here.
+      // (FW_PROGRESS and FW_DEPLOY_DONE are deploy-phase messages that
+      // route to the orchestrator, not the upload-phase streamer.) If a
+      // new FW_* response is added that the streamer should observe, add
+      // a case above and extend FwInboundAck in chunk_streamer.ts.
       return null;
+    }
   }
 }
