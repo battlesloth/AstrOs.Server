@@ -48,7 +48,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
   - `StoredUploadMeta` — `{ uploadId: string, originalFilename: string, projectName: string, version: string, uploadedAt: string, sizeBytes: number }`. Persisted as `upload-<uuid>.meta.json`.
   - `StoredUpload` — `{ path: string, sha256: string, sizeBytes: number, meta: StoredUploadMeta }`. Returned by `store()` and `latest()`. Mirrors c.4's `CachedAsset`.
 
-- [ ] **`esp_app_desc_t` parser** (new `astros_api/src/firmware/esp_app_desc.ts`). Pure-compute, no fs/network. Single export `parseEspAppDesc(buf: Buffer): EspAppDesc`. Throws on any structural failure. Constants:
+- [x] **`esp_app_desc_t` parser** (new `astros_api/src/firmware/esp_app_desc.ts`). Pure-compute, no fs/network. Single export `parseEspAppDesc(buf: Buffer): EspAppDesc`. Throws on any structural failure. Constants:
   - `ESP_IMAGE_HEADER_SIZE = 24`, `ESP_IMAGE_SEGMENT_HEADER_SIZE = 8`, `ESP_APP_DESC_OFFSET = 32`, `ESP_APP_DESC_SIZE = 256`, `ESP_APP_DESC_MAGIC = 0xABCD5432`.
   - Field offsets within `esp_app_desc_t`: `magic_word=0`, `secure_version=4`, `reserv1=8..16`, `version=16` (32 B), `project_name=48` (32 B), `time=80` (16 B), `date=96` (16 B), `idf_ver=112` (32 B), `app_elf_sha256=144` (32 B).
   - Helper `readFixedString(buf, off, len)` slices `len` bytes, finds first `0x00`, throws if no null terminator within slot, decodes prefix as UTF-8, rejects any embedded control char `< 0x20` so a tampered `version` field with `\x00\x01` etc. fails fast.
@@ -76,7 +76,7 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
   - **Filename safety:** `pathsFor(rootDir, uploadId)` runs `assertPathSafe(uploadId, 'uploadId')`. UUID v4 is `[0-9a-f-]+` so always passes; the assertion guards future refactors.
   - **Concurrency:** no in-process mutex. Two concurrent uploads tolerated by last-writer-wins on the wipe-then-rename sequence; `.meta.json` is the durability anchor. The flash-job hard lock from c.0/c.2 ensures uploads never overlap with a flash, so the only race is two browser tabs uploading back-to-back. Per-store atomic rename is the entire concurrency model.
 
-- [ ] **Tests** (new `astros_api/src/firmware/esp_app_desc.test.ts`). Pure parser tests with constructed fixtures:
+- [x] **Tests** (new `astros_api/src/firmware/esp_app_desc.test.ts`). Pure parser tests with constructed fixtures:
   - Helper `makeAppDescBuffer({ projectName, version, ... })` builds a 288-byte Buffer: 32 zero bytes for image+segment header stub, magic word at offset 32, fixed-length string slots populated with `Buffer.from(name, 'utf8').copy(target, 0); target[name.length] = 0`. Rest zero-filled.
   - Valid binary parses; `projectName === 'astros-esp'`, `version === '1.4.0'`.
   - Wrong magic word → throws.
