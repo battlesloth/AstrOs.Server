@@ -152,6 +152,29 @@ describe('FirmwareUploadStore.latest()', () => {
     expect(await store.latest()).toBeNull();
   });
 
+  it('returns null (does not throw) for a meta filename whose id starts with a dash', async () => {
+    // Regression guard: pre-fix UPLOAD_META_RE accepted `[0-9a-f-]{36}`
+    // which matched ids beginning with `-`, then assertPathSafe inside
+    // pathsFor() rejected the leading dash and threw outside the inner
+    // try/catch — `latest()` would propagate the throw instead of
+    // returning null per the documented contract. Tightened regex now
+    // enforces canonical UUID v4 positional structure (8-4-4-4-12) so
+    // the malformed name is filtered out before pathsFor() runs.
+    const uploadsDir = path.join(rootDir, 'uploads');
+    fs.mkdirSync(uploadsDir);
+    // 36-char id with leading dash + 35 hex/dashes — would have
+    // matched the old regex but fails assertPathSafe.
+    const malformedName = 'upload--aaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.meta.json';
+    fs.writeFileSync(path.join(uploadsDir, malformedName), '{}');
+    fs.writeFileSync(
+      path.join(uploadsDir, malformedName.replace(/\.meta\.json$/, '.bin')),
+      Buffer.alloc(100),
+    );
+
+    // Must not throw; must return null.
+    expect(await store.latest()).toBeNull();
+  });
+
   it('returns null when meta.json uploadId disagrees with the filename uuid', async () => {
     // Simulates corruption / manual `cp` of a sidecar from another
     // upload — filename says one uuid, JSON content says another.
