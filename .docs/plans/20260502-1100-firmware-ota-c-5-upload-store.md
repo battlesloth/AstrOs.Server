@@ -41,9 +41,9 @@ Each upload has the same three-file shape as c.4: `.bin` + `.sha256` (lowercase 
 
 ## Tasks
 
-- [ ] **Extract `assertPathSafe` to a shared module** (new `astros_api/src/firmware/path_safety.ts`). Move `PATH_SAFE_RE` + `assertPathSafe` out of `firmware_cache.ts`; update `firmware_cache.ts` to import. Both helpers remain module-scope; c.4 behavior unchanged. This is the cleanest moment to extract — c.5 is the second consumer.
+- [x] **Extract `assertPathSafe` to a shared module** (new `astros_api/src/firmware/path_safety.ts`). Move `PATH_SAFE_RE` + `assertPathSafe` out of `firmware_cache.ts`; update `firmware_cache.ts` to import. Both helpers remain module-scope; c.4 behavior unchanged. This is the cleanest moment to extract — c.5 is the second consumer.
 
-- [ ] **Typed models** (new `astros_api/src/models/firmware/upload.ts`):
+- [x] **Typed models** (new `astros_api/src/models/firmware/upload.ts`):
   - `EspAppDesc` — `{ magicWord: number, secureVersion: number, version: string, projectName: string, time: string, date: string, idfVer: string, appElfSha256: Buffer }`. Returned by the parser.
   - `StoredUploadMeta` — `{ uploadId: string, originalFilename: string, projectName: string, version: string, uploadedAt: string, sizeBytes: number }`. Persisted as `upload-<uuid>.meta.json`.
   - `StoredUpload` — `{ path: string, sha256: string, sizeBytes: number, meta: StoredUploadMeta }`. Returned by `store()` and `latest()`. Mirrors c.4's `CachedAsset`.
