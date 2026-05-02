@@ -856,7 +856,7 @@ describe('FirmwareUploadStore — multiple meta files race-safety', () => {
 });
 
 describe('FirmwareUploadStore — multiple meta files', () => {
-  it('latest() picks the most-recently-mtime`d when multiple meta files exist', async () => {
+  it("latest() picks the most-recently-mtime'd when multiple meta files exist", async () => {
     const uploadsDir = path.join(rootDir, 'uploads');
     fs.mkdirSync(uploadsDir);
 
