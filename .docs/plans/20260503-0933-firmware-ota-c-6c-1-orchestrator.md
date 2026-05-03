@@ -506,7 +506,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
   - **Tests:** none directly (api_server.ts is integration-tested via existing test infrastructure; smoke verified manually + via QA plan in Task 14)
   - Smoke check: `npm run build` clean; `npm run start:tsx` boots without errors
 
-- [ ] **Task 14 — QA test plan + verification** (new `.docs/qa/firmware-ota-flash.md`):
+- [x] **Task 14 — QA test plan + verification** (new `.docs/qa/firmware-ota-flash.md`):
   - QA plan with preconditions (server running, master + controllers connected — PTY harness when c.6c.2 lands; mocked Vue button + curl until then), step-by-step test cases, expected results, edge cases
   - Sections:
     - Trigger flash from cache (POST with kind=github)
