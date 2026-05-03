@@ -90,8 +90,9 @@ export class MessageHandler {
 
     const parts = msg.split(MessageHelper.US);
 
-    // Legacy firmware sends 3 fields (mac, name, fingerprint); 1.2.0+ adds version as the 4th.
-    if (parts.length < 3 || parts.length > 4) {
+    // Legacy firmware sends 3 fields (mac, name, fingerprint); 1.2.0+ adds
+    // version as the 4th; c.6c.1 orchestrator firmware adds variant as the 5th.
+    if (parts.length < 3 || parts.length > 5) {
       logger.error(`Invalid poll ack: ${msg}`);
       response.type = SerialWorkerResponseType.UNKNOWN;
       return response;
@@ -99,10 +100,16 @@ export class MessageHandler {
 
     const module: ControlModule = { id: '', name: parts[1], address: parts[0] };
     module.fingerprint = parts[2];
-    if (parts.length === 4) {
+    if (parts.length >= 4) {
       const version = parts[3].trim();
       if (version.length > 0) {
         module.firmwareVersion = version;
+      }
+    }
+    if (parts.length === 5) {
+      const variant = parts[4].trim();
+      if (variant.length > 0) {
+        module.variant = variant;
       }
     }
     response.controller = module;
