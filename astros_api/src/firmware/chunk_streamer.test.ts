@@ -102,15 +102,20 @@ function endAck(status: 'OK' | 'HASH_MISMATCH' | 'IO_ERROR' = 'OK'): FwInboundAc
 // (setImmediate) rather than microtasks so the streamer's `await fsp.readFile`
 // is allowed to complete — microtask-only yields would starve the event loop.
 //
-// Task 3 has no time-dependent logic, so real timers are fine.
+// We bound the wait by wall-clock time rather than by iteration count: under
+// heavy parallel test load (vitest runs many files in parallel; libuv's fs
+// thread pool is contended), `fsp.readFile` can take longer than a fixed
+// number of setImmediate cycles. A wall-clock bound is robust to that — the
+// only thing it costs in the failure case is the elapsed milliseconds.
+//
+// Task 3/4 has no time-dependent logic, so real timers are fine.
 async function waitFor(predicate: () => boolean, label: string): Promise<void> {
-  // 200 macrotask iterations is plenty for the streamer to reach the next
-  // send(); any more and something is wrong (avoids an infinite hang).
-  for (let i = 0; i < 200; i++) {
+  const deadline = Date.now() + 4000;
+  while (Date.now() < deadline) {
     if (predicate()) return;
     await new Promise<void>((r) => setImmediate(r));
   }
-  throw new Error(`waitFor(${label}) timed out after 200 iterations`);
+  throw new Error(`waitFor(${label}) timed out after 4000ms`);
 }
 
 function scheduleHappyPath(bus: FakeSerialBus): Promise<void> {
@@ -214,6 +219,224 @@ describe('ChunkStreamer — single-chunk happy path (Task 3 skeleton)', () => {
     await driver;
 
     expect(bus.subscribers.size).toBe(0);
+  });
+});
+
+describe('ChunkStreamer — sliding window (Task 4)', () => {
+  // Counts FW_CHUNK sends in bus.sent. The first message is BEGIN; chunk
+  // messages follow until END is sent at the very end. Used by waitFor
+  // predicates that need to count outgoing chunks.
+  function chunkSendCount(bus: FakeSerialBus): number {
+    return bus.sent.filter((s) => s.payload.includes('FW_CHUNK')).length;
+  }
+
+  // Drives the BEGIN handshake but leaves the chunk phase to the test body.
+  // After this resolves, the streamer has been informed that BEGIN_ACK
+  // arrived and the in-flight window has been filled with up to WINDOW_SIZE
+  // chunks. Returns once the initial fill has reached the expected count.
+  async function driveBeginAndAwaitInitialFill(
+    bus: FakeSerialBus,
+    expectedInitialFill: number,
+  ): Promise<void> {
+    await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+    bus.deliver(TRANSFER_ID, beginAck());
+    await waitFor(
+      () => chunkSendCount(bus) >= expectedInitialFill,
+      `initial window fill (${expectedInitialFill} chunks)`,
+    );
+  }
+
+  it('window-aligned 16-chunk transfer: fills window, single cumulative ACK retires all 16', async () => {
+    // 16 * 4096 = 65,536 bytes — exactly one full window at the default config.
+    const buf = Buffer.alloc(16 * 4096, 0x42);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus });
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        // Initial fill: all 16 chunks should be sent before any ACK arrives.
+        await driveBeginAndAwaitInitialFill(bus, 16);
+        // Sanity: BEGIN + 16 chunks, no END yet.
+        expect(bus.sent.length).toBe(17);
+        expect(bus.sent[0].payload).toContain('FW_TRANSFER_BEGIN');
+        expect(chunkSendCount(bus)).toBe(16);
+
+        // One cumulative ACK retires all 16.
+        bus.deliver(TRANSFER_ID, chunkAck(15, 16));
+
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onChunkAck });
+      await driver;
+
+      expect(result.totalChunks).toBe(16);
+      expect(result.totalBytesSent).toBe(buf.length);
+      // Single chunk-ack call: highestContiguousSeq=15, bytesSent=full payload.
+      expect(onChunkAck).toHaveBeenCalledTimes(1);
+      expect(onChunkAck).toHaveBeenCalledWith(15, buf.length);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('large transfer (300 chunks): progressive ACKs drain and refill the window to completion', async () => {
+    // 300 chunks at 100 bytes each = 30,000 bytes. Smaller-than-default
+    // chunkSize keeps the test buffer tiny while still exercising 300 chunks.
+    const chunkSize = 100;
+    const totalChunks = 300;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x55);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        // Initial fill is WINDOW_SIZE (16) chunks.
+        await driveBeginAndAwaitInitialFill(bus, 16);
+        expect(chunkSendCount(bus)).toBe(16);
+
+        // Walk acks in batches of 4 until everything is acked. After each ack,
+        // wait for the streamer to top the window back up to its previous
+        // high-water mark (or the lastSeq, whichever comes first).
+        let highest = -1;
+        const batch = 4;
+        while (highest < totalChunks - 1) {
+          const newHighest = Math.min(highest + batch, totalChunks - 1);
+          bus.deliver(TRANSFER_ID, chunkAck(newHighest, newHighest + 1));
+          // After this ack, the streamer should top the window up so that the
+          // total sent count is min(newHighest + 1 + WINDOW_SIZE, totalChunks).
+          const expectedSent = Math.min(newHighest + 1 + 16, totalChunks);
+          await waitFor(
+            () => chunkSendCount(bus) >= expectedSent,
+            `top-up after ack ${newHighest} (expect ${expectedSent} chunks sent)`,
+          );
+          highest = newHighest;
+        }
+
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onChunkAck });
+      await driver;
+
+      expect(result.totalChunks).toBe(totalChunks);
+      expect(result.totalBytesSent).toBe(buf.length);
+      expect(chunkSendCount(bus)).toBe(totalChunks);
+      // 300 / 4 = 75 acks delivered.
+      expect(onChunkAck).toHaveBeenCalledTimes(75);
+      // Final ack: highestContiguousSeq = 299, bytesSent capped at buf.length.
+      const finalCall = onChunkAck.mock.calls[onChunkAck.mock.calls.length - 1];
+      expect(finalCall).toEqual([totalChunks - 1, buf.length]);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('cumulative ACK consolidation: one ACK retires 5 in-flight chunks; window tops up by 4', async () => {
+    // 20 chunks at 100 bytes each. Window size is 16 (default), so initial
+    // fill sends seq 0..15 and 16..19 remain unsent. One ACK retiring seq 0..4
+    // frees 5 slots; only 4 chunks remain to send (16, 17, 18, 19).
+    const chunkSize = 100;
+    const totalChunks = 20;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x77);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await driveBeginAndAwaitInitialFill(bus, 16);
+        expect(chunkSendCount(bus)).toBe(16);
+
+        // Cumulative ACK retires seq 0..4 (5 in-flight chunks).
+        bus.deliver(TRANSFER_ID, chunkAck(4, 5));
+        // Top-up should send the remaining 4 chunks (seq 16..19) — not 5,
+        // because lastSeq=19 caps further sends.
+        await waitFor(() => chunkSendCount(bus) >= 20, 'top-up after consolidation ack');
+        expect(chunkSendCount(bus)).toBe(20);
+        // Observer sees one ack with bytesSent = (4+1) * 100 = 500.
+        expect(onChunkAck).toHaveBeenCalledTimes(1);
+        expect(onChunkAck).toHaveBeenCalledWith(4, 500);
+
+        // Drain the rest with one final cumulative ack.
+        bus.deliver(TRANSFER_ID, chunkAck(19, 20));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onChunkAck });
+      await driver;
+
+      expect(result.totalChunks).toBe(totalChunks);
+      expect(chunkSendCount(bus)).toBe(totalChunks);
+      // Two acks total: one consolidating, one final.
+      expect(onChunkAck).toHaveBeenCalledTimes(2);
+      expect(onChunkAck.mock.calls[0]).toEqual([4, 500]);
+      expect(onChunkAck.mock.calls[1]).toEqual([19, buf.length]);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('observer.onChunkAck receives correct (highestContiguousSeq, bytesSent) per ack — capped at sourceBuffer.length', async () => {
+    // Use a non-window-aligned tail so the bytesSent cap is exercised on the
+    // final ack: 18 chunks at 100 bytes = 1,800 bytes. The last ack reports
+    // highest=17, bytesSent should be exactly 1800 (not 18 * 100 if chunkSize
+    // happened to be larger — they match here, but the cap path is taken).
+    const chunkSize = 100;
+    const totalChunks = 18;
+    const totalBytes = chunkSize * totalChunks;
+    const buf = Buffer.alloc(totalBytes, 0x33);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await driveBeginAndAwaitInitialFill(bus, 16);
+
+        // Ack seq 7 → bytesSent = 8 * 100 = 800.
+        bus.deliver(TRANSFER_ID, chunkAck(7, 8));
+        await waitFor(() => chunkSendCount(bus) >= 18, 'top-up after seq 7 ack');
+
+        // Final ack: seq 17, bytesSent = 18 * 100 = 1800 (== buf.length).
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      await streamer.run(specFor(tempPath, totalBytes), { onChunkAck });
+      await driver;
+
+      expect(onChunkAck).toHaveBeenCalledTimes(2);
+      expect(onChunkAck.mock.calls[0]).toEqual([7, 800]);
+      expect(onChunkAck.mock.calls[1]).toEqual([17, totalBytes]);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
   });
 });
 

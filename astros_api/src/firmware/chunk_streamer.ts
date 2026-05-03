@@ -1,10 +1,15 @@
 // ChunkStreamer — sliding-window FW_CHUNK transport over a SerialBus.
 //
-// Task 3 (this file's first cut): linear single-chunk skeleton only —
-//   BEGIN → wait BEGIN_ACK → CHUNK → wait CHUNK_ACK → END → wait END_ACK
-// with one unified ack subscriber and a single waiter per phase. No sliding
-// window, no NAK handling, no per-chunk timeout, no watchdog, no abort
-// listener — those layers land in Tasks 4–9 of the c.6b plan.
+// Task 3 (skeleton): linear BEGIN → CHUNK(seq=0) → END pipeline with a single
+// waiter per phase.
+// Task 4 (this revision): replaces the chunk-phase single waiter with a
+// sliding-window state machine. State: an `inFlight` Map keyed by seq, plus
+// `nextToSend` / `highestAcked` cursors. Window grows up to WINDOW_SIZE on
+// each top-up; cumulative CHUNK_ACK semantics retire every entry with
+// seq <= highestContiguousSeq in one shot. BEGIN-wait and END-wait keep
+// the single-slot waiter — only one outstanding ack is possible there.
+// No NAK handling, no per-chunk timeout, no watchdog, no abort listener,
+// no backpressure — those layers land in Tasks 5–9 of the c.6b plan.
 //
 // `fs.promises.readFile` is the only fs touch in this module: TransferSpec
 // gives us a path, and the streamer needs the bytes to chunk-and-send. Future
@@ -31,6 +36,7 @@ import type {
 import { TransferError } from '../models/firmware/chunk_streamer.js';
 import type {
   FwChunk,
+  FwChunkAck,
   FwTransferBegin,
   FwTransferEnd,
 } from '../models/firmware/firmware_messages.js';
@@ -112,19 +118,107 @@ export class ChunkStreamer {
     const startedAt = Date.now();
     const sourceBuffer = await fsp.readFile(spec.source.path);
     const totalChunks = Math.max(1, Math.ceil(sourceBuffer.length / this.config.chunkSizeBytes));
+    const lastSeq = totalChunks - 1;
+    const { chunkSizeBytes, windowSize } = this.config;
 
-    // Single waiter slot — Task 3's linear pipeline only ever has one phase
-    // pending at a time. Tasks 4+ will replace this with the in-flight Map
-    // for the sliding window.
+    // ---- Sliding-window state (Task 4). Initialized eagerly so the `finally`
+    // block can always clear `inFlight` regardless of which phase we error in.
+    // `inFlight`: seq → bookkeeping for chunks sent but not yet cumulatively
+    //   acked. Tasks 5–6 will read `sentAt`/`retries` for retry & NAK logic.
+    // `nextToSend`: next seq to put on the wire when the window has room.
+    // `highestAcked`: greatest cumulatively-acked seq, or -1 before any ACK.
+    const inFlight = new Map<number, { sentAt: number; retries: number }>();
+    let nextToSend = 0;
+    let highestAcked = -1;
+
+    // Single waiter slot — used by BEGIN-wait and END-wait phases only. The
+    // chunk phase (Task 4+) drives off `inFlight` / `highestAcked` and is
+    // released by `chunkPhaseDone`, not this slot.
     let currentWaiter: Waiter<WaitableKind> | null = null;
 
-    const unsubscribe = this.bus.subscribeFwAcks(spec.transferId, (ack) => {
-      if (currentWaiter === null) return;
-      if (ack.kind !== currentWaiter.kind) {
-        // Skeleton: out-of-phase acks are ignored. Proper dispatch (NAK,
-        // backpressure, multi-window CHUNK_ACK arrival) lands in Tasks 4–7.
+    // Resolves when `highestAcked === lastSeq`. The chunk-phase ack handler
+    // calls `resolveChunkPhaseDone` after the cumulative ACK that completes
+    // the transfer; the main loop awaits this before sending TRANSFER_END.
+    let resolveChunkPhaseDone: (() => void) | null = null;
+    const chunkPhaseDone = new Promise<void>((resolve) => {
+      resolveChunkPhaseDone = resolve;
+    });
+
+    const handleChunkAck = (ack: FwChunkAck): void => {
+      // Cumulative-ACK semantics: every in-flight entry with
+      // seq <= highestContiguousSeq is retired in one shot. A single ACK can
+      // therefore retire many chunks (e.g. one ACK closing out a full window).
+      for (const seq of Array.from(inFlight.keys())) {
+        if (seq <= ack.highestContiguousSeq) inFlight.delete(seq);
+      }
+      // Monotonic: out-of-order or duplicate older ACKs can't roll back.
+      if (ack.highestContiguousSeq > highestAcked) {
+        highestAcked = ack.highestContiguousSeq;
+      }
+
+      const bytesSent = Math.min((highestAcked + 1) * chunkSizeBytes, sourceBuffer.length);
+      observer.onChunkAck?.(ack.highestContiguousSeq, bytesSent);
+
+      if (highestAcked >= lastSeq) {
+        // All chunks acked — release the chunk phase. Top-up is a no-op past
+        // lastSeq, so we can skip it.
+        resolveChunkPhaseDone?.();
         return;
       }
+      topUpWindow();
+    };
+
+    const topUpWindow = (): void => {
+      while (inFlight.size < windowSize && nextToSend <= lastSeq) {
+        const seq = nextToSend++;
+        // subarray() returns a zero-copy view — important for 300+ chunk
+        // transfers where Buffer.from(slice(...)) would copy each chunk.
+        const chunkBytes = sourceBuffer.subarray(
+          seq * chunkSizeBytes,
+          Math.min((seq + 1) * chunkSizeBytes, sourceBuffer.length),
+        );
+        const chunkPayload: FwChunk = {
+          transferId: spec.transferId,
+          seq,
+          payloadLen: chunkBytes.length,
+          base64Bytes: chunkBytes.toString('base64'),
+          // CRC-16 of the chunk bytes. Task 3/4 send a placeholder so the wire
+          // framing is well-formed; FakeSerialBus does not validate. A real
+          // CRC helper is tracked separately and lands when the master starts
+          // checking it.
+          //
+          // The value is a non-numeric greppable marker (NOT '0000') so a
+          // buggy CRC validator can't silently accept it as a valid all-zero
+          // CRC — any well-formed validator will reject this at parse time
+          // and a maintainer running against a real master will have an
+          // obvious search target.
+          crc16Hex: 'TODO_TASK_4_CRC16',
+        };
+        const chunkMsg = this.messageGenerator.generateMessage(
+          SerialMessageType.FW_CHUNK,
+          uuid_v4(),
+          chunkPayload,
+        );
+        this.bus.send(chunkMsg.msg, { kind: 'firmware' });
+        inFlight.set(seq, { sentAt: Date.now(), retries: 0 });
+      }
+    };
+
+    const unsubscribe = this.bus.subscribeFwAcks(spec.transferId, (ack) => {
+      // Phase-aware dispatch: the chunk phase routes chunkAck into the
+      // sliding-window machine; BEGIN-wait / END-wait route their ack-of-
+      // interest into the single-slot waiter.
+      if (ack.kind === 'chunkAck') {
+        // Chunk-phase acks are handled directly. If we somehow receive one
+        // outside the chunk phase (BEGIN-wait, post-END-wait), it's a
+        // protocol oddity; ignoring it matches the Task 3 "out-of-phase ack"
+        // policy. Tasks 5–7 (NAK, backpressure) will refine this dispatcher.
+        if (currentWaiter !== null) return;
+        handleChunkAck(ack);
+        return;
+      }
+      if (currentWaiter === null) return;
+      if (ack.kind !== currentWaiter.kind) return;
       const w = currentWaiter as Waiter<typeof ack.kind>;
       currentWaiter = null;
       w.resolve(ack as Extract<FwInboundAck, { kind: typeof ack.kind }>);
@@ -143,7 +237,7 @@ export class ChunkStreamer {
         transferId: spec.transferId,
         totalSize: sourceBuffer.length,
         sha256Hex: spec.source.sha256,
-        chunkSize: this.config.chunkSizeBytes,
+        chunkSize: chunkSizeBytes,
         targets: spec.targets,
       };
       const beginMsg = this.messageGenerator.generateMessage(
@@ -155,35 +249,13 @@ export class ChunkStreamer {
       const beginAck = await waitFor('beginAck');
       observer.onTransferBegun?.(beginAck);
 
-      // ---------- CHUNK (single, skeleton-only) ----------
-      // Multi-chunk loop replaces this in Task 4. For now we send seq=0 of
-      // the whole buffer and wait for one CHUNK_ACK.
-      const chunkBytes = sourceBuffer.subarray(0, this.config.chunkSizeBytes);
-      const chunkPayload: FwChunk = {
-        transferId: spec.transferId,
-        seq: 0,
-        payloadLen: chunkBytes.length,
-        base64Bytes: chunkBytes.toString('base64'),
-        // CRC-16 of the chunk bytes. Task 3 sends a placeholder so the wire
-        // framing is well-formed; FakeSerialBus does not validate. A real CRC
-        // helper lands alongside Task 4's chunking loop, where the master
-        // actually checks it. Tracked in the c.6b design spec.
-        //
-        // The value is a non-numeric greppable marker (NOT '0000') so a
-        // buggy CRC validator can't silently accept it as a valid all-zero
-        // CRC — any well-formed validator will reject this at parse time
-        // and a maintainer running against a real master will have an
-        // obvious search target.
-        crc16Hex: 'TODO_TASK_4_CRC16',
-      };
-      const chunkMsg = this.messageGenerator.generateMessage(
-        SerialMessageType.FW_CHUNK,
-        uuid_v4(),
-        chunkPayload,
-      );
-      this.bus.send(chunkMsg.msg, { kind: 'firmware' });
-      const chunkAck = await waitFor('chunkAck');
-      observer.onChunkAck?.(chunkAck.highestContiguousSeq, sourceBuffer.length);
+      // ---------- CHUNK (sliding window) ----------
+      // currentWaiter is null here — the chunk-phase dispatcher uses
+      // inFlight/highestAcked instead. Initial fill kicks off the window;
+      // each subsequent CHUNK_ACK arrival in handleChunkAck() retires
+      // entries and tops the window back up.
+      topUpWindow();
+      await chunkPhaseDone;
 
       // ---------- END ----------
       const endPayload: FwTransferEnd = {
@@ -221,8 +293,10 @@ export class ChunkStreamer {
       };
     } finally {
       // Cleanup invariants: this block extends as later tasks add state.
-      // Task 4 will clear the in-flight Map; Task 6 the per-chunk timer
-      // Map; Task 8 the transfer watchdog; Task 9 the AbortSignal listener.
+      // Task 4 added: clear the in-flight Map. Task 6 will clear the
+      // per-chunk timer Map; Task 8 the transfer watchdog; Task 9 the
+      // AbortSignal listener.
+      inFlight.clear();
       unsubscribe();
     }
   }
