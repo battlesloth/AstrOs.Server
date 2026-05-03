@@ -1441,6 +1441,98 @@ describe('ChunkStreamer — backpressure pause/resume (Task 7)', () => {
     }
   });
 
+  it('PAUSEd-throughout retry budget exhausts to chunk_retry_exhausted without ever resending', async () => {
+    // The "retries still count under PAUSE" branch in onChunkTimeout is
+    // a load-bearing budget on a master that PAUSEs and then never
+    // RESUMEs — without it, the streamer would hang forever waiting for
+    // the master to come back. This test pins that contract: every
+    // per-chunk timer fire while PAUSEd increments the retry counter
+    // and re-arms but DOES NOT resend; once the budget hits
+    // maxRetriesPerChunk, the chunk phase rejects with
+    // `chunk_retry_exhausted` even though the wire never saw a single
+    // resend.
+    //
+    // 1-chunk transfer keeps the timer-fire ordering deterministic —
+    // exactly one timer at a time. With maxRetriesPerChunk=3 and the
+    // initial send at retries=0:
+    //   advance ACK_TIMEOUT_MS → retries=1, observer.onRetry(0,1), re-arm (no resend)
+    //   advance ACK_TIMEOUT_MS → retries=2, observer.onRetry(0,2), re-arm (no resend)
+    //   advance ACK_TIMEOUT_MS → retries=3 == max, REJECT chunk_retry_exhausted
+    //                            (no observer.onRetry, no re-arm, no resend)
+    // Final assertions: bus.sent contains BEGIN + 1 initial CHUNK only
+    // (NO resends), onRetry called exactly twice.
+    const ACK_TIMEOUT_MS = 1500;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const chunkSize = 100;
+      const buf = Buffer.alloc(chunkSize, 0xbb);
+      const tempPath = await writeTempFirmware(buf);
+      try {
+        const bus = new FakeSerialBus();
+        const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+        const onBackpressure = vi.fn();
+        const onRetry = vi.fn();
+
+        const driver = (async (): Promise<void> => {
+          await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+          bus.deliver(TRANSFER_ID, beginAck());
+          await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
+          expect(chunkSendCount(bus)).toBe(1);
+
+          // Enter PAUSE and stay there. No RESUME will be delivered —
+          // the retry budget is the only thing that ends this run.
+          bus.deliver(TRANSFER_ID, backpressure('PAUSE'));
+          expect(onBackpressure).toHaveBeenCalledWith(true);
+
+          // First timeout: retries=1, no resend.
+          await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+          await new Promise<void>((r) => setImmediate(r));
+          expect(onRetry).toHaveBeenCalledTimes(1);
+          expect(onRetry).toHaveBeenCalledWith(0, 1);
+          expect(chunkSendCount(bus)).toBe(1);
+
+          // Second timeout: retries=2, no resend.
+          await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+          await new Promise<void>((r) => setImmediate(r));
+          expect(onRetry).toHaveBeenCalledTimes(2);
+          expect(onRetry.mock.calls[1]).toEqual([0, 2]);
+          expect(chunkSendCount(bus)).toBe(1);
+
+          // Third timeout: retries=3 hits max → chunk-phase rejects.
+          // No observer.onRetry call (the budget check happens before
+          // the observer notification). No re-arm. No resend.
+          await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+        })();
+
+        await expect(
+          streamer.run(specFor(tempPath, buf.length), { onBackpressure, onRetry }),
+        ).rejects.toMatchObject({
+          code: 'chunk_retry_exhausted',
+          transferId: TRANSFER_ID,
+        });
+        await driver;
+
+        // The wire only ever saw the initial CHUNK send. Every fire
+        // during PAUSE incremented the budget without resending.
+        expect(chunkSendCount(bus)).toBe(1);
+        // Two retries observed (attempts 1 and 2). The third firing
+        // rejected before observer.onRetry would fire.
+        expect(onRetry).toHaveBeenCalledTimes(2);
+        expect(onRetry.mock.calls[0]).toEqual([0, 1]);
+        expect(onRetry.mock.calls[1]).toEqual([0, 2]);
+        // Only PAUSE fired (no RESUME ever delivered).
+        expect(onBackpressure).toHaveBeenCalledTimes(1);
+        expect(onBackpressure).toHaveBeenCalledWith(true);
+        // Cleanup verified: subscriber disposed on the reject path.
+        expect(bus.subscribers.size).toBe(0);
+      } finally {
+        await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+      }
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('per-chunk timeout during PAUSE re-arms but does not resend; resend resumes after RESUME', async () => {
     // Fake timers gated to setTimeout/clearTimeout (same scoping as the
     // Task 6 suite). 1-chunk transfer keeps the timer-fire ordering
@@ -1919,6 +2011,75 @@ describe('ChunkStreamer — AbortSignal cancellation (Task 9)', () => {
       expect(bus.sent).toHaveLength(0);
       // Subscriber was set up then torn down in finally.
       expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('abort after a NAK Go-Back-N has rebuilt the in-flight window cleans up the new state', async () => {
+    // A NAK runs `inFlight.clear()` + `chunkTimers.clear()` and then
+    // refills both via topUpWindow. The new in-flight set has armed
+    // per-chunk timers that are unrelated to anything the streamer had
+    // before the NAK. We then fire abort while that fresh window is
+    // mid-flight (no acks delivered yet). The chunk-phase reject path
+    // must cleanly tear down the post-Go-Back-N state — subscriber
+    // disposed, no timer leaks past `finally`. This is distinct from the
+    // "abort during chunk-loop" test above, which aborts before any NAK
+    // mutates state; this one specifically pins the rejection landing
+    // cleanly when the chunk maps were just rebuilt.
+    const chunkSize = 100;
+    const totalChunks = 20;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0xab);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const ac = new AbortController();
+      const onChunkNak = vi.fn();
+
+      // Counts FW_CHUNK sends — same helper shape as the NAK suite uses.
+      const chunkSendCount = (): number =>
+        bus.sent.filter((s) => s.payload.includes('FW_CHUNK')).length;
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount() >= 16, 'initial window fill');
+        expect(chunkSendCount()).toBe(16);
+
+        // NAK at lastGoodSeq=5 → Go-Back-N: clears inFlight + chunkTimers,
+        // refills with seq 6..19 (14 chunks; 14 < windowSize so the entire
+        // remainder fits in the rebuilt window).
+        bus.deliver(TRANSFER_ID, chunkNak(5, 'CRC'));
+        await waitFor(() => chunkSendCount() >= 30, 'Go-Back-N refill from seq 6');
+        expect(chunkSendCount()).toBe(30);
+        expect(onChunkNak).toHaveBeenCalledTimes(1);
+
+        // Abort while the rebuilt window is still in-flight (no chunkAck
+        // has retired any of the refill). The chunk-phase reject path
+        // routes through rejectRun → rejectChunkPhase, and the outer
+        // `finally` block is responsible for draining the 14 freshly-
+        // armed per-chunk timers + clearing the rebuilt inFlight Map.
+        ac.abort('panic-stop-after-nak');
+      })();
+
+      await expect(
+        streamer.run(specFor(tempPath, buf.length), { onChunkNak }, { signal: ac.signal }),
+      ).rejects.toMatchObject({
+        code: 'aborted',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('panic-stop-after-nak'),
+      });
+      await driver;
+
+      // Subscriber disposed — proves the `finally` ran end-to-end.
+      // Combined with the resolved promise above (no hang, no
+      // unhandled rejection), this confirms the chunk-phase reject
+      // landed cleanly through the post-Go-Back-N state.
+      expect(bus.subscribers.size).toBe(0);
+      // Sanity: total wire sends include both fills, confirming the
+      // NAK path executed before abort fired.
+      expect(chunkSendCount()).toBe(30);
     } finally {
       await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
     }

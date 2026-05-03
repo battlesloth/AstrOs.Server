@@ -316,6 +316,21 @@ export class ChunkStreamer {
     // is a no-op rejection — nothing is awaiting `chunkPhaseDone` yet — but
     // the construction order eliminates a TDZ-style "rejectChunkPhase is
     // null" race the lazy form would have introduced.)
+    //
+    // First-error-wins semantics rely on the Promise spec: the underlying
+    // `reject` function latches the first call and silently drops every
+    // subsequent reject/resolve attempt. Two real cases this protects:
+    //   1. Watchdog fires AND abort fires in the same microtask. Whichever
+    //      `rejectChunkPhase(err)` lands first sets the rejection reason;
+    //      the second is dropped. Operators see one cause, not a confusing
+    //      pair, and the run still settles deterministically.
+    //   2. A late cumulative-ACK arrives *after* a reject has already
+    //      latched (e.g. the master's ACK for the final chunk lands in the
+    //      same turn as our watchdog fires). `handleChunkAck` will call
+    //      `resolveChunkPhaseDone()` on a promise that is already rejected;
+    //      Promise spec guarantees this is a no-op, so the rejection wins
+    //      and the success path never resumes. We rely on this rather than
+    //      tracking phase state externally.
     let resolveChunkPhaseDone: (() => void) | null = null;
     let rejectChunkPhase: ((err: Error) => void) | null = null;
     const chunkPhaseDone = new Promise<void>((resolve, reject) => {
@@ -388,11 +403,14 @@ export class ChunkStreamer {
       }
     };
 
-    // Per-chunk timer helpers. `armChunkTimer` clears any prior timer for the
-    // same seq before re-arming so a resend that calls into here cannot leak
-    // the previous timer (defense in depth — the resend path already calls
-    // clearChunkTimer first, but a future caller adding a second arm site
-    // would still be safe).
+    // Per-chunk timer helpers. The `if (existing) clearTimeout(existing)`
+    // pre-clear in `armChunkTimer` is unreachable in c.6b — every call site
+    // either ran `chunkTimers.delete(seq)` immediately before (onChunkTimeout
+    // deletes the fired timer's entry at the top of its handler) or has
+    // just allocated a fresh seq with no prior timer (topUpWindow). Kept as
+    // defense-in-depth so a future arm site added in c.6c (e.g. a
+    // "rearm-on-NAK" optimization) cannot accidentally double-arm. If c.6c
+    // proves no such site is needed, this guard should come out then.
     const armChunkTimer = (seq: number): void => {
       const existing = chunkTimers.get(seq);
       if (existing) clearTimeout(existing);
@@ -409,12 +427,15 @@ export class ChunkStreamer {
     };
 
     // Whole-transfer watchdog helpers (Task 8). `armTransferWatchdog` is
-    // called exactly once per run, post-BEGIN_ACK, on entry to the
-    // chunk-streaming phase. The defensive clear here is belt-and-suspenders:
-    // a future caller adding a second arm site would still be safe from
-    // leaking the prior timer. `clearTransferWatchdog` is idempotent (null
-    // check) so the success-path call AND the `finally` cleanup call can
-    // safely both run on a happy-path resolution.
+    // called exactly once per run in c.6b — post-BEGIN_ACK, on entry to the
+    // chunk-streaming phase — so the `if (transferWatchdogTimer)` pre-clear
+    // is unreachable today. Kept as defense-in-depth against c.6c adding a
+    // second arm site (e.g. resetting the watchdog on progress milestones
+    // so an under-budget-but-slow master extends rather than aborts the
+    // run). If c.6c doesn't need it, the guard should come out then.
+    // `clearTransferWatchdog` is idempotent (null check) so the success-path
+    // call AND the `finally` cleanup call can safely both run on a
+    // happy-path resolution.
     const armTransferWatchdog = (): void => {
       if (transferWatchdogTimer) clearTimeout(transferWatchdogTimer);
       transferWatchdogTimer = setTimeout(() => {
@@ -437,13 +458,21 @@ export class ChunkStreamer {
 
     const onChunkTimeout = (seq: number): void => {
       // The timer just fired — its ID is now garbage. Remove it from
-      // chunkTimers immediately so the lockstep invariant
-      //   chunkTimers.has(seq) ⇔ inFlight.has(seq)
-      //     AND the corresponding timer is still pending
-      // holds for any future reader (e.g. c.6c observability metrics).
-      // The re-arm path below calls armChunkTimer, which adds the new
-      // timer back to chunkTimers within the same synchronous turn, so
-      // the invariant is restored before any other code can observe it.
+      // chunkTimers immediately so the forward invariant
+      //   chunkTimers.has(seq) ⇒ inFlight.has(seq) AND its timer is pending
+      // holds for any future reader (e.g. c.6c observability metrics that
+      // read chunkTimers as the "actively timed-out-able" set). The
+      // converse direction (inFlight ⇒ chunkTimers) is NOT maintained on
+      // the exhausted-retry path below — `chunkTimers.delete(seq)` runs
+      // here, but the matching `inFlight` entry persists until the outer
+      // `finally` clears it via `inFlight.clear()`. The non-exhausted
+      // paths either re-arm the timer (restoring the entry within the
+      // same synchronous turn — armChunkTimer below) or are interrupted
+      // by `rejectChunkPhase`, in which case the `finally` drains both
+      // maps in lockstep. Holding only the forward direction tight is
+      // enough for c.6c — readers only ever ask "do I have an active
+      // timer for seq N?", never "do I have an in-flight chunk for
+      // every active timer?"
       chunkTimers.delete(seq);
 
       const entry = inFlight.get(seq);
