@@ -56,10 +56,15 @@
 //     try/catch. Any fs error (ENOENT / EACCES / EIO / …) is rethrown
 //     as TransferError('source_read_failed') with the original message
 //     and `errno` code in `detail` so the orchestrator can report a
-//     specific cause. The throw exits via the outer try/finally so
-//     subscriber teardown still runs even though the failure happened
-//     before subscribe — the `try` block guards against future
-//     reorderings that might subscribe earlier.
+//     specific cause. The readFile runs BEFORE any subscriber, timer,
+//     or abort listener is set up — the outer try/finally block is not
+//     yet in scope at the throw site. The throw therefore propagates
+//     directly out of `run()` to the caller's `.catch`; no cleanup is
+//     needed because no resources have been allocated. If a future
+//     change moves resource allocation above the readFile, that
+//     allocation must either be deferred until after readFile succeeds
+//     OR the readFile must be moved inside the outer try block so the
+//     allocation gets torn down on a source_read_failed throw.
 //   - `begin_timeout`: the BEGIN-wait now races `waitFor('beginAck')`
 //     against `setTimeout(ackTimeoutMs)`. If no FW_TRANSFER_BEGIN_ACK
 //     arrives within the budget, the timer fires and rejects with
