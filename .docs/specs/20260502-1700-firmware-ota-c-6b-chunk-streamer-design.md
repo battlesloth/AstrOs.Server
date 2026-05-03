@@ -119,9 +119,14 @@ ChunkStreamer.run(spec, observer, { signal? }):
 
  4. SEND FW_TRANSFER_BEGIN { transferId, totalSize, sha256, chunkSize, targets }
     → wait for FW_TRANSFER_BEGIN_ACK (with ACK_TIMEOUT_MS deadline)
-       - status=READY  → proceed
-       - status=REJECT → reject with TransferError 'begin_rejected'
-       - timeout       → reject with 'begin_timeout'
+       - status='OK'        → proceed
+       - status=<any other> → reject with TransferError 'begin_rejected';
+                              the rejection reason (e.g. 'sd_full', 'busy',
+                              'version_mismatch') is surfaced verbatim in
+                              `detail`. Per .docs/protocol.md the field is
+                              an open-ended string — 'OK' is the only
+                              happy-path value.
+       - timeout            → reject with 'begin_timeout'
     → observer.onTransferBegun(ack)
 
  5. Start whole-transfer watchdog (TRANSFER_TIMEOUT_MS = 300_000)

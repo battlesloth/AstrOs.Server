@@ -97,7 +97,7 @@ Each task is one logical commit. TDD where applicable (write tests, watch them f
 - [ ] **Pre-transfer error codes** (extend `chunk_streamer.ts`):
   - `source_read_failed`: wrap `fs.readFile` (or `fsp.open` + `read`) in try/catch; on fs error, reject with `TransferError('source_read_failed', err.message, transferId, err.code)`.
   - `begin_timeout`: BEGIN_ACK wait uses `setTimeout(ACK_TIMEOUT_MS)`. Reject if no ACK arrives.
-  - `begin_rejected`: BEGIN_ACK with non-READY status rejects with the master's reason code in `detail`.
+  - `begin_rejected`: BEGIN_ACK with status !== 'OK' rejects with the master's reason code in `detail`. Per `.docs/protocol.md` the status field is an open-ended string — 'OK' is the only happy-path value, every other string (e.g. 'sd_full', 'busy', 'version_mismatch') is a rejection reason.
   - **Tests:** mock `fsp.readFile` to throw; deliver no BEGIN_ACK; deliver BEGIN_ACK with reject status. Each rejects with the right code + cleanup runs.
 
 - [ ] **Post-transfer error codes** (extend `chunk_streamer.ts`):
