@@ -8,6 +8,12 @@ import type { StreamObserver, TransferResult, TransferSpec } from './chunk_strea
 // Request body shape for `POST /api/firmware/flash`. The discriminator lets
 // the orchestrator branch between a GitHub release fetch and a pre-uploaded
 // artifact without smuggling a sentinel into a single string field.
+//
+// `version` accepts EITHER the GitHub tag form (`'v1.4.0'`) OR the
+// stripped form (`'1.4.0'`) — `resolveFlashSource` matches against
+// both `release.tag` and `release.version` so operators submitting
+// either form work. Field is named `version` rather than
+// `tagOrVersion` to match the Vue / operator mental model.
 export type FlashRequest =
   | { source: { kind: 'github'; version: string } }
   | { source: { kind: 'upload' } };
