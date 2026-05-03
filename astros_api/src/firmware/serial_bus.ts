@@ -14,6 +14,7 @@
 
 import type { Worker } from 'worker_threads';
 import type { FwInboundAck, SerialBus } from '../models/firmware/chunk_streamer.js';
+import { SerialMessageType } from '../serial/serial_message.js';
 import type { ISerialWorkerResponse } from '../serial/serial_worker_response.js';
 import { SerialWorkerResponseType } from '../serial/serial_worker_response.js';
 
@@ -32,12 +33,15 @@ export class WorkerSerialBus implements SerialBus {
     // c.6b: forward unconditionally regardless of kind. The drop-when-locked
     // policy lands in c.6c — see SerialBus.send doc-comment in chunk_streamer.ts.
     //
-    // NOTE: payload is the wire string built by MessageGenerator. The
-    // existing serial worker accepts the legacy { type, data } envelope
-    // for non-FW traffic; routing string payloads through the worker is
-    // c.6c's wire-up work. The literal forward here matches Task 2's
-    // spec and is unit-testable against the mock-Worker EventEmitter.
-    this.worker.postMessage(payload);
+    // The payload is the pre-formed wire string built by ChunkStreamer's
+    // MessageGenerator. We wrap it in the RAW_WIRE IPC envelope so the
+    // serial worker echoes it straight back as SEND_SERIAL_MESSAGE
+    // without running it through msgService.generateMessage. Bypassing
+    // msgService is intentional: the streamer has its own sliding-window
+    // retry tracker, and msgService would install a parallel tracker
+    // timeout per FW_CHUNK that conflicts with the streamer's own budget.
+    // See SerialMessageType.RAW_WIRE for the protocol contract.
+    this.worker.postMessage({ type: SerialMessageType.RAW_WIRE, data: payload });
   }
 
   subscribeFwAcks(transferId: string, handler: (ack: FwInboundAck) => void): () => void {

@@ -1,5 +1,21 @@
 export enum SerialMessageType {
-  // for internal use
+  // Internal-use IPC envelopes (negative values). Not part of the wire
+  // protocol — never sent to or received from a controller. Used only as
+  // the `type` field on `worker.postMessage` payloads between the main
+  // thread and the serial worker.
+  //
+  // SERIAL_MSG_RECEIVED: parent → worker. "I read these bytes from the
+  // port; please parse them." The worker routes via msgService.handleMessage
+  // and posts back a typed ISerialWorkerResponse.
+  //
+  // RAW_WIRE: parent → worker. "Send these pre-formed wire bytes verbatim."
+  // The worker echoes them back as { type: SEND_SERIAL_MESSAGE, data }
+  // so the parent's existing handler writes them to the port. This path
+  // bypasses msgService.generateMessage's tracker/timeout machinery —
+  // intentional, because the firmware streamer (c.6b) has its own
+  // sliding-window retry budget and would conflict with msgService firing
+  // parallel timeouts per FW_CHUNK.
+  RAW_WIRE = -2,
   SERIAL_MSG_RECEIVED = -1,
 
   // needs to match ESP enums
