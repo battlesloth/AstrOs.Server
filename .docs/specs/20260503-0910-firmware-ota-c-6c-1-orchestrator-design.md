@@ -57,7 +57,7 @@ The orchestrator owns at most one `currentJob: FlashJobState | null` at a time (
 Two-phase flow per job:
 
 - **Upload phase** — drive `ChunkStreamer.run()` with all controllers in `UploadingToMaster`. Streamer events (`onChunkAck`, `onTransferEnd`, etc.) translate to throttled `flashControllerUpdate` emissions
-- **Deploy phase** — after streamer succeeds, send `FW_DEPLOY_BEGIN`, then per-controller `FW_PROGRESS` / `FW_DEPLOY_DONE` events drive each controller through `Sending → Verifying → Rebooting → VersionConfirmed` (or `→ Failed`)
+- **Deploy phase** — after streamer succeeds, send `FW_DEPLOY_BEGIN`. Multiple per-controller `FW_PROGRESS` events drive each controller through `Sending → Verifying → Rebooting`; a single job-wide `FW_DEPLOY_DONE` message arrives at deploy end with a `results: FwDeployDoneResult[]` array carrying per-controller terminal outcomes (`VersionConfirmed` or `Failed`)
 
 After all controllers terminal, orchestrator emits `flashJobDone` and starts a 15-sec reboot timer; JobLock releases on heartbeat callback OR timer expiry (whichever first), emitting `lockStateChanged`.
 
@@ -71,7 +71,7 @@ After all controllers terminal, orchestrator emits `flashJobDone` and starts a 1
 | `astros_api/src/firmware/flash_orchestrator.test.ts` | Orchestrator unit tests against fake bus + fake streamerFactory + fake cache/upload + fake controllersStore + real JobLock |
 | `astros_api/src/controllers/firmware_flash_controller.ts` | Express routes — `POST /api/firmware/flash`, `DELETE /api/firmware/flash`, `GET /api/firmware/flash` |
 | `astros_api/src/controllers/firmware_flash_controller.test.ts` | HTTP-level tests with supertest |
-| `astros_api/src/models/firmware/flash_orchestrator.ts` | Typed `FlashRequest`, `FwDeployEvent` discriminated union (FW_PROGRESS / FW_DEPLOY_DONE variants) |
+| `astros_api/src/models/firmware/flash_orchestrator.ts` | Typed `FlashRequest`, `FwDeployEvent` discriminated union (`{ kind: 'progress', payload: FwProgress }` per-controller and `{ kind: 'done', payload: FwDeployDone }` job-wide) |
 
 **Modified source files (4):**
 
@@ -173,8 +173,8 @@ All wrapped as `{ type: TransmissionType, data: ... }`:
 9. Transition all controllers `UploadingToMaster → Sending`; emit `flashControllerUpdate` per controller (bypasses throttle — stage transition)
 10. `bus.send(generateFwDeployBegin({ transferId, order: targetIds }), { kind: 'firmware' })`
 11. `bus.subscribeDeployEvents(transferId, handleDeployEvent)`. Per inbound event:
-    - `FW_PROGRESS { controllerId, stage, bytesSent, totalBytes }` → `transitionControllerState()`; emit throttled `flashControllerUpdate`
-    - `FW_DEPLOY_DONE { controllerId, status: 'OK' | 'ERROR', finalVersion?, error? }` → terminal transition (`VersionConfirmed` or `Failed`); emit `flashControllerResult` (bypasses throttle)
+    - `FW_PROGRESS { controllerId, stage, bytesSent, totalBytes, detail }` (per-controller, multiple per job) → `transitionControllerState()`; emit throttled `flashControllerUpdate`
+    - `FW_DEPLOY_DONE { transferId, results: FwDeployDoneResult[] }` (job-wide, one per job) → iterate `results`; for each `{ controllerId, outcome, finalVersion, error }` perform terminal transition (`VersionConfirmed` if outcome=`'OK'`, `Failed` if `'FAILED'`); emit `flashControllerResult` per controller (bypasses throttle)
 12. When `deriveJobLifecycle(state) === 'done'` (all controllers terminal): emit `flashJobDone`; start 15-sec reboot timer
 13. Reboot timer expires (heartbeat detection deferred per "Out of scope"): release `JobLock`; emit `lockStateChanged { locked: false }`; clear `currentJob = null`
 
@@ -184,7 +184,7 @@ All wrapped as `{ type: TransmissionType, data: ... }`:
 |---|---|---|
 | **A** — source-resolution failure | Cache miss, upload empty, c.6b's `source_size_mismatch` from disk-vs-manifest divergence, etc. | Release `JobLock` (acquired in step 2); emit `flashJobFailed { reason }`; HTTP 4xx; `currentJob` never set |
 | **B** — streamer rejects with `TransferError` | Any of the 12 codes from c.6b | Set `abortReason = error.code`; transition all currently-non-terminal controllers to `Failed`; emit `flashControllerResult` per affected controller, then `flashJobFailed`; release `JobLock`; clear `currentJob` |
-| **C** — per-controller deploy failure | `FW_DEPLOY_DONE { status: 'ERROR' }` for one controller; others succeed | That controller transitions to `Failed`; emit `flashControllerResult`. Job *continues* for other controllers. When all terminal → emit `flashJobDone` (NOT failed — per c.6a's `deriveJobLifecycle`, "done" includes mixed terminal results). 15-sec reboot timer still runs |
+| **C** — per-controller deploy failure | `FW_DEPLOY_DONE.results[]` contains an entry with `outcome: 'FAILED'` mixed with `'OK'` entries | The failing controllers transition to `Failed` with the carried `error`; the OK ones to `VersionConfirmed` with `finalVersion`. Emit `flashControllerResult` for each. Per c.6a's `deriveJobLifecycle`, all-terminal → `'done'` regardless of mix → emit `flashJobDone` (NOT failed). 15-sec reboot timer still runs |
 | **D** — cancel during upload | `DELETE /api/firmware/flash` → `orchestrator.cancel('user')` | `abortController.abort('user-cancel')` → streamer rejects with `TransferError 'aborted'` → falls through to error path B with `reason: 'aborted'` |
 | **E** — cancel during deploy | Same trigger, but past upload | Best-effort: orchestrator unsubscribes from deploy events, sets `abortReason: 'cancelled'`, transitions remaining non-terminal controllers to `Failed`, emits `flashControllerResult` + `flashJobFailed`, releases `JobLock`. Master continues forwarding to controllers regardless (protocol-level limitation) |
 | **F** — master never heartbeats | 15-sec timer fires after `flashJobDone` | Normal v1 path — release `JobLock` via timer. Job state already shows done; lock release just gates the next concurrent flash |
@@ -213,8 +213,8 @@ Per-controller leading-edge throttle, 250 ms window (4 Hz):
 
 - Happy path (start → upload → deploy → reboot timer → release)
 - All 12 `TransferError` codes from c.6b → `flashJobFailed` with that reason; controller cleanup correct in each
-- Each FW_PROGRESS stage transition (UploadingToMaster→Sending→Verifying→Rebooting)
-- FW_DEPLOY_DONE OK and ERROR per controller; mixed terminal results → `flashJobDone` (not Failed)
+- Each FW_PROGRESS stage transition (Sending→Verifying→Rebooting). Note: `UploadingToMaster` is set via streamer events, not FW_PROGRESS — the master only emits FW_PROGRESS during deploy phase
+- FW_DEPLOY_DONE.results[] processing — all OK, all FAILED, mixed; all paths converge to `flashJobDone` per `deriveJobLifecycle`
 - Concurrent `start()` rejected with HTTP 409 carrying `currentJobId`
 - Cancel during upload (aborts streamer); cancel during deploy (best-effort stop); cancel with no active job → 404
 - 15-sec timer fires lock release; `notifyMasterHeartbeat()` fires lock release pre-timer; whichever-first-wins (other gets cleared)
