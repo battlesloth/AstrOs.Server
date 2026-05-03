@@ -2791,3 +2791,117 @@ describe('ChunkStreamer — cleanup invariants verification (Task 12)', () => {
     }
   });
 });
+
+describe('ChunkStreamer — out-of-phase chunk-ack gate', () => {
+  // The phase-aware dispatcher gates chunkAck/chunkNak/backpressure on an
+  // explicit `chunkPhaseActive` flag, NOT on `currentWaiter === null`.
+  // Three windows where currentWaiter is null but we are NOT in the chunk
+  // phase: (1) between subscribeFwAcks and the BEGIN-wait Promise being
+  // constructed; (2) after BEGIN_ACK resolves and before topUpWindow
+  // begins; (3) after `await chunkPhaseDone` resolves and before the
+  // END-wait Promise is constructed. A stale chunkAck arriving in any of
+  // those windows would mutate `highestAcked` / `inFlight` and could fire
+  // `resolveChunkPhaseDone()` if its claimed `highestContiguousSeq >=
+  // lastSeq` — the streamer would skip the chunk phase entirely and send
+  // END after BEGIN with no chunks on the wire.
+  //
+  // To exercise window (1), we subclass FakeSerialBus and have `send`
+  // synchronously deliver a stale chunkAck on the BEGIN send. At that
+  // moment, the streamer has subscribed but has not yet constructed the
+  // BEGIN-wait Promise — currentWaiter is null and chunkPhaseActive is
+  // false. With the gate, the dispatcher must drop the stale ack; the
+  // streamer then proceeds normally and sends real chunks. Without the
+  // gate (mutation: change `if (!chunkPhaseActive)` back to
+  // `if (currentWaiter !== null)`) the stale ack would route to
+  // `handleChunkAck`, fire `resolveChunkPhaseDone`, and the streamer
+  // would emit zero FW_CHUNK before sending FW_TRANSFER_END.
+
+  it('drops a stale chunkAck delivered during the BEGIN send (window 1)', async () => {
+    const chunkSize = 100;
+    const totalChunks = 5;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0xa1);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      class EarlyAckBus extends FakeSerialBus {
+        deliverEarlyAckOnBegin = false;
+        override send(payload: string, opts: { kind: SendKind }): void {
+          super.send(payload, opts);
+          // Synchronously deliver a stale chunkAck the moment BEGIN lands
+          // on the wire. The streamer is in the synchronous setup window
+          // between subscribeFwAcks and the BEGIN-wait Promise being
+          // constructed: currentWaiter is null, chunkPhaseActive is
+          // false. Only fire on the FIRST send (the BEGIN) — we don't
+          // want to recurse into END-send.
+          //
+          // Partial-progress ack (highestContiguousSeq=2, lastSeq=4) is
+          // critical for mutation discrimination. A "complete" ack here
+          // would coincidentally collapse under the bug — the streamer
+          // would still send all 5 chunks via topUpWindow because
+          // highestAcked >= lastSeq fires resolveChunkPhaseDone but
+          // doesn't suppress the post-BEGIN_ACK topUpWindow call. With
+          // a partial ack, the bug forces TWO observer.onChunkAck fires
+          // (one for the stale (2, 300), one for the real (4, 500))
+          // versus exactly one under the gate.
+          if (
+            this.deliverEarlyAckOnBegin &&
+            payload.includes('FW_TRANSFER_BEGIN') &&
+            !payload.includes('FW_TRANSFER_BEGIN_ACK')
+          ) {
+            this.deliverEarlyAckOnBegin = false;
+            this.deliver(TRANSFER_ID, chunkAck(2, 3));
+          }
+        }
+      }
+
+      const bus = new EarlyAckBus();
+      bus.deliverEarlyAckOnBegin = true;
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        // The stale ack has already been delivered synchronously inside
+        // bus.send. With the gate active, it should have been dropped
+        // and the streamer is awaiting BEGIN_ACK.
+        bus.deliver(TRANSFER_ID, beginAck());
+        // After BEGIN_ACK, the chunk phase opens and chunks should fire.
+        await waitFor(
+          () =>
+            bus.sent.filter(
+              (s) => s.payload.includes('FW_CHUNK') && !s.payload.includes('FW_CHUNK_'),
+            ).length >= totalChunks,
+          'all chunks sent',
+        );
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onChunkAck });
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+      expect(result.totalChunks).toBe(totalChunks);
+      // Critical assertion: real chunks were sent. Without the gate, the
+      // stale ack would have fired resolveChunkPhaseDone and the streamer
+      // would have skipped from BEGIN_ACK directly to END with zero
+      // FW_CHUNK on the wire.
+      const chunkCount = bus.sent.filter(
+        (s) => s.payload.includes('FW_CHUNK') && !s.payload.includes('FW_CHUNK_'),
+      ).length;
+      expect(chunkCount).toBe(totalChunks);
+      // Observer fired exactly once — for the LEGITIMATE final ack from
+      // the driver, not for the stale early ack. Without the gate, this
+      // would be 2 (or 1 with stale data — depending on which the
+      // assertion catches first).
+      expect(onChunkAck).toHaveBeenCalledTimes(1);
+      expect(onChunkAck).toHaveBeenCalledWith(totalChunks - 1, buf.length);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+});

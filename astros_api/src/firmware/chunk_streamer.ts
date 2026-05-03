@@ -306,6 +306,29 @@ export class ChunkStreamer {
     // released by `chunkPhaseDone`, not this slot.
     let currentWaiter: Waiter<WaitableKind> | null = null;
 
+    // Explicit chunk-phase gate. Set true ONLY after FW_TRANSFER_BEGIN_ACK
+    // arrives with status='OK', cleared before END-wait begins (and again
+    // in `finally` as a defensive belt). The dispatcher uses this — not
+    // `currentWaiter === null` — to gate chunkAck/chunkNak/backpressure
+    // routing into the sliding-window machine.
+    //
+    // Why a separate flag: `currentWaiter === null` is true in three
+    // narrow windows where we are NOT in the chunk phase:
+    //   1. Between subscribeFwAcks() and the BEGIN-wait Promise being
+    //      constructed (purely synchronous setup window in run()).
+    //   2. After BEGIN_ACK arrives and the waiter resolves, before
+    //      topUpWindow() is called.
+    //   3. After `await chunkPhaseDone` resolves (success path), before
+    //      the END-wait Promise is constructed.
+    // A stale chunkAck (e.g. from a master that's still sending acks for
+    // a previous transferId, or from an out-of-protocol race) arriving in
+    // any of those windows would mutate `highestAcked` / `inFlight` and
+    // could even fire `resolveChunkPhaseDone()` if its claimed
+    // `highestContiguousSeq >= lastSeq` — the streamer would skip the
+    // chunk phase entirely and send END after BEGIN with no chunks on
+    // the wire. The explicit phase flag closes those windows.
+    let chunkPhaseActive = false;
+
     // Resolves when `highestAcked === lastSeq`. The chunk-phase ack handler
     // calls `resolveChunkPhaseDone` after the cumulative ACK that completes
     // the transfer; the main loop awaits this before sending TRANSFER_END.
@@ -713,13 +736,16 @@ export class ChunkStreamer {
       // and backpressure into the sliding-window machine; BEGIN-wait /
       // END-wait route their ack-of-interest into the single-slot waiter.
       if (ack.kind === 'chunkAck' || ack.kind === 'chunkNak' || ack.kind === 'backpressure') {
-        // Chunk-phase signals are handled directly. If we somehow receive
-        // one outside the chunk phase (BEGIN-wait, post-END-wait), it's a
-        // protocol oddity; ignoring it matches the Task 3 "out-of-phase ack"
-        // policy. The master only emits FW_BACKPRESSURE during chunk
-        // streaming, so the same gating that protects chunkAck/chunkNak
-        // applies to backpressure.
-        if (currentWaiter !== null) return;
+        // Gate on the explicit `chunkPhaseActive` flag, NOT
+        // `currentWaiter === null`. The waiter-null check is true in
+        // three windows where we are NOT in the chunk phase (see the
+        // `chunkPhaseActive` declaration above for the enumeration); a
+        // chunk-phase ack arriving in any of those windows would mutate
+        // sliding-window state before the transfer is accepted. The
+        // master only emits FW_BACKPRESSURE during chunk streaming, so
+        // the same gating that protects chunkAck/chunkNak applies to
+        // backpressure.
+        if (!chunkPhaseActive) return;
         if (ack.kind === 'chunkAck') {
           handleChunkAck(ack);
         } else if (ack.kind === 'chunkNak') {
@@ -882,6 +908,15 @@ export class ChunkStreamer {
       // watchdog rejects the chunk-phase awaiter via `rejectChunkPhase`.
       armTransferWatchdog();
 
+      // Open the chunk-phase gate. From here until the matching clear
+      // below, the dispatcher routes chunkAck/chunkNak/backpressure into
+      // the sliding-window machine. Set AFTER `armTransferWatchdog` so a
+      // racing ack delivered during watchdog setup still has a watchdog
+      // armed by the time it lands; set BEFORE `topUpWindow` so the
+      // first wire send is paired with an open gate (acks for the very
+      // first chunk could otherwise return before the gate opens).
+      chunkPhaseActive = true;
+
       // ---------- CHUNK (sliding window) ----------
       // currentWaiter is null here — the chunk-phase dispatcher uses
       // inFlight/highestAcked instead. Initial fill kicks off the window;
@@ -889,6 +924,15 @@ export class ChunkStreamer {
       // entries and tops the window back up.
       topUpWindow();
       await chunkPhaseDone;
+
+      // Close the chunk-phase gate before END-wait. Any chunkAck arriving
+      // from here on is stale — the streamer's window state has already
+      // been retired by the cumulative ACK that resolved chunkPhaseDone,
+      // and entering it now would mutate state we no longer act on. The
+      // outer `finally` block also clears this as a defensive belt
+      // against the chunk-phase reject paths (FLASH_FULL, watchdog,
+      // abort) that exit the await without reaching this line.
+      chunkPhaseActive = false;
 
       // ---------- END ----------
       const endPayload: FwTransferEnd = {
@@ -989,7 +1033,14 @@ export class ChunkStreamer {
       // abort listener — done FIRST so a fire-during-cleanup race
       // (signal aborts in the same microtask we settle the run) cannot
       // re-enter `rejectRun` and try to reject already-disposed state.
+      // chunkPhaseActive cleared as a defensive belt for the chunk-phase
+      // reject paths (FLASH_FULL, watchdog, abort) that exit the chunk
+      // phase via throw rather than the success-path clear above. Done
+      // before unsubscribe() so the dispatcher — which is still attached
+      // until the unsubscribe call returns — drops any chunk-phase ack
+      // that lands during the cleanup window.
       opts?.signal?.removeEventListener('abort', abortListener);
+      chunkPhaseActive = false;
       clearTransferWatchdog();
       for (const timer of chunkTimers.values()) clearTimeout(timer);
       chunkTimers.clear();
