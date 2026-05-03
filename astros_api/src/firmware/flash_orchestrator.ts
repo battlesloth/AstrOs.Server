@@ -273,11 +273,11 @@ export interface FlashControllersStore {
   listInLocation(): Promise<Array<{ id: string; variant: string | undefined }>>;
 }
 
-// Reasons surfaced as `FlashOrchestratorError.reason`. Task 6 covers the
-// pre-streamer failure modes plus the source-resolution bucket (refined in
-// Task 11 to distinguish `release_lookup_failed` vs `source_resolution_failed`,
-// add `protocol_violation`, `bus_send_failed`, etc., and pass through every
-// `TransferErrorCode` from c.6b).
+// Reasons surfaced as `FlashOrchestratorError.reason`. Tasks 6 and 8 cover
+// pre-streamer validation, source resolution, and the deploy-phase failure
+// modes (`bus_send_failed`, `protocol_violation`). Task 11 will refine the
+// catch-all `source_resolution_failed` bucket and pass through every c.6b
+// `TransferErrorCode` plus a `streamer_unknown_error` fallback.
 export type FlashOrchestratorErrorReason =
   | 'job_already_running'
   | 'no_controllers'
@@ -522,8 +522,8 @@ export class FlashJobOrchestrator {
           // controller state is unchanged.
           logger.info(`flash orchestrator: onChunkNak lastGoodSeq=${lastGoodSeq} reason=${reason}`);
         },
-        // onTransferEnd: deploy phase is Task 8's responsibility; no
-        // controller transition fires here.
+        // onTransferEnd: the deploy phase is driven off the awaited
+        // `streamer.run()` resolution below, not from this hook.
       };
       await streamer.run(transferSpec, observer, {});
 
@@ -608,12 +608,10 @@ export class FlashJobOrchestrator {
         this.deployUnsubscriber();
         this.deployUnsubscriber = null;
       }
-      this.currentJob = null;
       // `release()` returns false if we never acquired — happens only if a
       // subclass overrides start() and throws before acquire. Defensive:
-      // call it unconditionally but ignore the return.
-      this.jobLock.release(jobId);
-      this.broadcastLockState();
+      // call it unconditionally via the shared helper.
+      this.releaseLock(jobId);
       throw err;
     }
   }
