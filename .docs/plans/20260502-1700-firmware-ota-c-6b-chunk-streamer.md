@@ -64,7 +64,7 @@ Each task is one logical commit. TDD where applicable (write tests, watch them f
   - Uses `MessageGenerator` from `astros_api/src/serial/message_generator.ts` to build outbound payloads (do NOT reimplement framing / base64 / CRC).
   - **Tests:** single-chunk happy path (a small Buffer that fits in one chunk); the streamer subscribes, sends BEGIN, FakeSerialBus delivers BEGIN_ACK, streamer sends one CHUNK, FakeSerialBus delivers CHUNK_ACK, streamer sends END, FakeSerialBus delivers END_ACK, run() resolves with the right `TransferResult`.
 
-- [ ] **Multi-chunk sliding window** (extend `chunk_streamer.ts`):
+- [x] **Multi-chunk sliding window** (extend `chunk_streamer.ts`):
   - Replace the trivial single-chunk send with a sliding-window loop. State: `inFlight: Map<seq, { sentAt: number, retries: number }>`, `nextToSend: number`, `highestAcked: number`, `lastSeq: number`. Window grows up to `WINDOW_SIZE`; advances on `CHUNK_ACK`.
   - On each `CHUNK_ACK`, drop entries with `seq <= highestContiguousSeq`, advance `highestAcked`, top up the window from `nextToSend`. Cumulative-ACK semantics: a single ACK can retire many chunks at once.
   - `observer.onChunkAck(highestContiguousSeq, bytesSent)` where `bytesSent = (highestAcked + 1) * CHUNK_SIZE_BYTES` (capped at `source.sizeBytes`).
@@ -74,12 +74,12 @@ Each task is one logical commit. TDD where applicable (write tests, watch them f
   - On `FW_CHUNK_NAK`: `observer.onChunkNak(lastGoodSeq, reason)`. If `reason === 'FLASH_FULL'`, reject with `TransferError('flash_full', ...)`. Otherwise (CRC, SIZE, OUT_OF_ORDER): clear `inFlight`, set `nextToSend = lastGoodSeq + 1`, set `highestAcked = lastGoodSeq`. Loop continues, refills window from new `nextToSend`.
   - **Tests:** NAK at seq=N clears the in-flight window and restarts from N+1; consecutive NAKs converge correctly; NAK with `FLASH_FULL` rejects with the right error code.
 
-- [ ] **Per-chunk timeout + retry counter** (extend `chunk_streamer.ts`):
+- [x] **Per-chunk timeout + retry counter** (extend `chunk_streamer.ts`):
   - Each chunk armed with a `setTimeout(ACK_TIMEOUT_MS)` on send. On fire (chunk still in `inFlight`): increment `retries`. If `retries >= MAX_RETRIES_PER_CHUNK`, reject with `TransferError('chunk_retry_exhausted', ...)`. Otherwise call `observer.onRetry(seq, retries)`, resend the chunk (new `MessageGenerator.generateFwChunk` payload), re-arm the timer.
   - On `CHUNK_ACK` retiring a chunk, clear that chunk's timer (`clearTimeout`).
   - **Tests:** single timeout → resend → ACK (retries=1, completes); 3 timeouts on the same chunk → `chunk_retry_exhausted`; concurrent in-flight chunks timing out independently. Use `vi.useFakeTimers()`.
 
-- [ ] **Backpressure pause/resume** (extend `chunk_streamer.ts`):
+- [x] **Backpressure pause/resume** (extend `chunk_streamer.ts`):
   - State flag `backpressurePaused: boolean`. On `FW_BACKPRESSURE { state: 'PAUSE' }`, set `true` and call `observer.onBackpressure(true)`. On `'RESUME'`, set `false`, call `observer.onBackpressure(false)`, top up the window from current state.
   - During pause: in-flight ACKs still drain (advance `highestAcked`), but no new chunks sent until resume.
   - **Tests:** PAUSE arrives mid-window → no new sends until RESUME; PAUSE during full window → in-flight ACKs still retire entries (verify `inFlight.size` shrinks); RESUME refills the window from the now-current `nextToSend`.

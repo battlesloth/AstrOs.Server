@@ -9,6 +9,8 @@ import type {
   TransferSpec,
 } from '../models/firmware/chunk_streamer.js';
 import type {
+  FwBackpressure,
+  FwBackpressureAction,
   FwChunkAck,
   FwChunkNak,
   FwChunkNakReason,
@@ -105,6 +107,15 @@ function endAck(status: 'OK' | 'HASH_MISMATCH' | 'IO_ERROR' = 'OK'): FwInboundAc
     status,
     computedSha256Hex: SHA256_PLACEHOLDER,
   } satisfies { kind: 'transferEndAck' } & FwTransferEndAck;
+}
+
+function backpressure(action: FwBackpressureAction, reason = 'master_busy'): FwInboundAck {
+  return {
+    kind: 'backpressure',
+    transferId: TRANSFER_ID,
+    action,
+    reason,
+  } satisfies { kind: 'backpressure' } & FwBackpressure;
 }
 
 // Drives the BEGIN→CHUNK→END handshake. Because the streamer awaits each ack
@@ -1216,6 +1227,307 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
       expect(bus.subscribers.size).toBe(0);
     } finally {
       await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+});
+
+describe('ChunkStreamer — backpressure pause/resume (Task 7)', () => {
+  // Same FW_CHUNK counter as the Task 5/6 suites.
+  function chunkSendCount(bus: FakeSerialBus): number {
+    return bus.sent.filter((s) => s.payload.includes('FW_CHUNK')).length;
+  }
+
+  // Test 1, 2, 3 use real timers (no per-chunk timeout interaction needed).
+  // Test 4 explicitly opts in with vi.useFakeTimers in its body.
+
+  it('PAUSE mid-window halts new sends; cumulative ACK retires entries during PAUSE; RESUME refills', async () => {
+    // 20 chunks at 100 bytes. Initial fill: seq 0..15 (window size 16).
+    // PAUSE arrives → observer.onBackpressure(true).
+    // chunkAck(3) arrives during PAUSE → in-flight retires 0..3, but
+    //   topUpWindow no-ops (paused), so chunkSendCount stays at 16.
+    // RESUME arrives → observer.onBackpressure(false), topUpWindow refills:
+    //   inFlight is now {4..15} (12 entries), nextToSend=16. Refill sends
+    //   seq 16..19 (4 chunks; remaining seqs are <16 so window can't fully
+    //   refill to 16 entries — caps out at 12 + 4 = 16 in flight).
+    //   chunkSendCount climbs to 16 + 4 = 20.
+    // Final cumulative ack drains the rest, then END.
+    const chunkSize = 100;
+    const totalChunks = 20;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x77);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onBackpressure = vi.fn();
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 16, 'initial window fill');
+        expect(chunkSendCount(bus)).toBe(16);
+
+        // PAUSE.
+        bus.deliver(TRANSFER_ID, backpressure('PAUSE'));
+        // Observer fired with `true` once.
+        expect(onBackpressure).toHaveBeenCalledTimes(1);
+        expect(onBackpressure).toHaveBeenCalledWith(true);
+
+        // ACK retiring seq 0..3 during PAUSE: drains in-flight from 16→12,
+        // observer.onChunkAck still fires, but no new wire sends.
+        bus.deliver(TRANSFER_ID, chunkAck(3, 4));
+        // Wait long enough that any (incorrectly) un-gated topUpWindow would
+        // have run and grown bus.sent. setImmediate cycle is enough — the
+        // ack handler runs synchronously.
+        await new Promise<void>((r) => setImmediate(r));
+        expect(chunkSendCount(bus)).toBe(16);
+        expect(onChunkAck).toHaveBeenCalledTimes(1);
+        expect(onChunkAck).toHaveBeenCalledWith(3, 4 * chunkSize);
+
+        // RESUME. Observer fires with `false`. topUpWindow refills from
+        // nextToSend=16: sends seq 16..19 (4 new chunks).
+        bus.deliver(TRANSFER_ID, backpressure('RESUME'));
+        expect(onBackpressure).toHaveBeenCalledTimes(2);
+        expect(onBackpressure.mock.calls[1]).toEqual([false]);
+        await waitFor(() => chunkSendCount(bus) >= 20, 'refill after RESUME');
+        expect(chunkSendCount(bus)).toBe(20);
+
+        // Final cumulative ACK drains seq 4..19, then END.
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), {
+        onBackpressure,
+        onChunkAck,
+      });
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+      expect(result.totalChunks).toBe(totalChunks);
+      // Two transitions only: PAUSE→RESUME.
+      expect(onBackpressure).toHaveBeenCalledTimes(2);
+      expect(onBackpressure.mock.calls[0]).toEqual([true]);
+      expect(onBackpressure.mock.calls[1]).toEqual([false]);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('PAUSE during full window: in-flight ACKs still drain (inFlight.size shrinks to 0)', async () => {
+    // 16 chunks at 100 bytes — exactly fills the window. PAUSE arrives.
+    // A single cumulative ACK for seq 15 retires ALL 16 in-flight entries.
+    // Observable proxy for inFlight.size == 0: lastSeq is acked, the chunk
+    // phase resolves, the streamer sends END. If PAUSE incorrectly blocked
+    // the ACK retire path, we'd hang here until the test timeout.
+    const chunkSize = 100;
+    const totalChunks = 16;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x88);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onBackpressure = vi.fn();
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 16, 'full window fill');
+        expect(chunkSendCount(bus)).toBe(16);
+
+        // PAUSE while window is full.
+        bus.deliver(TRANSFER_ID, backpressure('PAUSE'));
+        expect(onBackpressure).toHaveBeenCalledWith(true);
+
+        // Cumulative ACK retires every in-flight entry. After this, the
+        // chunk phase should resolve and the streamer proceeds to END
+        // even though we're still PAUSEd — there are no MORE chunks to
+        // send, so nothing is gated. chunkPhaseDone fires on
+        // `highestAcked >= lastSeq`, independent of pause state.
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent during PAUSE (no more chunks pending)',
+        );
+
+        // We never RESUME — the transfer completes from PAUSE because the
+        // ACK drained everything. observer.onChunkAck saw the cumulative
+        // retirement, confirming the in-flight Map shrank.
+        expect(onChunkAck).toHaveBeenCalledTimes(1);
+        expect(onChunkAck).toHaveBeenCalledWith(totalChunks - 1, totalChunks * chunkSize);
+
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), {
+        onBackpressure,
+        onChunkAck,
+      });
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+      // No new chunks sent during PAUSE — initial fill is the only sends.
+      expect(chunkSendCount(bus)).toBe(16);
+      // Only PAUSE fired (we never RESUMEd).
+      expect(onBackpressure).toHaveBeenCalledTimes(1);
+      expect(onBackpressure).toHaveBeenCalledWith(true);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('idempotent: duplicate PAUSE / duplicate RESUME do not refire observer.onBackpressure', async () => {
+    // Drives PAUSE, PAUSE, RESUME, RESUME. observer.onBackpressure should
+    // be called exactly twice — once per state transition. Without the
+    // idempotent guard, it would be called four times.
+    const chunkSize = 100;
+    const totalChunks = 4;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x99);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onBackpressure = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= totalChunks, 'initial fill');
+
+        bus.deliver(TRANSFER_ID, backpressure('PAUSE'));
+        bus.deliver(TRANSFER_ID, backpressure('PAUSE')); // duplicate — no-op
+        expect(onBackpressure).toHaveBeenCalledTimes(1);
+        expect(onBackpressure).toHaveBeenCalledWith(true);
+
+        bus.deliver(TRANSFER_ID, backpressure('RESUME'));
+        bus.deliver(TRANSFER_ID, backpressure('RESUME')); // duplicate — no-op
+        expect(onBackpressure).toHaveBeenCalledTimes(2);
+        expect(onBackpressure.mock.calls[1]).toEqual([false]);
+
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onBackpressure });
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+      // Exactly two transitions despite four backpressure messages.
+      expect(onBackpressure).toHaveBeenCalledTimes(2);
+      expect(onBackpressure.mock.calls[0]).toEqual([true]);
+      expect(onBackpressure.mock.calls[1]).toEqual([false]);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('per-chunk timeout during PAUSE re-arms but does not resend; resend resumes after RESUME', async () => {
+    // Fake timers gated to setTimeout/clearTimeout (same scoping as the
+    // Task 6 suite). 1-chunk transfer keeps the timer-fire ordering
+    // deterministic.
+    //
+    // Sequence:
+    //   1. BEGIN_ACK delivered, initial chunk armed (FW_CHUNK count = 1).
+    //   2. PAUSE delivered.
+    //   3. Advance fake time by ACK_TIMEOUT_MS — per-chunk timer fires.
+    //      During PAUSE: observer.onRetry fires (retries=1), timer is
+    //      re-armed, but NO resend goes out (FW_CHUNK count still 1).
+    //   4. RESUME delivered. (Top-up no-ops because the only seq=0 is
+    //      still in flight.)
+    //   5. Advance fake time by ACK_TIMEOUT_MS again — per-chunk timer
+    //      fires AGAIN. Now PAUSE is clear, so the resend happens
+    //      (retries=2, FW_CHUNK count = 2).
+    //   6. Deliver chunkAck, then END to finish cleanly.
+    const ACK_TIMEOUT_MS = 1500;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const chunkSize = 100;
+      const buf = Buffer.alloc(chunkSize, 0xaa);
+      const tempPath = await writeTempFirmware(buf);
+      try {
+        const bus = new FakeSerialBus();
+        const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+        const onBackpressure = vi.fn();
+        const onRetry = vi.fn();
+
+        const driver = (async (): Promise<void> => {
+          await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+          bus.deliver(TRANSFER_ID, beginAck());
+          await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
+          expect(chunkSendCount(bus)).toBe(1);
+
+          // PAUSE.
+          bus.deliver(TRANSFER_ID, backpressure('PAUSE'));
+          expect(onBackpressure).toHaveBeenCalledWith(true);
+
+          // First timeout during PAUSE: observer.onRetry fires, but no
+          // resend.
+          await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+          // Drain any setImmediate-deferred work just in case.
+          await new Promise<void>((r) => setImmediate(r));
+          expect(onRetry).toHaveBeenCalledTimes(1);
+          expect(onRetry).toHaveBeenCalledWith(0, 1);
+          // Critical assertion: NO resend during PAUSE.
+          expect(chunkSendCount(bus)).toBe(1);
+          // Timer was re-armed (still 1 active fake timer).
+          expect(vi.getTimerCount()).toBe(1);
+
+          // RESUME. Top-up no-ops because seq 0 is still inFlight and
+          // there are no more seqs (1-chunk transfer).
+          bus.deliver(TRANSFER_ID, backpressure('RESUME'));
+          expect(onBackpressure).toHaveBeenCalledWith(false);
+          // No new sends from RESUME (the in-flight chunk is the only
+          // seq we have).
+          expect(chunkSendCount(bus)).toBe(1);
+
+          // Second timeout — now NOT paused, resend happens.
+          await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+          await waitFor(() => chunkSendCount(bus) >= 2, 'resend after RESUME');
+          expect(chunkSendCount(bus)).toBe(2);
+          expect(onRetry).toHaveBeenCalledTimes(2);
+          expect(onRetry.mock.calls[1]).toEqual([0, 2]);
+
+          // ACK the chunk to finish.
+          bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+          await waitFor(
+            () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+            'END sent',
+          );
+          bus.deliver(TRANSFER_ID, endAck('OK'));
+        })();
+
+        const result = await streamer.run(specFor(tempPath, buf.length), {
+          onBackpressure,
+          onRetry,
+        });
+        await driver;
+
+        expect(result.endAck.status).toBe('OK');
+        // The retry budget DID count the PAUSE-time fire (retries=1) plus
+        // the post-RESUME fire (retries=2).
+        expect(onRetry).toHaveBeenCalledTimes(2);
+        expect(onRetry.mock.calls[0]).toEqual([0, 1]);
+        expect(onRetry.mock.calls[1]).toEqual([0, 2]);
+        // PAUSE then RESUME — exactly two backpressure transitions.
+        expect(onBackpressure).toHaveBeenCalledTimes(2);
+        expect(bus.subscribers.size).toBe(0);
+      } finally {
+        await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+      }
+    } finally {
+      vi.useRealTimers();
     }
   });
 });

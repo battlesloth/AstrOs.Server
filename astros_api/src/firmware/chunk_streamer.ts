@@ -14,15 +14,24 @@
 // out to the outer try/catch/finally. CRC / SIZE / OUT_OF_ORDER trigger
 // Go-Back-N: clear `inFlight`, set nextToSend = lastGoodSeq + 1, set
 // highestAcked = lastGoodSeq, and let the existing top-up refill the window.
-// Task 6 (this revision): per-chunk ack timeout + retry counter. Each chunk
-// is armed with `setTimeout(ackTimeoutMs)` on send. On fire, retries++ and
-// if we've hit `maxRetriesPerChunk`, reject the chunk phase with
+// Task 6: per-chunk ack timeout + retry counter. Each chunk is armed with
+// `setTimeout(ackTimeoutMs)` on send. On fire, retries++ and if we've hit
+// `maxRetriesPerChunk`, reject the chunk phase with
 // TransferError('chunk_retry_exhausted'); otherwise observer.onRetry, build
 // a fresh FW_CHUNK payload, resend, re-arm. Timer is cleared on the
 // cumulative ACK that retires the seq, on the all-clear of NAK Go-Back-N,
 // and on cleanup in the `finally` block.
-// No watchdog, no abort listener, no backpressure — those layers land in
-// Tasks 7–9 of the c.6b plan.
+// Task 7 (this revision): backpressure pause/resume. A `backpressurePaused`
+// flag local to `run()` gates `topUpWindow` so PAUSE halts NEW sends while
+// in-flight ACKs continue draining the window. RESUME clears the flag and
+// tops the window up from current state. `handleBackpressure` is idempotent
+// — duplicate PAUSE/PAUSE or RESUME/RESUME do not refire the observer.
+// Per-chunk timeouts during PAUSE re-arm (so retries still count toward
+// exhaustion — the master's pause does not extend our retry budget) but do
+// NOT resend; resending while the master is paused would overflow its
+// receive buffer with chunks it has already buffered.
+// No watchdog, no abort listener — those layers land in Tasks 8–9 of the
+// c.6b plan.
 //
 // `fs.promises.readFile` is the only fs touch in this module: TransferSpec
 // gives us a path, and the streamer needs the bytes to chunk-and-send. Future
@@ -48,6 +57,7 @@ import type {
 } from '../models/firmware/chunk_streamer.js';
 import { TransferError } from '../models/firmware/chunk_streamer.js';
 import type {
+  FwBackpressure,
   FwChunk,
   FwChunkAck,
   FwChunkNak,
@@ -157,6 +167,23 @@ export class ChunkStreamer {
     // `this.config.*`.
     const chunkTimers = new Map<number, NodeJS.Timeout>();
     const { ackTimeoutMs, maxRetriesPerChunk } = this.config;
+
+    // ---- Backpressure state (Task 7). Defaults to `false` — the master is
+    // assumed willing to receive until it explicitly says otherwise via
+    // FW_BACKPRESSURE { action: 'PAUSE' }. While paused:
+    //   - `topUpWindow` no-ops (no new chunks placed on the wire), so the
+    //     in-flight count can only shrink, never grow.
+    //   - cumulative ACKs continue retiring entries (handleChunkAck still
+    //     runs; topUpWindow inside it is a no-op).
+    //   - per-chunk timers still fire and still count toward
+    //     maxRetriesPerChunk, but their resend is suppressed — see
+    //     onChunkTimeout. The retry budget therefore acts as a watchdog on
+    //     a master that PAUSEs and never RESUMEs.
+    // RESUME clears the flag and calls topUpWindow once to refill the
+    // window from `nextToSend`. This boolean is a primitive local to
+    // `run()` and goes out of scope when the function returns; no `finally`
+    // cleanup needed.
+    let backpressurePaused = false;
 
     // Single waiter slot — used by BEGIN-wait and END-wait phases only. The
     // chunk phase (Task 4+) drives off `inFlight` / `highestAcked` and is
@@ -283,6 +310,19 @@ export class ChunkStreamer {
       // event in causal order with the wire send that follows it.
       observer.onRetry?.(seq, entry.retries);
 
+      if (backpressurePaused) {
+        // Master told us to PAUSE — re-sending now would overflow its
+        // receive buffer with a chunk it has already buffered. We DO let
+        // the retry counter increment (above) so a master that PAUSEs
+        // and never RESUMEs eventually exhausts the chunk-retry budget
+        // and surfaces as `chunk_retry_exhausted` rather than hanging
+        // on the chunk-phase await indefinitely. Re-arm the timer so
+        // the next tick of the budget can fire on schedule, and skip
+        // the wire send.
+        armChunkTimer(seq);
+        return;
+      }
+
       // Resend the same seq with a fresh FW_CHUNK payload + new timer.
       sendChunk(seq);
       entry.sentAt = Date.now();
@@ -394,8 +434,35 @@ export class ChunkStreamer {
       topUpWindow();
     };
 
+    const handleBackpressure = (bp: FwBackpressure): void => {
+      const newPausedState = bp.action === 'PAUSE';
+
+      // Idempotent: a duplicate PAUSE / duplicate RESUME (master-side
+      // retransmit, or a benign repeat) leaves the flag unchanged and
+      // suppresses the observer notification. Without this guard,
+      // observer.onBackpressure would fire twice for the same logical
+      // state transition and the UI would see spurious paused/resumed
+      // events. RESUME's `topUpWindow` call is also gated by this
+      // guard — a duplicate RESUME would otherwise re-enter top-up
+      // when there's nothing new to do.
+      if (newPausedState === backpressurePaused) {
+        return;
+      }
+
+      backpressurePaused = newPausedState;
+      observer.onBackpressure?.(backpressurePaused);
+
+      if (!backpressurePaused) {
+        // Resumed — top up the window from current state. Cumulative ACKs
+        // that arrived while paused have advanced highestAcked / shrunk
+        // inFlight, so this top-up will refill from the post-PAUSE
+        // nextToSend up to windowSize.
+        topUpWindow();
+      }
+    };
+
     const topUpWindow = (): void => {
-      while (inFlight.size < windowSize && nextToSend <= lastSeq) {
+      while (!backpressurePaused && inFlight.size < windowSize && nextToSend <= lastSeq) {
         const seq = nextToSend++;
         sendChunk(seq);
         inFlight.set(seq, { sentAt: Date.now(), retries: 0 });
@@ -407,19 +474,23 @@ export class ChunkStreamer {
     };
 
     const unsubscribe = this.bus.subscribeFwAcks(spec.transferId, (ack) => {
-      // Phase-aware dispatch: the chunk phase routes chunkAck and chunkNak
-      // into the sliding-window machine; BEGIN-wait / END-wait route their
-      // ack-of-interest into the single-slot waiter.
-      if (ack.kind === 'chunkAck' || ack.kind === 'chunkNak') {
-        // Chunk-phase acks are handled directly. If we somehow receive one
-        // outside the chunk phase (BEGIN-wait, post-END-wait), it's a
+      // Phase-aware dispatch: the chunk phase routes chunkAck, chunkNak,
+      // and backpressure into the sliding-window machine; BEGIN-wait /
+      // END-wait route their ack-of-interest into the single-slot waiter.
+      if (ack.kind === 'chunkAck' || ack.kind === 'chunkNak' || ack.kind === 'backpressure') {
+        // Chunk-phase signals are handled directly. If we somehow receive
+        // one outside the chunk phase (BEGIN-wait, post-END-wait), it's a
         // protocol oddity; ignoring it matches the Task 3 "out-of-phase ack"
-        // policy. Task 7 (backpressure) will route 'backpressure' similarly.
+        // policy. The master only emits FW_BACKPRESSURE during chunk
+        // streaming, so the same gating that protects chunkAck/chunkNak
+        // applies to backpressure.
         if (currentWaiter !== null) return;
         if (ack.kind === 'chunkAck') {
           handleChunkAck(ack);
-        } else {
+        } else if (ack.kind === 'chunkNak') {
           handleChunkNak(ack);
+        } else {
+          handleBackpressure(ack);
         }
         return;
       }
