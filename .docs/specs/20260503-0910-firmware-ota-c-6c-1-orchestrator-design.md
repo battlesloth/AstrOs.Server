@@ -80,7 +80,9 @@ After all controllers terminal, orchestrator emits `flashJobDone` and starts a 1
 | `astros_api/src/firmware/serial_bus.ts` | Add `subscribeDeployEvents(transferId, handler)` to `WorkerSerialBus`. The handler receives typed `FwDeployEvent` variants (FW_PROGRESS / FW_DEPLOY_DONE). Returns disposer |
 | `astros_api/src/firmware/serial_bus.test.ts` | Tests for the new method (filter by transferId, dispose detaches listener, cross-talk between subscribers) |
 | `astros_api/src/models/firmware/chunk_streamer.ts` (the types module) | Extend `SerialBus` interface with `subscribeDeployEvents`. `FwInboundAck` stays unchanged — deploy events are a separate typed channel |
-| `astros_api/src/api_server.ts` | Instantiate `FlashJobOrchestrator` (passing the existing serial worker via `WorkerSerialBus`); register flash routes; wire late-join WS snapshot via `orchestrator.getCurrentJob()`; the `notifyMasterHeartbeat` wiring into the POLL handler is **deferred** to a follow-up PR (see "Out of scope") |
+| `astros_api/src/api_server.ts` | Instantiate `FlashJobOrchestrator` (passing the existing serial worker via `WorkerSerialBus`); register flash routes; wire late-join WS snapshot via `orchestrator.getCurrentJob()`; POLL handler extracts `version` from `POLL_ACK` and calls `orchestrator.notifyMasterHeartbeat(version)` when the master reboots post-deploy; POLL handler also extracts `variant` per controller and updates the in-memory controllers state |
+| `astros_api/src/models/firmware/firmware_messages.ts` | Extend `PollAck` (or wherever the POLL_ACK payload type lives) with `variant: string` (per-controller hardware variant, populated by the firmware) and an optional `version: string` field (carried only on the post-reboot heartbeat poll). Existing fields unchanged |
+| `astros_api/src/serial/serial_worker_response.ts` + `astros_api/src/serial/message_handler.ts` | Extend the POLL_ACK parser to surface the new `variant` + `version` fields on the typed `PollAckResponse`; downstream handlers (api_server's POLL handler) read these |
 
 **Spec / plan / QA docs:**
 
@@ -100,7 +102,7 @@ interface FlashJobOrchestratorOpts {
   jobLock: JobLock;
   cache: { fetch(release, asset): Promise<CachedAsset> };
   upload: { latest(): Promise<StoredUpload | null> };
-  controllersStore: { listInLocation(): Promise<string[]> };
+  controllersStore: { listInLocation(): Promise<Array<{ id: string; variant: string }>> };
   emitWs: (msg: TransmissionMessage) => void;
   streamerFactory?: (opts: ChunkStreamerOpts) => Streamer;  // default returns real ChunkStreamer
   clock?: Clock;                                             // default = real timers
@@ -163,8 +165,8 @@ All wrapped as `{ type: TransmissionType, data: ... }`:
 1. `POST /api/firmware/flash` arrives → controller calls `orchestrator.start(request)`
 2. Acquire `JobLock` (synchronous boolean gate). Already-held → throw, controller returns HTTP 409 with `currentJobId`. On acquire → emit `lockStateChanged { locked: true, owner: jobId }`
 3. Generate `jobId` (uuid), `transferId` (uuid)
-4. `resolveFlashSource(request, cache, upload)` → `FlashSource { path, sha256, sizeBytes, displayName }`. Cache misses or empty upload throw → see error path A
-5. Read controllers list via `controllersStore.listInLocation()` → target IDs
+4. Read controllers list via `controllersStore.listInLocation()` → `Array<{ id: string; variant: string }>`. Empty list → fail with `'no_controllers'`. Validate uniform variant across targets; mismatch → fail with `'variant_mismatch'` (controllers can only be flashed together when they share a hardware variant — the streamer transmits one binary). The shared variant becomes the input to step 5
+5. `resolveFlashSource(request, cache, upload, releaseService, variant)` → `FlashSource { path, sha256, sizeBytes, displayName }`. For `kind: 'github'`: looks up the matching release via `releaseService.getReleases()`, picks the asset whose `variant` matches the controllers' shared variant, calls `cache.fetch(release, asset)`. For `kind: 'upload'`: calls `upload.latest()`. Cache miss / empty upload / no matching release / no matching variant asset → see error path A
 6. Build initial `FlashJobState` (all controllers `Queued`); set `currentJob = state`; emit `flashJobStarted`
 7. Transition all controllers `Queued → UploadingToMaster`; emit throttled `flashControllerUpdate` per controller
 8. Instantiate `Streamer` (via injected factory) and `await streamer.run(spec, observer, { signal: abortController.signal })`:
@@ -176,18 +178,20 @@ All wrapped as `{ type: TransmissionType, data: ... }`:
     - `FW_PROGRESS { controllerId, stage, bytesSent, totalBytes, detail }` (per-controller, multiple per job) → `transitionControllerState()`; emit throttled `flashControllerUpdate`
     - `FW_DEPLOY_DONE { transferId, results: FwDeployDoneResult[] }` (job-wide, one per job) → iterate `results`; for each `{ controllerId, outcome, finalVersion, error }` perform terminal transition (`VersionConfirmed` if outcome=`'OK'`, `Failed` if `'FAILED'`); emit `flashControllerResult` per controller (bypasses throttle)
 12. When `deriveJobLifecycle(state) === 'done'` (all controllers terminal): emit `flashJobDone`; start 15-sec reboot timer
-13. Reboot timer expires (heartbeat detection deferred per "Out of scope"): release `JobLock`; emit `lockStateChanged { locked: false }`; clear `currentJob = null`
+13. **Master heartbeat OR reboot timer fires** (whichever first): release `JobLock`; emit `lockStateChanged { locked: false }`; clear `currentJob = null`. The heartbeat path is the primary release: post-deploy, the master reboots and sends a `POLL_ACK` carrying its now-running `version`; `api_server`'s POLL handler calls `orchestrator.notifyMasterHeartbeat(version)`. The 15-sec timer is a fallback for malfunction (master fails to reboot, version field absent, etc.)
 
 ### Error paths
 
 | Code | Trigger | Handling |
 |---|---|---|
-| **A** — source-resolution failure | Cache miss, upload empty, c.6b's `source_size_mismatch` from disk-vs-manifest divergence, etc. | Release `JobLock` (acquired in step 2); emit `flashJobFailed { reason }`; HTTP 4xx; `currentJob` never set |
+| **A** — source-resolution failure | Cache miss, upload empty, c.6b's `source_size_mismatch` from disk-vs-manifest divergence, no release matching the requested version, no asset matching the controllers' variant (`'asset_not_found'`), etc. | Release `JobLock` (acquired in step 2); emit `flashJobFailed { reason }`; HTTP 4xx; `currentJob` never set |
+| **A2** — variant mismatch across targets | `controllersStore.listInLocation()` returns controllers with differing `variant` values (e.g., one `lolin_d32_pro`, one `metro_s3`) | Release `JobLock`; emit `flashJobFailed { reason: 'variant_mismatch', detail }`; HTTP 4xx with the mismatched variants enumerated. Operator must flash mixed-variant locations as separate jobs (one variant at a time), or the data must be corrected so all controllers in a location share a variant |
+| **A3** — empty controllers list | `controllersStore.listInLocation()` returns `[]` (no controllers in current location, or all have failed to register a variant via POLL_ACK) | Release `JobLock`; emit `flashJobFailed { reason: 'no_controllers' }`; HTTP 400 |
 | **B** — streamer rejects with `TransferError` | Any of the 12 codes from c.6b | Set `abortReason = error.code`; transition all currently-non-terminal controllers to `Failed`; emit `flashControllerResult` per affected controller, then `flashJobFailed`; release `JobLock`; clear `currentJob` |
 | **C** — per-controller deploy failure | `FW_DEPLOY_DONE.results[]` contains an entry with `outcome: 'FAILED'` mixed with `'OK'` entries | The failing controllers transition to `Failed` with the carried `error`; the OK ones to `VersionConfirmed` with `finalVersion`. Emit `flashControllerResult` for each. Per c.6a's `deriveJobLifecycle`, all-terminal → `'done'` regardless of mix → emit `flashJobDone` (NOT failed). 15-sec reboot timer still runs |
 | **D** — cancel during upload | `DELETE /api/firmware/flash` → `orchestrator.cancel('user')` | `abortController.abort('user-cancel')` → streamer rejects with `TransferError 'aborted'` → falls through to error path B with `reason: 'aborted'` |
 | **E** — cancel during deploy | Same trigger, but past upload | Best-effort: orchestrator unsubscribes from deploy events, sets `abortReason: 'cancelled'`, transitions remaining non-terminal controllers to `Failed`, emits `flashControllerResult` + `flashJobFailed`, releases `JobLock`. Master continues forwarding to controllers regardless (protocol-level limitation) |
-| **F** — master never heartbeats | 15-sec timer fires after `flashJobDone` | Normal v1 path — release `JobLock` via timer. Job state already shows done; lock release just gates the next concurrent flash |
+| **F** — master never heartbeats | 15-sec timer fires after `flashJobDone` because no `POLL_ACK` carrying a `version` arrived (master failed to reboot, or rebooted without populating version) | Fallback path — release `JobLock` via timer. Job state already shows done; lock release just gates the next concurrent flash. The timer covers genuine master malfunction; the heartbeat path is the primary release |
 
 ## Throttling (`flashProgressThrottle`)
 
@@ -205,7 +209,8 @@ Per-controller leading-edge throttle, 250 ms window (4 Hz):
 - **`streamerFactory: (opts) => Streamer`** — interface narrows `ChunkStreamer` to its `run(spec, observer, opts)` signature. Tests inject a fake that returns a controllable promise + a scripted observer-event emitter. Default factory returns real `ChunkStreamer`
 - **`bus: SerialBus`** — `FakeSerialBus` extends c.6b's pattern with `subscribeDeployEvents(...)` + a test-only `deliverDeployEvent(transferId, event)` driver
 - **`cache: { fetch(...) }`, `upload: { latest() }`** — narrow interfaces matching c.4 / c.5 surfaces; tests inject fakes that resolve / reject as needed
-- **`controllersStore: { listInLocation() }`** — small interface pulling target IDs from existing controllers data
+- **`controllersStore: { listInLocation() }`** — small interface pulling target IDs *plus their POLL_ACK-reported variant* from in-memory live controller state. Tests inject fakes returning canned data (uniform-variant happy path; mixed-variant for `'variant_mismatch'` tests; empty for `'no_controllers'`)
+- **`releaseService: { getReleases() }`** — narrow interface over c.3's GitHub release service. Tests inject fakes returning canned `ReleaseInfo[]` data (matched / unmatched-version / no-asset-for-variant scenarios)
 - **`jobLock: JobLock`** — real c.0 `JobLock` (already simple synchronous boolean; no fake needed)
 - **`clock: { now(), setTimeout, clearTimeout }`** — tiny abstraction so the 15-sec reboot timer + 250 ms throttle window are deterministic under `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })`. Date and setImmediate stay real
 
@@ -217,7 +222,8 @@ Per-controller leading-edge throttle, 250 ms window (4 Hz):
 - FW_DEPLOY_DONE.results[] processing — all OK, all FAILED, mixed; all paths converge to `flashJobDone` per `deriveJobLifecycle`
 - Concurrent `start()` rejected with HTTP 409 carrying `currentJobId`
 - Cancel during upload (aborts streamer); cancel during deploy (best-effort stop); cancel with no active job → 404
-- 15-sec timer fires lock release; `notifyMasterHeartbeat()` fires lock release pre-timer; whichever-first-wins (other gets cleared)
+- `notifyMasterHeartbeat(version)` fires lock release (primary path); 15-sec timer fires lock release as fallback; whichever-first-wins (other gets cleared). Test the version-extraction in `api_server`'s POLL handler separately
+- Variant validation: uniform variant in controllers list → flash proceeds; mixed-variant → fails fast with `'variant_mismatch'` listing the mismatched values; resolver picks asset matching variant; release missing the variant's asset → `'asset_not_found'`
 - Late-join snapshot via `getCurrentJob()` returns valid mid-flash state with all in-flight controller updates applied
 - Throttle leading-edge fires immediately; mid-window updates pend; stage transitions flush pending
 - Source resolution failure releases lock, emits `flashJobFailed`, never sets `currentJob`
@@ -236,7 +242,7 @@ Per-controller leading-edge throttle, 250 ms window (4 Hz):
 ## Out of scope (deferred)
 
 - **PTY-stub harness + integration tests** — c.6c.2's scope. The harness uses `node-pty` / `socat` PTY pair driving a stub-firmware process; verifies the orchestrator's behavior end-to-end against `serial_worker.js` + a fake master. c.6c.1's unit tests use `FakeSerialBus` and a scripted `streamerFactory`
-- **`POLL_ACK` version-field protocol extension** — cross-repo dep flagged in PR #70's notes. AstrOs.ESP needs to add a `version` field to `POLL_ACK`; once that lands, a small follow-up server PR wires `api_server`'s POLL handler to extract the version and call `orchestrator.notifyMasterHeartbeat(version)`. Until then, JobLock releases via the 15-sec reboot timer only. The orchestrator method itself ships tested
+<!-- POLL_ACK extensions are IN scope for c.6c.1 — see Components table + Data flow step 13. AstrOs.ESP work lands in lockstep with this PR; placeholders or proxies for the cross-repo work would create rework on merge. -->
 - **Empty firmware defense at the resolver** — `FlashSource` with `sizeBytes: 0` should be rejected at `resolveFlashSource` time (master's eventual `HASH_MISMATCH` is a more expensive way to discover this). Carry-over from the c.6b cross-cutting review followups
 - **Multi-job queue** — v1 is single-flight via JobLock; concurrent requests get HTTP 409, no queueing. Persistence + queue land later if there's demand
 - **Per-controller targeting** — request body has no `targets` field; orchestrator always flashes all controllers in the current location. Subset-targeting lands later if there's demand
