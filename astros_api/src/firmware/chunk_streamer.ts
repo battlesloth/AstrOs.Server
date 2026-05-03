@@ -145,6 +145,16 @@ export class ChunkStreamer {
     });
 
     const handleChunkAck = (ack: FwChunkAck): void => {
+      // Capture the cursor BEFORE the monotonic update so we can detect
+      // whether this ACK actually advanced progress. A duplicate / late
+      // cumulative ACK (e.g. master NIC-level retransmit, or a stale ACK
+      // arriving in the gap between resolveChunkPhaseDone firing and the
+      // END-phase waiter being installed) leaves prevHighestAcked === the
+      // post-update highestAcked, and we suppress the observer notification
+      // — otherwise the UI would see a duplicate progress event with the
+      // same (lastSeq, totalBytes) data and "complete twice."
+      const prevHighestAcked = highestAcked;
+
       // Cumulative-ACK semantics: every in-flight entry with
       // seq <= highestContiguousSeq is retired in one shot. A single ACK can
       // therefore retire many chunks (e.g. one ACK closing out a full window).
@@ -156,8 +166,12 @@ export class ChunkStreamer {
         highestAcked = ack.highestContiguousSeq;
       }
 
-      const bytesSent = Math.min((highestAcked + 1) * chunkSizeBytes, sourceBuffer.length);
-      observer.onChunkAck?.(ack.highestContiguousSeq, bytesSent);
+      // Only notify the observer when the cursor actually advanced. Duplicate
+      // / stale cumulative ACKs are silently absorbed.
+      if (ack.highestContiguousSeq > prevHighestAcked) {
+        const bytesSent = Math.min((highestAcked + 1) * chunkSizeBytes, sourceBuffer.length);
+        observer.onChunkAck?.(ack.highestContiguousSeq, bytesSent);
+      }
 
       if (highestAcked >= lastSeq) {
         // All chunks acked — release the chunk phase. Top-up is a no-op past

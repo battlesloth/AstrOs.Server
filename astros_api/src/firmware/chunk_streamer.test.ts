@@ -109,6 +109,10 @@ function endAck(status: 'OK' | 'HASH_MISMATCH' | 'IO_ERROR' = 'OK'): FwInboundAc
 // only thing it costs in the failure case is the elapsed milliseconds.
 //
 // Task 3/4 has no time-dependent logic, so real timers are fine.
+//
+// TODO(c.6b Task 6): migrate to vi.useFakeTimers() once timer-driven
+// retry/watchdog logic lands; this wall-clock bound is a temporary
+// measure for Tasks 3-5 which use real timers only for the readFile.
 async function waitFor(predicate: () => boolean, label: string): Promise<void> {
   const deadline = Date.now() + 4000;
   while (Date.now() < deadline) {
@@ -434,6 +438,119 @@ describe('ChunkStreamer — sliding window (Task 4)', () => {
       expect(onChunkAck).toHaveBeenCalledTimes(2);
       expect(onChunkAck.mock.calls[0]).toEqual([7, 800]);
       expect(onChunkAck.mock.calls[1]).toEqual([17, totalBytes]);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('does not fire onChunkAck twice for a duplicate cumulative ACK', async () => {
+    // Real-world hazard locked in: master retransmits a cumulative ACK (e.g.
+    // its NIC-level retry kicks in, or a stale ACK arrives in the gap between
+    // resolveChunkPhaseDone firing and the END-phase waiter being installed).
+    // The monotonic guard prevents highestAcked from rolling back, but the
+    // observer call must also be gated on cursor advance — otherwise the UI
+    // would see a duplicate progress event with the same (lastSeq, bytes)
+    // data and "complete twice."
+    //
+    // We deliver the seq=4 cumulative ACK twice in a row before END is sent.
+    // After the first ACK, highestAcked==lastSeq==4 and the chunk phase is
+    // released. The second ACK arrives while currentWaiter is still null
+    // (the END-wait waiter has not yet been installed), so it routes to
+    // handleChunkAck — exercising the duplicate-ACK path.
+    const chunkSize = 100;
+    const totalChunks = 5;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x99);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        // 5 chunks fit inside the default window — initial fill sends all 5.
+        await driveBeginAndAwaitInitialFill(bus, totalChunks);
+        expect(chunkSendCount(bus)).toBe(totalChunks);
+
+        // First cumulative ACK retires all 5. Streamer transitions to END.
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        // Duplicate cumulative ACK — same highestContiguousSeq. Delivered
+        // synchronously here; in production this models a master retransmit
+        // arriving while the streamer is still mid-transition to the END
+        // phase (currentWaiter === null).
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onChunkAck });
+      await driver;
+
+      expect(result.totalChunks).toBe(totalChunks);
+      // Critical assertion: observer fires exactly ONCE despite two ACKs.
+      expect(onChunkAck).toHaveBeenCalledTimes(1);
+      expect(onChunkAck).toHaveBeenCalledWith(totalChunks - 1, buf.length);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('silently drops a chunkAck arriving during BEGIN-wait phase', async () => {
+    // Locks in the phase-aware dispatcher's "drop unexpected acks" policy:
+    // a chunkAck arriving while currentWaiter is set (BEGIN-wait or END-wait)
+    // must be ignored — no exception, no observer call. A future
+    // "improvement" that, e.g., starts logging or throwing on out-of-phase
+    // acks would trip this test deliberately rather than silently shipping
+    // a regression.
+    const chunkSize = 100;
+    const totalChunks = 5;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0xab);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        // Wait for BEGIN to hit the wire. At this moment the streamer is in
+        // BEGIN-wait — currentWaiter is the begin-ack waiter — and zero
+        // chunks have been sent.
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        expect(chunkSendCount(bus)).toBe(0);
+
+        // Out-of-phase chunkAck during BEGIN-wait. Dispatcher must drop it
+        // silently: no observer call, no thrown exception, no progress.
+        bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+        // No chunks should have been sent in response — we are still in BEGIN.
+        expect(chunkSendCount(bus)).toBe(0);
+        expect(onChunkAck).not.toHaveBeenCalled();
+
+        // Now deliver BEGIN_ACK; the run continues normally.
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= totalChunks, 'initial fill after BEGIN');
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      // run() must resolve successfully — the dropped ACK didn't poison state.
+      const result = await streamer.run(specFor(tempPath, buf.length), { onChunkAck });
+      await driver;
+
+      expect(result.totalChunks).toBe(totalChunks);
+      expect(result.endAck.status).toBe('OK');
+      // Observer was called exactly once for the legitimate post-BEGIN ack —
+      // the BEGIN-phase ack was dropped on the floor as required.
+      expect(onChunkAck).toHaveBeenCalledTimes(1);
+      expect(onChunkAck).toHaveBeenCalledWith(totalChunks - 1, buf.length);
+      expect(bus.subscribers.size).toBe(0);
     } finally {
       await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
     }
