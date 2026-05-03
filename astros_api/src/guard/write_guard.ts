@@ -15,10 +15,13 @@ const ALLOWED_IN_READONLY: Array<{ method: string; path: string }> = [
 // intentionally NOT allowed while a flash job is running because emitting a
 // PANIC_STOP frame on the serial port would interleave with FW_CHUNK frames
 // and corrupt the in-flight transfer. Login / reauth still work so a fresh
-// session can attach to the live job.
+// session can attach to the live job. DELETE /firmware/flash is the cancel
+// path — it MUST be allowed during a flash, otherwise the cancel button is
+// unreachable while the orchestrator holds the lock.
 const ALLOWED_DURING_FLASH: Array<{ method: string; path: string }> = [
   { method: 'POST', path: '/login' },
   { method: 'POST', path: '/reauth' },
+  { method: 'DELETE', path: '/firmware/flash' },
 ];
 
 const BLOCKED_GET_PATHS = new Set([
