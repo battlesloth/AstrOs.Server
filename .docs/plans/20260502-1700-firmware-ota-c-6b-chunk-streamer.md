@@ -52,13 +52,13 @@ Each task is one logical commit. TDD where applicable (write tests, watch them f
   - `subscribeFwAcks(transferId, handler)`: registers a worker `'message'` listener that parses inbound `FW_*_ACK` / `FW_*_NAK` / `FW_BACKPRESSURE` messages, filters by `transferId`, and invokes `handler` with the typed `FwInboundAck`. Returns a disposer that removes the listener.
   - **Tests** (light): unit-test the `subscribeFwAcks` filtering using a mock `Worker`-like EventEmitter; verify the disposer removes the listener; verify non-matching `transferId` is ignored.
 
-- [ ] **Inline `FakeSerialBus` test helper** (in `astros_api/src/firmware/chunk_streamer.test.ts`):
+- [x] **Inline `FakeSerialBus` test helper** (in `astros_api/src/firmware/chunk_streamer.test.ts`):
   - Implements `SerialBus`. Stores all `send()` calls in `sent: Array<{ payload: string; kind: SendKind }>`.
   - `subscribeFwAcks(transferId, handler)` stores the handler keyed by `transferId`; returns a disposer.
   - Test-only `deliver(transferId: string, ack: FwInboundAck)` synthesizes inbound messages.
   - Designed for inline use; lift to `chunk_streamer_testing.ts` if c.6c needs to share.
 
-- [ ] **`ChunkStreamer` skeleton + happy-path single-chunk transfer** (new `astros_api/src/firmware/chunk_streamer.ts`):
+- [x] **`ChunkStreamer` skeleton + happy-path single-chunk transfer** (new `astros_api/src/firmware/chunk_streamer.ts`):
   - Class with constructor taking `{ bus: SerialBus; config?: Partial<TransportConfig> }`. Stores merged config. `TRANSPORT_DEFAULTS` constants at module top.
   - `run(spec, observer, opts?)` returns `Promise<TransferResult>`. Initial implementation handles only the trivial path: send `FW_TRANSFER_BEGIN`, wait for `BEGIN_ACK`, send single `FW_CHUNK`, wait for `CHUNK_ACK`, send `FW_TRANSFER_END`, wait for `END_ACK`, resolve. No window, no retries, no watchdog yet — just enough to wire the message flow.
   - Uses `MessageGenerator` from `astros_api/src/serial/message_generator.ts` to build outbound payloads (do NOT reimplement framing / base64 / CRC).
