@@ -96,9 +96,9 @@ export async function resolveFlashSource(
 //     `pending` and a single flush timer is armed for the remainder of
 //     the window. Subsequent in-window submits overwrite `pending`
 //     without re-arming.
-//   * Force: flushes any pending entry by emitting the new state
-//     immediately and resets `lastEmittedAt`. The next in-window submit
-//     will be throttled.
+//   * Force: emits the supplied state immediately, dropping any pending
+//     entry (the forced state supersedes it), and stamps
+//     `lastEmittedAt`. The next in-window submit will be throttled.
 //   * Dispose: clears all internal state and cancels every scheduled
 //     timer. Safe to call multiple times (idempotent).
 // ---------------------------------------------------------------------------

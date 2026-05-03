@@ -425,4 +425,51 @@ describe('createFlashProgressThrottle', () => {
     expect(emit).toHaveBeenCalledTimes(2);
     expect(emit).toHaveBeenNthCalledWith(2, uploadingState('a', 510));
   });
+
+  // Mutation-discipline tests for the flush() cleanup path. Without these,
+  // reverting `pending.delete(controllerId)` or `scheduledTimer.delete(controllerId)`
+  // in flush() would leave latent bugs masked by other test paths' overwrites.
+
+  it('post-flush re-arm: pending consumed AND a new in-window submit arms a fresh timer', () => {
+    // Reverting EITHER `pending.delete(controllerId)` OR
+    // `scheduledTimer.delete(controllerId)` in flush() makes this fail.
+    // The combined post-flush test catches both cleanup-on-flush invariants.
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    throttle.submit('a', uploadingState('a', 100)); // leading edge at t=0
+    advance(50);
+    throttle.submit('a', uploadingState('a', 200)); // pending, timer at t=250
+    advance(200); // t=250 → flush emits 200, clears pending + scheduledTimer
+    expect(emit).toHaveBeenCalledTimes(2);
+    expect(emit).toHaveBeenNthCalledWith(2, uploadingState('a', 200));
+
+    advance(50); // t=300, mid-window of the just-emitted 200
+    throttle.submit('a', uploadingState('a', 300)); // must arm a NEW timer (stale handle bug)
+    advance(200); // t=500, new timer fires
+    expect(emit).toHaveBeenCalledTimes(3);
+    expect(emit).toHaveBeenNthCalledWith(3, uploadingState('a', 300));
+
+    // Mutation defense: more time elapsing must NOT re-emit a stale 200
+    // (would happen if pending.delete in flush() were reverted).
+    advance(500);
+    expect(emit).toHaveBeenCalledTimes(3);
+  });
+
+  it('idempotent re-arm: multiple in-window submits do not stack flush timers', () => {
+    // Reverting `if (scheduledTimer.has(controllerId)) return;` makes this fail —
+    // every in-window submit would register a new setTimeout, leaking handles
+    // and potentially firing flush multiple times for one window.
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    throttle.submit('a', uploadingState('a', 100)); // leading edge
+    advance(10);
+    throttle.submit('a', uploadingState('a', 200)); // arms ONE timer
+    expect(vi.getTimerCount()).toBe(1);
+
+    throttle.submit('a', uploadingState('a', 250)); // must NOT add a 2nd timer
+    throttle.submit('a', uploadingState('a', 275)); // still must NOT add a 2nd timer
+    expect(vi.getTimerCount()).toBe(1);
+  });
 });
