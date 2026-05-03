@@ -10,6 +10,8 @@ import type {
 } from '../models/firmware/chunk_streamer.js';
 import type {
   FwChunkAck,
+  FwChunkNak,
+  FwChunkNakReason,
   FwTransferBeginAck,
   FwTransferEndAck,
 } from '../models/firmware/firmware_messages.js';
@@ -85,6 +87,15 @@ function chunkAck(highest: number, next: number): FwInboundAck {
     nextExpectedSeq: next,
     windowRemaining: 16,
   } satisfies { kind: 'chunkAck' } & FwChunkAck;
+}
+
+function chunkNak(lastGoodSeq: number, reasonCode: FwChunkNakReason): FwInboundAck {
+  return {
+    kind: 'chunkNak',
+    transferId: TRANSFER_ID,
+    lastGoodSeq,
+    reasonCode,
+  } satisfies { kind: 'chunkNak' } & FwChunkNak;
 }
 
 function endAck(status: 'OK' | 'HASH_MISMATCH' | 'IO_ERROR' = 'OK'): FwInboundAck {
@@ -555,6 +566,240 @@ describe('ChunkStreamer — sliding window (Task 4)', () => {
       await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
     }
   });
+});
+
+describe('ChunkStreamer — NAK + Go-Back-N (Task 5)', () => {
+  // Counts FW_CHUNK sends in bus.sent. Each call to bus.send increments
+  // bus.sent by one entry, so resends after a NAK appear as additional
+  // FW_CHUNK entries — meaning chunkSendCount climbs past the chunk count
+  // when Go-Back-N retransmits.
+  function chunkSendCount(bus: FakeSerialBus): number {
+    return bus.sent.filter((s) => s.payload.includes('FW_CHUNK')).length;
+  }
+
+  // Same helper as the sliding-window suite — duplicated locally to keep
+  // each describe independent. driveBeginAndAwaitInitialFill returns once
+  // the streamer has filled the in-flight window with `expectedInitialFill`
+  // chunks following BEGIN_ACK.
+  async function driveBeginAndAwaitInitialFill(
+    bus: FakeSerialBus,
+    expectedInitialFill: number,
+  ): Promise<void> {
+    await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+    bus.deliver(TRANSFER_ID, beginAck());
+    await waitFor(
+      () => chunkSendCount(bus) >= expectedInitialFill,
+      `initial window fill (${expectedInitialFill} chunks)`,
+    );
+  }
+
+  it('NAK at lastGoodSeq=5 clears window, restarts from seq=6, and converges to completion', async () => {
+    // 20 chunks at 100 bytes. Initial fill sends seq 0..15. Master NAKs
+    // claiming seq 5 was the last good one (CRC error on seq 6, say). The
+    // streamer must:
+    //   - clear inFlight
+    //   - set nextToSend = 6, highestAcked = 5
+    //   - top-up the window with seq 6..19 (the remaining 14 chunks; 14 < 16
+    //     so no further sends after that until acks free slots)
+    // Total resent in this scenario: seq 6..15 from the initial window are
+    // resent on top of the surviving 4 unsent (16..19). Net effect on
+    // bus.sent: initial 16 chunks + 14 resends = 30 FW_CHUNK entries before
+    // the first post-NAK ack.
+    const chunkSize = 100;
+    const totalChunks = 20;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x42);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkNak = vi.fn();
+      const onChunkAck = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await driveBeginAndAwaitInitialFill(bus, 16);
+        const sentBeforeNak = chunkSendCount(bus);
+        expect(sentBeforeNak).toBe(16);
+
+        // NAK with lastGoodSeq=5, reason=CRC. Triggers Go-Back-N from seq 6.
+        bus.deliver(TRANSFER_ID, chunkNak(5, 'CRC'));
+
+        // After Go-Back-N, the streamer should refill the window from seq 6.
+        // Remaining chunks (seq 6..19) is 14, which is below windowSize 16,
+        // so all 14 fire and the window stays partially filled. Total
+        // bus.sent FW_CHUNK count climbs to 16 (initial) + 14 (refill) = 30.
+        await waitFor(() => chunkSendCount(bus) >= 30, 'Go-Back-N refill from seq 6');
+        expect(chunkSendCount(bus)).toBe(30);
+
+        // Drain the rest with one cumulative ack covering seq 0..19.
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), {
+        onChunkNak,
+        onChunkAck,
+      });
+      await driver;
+
+      expect(result.totalChunks).toBe(totalChunks);
+      expect(result.endAck.status).toBe('OK');
+      // Observer fired with (lastGoodSeq, reason).
+      expect(onChunkNak).toHaveBeenCalledTimes(1);
+      expect(onChunkNak).toHaveBeenCalledWith(5, 'CRC');
+      // Total sends: 16 initial + 14 Go-Back-N refill = 30 FW_CHUNK entries.
+      expect(chunkSendCount(bus)).toBe(30);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('consecutive NAKs converge: second NAK acknowledges progress made by first refill', async () => {
+    // 30 chunks at 100 bytes. Initial fill: seq 0..15. First NAK at
+    // lastGoodSeq=3 (master accepted 0..3, rejected 4): refill from seq 4.
+    //   - inFlight cleared, nextToSend=4, highestAcked=3
+    //   - top-up sends seq 4..19 (16 chunks fill the window)
+    // Master then accepts seq 4..7 from the refill but NAKs at seq 8 with
+    // lastGoodSeq=7. Second Go-Back-N: nextToSend=8, highestAcked=7,
+    // refill from seq 8 (16 chunks: 8..23).
+    // Final ack drains the rest.
+    const chunkSize = 100;
+    const totalChunks = 30;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x55);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkNak = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await driveBeginAndAwaitInitialFill(bus, 16);
+        expect(chunkSendCount(bus)).toBe(16);
+
+        // First NAK: lastGoodSeq=3, reason=CRC. Refill from seq 4.
+        bus.deliver(TRANSFER_ID, chunkNak(3, 'CRC'));
+        // After Go-Back-N from seq 4: total sent climbs to 16 (initial) + 16
+        // (refill of seq 4..19) = 32.
+        await waitFor(() => chunkSendCount(bus) >= 32, 'first Go-Back-N refill from seq 4');
+        expect(chunkSendCount(bus)).toBe(32);
+
+        // Second NAK: master accepted seq 4..7 from the refill, then rejected
+        // seq 8. lastGoodSeq=7. Refill from seq 8.
+        bus.deliver(TRANSFER_ID, chunkNak(7, 'OUT_OF_ORDER'));
+        // After second Go-Back-N: total sent climbs by 16 more (refill of
+        // seq 8..23) = 48.
+        await waitFor(() => chunkSendCount(bus) >= 48, 'second Go-Back-N refill from seq 8');
+        expect(chunkSendCount(bus)).toBe(48);
+
+        // Drain the rest: cumulative ACK for seq 23, then seq 29.
+        bus.deliver(TRANSFER_ID, chunkAck(23, 24));
+        // After this ack, the window tops up by 6 to send seq 24..29.
+        await waitFor(() => chunkSendCount(bus) >= 54, 'top-up after seq 23 ack');
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onChunkNak });
+      await driver;
+
+      expect(result.totalChunks).toBe(totalChunks);
+      expect(result.endAck.status).toBe('OK');
+      expect(onChunkNak).toHaveBeenCalledTimes(2);
+      expect(onChunkNak.mock.calls[0]).toEqual([3, 'CRC']);
+      expect(onChunkNak.mock.calls[1]).toEqual([7, 'OUT_OF_ORDER']);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('NAK with FLASH_FULL rejects with code flash_full and cleans up', async () => {
+    // 5 chunks at 100 bytes. Initial fill sends all 5. Master responds with
+    // FLASH_FULL (lastGoodSeq=2). The streamer must:
+    //   - fire observer.onChunkNak(2, 'FLASH_FULL')
+    //   - reject run() with TransferError code 'flash_full'
+    //   - clean up the subscriber (finally block)
+    const chunkSize = 100;
+    const totalChunks = 5;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0xff);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkNak = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await driveBeginAndAwaitInitialFill(bus, totalChunks);
+        bus.deliver(TRANSFER_ID, chunkNak(2, 'FLASH_FULL'));
+      })();
+
+      await expect(
+        streamer.run(specFor(tempPath, buf.length), { onChunkNak }),
+      ).rejects.toMatchObject({
+        code: 'flash_full',
+        transferId: TRANSFER_ID,
+      });
+      await driver;
+
+      // Observer was notified before rejection.
+      expect(onChunkNak).toHaveBeenCalledTimes(1);
+      expect(onChunkNak).toHaveBeenCalledWith(2, 'FLASH_FULL');
+      // Cleanup must have run on the reject path.
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it.each<FwChunkNakReason>(['CRC', 'SIZE', 'OUT_OF_ORDER'])(
+    'NAK with reason=%s triggers Go-Back-N (not rejection)',
+    async (reason) => {
+      // Smoke check that all three non-FLASH_FULL reasons route through the
+      // Go-Back-N branch. 10 chunks; NAK at lastGoodSeq=2; expect refill
+      // from seq 3 and successful completion after final ack.
+      const chunkSize = 100;
+      const totalChunks = 10;
+      const buf = Buffer.alloc(chunkSize * totalChunks, 0x66);
+      const tempPath = await writeTempFirmware(buf);
+      try {
+        const bus = new FakeSerialBus();
+        const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+        const onChunkNak = vi.fn();
+
+        const driver = (async (): Promise<void> => {
+          await driveBeginAndAwaitInitialFill(bus, totalChunks);
+          expect(chunkSendCount(bus)).toBe(10);
+
+          bus.deliver(TRANSFER_ID, chunkNak(2, reason));
+          // Refill from seq 3..9 = 7 more chunks. Total = 10 + 7 = 17.
+          await waitFor(() => chunkSendCount(bus) >= 17, `Go-Back-N refill after NAK ${reason}`);
+
+          bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+          await waitFor(
+            () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+            'END sent',
+          );
+          bus.deliver(TRANSFER_ID, endAck('OK'));
+        })();
+
+        const result = await streamer.run(specFor(tempPath, buf.length), { onChunkNak });
+        await driver;
+
+        expect(result.endAck.status).toBe('OK');
+        expect(onChunkNak).toHaveBeenCalledWith(2, reason);
+      } finally {
+        await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+      }
+    },
+  );
 });
 
 describe('ChunkStreamer — END_ACK non-OK rejects with cleanup', () => {

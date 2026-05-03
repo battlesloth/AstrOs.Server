@@ -70,7 +70,7 @@ Each task is one logical commit. TDD where applicable (write tests, watch them f
   - `observer.onChunkAck(highestContiguousSeq, bytesSent)` where `bytesSent = (highestAcked + 1) * CHUNK_SIZE_BYTES` (capped at `source.sizeBytes`).
   - **Tests:** multi-chunk window-aligned (e.g., 16 chunks fit one full window); larger transfer (300 chunks for 1.2 MB); cumulative ACK consolidation (one `CHUNK_ACK` retires 5 in-flight chunks at once, top-up sends next 5).
 
-- [ ] **NAK + Go-Back-N** (extend `chunk_streamer.ts`):
+- [x] **NAK + Go-Back-N** (extend `chunk_streamer.ts`):
   - On `FW_CHUNK_NAK`: `observer.onChunkNak(lastGoodSeq, reason)`. If `reason === 'FLASH_FULL'`, reject with `TransferError('flash_full', ...)`. Otherwise (CRC, SIZE, OUT_OF_ORDER): clear `inFlight`, set `nextToSend = lastGoodSeq + 1`, set `highestAcked = lastGoodSeq`. Loop continues, refills window from new `nextToSend`.
   - **Tests:** NAK at seq=N clears the in-flight window and restarts from N+1; consecutive NAKs converge correctly; NAK with `FLASH_FULL` rejects with the right error code.
 

@@ -2,14 +2,20 @@
 //
 // Task 3 (skeleton): linear BEGIN → CHUNK(seq=0) → END pipeline with a single
 // waiter per phase.
-// Task 4 (this revision): replaces the chunk-phase single waiter with a
-// sliding-window state machine. State: an `inFlight` Map keyed by seq, plus
-// `nextToSend` / `highestAcked` cursors. Window grows up to WINDOW_SIZE on
-// each top-up; cumulative CHUNK_ACK semantics retire every entry with
+// Task 4: replaces the chunk-phase single waiter with a sliding-window state
+// machine. State: an `inFlight` Map keyed by seq, plus `nextToSend` /
+// `highestAcked` cursors. Window grows up to WINDOW_SIZE on each top-up;
+// cumulative CHUNK_ACK semantics retire every entry with
 // seq <= highestContiguousSeq in one shot. BEGIN-wait and END-wait keep
 // the single-slot waiter — only one outstanding ack is possible there.
-// No NAK handling, no per-chunk timeout, no watchdog, no abort listener,
-// no backpressure — those layers land in Tasks 5–9 of the c.6b plan.
+// Task 5 (this revision): wires FW_CHUNK_NAK into the phase-aware dispatcher.
+// FLASH_FULL is unrecoverable — `handleChunkNak` rejects the chunk-phase
+// awaiter via `rejectChunkPhase`, propagating a TransferError('flash_full')
+// out to the outer try/catch/finally. CRC / SIZE / OUT_OF_ORDER trigger
+// Go-Back-N: clear `inFlight`, set nextToSend = lastGoodSeq + 1, set
+// highestAcked = lastGoodSeq, and let the existing top-up refill the window.
+// No per-chunk timeout, no watchdog, no abort listener, no backpressure —
+// those layers land in Tasks 6–9 of the c.6b plan.
 //
 // `fs.promises.readFile` is the only fs touch in this module: TransferSpec
 // gives us a path, and the streamer needs the bytes to chunk-and-send. Future
@@ -37,6 +43,7 @@ import { TransferError } from '../models/firmware/chunk_streamer.js';
 import type {
   FwChunk,
   FwChunkAck,
+  FwChunkNak,
   FwTransferBegin,
   FwTransferEnd,
 } from '../models/firmware/firmware_messages.js';
@@ -139,9 +146,15 @@ export class ChunkStreamer {
     // Resolves when `highestAcked === lastSeq`. The chunk-phase ack handler
     // calls `resolveChunkPhaseDone` after the cumulative ACK that completes
     // the transfer; the main loop awaits this before sending TRANSFER_END.
+    // `rejectChunkPhase` lets the chunk-phase awaiter throw from outside the
+    // `await chunkPhaseDone` — currently used by the FLASH_FULL NAK path
+    // (Task 5) and reserved for the watchdog (Task 8) and AbortSignal
+    // listener (Task 9).
     let resolveChunkPhaseDone: (() => void) | null = null;
-    const chunkPhaseDone = new Promise<void>((resolve) => {
+    let rejectChunkPhase: ((err: Error) => void) | null = null;
+    const chunkPhaseDone = new Promise<void>((resolve, reject) => {
       resolveChunkPhaseDone = resolve;
+      rejectChunkPhase = reject;
     });
 
     const handleChunkAck = (ack: FwChunkAck): void => {
@@ -182,6 +195,39 @@ export class ChunkStreamer {
       topUpWindow();
     };
 
+    const handleChunkNak = (nak: FwChunkNak): void => {
+      // Observer fires before any state mutation so listeners see the NAK
+      // even when FLASH_FULL is about to terminate the transfer. Symmetric
+      // to handleChunkAck calling onChunkAck before the early return on
+      // completion.
+      observer.onChunkNak?.(nak.lastGoodSeq, nak.reasonCode);
+
+      if (nak.reasonCode === 'FLASH_FULL') {
+        // Master's flash is exhausted — there's no recovery path. Reject the
+        // chunk-phase awaiter; the outer try/catch/finally propagates the
+        // error and the finally block clears in-flight state and disposes
+        // the subscriber.
+        rejectChunkPhase?.(
+          new TransferError(
+            'flash_full',
+            spec.transferId,
+            `master refused chunk after seq=${nak.lastGoodSeq}: FLASH_FULL`,
+          ),
+        );
+        return;
+      }
+
+      // CRC / SIZE / OUT_OF_ORDER → Go-Back-N. Wipe the in-flight window,
+      // rewind cursors so the next top-up retransmits from lastGoodSeq + 1,
+      // and let topUpWindow refill. The `inFlight.clear()` here makes the
+      // finally-block's `inFlight.clear()` a no-op on the post-NAK happy
+      // path, which is fine — clearing an empty Map is cheap.
+      inFlight.clear();
+      nextToSend = nak.lastGoodSeq + 1;
+      highestAcked = nak.lastGoodSeq;
+      topUpWindow();
+    };
+
     const topUpWindow = (): void => {
       while (inFlight.size < windowSize && nextToSend <= lastSeq) {
         const seq = nextToSend++;
@@ -219,16 +265,20 @@ export class ChunkStreamer {
     };
 
     const unsubscribe = this.bus.subscribeFwAcks(spec.transferId, (ack) => {
-      // Phase-aware dispatch: the chunk phase routes chunkAck into the
-      // sliding-window machine; BEGIN-wait / END-wait route their ack-of-
-      // interest into the single-slot waiter.
-      if (ack.kind === 'chunkAck') {
+      // Phase-aware dispatch: the chunk phase routes chunkAck and chunkNak
+      // into the sliding-window machine; BEGIN-wait / END-wait route their
+      // ack-of-interest into the single-slot waiter.
+      if (ack.kind === 'chunkAck' || ack.kind === 'chunkNak') {
         // Chunk-phase acks are handled directly. If we somehow receive one
         // outside the chunk phase (BEGIN-wait, post-END-wait), it's a
         // protocol oddity; ignoring it matches the Task 3 "out-of-phase ack"
-        // policy. Tasks 5–7 (NAK, backpressure) will refine this dispatcher.
+        // policy. Task 7 (backpressure) will route 'backpressure' similarly.
         if (currentWaiter !== null) return;
-        handleChunkAck(ack);
+        if (ack.kind === 'chunkAck') {
+          handleChunkAck(ack);
+        } else {
+          handleChunkNak(ack);
+        }
         return;
       }
       if (currentWaiter === null) return;
