@@ -294,7 +294,7 @@ export function createFlashProgressThrottle(opts: {
 //     — source binary acquisition.
 //   * c.3 `GitHubReleaseService` — release/asset enumeration.
 //
-// All error paths funnel through `failJob(reason, detail)` (Task 11). That
+// All error paths funnel through `failJob(jobId, reason, detail, opts?)`. That
 // helper is the single site where `flashJobFailed` is emitted, non-terminal
 // controllers are transitioned to Failed, the lock is released, and (for
 // streamer-rejection failures) `currentJob.abortReason` is stamped. Three
@@ -734,8 +734,7 @@ export class FlashJobOrchestrator {
       //   * `TransferError` — c.6b's 12 streamer-rejection codes (bucket B
       //     in spec §"Error paths"). The code is stamped onto
       //     `currentJob.abortReason` AND surfaced as the `reason` on the
-      //     emit; both fields exist on bucket-B emits per the test
-      //     contract (Task 11 fixture).
+      //     emit; both fields exist on bucket-B emits.
       //   * Anything else — a defensive fallback for non-`TransferError`
       //     streamer rejections. Mapped to `streamer_unknown_error` so
       //     the operator at least sees a typed reason rather than a bare

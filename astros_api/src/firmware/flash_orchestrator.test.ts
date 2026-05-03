@@ -2507,17 +2507,13 @@ describe('FlashJobOrchestrator', () => {
       // was already sent — the master may proceed without a server-side
       // observer; the operator UI sees Failed and the lock releases.
       const fx = setupHappyPath();
-      const originalSubscribe = fx.bus.subscribeDeployEvents.bind(fx.bus);
+      // The fixture is local to this test; no need to restore the
+      // original subscribeDeployEvents after the override.
       fx.bus.subscribeDeployEvents = (transferId, handler) => {
-        // Throw on the orchestrator's subscribe call. The test fixture's
-        // own setup doesn't subscribe before start(), so any subscribe
-        // attempt is the orchestrator's.
         void transferId;
         void handler;
         throw new Error('listener limit reached');
       };
-      // Restore so the test cleanup paths (if any) work.
-      void originalSubscribe;
 
       const startPromise = fx.orchestrator.start(fx.request);
       await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
