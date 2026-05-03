@@ -1,11 +1,27 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createFlashProgressThrottle, resolveFlashSource } from './flash_orchestrator.js';
-import type { Clock, FlashRequest } from '../models/firmware/flash_orchestrator.js';
+import {
+  createFlashProgressThrottle,
+  FlashJobOrchestrator,
+  FlashOrchestratorError,
+  resolveFlashSource,
+  type FlashOrchestratorWsMessage,
+} from './flash_orchestrator.js';
+import type { Clock, FlashRequest, Streamer } from '../models/firmware/flash_orchestrator.js';
 import type { ControllerFlashState } from '../models/firmware/flash_job_state.js';
 import { FwStage } from '../models/firmware/firmware_messages.js';
 import type { AssetInfo, ReleaseInfo, ReleaseListResult } from '../models/firmware/release.js';
 import type { CachedAsset } from '../models/firmware/cache.js';
 import type { StoredUpload } from '../models/firmware/upload.js';
+import type {
+  FwInboundAck,
+  SerialBus,
+  StreamObserver,
+  TransferResult,
+  TransferSpec,
+} from '../models/firmware/chunk_streamer.js';
+import type { FwDeployEvent } from '../models/firmware/flash_orchestrator.js';
+import { JobLock } from '../job_lock/job_lock.js';
+import { TransmissionType } from '../models/enums.js';
 
 // --- Fixture builders -------------------------------------------------------
 // Each builder fills only the fields `resolveFlashSource` actually reads. The
@@ -75,7 +91,7 @@ function makeReleaseList(releases: ReleaseInfo[] = []): ReleaseListResult {
 // --- github source path -----------------------------------------------------
 
 describe('resolveFlashSource — github source', () => {
-  it('returns FlashSource with kind=github and variant in displayName on happy path', async () => {
+  it('returns ResolvedFlashSource with kind=github, variant in displayName, and path on happy path', async () => {
     const release = makeRelease();
     const cached = makeCachedAsset();
     const cache = { fetch: vi.fn().mockResolvedValue(cached) };
@@ -92,11 +108,14 @@ describe('resolveFlashSource — github source', () => {
     );
 
     expect(result).toEqual({
-      kind: 'github',
-      version: '1.4.0',
-      sha256: 'a'.repeat(64),
-      sizeBytes: 1_200_000,
-      displayName: 'astros-esp 1.4.0 (lolin_d32_pro)',
+      source: {
+        kind: 'github',
+        version: '1.4.0',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 1_200_000,
+        displayName: 'astros-esp 1.4.0 (lolin_d32_pro)',
+      },
+      path: cached.path,
     });
     expect(cache.fetch).toHaveBeenCalledWith(release, release.assets[0]);
     expect(upload.latest).not.toHaveBeenCalled();
@@ -117,7 +136,7 @@ describe('resolveFlashSource — github source', () => {
       'lolin_d32_pro',
     );
 
-    expect(result.kind).toBe('github');
+    expect(result.source.kind).toBe('github');
     expect(cache.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -181,7 +200,7 @@ describe('resolveFlashSource — github source', () => {
 // --- upload source path -----------------------------------------------------
 
 describe('resolveFlashSource — upload source', () => {
-  it('returns FlashSource with kind=upload and displayName from originalFilename', async () => {
+  it('returns ResolvedFlashSource with kind=upload, displayName from originalFilename, and path', async () => {
     const stored = makeStoredUpload();
     const cache = { fetch: vi.fn() };
     const upload = { latest: vi.fn().mockResolvedValue(stored) };
@@ -200,11 +219,14 @@ describe('resolveFlashSource — upload source', () => {
     );
 
     expect(result).toEqual({
-      kind: 'upload',
-      version: '1.5.0-dev',
-      sha256: 'b'.repeat(64),
-      sizeBytes: 950_000,
-      displayName: 'my-custom-build.bin',
+      source: {
+        kind: 'upload',
+        version: '1.5.0-dev',
+        sha256: 'b'.repeat(64),
+        sizeBytes: 950_000,
+        displayName: 'my-custom-build.bin',
+      },
+      path: stored.path,
     });
     expect(releaseService.getReleases).not.toHaveBeenCalled();
     expect(cache.fetch).not.toHaveBeenCalled();
@@ -471,5 +493,546 @@ describe('createFlashProgressThrottle', () => {
     throttle.submit('a', uploadingState('a', 250)); // must NOT add a 2nd timer
     throttle.submit('a', uploadingState('a', 275)); // still must NOT add a 2nd timer
     expect(vi.getTimerCount()).toBe(1);
+  });
+});
+
+// --- FlashJobOrchestrator ---------------------------------------------------
+
+describe('FlashJobOrchestrator', () => {
+  // FakeSerialBus mirrors the c.6b chunk_streamer.test pattern: record every
+  // `send`, expose maps keyed by transferId for both ack and deploy-event
+  // subscribers, and offer test-only `deliver`/`deliverDeployEvent` helpers
+  // for invoking the registered handlers. Task 6's tests don't drive deploy
+  // events (no-op observer + placeholder deploy phase), but the surface is
+  // here so Tasks 7+8 can extend without re-doing the fixture.
+  type SendKind = Parameters<SerialBus['send']>[1]['kind'];
+
+  class FakeSerialBus implements SerialBus {
+    readonly sent: Array<{ payload: string; kind: SendKind }> = [];
+    readonly ackSubscribers = new Map<string, (ack: FwInboundAck) => void>();
+    readonly deploySubscribers = new Map<string, (event: FwDeployEvent) => void>();
+
+    send(payload: string, opts: { kind: SendKind }): void {
+      this.sent.push({ payload, kind: opts.kind });
+    }
+
+    subscribeFwAcks(transferId: string, handler: (ack: FwInboundAck) => void): () => void {
+      this.ackSubscribers.set(transferId, handler);
+      return () => {
+        this.ackSubscribers.delete(transferId);
+      };
+    }
+
+    subscribeDeployEvents(transferId: string, handler: (event: FwDeployEvent) => void): () => void {
+      this.deploySubscribers.set(transferId, handler);
+      return () => {
+        this.deploySubscribers.delete(transferId);
+      };
+    }
+
+    deliver(transferId: string, ack: FwInboundAck): void {
+      const handler = this.ackSubscribers.get(transferId);
+      if (!handler) throw new Error(`no ack subscriber for ${transferId}`);
+      handler(ack);
+    }
+
+    deliverDeployEvent(transferId: string, event: FwDeployEvent): void {
+      const handler = this.deploySubscribers.get(transferId);
+      if (!handler) throw new Error(`no deploy subscriber for ${transferId}`);
+      handler(event);
+    }
+  }
+
+  // Scripted streamer factory: returns a Streamer whose `run()` resolves /
+  // rejects on test demand. The first `run()` call captures the `spec` +
+  // `observer` + `signal` for assertion; subsequent calls are unexpected
+  // (Task 6 is single-shot per orchestrator instance).
+  interface ScriptedStreamerControls {
+    runs: Array<{ spec: TransferSpec; observer: StreamObserver; signal?: AbortSignal }>;
+    resolve: (result: TransferResult) => void;
+    reject: (err: Error) => void;
+    settled: boolean;
+  }
+
+  function makeScriptedStreamer(): {
+    factory: (opts: { bus: SerialBus }) => Streamer;
+    controls: ScriptedStreamerControls;
+  } {
+    const controls: ScriptedStreamerControls = {
+      runs: [],
+      // Set in factory.run; placeholders keep TS happy.
+      resolve: () => {
+        throw new Error('streamer.run not yet called');
+      },
+      reject: () => {
+        throw new Error('streamer.run not yet called');
+      },
+      settled: false,
+    };
+    const factory = (_opts: { bus: SerialBus }): Streamer => ({
+      run: (spec, observer, opts) => {
+        controls.runs.push({ spec, observer, signal: opts?.signal });
+        return new Promise<TransferResult>((resolve, reject) => {
+          controls.resolve = (r) => {
+            controls.settled = true;
+            resolve(r);
+          };
+          controls.reject = (e) => {
+            controls.settled = true;
+            reject(e);
+          };
+        });
+      },
+    });
+    return { factory, controls };
+  }
+
+  // Canned TransferResult — Task 6 doesn't inspect the result fields, but
+  // we need a valid shape because the orchestrator awaits the promise.
+  function makeTransferResult(spec: TransferSpec): TransferResult {
+    return {
+      transferId: spec.transferId,
+      totalBytesSent: spec.source.sizeBytes,
+      totalChunks: 1,
+      durationMs: 100,
+      endAck: {
+        transferId: spec.transferId,
+        status: 'OK',
+        computedSha256Hex: spec.source.sha256,
+      },
+    };
+  }
+
+  // Minimal real-time clock — Task 6 doesn't need fake timers (Tasks 8/9 will).
+  // Wrapping `Date.now()` keeps every `startedAt` / `endedAt` strictly
+  // monotonic across the test (each call advances the wall clock by at
+  // least the JS event-loop tick), so any test that asserts on those
+  // timestamps gets reproducible non-equal values.
+  const realClock: Clock = {
+    now: () => Date.now(),
+    setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms),
+    clearTimeout: (t) => globalThis.clearTimeout(t),
+  };
+
+  // Factory for the standard "happy-path" orchestrator + fakes. Each test
+  // either uses these defaults or overrides one fake (e.g.,
+  // `controllersStore.listInLocation` resolving to `[]` for the
+  // no_controllers test). The setup is parameterized so the same helper
+  // covers github + upload sources without copy-pasting.
+  interface SetupOpts {
+    controllers?: Array<{ id: string; variant: string }>;
+    request?: FlashRequest;
+    cachedAsset?: CachedAsset;
+    storedUpload?: StoredUpload | null;
+    releases?: ReleaseInfo[];
+    controllersStoreError?: Error;
+  }
+
+  function setupHappyPath(opts: SetupOpts = {}) {
+    const controllers = opts.controllers ?? [
+      { id: 'controller-a', variant: 'lolin_d32_pro' },
+      { id: 'controller-b', variant: 'lolin_d32_pro' },
+    ];
+    const cachedAsset = opts.cachedAsset ?? makeCachedAsset();
+    const storedUpload = opts.storedUpload === undefined ? makeStoredUpload() : opts.storedUpload;
+    const releases = opts.releases ?? [makeRelease()];
+    const request: FlashRequest = opts.request ?? { source: { kind: 'github', version: '1.4.0' } };
+
+    const bus = new FakeSerialBus();
+    const cache = { fetch: vi.fn().mockResolvedValue(cachedAsset) };
+    const upload = { latest: vi.fn().mockResolvedValue(storedUpload) };
+    const releaseService = {
+      getReleases: vi.fn().mockResolvedValue(makeReleaseList(releases)),
+    };
+    const controllersStore = {
+      listInLocation: opts.controllersStoreError
+        ? vi.fn().mockRejectedValue(opts.controllersStoreError)
+        : vi.fn().mockResolvedValue(controllers),
+    };
+    const emitWs = vi.fn<[FlashOrchestratorWsMessage], void>();
+    const jobLock = new JobLock();
+    const { factory: streamerFactory, controls: streamerControls } = makeScriptedStreamer();
+
+    const orchestrator = new FlashJobOrchestrator({
+      bus,
+      jobLock,
+      cache,
+      upload,
+      releaseService,
+      controllersStore,
+      emitWs,
+      streamerFactory,
+      clock: realClock,
+    });
+
+    return {
+      orchestrator,
+      bus,
+      cache,
+      upload,
+      releaseService,
+      controllersStore,
+      emitWs,
+      jobLock,
+      streamerControls,
+      request,
+      controllers,
+      cachedAsset,
+      storedUpload,
+    };
+  }
+
+  // Convenience: filter the emitWs calls down to a specific event type.
+  function emittedFrames(
+    emitWs: ReturnType<typeof vi.fn>,
+    type: TransmissionType,
+  ): FlashOrchestratorWsMessage[] {
+    return emitWs.mock.calls
+      .map((call) => call[0] as FlashOrchestratorWsMessage)
+      .filter((msg) => msg.type === type);
+  }
+
+  it('happy path (github source): acquires lock, resolves source, runs streamer, emits lifecycle events, releases lock', async () => {
+    const fx = setupHappyPath();
+
+    const startPromise = fx.orchestrator.start(fx.request);
+
+    // Streamer.run was invoked synchronously after the source resolved. Wait
+    // for the resolver chain to settle by yielding the microtask queue, then
+    // resolve the streamer's promise to drive the orchestrator to completion.
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+    const { spec } = fx.streamerControls.runs[0];
+    fx.streamerControls.resolve(makeTransferResult(spec));
+
+    const result = await startPromise;
+
+    // Return value carries jobId, transferId, source, targets.
+    expect(result.jobId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(result.transferId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(result.source).toEqual({
+      kind: 'github',
+      version: '1.4.0',
+      sha256: fx.cachedAsset.sha256,
+      sizeBytes: fx.cachedAsset.sizeBytes,
+      displayName: 'astros-esp 1.4.0 (lolin_d32_pro)',
+    });
+    expect(result.targets).toEqual(['controller-a', 'controller-b']);
+
+    // TransferSpec carried both the on-disk path (from CachedAsset) and the
+    // controllers' IDs as targets.
+    expect(spec.source.path).toBe(fx.cachedAsset.path);
+    expect(spec.source.sha256).toBe(fx.cachedAsset.sha256);
+    expect(spec.source.sizeBytes).toBe(fx.cachedAsset.sizeBytes);
+    expect(spec.targets).toEqual(['controller-a', 'controller-b']);
+    expect(spec.transferId).toBe(result.transferId);
+
+    // Source path under streamer is on disk; resolver returns it via the
+    // ResolvedFlashSource intermediate so the operator-facing `source`
+    // shape never carries `path`.
+    expect((result.source as unknown as { path?: string }).path).toBeUndefined();
+
+    // WS lifecycle: lockStateChanged (acquire) → flashJobStarted →
+    // flashJobDone → lockStateChanged (release). Order matters.
+    const types = fx.emitWs.mock.calls.map((c) => (c[0] as FlashOrchestratorWsMessage).type);
+    expect(types).toEqual([
+      TransmissionType.lockStateChanged,
+      TransmissionType.flashJobStarted,
+      TransmissionType.flashJobDone,
+      TransmissionType.lockStateChanged,
+    ]);
+
+    // flashJobStarted carries the full FlashJobState with all controllers
+    // initially Queued.
+    const startedFrames = emittedFrames(fx.emitWs, TransmissionType.flashJobStarted);
+    expect(startedFrames).toHaveLength(1);
+    const startedData = (
+      startedFrames[0] as { data: { jobId: string; controllers: ControllerFlashState[] } }
+    ).data;
+    expect(startedData.jobId).toBe(result.jobId);
+    expect(startedData.controllers).toEqual([
+      {
+        controllerId: 'controller-a',
+        stage: FwStage.Queued,
+        bytesSent: 0,
+        totalBytes: fx.cachedAsset.sizeBytes,
+        detail: '',
+      },
+      {
+        controllerId: 'controller-b',
+        stage: FwStage.Queued,
+        bytesSent: 0,
+        totalBytes: fx.cachedAsset.sizeBytes,
+        detail: '',
+      },
+    ]);
+
+    // flashJobDone carries jobId + endedAt.
+    const doneFrames = emittedFrames(fx.emitWs, TransmissionType.flashJobDone);
+    expect(doneFrames).toHaveLength(1);
+    const doneData = (doneFrames[0] as { data: { jobId: string; endedAt: string } }).data;
+    expect(doneData.jobId).toBe(result.jobId);
+    expect(typeof doneData.endedAt).toBe('string');
+
+    // Lock acquired then released: getOwner is null at end; both
+    // lockStateChanged frames reflect the transitions.
+    const lockFrames = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged);
+    expect(lockFrames).toHaveLength(2);
+    expect((lockFrames[0] as unknown as { locked: boolean; owner: string }).locked).toBe(true);
+    expect((lockFrames[0] as unknown as { locked: boolean; owner: string }).owner).toBe(
+      result.jobId,
+    );
+    expect((lockFrames[1] as unknown as { locked: boolean; owner: string | null }).locked).toBe(
+      false,
+    );
+    expect((lockFrames[1] as unknown as { locked: boolean; owner: string | null }).owner).toBe(
+      null,
+    );
+
+    // After release: lock free, currentJob null.
+    expect(fx.jobLock.isLocked()).toBe(false);
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+  });
+
+  it('happy path (upload source): displayName comes from upload originalFilename', async () => {
+    const fx = setupHappyPath({ request: { source: { kind: 'upload' } } });
+
+    const startPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+    const { spec } = fx.streamerControls.runs[0];
+    fx.streamerControls.resolve(makeTransferResult(spec));
+
+    const result = await startPromise;
+
+    expect(result.source).toEqual({
+      kind: 'upload',
+      version: '1.5.0-dev',
+      sha256: 'b'.repeat(64),
+      sizeBytes: 950_000,
+      displayName: 'my-custom-build.bin',
+    });
+    expect(spec.source.path).toBe(fx.storedUpload?.path);
+
+    // Releases service is unused on the upload path.
+    expect(fx.releaseService.getReleases).not.toHaveBeenCalled();
+    expect(fx.cache.fetch).not.toHaveBeenCalled();
+  });
+
+  it('concurrent start: second start while lock held throws job_already_running with currentJobId', async () => {
+    const fx = setupHappyPath();
+
+    // Kick off the first job; do NOT settle the streamer so the lock is held.
+    const firstStart = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+
+    // The first start has acquired the lock and emitted flashJobStarted by now.
+    // currentJob holds the in-flight state; getOwner() carries the first job's id.
+    const firstJobId = fx.jobLock.getOwner();
+    expect(firstJobId).not.toBeNull();
+    const inflight = fx.orchestrator.getCurrentJob();
+    expect(inflight).not.toBeNull();
+
+    // Second start fails synchronously at the lock gate.
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('job_already_running');
+    expect((caught as FlashOrchestratorError).currentJobId).toBe(firstJobId);
+
+    // First job state untouched by the rejection — same currentJob, still in flight.
+    expect(fx.orchestrator.getCurrentJob()).toBe(inflight);
+
+    // Drain the first job so the test doesn't leave a dangling promise.
+    fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+    await firstStart;
+  });
+
+  it('rejects with no_controllers when controllersStore returns empty list; lock released, currentJob never set', async () => {
+    const fx = setupHappyPath({ controllers: [] });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('no_controllers');
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(false);
+
+    // No flashJobStarted should have been emitted (we never built a state).
+    expect(emittedFrames(fx.emitWs, TransmissionType.flashJobStarted)).toHaveLength(0);
+    // But we did acquire+release the lock, so two lockStateChanged frames.
+    expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(2);
+  });
+
+  it('rejects with variant_mismatch when controllers have differing variants; detail enumerates pairs', async () => {
+    const fx = setupHappyPath({
+      controllers: [
+        { id: 'controller-a', variant: 'lolin_d32_pro' },
+        { id: 'controller-b', variant: 'metro_s3' },
+      ],
+    });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('variant_mismatch');
+    // Detail must surface BOTH offending pairs so the operator can see which is wrong.
+    const detail = (caught as FlashOrchestratorError).detail ?? '';
+    expect(detail).toContain('controller-a=lolin_d32_pro');
+    expect(detail).toContain('controller-b=metro_s3');
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(false);
+  });
+
+  it('rejects with variant_unknown when one controller has empty variant; detail names the controllerId', async () => {
+    const fx = setupHappyPath({
+      controllers: [
+        { id: 'controller-a', variant: 'lolin_d32_pro' },
+        { id: 'controller-b', variant: '' },
+      ],
+    });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('variant_unknown');
+    expect((caught as FlashOrchestratorError).detail).toContain('controller-b');
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(false);
+  });
+
+  it('rejects with asset_not_found when github source has no asset matching variant', async () => {
+    // Release exists, but its only asset is metro_s3; controllers report
+    // lolin_d32_pro → mismatch surfaced as asset_not_found.
+    const release = makeRelease({ assets: [makeAsset({ variant: 'metro_s3' })] });
+    const fx = setupHappyPath({ releases: [release] });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('asset_not_found');
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(false);
+  });
+
+  it('rejects with release_not_found when github request version matches no release', async () => {
+    const fx = setupHappyPath({
+      releases: [makeRelease({ tag: 'v1.3.0', version: '1.3.0' })],
+      request: { source: { kind: 'github', version: '1.4.0' } },
+    });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('release_not_found');
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(false);
+  });
+
+  it('rejects with no_upload when upload source returns null', async () => {
+    const fx = setupHappyPath({
+      request: { source: { kind: 'upload' } },
+      storedUpload: null,
+    });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('no_upload');
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(false);
+  });
+
+  it('rejects with source_resolution_failed when releaseService rejects (Task 11 will refine to release_lookup_failed)', async () => {
+    const fx = setupHappyPath();
+    fx.releaseService.getReleases.mockRejectedValue(new Error('upstream_offline'));
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('source_resolution_failed');
+    expect((caught as FlashOrchestratorError).detail).toBe('upstream_offline');
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(false);
+  });
+
+  it('streamer rejection: lock released, currentJob cleared, error propagates (Task 11 will map to typed reasons)', async () => {
+    const fx = setupHappyPath();
+    const startPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+
+    // currentJob is set before streamer.run resolves.
+    expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+
+    fx.streamerControls.reject(new Error('begin_timeout'));
+
+    await expect(startPromise).rejects.toThrow('begin_timeout');
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(false);
+    // lockStateChanged still fired twice (acquire + release).
+    expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(2);
+    // flashJobDone is NOT emitted on streamer failure.
+    expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(0);
+  });
+
+  it('getCurrentJob: returns in-flight state mid-flow, null after release', async () => {
+    const fx = setupHappyPath();
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+
+    const startPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+
+    // Mid-flow: streamer hasn't resolved yet; currentJob exposes the
+    // initial Queued state.
+    const inflight = fx.orchestrator.getCurrentJob();
+    expect(inflight).not.toBeNull();
+    expect(inflight?.controllers).toHaveLength(2);
+    expect(inflight?.controllers.every((c) => c.stage === FwStage.Queued)).toBe(true);
+    expect(inflight?.endedAt).toBeUndefined();
+
+    // Drive to completion.
+    fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+    await startPromise;
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
   });
 });
