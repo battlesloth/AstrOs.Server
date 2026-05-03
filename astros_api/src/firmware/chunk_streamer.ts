@@ -8,14 +8,21 @@
 // cumulative CHUNK_ACK semantics retire every entry with
 // seq <= highestContiguousSeq in one shot. BEGIN-wait and END-wait keep
 // the single-slot waiter — only one outstanding ack is possible there.
-// Task 5 (this revision): wires FW_CHUNK_NAK into the phase-aware dispatcher.
+// Task 5: wires FW_CHUNK_NAK into the phase-aware dispatcher.
 // FLASH_FULL is unrecoverable — `handleChunkNak` rejects the chunk-phase
 // awaiter via `rejectChunkPhase`, propagating a TransferError('flash_full')
 // out to the outer try/catch/finally. CRC / SIZE / OUT_OF_ORDER trigger
 // Go-Back-N: clear `inFlight`, set nextToSend = lastGoodSeq + 1, set
 // highestAcked = lastGoodSeq, and let the existing top-up refill the window.
-// No per-chunk timeout, no watchdog, no abort listener, no backpressure —
-// those layers land in Tasks 6–9 of the c.6b plan.
+// Task 6 (this revision): per-chunk ack timeout + retry counter. Each chunk
+// is armed with `setTimeout(ackTimeoutMs)` on send. On fire, retries++ and
+// if we've hit `maxRetriesPerChunk`, reject the chunk phase with
+// TransferError('chunk_retry_exhausted'); otherwise observer.onRetry, build
+// a fresh FW_CHUNK payload, resend, re-arm. Timer is cleared on the
+// cumulative ACK that retires the seq, on the all-clear of NAK Go-Back-N,
+// and on cleanup in the `finally` block.
+// No watchdog, no abort listener, no backpressure — those layers land in
+// Tasks 7–9 of the c.6b plan.
 //
 // `fs.promises.readFile` is the only fs touch in this module: TransferSpec
 // gives us a path, and the streamer needs the bytes to chunk-and-send. Future
@@ -131,12 +138,25 @@ export class ChunkStreamer {
     // ---- Sliding-window state (Task 4). Initialized eagerly so the `finally`
     // block can always clear `inFlight` regardless of which phase we error in.
     // `inFlight`: seq → bookkeeping for chunks sent but not yet cumulatively
-    //   acked. Tasks 5–6 will read `sentAt`/`retries` for retry & NAK logic.
+    //   acked. Task 5 reads `sentAt`/`retries` for retry & NAK logic.
     // `nextToSend`: next seq to put on the wire when the window has room.
     // `highestAcked`: greatest cumulatively-acked seq, or -1 before any ACK.
     const inFlight = new Map<number, { sentAt: number; retries: number }>();
     let nextToSend = 0;
     let highestAcked = -1;
+
+    // ---- Per-chunk ack timers (Task 6). Parallel structure to `inFlight`,
+    // keyed by the same seq. Each `setTimeout` ID is stored so:
+    //   - the cumulative-ACK retire path can clearTimeout per retired seq,
+    //   - the NAK Go-Back-N path can clear all timers in lockstep with
+    //     `inFlight.clear()`,
+    //   - and the `finally` block can drain any leftover timers on error
+    //     so a rejected run doesn't leak a node `setTimeout` past return.
+    // The `chunkSizeBytes` and `ackTimeoutMs` reads below are hoisted into a
+    // local for the timer callbacks; the rest of the streamer reads via
+    // `this.config.*`.
+    const chunkTimers = new Map<number, NodeJS.Timeout>();
+    const { ackTimeoutMs, maxRetriesPerChunk } = this.config;
 
     // Single waiter slot — used by BEGIN-wait and END-wait phases only. The
     // chunk phase (Task 4+) drives off `inFlight` / `highestAcked` and is
@@ -157,6 +177,96 @@ export class ChunkStreamer {
       rejectChunkPhase = reject;
     });
 
+    // Build the wire payload + send for a single seq. Used by both the
+    // initial top-up loop and the retry path on per-chunk timeout. Centralizing
+    // the FW_CHUNK build keeps the two call sites in lockstep — they must
+    // agree on payload shape, message-id strategy, and bus.send 'firmware'
+    // tagging so a future protocol tweak doesn't drift between them.
+    const sendChunk = (seq: number): void => {
+      // subarray() returns a zero-copy view — important for 300+ chunk
+      // transfers where Buffer.from(slice(...)) would copy each chunk.
+      const chunkBytes = sourceBuffer.subarray(
+        seq * chunkSizeBytes,
+        Math.min((seq + 1) * chunkSizeBytes, sourceBuffer.length),
+      );
+      const chunkPayload: FwChunk = {
+        transferId: spec.transferId,
+        seq,
+        payloadLen: chunkBytes.length,
+        base64Bytes: chunkBytes.toString('base64'),
+        // CRC-16 of the chunk bytes. Task 3/4 send a placeholder so the wire
+        // framing is well-formed; FakeSerialBus does not validate. A real
+        // CRC helper is tracked separately and lands when the master starts
+        // checking it.
+        //
+        // The value is a non-numeric greppable marker (NOT '0000') so a
+        // buggy CRC validator can't silently accept it as a valid all-zero
+        // CRC — any well-formed validator will reject this at parse time
+        // and a maintainer running against a real master will have an
+        // obvious search target.
+        crc16Hex: 'TODO_TASK_4_CRC16',
+      };
+      const chunkMsg = this.messageGenerator.generateMessage(
+        SerialMessageType.FW_CHUNK,
+        uuid_v4(),
+        chunkPayload,
+      );
+      this.bus.send(chunkMsg.msg, { kind: 'firmware' });
+    };
+
+    // Per-chunk timer helpers. `armChunkTimer` clears any prior timer for the
+    // same seq before re-arming so a resend that calls into here cannot leak
+    // the previous timer (defense in depth — the resend path already calls
+    // clearChunkTimer first, but a future caller adding a second arm site
+    // would still be safe).
+    const armChunkTimer = (seq: number): void => {
+      const existing = chunkTimers.get(seq);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(() => onChunkTimeout(seq), ackTimeoutMs);
+      chunkTimers.set(seq, timer);
+    };
+
+    const clearChunkTimer = (seq: number): void => {
+      const timer = chunkTimers.get(seq);
+      if (timer) {
+        clearTimeout(timer);
+        chunkTimers.delete(seq);
+      }
+    };
+
+    const onChunkTimeout = (seq: number): void => {
+      // Defensive guard: if the chunk was retired between timer fire and this
+      // callback (shouldn't happen given clearTimeout is synchronous, but
+      // covers a future refactor that might race), no-op.
+      const entry = inFlight.get(seq);
+      if (!entry) return;
+
+      entry.retries += 1;
+
+      if (entry.retries >= maxRetriesPerChunk) {
+        // Exhausted — reject the chunk-phase awaiter. The outer try/finally
+        // propagates the error and the finally block drains chunkTimers,
+        // disposes the subscriber, and clears inFlight.
+        rejectChunkPhase?.(
+          new TransferError(
+            'chunk_retry_exhausted',
+            spec.transferId,
+            `seq=${seq} exhausted ${maxRetriesPerChunk} retries`,
+          ),
+        );
+        return;
+      }
+
+      // Notify the observer BEFORE the resend so listeners see the retry
+      // event in causal order with the wire send that follows it.
+      observer.onRetry?.(seq, entry.retries);
+
+      // Resend the same seq with a fresh FW_CHUNK payload + new timer.
+      sendChunk(seq);
+      entry.sentAt = Date.now();
+      armChunkTimer(seq);
+    };
+
     const handleChunkAck = (ack: FwChunkAck): void => {
       // Capture the cursor BEFORE the monotonic update so we can detect
       // whether this ACK actually advanced progress. A duplicate / late
@@ -171,8 +281,13 @@ export class ChunkStreamer {
       // Cumulative-ACK semantics: every in-flight entry with
       // seq <= highestContiguousSeq is retired in one shot. A single ACK can
       // therefore retire many chunks (e.g. one ACK closing out a full window).
+      // Each retired seq's pending ack timer (Task 6) is cleared in lockstep
+      // so a retired chunk cannot fire a phantom retry after its ACK.
       for (const seq of Array.from(inFlight.keys())) {
-        if (seq <= ack.highestContiguousSeq) inFlight.delete(seq);
+        if (seq <= ack.highestContiguousSeq) {
+          clearChunkTimer(seq);
+          inFlight.delete(seq);
+        }
       }
       // Monotonic: out-of-order or duplicate older ACKs can't roll back.
       if (ack.highestContiguousSeq > highestAcked) {
@@ -241,6 +356,16 @@ export class ChunkStreamer {
       // and let topUpWindow refill. The `inFlight.clear()` here makes the
       // finally-block's `inFlight.clear()` a no-op on the post-NAK happy
       // path, which is fine — clearing an empty Map is cheap.
+      //
+      // Task 6: chunkTimers must be drained in lockstep with inFlight.
+      // Otherwise a stale per-chunk timer for a now-discarded seq would
+      // fire after the resend, find no inFlight entry (the early-return
+      // guard in onChunkTimeout would catch it), but in the racy case
+      // where the new top-up has already re-armed seq=N before the old
+      // timer fires, the old fire would walk an entry that "looks valid"
+      // and double-count its retries.
+      for (const timer of chunkTimers.values()) clearTimeout(timer);
+      chunkTimers.clear();
       inFlight.clear();
       nextToSend = nak.lastGoodSeq + 1;
       highestAcked = nak.lastGoodSeq;
@@ -250,36 +375,12 @@ export class ChunkStreamer {
     const topUpWindow = (): void => {
       while (inFlight.size < windowSize && nextToSend <= lastSeq) {
         const seq = nextToSend++;
-        // subarray() returns a zero-copy view — important for 300+ chunk
-        // transfers where Buffer.from(slice(...)) would copy each chunk.
-        const chunkBytes = sourceBuffer.subarray(
-          seq * chunkSizeBytes,
-          Math.min((seq + 1) * chunkSizeBytes, sourceBuffer.length),
-        );
-        const chunkPayload: FwChunk = {
-          transferId: spec.transferId,
-          seq,
-          payloadLen: chunkBytes.length,
-          base64Bytes: chunkBytes.toString('base64'),
-          // CRC-16 of the chunk bytes. Task 3/4 send a placeholder so the wire
-          // framing is well-formed; FakeSerialBus does not validate. A real
-          // CRC helper is tracked separately and lands when the master starts
-          // checking it.
-          //
-          // The value is a non-numeric greppable marker (NOT '0000') so a
-          // buggy CRC validator can't silently accept it as a valid all-zero
-          // CRC — any well-formed validator will reject this at parse time
-          // and a maintainer running against a real master will have an
-          // obvious search target.
-          crc16Hex: 'TODO_TASK_4_CRC16',
-        };
-        const chunkMsg = this.messageGenerator.generateMessage(
-          SerialMessageType.FW_CHUNK,
-          uuid_v4(),
-          chunkPayload,
-        );
-        this.bus.send(chunkMsg.msg, { kind: 'firmware' });
+        sendChunk(seq);
         inFlight.set(seq, { sentAt: Date.now(), retries: 0 });
+        // Arm the per-chunk ack timer (Task 6). The timer fires after
+        // ackTimeoutMs if no cumulative ACK has retired this seq by then;
+        // see onChunkTimeout for the retry/exhaust logic.
+        armChunkTimer(seq);
       }
     };
 
@@ -376,9 +477,12 @@ export class ChunkStreamer {
       };
     } finally {
       // Cleanup invariants: this block extends as later tasks add state.
-      // Task 4 added: clear the in-flight Map. Task 6 will clear the
-      // per-chunk timer Map; Task 8 the transfer watchdog; Task 9 the
-      // AbortSignal listener.
+      // Task 4 added: clear the in-flight Map. Task 6 added: drain the
+      // per-chunk timer Map so a rejected run doesn't leak a node
+      // setTimeout past return. Task 8 will clear the transfer watchdog;
+      // Task 9 the AbortSignal listener.
+      for (const timer of chunkTimers.values()) clearTimeout(timer);
+      chunkTimers.clear();
       inFlight.clear();
       unsubscribe();
     }

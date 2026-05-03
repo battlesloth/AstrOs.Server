@@ -119,11 +119,10 @@ function endAck(status: 'OK' | 'HASH_MISMATCH' | 'IO_ERROR' = 'OK'): FwInboundAc
 // number of setImmediate cycles. A wall-clock bound is robust to that — the
 // only thing it costs in the failure case is the elapsed milliseconds.
 //
-// Task 3/4 has no time-dependent logic, so real timers are fine.
-//
-// TODO(c.6b Task 6): migrate to vi.useFakeTimers() once timer-driven
-// retry/watchdog logic lands; this wall-clock bound is a temporary
-// measure for Tasks 3-5 which use real timers only for the readFile.
+// Tasks 3-5 have no time-dependent logic, so real timers are fine. The Task 6
+// describe block uses `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })`,
+// deliberately leaving Date and setImmediate un-faked so this same `waitFor`
+// helper continues to work without a parallel fake-timer-aware variant.
 async function waitFor(predicate: () => boolean, label: string): Promise<void> {
   const deadline = Date.now() + 4000;
   while (Date.now() < deadline) {
@@ -941,5 +940,282 @@ describe('ChunkStreamer — END_ACK non-OK rejects with cleanup', () => {
     });
     await driver;
     expect(bus.subscribers.size).toBe(0);
+  });
+});
+
+describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
+  // Default ackTimeoutMs from TRANSPORT_DEFAULTS. Hard-coded here rather than
+  // imported so the test stays self-contained and a future config tweak that
+  // changes the default would force these tests to be reviewed deliberately.
+  const ACK_TIMEOUT_MS = 1500;
+
+  // Task 6 keeps Date and setImmediate un-faked (only setTimeout/clearTimeout
+  // are intercepted), so the top-of-file wall-clock `waitFor` works as-is
+  // here for predicate polling. `advanceTimersByTimeAsync(ACK_TIMEOUT_MS)` is
+  // what we actually need fake timers for — fast-forwarding the streamer's
+  // ack-timeout setTimeout without sitting through 1.5 real-time seconds.
+
+  function chunkSendCount(bus: FakeSerialBus): number {
+    return bus.sent.filter((s) => s.payload.includes('FW_CHUNK')).length;
+  }
+
+  beforeEach(() => {
+    // Fake ONLY setTimeout/clearTimeout — the two timer APIs the streamer
+    // uses for the per-chunk ack timeout in Task 6. Three deliberate
+    // exclusions that keep this surgical:
+    //   * setImmediate stays real, because under parallel test load
+    //     vitest's fs plumbing for `fsp.readFile` (the streamer's first
+    //     await) can stall when setImmediate is faked, deadlocking the
+    //     test before BEGIN ever hits the wire.
+    //   * Date stays real, because the top-of-file `waitFor` helper bounds
+    //     its polling on `Date.now()` deadlines and a faked Date makes
+    //     that infinite-spin under load.
+    //   * setInterval stays real (not used by the streamer; faking it
+    //     would only invite cross-suite surprise).
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('single chunk timeout → resend → ACK: observer.onRetry fires once, retry attempt resends, transfer completes', async () => {
+    // Single-chunk transfer keeps the timer-fire ordering deterministic:
+    // exactly one timer is armed, advancing fake time by ACK_TIMEOUT_MS
+    // fires only that one. Anything larger risks all-timers-fire-at-once
+    // (since they're armed in the same synchronous topUpWindow loop) which
+    // makes the assertion order tricky.
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize, 0x11);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onRetry = vi.fn();
+      const onChunkAck = vi.fn();
+
+      // Drive the BEGIN handshake without delivering chunkAck yet — we want
+      // to time out the chunk first.
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
+        // Sanity: BEGIN + 1 chunk on the wire, no ACK yet.
+        expect(chunkSendCount(bus)).toBe(1);
+
+        // Advance past the per-chunk timeout. Timer fires, retries++ to 1,
+        // observer.onRetry called, resend issued, timer re-armed.
+        await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+        await waitFor(() => chunkSendCount(bus) >= 2, 'resend after timeout');
+        expect(chunkSendCount(bus)).toBe(2);
+        expect(onRetry).toHaveBeenCalledTimes(1);
+        expect(onRetry).toHaveBeenCalledWith(0, 1);
+
+        // Now deliver the cumulative ACK. The retire path clears the
+        // (re-armed) timer so no further onRetry fires even if we advance
+        // time past the next ACK_TIMEOUT_MS.
+        bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onRetry, onChunkAck });
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+      expect(result.totalChunks).toBe(1);
+      // Exactly one retry across the full run.
+      expect(onRetry).toHaveBeenCalledTimes(1);
+      expect(onRetry).toHaveBeenCalledWith(0, 1);
+      // Subscriber disposed on the resolve path.
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('three timeouts on the same chunk reject with chunk_retry_exhausted', async () => {
+    // 1-chunk transfer. Initial send arms timer.
+    //   advance ACK_TIMEOUT_MS → retries=1, observer.onRetry(0, 1), resend.
+    //   advance ACK_TIMEOUT_MS → retries=2, observer.onRetry(0, 2), resend.
+    //   advance ACK_TIMEOUT_MS → retries=3 == maxRetriesPerChunk, reject
+    //                            with TransferError('chunk_retry_exhausted').
+    // observer.onRetry is called exactly twice (for retries=1 and 2).
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize, 0x22);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onRetry = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
+
+        // Three consecutive timeouts. Note we await microtask drains between
+        // each so the resend and re-arm happen before we advance fake time
+        // again (otherwise the second advance might fire BOTH the original
+        // re-armed timer AND any timer armed during the resend handler).
+        await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS); // retries=1, resend
+        await waitFor(() => chunkSendCount(bus) >= 2, 'first resend');
+        expect(onRetry).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS); // retries=2, resend
+        await waitFor(() => chunkSendCount(bus) >= 3, 'second resend');
+        expect(onRetry).toHaveBeenCalledTimes(2);
+
+        // Third advance: retries hits maxRetriesPerChunk (3) and the chunk
+        // phase rejects. No third resend, no third onRetry.
+        await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), { onRetry })).rejects.toMatchObject({
+        code: 'chunk_retry_exhausted',
+        transferId: TRANSFER_ID,
+      });
+      await driver;
+
+      // Two retries observed (for attempts 1 and 2). The third firing
+      // rejected before observer.onRetry would have been called.
+      expect(onRetry).toHaveBeenCalledTimes(2);
+      expect(onRetry.mock.calls[0]).toEqual([0, 1]);
+      expect(onRetry.mock.calls[1]).toEqual([0, 2]);
+      // bus.sent: BEGIN + initial CHUNK + 2 resends = 3 FW_CHUNK entries
+      // (no third resend — the third timeout rejected instead).
+      expect(chunkSendCount(bus)).toBe(3);
+      // Cleanup verified: subscriber disposed on the reject path.
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('concurrent in-flight chunks time out independently and each fires its own retry', async () => {
+    // 2-chunk transfer. Initial top-up sends seq 0 and 1 in lockstep, both
+    // armed within the same synchronous topUpWindow call so their timers
+    // fire on the same fake-time boundary. After advancing ACK_TIMEOUT_MS,
+    // observer.onRetry fires twice (once per seq) and bus.sent gets 2
+    // resends. Delivering the cumulative ACK then drains both.
+    const chunkSize = 100;
+    const totalChunks = 2;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x33);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onRetry = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 2, 'initial fill 2 chunks');
+        expect(chunkSendCount(bus)).toBe(2);
+
+        // Both per-chunk timers fire on this advance.
+        await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS);
+        // After the resends settle, total FW_CHUNK count is 2 + 2 = 4.
+        await waitFor(() => chunkSendCount(bus) >= 4, 'both resends');
+        expect(chunkSendCount(bus)).toBe(4);
+
+        // Both seqs got an onRetry call with attempt=1.
+        expect(onRetry).toHaveBeenCalledTimes(2);
+        const calls = onRetry.mock.calls.map((c) => c[0]).sort((a, b) => a - b);
+        expect(calls).toEqual([0, 1]);
+        for (const c of onRetry.mock.calls) {
+          expect(c[1]).toBe(1);
+        }
+
+        // Drain with one cumulative ACK.
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onRetry });
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+      expect(result.totalChunks).toBe(totalChunks);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('clearTimeout on ACK: ACK-retired chunks have their timers disarmed (vi.getTimerCount goes to 0)', async () => {
+    // Mutation-friendly. Two layers of protection in the impl make a missing
+    // `clearChunkTimer` in the ACK-retire loop hard to observe via side
+    // effects alone:
+    //   * the `if (!entry) return` early-return in onChunkTimeout swallows
+    //     the late timer fire, so observer.onRetry would still NOT be called,
+    //   * and no resend happens for the same reason — bus.sent is unaffected.
+    // What IS observable is the active fake-timer count: an unrcleared
+    // setTimeout stays armed until it fires (consuming a fake-timer slot
+    // until advanceTimersByTime runs it). We assert the count is 0 right
+    // after the ACK retires the only in-flight chunk — if clearChunkTimer
+    // were dropped, getTimerCount() would be 1 here.
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize, 0x44);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onRetry = vi.fn();
+
+      let timerCountAfterAck = -1;
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
+        // Sanity: exactly one fake-timer slot is occupied (the per-chunk
+        // ack timer for seq=0). If this fails the test pre-condition is
+        // wrong, not the invariant we're testing.
+        expect(vi.getTimerCount()).toBe(1);
+
+        // Deliver the ACK BEFORE the timer fires. clearChunkTimer should
+        // disarm the per-chunk timer in lockstep with inFlight.delete —
+        // this is what we want to verify.
+        bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+        // Snapshot the count synchronously after the deliver returns. The
+        // ACK retire path runs synchronously in the bus subscriber callback,
+        // so by this point clearChunkTimer should have run.
+        timerCountAfterAck = vi.getTimerCount();
+
+        // Belt-and-suspenders: advance past the timeout to confirm onRetry
+        // is not somehow triggered through a side-channel.
+        await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS * 2);
+
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onRetry });
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+      // Primary mutation-friendly assertion: timer was actively cleared.
+      // If clearChunkTimer were dropped from the ACK retire path, the
+      // setTimeout would still be armed here and the count would be 1.
+      expect(timerCountAfterAck).toBe(0);
+      // Side-channel checks — both held even with the defensive guard,
+      // but worth pinning so a future refactor that drops the guard
+      // would still surface a regression here.
+      expect(onRetry).not.toHaveBeenCalled();
+      expect(chunkSendCount(bus)).toBe(1);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
   });
 });
