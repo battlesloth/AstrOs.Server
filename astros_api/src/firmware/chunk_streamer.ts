@@ -235,12 +235,34 @@ export class ChunkStreamer {
     };
 
     const onChunkTimeout = (seq: number): void => {
-      // Defensive guard: if the chunk was retired between timer fire and this
-      // callback (shouldn't happen given clearTimeout is synchronous, but
-      // covers a future refactor that might race), no-op.
-      const entry = inFlight.get(seq);
-      if (!entry) return;
+      // The timer just fired — its ID is now garbage. Remove it from
+      // chunkTimers immediately so the lockstep invariant
+      //   chunkTimers.has(seq) ⇔ inFlight.has(seq)
+      //     AND the corresponding timer is still pending
+      // holds for any future reader (e.g. c.6c observability metrics).
+      // The re-arm path below calls armChunkTimer, which adds the new
+      // timer back to chunkTimers within the same synchronous turn, so
+      // the invariant is restored before any other code can observe it.
+      chunkTimers.delete(seq);
 
+      const entry = inFlight.get(seq);
+      if (!entry) {
+        // Defense-in-depth: a timer whose callback was already pulled
+        // from the runtime's timer queue can't be retroactively
+        // unscheduled by a sibling clearTimeout. Real cases:
+        //   - vi.advanceTimersByTimeAsync fires multiple armed timers
+        //     in one batch, and a cumulative ACK inside one callback
+        //     retires others whose timers are already pending execution
+        //   - post-NAK Go-Back-N drains inFlight + chunkTimers, but a
+        //     timer already in the about-to-fire queue still fires
+        // In both cases inFlight.get(seq) returns undefined; no-op.
+        return;
+      }
+
+      // retries counts attempts INCLUDING the one that just timed out.
+      // When retries reaches maxRetriesPerChunk, we've spent our budget;
+      // reject instead of resending one more time (so maxRetriesPerChunk
+      // = 3 means 2 resends + 1 reject, not 3 resends).
       entry.retries += 1;
 
       if (entry.retries >= maxRetriesPerChunk) {
