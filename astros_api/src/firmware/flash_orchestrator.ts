@@ -240,7 +240,10 @@ export function createFlashProgressThrottle(opts: {
 // (FW_DEPLOY_BEGIN send + per-controller FW_PROGRESS + job-wide
 // FW_DEPLOY_DONE). Task 9 wires the post-deploy `flashJobDone` emit +
 // reboot-timer fallback + `notifyMasterHeartbeat` (primary lock-release
-// path). Tasks 10-11 will add cancel + full error-path mapping.
+// path). Task 10 wires `cancel()` (AbortController for upload-phase, inline
+// cleanup for deploy-phase, no-op once `flashJobDone` has emitted). Task 11
+// will add the full error-path mapping (TransferError + non-typed streamer
+// rejections → typed `flashJobFailed` reasons).
 
 const DEFAULT_REBOOT_TIMEOUT_MS = 15_000;
 const DEFAULT_THROTTLE_WINDOW_MS = 250;
@@ -362,7 +365,7 @@ export class FlashJobOrchestrator {
   // asynchronously through `handleDeployEvent`. Both fields are disposed on
   // every exit path: FW_DEPLOY_DONE drops the subscriber inline; the
   // canonical `releaseLock` helper disposes both idempotently for the
-  // protocol_violation, reboot-timeout, heartbeat, and future cancel paths.
+  // protocol_violation, reboot-timeout, heartbeat, and cancel paths.
   // A leaked subscriber would route a stale prior job's deploy events into
   // the next job; a leaked throttle would carry per-controller flush timers
   // across jobs.
@@ -376,6 +379,23 @@ export class FlashJobOrchestrator {
   // null-ness as the first-fire-wins guard so a heartbeat racing the timer
   // doesn't double-release the lock.
   private rebootTimer: NodeJS.Timeout | null = null;
+  // AbortController whose signal threads through `streamer.run`'s `opts.signal`.
+  // Created at upload-phase entry, fired by `cancel()` during the upload
+  // phase to reject the in-flight `streamer.run()` with TransferError 'aborted'
+  // (path B in spec §"Error paths"). Discarded on every exit path; once the
+  // streamer settles the controller is no longer load-bearing — `.abort()`
+  // becomes a no-op — but we still null the field on release so a stale
+  // reference can't leak across jobs.
+  private abortController: AbortController | null = null;
+  // Phase tracker for the cancel decision. Cancel during 'upload' fires the
+  // AbortController + lets the streamer rejection path drive cleanup; cancel
+  // during 'deploy' takes the inline cleanup path (dispose subscriber, fail
+  // non-terminal controllers, emit flashJobFailed, release lock); cancel
+  // during 'done' (post-flashJobDone, awaiting heartbeat or timer) is a no-op
+  // because the work itself is complete — the lock release is already
+  // queued via the timer or will fire via the next heartbeat. Cleared back
+  // to `null` in `releaseLock`.
+  private phase: 'upload' | 'deploy' | 'done' | null = null;
   private readonly messageGenerator = new MessageGenerator();
 
   constructor(opts: FlashJobOrchestratorOpts) {
@@ -491,6 +511,15 @@ export class FlashJobOrchestrator {
       });
       const localThrottle = this.throttle;
 
+      // Arm the AbortController + mark the upload phase before invoking the
+      // streamer. `cancel()` reads `this.phase` to decide whether to fire the
+      // controller (upload) vs run inline cleanup (deploy/done); the
+      // AbortController itself is consumed by `streamer.run`'s `opts.signal`
+      // — c.6b's streamer rejects with TransferError('aborted', ...) when
+      // the signal fires.
+      this.abortController = new AbortController();
+      this.phase = 'upload';
+
       const streamer = this.streamerFactory({ bus: this.bus });
       const transferSpec: TransferSpec = {
         transferId,
@@ -539,7 +568,8 @@ export class FlashJobOrchestrator {
         // onTransferEnd: the deploy phase is driven off the awaited
         // `streamer.run()` resolution below, not from this hook.
       };
-      await streamer.run(transferSpec, observer, {});
+      await streamer.run(transferSpec, observer, { signal: this.abortController.signal });
+      this.phase = 'deploy';
 
       // Streamer succeeded → deploy phase. Transition every controller to
       // Sending (force=true emits flush any pending throttle state and emit
@@ -622,13 +652,66 @@ export class FlashJobOrchestrator {
   }
 
   /**
-   * Cancel the in-flight job. Stub for Task 10.
-   * Returns `null` when no job is active.
+   * Cancel the in-flight job. Returns `null` when no job is active or when
+   * the job has already reached its terminal `flashJobDone` state and is
+   * just awaiting the post-deploy lock release (heartbeat or timer).
+   *
+   * Behavior by phase:
+   *   * `'upload'` — fire `abortController.abort(reason)`. The streamer's
+   *     own abort listener rejects `streamer.run()` with
+   *     `TransferError('aborted', ...)`; the rejection bubbles up to
+   *     `start()`'s catch block which releases the lock + clears
+   *     `currentJob`. Task 11 will add the typed `flashJobFailed` mapping
+   *     for the TransferError path; for now the rejection just propagates.
+   *   * `'deploy'` — inline cleanup: dispose the deploy subscriber, set
+   *     `abortReason` on `currentJob`, transition every non-terminal
+   *     controller to `Failed` (with the cancel reason), emit
+   *     `flashControllerResult` per affected controller and
+   *     `flashJobFailed` job-wide, then release the lock.
+   *   * `'done'` — no-op. The work is already complete; the operator's
+   *     cancel arrived too late to matter. Returns `null` so the HTTP
+   *     layer surfaces a 404 ("no_active_job") rather than confusing the
+   *     operator with a "cancelled" response for a job that already
+   *     finished.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async cancel(_reason: string): Promise<{ jobId: string } | null> {
+  async cancel(reason: string): Promise<{ jobId: string } | null> {
     if (this.currentJob === null) return null;
-    return { jobId: this.currentJob.jobId };
+    // Cancel-during-reboot-wait: the job already emitted `flashJobDone`,
+    // so per spec §"Cancel race windows" this is a documented no-op.
+    if (this.phase === 'done') return null;
+    const jobId = this.currentJob.jobId;
+
+    if (this.phase === 'upload') {
+      // Hand off to the streamer rejection path. The streamer's own abort
+      // listener (chunk_streamer.ts) rejects `run()` with
+      // `TransferError('aborted', transferId, ...)`; that rejection lands
+      // in `start()`'s catch block, which calls `releaseLock(jobId)` —
+      // dropping the streamer reference, throttle, subscriber (if any),
+      // and the AbortController itself. We don't release here; doing so
+      // would race the streamer's still-pending rejection.
+      if (this.abortController !== null) {
+        this.abortController.abort(reason);
+      }
+      return { jobId };
+    }
+
+    // phase === 'deploy' — inline cleanup. The streamer has already
+    // resolved (we're past `await streamer.run`); aborting the controller
+    // now would be a no-op against a settled run. Run the deploy-cancel
+    // sequence directly.
+    if (this.deployUnsubscriber !== null) {
+      this.deployUnsubscriber();
+      this.deployUnsubscriber = null;
+    }
+    this.currentJob = { ...this.currentJob, abortReason: reason };
+    this.failNonTerminalControllers(reason);
+    const endedAt = new Date(this.clock.now()).toISOString();
+    this.safeEmitWs({
+      type: TransmissionType.flashJobFailed,
+      data: { jobId, abortReason: reason, endedAt },
+    });
+    this.releaseLock(jobId);
+    return { jobId };
   }
 
   /**
@@ -722,6 +805,8 @@ export class FlashJobOrchestrator {
       this.throttle.dispose();
       this.throttle = null;
     }
+    this.abortController = null;
+    this.phase = null;
     this.currentJob = null;
     this.jobLock.release(jobId);
     this.broadcastLockState();
@@ -881,6 +966,11 @@ export class FlashJobOrchestrator {
     const jobId = this.currentJob.jobId;
     const endedAt = new Date(this.clock.now()).toISOString();
     this.currentJob = { ...this.currentJob, endedAt };
+    // Phase transitions to 'done' before the WS emit so a `cancel()` racing
+    // through this control flow (operator clicks cancel just as deploy-done
+    // arrives) sees the post-done state and short-circuits to no-op rather
+    // than running deploy-cancel cleanup against an already-terminal job.
+    this.phase = 'done';
     this.safeEmitWs({
       type: TransmissionType.flashJobDone,
       data: { jobId, endedAt },

@@ -19,6 +19,7 @@ import type {
   TransferResult,
   TransferSpec,
 } from '../models/firmware/chunk_streamer.js';
+import { TransferError } from '../models/firmware/chunk_streamer.js';
 import type { FwDeployEvent } from '../models/firmware/flash_orchestrator.js';
 import { JobLock } from '../job_lock/job_lock.js';
 import { logger } from '../logger.js';
@@ -2345,5 +2346,392 @@ describe('FlashJobOrchestrator', () => {
     } finally {
       errorSpy.mockRestore();
     }
+  });
+
+  describe('cancel', () => {
+    // Same fake-timer pattern as the deploy-phase / reboot-timer blocks:
+    // counter-backed clock + faked setTimeout/clearTimeout so the throttle
+    // window math + reboot timer stay deterministic. Cancel-during-deploy
+    // doesn't strictly need the throttle to advance, but the orchestrator's
+    // throttle is constructed against the injected clock and asserts on
+    // controllers' `flashControllerResult` emits which run through that
+    // clock — keeping the pattern uniform avoids subtle ordering surprises.
+    let nowMs = 0;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      nowMs = 0;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function advance(ms: number): void {
+      nowMs += ms;
+      vi.advanceTimersByTime(ms);
+    }
+
+    const fakeClock: Clock = {
+      now: () => nowMs,
+      setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms),
+      clearTimeout: (t) => globalThis.clearTimeout(t),
+    };
+
+    function controllerResults(emitWs: ReturnType<typeof vi.fn>): Array<{
+      jobId: string;
+      controller: ControllerFlashState;
+    }> {
+      return emittedFrames(emitWs, TransmissionType.flashControllerResult).map(
+        (frame) => (frame as { data: { jobId: string; controller: ControllerFlashState } }).data,
+      );
+    }
+
+    it('cancel with no active job: returns null (no emits, lock unchanged)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const result = await fx.orchestrator.cancel('test');
+
+      expect(result).toBeNull();
+      expect(fx.emitWs).not.toHaveBeenCalled();
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    });
+
+    it('cancel during upload: fires AbortController; streamer rejection cleans up; returns jobId', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+
+      // The orchestrator passed an AbortSignal to streamer.run.
+      const run = fx.streamerControls.runs[0];
+      expect(run.signal).toBeDefined();
+      expect(run.signal?.aborted).toBe(false);
+
+      const inflight = fx.orchestrator.getCurrentJob();
+      expect(inflight).not.toBeNull();
+      const expectedJobId = inflight?.jobId;
+
+      // Cancel mid-upload. The stub-streamer doesn't itself listen for the
+      // signal (it returns a controllable promise), so we observe the abort
+      // via `signal.aborted` and then drive the rejection by calling
+      // `controls.reject(...)` with TransferError('aborted', ...) — c.6b's
+      // real ChunkStreamer would do the same when its own abort listener
+      // fires. The cancel() promise resolves once it's handed control off
+      // to the streamer; we don't await `startPromise` until after we
+      // simulate the rejection.
+      const cancelResult = fx.orchestrator.cancel('user-initiated');
+
+      expect(run.signal?.aborted).toBe(true);
+      // .reason carries the cancel reason (Node 18+ AbortController behavior).
+      expect(run.signal?.reason).toBe('user-initiated');
+      const resolved = await cancelResult;
+      expect(resolved).toEqual({ jobId: expectedJobId });
+
+      // Drive the streamer rejection — TransferError('aborted', ...) is what
+      // the real ChunkStreamer rejects with on signal-fire.
+      fx.streamerControls.reject(new TransferError('aborted', run.spec.transferId));
+
+      // start() rethrows the streamer rejection.
+      let caught: unknown;
+      try {
+        await startPromise;
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(TransferError);
+      expect((caught as TransferError).code).toBe('aborted');
+
+      // After the catch block: lock released, currentJob cleared. Task 11
+      // will add the typed flashJobFailed emit on the TransferError path;
+      // for now we only assert the cleanup invariants.
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+      // No deploy subscriber was attached (we never reached deploy phase).
+      expect(fx.bus.deploySubscribers.size).toBe(0);
+    });
+
+    it('cancel during upload: requires AbortController setup in start() (mutation-discipline pin)', async () => {
+      // This test fails if `this.abortController = new AbortController()` is
+      // removed from start(): no signal would land in streamer.run, so
+      // run.signal would be undefined and the cancel-during-upload path
+      // would have nothing to fire. Pinning the signal threading.
+      const fx = setupHappyPath({ clock: fakeClock });
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+
+      expect(fx.streamerControls.runs[0].signal).toBeInstanceOf(AbortSignal);
+
+      // Drain so the test exits cleanly.
+      fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+      await startPromise;
+    });
+
+    it('cancel during deploy: disposes deploy subscriber, fails non-terminal controllers, emits flashJobFailed with abortReason, releases lock', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+
+      // Drive into the deploy phase: streamer resolves, FW_DEPLOY_BEGIN
+      // sent, deploy subscriber armed. Don't deliver any FW_PROGRESS so
+      // both controllers stay in `Sending` (non-terminal).
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      const armed = await startPromise;
+
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+      expect(fx.jobLock.isLocked()).toBe(true);
+      const baselineResults = controllerResults(fx.emitWs).length;
+      const lockEventsBefore = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged).length;
+
+      // Cancel mid-deploy.
+      const cancelResult = await fx.orchestrator.cancel('operator-cancel');
+      expect(cancelResult).toEqual({ jobId: armed.jobId });
+
+      // Subscriber disposed.
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+
+      // Each non-terminal controller transitioned to Failed with the cancel
+      // reason as the error string + got a flashControllerResult emission.
+      const newResults = controllerResults(fx.emitWs).slice(baselineResults);
+      expect(newResults).toHaveLength(2);
+      for (const r of newResults) {
+        expect(r.jobId).toBe(armed.jobId);
+        expect(r.controller.stage).toBe(FwStage.Failed);
+        if (r.controller.stage === FwStage.Failed) {
+          expect(r.controller.error).toBe('operator-cancel');
+        }
+      }
+
+      // flashJobFailed emitted with abortReason carrying the cancel reason.
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({
+        jobId: armed.jobId,
+        abortReason: 'operator-cancel',
+      });
+      expect((failed[0].data as { endedAt: string }).endedAt).toMatch(/^\d{4}-/);
+
+      // Lock released; lockStateChanged emitted; currentJob cleared.
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+      expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(
+        lockEventsBefore + 1,
+      );
+    });
+
+    it('cancel during reboot-timer wait (post-flashJobDone): no-op (returns null, lock still held until timer/heartbeat)', async () => {
+      // Drive a happy path job all the way through to flashJobDone so the
+      // phase is 'done' and the reboot timer is armed.
+      const fx = setupHappyPath({ clock: fakeClock });
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      const armed = await startPromise;
+
+      // Walk both controllers to Rebooting then deliver FW_DEPLOY_DONE all OK.
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: armed.targets.map((id) => ({
+            controllerId: id,
+            outcome: 'OK',
+            finalVersion: '1.4.0',
+            error: '',
+          })),
+        },
+      });
+
+      // We're now in the post-flashJobDone, pre-release window. Lock still
+      // held; reboot timer armed; phase === 'done'.
+      expect(fx.jobLock.isLocked()).toBe(true);
+      expect(vi.getTimerCount()).toBe(1);
+      const failedBefore = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed).length;
+      const lockEventsBefore = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged).length;
+
+      // Cancel arrives. Per spec §"Cancel race windows": "cancel in window 2
+      // is a no-op since the work is already done."
+      const cancelResult = await fx.orchestrator.cancel('too-late');
+      expect(cancelResult).toBeNull();
+
+      // No flashJobFailed emit, no lock release, currentJob still set, timer
+      // still armed.
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(failedBefore);
+      expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(
+        lockEventsBefore,
+      );
+      expect(fx.jobLock.isLocked()).toBe(true);
+      expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+      expect(vi.getTimerCount()).toBe(1);
+
+      // Drain the timer so the test exits cleanly.
+      advance(15_000);
+      expect(fx.jobLock.isLocked()).toBe(false);
+    });
+
+    it('cancel race: arrives before currentJob is set (mid-source-resolution): returns null; start continues', async () => {
+      // Hold up source resolution by making releaseService.getReleases return
+      // a never-settling promise; cancel() arrives in that window. Per spec
+      // §"Cancel race windows": "cancel in window 1 returns 404 (no
+      // currentJob yet); operator retries cancel after flashJobStarted."
+      let releaseGate: () => void = () => {
+        throw new Error('gate not yet captured');
+      };
+      const release = makeRelease();
+      const cachedAsset = makeCachedAsset();
+      const bus = new FakeSerialBus();
+      const cache = { fetch: vi.fn().mockResolvedValue(cachedAsset) };
+      const upload = { latest: vi.fn().mockResolvedValue(null) };
+      const releaseService = {
+        getReleases: vi.fn().mockImplementation(
+          () =>
+            new Promise<ReleaseListResult>((resolve) => {
+              releaseGate = () => resolve(makeReleaseList([release]));
+            }),
+        ),
+      };
+      const controllersStore = {
+        listInLocation: vi.fn().mockResolvedValue([
+          { id: 'controller-a', variant: 'lolin_d32_pro' },
+          { id: 'controller-b', variant: 'lolin_d32_pro' },
+        ]),
+      };
+      const emitWs = vi.fn<[FlashOrchestratorWsMessage], void>();
+      const jobLock = new JobLock();
+      const { factory: streamerFactory, controls: streamerControls } = makeScriptedStreamer();
+      const orchestrator = new FlashJobOrchestrator({
+        bus,
+        jobLock,
+        cache,
+        upload,
+        releaseService,
+        controllersStore,
+        emitWs,
+        streamerFactory,
+        clock: fakeClock,
+      });
+
+      // Kick off start(); it will block in releaseService.getReleases().
+      const startPromise = orchestrator.start({ source: { kind: 'github', version: '1.4.0' } });
+      // Yield enough microtasks for the orchestrator to land in the
+      // `getReleases()` await — controllersStore + lock acquisition are
+      // synchronous and the resolveFlashSource entry point hits the
+      // releaseService first.
+      await vi.waitFor(() => expect(releaseService.getReleases).toHaveBeenCalled());
+
+      // currentJob is NOT yet set (source resolution hasn't completed).
+      expect(orchestrator.getCurrentJob()).toBeNull();
+      // Lock IS held (window 1 of the race).
+      expect(jobLock.isLocked()).toBe(true);
+
+      // Cancel returns null (no currentJob to capture jobId from).
+      const cancelResult = await orchestrator.cancel('mid-resolve');
+      expect(cancelResult).toBeNull();
+
+      // Unblock the resolver; start() proceeds to streamer.run.
+      releaseGate();
+      await vi.waitFor(() => expect(streamerControls.runs.length).toBe(1));
+
+      // Drain to completion so the test exits cleanly.
+      streamerControls.resolve(makeTransferResult(streamerControls.runs[0].spec));
+      await startPromise;
+    });
+
+    it('cancel during deploy: requires phase tracking (mutation-discipline pin for the deploy branch)', async () => {
+      // If the phase==='deploy' branch were collapsed into the upload
+      // branch (i.e., always abort the controller), the cancel-during-deploy
+      // call would be a no-op against the already-settled streamer — no
+      // flashJobFailed emit, no controller cleanup, no lock release. This
+      // test pins that the deploy branch runs the inline cleanup.
+      const fx = setupHappyPath({ clock: fakeClock });
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      await startPromise;
+
+      // Mid-deploy cancel: must produce flashJobFailed + release lock.
+      await fx.orchestrator.cancel('verify-deploy-branch');
+
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(fx.jobLock.isLocked()).toBe(false);
+    });
+
+    it('cancel during reboot wait: phase === "done" guard fires (mutation-discipline pin)', async () => {
+      // Reverting `if (this.phase === 'done') return null;` makes this fail —
+      // cancel would fall through to the deploy branch, attempt to dispose
+      // an already-disposed deployUnsubscriber, then call
+      // failNonTerminalControllers which would either throw (terminal
+      // controllers can't transition further) or emit spurious results, and
+      // would emit an extra flashJobFailed for an already-done job.
+      const fx = setupHappyPath({ clock: fakeClock });
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      const armed = await startPromise;
+
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: armed.targets.map((id) => ({
+            controllerId: id,
+            outcome: 'OK',
+            finalVersion: '1.4.0',
+            error: '',
+          })),
+        },
+      });
+
+      const failedBefore = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed).length;
+
+      // Cancel — must be a no-op.
+      const result = await fx.orchestrator.cancel('after-done');
+      expect(result).toBeNull();
+
+      // No additional flashJobFailed.
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(failedBefore);
+
+      // Drain timer.
+      advance(15_000);
+    });
   });
 });

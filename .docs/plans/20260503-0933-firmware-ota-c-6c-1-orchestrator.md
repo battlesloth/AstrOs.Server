@@ -401,7 +401,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - heartbeat called with no active job: no-op (no `currentJob`)
     - heartbeat called mid-upload (out-of-protocol): no-op (rebootTimer null)
 
-- [ ] **Task 10 — Cancel mechanism (AbortController + cancel methods)** (extend `flash_orchestrator.ts`):
+- [x] **Task 10 — Cancel mechanism (AbortController + cancel methods)** (extend `flash_orchestrator.ts`):
   - In `start()`, create `this.abortController = new AbortController()` and pass `signal` to `streamer.run`
   - `cancel(reason)` method:
     - If `currentJob === null`: return null
