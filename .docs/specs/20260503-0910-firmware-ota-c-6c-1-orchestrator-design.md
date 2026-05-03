@@ -65,26 +65,29 @@ After all controllers terminal, orchestrator emits `flashJobDone` and starts a 1
 
 ## Components
 
+The `Phase` column tracks the part-1 / part-2 split (see "Shipping note" in Context). **Part 1** rows ship in the first PR; **Part 2** rows defer to the follow-up.
+
 **New source files (5):**
 
-| Path | Responsibility |
-|---|---|
-| `astros_api/src/firmware/flash_orchestrator.ts` | `FlashJobOrchestrator` class. Public surface: `start(request)`, `cancel(reason)`, `notifyMasterHeartbeat(version?)`, `getCurrentJob()`. Includes the small private helpers `resolveFlashSource()` (~40 lines) and `flashProgressThrottle()` (~30 lines) inline rather than separate files |
-| `astros_api/src/firmware/flash_orchestrator.test.ts` | Orchestrator unit tests against fake bus + fake streamerFactory + fake cache/upload + fake controllersStore + real JobLock |
-| `astros_api/src/controllers/firmware_flash_controller.ts` | Express routes — `POST /api/firmware/flash`, `DELETE /api/firmware/flash`, `GET /api/firmware/flash` |
-| `astros_api/src/controllers/firmware_flash_controller.test.ts` | HTTP-level tests with supertest |
-| `astros_api/src/models/firmware/flash_orchestrator.ts` | Typed `FlashRequest`, `FwDeployEvent` discriminated union (`{ kind: 'progress', payload: FwProgress }` per-controller and `{ kind: 'done', payload: FwDeployDone }` job-wide) |
+| Phase | Path | Responsibility |
+|---|---|---|
+| Part 1 | `astros_api/src/firmware/flash_orchestrator.ts` | `FlashJobOrchestrator` class. Public surface: `start(request)`, `cancel(reason)`, `notifyMasterHeartbeat(version?)`, `getCurrentJob()`. Includes the small private helpers `resolveFlashSource()` (~40 lines) and `flashProgressThrottle()` (~30 lines) inline rather than separate files. **Part 1** ships the class with happy-path `start()` + variant validation + a no-op streamer observer; `cancel()` and `notifyMasterHeartbeat()` are stubs. Tasks 7-11 (Part 2) replace the no-op observer with the real upload-phase wiring + deploy phase + heartbeat + cancel + error-path consolidation |
+| Part 1 | `astros_api/src/firmware/flash_orchestrator.test.ts` | Orchestrator unit tests against fake bus + fake streamerFactory + fake cache/upload + fake controllersStore + real JobLock |
+| **Part 2** | `astros_api/src/controllers/firmware_flash_controller.ts` | Express routes — `POST /api/firmware/flash`, `DELETE /api/firmware/flash`, `GET /api/firmware/flash`. Lands in Task 12 |
+| **Part 2** | `astros_api/src/controllers/firmware_flash_controller.test.ts` | HTTP-level tests with supertest. Lands in Task 12 |
+| Part 1 | `astros_api/src/models/firmware/flash_orchestrator.ts` | Typed `FlashRequest`, `FwDeployEvent` discriminated union (`{ kind: 'progress', payload: FwProgress }` per-controller and `{ kind: 'done', payload: FwDeployDone }` job-wide), `Streamer` interface, `Clock` interface |
 
-**Modified source files (4):**
+**Modified source files (7):**
 
-| Path | Change |
-|---|---|
-| `astros_api/src/firmware/serial_bus.ts` | Add `subscribeDeployEvents(transferId, handler)` to `WorkerSerialBus`. The handler receives typed `FwDeployEvent` variants (FW_PROGRESS / FW_DEPLOY_DONE). Returns disposer |
-| `astros_api/src/firmware/serial_bus.test.ts` | Tests for the new method (filter by transferId, dispose detaches listener, cross-talk between subscribers) |
-| `astros_api/src/models/firmware/chunk_streamer.ts` (the types module) | Extend `SerialBus` interface with `subscribeDeployEvents`. `FwInboundAck` stays unchanged — deploy events are a separate typed channel |
-| `astros_api/src/api_server.ts` | Instantiate `FlashJobOrchestrator` (passing the existing serial worker via `WorkerSerialBus`); register flash routes; wire late-join WS snapshot via `orchestrator.getCurrentJob()`; POLL handler reads `module.firmwareVersion` from the parsed POLL_ACK (already populated since firmware 1.2.0+) and calls `orchestrator.notifyMasterHeartbeat(firmwareVersion)` when a flash is in flight and the version matches the deployed target; POLL handler also reads `module.variant` per controller and updates the in-memory controllers state |
-| `astros_api/src/models/control_module/control_module.ts` | Extend `ControlModule` with `variant?: string` (per-controller hardware variant, populated from `parts[4]` of POLL_ACK by `message_handler.ts`). Existing fields unchanged. **Note:** the heartbeat-version flow uses the existing `firmwareVersion` field (already on `ControlModule`, populated from `parts[3]` since firmware 1.2.0+). No separate `version` field is added — the POLL_ACK extension is `variant`-only |
-| `astros_api/src/serial/message_handler.ts` | Extend `handlePollAck` to accept 5-field POLL_ACK and extract `parts[4]` as `variant` (mirroring the existing `parts[3]` → `firmwareVersion` extraction). Backward-compatible: 3-field and 4-field POLL_ACKs continue to parse correctly |
+| Phase | Path | Change |
+|---|---|---|
+| Part 1 | `astros_api/src/firmware/serial_bus.ts` | Add `subscribeDeployEvents(transferId, handler)` to `WorkerSerialBus`. The handler receives typed `FwDeployEvent` variants (FW_PROGRESS / FW_DEPLOY_DONE). Returns disposer |
+| Part 1 | `astros_api/src/firmware/serial_bus.test.ts` | Tests for the new method (filter by transferId, dispose detaches listener, cross-talk between subscribers) |
+| Part 1 | `astros_api/src/models/firmware/chunk_streamer.ts` (the types module) | Extend `SerialBus` interface with `subscribeDeployEvents`. `FwInboundAck` stays unchanged — deploy events are a separate typed channel |
+| Part 1 | `astros_api/src/models/enums.ts` | Add 5 new flash event entries (`flashJobStarted`, `flashControllerUpdate`, `flashControllerResult`, `flashJobDone`, `flashJobFailed`) to the `TransmissionType` enum, after the existing `flashJobActive`. Existing entries unchanged — `flashJobActive` ships from c.2 and stays |
+| Part 1 | `astros_api/src/models/control_module/control_module.ts` | Extend `ControlModule` with `variant?: string` (per-controller hardware variant, populated from `parts[4]` of POLL_ACK by `message_handler.ts`). Existing fields unchanged. **Note:** the heartbeat-version flow uses the existing `firmwareVersion` field (already on `ControlModule`, populated from `parts[3]` since firmware 1.2.0+). No separate `version` field is added — the POLL_ACK extension is `variant`-only |
+| Part 1 | `astros_api/src/serial/message_handler.ts` | Extend `handlePollAck` to accept 5-field POLL_ACK and extract `parts[4]` as `variant` (mirroring the existing `parts[3]` → `firmwareVersion` extraction). Backward-compatible: 3-field and 4-field POLL_ACKs continue to parse correctly |
+| **Part 2** | `astros_api/src/api_server.ts` | Instantiate `FlashJobOrchestrator` (passing the existing serial worker via `WorkerSerialBus`); register flash routes; wire late-join WS snapshot via `orchestrator.getCurrentJob()`; POLL handler reads `module.firmwareVersion` from the parsed POLL_ACK (already populated since firmware 1.2.0+) and calls `orchestrator.notifyMasterHeartbeat(firmwareVersion)` when a flash is in flight and the version matches the deployed target; POLL handler also reads `module.variant` per controller and updates the in-memory controllers state. Lands in Task 13 — Part 1 does NOT touch `api_server.ts`, so the orchestrator class exists as importable surface but isn't instantiated outside tests |
 
 **Spec / plan / QA docs:**
 
