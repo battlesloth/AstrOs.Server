@@ -8,6 +8,7 @@ import type {
   TransferResult,
   TransferSpec,
 } from '../models/firmware/chunk_streamer.js';
+import type { FwDeployEvent } from '../models/firmware/flash_orchestrator.js';
 import type {
   FwBackpressure,
   FwBackpressureAction,
@@ -40,6 +41,19 @@ class FakeSerialBus implements SerialBus {
     this.subscribers.set(transferId, handler);
     return () => {
       this.subscribers.delete(transferId);
+    };
+  }
+
+  // No-op deploy-event subscriber to satisfy the SerialBus interface
+  // (added in c.6c.1 Task 2). The streamer doesn't consume deploy events —
+  // those flow to the orchestrator. These tests exercise upload-phase
+  // behavior only, so no handler is ever invoked. The disposer is a no-op
+  // for the same reason. flash_orchestrator.test.ts's FakeSerialBus has
+  // the real impl with a `deliverDeployEvent` driver.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  subscribeDeployEvents(_transferId: string, _handler: (event: FwDeployEvent) => void): () => void {
+    return () => {
+      /* no-op disposer — these tests never subscribe to deploy events. */
     };
   }
 
