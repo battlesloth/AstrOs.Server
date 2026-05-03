@@ -14,6 +14,7 @@
 
 import type { Worker } from 'worker_threads';
 import type { FwInboundAck, SerialBus } from '../models/firmware/chunk_streamer.js';
+import type { FwDeployEvent } from '../models/firmware/flash_orchestrator.js';
 import { SerialMessageType } from '../serial/serial_message.js';
 import type { ISerialWorkerResponse } from '../serial/serial_worker_response.js';
 import { SerialWorkerResponseType } from '../serial/serial_worker_response.js';
@@ -57,6 +58,20 @@ export class WorkerSerialBus implements SerialBus {
       this.worker.off('message', listener);
     };
   }
+
+  subscribeDeployEvents(transferId: string, handler: (event: FwDeployEvent) => void): () => void {
+    const listener = (msg: ISerialWorkerResponse): void => {
+      const event = mapToFwDeployEvent(msg);
+      if (event === null) return;
+      if (event.payload.transferId !== transferId) return;
+      handler(event);
+    };
+
+    this.worker.on('message', listener);
+    return () => {
+      this.worker.off('message', listener);
+    };
+  }
 }
 
 // Returns null for any worker message that is not one of the five FwInboundAck
@@ -82,5 +97,24 @@ function mapToFwInboundAck(msg: ISerialWorkerResponse): FwInboundAck | null {
       // a case above and extend FwInboundAck in chunk_streamer.ts.
       return null;
     }
+  }
+}
+
+// Returns null for any worker message that is not one of the two deploy-phase
+// FwDeployEvent variants. The upload-phase ack/nak family is intentionally
+// omitted — those flow to the streamer via mapToFwInboundAck. Keeping the two
+// channels split lets the streamer's FwInboundAck stay narrow (5 variants)
+// while the orchestrator gets a typed view of progress + deploy completion.
+function mapToFwDeployEvent(msg: ISerialWorkerResponse): FwDeployEvent | null {
+  switch (msg.type) {
+    case SerialWorkerResponseType.FW_PROGRESS:
+      return { kind: 'progress', payload: msg.payload };
+    case SerialWorkerResponseType.FW_DEPLOY_DONE:
+      return { kind: 'done', payload: msg.payload };
+    default:
+      // Drop everything else (FW_TRANSFER_BEGIN_ACK, FW_CHUNK_ACK, etc.,
+      // plus all non-FW types). If a new deploy-phase response is added,
+      // add a case above and extend FwDeployEvent in flash_orchestrator.ts.
+      return null;
   }
 }
