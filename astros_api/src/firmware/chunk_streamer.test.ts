@@ -1203,17 +1203,20 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
         // disarmed.
         timerCountAfterAck = vi.getTimerCount();
 
-        // Belt-and-suspenders: advance past the timeout to confirm onRetry
-        // is not somehow triggered through a side-channel. Bounded by less
-        // than the watchdog's 300_000 ms default so the watchdog itself
-        // doesn't fire mid-test.
-        await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS * 2);
-
+        // Drain the END phase BEFORE advancing past the timeout, so the
+        // Task 11 end-timeout race (also armed at ackTimeoutMs) cannot
+        // fire and reject the run before our belt-and-suspenders advance.
         await waitFor(
           () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
           'END sent',
         );
         bus.deliver(TRANSFER_ID, endAck('OK'));
+
+        // Belt-and-suspenders: advance past the per-chunk timeout to
+        // confirm onRetry is not somehow triggered through a side-channel
+        // by an un-cleared per-chunk timer. Run is already resolved at
+        // this point so no other timer can fire.
+        await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS * 2);
       })();
 
       const result = await streamer.run(specFor(tempPath, buf.length), { onRetry });
@@ -2115,5 +2118,136 @@ describe('ChunkStreamer — pre-transfer error codes (Task 10)', () => {
     } finally {
       await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
     }
+  });
+});
+
+describe('ChunkStreamer — post-transfer error codes (Task 11)', () => {
+  // Failure modes that surface AFTER the chunk-streaming phase completes,
+  // each with its own TransferErrorCode:
+  //   - end_timeout: master never replies to FW_TRANSFER_END
+  //   - hash_mismatch: END_ACK status === 'HASH_MISMATCH' (Task 3 — verified
+  //     in the "END_ACK non-OK rejects with cleanup" suite above; not
+  //     reasserted here)
+  //   - master_io_error: END_ACK status === 'IO_ERROR' (Task 3 — same)
+  // FwTransferEndAck.status is a closed enum ('OK' | 'HASH_MISMATCH' |
+  // 'IO_ERROR'; see firmware_messages.ts), so the two-arm dispatch in the
+  // streamer is exhaustive and no fallback test is needed.
+
+  describe('end_timeout', () => {
+    // Fake timers scoped to setTimeout/clearTimeout — same scoping as the
+    // Task 6/7/8/10 fake-timer suites. Date and setImmediate stay real so
+    // the wall-clock `waitFor` helper at the top of the file keeps working.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('no FW_TRANSFER_END_ACK within ackTimeoutMs rejects with end_timeout and cleans up', async () => {
+      // Drive run() through BEGIN_ACK and chunkAck so END is sent on the
+      // wire, but never deliver END_ACK. Advance fake time past
+      // ackTimeoutMs; the end-timeout race must fire and reject. Cleanup
+      // runs in finally.
+      //
+      // Note: transferTimeoutMs (the whole-transfer watchdog) is left at
+      // its 300_000 ms default. We never advance fake time anywhere near
+      // that, so the watchdog cannot win the race against the
+      // end-timeout setTimeout(ackTimeoutMs=500). If the end-timeout
+      // race were dropped (mutation), the run would hang — fake time
+      // would still need to be advanced, and even at the 300_000 ms
+      // mark the rejection code would be 'transfer_timeout' rather
+      // than 'end_timeout', so the assertion still catches the
+      // mutation but with a different (slower) failure mode.
+      const ackTimeoutMs = 500;
+      const chunkSize = 100;
+      const buf = Buffer.alloc(chunkSize, 0x50);
+      const tempPath = await writeTempFirmware(buf);
+      try {
+        const bus = new FakeSerialBus();
+        const streamer = new ChunkStreamer({
+          bus,
+          config: { ackTimeoutMs, chunkSizeBytes: chunkSize },
+        });
+
+        const driver = (async (): Promise<void> => {
+          await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+          bus.deliver(TRANSFER_ID, beginAck());
+          await waitFor(() => bus.sent.some((s) => s.payload.includes('FW_CHUNK')), 'CHUNK sent');
+          bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+          await waitFor(
+            () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+            'END sent',
+          );
+          // Sanity: end-timeout + watchdog are armed (per-chunk timer
+          // was cleared by the cumulative ACK above).
+          expect(vi.getTimerCount()).toBe(2);
+          // Advance just past the end-timeout deadline — the watchdog
+          // is at the 300_000 ms default so it doesn't fire here.
+          await vi.advanceTimersByTimeAsync(ackTimeoutMs);
+        })();
+
+        await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+          code: 'end_timeout',
+          transferId: TRANSFER_ID,
+          detail: expect.stringContaining(`${ackTimeoutMs}ms`),
+        });
+        await driver;
+
+        // Cleanup verified on the reject path. Subscriber disposed; no
+        // leftover pending fake timers (the end-timeout self-cleared
+        // when it fired then was re-cleared by the END-scope finally;
+        // the watchdog was cleared by the outer-block finally).
+        expect(bus.subscribers.size).toBe(0);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+      }
+    });
+
+    it('successful END_ACK clears the end-timeout timer (no leak)', async () => {
+      // Mutation guard for the `clearTimeout(endAckTimer)` in the END-scope
+      // finally. Drive a happy-path 1-chunk run with fake timers active.
+      // After END_ACK arrives and the run resolves, no fake timers must
+      // remain pending — the end-timeout timer must have been cleared
+      // before resolve. If the END-scope finally clear were dropped,
+      // getTimerCount() would be 1 (the still-pending end-timeout).
+      const ackTimeoutMs = 500;
+      const chunkSize = 100;
+      const buf = Buffer.alloc(chunkSize, 0x60);
+      const tempPath = await writeTempFirmware(buf);
+      try {
+        const bus = new FakeSerialBus();
+        const streamer = new ChunkStreamer({
+          bus,
+          config: { ackTimeoutMs, chunkSizeBytes: chunkSize },
+        });
+
+        const driver = (async (): Promise<void> => {
+          await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+          bus.deliver(TRANSFER_ID, beginAck());
+          await waitFor(() => bus.sent.some((s) => s.payload.includes('FW_CHUNK')), 'CHUNK sent');
+          bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+          await waitFor(
+            () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+            'END sent',
+          );
+          // END_ACK happy path — run() resolves; end-timeout must clear.
+          bus.deliver(TRANSFER_ID, endAck('OK'));
+        })();
+
+        const result = await streamer.run(specFor(tempPath, buf.length), {});
+        await driver;
+
+        expect(result.endAck.status).toBe('OK');
+        // No pending timers after resolution — end-timeout, watchdog,
+        // and per-chunk timer all cleared. If the end-timeout finally
+        // clear were dropped, this would be 1.
+        expect(vi.getTimerCount()).toBe(0);
+        expect(bus.subscribers.size).toBe(0);
+      } finally {
+        await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+      }
+    });
   });
 });

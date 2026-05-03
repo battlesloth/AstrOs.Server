@@ -51,7 +51,7 @@
 // streamer even sends FW_TRANSFER_BEGIN. Reuses Task 5's `Waiter.reject`
 // (reserved at the time for "Task 8+ external reject paths") and
 // Task 5/8's `rejectChunkPhase`.
-// Task 10 (this revision): pre-transfer error codes.
+// Task 10: pre-transfer error codes.
 //   - `source_read_failed`: the `fsp.readFile` call is wrapped in
 //     try/catch. Any fs error (ENOENT / EACCES / EIO / …) is rethrown
 //     as TransferError('source_read_failed') with the original message
@@ -74,6 +74,24 @@
 //     status surfaced in `detail`. The check happens BEFORE the
 //     watchdog is armed so a rejected transfer doesn't even enter the
 //     chunk-streaming phase.
+// Task 11 (this revision): post-transfer error codes.
+//   - `end_timeout`: the END-wait now races `waitFor('transferEndAck')`
+//     against `setTimeout(ackTimeoutMs)`. If no FW_TRANSFER_END_ACK
+//     arrives within the budget, the timer fires and rejects with
+//     TransferError('end_timeout'). Symmetric to `begin_timeout`; the
+//     timer is cleared on the ack-arrival path so a successful END
+//     doesn't leak a pending setTimeout past the END scope. Inlined
+//     rather than factored into a helper because the scope-local
+//     `currentWaiter = null` cleanup that pairs with the timeout would
+//     leak abstraction across the helper boundary; the two BEGIN/END
+//     races are short and self-contained.
+//   - `hash_mismatch` / `master_io_error`: already wired in Task 3 as
+//     the natural exit boundary of the trivial path. The existing
+//     END_ACK status checks remain unchanged — `FwTransferEndAck.status`
+//     is a closed enum (`'OK' | 'HASH_MISMATCH' | 'IO_ERROR'`, see
+//     firmware_messages.ts) unlike BEGIN_ACK's open-ended string, so
+//     the two-arm dispatch is exhaustive and no fallback branch is
+//     needed.
 //
 // `fs.promises.readFile` is the only fs touch in this module: TransferSpec
 // gives us a path, and the streamer needs the bytes to chunk-and-send. Future
@@ -774,7 +792,44 @@ export class ChunkStreamer {
         endPayload,
       );
       this.bus.send(endMsg.msg, { kind: 'firmware' });
-      const endAck = await waitFor('transferEndAck');
+
+      // Task 11: race the END_ACK wait against ackTimeoutMs. Symmetric to
+      // the Task 10 BEGIN-wait race. If the master never replies,
+      // `end_timeout` fires; the timer is explicitly cleared in the
+      // BEGIN-pattern `finally` so a successful END doesn't leak a pending
+      // setTimeout past this scope. We also clear the single-slot waiter
+      // on the timeout path — the dispatcher would otherwise resolve a
+      // stale waiter into the (already-rejected) Promise on a late ack
+      // arrival; harmless, but explicit teardown makes the post-condition
+      // obvious. The whole-transfer watchdog is still armed at this
+      // point and would also fire eventually, but with a much longer
+      // budget (300_000 ms default vs 1500 ms ackTimeoutMs); the
+      // end_timeout race surfaces a faster, more specific code so the
+      // operator gets "the master didn't reply to END" rather than the
+      // catch-all "the whole transfer hung."
+      let endAckTimer: NodeJS.Timeout | null = null;
+      let endAck;
+      try {
+        endAck = await new Promise<Extract<FwInboundAck, { kind: 'transferEndAck' }>>(
+          (resolve, reject) => {
+            endAckTimer = setTimeout(() => {
+              if (currentWaiter?.kind === 'transferEndAck') {
+                currentWaiter = null;
+              }
+              reject(
+                new TransferError(
+                  'end_timeout',
+                  spec.transferId,
+                  `no FW_TRANSFER_END_ACK within ${ackTimeoutMs}ms`,
+                ),
+              );
+            }, ackTimeoutMs);
+            waitFor('transferEndAck').then(resolve, reject);
+          },
+        );
+      } finally {
+        if (endAckTimer) clearTimeout(endAckTimer);
+      }
       observer.onTransferEnd?.(endAck);
 
       if (endAck.status === 'HASH_MISMATCH') {
