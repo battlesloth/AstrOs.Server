@@ -7,7 +7,7 @@ import {
   type FlashOrchestratorWsMessage,
 } from './flash_orchestrator.js';
 import type { Clock, FlashRequest, Streamer } from '../models/firmware/flash_orchestrator.js';
-import type { ControllerFlashState } from '../models/firmware/flash_job_state.js';
+import type { ControllerFlashState, FlashJobState } from '../models/firmware/flash_job_state.js';
 import { FwStage } from '../models/firmware/firmware_messages.js';
 import type { AssetInfo, ReleaseInfo, ReleaseListResult } from '../models/firmware/release.js';
 import type { CachedAsset } from '../models/firmware/cache.js';
@@ -620,7 +620,7 @@ describe('FlashJobOrchestrator', () => {
   // no_controllers test). The setup is parameterized so the same helper
   // covers github + upload sources without copy-pasting.
   interface SetupOpts {
-    controllers?: Array<{ id: string; variant: string }>;
+    controllers?: Array<{ id: string; variant: string | undefined }>;
     request?: FlashRequest;
     cachedAsset?: CachedAsset;
     storedUpload?: StoredUpload | null;
@@ -926,6 +926,91 @@ describe('FlashJobOrchestrator', () => {
     const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
     expect(failed).toHaveLength(1);
     expect(failed[0].data).toMatchObject({ reason: 'variant_unknown' });
+  });
+
+  it('rejects with variant_unknown when a controller has variant === undefined (production wiring path)', async () => {
+    // Production data path: ControlModule.variant is optional and
+    // handlePollAck leaves it undefined when firmware doesn't report one.
+    // validateControllers must treat undefined the same as empty string —
+    // otherwise the request would slip through to resolveFlashSource and
+    // surface as a misleading asset_not_found.
+    const fx = setupHappyPath({
+      controllers: [
+        { id: 'controller-a', variant: 'lolin_d32_pro' },
+        { id: 'controller-b', variant: undefined },
+      ],
+    });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('variant_unknown');
+    expect((caught as FlashOrchestratorError).detail).toContain('controller-b');
+
+    const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+    expect(failed).toHaveLength(1);
+    expect(failed[0].data).toMatchObject({ reason: 'variant_unknown' });
+  });
+
+  it('rejects with variant_unknown when a controller variant is whitespace-only', async () => {
+    // Defense-in-depth: a buggy cache layer (or hand-edited data) that
+    // leaves whitespace where a variant should be must NOT slip through
+    // as a "uniform variant of '   '" — that would also surface as
+    // asset_not_found later. validateControllers trims first.
+    const fx = setupHappyPath({
+      controllers: [
+        { id: 'controller-a', variant: 'lolin_d32_pro' },
+        { id: 'controller-b', variant: '   ' },
+      ],
+    });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('variant_unknown');
+    expect((caught as FlashOrchestratorError).detail).toContain('controller-b');
+  });
+
+  it('trims surrounding whitespace from variant before uniformity check', async () => {
+    // A populated-but-padded variant (e.g. firmware appending a newline)
+    // should be treated as the trimmed value — both for the
+    // uniformity check AND for the variant string passed to
+    // resolveFlashSource. Otherwise '  lolin_d32_pro' and 'lolin_d32_pro'
+    // would mis-fire as variant_mismatch despite identifying the same
+    // hardware.
+    const fx = setupHappyPath({
+      controllers: [
+        { id: 'controller-a', variant: 'lolin_d32_pro' },
+        { id: 'controller-b', variant: '  lolin_d32_pro\n' },
+      ],
+    });
+
+    // Don't await start() to completion — that would require driving the
+    // streamer to resolve. The test assertion is "validation passes and
+    // the trimmed variant flows through," which we observe via
+    // flashJobStarted emission (fires after validation, before await
+    // streamer.run). Resolve the streamer afterward to clean up.
+    const startPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() =>
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobStarted)).toHaveLength(1),
+    );
+    // The flashJobStarted payload's source.kind === 'github' confirms the
+    // resolver ran (so the trimmed variant matched a github asset).
+    const startedFrame = emittedFrames(fx.emitWs, TransmissionType.flashJobStarted)[0];
+    expect((startedFrame.data as FlashJobState).source.kind).toBe('github');
+    // Cleanup: resolve the streamer so the start() promise settles before
+    // the test exits, and so the lock is released.
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+    fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+    await startPromise;
   });
 
   it('rejects with controllers_lookup_failed when controllersStore.listInLocation rejects; lock released, flashJobFailed emitted', async () => {

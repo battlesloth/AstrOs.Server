@@ -241,8 +241,16 @@ export interface FlashOrchestratorWsMessage extends Record<string, unknown> {
 // Narrow interface around the controllers data store. The orchestrator only
 // needs the per-target ID + variant tuple at flash time; the larger
 // `ControllersRepository` surface stays out of the way.
+//
+// `variant` is `string | undefined` because the production data path
+// (Task 13's POLL_ACK-fed cache) inherits the optionality of
+// `ControlModule.variant` — older firmware that doesn't report one
+// leaves it undefined. The orchestrator's `validateControllers`
+// normalizes (trim + treat undefined/null/whitespace as missing)
+// and surfaces `'variant_unknown'` so the impl doesn't have to write
+// coercion boilerplate at the cache boundary.
 export interface FlashControllersStore {
-  listInLocation(): Promise<Array<{ id: string; variant: string }>>;
+  listInLocation(): Promise<Array<{ id: string; variant: string | undefined }>>;
 }
 
 // Reasons surfaced as `FlashOrchestratorError.reason`. Task 6 covers the
@@ -381,7 +389,7 @@ export class FlashJobOrchestrator {
       // path. Mirrors the `mapResolveError` wrap on resolveFlashSource: any
       // upstream-data-access failure becomes a `controllers_lookup_failed`
       // event so WS consumers reliably see job rejection reasons.
-      let targetsList: Array<{ id: string; variant: string }>;
+      let targetsList: Array<{ id: string; variant: string | undefined }>;
       try {
         targetsList = await this.controllersStore.listInLocation();
       } catch (err) {
@@ -559,25 +567,37 @@ export class FlashJobOrchestrator {
 
 // Validates the controllers list returned by `controllersStore.listInLocation()`:
 //   * non-empty (else `'no_controllers'`)
-//   * every entry has a non-empty `variant` (else `'variant_unknown'`, detail
+//   * every entry has a populated `variant` (else `'variant_unknown'`, detail
 //     enumerates the offending controller IDs)
 //   * all variants identical (else `'variant_mismatch'`, detail enumerates
 //     the controller=variant pairs so the operator can see which one is
 //     wrong)
 //
-// Returns the (uniform) variant string for downstream consumption.
-function validateControllers(controllers: Array<{ id: string; variant: string }>): string {
+// `variant` is normalized via `String#trim` and treated as missing if
+// `undefined`, `null`, or empty-after-trim. This matches the production
+// data path: `handlePollAck` leaves `ControlModule.variant` undefined
+// when the firmware doesn't report one, and a hypothetical wiring
+// regression that left whitespace through (e.g., a buggy cache layer)
+// would surface here as `'variant_unknown'` rather than tripping a
+// misleading `'asset_not_found'` further down the resolver.
+//
+// Returns the (uniform, trimmed) variant string for downstream consumption.
+function validateControllers(controllers: Array<{ id: string; variant?: string | null }>): string {
   if (controllers.length === 0) {
     throw new FlashOrchestratorError('no_controllers');
   }
-  const missingVariant = controllers.filter((c) => c.variant === '').map((c) => c.id);
+  const normalized = controllers.map((c) => ({
+    id: c.id,
+    variant: typeof c.variant === 'string' ? c.variant.trim() : '',
+  }));
+  const missingVariant = normalized.filter((c) => c.variant === '').map((c) => c.id);
   if (missingVariant.length > 0) {
     throw new FlashOrchestratorError('variant_unknown', missingVariant.join(', '));
   }
-  const firstVariant = controllers[0].variant;
-  const uniform = controllers.every((c) => c.variant === firstVariant);
+  const firstVariant = normalized[0].variant;
+  const uniform = normalized.every((c) => c.variant === firstVariant);
   if (!uniform) {
-    const detail = controllers.map((c) => `${c.id}=${c.variant}`).join(', ');
+    const detail = normalized.map((c) => `${c.id}=${c.variant}`).join(', ');
     throw new FlashOrchestratorError('variant_mismatch', detail);
   }
   return firstVariant;
