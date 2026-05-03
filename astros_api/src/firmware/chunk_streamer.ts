@@ -38,7 +38,7 @@
 // AND in the `finally` cleanup, so a rejected run never leaks a pending
 // timer past return. Reuses Task 5's `rejectChunkPhase` mechanism — the
 // watchdog is the second consumer after FLASH_FULL.
-// Task 9 (this revision): external cancellation via AbortSignal. The
+// Task 9: external cancellation via AbortSignal. The
 // orchestrator (c.6c) passes `opts.signal` that aborts on panic-stop /
 // job-cancel. An abort listener is registered at the top of `run()`
 // before any await. On fire, `rejectRun(err)` delegates to BOTH
@@ -51,6 +51,29 @@
 // streamer even sends FW_TRANSFER_BEGIN. Reuses Task 5's `Waiter.reject`
 // (reserved at the time for "Task 8+ external reject paths") and
 // Task 5/8's `rejectChunkPhase`.
+// Task 10 (this revision): pre-transfer error codes.
+//   - `source_read_failed`: the `fsp.readFile` call is wrapped in
+//     try/catch. Any fs error (ENOENT / EACCES / EIO / …) is rethrown
+//     as TransferError('source_read_failed') with the original message
+//     and `errno` code in `detail` so the orchestrator can report a
+//     specific cause. The throw exits via the outer try/finally so
+//     subscriber teardown still runs even though the failure happened
+//     before subscribe — the `try` block guards against future
+//     reorderings that might subscribe earlier.
+//   - `begin_timeout`: the BEGIN-wait now races `waitFor('beginAck')`
+//     against `setTimeout(ackTimeoutMs)`. If no FW_TRANSFER_BEGIN_ACK
+//     arrives within the budget, the timer fires and rejects with
+//     TransferError('begin_timeout'). The timer is cleared on the
+//     ack-arrival path so a successful BEGIN doesn't leak a pending
+//     setTimeout past the BEGIN scope.
+//   - `begin_rejected`: a BEGIN_ACK whose `status` is not the
+//     happy-path `'OK'` (per protocol.md the field is open-ended; the
+//     master uses `'OK'` for accept and any other string — e.g.
+//     `'sd_full'`, `'busy'`, `'version_mismatch'` — for rejection)
+//     rejects with TransferError('begin_rejected') and the rejected
+//     status surfaced in `detail`. The check happens BEFORE the
+//     watchdog is armed so a rejected transfer doesn't even enter the
+//     chunk-streaming phase.
 //
 // `fs.promises.readFile` is the only fs touch in this module: TransferSpec
 // gives us a path, and the streamer needs the bytes to chunk-and-send. Future
@@ -162,7 +185,25 @@ export class ChunkStreamer {
     opts?: ChunkStreamerRunOpts,
   ): Promise<TransferResult> {
     const startedAt = Date.now();
-    const sourceBuffer = await fsp.readFile(spec.source.path);
+    // Task 10: wrap fs read so any fs error surfaces as TransferError with
+    // a stable code rather than a bare NodeJS.ErrnoException. The throw
+    // happens before any subscriber is installed or any timer is armed,
+    // so no cleanup is required at this point — the throw propagates out
+    // of `run()` to the caller's `.catch`. We still keep the wrap inside
+    // run() (not at construction) so each `run()` call gets fresh error
+    // routing and the streamer remains reusable across retries that
+    // re-read the source.
+    let sourceBuffer: Buffer;
+    try {
+      sourceBuffer = await fsp.readFile(spec.source.path);
+    } catch (err) {
+      const errnoCode = (err as NodeJS.ErrnoException).code;
+      const message = err instanceof Error ? err.message : String(err);
+      const detail = errnoCode
+        ? `failed to read source ${spec.source.path}: ${message} (${errnoCode})`
+        : `failed to read source ${spec.source.path}: ${message}`;
+      throw new TransferError('source_read_failed', spec.transferId, detail);
+    }
     const totalChunks = Math.max(1, Math.ceil(sourceBuffer.length / this.config.chunkSizeBytes));
     const lastSeq = totalChunks - 1;
     const { chunkSizeBytes, windowSize } = this.config;
@@ -656,7 +697,53 @@ export class ChunkStreamer {
         beginPayload,
       );
       this.bus.send(beginMsg.msg, { kind: 'firmware' });
-      const beginAck = await waitFor('beginAck');
+
+      // Task 10: race the BEGIN_ACK wait against ackTimeoutMs. If the
+      // master never replies, `begin_timeout` fires; the timer is
+      // explicitly cleared on the ack-arrival path so a successful BEGIN
+      // doesn't leak a pending setTimeout past this scope. We also clear
+      // the single-slot waiter on the timeout path — the dispatcher
+      // would otherwise resolve a stale waiter into the (already-
+      // rejected) Promise on a late ack arrival; harmless, but explicit
+      // teardown makes the post-condition obvious.
+      let beginAckTimer: NodeJS.Timeout | null = null;
+      let beginAck;
+      try {
+        beginAck = await new Promise<Extract<FwInboundAck, { kind: 'beginAck' }>>(
+          (resolve, reject) => {
+            beginAckTimer = setTimeout(() => {
+              if (currentWaiter?.kind === 'beginAck') {
+                currentWaiter = null;
+              }
+              reject(
+                new TransferError(
+                  'begin_timeout',
+                  spec.transferId,
+                  `no FW_TRANSFER_BEGIN_ACK within ${ackTimeoutMs}ms`,
+                ),
+              );
+            }, ackTimeoutMs);
+            waitFor('beginAck').then(resolve, reject);
+          },
+        );
+      } finally {
+        if (beginAckTimer) clearTimeout(beginAckTimer);
+      }
+
+      // Task 10: master rejects the transfer (sd_full, busy, version
+      // mismatch, …). Per protocol.md the `status` field is open-ended;
+      // 'OK' is the only happy-path value, every other string is a
+      // rejection reason. Surfacing the raw status in `detail` lets the
+      // orchestrator log/report the specific cause without this module
+      // needing to enumerate every possible rejection code.
+      if (beginAck.status !== 'OK') {
+        throw new TransferError(
+          'begin_rejected',
+          spec.transferId,
+          `master rejected transfer: status=${beginAck.status}`,
+        );
+      }
+
       observer.onTransferBegun?.(beginAck);
 
       // Task 8: arm the whole-transfer watchdog on entry to the

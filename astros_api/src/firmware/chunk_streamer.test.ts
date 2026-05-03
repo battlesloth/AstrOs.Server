@@ -1921,3 +1921,199 @@ describe('ChunkStreamer — AbortSignal cancellation (Task 9)', () => {
     }
   });
 });
+
+describe('ChunkStreamer — pre-transfer error codes (Task 10)', () => {
+  // Three failure modes that all surface BEFORE the chunk-streaming phase
+  // begins, each with its own TransferErrorCode:
+  //   - source_read_failed: fs.readFile throws (ENOENT, EACCES, …)
+  //   - begin_timeout: master never replies to FW_TRANSFER_BEGIN
+  //   - begin_rejected: master replies but with a non-OK status
+  // Each test verifies the rejection code, the detail content, and that
+  // cleanup (subscriber dispose) ran where applicable.
+
+  it('source_read_failed: fsp.readFile ENOENT rejects with code source_read_failed and surfaces errno code', async () => {
+    // Spy on fsp.readFile and force it to throw a synthetic
+    // NodeJS.ErrnoException. We intentionally do NOT actually create the
+    // source file — the spy short-circuits before any real fs touch. The
+    // streamer must:
+    //   - catch the throw inside run()
+    //   - rethrow as TransferError with code 'source_read_failed'
+    //   - include both the path and the errno code in `detail`
+    //   - NOT subscribe the FwAcks handler (the throw happens before
+    //     subscribe; verify by checking bus.subscribers stays empty)
+    //   - NOT send anything on the wire (no BEGIN attempted)
+    const bus = new FakeSerialBus();
+    const streamer = new ChunkStreamer({ bus });
+
+    const enoent = Object.assign(new Error('ENOENT: no such file or directory'), {
+      code: 'ENOENT',
+    }) as NodeJS.ErrnoException;
+    const readSpy = vi.spyOn(fsp, 'readFile').mockRejectedValueOnce(enoent);
+
+    try {
+      // Capture the rejection once and assert all detail facets against
+      // the same Error instance. `toMatchObject` with a single
+      // `stringContaining` would only pin one substring; capturing the
+      // error lets us assert both the path and the errno code fragment
+      // are present in `detail`.
+      const err = (await streamer
+        .run(specFor('/nonexistent/firmware.bin', 0), {})
+        .catch((e) => e)) as Error & { code?: string; transferId?: string; detail?: string };
+
+      expect(err.code).toBe('source_read_failed');
+      expect(err.transferId).toBe(TRANSFER_ID);
+      // Both the path and the errno code surface in detail so the
+      // orchestrator can present a precise message to the operator.
+      expect(err.detail).toContain('/nonexistent/firmware.bin');
+      expect(err.detail).toContain('ENOENT');
+
+      // No subscribe attempted, no wire activity.
+      expect(bus.subscribers.size).toBe(0);
+      expect(bus.sent).toHaveLength(0);
+    } finally {
+      readSpy.mockRestore();
+    }
+  });
+
+  describe('begin_timeout', () => {
+    // Fake timers scoped to setTimeout/clearTimeout so we can fast-forward
+    // past the ackTimeoutMs without sitting through real wall-clock.
+    // Same scoping as the Task 6/7/8 fake-timer suites.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('no FW_TRANSFER_BEGIN_ACK within ackTimeoutMs rejects with begin_timeout and cleans up', async () => {
+      // Drive run() to the BEGIN-wait phase (BEGIN on the wire) but never
+      // deliver BEGIN_ACK. Advance fake time past ackTimeoutMs; the
+      // begin-timeout race must fire and reject. Cleanup runs in finally.
+      const ackTimeoutMs = 500;
+      const buf = Buffer.from('A'.repeat(50));
+      const tempPath = await writeTempFirmware(buf);
+      try {
+        const bus = new FakeSerialBus();
+        const streamer = new ChunkStreamer({ bus, config: { ackTimeoutMs } });
+
+        const driver = (async (): Promise<void> => {
+          await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+          // Sanity: BEGIN-wait timer is the only fake timer armed.
+          expect(vi.getTimerCount()).toBe(1);
+          // Advance just past the deadline. The begin-timeout fires.
+          await vi.advanceTimersByTimeAsync(ackTimeoutMs);
+        })();
+
+        await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+          code: 'begin_timeout',
+          transferId: TRANSFER_ID,
+          detail: expect.stringContaining(`${ackTimeoutMs}ms`),
+        });
+        await driver;
+
+        // Cleanup verified on the reject path. Subscriber disposed; no
+        // leftover pending fake timers (the begin-timeout self-cleared
+        // when it fired then was re-cleared by the BEGIN-scope finally).
+        expect(bus.subscribers.size).toBe(0);
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+      }
+    });
+
+    it('successful BEGIN_ACK clears the begin-timeout timer (no leak)', async () => {
+      // Mutation guard for the `clearTimeout(beginAckTimer)` in the
+      // BEGIN-scope finally. Drive a happy-path 1-chunk run with fake
+      // timers active. After BEGIN_ACK arrives but before any chunk-phase
+      // timer arms, the begin-timeout timer must already be cleared. We
+      // assert by checking that getTimerCount() never exceeds 1 across
+      // the BEGIN→chunk-phase transition: the begin-timeout (1) clears
+      // BEFORE the per-chunk timer (1) and watchdog (1) arm, but the
+      // observable steady state once the chunk phase is running is
+      // 2 timers (per-chunk + watchdog) — NOT 3.
+      const chunkSize = 100;
+      const buf = Buffer.alloc(chunkSize, 0x40);
+      const tempPath = await writeTempFirmware(buf);
+      try {
+        const bus = new FakeSerialBus();
+        const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+
+        const driver = (async (): Promise<void> => {
+          await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+          // BEGIN-wait: only the begin-timeout timer should be armed.
+          expect(vi.getTimerCount()).toBe(1);
+          bus.deliver(TRANSFER_ID, beginAck());
+          await waitFor(
+            () => bus.sent.filter((s) => s.payload.includes('FW_CHUNK')).length >= 1,
+            'first FW_CHUNK sent',
+          );
+          // Chunk phase running: per-chunk timer + watchdog = 2. The
+          // begin-timeout timer must have been cleared in the BEGIN-scope
+          // finally — if it were leaked, this would be 3.
+          expect(vi.getTimerCount()).toBe(2);
+
+          bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+          await waitFor(
+            () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+            'END sent',
+          );
+          bus.deliver(TRANSFER_ID, endAck('OK'));
+        })();
+
+        const result = await streamer.run(specFor(tempPath, buf.length), {});
+        await driver;
+
+        expect(result.endAck.status).toBe('OK');
+        // No pending timers at the end — begin-timeout, per-chunk, and
+        // watchdog all cleared.
+        expect(vi.getTimerCount()).toBe(0);
+        expect(bus.subscribers.size).toBe(0);
+      } finally {
+        await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('begin_rejected: BEGIN_ACK with non-OK status rejects with code begin_rejected and surfaces the status', async () => {
+    // Master replied to BEGIN but with a rejection reason (e.g. SD card
+    // full, master busy mid-other-transfer, version mismatch). Per
+    // protocol.md the field is open-ended; the streamer must surface the
+    // rejected status string in `detail` and reject with code
+    // 'begin_rejected' rather than proceeding to the chunk phase.
+    const buf = Buffer.from('R'.repeat(50));
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus });
+
+      const rejectedStatus = 'sd_full';
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        // Deliver BEGIN_ACK with a non-OK status — master is rejecting.
+        bus.deliver(TRANSFER_ID, {
+          kind: 'beginAck',
+          transferId: TRANSFER_ID,
+          status: rejectedStatus,
+        });
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'begin_rejected',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining(rejectedStatus),
+      });
+      await driver;
+
+      // Critical: NO chunk activity. The streamer must not proceed past
+      // BEGIN if the status is non-OK — only the BEGIN frame was sent.
+      expect(bus.sent.filter((s) => s.payload.includes('FW_CHUNK'))).toHaveLength(0);
+      expect(bus.sent.filter((s) => s.payload.includes('FW_TRANSFER_END'))).toHaveLength(0);
+      // Cleanup runs on the reject path.
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+});
