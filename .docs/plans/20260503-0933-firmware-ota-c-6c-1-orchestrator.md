@@ -417,7 +417,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - cancel during reboot-timer wait (post-flashJobDone, pre-release): job is "done" — cancel is a no-op (returns null because phase==='done' OR currentJob mid-cleanup)
     - cancel race: cancel arrives before currentJob set (mid-source-resolution): returns null (currentJob === null); start continues to completion (operator can retry cancel after flashJobStarted)
 
-- [ ] **Task 11 — Error paths consolidated (TransferError, source resolution, hostile input)** (extend `flash_orchestrator.ts`):
+- [x] **Task 11 — Error paths consolidated (TransferError, source resolution, hostile input)** (extend `flash_orchestrator.ts`):
   - Wrap the `start()` body in try/catch capturing all error sources. Centralize cleanup-on-fail in a private `failJob(reason, detail)` method. Reasons:
     - `release_lookup_failed` — `releaseService.getReleases()` rejects
     - `release_not_found` — version doesn't match any release
