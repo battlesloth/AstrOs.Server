@@ -346,7 +346,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - github source with no matching variant asset: lock released, `flashJobFailed { reason: 'asset_not_found', detail: variant }` emitted
     - `getCurrentJob()` returns `null` after release; returns the in-flight state mid-flow
 
-- [ ] **Task 7 — Upload-phase wiring (streamer observer translates to controller updates)** (extend `flash_orchestrator.ts`):
+- [x] **Task 7 — Upload-phase wiring (streamer observer translates to controller updates)** (extend `flash_orchestrator.ts`):
   - Replace the no-op observer in `start()` with a real one:
     - On `streamer.run` start: transition all controllers `Queued → UploadingToMaster` (via `transitionControllerState`); emit `flashControllerUpdate` per controller via the throttle (force=true on stage transition)
     - `onChunkAck(highestContiguousSeq, bytesSent)`: update `bytesSent` / `totalBytes` on every controller (same value for all — single-target upload to master); emit throttled `flashControllerUpdate` per controller

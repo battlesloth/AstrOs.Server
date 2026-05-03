@@ -1204,6 +1204,316 @@ describe('FlashJobOrchestrator', () => {
     expect(fx.orchestrator.getCurrentJob()).toBeNull();
   });
 
+  describe('upload-phase observer', () => {
+    // These tests need deterministic throttle timing — fake setTimeout/clearTimeout
+    // and a counter-backed clock that advances in lockstep with the timer queue,
+    // matching the pattern in the createFlashProgressThrottle suite above. The
+    // realClock used by the rest of the FlashJobOrchestrator describe block
+    // can't satisfy the throttle's window math under faked timers because
+    // `vi.advanceTimersByTime` does NOT advance Date.now().
+    let nowMs = 0;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      nowMs = 0;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function advance(ms: number): void {
+      nowMs += ms;
+      vi.advanceTimersByTime(ms);
+    }
+
+    const fakeClock: Clock = {
+      now: () => nowMs,
+      setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms),
+      clearTimeout: (t) => globalThis.clearTimeout(t),
+    };
+
+    // Builds a setupHappyPath-style fixture but with `clock: fakeClock` so the
+    // throttle window math is deterministic under faked timers.
+    function setupWithFakeClock(opts: SetupOpts = {}) {
+      const controllers = opts.controllers ?? [
+        { id: 'controller-a', variant: 'lolin_d32_pro' },
+        { id: 'controller-b', variant: 'lolin_d32_pro' },
+      ];
+      const cachedAsset = opts.cachedAsset ?? makeCachedAsset();
+      const storedUpload = opts.storedUpload === undefined ? makeStoredUpload() : opts.storedUpload;
+      const releases = opts.releases ?? [makeRelease()];
+      const request: FlashRequest = opts.request ?? {
+        source: { kind: 'github', version: '1.4.0' },
+      };
+
+      const bus = new FakeSerialBus();
+      const cache = { fetch: vi.fn().mockResolvedValue(cachedAsset) };
+      const upload = { latest: vi.fn().mockResolvedValue(storedUpload) };
+      const releaseService = {
+        getReleases: vi.fn().mockResolvedValue(makeReleaseList(releases)),
+      };
+      const controllersStore = {
+        listInLocation: vi.fn().mockResolvedValue(controllers),
+      };
+      const emitWs = vi.fn<[FlashOrchestratorWsMessage], void>();
+      const jobLock = new JobLock();
+      const { factory: streamerFactory, controls: streamerControls } = makeScriptedStreamer();
+
+      const orchestrator = new FlashJobOrchestrator({
+        bus,
+        jobLock,
+        cache,
+        upload,
+        releaseService,
+        controllersStore,
+        emitWs,
+        streamerFactory,
+        clock: fakeClock,
+      });
+
+      return { orchestrator, bus, emitWs, jobLock, streamerControls, request, controllers };
+    }
+
+    // Drives the orchestrator into "streamer awaiting" — start() called,
+    // streamer.run captured, observer available. Returns the captured run
+    // for the test to invoke observer hooks against.
+    async function startAndAwaitStreamer(fx: ReturnType<typeof setupWithFakeClock>) {
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      return { startPromise, run: fx.streamerControls.runs[0] };
+    }
+
+    function controllerUpdates(emitWs: ReturnType<typeof vi.fn>): ControllerFlashState[] {
+      return emittedFrames(emitWs, TransmissionType.flashControllerUpdate).map(
+        (frame) => (frame as { data: ControllerFlashState }).data,
+      );
+    }
+
+    it('onTransferBegun: transitions all controllers Queued→UploadingToMaster and emits flashControllerUpdate per controller', async () => {
+      const fx = setupWithFakeClock();
+      const { startPromise, run } = await startAndAwaitStreamer(fx);
+
+      // Pre-condition: controllers all Queued, no flashControllerUpdate emitted yet.
+      expect(controllerUpdates(fx.emitWs)).toHaveLength(0);
+      expect(
+        fx.orchestrator.getCurrentJob()?.controllers.every((c) => c.stage === FwStage.Queued),
+      ).toBe(true);
+
+      // Drive the begin-ack hook.
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+
+      // Both controllers transitioned + emitted, force=true on the stage transition.
+      const updates = controllerUpdates(fx.emitWs);
+      expect(updates).toHaveLength(2);
+      expect(updates.map((u) => u.controllerId).sort()).toEqual(['controller-a', 'controller-b']);
+      expect(updates.every((u) => u.stage === FwStage.UploadingToMaster)).toBe(true);
+      expect(updates.every((u) => u.bytesSent === 0)).toBe(true);
+      expect(updates.every((u) => u.totalBytes === run.spec.source.sizeBytes)).toBe(true);
+
+      // currentJob's controllers also reflect the new stage.
+      expect(
+        fx.orchestrator
+          .getCurrentJob()
+          ?.controllers.every((c) => c.stage === FwStage.UploadingToMaster),
+      ).toBe(true);
+
+      // Drain so the test exits cleanly.
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      await startPromise;
+    });
+
+    it('onChunkAck: advances bytesSent on every controller and emits flashControllerUpdate via the throttle (leading edge)', async () => {
+      const fx = setupWithFakeClock();
+      const { startPromise, run } = await startAndAwaitStreamer(fx);
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      // Two transition emits (one per controller). Subsequent counts are
+      // measured from this baseline.
+      expect(controllerUpdates(fx.emitWs)).toHaveLength(2);
+
+      // Advance past the throttle window so the next ack fires its leading
+      // edge for both controllers (the transition force-emits stamped
+      // lastEmittedAt at t=0).
+      advance(300);
+      run.observer.onChunkAck?.(0, 1024);
+
+      const updatesAfterFirst = controllerUpdates(fx.emitWs);
+      expect(updatesAfterFirst).toHaveLength(4);
+      const tail = updatesAfterFirst.slice(-2);
+      expect(tail.every((u) => u.stage === FwStage.UploadingToMaster)).toBe(true);
+      expect(tail.every((u) => u.bytesSent === 1024)).toBe(true);
+      expect(tail.every((u) => u.totalBytes === run.spec.source.sizeBytes)).toBe(true);
+
+      // currentJob.controllers reflects the bytesSent advance.
+      expect(fx.orchestrator.getCurrentJob()?.controllers.every((c) => c.bytesSent === 1024)).toBe(
+        true,
+      );
+
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      await startPromise;
+    });
+
+    it('rapid onChunkAck within window: coalesces per-controller via the throttle, last value flushes when window elapses', async () => {
+      const fx = setupWithFakeClock();
+      const { startPromise, run } = await startAndAwaitStreamer(fx);
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      // 2 transition emits at t=0.
+      expect(controllerUpdates(fx.emitWs)).toHaveLength(2);
+
+      // Push three acks back-to-back inside the same 250 ms window. The
+      // first ack's leading edge can't fire either: the transition at t=0
+      // stamped lastEmittedAt for both controllers, so the throttle treats
+      // every in-window ack as pending.
+      advance(50);
+      run.observer.onChunkAck?.(0, 1024);
+      advance(50);
+      run.observer.onChunkAck?.(1, 2048);
+      advance(50);
+      run.observer.onChunkAck?.(2, 4096);
+
+      // Still just the 2 transition emits — every ack stashed as pending.
+      expect(controllerUpdates(fx.emitWs)).toHaveLength(2);
+
+      // Advance past the window; flush timers fire and the latest pending
+      // value (4096) lands per controller.
+      advance(200);
+      const updates = controllerUpdates(fx.emitWs);
+      expect(updates).toHaveLength(4);
+      const tail = updates.slice(-2);
+      expect(tail.every((u) => u.bytesSent === 4096)).toBe(true);
+      expect(tail.every((u) => u.stage === FwStage.UploadingToMaster)).toBe(true);
+
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      await startPromise;
+    });
+
+    it('onTransferBegun stamps the throttle window: a mid-window onChunkAck right after is coalesced (proves the transition emit went through the throttle)', async () => {
+      // Mutation-discipline pin for the observer's throttle integration.
+      // If onTransferBegun bypassed the throttle (e.g., emitted directly
+      // via safeEmitWs without calling submit), the per-controller
+      // `lastEmittedAt` map would never be stamped — and the very next
+      // onChunkAck would fire its own leading edge, producing 4 emits
+      // (2 transition + 2 ack) instead of 2 (only the transitions; the
+      // ack stashes as pending). Conversely, if force=true were dropped
+      // to force=false, the empty-throttle leading-edge path would still
+      // emit immediately (lastEmittedAt unset → fires regardless), so
+      // this test would not distinguish those two — but the Throttle's
+      // own `force=true sets lastEmittedAt` test at line ~429 already
+      // pins that semantic; here we pin the orchestrator USES the
+      // throttle at all.
+      const fx = setupWithFakeClock();
+      const { startPromise, run } = await startAndAwaitStreamer(fx);
+
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      expect(controllerUpdates(fx.emitWs)).toHaveLength(2);
+
+      // Mid-window in-flight progress — must be stashed as pending, NOT
+      // fired as a leading edge.
+      advance(50);
+      run.observer.onChunkAck?.(0, 1024);
+      expect(controllerUpdates(fx.emitWs)).toHaveLength(2);
+
+      // Window elapses; pending flushes — controllers emit with the ack's bytesSent.
+      advance(250);
+      const updates = controllerUpdates(fx.emitWs);
+      expect(updates).toHaveLength(4);
+      const tail = updates.slice(-2);
+      expect(tail.every((u) => u.bytesSent === 1024)).toBe(true);
+
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      await startPromise;
+    });
+
+    it('large transfer: 10 chunks across 5 controllers — final bytesSent matches source.sizeBytes for every controller', async () => {
+      const fx = setupWithFakeClock({
+        controllers: [
+          { id: 'c0', variant: 'lolin_d32_pro' },
+          { id: 'c1', variant: 'lolin_d32_pro' },
+          { id: 'c2', variant: 'lolin_d32_pro' },
+          { id: 'c3', variant: 'lolin_d32_pro' },
+          { id: 'c4', variant: 'lolin_d32_pro' },
+        ],
+      });
+      const { startPromise, run } = await startAndAwaitStreamer(fx);
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+
+      const total = run.spec.source.sizeBytes;
+      // 10 acks; each progresses bytesSent up to `total`. Spread them just
+      // far enough apart that some land mid-window (pending) and some past
+      // the window (leading edge). Final ack carries `total`.
+      for (let i = 0; i < 10; i++) {
+        const bytes = Math.floor(((i + 1) / 10) * total);
+        run.observer.onChunkAck?.(i, bytes);
+        advance(30); // 10 * 30ms = 300ms — multiple windows traversed
+      }
+      // Drain any pending flush at the tail.
+      advance(300);
+
+      // currentJob.controllers all show bytesSent === total (the last
+      // chunk's bytesSent value).
+      const job = fx.orchestrator.getCurrentJob();
+      expect(job?.controllers).toHaveLength(5);
+      for (const c of job?.controllers ?? []) {
+        expect(c.bytesSent).toBe(total);
+        expect(c.stage).toBe(FwStage.UploadingToMaster);
+      }
+
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      await startPromise;
+    });
+
+    it('onChunkNak: observed but does NOT mutate controller state', async () => {
+      const fx = setupWithFakeClock();
+      const { startPromise, run } = await startAndAwaitStreamer(fx);
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+
+      // Push a chunk-ack so bytesSent is non-zero; baseline assertion target.
+      advance(300);
+      run.observer.onChunkAck?.(2, 4096);
+      const baselineUpdates = controllerUpdates(fx.emitWs).length;
+
+      // NAK arrives. Per the orchestrator contract, log only — no controller
+      // state change, no flashControllerUpdate, no stage transition.
+      run.observer.onChunkNak?.(1, 'CRC');
+
+      expect(controllerUpdates(fx.emitWs)).toHaveLength(baselineUpdates);
+      const job = fx.orchestrator.getCurrentJob();
+      // bytesSent unchanged from the prior chunk-ack value.
+      expect(job?.controllers.every((c) => c.bytesSent === 4096)).toBe(true);
+      expect(job?.controllers.every((c) => c.stage === FwStage.UploadingToMaster)).toBe(true);
+
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      await startPromise;
+    });
+
+    it('onTransferEnd: does NOT trigger any controller stage transition (deploy phase is Task 8)', async () => {
+      const fx = setupWithFakeClock();
+      const { startPromise, run } = await startAndAwaitStreamer(fx);
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      advance(300);
+      run.observer.onChunkAck?.(0, run.spec.source.sizeBytes);
+      advance(300);
+      const baselineUpdates = controllerUpdates(fx.emitWs).length;
+      const baselineStages = fx.orchestrator.getCurrentJob()?.controllers.map((c) => c.stage);
+
+      run.observer.onTransferEnd?.({
+        transferId: run.spec.transferId,
+        status: 'OK',
+        computedSha256Hex: run.spec.source.sha256,
+      });
+
+      // No additional flashControllerUpdate; controllers still in
+      // UploadingToMaster (deploy-phase wiring lives in Task 8).
+      expect(controllerUpdates(fx.emitWs)).toHaveLength(baselineUpdates);
+      expect(fx.orchestrator.getCurrentJob()?.controllers.map((c) => c.stage)).toEqual(
+        baselineStages,
+      );
+
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      await startPromise;
+    });
+  });
+
   it('safeEmitWs error log includes the readable TransmissionType name (not just the numeric value)', async () => {
     // Operational ergonomics: TransmissionType is a numeric enum, so logging
     // bare `String(msg.type)` would produce numbers like "13" — hard to

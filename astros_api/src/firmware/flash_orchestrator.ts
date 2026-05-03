@@ -220,11 +220,12 @@ export function createFlashProgressThrottle(opts: {
 //     — source binary acquisition.
 //   * c.3 `GitHubReleaseService` — release/asset enumeration.
 //
-// Task 6 ships the skeleton + happy-path `start()` with a NO-OP streamer
-// observer and a placeholder VersionConfirmed-and-release-immediately on
-// streamer success. Tasks 7-11 wire the real upload-phase observer
-// (Task 7), deploy phase (Task 8), reboot timer + heartbeat (Task 9),
-// cancel (Task 10), and full error-path mapping (Task 11).
+// Task 6 ships the skeleton + happy-path `start()`. Task 7 wires the real
+// upload-phase streamer observer (Queued→UploadingToMaster transition on
+// onTransferBegun + per-controller bytesSent updates on onChunkAck, both
+// routed through `flashProgressThrottle`). Tasks 8-11 wire the deploy
+// phase (Task 8), reboot timer + heartbeat (Task 9), cancel (Task 10),
+// and full error-path mapping (Task 11).
 
 const DEFAULT_REBOOT_TIMEOUT_MS = 15_000;
 const DEFAULT_THROTTLE_WINDOW_MS = 250;
@@ -331,8 +332,8 @@ export class FlashJobOrchestrator {
   private readonly emitWs: (msg: FlashOrchestratorWsMessage) => void;
   private readonly streamerFactory: (opts: { bus: SerialBus }) => Streamer;
   private readonly clock: Clock;
-  // Stored for Tasks 8-9 (reboot timer arm) and Task 5's throttle (Task 7).
-  // Not yet consumed in Task 6.
+  // `rebootTimeoutMs` arms the post-deploy lock-release fallback (Task 9 wires it).
+  // `throttleWindowMs` feeds the per-job `flashProgressThrottle` (Task 7) below.
   private readonly rebootTimeoutMs: number;
   private readonly throttleWindowMs: number;
 
@@ -350,23 +351,19 @@ export class FlashJobOrchestrator {
     this.clock = opts.clock ?? defaultClock;
     this.rebootTimeoutMs = opts.config?.rebootTimeoutMs ?? DEFAULT_REBOOT_TIMEOUT_MS;
     this.throttleWindowMs = opts.config?.throttleWindowMs ?? DEFAULT_THROTTLE_WINDOW_MS;
-    // Stash unused-for-Task-6 fields against the linter / `noUnusedLocals`.
-    // `throttleWindowMs` is consumed in Task 7 (passed into the progress
-    // throttle); `rebootTimeoutMs` is consumed in Task 9 (reboot timer arm
-    // duration). Removed when those tasks wire the fields in.
+    // `rebootTimeoutMs` is consumed in Task 9 (reboot timer arm duration).
+    // `throttleWindowMs` is consumed in Task 7's upload-phase observer below.
     void this.rebootTimeoutMs;
-    void this.throttleWindowMs;
   }
 
   /**
-   * Acquire `JobLock`, validate targets, resolve source, and run the streamer.
-   *
-   * Task 6: happy-path skeleton. Streamer runs with a NO-OP observer and on
-   * success all controllers are placeholder-transitioned to
-   * `VersionConfirmed { finalVersion: source.version }`, `flashJobDone` is
-   * emitted, and the lock is released immediately. Tasks 7-9 replace this
-   * placeholder with the real upload-observer wiring, deploy phase, and
-   * reboot timer.
+   * Acquire `JobLock`, validate targets, resolve source, and run the streamer
+   * with the upload-phase observer wired (Task 7 — `Queued → UploadingToMaster`
+   * on `onTransferBegun`, `bytesSent` updates on `onChunkAck`). On streamer
+   * success the post-streamer tail still placeholder-walks every controller
+   * through `Sending → Verifying → Rebooting → VersionConfirmed` and emits
+   * `flashJobDone`; Tasks 8 (deploy phase) and 9 (reboot timer) replace that
+   * tail.
    */
   async start(request: FlashRequest): Promise<{
     jobId: string;
@@ -389,6 +386,8 @@ export class FlashJobOrchestrator {
       );
     }
     this.broadcastLockState();
+
+    let throttle: FlashProgressThrottle | null = null;
 
     try {
       // Wrap the controllers-store lookup so a raw fs/db/etc throw surfaces as
@@ -439,9 +438,19 @@ export class FlashJobOrchestrator {
         data: this.currentJob,
       });
 
-      // Run the streamer with a no-op observer. Task 7 wires the real one
-      // (Queued→UploadingToMaster transition + per-controller bytesSent
-      // updates + stage-boundary force-emits via the throttle).
+      // Per-job progress throttle. Stage transitions emit via `force=true`
+      // (bypass throttle); mid-stage bytesSent updates submit with
+      // `force=false` so the streamer's high-frequency ack loop is
+      // coalesced into ≤4 emits/sec per controller. Disposed on every
+      // exit path (success + catch); leaks would carry timers across jobs.
+      throttle = createFlashProgressThrottle({
+        emit: (state) =>
+          this.safeEmitWs({ type: TransmissionType.flashControllerUpdate, data: state }),
+        windowMs: this.throttleWindowMs,
+        clock: this.clock,
+      });
+      const localThrottle = throttle;
+
       const streamer = this.streamerFactory({ bus: this.bus });
       const transferSpec: TransferSpec = {
         transferId,
@@ -452,22 +461,57 @@ export class FlashJobOrchestrator {
         },
         targets: targetIds,
       };
-      const noopObserver: StreamObserver = {};
-      await streamer.run(transferSpec, noopObserver, {});
+      const observer: StreamObserver = {
+        onTransferBegun: () => {
+          // Queued → UploadingToMaster for every controller. The streamer
+          // uploads a single binary to the master, so all targets share
+          // bytesSent/totalBytes — the per-controller emit just makes the
+          // UI bookkeeping uniform with the deploy phase (Task 8) which
+          // does have per-controller divergence.
+          if (this.currentJob === null) return;
+          const updated = this.currentJob.controllers.map((c) => {
+            if (c.stage !== FwStage.Queued) return c;
+            return transitionControllerState(c, FwStage.UploadingToMaster);
+          });
+          this.currentJob = { ...this.currentJob, controllers: updated };
+          for (const c of updated) {
+            localThrottle.submit(c.controllerId, c, true);
+          }
+        },
+        onChunkAck: (_seq, bytesSent) => {
+          if (this.currentJob === null) return;
+          const updated = this.currentJob.controllers.map((c) => {
+            if (c.stage !== FwStage.UploadingToMaster) return c;
+            return transitionControllerState(c, FwStage.UploadingToMaster, { bytesSent });
+          });
+          this.currentJob = { ...this.currentJob, controllers: updated };
+          for (const c of updated) {
+            if (c.stage !== FwStage.UploadingToMaster) continue;
+            localThrottle.submit(c.controllerId, c);
+          }
+        },
+        onChunkNak: (lastGoodSeq, reason) => {
+          // c.6b's streamer handles Go-Back-N retransmission internally.
+          // The orchestrator observes the NAK for diagnostic logging only;
+          // controller state is unchanged.
+          logger.info(`flash orchestrator: onChunkNak lastGoodSeq=${lastGoodSeq} reason=${reason}`);
+        },
+        // onTransferEnd: deploy phase is Task 8's responsibility; no
+        // controller transition fires here.
+      };
+      await streamer.run(transferSpec, observer, {});
 
-      // Placeholder for the deploy phase (Task 8) + reboot timer (Task 9).
-      // Currently: walk every controller from Queued through the FSM to a
-      // terminal VersionConfirmed (using the requested version as a stand-in
-      // for the master-reported finalVersion), emit `flashJobDone`, release
-      // the lock immediately. None of these shortcuts survive Tasks 7-9 —
-      // Task 7 owns the Queued→UploadingToMaster transition, Task 8 owns
-      // UploadingToMaster→…→VersionConfirmed driven by FW_DEPLOY_DONE
-      // results, and Task 9 owns the reboot-timer-then-release flow. The
-      // intermediate transitions are walked one stage at a time because the
-      // FSM only permits adjacent moves (`Queued → UploadingToMaster`,
-      // not `Queued → VersionConfirmed`).
+      // Placeholder until Task 8 wires the deploy phase + Task 9 wires the
+      // reboot-timer-then-release flow. After Task 7 the streamer-success
+      // exit point leaves controllers in `UploadingToMaster`, so the walk
+      // resumes from there (Task 6's walk started at `Queued`; Task 7's
+      // observer already advanced them). Each step is one FSM-legal hop
+      // because only adjacent stages are permitted.
       const finalControllers: ControllerFlashState[] = this.currentJob.controllers.map((c) => {
-        const uploading = transitionControllerState(c, FwStage.UploadingToMaster);
+        const uploading =
+          c.stage === FwStage.UploadingToMaster
+            ? c
+            : transitionControllerState(c, FwStage.UploadingToMaster);
         const sending = transitionControllerState(uploading, FwStage.Sending);
         const verifying = transitionControllerState(sending, FwStage.Verifying);
         const rebooting = transitionControllerState(verifying, FwStage.Rebooting);
@@ -481,6 +525,8 @@ export class FlashJobOrchestrator {
         type: TransmissionType.flashJobDone,
         data: { jobId, endedAt },
       });
+      throttle.dispose();
+      throttle = null;
       this.releaseLock(jobId);
 
       return {
@@ -507,6 +553,13 @@ export class FlashJobOrchestrator {
             endedAt,
           },
         });
+      }
+      // Dispose the throttle if the streamer (or its observer) failed
+      // mid-flight. Leaks would carry per-controller pending timers across
+      // jobs; the next `start()` would emit stale state into a fresh job.
+      if (throttle !== null) {
+        throttle.dispose();
+        throttle = null;
       }
       this.currentJob = null;
       // `release()` returns false if we never acquired — happens only if a
