@@ -659,7 +659,11 @@ describe('FlashJobOrchestrator', () => {
   // either uses these defaults or overrides one fake (e.g.,
   // `controllersStore.listInLocation` resolving to `[]` for the
   // no_controllers test). The setup is parameterized so the same helper
-  // covers github + upload sources without copy-pasting.
+  // covers github + upload sources without copy-pasting. The optional
+  // `clock` lets fake-timer-driven tests (deploy phase, throttle) inject
+  // a counter-backed Clock — same pattern the upload-phase observer block
+  // used to fork into a separate `setupWithFakeClock`; folding the
+  // parameter through the shared helper avoids the duplicate.
   interface SetupOpts {
     controllers?: Array<{ id: string; variant: string | undefined }>;
     request?: FlashRequest;
@@ -667,6 +671,7 @@ describe('FlashJobOrchestrator', () => {
     storedUpload?: StoredUpload | null;
     releases?: ReleaseInfo[];
     controllersStoreError?: Error;
+    clock?: Clock;
   }
 
   function setupHappyPath(opts: SetupOpts = {}) {
@@ -703,7 +708,7 @@ describe('FlashJobOrchestrator', () => {
       controllersStore,
       emitWs,
       streamerFactory,
-      clock: realClock,
+      clock: opts.clock ?? realClock,
     });
 
     return {
@@ -733,14 +738,16 @@ describe('FlashJobOrchestrator', () => {
       .filter((msg) => msg.type === type);
   }
 
-  it('happy path (github source): acquires lock, resolves source, runs streamer, emits lifecycle events, releases lock', async () => {
+  it('happy path (github source): acquires lock, resolves source, runs streamer, sends FW_DEPLOY_BEGIN, arms deploy subscriber', async () => {
     const fx = setupHappyPath();
 
     const startPromise = fx.orchestrator.start(fx.request);
 
     // Streamer.run was invoked synchronously after the source resolved. Wait
     // for the resolver chain to settle by yielding the microtask queue, then
-    // resolve the streamer's promise to drive the orchestrator to completion.
+    // resolve the streamer's promise. After Task 8, start() resolves once
+    // FW_DEPLOY_BEGIN has been sent and the deploy subscriber is armed; the
+    // post-deploy lock release lives in Task 9.
     await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
     const { spec } = fx.streamerControls.runs[0];
     fx.streamerControls.resolve(makeTransferResult(spec));
@@ -772,69 +779,35 @@ describe('FlashJobOrchestrator', () => {
     // shape never carries `path`.
     expect((result.source as unknown as { path?: string }).path).toBeUndefined();
 
-    // WS lifecycle: lockStateChanged (acquire) → flashJobStarted →
-    // flashJobDone → lockStateChanged (release). Order matters.
-    const types = fx.emitWs.mock.calls.map((c) => (c[0] as FlashOrchestratorWsMessage).type);
-    expect(types).toEqual([
-      TransmissionType.lockStateChanged,
-      TransmissionType.flashJobStarted,
-      TransmissionType.flashJobDone,
-      TransmissionType.lockStateChanged,
-    ]);
+    // FW_DEPLOY_BEGIN was sent on the firmware channel after streamer success.
+    const deployBeginSends = fx.bus.sent.filter((s) => s.kind === 'firmware');
+    expect(deployBeginSends).toHaveLength(1);
+    expect(deployBeginSends[0].payload).toContain(result.transferId);
 
-    // flashJobStarted carries the full FlashJobState with all controllers
-    // initially Queued.
+    // Deploy subscriber is armed on the transferId.
+    expect(fx.bus.deploySubscribers.has(result.transferId)).toBe(true);
+
+    // flashJobStarted emitted with controllers initially Queued.
     const startedFrames = emittedFrames(fx.emitWs, TransmissionType.flashJobStarted);
     expect(startedFrames).toHaveLength(1);
     const startedData = (
       startedFrames[0] as { data: { jobId: string; controllers: ControllerFlashState[] } }
     ).data;
     expect(startedData.jobId).toBe(result.jobId);
-    expect(startedData.controllers).toEqual([
-      {
-        controllerId: 'controller-a',
-        stage: FwStage.Queued,
-        bytesSent: 0,
-        totalBytes: fx.cachedAsset.sizeBytes,
-        detail: '',
-      },
-      {
-        controllerId: 'controller-b',
-        stage: FwStage.Queued,
-        bytesSent: 0,
-        totalBytes: fx.cachedAsset.sizeBytes,
-        detail: '',
-      },
-    ]);
 
-    // flashJobDone carries jobId + endedAt.
-    const doneFrames = emittedFrames(fx.emitWs, TransmissionType.flashJobDone);
-    expect(doneFrames).toHaveLength(1);
-    const doneData = (doneFrames[0] as { data: { jobId: string; endedAt: string } }).data;
-    expect(doneData.jobId).toBe(result.jobId);
-    expect(typeof doneData.endedAt).toBe('string');
+    // flashJobDone NOT yet emitted (deploy phase hasn't completed; Task 9
+    // wires the post-FW_DEPLOY_DONE flashJobDone).
+    expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(0);
 
-    // Lock acquired then released: getOwner is null at end; both
-    // lockStateChanged frames reflect the transitions.
-    const lockFrames = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged);
-    expect(lockFrames).toHaveLength(2);
-    expect((lockFrames[0] as unknown as { locked: boolean; owner: string }).locked).toBe(true);
-    expect((lockFrames[0] as unknown as { locked: boolean; owner: string }).owner).toBe(
-      result.jobId,
-    );
-    expect((lockFrames[1] as unknown as { locked: boolean; owner: string | null }).locked).toBe(
-      false,
-    );
-    expect((lockFrames[1] as unknown as { locked: boolean; owner: string | null }).owner).toBe(
-      null,
-    );
-
-    // After release: lock free, currentJob null.
-    expect(fx.jobLock.isLocked()).toBe(false);
-    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    // Lock acquired but not yet released (Task 9 wires the heartbeat-or-
+    // timer release path); only one lockStateChanged frame so far.
+    expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(1);
+    expect(fx.jobLock.isLocked()).toBe(true);
+    expect(fx.jobLock.getOwner()).toBe(result.jobId);
+    expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
   });
 
-  it('happy path (upload source): displayName comes from upload originalFilename', async () => {
+  it('happy path (upload source): displayName comes from upload originalFilename; FW_DEPLOY_BEGIN sent', async () => {
     const fx = setupHappyPath({ request: { source: { kind: 'upload' } } });
 
     const startPromise = fx.orchestrator.start(fx.request);
@@ -856,6 +829,10 @@ describe('FlashJobOrchestrator', () => {
     // Releases service is unused on the upload path.
     expect(fx.releaseService.getReleases).not.toHaveBeenCalled();
     expect(fx.cache.fetch).not.toHaveBeenCalled();
+
+    // FW_DEPLOY_BEGIN sent + deploy subscriber armed for upload path too.
+    expect(fx.bus.sent.filter((s) => s.kind === 'firmware')).toHaveLength(1);
+    expect(fx.bus.deploySubscribers.has(result.transferId)).toBe(true);
   });
 
   it('concurrent start: second start while lock held throws job_already_running with currentJobId', async () => {
@@ -1181,7 +1158,7 @@ describe('FlashJobOrchestrator', () => {
     expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(0);
   });
 
-  it('getCurrentJob: returns in-flight state mid-flow, null after release', async () => {
+  it('getCurrentJob: returns in-flight state mid-flow, persists after start() returns (deploy phase pending)', async () => {
     const fx = setupHappyPath();
 
     expect(fx.orchestrator.getCurrentJob()).toBeNull();
@@ -1197,11 +1174,15 @@ describe('FlashJobOrchestrator', () => {
     expect(inflight?.controllers.every((c) => c.stage === FwStage.Queued)).toBe(true);
     expect(inflight?.endedAt).toBeUndefined();
 
-    // Drive to completion.
+    // Drive to completion. After Task 8, start() resolves once FW_DEPLOY_BEGIN
+    // is sent + deploy subscriber armed; currentJob remains set because the
+    // deploy phase (FW_DEPLOY_DONE → terminal transitions) runs
+    // asynchronously and Task 9 owns the post-deploy lock release.
     fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
     await startPromise;
 
-    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(true);
   });
 
   describe('upload-phase observer', () => {
@@ -1233,52 +1214,10 @@ describe('FlashJobOrchestrator', () => {
       clearTimeout: (t) => globalThis.clearTimeout(t),
     };
 
-    // Builds a setupHappyPath-style fixture but with `clock: fakeClock` so the
-    // throttle window math is deterministic under faked timers.
-    function setupWithFakeClock(opts: SetupOpts = {}) {
-      const controllers = opts.controllers ?? [
-        { id: 'controller-a', variant: 'lolin_d32_pro' },
-        { id: 'controller-b', variant: 'lolin_d32_pro' },
-      ];
-      const cachedAsset = opts.cachedAsset ?? makeCachedAsset();
-      const storedUpload = opts.storedUpload === undefined ? makeStoredUpload() : opts.storedUpload;
-      const releases = opts.releases ?? [makeRelease()];
-      const request: FlashRequest = opts.request ?? {
-        source: { kind: 'github', version: '1.4.0' },
-      };
-
-      const bus = new FakeSerialBus();
-      const cache = { fetch: vi.fn().mockResolvedValue(cachedAsset) };
-      const upload = { latest: vi.fn().mockResolvedValue(storedUpload) };
-      const releaseService = {
-        getReleases: vi.fn().mockResolvedValue(makeReleaseList(releases)),
-      };
-      const controllersStore = {
-        listInLocation: vi.fn().mockResolvedValue(controllers),
-      };
-      const emitWs = vi.fn<[FlashOrchestratorWsMessage], void>();
-      const jobLock = new JobLock();
-      const { factory: streamerFactory, controls: streamerControls } = makeScriptedStreamer();
-
-      const orchestrator = new FlashJobOrchestrator({
-        bus,
-        jobLock,
-        cache,
-        upload,
-        releaseService,
-        controllersStore,
-        emitWs,
-        streamerFactory,
-        clock: fakeClock,
-      });
-
-      return { orchestrator, bus, emitWs, jobLock, streamerControls, request, controllers };
-    }
-
     // Drives the orchestrator into "streamer awaiting" — start() called,
     // streamer.run captured, observer available. Returns the captured run
     // for the test to invoke observer hooks against.
-    async function startAndAwaitStreamer(fx: ReturnType<typeof setupWithFakeClock>) {
+    async function startAndAwaitStreamer(fx: ReturnType<typeof setupHappyPath>) {
       const startPromise = fx.orchestrator.start(fx.request);
       await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
       return { startPromise, run: fx.streamerControls.runs[0] };
@@ -1291,7 +1230,7 @@ describe('FlashJobOrchestrator', () => {
     }
 
     it('onTransferBegun: transitions all controllers Queued→UploadingToMaster and emits flashControllerUpdate per controller', async () => {
-      const fx = setupWithFakeClock();
+      const fx = setupHappyPath({ clock: fakeClock });
       const { startPromise, run } = await startAndAwaitStreamer(fx);
 
       // Pre-condition: controllers all Queued, no flashControllerUpdate emitted yet.
@@ -1324,7 +1263,7 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('onChunkAck: advances bytesSent on every controller and emits flashControllerUpdate via the throttle (leading edge)', async () => {
-      const fx = setupWithFakeClock();
+      const fx = setupHappyPath({ clock: fakeClock });
       const { startPromise, run } = await startAndAwaitStreamer(fx);
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       // Two transition emits (one per controller). Subsequent counts are
@@ -1354,7 +1293,7 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('rapid onChunkAck within window: coalesces per-controller via the throttle, last value flushes when window elapses', async () => {
-      const fx = setupWithFakeClock();
+      const fx = setupHappyPath({ clock: fakeClock });
       const { startPromise, run } = await startAndAwaitStreamer(fx);
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       // 2 transition emits at t=0.
@@ -1401,7 +1340,7 @@ describe('FlashJobOrchestrator', () => {
       // own `force=true sets lastEmittedAt` test at line ~429 already
       // pins that semantic; here we pin the orchestrator USES the
       // throttle at all.
-      const fx = setupWithFakeClock();
+      const fx = setupHappyPath({ clock: fakeClock });
       const { startPromise, run } = await startAndAwaitStreamer(fx);
 
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
@@ -1425,7 +1364,8 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('large transfer: 10 chunks across 5 controllers — final bytesSent matches source.sizeBytes for every controller', async () => {
-      const fx = setupWithFakeClock({
+      const fx = setupHappyPath({
+        clock: fakeClock,
         controllers: [
           { id: 'c0', variant: 'lolin_d32_pro' },
           { id: 'c1', variant: 'lolin_d32_pro' },
@@ -1463,7 +1403,7 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('onChunkNak: observed but does NOT mutate controller state', async () => {
-      const fx = setupWithFakeClock();
+      const fx = setupHappyPath({ clock: fakeClock });
       const { startPromise, run } = await startAndAwaitStreamer(fx);
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
 
@@ -1487,7 +1427,7 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('onTransferEnd: does NOT trigger any controller stage transition (deploy phase is Task 8)', async () => {
-      const fx = setupWithFakeClock();
+      const fx = setupHappyPath({ clock: fakeClock });
       const { startPromise, run } = await startAndAwaitStreamer(fx);
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       advance(300);
@@ -1514,6 +1454,477 @@ describe('FlashJobOrchestrator', () => {
     });
   });
 
+  describe('deploy-phase observer', () => {
+    // Same fake-timer pattern as the upload-phase observer block: faked
+    // setTimeout/clearTimeout + a counter-backed clock so the throttle's
+    // window math is deterministic.
+    let nowMs = 0;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      nowMs = 0;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function advance(ms: number): void {
+      nowMs += ms;
+      vi.advanceTimersByTime(ms);
+    }
+
+    const fakeClock: Clock = {
+      now: () => nowMs,
+      setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms),
+      clearTimeout: (t) => globalThis.clearTimeout(t),
+    };
+
+    // Drives the orchestrator through the full upload phase to the deploy-
+    // phase armed point: start() → onTransferBegun → settle streamer → await
+    // start() resolution. After this, FW_DEPLOY_BEGIN has been sent + the
+    // deploy subscriber is armed; tests deliver FW_PROGRESS / FW_DEPLOY_DONE
+    // through the FakeSerialBus and assert on the resulting state.
+    async function startAndArmDeploy(fx: ReturnType<typeof setupHappyPath>): Promise<{
+      jobId: string;
+      transferId: string;
+      targets: string[];
+    }> {
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      const result = await startPromise;
+      return result;
+    }
+
+    function controllerResults(emitWs: ReturnType<typeof vi.fn>): Array<{
+      jobId: string;
+      controller: ControllerFlashState;
+    }> {
+      return emittedFrames(emitWs, TransmissionType.flashControllerResult).map(
+        (frame) => (frame as { data: { jobId: string; controller: ControllerFlashState } }).data,
+      );
+    }
+
+    it('happy path: streamer succeeds → FW_DEPLOY_BEGIN sent → controllers transition to Sending → FW_PROGRESS drives Sending→Verifying→Rebooting → FW_DEPLOY_DONE all OK transitions to VersionConfirmed', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+
+      // Post-arm: FW_DEPLOY_BEGIN sent on the firmware channel; deploy
+      // subscriber registered against the transferId.
+      const firmwareSends = fx.bus.sent.filter((s) => s.kind === 'firmware');
+      expect(firmwareSends).toHaveLength(1);
+      expect(firmwareSends[0].payload).toContain(armed.transferId);
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+
+      // Both controllers transitioned UploadingToMaster → Sending (force=true
+      // → bypass throttle, immediate emit per controller). The flash-
+      // controller-update stream so far: 2 transition emits for the upload
+      // (Queued→UploadingToMaster from onTransferBegun) + 2 transition emits
+      // for the deploy (UploadingToMaster→Sending after streamer success).
+      const updatesAfterArm = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate);
+      expect(updatesAfterArm).toHaveLength(4);
+      const sendingFrames = updatesAfterArm
+        .slice(-2)
+        .map((f) => (f as { data: ControllerFlashState }).data);
+      expect(sendingFrames.every((c) => c.stage === FwStage.Sending)).toBe(true);
+      expect(sendingFrames.map((c) => c.controllerId).sort()).toEqual([
+        'controller-a',
+        'controller-b',
+      ]);
+
+      // Drive each controller through Sending→Verifying→Rebooting via
+      // FW_PROGRESS. Each stage transition forces an emit (force=true);
+      // mid-stage progress would throttle (covered in a separate test).
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+
+      // 4 baseline emits + 2 controllers * 2 stage transitions = 8 emits.
+      const updatesPreDone = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate);
+      expect(updatesPreDone).toHaveLength(8);
+
+      // Deliver FW_DEPLOY_DONE with all OK outcomes.
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: armed.targets.map((id) => ({
+            controllerId: id,
+            outcome: 'OK',
+            finalVersion: '1.4.0',
+            error: '',
+          })),
+        },
+      });
+
+      // flashControllerResult emitted per controller (bypasses throttle).
+      const results = controllerResults(fx.emitWs);
+      expect(results).toHaveLength(2);
+      for (const r of results) {
+        expect(r.jobId).toBe(armed.jobId);
+        expect(r.controller.stage).toBe(FwStage.VersionConfirmed);
+        if (r.controller.stage === FwStage.VersionConfirmed) {
+          expect(r.controller.finalVersion).toBe('1.4.0');
+        }
+      }
+
+      // currentJob's controllers all VersionConfirmed.
+      const job = fx.orchestrator.getCurrentJob();
+      expect(job?.controllers.every((c) => c.stage === FwStage.VersionConfirmed)).toBe(true);
+
+      // Subscriber disposed (single-shot — done is terminal).
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+
+      // Lock NOT yet released (Task 9 wires that). currentJob still set.
+      expect(fx.jobLock.isLocked()).toBe(true);
+      expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+    });
+
+    it('mid-stage FW_PROGRESS within window: throttled (no immediate emit), flushes when window elapses', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+      const baseline = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate).length;
+
+      // Same-stage progress (Sending→Sending advance of bytesSent). The
+      // transition emit at arm time stamped lastEmittedAt; this in-window
+      // submit must stash as pending — no immediate emit.
+      advance(50);
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.Sending,
+          bytesSent: 1024,
+          totalBytes: 2048,
+          detail: '',
+        },
+      });
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate)).toHaveLength(
+        baseline,
+      );
+
+      // Window elapses — pending state flushes.
+      advance(250);
+      const updates = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate);
+      expect(updates).toHaveLength(baseline + 1);
+      const last = (updates[updates.length - 1] as { data: ControllerFlashState }).data;
+      expect(last.controllerId).toBe('controller-a');
+      expect(last.stage).toBe(FwStage.Sending);
+      expect(last.bytesSent).toBe(1024);
+    });
+
+    it('mixed terminal: FW_DEPLOY_DONE with one OK + one FAILED — flashControllerResult per controller; deriveJobLifecycle === done', async () => {
+      const { deriveJobLifecycle } = await import('./flash_job_state_machine.js');
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+
+      // Drive each controller through Sending→Verifying→Rebooting via
+      // FW_PROGRESS so the terminal transition (Rebooting→VersionConfirmed
+      // for OK; any-non-terminal→Failed for FAILED) is FSM-legal.
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [
+            { controllerId: 'controller-a', outcome: 'OK', finalVersion: '1.4.0', error: '' },
+            {
+              controllerId: 'controller-b',
+              outcome: 'FAILED',
+              finalVersion: '',
+              error: 'flash_corrupt',
+            },
+          ],
+        },
+      });
+
+      const results = controllerResults(fx.emitWs);
+      expect(results).toHaveLength(2);
+      const a = results.find((r) => r.controller.controllerId === 'controller-a');
+      const b = results.find((r) => r.controller.controllerId === 'controller-b');
+      expect(a?.controller.stage).toBe(FwStage.VersionConfirmed);
+      expect(b?.controller.stage).toBe(FwStage.Failed);
+      if (b !== undefined && b.controller.stage === FwStage.Failed) {
+        expect(b.controller.error).toBe('flash_corrupt');
+      }
+
+      // Per c.6a's deriveJobLifecycle: any combination of terminal stages
+      // (VersionConfirmed + Failed) → 'done' (NOT 'failed'). flashJobFailed
+      // is reserved for job-wide aborts; per-controller failures are local.
+      const job = fx.orchestrator.getCurrentJob();
+      expect(job).not.toBeNull();
+      if (job !== null) expect(deriveJobLifecycle(job)).toBe('done');
+      // No flashJobFailed should have been emitted.
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+    });
+
+    it('protocol violation (invalid stage): emits flashJobFailed protocol_violation; non-terminal controllers transition to Failed; lock released', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+      const baselineResults = controllerResults(fx.emitWs).length;
+
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          // Cast through unknown to inject a wire-level invalid stage; runtime
+          // guard must reject regardless of the (untyped) source.
+          stage: 'BOGUS' as unknown as FwStage,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: '',
+        },
+      });
+
+      // flashJobFailed emitted with reason: protocol_violation. Detail must
+      // surface the wire-validation message ("invalid stage: BOGUS") rather
+      // than the FSM-transition error ("illegal flash-job transition: ...");
+      // a missing wire-validation guard would let stage='BOGUS' fall through
+      // to transitionControllerState, which throws with the FSM-shaped error
+      // — different reason, less greppable, and harder to map to "the master
+      // sent garbage" in operator triage.
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({
+        jobId: armed.jobId,
+        reason: 'protocol_violation',
+      });
+      const failDetail = (failed[0].data as { detail?: string }).detail ?? '';
+      expect(failDetail).toContain('invalid stage');
+      expect(failDetail).toContain('BOGUS');
+
+      // Both non-terminal controllers transitioned to Failed; flashController
+      // Result emitted per affected controller.
+      const newResults = controllerResults(fx.emitWs).slice(baselineResults);
+      expect(newResults).toHaveLength(2);
+      expect(newResults.every((r) => r.controller.stage === FwStage.Failed)).toBe(true);
+
+      // Lock released, currentJob cleared, subscriber disposed.
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+    });
+
+    it('protocol violation (invalid outcome in FW_DEPLOY_DONE): same cleanup as invalid-stage', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [
+            {
+              controllerId: 'controller-a',
+              outcome: 'WAT' as unknown as 'OK' | 'FAILED',
+              finalVersion: '',
+              error: '',
+            },
+          ],
+        },
+      });
+
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({ reason: 'protocol_violation' });
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    });
+
+    it('protocol violation (empty results in FW_DEPLOY_DONE): protocol_violation; lock released', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [],
+        },
+      });
+
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({ reason: 'protocol_violation' });
+      expect(fx.jobLock.isLocked()).toBe(false);
+    });
+
+    it('unknown controllerId in FW_PROGRESS: dropped silently (logged); other controllers unchanged; subscriber stays armed', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+      const baselineUpdates = emittedFrames(
+        fx.emitWs,
+        TransmissionType.flashControllerUpdate,
+      ).length;
+      const beforeJob = fx.orchestrator.getCurrentJob();
+      const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+
+      try {
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'progress',
+          payload: {
+            transferId: armed.transferId,
+            controllerId: 'phantom-controller',
+            stage: FwStage.Sending,
+            bytesSent: 100,
+            totalBytes: 1000,
+            detail: '',
+          },
+        });
+
+        // No new flashControllerUpdate, no flashJobFailed, currentJob untouched.
+        expect(emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate)).toHaveLength(
+          baselineUpdates,
+        );
+        expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+        expect(fx.orchestrator.getCurrentJob()).toEqual(beforeJob);
+        // Subscriber still armed — drop-and-log isn't a terminal event.
+        expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+        // Log line surfaces the rejected controllerId.
+        expect(infoSpy).toHaveBeenCalled();
+        const logged = infoSpy.mock.calls.some((call) =>
+          (call[0] as string).includes('phantom-controller'),
+        );
+        expect(logged).toBe(true);
+      } finally {
+        infoSpy.mockRestore();
+      }
+    });
+
+    it('unknown controllerId in FW_DEPLOY_DONE result: skipped with log; known controllers terminate normally', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+      const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+
+      // Advance controllers to Rebooting so the Rebooting→VersionConfirmed
+      // terminal transition is FSM-legal.
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+
+      try {
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'done',
+          payload: {
+            transferId: armed.transferId,
+            results: [
+              { controllerId: 'controller-a', outcome: 'OK', finalVersion: '1.4.0', error: '' },
+              { controllerId: 'phantom', outcome: 'OK', finalVersion: '1.4.0', error: '' },
+              { controllerId: 'controller-b', outcome: 'OK', finalVersion: '1.4.0', error: '' },
+            ],
+          },
+        });
+
+        // 2 known controllers got results; phantom skipped + logged.
+        const results = controllerResults(fx.emitWs);
+        expect(results).toHaveLength(2);
+        expect(results.map((r) => r.controller.controllerId).sort()).toEqual([
+          'controller-a',
+          'controller-b',
+        ]);
+        expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+
+        const logged = infoSpy.mock.calls.some((call) => (call[0] as string).includes('phantom'));
+        expect(logged).toBe(true);
+      } finally {
+        infoSpy.mockRestore();
+      }
+    });
+
+    it('bus.send throws on FW_DEPLOY_BEGIN: flashJobFailed bus_send_failed; controllers transition to Failed; lock released', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      // Override bus.send to reject FW_DEPLOY_BEGIN. We detect it by checking
+      // the firmware kind on a payload that comes after the streamer settled
+      // (the streamer fake doesn't call bus.send, so any firmware-kind send
+      // we see came from FW_DEPLOY_BEGIN).
+      const originalSend = fx.bus.send.bind(fx.bus);
+      fx.bus.send = (payload, opts) => {
+        if (opts.kind === 'firmware') {
+          throw new Error('worker channel closed');
+        }
+        originalSend(payload, opts);
+      };
+
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+
+      // start() rejects with bus_send_failed.
+      let caught: unknown;
+      try {
+        await startPromise;
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught).toBeInstanceOf(FlashOrchestratorError);
+      expect((caught as FlashOrchestratorError).reason).toBe('bus_send_failed');
+      expect((caught as FlashOrchestratorError).detail).toContain('worker channel closed');
+
+      // flashJobFailed emitted; lock released; currentJob cleared.
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({ reason: 'bus_send_failed' });
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+
+      // Both controllers got flashControllerResult with Failed (they'd been
+      // transitioned to Sending right before the throw; failNonTerminal
+      // moved them to Failed).
+      const results = controllerResults(fx.emitWs);
+      expect(results).toHaveLength(2);
+      expect(results.every((r) => r.controller.stage === FwStage.Failed)).toBe(true);
+
+      // No deploy subscriber attached (we threw before subscribe).
+      expect(fx.bus.deploySubscribers.size).toBe(0);
+    });
+  });
+
   it('safeEmitWs error log includes the readable TransmissionType name (not just the numeric value)', async () => {
     // Operational ergonomics: TransmissionType is a numeric enum, so logging
     // bare `String(msg.type)` would produce numbers like "13" — hard to
@@ -1534,13 +1945,13 @@ describe('FlashJobOrchestrator', () => {
     try {
       const startPromise = fx.orchestrator.start(fx.request);
       // Drive the streamer to completion so start() resolves rather than
-      // hanging on the inner await.
+      // hanging on the inner await. After Task 8, the only lockStateChanged
+      // emit during start() is the acquire — the release fires later (Task 9
+      // post-FW_DEPLOY_DONE), but one log line is enough to assert format.
       await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
       fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
       await startPromise;
 
-      // Two lockStateChanged emits fire (acquire + release); both throw,
-      // both produce a log line.
       expect(errorSpy).toHaveBeenCalled();
       const logLine = errorSpy.mock.calls[0]?.[0] as string;
       // Readable enum name surfaces.

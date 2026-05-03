@@ -14,13 +14,23 @@
 
 import { v4 as uuid_v4 } from 'uuid';
 import { logger } from '../logger.js';
-import type { Clock, FlashRequest, Streamer } from '../models/firmware/flash_orchestrator.js';
+import type {
+  Clock,
+  FlashRequest,
+  FwDeployEvent,
+  Streamer,
+} from '../models/firmware/flash_orchestrator.js';
 import type {
   ControllerFlashState,
   FlashJobState,
   FlashSource,
 } from '../models/firmware/flash_job_state.js';
-import { FwStage } from '../models/firmware/firmware_messages.js';
+import {
+  FwStage,
+  type FwDeployBegin,
+  type FwDeployDoneResult,
+  type FwProgress,
+} from '../models/firmware/firmware_messages.js';
 import { transitionControllerState } from './flash_job_state_machine.js';
 import type { SerialBus, StreamObserver, TransferSpec } from '../models/firmware/chunk_streamer.js';
 import type { AssetInfo, ReleaseInfo, ReleaseListResult } from '../models/firmware/release.js';
@@ -30,6 +40,8 @@ import type { JobLock } from '../job_lock/job_lock.js';
 import { TransmissionType } from '../models/enums.js';
 import { buildLockStateResponse } from '../models/networking/lock_responses.js';
 import { ChunkStreamer } from './chunk_streamer.js';
+import { MessageGenerator } from '../serial/message_generator.js';
+import { SerialMessageType } from '../serial/serial_message.js';
 
 // Result of resolving a `FlashRequest`. `source` is the operator-facing
 // shape (carried into `flashJobStarted` and the HTTP response); `path` is
@@ -276,7 +288,9 @@ export type FlashOrchestratorErrorReason =
   | 'no_upload'
   | 'release_lookup_failed'
   | 'source_resolution_failed'
-  | 'controllers_lookup_failed';
+  | 'controllers_lookup_failed'
+  | 'bus_send_failed'
+  | 'protocol_violation';
 
 export class FlashOrchestratorError extends Error {
   readonly reason: FlashOrchestratorErrorReason;
@@ -338,6 +352,17 @@ export class FlashJobOrchestrator {
   private readonly throttleWindowMs: number;
 
   private currentJob: FlashJobState | null = null;
+  // Deploy-phase resources owned beyond the synchronous span of `start()`.
+  // The streamer-success branch sends FW_DEPLOY_BEGIN, subscribes to deploy
+  // events, and returns from `start()` while the deploy phase runs
+  // asynchronously through `handleDeployEvent`. Both fields are disposed on
+  // every exit path (FW_DEPLOY_DONE, protocol_violation, future cancel/error
+  // paths in Tasks 9-11). A leaked subscriber would route a stale prior job's
+  // deploy events into the next job; a leaked throttle would carry per-
+  // controller flush timers across jobs.
+  private deployUnsubscriber: (() => void) | null = null;
+  private throttle: FlashProgressThrottle | null = null;
+  private readonly messageGenerator = new MessageGenerator();
 
   constructor(opts: FlashJobOrchestratorOpts) {
     this.bus = opts.bus;
@@ -357,13 +382,14 @@ export class FlashJobOrchestrator {
   }
 
   /**
-   * Acquire `JobLock`, validate targets, resolve source, and run the streamer
-   * with the upload-phase observer wired (Task 7 — `Queued → UploadingToMaster`
-   * on `onTransferBegun`, `bytesSent` updates on `onChunkAck`). On streamer
-   * success the post-streamer tail still placeholder-walks every controller
-   * through `Sending → Verifying → Rebooting → VersionConfirmed` and emits
-   * `flashJobDone`; Tasks 8 (deploy phase) and 9 (reboot timer) replace that
-   * tail.
+   * Acquire `JobLock`, validate targets, resolve source, run the streamer
+   * with the upload-phase observer (Task 7), then arm the deploy phase by
+   * sending FW_DEPLOY_BEGIN and subscribing to per-controller FW_PROGRESS
+   * + the job-wide FW_DEPLOY_DONE (Task 8). The returned promise resolves
+   * once the deploy phase is armed — the operator-facing HTTP layer (Task 12)
+   * gets a fast "flash started, jobId=X" response while the deploy events
+   * drive the rest asynchronously through `handleDeployEvent`. Lock release
+   * and the post-deploy reboot timer (Task 9) live past the `start()` return.
    */
   async start(request: FlashRequest): Promise<{
     jobId: string;
@@ -386,8 +412,6 @@ export class FlashJobOrchestrator {
       );
     }
     this.broadcastLockState();
-
-    let throttle: FlashProgressThrottle | null = null;
 
     try {
       // Wrap the controllers-store lookup so a raw fs/db/etc throw surfaces as
@@ -441,15 +465,17 @@ export class FlashJobOrchestrator {
       // Per-job progress throttle. Stage transitions emit via `force=true`
       // (bypass throttle); mid-stage bytesSent updates submit with
       // `force=false` so the streamer's high-frequency ack loop is
-      // coalesced into ≤4 emits/sec per controller. Disposed on every
-      // exit path (success + catch); leaks would carry timers across jobs.
-      throttle = createFlashProgressThrottle({
+      // coalesced into ≤4 emits/sec per controller. Stored on `this` so the
+      // deploy-phase event handler (Task 8, runs past `start()`) and the
+      // synchronous catch block can both reach it. Disposed on every exit
+      // path; leaks would carry timers across jobs.
+      this.throttle = createFlashProgressThrottle({
         emit: (state) =>
           this.safeEmitWs({ type: TransmissionType.flashControllerUpdate, data: state }),
         windowMs: this.throttleWindowMs,
         clock: this.clock,
       });
-      const localThrottle = throttle;
+      const localThrottle = this.throttle;
 
       const streamer = this.streamerFactory({ bus: this.bus });
       const transferSpec: TransferSpec = {
@@ -501,33 +527,45 @@ export class FlashJobOrchestrator {
       };
       await streamer.run(transferSpec, observer, {});
 
-      // Placeholder until Task 8 wires the deploy phase + Task 9 wires the
-      // reboot-timer-then-release flow. After Task 7 the streamer-success
-      // exit point leaves controllers in `UploadingToMaster`, so the walk
-      // resumes from there (Task 6's walk started at `Queued`; Task 7's
-      // observer already advanced them). Each step is one FSM-legal hop
-      // because only adjacent stages are permitted.
-      const finalControllers: ControllerFlashState[] = this.currentJob.controllers.map((c) => {
-        const uploading =
-          c.stage === FwStage.UploadingToMaster
-            ? c
-            : transitionControllerState(c, FwStage.UploadingToMaster);
-        const sending = transitionControllerState(uploading, FwStage.Sending);
-        const verifying = transitionControllerState(sending, FwStage.Verifying);
-        const rebooting = transitionControllerState(verifying, FwStage.Rebooting);
-        return transitionControllerState(rebooting, FwStage.VersionConfirmed, {
-          finalVersion: resolved.source.version,
-        });
-      });
-      const endedAt = new Date(this.clock.now()).toISOString();
-      this.currentJob = { ...this.currentJob, controllers: finalControllers, endedAt };
-      this.safeEmitWs({
-        type: TransmissionType.flashJobDone,
-        data: { jobId, endedAt },
-      });
-      throttle.dispose();
-      throttle = null;
-      this.releaseLock(jobId);
+      // Streamer succeeded → deploy phase. Transition every controller to
+      // Sending (force=true emits flush any pending throttle state and emit
+      // the transition immediately), send FW_DEPLOY_BEGIN to the master, then
+      // subscribe to per-controller FW_PROGRESS + the job-wide FW_DEPLOY_DONE.
+      // The subscriber drives the rest of the job asynchronously; `start()`
+      // returns once the deploy phase is armed so the HTTP layer (Task 12)
+      // gets a fast "started" response. Lock release lives in Task 9.
+      if (this.currentJob !== null) {
+        const sending = this.currentJob.controllers.map((c) =>
+          c.stage === FwStage.UploadingToMaster ? transitionControllerState(c, FwStage.Sending) : c,
+        );
+        this.currentJob = { ...this.currentJob, controllers: sending };
+        for (const c of sending) {
+          localThrottle.submit(c.controllerId, c, true);
+        }
+      }
+
+      const beginPayload: FwDeployBegin = { transferId, order: targetIds };
+      const beginMsg = this.messageGenerator.generateMessage(
+        SerialMessageType.FW_DEPLOY_BEGIN,
+        uuid_v4(),
+        beginPayload,
+      );
+      try {
+        this.bus.send(beginMsg.msg, { kind: 'firmware' });
+      } catch (err) {
+        // Per FMI §1: a Worker channel / IPC failure on the deploy-begin
+        // send leaves controllers stuck in Sending. Fail them out so the
+        // operator's UI doesn't hang on stale mid-stage state, then throw
+        // the typed reason — the outer catch handles flashJobFailed +
+        // lock release.
+        const detail = err instanceof Error ? err.message : String(err);
+        this.failNonTerminalControllers(`bus_send_failed: ${detail}`);
+        throw new FlashOrchestratorError('bus_send_failed', detail);
+      }
+
+      this.deployUnsubscriber = this.bus.subscribeDeployEvents(transferId, (event) =>
+        this.handleDeployEvent(event),
+      );
 
       return {
         jobId,
@@ -557,9 +595,18 @@ export class FlashJobOrchestrator {
       // Dispose the throttle if the streamer (or its observer) failed
       // mid-flight. Leaks would carry per-controller pending timers across
       // jobs; the next `start()` would emit stale state into a fresh job.
-      if (throttle !== null) {
-        throttle.dispose();
-        throttle = null;
+      if (this.throttle !== null) {
+        this.throttle.dispose();
+        this.throttle = null;
+      }
+      // Same rationale for the deploy-event subscriber: a stale handler
+      // would route the next job's events into a disposed `currentJob`.
+      // Practically only reachable if bus.send for FW_DEPLOY_BEGIN
+      // succeeded but a follow-up step (e.g., subscribeDeployEvents)
+      // threw — which today doesn't happen, but cheap defense.
+      if (this.deployUnsubscriber !== null) {
+        this.deployUnsubscriber();
+        this.deployUnsubscriber = null;
       }
       this.currentJob = null;
       // `release()` returns false if we never acquired — happens only if a
@@ -629,6 +676,196 @@ export class FlashJobOrchestrator {
     this.jobLock.release(jobId);
     this.broadcastLockState();
   }
+
+  // Routes a deploy-phase event (FW_PROGRESS or FW_DEPLOY_DONE) into the
+  // FSM. Hostile-input guards per FMI §6: unknown controllerIds drop with a
+  // log, invalid stage / outcome / empty results trip protocol_violation.
+  private handleDeployEvent(event: FwDeployEvent): void {
+    if (this.currentJob === null) return;
+    if (event.kind === 'progress') {
+      this.handleDeployProgress(event.payload);
+      return;
+    }
+    this.handleDeployDone(event.payload.results);
+  }
+
+  private handleDeployProgress(payload: FwProgress): void {
+    if (this.currentJob === null) return;
+    const target = this.currentJob.controllers.find((c) => c.controllerId === payload.controllerId);
+    if (target === undefined) {
+      // Stale-job leak guard: a master that mistakenly forwards events for
+      // a controller that isn't in this job's target list. Drop + log.
+      logger.info(
+        `flash orchestrator: FW_PROGRESS for unknown controllerId=${payload.controllerId}; dropping`,
+      );
+      return;
+    }
+    if (!isValidFwStage(payload.stage)) {
+      this.failDeployPhase('protocol_violation', `invalid stage: ${String(payload.stage)}`);
+      return;
+    }
+    // Same-stage progress (bytesSent advance) and stage transitions both
+    // route through `transitionControllerState`, which permits the
+    // self-edge in the LEGAL_NEXT_STAGES map for non-terminal stages.
+    // The throttle decides emit-now vs flush-later: stage-changed → force
+    // (bypass), same-stage → throttled.
+    const stageChanged = target.stage !== payload.stage;
+    let next: ControllerFlashState;
+    try {
+      // Terminal stages arrive via FW_DEPLOY_DONE; `handleDeployProgress` only
+      // sees in-flight stages. The narrow union below excludes terminal
+      // stages so transitionControllerState's overload picks the in-flight
+      // payload (bytesSent / totalBytes / detail).
+      next = transitionControllerState(
+        target,
+        payload.stage as
+          | FwStage.Queued
+          | FwStage.UploadingToMaster
+          | FwStage.Sending
+          | FwStage.Verifying
+          | FwStage.Rebooting,
+        {
+          bytesSent: payload.bytesSent,
+          totalBytes: payload.totalBytes,
+          detail: payload.detail,
+        },
+      );
+    } catch (err) {
+      // Illegal transition (e.g., master forwards Verifying when the
+      // controller is in Queued). Surface as protocol_violation per FMI §6.
+      const detail = err instanceof Error ? err.message : String(err);
+      this.failDeployPhase('protocol_violation', detail);
+      return;
+    }
+    const updated = this.currentJob.controllers.map((c) =>
+      c.controllerId === payload.controllerId ? next : c,
+    );
+    this.currentJob = { ...this.currentJob, controllers: updated };
+    if (this.throttle !== null) {
+      this.throttle.submit(next.controllerId, next, stageChanged);
+    }
+  }
+
+  private handleDeployDone(results: FwDeployDoneResult[]): void {
+    if (this.currentJob === null) return;
+    if (results.length === 0) {
+      // Empty results array = master sent "done" with no per-controller
+      // outcomes. Per FMI §1's hostile-input guard, treat as protocol
+      // violation rather than silently leaving controllers mid-stage.
+      this.failDeployPhase('protocol_violation', 'empty FW_DEPLOY_DONE results');
+      return;
+    }
+    // Validate every entry's outcome up-front. If any is malformed we fail
+    // the job; partial-validity is not a state we can reason about (the
+    // orchestrator can't know whether the OK entries reflect real outcomes
+    // or are a master bug, so reject the lot rather than apply some).
+    for (const r of results) {
+      if (r.outcome !== 'OK' && r.outcome !== 'FAILED') {
+        this.failDeployPhase(
+          'protocol_violation',
+          `invalid outcome for controllerId=${r.controllerId}: ${String(r.outcome)}`,
+        );
+        return;
+      }
+    }
+    // Apply terminal transitions. Unknown controllerIds drop with a log per
+    // FMI §6 (master might mistakenly include a phantom id; rejecting the
+    // whole job over it would be brittle when the rest is sound).
+    let updated = this.currentJob.controllers;
+    for (const r of results) {
+      const target = updated.find((c) => c.controllerId === r.controllerId);
+      if (target === undefined) {
+        logger.info(
+          `flash orchestrator: FW_DEPLOY_DONE result for unknown controllerId=${r.controllerId}; skipping`,
+        );
+        continue;
+      }
+      let next: ControllerFlashState;
+      try {
+        if (r.outcome === 'OK') {
+          next = transitionControllerState(target, FwStage.VersionConfirmed, {
+            finalVersion: r.finalVersion,
+          });
+        } else {
+          next = transitionControllerState(target, FwStage.Failed, {
+            error: r.error,
+          });
+        }
+      } catch (err) {
+        // Illegal transition (e.g., terminal arriving when the controller
+        // is already terminal — duplicate FW_DEPLOY_DONE). Surface as
+        // protocol_violation; we'd rather flag this loudly than swallow
+        // a master-side double-send bug.
+        const detail = err instanceof Error ? err.message : String(err);
+        this.failDeployPhase('protocol_violation', detail);
+        return;
+      }
+      updated = updated.map((c) => (c.controllerId === r.controllerId ? next : c));
+      this.safeEmitWs({
+        type: TransmissionType.flashControllerResult,
+        data: { jobId: this.currentJob.jobId, controller: next },
+      });
+    }
+    this.currentJob = { ...this.currentJob, controllers: updated };
+    // Done is terminal for the deploy phase — drop the subscriber so a
+    // late retransmit doesn't double-process. Task 9 wires the
+    // post-flashJobDone reboot timer + lock release; for Task 8 we
+    // intentionally leave `currentJob` set + lock held.
+    if (this.deployUnsubscriber !== null) {
+      this.deployUnsubscriber();
+      this.deployUnsubscriber = null;
+    }
+  }
+
+  // Mid-deploy failure cleanup (bus_send_failed and protocol_violation).
+  // Same shape as the Task 6 catch block but inlined for the async deploy
+  // path: transition non-terminal controllers to Failed + emit per-
+  // controller flashControllerResult + emit job-wide flashJobFailed +
+  // dispose subscriber/throttle + release lock.
+  private failDeployPhase(reason: FlashOrchestratorErrorReason, detail: string): void {
+    if (this.currentJob === null) return;
+    const jobId = this.currentJob.jobId;
+    this.failNonTerminalControllers(`${reason}: ${detail}`);
+    const endedAt = new Date(this.clock.now()).toISOString();
+    this.safeEmitWs({
+      type: TransmissionType.flashJobFailed,
+      data: { jobId, reason, detail, endedAt },
+    });
+    if (this.deployUnsubscriber !== null) {
+      this.deployUnsubscriber();
+      this.deployUnsubscriber = null;
+    }
+    if (this.throttle !== null) {
+      this.throttle.dispose();
+      this.throttle = null;
+    }
+    this.releaseLock(jobId);
+  }
+
+  // Transitions every currently-non-terminal controller to Failed with the
+  // supplied error string AND emits flashControllerResult per affected
+  // controller (bypasses throttle — terminal results never coalesce).
+  // Used by both the synchronous bus_send_failed path (catch in start()
+  // takes over for flashJobFailed + lock release) and the async
+  // protocol_violation path inside handleDeployEvent.
+  private failNonTerminalControllers(error: string): void {
+    if (this.currentJob === null) return;
+    const jobId = this.currentJob.jobId;
+    const updated: ControllerFlashState[] = [];
+    for (const c of this.currentJob.controllers) {
+      if (c.stage === FwStage.VersionConfirmed || c.stage === FwStage.Failed) {
+        updated.push(c);
+        continue;
+      }
+      const next = transitionControllerState(c, FwStage.Failed, { error });
+      updated.push(next);
+      this.safeEmitWs({
+        type: TransmissionType.flashControllerResult,
+        data: { jobId, controller: next },
+      });
+    }
+    this.currentJob = { ...this.currentJob, controllers: updated };
+  }
 }
 
 // Validates the controllers list returned by `controllersStore.listInLocation()`:
@@ -667,6 +904,16 @@ function validateControllers(controllers: Array<{ id: string; variant?: string |
     throw new FlashOrchestratorError('variant_mismatch', detail);
   }
   return firstVariant;
+}
+
+// Hostile-input guard for FW_PROGRESS.stage. The wire field is a string; the
+// master might emit anything (firmware bug, future protocol extension that
+// the server doesn't know yet, malicious input). Cross-check against the
+// enum's value set rather than `keyof typeof FwStage` because the wire form
+// uses the value strings (`'SENDING'`), not the enum keys (`'Sending'`).
+const VALID_FW_STAGES: ReadonlySet<FwStage> = new Set<FwStage>(Object.values(FwStage));
+function isValidFwStage(stage: unknown): stage is FwStage {
+  return typeof stage === 'string' && VALID_FW_STAGES.has(stage as FwStage);
 }
 
 // Maps the greppable-string Errors thrown by `resolveFlashSource` onto typed

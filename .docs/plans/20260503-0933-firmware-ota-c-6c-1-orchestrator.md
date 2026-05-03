@@ -359,7 +359,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - large transfer (10 chunks, 5 controllers): final `bytesSent` matches `source.sizeBytes` for every controller
     - `onChunkNak` is observed but does NOT mutate controller state
 
-- [ ] **Task 8 — Deploy-phase wiring** (extend `flash_orchestrator.ts`):
+- [x] **Task 8 — Deploy-phase wiring** (extend `flash_orchestrator.ts`):
   - After `streamer.run()` resolves OK:
     - Transition all controllers `UploadingToMaster → Sending`; emit `flashControllerUpdate` per controller (force=true)
     - Generate FW_DEPLOY_BEGIN payload via `MessageGenerator.generateMessage(SerialMessageType.FW_DEPLOY_BEGIN, ..., { transferId, order: targetIds })`; call `bus.send(msg, { kind: 'firmware' })` wrapped in try/catch (throw → flashJobFailed { reason: 'bus_send_failed' })
