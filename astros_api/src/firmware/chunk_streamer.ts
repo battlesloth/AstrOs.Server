@@ -74,7 +74,27 @@
 //     status surfaced in `detail`. The check happens BEFORE the
 //     watchdog is armed so a rejected transfer doesn't even enter the
 //     chunk-streaming phase.
-// Task 11 (this revision): post-transfer error codes.
+// Task 12: `bus_send_failed`. `bus.send()` itself can throw — the underlying
+// Worker channel may have died, the IPC pipe may be closed, the message
+// generator might surface a serialization fault. Without explicit handling
+// such a throw escapes uncaught (BEGIN/END sites) or — worse — into a
+// setTimeout callback (the resend path inside `onChunkTimeout`) where Node
+// surfaces it as `uncaughtException`. Every `bus.send()` call site is now
+// wrapped to convert the throw into TransferError('bus_send_failed', ...):
+//   - BEGIN send in run(): wrapped inline; the throw propagates out of the
+//     outer try/catch/finally so the standard cleanup runs.
+//   - sendChunk(): wrapped at the helper boundary so the initial top-up
+//     loop and the resend path share one catch site. Throws TransferError
+//     to the caller — `topUpWindow` (synchronous in run()) lets it bubble,
+//     `onChunkTimeout` (a timer callback) catches it and routes to
+//     `rejectChunkPhase` instead so the throw never leaks past the timer.
+//   - END send in run(): same shape as BEGIN.
+// Cleanup invariants (subscriber dispose, chunk-timer drain, watchdog
+// clear, abort-listener remove, inFlight clear) all run in the outer
+// `finally` regardless of which path throws — verified by the
+// "Cleanup invariants" describe block in chunk_streamer.test.ts.
+//
+// Task 11: post-transfer error codes.
 //   - `end_timeout`: the END-wait now races `waitFor('transferEndAck')`
 //     against `setTimeout(ackTimeoutMs)`. If no FW_TRANSFER_END_ACK
 //     arrives within the budget, the timer fires and rejects with
@@ -348,7 +368,24 @@ export class ChunkStreamer {
         uuid_v4(),
         chunkPayload,
       );
-      this.bus.send(chunkMsg.msg, { kind: 'firmware' });
+      // Task 12: wrap bus.send so a Worker-channel / IPC failure surfaces
+      // as TransferError('bus_send_failed', ...) instead of escaping
+      // uncaught. The throw propagates to the caller — `topUpWindow`
+      // (synchronous from inside run()) lets it bubble out via the outer
+      // try/catch/finally. The resend path inside `onChunkTimeout` (a
+      // setTimeout callback) catches and routes to `rejectChunkPhase`
+      // since a throw from a timer callback would otherwise become an
+      // uncaught exception at the Node runtime level.
+      try {
+        this.bus.send(chunkMsg.msg, { kind: 'firmware' });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new TransferError(
+          'bus_send_failed',
+          spec.transferId,
+          `bus.send threw on FW_CHUNK seq=${seq}: ${message}`,
+        );
+      }
     };
 
     // Per-chunk timer helpers. `armChunkTimer` clears any prior timer for the
@@ -461,7 +498,19 @@ export class ChunkStreamer {
       }
 
       // Resend the same seq with a fresh FW_CHUNK payload + new timer.
-      sendChunk(seq);
+      // Task 12: a throw from sendChunk (bus.send threw — converted to
+      // TransferError('bus_send_failed') inside the helper) cannot
+      // propagate out of this setTimeout callback without becoming an
+      // uncaughtException. Catch and route to rejectChunkPhase so the
+      // chunk-phase awaiter rejects with the right code; the outer
+      // try/finally then runs cleanup. Re-arming the timer is also
+      // skipped — the run is over.
+      try {
+        sendChunk(seq);
+      } catch (err) {
+        rejectChunkPhase?.(err instanceof Error ? err : new Error(String(err)));
+        return;
+      }
       entry.sentAt = Date.now();
       armChunkTimer(seq);
     };
@@ -601,7 +650,22 @@ export class ChunkStreamer {
     const topUpWindow = (): void => {
       while (!backpressurePaused && inFlight.size < windowSize && nextToSend <= lastSeq) {
         const seq = nextToSend++;
-        sendChunk(seq);
+        // Task 12: sendChunk converts bus.send throws to TransferError
+        // ('bus_send_failed'). topUpWindow runs both synchronously from
+        // run() (initial fill + post-BEGIN entry) AND from inside the
+        // subscriber callback (handleChunkAck, handleChunkNak,
+        // handleBackpressure). A throw from the subscriber-callback
+        // path would propagate out to the bus dispatcher rather than
+        // rejecting the chunk-phase awaiter, so we catch here and route
+        // through rejectChunkPhase. From the synchronous-run path the
+        // outer try/catch/finally would also catch it, but routing
+        // through rejectChunkPhase keeps both paths uniform.
+        try {
+          sendChunk(seq);
+        } catch (err) {
+          rejectChunkPhase?.(err instanceof Error ? err : new Error(String(err)));
+          return;
+        }
         inFlight.set(seq, { sentAt: Date.now(), retries: 0 });
         // Arm the per-chunk ack timer (Task 6). The timer fires after
         // ackTimeoutMs if no cumulative ACK has retired this seq by then;
@@ -714,7 +778,19 @@ export class ChunkStreamer {
         uuid_v4(),
         beginPayload,
       );
-      this.bus.send(beginMsg.msg, { kind: 'firmware' });
+      // Task 12: wrap bus.send. A throw here exits via the outer
+      // try/finally so subscriber disposal, abort-listener removal, and
+      // the (yet-unarmed) timer drains all run.
+      try {
+        this.bus.send(beginMsg.msg, { kind: 'firmware' });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new TransferError(
+          'bus_send_failed',
+          spec.transferId,
+          `bus.send threw on FW_TRANSFER_BEGIN: ${message}`,
+        );
+      }
 
       // Task 10: race the BEGIN_ACK wait against ackTimeoutMs. If the
       // master never replies, `begin_timeout` fires; the timer is
@@ -791,7 +867,19 @@ export class ChunkStreamer {
         uuid_v4(),
         endPayload,
       );
-      this.bus.send(endMsg.msg, { kind: 'firmware' });
+      // Task 12: wrap bus.send. By this point the watchdog and (likely)
+      // some chunk timers may still be armed; an exception here exits to
+      // the outer `finally` which drains them all.
+      try {
+        this.bus.send(endMsg.msg, { kind: 'firmware' });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new TransferError(
+          'bus_send_failed',
+          spec.transferId,
+          `bus.send threw on FW_TRANSFER_END: ${message}`,
+        );
+      }
 
       // Task 11: race the END_ACK wait against ackTimeoutMs. Symmetric to
       // the Task 10 BEGIN-wait race. If the master never replies,

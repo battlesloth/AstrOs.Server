@@ -2251,3 +2251,382 @@ describe('ChunkStreamer — post-transfer error codes (Task 11)', () => {
     });
   });
 });
+
+describe('ChunkStreamer — bus_send_failed (Task 12)', () => {
+  // `bus.send()` may throw — in production the WorkerSerialBus's underlying
+  // Worker channel can die, the postMessage IPC pipe can close, or a
+  // serialization fault can surface synchronously. Without explicit
+  // handling, such throws either escape uncaught (BEGIN/END sites in
+  // run()) or — worse — escape from a setTimeout callback (the resend
+  // path inside onChunkTimeout) where Node surfaces them as
+  // `uncaughtException`. Task 12 wraps every bus.send call site so the
+  // throw becomes TransferError('bus_send_failed', ...).
+  //
+  // FakeSerialBusThatThrows is a per-test-built variant: replaces `send`
+  // with a vi.fn() configured to throw on the Nth call (or always).
+  // Constructed inline rather than as a class hierarchy so each test owns
+  // its throw policy explicitly.
+
+  it('bus.send throws on FW_TRANSFER_BEGIN: rejects with bus_send_failed and cleans up', async () => {
+    const buf = Buffer.from('A'.repeat(50));
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      // Replace send with a thrower. The first (and only) call attempts to
+      // put FW_TRANSFER_BEGIN on the wire; the throw surfaces as
+      // TransferError('bus_send_failed') via the run() try/catch wrap.
+      bus.send = vi.fn(() => {
+        throw new Error('worker channel died');
+      });
+
+      const streamer = new ChunkStreamer({ bus });
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'bus_send_failed',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('FW_TRANSFER_BEGIN'),
+      });
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        detail: expect.stringContaining('worker channel died'),
+      });
+
+      // Cleanup must run even though the throw happened inside the BEGIN
+      // send — the subscriber was set up immediately before, so the
+      // finally must dispose it.
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('bus.send throws mid-chunk-stream: rejects with bus_send_failed and cleans up', async () => {
+    // Multi-chunk transfer. The first 2 calls (BEGIN + first FW_CHUNK)
+    // succeed; the 3rd call (second FW_CHUNK during top-up) throws. The
+    // throw flows through sendChunk → topUpWindow → rejectChunkPhase
+    // (since topUpWindow runs inside the subscriber callback driving the
+    // post-BEGIN_ACK initial fill).
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize * 4, 0x33); // 4 chunks
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      // Track calls: 1=BEGIN, 2=first chunk, 3=second chunk (throws here).
+      let callCount = 0;
+      const realSend = bus.send.bind(bus);
+      bus.send = vi.fn((payload: string, opts: { kind: 'firmware' }) => {
+        callCount += 1;
+        if (callCount >= 3) {
+          throw new Error('IPC pipe closed');
+        }
+        realSend(payload, opts);
+      });
+
+      const streamer = new ChunkStreamer({
+        bus,
+        // windowSize=4 so the initial top-up tries to send all 4 chunks
+        // synchronously after BEGIN_ACK; the 3rd call throws.
+        config: { chunkSizeBytes: chunkSize, windowSize: 4 },
+      });
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'bus_send_failed',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('FW_CHUNK'),
+      });
+      await driver;
+
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('bus.send throws on FW_TRANSFER_END: rejects with bus_send_failed and cleans up', async () => {
+    // Drive the full chunk phase so the streamer reaches the END send,
+    // then make that call throw. Verifies the END-site try/catch and
+    // that the finally still drains the watchdog (armed during chunk
+    // phase) and disposes the subscriber.
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize, 0x44);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      let callCount = 0;
+      const realSend = bus.send.bind(bus);
+      // BEGIN (1) + FW_CHUNK (2) succeed; FW_TRANSFER_END (3) throws.
+      bus.send = vi.fn((payload: string, opts: { kind: 'firmware' }) => {
+        callCount += 1;
+        if (callCount === 3) {
+          throw new Error('serial port closed unexpectedly');
+        }
+        realSend(payload, opts);
+      });
+
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => bus.sent.length >= 2, 'CHUNK sent');
+        bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'bus_send_failed',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('FW_TRANSFER_END'),
+      });
+      await driver;
+
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('bus.send throws on resend path (per-chunk timeout): rejects with bus_send_failed without uncaughtException', async () => {
+    // The trickiest call site: the resend inside `onChunkTimeout` is a
+    // setTimeout callback. A throw there cannot propagate via return —
+    // it would become an uncaughtException at the runtime level. The
+    // wrap in onChunkTimeout catches and routes through
+    // rejectChunkPhase. We verify by:
+    //   1. Driving a 1-chunk transfer through BEGIN_ACK
+    //   2. Letting the per-chunk timer fire (no chunkAck delivered)
+    //   3. The resend invokes bus.send, which throws
+    //   4. run() rejects with bus_send_failed (NOT
+    //      chunk_retry_exhausted, NOT transfer_timeout)
+    //
+    // We attach a `process` listener for `uncaughtException` to catch the
+    // mutation case (if the wrap were removed). Vitest by default would
+    // also surface the uncaught throw as a test failure, but the explicit
+    // listener gives us a precise assertion.
+    const ackTimeoutMs = 500;
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize, 0x55);
+    const tempPath = await writeTempFirmware(buf);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const uncaught: Error[] = [];
+    const onUncaught = (err: Error): void => {
+      uncaught.push(err);
+    };
+    process.on('uncaughtException', onUncaught);
+    try {
+      const bus = new FakeSerialBus();
+      let callCount = 0;
+      const realSend = bus.send.bind(bus);
+      // Calls: 1=BEGIN (succeeds), 2=initial chunk send (succeeds),
+      // 3=resend on timeout (throws).
+      bus.send = vi.fn((payload: string, opts: { kind: 'firmware' }) => {
+        callCount += 1;
+        if (callCount === 3) {
+          throw new Error('worker terminated mid-resend');
+        }
+        realSend(payload, opts);
+      });
+
+      const streamer = new ChunkStreamer({
+        bus,
+        config: { chunkSizeBytes: chunkSize, ackTimeoutMs },
+      });
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_CHUNK')),
+          'first chunk sent',
+        );
+        // No chunkAck delivered. Advance past ackTimeoutMs so the
+        // per-chunk timer fires; the resend inside onChunkTimeout
+        // calls bus.send, which throws.
+        await vi.advanceTimersByTimeAsync(ackTimeoutMs);
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'bus_send_failed',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('worker terminated mid-resend'),
+      });
+      await driver;
+
+      // No uncaughtException — the timer-callback wrap caught the throw.
+      expect(uncaught).toHaveLength(0);
+      // Cleanup: subscriber disposed, all timers drained.
+      expect(bus.subscribers.size).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      process.off('uncaughtException', onUncaught);
+      vi.useRealTimers();
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+});
+
+describe('ChunkStreamer — cleanup invariants verification (Task 12)', () => {
+  // Cross-cutting cleanup tests: for each major rejection path, assert
+  // the post-rejection invariants hold:
+  //   (a) the FwAcks subscriber was disposed (bus.subscribers.size === 0)
+  //   (b) all per-chunk setTimeout IDs cleared (vi.getTimerCount() === 0)
+  //   (c) the transfer watchdog cleared (subsumed by (b) under fake timers)
+  //   (d) AbortSignal listener removed (verified via spy where applicable)
+  // The Buffer reference dropping (sourceBuffer) is implicit — the local
+  // goes out of scope when run() returns — and is not directly asserted
+  // because there's no leak-tracking hook in JS without resorting to
+  // FinalizationRegistry, which is too flaky for a deterministic test.
+  //
+  // Per-error-code cleanup is already asserted in the individual Task
+  // 4–11 suites where each error code lives. This block focuses on the
+  // CROSS-CUTTING shape: every error path runs the SAME finally, so
+  // covering 3 representative paths (early, mid-chunk, post-chunk) is
+  // sufficient confidence that the finally is reached uniformly. If a
+  // future task adds a 12th error code that doesn't share the run()
+  // try/finally (e.g. a synchronous throw before subscribe()), THAT
+  // task would add its own cleanup test.
+
+  it('post-rejection invariants hold for source_read_failed (pre-subscribe path)', async () => {
+    // source_read_failed throws before subscribeFwAcks runs. The finally
+    // never gets a chance to call unsubscribe() — but that's fine,
+    // because no subscriber was ever installed. Invariant: bus.subscribers
+    // remains empty throughout. No timers were ever armed.
+    const bus = new FakeSerialBus();
+    const streamer = new ChunkStreamer({ bus });
+
+    await expect(
+      streamer.run(specFor('/nonexistent/path/firmware.bin', 100), {}),
+    ).rejects.toMatchObject({
+      code: 'source_read_failed',
+    });
+
+    expect(bus.subscribers.size).toBe(0);
+  });
+
+  it('post-rejection invariants hold for chunk_retry_exhausted (mid-chunk path)', async () => {
+    // chunk_retry_exhausted is a chunk-phase rejection: subscriber was
+    // installed, watchdog armed, per-chunk timer armed. Finally must
+    // drain ALL of them.
+    const ackTimeoutMs = 500;
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize, 0x77);
+    const tempPath = await writeTempFirmware(buf);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({
+        bus,
+        config: { chunkSizeBytes: chunkSize, ackTimeoutMs, maxRetriesPerChunk: 2 },
+      });
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_CHUNK')),
+          'first chunk sent',
+        );
+        // Burn through retries: maxRetriesPerChunk=2 means
+        // retries=1 (resend) → retries=2 (reject).
+        await vi.advanceTimersByTimeAsync(ackTimeoutMs);
+        await vi.advanceTimersByTimeAsync(ackTimeoutMs);
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'chunk_retry_exhausted',
+      });
+      await driver;
+
+      // (a) subscriber disposed
+      expect(bus.subscribers.size).toBe(0);
+      // (b) + (c) all timers cleared (per-chunk timers + watchdog)
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('post-rejection invariants hold for aborted (chunk-phase, with abort listener removal)', async () => {
+    // aborted exercises the most cleanup paths: subscriber, watchdog,
+    // per-chunk timers, AND the AbortSignal listener. Verify ALL of them
+    // are released — adds the spy-based listener-removal assertion that
+    // chunk_retry_exhausted's path doesn't have.
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize * 2, 0x88); // 2 chunks so a timer is armed
+    const tempPath = await writeTempFirmware(buf);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const ac = new AbortController();
+      const addSpy = vi.spyOn(ac.signal, 'addEventListener');
+      const removeSpy = vi.spyOn(ac.signal, 'removeEventListener');
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_CHUNK')),
+          'first chunk sent',
+        );
+        // At this point: subscriber set, watchdog armed, per-chunk
+        // timers armed, abort listener wired. Abort triggers cleanup.
+        ac.abort('test-cleanup');
+      })();
+
+      await expect(
+        streamer.run(specFor(tempPath, buf.length), {}, { signal: ac.signal }),
+      ).rejects.toMatchObject({
+        code: 'aborted',
+      });
+      await driver;
+
+      // (a) subscriber disposed
+      expect(bus.subscribers.size).toBe(0);
+      // (b) + (c) all timers cleared (per-chunk timers + watchdog)
+      expect(vi.getTimerCount()).toBe(0);
+      // (d) abort listener removed — same fn ref added once and
+      // removed once.
+      const abortAdds = addSpy.mock.calls.filter((c) => c[0] === 'abort');
+      const abortRemoves = removeSpy.mock.calls.filter((c) => c[0] === 'abort');
+      expect(abortAdds).toHaveLength(1);
+      expect(abortRemoves).toHaveLength(1);
+      expect(abortRemoves[0][1]).toBe(abortAdds[0][1]);
+
+      addSpy.mockRestore();
+      removeSpy.mockRestore();
+    } finally {
+      vi.useRealTimers();
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('post-rejection invariants hold for bus_send_failed at BEGIN (subscriber installed, no timers armed yet)', async () => {
+    // bus_send_failed at BEGIN exercises a narrow but important case:
+    // subscriber WAS installed (subscribe runs before the BEGIN send),
+    // but no timers were ever armed (the BEGIN throw happens before
+    // beginAckTimer/watchdog/chunk timers come into play). Finally must
+    // dispose the subscriber even though no timer drain is needed.
+    const buf = Buffer.from('Z'.repeat(50));
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      bus.send = vi.fn(() => {
+        throw new Error('test-bus-send-failed');
+      });
+      const streamer = new ChunkStreamer({ bus });
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'bus_send_failed',
+      });
+
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+});
