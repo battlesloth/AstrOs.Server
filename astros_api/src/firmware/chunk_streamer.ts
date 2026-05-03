@@ -21,17 +21,24 @@
 // a fresh FW_CHUNK payload, resend, re-arm. Timer is cleared on the
 // cumulative ACK that retires the seq, on the all-clear of NAK Go-Back-N,
 // and on cleanup in the `finally` block.
-// Task 7 (this revision): backpressure pause/resume. A `backpressurePaused`
-// flag local to `run()` gates `topUpWindow` so PAUSE halts NEW sends while
-// in-flight ACKs continue draining the window. RESUME clears the flag and
-// tops the window up from current state. `handleBackpressure` is idempotent
-// — duplicate PAUSE/PAUSE or RESUME/RESUME do not refire the observer.
-// Per-chunk timeouts during PAUSE re-arm (so retries still count toward
-// exhaustion — the master's pause does not extend our retry budget) but do
-// NOT resend; resending while the master is paused would overflow its
-// receive buffer with chunks it has already buffered.
-// No watchdog, no abort listener — those layers land in Tasks 8–9 of the
-// c.6b plan.
+// Task 7: backpressure pause/resume. A `backpressurePaused` flag local to
+// `run()` gates `topUpWindow` so PAUSE halts NEW sends while in-flight ACKs
+// continue draining the window. RESUME clears the flag and tops the window
+// up from current state. `handleBackpressure` is idempotent — duplicate
+// PAUSE/PAUSE or RESUME/RESUME do not refire the observer. Per-chunk
+// timeouts during PAUSE re-arm (so retries still count toward exhaustion —
+// the master's pause does not extend our retry budget) but do NOT resend;
+// resending while the master is paused would overflow its receive buffer
+// with chunks it has already buffered.
+// Task 8 (this revision): whole-transfer watchdog. A single
+// `setTimeout(transferTimeoutMs)` (default 300_000 ms = 5 min) is armed on
+// entry to the chunk-streaming phase (post-BEGIN_ACK). On fire it rejects
+// the chunk-phase awaiter with TransferError('transfer_timeout', ...).
+// Cleared on the success path (post-END_ACK status=OK, before resolve)
+// AND in the `finally` cleanup, so a rejected run never leaks a pending
+// timer past return. Reuses Task 5's `rejectChunkPhase` mechanism — the
+// watchdog is the second consumer after FLASH_FULL.
+// No abort listener yet — that lands in Task 9 of the c.6b plan.
 //
 // `fs.promises.readFile` is the only fs touch in this module: TransferSpec
 // gives us a path, and the streamer needs the bytes to chunk-and-send. Future
@@ -168,6 +175,16 @@ export class ChunkStreamer {
     const chunkTimers = new Map<number, NodeJS.Timeout>();
     const { ackTimeoutMs, maxRetriesPerChunk } = this.config;
 
+    // ---- Whole-transfer watchdog (Task 8). A single setTimeout — NOT a Map
+    // like `chunkTimers`, since exactly one watchdog runs per `run()`. Armed
+    // on entry to the chunk-streaming phase (after BEGIN_ACK) and cleared
+    // on the success path (post-END_ACK status=OK) AND in the `finally`
+    // cleanup. The two clear sites are intentional: the success-path clear
+    // ensures no late fire after resolve(), the finally clear handles every
+    // rejection path. `clearTransferWatchdog` is idempotent (null-guarded)
+    // so running both on the success path is safe.
+    let transferWatchdogTimer: NodeJS.Timeout | null = null;
+
     // ---- Backpressure state (Task 7). Defaults to `false` — the master is
     // assumed willing to receive until it explicitly says otherwise via
     // FW_BACKPRESSURE { action: 'PAUSE' }. While paused:
@@ -258,6 +275,33 @@ export class ChunkStreamer {
       if (timer) {
         clearTimeout(timer);
         chunkTimers.delete(seq);
+      }
+    };
+
+    // Whole-transfer watchdog helpers (Task 8). `armTransferWatchdog` is
+    // called exactly once per run, post-BEGIN_ACK, on entry to the
+    // chunk-streaming phase. The defensive clear here is belt-and-suspenders:
+    // a future caller adding a second arm site would still be safe from
+    // leaking the prior timer. `clearTransferWatchdog` is idempotent (null
+    // check) so the success-path call AND the `finally` cleanup call can
+    // safely both run on a happy-path resolution.
+    const armTransferWatchdog = (): void => {
+      if (transferWatchdogTimer) clearTimeout(transferWatchdogTimer);
+      transferWatchdogTimer = setTimeout(() => {
+        rejectChunkPhase?.(
+          new TransferError(
+            'transfer_timeout',
+            spec.transferId,
+            `transfer exceeded ${this.config.transferTimeoutMs}ms watchdog`,
+          ),
+        );
+      }, this.config.transferTimeoutMs);
+    };
+
+    const clearTransferWatchdog = (): void => {
+      if (transferWatchdogTimer) {
+        clearTimeout(transferWatchdogTimer);
+        transferWatchdogTimer = null;
       }
     };
 
@@ -526,6 +570,14 @@ export class ChunkStreamer {
       const beginAck = await waitFor('beginAck');
       observer.onTransferBegun?.(beginAck);
 
+      // Task 8: arm the whole-transfer watchdog on entry to the
+      // chunk-streaming phase. If the chunk loop hangs for any reason that
+      // per-chunk retries don't surface (e.g. a pathological PAUSE/RESUME
+      // dance, or a master that ACKs slowly enough to stay under the
+      // per-chunk budget but exceed transferTimeoutMs in aggregate), the
+      // watchdog rejects the chunk-phase awaiter via `rejectChunkPhase`.
+      armTransferWatchdog();
+
       // ---------- CHUNK (sliding window) ----------
       // currentWaiter is null here — the chunk-phase dispatcher uses
       // inFlight/highestAcked instead. Initial fill kicks off the window;
@@ -561,6 +613,12 @@ export class ChunkStreamer {
       }
       // status === 'OK' — falls through to the resolve below.
 
+      // Task 8: clear the whole-transfer watchdog on the success path BEFORE
+      // returning. The `finally` block also clears it (idempotent), but
+      // doing so here ensures no late fire can race the resolve and reject
+      // an already-resolved run.
+      clearTransferWatchdog();
+
       return {
         transferId: spec.transferId,
         totalBytesSent: sourceBuffer.length,
@@ -572,8 +630,11 @@ export class ChunkStreamer {
       // Cleanup invariants: this block extends as later tasks add state.
       // Task 4 added: clear the in-flight Map. Task 6 added: drain the
       // per-chunk timer Map so a rejected run doesn't leak a node
-      // setTimeout past return. Task 8 will clear the transfer watchdog;
-      // Task 9 the AbortSignal listener.
+      // setTimeout past return. Task 8 added: clear the whole-transfer
+      // watchdog (idempotent — null-guarded — so the success-path call
+      // above and this one cooperate safely). Task 9 will add the
+      // AbortSignal listener.
+      clearTransferWatchdog();
       for (const timer of chunkTimers.values()) clearTimeout(timer);
       chunkTimers.clear();
       inFlight.clear();

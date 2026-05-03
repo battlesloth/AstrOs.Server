@@ -1186,10 +1186,11 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
         await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
         bus.deliver(TRANSFER_ID, beginAck());
         await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
-        // Sanity: exactly one fake-timer slot is occupied (the per-chunk
-        // ack timer for seq=0). If this fails the test pre-condition is
+        // Sanity: two fake-timer slots are occupied — the per-chunk ack
+        // timer for seq=0 (Task 6) AND the whole-transfer watchdog (Task 8,
+        // armed post-BEGIN_ACK). If this fails the test pre-condition is
         // wrong, not the invariant we're testing.
-        expect(vi.getTimerCount()).toBe(1);
+        expect(vi.getTimerCount()).toBe(2);
 
         // Deliver the ACK BEFORE the timer fires. clearChunkTimer should
         // disarm the per-chunk timer in lockstep with inFlight.delete —
@@ -1197,11 +1198,15 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
         bus.deliver(TRANSFER_ID, chunkAck(0, 1));
         // Snapshot the count synchronously after the deliver returns. The
         // ACK retire path runs synchronously in the bus subscriber callback,
-        // so by this point clearChunkTimer should have run.
+        // so by this point clearChunkTimer should have run. We expect 1
+        // remaining (the Task 8 watchdog); the per-chunk timer has been
+        // disarmed.
         timerCountAfterAck = vi.getTimerCount();
 
         // Belt-and-suspenders: advance past the timeout to confirm onRetry
-        // is not somehow triggered through a side-channel.
+        // is not somehow triggered through a side-channel. Bounded by less
+        // than the watchdog's 300_000 ms default so the watchdog itself
+        // doesn't fire mid-test.
         await vi.advanceTimersByTimeAsync(ACK_TIMEOUT_MS * 2);
 
         await waitFor(
@@ -1215,10 +1220,10 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
       await driver;
 
       expect(result.endAck.status).toBe('OK');
-      // Primary mutation-friendly assertion: timer was actively cleared.
-      // If clearChunkTimer were dropped from the ACK retire path, the
-      // setTimeout would still be armed here and the count would be 1.
-      expect(timerCountAfterAck).toBe(0);
+      // Primary mutation-friendly assertion: per-chunk timer was actively
+      // cleared. The Task 8 watchdog is still armed at this snapshot
+      // (count == 1), so a missing clearChunkTimer would push it to 2.
+      expect(timerCountAfterAck).toBe(1);
       // Side-channel checks — both held even with the defensive guard,
       // but worth pinning so a future refactor that drops the guard
       // would still surface a regression here.
@@ -1481,8 +1486,12 @@ describe('ChunkStreamer — backpressure pause/resume (Task 7)', () => {
           expect(onRetry).toHaveBeenCalledWith(0, 1);
           // Critical assertion: NO resend during PAUSE.
           expect(chunkSendCount(bus)).toBe(1);
-          // Timer was re-armed (still 1 active fake timer).
-          expect(vi.getTimerCount()).toBe(1);
+          // Timer was re-armed: still 2 active fake timers (the per-chunk
+          // ack timer + the Task 8 whole-transfer watchdog). If the
+          // re-arm path during PAUSE were broken, the per-chunk timer
+          // would be missing and the count would drop to 1 (just the
+          // watchdog).
+          expect(vi.getTimerCount()).toBe(2);
 
           // RESUME. Top-up no-ops because seq 0 is still inFlight and
           // there are no more seqs (1-chunk transfer).
@@ -1528,6 +1537,190 @@ describe('ChunkStreamer — backpressure pause/resume (Task 7)', () => {
       }
     } finally {
       vi.useRealTimers();
+    }
+  });
+});
+
+describe('ChunkStreamer — whole-transfer watchdog (Task 8)', () => {
+  // Each test in this suite uses fake timers scoped to setTimeout/clearTimeout
+  // (same scoping as the Task 6/7 fake-timer tests). Date and setImmediate
+  // stay real so the wall-clock `waitFor` helper at the top of the file keeps
+  // working for predicate polling.
+
+  function chunkSendCount(bus: FakeSerialBus): number {
+    return bus.sent.filter((s) => s.payload.includes('FW_CHUNK')).length;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('hung transfer past transferTimeoutMs rejects with transfer_timeout and cleans up', async () => {
+    // Setup the watchdog deadline (500ms) shorter than the per-chunk
+    // ackTimeoutMs (1500ms) so the watchdog wins the race against
+    // `chunk_retry_exhausted`. Without this gating, a 1-chunk transfer that
+    // never receives a chunkAck would burn through 3 retries (~4.5s) and
+    // surface as `chunk_retry_exhausted` long before the production-default
+    // 5-min watchdog could fire — making the test untestable in fake-time
+    // without contortions. The gating mirrors how production deployments
+    // would actually configure the two budgets if the watchdog were ever
+    // shorter than the chunk-retry budget.
+    const transferTimeoutMs = 500;
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize, 0x10);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({
+        bus,
+        config: { chunkSizeBytes: chunkSize, transferTimeoutMs },
+      });
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        // Deliver BEGIN_ACK so the chunk phase starts and the watchdog arms.
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
+        // Sanity: watchdog timer + per-chunk timer are both armed.
+        expect(vi.getTimerCount()).toBe(2);
+
+        // Advance JUST past the watchdog deadline. The watchdog is shorter
+        // than ackTimeoutMs, so it fires FIRST and the run rejects with
+        // transfer_timeout — not chunk_retry_exhausted.
+        await vi.advanceTimersByTimeAsync(transferTimeoutMs);
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'transfer_timeout',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('watchdog'),
+      });
+      await driver;
+
+      // Cleanup verified on the reject path. Subscriber disposed; no leftover
+      // pending fake timers (per-chunk timer drained in finally cleanup AND
+      // the watchdog timer self-cleared when it fired then was re-cleared in
+      // finally — idempotent).
+      expect(bus.subscribers.size).toBe(0);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('successful transfer leaves no pending watchdog after resolution', async () => {
+    // Drive a full happy-path 1-chunk run with fake timers active. After
+    // resolve, advance fake time past what would have been the watchdog
+    // deadline and assert no pending timers remain — the watchdog must have
+    // been cleared on the success path (and the finally cleanup is a no-op
+    // on the now-null timer). If the success-path clear were dropped, the
+    // watchdog would still be armed here and getTimerCount() would be 1.
+    const transferTimeoutMs = 500;
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize, 0x20);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({
+        bus,
+        config: { chunkSizeBytes: chunkSize, transferTimeoutMs },
+      });
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
+        // Both watchdog and per-chunk timers armed.
+        expect(vi.getTimerCount()).toBe(2);
+
+        // Drive the happy path. ACK retires the chunk (clears its timer);
+        // END_ACK status=OK then resolves the run.
+        bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), {});
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+
+      // Primary mutation-friendly assertion: NO pending timers after
+      // resolution. The watchdog was cleared on the success path; the
+      // per-chunk timer was cleared by the cumulative ACK earlier. If the
+      // success-path `clearTransferWatchdog()` were dropped, this would be 1.
+      expect(vi.getTimerCount()).toBe(0);
+
+      // Belt-and-suspenders: even if we advance fake time WELL past the
+      // watchdog deadline, no callback fires (no late warn, no late
+      // observer). A pending watchdog would have rejected at this point —
+      // but the run is already resolved, so the rejection would be silently
+      // dropped by the underlying Promise. The getTimerCount() assertion
+      // above is the actual mutation-detector; this advance is just a
+      // smoke check that nothing weird happens.
+      await vi.advanceTimersByTimeAsync(transferTimeoutMs * 2);
+      expect(vi.getTimerCount()).toBe(0);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('rejected run leaves no pending watchdog (finally cleanup)', async () => {
+    // Mutation guard for the `clearTransferWatchdog()` call in the `finally`
+    // block. Drives a HASH_MISMATCH rejection (END_ACK status non-OK). The
+    // success-path clear is NOT reached on this path — only the finally
+    // clear runs. If the finally-block clear were dropped, the watchdog
+    // would still be armed and getTimerCount() would be 1 after the
+    // rejection.
+    //
+    // Crucially we use a transferTimeoutMs LARGE enough that the watchdog
+    // does NOT fire during the test (otherwise the rejection code would be
+    // 'transfer_timeout' instead of 'hash_mismatch' and the path under test
+    // wouldn't be exercised). Default 300_000 is fine; we never advance
+    // fake time at all in this test.
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize, 0x30);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
+        bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        // END_ACK with HASH_MISMATCH — run() rejects, success-path
+        // `clearTransferWatchdog()` is NOT reached, only the finally clear.
+        bus.deliver(TRANSFER_ID, endAck('HASH_MISMATCH'));
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'hash_mismatch',
+        transferId: TRANSFER_ID,
+      });
+      await driver;
+
+      // Primary assertion: finally cleanup cleared the watchdog. If the
+      // finally `clearTransferWatchdog()` call were dropped, this would be
+      // 1 (the watchdog timer would still be pending until its 300_000 ms
+      // deadline expired in fake-time, which we never advance to here).
+      expect(vi.getTimerCount()).toBe(0);
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
     }
   });
 });
