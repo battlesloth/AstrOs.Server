@@ -928,6 +928,35 @@ describe('FlashJobOrchestrator', () => {
     expect(failed[0].data).toMatchObject({ reason: 'variant_unknown' });
   });
 
+  it('rejects with controllers_lookup_failed when controllersStore.listInLocation rejects; lock released, flashJobFailed emitted', async () => {
+    // Per PR feedback: a controllersStore rejection (DB error, fs read
+    // failure, etc.) must surface as a typed FlashOrchestratorError so the
+    // failJob path emits flashJobFailed. Without the wrap around
+    // listInLocation(), the raw Error bypasses the FlashOrchestratorError
+    // branch in the catch block and WS consumers see only lockStateChanged
+    // with no reason.
+    const fx = setupHappyPath({
+      controllersStoreError: new Error('database connection refused'),
+    });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('controllers_lookup_failed');
+    // Detail surfaces the upstream error message so operators can diagnose.
+    expect((caught as FlashOrchestratorError).detail).toContain('database connection refused');
+
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    expect(fx.jobLock.isLocked()).toBe(false);
+    const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+    expect(failed).toHaveLength(1);
+    expect(failed[0].data).toMatchObject({ reason: 'controllers_lookup_failed' });
+  });
+
   it('rejects with asset_not_found when github source has no asset matching variant', async () => {
     // Release exists, but its only asset is metro_s3; controllers report
     // lolin_d32_pro → mismatch surfaced as asset_not_found.

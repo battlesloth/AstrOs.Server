@@ -259,7 +259,8 @@ export type FlashOrchestratorErrorReason =
   | 'asset_not_found'
   | 'no_upload'
   | 'release_lookup_failed'
-  | 'source_resolution_failed';
+  | 'source_resolution_failed'
+  | 'controllers_lookup_failed';
 
 export class FlashOrchestratorError extends Error {
   readonly reason: FlashOrchestratorErrorReason;
@@ -375,7 +376,18 @@ export class FlashJobOrchestrator {
     this.broadcastLockState();
 
     try {
-      const targetsList = await this.controllersStore.listInLocation();
+      // Wrap the controllers-store lookup so a raw fs/db/etc throw surfaces as
+      // a typed FlashOrchestratorError rather than bypassing the failJob emit
+      // path. Mirrors the `mapResolveError` wrap on resolveFlashSource: any
+      // upstream-data-access failure becomes a `controllers_lookup_failed`
+      // event so WS consumers reliably see job rejection reasons.
+      let targetsList: Array<{ id: string; variant: string }>;
+      try {
+        targetsList = await this.controllersStore.listInLocation();
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        throw new FlashOrchestratorError('controllers_lookup_failed', detail);
+      }
       const variant = validateControllers(targetsList);
 
       let resolved: ResolvedFlashSource;
