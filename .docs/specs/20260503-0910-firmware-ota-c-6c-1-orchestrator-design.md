@@ -17,6 +17,8 @@ c.6c is itself split two ways: this spec (**c.6c.1**) ships the orchestrator + s
 
 c.6c.1's payoff: by the time c.6c.2 is written, the orchestrator's failure routing, JobLock lifecycle, and WS emit semantics are pinned in tests. The harness exercises the integration but doesn't have to re-litigate orchestrator-internal correctness.
 
+**Shipping note (May 2026):** c.6c.1 itself is shipping in two PRs to keep each review tractable. **Part 1** lands the scaffolding (Tasks 1-6 from the implementation plan): typed models, WS event-enum entries, `SerialBus.subscribeDeployEvents`, the POLL_ACK `variant` extension, `resolveFlashSource` + `flashProgressThrottle` helpers, and the `FlashJobOrchestrator` class skeleton with happy-path `start()` + variant validation. The orchestrator class exists as importable surface but is NOT wired into `api_server.ts` yet, so no operator-facing flash capability ships in part 1 — it's pure scaffolding. **Part 2** lands Tasks 7-14: the real upload-phase observer, deploy-phase wiring, reboot-timer + heartbeat, cancel mechanism, error-path consolidation, HTTP controller, `api_server.ts` instantiation + POLL handler hookup, and QA plan. This is intra-feature partitioning to manage review burden, distinct from the cross-repo deferral pattern (POLL_ACK extensions are in-scope; AstrOs.ESP work lands in lockstep).
+
 ## Architecture
 
 ```

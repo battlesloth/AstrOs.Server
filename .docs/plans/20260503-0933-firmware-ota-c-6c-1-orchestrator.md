@@ -15,6 +15,13 @@ Two-phase per job: **upload** drives `ChunkStreamer.run()` (all controllers `Upl
 
 **POLL_ACK protocol extension is in-scope** for c.6c.1 (per user redirect — ships as a whole feature, not piecewise with placeholders for cross-repo work). The `POLL_ACK` payload gains `variant: string` per controller as a 5th wire-position field (populated from firmware). The version field is NOT a new addition — `firmwareVersion` has already shipped on `ControlModule` since firmware 1.2.0+ (`parts[3]` of POLL_ACK), and the heartbeat-vs-deploy version match reuses that existing field. Server-side parsing extracts variant; `api_server`'s POLL handler updates an in-memory controllers cache with `variant` and calls `orchestrator.notifyMasterHeartbeat(firmwareVersion)` post-deploy when version matches the deployed target. AstrOs.ESP work to populate the new `variant` field lands in lockstep with this PR.
 
+**Shipping in two PRs.** c.6c.1 itself partitions into:
+
+- **Part 1 (this branch's first PR):** Tasks 1-6. Typed models + WS-enum entries, `SerialBus.subscribeDeployEvents`, POLL_ACK `variant` extension, `resolveFlashSource` + `flashProgressThrottle` helpers, `FlashJobOrchestrator` class skeleton with happy-path `start()` + variant validation. The orchestrator class is exposed as importable surface but is NOT wired into `api_server.ts`, so no flash capability ships in part 1 — it's pure scaffolding. Merging part 1 to `develop` activates only the POLL_ACK variant parsing + the `ControlModule.variant` field; everything else is dormant.
+- **Part 2 (follow-up branch):** Tasks 7-14. Real upload-phase observer wiring, deploy-phase event handler, reboot-timer + heartbeat callback, cancel mechanism, error-path consolidation, HTTP controller, `api_server.ts` instantiation + POLL handler hookup, QA plan + final verification.
+
+This is intra-feature partitioning to manage review burden; it's NOT the same as the cross-repo deferral pattern (POLL_ACK extensions stay in-scope, AstrOs.ESP work lands in lockstep). The split is justified by the scaffolding-without-wiring property: nothing in part 1 is operator-facing, so reviewers can engage on type contracts and unit-test coverage without worrying about half-shipped behavior.
+
 ## API overview
 
 ```typescript
@@ -232,7 +239,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
   - In `message_handler.test.ts`: add 5 new test cases — 3-field legacy yields undefined variant; 4-field 1.2.0+ yields populated firmwareVersion + undefined variant; 5-field with variant yields both populated; 5-field with empty variant yields undefined variant; 5-field with whitespace variant yields undefined variant. Replace the now-obsolete "5-field rejected as UNKNOWN" test with "6-field rejected as UNKNOWN" to lock the upper-bound check.
   - `serial_worker_response.ts` is NOT modified — `PollResponse.controller: ControlModule` flows the new field transitively, no plumbing change needed.
 
-- [ ] **Task 4 — `resolveFlashSource` exported helper with variant-aware asset selection** (new `astros_api/src/firmware/flash_orchestrator.ts`):
+- [x] **Task 4 — `resolveFlashSource` exported helper with variant-aware asset selection** (new `astros_api/src/firmware/flash_orchestrator.ts`):
   - Module-level export:
     ```ts
     export async function resolveFlashSource(
@@ -282,7 +289,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - cache.fetch rejects → propagates rejection (orchestrator-level catch maps to `flashJobFailed { reason: 'source_resolution_failed' }`)
     - upload.latest rejects → propagates
 
-- [ ] **Task 5 — `flashProgressThrottle` exported helper** (extend `flash_orchestrator.ts`):
+- [x] **Task 5 — `flashProgressThrottle` exported helper** (extend `flash_orchestrator.ts`):
   - Per-controller leading-edge throttle, configurable `windowMs` (default 250 ms = 4 Hz). Shape:
     ```ts
     export interface FlashProgressThrottle {
@@ -310,7 +317,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - per-controller independence: submits for controller A don't affect controller B
     - dispose: clears any scheduled flush timers (verify via `vi.getTimerCount()`)
 
-- [ ] **Task 6 — `FlashJobOrchestrator` class skeleton with happy-path `start()`** (extend `flash_orchestrator.ts`; new `flash_orchestrator.test.ts`):
+- [x] **Task 6 — `FlashJobOrchestrator` class skeleton with happy-path `start()`** (extend `flash_orchestrator.ts`; new `flash_orchestrator.test.ts`):
   - Scaffold the class with constructor accepting all injected deps (per "API overview" above — including `releaseService` and the `controllersStore` whose `listInLocation()` returns `Array<{ id: string; variant: string }>`). Module-level defaults for `rebootTimeoutMs = 15_000`, `throttleWindowMs = 250`.
   - `start(request)`:
     1. synchronously try `jobLock.acquire(jobId)` — on fail, throw `Error('job_already_running')` with `currentJobId` attached
