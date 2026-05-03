@@ -196,6 +196,25 @@ export class ChunkStreamer {
     };
 
     const handleChunkNak = (nak: FwChunkNak): void => {
+      // Stale-NAK guard: a NAK whose lastGoodSeq is below our current
+      // highestAcked is from a retransmit-pair the streamer has already
+      // moved past (master retransmitted the NAK; both arrive after we
+      // already restarted). Both the observer call AND the Go-Back-N
+      // mutation must be skipped: rewinding nextToSend / highestAcked
+      // here would roll back the monotonic cumulative-progress cursor
+      // (handleChunkAck has the symmetric guard at the top of its
+      // observer/early-return path), and firing observer.onChunkNak
+      // would surface a phantom error to the UI for a NAK we've already
+      // recovered from.
+      //
+      // FLASH_FULL is exempt — it's terminal regardless of when the master
+      // sent it. A late-arriving FLASH_FULL still means flash is exhausted;
+      // we must reject the transfer rather than silently swallow it.
+      const isStale = nak.lastGoodSeq < highestAcked;
+      if (isStale && nak.reasonCode !== 'FLASH_FULL') {
+        return;
+      }
+
       // Observer fires before any state mutation so listeners see the NAK
       // even when FLASH_FULL is about to terminate the transfer. Symmetric
       // to handleChunkAck calling onChunkAck before the early return on
