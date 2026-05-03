@@ -259,8 +259,7 @@ export type FlashOrchestratorErrorReason =
   | 'asset_not_found'
   | 'no_upload'
   | 'release_lookup_failed'
-  | 'source_resolution_failed'
-  | 'streamer_unknown_error';
+  | 'source_resolution_failed';
 
 export class FlashOrchestratorError extends Error {
   readonly reason: FlashOrchestratorErrorReason;
