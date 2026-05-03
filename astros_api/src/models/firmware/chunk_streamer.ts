@@ -6,6 +6,7 @@ import type {
   FwTransferBeginAck,
   FwTransferEndAck,
 } from './firmware_messages.js';
+import type { FwDeployEvent } from './flash_orchestrator.js';
 
 export interface TransferSpec {
   transferId: string;
@@ -43,6 +44,19 @@ export interface SerialBus {
   // discard `kind: 'normal'` sends when the lock is held.
   send(payload: string, opts: { kind: 'firmware' | 'normal' }): void;
   subscribeFwAcks(transferId: string, handler: (ack: FwInboundAck) => void): () => void;
+  // Separate typed channel from `subscribeFwAcks`. Deploy-phase events
+  // (FW_PROGRESS, FW_DEPLOY_DONE) flow during the deploy phase that
+  // begins after the server emits FW_DEPLOY_BEGIN, so they are routed
+  // to the c.6c.1 FlashJobOrchestrator — not to the upload-phase
+  // ChunkStreamer. Keeping the channels split prevents broadening
+  // FwInboundAck (the streamer's narrow union) and lets each consumer
+  // see exactly the events it cares about.
+  //
+  // The orchestrator owns this subscription; the streamer never calls
+  // it. Returns a disposer that removes the underlying listener — the
+  // orchestrator must invoke the disposer on job teardown to avoid
+  // leaking handlers across successive flash jobs.
+  subscribeDeployEvents(transferId: string, handler: (event: FwDeployEvent) => void): () => void;
 }
 
 export type TransferErrorCode =
