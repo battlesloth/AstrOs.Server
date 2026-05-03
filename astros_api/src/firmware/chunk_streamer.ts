@@ -30,7 +30,7 @@
 // the master's pause does not extend our retry budget) but do NOT resend;
 // resending while the master is paused would overflow its receive buffer
 // with chunks it has already buffered.
-// Task 8 (this revision): whole-transfer watchdog. A single
+// Task 8: whole-transfer watchdog. A single
 // `setTimeout(transferTimeoutMs)` (default 300_000 ms = 5 min) is armed on
 // entry to the chunk-streaming phase (post-BEGIN_ACK). On fire it rejects
 // the chunk-phase awaiter with TransferError('transfer_timeout', ...).
@@ -38,7 +38,19 @@
 // AND in the `finally` cleanup, so a rejected run never leaks a pending
 // timer past return. Reuses Task 5's `rejectChunkPhase` mechanism — the
 // watchdog is the second consumer after FLASH_FULL.
-// No abort listener yet — that lands in Task 9 of the c.6b plan.
+// Task 9 (this revision): external cancellation via AbortSignal. The
+// orchestrator (c.6c) passes `opts.signal` that aborts on panic-stop /
+// job-cancel. An abort listener is registered at the top of `run()`
+// before any await. On fire, `rejectRun(err)` delegates to BOTH
+// `rejectChunkPhase` (covers the chunk-streaming phase) AND
+// `currentWaiter.reject` (covers BEGIN-wait / END-wait phases) — abort
+// can land in any phase, so both reject paths must be wired. The
+// listener is removed in `finally` via `removeEventListener` so a late
+// abort after a settled run() can't fire into a void. A signal that is
+// already aborted at run() entry rejects immediately, before the
+// streamer even sends FW_TRANSFER_BEGIN. Reuses Task 5's `Waiter.reject`
+// (reserved at the time for "Task 8+ external reject paths") and
+// Task 5/8's `rejectChunkPhase`.
 //
 // `fs.promises.readFile` is the only fs touch in this module: TransferSpec
 // gives us a path, and the streamer needs the bytes to chunk-and-send. Future
@@ -90,8 +102,11 @@ export interface ChunkStreamerOpts {
 }
 
 export interface ChunkStreamerRunOpts {
-  // Reserved for Task 9 (AbortSignal cancellation). Accepted now so callers
-  // wiring the streamer in c.6c don't need a signature change later.
+  // Wired by Task 9. The orchestrator (c.6c) aborts this signal on
+  // panic-stop / job-cancel. An abort during any phase (BEGIN-wait,
+  // chunk-streaming, END-wait) rejects `run()` with
+  // TransferError('aborted', ...). A signal that is already aborted at
+  // entry rejects immediately, before BEGIN is sent.
   signal?: AbortSignal;
 }
 
@@ -100,11 +115,11 @@ export interface ChunkStreamerRunOpts {
 // types tight and lets `Extract<FwInboundAck, ...>` resolve cleanly.
 type WaitableKind = 'beginAck' | 'chunkAck' | 'transferEndAck';
 
-// `reject` is reserved for Task 8+ — the watchdog (Task 8), AbortSignal
-// listener (Task 9), and per-phase timeout paths (Tasks 10–11) will need
-// to reject the in-flight waiter from outside the ack subscriber.
-// Currently unused: the Task 3 skeleton only resolves on protocol-correct
-// ack arrival and surfaces other failures via thrown TransferError.
+// `reject` is the external-reject path for the single-slot waiter used
+// by BEGIN-wait and END-wait. Task 9 (AbortSignal cancellation) is the
+// first consumer — `rejectRun` reaches into `currentWaiter.reject` when
+// abort fires during BEGIN-wait or END-wait. Per-phase timeout paths
+// (Tasks 10–11) will likely reuse the same hook.
 interface Waiter<K extends WaitableKind> {
   kind: K;
   resolve: (ack: Extract<FwInboundAck, { kind: K }>) => void;
@@ -144,7 +159,7 @@ export class ChunkStreamer {
   async run(
     spec: TransferSpec,
     observer: StreamObserver,
-    _opts?: ChunkStreamerRunOpts,
+    opts?: ChunkStreamerRunOpts,
   ): Promise<TransferResult> {
     const startedAt = Date.now();
     const sourceBuffer = await fsp.readFile(spec.source.path);
@@ -211,14 +226,33 @@ export class ChunkStreamer {
     // calls `resolveChunkPhaseDone` after the cumulative ACK that completes
     // the transfer; the main loop awaits this before sending TRANSFER_END.
     // `rejectChunkPhase` lets the chunk-phase awaiter throw from outside the
-    // `await chunkPhaseDone` — currently used by the FLASH_FULL NAK path
-    // (Task 5) and reserved for the watchdog (Task 8) and AbortSignal
-    // listener (Task 9).
+    // `await chunkPhaseDone` — used by the FLASH_FULL NAK path (Task 5),
+    // the whole-transfer watchdog (Task 8), and the AbortSignal listener
+    // (Task 9, via `rejectRun`).
+    //
+    // Constructed eagerly at the top of run() — BEFORE the BEGIN-wait await
+    // — so the abort listener registered immediately after can safely
+    // delegate to rejectChunkPhase even if abort fires before the chunk
+    // phase has begun. (Reaching into `rejectChunkPhase` during BEGIN-wait
+    // is a no-op rejection — nothing is awaiting `chunkPhaseDone` yet — but
+    // the construction order eliminates a TDZ-style "rejectChunkPhase is
+    // null" race the lazy form would have introduced.)
     let resolveChunkPhaseDone: (() => void) | null = null;
     let rejectChunkPhase: ((err: Error) => void) | null = null;
     const chunkPhaseDone = new Promise<void>((resolve, reject) => {
       resolveChunkPhaseDone = resolve;
       rejectChunkPhase = reject;
+    });
+    // Suppress UnhandledPromiseRejection if abort fires during BEGIN-wait /
+    // END-wait: in those phases nothing is `await`ing `chunkPhaseDone`, so
+    // a `rejectChunkPhase(err)` from `rejectRun` would otherwise surface as
+    // an unhandled rejection on the next microtask. Attaching a no-op
+    // catcher marks the promise as handled; the actual abort error is
+    // surfaced via `currentWaiter.reject` in those phases (and via the
+    // direct `await chunkPhaseDone` in the chunk phase).
+    chunkPhaseDone.catch(() => {
+      // intentionally empty — handler installed only to mark the promise
+      // as handled; see comment above.
     });
 
     // Build the wire payload + send for a single seq. Used by both the
@@ -552,7 +586,62 @@ export class ChunkStreamer {
         currentWaiter = { kind, resolve, reject } as Waiter<WaitableKind>;
       });
 
+    // ---- AbortSignal cancellation (Task 9). `rejectRun` is the single
+    // entry point for external rejection; it routes the error to whichever
+    // phase is currently active:
+    //   - chunk-streaming phase: `rejectChunkPhase(err)` releases the
+    //     `await chunkPhaseDone` (also used by FLASH_FULL NAK in Task 5
+    //     and the watchdog in Task 8).
+    //   - BEGIN-wait / END-wait: `currentWaiter.reject(err)` releases the
+    //     single-slot waiter installed by `waitFor()`.
+    // Both paths run unconditionally — the chunk-phase reject is a no-op
+    // outside the chunk phase (its catcher is attached above) and the
+    // waiter reject is a no-op when no waiter is active. Calling both
+    // means we don't have to track which phase we're in from outside the
+    // closures.
+    const rejectRun = (err: Error): void => {
+      rejectChunkPhase?.(err);
+      if (currentWaiter !== null) {
+        const w = currentWaiter;
+        currentWaiter = null;
+        w.reject(err);
+      }
+    };
+
+    const abortListener = (): void => {
+      const reason = opts?.signal?.reason;
+      const reasonText =
+        reason instanceof Error
+          ? reason.message
+          : typeof reason === 'string' && reason.length > 0
+            ? reason
+            : 'no reason';
+      rejectRun(new TransferError('aborted', spec.transferId, `transfer aborted: ${reasonText}`));
+    };
+    // `{ once: true }` auto-removes the listener after fire, but we still
+    // call `removeEventListener` explicitly in `finally` for the success
+    // path (where abort never fires and the listener would otherwise
+    // outlive the run, holding `spec` / closure refs alive against the
+    // signal's lifetime).
+    opts?.signal?.addEventListener('abort', abortListener, { once: true });
+
     try {
+      // Pre-aborted signal at entry: reject immediately, before sending
+      // FW_TRANSFER_BEGIN. The listener above won't fire (abort already
+      // happened), so we synthesize the rejection directly. The throw
+      // exits via the outer try/finally so cleanup (subscriber dispose,
+      // listener remove, timer drain) still runs.
+      if (opts?.signal?.aborted) {
+        const reason = opts.signal.reason;
+        const reasonText =
+          reason instanceof Error
+            ? reason.message
+            : typeof reason === 'string' && reason.length > 0
+              ? reason
+              : 'pre-aborted';
+        throw new TransferError('aborted', spec.transferId, `transfer aborted: ${reasonText}`);
+      }
+
       // ---------- BEGIN ----------
       const beginPayload: FwTransferBegin = {
         transferId: spec.transferId,
@@ -632,8 +721,11 @@ export class ChunkStreamer {
       // per-chunk timer Map so a rejected run doesn't leak a node
       // setTimeout past return. Task 8 added: clear the whole-transfer
       // watchdog (idempotent — null-guarded — so the success-path call
-      // above and this one cooperate safely). Task 9 will add the
-      // AbortSignal listener.
+      // above and this one cooperate safely). Task 9 added: remove the
+      // abort listener — done FIRST so a fire-during-cleanup race
+      // (signal aborts in the same microtask we settle the run) cannot
+      // re-enter `rejectRun` and try to reject already-disposed state.
+      opts?.signal?.removeEventListener('abort', abortListener);
       clearTransferWatchdog();
       for (const timer of chunkTimers.values()) clearTimeout(timer);
       chunkTimers.clear();

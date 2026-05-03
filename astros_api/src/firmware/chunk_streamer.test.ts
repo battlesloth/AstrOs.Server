@@ -1724,3 +1724,200 @@ describe('ChunkStreamer — whole-transfer watchdog (Task 8)', () => {
     }
   });
 });
+
+describe('ChunkStreamer — AbortSignal cancellation (Task 9)', () => {
+  // Real timers throughout this suite. Abort is event-driven, not timer-
+  // driven, so faking timers would only complicate setup. The chunk-loop
+  // test below intentionally short-circuits the per-chunk timer race by
+  // firing abort BEFORE ackTimeoutMs elapses (the streamer rejects on
+  // abort long before any chunk timer would fire).
+
+  function chunkSendCount(bus: FakeSerialBus): number {
+    return bus.sent.filter((s) => s.payload.includes('FW_CHUNK')).length;
+  }
+
+  it('abort during BEGIN-wait rejects with aborted and cleans up', async () => {
+    const buf = Buffer.from('A'.repeat(50));
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus });
+      const ac = new AbortController();
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        // Do NOT deliver BEGIN_ACK. Trigger abort instead — run() must
+        // reject via the abort listener even though no ack ever arrived.
+        ac.abort('panic-stop');
+      })();
+
+      await expect(
+        streamer.run(specFor(tempPath, buf.length), {}, { signal: ac.signal }),
+      ).rejects.toMatchObject({
+        code: 'aborted',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('panic-stop'),
+      });
+      await driver;
+
+      // Cleanup must run on the abort path.
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('abort during chunk-loop rejects with aborted and cleans up', async () => {
+    // Multi-chunk transfer; deliver BEGIN_ACK so the chunk phase starts,
+    // then fire abort without delivering any chunkAck. The streamer is
+    // mid-`await chunkPhaseDone` and the abort listener routes through
+    // rejectRun → rejectChunkPhase to release it.
+    const chunkSize = 100;
+    const buf = Buffer.alloc(chunkSize * 4, 0x10); // 4 chunks
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const ac = new AbortController();
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
+        // Abort while chunks are in-flight, before any chunkAck.
+        ac.abort('job-cancel');
+      })();
+
+      await expect(
+        streamer.run(specFor(tempPath, buf.length), {}, { signal: ac.signal }),
+      ).rejects.toMatchObject({
+        code: 'aborted',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('job-cancel'),
+      });
+      await driver;
+
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('abort during END-wait rejects with aborted and cleans up', async () => {
+    const buf = Buffer.from('B'.repeat(50));
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus });
+      const ac = new AbortController();
+
+      const driver = (async (): Promise<void> => {
+        await waitFor(() => bus.sent.length >= 1, 'BEGIN sent');
+        bus.deliver(TRANSFER_ID, beginAck());
+        await waitFor(() => bus.sent.length >= 2, 'CHUNK sent');
+        bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        // END is on the wire; the streamer is mid-`await waitFor('transferEndAck')`.
+        // Abort before delivering END_ACK — the abort listener routes through
+        // rejectRun → currentWaiter.reject (single-slot waiter is set for
+        // 'transferEndAck' at this point).
+        ac.abort('user-cancelled');
+      })();
+
+      await expect(
+        streamer.run(specFor(tempPath, buf.length), {}, { signal: ac.signal }),
+      ).rejects.toMatchObject({
+        code: 'aborted',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('user-cancelled'),
+      });
+      await driver;
+
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('successful run removes the abort listener (no leak)', async () => {
+    // Spy on addEventListener / removeEventListener so we can assert the
+    // listener was added once and removed once. Aborting AFTER run()
+    // resolves must NOT trigger the listener (it has already been
+    // removed); we verify by checking that the addEventListener call
+    // count stays at 1 and the same listener function reference passed
+    // to add was passed to remove.
+    const buf = Buffer.from('C'.repeat(50));
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus });
+      const ac = new AbortController();
+      const addSpy = vi.spyOn(ac.signal, 'addEventListener');
+      const removeSpy = vi.spyOn(ac.signal, 'removeEventListener');
+
+      const driver = scheduleHappyPath(bus);
+      const result = await streamer.run(specFor(tempPath, buf.length), {}, { signal: ac.signal });
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+
+      // The streamer must have wired an abort listener on entry...
+      const abortAdds = addSpy.mock.calls.filter((c) => c[0] === 'abort');
+      expect(abortAdds).toHaveLength(1);
+      // ...and removed it in the finally block. Same function reference
+      // — otherwise removeEventListener is a no-op and the listener
+      // would still be wired after run().
+      const abortRemoves = removeSpy.mock.calls.filter((c) => c[0] === 'abort');
+      expect(abortRemoves).toHaveLength(1);
+      expect(abortRemoves[0][1]).toBe(abortAdds[0][1]);
+
+      // Belt-and-suspenders: aborting now should fire into a void —
+      // no rejection thrown back through the already-resolved run(),
+      // no UnhandledPromiseRejection. We can't directly assert
+      // "listener didn't run" but we CAN assert the abort doesn't
+      // raise any error here.
+      expect(() => ac.abort('post-resolve')).not.toThrow();
+
+      addSpy.mockRestore();
+      removeSpy.mockRestore();
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('pre-aborted signal at run() entry rejects immediately without sending BEGIN', async () => {
+    // The signal is already aborted before run() is called. The streamer
+    // must short-circuit at the top of try{} and reject — it must NOT
+    // send FW_TRANSFER_BEGIN to a master that the orchestrator has
+    // already cancelled on.
+    const buf = Buffer.from('D'.repeat(50));
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus });
+      const ac = new AbortController();
+      ac.abort('pre-cancelled');
+
+      await expect(
+        streamer.run(specFor(tempPath, buf.length), {}, { signal: ac.signal }),
+      ).rejects.toMatchObject({
+        code: 'aborted',
+        transferId: TRANSFER_ID,
+        detail: expect.stringContaining('pre-cancelled'),
+      });
+
+      // Critical: nothing was put on the wire. If the pre-abort check
+      // were dropped, the streamer would send FW_TRANSFER_BEGIN and then
+      // hang waiting for BEGIN_ACK — the test would time out instead of
+      // reject promptly.
+      expect(bus.sent).toHaveLength(0);
+      // Subscriber was set up then torn down in finally.
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+});
