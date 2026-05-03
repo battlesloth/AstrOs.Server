@@ -544,7 +544,13 @@ export class FlashJobOrchestrator {
     try {
       this.emitWs(msg);
     } catch (err) {
-      logger.error(`flash orchestrator: emitWs(${String(msg.type)}) threw: ${String(err)}`);
+      // TransmissionType is a numeric enum, so `String(msg.type)` alone
+      // would log a bare integer (hard to grep, hard to diagnose). Reverse-
+      // mapping via `TransmissionType[msg.type]` yields the readable name;
+      // we still surface the integer alongside so log greps for either form
+      // — name or number — both work, and an unknown value surfaces clearly.
+      const typeName = TransmissionType[msg.type] ?? '<unknown>';
+      logger.error(`flash orchestrator: emitWs(${typeName} (${msg.type})) threw: ${String(err)}`);
     }
   }
 

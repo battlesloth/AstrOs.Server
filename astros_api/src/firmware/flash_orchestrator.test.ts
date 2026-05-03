@@ -21,6 +21,7 @@ import type {
 } from '../models/firmware/chunk_streamer.js';
 import type { FwDeployEvent } from '../models/firmware/flash_orchestrator.js';
 import { JobLock } from '../job_lock/job_lock.js';
+import { logger } from '../logger.js';
 import { TransmissionType } from '../models/enums.js';
 
 // --- Fixture builders -------------------------------------------------------
@@ -1161,5 +1162,45 @@ describe('FlashJobOrchestrator', () => {
     await startPromise;
 
     expect(fx.orchestrator.getCurrentJob()).toBeNull();
+  });
+
+  it('safeEmitWs error log includes the readable TransmissionType name (not just the numeric value)', async () => {
+    // Operational ergonomics: TransmissionType is a numeric enum, so logging
+    // bare `String(msg.type)` would produce numbers like "13" — hard to
+    // grep, hard to diagnose. The log line must include the reverse-mapped
+    // enum key (e.g., "lockStateChanged") alongside the numeric value.
+    const fx = setupHappyPath();
+    // Make ONLY the lockStateChanged emits throw; let the others succeed
+    // so start() can complete normally (otherwise the test hangs awaiting
+    // streamer.run). The orchestrator's safeEmitWs catches the throws +
+    // logs; start() proceeds because the catch swallows.
+    fx.emitWs.mockImplementation((msg: { type: number }) => {
+      if (msg.type === TransmissionType.lockStateChanged) {
+        throw new Error('ws server mid-shutdown');
+      }
+    });
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+    try {
+      const startPromise = fx.orchestrator.start(fx.request);
+      // Drive the streamer to completion so start() resolves rather than
+      // hanging on the inner await.
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+      await startPromise;
+
+      // Two lockStateChanged emits fire (acquire + release); both throw,
+      // both produce a log line.
+      expect(errorSpy).toHaveBeenCalled();
+      const logLine = errorSpy.mock.calls[0]?.[0] as string;
+      // Readable enum name surfaces.
+      expect(logLine).toContain('lockStateChanged');
+      // Numeric value surfaces too — preserves grep-by-number diagnostics.
+      expect(logLine).toContain(String(TransmissionType.lockStateChanged));
+      // Underlying error message surfaces.
+      expect(logLine).toContain('ws server mid-shutdown');
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
