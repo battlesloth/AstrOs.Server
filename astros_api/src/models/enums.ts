@@ -92,6 +92,11 @@ export enum TransmissionType {
   systemStatus,
   lockStateChanged,
   flashJobActive,
+  flashJobStarted,
+  flashControllerUpdate,
+  flashControllerResult,
+  flashJobDone,
+  flashJobFailed,
 }
 
 export enum TransmissionStatus {
