@@ -63,6 +63,11 @@ export interface ChunkStreamerRunOpts {
 // types tight and lets `Extract<FwInboundAck, ...>` resolve cleanly.
 type WaitableKind = 'beginAck' | 'chunkAck' | 'transferEndAck';
 
+// `reject` is reserved for Task 8+ — the watchdog (Task 8), AbortSignal
+// listener (Task 9), and per-phase timeout paths (Tasks 10–11) will need
+// to reject the in-flight waiter from outside the ack subscriber.
+// Currently unused: the Task 3 skeleton only resolves on protocol-correct
+// ack arrival and surfaces other failures via thrown TransferError.
 interface Waiter<K extends WaitableKind> {
   kind: K;
   resolve: (ack: Extract<FwInboundAck, { kind: K }>) => void;
@@ -77,6 +82,26 @@ export class ChunkStreamer {
   constructor(opts: ChunkStreamerOpts) {
     this.bus = opts.bus;
     this.config = { ...TRANSPORT_DEFAULTS, ...(opts.config ?? {}) };
+    // Defensive validation. The spread merge above correctly handles
+    // `undefined` overrides (no `??` footgun where 0 falls back to default),
+    // but a caller passing an explicit `0` or negative value would slip
+    // through and produce nonsense at runtime — e.g. `Math.ceil(len / 0)`
+    // returns Infinity and the chunk loop would never make progress.
+    if (this.config.chunkSizeBytes <= 0) {
+      throw new TypeError(`chunkSizeBytes must be > 0; got ${this.config.chunkSizeBytes}`);
+    }
+    if (this.config.windowSize <= 0) {
+      throw new TypeError(`windowSize must be > 0; got ${this.config.windowSize}`);
+    }
+    if (this.config.ackTimeoutMs <= 0) {
+      throw new TypeError(`ackTimeoutMs must be > 0; got ${this.config.ackTimeoutMs}`);
+    }
+    if (this.config.transferTimeoutMs <= 0) {
+      throw new TypeError(`transferTimeoutMs must be > 0; got ${this.config.transferTimeoutMs}`);
+    }
+    if (this.config.maxRetriesPerChunk <= 0) {
+      throw new TypeError(`maxRetriesPerChunk must be > 0; got ${this.config.maxRetriesPerChunk}`);
+    }
   }
 
   async run(
@@ -143,7 +168,13 @@ export class ChunkStreamer {
         // framing is well-formed; FakeSerialBus does not validate. A real CRC
         // helper lands alongside Task 4's chunking loop, where the master
         // actually checks it. Tracked in the c.6b design spec.
-        crc16Hex: '0000',
+        //
+        // The value is a non-numeric greppable marker (NOT '0000') so a
+        // buggy CRC validator can't silently accept it as a valid all-zero
+        // CRC — any well-formed validator will reject this at parse time
+        // and a maintainer running against a real master will have an
+        // obvious search target.
+        crc16Hex: 'TODO_TASK_4_CRC16',
       };
       const chunkMsg = this.messageGenerator.generateMessage(
         SerialMessageType.FW_CHUNK,
@@ -189,6 +220,9 @@ export class ChunkStreamer {
         endAck,
       };
     } finally {
+      // Cleanup invariants: this block extends as later tasks add state.
+      // Task 4 will clear the in-flight Map; Task 6 the per-chunk timer
+      // Map; Task 8 the transfer watchdog; Task 9 the AbortSignal listener.
       unsubscribe();
     }
   }
