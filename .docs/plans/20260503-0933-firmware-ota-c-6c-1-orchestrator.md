@@ -445,7 +445,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - lock state: every error path releases the lock (parameterized over all reasons)
     - currentJob state: every error path clears `currentJob` to null (or never sets it)
 
-- [ ] **Task 12 — HTTP controller (Express routes)** (new `astros_api/src/controllers/firmware_flash_controller.ts` + `firmware_flash_controller.test.ts`):
+- [x] **Task 12 — HTTP controller (Express routes)** (new `astros_api/src/controllers/firmware_flash_controller.ts` + `firmware_flash_controller.test.ts`):
   - `registerFirmwareFlashRoutes(router: Router, auth: any, orchestrator: FlashJobOrchestrator)` — follow audio_controller.ts pattern
   - `POST /api/firmware/flash`:
     - validate `req.body.source` shape
