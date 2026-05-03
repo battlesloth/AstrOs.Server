@@ -1925,6 +1925,388 @@ describe('FlashJobOrchestrator', () => {
     });
   });
 
+  describe('reboot timer + heartbeat', () => {
+    // Same fake-timer pattern as the deploy-phase observer block. The reboot
+    // timer is a `clock.setTimeout` (faked via the injected mockClock) so we
+    // need both `vi.useFakeTimers` AND a counter-backed clock to stay in
+    // lockstep.
+    let nowMs = 0;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      nowMs = 0;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function advance(ms: number): void {
+      nowMs += ms;
+      vi.advanceTimersByTime(ms);
+    }
+
+    const fakeClock: Clock = {
+      now: () => nowMs,
+      setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms),
+      clearTimeout: (t) => globalThis.clearTimeout(t),
+    };
+
+    // Drives the orchestrator through the full upload + deploy phases to
+    // an all-OK terminal job. After this returns, every controller is
+    // VersionConfirmed, `flashJobDone` has been emitted, and the reboot
+    // timer is armed.
+    async function startAndCompleteDeploy(fx: ReturnType<typeof setupHappyPath>): Promise<{
+      jobId: string;
+      transferId: string;
+      targets: string[];
+    }> {
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      const result = await startPromise;
+
+      // Drive each controller through Sending→Verifying→Rebooting so the
+      // FW_DEPLOY_DONE Rebooting→VersionConfirmed transition is FSM-legal.
+      for (const controllerId of result.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(result.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: result.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+
+      fx.bus.deliverDeployEvent(result.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: result.transferId,
+          results: result.targets.map((id) => ({
+            controllerId: id,
+            outcome: 'OK',
+            finalVersion: '1.4.0',
+            error: '',
+          })),
+        },
+      });
+
+      return result;
+    }
+
+    it('all controllers terminal: emits flashJobDone with jobId+endedAt; arms a reboot timer', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      // Stamp the clock so endedAt is non-trivial (and lands in ISO form).
+      nowMs = 1_000_000;
+      const armed = await startAndCompleteDeploy(fx);
+
+      const doneFrames = emittedFrames(fx.emitWs, TransmissionType.flashJobDone);
+      expect(doneFrames).toHaveLength(1);
+      const doneData = doneFrames[0].data as { jobId: string; endedAt: string };
+      expect(doneData.jobId).toBe(armed.jobId);
+      // endedAt is an ISO timestamp derived from clock.now() at deploy-done.
+      expect(doneData.endedAt).toBe(new Date(1_000_000).toISOString());
+
+      // Reboot timer is armed (one outstanding fake-timer).
+      expect(vi.getTimerCount()).toBe(1);
+
+      // Lock still held (release is gated on heartbeat-or-timer).
+      expect(fx.jobLock.isLocked()).toBe(true);
+      expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+      // currentJob also reflects endedAt (same field that `flashJobDone` carries).
+      expect(fx.orchestrator.getCurrentJob()?.endedAt).toBe(doneData.endedAt);
+      // Lock release event NOT yet emitted — only the acquire so far.
+      expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(1);
+    });
+
+    it('mixed terminal (one OK + one FAILED) still emits flashJobDone and arms reboot timer (per-controller failures are local)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      const result = await startPromise;
+
+      // Walk both controllers to Rebooting so the OK controller's terminal
+      // transition is legal; the FAILED outcome is legal from any non-terminal.
+      for (const controllerId of result.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(result.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: result.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+
+      fx.bus.deliverDeployEvent(result.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: result.transferId,
+          results: [
+            { controllerId: 'controller-a', outcome: 'OK', finalVersion: '1.4.0', error: '' },
+            {
+              controllerId: 'controller-b',
+              outcome: 'FAILED',
+              finalVersion: '',
+              error: 'flash_corrupt',
+            },
+          ],
+        },
+      });
+
+      // flashJobDone fires (mixed-terminal still counts as 'done' per FSM);
+      // flashJobFailed does NOT (job-wide abort is a separate event).
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(1);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+      // Reboot timer armed even with a partial failure — the master still
+      // rebooted; we still want to release the lock when its heartbeat lands.
+      expect(vi.getTimerCount()).toBe(1);
+      expect(fx.jobLock.isLocked()).toBe(true);
+    });
+
+    it('heartbeat called pre-timer: clears the timer, releases the lock, emits lockStateChanged; no leaked timers', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndCompleteDeploy(fx);
+      expect(vi.getTimerCount()).toBe(1);
+
+      const lockEventsBefore = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged).length;
+
+      fx.orchestrator.notifyMasterHeartbeat('1.4.0');
+
+      // Lock released; lockStateChanged emitted (one new frame).
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+      expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(
+        lockEventsBefore + 1,
+      );
+      // Reboot timer cleared — no leaked fake-timer.
+      expect(vi.getTimerCount()).toBe(0);
+
+      // Advancing time past the reboot timeout must NOT trigger a second
+      // release (no double-release).
+      advance(20_000);
+      expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(
+        lockEventsBefore + 1,
+      );
+      // jobId-bearing fake assertion: a stale timer firing would have tried
+      // to release a lock that's already free; the JobLock would silently
+      // ignore but our broadcastLockState would emit an extra frame. The
+      // count assertion above pins that.
+      void armed;
+    });
+
+    it('reboot timer fires (no heartbeat): releases the lock, emits lockStateChanged; subsequent heartbeat is a no-op', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      await startAndCompleteDeploy(fx);
+      expect(vi.getTimerCount()).toBe(1);
+      const lockEventsBefore = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged).length;
+
+      // Advance past the default 15-sec reboot timeout.
+      advance(15_000);
+
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+      expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(
+        lockEventsBefore + 1,
+      );
+      expect(vi.getTimerCount()).toBe(0);
+
+      // A late heartbeat (e.g., the master's POLL_ACK arriving 1s past the
+      // timer firing) must be a no-op — the timer already released.
+      fx.orchestrator.notifyMasterHeartbeat('1.4.0');
+      expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(
+        lockEventsBefore + 1,
+      );
+      expect(fx.jobLock.isLocked()).toBe(false);
+    });
+
+    it('respects a custom rebootTimeoutMs from config', async () => {
+      // Default is 15s; pin a non-default value so a regression that hard-codes
+      // the timeout would surface here.
+      const fx = setupHappyPath({ clock: fakeClock });
+      // Re-construct with config override; setupHappyPath's orchestrator was
+      // built with defaults, so we need our own.
+      const customOrchestrator = new FlashJobOrchestrator({
+        bus: fx.bus,
+        jobLock: fx.jobLock,
+        cache: fx.cache,
+        upload: fx.upload,
+        releaseService: fx.releaseService,
+        controllersStore: fx.controllersStore,
+        emitWs: fx.emitWs,
+        streamerFactory: () => ({
+          run: (spec, observer) => {
+            // Mirror the scripted-streamer pattern but inline: capture the
+            // observer + resolve immediately so we land in the deploy phase.
+            return new Promise((resolve) => {
+              observer.onTransferBegun?.({ transferId: spec.transferId, status: 'OK' });
+              resolve(makeTransferResult(spec));
+            });
+          },
+        }),
+        clock: fakeClock,
+        config: { rebootTimeoutMs: 5_000 },
+      });
+
+      const startPromise = customOrchestrator.start(fx.request);
+      const result = await startPromise;
+      // Drive controllers terminal to arm the (5s) timer.
+      for (const controllerId of result.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(result.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: result.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+      fx.bus.deliverDeployEvent(result.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: result.transferId,
+          results: result.targets.map((id) => ({
+            controllerId: id,
+            outcome: 'OK',
+            finalVersion: '1.4.0',
+            error: '',
+          })),
+        },
+      });
+      expect(vi.getTimerCount()).toBe(1);
+
+      // Advance just under the configured timeout — must NOT have released yet.
+      advance(4_999);
+      expect(fx.jobLock.isLocked()).toBe(true);
+      // Cross the 5s threshold — release fires.
+      advance(2);
+      expect(fx.jobLock.isLocked()).toBe(false);
+    });
+
+    it('heartbeat called twice: first releases; second is a no-op (no double-release)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      await startAndCompleteDeploy(fx);
+
+      fx.orchestrator.notifyMasterHeartbeat('1.4.0');
+      const lockEventsAfterFirst = emittedFrames(
+        fx.emitWs,
+        TransmissionType.lockStateChanged,
+      ).length;
+      expect(fx.jobLock.isLocked()).toBe(false);
+
+      // Second heartbeat — rebootTimer is null now, so the guard short-circuits
+      // before any emit / lock-release work.
+      fx.orchestrator.notifyMasterHeartbeat('1.4.0');
+      expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(
+        lockEventsAfterFirst,
+      );
+      expect(fx.jobLock.isLocked()).toBe(false);
+    });
+
+    it('heartbeat called with no active job: no-op (no emit, no error)', async () => {
+      // Brand-new orchestrator; nothing has been started.
+      const fx = setupHappyPath({ clock: fakeClock });
+
+      fx.orchestrator.notifyMasterHeartbeat('1.4.0');
+
+      expect(fx.emitWs).not.toHaveBeenCalled();
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    });
+
+    it('heartbeat called mid-upload (out-of-protocol): no-op (rebootTimer null)', async () => {
+      // Driving start() up to the streamer-awaiting point means the upload
+      // phase is in flight; rebootTimer is null. A heartbeat arriving here is
+      // protocol garbage (the master can't have rebooted) — must be ignored.
+      const fx = setupHappyPath({ clock: fakeClock });
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const lockEventsBefore = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged).length;
+      const allEventsBefore = fx.emitWs.mock.calls.length;
+
+      fx.orchestrator.notifyMasterHeartbeat('1.4.0');
+
+      // No emit, no lock change, no currentJob change.
+      expect(fx.emitWs.mock.calls.length).toBe(allEventsBefore);
+      expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(
+        lockEventsBefore,
+      );
+      expect(fx.jobLock.isLocked()).toBe(true);
+      expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+
+      // Drain the streamer + deploy phase so the test exits cleanly. We
+      // can't `await` the deploy phase to terminal here because that would
+      // arm the reboot timer and pollute teardown — just resolve the
+      // streamer and the start() promise; the deploy subscriber is
+      // disposed when the orchestrator is GC'd.
+      fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+      await startPromise;
+    });
+
+    it('heartbeat called mid-deploy (post-streamer, pre-FW_DEPLOY_DONE): no-op (rebootTimer null)', async () => {
+      // Heartbeat arriving between FW_DEPLOY_BEGIN and FW_DEPLOY_DONE — the
+      // master might be rebooting one controller while another is still
+      // deploying. rebootTimer is only armed AFTER all controllers terminal,
+      // so this must be a no-op too.
+      const fx = setupHappyPath({ clock: fakeClock });
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      const armed = await startPromise;
+
+      // We're now post-FW_DEPLOY_BEGIN, mid-deploy. Subscribers armed; no
+      // reboot timer yet.
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+
+      const allEventsBefore = fx.emitWs.mock.calls.length;
+      fx.orchestrator.notifyMasterHeartbeat('1.4.0');
+
+      // No emit, no state change.
+      expect(fx.emitWs.mock.calls.length).toBe(allEventsBefore);
+      expect(fx.jobLock.isLocked()).toBe(true);
+      expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+    });
+
+    it('heartbeat ignores its version argument (api_server is responsible for version validation)', async () => {
+      // The orchestrator's contract: the caller (api_server's POLL handler)
+      // is responsible for the version match. The orchestrator just clears
+      // the timer + releases the lock when a heartbeat lands. A wrong-version
+      // call should still proceed — that's the api_server's bug, not ours.
+      const fx = setupHappyPath({ clock: fakeClock });
+      await startAndCompleteDeploy(fx);
+
+      fx.orchestrator.notifyMasterHeartbeat('totally-wrong-version');
+
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    });
+  });
+
   it('safeEmitWs error log includes the readable TransmissionType name (not just the numeric value)', async () => {
     // Operational ergonomics: TransmissionType is a numeric enum, so logging
     // bare `String(msg.type)` would produce numbers like "13" — hard to

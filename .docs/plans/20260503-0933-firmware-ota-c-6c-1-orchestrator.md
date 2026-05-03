@@ -385,7 +385,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - bus.send throws on FW_DEPLOY_BEGIN: `flashJobFailed { reason: 'bus_send_failed' }`; controllers transition to Failed; lock released
     - empty results[]: protocol violation; `flashJobFailed { reason: 'protocol_violation' }`
 
-- [ ] **Task 9 — `flashJobDone` + reboot timer + heartbeat callback (real wiring)** (extend `flash_orchestrator.ts`):
+- [x] **Task 9 — `flashJobDone` + reboot timer + heartbeat callback (real wiring)** (extend `flash_orchestrator.ts`):
   - When `deriveJobLifecycle(currentJob) === 'done'` (all controllers terminal): emit `flashJobDone { jobId, endedAt }`, arm reboot timer via `clock.setTimeout(rebootTimeoutMs, () => releaseLock('timeout'))`. Store timer ID as `rebootTimer` instance field.
   - Add `notifyMasterHeartbeat(version: string): void` method:
     - If `rebootTimer === null`: ignore (no job in deploy-done state, OR heartbeat already fired)

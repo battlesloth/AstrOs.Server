@@ -31,7 +31,7 @@ import {
   type FwDeployDoneResult,
   type FwProgress,
 } from '../models/firmware/firmware_messages.js';
-import { transitionControllerState } from './flash_job_state_machine.js';
+import { deriveJobLifecycle, transitionControllerState } from './flash_job_state_machine.js';
 import type { SerialBus, StreamObserver, TransferSpec } from '../models/firmware/chunk_streamer.js';
 import type { AssetInfo, ReleaseInfo, ReleaseListResult } from '../models/firmware/release.js';
 import type { CachedAsset } from '../models/firmware/cache.js';
@@ -235,9 +235,11 @@ export function createFlashProgressThrottle(opts: {
 // Task 6 ships the skeleton + happy-path `start()`. Task 7 wires the real
 // upload-phase streamer observer (Queued→UploadingToMaster transition on
 // onTransferBegun + per-controller bytesSent updates on onChunkAck, both
-// routed through `flashProgressThrottle`). Tasks 8-11 wire the deploy
-// phase (Task 8), reboot timer + heartbeat (Task 9), cancel (Task 10),
-// and full error-path mapping (Task 11).
+// routed through `flashProgressThrottle`). Task 8 wires the deploy phase
+// (FW_DEPLOY_BEGIN send + per-controller FW_PROGRESS + job-wide
+// FW_DEPLOY_DONE). Task 9 wires the post-deploy `flashJobDone` emit +
+// reboot-timer fallback + `notifyMasterHeartbeat` (primary lock-release
+// path). Tasks 10-11 will add cancel + full error-path mapping.
 
 const DEFAULT_REBOOT_TIMEOUT_MS = 15_000;
 const DEFAULT_THROTTLE_WINDOW_MS = 250;
@@ -346,8 +348,9 @@ export class FlashJobOrchestrator {
   private readonly emitWs: (msg: FlashOrchestratorWsMessage) => void;
   private readonly streamerFactory: (opts: { bus: SerialBus }) => Streamer;
   private readonly clock: Clock;
-  // `rebootTimeoutMs` arms the post-deploy lock-release fallback (Task 9 wires it).
-  // `throttleWindowMs` feeds the per-job `flashProgressThrottle` (Task 7) below.
+  // `rebootTimeoutMs` is the duration the reboot timer waits before
+  // releasing the lock as a fallback when the master never heartbeats.
+  // `throttleWindowMs` feeds the per-job `flashProgressThrottle` window.
   private readonly rebootTimeoutMs: number;
   private readonly throttleWindowMs: number;
 
@@ -356,12 +359,22 @@ export class FlashJobOrchestrator {
   // The streamer-success branch sends FW_DEPLOY_BEGIN, subscribes to deploy
   // events, and returns from `start()` while the deploy phase runs
   // asynchronously through `handleDeployEvent`. Both fields are disposed on
-  // every exit path (FW_DEPLOY_DONE, protocol_violation, future cancel/error
-  // paths in Tasks 9-11). A leaked subscriber would route a stale prior job's
-  // deploy events into the next job; a leaked throttle would carry per-
-  // controller flush timers across jobs.
+  // every exit path: FW_DEPLOY_DONE drops the subscriber inline; the
+  // canonical `releaseLock` helper disposes both idempotently for the
+  // protocol_violation, reboot-timeout, heartbeat, and future cancel paths.
+  // A leaked subscriber would route a stale prior job's deploy events into
+  // the next job; a leaked throttle would carry per-controller flush timers
+  // across jobs.
   private deployUnsubscriber: (() => void) | null = null;
   private throttle: FlashProgressThrottle | null = null;
+  // Post-deploy reboot timer. Armed when `handleDeployDone` lands and all
+  // controllers are terminal (`deriveJobLifecycle === 'done'`); cleared by
+  // either the heartbeat callback (primary path) or by the timer firing
+  // (fallback path). `null` outside the post-deploy-pre-release window.
+  // `notifyMasterHeartbeat` and the timer callback both use the field's
+  // null-ness as the first-fire-wins guard so a heartbeat racing the timer
+  // doesn't double-release the lock.
+  private rebootTimer: NodeJS.Timeout | null = null;
   private readonly messageGenerator = new MessageGenerator();
 
   constructor(opts: FlashJobOrchestratorOpts) {
@@ -376,20 +389,20 @@ export class FlashJobOrchestrator {
     this.clock = opts.clock ?? defaultClock;
     this.rebootTimeoutMs = opts.config?.rebootTimeoutMs ?? DEFAULT_REBOOT_TIMEOUT_MS;
     this.throttleWindowMs = opts.config?.throttleWindowMs ?? DEFAULT_THROTTLE_WINDOW_MS;
-    // `rebootTimeoutMs` is consumed in Task 9 (reboot timer arm duration).
-    // `throttleWindowMs` is consumed in Task 7's upload-phase observer below.
-    void this.rebootTimeoutMs;
   }
 
   /**
    * Acquire `JobLock`, validate targets, resolve source, run the streamer
-   * with the upload-phase observer (Task 7), then arm the deploy phase by
-   * sending FW_DEPLOY_BEGIN and subscribing to per-controller FW_PROGRESS
-   * + the job-wide FW_DEPLOY_DONE (Task 8). The returned promise resolves
-   * once the deploy phase is armed — the operator-facing HTTP layer (Task 12)
-   * gets a fast "flash started, jobId=X" response while the deploy events
-   * drive the rest asynchronously through `handleDeployEvent`. Lock release
-   * and the post-deploy reboot timer (Task 9) live past the `start()` return.
+   * with the upload-phase observer, then arm the deploy phase by sending
+   * FW_DEPLOY_BEGIN and subscribing to per-controller FW_PROGRESS + the
+   * job-wide FW_DEPLOY_DONE. The returned promise resolves once the deploy
+   * phase is armed — the operator-facing HTTP layer (Task 12) gets a fast
+   * "flash started, jobId=X" response while the deploy events drive the
+   * rest asynchronously through `handleDeployEvent`. After all controllers
+   * reach a terminal stage, `handleDeployDone` emits `flashJobDone` and
+   * arms the reboot-timer fallback; lock release happens via
+   * `notifyMasterHeartbeat` (primary, post-deploy POLL_ACK) or the timer
+   * (fallback for master malfunction).
    */
   async start(request: FlashRequest): Promise<{
     jobId: string;
@@ -592,25 +605,14 @@ export class FlashJobOrchestrator {
           },
         });
       }
-      // Dispose the throttle if the streamer (or its observer) failed
-      // mid-flight. Leaks would carry per-controller pending timers across
-      // jobs; the next `start()` would emit stale state into a fresh job.
-      if (this.throttle !== null) {
-        this.throttle.dispose();
-        this.throttle = null;
-      }
-      // Same rationale for the deploy-event subscriber: a stale handler
-      // would route the next job's events into a disposed `currentJob`.
-      // Practically only reachable if bus.send for FW_DEPLOY_BEGIN
-      // succeeded but a follow-up step (e.g., subscribeDeployEvents)
-      // threw — which today doesn't happen, but cheap defense.
-      if (this.deployUnsubscriber !== null) {
-        this.deployUnsubscriber();
-        this.deployUnsubscriber = null;
-      }
-      // `release()` returns false if we never acquired — happens only if a
-      // subclass overrides start() and throws before acquire. Defensive:
-      // call it unconditionally via the shared helper.
+      // `releaseLock` idempotently disposes throttle + deployUnsubscriber +
+      // any pending reboot timer (none of those latter two can be set on
+      // pre-deploy-phase failures, but the canonical teardown handles it
+      // either way). Without throttle disposal here, a streamer-mid-flight
+      // failure would leak per-controller pending timers into the next job
+      // and emit stale state. Without subscriber disposal, a stale
+      // handler would route the next job's events into a disposed
+      // `currentJob`. Both are kept honest by the shared helper.
       this.releaseLock(jobId);
       throw err;
     }
@@ -628,13 +630,37 @@ export class FlashJobOrchestrator {
 
   /**
    * Post-deploy heartbeat from the master (carries its now-running version).
-   * Stub for Task 9 — currently a no-op. The real impl clears the reboot
-   * timer + releases the lock when the timer was armed in Task 9's deploy
-   * completion path.
+   * Called by `api_server`'s POLL handler when a POLL_ACK arrives carrying a
+   * version that matches the in-flight job's deployed target. The version
+   * argument is intentionally unused at this layer: api_server is responsible
+   * for the version-vs-expected match (see spec §"Data flow" step 13). The
+   * orchestrator's job is to clear the reboot timer + release the lock.
+   *
+   * No-op when the reboot timer isn't armed: out-of-protocol heartbeats
+   * (mid-upload, mid-deploy, never-started) all leave `rebootTimer === null`,
+   * and a second heartbeat after the first one fired hits the same null check
+   * — first-fire-wins, no double release.
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   notifyMasterHeartbeat(_version: string): void {
-    // no-op until Task 9
+    // First-fire-wins guard. `rebootTimer` is only non-null between
+    // `flashJobDone` emit and the lock-release (whichever path wins).
+    // Outside that window — including pre-job, mid-upload, mid-deploy,
+    // and post-release — the heartbeat is a no-op.
+    if (this.rebootTimer === null) return;
+    // Capture jobId before `releaseLock` clears `currentJob`. If
+    // `currentJob` is somehow null while `rebootTimer` is set, we have
+    // an internal invariant violation; bail rather than passing an
+    // empty string into `jobLock.release` (which would be a no-op
+    // anyway, but the bail surfaces the bug rather than masking it).
+    // Per Task-9 mutation discipline: this guard is defensive — the
+    // first-fire-wins guard above already handles every reachable
+    // call site.
+    const jobId = this.currentJob?.jobId;
+    if (jobId === undefined) return;
+    this.clock.clearTimeout(this.rebootTimer);
+    this.rebootTimer = null;
+    this.releaseLock(jobId);
   }
 
   getCurrentJob(): FlashJobState | null {
@@ -669,7 +695,33 @@ export class FlashJobOrchestrator {
     );
   }
 
+  // Canonical "tear down everything" exit path. Called from:
+  //   * the synchronous catch in `start()` after a typed error throws
+  //   * `failDeployPhase` after a mid-deploy protocol violation
+  //   * the reboot-timer fallback (post-flashJobDone)
+  //   * `notifyMasterHeartbeat` (post-flashJobDone primary path)
+  //
+  // Every cleanup step is idempotent: when an earlier site has already
+  // disposed a resource (e.g., the deploy-done branch disposed
+  // `deployUnsubscriber` before arming the reboot timer; the heartbeat /
+  // timer paths null `rebootTimer` before invoking this helper), the field
+  // is already null and the corresponding step is a no-op. The duplicate
+  // cleanup keeps every entry-point self-contained — callers don't have to
+  // remember which resources they need to dispose vs. which the helper
+  // handles.
   private releaseLock(jobId: string): void {
+    if (this.rebootTimer !== null) {
+      this.clock.clearTimeout(this.rebootTimer);
+      this.rebootTimer = null;
+    }
+    if (this.deployUnsubscriber !== null) {
+      this.deployUnsubscriber();
+      this.deployUnsubscriber = null;
+    }
+    if (this.throttle !== null) {
+      this.throttle.dispose();
+      this.throttle = null;
+    }
     this.currentJob = null;
     this.jobLock.release(jobId);
     this.broadcastLockState();
@@ -806,20 +858,60 @@ export class FlashJobOrchestrator {
     }
     this.currentJob = { ...this.currentJob, controllers: updated };
     // Done is terminal for the deploy phase — drop the subscriber so a
-    // late retransmit doesn't double-process. Task 9 wires the
-    // post-flashJobDone reboot timer + lock release; for Task 8 we
-    // intentionally leave `currentJob` set + lock held.
+    // late retransmit doesn't double-process.
     if (this.deployUnsubscriber !== null) {
       this.deployUnsubscriber();
       this.deployUnsubscriber = null;
     }
+
+    // If every controller reached a terminal stage (any mix of
+    // VersionConfirmed and Failed), the job is "done" per c.6a's
+    // `deriveJobLifecycle`. Per-controller failures are local — the
+    // job-wide event is `flashJobDone` even when some controllers failed
+    // (the master still rebooted; we still want to release the lock when
+    // its post-reboot heartbeat arrives). `flashJobFailed` is reserved for
+    // job-wide aborts (set via `abortReason`), distinct from per-controller
+    // `Failed`. Mid-flight stages (Sending/Verifying/Rebooting still
+    // present in `controllers[]`) keep us in `'in_flight'` and the
+    // subscriber would have already been disposed above; in that case we
+    // never armed the timer, which matches the FMI §2 state matrix.
+    const lifecycle = deriveJobLifecycle(this.currentJob);
+    if (lifecycle !== 'done') return;
+
+    const jobId = this.currentJob.jobId;
+    const endedAt = new Date(this.clock.now()).toISOString();
+    this.currentJob = { ...this.currentJob, endedAt };
+    this.safeEmitWs({
+      type: TransmissionType.flashJobDone,
+      data: { jobId, endedAt },
+    });
+
+    // Arm the reboot-timer fallback. Lock release happens via either
+    // `notifyMasterHeartbeat` (primary, fires on the post-deploy POLL_ACK)
+    // or this timer (secondary, covers master-malfunction). First-fire-wins
+    // is enforced by both paths checking `rebootTimer === null` before
+    // touching shared state.
+    this.rebootTimer = this.clock.setTimeout(() => {
+      // Heartbeat got here first — its `clearTimeout(rebootTimer)` would
+      // normally drop the queued callback, but defensively guard in case
+      // the runtime delivered the callback before clearTimeout took effect.
+      // Per Task-9 mutation discipline: removing this guard keeps every
+      // current test passing because vitest fake timers honor
+      // clearTimeout reliably; this is belt-and-suspenders against a
+      // pathological real-runtime race rather than a load-bearing
+      // invariant under test.
+      if (this.rebootTimer === null) return;
+      this.rebootTimer = null;
+      this.releaseLock(jobId);
+    }, this.rebootTimeoutMs);
   }
 
   // Mid-deploy failure cleanup (bus_send_failed and protocol_violation).
   // Same shape as the Task 6 catch block but inlined for the async deploy
   // path: transition non-terminal controllers to Failed + emit per-
   // controller flashControllerResult + emit job-wide flashJobFailed +
-  // dispose subscriber/throttle + release lock.
+  // release lock (which idempotently disposes subscriber + throttle +
+  // any reboot timer).
   private failDeployPhase(reason: FlashOrchestratorErrorReason, detail: string): void {
     if (this.currentJob === null) return;
     const jobId = this.currentJob.jobId;
@@ -829,14 +921,6 @@ export class FlashJobOrchestrator {
       type: TransmissionType.flashJobFailed,
       data: { jobId, reason, detail, endedAt },
     });
-    if (this.deployUnsubscriber !== null) {
-      this.deployUnsubscriber();
-      this.deployUnsubscriber = null;
-    }
-    if (this.throttle !== null) {
-      this.throttle.dispose();
-      this.throttle = null;
-    }
     this.releaseLock(jobId);
   }
 
