@@ -61,10 +61,20 @@
 //     yet in scope at the throw site. The throw therefore propagates
 //     directly out of `run()` to the caller's `.catch`; no cleanup is
 //     needed because no resources have been allocated. If a future
-//     change moves resource allocation above the readFile, that
-//     allocation must either be deferred until after readFile succeeds
-//     OR the readFile must be moved inside the outer try block so the
-//     allocation gets torn down on a source_read_failed throw.
+//     change moves resource allocation above either of the pre-subscribe
+//     throws (`source_read_failed` or `source_size_mismatch` below),
+//     that allocation must either be deferred until after the checks
+//     succeed OR both checks must be moved inside the outer try block
+//     so the allocation gets torn down on a pre-subscribe throw.
+//   - `source_size_mismatch`: validates that the on-disk artifact's
+//     size matches `spec.source.sizeBytes` (the metadata the
+//     orchestrator was given by c.4's CachedAsset / c.5's StoredUpload).
+//     Mismatch → upstream state drift (cache file truncated, upload
+//     stale-after-overwrite, partial download). Distinct from
+//     `hash_mismatch` (master-side SHA computation surfaced via END_ACK)
+//     so the orchestrator can route the two to different remediations.
+//     Same pre-subscribe path as source_read_failed: throw propagates
+//     out of run() with no cleanup required.
 //   - `begin_timeout`: the BEGIN-wait now races `waitFor('beginAck')`
 //     against `setTimeout(ackTimeoutMs)`. If no FW_TRANSFER_BEGIN_ACK
 //     arrives within the budget, the timer fires and rejects with
@@ -246,6 +256,29 @@ export class ChunkStreamer {
         ? `failed to read source ${spec.source.path}: ${message} (${errnoCode})`
         : `failed to read source ${spec.source.path}: ${message}`;
       throw new TransferError('source_read_failed', spec.transferId, detail);
+    }
+    // Validate that the on-disk artifact matches the metadata the
+    // orchestrator was given (c.4's CachedAsset manifest, c.5's
+    // StoredUpload metadata). A mismatch means upstream state has
+    // drifted — cache file truncated/corrupted between manifest write
+    // and our read, upload metadata stale after overwrite, partial
+    // download. Surfacing this here as a fast-fail is much cheaper
+    // than letting the master discover it via HASH_MISMATCH at END_ACK
+    // time after the entire file is on the wire. Distinct from
+    // hash_mismatch (which is master-side computation) so the
+    // orchestrator can route the two failure modes to different
+    // remediations: size_mismatch → re-cache or re-prompt upload;
+    // hash_mismatch → retry transfer (transient) or re-cache.
+    //
+    // Same pre-subscribe path as source_read_failed: the throw
+    // propagates out of run() with no cleanup required because no
+    // subscriber, timer, or listener has been allocated yet.
+    if (sourceBuffer.length !== spec.source.sizeBytes) {
+      throw new TransferError(
+        'source_size_mismatch',
+        spec.transferId,
+        `source size mismatch for ${spec.source.path}: expected ${spec.source.sizeBytes} bytes, read ${sourceBuffer.length}`,
+      );
     }
     const totalChunks = Math.max(1, Math.ceil(sourceBuffer.length / this.config.chunkSizeBytes));
     const lastSeq = totalChunks - 1;

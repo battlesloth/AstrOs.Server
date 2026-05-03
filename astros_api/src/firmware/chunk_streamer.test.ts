@@ -2087,9 +2087,10 @@ describe('ChunkStreamer — AbortSignal cancellation (Task 9)', () => {
 });
 
 describe('ChunkStreamer — pre-transfer error codes (Task 10)', () => {
-  // Three failure modes that all surface BEFORE the chunk-streaming phase
+  // Four failure modes that all surface BEFORE the chunk-streaming phase
   // begins, each with its own TransferErrorCode:
   //   - source_read_failed: fs.readFile throws (ENOENT, EACCES, …)
+  //   - source_size_mismatch: on-disk size diverges from spec metadata
   //   - begin_timeout: master never replies to FW_TRANSFER_BEGIN
   //   - begin_rejected: master replies but with a non-OK status
   // Each test verifies the rejection code, the detail content, and that
@@ -2136,6 +2137,49 @@ describe('ChunkStreamer — pre-transfer error codes (Task 10)', () => {
       expect(bus.sent).toHaveLength(0);
     } finally {
       readSpy.mockRestore();
+    }
+  });
+
+  it('source_size_mismatch: on-disk size diverges from spec metadata, fails fast before BEGIN is sent', async () => {
+    // Real failure mode: c.4's CachedAsset manifest says the cached
+    // firmware is N bytes, but the file on disk is N-1 (truncated by
+    // a partial download or a race with cache eviction). The streamer
+    // reads the file, sees the mismatch, and rejects BEFORE putting
+    // FW_TRANSFER_BEGIN on the wire — much cheaper than letting the
+    // master discover it via HASH_MISMATCH at END_ACK time.
+    //
+    // Setup: write a 100-byte file but pass a TransferSpec claiming
+    // 200 bytes. Verify rejection with code 'source_size_mismatch',
+    // detail includes both the expected and actual sizes, no
+    // subscribe, no wire activity.
+    const actualSize = 100;
+    const claimedSize = 200;
+    const buf = Buffer.alloc(actualSize, 0xcd);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus });
+
+      // specFor() takes the size as the second arg; pass the LIE.
+      const err = (await streamer
+        .run(specFor(tempPath, claimedSize), {})
+        .catch((e) => e)) as Error & { code?: string; transferId?: string; detail?: string };
+
+      expect(err.code).toBe('source_size_mismatch');
+      expect(err.transferId).toBe(TRANSFER_ID);
+      // Both numbers in detail so the orchestrator can present a precise
+      // diagnosis ("manifest claimed 200, disk has 100 — re-cache").
+      expect(err.detail).toContain(String(claimedSize));
+      expect(err.detail).toContain(String(actualSize));
+      expect(err.detail).toContain(tempPath);
+
+      // Critical: validation runs BEFORE subscribeFwAcks and BEFORE
+      // FW_TRANSFER_BEGIN is generated. The streamer must not have
+      // touched the bus at all.
+      expect(bus.subscribers.size).toBe(0);
+      expect(bus.sent).toHaveLength(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
     }
   });
 
