@@ -9,8 +9,9 @@
 //     that caps `flashControllerUpdate` WS emissions at one per `windowMs`
 //     per controller, with a `force=true` bypass for stage transitions.
 //   * `FlashJobOrchestrator` — single-flight job runner gated by `JobLock`.
-//     Composes the resolver + streamer + (forthcoming) deploy phase behind
-//     `start()` / `cancel()` / `notifyMasterHeartbeat()` / `getCurrentJob()`.
+//     Composes the resolver + streamer + deploy phase + reboot lifecycle
+//     behind `start()` / `cancel()` / `notifyMasterHeartbeat()` /
+//     `getCurrentJob()`.
 
 import { v4 as uuid_v4 } from 'uuid';
 import { logger } from '../logger.js';
@@ -546,7 +547,9 @@ export class FlashJobOrchestrator {
       // subscribe to per-controller FW_PROGRESS + the job-wide FW_DEPLOY_DONE.
       // The subscriber drives the rest of the job asynchronously; `start()`
       // returns once the deploy phase is armed so the HTTP layer (Task 12)
-      // gets a fast "started" response. Lock release lives in Task 9.
+      // gets a fast "started" response. Lock release happens via
+      // `notifyMasterHeartbeat` or the reboot-timer fallback armed in
+      // `handleDeployDone`.
       if (this.currentJob !== null) {
         const sending = this.currentJob.controllers.map((c) =>
           c.stage === FwStage.UploadingToMaster ? transitionControllerState(c, FwStage.Sending) : c,
@@ -648,16 +651,13 @@ export class FlashJobOrchestrator {
     // Outside that window — including pre-job, mid-upload, mid-deploy,
     // and post-release — the heartbeat is a no-op.
     if (this.rebootTimer === null) return;
-    // Capture jobId before `releaseLock` clears `currentJob`. If
-    // `currentJob` is somehow null while `rebootTimer` is set, we have
-    // an internal invariant violation; bail rather than passing an
-    // empty string into `jobLock.release` (which would be a no-op
-    // anyway, but the bail surfaces the bug rather than masking it).
-    // Per Task-9 mutation discipline: this guard is defensive — the
-    // first-fire-wins guard above already handles every reachable
-    // call site.
-    const jobId = this.currentJob?.jobId;
-    if (jobId === undefined) return;
+    // Invariant: `rebootTimer` is armed only inside `handleDeployDone`,
+    // which only runs while `currentJob !== null`. A violation indicates
+    // a bug somewhere upstream — surface it loudly rather than masking.
+    if (this.currentJob === null) {
+      throw new Error('flash orchestrator invariant: rebootTimer is set but currentJob is null');
+    }
+    const jobId = this.currentJob.jobId;
     this.clock.clearTimeout(this.rebootTimer);
     this.rebootTimer = null;
     this.releaseLock(jobId);
@@ -892,15 +892,6 @@ export class FlashJobOrchestrator {
     // is enforced by both paths checking `rebootTimer === null` before
     // touching shared state.
     this.rebootTimer = this.clock.setTimeout(() => {
-      // Heartbeat got here first — its `clearTimeout(rebootTimer)` would
-      // normally drop the queued callback, but defensively guard in case
-      // the runtime delivered the callback before clearTimeout took effect.
-      // Per Task-9 mutation discipline: removing this guard keeps every
-      // current test passing because vitest fake timers honor
-      // clearTimeout reliably; this is belt-and-suspenders against a
-      // pathological real-runtime race rather than a load-bearing
-      // invariant under test.
-      if (this.rebootTimer === null) return;
       this.rebootTimer = null;
       this.releaseLock(jobId);
     }, this.rebootTimeoutMs);
