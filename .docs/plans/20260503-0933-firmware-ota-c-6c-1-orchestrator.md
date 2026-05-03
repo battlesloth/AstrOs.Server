@@ -13,7 +13,7 @@ c.6a (PR #72) shipped pure FSM types + transitions (consumed via `transitionCont
 
 Two-phase per job: **upload** drives `ChunkStreamer.run()` (all controllers `UploadingToMaster`); **deploy** sends `FW_DEPLOY_BEGIN` then observes per-controller `FW_PROGRESS` plus the job-wide `FW_DEPLOY_DONE` carrying `results: FwDeployDoneResult[]`. After all controllers terminal, `flashJobDone` fires; `JobLock` releases on `notifyMasterHeartbeat(version)` (primary path) OR a 15-second reboot timer fallback (whichever first).
 
-**POLL_ACK protocol extensions are in-scope** for c.6c.1 (per user redirect — ships as a whole feature, not piecewise with placeholders for cross-repo work). The `POLL_ACK` payload gains `variant: string` per controller (populated from firmware) and `version: string` carried on the post-reboot heartbeat. Server-side parsing extracts both; `api_server`'s POLL handler updates an in-memory controllers cache with `variant` and calls `orchestrator.notifyMasterHeartbeat(version)` post-deploy. AstrOs.ESP work lands in lockstep with this PR.
+**POLL_ACK protocol extension is in-scope** for c.6c.1 (per user redirect — ships as a whole feature, not piecewise with placeholders for cross-repo work). The `POLL_ACK` payload gains `variant: string` per controller as a 5th wire-position field (populated from firmware). The version field is NOT a new addition — `firmwareVersion` has already shipped on `ControlModule` since firmware 1.2.0+ (`parts[3]` of POLL_ACK), and the heartbeat-vs-deploy version match reuses that existing field. Server-side parsing extracts variant; `api_server`'s POLL handler updates an in-memory controllers cache with `variant` and calls `orchestrator.notifyMasterHeartbeat(firmwareVersion)` post-deploy when version matches the deployed target. AstrOs.ESP work to populate the new `variant` field lands in lockstep with this PR.
 
 ## API overview
 
@@ -70,9 +70,9 @@ type FwDeployEvent =
 | `astros_api/src/firmware/serial_bus.ts` | `WorkerSerialBus.subscribeDeployEvents()` impl — separate listener that maps `FwProgressResponse` / `FwDeployDoneResponse` to typed `FwDeployEvent` and filters by `transferId` |
 | `astros_api/src/firmware/serial_bus.test.ts` | Tests for `subscribeDeployEvents` |
 | `astros_api/src/models/enums.ts` | ADD 5 new flash event types (`flashJobStarted`, `flashControllerUpdate`, `flashControllerResult`, `flashJobDone`, `flashJobFailed`) to `TransmissionType` after the existing `flashJobActive` (keep that one — c.2 ships it) |
-| `astros_api/src/models/firmware/firmware_messages.ts` | Extend the POLL_ACK payload type with `variant: string` per controller + optional `version: string` (carried on post-reboot heartbeat). Existing fields unchanged |
-| `astros_api/src/serial/serial_worker_response.ts` + `astros_api/src/serial/message_handler.ts` | Extend POLL_ACK parser to surface the new `variant` + `version` on `PollAckResponse` |
-| `astros_api/src/api_server.ts` | Instantiate `FlashJobOrchestrator`; register flash routes; wire late-join WS snapshot via `orchestrator.getCurrentJob()`; POLL handler extracts `variant` per controller into in-memory state, extracts `version` on post-reboot heartbeats and calls `orchestrator.notifyMasterHeartbeat(version)` |
+| `astros_api/src/models/control_module/control_module.ts` | Extend `ControlModule` with `variant?: string` (per-controller hardware variant, populated from `parts[4]` of POLL_ACK). The `firmwareVersion?: string` field is already there since firmware 1.2.0+ — no separate `version` field added |
+| `astros_api/src/serial/message_handler.ts` | Extend `handlePollAck()` to accept 5-field POLL_ACK and extract `parts[4]` as `variant`; relax existing `firmwareVersion` guard so it still extracts on 5-field payloads. Backward-compatible with 3-field and 4-field POLL_ACKs |
+| `astros_api/src/api_server.ts` | Instantiate `FlashJobOrchestrator`; register flash routes; wire late-join WS snapshot via `orchestrator.getCurrentJob()`; POLL handler reads `module.variant` per controller into in-memory cache, reads `module.firmwareVersion` and calls `orchestrator.notifyMasterHeartbeat(firmwareVersion)` when a flash is in flight and the version matches the deployed target |
 
 **Spec / plan / QA docs:**
 
@@ -225,19 +225,12 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - disposer detaches the listener (subsequent emits not delivered)
     - multiple concurrent subscribers (two transferIds) are independent
 
-- [ ] **Task 3 — POLL_ACK protocol extensions (variant + version)** (modify `astros_api/src/models/firmware/firmware_messages.ts`, `astros_api/src/serial/serial_worker_response.ts`, `astros_api/src/serial/message_handler.ts`):
-  - In `firmware_messages.ts`: extend the existing POLL_ACK payload type (find the `PollAck` interface or equivalent — named per existing convention) with two new fields:
-    - `variant: string` — required. The PlatformIO board variant the controller's firmware reports (e.g., `'lolin_d32_pro'`, `'metro_s3'`). Consumed by orchestrator for asset selection. Empty string if firmware doesn't yet report it (treat as `variant_unknown` at orchestrator level).
-    - `version?: string` — optional. Carried only on the *post-reboot* heartbeat poll (master sends after rebooting into new firmware). Absent on routine polls. Consumed by `api_server`'s POLL handler to call `orchestrator.notifyMasterHeartbeat(version)` when a flash is in flight.
-  - In `serial_worker_response.ts`: extend the typed `PollAckResponse` (or equivalent — find the existing response type) so the new payload fields surface to consumers.
-  - In `message_handler.ts`: extend the POLL_ACK parser. Walk the existing parser to identify where POLL_ACK fields are extracted; add `variant` (required) and `version` (optional) extraction. Maintain existing field handling unchanged. If parser fields use indexed positional parsing, the new fields go at the END of the wire shape (don't shift existing field positions). The exact wire-position is dictated by the protocol document — read `.docs/protocol.md` § B (or wherever POLL_ACK is documented) to find the agreed positions, then mirror them in the parser.
-  - **Tests:** modify existing POLL_ACK parser tests in `message_handler.test.ts` (or wherever they live). New cases:
-    - POLL_ACK with `variant` field populated → response has `variant` set, `version` undefined
-    - POLL_ACK with `variant` empty string → response has `variant: ''` (don't transform; orchestrator handles)
-    - POLL_ACK with both `variant` AND `version` (post-reboot heartbeat) → response has both
-    - POLL_ACK from older firmware (no variant field) → response has `variant: ''` (graceful degradation; tested with the wire format that lacks the new positions)
-    - All existing POLL_ACK tests still pass with the extended type (no regressions on the existing fields)
-  - **Note for implementer:** if the POLL_ACK wire format already uses an extensible shape (e.g., named-key object instead of positional fields), the addition is mechanical. If it's positional, this is more delicate — read the existing parser carefully and ASK if uncertain about wire-position ordering. AstrOs.ESP firmware ships the new fields in lockstep with this PR; the wire-position decision must match.
+- [x] **Task 3 — POLL_ACK protocol extension (variant)** (modify `astros_api/src/models/control_module/control_module.ts`, `astros_api/src/serial/message_handler.ts`, `astros_api/src/serial/message_handler.test.ts`):
+  - **Pre-flight discovery (preserved here for future readers):** POLL_ACK is positional (US-separated `parts[]`). Fields shipped to date: `parts[0]` mac, `parts[1]` name, `parts[2]` fingerprint, `parts[3]` firmwareVersion (added in firmware 1.2.0+ and surfaced as `ControlModule.firmwareVersion`). The c.6c.1 work adds `parts[4]` for `variant` only — the heartbeat-vs-deploy version match reuses the existing `firmwareVersion` field. No separate `version` field is added.
+  - In `control_module.ts`: add `variant?: string` to `ControlModule` (optional — older firmware doesn't ship it). Brief inline comment explaining the role: PlatformIO board variant reported via POLL_ACK; orchestrator consumes for asset selection at flash time.
+  - In `message_handler.ts` `handlePollAck()`: widen length check from `> 4` to `> 5`; relax the `firmwareVersion` extraction guard from `=== 4` to `>= 4` so 5-field POLL_ACKs still set firmwareVersion from `parts[3]`; add `parts[4]` → `variant` extraction (trim + non-empty length-check) mirroring the existing firmwareVersion pattern.
+  - In `message_handler.test.ts`: add 5 new test cases — 3-field legacy yields undefined variant; 4-field 1.2.0+ yields populated firmwareVersion + undefined variant; 5-field with variant yields both populated; 5-field with empty variant yields undefined variant; 5-field with whitespace variant yields undefined variant. Replace the now-obsolete "5-field rejected as UNKNOWN" test with "6-field rejected as UNKNOWN" to lock the upper-bound check.
+  - `serial_worker_response.ts` is NOT modified — `PollResponse.controller: ControlModule` flows the new field transitively, no plumbing change needed.
 
 - [ ] **Task 4 — `resolveFlashSource` exported helper with variant-aware asset selection** (new `astros_api/src/firmware/flash_orchestrator.ts`):
   - Module-level export:
@@ -538,18 +531,18 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
 - [ ] All FMI §1–§7 items have corresponding tests OR are explicitly marked N/A.
 - [ ] FMI §8 reviewer pre-flight checklist completed before PR open.
 
-## Files in scope (12 source + 3 docs)
+## Files in scope (11 source + 3 docs)
 
 1. `astros_api/src/models/enums.ts` — modified (TransmissionType enum entries)
 2. `astros_api/src/models/firmware/chunk_streamer.ts` — modified (SerialBus interface extension)
 3. `astros_api/src/models/firmware/flash_orchestrator.ts` — new
-4. `astros_api/src/models/firmware/firmware_messages.ts` — modified (POLL_ACK payload + FwProgress + FwDeployDone types)
+4. `astros_api/src/models/control_module/control_module.ts` — modified (added `variant?: string`)
 5. `astros_api/src/firmware/serial_bus.ts` — modified
 6. `astros_api/src/firmware/serial_bus.test.ts` — modified
 7. `astros_api/src/firmware/flash_orchestrator.ts` — new
 8. `astros_api/src/firmware/flash_orchestrator.test.ts` — new
-9. `astros_api/src/serial/serial_worker_response.ts` — modified (extended PollAckResponse)
-10. `astros_api/src/serial/message_handler.ts` — modified (extended POLL_ACK parser)
+9. `astros_api/src/serial/message_handler.ts` — modified (extended POLL_ACK parser to 5 fields)
+10. `astros_api/src/serial/message_handler.test.ts` — modified (added 5-field POLL_ACK tests)
 11. `astros_api/src/controllers/firmware_flash_controller.ts` — new
 12. `astros_api/src/controllers/firmware_flash_controller.test.ts` — new
 13. `astros_api/src/api_server.ts` — modified
