@@ -1,6 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { resolveFlashSource } from './flash_orchestrator.js';
-import type { FlashRequest } from '../models/firmware/flash_orchestrator.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createFlashProgressThrottle, resolveFlashSource } from './flash_orchestrator.js';
+import type { Clock, FlashRequest } from '../models/firmware/flash_orchestrator.js';
+import type { ControllerFlashState } from '../models/firmware/flash_job_state.js';
+import { FwStage } from '../models/firmware/firmware_messages.js';
 import type { AssetInfo, ReleaseInfo, ReleaseListResult } from '../models/firmware/release.js';
 import type { CachedAsset } from '../models/firmware/cache.js';
 import type { StoredUpload } from '../models/firmware/upload.js';
@@ -228,5 +230,199 @@ describe('resolveFlashSource — upload source', () => {
     await expect(
       resolveFlashSource(request, cache, upload, releaseService, 'lolin_d32_pro'),
     ).rejects.toThrow('upload_io_failed');
+  });
+});
+
+// --- createFlashProgressThrottle -------------------------------------------
+
+describe('createFlashProgressThrottle', () => {
+  // Per c.6b chunk_streamer.test.ts pattern (see CLAUDE memory): fake only
+  // setTimeout/clearTimeout, leaving Date un-faked. We deviate from a literal
+  // `Date.now()` mockClock here because under that toFake list,
+  // `vi.advanceTimersByTime` does NOT advance the system clock — so a flush
+  // timer would fire with `Date.now()` still reporting the pre-arm time, and
+  // the throttle's window math would silently drift from the timer queue.
+  // Instead, mockClock reads from a counter that the `advance()` helper
+  // bumps in lockstep with the fake-timer queue.
+  let nowMs = 0;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    nowMs = 0;
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Advances both the fake-timer queue AND mockClock's counter by `ms`.
+  function advance(ms: number): void {
+    nowMs += ms;
+    vi.advanceTimersByTime(ms);
+  }
+
+  // mockClock hands a counter-backed `now()` and the globally-faked
+  // setTimeout/clearTimeout to the throttle. The throttle never sees
+  // vitest internals — it just sees a Clock.
+  const mockClock: Clock = {
+    now: () => nowMs,
+    setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms),
+    clearTimeout: (t) => globalThis.clearTimeout(t),
+  };
+
+  // Minimal canned states. `bytesSent` is the only field tests use to
+  // distinguish updates — keeping the rest constant makes the assertions
+  // about *what was emitted* trivial.
+  function uploadingState(controllerId: string, bytesSent: number): ControllerFlashState {
+    return {
+      controllerId,
+      stage: FwStage.UploadingToMaster,
+      bytesSent,
+      totalBytes: 1000,
+      detail: '',
+    };
+  }
+
+  it('leading edge: first submit emits immediately', () => {
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    throttle.submit('a', uploadingState('a', 100));
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledWith(uploadingState('a', 100));
+  });
+
+  it('mid-window: second submit within windowMs does NOT emit; pending stored', () => {
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    throttle.submit('a', uploadingState('a', 100));
+    expect(emit).toHaveBeenCalledTimes(1);
+
+    advance(50);
+    throttle.submit('a', uploadingState('a', 200));
+
+    // Still just the leading-edge emit; second one is pending.
+    expect(emit).toHaveBeenCalledTimes(1);
+  });
+
+  it('mid-window flush: advancing fake time by windowMs flushes pending', () => {
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    throttle.submit('a', uploadingState('a', 100));
+    advance(50);
+    throttle.submit('a', uploadingState('a', 200));
+    advance(50);
+    // Latest in-window state — overwrites the pending entry, no re-arm.
+    throttle.submit('a', uploadingState('a', 300));
+
+    // Advance to the end of the window — flush timer fires, emits the
+    // most-recent pending state (300), not the older 200.
+    advance(150);
+
+    expect(emit).toHaveBeenCalledTimes(2);
+    expect(emit).toHaveBeenNthCalledWith(2, uploadingState('a', 300));
+  });
+
+  it('mid-window with force=true: emits immediately, clears pending, resets lastEmittedAt', () => {
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    throttle.submit('a', uploadingState('a', 100));
+    advance(50);
+    throttle.submit('a', uploadingState('a', 200)); // pending
+    expect(emit).toHaveBeenCalledTimes(1);
+
+    // Force-emit a stage transition.
+    throttle.submit('a', uploadingState('a', 250), true);
+    expect(emit).toHaveBeenCalledTimes(2);
+    expect(emit).toHaveBeenNthCalledWith(2, uploadingState('a', 250));
+
+    // Pending was cleared — advancing past the original window must not
+    // re-emit the stale 200 state.
+    advance(500);
+    expect(emit).toHaveBeenCalledTimes(2);
+  });
+
+  it('per-controller independence: A submits do not affect B window', () => {
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    throttle.submit('a', uploadingState('a', 100));
+    expect(emit).toHaveBeenCalledTimes(1);
+
+    // B has no prior emission — its leading edge fires immediately even
+    // though A is mid-window.
+    throttle.submit('b', uploadingState('b', 50));
+    expect(emit).toHaveBeenCalledTimes(2);
+    expect(emit).toHaveBeenNthCalledWith(2, uploadingState('b', 50));
+
+    // A is still throttled.
+    advance(10);
+    throttle.submit('a', uploadingState('a', 110));
+    expect(emit).toHaveBeenCalledTimes(2);
+
+    // B is also throttled now.
+    throttle.submit('b', uploadingState('b', 60));
+    expect(emit).toHaveBeenCalledTimes(2);
+  });
+
+  it('dispose: clears any scheduled flush timers', () => {
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    throttle.submit('a', uploadingState('a', 100));
+    advance(50);
+    throttle.submit('a', uploadingState('a', 200)); // arms a flush timer
+    throttle.submit('b', uploadingState('b', 50));
+    advance(50);
+    throttle.submit('b', uploadingState('b', 75)); // arms another
+
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+    throttle.dispose();
+
+    expect(vi.getTimerCount()).toBe(0);
+
+    // After dispose, advancing time must not call emit (the leading edges
+    // were the only emits, and the flush timers are gone).
+    const beforeAdvance = emit.mock.calls.length;
+    advance(1000);
+    expect(emit).toHaveBeenCalledTimes(beforeAdvance);
+  });
+
+  it('dispose is idempotent', () => {
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    throttle.submit('a', uploadingState('a', 100));
+    throttle.dispose();
+    expect(() => throttle.dispose()).not.toThrow();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('terminal-transition pattern: submit after force=true is throttled within windowMs', () => {
+    // This proves force=true correctly stamps lastEmittedAt — if it didn't,
+    // a follow-up `submit(force=false)` immediately after would treat the
+    // controller as never-emitted and fire a leading edge.
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({ emit, windowMs: 250, clock: mockClock });
+
+    // Force-emit a stage transition (e.g., UploadingToMaster -> Sending).
+    throttle.submit('a', uploadingState('a', 500), true);
+    expect(emit).toHaveBeenCalledTimes(1);
+
+    // Mid-stage progress fires shortly after. Must be throttled, not
+    // a fresh leading edge.
+    advance(10);
+    throttle.submit('a', uploadingState('a', 510));
+    expect(emit).toHaveBeenCalledTimes(1);
+
+    // And the pending state flushes when the window elapses.
+    advance(240);
+    expect(emit).toHaveBeenCalledTimes(2);
+    expect(emit).toHaveBeenNthCalledWith(2, uploadingState('a', 510));
   });
 });

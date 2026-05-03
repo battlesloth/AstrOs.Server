@@ -1,13 +1,18 @@
 // FlashJobOrchestrator runtime (c.6c.1).
 //
-// Currently this module exposes a single pure helper, `resolveFlashSource`,
-// which bridges the typed `FlashRequest` HTTP body to the orchestrator's
-// `FlashSource` shape. Tasks 5 (progress throttle) and 6 (orchestrator class)
-// extend this same file — keep additions colocated so the orchestrator's
-// HTTP-to-runtime translation lives in one place.
+// This module currently exposes:
+//   * `resolveFlashSource` — bridges the typed `FlashRequest` HTTP body to
+//     the orchestrator's `FlashSource` shape.
+//   * `createFlashProgressThrottle` — per-controller leading-edge throttle
+//     that caps `flashControllerUpdate` WS emissions at one per `windowMs`
+//     per controller, with a `force=true` bypass for stage transitions.
+//
+// Task 6 (orchestrator class) extends this same file — keep additions
+// colocated so the orchestrator's HTTP-to-runtime translation lives in
+// one place.
 
-import type { FlashRequest } from '../models/firmware/flash_orchestrator.js';
-import type { FlashSource } from '../models/firmware/flash_job_state.js';
+import type { Clock, FlashRequest } from '../models/firmware/flash_orchestrator.js';
+import type { ControllerFlashState, FlashSource } from '../models/firmware/flash_job_state.js';
 import type { AssetInfo, ReleaseInfo, ReleaseListResult } from '../models/firmware/release.js';
 import type { CachedAsset } from '../models/firmware/cache.js';
 import type { StoredUpload } from '../models/firmware/upload.js';
@@ -70,5 +75,96 @@ export async function resolveFlashSource(
     sha256: stored.sha256,
     sizeBytes: stored.sizeBytes,
     displayName: stored.meta.originalFilename,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// flashProgressThrottle — per-controller leading-edge rate limiter for
+// `flashControllerUpdate` WS emissions.
+//
+// Mid-stage progress (e.g., bytesSent advancing during UploadingToMaster)
+// can fire at hundreds of Hz when the streamer is in the inner ack loop.
+// The orchestrator coalesces those into ≤4 emits/sec per controller by
+// passing `force=false`. Stage-boundary transitions (Queued→…→
+// VersionConfirmed/Failed) pass `force=true` so no terminal/transition
+// state is dropped.
+//
+// Semantics (per controllerId):
+//   * Leading edge: first submit fires immediately and stamps
+//     `lastEmittedAt`.
+//   * Within window (`force=false`): the latest state is stashed in
+//     `pending` and a single flush timer is armed for the remainder of
+//     the window. Subsequent in-window submits overwrite `pending`
+//     without re-arming.
+//   * Force: flushes any pending entry by emitting the new state
+//     immediately and resets `lastEmittedAt`. The next in-window submit
+//     will be throttled.
+//   * Dispose: clears all internal state and cancels every scheduled
+//     timer. Safe to call multiple times (idempotent).
+// ---------------------------------------------------------------------------
+
+export interface FlashProgressThrottle {
+  submit(controllerId: string, state: ControllerFlashState, force?: boolean): void;
+  dispose(): void;
+}
+
+export function createFlashProgressThrottle(opts: {
+  emit: (state: ControllerFlashState) => void;
+  windowMs: number;
+  clock: Clock;
+}): FlashProgressThrottle {
+  const { emit, windowMs, clock } = opts;
+  const lastEmittedAt = new Map<string, number>();
+  const pending = new Map<string, ControllerFlashState>();
+  const scheduledTimer = new Map<string, NodeJS.Timeout>();
+
+  function flush(controllerId: string): void {
+    const state = pending.get(controllerId);
+    scheduledTimer.delete(controllerId);
+    if (state === undefined) return;
+    pending.delete(controllerId);
+    emit(state);
+    lastEmittedAt.set(controllerId, clock.now());
+  }
+
+  return {
+    submit(controllerId, state, force = false) {
+      if (force) {
+        // Cancel any pending flush — the forced state supersedes it.
+        const t = scheduledTimer.get(controllerId);
+        if (t !== undefined) {
+          clock.clearTimeout(t);
+          scheduledTimer.delete(controllerId);
+        }
+        pending.delete(controllerId);
+        emit(state);
+        lastEmittedAt.set(controllerId, clock.now());
+        return;
+      }
+
+      const last = lastEmittedAt.get(controllerId) ?? Number.NEGATIVE_INFINITY;
+      const elapsed = clock.now() - last;
+      if (elapsed >= windowMs) {
+        emit(state);
+        lastEmittedAt.set(controllerId, clock.now());
+        return;
+      }
+
+      // Within the window: stash and (idempotently) arm a flush timer.
+      pending.set(controllerId, state);
+      if (scheduledTimer.has(controllerId)) return;
+      const remaining = Math.max(0, last + windowMs - clock.now());
+      const t = clock.setTimeout(() => flush(controllerId), remaining);
+      scheduledTimer.set(controllerId, t);
+    },
+
+    dispose() {
+      for (const t of scheduledTimer.values()) {
+        clock.clearTimeout(t);
+      }
+      scheduledTimer.clear();
+      pending.clear();
+      lastEmittedAt.clear();
+    },
   };
 }
