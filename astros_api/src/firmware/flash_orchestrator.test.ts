@@ -495,6 +495,46 @@ describe('createFlashProgressThrottle', () => {
     throttle.submit('a', uploadingState('a', 275)); // still must NOT add a 2nd timer
     expect(vi.getTimerCount()).toBe(1);
   });
+
+  it('reads clock.now() at most once per submit() (single-snapshot invariant)', () => {
+    // Per PR feedback: if submit() reads clock.now() multiple times, the
+    // clock could drift across the window boundary between reads, producing
+    // an immediate flush via setTimeout(0) and an extra emission. Capturing
+    // `now` once at the top of submit() keeps elapsed/remaining/lastEmittedAt
+    // internally consistent. This test pins the invariant by spying the
+    // clock and asserting exactly one read per submit, across all three
+    // branches (leading-edge, in-window, force).
+    const nowSpy = vi.fn().mockReturnValue(0);
+    const driftDetector: Clock = {
+      now: nowSpy,
+      setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms),
+      clearTimeout: (t) => globalThis.clearTimeout(t),
+    };
+    const emit = vi.fn();
+    const throttle = createFlashProgressThrottle({
+      emit,
+      windowMs: 250,
+      clock: driftDetector,
+    });
+
+    // Leading-edge branch: empty lastEmittedAt → emit, set lastEmittedAt.
+    throttle.submit('a', uploadingState('a', 100));
+    expect(nowSpy).toHaveBeenCalledTimes(1);
+
+    // In-window branch: pending stash + arm timer (no emit).
+    nowSpy.mockClear();
+    nowSpy.mockReturnValue(50); // 50ms after leading edge — still in window
+    throttle.submit('a', uploadingState('a', 200));
+    expect(nowSpy).toHaveBeenCalledTimes(1);
+
+    // Force branch: cancel pending + emit + set lastEmittedAt.
+    nowSpy.mockClear();
+    nowSpy.mockReturnValue(60);
+    throttle.submit('a', uploadingState('a', 300), true);
+    expect(nowSpy).toHaveBeenCalledTimes(1);
+
+    throttle.dispose();
+  });
 });
 
 // --- FlashJobOrchestrator ---------------------------------------------------

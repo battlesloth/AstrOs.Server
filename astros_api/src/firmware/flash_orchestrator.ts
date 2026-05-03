@@ -160,6 +160,13 @@ export function createFlashProgressThrottle(opts: {
 
   return {
     submit(controllerId, state, force = false) {
+      // Capture clock.now() once per submit. If the clock advanced between
+      // reads, `elapsed` (computed earlier) and `remaining` (computed later)
+      // could land on opposite sides of the window boundary, producing an
+      // immediate flush via setTimeout(0) and an extra emission inside the
+      // intended throttle window. Reading once keeps every branch's
+      // elapsed/remaining/lastEmittedAt computation internally consistent.
+      const now = clock.now();
       if (force) {
         // Cancel any pending flush — the forced state supersedes it.
         const t = scheduledTimer.get(controllerId);
@@ -169,22 +176,22 @@ export function createFlashProgressThrottle(opts: {
         }
         pending.delete(controllerId);
         emit(state);
-        lastEmittedAt.set(controllerId, clock.now());
+        lastEmittedAt.set(controllerId, now);
         return;
       }
 
       const last = lastEmittedAt.get(controllerId) ?? Number.NEGATIVE_INFINITY;
-      const elapsed = clock.now() - last;
+      const elapsed = now - last;
       if (elapsed >= windowMs) {
         emit(state);
-        lastEmittedAt.set(controllerId, clock.now());
+        lastEmittedAt.set(controllerId, now);
         return;
       }
 
       // Within the window: stash and (idempotently) arm a flush timer.
       pending.set(controllerId, state);
       if (scheduledTimer.has(controllerId)) return;
-      const remaining = Math.max(0, last + windowMs - clock.now());
+      const remaining = Math.max(0, last + windowMs - now);
       const t = clock.setTimeout(() => flush(controllerId), remaining);
       scheduledTimer.set(controllerId, t);
     },
