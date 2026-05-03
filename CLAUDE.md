@@ -76,6 +76,12 @@ Before each implementation commit, run in order:
 2. `npm run build` (type-check) and the test suite (`npx vitest run` for single-run mode).
 3. Invoke `superpowers:requesting-code-review` on the diff against the prior commit (or `origin/<branch>` for a batch of unpushed work). Mechanical checks confirm the code compiles and tests pass; code review catches what tests can't see — comment-vs-code drift, naming-vs-protocol mismatches, missing capabilities, broken test-name format strings, and similar issues that have repeatedly come back as PR feedback when this step is skipped. Address **Critical** and **Important** issues before committing; note **Minor** for later.
 
+**When dispatching the reviewer (step 3):**
+
+- Include the OTHER side of any interface boundary the diff touches (consumer of an enum, worker that receives an envelope, test that pins the contract). The reviewer can't catch contract mismatches it never sees.
+- Frame the prompt as "find anything wrong" rather than "verify X works." Pre-framed questions return confirmation of your framing, not the bugs outside it.
+- Explicitly request: dead-metadata sweep (declared fields with no read sites), doc-vs-code drift (spec/plan claims that don't match runtime behavior), and contract checks against consumers outside the diff.
+
 **Carve-outs that may skip step 3:** plan-only commits (no source changes), trivial typo / comment-only fixes, and check-off-only updates to a plan file. Everything else — including any change to a `.ts` / `.tsx` / test file with logic — requires the review.
 
 ## Branching & PRs

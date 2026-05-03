@@ -19,15 +19,15 @@ import type {
 } from '../models/firmware/firmware_messages.js';
 import { ChunkStreamer } from './chunk_streamer.js';
 
-// Inline FakeSerialBus — Task 3 only. If a future task in c.6b or c.6c needs to
-// share this, lift to chunk_streamer_testing.ts. Keeping it co-located with the
-// happy-path test for now keeps the surface area small and discourages
-// accidental coupling between streamer tests and other suites.
+// Inline FakeSerialBus — co-located with the streamer tests. If another suite
+// ever needs to share this, lift to chunk_streamer_testing.ts. Keeping it
+// inline keeps the surface area small and discourages accidental coupling
+// between streamer tests and other suites.
 type SendKind = Parameters<SerialBus['send']>[1]['kind'];
 
 class FakeSerialBus implements SerialBus {
   readonly sent: Array<{ payload: string; kind: SendKind }> = [];
-  // Map keyed by transferId. Task 3's streamer subscribes once at the start of
+  // Map keyed by transferId. The streamer subscribes once at the start of
   // run(), so a single-entry map is enough; using a map keeps the contract
   // ready for the multi-streamer future without leaking implementation detail.
   readonly subscribers = new Map<string, (ack: FwInboundAck) => void>();
@@ -130,8 +130,9 @@ function backpressure(action: FwBackpressureAction, reason = 'master_busy'): FwI
 // number of setImmediate cycles. A wall-clock bound is robust to that — the
 // only thing it costs in the failure case is the elapsed milliseconds.
 //
-// Tasks 3-5 have no time-dependent logic, so real timers are fine. The Task 6
-// describe block uses `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })`,
+// Most suites have no time-dependent logic, so real timers are fine. Suites
+// that drive timer-based behavior (per-chunk timeout, watchdog, etc.) opt in
+// with `vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })`,
 // deliberately leaving Date and setImmediate un-faked so this same `waitFor`
 // helper continues to work without a parallel fake-timer-aware variant.
 async function waitFor(predicate: () => boolean, label: string): Promise<void> {
@@ -156,7 +157,7 @@ function scheduleHappyPath(bus: FakeSerialBus): Promise<void> {
 
 // -----------------------------------------------------------------------------
 
-describe('ChunkStreamer — single-chunk happy path (Task 3 skeleton)', () => {
+describe('ChunkStreamer — single-chunk happy path', () => {
   let tempPath: string;
 
   beforeEach(async () => {
@@ -247,7 +248,7 @@ describe('ChunkStreamer — single-chunk happy path (Task 3 skeleton)', () => {
   });
 });
 
-describe('ChunkStreamer — sliding window (Task 4)', () => {
+describe('ChunkStreamer — sliding window', () => {
   // Counts FW_CHUNK sends in bus.sent. The first message is BEGIN; chunk
   // messages follow until END is sent at the very end. Used by waitFor
   // predicates that need to count outgoing chunks.
@@ -578,7 +579,7 @@ describe('ChunkStreamer — sliding window (Task 4)', () => {
   });
 });
 
-describe('ChunkStreamer — NAK + Go-Back-N (Task 5)', () => {
+describe('ChunkStreamer — NAK + Go-Back-N', () => {
   // Counts FW_CHUNK sends in bus.sent. Each call to bus.send increments
   // bus.sent by one entry, so resends after a NAK appear as additional
   // FW_CHUNK entries — meaning chunkSendCount climbs past the chunk count
@@ -954,15 +955,15 @@ describe('ChunkStreamer — END_ACK non-OK rejects with cleanup', () => {
   });
 });
 
-describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
+describe('ChunkStreamer — per-chunk timeout + retry', () => {
   // Default ackTimeoutMs from TRANSPORT_DEFAULTS. Hard-coded here rather than
   // imported so the test stays self-contained and a future config tweak that
   // changes the default would force these tests to be reviewed deliberately.
   const ACK_TIMEOUT_MS = 1500;
 
-  // Task 6 keeps Date and setImmediate un-faked (only setTimeout/clearTimeout
-  // are intercepted), so the top-of-file wall-clock `waitFor` works as-is
-  // here for predicate polling. `advanceTimersByTimeAsync(ACK_TIMEOUT_MS)` is
+  // Date and setImmediate stay un-faked (only setTimeout/clearTimeout are
+  // intercepted), so the top-of-file wall-clock `waitFor` works as-is here
+  // for predicate polling. `advanceTimersByTimeAsync(ACK_TIMEOUT_MS)` is
   // what we actually need fake timers for — fast-forwarding the streamer's
   // ack-timeout setTimeout without sitting through 1.5 real-time seconds.
 
@@ -972,7 +973,7 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
 
   beforeEach(() => {
     // Fake ONLY setTimeout/clearTimeout — the two timer APIs the streamer
-    // uses for the per-chunk ack timeout in Task 6. Three deliberate
+    // uses for the per-chunk ack timeout. Three deliberate
     // exclusions that keep this surgical:
     //   * setImmediate stays real, because under parallel test load
     //     vitest's fs plumbing for `fsp.readFile` (the streamer's first
@@ -1187,9 +1188,9 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
         bus.deliver(TRANSFER_ID, beginAck());
         await waitFor(() => chunkSendCount(bus) >= 1, 'first FW_CHUNK sent');
         // Sanity: two fake-timer slots are occupied — the per-chunk ack
-        // timer for seq=0 (Task 6) AND the whole-transfer watchdog (Task 8,
-        // armed post-BEGIN_ACK). If this fails the test pre-condition is
-        // wrong, not the invariant we're testing.
+        // timer for seq=0 AND the whole-transfer watchdog (armed
+        // post-BEGIN_ACK). If this fails the test pre-condition is wrong,
+        // not the invariant we're testing.
         expect(vi.getTimerCount()).toBe(2);
 
         // Deliver the ACK BEFORE the timer fires. clearChunkTimer should
@@ -1199,13 +1200,13 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
         // Snapshot the count synchronously after the deliver returns. The
         // ACK retire path runs synchronously in the bus subscriber callback,
         // so by this point clearChunkTimer should have run. We expect 1
-        // remaining (the Task 8 watchdog); the per-chunk timer has been
-        // disarmed.
+        // remaining (the whole-transfer watchdog); the per-chunk timer has
+        // been disarmed.
         timerCountAfterAck = vi.getTimerCount();
 
         // Drain the END phase BEFORE advancing past the timeout, so the
-        // Task 11 end-timeout race (also armed at ackTimeoutMs) cannot
-        // fire and reject the run before our belt-and-suspenders advance.
+        // end-timeout race (also armed at ackTimeoutMs) cannot fire and
+        // reject the run before our belt-and-suspenders advance.
         await waitFor(
           () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
           'END sent',
@@ -1224,8 +1225,9 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
 
       expect(result.endAck.status).toBe('OK');
       // Primary mutation-friendly assertion: per-chunk timer was actively
-      // cleared. The Task 8 watchdog is still armed at this snapshot
-      // (count == 1), so a missing clearChunkTimer would push it to 2.
+      // cleared. The whole-transfer watchdog is still armed at this
+      // snapshot (count == 1), so a missing clearChunkTimer would push
+      // it to 2.
       expect(timerCountAfterAck).toBe(1);
       // Side-channel checks — both held even with the defensive guard,
       // but worth pinning so a future refactor that drops the guard
@@ -1239,8 +1241,8 @@ describe('ChunkStreamer — per-chunk timeout + retry (Task 6)', () => {
   });
 });
 
-describe('ChunkStreamer — backpressure pause/resume (Task 7)', () => {
-  // Same FW_CHUNK counter as the Task 5/6 suites.
+describe('ChunkStreamer — backpressure pause/resume', () => {
+  // Same FW_CHUNK counter as the NAK and per-chunk-timeout suites.
   function chunkSendCount(bus: FakeSerialBus): number {
     return bus.sent.filter((s) => s.payload.includes('FW_CHUNK')).length;
   }
@@ -1534,9 +1536,8 @@ describe('ChunkStreamer — backpressure pause/resume (Task 7)', () => {
   });
 
   it('per-chunk timeout during PAUSE re-arms but does not resend; resend resumes after RESUME', async () => {
-    // Fake timers gated to setTimeout/clearTimeout (same scoping as the
-    // Task 6 suite). 1-chunk transfer keeps the timer-fire ordering
-    // deterministic.
+    // Fake timers gated to setTimeout/clearTimeout. 1-chunk transfer keeps
+    // the timer-fire ordering deterministic.
     //
     // Sequence:
     //   1. BEGIN_ACK delivered, initial chunk armed (FW_CHUNK count = 1).
@@ -1582,7 +1583,7 @@ describe('ChunkStreamer — backpressure pause/resume (Task 7)', () => {
           // Critical assertion: NO resend during PAUSE.
           expect(chunkSendCount(bus)).toBe(1);
           // Timer was re-armed: still 2 active fake timers (the per-chunk
-          // ack timer + the Task 8 whole-transfer watchdog). If the
+          // ack timer + the whole-transfer watchdog). If the
           // re-arm path during PAUSE were broken, the per-chunk timer
           // would be missing and the count would drop to 1 (just the
           // watchdog).
@@ -1636,9 +1637,9 @@ describe('ChunkStreamer — backpressure pause/resume (Task 7)', () => {
   });
 });
 
-describe('ChunkStreamer — whole-transfer watchdog (Task 8)', () => {
+describe('ChunkStreamer — whole-transfer watchdog', () => {
   // Each test in this suite uses fake timers scoped to setTimeout/clearTimeout
-  // (same scoping as the Task 6/7 fake-timer tests). Date and setImmediate
+  // (same scoping as the per-chunk-timeout / backpressure suites). Date and setImmediate
   // stay real so the wall-clock `waitFor` helper at the top of the file keeps
   // working for predicate polling.
 
@@ -1820,7 +1821,7 @@ describe('ChunkStreamer — whole-transfer watchdog (Task 8)', () => {
   });
 });
 
-describe('ChunkStreamer — AbortSignal cancellation (Task 9)', () => {
+describe('ChunkStreamer — AbortSignal cancellation', () => {
   // Real timers throughout this suite. Abort is event-driven, not timer-
   // driven, so faking timers would only complicate setup. The chunk-loop
   // test below intentionally short-circuits the per-chunk timer race by
@@ -2086,7 +2087,7 @@ describe('ChunkStreamer — AbortSignal cancellation (Task 9)', () => {
   });
 });
 
-describe('ChunkStreamer — pre-transfer error codes (Task 10)', () => {
+describe('ChunkStreamer — pre-transfer error codes', () => {
   // Four failure modes that all surface BEFORE the chunk-streaming phase
   // begins, each with its own TransferErrorCode:
   //   - source_read_failed: fs.readFile throws (ENOENT, EACCES, …)
@@ -2186,7 +2187,6 @@ describe('ChunkStreamer — pre-transfer error codes (Task 10)', () => {
   describe('begin_timeout', () => {
     // Fake timers scoped to setTimeout/clearTimeout so we can fast-forward
     // past the ackTimeoutMs without sitting through real wall-clock.
-    // Same scoping as the Task 6/7/8 fake-timer suites.
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     });
@@ -2326,22 +2326,20 @@ describe('ChunkStreamer — pre-transfer error codes (Task 10)', () => {
   });
 });
 
-describe('ChunkStreamer — post-transfer error codes (Task 11)', () => {
+describe('ChunkStreamer — post-transfer error codes', () => {
   // Failure modes that surface AFTER the chunk-streaming phase completes,
   // each with its own TransferErrorCode:
   //   - end_timeout: master never replies to FW_TRANSFER_END
-  //   - hash_mismatch: END_ACK status === 'HASH_MISMATCH' (Task 3 — verified
-  //     in the "END_ACK non-OK rejects with cleanup" suite above; not
-  //     reasserted here)
-  //   - master_io_error: END_ACK status === 'IO_ERROR' (Task 3 — same)
+  //   - hash_mismatch: END_ACK status === 'HASH_MISMATCH' — verified in the
+  //     "END_ACK non-OK rejects with cleanup" suite above; not reasserted here
+  //   - master_io_error: END_ACK status === 'IO_ERROR' — same
   // FwTransferEndAck.status is a closed enum ('OK' | 'HASH_MISMATCH' |
   // 'IO_ERROR'; see firmware_messages.ts), so the two-arm dispatch in the
   // streamer is exhaustive and no fallback test is needed.
 
   describe('end_timeout', () => {
-    // Fake timers scoped to setTimeout/clearTimeout — same scoping as the
-    // Task 6/7/8/10 fake-timer suites. Date and setImmediate stay real so
-    // the wall-clock `waitFor` helper at the top of the file keeps working.
+    // Fake timers scoped to setTimeout/clearTimeout. Date and setImmediate
+    // stay real so the wall-clock `waitFor` helper keeps working.
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     });
@@ -2457,14 +2455,14 @@ describe('ChunkStreamer — post-transfer error codes (Task 11)', () => {
   });
 });
 
-describe('ChunkStreamer — bus_send_failed (Task 12)', () => {
+describe('ChunkStreamer — bus_send_failed', () => {
   // `bus.send()` may throw — in production the WorkerSerialBus's underlying
   // Worker channel can die, the postMessage IPC pipe can close, or a
   // serialization fault can surface synchronously. Without explicit
   // handling, such throws either escape uncaught (BEGIN/END sites in
   // run()) or — worse — escape from a setTimeout callback (the resend
   // path inside onChunkTimeout) where Node surfaces them as
-  // `uncaughtException`. Task 12 wraps every bus.send call site so the
+  // `uncaughtException`. The streamer wraps every bus.send call site so the
   // throw becomes TransferError('bus_send_failed', ...).
   //
   // FakeSerialBusThatThrows is a per-test-built variant: replaces `send`
@@ -2673,7 +2671,7 @@ describe('ChunkStreamer — bus_send_failed (Task 12)', () => {
   });
 });
 
-describe('ChunkStreamer — cleanup invariants verification (Task 12)', () => {
+describe('ChunkStreamer — cleanup invariants verification', () => {
   // Cross-cutting cleanup tests: for each major rejection path, assert
   // the post-rejection invariants hold:
   //   (a) the FwAcks subscriber was disposed (bus.subscribers.size === 0)

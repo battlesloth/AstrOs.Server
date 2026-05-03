@@ -1,144 +1,39 @@
 // ChunkStreamer — sliding-window FW_CHUNK transport over a SerialBus.
 //
-// Task 3 (skeleton): linear BEGIN → CHUNK(seq=0) → END pipeline with a single
-// waiter per phase.
-// Task 4: replaces the chunk-phase single waiter with a sliding-window state
-// machine. State: an `inFlight` Map keyed by seq, plus `nextToSend` /
-// `highestAcked` cursors. Window grows up to WINDOW_SIZE on each top-up;
-// cumulative CHUNK_ACK semantics retire every entry with
-// seq <= highestContiguousSeq in one shot. BEGIN-wait and END-wait keep
-// the single-slot waiter — only one outstanding ack is possible there.
-// Task 5: wires FW_CHUNK_NAK into the phase-aware dispatcher.
-// FLASH_FULL is unrecoverable — `handleChunkNak` rejects the chunk-phase
-// awaiter via `rejectChunkPhase`, propagating a TransferError('flash_full')
-// out to the outer try/catch/finally. CRC / SIZE / OUT_OF_ORDER trigger
-// Go-Back-N: clear `inFlight`, set nextToSend = lastGoodSeq + 1, set
-// highestAcked = lastGoodSeq, and let the existing top-up refill the window.
-// Task 6: per-chunk ack timeout + retry counter. Each chunk is armed with
-// `setTimeout(ackTimeoutMs)` on send. On fire, retries++ and if we've hit
-// `maxRetriesPerChunk`, reject the chunk phase with
-// TransferError('chunk_retry_exhausted'); otherwise observer.onRetry, build
-// a fresh FW_CHUNK payload, resend, re-arm. Timer is cleared on the
-// cumulative ACK that retires the seq, on the all-clear of NAK Go-Back-N,
-// and on cleanup in the `finally` block.
-// Task 7: backpressure pause/resume. A `backpressurePaused` flag local to
-// `run()` gates `topUpWindow` so PAUSE halts NEW sends while in-flight ACKs
-// continue draining the window. RESUME clears the flag and tops the window
-// up from current state. `handleBackpressure` is idempotent — duplicate
-// PAUSE/PAUSE or RESUME/RESUME do not refire the observer. Per-chunk
-// timeouts during PAUSE re-arm (so retries still count toward exhaustion —
-// the master's pause does not extend our retry budget) but do NOT resend;
-// resending while the master is paused would overflow its receive buffer
-// with chunks it has already buffered.
-// Task 8: whole-transfer watchdog. A single
-// `setTimeout(transferTimeoutMs)` (default 300_000 ms = 5 min) is armed on
-// entry to the chunk-streaming phase (post-BEGIN_ACK). On fire it rejects
-// the chunk-phase awaiter with TransferError('transfer_timeout', ...).
-// Cleared on the success path (post-END_ACK status=OK, before resolve)
-// AND in the `finally` cleanup, so a rejected run never leaks a pending
-// timer past return. Reuses Task 5's `rejectChunkPhase` mechanism — the
-// watchdog is the second consumer after FLASH_FULL.
-// Task 9: external cancellation via AbortSignal. The
-// orchestrator (c.6c) passes `opts.signal` that aborts on panic-stop /
-// job-cancel. An abort listener is registered at the top of `run()`
-// before any await. On fire, `rejectRun(err)` delegates to BOTH
-// `rejectChunkPhase` (covers the chunk-streaming phase) AND
-// `currentWaiter.reject` (covers BEGIN-wait / END-wait phases) — abort
-// can land in any phase, so both reject paths must be wired. The
-// listener is removed in `finally` via `removeEventListener` so a late
-// abort after a settled run() can't fire into a void. A signal that is
-// already aborted at run() entry rejects immediately, before the
-// streamer even sends FW_TRANSFER_BEGIN. Reuses Task 5's `Waiter.reject`
-// (reserved at the time for "Task 8+ external reject paths") and
-// Task 5/8's `rejectChunkPhase`.
-// Task 10: pre-transfer error codes.
-//   - `source_read_failed`: the `fsp.readFile` call is wrapped in
-//     try/catch. Any fs error (ENOENT / EACCES / EIO / …) is rethrown
-//     as TransferError('source_read_failed') with the original message
-//     and `errno` code in `detail` so the orchestrator can report a
-//     specific cause. The readFile runs BEFORE any subscriber, timer,
-//     or abort listener is set up — the outer try/finally block is not
-//     yet in scope at the throw site. The throw therefore propagates
-//     directly out of `run()` to the caller's `.catch`; no cleanup is
-//     needed because no resources have been allocated. If a future
-//     change moves resource allocation above either of the pre-subscribe
-//     throws (`source_read_failed` or `source_size_mismatch` below),
-//     that allocation must either be deferred until after the checks
-//     succeed OR both checks must be moved inside the outer try block
-//     so the allocation gets torn down on a pre-subscribe throw.
-//   - `source_size_mismatch`: validates that the on-disk artifact's
-//     size matches `spec.source.sizeBytes` (the metadata the
-//     orchestrator was given by c.4's CachedAsset / c.5's StoredUpload).
-//     Mismatch → upstream state drift (cache file truncated, upload
-//     stale-after-overwrite, partial download). Distinct from
-//     `hash_mismatch` (master-side SHA computation surfaced via END_ACK)
-//     so the orchestrator can route the two to different remediations.
-//     Same pre-subscribe path as source_read_failed: throw propagates
-//     out of run() with no cleanup required.
-//   - `begin_timeout`: the BEGIN-wait now races `waitFor('beginAck')`
-//     against `setTimeout(ackTimeoutMs)`. If no FW_TRANSFER_BEGIN_ACK
-//     arrives within the budget, the timer fires and rejects with
-//     TransferError('begin_timeout'). The timer is cleared on the
-//     ack-arrival path so a successful BEGIN doesn't leak a pending
-//     setTimeout past the BEGIN scope.
-//   - `begin_rejected`: a BEGIN_ACK whose `status` is not the
-//     happy-path `'OK'` (per protocol.md the field is open-ended; the
-//     master uses `'OK'` for accept and any other string — e.g.
-//     `'sd_full'`, `'busy'`, `'version_mismatch'` — for rejection)
-//     rejects with TransferError('begin_rejected') and the rejected
-//     status surfaced in `detail`. The check happens BEFORE the
-//     watchdog is armed so a rejected transfer doesn't even enter the
-//     chunk-streaming phase.
-// Task 12: `bus_send_failed`. `bus.send()` itself can throw — the underlying
-// Worker channel may have died, the IPC pipe may be closed, the message
-// generator might surface a serialization fault. Without explicit handling
-// such a throw escapes uncaught (BEGIN/END sites) or — worse — into a
-// setTimeout callback (the resend path inside `onChunkTimeout`) where Node
-// surfaces it as `uncaughtException`. Every `bus.send()` call site is now
-// wrapped to convert the throw into TransferError('bus_send_failed', ...):
-//   - BEGIN send in run(): wrapped inline; the throw propagates out of the
-//     outer try/catch/finally so the standard cleanup runs.
-//   - sendChunk(): wrapped at the helper boundary so the initial top-up
-//     loop and the resend path share one catch site. Throws TransferError
-//     to the caller — `topUpWindow` (synchronous in run()) lets it bubble,
-//     `onChunkTimeout` (a timer callback) catches it and routes to
-//     `rejectChunkPhase` instead so the throw never leaks past the timer.
-//   - END send in run(): same shape as BEGIN.
-// Cleanup invariants (subscriber dispose, chunk-timer drain, watchdog
-// clear, abort-listener remove, inFlight clear) all run in the outer
-// `finally` regardless of which path throws — verified by the
-// "Cleanup invariants" describe block in chunk_streamer.test.ts.
+// One transfer drives `BEGIN → chunk loop → END`:
+//   - sliding window of WINDOW_SIZE chunks in flight, retired by
+//     cumulative FW_CHUNK_ACK
+//   - FW_CHUNK_NAK with FLASH_FULL is terminal; CRC / SIZE / OUT_OF_ORDER
+//     trigger Go-Back-N from `lastGoodSeq + 1`
+//   - per-chunk ack timer with `maxRetriesPerChunk` budget; whole-transfer
+//     watchdog as a second-level safety net
+//   - FW_BACKPRESSURE PAUSE halts new sends but in-flight ACKs still drain;
+//     PAUSEd timeouts increment the retry budget but don't resend
+//   - AbortSignal cancellation rejects whatever phase is current (BEGIN-wait,
+//     chunk-streaming, END-wait)
 //
-// Task 11: post-transfer error codes.
-//   - `end_timeout`: the END-wait now races `waitFor('transferEndAck')`
-//     against `setTimeout(ackTimeoutMs)`. If no FW_TRANSFER_END_ACK
-//     arrives within the budget, the timer fires and rejects with
-//     TransferError('end_timeout'). Symmetric to `begin_timeout`; the
-//     timer is cleared on the ack-arrival path so a successful END
-//     doesn't leak a pending setTimeout past the END scope. Inlined
-//     rather than factored into a helper because the scope-local
-//     `currentWaiter = null` cleanup that pairs with the timeout would
-//     leak abstraction across the helper boundary; the two BEGIN/END
-//     races are short and self-contained.
-//   - `hash_mismatch` / `master_io_error`: already wired in Task 3 as
-//     the natural exit boundary of the trivial path. The existing
-//     END_ACK status checks remain unchanged — `FwTransferEndAck.status`
-//     is a closed enum (`'OK' | 'HASH_MISMATCH' | 'IO_ERROR'`, see
-//     firmware_messages.ts) unlike BEGIN_ACK's open-ended string, so
-//     the two-arm dispatch is exhaustive and no fallback branch is
-//     needed.
+// `chunkPhaseActive` is the dispatcher's gate for routing chunkAck/chunkNak/
+// backpressure into the sliding-window machine — `currentWaiter === null`
+// alone is not enough (it's also true in the synchronous setup window before
+// BEGIN-wait, between BEGIN_ACK and the chunk loop, and between
+// `chunkPhaseDone` resolving and the END-wait Promise constructing).
 //
-// `fs.promises.readFile` is the only fs touch in this module: TransferSpec
-// gives us a path, and the streamer needs the bytes to chunk-and-send. Future
-// tasks may switch to a streaming reader (chunk-by-chunk fsp.read at offsets)
-// to bound memory for large firmware images, but the 1.2 MB ESP firmware fits
-// comfortably in memory today and the simpler readFile is preferred while the
-// state machine grows.
+// Wire-payload encoding split:
+//   - Framing (line-delimited GS/RS/US bytes) lives in MessageGenerator
+//   - Bytes-level encoding (base64 of chunk slice, CRC-16) is the streamer's
+//     responsibility. CRC currently uses the `'TODO_TASK_4_CRC16'` greppable
+//     placeholder — non-numeric so a buggy validator can't silently accept it
+//     as a valid all-zero CRC. Replaced when the master starts checking it.
 //
-// Payload framing (base64, CRC-16, line-delimited GS/RS/US bytes) lives in
-// MessageGenerator (c.1). This module never builds wire bytes directly — it
-// passes typed payload objects through generateMessage and forwards the
-// resulting string to bus.send.
+// `fs.promises.readFile` is the only fs touch — `TransferSpec.source.path`
+// resolves to a Buffer at run() entry. 1.2 MB ESP firmware fits in memory;
+// streaming-from-disk per chunk would complicate Go-Back-N (file-handle
+// seek-back) without bounded benefit.
+//
+// All cleanup (subscriber dispose, chunk-timer drain, watchdog clear,
+// abort-listener removal, inFlight + chunkPhaseActive reset) runs in the
+// outer `finally` regardless of which path throws. The "Cleanup invariants
+// verification" describe block in `chunk_streamer.test.ts` pins this.
 
 import { promises as fsp } from 'fs';
 import { v4 as uuid_v4 } from 'uuid';
@@ -178,11 +73,10 @@ export interface ChunkStreamerOpts {
 }
 
 export interface ChunkStreamerRunOpts {
-  // Wired by Task 9. The orchestrator (c.6c) aborts this signal on
-  // panic-stop / job-cancel. An abort during any phase (BEGIN-wait,
-  // chunk-streaming, END-wait) rejects `run()` with
-  // TransferError('aborted', ...). A signal that is already aborted at
-  // entry rejects immediately, before BEGIN is sent.
+  // The orchestrator aborts this signal on panic-stop / job-cancel.
+  // An abort during any phase (BEGIN-wait, chunk-streaming, END-wait)
+  // rejects `run()` with TransferError('aborted', ...). A signal already
+  // aborted at entry rejects immediately, before BEGIN is sent.
   signal?: AbortSignal;
 }
 
@@ -192,10 +86,9 @@ export interface ChunkStreamerRunOpts {
 type WaitableKind = 'beginAck' | 'chunkAck' | 'transferEndAck';
 
 // `reject` is the external-reject path for the single-slot waiter used
-// by BEGIN-wait and END-wait. Task 9 (AbortSignal cancellation) is the
-// first consumer — `rejectRun` reaches into `currentWaiter.reject` when
-// abort fires during BEGIN-wait or END-wait. Per-phase timeout paths
-// (Tasks 10–11) will likely reuse the same hook.
+// by BEGIN-wait and END-wait. `rejectRun` reaches into `currentWaiter.reject`
+// when abort fires during BEGIN-wait or END-wait; the per-phase timeout
+// paths (begin_timeout / end_timeout) reach in directly.
 interface Waiter<K extends WaitableKind> {
   kind: K;
   resolve: (ack: Extract<FwInboundAck, { kind: K }>) => void;
@@ -238,14 +131,19 @@ export class ChunkStreamer {
     opts?: ChunkStreamerRunOpts,
   ): Promise<TransferResult> {
     const startedAt = Date.now();
-    // Task 10: wrap fs read so any fs error surfaces as TransferError with
-    // a stable code rather than a bare NodeJS.ErrnoException. The throw
-    // happens before any subscriber is installed or any timer is armed,
-    // so no cleanup is required at this point — the throw propagates out
-    // of `run()` to the caller's `.catch`. We still keep the wrap inside
+    // Wrap fs read so any fs error surfaces as TransferError with a stable
+    // code rather than a bare NodeJS.ErrnoException. The throw happens
+    // before any subscriber is installed or any timer is armed, so no
+    // cleanup is required at this point — the throw propagates out of
+    // `run()` to the caller's `.catch`. We still keep the wrap inside
     // run() (not at construction) so each `run()` call gets fresh error
     // routing and the streamer remains reusable across retries that
     // re-read the source.
+    //
+    // If a future change adds resource allocation above this readFile,
+    // either defer the allocation until after the readFile + size-mismatch
+    // checks succeed, OR move both checks inside the outer try block so
+    // the allocation gets torn down on a pre-subscribe throw.
     let sourceBuffer: Buffer;
     try {
       sourceBuffer = await fsp.readFile(spec.source.path);
@@ -284,59 +182,50 @@ export class ChunkStreamer {
     const lastSeq = totalChunks - 1;
     const { chunkSizeBytes, windowSize } = this.config;
 
-    // ---- Sliding-window state (Task 4). Initialized eagerly so the `finally`
-    // block can always clear `inFlight` regardless of which phase we error in.
-    // `inFlight`: seq → bookkeeping for chunks sent but not yet cumulatively
-    //   acked. Task 5 reads `sentAt`/`retries` for retry & NAK logic.
-    // `nextToSend`: next seq to put on the wire when the window has room.
-    // `highestAcked`: greatest cumulatively-acked seq, or -1 before any ACK.
+    // Sliding-window state. `inFlight`: seq → bookkeeping for chunks sent
+    // but not yet cumulatively acked (sentAt/retries used by retry and NAK
+    // logic). `nextToSend`: next seq to put on the wire when the window has
+    // room. `highestAcked`: greatest cumulatively-acked seq, or -1 before
+    // any ACK. Initialized eagerly so the `finally` block can always clear
+    // `inFlight` regardless of which phase we error in.
     const inFlight = new Map<number, { sentAt: number; retries: number }>();
     let nextToSend = 0;
     let highestAcked = -1;
 
-    // ---- Per-chunk ack timers (Task 6). Parallel structure to `inFlight`,
-    // keyed by the same seq. Each `setTimeout` ID is stored so:
-    //   - the cumulative-ACK retire path can clearTimeout per retired seq,
-    //   - the NAK Go-Back-N path can clear all timers in lockstep with
-    //     `inFlight.clear()`,
-    //   - and the `finally` block can drain any leftover timers on error
-    //     so a rejected run doesn't leak a node `setTimeout` past return.
-    // The `chunkSizeBytes` and `ackTimeoutMs` reads below are hoisted into a
-    // local for the timer callbacks; the rest of the streamer reads via
-    // `this.config.*`.
+    // Per-chunk ack timers — parallel structure to `inFlight`, keyed by the
+    // same seq. The cumulative-ACK retire path clears per retired seq; the
+    // NAK Go-Back-N path clears all timers in lockstep with `inFlight.clear()`;
+    // the `finally` block drains any leftover timers so a rejected run
+    // doesn't leak a setTimeout past return. `ackTimeoutMs` and
+    // `maxRetriesPerChunk` are hoisted into locals for timer callbacks.
     const chunkTimers = new Map<number, NodeJS.Timeout>();
     const { ackTimeoutMs, maxRetriesPerChunk } = this.config;
 
-    // ---- Whole-transfer watchdog (Task 8). A single setTimeout — NOT a Map
-    // like `chunkTimers`, since exactly one watchdog runs per `run()`. Armed
-    // on entry to the chunk-streaming phase (after BEGIN_ACK) and cleared
-    // on the success path (post-END_ACK status=OK) AND in the `finally`
-    // cleanup. The two clear sites are intentional: the success-path clear
-    // ensures no late fire after resolve(), the finally clear handles every
-    // rejection path. `clearTransferWatchdog` is idempotent (null-guarded)
-    // so running both on the success path is safe.
+    // Whole-transfer watchdog — single setTimeout (not a Map; exactly one
+    // per run). Armed on entry to the chunk-streaming phase, cleared on the
+    // success path AND in `finally`. Both clears are intentional: the
+    // success-path clear ensures no late fire after resolve(), the finally
+    // clear handles every rejection path. `clearTransferWatchdog` is
+    // idempotent (null-guarded) so running both on the success path is safe.
     let transferWatchdogTimer: NodeJS.Timeout | null = null;
 
-    // ---- Backpressure state (Task 7). Defaults to `false` — the master is
-    // assumed willing to receive until it explicitly says otherwise via
-    // FW_BACKPRESSURE { action: 'PAUSE' }. While paused:
-    //   - `topUpWindow` no-ops (no new chunks placed on the wire), so the
-    //     in-flight count can only shrink, never grow.
-    //   - cumulative ACKs continue retiring entries (handleChunkAck still
-    //     runs; topUpWindow inside it is a no-op).
+    // Backpressure state — the master is assumed willing to receive until
+    // it explicitly says otherwise via FW_BACKPRESSURE { action: 'PAUSE' }.
+    // While paused:
+    //   - `topUpWindow` no-ops (no new chunks placed on the wire); in-flight
+    //     count can only shrink, never grow.
+    //   - cumulative ACKs continue retiring entries.
     //   - per-chunk timers still fire and still count toward
-    //     maxRetriesPerChunk, but their resend is suppressed — see
-    //     onChunkTimeout. The retry budget therefore acts as a watchdog on
-    //     a master that PAUSEs and never RESUMEs.
-    // RESUME clears the flag and calls topUpWindow once to refill the
-    // window from `nextToSend`. This boolean is a primitive local to
-    // `run()` and goes out of scope when the function returns; no `finally`
-    // cleanup needed.
+    //     maxRetriesPerChunk, but their resend is suppressed (see
+    //     onChunkTimeout). The retry budget therefore acts as a watchdog
+    //     on a master that PAUSEs and never RESUMEs.
+    // RESUME clears the flag and calls topUpWindow once to refill from
+    // `nextToSend`.
     let backpressurePaused = false;
 
     // Single waiter slot — used by BEGIN-wait and END-wait phases only. The
-    // chunk phase (Task 4+) drives off `inFlight` / `highestAcked` and is
-    // released by `chunkPhaseDone`, not this slot.
+    // chunk phase drives off `inFlight` / `highestAcked` and is released
+    // by `chunkPhaseDone`, not this slot.
     let currentWaiter: Waiter<WaitableKind> | null = null;
 
     // Explicit chunk-phase gate. Set true ONLY after FW_TRANSFER_BEGIN_ACK
@@ -366,9 +255,8 @@ export class ChunkStreamer {
     // calls `resolveChunkPhaseDone` after the cumulative ACK that completes
     // the transfer; the main loop awaits this before sending TRANSFER_END.
     // `rejectChunkPhase` lets the chunk-phase awaiter throw from outside the
-    // `await chunkPhaseDone` — used by the FLASH_FULL NAK path (Task 5),
-    // the whole-transfer watchdog (Task 8), and the AbortSignal listener
-    // (Task 9, via `rejectRun`).
+    // `await chunkPhaseDone` — used by the FLASH_FULL NAK path, the
+    // whole-transfer watchdog, and the AbortSignal listener (via `rejectRun`).
     //
     // Constructed eagerly at the top of run() — BEFORE the BEGIN-wait await
     // — so the abort listener registered immediately after can safely
@@ -427,16 +315,11 @@ export class ChunkStreamer {
         seq,
         payloadLen: chunkBytes.length,
         base64Bytes: chunkBytes.toString('base64'),
-        // CRC-16 of the chunk bytes. Task 3/4 send a placeholder so the wire
-        // framing is well-formed; FakeSerialBus does not validate. A real
-        // CRC helper is tracked separately and lands when the master starts
+        // CRC-16 placeholder. Non-numeric greppable marker (NOT '0000') so
+        // a buggy validator can't silently accept it as a valid all-zero
+        // CRC — any well-formed CRC parser will reject this. Replaced with
+        // the real CRC-16/CCITT-FALSE helper when the master starts
         // checking it.
-        //
-        // The value is a non-numeric greppable marker (NOT '0000') so a
-        // buggy CRC validator can't silently accept it as a valid all-zero
-        // CRC — any well-formed validator will reject this at parse time
-        // and a maintainer running against a real master will have an
-        // obvious search target.
         crc16Hex: 'TODO_TASK_4_CRC16',
       };
       const chunkMsg = this.messageGenerator.generateMessage(
@@ -444,14 +327,14 @@ export class ChunkStreamer {
         uuid_v4(),
         chunkPayload,
       );
-      // Task 12: wrap bus.send so a Worker-channel / IPC failure surfaces
-      // as TransferError('bus_send_failed', ...) instead of escaping
-      // uncaught. The throw propagates to the caller — `topUpWindow`
-      // (synchronous from inside run()) lets it bubble out via the outer
+      // Wrap bus.send so a Worker-channel / IPC failure surfaces as
+      // TransferError('bus_send_failed', ...) instead of escaping uncaught.
+      // The throw propagates to the caller — `topUpWindow` (synchronous
+      // from inside run()) lets it bubble out via the outer
       // try/catch/finally. The resend path inside `onChunkTimeout` (a
-      // setTimeout callback) catches and routes to `rejectChunkPhase`
-      // since a throw from a timer callback would otherwise become an
-      // uncaught exception at the Node runtime level.
+      // setTimeout callback) catches and routes to `rejectChunkPhase` since
+      // a throw from a timer callback would otherwise become an uncaught
+      // exception at the Node runtime level.
       try {
         this.bus.send(chunkMsg.msg, { kind: 'firmware' });
       } catch (err) {
@@ -464,14 +347,13 @@ export class ChunkStreamer {
       }
     };
 
-    // Per-chunk timer helpers. The `if (existing) clearTimeout(existing)`
-    // pre-clear in `armChunkTimer` is unreachable in c.6b — every call site
-    // either ran `chunkTimers.delete(seq)` immediately before (onChunkTimeout
-    // deletes the fired timer's entry at the top of its handler) or has
-    // just allocated a fresh seq with no prior timer (topUpWindow). Kept as
-    // defense-in-depth so a future arm site added in c.6c (e.g. a
-    // "rearm-on-NAK" optimization) cannot accidentally double-arm. If c.6c
-    // proves no such site is needed, this guard should come out then.
+    // The `if (existing) clearTimeout(existing)` pre-clear in armChunkTimer
+    // is unreachable today — every call site either ran
+    // `chunkTimers.delete(seq)` immediately before (onChunkTimeout deletes
+    // at the top of its handler) or has just allocated a fresh seq with no
+    // prior timer (topUpWindow). Kept as defense-in-depth so a future arm
+    // site (e.g. a "rearm-on-NAK" optimization) cannot accidentally
+    // double-arm.
     const armChunkTimer = (seq: number): void => {
       const existing = chunkTimers.get(seq);
       if (existing) clearTimeout(existing);
@@ -487,16 +369,14 @@ export class ChunkStreamer {
       }
     };
 
-    // Whole-transfer watchdog helpers (Task 8). `armTransferWatchdog` is
-    // called exactly once per run in c.6b — post-BEGIN_ACK, on entry to the
-    // chunk-streaming phase — so the `if (transferWatchdogTimer)` pre-clear
-    // is unreachable today. Kept as defense-in-depth against c.6c adding a
-    // second arm site (e.g. resetting the watchdog on progress milestones
-    // so an under-budget-but-slow master extends rather than aborts the
-    // run). If c.6c doesn't need it, the guard should come out then.
-    // `clearTransferWatchdog` is idempotent (null check) so the success-path
-    // call AND the `finally` cleanup call can safely both run on a
-    // happy-path resolution.
+    // `armTransferWatchdog` is called exactly once per run — post-BEGIN_ACK,
+    // on entry to the chunk-streaming phase — so the `if
+    // (transferWatchdogTimer)` pre-clear is unreachable today. Kept as
+    // defense-in-depth against a future second arm site (e.g. resetting
+    // the watchdog on progress milestones so an under-budget-but-slow
+    // master extends rather than aborts the run). `clearTransferWatchdog`
+    // is idempotent (null check) so the success-path call AND the
+    // `finally` cleanup call can safely both run on a happy-path resolution.
     const armTransferWatchdog = (): void => {
       if (transferWatchdogTimer) clearTimeout(transferWatchdogTimer);
       transferWatchdogTimer = setTimeout(() => {
@@ -521,19 +401,18 @@ export class ChunkStreamer {
       // The timer just fired — its ID is now garbage. Remove it from
       // chunkTimers immediately so the forward invariant
       //   chunkTimers.has(seq) ⇒ inFlight.has(seq) AND its timer is pending
-      // holds for any future reader (e.g. c.6c observability metrics that
-      // read chunkTimers as the "actively timed-out-able" set). The
-      // converse direction (inFlight ⇒ chunkTimers) is NOT maintained on
-      // the exhausted-retry path below — `chunkTimers.delete(seq)` runs
-      // here, but the matching `inFlight` entry persists until the outer
-      // `finally` clears it via `inFlight.clear()`. The non-exhausted
-      // paths either re-arm the timer (restoring the entry within the
-      // same synchronous turn — armChunkTimer below) or are interrupted
-      // by `rejectChunkPhase`, in which case the `finally` drains both
-      // maps in lockstep. Holding only the forward direction tight is
-      // enough for c.6c — readers only ever ask "do I have an active
-      // timer for seq N?", never "do I have an in-flight chunk for
-      // every active timer?"
+      // holds for any future reader (e.g. observability metrics that read
+      // chunkTimers as the "actively timed-out-able" set). The converse
+      // direction (inFlight ⇒ chunkTimers) is NOT maintained on the
+      // exhausted-retry path below — `chunkTimers.delete(seq)` runs here,
+      // but the matching `inFlight` entry persists until the outer
+      // `finally` clears it. The non-exhausted paths either re-arm the
+      // timer (restoring the entry within the same synchronous turn) or
+      // are interrupted by `rejectChunkPhase`, in which case the `finally`
+      // drains both maps in lockstep. Holding only the forward direction
+      // tight is enough — readers only ever ask "do I have an active
+      // timer for seq N?", never "do I have an in-flight chunk for every
+      // active timer?"
       chunkTimers.delete(seq);
 
       const entry = inFlight.get(seq);
@@ -587,8 +466,8 @@ export class ChunkStreamer {
         return;
       }
 
-      // Resend the same seq with a fresh FW_CHUNK payload + new timer.
-      // Task 12: a throw from sendChunk (bus.send threw — converted to
+      // Resend the same seq with a fresh FW_CHUNK payload + new timer. A
+      // throw from sendChunk (bus.send threw — converted to
       // TransferError('bus_send_failed') inside the helper) cannot
       // propagate out of this setTimeout callback without becoming an
       // uncaughtException. Catch and route to rejectChunkPhase so the
@@ -619,8 +498,8 @@ export class ChunkStreamer {
       // Cumulative-ACK semantics: every in-flight entry with
       // seq <= highestContiguousSeq is retired in one shot. A single ACK can
       // therefore retire many chunks (e.g. one ACK closing out a full window).
-      // Each retired seq's pending ack timer (Task 6) is cleared in lockstep
-      // so a retired chunk cannot fire a phantom retry after its ACK.
+      // Each retired seq's pending ack timer is cleared in lockstep so a
+      // retired chunk cannot fire a phantom retry after its ACK.
       for (const seq of Array.from(inFlight.keys())) {
         if (seq <= ack.highestContiguousSeq) {
           clearChunkTimer(seq);
@@ -695,13 +574,13 @@ export class ChunkStreamer {
       // finally-block's `inFlight.clear()` a no-op on the post-NAK happy
       // path, which is fine — clearing an empty Map is cheap.
       //
-      // Task 6: chunkTimers must be drained in lockstep with inFlight.
-      // Otherwise a stale per-chunk timer for a now-discarded seq would
-      // fire after the resend, find no inFlight entry (the early-return
-      // guard in onChunkTimeout would catch it), but in the racy case
-      // where the new top-up has already re-armed seq=N before the old
-      // timer fires, the old fire would walk an entry that "looks valid"
-      // and double-count its retries.
+      // chunkTimers must be drained in lockstep with inFlight. Otherwise a
+      // stale per-chunk timer for a now-discarded seq would fire after the
+      // resend, find no inFlight entry (the early-return guard in
+      // onChunkTimeout would catch it), but in the racy case where the new
+      // top-up has already re-armed seq=N before the old timer fires, the
+      // old fire would walk an entry that "looks valid" and double-count
+      // its retries.
       for (const timer of chunkTimers.values()) clearTimeout(timer);
       chunkTimers.clear();
       inFlight.clear();
@@ -740,16 +619,16 @@ export class ChunkStreamer {
     const topUpWindow = (): void => {
       while (!backpressurePaused && inFlight.size < windowSize && nextToSend <= lastSeq) {
         const seq = nextToSend++;
-        // Task 12: sendChunk converts bus.send throws to TransferError
+        // sendChunk converts bus.send throws to TransferError
         // ('bus_send_failed'). topUpWindow runs both synchronously from
         // run() (initial fill + post-BEGIN entry) AND from inside the
         // subscriber callback (handleChunkAck, handleChunkNak,
-        // handleBackpressure). A throw from the subscriber-callback
-        // path would propagate out to the bus dispatcher rather than
-        // rejecting the chunk-phase awaiter, so we catch here and route
-        // through rejectChunkPhase. From the synchronous-run path the
-        // outer try/catch/finally would also catch it, but routing
-        // through rejectChunkPhase keeps both paths uniform.
+        // handleBackpressure). A throw from the subscriber-callback path
+        // would propagate out to the bus dispatcher rather than rejecting
+        // the chunk-phase awaiter, so we catch here and route through
+        // rejectChunkPhase. From the synchronous-run path the outer
+        // try/catch/finally would also catch it, but routing through
+        // rejectChunkPhase keeps both paths uniform.
         try {
           sendChunk(seq);
         } catch (err) {
@@ -757,9 +636,6 @@ export class ChunkStreamer {
           return;
         }
         inFlight.set(seq, { sentAt: Date.now(), retries: 0 });
-        // Arm the per-chunk ack timer (Task 6). The timer fires after
-        // ackTimeoutMs if no cumulative ACK has retired this seq by then;
-        // see onChunkTimeout for the retry/exhaust logic.
         armChunkTimer(seq);
       }
     };
@@ -802,12 +678,11 @@ export class ChunkStreamer {
         currentWaiter = { kind, resolve, reject } as Waiter<WaitableKind>;
       });
 
-    // ---- AbortSignal cancellation (Task 9). `rejectRun` is the single
-    // entry point for external rejection; it routes the error to whichever
-    // phase is currently active:
+    // `rejectRun` is the single entry point for external rejection; it
+    // routes the error to whichever phase is currently active:
     //   - chunk-streaming phase: `rejectChunkPhase(err)` releases the
-    //     `await chunkPhaseDone` (also used by FLASH_FULL NAK in Task 5
-    //     and the watchdog in Task 8).
+    //     `await chunkPhaseDone` (also used by FLASH_FULL NAK and the
+    //     whole-transfer watchdog).
     //   - BEGIN-wait / END-wait: `currentWaiter.reject(err)` releases the
     //     single-slot waiter installed by `waitFor()`.
     // Both paths run unconditionally — the chunk-phase reject is a no-op
@@ -871,9 +746,9 @@ export class ChunkStreamer {
         uuid_v4(),
         beginPayload,
       );
-      // Task 12: wrap bus.send. A throw here exits via the outer
-      // try/finally so subscriber disposal, abort-listener removal, and
-      // the (yet-unarmed) timer drains all run.
+      // Wrap bus.send. A throw here exits via the outer try/finally so
+      // subscriber disposal, abort-listener removal, and the (yet-unarmed)
+      // timer drains all run.
       try {
         this.bus.send(beginMsg.msg, { kind: 'firmware' });
       } catch (err) {
@@ -885,14 +760,14 @@ export class ChunkStreamer {
         );
       }
 
-      // Task 10: race the BEGIN_ACK wait against ackTimeoutMs. If the
-      // master never replies, `begin_timeout` fires; the timer is
-      // explicitly cleared on the ack-arrival path so a successful BEGIN
-      // doesn't leak a pending setTimeout past this scope. We also clear
-      // the single-slot waiter on the timeout path — the dispatcher
-      // would otherwise resolve a stale waiter into the (already-
-      // rejected) Promise on a late ack arrival; harmless, but explicit
-      // teardown makes the post-condition obvious.
+      // Race the BEGIN_ACK wait against ackTimeoutMs. If the master never
+      // replies, `begin_timeout` fires; the timer is explicitly cleared on
+      // the ack-arrival path so a successful BEGIN doesn't leak a pending
+      // setTimeout past this scope. We also clear the single-slot waiter
+      // on the timeout path — the dispatcher would otherwise resolve a
+      // stale waiter into the (already-rejected) Promise on a late ack
+      // arrival; harmless, but explicit teardown makes the post-condition
+      // obvious.
       let beginAckTimer: NodeJS.Timeout | null = null;
       let beginAck;
       try {
@@ -917,12 +792,12 @@ export class ChunkStreamer {
         if (beginAckTimer) clearTimeout(beginAckTimer);
       }
 
-      // Task 10: master rejects the transfer (sd_full, busy, version
-      // mismatch, …). Per protocol.md the `status` field is open-ended;
-      // 'OK' is the only happy-path value, every other string is a
-      // rejection reason. Surfacing the raw status in `detail` lets the
-      // orchestrator log/report the specific cause without this module
-      // needing to enumerate every possible rejection code.
+      // Master rejects the transfer (sd_full, busy, version mismatch, …).
+      // Per protocol.md the `status` field is open-ended; 'OK' is the only
+      // happy-path value, every other string is a rejection reason.
+      // Surfacing the raw status in `detail` lets the orchestrator
+      // log/report the specific cause without this module needing to
+      // enumerate every possible rejection code.
       if (beginAck.status !== 'OK') {
         throw new TransferError(
           'begin_rejected',
@@ -933,12 +808,12 @@ export class ChunkStreamer {
 
       observer.onTransferBegun?.(beginAck);
 
-      // Task 8: arm the whole-transfer watchdog on entry to the
-      // chunk-streaming phase. If the chunk loop hangs for any reason that
-      // per-chunk retries don't surface (e.g. a pathological PAUSE/RESUME
-      // dance, or a master that ACKs slowly enough to stay under the
-      // per-chunk budget but exceed transferTimeoutMs in aggregate), the
-      // watchdog rejects the chunk-phase awaiter via `rejectChunkPhase`.
+      // Arm the whole-transfer watchdog on entry to the chunk-streaming
+      // phase. If the chunk loop hangs for any reason that per-chunk
+      // retries don't surface (e.g. a pathological PAUSE/RESUME dance, or
+      // a master that ACKs slowly enough to stay under the per-chunk
+      // budget but exceed transferTimeoutMs in aggregate), the watchdog
+      // rejects the chunk-phase awaiter via `rejectChunkPhase`.
       armTransferWatchdog();
 
       // Open the chunk-phase gate. From here until the matching clear
@@ -978,9 +853,9 @@ export class ChunkStreamer {
         uuid_v4(),
         endPayload,
       );
-      // Task 12: wrap bus.send. By this point the watchdog and (likely)
-      // some chunk timers may still be armed; an exception here exits to
-      // the outer `finally` which drains them all.
+      // Wrap bus.send. By this point the watchdog and (likely) some chunk
+      // timers may still be armed; an exception here exits to the outer
+      // `finally` which drains them all.
       try {
         this.bus.send(endMsg.msg, { kind: 'firmware' });
       } catch (err) {
@@ -992,20 +867,19 @@ export class ChunkStreamer {
         );
       }
 
-      // Task 11: race the END_ACK wait against ackTimeoutMs. Symmetric to
-      // the Task 10 BEGIN-wait race. If the master never replies,
-      // `end_timeout` fires; the timer is explicitly cleared in the
-      // BEGIN-pattern `finally` so a successful END doesn't leak a pending
-      // setTimeout past this scope. We also clear the single-slot waiter
-      // on the timeout path — the dispatcher would otherwise resolve a
-      // stale waiter into the (already-rejected) Promise on a late ack
-      // arrival; harmless, but explicit teardown makes the post-condition
-      // obvious. The whole-transfer watchdog is still armed at this
-      // point and would also fire eventually, but with a much longer
-      // budget (300_000 ms default vs 1500 ms ackTimeoutMs); the
-      // end_timeout race surfaces a faster, more specific code so the
-      // operator gets "the master didn't reply to END" rather than the
-      // catch-all "the whole transfer hung."
+      // Race the END_ACK wait against ackTimeoutMs (symmetric to the
+      // BEGIN-wait race). If the master never replies, `end_timeout`
+      // fires; the timer is explicitly cleared in the inner `finally` so a
+      // successful END doesn't leak a pending setTimeout past this scope.
+      // We also clear the single-slot waiter on the timeout path — the
+      // dispatcher would otherwise resolve a stale waiter into the
+      // (already-rejected) Promise on a late ack arrival; harmless, but
+      // explicit teardown makes the post-condition obvious. The
+      // whole-transfer watchdog is still armed and would also fire
+      // eventually, but with a much longer budget (300_000 ms default vs
+      // 1500 ms ackTimeoutMs); the end_timeout race surfaces a faster,
+      // more specific code so the operator gets "the master didn't reply
+      // to END" rather than the catch-all "the whole transfer hung."
       let endAckTimer: NodeJS.Timeout | null = null;
       let endAck;
       try {
@@ -1043,10 +917,10 @@ export class ChunkStreamer {
       }
       // status === 'OK' — falls through to the resolve below.
 
-      // Task 8: clear the whole-transfer watchdog on the success path BEFORE
+      // Clear the whole-transfer watchdog on the success path BEFORE
       // returning. The `finally` block also clears it (idempotent), but
-      // doing so here ensures no late fire can race the resolve and reject
-      // an already-resolved run.
+      // doing so here ensures no late fire can race the resolve and
+      // reject an already-resolved run.
       clearTransferWatchdog();
 
       return {
@@ -1057,21 +931,18 @@ export class ChunkStreamer {
         endAck,
       };
     } finally {
-      // Cleanup invariants: this block extends as later tasks add state.
-      // Task 4 added: clear the in-flight Map. Task 6 added: drain the
-      // per-chunk timer Map so a rejected run doesn't leak a node
-      // setTimeout past return. Task 8 added: clear the whole-transfer
-      // watchdog (idempotent — null-guarded — so the success-path call
-      // above and this one cooperate safely). Task 9 added: remove the
-      // abort listener — done FIRST so a fire-during-cleanup race
-      // (signal aborts in the same microtask we settle the run) cannot
-      // re-enter `rejectRun` and try to reject already-disposed state.
-      // chunkPhaseActive cleared as a defensive belt for the chunk-phase
-      // reject paths (FLASH_FULL, watchdog, abort) that exit the chunk
-      // phase via throw rather than the success-path clear above. Done
-      // before unsubscribe() so the dispatcher — which is still attached
-      // until the unsubscribe call returns — drops any chunk-phase ack
-      // that lands during the cleanup window.
+      // Order matters here:
+      //   - removeEventListener FIRST so a fire-during-cleanup race
+      //     (signal aborts in the same microtask we settle the run)
+      //     cannot re-enter `rejectRun` and try to reject already-
+      //     disposed state.
+      //   - chunkPhaseActive cleared BEFORE unsubscribe so the dispatcher
+      //     (still attached until unsubscribe returns) drops any
+      //     chunk-phase ack that lands during the cleanup window.
+      //   - clearTransferWatchdog is idempotent (null-guarded), so the
+      //     success-path call and this one cooperate safely.
+      // The chunkTimers drain + inFlight.clear() prevent leaked setTimeouts
+      // and stale window state from outliving a rejected run.
       opts?.signal?.removeEventListener('abort', abortListener);
       chunkPhaseActive = false;
       clearTransferWatchdog();
