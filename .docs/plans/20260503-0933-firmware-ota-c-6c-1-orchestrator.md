@@ -475,7 +475,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - GET with active job → 200 with FlashJobState
     - GET with no active job → 200 with null body
 
-- [ ] **Task 13 — `api_server.ts` wiring** (modify `astros_api/src/api_server.ts`):
+- [x] **Task 13 — `api_server.ts` wiring** (modify `astros_api/src/api_server.ts`):
   - Import `FlashJobOrchestrator`, `WorkerSerialBus`, `registerFirmwareFlashRoutes`
   - In `setupSerialPort()` (or wherever the worker is constructed), build:
     ```ts
