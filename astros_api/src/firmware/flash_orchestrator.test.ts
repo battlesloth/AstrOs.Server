@@ -869,6 +869,10 @@ describe('FlashJobOrchestrator', () => {
     expect(emittedFrames(fx.emitWs, TransmissionType.flashJobStarted)).toHaveLength(0);
     // But we did acquire+release the lock, so two lockStateChanged frames.
     expect(emittedFrames(fx.emitWs, TransmissionType.lockStateChanged)).toHaveLength(2);
+    // And flashJobFailed must fire so WS consumers see the rejection.
+    const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+    expect(failed).toHaveLength(1);
+    expect(failed[0].data).toMatchObject({ reason: 'no_controllers' });
   });
 
   it('rejects with variant_mismatch when controllers have differing variants; detail enumerates pairs', async () => {
@@ -894,6 +898,9 @@ describe('FlashJobOrchestrator', () => {
 
     expect(fx.orchestrator.getCurrentJob()).toBeNull();
     expect(fx.jobLock.isLocked()).toBe(false);
+    const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+    expect(failed).toHaveLength(1);
+    expect(failed[0].data).toMatchObject({ reason: 'variant_mismatch' });
   });
 
   it('rejects with variant_unknown when one controller has empty variant; detail names the controllerId', async () => {
@@ -916,6 +923,9 @@ describe('FlashJobOrchestrator', () => {
 
     expect(fx.orchestrator.getCurrentJob()).toBeNull();
     expect(fx.jobLock.isLocked()).toBe(false);
+    const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+    expect(failed).toHaveLength(1);
+    expect(failed[0].data).toMatchObject({ reason: 'variant_unknown' });
   });
 
   it('rejects with asset_not_found when github source has no asset matching variant', async () => {
@@ -935,6 +945,9 @@ describe('FlashJobOrchestrator', () => {
 
     expect(fx.orchestrator.getCurrentJob()).toBeNull();
     expect(fx.jobLock.isLocked()).toBe(false);
+    const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+    expect(failed).toHaveLength(1);
+    expect(failed[0].data).toMatchObject({ reason: 'asset_not_found' });
   });
 
   it('rejects with release_not_found when github request version matches no release', async () => {

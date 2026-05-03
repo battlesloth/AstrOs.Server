@@ -465,10 +465,23 @@ export class FlashJobOrchestrator {
       };
     } catch (err) {
       // Any post-acquire failure releases the lock and clears `currentJob`
-      // so the next `start()` can run. Task 11 will replace this with a
-      // proper `failJob()` helper that also emits `flashJobFailed { reason }`
-      // and runs per-controller fail-cleanup; for Task 6 we only own the
-      // lock + currentJob cleanup and re-throw.
+      // so the next `start()` can run. For typed `FlashOrchestratorError`
+      // failures (the validation + resolver paths Task 6 owns), emit
+      // `flashJobFailed` so WS consumers see the rejection. Task 11 will
+      // extend this to also handle untyped streamer rejections + the
+      // per-controller fail-cleanup that streamer-mid-flight failures need.
+      if (err instanceof FlashOrchestratorError) {
+        const endedAt = new Date(this.clock.now()).toISOString();
+        this.safeEmitWs({
+          type: TransmissionType.flashJobFailed,
+          data: {
+            jobId,
+            reason: err.reason,
+            detail: err.detail,
+            endedAt,
+          },
+        });
+      }
       this.currentJob = null;
       // `release()` returns false if we never acquired — happens only if a
       // subclass overrides start() and throws before acquire. Defensive:
