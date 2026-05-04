@@ -462,7 +462,12 @@ export class ApiServer {
   }
 
   private setupSerialPort(): void {
-    this.serialWorker = new Worker(new URL('./background_tasks/serial_worker.js', import.meta.url));
+    this.serialWorker = new Worker(
+      new URL('./background_tasks/serial_worker.js', import.meta.url),
+      {
+        execArgv: process.execArgv,
+      },
+    );
 
     this.serialWorker.on('exit', (exit) => {
       logger.info(exit);
