@@ -70,6 +70,7 @@ import { registerFirmwareFlashRoutes } from './controllers/firmware_flash_contro
 import { FirmwareCache } from './firmware/firmware_cache.js';
 import { FirmwareUploadStore } from './firmware/firmware_upload_store.js';
 import { GitHubReleaseService } from './firmware/github_release_service.js';
+import { decidePostDeployHeartbeat } from './firmware/post_deploy_heartbeat.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -715,25 +716,38 @@ class ApiServer {
         this.controllerVariantCache.set(val.controller.address, variant);
       }
 
-      // Heartbeat callback: a post-deploy POLL_ACK whose firmwareVersion
-      // matches the in-flight job's source.version is the master telling
-      // us "I rebooted into the new firmware." The orchestrator's reboot
-      // timer is the fallback; this callback is the primary lock-release
-      // path. Mismatches are logged + ignored — could be a stale POLL_ACK
-      // from before the deploy, or a master that booted into the wrong
-      // version (rare, but the timer will still release the lock).
-      const reportedFwVersion = val.controller.firmwareVersion;
-      if (typeof reportedFwVersion === 'string' && reportedFwVersion.length > 0) {
-        const currentJob = this.flashOrchestrator?.getCurrentJob();
-        if (currentJob !== null && currentJob !== undefined) {
-          if (reportedFwVersion === currentJob.source.version) {
-            this.flashOrchestrator?.notifyMasterHeartbeat(reportedFwVersion);
-          } else {
-            logger.info(
-              `flash heartbeat: POLL_ACK firmwareVersion=${reportedFwVersion} from ${val.controller.address} does not match expected ${currentJob.source.version}; ignoring`,
-            );
-          }
-        }
+      // Heartbeat callback: only the master's post-deploy POLL_ACK
+      // (sentinel MAC, version matches deployed target) releases the
+      // lock. Padawans poll routinely during a flash and any padawan
+      // that has already rebooted into the same target version would
+      // race the master if we didn't filter on the master sentinel.
+      // Decision logic lives in `decidePostDeployHeartbeat` — pure
+      // function, fully unit-tested. Log paths surface diagnostic
+      // gaps (empty firmwareVersion / wrong version) instead of
+      // silently relying on the 15s timer fallback.
+      const currentJob = this.flashOrchestrator?.getCurrentJob() ?? null;
+      const decision = decidePostDeployHeartbeat(
+        val.controller.address,
+        val.controller.firmwareVersion,
+        currentJob,
+      );
+      switch (decision.kind) {
+        case 'fire':
+          this.flashOrchestrator?.notifyMasterHeartbeat(decision.version);
+          break;
+        case 'empty_version_during_flash':
+          logger.info(
+            `flash heartbeat: master POLL_ACK from ${decision.from} carried no firmwareVersion during active flash ${decision.jobId}; relying on reboot-timer fallback`,
+          );
+          break;
+        case 'version_mismatch':
+          logger.info(
+            `flash heartbeat: master POLL_ACK firmwareVersion=${decision.reported} does not match expected ${decision.expected} for job ${decision.jobId}; ignoring`,
+          );
+          break;
+        case 'no_active_job':
+        case 'not_master':
+          break;
       }
 
       const controlerRepo = new ControllerRepository(this.db);
