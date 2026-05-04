@@ -659,7 +659,7 @@ describe('FlashJobOrchestrator', () => {
 
   // Factory for the standard "happy-path" orchestrator + fakes. Each test
   // either uses these defaults or overrides one fake (e.g.,
-  // `controllersStore.listInLocation` resolving to `[]` for the
+  // `controllersStore.listFlashTargets` resolving to `[]` for the
   // no_controllers test). The setup is parameterized so the same helper
   // covers github + upload sources without copy-pasting. The optional
   // `clock` lets fake-timer-driven tests (deploy phase, throttle) inject
@@ -693,7 +693,7 @@ describe('FlashJobOrchestrator', () => {
       getReleases: vi.fn().mockResolvedValue(makeReleaseList(releases)),
     };
     const controllersStore = {
-      listInLocation: opts.controllersStoreError
+      listFlashTargets: opts.controllersStoreError
         ? vi.fn().mockRejectedValue(opts.controllersStoreError)
         : vi.fn().mockResolvedValue(controllers),
     };
@@ -1033,11 +1033,11 @@ describe('FlashJobOrchestrator', () => {
     await startPromise;
   });
 
-  it('rejects with controllers_lookup_failed when controllersStore.listInLocation rejects; lock released, flashJobFailed emitted', async () => {
+  it('rejects with controllers_lookup_failed when controllersStore.listFlashTargets rejects; lock released, flashJobFailed emitted', async () => {
     // Per PR feedback: a controllersStore rejection (DB error, fs read
     // failure, etc.) must surface as a typed FlashOrchestratorError so the
     // failJob path emits flashJobFailed. Without the wrap around
-    // listInLocation(), the raw Error bypasses the FlashOrchestratorError
+    // listFlashTargets(), the raw Error bypasses the FlashOrchestratorError
     // branch in the catch block and WS consumers see only lockStateChanged
     // with no reason.
     const fx = setupHappyPath({
@@ -2559,14 +2559,14 @@ describe('FlashJobOrchestrator', () => {
       {
         name: 'no_controllers',
         drive: async (fx) => {
-          fx.controllersStore.listInLocation.mockResolvedValue([]);
+          fx.controllersStore.listFlashTargets.mockResolvedValue([]);
           await fx.orchestrator.start(fx.request).catch(() => undefined);
         },
       },
       {
         name: 'variant_mismatch',
         drive: async (fx) => {
-          fx.controllersStore.listInLocation.mockResolvedValue([
+          fx.controllersStore.listFlashTargets.mockResolvedValue([
             { id: 'a', variant: 'lolin_d32_pro' },
             { id: 'b', variant: 'metro_s3' },
           ]);
@@ -2576,7 +2576,7 @@ describe('FlashJobOrchestrator', () => {
       {
         name: 'variant_unknown',
         drive: async (fx) => {
-          fx.controllersStore.listInLocation.mockResolvedValue([
+          fx.controllersStore.listFlashTargets.mockResolvedValue([
             { id: 'a', variant: 'lolin_d32_pro' },
             { id: 'b', variant: '' },
           ]);
@@ -2586,7 +2586,7 @@ describe('FlashJobOrchestrator', () => {
       {
         name: 'controllers_lookup_failed',
         drive: async (fx) => {
-          fx.controllersStore.listInLocation.mockRejectedValue(new Error('db down'));
+          fx.controllersStore.listFlashTargets.mockRejectedValue(new Error('db down'));
           await fx.orchestrator.start(fx.request).catch(() => undefined);
         },
       },
@@ -3061,7 +3061,7 @@ describe('FlashJobOrchestrator', () => {
         ),
       };
       const controllersStore = {
-        listInLocation: vi.fn().mockResolvedValue([
+        listFlashTargets: vi.fn().mockResolvedValue([
           { id: 'controller-a', variant: 'lolin_d32_pro' },
           { id: 'controller-b', variant: 'lolin_d32_pro' },
         ]),

@@ -337,6 +337,39 @@ describe('Firmware Flash Controller', () => {
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({ error: 'no_active_job' });
     });
+
+    it('surfaces FlashOrchestratorError reason+detail when cancel throws a typed error', async () => {
+      // Symmetric with startFlashJob's error handling. The cancel path
+      // is unlikely to throw a typed error today, but the test pins the
+      // contract so a future regression to "everything is 500" is
+      // caught.
+      orchestrator.cancel.mockRejectedValueOnce(
+        new FlashOrchestratorError('protocol_violation', 'invalid stage during cancel'),
+      );
+
+      const req: any = { body: { reason: 'user' } };
+      const res = mockRes();
+
+      await cancelFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'protocol_violation',
+        detail: 'invalid stage during cancel',
+      });
+    });
+
+    it('falls back to internal_server_error for non-typed cancel throws', async () => {
+      orchestrator.cancel.mockRejectedValueOnce(new Error('worker channel closed'));
+
+      const req: any = { body: { reason: 'user' } };
+      const res = mockRes();
+
+      await cancelFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: 'internal_server_error' });
+    });
   });
 
   describe('GET /api/firmware/flash', () => {

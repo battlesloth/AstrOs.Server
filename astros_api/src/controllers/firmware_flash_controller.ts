@@ -109,6 +109,17 @@ export async function cancelFlashJob(
     res.status(200);
     res.json({ jobId: result.jobId, cancelled: true });
   } catch (error) {
+    // Symmetric with startFlashJob: surface FlashOrchestratorError
+    // reason+detail when the orchestrator throws a typed error rather
+    // than collapsing every failure to a generic 500. Today the cancel
+    // path is unlikely to throw a typed error, but the symmetry keeps
+    // operator-facing failure shapes consistent across the route.
+    if (error instanceof FlashOrchestratorError) {
+      logger.error(error);
+      res.status(500);
+      res.json({ error: error.reason, detail: error.detail });
+      return;
+    }
     logger.error(error);
     res.status(500);
     res.json({ error: 'internal_server_error' });
@@ -116,15 +127,10 @@ export async function cancelFlashJob(
 }
 
 export function getFlashJob(orchestrator: FlashJobOrchestrator, _req: any, res: any, _next: any) {
-  try {
-    const job = orchestrator.getCurrentJob();
-    res.status(200);
-    res.json(job);
-  } catch (error) {
-    logger.error(error);
-    res.status(500);
-    res.json({ error: 'internal_server_error' });
-  }
+  // `getCurrentJob()` is a synchronous field read that can't throw.
+  const job = orchestrator.getCurrentJob();
+  res.status(200);
+  res.json(job);
 }
 
 type ValidationResult = { ok: true; request: FlashRequest } | { ok: false; detail: string };

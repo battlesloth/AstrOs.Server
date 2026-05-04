@@ -345,7 +345,7 @@ export interface FlashOrchestratorWsMessage extends Record<string, unknown> {
 // and surfaces `'variant_unknown'` so the impl doesn't have to write
 // coercion boilerplate at the cache boundary.
 export interface FlashControllersStore {
-  listInLocation(): Promise<Array<{ id: string; variant: string | undefined }>>;
+  listFlashTargets(): Promise<Array<{ id: string; variant: string | undefined }>>;
 }
 
 // Reasons surfaced as `FlashOrchestratorError.reason`. Three buckets:
@@ -546,7 +546,7 @@ export class FlashJobOrchestrator {
       // event so WS consumers reliably see job rejection reasons.
       let targetsList: Array<{ id: string; variant: string | undefined }>;
       try {
-        targetsList = await this.controllersStore.listInLocation();
+        targetsList = await this.controllersStore.listFlashTargets();
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
         throw new FlashOrchestratorError('controllers_lookup_failed', detail);
@@ -1181,7 +1181,7 @@ export class FlashJobOrchestrator {
   }
 }
 
-// Validates the controllers list returned by `controllersStore.listInLocation()`:
+// Validates the controllers list returned by `controllersStore.listFlashTargets()`:
 //   * non-empty (else `'no_controllers'`)
 //   * every entry has a populated `variant` (else `'variant_unknown'`, detail
 //     enumerates the offending controller IDs)

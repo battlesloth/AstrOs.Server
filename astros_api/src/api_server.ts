@@ -71,6 +71,7 @@ import { FirmwareCache } from './firmware/firmware_cache.js';
 import { FirmwareUploadStore } from './firmware/firmware_upload_store.js';
 import { GitHubReleaseService } from './firmware/github_release_service.js';
 import { decidePostDeployHeartbeat } from './firmware/post_deploy_heartbeat.js';
+import { decideLateJoinSnapshot } from './firmware/late_join_snapshot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -142,7 +143,7 @@ class ApiServer {
   // POLL_ACK-fed variant cache, keyed by controller MAC (the same id flowing
   // through FW_PROGRESS / FW_DEPLOY_BEGIN). Populated by handlePollResponse
   // whenever a POLL_ACK arrives with a non-empty variant; consumed by the
-  // orchestrator's controllersStore.listInLocation() at flash time. Entries
+  // orchestrator's controllersStore.listFlashTargets() at flash time. Entries
   // never expire — a controller that goes offline keeps its last-known
   // variant until the server restarts (or a fresh POLL_ACK overwrites it).
   // Per FMI §7 row "controllers cache": stale entries are operator-recoverable
@@ -490,7 +491,7 @@ class ApiServer {
         // Returning a snapshot per call keeps the orchestrator's
         // validateControllers free to apply trim/uniformity checks without
         // racing a concurrent POLL_ACK update of the underlying Map.
-        listInLocation: async () =>
+        listFlashTargets: async () =>
           Array.from(this.controllerVariantCache.entries()).map(([id, variant]) => ({
             id,
             variant,
@@ -571,18 +572,12 @@ class ApiServer {
       // test mode where flashOrchestrator is undefined.
       if (this.flashOrchestrator !== undefined) {
         try {
-          const currentJob = this.flashOrchestrator.getCurrentJob();
-          // Skip the snapshot once the job has reached its post-DONE
-          // reboot-wait window (signaled by `endedAt` being set in
-          // `handleDeployDone`). Emitting `flashJobStarted` for a terminal
-          // job would mislead a fresh client into thinking a new flash is
-          // beginning. The lock-release event arrives within 15s either
-          // way, so the new client converges to the correct state.
-          if (currentJob !== null && currentJob.endedAt === undefined) {
+          const snapshot = decideLateJoinSnapshot(this.flashOrchestrator.getCurrentJob());
+          if (snapshot.kind === 'flashJobStarted') {
             conn.send(
               JSON.stringify({
                 type: TransmissionType.flashJobStarted,
-                data: currentJob,
+                data: snapshot.data,
               }),
             );
           }
