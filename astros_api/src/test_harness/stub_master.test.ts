@@ -8,10 +8,7 @@ import { MessageGenerator } from '../serial/message_generator.js';
 import { MessageHandler } from '../serial/message_handler.js';
 import { SerialMessageType } from '../serial/serial_message.js';
 import { SerialWorkerResponseType } from '../serial/serial_worker_response.js';
-import {
-  FW_SERIAL_SLIDING_WINDOW,
-  type FwTransferBegin,
-} from '../models/firmware/firmware_messages.js';
+import { type FwTransferBegin } from '../models/firmware/firmware_messages.js';
 
 const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
 
@@ -110,7 +107,7 @@ describe('StubMaster (PTY-backed)', () => {
 
         stub.writeFwTransferBeginAck({
           transferId: 'xfer-1',
-          windowSize: FW_SERIAL_SLIDING_WINDOW,
+          status: 'OK',
           msgId: 'm1',
         });
 
@@ -125,9 +122,7 @@ describe('StubMaster (PTY-backed)', () => {
         expect(response.type).toBe(SerialWorkerResponseType.FW_TRANSFER_BEGIN_ACK);
         if (response.type === SerialWorkerResponseType.FW_TRANSFER_BEGIN_ACK) {
           expect(response.payload.transferId).toBe('xfer-1');
-          // The fake serializes windowSize as the status field; round-trip
-          // here just confirms it survives the wire intact.
-          expect(response.payload.status).toBe(String(FW_SERIAL_SLIDING_WINDOW));
+          expect(response.payload.status).toBe('OK');
         }
       } finally {
         await stub.dispose();

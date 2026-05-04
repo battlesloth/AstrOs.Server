@@ -74,15 +74,12 @@ export interface InboundFrame {
 
 export interface FwTransferBeginAckArgs {
   transferId: string;
-  // The handler accepts an open-ended status string (per protocol.md), but
-  // for the test fake we expose a `windowSize` knob and serialize it as the
-  // status field's stand-in. In practice firmware sends "OK" + a separate
-  // window-size advertisement on the FW_CHUNK_ACK stream; this fake compresses
-  // both into the begin-ack so tests can declare the window upfront.
-  // NOTE: this matches how serial_bus_response_test.ts and the streamer's
-  // begin-ack consumer treat the field — they just record `status` as a
-  // string and ignore its content, so any value works for round-trip tests.
-  windowSize?: number;
+  // The wire-format `status` field is open-ended (the handler accepts any
+  // string), but per chunk_streamer.ts the only value that lets the transfer
+  // proceed is 'OK'; any other value aborts with reason 'transfer-rejected'.
+  // Tests default to 'OK' (happy path); failure-mode tests pass an explicit
+  // value like 'sd_full' to drive the rejection branch.
+  status?: string;
   msgId?: string;
 }
 
@@ -311,8 +308,8 @@ export class StubMaster {
   // -------------------------------------------------------------------------
 
   writeFwTransferBeginAck(args: FwTransferBeginAckArgs): void {
-    const window = args.windowSize ?? FW_SERIAL_SLIDING_WINDOW;
-    const payload = [args.transferId, String(window)].join(MessageHelper.US);
+    const status = args.status ?? 'OK';
+    const payload = [args.transferId, status].join(MessageHelper.US);
     this.writeFrame(SerialMessageType.FW_TRANSFER_BEGIN_ACK, args.msgId, payload);
   }
 
