@@ -9,18 +9,49 @@ import type { FlashRequest } from '../models/firmware/flash_orchestrator.js';
 
 const route = '/firmware/flash';
 
-const BAD_REQUEST_REASONS: ReadonlySet<FlashOrchestratorErrorReason> =
-  new Set<FlashOrchestratorErrorReason>([
-    'no_controllers',
-    'variant_mismatch',
-    'variant_unknown',
-    'release_not_found',
-    'asset_not_found',
-    'no_upload',
-  ]);
+type HttpStatus = 400 | 409 | 500 | 502;
 
-const BAD_GATEWAY_REASONS: ReadonlySet<FlashOrchestratorErrorReason> =
-  new Set<FlashOrchestratorErrorReason>(['release_lookup_failed', 'source_resolution_failed']);
+// Exhaustive map from every FlashOrchestratorErrorReason to its HTTP
+// status. The Record type makes this exhaustive at compile time —
+// adding a new reason without updating the map is a TS error, so the
+// silent fall-through-to-500 hazard is closed. Statuses:
+//   * 409 — concurrent flash (operator should wait)
+//   * 400 — pre-streamer validation the operator can fix
+//   * 502 — upstream-dependency failure (cache fetch, github fetch)
+//   * 500 — post-`flashJobStarted` failures whose truth source is the
+//     WS broadcast; HTTP just signals "synchronous failure" to the
+//     operator-side caller.
+const REASON_HTTP_STATUS: Record<FlashOrchestratorErrorReason, HttpStatus> = {
+  job_already_running: 409,
+
+  no_controllers: 400,
+  variant_mismatch: 400,
+  variant_unknown: 400,
+  release_not_found: 400,
+  asset_not_found: 400,
+  no_upload: 400,
+
+  release_lookup_failed: 502,
+  source_resolution_failed: 502,
+
+  controllers_lookup_failed: 500,
+  subscriber_attach_failed: 500,
+  protocol_violation: 500,
+  streamer_unknown_error: 500,
+
+  source_read_failed: 500,
+  source_size_mismatch: 500,
+  begin_timeout: 500,
+  begin_rejected: 500,
+  chunk_retry_exhausted: 500,
+  flash_full: 500,
+  transfer_timeout: 500,
+  aborted: 500,
+  end_timeout: 500,
+  hash_mismatch: 500,
+  master_io_error: 500,
+  bus_send_failed: 500,
+};
 
 export function registerFirmwareFlashRoutes(
   router: Router,
@@ -65,23 +96,16 @@ export async function startFlashJob(
     // 500 here only as a generic "synchronous failure" marker — the WS
     // surface is the operator's truth source for those cases.
     if (error instanceof FlashOrchestratorError) {
-      if (error.reason === 'job_already_running') {
+      const status = REASON_HTTP_STATUS[error.reason];
+      if (status === 409) {
         res.status(409);
         res.json({ error: 'job_already_running', currentJobId: error.currentJobId });
         return;
       }
-      if (BAD_REQUEST_REASONS.has(error.reason)) {
-        res.status(400);
-        res.json({ error: error.reason, detail: error.detail });
-        return;
+      if (status === 500) {
+        logger.error(error);
       }
-      if (BAD_GATEWAY_REASONS.has(error.reason)) {
-        res.status(502);
-        res.json({ error: error.reason, detail: error.detail });
-        return;
-      }
-      logger.error(error);
-      res.status(500);
+      res.status(status);
       res.json({ error: error.reason, detail: error.detail });
       return;
     }

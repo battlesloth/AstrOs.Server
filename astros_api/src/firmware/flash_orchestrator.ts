@@ -45,7 +45,10 @@ import type { CachedAsset } from '../models/firmware/cache.js';
 import type { StoredUpload } from '../models/firmware/upload.js';
 import type { JobLock } from '../job_lock/job_lock.js';
 import { TransmissionType } from '../models/enums.js';
-import { buildLockStateResponse } from '../models/networking/lock_responses.js';
+import {
+  buildLockStateResponse,
+  type LockStateResponse,
+} from '../models/networking/lock_responses.js';
 import { ChunkStreamer } from './chunk_streamer.js';
 import { MessageGenerator } from '../serial/message_generator.js';
 import { SerialMessageType } from '../serial/serial_message.js';
@@ -288,7 +291,7 @@ export function createFlashProgressThrottle(opts: {
 // Single-flight orchestrator for OTA flash jobs. Composes:
 //   * c.0 `JobLock` — synchronous boolean gate; only one flash at a time.
 //   * c.6a `transitionControllerState` / `deriveJobLifecycle` — per-controller
-//     FSM machinery (consumed in Tasks 7+).
+//     per-controller FSM machinery.
 //   * c.6b `ChunkStreamer` — sliding-window upload to the master ESP32.
 //   * c.4 `FirmwareCache` + c.5 `FirmwareUploadStore` (via `resolveFlashSource`)
 //     — source binary acquisition.
@@ -317,33 +320,39 @@ export function createFlashProgressThrottle(opts: {
 const DEFAULT_REBOOT_TIMEOUT_MS = 15_000;
 const DEFAULT_THROTTLE_WINDOW_MS = 250;
 
-// Shape passed to `emitWs`. Mirrors the existing `updateClients(any)` contract
-// without losing the discriminator. Each broadcast is one of:
-//   * `LockStateResponse` (built via `buildLockStateResponse`) — for
-//     `lockStateChanged`. Carries `BaseResponse` fields plus the lock state.
-//   * `{ type, data }` — for the 5 flash lifecycle events. Matches the
-//     `{ type: TransmissionType, data: ... }` envelope the design spec
-//     specifies for flash WS events (spec §"WebSocket events").
-//
-// The orchestrator is the only writer; the consumer (`updateClients`)
-// JSON-stringifies the whole object and forwards to clients. We require the
-// `type` discriminator so consumers can route by it; everything else is open
-// (`Record<string, unknown>`) because the per-event payloads vary.
-export interface FlashOrchestratorWsMessage extends Record<string, unknown> {
-  type: TransmissionType;
+// Discriminated union of every shape the orchestrator broadcasts. Each
+// `safeEmitWs` call site now structurally matches one arm, so a new event
+// (or a payload change) requires updating the type — `updateClients(any)`
+// no longer hides drift behind a generic envelope.
+export interface FlashJobFailedData {
+  jobId: string;
+  endedAt: string;
+  reason?: FlashOrchestratorErrorReason;
+  detail?: string;
+  abortReason?: string;
 }
+
+export type FlashOrchestratorWsMessage =
+  | { type: TransmissionType.flashJobStarted; data: FlashJobState }
+  | { type: TransmissionType.flashControllerUpdate; data: ControllerFlashState }
+  | {
+      type: TransmissionType.flashControllerResult;
+      data: { jobId: string; controller: ControllerFlashState };
+    }
+  | { type: TransmissionType.flashJobDone; data: { jobId: string; endedAt: string } }
+  | { type: TransmissionType.flashJobFailed; data: FlashJobFailedData }
+  | LockStateResponse;
 
 // Narrow interface around the controllers data store. The orchestrator only
 // needs the per-target ID + variant tuple at flash time; the larger
 // `ControllersRepository` surface stays out of the way.
 //
-// `variant` is `string | undefined` because the production data path
-// (Task 13's POLL_ACK-fed cache) inherits the optionality of
-// `ControlModule.variant` — older firmware that doesn't report one
-// leaves it undefined. The orchestrator's `validateControllers`
-// normalizes (trim + treat undefined/null/whitespace as missing)
-// and surfaces `'variant_unknown'` so the impl doesn't have to write
-// coercion boilerplate at the cache boundary.
+// `variant` is `string | undefined` because the production POLL_ACK-fed
+// cache inherits the optionality of `ControlModule.variant` — older
+// firmware that doesn't report one leaves it undefined. The orchestrator's
+// `validateControllers` normalizes (trim + treat undefined/null/whitespace
+// as missing) and surfaces `'variant_unknown'` so the impl doesn't have
+// to write coercion boilerplate at the cache boundary.
 export interface FlashControllersStore {
   listFlashTargets(): Promise<Array<{ id: string; variant: string | undefined }>>;
 }
@@ -421,7 +430,7 @@ export interface FlashJobOrchestratorOpts {
 }
 
 // Default real-clock + real-streamer factories. Exported test-helper-style so
-// the production wiring (Task 13) can use defaults via `new FlashJobOrchestrator({...})`
+// the production wiring can use defaults via `new FlashJobOrchestrator({...})`
 // without naming them.
 const defaultClock: Clock = {
   now: () => Date.now(),
@@ -508,7 +517,7 @@ export class FlashJobOrchestrator {
    * with the upload-phase observer, then arm the deploy phase by sending
    * FW_DEPLOY_BEGIN and subscribing to per-controller FW_PROGRESS + the
    * job-wide FW_DEPLOY_DONE. The returned promise resolves once the deploy
-   * phase is armed — the operator-facing HTTP layer (Task 12) gets a fast
+   * phase is armed — the operator-facing HTTP layer gets a fast
    * "flash started, jobId=X" response while the deploy events drive the
    * rest asynchronously through `handleDeployEvent`. After all controllers
    * reach a terminal stage, `handleDeployDone` emits `flashJobDone` and
@@ -591,7 +600,7 @@ export class FlashJobOrchestrator {
       // (bypass throttle); mid-stage bytesSent updates submit with
       // `force=false` so the streamer's high-frequency ack loop is
       // coalesced into ≤4 emits/sec per controller. Stored on `this` so the
-      // deploy-phase event handler (Task 8, runs past `start()`) and the
+      // deploy-phase event handler (runs past `start()`) and the
       // synchronous catch block can both reach it. Disposed on every exit
       // path; leaks would carry timers across jobs.
       this.throttle = createFlashProgressThrottle({
@@ -626,7 +635,7 @@ export class FlashJobOrchestrator {
           // Queued → UploadingToMaster for every controller. The streamer
           // uploads a single binary to the master, so all targets share
           // bytesSent/totalBytes — the per-controller emit just makes the
-          // UI bookkeeping uniform with the deploy phase (Task 8) which
+          // UI bookkeeping uniform with the deploy phase which
           // does have per-controller divergence.
           if (this.currentJob === null) return;
           const updated = this.currentJob.controllers.map((c) => {
@@ -667,7 +676,7 @@ export class FlashJobOrchestrator {
       // the transition immediately), send FW_DEPLOY_BEGIN to the master, then
       // subscribe to per-controller FW_PROGRESS + the job-wide FW_DEPLOY_DONE.
       // The subscriber drives the rest of the job asynchronously; `start()`
-      // returns once the deploy phase is armed so the HTTP layer (Task 12)
+      // returns once the deploy phase is armed so the HTTP layer
       // gets a fast "started" response. Lock release happens via
       // `notifyMasterHeartbeat` or the reboot-timer fallback armed in
       // `handleDeployDone`.
@@ -871,13 +880,7 @@ export class FlashJobOrchestrator {
   }
 
   private broadcastLockState(): void {
-    // `LockStateResponse` is a closed interface from c.0; the cast widens
-    // it to the orchestrator's open `Record<string, unknown>`-extending
-    // emit shape. The wire bytes are unchanged — `updateClients`
-    // JSON-stringifies the same fields either way.
-    this.safeEmitWs(
-      buildLockStateResponse(this.jobLock.getState()) as unknown as FlashOrchestratorWsMessage,
-    );
+    this.safeEmitWs(buildLockStateResponse(this.jobLock.getState()));
   }
 
   // Canonical "tear down everything" exit path. Called from:
@@ -1145,7 +1148,7 @@ export class FlashJobOrchestrator {
       this.failNonTerminalControllers(errorStr);
     }
     const endedAt = new Date(this.clock.now()).toISOString();
-    const data: Record<string, unknown> = { jobId, reason, endedAt };
+    const data: FlashJobFailedData = { jobId, reason, endedAt };
     if (detail !== undefined) data.detail = detail;
     if (opts.abortReason !== undefined) data.abortReason = opts.abortReason;
     this.safeEmitWs({

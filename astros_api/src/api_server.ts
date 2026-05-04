@@ -126,7 +126,7 @@ class ApiServer {
   private systemStatus = new SystemStatus();
   private readonly jobLock = new JobLock();
 
-  // Firmware-OTA wiring (c.6c.1 Task 13). The orchestrator + WorkerSerialBus
+  // Firmware-OTA wiring. The orchestrator + WorkerSerialBus
   // are constructed in setupSerialPort() because they depend on the serial
   // worker; in test mode (NODE_ENV=test) setupSerialPort() is skipped and
   // `flashOrchestrator` stays undefined — the flash routes aren't registered
@@ -563,7 +563,7 @@ class ApiServer {
         logger.error(`websocket initial lockState send error: ${err}`);
       }
 
-      // Flash-job late-join snapshot (c.6c.1 Task 13). When a client connects
+      // Flash-job late-join snapshot. When a client connects
       // mid-flash, send the current FlashJobState so the operator UI can
       // reconstruct progress without waiting for the next per-controller
       // update. Sent only when a job is in flight; nothing is sent for the
@@ -695,7 +695,7 @@ class ApiServer {
     try {
       const val = msg as PollResponse;
 
-      // c.6c.1 Task 13: feed the variant cache + heartbeat callback BEFORE
+      // Feed the variant cache + heartbeat callback BEFORE
       // the existing DB lookups. The cache populates regardless of whether
       // the controller is registered (DB lookup may fail for first-poll
       // controllers before sync runs); the heartbeat callback fires only
