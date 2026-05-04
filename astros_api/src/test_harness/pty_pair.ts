@@ -23,6 +23,7 @@ export async function createPtyPair(): Promise<PtyPair> {
 
   const ready = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {
+      child.kill('SIGTERM');
       reject(new Error(`socat did not emit PTY paths within ${SOCAT_STARTUP_TIMEOUT_MS}ms`));
     }, SOCAT_STARTUP_TIMEOUT_MS);
 
