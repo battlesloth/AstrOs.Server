@@ -3,9 +3,11 @@
 // dispose(). Linux/macOS only (inherits PTY pair platform constraint).
 
 import { spawnSync } from 'child_process';
+import { createHash, randomUUID } from 'crypto';
 import { statSync } from 'fs';
 import { createServer } from 'net';
-import { mkdtemp, rm } from 'fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
+import jsonwebtoken from 'jsonwebtoken';
 import { tmpdir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -22,11 +24,30 @@ export interface BootIntegrationHarnessOpts {
   masterFingerprint?: string; // default 'master-stub'
 }
 
+// Args for `harness.populateUpload(...)` — used by integration tests that
+// need to seed the FirmwareUploadStore's single-slot directory directly
+// (bypassing the validate-and-promote path of `store()`). The triple
+// written to disk satisfies `FirmwareUploadStore.latest()`'s 4 cross-checks:
+//   1. UPLOAD_META_RE matches `upload-<uuidv4>.meta.json`
+//   2. .sha256 contents match `/^[0-9a-f]{64}$/`
+//   3. parsed.uploadId === uuid in filename
+//   4. parsed.sizeBytes === bin file size
+export interface PopulateUploadArgs {
+  binBytes: Buffer; // raw firmware bytes (test fixture content)
+  originalFilename: string; // e.g. 'astros-esp-1.5.0.bin'
+  version: string; // semver string in meta
+  projectName?: string; // default 'AstrOs.ESP'
+}
+
 export interface IntegrationHarness {
   server: ApiServer;
   stub: StubMaster;
   pty: PtyPair;
   httpBaseUrl: string;
+  // JWT signed with the same JWT_KEY the ApiServer reads from env, valid
+  // for 7 days. Tests pass `Authorization: Bearer ${authToken}` on
+  // protected routes (everything under /api except /api/auth/*).
+  authToken: string;
   wsClient: WebSocket;
   receivedWsMessages: readonly unknown[];
   // Errors emitted by the spawned serial Worker thread. Tests assert this is
@@ -38,6 +59,12 @@ export interface IntegrationHarness {
     predicate: (msg: unknown) => boolean,
     timeoutMs?: number,
   ): Promise<T>;
+  // Seeds the FirmwareUploadStore (FIRMWARE_CACHE_PATH/uploads/) with a
+  // valid `upload-<uuid>.bin` + `.bin.sha256` + `.meta.json` triple so a
+  // subsequent flash with `kind: 'upload'` resolves without going through
+  // `store()` (which requires a real esp_app_desc_t header). Returns the
+  // generated uploadId + sha256 so callers can cross-reference if needed.
+  populateUpload(args: PopulateUploadArgs): Promise<{ uploadId: string; sha256: string }>;
   dispose(): Promise<void>;
 }
 
@@ -132,6 +159,12 @@ export async function bootIntegrationHarness(
   // 3. Temp DB directory (so tests don't pollute ~/.config/astrosserver)
   const dbDir = await mkdtemp(join(tmpdir(), 'astros-integration-'));
 
+  // 3b. Temp firmware-cache directory. FirmwareCache + FirmwareUploadStore
+  //     are constructed during ApiServer.bootstrap and read this env var
+  //     at construction time, so it must be set BEFORE bootstrap is called.
+  //     Cleaned up in dispose alongside dbDir.
+  const firmwareCacheDir = await mkdtemp(join(tmpdir(), 'astros-fwcache-'));
+
   // 4. Set env vars for the ApiServer's bootstrap.
   // NOTE: process.env is process-global, so concurrent harness boots in the
   // same process would race. vitest doesn't run tests within the same file
@@ -143,18 +176,34 @@ export async function bootIntegrationHarness(
     WEBSOCKET_PORT: process.env.WEBSOCKET_PORT,
     JWT_KEY: process.env.JWT_KEY,
     DATABASE_PATH: process.env.DATABASE_PATH,
+    FIRMWARE_CACHE_PATH: process.env.FIRMWARE_CACHE_PATH,
     NODE_ENV: process.env.NODE_ENV,
   };
   process.env.SERIAL_PORT = pty.serverPath;
   process.env.BAUD_RATE = '9600';
   process.env.API_PORT = String(apiPort);
   process.env.WEBSOCKET_PORT = String(wsPort);
-  process.env.JWT_KEY = process.env.JWT_KEY ?? 'test-jwt-key';
+  const jwtKey = process.env.JWT_KEY ?? 'test-jwt-key';
+  process.env.JWT_KEY = jwtKey;
   process.env.DATABASE_PATH = dbDir;
+  process.env.FIRMWARE_CACHE_PATH = firmwareCacheDir;
   // Important: do NOT set NODE_ENV='test' — that would skip setupSerialPort,
   // which is the very thing we want to exercise. Override to undefined if it
   // was set by vitest globals.
   delete process.env.NODE_ENV;
+
+  // 4b. Generate a long-lived JWT signed with the same JWT_KEY the
+  //     ApiServer reads. Mirrors `User.generateJwt()` in models/users.ts so
+  //     the express-jwt middleware on /api routes accepts it identically.
+  //     Done before bootstrap so the harness can return the token even if
+  //     bootstrap fails partway (the token itself doesn't depend on server
+  //     state — it's just a signed envelope).
+  const jwtExpiry = new Date();
+  jwtExpiry.setDate(jwtExpiry.getDate() + 7);
+  const authToken = jsonwebtoken.sign(
+    { name: 'integration-test', exp: jwtExpiry.getTime() / 1000 },
+    jwtKey,
+  );
 
   let server: ApiServer | undefined;
   let stub: StubMaster | undefined;
@@ -242,6 +291,36 @@ export async function bootIntegrationHarness(
       });
     };
 
+    // Closure over firmwareCacheDir: each test gets a fresh harness with a
+    // fresh cache dir, so populateUpload always writes into the dir the
+    // ApiServer's FirmwareUploadStore is reading from.
+    const populateUpload = async (
+      args: PopulateUploadArgs,
+    ): Promise<{ uploadId: string; sha256: string }> => {
+      const uploadId = randomUUID();
+      const uploadsDir = join(firmwareCacheDir, 'uploads');
+      await mkdir(uploadsDir, { recursive: true });
+
+      const sha256 = createHash('sha256').update(args.binBytes).digest('hex');
+      const baseName = `upload-${uploadId}`;
+
+      await writeFile(join(uploadsDir, `${baseName}.bin`), args.binBytes);
+      await writeFile(join(uploadsDir, `${baseName}.bin.sha256`), sha256);
+      await writeFile(
+        join(uploadsDir, `${baseName}.meta.json`),
+        JSON.stringify({
+          uploadId,
+          originalFilename: args.originalFilename,
+          projectName: args.projectName ?? 'AstrOs.ESP',
+          version: args.version,
+          uploadedAt: new Date().toISOString(),
+          sizeBytes: args.binBytes.length,
+        }),
+      );
+
+      return { uploadId, sha256 };
+    };
+
     const dispose = async (): Promise<void> => {
       // Reverse-order teardown. Resilient: each step in its own try/catch so
       // a failure in one doesn't leak the others.
@@ -270,6 +349,11 @@ export async function bootIntegrationHarness(
       } catch {
         /* ignore */
       }
+      try {
+        await rm(firmwareCacheDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
 
       // Restore env vars to prevent leakage to other tests.
       for (const [key, value] of Object.entries(prevEnv)) {
@@ -283,10 +367,12 @@ export async function bootIntegrationHarness(
       stub,
       pty,
       httpBaseUrl: `http://127.0.0.1:${apiPort}`,
+      authToken,
       wsClient,
       receivedWsMessages,
       workerErrors,
       waitForWsMessage,
+      populateUpload,
       dispose,
     };
   } catch (bootErr) {
@@ -313,6 +399,11 @@ export async function bootIntegrationHarness(
     }
     try {
       await rm(dbDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
+    try {
+      await rm(firmwareCacheDir, { recursive: true, force: true });
     } catch {
       /* ignore */
     }
