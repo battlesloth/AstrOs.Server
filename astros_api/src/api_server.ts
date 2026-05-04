@@ -1,3 +1,24 @@
+/**
+ * Two-mode entrypoint.
+ *
+ * - **Production / dev runs** (`node dist/api_server.js`, `tsx src/api_server.ts`):
+ *   this file is the main module. The IIFE at the bottom calls
+ *   `ApiServer.bootstrap()` automatically and installs SIGTERM/SIGINT handlers
+ *   that trigger a clean async shutdown. This is how the server runs on the
+ *   droid.
+ *
+ * - **Integration test harness** (`src/test_harness/integration_harness.ts`):
+ *   the harness imports `ApiServer` and calls `bootstrap()` itself, with
+ *   options that point the serial Worker at compiled dist/ and inject an
+ *   error callback. The `isMainModule` check at the bottom suppresses the
+ *   auto-bootstrap when this file is imported, so importing doesn't spawn
+ *   a "default" server in the test process.
+ *
+ * Production and test paths share the same class; the only differences are
+ * the constructor opts (`workerScriptUrl`, `onWorkerError`) and which side
+ * initiates `bootstrap()` / `shutdown()`.
+ */
+
 import Dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import path from 'path';
@@ -122,6 +143,10 @@ export interface ApiServerOptions {
   onWorkerError?: (err: Error) => void;
 }
 
+// Exported so the integration test harness can import + bootstrap an
+// instance directly. Production never imports this class — the IIFE at
+// the bottom of this file is the only production caller of `bootstrap()`.
+// See file header for the full two-mode contract.
 export class ApiServer {
   private apiPort = 0;
   private websocketPort = 0;
@@ -280,6 +305,16 @@ export class ApiServer {
     this.runWebServices();
   }
 
+  /**
+   * Construct + Init the server. Two callers:
+   *  1. Production IIFE at the bottom of this file — invoked with no args
+   *     when api_server.js is the main module.
+   *  2. Integration test harness — invoked with `opts` pointing the serial
+   *     Worker at compiled dist/ and supplying an error callback so a
+   *     Worker boot failure surfaces as a test failure.
+   *
+   * On boot failure, throws after logging the underlying cause.
+   */
   public static async bootstrap(opts?: ApiServerOptions): Promise<ApiServer> {
     const server = new ApiServer(opts);
     try {
@@ -1164,6 +1199,17 @@ export class ApiServer {
 
   //#endregion
 
+  /**
+   * Async, awaitable shutdown. Two callers:
+   *  1. Production SIGTERM/SIGINT handlers in the IIFE at the bottom of
+   *     this file — they `await shutdown()` then call `process.exit(0)`.
+   *  2. Integration test harness `dispose()` — `await`s shutdown() between
+   *     tests so each test gets a fresh ApiServer.
+   *
+   * Closes resources in dependency order: hardware (serial port + Worker),
+   * then network (WS server, HTTP server), then DB. Does NOT call
+   * `process.exit()` — the caller decides whether the process should exit.
+   */
   public async shutdown(): Promise<void> {
     logger.info('Shutting down...');
     this.animationQueue?.panicStop();
@@ -1194,9 +1240,18 @@ export class ApiServer {
   }
 }
 
-// Only auto-bootstrap when this file is run as the main module
-// (i.e., `node dist/api_server.js` or `tsx src/api_server.ts`). Tests
-// import the ApiServer class without triggering this side effect.
+// Production auto-bootstrap. Fires only when this file is the entry point
+// passed to `node` (or `tsx`) — `import.meta.url` matches the resolved
+// `argv[1]`. When the file is imported from another module — most importantly
+// the integration test harness, which does `import { ApiServer } from
+// '../api_server.js'` then calls `bootstrap()` itself — `argv[1]` is some
+// other entry (vitest's runner, etc.), the URLs don't match, and this block
+// is skipped.
+//
+// Without this guard, the harness's import would spawn a "default" ApiServer
+// the moment api_server.js loads, then collide with the harness's own
+// `bootstrap()` call on the same env-var ports. See file header for full
+// two-mode contract.
 const isMainModule = (() => {
   try {
     return import.meta.url === new URL(`file://${process.argv[1]}`).href;
