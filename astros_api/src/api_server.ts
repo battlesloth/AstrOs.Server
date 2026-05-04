@@ -571,7 +571,13 @@ class ApiServer {
       if (this.flashOrchestrator !== undefined) {
         try {
           const currentJob = this.flashOrchestrator.getCurrentJob();
-          if (currentJob !== null) {
+          // Skip the snapshot once the job has reached its post-DONE
+          // reboot-wait window (signaled by `endedAt` being set in
+          // `handleDeployDone`). Emitting `flashJobStarted` for a terminal
+          // job would mislead a fresh client into thinking a new flash is
+          // beginning. The lock-release event arrives within 15s either
+          // way, so the new client converges to the correct state.
+          if (currentJob !== null && currentJob.endedAt === undefined) {
             conn.send(
               JSON.stringify({
                 type: TransmissionType.flashJobStarted,

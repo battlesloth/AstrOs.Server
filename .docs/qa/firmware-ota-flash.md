@@ -269,7 +269,7 @@ release service are queried).
      -d '{"source":{"kind":"github","version":"99.99.99"}}' | jq
    ```
 2. **Pass:** HTTP 400 with body `{ error: 'release_not_found', detail: '99.99.99' }`.
-3. **Pass:** WS frame `flashJobFailed` with `{ reason: 'release_not_found', detail: '99.99.99', endedAt }`.
+3. **Pass:** WS frame `flashJobFailed` with `{ jobId, reason: 'release_not_found', detail: '99.99.99', endedAt }`.
 4. **Pass:** WS frame `lockStateChanged` with `locked === false`.
 5. **Pass:** no `flashJobStarted` was emitted (currentJob never set per spec).
 6. **Pass:** subsequent `GET /api/firmware/flash` returns 200 with body `null`.
@@ -302,7 +302,7 @@ PTY-stub harness will inject mixed-variant POLL_ACKs deterministically.
      -d '{"source":{"kind":"github","version":"1.4.0"}}' | jq
    ```
 3. **Pass:** HTTP 400 with body `{ error: 'variant_mismatch', detail: <list of mismatched variants> }`.
-4. **Pass:** WS frame `flashJobFailed` with `{ reason: 'variant_mismatch', detail, endedAt }`.
+4. **Pass:** WS frame `flashJobFailed` with `{ jobId, reason: 'variant_mismatch', detail, endedAt }`.
 5. **Pass:** WS frame `lockStateChanged` with `locked === false`.
 6. **Recovery:** operator must either (a) flash variants separately by
    physically isolating one controller at a time, or (b) correct the
@@ -329,7 +329,7 @@ goes stale (won't help — the cache only writes; entries never time out in v1).
    variant string and then have it stripped — not currently reproducible
    against real hardware. This case is primarily defensive; full validation
    awaits the c.6c.2 PTY harness which can inject empty-string variants.
-3. **Pass:** WS `flashJobFailed { reason: 'variant_unknown', detail, endedAt }`
+3. **Pass:** WS `flashJobFailed { jobId, reason: 'variant_unknown', detail, endedAt }`
    + `lockStateChanged { locked: false }`.
 4. **Recovery:** wait for the next POLL cycle (~5 sec) to populate the cache, retry.
 
@@ -351,7 +351,7 @@ of those releases reproduces this case.)
      -d '{"source":{"kind":"github","version":"1.0.0"}}' | jq
    ```
 3. **Pass:** HTTP 400 with body `{ error: 'asset_not_found', detail: 'metro_s3' }`.
-4. **Pass:** WS `flashJobFailed { reason: 'asset_not_found', detail: 'metro_s3', endedAt }`
+4. **Pass:** WS `flashJobFailed { jobId, reason: 'asset_not_found', detail: 'metro_s3', endedAt }`
    + `lockStateChanged { locked: false }`.
 
 ### 11. Server shutdown during flash (lock auto-release on next start)

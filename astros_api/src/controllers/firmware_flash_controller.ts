@@ -56,6 +56,14 @@ export async function startFlashJob(
     res.status(200);
     res.json(result);
   } catch (error) {
+    // Pre-streamer failures (controllers / source resolve / lock-acquire
+    // race) surface synchronously here as typed FlashOrchestratorError.
+    // Post-`flashJobStarted` failures (mid-deploy bus_send_failed,
+    // protocol_violation, the 12 c.6b TransferErrorCodes,
+    // streamer_unknown_error) are routed through the orchestrator's
+    // failJob path and broadcast on WS as `flashJobFailed`; HTTP returns
+    // 500 here only as a generic "synchronous failure" marker — the WS
+    // surface is the operator's truth source for those cases.
     if (error instanceof FlashOrchestratorError) {
       if (error.reason === 'job_already_running') {
         res.status(409);
