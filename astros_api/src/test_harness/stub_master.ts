@@ -172,12 +172,6 @@ export interface AutoAckUploadOpts {
   // streamer's bookkeeping is what matters; fake in-flight tracking would add
   // complexity without test value.
   windowSize?: number;
-  // Only 'every' is supported: ACK each FW_CHUNK individually. 'window'-level
-  // batching is unused for now; the union is kept narrow to avoid misleading
-  // callers. This field is accepted but not read at runtime — the implicit
-  // behavior IS 'every', so passing it is a no-op. It exists so tests can
-  // document intent explicitly without breaking when 'window' is added later.
-  ackCadence?: 'every';
   // Status field for FW_TRANSFER_END_ACK. Default 'OK' (happy path).
   endStatus?: FwTransferEndStatus;
   // If set, NAK exactly once when the first FW_CHUNK with seq === failAtSeq
@@ -572,8 +566,10 @@ export class StubMaster {
     switch (frame.type) {
       case SerialMessageType.FW_TRANSFER_BEGIN: {
         if (cfg === null) break;
+        const transferId = extractTransferId(frame.payload);
+        if (transferId === null) break; // Malformed payload; drop silently — would have produced a malformed ACK.
         this.writeFwTransferBeginAck({
-          transferId: extractTransferId(frame.payload),
+          transferId,
           status: 'OK',
         });
         break;
@@ -693,9 +689,9 @@ function parseInbound(line: string): InboundFrame | null {
 
 // Extract transferId from any payload whose first US-separated field is the
 // transferId. Used for FW_TRANSFER_BEGIN where we only need the ID.
-function extractTransferId(payload: string): string {
+function extractTransferId(payload: string): string | null {
   const idx = payload.indexOf(MessageHelper.US);
-  return idx < 0 ? payload : payload.substring(0, idx);
+  return idx < 0 ? null : payload.substring(0, idx);
 }
 
 // FW_CHUNK payload (5 US-separated fields per generateFwChunk):
