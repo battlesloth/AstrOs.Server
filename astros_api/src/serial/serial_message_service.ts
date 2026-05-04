@@ -89,6 +89,27 @@ export class SerialMessageService {
           validationResult.data,
         );
         break;
+      case SerialMessageType.FW_TRANSFER_BEGIN_ACK:
+        result = this.messageHandler.handleFwTransferBeginAck(validationResult.data);
+        break;
+      case SerialMessageType.FW_CHUNK_ACK:
+        result = this.messageHandler.handleFwChunkAck(validationResult.data);
+        break;
+      case SerialMessageType.FW_CHUNK_NAK:
+        result = this.messageHandler.handleFwChunkNak(validationResult.data);
+        break;
+      case SerialMessageType.FW_TRANSFER_END_ACK:
+        result = this.messageHandler.handleFwTransferEndAck(validationResult.data);
+        break;
+      case SerialMessageType.FW_PROGRESS:
+        result = this.messageHandler.handleFwProgress(validationResult.data);
+        break;
+      case SerialMessageType.FW_DEPLOY_DONE:
+        result = this.messageHandler.handleFwDeployDone(validationResult.data);
+        break;
+      case SerialMessageType.FW_BACKPRESSURE:
+        result = this.messageHandler.handleFwBackpressure(validationResult.data);
+        break;
     }
 
     if (validationResult.type !== SerialMessageType.POLL_ACK) {
