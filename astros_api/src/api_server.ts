@@ -104,7 +104,7 @@ interface IServoTestData {
   value: number;
 }
 
-class ApiServer {
+export class ApiServer {
   private apiPort = 0;
   private websocketPort = 0;
   private clients: Map<string, WebSocket>;
@@ -116,6 +116,8 @@ class ApiServer {
   private serialWorker!: Worker;
   private serialPort: any;
   private serialParser: any;
+
+  private httpServer?: import('http').Server;
 
   private animationQueue!: AnimationQueue;
 
@@ -529,8 +531,8 @@ class ApiServer {
   }
 
   private runWebServices(): void {
-    this.app.listen(this.apiPort, () => {
-      logger.info('The application is listening on port 3000');
+    this.httpServer = this.app.listen(this.apiPort, () => {
+      logger.info(`The application is listening on port ${this.apiPort}`);
     });
 
     this.websocket = new Server({ port: this.websocketPort });
@@ -1130,22 +1132,64 @@ class ApiServer {
 
   //#endregion
 
-  shutdown(): void {
+  public async shutdown(): Promise<void> {
     logger.info('Shutting down...');
     this.animationQueue?.panicStop();
-    this.serialPort?.close();
-    this.serialWorker?.terminate();
-    this.websocket?.close();
-    process.exit(0);
+
+    if (this.serialPort?.isOpen) {
+      await new Promise<void>((resolve) => this.serialPort.close(() => resolve()));
+    }
+
+    if (this.serialWorker !== undefined) {
+      await this.serialWorker.terminate();
+    }
+
+    if (this.websocket !== undefined) {
+      await new Promise<void>((resolve) => this.websocket.close(() => resolve()));
+    }
+
+    if (this.httpServer !== undefined) {
+      const httpServer = this.httpServer;
+      await new Promise<void>((resolve, reject) => {
+        httpServer.close((err) => (err ? reject(err) : resolve()));
+      });
+      this.httpServer = undefined;
+    }
+
+    if (this.db !== undefined) {
+      await this.db.destroy();
+    }
   }
 }
 
-ApiServer.bootstrap()
-  .then((server) => {
-    process.on('SIGTERM', () => server.shutdown());
-    process.on('SIGINT', () => server.shutdown());
-  })
-  .catch((err) => {
-    console.error(err.stack);
-    process.exit(1);
-  });
+// Only auto-bootstrap when this file is run as the main module
+// (i.e., `node dist/api_server.js` or `tsx src/api_server.ts`). Tests
+// import the ApiServer class without triggering this side effect.
+const isMainModule = (() => {
+  try {
+    return import.meta.url === new URL(`file://${process.argv[1]}`).href;
+  } catch {
+    return false;
+  }
+})();
+
+if (isMainModule) {
+  ApiServer.bootstrap()
+    .then((server) => {
+      const handleSignal = async (signal: NodeJS.Signals): Promise<void> => {
+        logger.info(`Received ${signal}; shutting down...`);
+        try {
+          await server.shutdown();
+        } catch (err) {
+          logger.error(`Shutdown error: ${(err as Error).message}`);
+        }
+        process.exit(0);
+      };
+      process.on('SIGTERM', () => void handleSignal('SIGTERM'));
+      process.on('SIGINT', () => void handleSignal('SIGINT'));
+    })
+    .catch((err) => {
+      console.error(err.stack);
+      process.exit(1);
+    });
+}
