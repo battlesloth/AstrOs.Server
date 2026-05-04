@@ -25,11 +25,11 @@ describe('integration harness', () => {
       );
       expect(msg).toBeDefined();
     },
-    20_000, // generous timeout — first boot includes DB init + worker spawn
+    30_000, // generous timeout — first boot includes a fresh `npm run build`
   );
 
   skipIfNotPosix(
-    'serial worker thread loads + round-trips a POLL_ACK frame end-to-end',
+    'serial worker thread loads + does not error when receiving a POLL_ACK frame',
     async () => {
       harness = await bootIntegrationHarness();
 
@@ -37,13 +37,6 @@ describe('integration harness', () => {
       // It travels: stub serialport -> kernel PTY pair -> server-side serialport ->
       // DelimiterParser -> serial_worker (PARSED via msgService.handleMessage) ->
       // back through Worker postMessage to ApiServer.handleSerialWorkerMessage.
-      //
-      // If the Worker fails to load (e.g. ERR_MODULE_NOT_FOUND on `.ts`
-      // imports under tsx), the on('error') handler logs but the process
-      // doesn't crash — meaning the original smoke test passes even with a
-      // dead Worker. This test forces a wire-level round-trip so that a
-      // broken Worker would surface (the server would hold the PARSED-event
-      // promise indefinitely or never observe the frame).
       //
       // We use a padawan MAC (NOT the master sentinel 00:00:..) so the frame
       // exercises the controllers update path. The test's empty DB means no
@@ -60,11 +53,14 @@ describe('integration harness', () => {
       // Allow the wire round-trip to complete.
       await new Promise((r) => setTimeout(r, 500));
 
-      // The value of this test is purely "the Worker loaded and didn't
-      // crash on the first real frame". If the server is still alive and
-      // listening here, the Worker loaded successfully under tsx.
-      expect(harness.server).toBeDefined();
+      // The Worker MUST not have errored. An earlier vacuous version of this
+      // test passed despite ERR_MODULE_NOT_FOUND because it only checked
+      // `harness.server` was defined — anything could be defined. workerErrors
+      // is populated by ApiServer's onWorkerError callback whenever the Worker
+      // emits an 'error' event (e.g. failed to load, crashed processing the
+      // frame).
+      expect(harness.workerErrors).toEqual([]);
     },
-    10_000,
+    30_000, // bumped from 10s — first run includes a fresh `npm run build`
   );
 });

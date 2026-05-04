@@ -104,6 +104,24 @@ interface IServoTestData {
   value: number;
 }
 
+/**
+ * Optional bootstrap/constructor inputs for the ApiServer. Both fields exist
+ * to support the integration test harness:
+ *   - `workerScriptUrl`: tests point this at compiled dist/ because tsx's
+ *     loader hooks do not propagate to Worker threads, so the src/ Worker
+ *     script (with its `.js`-style imports of TS sources) cannot load under
+ *     vitest+tsx. Production leaves this undefined and gets the default
+ *     relative-to-import.meta.url URL, which lands in dist/ at runtime.
+ *   - `onWorkerError`: tests pass a callback so they can fail the test if
+ *     the Worker emits an `error` event (e.g. ERR_MODULE_NOT_FOUND on boot),
+ *     instead of relying on the existing logger.error which is silent to
+ *     the test runner.
+ */
+export interface ApiServerOptions {
+  workerScriptUrl?: URL;
+  onWorkerError?: (err: Error) => void;
+}
+
 export class ApiServer {
   private apiPort = 0;
   private websocketPort = 0;
@@ -116,6 +134,9 @@ export class ApiServer {
   private serialWorker!: Worker;
   private serialPort: any;
   private serialParser: any;
+
+  private readonly workerScriptUrl: URL;
+  private readonly onWorkerError?: (err: Error) => void;
 
   private httpServer?: import('http').Server;
 
@@ -200,7 +221,7 @@ export class ApiServer {
     };
   }
 
-  constructor() {
+  constructor(opts?: ApiServerOptions) {
     Dotenv.config({ path: __dirname + '/.env' });
 
     this.apiPort = Number.parseInt(process.env.API_PORT || '3000');
@@ -209,6 +230,16 @@ export class ApiServer {
     this.clients = new Map<string, WebSocket>();
     this.app = Express();
     this.router = Express.Router();
+
+    // Default Worker URL is the relative ./background_tasks/serial_worker.js,
+    // which resolves correctly when running compiled `node dist/api_server.js`
+    // (where dist/background_tasks/serial_worker.js exists alongside dist/logger.js).
+    // Tests override this to point at the compiled dist/ Worker because the
+    // src/ Worker file's `.js` imports cannot be resolved by Worker threads
+    // under tsx (Worker threads don't inherit the tsx loader).
+    this.workerScriptUrl =
+      opts?.workerScriptUrl ?? new URL('./background_tasks/serial_worker.js', import.meta.url);
+    this.onWorkerError = opts?.onWorkerError;
 
     // Broadcast lock state to all connected clients on every change. Subscribed
     // here (rather than in Init) so a state change emitted before Init finishes
@@ -249,8 +280,8 @@ export class ApiServer {
     this.runWebServices();
   }
 
-  public static async bootstrap(): Promise<ApiServer> {
-    const server = new ApiServer();
+  public static async bootstrap(opts?: ApiServerOptions): Promise<ApiServer> {
+    const server = new ApiServer(opts);
     try {
       await server.Init();
     } catch (error) {
@@ -462,18 +493,14 @@ export class ApiServer {
   }
 
   private setupSerialPort(): void {
-    this.serialWorker = new Worker(
-      new URL('./background_tasks/serial_worker.js', import.meta.url),
-      {
-        execArgv: process.execArgv,
-      },
-    );
+    this.serialWorker = new Worker(this.workerScriptUrl);
 
     this.serialWorker.on('exit', (exit) => {
       logger.info(exit);
     });
     this.serialWorker.on('error', (err) => {
       logger.error(err);
+      this.onWorkerError?.(err);
     });
 
     this.serialWorker.on('message', (msg) => {
