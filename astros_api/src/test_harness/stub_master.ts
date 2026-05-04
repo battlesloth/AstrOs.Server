@@ -5,7 +5,7 @@
 // during tests. It is a *test fake*, not a behavior simulator — real
 // firmware behavior simulation lives in AstrOs.ESP.
 //
-// Task 2 (this file) covers the raw read/write skeleton:
+// Task 2 covered the raw read/write skeleton:
 //   - Opens a SerialPort + DelimiterParser on the master end of a PTY.
 //   - Parses inbound (server-emitted) frames into `{ type, msgId, payload }`.
 //   - Exposes typed outbound writers for every master→server message family
@@ -15,9 +15,12 @@
 //   - Exposes a `waitForFrame()` synchronization helper for deterministic
 //     test orchestration.
 //
-// The scripted-response API (auto-ack of uploads, deploy scripting) is a
-// separate concern and lands in Task 3 — keep this module focused on raw
-// I/O so Task 3 can layer on top without touching the wire format.
+// Task 3 (this file) adds the scripted-response API on top:
+//   - autoAckUpload(): auto-ACK FW_TRANSFER_BEGIN / FW_CHUNK / FW_TRANSFER_END.
+//     Supports failAtSeq for one-shot NAK injection (Go-Back-N).
+//   - scriptDeploy(opts): on FW_DEPLOY_BEGIN, walk each controller through
+//     stage FW_PROGRESS frames then emit FW_DEPLOY_DONE.
+//   - disable(feature): turn off a scripted response for timeout tests.
 
 import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
@@ -27,9 +30,9 @@ import { MessageHelper } from '../serial/message_helper.js';
 import { SerialMessageType } from '../serial/serial_message.js';
 import {
   FW_SERIAL_SLIDING_WINDOW,
+  FwStage,
   type FwBackpressureAction,
   type FwChunkNakReason,
-  type FwStage,
   type FwTransferEndStatus,
 } from '../models/firmware/firmware_messages.js';
 
@@ -159,6 +162,76 @@ export interface PollAckArgs {
 }
 
 // ---------------------------------------------------------------------------
+// Scripted-response API argument shapes (Task 3)
+// ---------------------------------------------------------------------------
+
+export interface AutoAckUploadOpts {
+  // Sliding window size to advertise in FW_CHUNK_ACK.windowRemaining.
+  // Defaults to FW_SERIAL_SLIDING_WINDOW (16). The stub doesn't track actual
+  // in-flight count — `windowRemaining` always echoes this value because the
+  // streamer's bookkeeping is what matters; fake in-flight tracking would add
+  // complexity without test value.
+  windowSize?: number;
+  // Only 'every' is supported: ACK each FW_CHUNK individually. 'window'-level
+  // batching is unused for now; the union is kept narrow to avoid misleading
+  // callers. This field is accepted but not read at runtime — the implicit
+  // behavior IS 'every', so passing it is a no-op. It exists so tests can
+  // document intent explicitly without breaking when 'window' is added later.
+  ackCadence?: 'every';
+  // Status field for FW_TRANSFER_END_ACK. Default 'OK' (happy path).
+  endStatus?: FwTransferEndStatus;
+  // If set, NAK exactly once when the first FW_CHUNK with seq === failAtSeq
+  // arrives (reasonCode='CRC', lastGoodSeq=failAtSeq-1). Subsequent chunks —
+  // including the retransmitted failAtSeq — are ACKed normally.
+  failAtSeq?: number;
+}
+
+export interface ScriptDeployControllerOpts {
+  // Controller MAC — must match what the orchestrator sent in
+  // FW_DEPLOY_BEGIN.order so progress frames are attributed correctly.
+  id: string;
+  outcome: 'OK' | 'FAILED';
+  // Required when outcome === 'OK'. Validated at scriptDeploy() call time.
+  finalVersion?: string;
+  // Required when outcome === 'FAILED'. Validated at scriptDeploy() call time.
+  error?: string;
+  // FW_PROGRESS stages to emit for this controller before FW_DEPLOY_DONE.
+  // Default [Sending, Verifying, Rebooting]. Terminal stages (VersionConfirmed
+  // / Failed) come from FW_DEPLOY_DONE, not a final FW_PROGRESS, so they
+  // should NOT appear here.
+  stages?: FwStage[];
+}
+
+export interface ScriptDeployOpts {
+  controllers: ScriptDeployControllerOpts[];
+}
+
+// ---------------------------------------------------------------------------
+// Internal: scripted-response configuration state
+// ---------------------------------------------------------------------------
+
+interface AutoAckUploadCfg {
+  windowSize: number;
+  endStatus: FwTransferEndStatus;
+  failAtSeq: number | undefined;
+  // Mutable flag: true after the first NAK is emitted for failAtSeq.
+  // Reset to false each time autoAckUpload() is called.
+  hasFailedOnce: boolean;
+}
+
+interface ScriptDeployControllerCfg {
+  id: string;
+  outcome: 'OK' | 'FAILED';
+  finalVersion: string;
+  error: string;
+  stages: FwStage[];
+}
+
+interface ScriptDeployCfg {
+  controllers: ScriptDeployControllerCfg[];
+}
+
+// ---------------------------------------------------------------------------
 // Internal: pending waitForFrame subscriber bookkeeping
 // ---------------------------------------------------------------------------
 
@@ -179,6 +252,12 @@ export class StubMaster {
   private parser: DelimiterParser | null = null;
   private readonly inbound: InboundFrame[] = [];
   private readonly waiters: FrameWaiter[] = [];
+
+  // Scripted-response configuration (Task 3). Both are null when the feature
+  // is not enabled; set by autoAckUpload() / scriptDeploy(); cleared by
+  // disable().
+  private autoAckUploadCfg: AutoAckUploadCfg | null = null;
+  private scriptDeployCfg: ScriptDeployCfg | null = null;
 
   constructor(opts: StubMasterOpts) {
     this.opts = {
@@ -383,6 +462,64 @@ export class StubMaster {
   }
 
   // -------------------------------------------------------------------------
+  // Scripted-response API (Task 3)
+  // -------------------------------------------------------------------------
+
+  // Configure the stub to automatically respond to FW_TRANSFER_BEGIN,
+  // FW_CHUNK, and FW_TRANSFER_END. The auto-responses fire BEFORE waiter
+  // notifications, so a test that waitForFrame(FW_TRANSFER_BEGIN) will see the
+  // ACK already written when its promise resolves.
+  autoAckUpload(opts?: AutoAckUploadOpts): void {
+    this.autoAckUploadCfg = {
+      windowSize: opts?.windowSize ?? FW_SERIAL_SLIDING_WINDOW,
+      endStatus: opts?.endStatus ?? 'OK',
+      failAtSeq: opts?.failAtSeq,
+      // Reset the "failed once" flag on each fresh autoAckUpload() call so
+      // re-use across tests within a single StubMaster instance works cleanly.
+      hasFailedOnce: false,
+    };
+  }
+
+  // Configure the stub to automatically respond to FW_DEPLOY_BEGIN. On
+  // receipt, the stub emits FW_PROGRESS for each controller's stages then
+  // emits FW_DEPLOY_DONE with the configured per-controller outcomes.
+  //
+  // Validation is done at call time (not response time) so misconfigured tests
+  // fail fast rather than producing a mysterious protocol error mid-test.
+  scriptDeploy(opts: ScriptDeployOpts): void {
+    const controllers: ScriptDeployControllerCfg[] = opts.controllers.map((c) => {
+      if (c.outcome === 'OK' && !c.finalVersion) {
+        throw new Error(
+          `StubMaster.scriptDeploy: controller '${c.id}' has outcome 'OK' but finalVersion is missing`,
+        );
+      }
+      if (c.outcome === 'FAILED' && !c.error) {
+        throw new Error(
+          `StubMaster.scriptDeploy: controller '${c.id}' has outcome 'FAILED' but error is missing`,
+        );
+      }
+      return {
+        id: c.id,
+        outcome: c.outcome,
+        finalVersion: c.finalVersion ?? '',
+        error: c.error ?? '',
+        stages: c.stages ?? [FwStage.Sending, FwStage.Verifying, FwStage.Rebooting],
+      };
+    });
+    this.scriptDeployCfg = { controllers };
+  }
+
+  // Disable a scripted-response feature. Useful for tests that need to drive
+  // protocol-level timeouts (the absence of a response is the assertion).
+  disable(feature: 'autoAckUpload' | 'scriptDeploy'): void {
+    if (feature === 'autoAckUpload') {
+      this.autoAckUploadCfg = null;
+    } else {
+      this.scriptDeployCfg = null;
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Internal helpers
   // -------------------------------------------------------------------------
 
@@ -407,6 +544,11 @@ export class StubMaster {
     if (frame === null) return;
     this.inbound.push(frame);
 
+    // Fire scripted responses BEFORE notifying waiters. Order matters: a test
+    // that waitForFrame(FW_TRANSFER_BEGIN) should see the auto-ACK already
+    // written on the wire when its promise resolves.
+    this.dispatchScriptedResponse(frame);
+
     // Notify any waiter whose predicate now matches. Use a copy of the array
     // so a waiter that calls waitForFrame again from inside its resolution
     // doesn't disturb iteration.
@@ -421,6 +563,99 @@ export class StubMaster {
     for (const waiter of matched) {
       clearTimeout(waiter.timer);
       waiter.resolve(frame);
+    }
+  }
+
+  private dispatchScriptedResponse(frame: InboundFrame): void {
+    const cfg = this.autoAckUploadCfg;
+
+    switch (frame.type) {
+      case SerialMessageType.FW_TRANSFER_BEGIN: {
+        if (cfg === null) break;
+        this.writeFwTransferBeginAck({
+          transferId: extractTransferId(frame.payload),
+          status: 'OK',
+        });
+        break;
+      }
+
+      case SerialMessageType.FW_CHUNK: {
+        if (cfg === null) break;
+        const chunkParsed = parseFwChunkPayload(frame.payload);
+        if (chunkParsed === null) break;
+        const { transferId, seq } = chunkParsed;
+        // Inject exactly one NAK when this seq matches failAtSeq and we
+        // haven't already failed. After that, resume normal ACKing
+        // (including for the retransmitted failAtSeq chunk).
+        if (cfg.failAtSeq !== undefined && seq === cfg.failAtSeq && !cfg.hasFailedOnce) {
+          cfg.hasFailedOnce = true;
+          this.writeFwChunkNak({
+            transferId,
+            lastGoodSeq: seq - 1,
+            reasonCode: 'CRC',
+          });
+        } else {
+          this.writeFwChunkAck({
+            transferId,
+            highestContiguousSeq: seq,
+            nextExpectedSeq: seq + 1,
+            windowRemaining: cfg.windowSize,
+          });
+        }
+        break;
+      }
+
+      case SerialMessageType.FW_TRANSFER_END: {
+        if (cfg === null) break;
+        const endParsed = parseFwTransferEndPayload(frame.payload);
+        if (endParsed === null) break;
+        this.writeFwTransferEndAck({
+          transferId: endParsed.transferId,
+          status: cfg.endStatus,
+          // Echo the hash the server sent so the streamer's hash check passes.
+          computedSha256Hex: endParsed.finalSha256Hex,
+        });
+        break;
+      }
+
+      case SerialMessageType.FW_DEPLOY_BEGIN: {
+        const deployCfg = this.scriptDeployCfg;
+        if (deployCfg === null) break;
+        const deployParsed = parseFwDeployBeginPayload(frame.payload);
+        if (deployParsed === null) break;
+        const { transferId } = deployParsed;
+        // Walk each controller through its stage progression then emit
+        // FW_DEPLOY_DONE. No artificial delay between frames — the
+        // orchestrator's per-controller throttle (250ms / 4Hz) means
+        // coalescing is acceptable in tests.
+        for (const ctrl of deployCfg.controllers) {
+          for (const stage of ctrl.stages) {
+            this.writeFwProgress({
+              transferId,
+              controllerId: ctrl.id,
+              stage,
+              // No actual bytes flow after FW_DEPLOY_BEGIN; using 0 here
+              // is correct. Tests asserting on bytesSent should use
+              // writeFwProgress directly.
+              bytesSent: 0,
+              totalBytes: 0,
+            });
+          }
+        }
+        this.writeFwDeployDone({
+          transferId,
+          results: deployCfg.controllers.map((ctrl) => ({
+            controllerId: ctrl.id,
+            outcome: ctrl.outcome,
+            finalVersion: ctrl.finalVersion,
+            error: ctrl.error,
+          })),
+        });
+        break;
+      }
+
+      default:
+        break;
     }
   }
 }
@@ -445,4 +680,53 @@ function parseInbound(line: string): InboundFrame | null {
     msgId: headerParts[2],
     payload: groups[1],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Narrow file-scope payload parsers for inbound server→master frames (Task 3).
+//
+// These are intentionally separate from MessageHandler, which parses the
+// master→server direction. Field counts and separator choice are verified
+// against MessageGenerator.generateFwChunk / generateFwTransferEnd /
+// generateFwDeployBegin (the runtime generators are the source of truth).
+// ---------------------------------------------------------------------------
+
+// Extract transferId from any payload whose first US-separated field is the
+// transferId. Used for FW_TRANSFER_BEGIN where we only need the ID.
+function extractTransferId(payload: string): string {
+  const idx = payload.indexOf(MessageHelper.US);
+  return idx < 0 ? payload : payload.substring(0, idx);
+}
+
+// FW_CHUNK payload (5 US-separated fields per generateFwChunk):
+//   transferId<US>seq<US>payloadLen<US>base64Bytes<US>crc16Hex
+function parseFwChunkPayload(payload: string): { transferId: string; seq: number } | null {
+  const parts = payload.split(MessageHelper.US);
+  if (parts.length !== 5) return null;
+  const seq = parseInt(parts[1], 10);
+  if (Number.isNaN(seq)) return null;
+  return { transferId: parts[0], seq };
+}
+
+// FW_TRANSFER_END payload (3 US-separated fields per generateFwTransferEnd):
+//   transferId<US>totalChunks<US>finalSha256Hex
+function parseFwTransferEndPayload(
+  payload: string,
+): { transferId: string; finalSha256Hex: string } | null {
+  const parts = payload.split(MessageHelper.US);
+  if (parts.length !== 3) return null;
+  return { transferId: parts[0], finalSha256Hex: parts[2] };
+}
+
+// FW_DEPLOY_BEGIN payload (per generateFwDeployBegin):
+//   transferId<US>controllerId_1<RS>controllerId_2<RS>...
+function parseFwDeployBeginPayload(
+  payload: string,
+): { transferId: string; order: string[] } | null {
+  const firstUs = payload.indexOf(MessageHelper.US);
+  if (firstUs < 0) return null;
+  const transferId = payload.substring(0, firstUs);
+  const orderStr = payload.substring(firstUs + 1);
+  const order = orderStr.split(MessageHelper.RS);
+  return { transferId, order };
 }
