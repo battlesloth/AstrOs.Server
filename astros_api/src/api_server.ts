@@ -64,6 +64,14 @@ import { Database } from './dal/types.js';
 import { SystemStatus } from './system_status.js';
 import { writeGuard } from './guard/write_guard.js';
 import { registerSystemStatusRoutes } from './controllers/system_status_controller.js';
+import { WorkerSerialBus } from './firmware/serial_bus.js';
+import { FlashJobOrchestrator } from './firmware/flash_orchestrator.js';
+import { registerFirmwareFlashRoutes } from './controllers/firmware_flash_controller.js';
+import { FirmwareCache } from './firmware/firmware_cache.js';
+import { FirmwareUploadStore } from './firmware/firmware_upload_store.js';
+import { GitHubReleaseService } from './firmware/github_release_service.js';
+import { decidePostDeployHeartbeat } from './firmware/post_deploy_heartbeat.js';
+import { decideLateJoinSnapshot } from './firmware/late_join_snapshot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -117,6 +125,30 @@ class ApiServer {
   private db!: Kysely<Database>;
   private systemStatus = new SystemStatus();
   private readonly jobLock = new JobLock();
+
+  // Firmware-OTA wiring. The orchestrator + WorkerSerialBus
+  // are constructed in setupSerialPort() because they depend on the serial
+  // worker; in test mode (NODE_ENV=test) setupSerialPort() is skipped and
+  // `flashOrchestrator` stays undefined — the flash routes aren't registered
+  // either, so HTTP /api/firmware/flash returns 404 in tests rather than
+  // tripping a null deref on the orchestrator. The firmware cache, upload
+  // store, and GitHub release service are constructed unconditionally in
+  // configApi() because they have no Worker dependency and are otherwise
+  // useful (tests don't reach them, but the construction is cheap).
+  private firmwareCache!: FirmwareCache;
+  private firmwareUploadStore!: FirmwareUploadStore;
+  private githubReleaseService!: GitHubReleaseService;
+  private workerSerialBus?: WorkerSerialBus;
+  private flashOrchestrator?: FlashJobOrchestrator;
+  // POLL_ACK-fed variant cache, keyed by controller MAC (the same id flowing
+  // through FW_PROGRESS / FW_DEPLOY_BEGIN). Populated by handlePollResponse
+  // whenever a POLL_ACK arrives with a non-empty variant; consumed by the
+  // orchestrator's controllersStore.listFlashTargets() at flash time. Entries
+  // never expire — a controller that goes offline keeps its last-known
+  // variant until the server restarts (or a fresh POLL_ACK overwrites it).
+  // Per FMI §7 row "controllers cache": stale entries are operator-recoverable
+  // (re-poll via syncControllers) and out-of-scope for c.6c.1.
+  private readonly controllerVariantCache = new Map<string, string>();
 
   upload!: any;
 
@@ -336,6 +368,17 @@ class ApiServer {
     });
 
     this.apiKeyValidator = ApiKeyValidator(this.db);
+
+    // Firmware infrastructure shared across the c.4 / c.5 / c.3 endpoints and
+    // the c.6c.1 orchestrator. Constructed unconditionally — the cache/upload
+    // store read FIRMWARE_CACHE_PATH from env (default ~/.config/astrosserver),
+    // and the release service is a thin GitHub API wrapper. None of them open
+    // the serial worker, so test mode is safe.
+    this.firmwareCache = new FirmwareCache();
+    this.firmwareUploadStore = new FirmwareUploadStore();
+    this.githubReleaseService = new GitHubReleaseService(
+      process.env.FIRMWARE_REPO ?? 'battlesloth/AstrOs.ESP',
+    );
   }
 
   private setRoutes(): void {
@@ -430,6 +473,34 @@ class ApiServer {
       this.handleSerialWorkerMessage(msg);
     });
 
+    // c.6c.1 firmware-OTA orchestrator. Built here (rather than in configApi)
+    // because the WorkerSerialBus needs the serialWorker reference. Test mode
+    // skips setupSerialPort() entirely, so this branch only runs in real
+    // runtime — the flash routes are registered alongside so HTTP /api/firmware/flash
+    // 404s in tests rather than reaching an undefined orchestrator.
+    this.workerSerialBus = new WorkerSerialBus({ worker: this.serialWorker });
+    this.flashOrchestrator = new FlashJobOrchestrator({
+      bus: this.workerSerialBus,
+      jobLock: this.jobLock,
+      cache: this.firmwareCache,
+      upload: this.firmwareUploadStore,
+      releaseService: this.githubReleaseService,
+      controllersStore: {
+        // The variant cache is the in-memory source of truth for "which
+        // controllers have we observed alive" (POLL_ACK is the heartbeat).
+        // Returning a snapshot per call keeps the orchestrator's
+        // validateControllers free to apply trim/uniformity checks without
+        // racing a concurrent POLL_ACK update of the underlying Map.
+        listFlashTargets: async () =>
+          Array.from(this.controllerVariantCache.entries()).map(([id, variant]) => ({
+            id,
+            variant,
+          })),
+      },
+      emitWs: (msg) => this.updateClients(msg),
+    });
+    registerFirmwareFlashRoutes(this.router, this.authHandler, this.flashOrchestrator);
+
     try {
       this.serialPort = new SerialPort({
         path: process.env.SERIAL_PORT || '/dev/ttyS0',
@@ -490,6 +561,29 @@ class ApiServer {
         conn.send(JSON.stringify(buildLockStateResponse(this.jobLock.getState())));
       } catch (err) {
         logger.error(`websocket initial lockState send error: ${err}`);
+      }
+
+      // Flash-job late-join snapshot. When a client connects
+      // mid-flash, send the current FlashJobState so the operator UI can
+      // reconstruct progress without waiting for the next per-controller
+      // update. Sent only when a job is in flight; nothing is sent for the
+      // common "no active job" case (per spec §"Late-join" — no history
+      // persistence in v1, so completed jobs are not retained). Skipped in
+      // test mode where flashOrchestrator is undefined.
+      if (this.flashOrchestrator !== undefined) {
+        try {
+          const snapshot = decideLateJoinSnapshot(this.flashOrchestrator.getCurrentJob());
+          if (snapshot.kind === 'flashJobStarted') {
+            conn.send(
+              JSON.stringify({
+                type: TransmissionType.flashJobStarted,
+                data: snapshot.data,
+              }),
+            );
+          }
+        } catch (err) {
+          logger.error(`websocket initial flashJobStarted send error: ${err}`);
+        }
       }
 
       conn.on('message', (msg) => {
@@ -600,6 +694,56 @@ class ApiServer {
   async handlePollResponse(msg: ISerialWorkerResponse) {
     try {
       const val = msg as PollResponse;
+
+      // Feed the variant cache + heartbeat callback BEFORE
+      // the existing DB lookups. The cache populates regardless of whether
+      // the controller is registered (DB lookup may fail for first-poll
+      // controllers before sync runs); the heartbeat callback fires only
+      // when a flash is in flight and the version matches the deployed
+      // target, so out-of-protocol heartbeats are dropped here rather than
+      // sent into the orchestrator. POLL_ACK with empty variant — older
+      // firmware that hasn't picked up the c.6c.1 protocol extension —
+      // leaves `controller.variant` undefined per handlePollAck; we skip
+      // updating the cache in that case so a regression to old firmware
+      // doesn't poison the cache with an empty string.
+      const variant = val.controller.variant;
+      if (typeof variant === 'string' && variant.length > 0) {
+        this.controllerVariantCache.set(val.controller.address, variant);
+      }
+
+      // Heartbeat callback: only the master's post-deploy POLL_ACK
+      // (sentinel MAC, version matches deployed target) releases the
+      // lock. Padawans poll routinely during a flash and any padawan
+      // that has already rebooted into the same target version would
+      // race the master if we didn't filter on the master sentinel.
+      // Decision logic lives in `decidePostDeployHeartbeat` — pure
+      // function, fully unit-tested. Log paths surface diagnostic
+      // gaps (empty firmwareVersion / wrong version) instead of
+      // silently relying on the 15s timer fallback.
+      const currentJob = this.flashOrchestrator?.getCurrentJob() ?? null;
+      const decision = decidePostDeployHeartbeat(
+        val.controller.address,
+        val.controller.firmwareVersion,
+        currentJob,
+      );
+      switch (decision.kind) {
+        case 'fire':
+          this.flashOrchestrator?.notifyMasterHeartbeat(decision.version);
+          break;
+        case 'empty_version_during_flash':
+          logger.info(
+            `flash heartbeat: master POLL_ACK from ${decision.from} carried no firmwareVersion during active flash ${decision.jobId}; relying on reboot-timer fallback`,
+          );
+          break;
+        case 'version_mismatch':
+          logger.info(
+            `flash heartbeat: master POLL_ACK firmwareVersion=${decision.reported} does not match expected ${decision.expected} for job ${decision.jobId}; ignoring`,
+          );
+          break;
+        case 'no_active_job':
+        case 'not_master':
+          break;
+      }
 
       const controlerRepo = new ControllerRepository(this.db);
       const locationRepo = new LocationsRepository(this.db);

@@ -159,6 +159,22 @@ describe('writeGuard', () => {
       }
     });
 
+    it('allows DELETE /firmware/flash (the cancel path)', () => {
+      const { status, lock } = activeFlash();
+      const { res, next } = call('DELETE', '/firmware/flash', status, lock);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('still blocks other DELETE paths even when /firmware/flash is allowlisted', () => {
+      const { status, lock } = activeFlash();
+      for (const p of ['/scripts/123', '/playlists/abc', '/firmware/cache']) {
+        const { res, next } = call('DELETE', p, status, lock);
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(423);
+      }
+    });
+
     it('blocks panicStop and panicClear with 423 (stricter than read-only mode)', () => {
       // Read-only allows panic so the user can halt motion during a server
       // outage; flash-active does NOT, because emitting a PANIC_STOP frame

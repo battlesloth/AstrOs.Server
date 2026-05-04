@@ -346,7 +346,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - github source with no matching variant asset: lock released, `flashJobFailed { reason: 'asset_not_found', detail: variant }` emitted
     - `getCurrentJob()` returns `null` after release; returns the in-flight state mid-flow
 
-- [ ] **Task 7 — Upload-phase wiring (streamer observer translates to controller updates)** (extend `flash_orchestrator.ts`):
+- [x] **Task 7 — Upload-phase wiring (streamer observer translates to controller updates)** (extend `flash_orchestrator.ts`):
   - Replace the no-op observer in `start()` with a real one:
     - On `streamer.run` start: transition all controllers `Queued → UploadingToMaster` (via `transitionControllerState`); emit `flashControllerUpdate` per controller via the throttle (force=true on stage transition)
     - `onChunkAck(highestContiguousSeq, bytesSent)`: update `bytesSent` / `totalBytes` on every controller (same value for all — single-target upload to master); emit throttled `flashControllerUpdate` per controller
@@ -359,7 +359,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - large transfer (10 chunks, 5 controllers): final `bytesSent` matches `source.sizeBytes` for every controller
     - `onChunkNak` is observed but does NOT mutate controller state
 
-- [ ] **Task 8 — Deploy-phase wiring** (extend `flash_orchestrator.ts`):
+- [x] **Task 8 — Deploy-phase wiring** (extend `flash_orchestrator.ts`):
   - After `streamer.run()` resolves OK:
     - Transition all controllers `UploadingToMaster → Sending`; emit `flashControllerUpdate` per controller (force=true)
     - Generate FW_DEPLOY_BEGIN payload via `MessageGenerator.generateMessage(SerialMessageType.FW_DEPLOY_BEGIN, ..., { transferId, order: targetIds })`; call `bus.send(msg, { kind: 'firmware' })` wrapped in try/catch (throw → flashJobFailed { reason: 'bus_send_failed' })
@@ -385,7 +385,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - bus.send throws on FW_DEPLOY_BEGIN: `flashJobFailed { reason: 'bus_send_failed' }`; controllers transition to Failed; lock released
     - empty results[]: protocol violation; `flashJobFailed { reason: 'protocol_violation' }`
 
-- [ ] **Task 9 — `flashJobDone` + reboot timer + heartbeat callback (real wiring)** (extend `flash_orchestrator.ts`):
+- [x] **Task 9 — `flashJobDone` + reboot timer + heartbeat callback (real wiring)** (extend `flash_orchestrator.ts`):
   - When `deriveJobLifecycle(currentJob) === 'done'` (all controllers terminal): emit `flashJobDone { jobId, endedAt }`, arm reboot timer via `clock.setTimeout(rebootTimeoutMs, () => releaseLock('timeout'))`. Store timer ID as `rebootTimer` instance field.
   - Add `notifyMasterHeartbeat(version: string): void` method:
     - If `rebootTimer === null`: ignore (no job in deploy-done state, OR heartbeat already fired)
@@ -401,7 +401,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - heartbeat called with no active job: no-op (no `currentJob`)
     - heartbeat called mid-upload (out-of-protocol): no-op (rebootTimer null)
 
-- [ ] **Task 10 — Cancel mechanism (AbortController + cancel methods)** (extend `flash_orchestrator.ts`):
+- [x] **Task 10 — Cancel mechanism (AbortController + cancel methods)** (extend `flash_orchestrator.ts`):
   - In `start()`, create `this.abortController = new AbortController()` and pass `signal` to `streamer.run`
   - `cancel(reason)` method:
     - If `currentJob === null`: return null
@@ -417,7 +417,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - cancel during reboot-timer wait (post-flashJobDone, pre-release): job is "done" — cancel is a no-op (returns null because phase==='done' OR currentJob mid-cleanup)
     - cancel race: cancel arrives before currentJob set (mid-source-resolution): returns null (currentJob === null); start continues to completion (operator can retry cancel after flashJobStarted)
 
-- [ ] **Task 11 — Error paths consolidated (TransferError, source resolution, hostile input)** (extend `flash_orchestrator.ts`):
+- [x] **Task 11 — Error paths consolidated (TransferError, source resolution, hostile input)** (extend `flash_orchestrator.ts`):
   - Wrap the `start()` body in try/catch capturing all error sources. Centralize cleanup-on-fail in a private `failJob(reason, detail)` method. Reasons:
     - `release_lookup_failed` — `releaseService.getReleases()` rejects
     - `release_not_found` — version doesn't match any release
@@ -445,7 +445,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - lock state: every error path releases the lock (parameterized over all reasons)
     - currentJob state: every error path clears `currentJob` to null (or never sets it)
 
-- [ ] **Task 12 — HTTP controller (Express routes)** (new `astros_api/src/controllers/firmware_flash_controller.ts` + `firmware_flash_controller.test.ts`):
+- [x] **Task 12 — HTTP controller (Express routes)** (new `astros_api/src/controllers/firmware_flash_controller.ts` + `firmware_flash_controller.test.ts`):
   - `registerFirmwareFlashRoutes(router: Router, auth: any, orchestrator: FlashJobOrchestrator)` — follow audio_controller.ts pattern
   - `POST /api/firmware/flash`:
     - validate `req.body.source` shape
@@ -475,7 +475,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
     - GET with active job → 200 with FlashJobState
     - GET with no active job → 200 with null body
 
-- [ ] **Task 13 — `api_server.ts` wiring** (modify `astros_api/src/api_server.ts`):
+- [x] **Task 13 — `api_server.ts` wiring** (modify `astros_api/src/api_server.ts`):
   - Import `FlashJobOrchestrator`, `WorkerSerialBus`, `registerFirmwareFlashRoutes`
   - In `setupSerialPort()` (or wherever the worker is constructed), build:
     ```ts
@@ -506,7 +506,7 @@ Each task is one logical commit. TDD where applicable. Per CLAUDE.md, `superpowe
   - **Tests:** none directly (api_server.ts is integration-tested via existing test infrastructure; smoke verified manually + via QA plan in Task 14)
   - Smoke check: `npm run build` clean; `npm run start:tsx` boots without errors
 
-- [ ] **Task 14 — QA test plan + verification** (new `.docs/qa/firmware-ota-flash.md`):
+- [x] **Task 14 — QA test plan + verification** (new `.docs/qa/firmware-ota-flash.md`):
   - QA plan with preconditions (server running, master + controllers connected — PTY harness when c.6c.2 lands; mocked Vue button + curl until then), step-by-step test cases, expected results, edge cases
   - Sections:
     - Trigger flash from cache (POST with kind=github)
