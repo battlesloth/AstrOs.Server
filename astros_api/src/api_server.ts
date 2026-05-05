@@ -205,6 +205,20 @@ export class ApiServer {
   // (re-poll via syncControllers) and out-of-scope for c.6c.1.
   private readonly controllerVariantCache = new Map<string, string>();
 
+  /**
+   * Test-only accessor for the POLL_ACK-fed variant cache. Used by the
+   * integration harness to poll-wait for a stub master's POLL_ACK to round-trip
+   * through Worker → handlePollResponse → cache.set(). Without this, tests
+   * have to sleep an arbitrary duration before flashing, which flakes under
+   * vitest's parallel-thread load.
+   *
+   * Not part of the production runtime API. Callers outside `test_harness/`
+   * should not use this.
+   */
+  public getVariantForControllerForTest(mac: string): string | undefined {
+    return this.controllerVariantCache.get(mac);
+  }
+
   upload!: any;
 
   private isSerialWorkerAvailable(): boolean {

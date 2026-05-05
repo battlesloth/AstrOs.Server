@@ -57,9 +57,12 @@ describe('integration: happy upload flash + heartbeat release', () => {
       //    handlePollResponse populates the cache so listFlashTargets()
       //    returns this controller at flash time. Without this, the
       //    orchestrator would reject with `no_controllers`.
+      //
+      //    `waitForVariantCachePopulated` polls the cache deterministically
+      //    instead of relying on a fixed sleep, which flakes under vitest's
+      //    parallel-thread load.
       harness.stub.writePollAck();
-      // Allow the wire round-trip + Worker post → handlePollResponse to run.
-      await new Promise((r) => setTimeout(r, 300));
+      await harness.waitForVariantCachePopulated(MASTER_SENTINEL_MAC, MASTER_VARIANT);
 
       // 3. Pre-populate the upload store with a small firmware blob. The
       //    helper writes the meta.json directly (bypassing the
@@ -136,6 +139,11 @@ describe('integration: happy upload flash + heartbeat release', () => {
       //    matches, version matches deployed target) → orchestrator's
       //    notifyMasterHeartbeat → lock release WELL BEFORE the 15-sec
       //    reboot-timer fallback would fire.
+      //
+      //    Snapshot the WS buffer length BEFORE emitting so the wait below
+      //    only sees the heartbeat-driven release, not the connect-time
+      //    lockStateChanged{locked:false} snapshot the server sent on WS open.
+      const snapshot = harness.receivedWsMessages.length;
       harness.stub.writePollAck({ firmwareVersion: POST_FLASH_FW });
 
       // 9. Wait for lockStateChanged{locked:false}. Should arrive within
@@ -148,10 +156,14 @@ describe('integration: happy upload flash + heartbeat release', () => {
       const lockReleased = await harness.waitForWsMessage<{
         type: number;
         locked: boolean;
-      }>((m) => {
-        const msg = m as { type?: unknown; locked?: unknown };
-        return msg.type === TransmissionType.lockStateChanged && msg.locked === false;
-      }, 5000);
+      }>(
+        (m) => {
+          const msg = m as { type?: unknown; locked?: unknown };
+          return msg.type === TransmissionType.lockStateChanged && msg.locked === false;
+        },
+        5000,
+        snapshot,
+      );
       expect(lockReleased.locked).toBe(false);
 
       // 10. GET /api/firmware/flash → null (no active job after release).

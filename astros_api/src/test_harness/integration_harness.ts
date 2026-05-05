@@ -78,9 +78,22 @@ export interface IntegrationHarness {
   // as a test failure rather than a silent log line. Mutated in-place by the
   // ApiServer's onWorkerError callback during the harness lifetime.
   workerErrors: readonly Error[];
+  /**
+   * Resolves with the next inbound WS frame matching `predicate`, or rejects
+   * after `timeoutMs` (default 5s) listing the last 10 received message types.
+   *
+   * Pass `fromIndex` to ignore everything already in `receivedWsMessages` up
+   * to (but not including) that index. Used to avoid matching connection-time
+   * snapshots when the test wants the result of an action it just initiated.
+   * Pattern:
+   *   const snapshot = harness.receivedWsMessages.length;
+   *   harness.stub.writePollAck({ firmwareVersion: '1.5.0' });
+   *   const released = await harness.waitForWsMessage(predicate, 5000, snapshot);
+   */
   waitForWsMessage<T = unknown>(
     predicate: (msg: unknown) => boolean,
     timeoutMs?: number,
+    fromIndex?: number,
   ): Promise<T>;
   // Seeds the FirmwareUploadStore (FIRMWARE_CACHE_PATH/uploads/) with a
   // valid `upload-<uuid>.bin` + `.bin.sha256` + `.meta.json` triple so a
@@ -95,6 +108,20 @@ export interface IntegrationHarness {
   // cross-reference if needed (the streamer will fail with hash_mismatch
   // if the fixture's sidecar diverges from the actual bytes).
   populateFirmwareCache(args: PopulateFirmwareCacheArgs): Promise<{ sha256: string }>;
+  /**
+   * Poll-waits up to `timeoutMs` for the ApiServer's controllerVariantCache
+   * to contain `mac` with the expected `variant`. The cache is populated
+   * asynchronously by handlePollResponse after a POLL_ACK arrives; under
+   * vitest's parallel-thread load, an arbitrary sleep after `stub.writePollAck`
+   * isn't reliable. This helper is the deterministic alternative.
+   *
+   * Throws on timeout (default 3000ms).
+   */
+  waitForVariantCachePopulated(
+    mac: string,
+    expectedVariant: string,
+    timeoutMs?: number,
+  ): Promise<void>;
   dispose(): Promise<void>;
 }
 
@@ -292,9 +319,17 @@ export async function bootIntegrationHarness(
     const waitForWsMessage = <T = unknown>(
       predicate: (msg: unknown) => boolean,
       timeoutMs = 5000,
+      fromIndex = 0,
     ): Promise<T> => {
-      const existing = receivedWsMessages.find(predicate);
-      if (existing !== undefined) return Promise.resolve(existing as T);
+      // Existing-scan ignores anything before fromIndex so a test waiting for
+      // the result of an action it just initiated doesn't match a connect-time
+      // snapshot frame (e.g. the WS server emits lockStateChanged{locked:false}
+      // on connect — without fromIndex, a post-flash heartbeat-release wait
+      // would resolve immediately on that buffered frame).
+      for (let i = fromIndex; i < receivedWsMessages.length; i++) {
+        const msg = receivedWsMessages[i];
+        if (predicate(msg)) return Promise.resolve(msg as T);
+      }
 
       return new Promise<T>((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -431,6 +466,35 @@ export async function bootIntegrationHarness(
       }
     };
 
+    const waitForVariantCachePopulated = async (
+      mac: string,
+      expectedVariant: string,
+      timeoutMs = 3000,
+    ): Promise<void> => {
+      const startedAt = Date.now();
+      // 25ms poll: the round-trip (PTY → DelimiterParser → Worker postMessage
+      // → handlePollResponse → cache.set) is sub-millisecond on a quiet
+      // machine but can stretch under vitest's parallel-thread load.
+      const pollIntervalMs = 25;
+      // Bind the server reference here — the outer `server` is reassigned
+      // by the bootstrap path so TS can't narrow the closure capture.
+      const apiServer = server;
+      if (apiServer === undefined) {
+        throw new Error('waitForVariantCachePopulated: harness server not bootstrapped');
+      }
+      while (Date.now() - startedAt < timeoutMs) {
+        if (apiServer.getVariantForControllerForTest(mac) === expectedVariant) {
+          return;
+        }
+        await new Promise((r) => setTimeout(r, pollIntervalMs));
+      }
+      const actual = apiServer.getVariantForControllerForTest(mac);
+      throw new Error(
+        `waitForVariantCachePopulated: cache for mac=${mac} did not reach variant=${expectedVariant} within ${timeoutMs}ms ` +
+          `(actual=${actual === undefined ? '<missing>' : actual})`,
+      );
+    };
+
     return {
       server,
       stub,
@@ -443,6 +507,7 @@ export async function bootIntegrationHarness(
       waitForWsMessage,
       populateUpload,
       populateFirmwareCache,
+      waitForVariantCachePopulated,
       dispose,
     };
   } catch (bootErr) {
