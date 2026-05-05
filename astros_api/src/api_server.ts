@@ -141,6 +141,12 @@ interface IServoTestData {
 export interface ApiServerOptions {
   workerScriptUrl?: URL;
   onWorkerError?: (err: Error) => void;
+  /**
+   * Tests inject a fake `fetch` so `GitHubReleaseService.getReleases()` returns
+   * canned release data instead of hitting GitHub's REST API. Production leaves
+   * this undefined and gets the global `fetch`.
+   */
+  firmwareReleaseFetcher?: typeof fetch;
 }
 
 // Exported so the integration test harness can import + bootstrap an
@@ -162,6 +168,7 @@ export class ApiServer {
 
   private readonly workerScriptUrl: URL;
   private readonly onWorkerError?: (err: Error) => void;
+  private readonly firmwareReleaseFetcher?: typeof fetch;
 
   private httpServer?: import('http').Server;
 
@@ -265,6 +272,7 @@ export class ApiServer {
     this.workerScriptUrl =
       opts?.workerScriptUrl ?? new URL('./background_tasks/serial_worker.js', import.meta.url);
     this.onWorkerError = opts?.onWorkerError;
+    this.firmwareReleaseFetcher = opts?.firmwareReleaseFetcher;
 
     // Broadcast lock state to all connected clients on every change. Subscribed
     // here (rather than in Init) so a state change emitted before Init finishes
@@ -446,6 +454,7 @@ export class ApiServer {
     this.firmwareUploadStore = new FirmwareUploadStore();
     this.githubReleaseService = new GitHubReleaseService(
       process.env.FIRMWARE_REPO ?? 'battlesloth/AstrOs.ESP',
+      this.firmwareReleaseFetcher ?? fetch,
     );
   }
 

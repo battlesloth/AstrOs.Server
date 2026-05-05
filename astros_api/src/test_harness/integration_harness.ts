@@ -22,6 +22,13 @@ export interface BootIntegrationHarnessOpts {
   masterVariant?: string; // default 'astros-master-test-variant'
   masterMac?: string; // default '00:00:00:00:00:00' (sentinel)
   masterFingerprint?: string; // default 'master-stub'
+  /**
+   * Tests targeting `kind: 'github'` flashes inject a fake fetch that returns
+   * canned GitHub release JSON. Combined with `populateFirmwareCache` (below),
+   * this lets the test exercise the github source-resolution path without
+   * any network I/O.
+   */
+  firmwareReleaseFetcher?: typeof fetch;
 }
 
 // Args for `harness.populateUpload(...)` — used by integration tests that
@@ -37,6 +44,22 @@ export interface PopulateUploadArgs {
   originalFilename: string; // e.g. 'astros-esp-1.5.0.bin'
   version: string; // semver string in meta
   projectName?: string; // default 'AstrOs.ESP'
+}
+
+// Args for `harness.populateFirmwareCache(...)` — used by integration tests
+// that exercise the `kind: 'github'` source path. Pre-seeds the on-disk
+// firmware cache so `FirmwareCache.lookup()` returns a hit and `fetch()`
+// short-circuits without any download attempt. Mirrors the cache layout
+// produced by a real `fetch(release, asset)` so `lookup()`'s validations
+// (SHA256_HEX_RE on the .sha256 sidecar, isValidMeta on the .meta.json)
+// pass.
+export interface PopulateFirmwareCacheArgs {
+  binBytes: Buffer; // raw firmware bytes
+  version: string; // semver, e.g. '1.5.0' (no leading 'v')
+  variant: string; // PlatformIO env name, e.g. 'lolin_d32_pro'
+  tag?: string; // default `v${version}` (mirrors GitHub convention)
+  publishedAt?: string; // default new Date().toISOString()
+  sourceUrl?: string; // default a synthetic example.test URL
 }
 
 export interface IntegrationHarness {
@@ -65,6 +88,13 @@ export interface IntegrationHarness {
   // `store()` (which requires a real esp_app_desc_t header). Returns the
   // generated uploadId + sha256 so callers can cross-reference if needed.
   populateUpload(args: PopulateUploadArgs): Promise<{ uploadId: string; sha256: string }>;
+  // Seeds the FirmwareCache (FIRMWARE_CACHE_PATH/github/) with a valid
+  // `astros-esp-<version>-<variant>-app.{bin,bin.sha256,meta.json}` triple so
+  // a subsequent flash with `kind: 'github'` resolves via cache hit and
+  // never attempts a download. Returns the computed sha256 so callers can
+  // cross-reference if needed (the streamer will fail with hash_mismatch
+  // if the fixture's sidecar diverges from the actual bytes).
+  populateFirmwareCache(args: PopulateFirmwareCacheArgs): Promise<{ sha256: string }>;
   dispose(): Promise<void>;
 }
 
@@ -219,6 +249,7 @@ export async function bootIntegrationHarness(
     server = await ApiServer.bootstrap({
       workerScriptUrl,
       onWorkerError: (err) => workerErrors.push(err),
+      firmwareReleaseFetcher: opts?.firmwareReleaseFetcher,
     });
 
     // 6. Construct + start StubMaster on the master end.
@@ -321,6 +352,44 @@ export async function bootIntegrationHarness(
       return { uploadId, sha256 };
     };
 
+    // Closure over firmwareCacheDir, mirroring populateUpload's shape.
+    // Layout per firmware_cache.ts:
+    //   <cache>/github/astros-esp-<version>-<variant>-app.bin
+    //   <cache>/github/astros-esp-<version>-<variant>-app.bin.sha256
+    //   <cache>/github/astros-esp-<version>-<variant>-app.meta.json
+    // The sidecar contents satisfy lookup()'s SHA256_HEX_RE + isValidMeta
+    // checks so a subsequent FirmwareCache.fetch() short-circuits via
+    // lookup() without ever invoking its injected fetcher.
+    const populateFirmwareCache = async (
+      args: PopulateFirmwareCacheArgs,
+    ): Promise<{ sha256: string }> => {
+      const githubDir = join(firmwareCacheDir, 'github');
+      await mkdir(githubDir, { recursive: true });
+
+      const sha256 = createHash('sha256').update(args.binBytes).digest('hex');
+      const baseName = `astros-esp-${args.version}-${args.variant}-app`;
+      const tag = args.tag ?? `v${args.version}`;
+      const publishedAt = args.publishedAt ?? new Date().toISOString();
+      const sourceUrl = args.sourceUrl ?? `https://example.test/${baseName}.bin`;
+
+      await writeFile(join(githubDir, `${baseName}.bin`), args.binBytes);
+      await writeFile(join(githubDir, `${baseName}.bin.sha256`), sha256);
+      await writeFile(
+        join(githubDir, `${baseName}.meta.json`),
+        JSON.stringify({
+          tag,
+          version: args.version,
+          variant: args.variant,
+          downloadedAt: new Date().toISOString(),
+          publishedAt,
+          sourceUrl,
+          sizeBytes: args.binBytes.length,
+        }),
+      );
+
+      return { sha256 };
+    };
+
     const dispose = async (): Promise<void> => {
       // Reverse-order teardown. Resilient: each step in its own try/catch so
       // a failure in one doesn't leak the others.
@@ -373,6 +442,7 @@ export async function bootIntegrationHarness(
       workerErrors,
       waitForWsMessage,
       populateUpload,
+      populateFirmwareCache,
       dispose,
     };
   } catch (bootErr) {
