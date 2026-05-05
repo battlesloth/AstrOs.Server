@@ -2,7 +2,6 @@
 // HTTP + WebSocket clients for tests, and tears everything down cleanly on
 // dispose(). Linux only (inherits PTY pair platform constraint).
 
-import { spawnSync } from 'child_process';
 import { createHash, randomUUID } from 'crypto';
 import { statSync } from 'fs';
 import { createServer } from 'net';
@@ -137,58 +136,33 @@ export interface IntegrationHarness {
 }
 
 /**
- * The integration harness boots a real ApiServer which spawns a serial Worker.
- * Worker threads under vitest+tsx cannot resolve the `.js`-style imports in
- * src/background_tasks/serial_worker.js — the tsx loader hooks do not propagate
- * to Worker threads. Workaround: build dist/ first and point the Worker at the
- * compiled JS instead.
+ * Resolve the dist Worker URL the harness will pass to ApiServer. The build
+ * itself happens in vitest's globalSetup (see global_setup.ts) so it runs
+ * once in the main process before any worker thread spawns; this function
+ * is read-only.
  *
- * The build is only run if dist/background_tasks/serial_worker.js is missing
- * or older than its src/ counterpart. Warm rebuilds are skipped so subsequent
- * test runs don't pay the build cost.
+ * Why a separate globalSetup instead of building here: vitest runs test
+ * files in parallel worker threads, and `npm run build` includes a
+ * `prebuild` step that does `rm -rf dist`. If two workers raced on the
+ * build, one would delete dist/ while another was mid-spawn of the Worker
+ * pointing at it — ERR_MODULE_NOT_FOUND on a half-deleted tree.
  */
-function ensureDistBuilt(): URL {
+function resolveDistWorkerUrl(): URL {
   // Resolve the astros_api root from this file's location.
   // here     -> .../astros_api/src/test_harness/integration_harness.ts
   // apiRoot  -> .../astros_api/
   const here = fileURLToPath(import.meta.url);
   const apiRoot = resolve(dirname(here), '..', '..');
   const distWorker = resolve(apiRoot, 'dist', 'background_tasks', 'serial_worker.js');
-  const srcWorker = resolve(apiRoot, 'src', 'background_tasks', 'serial_worker.js');
 
-  // Skip the build if dist/ is fresh (dist worker mtime >= src worker mtime).
-  try {
-    const distStat = statSync(distWorker);
-    const srcStat = statSync(srcWorker);
-    if (distStat.mtimeMs >= srcStat.mtimeMs) {
-      return pathToFileURL(distWorker);
-    }
-  } catch {
-    // dist/ missing or stat failed; fall through to build.
-  }
-
-  // Build it. `npm run build` runs the project's full pipeline (lint + tsc +
-  // tsc-alias). If lint fails, the build fails and the harness fails to
-  // boot — that's correct: a failing lint should not silently produce a
-  // stale dist/.
-  const result = spawnSync('npm', ['run', 'build'], {
-    cwd: apiRoot,
-    stdio: 'inherit',
-    env: process.env,
-  });
-  if (result.status !== 0) {
-    throw new Error(
-      `Integration harness: npm run build failed with code ${result.status}. ` +
-        `dist/ is required to spawn the serial Worker because tsx's loader does ` +
-        `not propagate to Worker threads.`,
-    );
-  }
-
-  // Verify the Worker file exists post-build.
   try {
     statSync(distWorker);
   } catch {
-    throw new Error(`Integration harness: build completed but ${distWorker} is missing.`);
+    throw new Error(
+      `Integration harness: ${distWorker} is missing. ` +
+        `vitest's globalSetup (src/test_harness/global_setup.ts) should have built it; ` +
+        `if you're running the harness outside vitest, run \`npm run build\` first.`,
+    );
   }
   return pathToFileURL(distWorker);
 }
@@ -213,9 +187,10 @@ async function findFreePort(): Promise<number> {
 export async function bootIntegrationHarness(
   opts: BootIntegrationHarnessOpts = {},
 ): Promise<IntegrationHarness> {
-  // 0. Ensure dist/ is built so the spawned serial Worker can actually load
-  //    its imports under vitest+tsx. See ensureDistBuilt() for rationale.
-  const workerScriptUrl = ensureDistBuilt();
+  // 0. Resolve the dist Worker URL. The build itself runs in vitest's
+  //    globalSetup before any worker thread spawns; we just point the
+  //    spawned ApiServer at the existing artifact here.
+  const workerScriptUrl = resolveDistWorkerUrl();
 
   // 1. PTY pair
   const pty = await createPtyPair();
