@@ -175,6 +175,29 @@ describe('writeGuard', () => {
       }
     });
 
+    it('allows POST /firmware/flash so the orchestrator can return 409 with currentJobId', () => {
+      // The flash POST is allowlisted while a flash is active so the
+      // request reaches the orchestrator's synchronous lock-acquire check
+      // and surfaces the documented 409 `{ error: 'job_already_running',
+      // currentJobId }` payload — operators need currentJobId to
+      // distinguish "flash already running" from "you can't do this
+      // right now". Without the allowlist the route would return a
+      // generic 423 with no jobId.
+      const { status, lock } = activeFlash();
+      const { res, next } = call('POST', '/firmware/flash', status, lock);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('still blocks other POST paths even when /firmware/flash is allowlisted', () => {
+      const { status, lock } = activeFlash();
+      for (const p of ['/scripts/upload', '/locations/syncconfig', '/firmware/upload']) {
+        const { res, next } = call('POST', p, status, lock);
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(423);
+      }
+    });
+
     it('blocks panicStop and panicClear with 423 (stricter than read-only mode)', () => {
       // Read-only allows panic so the user can halt motion during a server
       // outage; flash-active does NOT, because emitting a PANIC_STOP frame
