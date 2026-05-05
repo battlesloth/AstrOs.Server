@@ -1,4 +1,4 @@
-// c.6c.2 Task 11 — reboot-timer fallback when NO heartbeat arrives.
+// Integration test: reboot-timer fallback when NO heartbeat arrives.
 //
 // Pins the recovery contract: if a flash succeeds but the master never
 // emits a heartbeat POLL_ACK (bricked, partitioned, or just slow), the
@@ -41,7 +41,7 @@ describe('integration: reboot-timer fallback (no heartbeat)', () => {
       harness.stub.writePollAck();
       await harness.waitForVariantCachePopulated(MASTER_SENTINEL_MAC, MASTER_VARIANT);
 
-      // 2. Seed upload + happy stub setup (same as Task 5 / Task 10 test 1).
+      // 2. Seed upload + happy stub setup so the flash reaches flashJobDone.
       const binBytes = Buffer.alloc(4096, 0x42);
       await harness.populateUpload({
         binBytes,

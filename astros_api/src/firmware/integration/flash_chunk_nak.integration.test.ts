@@ -1,6 +1,6 @@
-// Integration test for c.6c.2 Task 8: chunk NAK + Go-Back-N retransmit.
+// Integration test: chunk NAK + Go-Back-N retransmit.
 //
-// Validates the c.6b chunk_streamer's NAK handling end-to-end against a
+// Validates the chunk_streamer's NAK handling end-to-end against a
 // real serial wire. The stub master is configured with autoAckUpload({
 // failAtSeq: 2 }), which NAKs FW_CHUNK seq=2 exactly once with
 // lastGoodSeq=1, reasonCode='CRC' before resuming normal ACKing — so the
@@ -42,7 +42,7 @@ const PRE_FLASH_FW = '1.0.0';
 const POST_FLASH_FW = '1.5.0';
 // 5 chunks of 4096 bytes each — needed so failAtSeq: 2 actually fires.
 // The streamer's default chunkSizeBytes=4096 (chunk_streamer.ts:63), so a
-// 4096-byte blob (Task 5) is exactly 1 chunk; we need ≥3 to NAK seq=2.
+// 4096-byte blob would be exactly 1 chunk; we need ≥3 to NAK seq=2.
 const BLOB_SIZE = 5 * 4096;
 
 // FW_CHUNK payload (5 US-separated fields per generateFwChunk):
@@ -89,7 +89,7 @@ describe('integration: chunk NAK + Go-Back-N recovery', () => {
       // 4. Configure stub: autoAckUpload({failAtSeq:2}) NAKs seq=2 once
       //    with lastGoodSeq=1, reasonCode='CRC' then resumes ACKing.
       //    scriptDeploy: happy single-controller OK so the deploy phase
-      //    completes the same as the Task 5 happy-path baseline.
+      //    completes after the upload recovers.
       harness.stub.autoAckUpload({ failAtSeq: 2 });
       harness.stub.scriptDeploy({
         controllers: [

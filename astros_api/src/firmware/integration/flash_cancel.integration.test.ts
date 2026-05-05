@@ -1,4 +1,4 @@
-// Integration tests for c.6c.2 Task 7: cancel mechanism. Two cases — cancel
+// Integration tests for the cancel mechanism. Two cases — cancel
 // during upload phase, cancel during deploy phase. Each verifies the
 // corresponding orchestrator branch ends in `flashJobFailed` + lock release.
 //

@@ -1,5 +1,4 @@
-// Integration test for c.6c.2 Task 9: per-controller deploy mixed
-// OK/FAILED outcomes.
+// Integration test: per-controller deploy mixed OK/FAILED outcomes.
 //
 // Pins the orchestrator's `deriveJobLifecycle` contract: when every
 // controller reaches a terminal stage, the job lifecycle is `'done'`

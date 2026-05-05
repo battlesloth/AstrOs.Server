@@ -5,7 +5,9 @@
 // during tests. It is a *test fake*, not a behavior simulator — real
 // firmware behavior simulation lives in AstrOs.ESP.
 //
-// Task 2 covered the raw read/write skeleton:
+// Two layers of API:
+//
+// Raw read/write skeleton:
 //   - Opens a SerialPort + DelimiterParser on the master end of a PTY.
 //   - Parses inbound (server-emitted) frames into `{ type, msgId, payload }`.
 //   - Exposes typed outbound writers for every master→server message family
@@ -15,7 +17,7 @@
 //   - Exposes a `waitForFrame()` synchronization helper for deterministic
 //     test orchestration.
 //
-// Task 3 (this file) adds the scripted-response API on top:
+// Scripted-response API on top:
 //   - autoAckUpload(): auto-ACK FW_TRANSFER_BEGIN / FW_CHUNK / FW_TRANSFER_END.
 //     Supports failAtSeq for one-shot NAK injection (Go-Back-N).
 //   - scriptDeploy(opts): on FW_DEPLOY_BEGIN, walk each controller through
@@ -64,8 +66,8 @@ export interface InboundFrame {
   type: SerialMessageType;
   msgId: string;
   // Raw payload bytes after the GS separator, unparsed. Tests can match on
-  // this directly (e.g. assert it contains a transferId substring); Task 3
-  // will layer per-type field decoding for the scripted-response API.
+  // this directly (e.g. assert it contains a transferId substring); the
+  // scripted-response API layers per-type field decoding on top.
   payload: string;
 }
 
@@ -162,7 +164,7 @@ export interface PollAckArgs {
 }
 
 // ---------------------------------------------------------------------------
-// Scripted-response API argument shapes (Task 3)
+// Scripted-response API argument shapes
 // ---------------------------------------------------------------------------
 
 export interface AutoAckUploadOpts {
@@ -247,7 +249,7 @@ export class StubMaster {
   private readonly inbound: InboundFrame[] = [];
   private readonly waiters: FrameWaiter[] = [];
 
-  // Scripted-response configuration (Task 3). Both are null when the feature
+  // Scripted-response configuration. Both are null when the feature
   // is not enabled; set by autoAckUpload() / scriptDeploy(); cleared by
   // disable().
   private autoAckUploadCfg: AutoAckUploadCfg | null = null;
@@ -456,7 +458,7 @@ export class StubMaster {
   }
 
   // -------------------------------------------------------------------------
-  // Scripted-response API (Task 3)
+  // Scripted-response API
   // -------------------------------------------------------------------------
 
   // Configure the stub to automatically respond to FW_TRANSFER_BEGIN,
@@ -679,7 +681,7 @@ function parseInbound(line: string): InboundFrame | null {
 }
 
 // ---------------------------------------------------------------------------
-// Narrow file-scope payload parsers for inbound server→master frames (Task 3).
+// Narrow file-scope payload parsers for inbound server→master frames.
 //
 // These are intentionally separate from MessageHandler, which parses the
 // master→server direction. Field counts and separator choice are verified

@@ -1,4 +1,4 @@
-// Integration test for c.6c.2 Task 12: concurrent flash rejection.
+// Integration test: concurrent flash rejection.
 //
 // Two assertions in one test:
 //
@@ -17,8 +17,8 @@
 // Cleanup: DELETE the in-flight flash at end-of-test so the lock releases
 // immediately rather than waiting 15s for the reboot timer.
 //
-// Tasks 5-11 all complete the flash cleanly; Task 12 is the only test
-// exercising the in-flight-flash rejection path.
+// This is the only integration test exercising the in-flight-flash
+// rejection path — every other test completes the flash cleanly.
 
 import { describe, it, expect, afterEach } from 'vitest';
 import {

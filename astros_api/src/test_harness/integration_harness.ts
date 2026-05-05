@@ -32,8 +32,9 @@ export interface BootIntegrationHarnessOpts {
   /**
    * Override the FlashJobOrchestrator's reboot-timeout / throttle-window to
    * keep timer-fallback tests fast. Default reboot timeout is 15000ms;
-   * Task 10 / 11 set this to a small value (e.g. 1000ms) so a wrong-version
-   * heartbeat or no-heartbeat scenario doesn't burn 15 seconds of wall-clock.
+   * tests exercising the timer fallback set this to a small value (e.g.
+   * 1000ms) so a wrong-version-heartbeat or no-heartbeat scenario doesn't
+   * burn 15 seconds of wall-clock.
    */
   flashOrchestratorConfig?: {
     rebootTimeoutMs?: number;

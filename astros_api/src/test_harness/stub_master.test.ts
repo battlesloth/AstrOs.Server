@@ -98,7 +98,7 @@ function requireFrame(frames: ValidatedFrame[], index: number): ValidatedFrame {
 
 describe('StubMaster (PTY-backed)', () => {
   // -------------------------------------------------------------------------
-  // Task 2 — raw I/O round-trips
+  // Raw I/O round-trips
   // -------------------------------------------------------------------------
 
   skipIfNotPosix(
@@ -227,7 +227,7 @@ describe('StubMaster (PTY-backed)', () => {
   );
 
   // -------------------------------------------------------------------------
-  // Task 3 — scripted-response API
+  // Scripted-response API
   // -------------------------------------------------------------------------
 
   skipIfNotPosix(

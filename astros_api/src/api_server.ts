@@ -4,7 +4,7 @@
  * - **Production / dev runs** (`node dist/api_server.js`, `tsx src/api_server.ts`):
  *   this file is the main module. The IIFE at the bottom calls
  *   `ApiServer.bootstrap()` automatically and installs SIGTERM/SIGINT handlers
- *   that trigger a clean async shutdown. This is how the server runs in the.
+ *   that trigger a clean async shutdown. This is how the server runs in the
  *   container.
  *
  * - **Integration test harness** (`src/test_harness/integration_harness.ts`):

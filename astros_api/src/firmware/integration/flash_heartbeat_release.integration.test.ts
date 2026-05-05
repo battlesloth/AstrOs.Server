@@ -1,4 +1,4 @@
-// c.6c.2 Task 10 — heartbeat-vs-reboot-timer first-fire-wins integration tests.
+// Integration tests: heartbeat-vs-reboot-timer first-fire-wins.
 //
 // Two scenarios:
 //   1. matching-version POLL_ACK heartbeat releases the lock fast (well under
