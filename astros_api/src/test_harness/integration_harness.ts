@@ -1,6 +1,6 @@
 // Boots a real ApiServer connected to a StubMaster via a PTY pair, exposes
 // HTTP + WebSocket clients for tests, and tears everything down cleanly on
-// dispose(). Linux/macOS only (inherits PTY pair platform constraint).
+// dispose(). Linux only (inherits PTY pair platform constraint).
 
 import { spawnSync } from 'child_process';
 import { createHash, randomUUID } from 'crypto';
