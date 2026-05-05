@@ -12,7 +12,7 @@ import {
 } from '../../test_harness/integration_harness.js';
 import { TransmissionType } from '../../models/enums.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 const MASTER_SENTINEL_MAC = '00:00:00:00:00:00';
 const MASTER_VARIANT = 'astros-controller-v1';
@@ -28,7 +28,7 @@ describe('integration: reboot-timer fallback (no heartbeat)', () => {
     harness = undefined;
   });
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'no POLL_ACK after flashJobDone → timer fallback fires → lockStateChanged{locked:false}',
     async () => {
       // 1. Boot with shrunken reboot timer so the test completes in seconds.

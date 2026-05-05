@@ -2,10 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { existsSync } from 'fs';
 import { createPtyPair } from './pty_pair.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 describe('createPtyPair', () => {
-  skipIfNotPosix('emits two distinct PTY paths under /dev/pts/', async () => {
+  skipIfNotLinux('emits two distinct PTY paths under /dev/pts/', async () => {
     const pty = await createPtyPair();
     try {
       expect(pty.serverPath).toMatch(/^\/dev\/pts\/\d+$/);
@@ -18,7 +18,7 @@ describe('createPtyPair', () => {
     }
   });
 
-  skipIfNotPosix('dispose() releases the socat process and PTY paths', async () => {
+  skipIfNotLinux('dispose() releases the socat process and PTY paths', async () => {
     const pty = await createPtyPair();
     const path = pty.serverPath;
     await pty.dispose();

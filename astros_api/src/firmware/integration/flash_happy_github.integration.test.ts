@@ -32,7 +32,7 @@ import {
 } from '../../test_harness/integration_harness.js';
 import { TransmissionType } from '../../models/enums.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 // Master's sentinel MAC per project_master_esp_sentinel_mac convention.
 // decidePostDeployHeartbeat filters on this exact string so the test must
@@ -73,7 +73,7 @@ describe('integration: happy github flash + heartbeat release', () => {
     harness = undefined;
   });
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'POST /api/firmware/flash kind=github → flashJobDone → POLL_ACK heartbeat → lockStateChanged{locked:false}',
     async () => {
       // 1. Boot the harness with a fake release fetcher. The cache is

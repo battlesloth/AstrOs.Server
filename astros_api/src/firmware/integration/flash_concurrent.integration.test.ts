@@ -28,7 +28,7 @@ import {
 import { TransmissionType } from '../../models/enums.js';
 import { SerialMessageType } from '../../serial/serial_message.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 const MASTER_SENTINEL_MAC = '00:00:00:00:00:00';
 const MASTER_VARIANT = 'astros-controller-v1';
@@ -43,7 +43,7 @@ describe('integration: concurrent flash rejection', () => {
     harness = undefined;
   });
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'second POST during in-flight flash → 409; WS SERVO_TEST → flashJobActive frame',
     async () => {
       // 1. Boot + variant cache + upload seed.

@@ -10,8 +10,15 @@ const PTY_LINE_REGEX = /N PTY is (\/dev\/pts\/\d+)/;
 const SOCAT_STARTUP_TIMEOUT_MS = 5000;
 
 export async function createPtyPair(): Promise<PtyPair> {
-  if (process.platform === 'win32') {
-    throw new Error('PtyPair: socat-based PTYs are not supported on Windows');
+  // Linux-only: PTY_LINE_REGEX matches the `/dev/pts/N` paths Linux's socat
+  // emits. macOS socat produces `/dev/ttysNNN`-style paths, so the regex
+  // would silently miss matches and the timeout would fire 5s later. Rather
+  // than maintain a per-platform regex matrix for a developer convenience
+  // we don't have hardware to test on, gate the whole helper to Linux.
+  if (process.platform !== 'linux') {
+    throw new Error(
+      `PtyPair: socat-based PTYs are only supported on Linux (got ${process.platform})`,
+    );
   }
 
   const child = spawn('socat', ['-d', '-d', 'pty,raw,echo=0', 'pty,raw,echo=0'], {

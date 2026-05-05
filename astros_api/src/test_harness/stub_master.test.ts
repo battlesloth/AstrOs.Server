@@ -17,7 +17,7 @@ import {
   type FwDeployBegin,
 } from '../models/firmware/firmware_messages.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 // ---------------------------------------------------------------------------
 // Shared setup helper — avoids 20+ lines of PTY/port/stub boilerplate per
@@ -102,7 +102,7 @@ describe('StubMaster (PTY-backed)', () => {
   // Raw I/O round-trips
   // -------------------------------------------------------------------------
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'inbound: server-side write of FW_TRANSFER_BEGIN is parsed by the stub master',
     async () => {
       const pty = await createPtyPair();
@@ -162,7 +162,7 @@ describe('StubMaster (PTY-backed)', () => {
     },
   );
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'outbound: stub master writes FW_TRANSFER_BEGIN_ACK that the server-side handler accepts',
     async () => {
       const pty = await createPtyPair();
@@ -231,7 +231,7 @@ describe('StubMaster (PTY-backed)', () => {
   // Scripted-response API
   // -------------------------------------------------------------------------
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'autoAckUpload: auto-ACKs FW_TRANSFER_BEGIN, three FW_CHUNKs, and FW_TRANSFER_END',
     async () => {
       const { stub, serverPort, dispose } = await setupBothEnds();
@@ -325,7 +325,7 @@ describe('StubMaster (PTY-backed)', () => {
     },
   );
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'autoAckUpload with failAtSeq=2: NAKs once then resumes normal ACKing',
     async () => {
       const { stub, serverPort, dispose } = await setupBothEnds();
@@ -414,7 +414,7 @@ describe('StubMaster (PTY-backed)', () => {
     },
   );
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'scriptDeploy: walks FW_PROGRESS stages then emits FW_DEPLOY_DONE with per-controller outcomes',
     async () => {
       const { stub, serverPort, dispose } = await setupBothEnds();
@@ -497,7 +497,7 @@ describe('StubMaster (PTY-backed)', () => {
     },
   );
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'writePollAck: emits POLL_ACK parseable by MessageHandler.handlePollAck',
     async () => {
       const { stub, serverPort, dispose } = await setupBothEnds();
@@ -534,7 +534,7 @@ describe('StubMaster (PTY-backed)', () => {
     },
   );
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'disable("autoAckUpload"): no response is written after FW_TRANSFER_BEGIN',
     async () => {
       const { stub, serverPort, dispose } = await setupBothEnds();

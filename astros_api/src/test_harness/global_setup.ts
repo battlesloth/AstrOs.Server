@@ -23,6 +23,15 @@ import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
 export default function setup(): void {
+  // The integration suite is Linux-only (see pty_pair.ts). Skip the build
+  // on every other platform so unit-only `npx vitest run` invocations on
+  // Windows still succeed — `npm run build`'s `prebuild` step uses
+  // `rm -rf dist` which fails on win32, and macOS's socat emits PTY paths
+  // pty_pair.ts's regex doesn't match anyway.
+  if (process.platform !== 'linux') {
+    return;
+  }
+
   // Resolve the astros_api root from this file's location.
   // here    -> .../astros_api/src/test_harness/global_setup.ts
   // apiRoot -> .../astros_api/

@@ -27,7 +27,7 @@ import {
 import { TransmissionType } from '../../models/enums.js';
 import { FwStage } from '../../models/firmware/firmware_messages.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 const MASTER_SENTINEL_MAC = '00:00:00:00:00:00';
 const PADAWAN_MAC = 'aa:bb:cc:dd:ee:ff';
@@ -44,7 +44,7 @@ describe('integration: per-controller deploy mixed OK/FAILED', () => {
     harness = undefined;
   });
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'master OK + padawan FAILED → flashJobDone (NOT failed) → master heartbeat releases lock',
     async () => {
       // 1. Boot harness configured for the master only. Both controllers

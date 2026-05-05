@@ -14,7 +14,7 @@ import {
 } from '../../test_harness/integration_harness.js';
 import { TransmissionType } from '../../models/enums.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 const MASTER_SENTINEL_MAC = '00:00:00:00:00:00';
 const MASTER_VARIANT = 'astros-controller-v1';
@@ -32,7 +32,7 @@ describe('integration: heartbeat vs reboot-timer', () => {
     harness = undefined;
   });
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'matching-version POLL_ACK heartbeat releases lock well under reboot timer',
     async () => {
       // 1. Boot — production 15s reboot timer (default). Test asserts the
@@ -115,7 +115,7 @@ describe('integration: heartbeat vs reboot-timer', () => {
     30_000,
   );
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'wrong-version POLL_ACK heartbeat is ignored → timer fallback releases lock',
     async () => {
       // 1. Boot with shrunken reboot timer so the timer-fallback path

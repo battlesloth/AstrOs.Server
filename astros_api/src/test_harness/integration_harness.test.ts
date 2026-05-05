@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { bootIntegrationHarness, type IntegrationHarness } from './integration_harness.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 describe('integration harness', () => {
   let harness: IntegrationHarness | undefined;
@@ -11,7 +11,7 @@ describe('integration harness', () => {
     harness = undefined;
   });
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'boots ApiServer + StubMaster, accepts WS, receives initial state, tears down',
     async () => {
       harness = await bootIntegrationHarness();
@@ -28,7 +28,7 @@ describe('integration harness', () => {
     30_000, // generous timeout — first boot includes a fresh `npm run build`
   );
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'serial worker thread loads + does not error when receiving a POLL_ACK frame',
     async () => {
       harness = await bootIntegrationHarness();

@@ -31,7 +31,7 @@ import { TransmissionType } from '../../models/enums.js';
 import { SerialMessageType } from '../../serial/serial_message.js';
 import { MessageHelper } from '../../serial/message_helper.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 // Master's sentinel MAC per project_master_esp_sentinel_mac convention.
 // decidePostDeployHeartbeat filters on this exact string so the test must
@@ -63,7 +63,7 @@ describe('integration: chunk NAK + Go-Back-N recovery', () => {
     harness = undefined;
   });
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'autoAckUpload({failAtSeq:2}) → seq=2 NAK once → streamer retransmits → flashJobDone',
     async () => {
       // 1. Boot harness configured for the master only.

@@ -472,10 +472,14 @@ cd astros_api && npm run test:integration
 The integration suite is also covered by the default `npm test` / `npx vitest run`
 sweep — `test:integration` exists for fast targeted re-runs during development.
 
-The suite is **Linux/macOS only** (depends on `socat` for PTY pair allocation).
-First run takes ~5-15 sec extra for a `dist/` build (Worker threads can't load
-TS source under vitest+tsx, so the harness runs the production worker from
-compiled JS); subsequent runs skip the build.
+The suite is **Linux only** — non-Linux runners skip the integration tests
+via `skipIfNotLinux`, and `globalSetup` short-circuits there too so unit
+tests still run normally on Windows. (macOS's `socat` emits a different PTY
+path format than the helper's regex matches; rather than maintain a
+per-platform matrix without hardware to test on, the suite is gated to
+Linux.) First run on Linux takes ~5-15 sec extra for a `dist/` build
+(Worker threads can't load TS source under vitest+tsx, so the harness runs
+the production worker from compiled JS); subsequent runs skip the build.
 
 The remaining manual scenarios in this plan still require operator attention —
 they cover boundaries the integration suite intentionally doesn't:

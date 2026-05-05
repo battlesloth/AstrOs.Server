@@ -39,7 +39,7 @@ jobs:
       # The integration suite (src/firmware/integration/*) drives a real
       # ApiServer + StubMaster across a socat-backed PTY pair. Without
       # socat, createPtyPair throws and every integration test fails.
-      # Linux-only; non-POSIX runners skip via skipIfNotPosix.
+      # Linux-only; non-Linux runners skip via skipIfNotLinux.
       - name: Install socat (PTY pair for integration tests)
         run: sudo apt-get update && sudo apt-get install -y socat
 

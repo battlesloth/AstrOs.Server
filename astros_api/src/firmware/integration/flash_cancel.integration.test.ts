@@ -25,7 +25,7 @@ import { TransmissionType } from '../../models/enums.js';
 import { SerialMessageType } from '../../serial/serial_message.js';
 import { FwStage } from '../../models/firmware/firmware_messages.js';
 
-const skipIfNotPosix = process.platform === 'win32' ? it.skip : it;
+const skipIfNotLinux = process.platform !== 'linux' ? it.skip : it;
 
 const MASTER_SENTINEL_MAC = '00:00:00:00:00:00';
 const MASTER_VARIANT = 'astros-controller-v1';
@@ -40,7 +40,7 @@ describe('integration: cancel during upload + deploy', () => {
     harness = undefined;
   });
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'DELETE during upload phase: streamer aborts → flashJobFailed{reason:aborted} → lock release',
     async () => {
       // 1. Boot harness + pre-populate variantCache so listFlashTargets()
@@ -158,7 +158,7 @@ describe('integration: cancel during upload + deploy', () => {
     30_000,
   );
 
-  skipIfNotPosix(
+  skipIfNotLinux(
     'DELETE during deploy phase: deploy-unsub disposed → flashJobFailed{abortReason} + per-controller Failed → lock release',
     async () => {
       // 1. Boot harness + variant cache + upload (same as upload-cancel test).
