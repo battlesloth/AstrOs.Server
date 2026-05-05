@@ -77,7 +77,7 @@ import { ServoTest } from './models/servo_test.js';
 import { FirmwareConfig } from './models/firmware_config.js';
 import { meetsMinimum } from './utility/semver.js';
 
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 import { initializeDatabase } from './dal/database.js';
 import { Kysely } from 'kysely';
@@ -1290,9 +1290,16 @@ export class ApiServer {
 // the moment api_server.js loads, then collide with the harness's own
 // `bootstrap()` call on the same env-var ports. See file header for full
 // two-mode contract.
+//
+// `pathToFileURL(path.resolve(...))` is the robust way to convert argv[1]
+// to a file URL — `argv[1]` is often a relative path (e.g. `./dist/api_server.js`
+// from `npm run start`), and `new URL('file://./dist/...')` would parse the
+// leading `.` as a host, never matching `import.meta.url`'s absolute form.
 const isMainModule = (() => {
   try {
-    return import.meta.url === new URL(`file://${process.argv[1]}`).href;
+    const argv1 = process.argv[1];
+    if (argv1 === undefined) return false;
+    return import.meta.url === pathToFileURL(path.resolve(argv1)).href;
   } catch {
     return false;
   }
