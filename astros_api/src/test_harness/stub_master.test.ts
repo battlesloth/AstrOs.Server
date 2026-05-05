@@ -9,6 +9,7 @@ import { MessageHandler } from '../serial/message_handler.js';
 import { SerialMessageType } from '../serial/serial_message.js';
 import { SerialWorkerResponseType } from '../serial/serial_worker_response.js';
 import {
+  FW_SERIAL_SLIDING_WINDOW,
   FwStage,
   type FwTransferBegin,
   type FwChunk,
@@ -570,4 +571,34 @@ describe('StubMaster (PTY-backed)', () => {
       }
     },
   );
+
+  // -------------------------------------------------------------------------
+  // autoAckUpload input validation — protects against frames the server
+  // would categorically parse as UNKNOWN. No PTY needed: the validation
+  // runs synchronously inside autoAckUpload() before any wire I/O.
+  // -------------------------------------------------------------------------
+
+  it('autoAckUpload: rejects windowSize > FW_SERIAL_SLIDING_WINDOW', () => {
+    const stub = new StubMaster({ ptyPath: '/dev/null' });
+    expect(() => stub.autoAckUpload({ windowSize: FW_SERIAL_SLIDING_WINDOW + 1 })).toThrow(
+      /windowSize must be in/,
+    );
+  });
+
+  it('autoAckUpload: rejects windowSize <= 0', () => {
+    const stub = new StubMaster({ ptyPath: '/dev/null' });
+    expect(() => stub.autoAckUpload({ windowSize: 0 })).toThrow(/windowSize must be in/);
+    expect(() => stub.autoAckUpload({ windowSize: -1 })).toThrow(/windowSize must be in/);
+  });
+
+  it('autoAckUpload: rejects failAtSeq <= 0 (would emit invalid lastGoodSeq)', () => {
+    const stub = new StubMaster({ ptyPath: '/dev/null' });
+    expect(() => stub.autoAckUpload({ failAtSeq: 0 })).toThrow(/failAtSeq must be > 0/);
+    expect(() => stub.autoAckUpload({ failAtSeq: -5 })).toThrow(/failAtSeq must be > 0/);
+  });
+
+  it('autoAckUpload: accepts windowSize at the FW_SERIAL_SLIDING_WINDOW boundary', () => {
+    const stub = new StubMaster({ ptyPath: '/dev/null' });
+    expect(() => stub.autoAckUpload({ windowSize: FW_SERIAL_SLIDING_WINDOW })).not.toThrow();
+  });
 });

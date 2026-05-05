@@ -466,8 +466,30 @@ export class StubMaster {
   // notifications, so a test that waitForFrame(FW_TRANSFER_BEGIN) will see the
   // ACK already written when its promise resolves.
   autoAckUpload(opts?: AutoAckUploadOpts): void {
+    // Validate at call time so misconfigured tests fail fast rather than
+    // emitting frames the server categorically parses as UNKNOWN.
+    //   - windowSize > FW_SERIAL_SLIDING_WINDOW: handleFwChunkAck rejects
+    //     `windowRemaining` exceeding the configured sliding window
+    //     (message_handler.ts:225-230). Every FW_CHUNK_ACK would route to
+    //     UNKNOWN and the streamer would never advance.
+    //   - failAtSeq <= 0: lastGoodSeq=failAtSeq-1 would serialize as a
+    //     negative integer, which parseUint rejects in handleFwChunkNak.
+    //     The streamer would never see the NAK so the retransmit branch
+    //     wouldn't exercise.
+    const windowSize = opts?.windowSize ?? FW_SERIAL_SLIDING_WINDOW;
+    if (windowSize <= 0 || windowSize > FW_SERIAL_SLIDING_WINDOW) {
+      throw new Error(
+        `StubMaster.autoAckUpload: windowSize must be in (0, ${FW_SERIAL_SLIDING_WINDOW}]; got ${windowSize}`,
+      );
+    }
+    if (opts?.failAtSeq !== undefined && opts.failAtSeq <= 0) {
+      throw new Error(
+        `StubMaster.autoAckUpload: failAtSeq must be > 0 (got ${opts.failAtSeq}); a NAK at seq=0 would emit lastGoodSeq=-1, which the server parses as UNKNOWN`,
+      );
+    }
+
     this.autoAckUploadCfg = {
-      windowSize: opts?.windowSize ?? FW_SERIAL_SLIDING_WINDOW,
+      windowSize,
       endStatus: opts?.endStatus ?? 'OK',
       failAtSeq: opts?.failAtSeq,
       // Reset the "failed once" flag on each fresh autoAckUpload() call so
