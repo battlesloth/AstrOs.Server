@@ -29,6 +29,16 @@ export interface BootIntegrationHarnessOpts {
    * any network I/O.
    */
   firmwareReleaseFetcher?: typeof fetch;
+  /**
+   * Override the FlashJobOrchestrator's reboot-timeout / throttle-window to
+   * keep timer-fallback tests fast. Default reboot timeout is 15000ms;
+   * Task 10 / 11 set this to a small value (e.g. 1000ms) so a wrong-version
+   * heartbeat or no-heartbeat scenario doesn't burn 15 seconds of wall-clock.
+   */
+  flashOrchestratorConfig?: {
+    rebootTimeoutMs?: number;
+    throttleWindowMs?: number;
+  };
 }
 
 // Args for `harness.populateUpload(...)` — used by integration tests that
@@ -277,6 +287,7 @@ export async function bootIntegrationHarness(
       workerScriptUrl,
       onWorkerError: (err) => workerErrors.push(err),
       firmwareReleaseFetcher: opts?.firmwareReleaseFetcher,
+      flashOrchestratorConfig: opts?.flashOrchestratorConfig,
     });
 
     // 6. Construct + start StubMaster on the master end.

@@ -147,6 +147,15 @@ export interface ApiServerOptions {
    * this undefined and gets the global `fetch`.
    */
   firmwareReleaseFetcher?: typeof fetch;
+  /**
+   * Tests override the FlashJobOrchestrator's reboot-timeout (default 15s)
+   * to keep wrong-version-heartbeat / timer-fallback tests fast. Production
+   * leaves this undefined.
+   */
+  flashOrchestratorConfig?: {
+    rebootTimeoutMs?: number;
+    throttleWindowMs?: number;
+  };
 }
 
 // Exported so the integration test harness can import + bootstrap an
@@ -169,6 +178,10 @@ export class ApiServer {
   private readonly workerScriptUrl: URL;
   private readonly onWorkerError?: (err: Error) => void;
   private readonly firmwareReleaseFetcher?: typeof fetch;
+  private readonly flashOrchestratorConfig?: {
+    rebootTimeoutMs?: number;
+    throttleWindowMs?: number;
+  };
 
   private httpServer?: import('http').Server;
 
@@ -287,6 +300,7 @@ export class ApiServer {
       opts?.workerScriptUrl ?? new URL('./background_tasks/serial_worker.js', import.meta.url);
     this.onWorkerError = opts?.onWorkerError;
     this.firmwareReleaseFetcher = opts?.firmwareReleaseFetcher;
+    this.flashOrchestratorConfig = opts?.flashOrchestratorConfig;
 
     // Broadcast lock state to all connected clients on every change. Subscribed
     // here (rather than in Init) so a state change emitted before Init finishes
@@ -590,6 +604,7 @@ export class ApiServer {
           })),
       },
       emitWs: (msg) => this.updateClients(msg),
+      config: this.flashOrchestratorConfig,
     });
     registerFirmwareFlashRoutes(this.router, this.authHandler, this.flashOrchestrator);
 
