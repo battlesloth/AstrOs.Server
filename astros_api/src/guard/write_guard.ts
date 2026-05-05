@@ -17,10 +17,20 @@ const ALLOWED_IN_READONLY: Array<{ method: string; path: string }> = [
 // and corrupt the in-flight transfer. Login / reauth still work so a fresh
 // session can attach to the live job. DELETE /firmware/flash is the cancel
 // path — it MUST be allowed during a flash, otherwise the cancel button is
-// unreachable while the orchestrator holds the lock.
+// unreachable while the orchestrator holds the lock. POST /firmware/flash is
+// allowed through so a second concurrent flash attempt reaches the orchestrator
+// and gets a 409 { error: 'job_already_running', currentJobId } rather than the
+// generic 423 — the operator UI needs currentJobId to distinguish "you're trying
+// to flash but a flash is already running" from "you can't do this right now".
+//
+// Note: read-only mode (ALLOWED_IN_READONLY) takes precedence over this list
+// when both gates fire simultaneously. That edge case (DB recovery + flash
+// active) is not reachable in practice — read-only is entered during bootstrap
+// before any flash job can exist — so the ordering is intentional.
 const ALLOWED_DURING_FLASH: Array<{ method: string; path: string }> = [
   { method: 'POST', path: '/login' },
   { method: 'POST', path: '/reauth' },
+  { method: 'POST', path: '/firmware/flash' },
   { method: 'DELETE', path: '/firmware/flash' },
 ];
 
