@@ -74,7 +74,7 @@ describe('integration: reboot-timer fallback (no heartbeat)', () => {
 
       const doneEvent = await harness.waitForWsMessage<{
         type: number;
-        data: { jobId: string };
+        data: { jobId: string; endedAt: string };
       }>(
         (m) =>
           (m as { type?: unknown }).type === TransmissionType.flashJobDone &&
@@ -83,10 +83,8 @@ describe('integration: reboot-timer fallback (no heartbeat)', () => {
       );
       expect(doneEvent.data.jobId).toBe(flashBody.jobId);
 
-      // 4. Snapshot the moment flashJobDone resolved + WS index.
-      //    DELIBERATELY emit NO POLL_ACK after this — the test pins the
-      //    timer-only release path.
-      const doneAt = Date.now();
+      // 4. Snapshot the WS index. DELIBERATELY emit NO POLL_ACK after this —
+      //    the test pins the timer-only release path.
       const snapshot = harness.receivedWsMessages.length;
 
       // 5. Wait for lock release. The reboot timer is the only path; with
@@ -95,6 +93,15 @@ describe('integration: reboot-timer fallback (no heartbeat)', () => {
       //    assertion: it proves the lock did NOT release immediately
       //    (which would indicate the timer didn't arm or fired
       //    prematurely). Upper bound 4000ms tolerates slow CI.
+      //
+      //    Reference timestamp is the server-side `endedAt` from the
+      //    flashJobDone payload, NOT `Date.now()` at WS-receive. The
+      //    orchestrator's `handleDeployDone` captures `endedAt` and arms
+      //    the timer in the same synchronous block, so the timer's notion
+      //    of "now" matches `endedAt` to within microseconds. Using a
+      //    client-side timestamp would undercount by however long WS
+      //    delivery took and could fail the lower bound on slow CI even
+      //    when the timer behaved correctly.
       const lockReleased = await harness.waitForWsMessage<{
         type: number;
         locked: boolean;
@@ -108,6 +115,7 @@ describe('integration: reboot-timer fallback (no heartbeat)', () => {
       );
       const releasedAt = Date.now();
       expect(lockReleased.locked).toBe(false);
+      const doneAt = new Date(doneEvent.data.endedAt).getTime();
       const deltaMs = releasedAt - doneAt;
       expect(deltaMs).toBeGreaterThanOrEqual(800);
       expect(deltaMs).toBeLessThan(4000);
