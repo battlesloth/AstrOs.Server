@@ -4,7 +4,6 @@
 
 import { createHash, randomUUID } from 'crypto';
 import { statSync } from 'fs';
-import { createServer } from 'net';
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import jsonwebtoken from 'jsonwebtoken';
 import { tmpdir } from 'os';
@@ -167,23 +166,6 @@ function resolveDistWorkerUrl(): URL {
   return pathToFileURL(distWorker);
 }
 
-async function findFreePort(): Promise<number> {
-  return new Promise<number>((resolve, reject) => {
-    const server = createServer();
-    server.unref();
-    server.on('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
-      server.close((err) => {
-        if (err) reject(err);
-        else if (port === 0) reject(new Error('findFreePort: failed to allocate'));
-        else resolve(port);
-      });
-    });
-  });
-}
-
 export async function bootIntegrationHarness(
   opts: BootIntegrationHarnessOpts = {},
 ): Promise<IntegrationHarness> {
@@ -195,23 +177,27 @@ export async function bootIntegrationHarness(
   // 1. PTY pair
   const pty = await createPtyPair();
 
-  // 2. Random ports
-  const apiPort = await findFreePort();
-  const wsPort = await findFreePort();
-
-  // 3. Temp DB directory (so tests don't pollute ~/.config/astrosserver)
+  // 2. Temp DB directory (so tests don't pollute ~/.config/astrosserver)
   const dbDir = await mkdtemp(join(tmpdir(), 'astros-integration-'));
 
-  // 3b. Temp firmware-cache directory. FirmwareCache + FirmwareUploadStore
+  // 2b. Temp firmware-cache directory. FirmwareCache + FirmwareUploadStore
   //     are constructed during ApiServer.bootstrap and read this env var
   //     at construction time, so it must be set BEFORE bootstrap is called.
   //     Cleaned up in dispose alongside dbDir.
   const firmwareCacheDir = await mkdtemp(join(tmpdir(), 'astros-fwcache-'));
 
-  // 4. Set env vars for the ApiServer's bootstrap.
+  // 3. Set env vars for the ApiServer's bootstrap.
   // NOTE: process.env is process-global, so concurrent harness boots in the
   // same process would race. vitest doesn't run tests within the same file
   // in parallel by default; each test sequentially boots+disposes.
+  //
+  // API_PORT='0' / WEBSOCKET_PORT='0' tells ApiServer to ask the kernel for
+  // an ephemeral port. The harness reads back the actual ports via
+  // server.getBoundApiPort()/getBoundWebsocketPort() AFTER bootstrap. This
+  // avoids a TOCTOU race: a "find free port, then bind it later" scheme
+  // closes the probe socket before the real bind, leaving a window for any
+  // other process (or sibling vitest worker) to grab the port and cause
+  // EADDRINUSE on bootstrap.
   const prevEnv = {
     SERIAL_PORT: process.env.SERIAL_PORT,
     BAUD_RATE: process.env.BAUD_RATE,
@@ -224,8 +210,8 @@ export async function bootIntegrationHarness(
   };
   process.env.SERIAL_PORT = pty.serverPath;
   process.env.BAUD_RATE = '9600';
-  process.env.API_PORT = String(apiPort);
-  process.env.WEBSOCKET_PORT = String(wsPort);
+  process.env.API_PORT = '0';
+  process.env.WEBSOCKET_PORT = '0';
   const jwtKey = process.env.JWT_KEY ?? 'test-jwt-key';
   process.env.JWT_KEY = jwtKey;
   process.env.DATABASE_PATH = dbDir;
@@ -235,7 +221,7 @@ export async function bootIntegrationHarness(
   // was set by vitest globals.
   delete process.env.NODE_ENV;
 
-  // 4b. Generate a long-lived JWT signed with the same JWT_KEY the
+  // 3b. Generate a long-lived JWT signed with the same JWT_KEY the
   //     ApiServer reads. Mirrors `User.generateJwt()` in models/users.ts so
   //     the express-jwt middleware on /api routes accepts it identically.
   //     Done before bootstrap so the harness can return the token even if
@@ -258,7 +244,9 @@ export async function bootIntegrationHarness(
   const workerErrors: Error[] = [];
 
   try {
-    // 5. Boot ApiServer.
+    // 4. Boot ApiServer. bootstrap() awaits both binds (HTTP listen + WS
+    //    'listening'), so it rejects on EADDRINUSE rather than returning a
+    //    server that's mid-bind.
     server = await ApiServer.bootstrap({
       workerScriptUrl,
       onWorkerError: (err) => workerErrors.push(err),
@@ -266,7 +254,13 @@ export async function bootIntegrationHarness(
       flashOrchestratorConfig: opts?.flashOrchestratorConfig,
     });
 
-    // 6. Construct + start StubMaster on the master end.
+    // 4b. Read back the kernel-assigned ports (we asked for 0). These are
+    //     used to construct httpBaseUrl and the WS client URL below; before
+    //     bootstrap returned they would have been 0, useless to the caller.
+    const apiPort = server.getBoundApiPort();
+    const wsPort = server.getBoundWebsocketPort();
+
+    // 5. Construct + start StubMaster on the master end.
     stub = new StubMaster({
       ptyPath: pty.masterPath,
       masterMac: opts.masterMac,
@@ -276,7 +270,7 @@ export async function bootIntegrationHarness(
     });
     await stub.start();
 
-    // 7. Connect WS client + buffer messages. The message listener must be
+    // 6. Connect WS client + buffer messages. The message listener must be
     // attached BEFORE the connection completes, because the server sends its
     // initial `systemStatus` + `lockState` snapshot inside its 'connection'
     // handler (which fires on handshake completion). If we awaited 'open'

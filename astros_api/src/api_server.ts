@@ -169,7 +169,7 @@ export class ApiServer {
 
   private app: Application;
   private router: Router;
-  private websocket!: Server;
+  private websocket?: Server;
 
   private serialWorker!: Worker;
   private serialPort: any;
@@ -338,7 +338,7 @@ export class ApiServer {
     }
 
     logger.info('Starting web services');
-    this.runWebServices();
+    await this.runWebServices();
   }
 
   /**
@@ -635,18 +635,33 @@ export class ApiServer {
     }
   }
 
-  private runWebServices(): void {
-    this.httpServer = this.app.listen(this.apiPort, () => {
-      logger.info(`The application is listening on port ${this.apiPort}`);
+  private async runWebServices(): Promise<void> {
+    // Await both binds (HTTP listen + WS 'listening') before returning so
+    // bootstrap() rejects cleanly on EADDRINUSE in production, and so the
+    // integration harness can read the bound ports back via
+    // getBoundApiPort/getBoundWebsocketPort. Setting API_PORT/WEBSOCKET_PORT
+    // to '0' lets the kernel assign ephemeral ports — used by the harness
+    // to avoid the TOCTOU race that any "find free port, then bind it
+    // later" scheme has.
+    await new Promise<void>((resolve, reject) => {
+      const httpServer = this.app.listen(this.apiPort, () => {
+        logger.info(`The application is listening on port ${this.getBoundApiPort()}`);
+        resolve();
+      });
+      this.httpServer = httpServer;
+      httpServer.once('error', reject);
     });
 
-    this.websocket = new Server({ port: this.websocketPort });
+    const ws = (this.websocket = new Server({ port: this.websocketPort }));
 
     this.systemStatus.subscribe((state) => {
       this.updateClients({ type: TransmissionType.systemStatus, data: state });
     });
 
-    this.websocket.on('connection', (conn) => {
+    // Connection handler attached synchronously before awaiting 'listening',
+    // mirroring the prior sync setup — any client racing the bind still hits
+    // the handler.
+    ws.on('connection', (conn) => {
       const id = uuid_v4();
       this.clients.set(id, conn);
 
@@ -709,6 +724,52 @@ export class ApiServer {
 
       logger.info(`websocket connected: id=${id}`);
     });
+
+    await new Promise<void>((resolve, reject) => {
+      ws.once('listening', () => resolve());
+      ws.once('error', reject);
+    });
+    logger.info(`websocket server listening on port ${this.getBoundWebsocketPort()}`);
+  }
+
+  /**
+   * Port the HTTP server is actually bound to. Useful for callers that pass
+   * `API_PORT=0` to request an ephemeral port and need to know the kernel's
+   * assignment. Throws if called before `runWebServices` completes.
+   */
+  public getBoundApiPort(): number {
+    if (this.httpServer === undefined) {
+      throw new Error('ApiServer.getBoundApiPort: httpServer not yet running');
+    }
+    const addr = this.httpServer.address();
+    if (typeof addr !== 'object' || addr === null) {
+      throw new Error(
+        `ApiServer.getBoundApiPort: httpServer.address() returned ${typeof addr}, expected object`,
+      );
+    }
+    return addr.port;
+  }
+
+  /**
+   * Port the WebSocket server is actually bound to. See `getBoundApiPort`.
+   * Throws if called before `runWebServices` completes or if the server was
+   * configured for a unix-socket path (never the case in this codebase, but
+   * the `ws` library's address() type permits it).
+   */
+  public getBoundWebsocketPort(): number {
+    if (this.websocket === undefined) {
+      throw new Error('ApiServer.getBoundWebsocketPort: websocket not yet running');
+    }
+    const addr = this.websocket.address();
+    if (typeof addr === 'string') {
+      throw new Error(
+        'ApiServer.getBoundWebsocketPort: websocket bound to unix socket, no port available',
+      );
+    }
+    if (addr === null) {
+      throw new Error('ApiServer.getBoundWebsocketPort: websocket.address() returned null');
+    }
+    return addr.port;
   }
 
   handleWebsocketMessage(msg: string, conn: WebSocket): void {
@@ -1261,7 +1322,9 @@ export class ApiServer {
     }
 
     if (this.websocket !== undefined) {
-      await new Promise<void>((resolve) => this.websocket.close(() => resolve()));
+      const websocket = this.websocket;
+      await new Promise<void>((resolve) => websocket.close(() => resolve()));
+      this.websocket = undefined;
     }
 
     if (this.httpServer !== undefined) {
