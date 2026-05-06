@@ -22,9 +22,15 @@ describe('createPtyPair', () => {
     const pty = await createPtyPair();
     const path = pty.serverPath;
     await pty.dispose();
-    // After dispose, the PTY device should be gone (kernel reaps when socat exits).
-    // Allow brief grace for the kernel close.
-    await new Promise((r) => setTimeout(r, 100));
+    // After dispose, the PTY device should be gone (kernel reaps when socat
+    // exits). Cleanup is kernel-async — usually completes in <50ms but can
+    // exceed 100ms on a loaded CI runner. Poll instead of sleeping a fixed
+    // duration so the test's wall-clock cost stays minimal on a quiet
+    // machine while tolerating slow runners up to the 2s ceiling.
+    const deadline = Date.now() + 2000;
+    while (existsSync(path) && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
     expect(existsSync(path)).toBe(false);
   });
 });
