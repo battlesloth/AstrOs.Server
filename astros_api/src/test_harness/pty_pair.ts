@@ -34,14 +34,31 @@ export async function createPtyPair(): Promise<PtyPair> {
       reject(new Error(`socat did not emit PTY paths within ${SOCAT_STARTUP_TIMEOUT_MS}ms`));
     }, SOCAT_STARTUP_TIMEOUT_MS);
 
-    if (!child.stderr) {
+    const stderr = child.stderr;
+    if (!stderr) {
       clearTimeout(timer);
       reject(new Error('socat process has no stderr stream (unexpected)'));
       return;
     }
 
-    child.stderr.on('data', (chunk: Buffer) => {
-      for (const line of chunk.toString('utf8').split('\n')) {
+    // Node stream chunks are not guaranteed to align to newlines, so a
+    // PTY line like `... N PTY is /dev/pts/3` can split across two 'data'
+    // events. Splitting each chunk in isolation would miss the line in
+    // both halves and the helper would flap on SOCAT_STARTUP_TIMEOUT_MS.
+    // Buffer text across chunks; pop the trailing element back into the
+    // buffer because it may be a partial line (or empty if the chunk
+    // ended on '\n').
+    //
+    // Once both PTY paths are captured we detach the listener and clear
+    // the buffer. socat run with `-d -d` keeps logging through the
+    // harness lifetime (data-transfer-loop notices, etc.); leaving the
+    // listener attached would accumulate that output indefinitely.
+    let stderrBuffer = '';
+    const onStderrData = (chunk: Buffer): void => {
+      stderrBuffer += chunk.toString('utf8');
+      const lines = stderrBuffer.split('\n');
+      stderrBuffer = lines.pop() ?? '';
+      for (const line of lines) {
         const match = line.match(PTY_LINE_REGEX);
         if (!match) continue;
         if (serverPath === undefined) {
@@ -49,10 +66,13 @@ export async function createPtyPair(): Promise<PtyPair> {
         } else if (masterPath === undefined) {
           masterPath = match[1];
           clearTimeout(timer);
+          stderr.off('data', onStderrData);
+          stderrBuffer = '';
           resolve();
         }
       }
-    });
+    };
+    stderr.on('data', onStderrData);
 
     child.on('exit', (code, signal) => {
       if (serverPath === undefined || masterPath === undefined) {
