@@ -39,10 +39,12 @@ describe('integration harness', () => {
       // back through Worker postMessage to ApiServer.handleSerialWorkerMessage.
       //
       // We use a padawan MAC (NOT the master sentinel 00:00:..) so the frame
-      // exercises the controllers update path. The test's empty DB means no
-      // controller is registered, so the variant cache won't be populated,
-      // but the Worker must still parse and forward the message without
-      // crashing.
+      // exercises the controllers update path. The DB has no row for this
+      // MAC so handlePollResponse bails at the controller-existence check
+      // after the lookup, but the variant-cache `.set` and heartbeat-decision
+      // logic run *before* that lookup — so awaiting the cache entry proves
+      // the frame round-tripped through the Worker and was dispatched
+      // end-to-end, not just that the Worker didn't crash.
 
       harness.stub.writePollAck({
         mac: 'aa:bb:cc:dd:ee:ff',
@@ -50,17 +52,18 @@ describe('integration harness', () => {
         variant: 'astros-controller-v1',
       });
 
-      // Allow the wire round-trip to complete.
-      await new Promise((r) => setTimeout(r, 500));
+      // Deterministic wait: polls the variant cache instead of sleeping.
+      // Throws on timeout, so failure to dispatch surfaces clearly rather
+      // than as a no-op `expect.toEqual([])` pass.
+      await harness.waitForVariantCachePopulated('aa:bb:cc:dd:ee:ff', 'astros-controller-v1');
 
-      // The Worker MUST not have errored. An earlier vacuous version of this
-      // test passed despite ERR_MODULE_NOT_FOUND because it only checked
-      // `harness.server` was defined — anything could be defined. workerErrors
-      // is populated by ApiServer's onWorkerError callback whenever the Worker
-      // emits an 'error' event (e.g. failed to load, crashed processing the
-      // frame).
+      // Belt-and-suspenders: even after end-to-end dispatch succeeded, an
+      // earlier vacuous version of this test passed despite
+      // ERR_MODULE_NOT_FOUND because it only checked `harness.server` was
+      // defined. workerErrors is populated by ApiServer's onWorkerError
+      // callback whenever the Worker emits an 'error' event.
       expect(harness.workerErrors).toEqual([]);
     },
-    30_000, // bumped from 10s — first run includes a fresh `npm run build`
+    30_000, // generous timeout — first run may include a fresh build
   );
 });
