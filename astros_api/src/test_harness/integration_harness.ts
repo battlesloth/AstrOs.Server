@@ -180,46 +180,38 @@ export async function bootIntegrationHarness(
   // 2. Temp DB directory (so tests don't pollute ~/.config/astrosserver)
   const dbDir = await mkdtemp(join(tmpdir(), 'astros-integration-'));
 
-  // 2b. Temp firmware-cache directory. FirmwareCache + FirmwareUploadStore
-  //     are constructed during ApiServer.bootstrap and read this env var
-  //     at construction time, so it must be set BEFORE bootstrap is called.
-  //     Cleaned up in dispose alongside dbDir.
+  // 2b. Temp firmware-cache directory. Passed via configOverrides below so
+  //     the harness doesn't need to mutate process.env. Cleaned up in
+  //     dispose alongside dbDir.
   const firmwareCacheDir = await mkdtemp(join(tmpdir(), 'astros-fwcache-'));
 
-  // 3. Set env vars for the ApiServer's bootstrap.
-  // NOTE: process.env is process-global, so concurrent harness boots in the
-  // same process would race. vitest doesn't run tests within the same file
-  // in parallel by default; each test sequentially boots+disposes.
+  // 3. Per-instance test config, passed to ApiServer via `configOverrides`.
+  //    The harness deliberately does NOT mutate process.env: env mutations
+  //    are process-global, so two harnesses booting concurrently (in any
+  //    test pool that shares process.env across workers, today or in the
+  //    future) would clobber each other's SERIAL_PORT / DATABASE_PATH /
+  //    etc. Plumbing the values through configOverrides keeps each
+  //    ApiServer instance hermetic.
   //
-  // API_PORT='0' / WEBSOCKET_PORT='0' tells ApiServer to ask the kernel for
-  // an ephemeral port. The harness reads back the actual ports via
-  // server.getBoundApiPort()/getBoundWebsocketPort() AFTER bootstrap. This
-  // avoids a TOCTOU race: a "find free port, then bind it later" scheme
-  // closes the probe socket before the real bind, leaving a window for any
-  // other process (or sibling vitest worker) to grab the port and cause
-  // EADDRINUSE on bootstrap.
-  const prevEnv = {
-    SERIAL_PORT: process.env.SERIAL_PORT,
-    BAUD_RATE: process.env.BAUD_RATE,
-    API_PORT: process.env.API_PORT,
-    WEBSOCKET_PORT: process.env.WEBSOCKET_PORT,
-    JWT_KEY: process.env.JWT_KEY,
-    DATABASE_PATH: process.env.DATABASE_PATH,
-    FIRMWARE_CACHE_PATH: process.env.FIRMWARE_CACHE_PATH,
-    NODE_ENV: process.env.NODE_ENV,
-  };
-  process.env.SERIAL_PORT = pty.serverPath;
-  process.env.BAUD_RATE = '9600';
-  process.env.API_PORT = '0';
-  process.env.WEBSOCKET_PORT = '0';
+  //    apiPort/websocketPort = 0 ask the kernel for ephemeral ports; the
+  //    harness reads back the actual ports via getBoundApiPort/
+  //    getBoundWebsocketPort after bootstrap completes (this also closes
+  //    the TOCTOU race a "find free port, then bind later" scheme has).
+  //
+  //    skipSerialSetup is set explicitly to false. Vitest defaults
+  //    NODE_ENV='test', which would otherwise short-circuit serial-port
+  //    setup — the very thing this harness is exercising.
   const jwtKey = process.env.JWT_KEY ?? 'test-jwt-key';
-  process.env.JWT_KEY = jwtKey;
-  process.env.DATABASE_PATH = dbDir;
-  process.env.FIRMWARE_CACHE_PATH = firmwareCacheDir;
-  // Important: do NOT set NODE_ENV='test' — that would skip setupSerialPort,
-  // which is the very thing we want to exercise. Override to undefined if it
-  // was set by vitest globals.
-  delete process.env.NODE_ENV;
+  const configOverrides = {
+    serialPort: pty.serverPath,
+    baudRate: 9600,
+    apiPort: 0,
+    websocketPort: 0,
+    jwtKey,
+    databasePath: join(dbDir, 'database.sqlite3'),
+    firmwareCachePath: firmwareCacheDir,
+    skipSerialSetup: false,
+  };
 
   // 3b. Generate a long-lived JWT signed with the same JWT_KEY the
   //     ApiServer reads. Mirrors `User.generateJwt()` in models/users.ts so
@@ -252,6 +244,7 @@ export async function bootIntegrationHarness(
       onWorkerError: (err) => workerErrors.push(err),
       firmwareReleaseFetcher: opts?.firmwareReleaseFetcher,
       flashOrchestratorConfig: opts?.flashOrchestratorConfig,
+      configOverrides,
     });
 
     // 4b. Read back the kernel-assigned ports (we asked for 0). These are
@@ -439,12 +432,6 @@ export async function bootIntegrationHarness(
       } catch {
         /* ignore */
       }
-
-      // Restore env vars to prevent leakage to other tests.
-      for (const [key, value] of Object.entries(prevEnv)) {
-        if (value === undefined) delete process.env[key];
-        else process.env[key] = value;
-      }
     };
 
     const waitForVariantCachePopulated = async (
@@ -522,10 +509,6 @@ export async function bootIntegrationHarness(
       await rm(firmwareCacheDir, { recursive: true, force: true });
     } catch {
       /* ignore */
-    }
-    for (const [key, value] of Object.entries(prevEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
     }
     throw bootErr;
   }

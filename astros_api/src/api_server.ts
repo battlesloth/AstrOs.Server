@@ -156,6 +156,37 @@ export interface ApiServerOptions {
     rebootTimeoutMs?: number;
     throttleWindowMs?: number;
   };
+  /**
+   * Per-instance overrides for values normally pulled from process.env.
+   * The integration harness uses this to avoid mutating the process-global
+   * environment — concurrent harness boots (in any future test pool that
+   * shares process.env across workers) would otherwise clobber each other's
+   * SERIAL_PORT / DATABASE_PATH / etc. Each field falls back to the
+   * corresponding env var when undefined, preserving production behavior
+   * for the auto-bootstrap caller.
+   */
+  configOverrides?: ConfigOverrides;
+}
+
+export interface ConfigOverrides {
+  serialPort?: string;
+  baudRate?: number;
+  apiPort?: number;
+  websocketPort?: number;
+  jwtKey?: string;
+  /**
+   * Full file path to the SQLite database (matching `initializeDatabase`'s
+   * `dbPath` semantics — the file, not the directory).
+   */
+  databasePath?: string;
+  firmwareCachePath?: string;
+  /**
+   * When true, ApiServer.Init skips serial-port setup. Mirrors the legacy
+   * `NODE_ENV=test` short-circuit. The harness sets this to `false`
+   * explicitly because vitest defaults NODE_ENV to 'test' (which would
+   * otherwise skip serial setup, the very thing the harness is exercising).
+   */
+  skipSerialSetup?: boolean;
 }
 
 // Exported so the integration test harness can import + bootstrap an
@@ -182,6 +213,7 @@ export class ApiServer {
     rebootTimeoutMs?: number;
     throttleWindowMs?: number;
   };
+  private readonly configOverrides?: ConfigOverrides;
 
   private httpServer?: import('http').Server;
 
@@ -196,13 +228,14 @@ export class ApiServer {
 
   // Firmware-OTA wiring. The orchestrator + WorkerSerialBus
   // are constructed in setupSerialPort() because they depend on the serial
-  // worker; in test mode (NODE_ENV=test) setupSerialPort() is skipped and
-  // `flashOrchestrator` stays undefined — the flash routes aren't registered
-  // either, so HTTP /api/firmware/flash returns 404 in tests rather than
-  // tripping a null deref on the orchestrator. The firmware cache, upload
-  // store, and GitHub release service are constructed unconditionally in
-  // configApi() because they have no Worker dependency and are otherwise
-  // useful (tests don't reach them, but the construction is cheap).
+  // worker; when serial setup is skipped (NODE_ENV=test, or
+  // `configOverrides.skipSerialSetup=true`) `flashOrchestrator` stays
+  // undefined — the flash routes aren't registered either, so HTTP
+  // /api/firmware/flash returns 404 in unit tests rather than tripping a
+  // null deref on the orchestrator. The firmware cache, upload store, and
+  // GitHub release service are constructed unconditionally in configApi()
+  // because they have no Worker dependency and are otherwise useful (unit
+  // tests don't reach them, but the construction is cheap).
   private firmwareCache!: FirmwareCache;
   private firmwareUploadStore!: FirmwareUploadStore;
   private githubReleaseService!: GitHubReleaseService;
@@ -283,8 +316,10 @@ export class ApiServer {
   constructor(opts?: ApiServerOptions) {
     Dotenv.config({ path: __dirname + '/.env' });
 
-    this.apiPort = Number.parseInt(process.env.API_PORT || '3000');
-    this.websocketPort = Number.parseInt(process.env.WEBSOCKET_PORT || '5000');
+    this.configOverrides = opts?.configOverrides;
+    this.apiPort = this.configOverrides?.apiPort ?? Number.parseInt(process.env.API_PORT || '3000');
+    this.websocketPort =
+      this.configOverrides?.websocketPort ?? Number.parseInt(process.env.WEBSOCKET_PORT || '5000');
 
     this.clients = new Map<string, WebSocket>();
     this.app = Express();
@@ -314,7 +349,9 @@ export class ApiServer {
 
   public async Init() {
     logger.info('Initializing database');
-    this.db = await initializeDatabase(this.systemStatus);
+    this.db = await initializeDatabase(this.systemStatus, {
+      dbPath: this.configOverrides?.databasePath,
+    });
 
     logger.info('Setting up authentication strategy');
     this.setAuthStrategy();
@@ -330,8 +367,12 @@ export class ApiServer {
     logger.info('Setting up routes');
     this.setRoutes();
 
-    if (process.env.NODE_ENV?.toLocaleLowerCase() === 'test') {
-      logger.warn('Running in test mode, skipping serial port setup');
+    const skipSerialSetup =
+      this.configOverrides?.skipSerialSetup ?? process.env.NODE_ENV?.toLocaleLowerCase() === 'test';
+    if (skipSerialSetup) {
+      logger.warn(
+        `Skipping serial port setup (configOverrides.skipSerialSetup=${String(this.configOverrides?.skipSerialSetup)}, NODE_ENV=${process.env.NODE_ENV ?? '<unset>'})`,
+      );
     } else {
       logger.info('Starting up serial port services');
       this.setupSerialPort();
@@ -460,9 +501,9 @@ export class ApiServer {
       });
     });
 
-    const jwtKey = process.env.JWT_KEY;
+    const jwtKey = this.configOverrides?.jwtKey ?? process.env.JWT_KEY;
     if (!jwtKey) {
-      logger.error('JWT_KEY environment variable is required');
+      logger.error('JWT_KEY is required (set process.env.JWT_KEY or pass configOverrides.jwtKey)');
       process.exit(1);
     }
 
@@ -475,11 +516,14 @@ export class ApiServer {
 
     // Firmware infrastructure shared across the c.4 / c.5 / c.3 endpoints and
     // the c.6c.1 orchestrator. Constructed unconditionally — the cache/upload
-    // store read FIRMWARE_CACHE_PATH from env (default ~/.config/astrosserver),
+    // store resolve their root from `configOverrides.firmwareCachePath` if
+    // supplied, otherwise FIRMWARE_CACHE_PATH (default ~/.config/astrosserver),
     // and the release service is a thin GitHub API wrapper. None of them open
     // the serial worker, so test mode is safe.
-    this.firmwareCache = new FirmwareCache();
-    this.firmwareUploadStore = new FirmwareUploadStore();
+    this.firmwareCache = new FirmwareCache({ rootDir: this.configOverrides?.firmwareCachePath });
+    this.firmwareUploadStore = new FirmwareUploadStore({
+      rootDir: this.configOverrides?.firmwareCachePath,
+    });
     this.githubReleaseService = new GitHubReleaseService(
       process.env.FIRMWARE_REPO ?? 'battlesloth/AstrOs.ESP',
       this.firmwareReleaseFetcher ?? fetch,
@@ -610,8 +654,9 @@ export class ApiServer {
 
     try {
       this.serialPort = new SerialPort({
-        path: process.env.SERIAL_PORT || '/dev/ttyS0',
-        baudRate: Number.parseInt(process.env.BAUD_RATE || '9600'),
+        path: this.configOverrides?.serialPort ?? process.env.SERIAL_PORT ?? '/dev/ttyS0',
+        baudRate:
+          this.configOverrides?.baudRate ?? Number.parseInt(process.env.BAUD_RATE || '9600'),
       });
 
       this.serialPort.on('error', (err: any) => {

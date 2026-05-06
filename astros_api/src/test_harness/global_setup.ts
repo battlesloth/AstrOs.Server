@@ -21,11 +21,11 @@
 // `tsc` + `tsc-alias` directly here — bypassing `npm run build` precisely
 // so the gitignored `.env` isn't required — so globalSetup never even
 // produces a dist/.env. Even if a manual `npm run build` had populated one,
-// integration_harness.ts sets every env var the ApiServer reads directly on
-// process.env before bootstrap and Dotenv.config is non-overwriting, so
-// dist/.env contents are unreachable from the integration suite either way.
-// Adding `.env*` to the check would force needless rebuilds when developers
-// tweak local files.
+// integration_harness.ts passes every per-test value through ApiServer's
+// `configOverrides` option, which takes precedence over both Dotenv-loaded
+// values and any pre-existing process.env entries. So dist/.env contents
+// are unreachable from the integration suite either way. Adding `.env*` to
+// the check would force needless rebuilds when developers tweak local files.
 
 import { spawnSync } from 'child_process';
 import { readdirSync, rmSync, statSync } from 'fs';
