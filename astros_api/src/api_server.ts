@@ -503,8 +503,15 @@ export class ApiServer {
 
     const jwtKey = this.configOverrides?.jwtKey ?? process.env.JWT_KEY;
     if (!jwtKey) {
-      logger.error('JWT_KEY is required (set process.env.JWT_KEY or pass configOverrides.jwtKey)');
-      process.exit(1);
+      // Throw rather than process.exit: ApiServer is also imported as a
+      // class by the integration harness, and library-style init code
+      // calling process.exit makes graceful test failure (or any caller's
+      // misconfiguration handling) impossible. The auto-bootstrap IIFE at
+      // the bottom of this file owns process.exit; bootstrap()'s catch
+      // logs the original error before rethrowing.
+      throw new Error(
+        'JWT_KEY is required (set process.env.JWT_KEY or pass configOverrides.jwtKey)',
+      );
     }
 
     this.authHandler = jwt({
