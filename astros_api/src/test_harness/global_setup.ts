@@ -14,13 +14,49 @@
 // its main process before any worker exists, so dist/ is stable for the
 // entire test run. Workers just resolve the URL — they never write to dist/.
 //
-// We still mtime-skip the build if dist/ is already fresh, so unit-only
-// `npx vitest run` invocations don't pay the build cost.
+// We still mtime-skip the build if dist/ is newer than every compilable
+// source file (see `newestCompiledMtime`) plus tsconfig.json / package.json,
+// so unit-only `npx vitest run` invocations don't pay the build cost.
+//
+// Not in the freshness check, intentionally: `.env` / `.env.test`. The build's
+// postbuild step copies them into dist/.env, but the integration harness
+// (integration_harness.ts) sets every env var the ApiServer reads directly
+// on process.env before bootstrap, and Dotenv.config is non-overwriting —
+// so dist/.env contents are unreachable from the integration suite. Adding
+// them to the check would force needless rebuilds when developers tweak
+// local .env files.
 
 import { spawnSync } from 'child_process';
-import { statSync } from 'fs';
+import { readdirSync, statSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
+
+// Walk a directory recursively and return the newest mtime among files that
+// would actually be compiled into dist/. Mirrors tsconfig.json's exclude list
+// (`**/*.test.ts`, `**/*.spec.ts`) so that editing a test file does not force
+// a rebuild — those files never end up in dist. If you change tsconfig.json's
+// exclude list, update this filter to match (and vice versa).
+//
+// Symlinks under src/ are intentionally skipped: `entry.isFile()` is false for
+// a symlink Dirent even when the target is a regular file, so they fall
+// through. There are none today, and skipping them avoids cyclic-symlink
+// recursion. If a future workflow needs them, switch to lstat + a realpath
+// visited-set guard.
+function newestCompiledMtime(dir: string): number {
+  let newest = 0;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = resolve(dir, entry.name);
+    if (entry.isDirectory()) {
+      newest = Math.max(newest, newestCompiledMtime(full));
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    if (entry.name.endsWith('.test.ts') || entry.name.endsWith('.spec.ts')) continue;
+    const m = statSync(full).mtimeMs;
+    if (m > newest) newest = m;
+  }
+  return newest;
+}
 
 export default function setup(): void {
   // The integration suite is Linux-only (see pty_pair.ts). Skip the build
@@ -37,14 +73,23 @@ export default function setup(): void {
   // apiRoot -> .../astros_api/
   const here = fileURLToPath(import.meta.url);
   const apiRoot = resolve(dirname(here), '..', '..');
+  const srcRoot = resolve(apiRoot, 'src');
   const distWorker = resolve(apiRoot, 'dist', 'background_tasks', 'serial_worker.js');
-  const srcWorker = resolve(apiRoot, 'src', 'background_tasks', 'serial_worker.js');
 
-  // Skip the build if dist/ is fresh (dist worker mtime >= src worker mtime).
+  // Skip the build only if dist/ is at least as new as every compilable source
+  // file plus tsconfig.json / package.json. The previous heuristic compared
+  // dist worker mtime to src worker mtime alone, which missed transitive deps
+  // — editing src/serial/serial_message_service.ts (imported by the worker)
+  // left dist stale while this check returned early. Walking src/ catches any
+  // change that would alter dist's contents; tsconfig.json and package.json
+  // are included because edits to either (compiler flags, TypeScript version)
+  // can also change dist output without touching any src/ file.
   try {
-    const distStat = statSync(distWorker);
-    const srcStat = statSync(srcWorker);
-    if (distStat.mtimeMs >= srcStat.mtimeMs) {
+    const distMtime = statSync(distWorker).mtimeMs;
+    const tsconfigMtime = statSync(resolve(apiRoot, 'tsconfig.json')).mtimeMs;
+    const packageMtime = statSync(resolve(apiRoot, 'package.json')).mtimeMs;
+    const newest = Math.max(newestCompiledMtime(srcRoot), tsconfigMtime, packageMtime);
+    if (distMtime >= newest) {
       return;
     }
   } catch {
