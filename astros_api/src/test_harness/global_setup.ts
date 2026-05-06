@@ -3,12 +3,11 @@
 //
 // Why globalSetup specifically: vitest's default pool runs test files in
 // parallel worker threads. If `bootIntegrationHarness` triggered the build
-// per-call, multiple workers could race on `npm run build` — and the build's
-// `prebuild` script (`rm -rf dist && eslint`) deletes dist/ from under any
-// worker that's mid-spawn or mid-load of the dist Worker file. Symptoms
-// range from ERR_MODULE_NOT_FOUND on a half-deleted dist tree to vacuous
-// passes when one worker finishes a build during another worker's mtime
-// check.
+// per-call, multiple workers could race on the rebuild — `rm -rf dist`
+// followed by `tsc` would delete dist/ from under any worker mid-spawn or
+// mid-load of the dist Worker file. Symptoms range from ERR_MODULE_NOT_FOUND
+// on a half-deleted dist tree to vacuous passes when one worker finishes a
+// build during another worker's mtime check.
 //
 // globalSetup eliminates the race by serializing: vitest invokes this in
 // its main process before any worker exists, so dist/ is stable for the
@@ -18,16 +17,18 @@
 // source file (see `newestCompiledMtime`) plus tsconfig.json / package.json,
 // so unit-only `npx vitest run` invocations don't pay the build cost.
 //
-// Not in the freshness check, intentionally: `.env` / `.env.test`. The build's
-// postbuild step copies them into dist/.env, but the integration harness
-// (integration_harness.ts) sets every env var the ApiServer reads directly
-// on process.env before bootstrap, and Dotenv.config is non-overwriting —
-// so dist/.env contents are unreachable from the integration suite. Adding
-// them to the check would force needless rebuilds when developers tweak
-// local .env files.
+// Not in the freshness check, intentionally: `.env` / `.env.test`. We invoke
+// `tsc` + `tsc-alias` directly here — bypassing `npm run build` precisely
+// so the gitignored `.env` isn't required — so globalSetup never even
+// produces a dist/.env. Even if a manual `npm run build` had populated one,
+// integration_harness.ts sets every env var the ApiServer reads directly on
+// process.env before bootstrap and Dotenv.config is non-overwriting, so
+// dist/.env contents are unreachable from the integration suite either way.
+// Adding `.env*` to the check would force needless rebuilds when developers
+// tweak local files.
 
 import { spawnSync } from 'child_process';
-import { readdirSync, statSync } from 'fs';
+import { readdirSync, rmSync, statSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -96,21 +97,39 @@ export default function setup(): void {
     // dist/ missing or stat failed; fall through to build.
   }
 
-  // Build it. `npm run build` runs the project's full pipeline (lint + tsc +
-  // tsc-alias). If lint fails, the build fails and the entire vitest run
-  // fails to start — that's correct: a failing lint should not silently
-  // produce a stale dist/.
-  const result = spawnSync('npm', ['run', 'build'], {
+  // Build it directly with tsc + tsc-alias instead of `npm run build`.
+  // `npm run build` invokes `postbuild` (`cp .env ./dist/.env`), which fails
+  // on any checkout without a local `.env` — `.env` is gitignored, so a
+  // clean clone or CI runner without one would fail integration tests at
+  // setup time. dist/.env is unreachable from the integration suite anyway:
+  // integration_harness.ts sets every env var the ApiServer reads directly
+  // on process.env before bootstrap, and Dotenv.config is non-overwriting.
+  //
+  // We mirror prebuild's `rm -rf dist` so renamed/deleted src files don't
+  // leave stale dist artifacts behind. Lint is intentionally skipped — it's
+  // a separate CI job and a pre-commit step, not vitest's responsibility.
+  rmSync(resolve(apiRoot, 'dist'), { recursive: true, force: true });
+
+  const tscResult = spawnSync('npx', ['tsc'], {
     cwd: apiRoot,
     stdio: 'inherit',
     env: process.env,
   });
-  if (result.status !== 0) {
+  if (tscResult.status !== 0) {
     throw new Error(
-      `vitest globalSetup: npm run build failed with code ${result.status}. ` +
+      `vitest globalSetup: npx tsc failed with code ${tscResult.status}. ` +
         `dist/ is required so integration tests can spawn the serial Worker — ` +
         `tsx's loader does not propagate to Worker threads.`,
     );
+  }
+
+  const aliasResult = spawnSync('npx', ['tsc-alias'], {
+    cwd: apiRoot,
+    stdio: 'inherit',
+    env: process.env,
+  });
+  if (aliasResult.status !== 0) {
+    throw new Error(`vitest globalSetup: npx tsc-alias failed with code ${aliasResult.status}.`);
   }
 
   // Verify the Worker file exists post-build.
