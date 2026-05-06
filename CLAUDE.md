@@ -95,6 +95,41 @@ All implementation work goes on a feature branch that merges into `develop` via 
 
 **Exception — doc-only changes:** Edits limited to `CLAUDE.md`, `README.md`, or `.docs/` (with no code or config impact) may be committed directly to `develop`. PR overhead isn't justified for pure meta edits.
 
+## Pre-push branch review
+
+Before pushing a feature branch, run a comprehensive multi-agent review on the full diff vs `develop`:
+
+```
+/pr-review-toolkit:review-pr
+```
+
+**When required:**
+
+- Branch touches any of: `astros_api/src/test_harness/`, `astros_api/src/firmware/`, `astros_api/src/serial/`, `astros_api/src/api_server.ts`, `astros_api/src/dal/database.ts`, `astros_api/src/job_lock/` (concurrency-heavy or production-critical paths).
+- Branch has more than 5 commits (cross-commit drift accumulates beyond what per-commit review can catch).
+
+**When optional:**
+
+- 1-2 commit fixes outside the directories above — the per-commit code review is sufficient.
+
+**What it does.** Dispatches 5 specialized agents in parallel against the full branch diff vs `develop`:
+
+- `code-reviewer`: bug patterns, project-convention adherence
+- `pr-test-analyzer`: coverage gaps, vacuous assertions, mutation sensitivity
+- `silent-failure-hunter`: swallowed errors, listener leaks, partial-failure cascades
+- `type-design-analyzer`: encapsulation, invariant expression
+- `comment-analyzer`: comment-vs-code drift, stale references after refactors
+
+**Prompt the agents with hazard categories, not "review this fix."** The per-commit reviewer is framed around the change; the pre-push review must be framed around what could be wrong on the full surface. Categories that have repeatedly shown up in PR feedback on this codebase:
+
+- **Concurrency**: TOCTOU windows, stream chunk boundaries, fixed sleeps masquerading as deterministic waits, missing line buffering on stream parsers, timing-baseline bugs (client-side `Date.now()` when server-side timestamps are in the payload).
+- **Operability**: `process.exit` in library code, `close()` calls that hang on unclosed clients, `process.env` mutations across concurrent boots, listener leaks after promise resolves.
+- **Resource lifecycle**: PTY cleanup, port allocation (especially "find then bind later" schemes), worker teardown, file-descriptor leaks, env restore vs explicit-config plumbing.
+
+**Address findings.** Critical and Important items must be fixed before push. Minor items may be deferred to a follow-up commit but not silently dropped.
+
+**Why this exists.** Per-commit reviews see narrow diffs and are framed by the specific change; cross-commit drift, architectural patterns, and stale comments-after-refactor only become visible at the full-branch level. Running this skill before push catches in ~10 minutes what would otherwise come back as multiple rounds of PR feedback churn.
+
 ## Planning (MANDATORY)
 
 **NEVER write implementation code without a written, committed plan.** This is a hard rule, with the exceptions below.
