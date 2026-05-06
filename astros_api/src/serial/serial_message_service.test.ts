@@ -241,8 +241,11 @@ describe('SerialMessageService', () => {
     it('routes FW_DEPLOY_DONE to handleFwDeployDone', () => {
       const service = new SerialMessageService(vi.fn());
 
-      // Wire format: transferId<US>controllerId<US>outcome<US>finalVersion<US>error
-      // (single-controller, OK -> empty error)
+      // Wire format: transferId<US>result_1<RS>result_2<RS>...
+      // where each result is controllerId<US>outcome<US>finalVersion<US>error.
+      // The single-controller case below has no RS — the result list is just
+      // result_1 — so the bytes coincidentally read as a flat structure, but
+      // the protocol is hierarchical (see message_handler.ts:handleFwDeployDone).
       const msg = buildMessage(
         SerialMessageType.FW_DEPLOY_DONE,
         'msg-fw-deploy-done',
