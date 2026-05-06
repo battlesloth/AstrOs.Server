@@ -160,7 +160,10 @@ describe('integration: heartbeat vs reboot-timer', () => {
       expect(flashRes.status).toBe(200);
       const flashBody = (await flashRes.json()) as { jobId: string };
 
-      await harness.waitForWsMessage(
+      const doneEvent = await harness.waitForWsMessage<{
+        type: number;
+        data: { jobId: string; endedAt: string };
+      }>(
         (m) =>
           (m as { type?: unknown }).type === TransmissionType.flashJobDone &&
           (m as { data?: { jobId?: unknown } }).data?.jobId === flashBody.jobId,
@@ -170,13 +173,23 @@ describe('integration: heartbeat vs reboot-timer', () => {
       // 4. Master heartbeat with WRONG version (still pre-flash).
       //    decidePostDeployHeartbeat returns 'version_mismatch'; orchestrator
       //    does NOT clear the reboot timer.
-      const wrongVersionAt = Date.now();
       const snapshot = harness.receivedWsMessages.length;
       harness.stub.writePollAck({ firmwareVersion: PRE_FLASH_FW }); // wrong version!
 
       // 5. Lock release should arrive via the timer fallback (~1s with our
       //    override). NOT before — this proves the wrong-version POLL_ACK
       //    was correctly ignored.
+      //
+      //    Reference timestamp is the server-side `endedAt` from the
+      //    flashJobDone payload, NOT `Date.now()` at WS-receive. The
+      //    orchestrator's `handleDeployDone` captures `endedAt` and arms
+      //    the reboot timer in the same synchronous block, so the timer's
+      //    notion of "now" matches `endedAt` to within a millisecond.
+      //    Using a client-side timestamp (e.g. `Date.now()` after
+      //    awaiting flashJobDone, or after writing the wrong-version
+      //    POLL_ACK) would undercount by however long WS delivery took
+      //    and could fail the lower bound on slow CI even when the timer
+      //    behaved correctly.
       const lockReleased = await harness.waitForWsMessage<{
         type: number;
         locked: boolean;
@@ -190,7 +203,8 @@ describe('integration: heartbeat vs reboot-timer', () => {
       );
       const releasedAt = Date.now();
       expect(lockReleased.locked).toBe(false);
-      const deltaMs = releasedAt - wrongVersionAt;
+      const doneAt = new Date(doneEvent.data.endedAt).getTime();
+      const deltaMs = releasedAt - doneAt;
       // Released via timer fallback — expected ~SHORT_REBOOT_TIMEOUT_MS
       // (1000ms). Generous lower bound (>= 800ms) to prove the heartbeat
       // didn't release; generous upper bound (< 4000ms) for CI slowness.

@@ -98,7 +98,7 @@ describe('integration: reboot-timer fallback (no heartbeat)', () => {
       //    flashJobDone payload, NOT `Date.now()` at WS-receive. The
       //    orchestrator's `handleDeployDone` captures `endedAt` and arms
       //    the timer in the same synchronous block, so the timer's notion
-      //    of "now" matches `endedAt` to within microseconds. Using a
+      //    of "now" matches `endedAt` to within a millisecond. Using a
       //    client-side timestamp would undercount by however long WS
       //    delivery took and could fail the lower bound on slow CI even
       //    when the timer behaved correctly.
