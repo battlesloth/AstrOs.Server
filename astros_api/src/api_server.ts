@@ -1368,14 +1368,31 @@ export class ApiServer {
 
     if (this.websocket !== undefined) {
       const websocket = this.websocket;
+      // ws.Server.close() only invokes its callback once every connected
+      // client has disconnected; it does NOT proactively close them. A
+      // SIGTERM with any idle client connected would otherwise hang the
+      // whole shutdown. terminate() force-destroys the underlying socket,
+      // which is appropriate on a shutdown path — no graceful handshake
+      // is required when the process is going down.
+      for (const client of websocket.clients) {
+        client.terminate();
+      }
       await new Promise<void>((resolve) => websocket.close(() => resolve()));
       this.websocket = undefined;
     }
 
     if (this.httpServer !== undefined) {
       const httpServer = this.httpServer;
+      // Same hazard as ws — http.Server.close() refuses to invoke its
+      // callback until every keep-alive connection drains naturally.
+      // closeAllConnections() (Node 18.2+) destroys those sockets so
+      // close() resolves promptly. WebSocket-upgraded sockets are
+      // unaffected by closeAllConnections, but our WS server is a
+      // separate WebSocketServer with its own internal http.Server, so
+      // there are none on this httpServer to begin with.
       await new Promise<void>((resolve, reject) => {
         httpServer.close((err) => (err ? reject(err) : resolve()));
+        httpServer.closeAllConnections();
       });
       this.httpServer = undefined;
     }

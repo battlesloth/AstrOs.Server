@@ -66,4 +66,33 @@ describe('integration harness', () => {
     },
     30_000, // generous timeout — first run may include a fresh build
   );
+
+  skipIfNotLinux(
+    'shutdown() completes promptly even when a WS client stays connected',
+    async () => {
+      // Pins the SIGTERM-doesn't-hang contract: ws.Server.close() refuses to
+      // invoke its callback until every client has disconnected, and
+      // http.Server.close() refuses to invoke its callback until every
+      // keep-alive connection drains. Without proactive teardown
+      // (terminate() on each ws client + closeAllConnections() on the
+      // http server), shutdown would hang indefinitely on any idle client.
+      //
+      // The other tests in this file go through `harness.dispose()`, which
+      // closes wsClient *before* invoking server.shutdown() — so they do
+      // not exercise the bug. Here we deliberately leave the client open
+      // and assert shutdown still completes within a generous bound.
+      harness = await bootIntegrationHarness();
+      expect(harness.wsClient.readyState).toBe(harness.wsClient.OPEN);
+
+      const start = Date.now();
+      await harness.server.shutdown();
+      const elapsed = Date.now() - start;
+
+      // Sub-second on a quiet machine; a few seconds covers slow CI. The
+      // bug was unbounded hang — anything in the seconds range proves the
+      // proactive-terminate path ran.
+      expect(elapsed).toBeLessThan(3000);
+    },
+    30_000,
+  );
 });
