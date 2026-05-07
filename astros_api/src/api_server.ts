@@ -709,16 +709,25 @@ export class ApiServer {
     // this rollback we'd leak a live listening socket on every failed
     // bootstrap, which manifests as cumulative EADDRINUSE flakes in tests
     // that retry-after-failure.
+    // Capture the systemStatus unsubscribe handle so the rollback can detach
+    // the subscriber if WS bind fails. Without this, the closure would
+    // outlive the dead instance — on the next bootstrap (or a sibling
+    // instance under test), the orphaned subscriber would double-emit
+    // systemStatus frames AND keep the dead instance alive in the
+    // emitter's set.
+    let unsubscribeSystemStatus: (() => void) | undefined;
     try {
       const ws = (this.websocket = new Server({ port: this.websocketPort }));
 
-      this.systemStatus.subscribe((state) => {
+      unsubscribeSystemStatus = this.systemStatus.subscribe((state) => {
         this.updateClients({ type: TransmissionType.systemStatus, data: state });
       });
 
-      // Connection handler attached synchronously before awaiting 'listening',
-      // mirroring the prior sync setup — any client racing the bind still hits
-      // the handler.
+      // Connection handler attached synchronously before awaiting 'listening'
+      // so any client racing the bind still hits the handler — the WS server
+      // begins accepting connections only when 'listening' fires, but
+      // attaching after the await would leave a window where the listener
+      // isn't installed yet.
       ws.on('connection', (conn) => {
         const id = uuid_v4();
         this.clients.set(id, conn);
@@ -792,7 +801,12 @@ export class ApiServer {
       // Roll back the HTTP bind so we don't leak a listening socket. Also
       // close the partial WS server if it got constructed before failing
       // (the ws library schedules its bind on next tick, so the Server
-      // instance exists even when the listen errored).
+      // instance exists even when the listen errored). And detach the
+      // systemStatus subscriber so the dead instance doesn't keep getting
+      // ticked by the emitter (and so the closure can be GC'd).
+      if (unsubscribeSystemStatus !== undefined) {
+        unsubscribeSystemStatus();
+      }
       const httpServer = this.httpServer;
       this.httpServer = undefined;
       if (httpServer !== undefined) {
