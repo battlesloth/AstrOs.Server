@@ -63,6 +63,13 @@ describe('integration harness', () => {
       // defined. workerErrors is populated by ApiServer's onWorkerError
       // callback whenever the Worker emits an 'error' event.
       expect(harness.workerErrors).toEqual([]);
+
+      // Also assert no stub-side parser errors. Wire-format drift between
+      // ApiServer's MessageGenerator and the stub's payload parsers would
+      // cause the stub to silently drop frames it can't ACK — tests would
+      // then time out with no hint why. Empty here is the load-bearing
+      // baseline; tests exercising FW_* paths should mirror this assertion.
+      expect(harness.stub.parsingErrors()).toEqual([]);
     },
     30_000, // generous timeout — first run may include a fresh build
   );

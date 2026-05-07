@@ -248,6 +248,18 @@ export class StubMaster {
   private parser: DelimiterParser | null = null;
   private readonly inbound: InboundFrame[] = [];
   private readonly waiters: FrameWaiter[] = [];
+  // Records every payload the scripted-response dispatcher couldn't parse.
+  // Stays empty in the happy case. A non-empty list is exactly the bug
+  // class the harness exists to catch — wire-format drift between the
+  // ApiServer's MessageGenerator and the stub's parsers would make every
+  // ACK silently never get sent, and tests would time out without a hint
+  // why. Tests should assert empty (the harness re-exposes this).
+  private readonly parseErrors: Array<{
+    type: SerialMessageType;
+    msgId: string;
+    payload: string;
+    note: string;
+  }> = [];
 
   // Scripted-response configuration. Both are null when the feature
   // is not enabled; set by autoAckUpload() / scriptDeploy(); cleared by
@@ -327,6 +339,21 @@ export class StubMaster {
 
   receivedFrames(): readonly InboundFrame[] {
     return this.inbound;
+  }
+
+  /**
+   * Records of payloads the scripted-response dispatcher couldn't parse.
+   * Tests should assert this is empty after each scenario — a non-empty
+   * list means a wire-format drift between MessageGenerator and the stub
+   * has silently broken every ACK on that frame type.
+   */
+  parsingErrors(): readonly Readonly<{
+    type: SerialMessageType;
+    msgId: string;
+    payload: string;
+    note: string;
+  }>[] {
+    return this.parseErrors;
   }
 
   async waitForFrame(
@@ -591,7 +618,15 @@ export class StubMaster {
       case SerialMessageType.FW_TRANSFER_BEGIN: {
         if (cfg === null) break;
         const transferId = extractTransferId(frame.payload);
-        if (transferId === null) break; // Malformed payload; drop silently — would have produced a malformed ACK.
+        if (transferId === null) {
+          this.parseErrors.push({
+            type: frame.type,
+            msgId: frame.msgId,
+            payload: frame.payload,
+            note: 'extractTransferId returned null — no FW_TRANSFER_BEGIN_ACK emitted',
+          });
+          break;
+        }
         this.writeFwTransferBeginAck({
           transferId,
           status: 'OK',
@@ -602,7 +637,15 @@ export class StubMaster {
       case SerialMessageType.FW_CHUNK: {
         if (cfg === null) break;
         const chunkParsed = parseFwChunkPayload(frame.payload);
-        if (chunkParsed === null) break;
+        if (chunkParsed === null) {
+          this.parseErrors.push({
+            type: frame.type,
+            msgId: frame.msgId,
+            payload: frame.payload,
+            note: 'parseFwChunkPayload returned null — no FW_CHUNK_ACK/NAK emitted',
+          });
+          break;
+        }
         const { transferId, seq } = chunkParsed;
         // Inject exactly one NAK when this seq matches failAtSeq and we
         // haven't already failed. After that, resume normal ACKing
@@ -628,7 +671,15 @@ export class StubMaster {
       case SerialMessageType.FW_TRANSFER_END: {
         if (cfg === null) break;
         const endParsed = parseFwTransferEndPayload(frame.payload);
-        if (endParsed === null) break;
+        if (endParsed === null) {
+          this.parseErrors.push({
+            type: frame.type,
+            msgId: frame.msgId,
+            payload: frame.payload,
+            note: 'parseFwTransferEndPayload returned null — no FW_TRANSFER_END_ACK emitted',
+          });
+          break;
+        }
         this.writeFwTransferEndAck({
           transferId: endParsed.transferId,
           status: cfg.endStatus,
@@ -642,7 +693,15 @@ export class StubMaster {
         const deployCfg = this.scriptDeployCfg;
         if (deployCfg === null) break;
         const deployParsed = parseFwDeployBeginPayload(frame.payload);
-        if (deployParsed === null) break;
+        if (deployParsed === null) {
+          this.parseErrors.push({
+            type: frame.type,
+            msgId: frame.msgId,
+            payload: frame.payload,
+            note: 'parseFwDeployBeginPayload returned null — no FW_DEPLOY_DONE/PROGRESS emitted',
+          });
+          break;
+        }
         const { transferId } = deployParsed;
         // Walk each controller through its stage progression then emit
         // FW_DEPLOY_DONE. No artificial delay between frames — the
