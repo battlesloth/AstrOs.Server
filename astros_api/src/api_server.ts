@@ -398,7 +398,16 @@ export class ApiServer {
       await server.Init();
     } catch (error) {
       logger.error(error);
-      throw new Error('Failed to initialize server');
+      // Preserve the original error via `cause` so callers can inspect the
+      // underlying failure (e.g. tests asserting on JWT_KEY misconfig, or a
+      // future debug session distinguishing EADDRINUSE from a DB migration
+      // failure). Without it, the rewrap discards the only specific signal
+      // the caller has. Set as a property rather than the ES2022 `Error`
+      // constructor option because tsconfig.target is ES6 — Node 20 still
+      // exposes `cause` on the instance just fine.
+      const wrapped = new Error('Failed to initialize server');
+      (wrapped as Error & { cause?: unknown }).cause = error;
+      throw wrapped;
     }
 
     return server;
