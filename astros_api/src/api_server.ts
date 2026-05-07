@@ -810,7 +810,21 @@ export class ApiServer {
       const httpServer = this.httpServer;
       this.httpServer = undefined;
       if (httpServer !== undefined) {
-        await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+        // Surface httpServer.close errors via logger.warn rather than the
+        // prior swallow. ENOTLISTENING here means the rollback is a no-op
+        // — combined with the still-bound socket from the listen success,
+        // that's a leak the user needs to know about. We don't rethrow
+        // because the original wsErr is the failure the caller asked
+        // about; close errors during rollback are diagnostics, not the
+        // primary fault.
+        await new Promise<void>((resolve) =>
+          httpServer.close((closeErr) => {
+            if (closeErr) {
+              logger.warn(`runWebServices rollback: httpServer.close failed: ${closeErr.message}`);
+            }
+            resolve();
+          }),
+        );
       }
       const partialWs = this.websocket;
       this.websocket = undefined;
