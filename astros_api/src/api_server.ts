@@ -1450,9 +1450,17 @@ export class ApiServer {
         // unaffected by closeAllConnections, but our WS server is a
         // separate WebSocketServer with its own internal http.Server, so
         // there are none on this httpServer to begin with.
+        //
+        // Runtime guard: closeAllConnections is Node 18.2+ but the project
+        // is pinned to Node 20+ (Dockerfile, CI). The typeof check is
+        // defense in depth — if anything ever runs this on an older Node
+        // (downstream fork, an analytics container, etc.), shutdown should
+        // degrade to "wait for keep-alives to drain" rather than throw.
         await new Promise<void>((resolve, reject) => {
           httpServer.close((err) => (err ? reject(err) : resolve()));
-          httpServer.closeAllConnections();
+          if (typeof httpServer.closeAllConnections === 'function') {
+            httpServer.closeAllConnections();
+          }
         });
         this.httpServer = undefined;
       }
