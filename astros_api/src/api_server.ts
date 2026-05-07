@@ -106,9 +106,9 @@ import { AnimationQueuePlaylist } from './serial/animation_queue/queue_item/anim
 import { PlaylistType } from './models/playlists/playlistType.js';
 import { convertPlaylistToQueueItem } from './serial/animation_queue/playlist_converter.js';
 import { PlaylistRepository } from './dal/repositories/playlist_repository.js';
-// Imported via `src/*` alias to match the converter's import path. Using a
-// relative path here would create two separate class instances under
-// esbuild-based runtimes (tsx/vitest) and break `instanceof` checks.
+// Must use `src/*` alias (not relative path) — esbuild-based runtimes
+// (tsx/vitest) treat the two import paths as separate modules and break
+// `instanceof` checks across the boundary.
 import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
 
 interface IWebSocketMessage {
@@ -125,46 +125,19 @@ interface IServoTestData {
   value: number;
 }
 
-/**
- * Optional bootstrap/constructor inputs for the ApiServer. Both fields exist
- * to support the integration test harness:
- *   - `workerScriptUrl`: tests point this at compiled dist/ because tsx's
- *     loader hooks do not propagate to Worker threads, so the src/ Worker
- *     script (with its `.js`-style imports of TS sources) cannot load under
- *     vitest+tsx. Production leaves this undefined and gets the default
- *     relative-to-import.meta.url URL, which lands in dist/ at runtime.
- *   - `onWorkerError`: tests pass a callback so they can fail the test if
- *     the Worker emits an `error` event (e.g. ERR_MODULE_NOT_FOUND on boot),
- *     instead of relying on the existing logger.error which is silent to
- *     the test runner.
- */
+// Test-harness hooks. `workerScriptUrl` points the Worker at compiled dist/
+// because tsx loader hooks don't propagate to Worker threads. `onWorkerError`
+// surfaces Worker boot failures to the test runner (logger.error is silent
+// to vitest). `configOverrides` avoids mutating process.env so concurrent
+// harness boots don't clobber each other.
 export interface ApiServerOptions {
   workerScriptUrl?: URL;
   onWorkerError?: (err: Error) => void;
-  /**
-   * Tests inject a fake `fetch` so `GitHubReleaseService.getReleases()` returns
-   * canned release data instead of hitting GitHub's REST API. Production leaves
-   * this undefined and gets the global `fetch`.
-   */
   firmwareReleaseFetcher?: typeof fetch;
-  /**
-   * Tests override the FlashJobOrchestrator's reboot-timeout (default 15s)
-   * to keep wrong-version-heartbeat / timer-fallback tests fast. Production
-   * leaves this undefined.
-   */
   flashOrchestratorConfig?: {
     rebootTimeoutMs?: number;
     throttleWindowMs?: number;
   };
-  /**
-   * Per-instance overrides for values normally pulled from process.env.
-   * The integration harness uses this to avoid mutating the process-global
-   * environment — concurrent harness boots (in any future test pool that
-   * shares process.env across workers) would otherwise clobber each other's
-   * SERIAL_PORT / DATABASE_PATH / etc. Each field falls back to the
-   * corresponding env var when undefined, preserving production behavior
-   * for the auto-bootstrap caller.
-   */
   configOverrides?: ConfigOverrides;
 }
 
@@ -174,26 +147,16 @@ export interface ConfigOverrides {
   readonly apiPort?: number;
   readonly websocketPort?: number;
   readonly jwtKey?: string;
-  /**
-   * Full file path to the SQLite database (matching `initializeDatabase`'s
-   * `dbPath` semantics — the file, not the directory).
-   */
+  // Full path to the SQLite file (not its directory).
   readonly databasePath?: string;
   readonly firmwareCachePath?: string;
-  /**
-   * When true, ApiServer.Init skips serial-port setup. Mirrors the legacy
-   * `NODE_ENV=test` short-circuit. The harness sets this to `false`
-   * explicitly because vitest defaults NODE_ENV to 'test' (which would
-   * otherwise skip serial setup, the very thing the harness is exercising).
-   */
+  // Explicit override for the implicit `NODE_ENV=test` skip. The harness sets
+  // this `false` so vitest's default NODE_ENV doesn't suppress the serial path
+  // it's trying to exercise.
   readonly skipSerialSetup?: boolean;
 }
 
-// Exported so the integration test harness can import + bootstrap an
-// instance directly. Production never imports this class — the auto-bootstrap
-// block at the bottom of this file is the only production caller of
-// `bootstrap()`.
-// See file header for the full two-mode contract.
+// See file header for the two-mode (production / test-harness) contract.
 export class ApiServer {
   private apiPort = 0;
   private websocketPort = 0;
@@ -227,44 +190,21 @@ export class ApiServer {
   private systemStatus = new SystemStatus();
   private readonly jobLock = new JobLock();
 
-  // Firmware-OTA wiring. The orchestrator + WorkerSerialBus
-  // are constructed in setupSerialPort() because they depend on the serial
-  // worker; when serial setup is skipped — either explicit override
-  // (`configOverrides.skipSerialSetup=true`), or no override AND
-  // NODE_ENV='test' — `flashOrchestrator` stays undefined and the flash
-  // routes aren't registered either, so HTTP /api/firmware/flash returns
-  // 404 in unit tests rather than tripping a null deref on the
-  // orchestrator. The integration harness sets skipSerialSetup=false
-  // explicitly to override vitest's NODE_ENV='test' default and exercise
-  // the serial path. The firmware cache, upload store, and GitHub release
-  // service are constructed unconditionally in configApi() because they
-  // have no Worker dependency and are otherwise useful (unit tests don't
-  // reach them, but the construction is cheap).
+  // Firmware-OTA wiring. The orchestrator + WorkerSerialBus depend on the
+  // serial worker, so they're built in setupSerialPort() and stay undefined
+  // when serial setup is skipped — flash routes aren't registered then, so
+  // /api/firmware/flash 404s rather than null-derefing.
   private firmwareCache!: FirmwareCache;
   private firmwareUploadStore!: FirmwareUploadStore;
   private githubReleaseService!: GitHubReleaseService;
   private workerSerialBus?: WorkerSerialBus;
   private flashOrchestrator?: FlashJobOrchestrator;
-  // POLL_ACK-fed variant cache, keyed by controller MAC (the same id flowing
-  // through FW_PROGRESS / FW_DEPLOY_BEGIN). Populated by handlePollResponse
-  // whenever a POLL_ACK arrives with a non-empty variant; consumed by the
-  // orchestrator's controllersStore.listFlashTargets() at flash time. Entries
-  // never expire — a controller that goes offline keeps its last-known
-  // variant until the server restarts (or a fresh POLL_ACK overwrites it).
-  // Per FMI §7 row "controllers cache": stale entries are operator-recoverable
-  // (re-poll via syncControllers) and out-of-scope for c.6c.1.
+  // POLL_ACK-fed variant cache keyed by controller MAC. Entries never expire;
+  // operator recovers stale state via syncControllers (re-poll).
   private readonly controllerVariantCache = new Map<string, string>();
 
-  /**
-   * Test-only accessor for the POLL_ACK-fed variant cache. Used by the
-   * integration harness to poll-wait for a stub master's POLL_ACK to round-trip
-   * through Worker → handlePollResponse → cache.set(). Without this, tests
-   * have to sleep an arbitrary duration before flashing, which flakes under
-   * vitest's parallel-thread load.
-   *
-   * Not part of the production runtime API. Callers outside `test_harness/`
-   * should not use this.
-   */
+  // Test-only: lets the harness poll-wait for a POLL_ACK to populate the cache
+  // instead of sleeping an arbitrary duration before flashing.
   public getVariantForControllerForTest(mac: string): string | undefined {
     return this.controllerVariantCache.get(mac);
   }
@@ -292,14 +232,8 @@ export class ApiServer {
     return true;
   }
 
-  /**
-   * Wraps a serial route handler with the standard boilerplate:
-   * - short-circuits with 503 when the serial worker is unavailable
-   * - catches thrown errors and responds with 500
-   *
-   * The wrapped handler is responsible for sending its own success response,
-   * so handlers can still return 404 or other status codes when appropriate.
-   */
+  // Wraps a route: 503 when serial worker is down, 500 on thrown errors.
+  // Handler still owns its success / 404 response.
   private withSerialGuard(
     handler: (req: any, res: any, next: any) => Promise<void> | void,
   ): (req: any, res: any, next: any) => Promise<void> {
@@ -329,23 +263,14 @@ export class ApiServer {
     this.app = Express();
     this.router = Express.Router();
 
-    // Default Worker URL is the relative ./background_tasks/serial_worker.js,
-    // which resolves correctly when running compiled `node dist/api_server.js`
-    // (where dist/background_tasks/serial_worker.js exists alongside dist/logger.js).
-    // Tests override this to point at the compiled dist/ Worker because the
-    // src/ Worker file's `.js` imports cannot be resolved by Worker threads
-    // under tsx (Worker threads don't inherit the tsx loader).
+    // Worker threads don't inherit the tsx loader, so the default URL only
+    // works against compiled dist/. Tests override to point at dist/ explicitly.
     this.workerScriptUrl =
       opts?.workerScriptUrl ?? new URL('./background_tasks/serial_worker.js', import.meta.url);
     this.onWorkerError = opts?.onWorkerError;
     this.firmwareReleaseFetcher = opts?.firmwareReleaseFetcher;
     this.flashOrchestratorConfig = opts?.flashOrchestratorConfig;
 
-    // Broadcast lock state to all connected clients on every change. Subscribed
-    // here (rather than in Init) so a state change emitted before Init finishes
-    // — which won't happen today, but is a cheap guarantee — still reaches the
-    // updateClients fan-out path. The clients Map starts empty; updateClients
-    // is a no-op until WS connections land.
     this.jobLock.subscribe((state) => {
       this.updateClients(buildLockStateResponse(state));
     });
@@ -371,6 +296,9 @@ export class ApiServer {
     logger.info('Setting up routes');
     this.setRoutes();
 
+    // configOverrides.skipSerialSetup wins over NODE_ENV — vitest defaults
+    // NODE_ENV=test, which would otherwise hide the serial path from the
+    // integration harness that is specifically exercising it.
     const skipSerialSetup =
       this.configOverrides?.skipSerialSetup ?? process.env.NODE_ENV?.toLocaleLowerCase() === 'test';
     if (skipSerialSetup) {
@@ -386,29 +314,15 @@ export class ApiServer {
     await this.runWebServices();
   }
 
-  /**
-   * Construct + Init the server. Two callers:
-   *  1. Production auto-bootstrap block at the bottom (gated by `isMainModule`) of this file — invoked with no args
-   *     when api_server.js is the main module.
-   *  2. Integration test harness — invoked with `opts` pointing the serial
-   *     Worker at compiled dist/ and supplying an error callback so a
-   *     Worker boot failure surfaces as a test failure.
-   *
-   * On boot failure, throws after logging the underlying cause.
-   */
+  // Construct + Init. On boot failure, logs and rethrows wrapped with `cause`.
   public static async bootstrap(opts?: ApiServerOptions): Promise<ApiServer> {
     const server = new ApiServer(opts);
     try {
       await server.Init();
     } catch (error) {
       logger.error(error);
-      // Preserve the original error via `cause` so callers can inspect the
-      // underlying failure (e.g. tests asserting on JWT_KEY misconfig, or a
-      // future debug session distinguishing EADDRINUSE from a DB migration
-      // failure). Without it, the rewrap discards the only specific signal
-      // the caller has. Set as a property rather than the ES2022 `Error`
-      // constructor option because tsconfig.target is ES6 — Node 20 still
-      // exposes `cause` on the instance just fine.
+      // Assign `cause` as a property — the ES2022 constructor option isn't
+      // available with tsconfig.target=ES6. Node 20 still surfaces it.
       const wrapped = new Error('Failed to initialize server');
       (wrapped as Error & { cause?: unknown }).cause = error;
       throw wrapped;
@@ -428,19 +342,16 @@ export class ApiServer {
 
           const user = await repository.getByUsername(username);
 
-          // Return if user not found in database
           if (!user) {
             return done(null, false, {
               message: 'User not found',
             });
           }
-          // Return if password is wrong
           if (!user.validatePassword(password)) {
             return done(null, false, {
               message: 'Password is wrong',
             });
           }
-          // If credentials are correct, return the user object
           return done(null, user);
         },
       ),
@@ -516,12 +427,9 @@ export class ApiServer {
 
     const jwtKey = this.configOverrides?.jwtKey ?? process.env.JWT_KEY;
     if (!jwtKey) {
-      // Throw rather than process.exit: ApiServer is also imported as a
-      // class by the integration harness, and library-style init code
-      // calling process.exit makes graceful test failure (or any caller's
-      // misconfiguration handling) impossible. The auto-bootstrap block
-      // at the bottom of this file owns process.exit; bootstrap()'s catch
-      // logs the original error before rethrowing.
+      // Throw, don't process.exit — the harness imports this class and a
+      // library-level exit defeats any caller's misconfiguration handling.
+      // The auto-bootstrap block at file-bottom owns process.exit.
       throw new Error(
         'JWT_KEY is required (set process.env.JWT_KEY or pass configOverrides.jwtKey)',
       );
@@ -534,12 +442,8 @@ export class ApiServer {
 
     this.apiKeyValidator = ApiKeyValidator(this.db);
 
-    // Firmware infrastructure shared across the c.4 / c.5 / c.3 endpoints and
-    // the c.6c.1 orchestrator. Constructed unconditionally — the cache/upload
-    // store resolve their root from `configOverrides.firmwareCachePath` if
-    // supplied, otherwise FIRMWARE_CACHE_PATH (default ~/.config/astrosserver),
-    // and the release service is a thin GitHub API wrapper. None of them open
-    // the serial worker, so test mode is safe.
+    // Firmware infrastructure has no Worker dependency — safe to construct
+    // unconditionally even when serial setup is skipped.
     this.firmwareCache = new FirmwareCache({ rootDir: this.configOverrides?.firmwareCachePath });
     this.firmwareUploadStore = new FirmwareUploadStore({
       rootDir: this.configOverrides?.firmwareCachePath,
@@ -643,11 +547,9 @@ export class ApiServer {
       this.handleSerialWorkerMessage(msg);
     });
 
-    // c.6c.1 firmware-OTA orchestrator. Built here (rather than in configApi)
-    // because the WorkerSerialBus needs the serialWorker reference. Test mode
-    // skips setupSerialPort() entirely, so this branch only runs in real
-    // runtime — the flash routes are registered alongside so HTTP /api/firmware/flash
-    // 404s in tests rather than reaching an undefined orchestrator.
+    // Built here (not in configApi) because WorkerSerialBus needs the
+    // serialWorker reference. Flash routes register alongside so they 404
+    // when serial setup is skipped instead of hitting an undefined orchestrator.
     this.workerSerialBus = new WorkerSerialBus({ worker: this.serialWorker });
     this.flashOrchestrator = new FlashJobOrchestrator({
       bus: this.workerSerialBus,
@@ -656,11 +558,8 @@ export class ApiServer {
       upload: this.firmwareUploadStore,
       releaseService: this.githubReleaseService,
       controllersStore: {
-        // The variant cache is the in-memory source of truth for "which
-        // controllers have we observed alive" (POLL_ACK is the heartbeat).
-        // Returning a snapshot per call keeps the orchestrator's
-        // validateControllers free to apply trim/uniformity checks without
-        // racing a concurrent POLL_ACK update of the underlying Map.
+        // Snapshot per call so validateControllers doesn't race a concurrent
+        // POLL_ACK update of the underlying Map.
         listFlashTargets: async () =>
           Array.from(this.controllerVariantCache.entries()).map(([id, variant]) => ({
             id,
@@ -701,13 +600,10 @@ export class ApiServer {
   }
 
   private async runWebServices(): Promise<void> {
-    // Await both binds (HTTP listen + WS 'listening') before returning so
-    // bootstrap() rejects cleanly on EADDRINUSE in production, and so the
-    // integration harness can read the bound ports back via
-    // getBoundApiPort/getBoundWebsocketPort. Setting API_PORT/WEBSOCKET_PORT
-    // to '0' lets the kernel assign ephemeral ports — used by the harness
-    // to avoid the TOCTOU race that any "find free port, then bind it
-    // later" scheme has.
+    // Await both binds so bootstrap() rejects cleanly on EADDRINUSE and
+    // getBoundApiPort/getBoundWebsocketPort have something to read.
+    // API_PORT/WEBSOCKET_PORT='0' requests ephemeral ports — the harness
+    // uses this to avoid TOCTOU on "find free port, bind later".
     await new Promise<void>((resolve, reject) => {
       const httpServer = this.app.listen(this.apiPort, () => {
         logger.info(`The application is listening on port ${this.getBoundApiPort()}`);
@@ -717,17 +613,9 @@ export class ApiServer {
       httpServer.once('error', reject);
     });
 
-    // Wrap WS setup in a try/catch. If WS bind fails (e.g. websocketPort
-    // already in use), the HTTP server above is already listening — without
-    // this rollback we'd leak a live listening socket on every failed
-    // bootstrap, which manifests as cumulative EADDRINUSE flakes in tests
-    // that retry-after-failure.
-    // Capture the systemStatus unsubscribe handle so the rollback can detach
-    // the subscriber if WS bind fails. Without this, the closure would
-    // outlive the dead instance — on the next bootstrap (or a sibling
-    // instance under test), the orphaned subscriber would double-emit
-    // systemStatus frames AND keep the dead instance alive in the
-    // emitter's set.
+    // If WS bind fails the HTTP server above is already listening; the
+    // catch below rolls it back to avoid leaking a live socket and
+    // double-emitting systemStatus frames from an orphaned subscriber.
     let unsubscribeSystemStatus: (() => void) | undefined;
     try {
       const ws = (this.websocket = new Server({ port: this.websocketPort }));
@@ -736,11 +624,8 @@ export class ApiServer {
         this.updateClients({ type: TransmissionType.systemStatus, data: state });
       });
 
-      // Connection handler attached synchronously before awaiting 'listening'
-      // so any client racing the bind still hits the handler — the WS server
-      // begins accepting connections only when 'listening' fires, but
-      // attaching after the await would leave a window where the listener
-      // isn't installed yet.
+      // Attach the connection handler before awaiting 'listening' to close
+      // the window where a racing client connects without a listener.
       ws.on('connection', (conn) => {
         const id = uuid_v4();
         this.clients.set(id, conn);
@@ -756,22 +641,16 @@ export class ApiServer {
           logger.error(`websocket initial systemStatus send error: ${err}`);
         }
 
-        // Late-join snapshot: a client connecting while the lock is held would
-        // otherwise wait until the next acquire/release transition to learn the
-        // current state. Mirrors the systemStatus initial send above.
+        // Late-join lock snapshot: a client connecting while the lock is held
+        // would otherwise wait until the next acquire/release to learn state.
         try {
           conn.send(JSON.stringify(buildLockStateResponse(this.jobLock.getState())));
         } catch (err) {
           logger.error(`websocket initial lockState send error: ${err}`);
         }
 
-        // Flash-job late-join snapshot. When a client connects
-        // mid-flash, send the current FlashJobState so the operator UI can
-        // reconstruct progress without waiting for the next per-controller
-        // update. Sent only when a job is in flight; nothing is sent for the
-        // common "no active job" case (per spec §"Late-join" — no history
-        // persistence in v1, so completed jobs are not retained). Skipped in
-        // test mode where flashOrchestrator is undefined.
+        // Late-join flash-job snapshot — only emitted when a job is in flight.
+        // No history persistence in v1, so completed jobs are not retained.
         if (this.flashOrchestrator !== undefined) {
           try {
             const snapshot = decideLateJoinSnapshot(this.flashOrchestrator.getCurrentJob());
@@ -811,25 +690,18 @@ export class ApiServer {
       });
       logger.info(`websocket server listening on port ${this.getBoundWebsocketPort()}`);
     } catch (wsErr) {
-      // Roll back the HTTP bind so we don't leak a listening socket. Also
-      // close the partial WS server if it got constructed before failing
-      // (the ws library schedules its bind on next tick, so the Server
-      // instance exists even when the listen errored). And detach the
-      // systemStatus subscriber so the dead instance doesn't keep getting
-      // ticked by the emitter (and so the closure can be GC'd).
+      // Roll back: detach the systemStatus subscriber, close the HTTP
+      // server, and close any partial WS instance (ws schedules its bind
+      // on next tick, so the Server may exist even when listen errored).
       if (unsubscribeSystemStatus !== undefined) {
         unsubscribeSystemStatus();
       }
       const httpServer = this.httpServer;
       this.httpServer = undefined;
       if (httpServer !== undefined) {
-        // Surface httpServer.close errors via logger.warn rather than the
-        // prior swallow. ENOTLISTENING here means the rollback is a no-op
-        // — combined with the still-bound socket from the listen success,
-        // that's a leak the user needs to know about. We don't rethrow
-        // because the original wsErr is the failure the caller asked
-        // about; close errors during rollback are diagnostics, not the
-        // primary fault.
+        // Log close errors instead of rethrowing — wsErr is the primary
+        // fault the caller asked about; an ENOTLISTENING here would still
+        // signal a real leak the operator needs to see.
         await new Promise<void>((resolve) =>
           httpServer.close((closeErr) => {
             if (closeErr) {
@@ -842,19 +714,15 @@ export class ApiServer {
       const partialWs = this.websocket;
       this.websocket = undefined;
       if (partialWs !== undefined) {
-        // ws.Server.close(cb) only fires its callback once the underlying
-        // http server has shut down — but on a WS that errored before
-        // reaching 'listening', that internal state may never resolve and
-        // close() can hang forever. Race against a short timeout so the
-        // rollback always completes; the original wsErr is the diagnostic
-        // we care about either way.
+        // ws.Server.close() can hang forever on an instance that errored
+        // before 'listening' — race a 1s timeout so rollback always completes.
         try {
           await Promise.race([
             new Promise<void>((resolve) => partialWs.close(() => resolve())),
             new Promise<void>((resolve) => setTimeout(resolve, 1000)),
           ]);
         } catch (closeErr) {
-          // Synchronous throw from partialWs.close — log but don't mask wsErr.
+          // Don't mask wsErr.
           const msg = closeErr instanceof Error ? closeErr.message : String(closeErr);
           logger.warn(`runWebServices rollback: partialWs.close threw: ${msg}`);
         }
@@ -863,11 +731,8 @@ export class ApiServer {
     }
   }
 
-  /**
-   * Port the HTTP server is actually bound to. Useful for callers that pass
-   * `API_PORT=0` to request an ephemeral port and need to know the kernel's
-   * assignment. Throws if called before `runWebServices` completes.
-   */
+  // Resolves the kernel-assigned port when API_PORT=0. Throws if called
+  // before runWebServices completes.
   public getBoundApiPort(): number {
     if (this.httpServer === undefined) {
       throw new Error('ApiServer.getBoundApiPort: httpServer not yet running');
@@ -881,12 +746,8 @@ export class ApiServer {
     return addr.port;
   }
 
-  /**
-   * Port the WebSocket server is actually bound to. See `getBoundApiPort`.
-   * Throws if called before `runWebServices` completes or if the server was
-   * configured for a unix-socket path (never the case in this codebase, but
-   * the `ws` library's address() type permits it).
-   */
+  // See getBoundApiPort. Also throws on a unix-socket WS bind, which the
+  // ws types permit but this codebase never uses.
   public getBoundWebsocketPort(): number {
     if (this.websocket === undefined) {
       throw new Error('ApiServer.getBoundWebsocketPort: websocket not yet running');
@@ -907,11 +768,8 @@ export class ApiServer {
     try {
       const parsed = JSON.parse(msg) as IWebSocketMessage;
 
-      // Lock guard: write-class inbound messages are rejected per-connection
-      // when a flash job is in progress. The originating client receives a
-      // lockStateChanged echo + flashJobActive frame and we skip dispatch.
-      // (HTTP write-class requests are gated separately in writeGuard at the
-      // global /api mount.)
+      // Per-connection lock guard for write-class messages during a flash.
+      // HTTP requests are gated separately by writeGuard on /api.
       if (rejectIfLocked(parsed.msgType, conn, this.jobLock)) return;
 
       switch (parsed.msgType) {
@@ -994,31 +852,18 @@ export class ApiServer {
     try {
       const val = msg as PollResponse;
 
-      // Feed the variant cache + heartbeat callback BEFORE
-      // the existing DB lookups. The cache populates regardless of whether
-      // the controller is registered (DB lookup may fail for first-poll
-      // controllers before sync runs); the heartbeat callback fires only
-      // when a flash is in flight and the version matches the deployed
-      // target, so out-of-protocol heartbeats are dropped here rather than
-      // sent into the orchestrator. POLL_ACK with empty variant — older
-      // firmware that hasn't picked up the c.6c.1 protocol extension —
-      // leaves `controller.variant` undefined per handlePollAck; we skip
-      // updating the cache in that case so a regression to old firmware
-      // doesn't poison the cache with an empty string.
+      // Update the variant cache before the DB lookups below — those can
+      // fail for first-poll controllers, but the cache should still populate.
+      // Skip empty variants (pre-c.6c.1 firmware) so a regression doesn't
+      // poison the cache.
       const variant = val.controller.variant;
       if (typeof variant === 'string' && variant.length > 0) {
         this.controllerVariantCache.set(val.controller.address, variant);
       }
 
-      // Heartbeat callback: only the master's post-deploy POLL_ACK
-      // (sentinel MAC, version matches deployed target) releases the
-      // lock. Padawans poll routinely during a flash and any padawan
-      // that has already rebooted into the same target version would
-      // race the master if we didn't filter on the master sentinel.
-      // Decision logic lives in `decidePostDeployHeartbeat` — pure
-      // function, fully unit-tested. Log paths surface diagnostic
-      // gaps (empty firmwareVersion / wrong version) instead of
-      // silently relying on the 15s timer fallback.
+      // Only the master's post-deploy POLL_ACK (sentinel MAC, version
+      // matches target) releases the flash lock — padawans polling during
+      // a flash would otherwise race the master.
       const currentJob = this.flashOrchestrator?.getCurrentJob() ?? null;
       const decision = decidePostDeployHeartbeat(
         val.controller.address,
@@ -1429,28 +1274,13 @@ export class ApiServer {
 
   //#endregion
 
-  /**
-   * Async, awaitable shutdown. Two callers:
-   *  1. Production SIGTERM/SIGINT handlers in the auto-bootstrap block at the bottom (gated by `isMainModule`) of
-   *     this file — they `await shutdown()` then call `process.exit(0)`.
-   *  2. Integration test harness `dispose()` — `await`s shutdown() between
-   *     tests so each test gets a fresh ApiServer.
-   *
-   * Closes resources in dependency order: hardware (serial port + Worker),
-   * then network (WS server, HTTP server), then DB. Does NOT call
-   * `process.exit()` — the caller decides whether the process should exit.
-   */
+  // Awaitable shutdown. Closes resources in dependency order — hardware,
+  // network, DB. Caller decides whether to process.exit().
   public async shutdown(): Promise<void> {
     logger.info('Shutting down...');
 
-    // Resilient cascade: each resource is closed in its own try/catch so a
-    // failure in one (e.g. serialPort.close errors, worker.terminate rejects
-    // on an already-exited worker) doesn't skip the rest, leaving the WS
-    // server bound, the HTTP server bound, and the DB connection open.
-    // Errors are logged with context; the SIGTERM handler / harness dispose
-    // already handle a thrown shutdown by bailing the process or test, so
-    // letting individual steps fail loudly here is strictly better than
-    // letting them cascade-suppress later steps.
+    // Each step gets its own try/catch so a failure in one resource doesn't
+    // skip the rest and leave sockets / DB handles dangling.
     const safeClose = async (label: string, fn: () => void | Promise<void>): Promise<void> => {
       try {
         await fn();
@@ -1477,12 +1307,8 @@ export class ApiServer {
     await safeClose('websocket.close', async () => {
       if (this.websocket !== undefined) {
         const websocket = this.websocket;
-        // ws.Server.close() only invokes its callback once every connected
-        // client has disconnected; it does NOT proactively close them. A
-        // SIGTERM with any idle client connected would otherwise hang the
-        // whole shutdown. terminate() force-destroys the underlying socket,
-        // which is appropriate on a shutdown path — no graceful handshake
-        // is required when the process is going down.
+        // ws.Server.close() waits for clients to disconnect on their own; an
+        // idle client would hang shutdown forever. terminate() each one first.
         for (const client of websocket.clients) {
           client.terminate();
         }
@@ -1494,19 +1320,12 @@ export class ApiServer {
     await safeClose('httpServer.close', async () => {
       if (this.httpServer !== undefined) {
         const httpServer = this.httpServer;
-        // Same hazard as ws — http.Server.close() refuses to invoke its
-        // callback until every keep-alive connection drains naturally.
-        // closeAllConnections() (Node 18.2+) destroys those sockets so
-        // close() resolves promptly. WebSocket-upgraded sockets are
-        // unaffected by closeAllConnections, but our WS server is a
-        // separate WebSocketServer with its own internal http.Server, so
-        // there are none on this httpServer to begin with.
-        //
-        // Runtime guard: closeAllConnections is Node 18.2+ but the project
-        // is pinned to Node 20+ (Dockerfile, CI). The typeof check is
-        // defense in depth — if anything ever runs this on an older Node
-        // (downstream fork, an analytics container, etc.), shutdown should
-        // degrade to "wait for keep-alives to drain" rather than throw.
+        // http.Server.close() blocks on keep-alive sockets draining naturally;
+        // closeAllConnections() (Node 18.2+) destroys them so close() resolves
+        // promptly. Our WS server is a separate WebSocketServer with its own
+        // http.Server, so no upgraded sockets live on this one. The typeof
+        // guard is defense in depth — Node is pinned to 20+ in Dockerfile/CI,
+        // but a downstream fork on older Node should still gracefully degrade.
         await new Promise<void>((resolve, reject) => {
           httpServer.close((err) => (err ? reject(err) : resolve()));
           if (typeof httpServer.closeAllConnections === 'function') {
@@ -1525,23 +1344,12 @@ export class ApiServer {
   }
 }
 
-// Production auto-bootstrap. Fires only when this file is the entry point
-// passed to `node` (or `tsx`) — `import.meta.url` matches the resolved
-// `argv[1]`. When the file is imported from another module — most importantly
-// the integration test harness, which does `import { ApiServer } from
-// '../api_server.js'` then calls `bootstrap()` itself — `argv[1]` is some
-// other entry (vitest's runner, etc.), the URLs don't match, and this block
-// is skipped.
-//
-// Without this guard, the harness's import would spawn a "default" ApiServer
-// the moment api_server.js loads, then collide with the harness's own
-// `bootstrap()` call on the same env-var ports. See file header for full
-// two-mode contract.
-//
-// `pathToFileURL(path.resolve(...))` is the robust way to convert argv[1]
-// to a file URL — `argv[1]` is often a relative path (e.g. `./dist/api_server.js`
-// from `npm run start`), and `new URL('file://./dist/...')` would parse the
-// leading `.` as a host, never matching `import.meta.url`'s absolute form.
+// Auto-bootstrap only when this file is the entry point. When imported (e.g.
+// by the test harness), this block must skip so it doesn't collide with the
+// caller's own bootstrap() on the same env-var ports.
+// `pathToFileURL(path.resolve(...))` handles argv[1] being relative (e.g.
+// `./dist/api_server.js`) — `new URL('file://./...')` would parse the `.`
+// as a host and never match `import.meta.url`.
 const isMainModule = (() => {
   try {
     const argv1 = process.argv[1];
