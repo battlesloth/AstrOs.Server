@@ -221,6 +221,8 @@ describe('integration: happy github flash + heartbeat release', () => {
       //     midway is caught even if other assertions happened to pass
       //     on stale message replay.
       expect(harness.workerErrors).toEqual([]);
+      expect(harness.stub.parsingErrors()).toEqual([]);
+      expect(harness.pty.unexpectedExits).toEqual([]);
     },
     60_000, // generous: includes potential first-time `npm run build` + WS round-trips
   );

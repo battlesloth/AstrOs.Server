@@ -173,6 +173,13 @@ describe('integration: chunk NAK + Go-Back-N recovery', () => {
       //     if other assertions happened to pass (stale message replay
       //     could mask earlier breakage).
       expect(harness.workerErrors).toEqual([]);
+      // Diagnostic surfaces — empty in the happy path. Non-empty means
+      // wire-format drift between MessageGenerator and the stub's parsers
+      // (parsingErrors) or socat dying mid-test (unexpectedExits). Either
+      // way the test failure points at the actual cause instead of a
+      // mysterious downstream timeout.
+      expect(harness.stub.parsingErrors()).toEqual([]);
+      expect(harness.pty.unexpectedExits).toEqual([]);
     },
     60_000, // generous: includes potential first-time `npm run build` + WS round-trips
   );

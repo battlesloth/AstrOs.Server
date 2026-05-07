@@ -154,6 +154,8 @@ describe('integration: cancel during upload + deploy', () => {
       // 10. Worker stayed healthy. LAST so a Worker that died midway is
       //     caught even if other assertions happened to pass.
       expect(harness.workerErrors).toEqual([]);
+      expect(harness.stub.parsingErrors()).toEqual([]);
+      expect(harness.pty.unexpectedExits).toEqual([]);
     },
     30_000,
   );
@@ -270,6 +272,8 @@ describe('integration: cancel during upload + deploy', () => {
 
       // 10. Worker stayed healthy.
       expect(harness.workerErrors).toEqual([]);
+      expect(harness.stub.parsingErrors()).toEqual([]);
+      expect(harness.pty.unexpectedExits).toEqual([]);
     },
     30_000,
   );

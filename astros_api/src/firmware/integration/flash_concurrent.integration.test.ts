@@ -168,6 +168,8 @@ describe('integration: concurrent flash rejection', () => {
 
       // 8. Worker stayed healthy.
       expect(harness.workerErrors).toEqual([]);
+      expect(harness.stub.parsingErrors()).toEqual([]);
+      expect(harness.pty.unexpectedExits).toEqual([]);
     },
     30_000,
   );

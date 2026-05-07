@@ -179,6 +179,8 @@ describe('integration: happy upload flash + heartbeat release', () => {
       //     if other assertions happened to pass (stale message replay
       //     could mask earlier breakage).
       expect(harness.workerErrors).toEqual([]);
+      expect(harness.stub.parsingErrors()).toEqual([]);
+      expect(harness.pty.unexpectedExits).toEqual([]);
     },
     60_000, // generous: includes potential first-time `npm run build` + WS round-trips
   );

@@ -240,6 +240,8 @@ describe('integration: per-controller deploy mixed OK/FAILED', () => {
       //     that died midway is caught even if other assertions
       //     happened to pass on stale message replay.
       expect(harness.workerErrors).toEqual([]);
+      expect(harness.stub.parsingErrors()).toEqual([]);
+      expect(harness.pty.unexpectedExits).toEqual([]);
     },
     30_000,
   );

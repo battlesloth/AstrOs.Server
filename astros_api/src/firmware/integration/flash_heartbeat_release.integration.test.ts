@@ -111,6 +111,8 @@ describe('integration: heartbeat vs reboot-timer', () => {
       expect(deltaMs).toBeLessThan(3000);
 
       expect(harness.workerErrors).toEqual([]);
+      expect(harness.stub.parsingErrors()).toEqual([]);
+      expect(harness.pty.unexpectedExits).toEqual([]);
     },
     30_000,
   );
@@ -212,6 +214,8 @@ describe('integration: heartbeat vs reboot-timer', () => {
       expect(deltaMs).toBeLessThan(4000);
 
       expect(harness.workerErrors).toEqual([]);
+      expect(harness.stub.parsingErrors()).toEqual([]);
+      expect(harness.pty.unexpectedExits).toEqual([]);
     },
     30_000,
   );
