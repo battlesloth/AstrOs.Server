@@ -101,6 +101,19 @@ describe('integration: concurrent flash rejection', () => {
       expect(conflictBody.error).toBe('job_already_running');
       expect(conflictBody.currentJobId).toBe(firstFlashBody.jobId);
 
+      // 5b. Prove the lock prevented a *ghost* second flash on the wire,
+      //     not just returned 409 to the client. Pre-lock work in the
+      //     orchestrator (e.g., emitting FW_TRANSFER_BEGIN before the
+      //     job-existence check) would let serial frames leak through
+      //     even though HTTP says 409 — visible to the master, invisible
+      //     to the rest of this assertion. The stub's receivedFrames()
+      //     buffer captures every server→master frame; for a single
+      //     in-flight flash there must be exactly one FW_TRANSFER_BEGIN.
+      const transferBeginFrames = harness.stub
+        .receivedFrames()
+        .filter((f) => f.type === SerialMessageType.FW_TRANSFER_BEGIN);
+      expect(transferBeginFrames).toHaveLength(1);
+
       // 6. Send a write-class WS message (SERVO_TEST, the only entry in
       //    WS_WRITE_CLASS_MESSAGE_TYPES) and expect a flashJobActive
       //    rejection frame back. Snapshot the buffer first so we don't
