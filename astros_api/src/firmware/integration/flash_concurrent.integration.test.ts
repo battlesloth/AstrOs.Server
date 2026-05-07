@@ -160,9 +160,7 @@ describe('integration: concurrent flash rejection', () => {
       await harness.waitForWsMessage(
         (m) => {
           const msg = m as { type?: unknown; data?: { abortReason?: unknown } };
-          return (
-            msg.type === TransmissionType.flashJobFailed && msg.data?.abortReason === 'http'
-          );
+          return msg.type === TransmissionType.flashJobFailed && msg.data?.abortReason === 'http';
         },
         5000,
         beforeCancelSnapshot,
