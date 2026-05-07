@@ -1363,50 +1363,78 @@ export class ApiServer {
    */
   public async shutdown(): Promise<void> {
     logger.info('Shutting down...');
-    this.animationQueue?.panicStop();
 
-    if (this.serialPort?.isOpen) {
-      await new Promise<void>((resolve) => this.serialPort.close(() => resolve()));
-    }
-
-    if (this.serialWorker !== undefined) {
-      await this.serialWorker.terminate();
-    }
-
-    if (this.websocket !== undefined) {
-      const websocket = this.websocket;
-      // ws.Server.close() only invokes its callback once every connected
-      // client has disconnected; it does NOT proactively close them. A
-      // SIGTERM with any idle client connected would otherwise hang the
-      // whole shutdown. terminate() force-destroys the underlying socket,
-      // which is appropriate on a shutdown path — no graceful handshake
-      // is required when the process is going down.
-      for (const client of websocket.clients) {
-        client.terminate();
+    // Resilient cascade: each resource is closed in its own try/catch so a
+    // failure in one (e.g. serialPort.close errors, worker.terminate rejects
+    // on an already-exited worker) doesn't skip the rest, leaving the WS
+    // server bound, the HTTP server bound, and the DB connection open.
+    // Errors are logged with context; the SIGTERM handler / harness dispose
+    // already handle a thrown shutdown by bailing the process or test, so
+    // letting individual steps fail loudly here is strictly better than
+    // letting them cascade-suppress later steps.
+    const safeClose = async (label: string, fn: () => void | Promise<void>): Promise<void> => {
+      try {
+        await fn();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error(`shutdown ${label} failed: ${msg}`);
       }
-      await new Promise<void>((resolve) => websocket.close(() => resolve()));
-      this.websocket = undefined;
-    }
+    };
 
-    if (this.httpServer !== undefined) {
-      const httpServer = this.httpServer;
-      // Same hazard as ws — http.Server.close() refuses to invoke its
-      // callback until every keep-alive connection drains naturally.
-      // closeAllConnections() (Node 18.2+) destroys those sockets so
-      // close() resolves promptly. WebSocket-upgraded sockets are
-      // unaffected by closeAllConnections, but our WS server is a
-      // separate WebSocketServer with its own internal http.Server, so
-      // there are none on this httpServer to begin with.
-      await new Promise<void>((resolve, reject) => {
-        httpServer.close((err) => (err ? reject(err) : resolve()));
-        httpServer.closeAllConnections();
-      });
-      this.httpServer = undefined;
-    }
+    await safeClose('animationQueue.panicStop', () => this.animationQueue?.panicStop());
 
-    if (this.db !== undefined) {
-      await this.db.destroy();
-    }
+    await safeClose('serialPort.close', async () => {
+      if (this.serialPort?.isOpen) {
+        await new Promise<void>((resolve) => this.serialPort.close(() => resolve()));
+      }
+    });
+
+    await safeClose('serialWorker.terminate', async () => {
+      if (this.serialWorker !== undefined) {
+        await this.serialWorker.terminate();
+      }
+    });
+
+    await safeClose('websocket.close', async () => {
+      if (this.websocket !== undefined) {
+        const websocket = this.websocket;
+        // ws.Server.close() only invokes its callback once every connected
+        // client has disconnected; it does NOT proactively close them. A
+        // SIGTERM with any idle client connected would otherwise hang the
+        // whole shutdown. terminate() force-destroys the underlying socket,
+        // which is appropriate on a shutdown path — no graceful handshake
+        // is required when the process is going down.
+        for (const client of websocket.clients) {
+          client.terminate();
+        }
+        await new Promise<void>((resolve) => websocket.close(() => resolve()));
+        this.websocket = undefined;
+      }
+    });
+
+    await safeClose('httpServer.close', async () => {
+      if (this.httpServer !== undefined) {
+        const httpServer = this.httpServer;
+        // Same hazard as ws — http.Server.close() refuses to invoke its
+        // callback until every keep-alive connection drains naturally.
+        // closeAllConnections() (Node 18.2+) destroys those sockets so
+        // close() resolves promptly. WebSocket-upgraded sockets are
+        // unaffected by closeAllConnections, but our WS server is a
+        // separate WebSocketServer with its own internal http.Server, so
+        // there are none on this httpServer to begin with.
+        await new Promise<void>((resolve, reject) => {
+          httpServer.close((err) => (err ? reject(err) : resolve()));
+          httpServer.closeAllConnections();
+        });
+        this.httpServer = undefined;
+      }
+    });
+
+    await safeClose('db.destroy', async () => {
+      if (this.db !== undefined) {
+        await this.db.destroy();
+      }
+    });
   }
 }
 
