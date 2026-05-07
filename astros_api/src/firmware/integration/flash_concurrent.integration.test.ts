@@ -130,11 +130,30 @@ describe('integration: concurrent flash rejection', () => {
 
       // 7. Clean up: DELETE the in-flight flash so the lock releases now
       //    rather than waiting 15s for the reboot timer.
+      const beforeCancelSnapshot = harness.receivedWsMessages.length;
       const cancelRes = await fetch(`${harness.httpBaseUrl}/api/firmware/flash`, {
         method: 'DELETE',
         headers: { authorization: `Bearer ${harness.authToken}` },
       });
       expect(cancelRes.status).toBe(200);
+
+      // 7b. Wait for the orchestrator to fully process the cancel before
+      //     letting afterEach run dispose/shutdown. The DELETE returns 200
+      //     synchronously, but per-controller cleanup + flashJobFailed
+      //     emit happen async after the response. Without this wait,
+      //     `afterEach` would terminate the Worker mid-cleanup and race
+      //     in-flight emitWs calls into a half-shut-down server — visible
+      //     as intermittent `workerErrors` under load.
+      await harness.waitForWsMessage(
+        (m) => {
+          const msg = m as { type?: unknown; data?: { abortReason?: unknown } };
+          return (
+            msg.type === TransmissionType.flashJobFailed && msg.data?.abortReason === 'http'
+          );
+        },
+        5000,
+        beforeCancelSnapshot,
+      );
 
       // 8. Worker stayed healthy.
       expect(harness.workerErrors).toEqual([]);
