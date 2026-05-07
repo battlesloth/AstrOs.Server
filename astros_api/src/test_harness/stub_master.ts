@@ -715,9 +715,9 @@ export class StubMaster {
         // frames so tests don't hang at a downstream waitForWsMessage —
         // the diagnostic is the value-add, not a hard fail.
         const requestedSet = new Set(requestedOrder);
-        const extras = deployCfg.controllers
-          .map((ctrl) => ctrl.id)
-          .filter((id) => !requestedSet.has(id));
+        const scriptedIds = deployCfg.controllers.map((ctrl) => ctrl.id);
+        const scriptedSet = new Set(scriptedIds);
+        const extras = scriptedIds.filter((id) => !requestedSet.has(id));
         if (extras.length > 0) {
           this.parseErrors.push({
             type: frame.type,
@@ -726,6 +726,23 @@ export class StubMaster {
             note:
               `scriptDeploy includes controller(s) not in FW_DEPLOY_BEGIN order: ` +
               `extras=[${extras.join(',')}], requested=[${requestedOrder.join(',')}]`,
+          });
+        }
+        // Symmetric: orchestrator requested a controller that scriptDeploy
+        // didn't script for. The dispatcher would still emit a
+        // FW_DEPLOY_DONE, but with results missing for that controller —
+        // the server then treats it as never-finishing and the test hangs
+        // at a downstream waitForWsMessage with no diagnostic. Surface
+        // here so the misconfig is visible.
+        const missing = requestedOrder.filter((id) => !scriptedSet.has(id));
+        if (missing.length > 0) {
+          this.parseErrors.push({
+            type: frame.type,
+            msgId: frame.msgId,
+            payload: frame.payload,
+            note:
+              `scriptDeploy missing controller(s) requested in FW_DEPLOY_BEGIN: ` +
+              `missing=[${missing.join(',')}], scripted=[${scriptedIds.join(',')}]`,
           });
         }
 

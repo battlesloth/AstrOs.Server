@@ -498,6 +498,45 @@ describe('StubMaster (PTY-backed)', () => {
   );
 
   skipIfNotLinux(
+    'scriptDeploy: surfaces parse error when FW_DEPLOY_BEGIN requests a controller not scripted for',
+    async () => {
+      // Symmetric to the "scripted but not requested" check. Without this
+      // validation, the dispatcher emits FW_DEPLOY_DONE with results
+      // missing for the unscripted controller, the server treats it as
+      // never-finishing, and the test hangs at a downstream waitForWsMessage
+      // with no diagnostic.
+      const { stub, serverPort, dispose } = await setupBothEnds();
+      try {
+        stub.scriptDeploy({
+          controllers: [{ id: 'ctrl-A', outcome: 'OK', finalVersion: '1.5.0' }],
+          // ctrl-B is requested by the orchestrator below but NOT scripted
+        });
+
+        const generator = new MessageGenerator();
+        const deployData: FwDeployBegin = {
+          transferId: 'xfer-1',
+          order: ['ctrl-A', 'ctrl-B'],
+        };
+        const header = generator.generateHeader(SerialMessageType.FW_DEPLOY_BEGIN, 'd1');
+        const { msg } = generator.generateFwDeployBegin(header, deployData);
+
+        const drainPromise = collectFrames(serverPort, 5).catch(() => []);
+        serverPort.write(msg);
+        await drainPromise;
+        await new Promise((r) => setTimeout(r, 50));
+
+        const errs = stub.parsingErrors();
+        expect(errs.length).toBeGreaterThan(0);
+        const missingErr = errs.find((e) => e.note.includes('missing'));
+        expect(missingErr).toBeDefined();
+        expect(missingErr?.note).toContain('ctrl-B');
+      } finally {
+        await dispose();
+      }
+    },
+  );
+
+  skipIfNotLinux(
     'scriptDeploy: surfaces parse error when scripted controller is not in FW_DEPLOY_BEGIN order',
     async () => {
       // Pins the diagnostic for a misconfigured test: scripting a deploy
