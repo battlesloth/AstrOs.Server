@@ -102,8 +102,9 @@ export default function setup(): void {
   // on any checkout without a local `.env` — `.env` is gitignored, so a
   // clean clone or CI runner without one would fail integration tests at
   // setup time. dist/.env is unreachable from the integration suite anyway:
-  // integration_harness.ts sets every env var the ApiServer reads directly
-  // on process.env before bootstrap, and Dotenv.config is non-overwriting.
+  // integration_harness.ts plumbs every per-instance value through
+  // ApiServer's `configOverrides` option, which takes precedence over both
+  // Dotenv-loaded values and any pre-existing process.env entries.
   //
   // We mirror prebuild's `rm -rf dist` so renamed/deleted src files don't
   // leave stale dist artifacts behind. Lint is intentionally skipped — it's
