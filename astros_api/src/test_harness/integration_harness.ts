@@ -104,13 +104,17 @@ export interface IntegrationHarness {
     timeoutMs?: number,
     fromIndex?: number,
   ): Promise<T>;
-  // Seeds the FirmwareUploadStore (FIRMWARE_CACHE_PATH/uploads/) with a
-  // valid `upload-<uuid>.bin` + `.bin.sha256` + `.meta.json` triple so a
+  // Seeds the FirmwareUploadStore (under the harness's per-instance
+  // `firmwareCachePath` override / FIRMWARE_CACHE_PATH in production,
+  // plus the `/uploads` subdir) with a valid
+  // `upload-<uuid>.bin` + `.bin.sha256` + `.meta.json` triple so a
   // subsequent flash with `kind: 'upload'` resolves without going through
   // `store()` (which requires a real esp_app_desc_t header). Returns the
   // generated uploadId + sha256 so callers can cross-reference if needed.
   populateUpload(args: PopulateUploadArgs): Promise<{ uploadId: string; sha256: string }>;
-  // Seeds the FirmwareCache (FIRMWARE_CACHE_PATH/github/) with a valid
+  // Seeds the FirmwareCache (under the harness's per-instance
+  // `firmwareCachePath` override / FIRMWARE_CACHE_PATH in production,
+  // plus the `/github` subdir) with a valid
   // `astros-esp-<version>-<variant>-app.{bin,bin.sha256,meta.json}` triple so
   // a subsequent flash with `kind: 'github'` resolves via cache hit and
   // never attempts a download. Returns the computed sha256 so callers can

@@ -2,7 +2,7 @@
  * Two-mode entrypoint.
  *
  * - **Production / dev runs** (`node dist/api_server.js`, `tsx src/api_server.ts`):
- *   this file is the main module. The IIFE at the bottom calls
+ *   this file is the main module. The auto-bootstrap block at the bottom (gated by `isMainModule`) calls
  *   `ApiServer.bootstrap()` automatically and installs SIGTERM/SIGINT handlers
  *   that trigger a clean async shutdown. This is how the server runs in the
  *   container.
@@ -190,8 +190,9 @@ export interface ConfigOverrides {
 }
 
 // Exported so the integration test harness can import + bootstrap an
-// instance directly. Production never imports this class — the IIFE at
-// the bottom of this file is the only production caller of `bootstrap()`.
+// instance directly. Production never imports this class — the auto-bootstrap
+// block at the bottom of this file is the only production caller of
+// `bootstrap()`.
 // See file header for the full two-mode contract.
 export class ApiServer {
   private apiPort = 0;
@@ -228,14 +229,17 @@ export class ApiServer {
 
   // Firmware-OTA wiring. The orchestrator + WorkerSerialBus
   // are constructed in setupSerialPort() because they depend on the serial
-  // worker; when serial setup is skipped (NODE_ENV=test, or
-  // `configOverrides.skipSerialSetup=true`) `flashOrchestrator` stays
-  // undefined — the flash routes aren't registered either, so HTTP
-  // /api/firmware/flash returns 404 in unit tests rather than tripping a
-  // null deref on the orchestrator. The firmware cache, upload store, and
-  // GitHub release service are constructed unconditionally in configApi()
-  // because they have no Worker dependency and are otherwise useful (unit
-  // tests don't reach them, but the construction is cheap).
+  // worker; when serial setup is skipped — either explicit override
+  // (`configOverrides.skipSerialSetup=true`), or no override AND
+  // NODE_ENV='test' — `flashOrchestrator` stays undefined and the flash
+  // routes aren't registered either, so HTTP /api/firmware/flash returns
+  // 404 in unit tests rather than tripping a null deref on the
+  // orchestrator. The integration harness sets skipSerialSetup=false
+  // explicitly to override vitest's NODE_ENV='test' default and exercise
+  // the serial path. The firmware cache, upload store, and GitHub release
+  // service are constructed unconditionally in configApi() because they
+  // have no Worker dependency and are otherwise useful (unit tests don't
+  // reach them, but the construction is cheap).
   private firmwareCache!: FirmwareCache;
   private firmwareUploadStore!: FirmwareUploadStore;
   private githubReleaseService!: GitHubReleaseService;
@@ -384,7 +388,7 @@ export class ApiServer {
 
   /**
    * Construct + Init the server. Two callers:
-   *  1. Production IIFE at the bottom of this file — invoked with no args
+   *  1. Production auto-bootstrap block at the bottom (gated by `isMainModule`) of this file — invoked with no args
    *     when api_server.js is the main module.
    *  2. Integration test harness — invoked with `opts` pointing the serial
    *     Worker at compiled dist/ and supplying an error callback so a
@@ -515,8 +519,8 @@ export class ApiServer {
       // Throw rather than process.exit: ApiServer is also imported as a
       // class by the integration harness, and library-style init code
       // calling process.exit makes graceful test failure (or any caller's
-      // misconfiguration handling) impossible. The auto-bootstrap IIFE at
-      // the bottom of this file owns process.exit; bootstrap()'s catch
+      // misconfiguration handling) impossible. The auto-bootstrap block
+      // at the bottom of this file owns process.exit; bootstrap()'s catch
       // logs the original error before rethrowing.
       throw new Error(
         'JWT_KEY is required (set process.env.JWT_KEY or pass configOverrides.jwtKey)',
@@ -1427,7 +1431,7 @@ export class ApiServer {
 
   /**
    * Async, awaitable shutdown. Two callers:
-   *  1. Production SIGTERM/SIGINT handlers in the IIFE at the bottom of
+   *  1. Production SIGTERM/SIGINT handlers in the auto-bootstrap block at the bottom (gated by `isMainModule`) of
    *     this file — they `await shutdown()` then call `process.exit(0)`.
    *  2. Integration test harness `dispose()` — `await`s shutdown() between
    *     tests so each test gets a fresh ApiServer.

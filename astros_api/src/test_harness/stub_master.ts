@@ -533,8 +533,12 @@ export class StubMaster {
   // receipt, the stub emits FW_PROGRESS for each controller's stages then
   // emits FW_DEPLOY_DONE with the configured per-controller outcomes.
   //
-  // Validation is done at call time (not response time) so misconfigured tests
-  // fail fast rather than producing a mysterious protocol error mid-test.
+  // Argument-shape validation (outcome/finalVersion/error invariants) runs
+  // at call time so misconfigured options fail fast rather than producing
+  // mysterious protocol errors mid-test. Cross-frame validation against the
+  // FW_DEPLOY_BEGIN order (controllers scripted-but-not-requested or
+  // requested-but-not-scripted) happens at dispatch time and is recorded in
+  // `parseErrors` for tests asserting `parsingErrors().toEqual([])`.
   scriptDeploy(opts: ScriptDeployOpts): void {
     const controllers: ScriptDeployControllerCfg[] = opts.controllers.map((c) => {
       if (c.outcome === 'OK' && !c.finalVersion) {

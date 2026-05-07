@@ -9,10 +9,10 @@
 //       matching the first flash's jobId.
 //
 //   (b) WS flashJobActive: with the lock still held, a SERVO_TEST message
-//       (the only entry in WS_WRITE_CLASS_MESSAGE_TYPES) is rejected by
-//       rejectIfLocked, which emits a flashJobActive frame back to the
-//       originating client carrying error='flashJobActive' and
-//       rejectedMsgType='SERVO_TEST'.
+//       (a write-class message in WS_WRITE_CLASS_MESSAGE_TYPES) is
+//       rejected by rejectIfLocked, which emits a flashJobActive frame
+//       back to the originating client carrying error='flashJobActive'
+//       and rejectedMsgType='SERVO_TEST'.
 //
 // Cleanup: DELETE the in-flight flash at end-of-test so the lock releases
 // immediately rather than waiting 15s for the reboot timer.
@@ -114,7 +114,7 @@ describe('integration: concurrent flash rejection', () => {
         .filter((f) => f.type === SerialMessageType.FW_TRANSFER_BEGIN);
       expect(transferBeginFrames).toHaveLength(1);
 
-      // 6. Send a write-class WS message (SERVO_TEST, the only entry in
+      // 6. Send a write-class WS message (SERVO_TEST, a member of
       //    WS_WRITE_CLASS_MESSAGE_TYPES) and expect a flashJobActive
       //    rejection frame back. Snapshot the buffer first so we don't
       //    match earlier flashJobActive frames if any landed.
