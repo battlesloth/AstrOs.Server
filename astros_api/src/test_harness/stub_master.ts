@@ -702,7 +702,33 @@ export class StubMaster {
           });
           break;
         }
-        const { transferId } = deployParsed;
+        const { transferId, order: requestedOrder } = deployParsed;
+
+        // Validate that every scripted controller appears in the
+        // FW_DEPLOY_BEGIN order. Tests that accidentally script results
+        // for a controller the orchestrator never requested would
+        // otherwise emit FW_PROGRESS/FW_DEPLOY_DONE with controller IDs
+        // the orchestrator can't match, producing confusing
+        // "result for unknown controller" failures downstream. Surface
+        // the mismatch here so it's visible in stub.parsingErrors()
+        // before that failure mode kicks in. We still emit the existing
+        // frames so tests don't hang at a downstream waitForWsMessage —
+        // the diagnostic is the value-add, not a hard fail.
+        const requestedSet = new Set(requestedOrder);
+        const extras = deployCfg.controllers
+          .map((ctrl) => ctrl.id)
+          .filter((id) => !requestedSet.has(id));
+        if (extras.length > 0) {
+          this.parseErrors.push({
+            type: frame.type,
+            msgId: frame.msgId,
+            payload: frame.payload,
+            note:
+              `scriptDeploy includes controller(s) not in FW_DEPLOY_BEGIN order: ` +
+              `extras=[${extras.join(',')}], requested=[${requestedOrder.join(',')}]`,
+          });
+        }
+
         // Walk each controller through its stage progression then emit
         // FW_DEPLOY_DONE. No artificial delay between frames — the
         // orchestrator's per-controller throttle (250ms / 4Hz) means

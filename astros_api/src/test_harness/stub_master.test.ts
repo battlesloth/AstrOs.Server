@@ -498,6 +498,51 @@ describe('StubMaster (PTY-backed)', () => {
   );
 
   skipIfNotLinux(
+    'scriptDeploy: surfaces parse error when scripted controller is not in FW_DEPLOY_BEGIN order',
+    async () => {
+      // Pins the diagnostic for a misconfigured test: scripting a deploy
+      // result for a controller the orchestrator never requested. Without
+      // the validation, the stub would happily emit FW_PROGRESS /
+      // FW_DEPLOY_DONE for that controller; the orchestrator would then
+      // produce a confusing "result for unknown controller" failure that's
+      // hard to trace back to the test config.
+      const { stub, serverPort, dispose } = await setupBothEnds();
+      try {
+        stub.scriptDeploy({
+          controllers: [
+            { id: 'ctrl-A', outcome: 'OK', finalVersion: '1.5.0' },
+            { id: 'ghost-B', outcome: 'OK', finalVersion: '1.5.0' },
+          ],
+        });
+
+        const generator = new MessageGenerator();
+        const deployData: FwDeployBegin = {
+          transferId: 'xfer-1',
+          order: ['ctrl-A'], // ghost-B is NOT requested
+        };
+        const header = generator.generateHeader(SerialMessageType.FW_DEPLOY_BEGIN, 'd1');
+        const { msg } = generator.generateFwDeployBegin(header, deployData);
+
+        // Drain whatever frames the stub emits in response (we don't assert
+        // on shape here — the existing scriptDeploy test covers that path).
+        const drainPromise = collectFrames(serverPort, 5).catch(() => []);
+        serverPort.write(msg);
+        await drainPromise;
+
+        // Give the stub's inbound dispatch a tick to record the error.
+        await new Promise((r) => setTimeout(r, 50));
+
+        const errs = stub.parsingErrors();
+        expect(errs.length).toBeGreaterThan(0);
+        expect(errs[0].note).toContain('ghost-B');
+        expect(errs[0].note).toContain('not in FW_DEPLOY_BEGIN order');
+      } finally {
+        await dispose();
+      }
+    },
+  );
+
+  skipIfNotLinux(
     'writePollAck: emits POLL_ACK parseable by MessageHandler.handlePollAck',
     async () => {
       const { stub, serverPort, dispose } = await setupBothEnds();
