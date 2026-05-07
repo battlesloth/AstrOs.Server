@@ -1,10 +1,15 @@
 import { spawn } from 'child_process';
 
+export interface SocatExit {
+  readonly code: number | null;
+  readonly signal: NodeJS.Signals | null;
+}
+
 export interface PtyPair {
-  serverPath: string; // /dev/pts/N — server-side ApiServer opens this
-  masterPath: string; // /dev/pts/M — stub master opens this
+  readonly serverPath: string; // /dev/pts/N — server-side ApiServer opens this
+  readonly masterPath: string; // /dev/pts/M — stub master opens this
   /** socat's process pid (for diagnostics; undefined if spawn failed). */
-  pid: number | undefined;
+  readonly pid?: number;
   /**
    * Records every socat exit that wasn't initiated by `dispose()`. Stays
    * empty in the happy case. Tests should assert empty after each scenario
@@ -12,7 +17,7 @@ export interface PtyPair {
    * crashed under -d -d log buffer pressure, etc.), which would otherwise
    * surface as a mysterious 5-second `waitForX` timeout with no diagnostic.
    */
-  unexpectedExits: ReadonlyArray<{ code: number | null; signal: NodeJS.Signals | null }>;
+  readonly unexpectedExits: ReadonlyArray<SocatExit>;
   dispose(): Promise<void>;
 }
 

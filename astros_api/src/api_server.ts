@@ -169,24 +169,24 @@ export interface ApiServerOptions {
 }
 
 export interface ConfigOverrides {
-  serialPort?: string;
-  baudRate?: number;
-  apiPort?: number;
-  websocketPort?: number;
-  jwtKey?: string;
+  readonly serialPort?: string;
+  readonly baudRate?: number;
+  readonly apiPort?: number;
+  readonly websocketPort?: number;
+  readonly jwtKey?: string;
   /**
    * Full file path to the SQLite database (matching `initializeDatabase`'s
    * `dbPath` semantics — the file, not the directory).
    */
-  databasePath?: string;
-  firmwareCachePath?: string;
+  readonly databasePath?: string;
+  readonly firmwareCachePath?: string;
   /**
    * When true, ApiServer.Init skips serial-port setup. Mirrors the legacy
    * `NODE_ENV=test` short-circuit. The harness sets this to `false`
    * explicitly because vitest defaults NODE_ENV to 'test' (which would
    * otherwise skip serial setup, the very thing the harness is exercising).
    */
-  skipSerialSetup?: boolean;
+  readonly skipSerialSetup?: boolean;
 }
 
 // Exported so the integration test harness can import + bootstrap an

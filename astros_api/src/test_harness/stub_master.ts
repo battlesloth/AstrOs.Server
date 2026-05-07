@@ -62,6 +62,20 @@ const DEFAULT_MASTER_VARIANT = 'astros-master-test-variant';
 // Inbound frame shape (parsed from server-emitted lines)
 // ---------------------------------------------------------------------------
 
+/**
+ * Diagnostic record for a payload the scripted-response dispatcher could
+ * not parse, or where scriptDeploy controllers don't match
+ * FW_DEPLOY_BEGIN's order. Tests assert `stub.parsingErrors()` is empty —
+ * a non-empty list means a wire-format drift / test misconfig that would
+ * otherwise surface as a mysterious downstream timeout.
+ */
+export interface StubParseError {
+  readonly type: SerialMessageType;
+  readonly msgId: string;
+  readonly payload: string;
+  readonly note: string;
+}
+
 export interface InboundFrame {
   type: SerialMessageType;
   msgId: string;
@@ -254,12 +268,7 @@ export class StubMaster {
   // ApiServer's MessageGenerator and the stub's parsers would make every
   // ACK silently never get sent, and tests would time out without a hint
   // why. Tests should assert empty (the harness re-exposes this).
-  private readonly parseErrors: Array<{
-    type: SerialMessageType;
-    msgId: string;
-    payload: string;
-    note: string;
-  }> = [];
+  private readonly parseErrors: StubParseError[] = [];
 
   // Scripted-response configuration. Both are null when the feature
   // is not enabled; set by autoAckUpload() / scriptDeploy(); cleared by
@@ -347,12 +356,7 @@ export class StubMaster {
    * list means a wire-format drift between MessageGenerator and the stub
    * has silently broken every ACK on that frame type.
    */
-  parsingErrors(): readonly Readonly<{
-    type: SerialMessageType;
-    msgId: string;
-    payload: string;
-    note: string;
-  }>[] {
+  parsingErrors(): ReadonlyArray<StubParseError> {
     return this.parseErrors;
   }
 
@@ -844,7 +848,7 @@ function parseFwTransferEndPayload(
 //   transferId<US>controllerId_1<RS>controllerId_2<RS>...
 function parseFwDeployBeginPayload(
   payload: string,
-): { transferId: string; order: string[] } | null {
+): { readonly transferId: string; readonly order: readonly string[] } | null {
   const firstUs = payload.indexOf(MessageHelper.US);
   if (firstUs < 0) return null;
   const transferId = payload.substring(0, firstUs);
