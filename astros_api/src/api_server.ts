@@ -815,11 +815,21 @@ export class ApiServer {
       const partialWs = this.websocket;
       this.websocket = undefined;
       if (partialWs !== undefined) {
+        // ws.Server.close(cb) only fires its callback once the underlying
+        // http server has shut down — but on a WS that errored before
+        // reaching 'listening', that internal state may never resolve and
+        // close() can hang forever. Race against a short timeout so the
+        // rollback always completes; the original wsErr is the diagnostic
+        // we care about either way.
         try {
-          await new Promise<void>((resolve) => partialWs.close(() => resolve()));
-        } catch {
-          // Best-effort — the bind already failed, so the WS server may be
-          // in an undefined state. Don't mask the original wsErr.
+          await Promise.race([
+            new Promise<void>((resolve) => partialWs.close(() => resolve())),
+            new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+          ]);
+        } catch (closeErr) {
+          // Synchronous throw from partialWs.close — log but don't mask wsErr.
+          const msg = closeErr instanceof Error ? closeErr.message : String(closeErr);
+          logger.warn(`runWebServices rollback: partialWs.close threw: ${msg}`);
         }
       }
       throw wsErr;
