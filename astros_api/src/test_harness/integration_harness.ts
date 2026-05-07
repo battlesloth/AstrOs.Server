@@ -241,6 +241,20 @@ export async function bootIntegrationHarness(
   // ERR_MODULE_NOT_FOUND would otherwise pass test assertions silently.
   const workerErrors: Error[] = [];
 
+  // Resilient teardown helper used by both the happy-path `dispose()` and
+  // the boot-error cleanup. Logs the failing step instead of swallowing —
+  // real cleanup failures (leaked socat, stuck WS, dirty DB) need to be
+  // visible diagnostically rather than surfacing as the next test's
+  // mysterious EADDRINUSE / polluted-DB / orphaned-tmp.
+  const safeRun = async (label: string, fn: () => void | Promise<void>): Promise<void> => {
+    try {
+      await fn();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`harness ${label} failed: ${msg}`);
+    }
+  };
+
   try {
     // 4. Boot ApiServer. bootstrap() awaits both binds (HTTP listen + WS
     //    'listening'), so it rejects on EADDRINUSE rather than returning a
@@ -406,38 +420,24 @@ export async function bootIntegrationHarness(
     };
 
     const dispose = async (): Promise<void> => {
-      // Reverse-order teardown. Resilient: each step in its own try/catch so
-      // a failure in one doesn't leak the others.
-      try {
-        wsClient?.close();
-      } catch {
-        /* ignore */
-      }
-      try {
+      // Reverse-order teardown. Resilient: each step is wrapped in safeRun
+      // (defined just above) so a failure in one doesn't leak the others —
+      // but unlike a bare `catch {}`, safeRun logs the failing step. Real
+      // cleanup failures (leaked socat, dirty DB, stuck WS) need to surface
+      // diagnostically; the next test seeing EADDRINUSE or a polluted DB
+      // shouldn't be the first signal that something went wrong.
+      await safeRun('wsClient.close', () => wsClient?.close());
+      await safeRun('stub.dispose', async () => {
         await stub?.dispose();
-      } catch {
-        /* ignore */
-      }
-      try {
+      });
+      await safeRun('server.shutdown', async () => {
         await server?.shutdown();
-      } catch {
-        /* ignore */
-      }
-      try {
-        await pty.dispose();
-      } catch {
-        /* ignore */
-      }
-      try {
-        await rm(dbDir, { recursive: true, force: true });
-      } catch {
-        /* ignore */
-      }
-      try {
-        await rm(firmwareCacheDir, { recursive: true, force: true });
-      } catch {
-        /* ignore */
-      }
+      });
+      await safeRun('pty.dispose', () => pty.dispose());
+      await safeRun('rm dbDir', () => rm(dbDir, { recursive: true, force: true }));
+      await safeRun('rm firmwareCacheDir', () =>
+        rm(firmwareCacheDir, { recursive: true, force: true }),
+      );
     };
 
     const waitForVariantCachePopulated = async (
@@ -485,37 +485,20 @@ export async function bootIntegrationHarness(
       dispose,
     };
   } catch (bootErr) {
-    // If anything fails mid-boot, tear down what we did set up.
-    try {
-      wsClient?.close();
-    } catch {
-      /* ignore */
-    }
-    try {
+    // If anything fails mid-boot, tear down what we did set up. Same
+    // resilient pattern as `dispose()` — log via safeRun, never swallow.
+    await safeRun('wsClient.close (boot-fail)', () => wsClient?.close());
+    await safeRun('stub.dispose (boot-fail)', async () => {
       await stub?.dispose();
-    } catch {
-      /* ignore */
-    }
-    try {
+    });
+    await safeRun('server.shutdown (boot-fail)', async () => {
       await server?.shutdown();
-    } catch {
-      /* ignore */
-    }
-    try {
-      await pty.dispose();
-    } catch {
-      /* ignore */
-    }
-    try {
-      await rm(dbDir, { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
-    try {
-      await rm(firmwareCacheDir, { recursive: true, force: true });
-    } catch {
-      /* ignore */
-    }
+    });
+    await safeRun('pty.dispose (boot-fail)', () => pty.dispose());
+    await safeRun('rm dbDir (boot-fail)', () => rm(dbDir, { recursive: true, force: true }));
+    await safeRun('rm firmwareCacheDir (boot-fail)', () =>
+      rm(firmwareCacheDir, { recursive: true, force: true }),
+    );
     throw bootErr;
   }
 }
