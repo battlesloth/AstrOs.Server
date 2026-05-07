@@ -704,84 +704,112 @@ export class ApiServer {
       httpServer.once('error', reject);
     });
 
-    const ws = (this.websocket = new Server({ port: this.websocketPort }));
+    // Wrap WS setup in a try/catch. If WS bind fails (e.g. websocketPort
+    // already in use), the HTTP server above is already listening — without
+    // this rollback we'd leak a live listening socket on every failed
+    // bootstrap, which manifests as cumulative EADDRINUSE flakes in tests
+    // that retry-after-failure.
+    try {
+      const ws = (this.websocket = new Server({ port: this.websocketPort }));
 
-    this.systemStatus.subscribe((state) => {
-      this.updateClients({ type: TransmissionType.systemStatus, data: state });
-    });
+      this.systemStatus.subscribe((state) => {
+        this.updateClients({ type: TransmissionType.systemStatus, data: state });
+      });
 
-    // Connection handler attached synchronously before awaiting 'listening',
-    // mirroring the prior sync setup — any client racing the bind still hits
-    // the handler.
-    ws.on('connection', (conn) => {
-      const id = uuid_v4();
-      this.clients.set(id, conn);
+      // Connection handler attached synchronously before awaiting 'listening',
+      // mirroring the prior sync setup — any client racing the bind still hits
+      // the handler.
+      ws.on('connection', (conn) => {
+        const id = uuid_v4();
+        this.clients.set(id, conn);
 
-      try {
-        conn.send(
-          JSON.stringify({
-            type: TransmissionType.systemStatus,
-            data: this.systemStatus.getState(),
-          }),
-        );
-      } catch (err) {
-        logger.error(`websocket initial systemStatus send error: ${err}`);
-      }
-
-      // Late-join snapshot: a client connecting while the lock is held would
-      // otherwise wait until the next acquire/release transition to learn the
-      // current state. Mirrors the systemStatus initial send above.
-      try {
-        conn.send(JSON.stringify(buildLockStateResponse(this.jobLock.getState())));
-      } catch (err) {
-        logger.error(`websocket initial lockState send error: ${err}`);
-      }
-
-      // Flash-job late-join snapshot. When a client connects
-      // mid-flash, send the current FlashJobState so the operator UI can
-      // reconstruct progress without waiting for the next per-controller
-      // update. Sent only when a job is in flight; nothing is sent for the
-      // common "no active job" case (per spec §"Late-join" — no history
-      // persistence in v1, so completed jobs are not retained). Skipped in
-      // test mode where flashOrchestrator is undefined.
-      if (this.flashOrchestrator !== undefined) {
         try {
-          const snapshot = decideLateJoinSnapshot(this.flashOrchestrator.getCurrentJob());
-          if (snapshot.kind === 'flashJobStarted') {
-            conn.send(
-              JSON.stringify({
-                type: TransmissionType.flashJobStarted,
-                data: snapshot.data,
-              }),
-            );
-          }
+          conn.send(
+            JSON.stringify({
+              type: TransmissionType.systemStatus,
+              data: this.systemStatus.getState(),
+            }),
+          );
         } catch (err) {
-          logger.error(`websocket initial flashJobStarted send error: ${err}`);
+          logger.error(`websocket initial systemStatus send error: ${err}`);
+        }
+
+        // Late-join snapshot: a client connecting while the lock is held would
+        // otherwise wait until the next acquire/release transition to learn the
+        // current state. Mirrors the systemStatus initial send above.
+        try {
+          conn.send(JSON.stringify(buildLockStateResponse(this.jobLock.getState())));
+        } catch (err) {
+          logger.error(`websocket initial lockState send error: ${err}`);
+        }
+
+        // Flash-job late-join snapshot. When a client connects
+        // mid-flash, send the current FlashJobState so the operator UI can
+        // reconstruct progress without waiting for the next per-controller
+        // update. Sent only when a job is in flight; nothing is sent for the
+        // common "no active job" case (per spec §"Late-join" — no history
+        // persistence in v1, so completed jobs are not retained). Skipped in
+        // test mode where flashOrchestrator is undefined.
+        if (this.flashOrchestrator !== undefined) {
+          try {
+            const snapshot = decideLateJoinSnapshot(this.flashOrchestrator.getCurrentJob());
+            if (snapshot.kind === 'flashJobStarted') {
+              conn.send(
+                JSON.stringify({
+                  type: TransmissionType.flashJobStarted,
+                  data: snapshot.data,
+                }),
+              );
+            }
+          } catch (err) {
+            logger.error(`websocket initial flashJobStarted send error: ${err}`);
+          }
+        }
+
+        conn.on('message', (msg) => {
+          this.handleWebsocketMessage(msg.toString(), conn);
+        });
+
+        conn.on('close', () => {
+          this.clients.delete(id);
+          logger.info(`websocket disconnected: id=${id}`);
+        });
+
+        conn.on('error', (err) => {
+          logger.error(`websocket client error: id=${id}, ${err}`);
+          this.clients.delete(id);
+        });
+
+        logger.info(`websocket connected: id=${id}`);
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        ws.once('listening', () => resolve());
+        ws.once('error', reject);
+      });
+      logger.info(`websocket server listening on port ${this.getBoundWebsocketPort()}`);
+    } catch (wsErr) {
+      // Roll back the HTTP bind so we don't leak a listening socket. Also
+      // close the partial WS server if it got constructed before failing
+      // (the ws library schedules its bind on next tick, so the Server
+      // instance exists even when the listen errored).
+      const httpServer = this.httpServer;
+      this.httpServer = undefined;
+      if (httpServer !== undefined) {
+        await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+      }
+      const partialWs = this.websocket;
+      this.websocket = undefined;
+      if (partialWs !== undefined) {
+        try {
+          await new Promise<void>((resolve) => partialWs.close(() => resolve()));
+        } catch {
+          // Best-effort — the bind already failed, so the WS server may be
+          // in an undefined state. Don't mask the original wsErr.
         }
       }
-
-      conn.on('message', (msg) => {
-        this.handleWebsocketMessage(msg.toString(), conn);
-      });
-
-      conn.on('close', () => {
-        this.clients.delete(id);
-        logger.info(`websocket disconnected: id=${id}`);
-      });
-
-      conn.on('error', (err) => {
-        logger.error(`websocket client error: id=${id}, ${err}`);
-        this.clients.delete(id);
-      });
-
-      logger.info(`websocket connected: id=${id}`);
-    });
-
-    await new Promise<void>((resolve, reject) => {
-      ws.once('listening', () => resolve());
-      ws.once('error', reject);
-    });
-    logger.info(`websocket server listening on port ${this.getBoundWebsocketPort()}`);
+      throw wsErr;
+    }
   }
 
   /**
