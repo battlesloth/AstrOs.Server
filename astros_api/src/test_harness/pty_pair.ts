@@ -3,6 +3,16 @@ import { spawn } from 'child_process';
 export interface PtyPair {
   serverPath: string; // /dev/pts/N — server-side ApiServer opens this
   masterPath: string; // /dev/pts/M — stub master opens this
+  /** socat's process pid (for diagnostics; undefined if spawn failed). */
+  pid: number | undefined;
+  /**
+   * Records every socat exit that wasn't initiated by `dispose()`. Stays
+   * empty in the happy case. Tests should assert empty after each scenario
+   * — a non-empty list means socat died mid-test (OOM kill, parent SIGHUP,
+   * crashed under -d -d log buffer pressure, etc.), which would otherwise
+   * surface as a mysterious 5-second `waitForX` timeout with no diagnostic.
+   */
+  unexpectedExits: ReadonlyArray<{ code: number | null; signal: NodeJS.Signals | null }>;
   dispose(): Promise<void>;
 }
 
@@ -95,7 +105,22 @@ export async function createPtyPair(): Promise<PtyPair> {
 
   await ready;
 
+  // Permanent exit listener attached AFTER startup completes. The listener
+  // inside the `ready` Promise short-circuits once both paths are captured,
+  // so it would silently no-op on a mid-test socat death — the test would
+  // then hit some `waitForWsMessage` / `waitForFrame` timeout with no
+  // indication that the PTY pair vanished. This separate listener records
+  // exits that weren't initiated by `dispose()` so tests can assert empty
+  // and surface socat crashes diagnostically.
+  let disposing = false;
+  const unexpectedExits: Array<{ code: number | null; signal: NodeJS.Signals | null }> = [];
+  child.on('exit', (code, signal) => {
+    if (disposing) return;
+    unexpectedExits.push({ code, signal });
+  });
+
   const dispose = async (): Promise<void> => {
+    disposing = true;
     if (child.exitCode !== null) return;
     child.kill('SIGTERM');
     await new Promise<void>((resolve) => {
@@ -103,7 +128,7 @@ export async function createPtyPair(): Promise<PtyPair> {
         child.kill('SIGKILL');
         resolve();
       }, 1000);
-      child.on('exit', () => {
+      child.once('exit', () => {
         clearTimeout(timer);
         resolve();
       });
@@ -116,5 +141,5 @@ export async function createPtyPair(): Promise<PtyPair> {
     throw new Error('socat PTY paths were not captured (internal error)');
   }
 
-  return { serverPath, masterPath, dispose };
+  return { serverPath, masterPath, pid: child.pid, unexpectedExits, dispose };
 }

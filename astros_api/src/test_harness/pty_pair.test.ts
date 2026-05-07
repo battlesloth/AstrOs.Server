@@ -18,6 +18,35 @@ describe('createPtyPair', () => {
     }
   });
 
+  skipIfNotLinux('records unexpected socat death in unexpectedExits', async () => {
+    // Pins the diagnostic surface for socat dying mid-test (OOM, parent
+    // SIGHUP, segfault under log pressure). Without the post-startup exit
+    // listener, the death would surface as a mysterious downstream
+    // timeout — the listener inside `await ready` short-circuits once
+    // both PTY paths are captured.
+    const pty = await createPtyPair();
+    expect(pty.unexpectedExits).toEqual([]);
+    expect(pty.pid).toBeDefined();
+
+    // Provoke an unexpected exit: SIGKILL the socat process from outside.
+    // dispose() sets `disposing = true` first, so anything that bypasses
+    // dispose (like this kill) hits the post-startup listener path.
+    process.kill(pty.pid as number, 'SIGKILL');
+
+    // Poll for the exit event (kernel signal delivery + Node's exit-event
+    // dispatch is sub-ms but not synchronous).
+    const deadline = Date.now() + 2000;
+    while (pty.unexpectedExits.length === 0 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 25));
+    }
+
+    expect(pty.unexpectedExits).toHaveLength(1);
+    expect(pty.unexpectedExits[0].signal).toBe('SIGKILL');
+
+    // dispose is idempotent against an already-dead child.
+    await pty.dispose();
+  });
+
   skipIfNotLinux('dispose() releases the socat process and PTY paths', async () => {
     const pty = await createPtyPair();
     const path = pty.serverPath;
