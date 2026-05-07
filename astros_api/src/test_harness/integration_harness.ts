@@ -201,7 +201,13 @@ export async function bootIntegrationHarness(
   //    skipSerialSetup is set explicitly to false. Vitest defaults
   //    NODE_ENV='test', which would otherwise short-circuit serial-port
   //    setup — the very thing this harness is exercising.
-  const jwtKey = process.env.JWT_KEY ?? 'test-jwt-key';
+  // Hardcoded fixed test key. We deliberately do NOT read process.env.JWT_KEY
+  // here — that read was the last surface in the harness coupling test boot
+  // to the process-global env. The harness signs its own JWT with this same
+  // value (just below) and passes it to ApiServer via configOverrides.jwtKey,
+  // so the value only needs to be self-consistent across the boot, not match
+  // anything outside it.
+  const jwtKey = 'test-jwt-key';
   const configOverrides = {
     serialPort: pty.serverPath,
     baudRate: 9600,
