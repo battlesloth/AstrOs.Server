@@ -440,6 +440,55 @@ POLL_ACK forces the orchestrator onto the timer fallback.
   with `lockStateChanged` + a `flashJobActive` frame (existing c.2 behavior;
   unchanged by c.6c.1).
 
+## Integration test suite (c.6c.2)
+
+The following scenarios are covered end-to-end by the automated integration
+suite under `astros_api/src/firmware/integration/`. Each test boots a real
+`ApiServer` against a `socat`-backed PTY pair driven by an in-process
+`StubMaster` (a scriptable wire-protocol responder, NOT a firmware
+simulator — real firmware behavior simulation lives in AstrOs.ESP). Operators
+do NOT need to manually verify these scenarios unless investigating a regression
+in the suite itself.
+
+| Scenario | File | What it pins |
+|---|---|---|
+| Happy upload flash + heartbeat | `flash_happy_upload.integration.test.ts` | POST `kind=upload` → flashJobStarted → flashJobDone → master POLL_ACK heartbeat with deployed version → lock release in ~1-2s |
+| Happy github flash + heartbeat | `flash_happy_github.integration.test.ts` | POST `kind=github version=1.5.0` with injected fake fetcher returning canned release JSON; cache hit short-circuits download |
+| Cancel during upload | `flash_cancel.integration.test.ts` | DELETE while streamer awaits begin-ack → AbortController.abort → flashJobFailed{reason:'aborted'} |
+| Cancel during deploy | (same file) | DELETE after FW_DEPLOY_BEGIN → inline deploy-cancel → per-controller Failed + flashJobFailed{abortReason:'http'} |
+| Chunk NAK + Go-Back-N | `flash_chunk_nak.integration.test.ts` | autoAckUpload({failAtSeq:2}) NAKs once → streamer rewinds to lastGoodSeq+1 → seq=2 received twice → flashJobDone |
+| Mixed OK/FAILED outcomes | `flash_partial_failure.integration.test.ts` | Master OK + padawan FAILED → flashJobDone (NOT failed) per `deriveJobLifecycle`; flashControllerResult per controller with correct stage/error |
+| Heartbeat releases lock fast | `flash_heartbeat_release.integration.test.ts` | Wall-clock delta from POLL_ACK to lockStateChanged < 3000ms (heartbeat path firing, not timer) |
+| Wrong-version heartbeat ignored | (same file) | sentinel POLL_ACK with non-matching firmwareVersion → orchestrator filters → timer fallback releases lock |
+| Reboot timer fallback | `flash_reboot_timer_fallback.integration.test.ts` | No heartbeat after flashJobDone → timer fires → lock release in `rebootTimeoutMs` ± tolerance |
+| Concurrent flash returns 409 | `flash_concurrent.integration.test.ts` | Second POST during in-flight flash → 409 with currentJobId; WS SERVO_TEST → flashJobActive rejection frame |
+
+Run via:
+
+```bash
+cd astros_api && npm run test:integration
+```
+
+The integration suite is also covered by the default `npm test` / `npx vitest run`
+sweep — `test:integration` exists for fast targeted re-runs during development.
+
+The suite is **Linux only** — non-Linux runners skip the integration tests
+via `skipIfNotLinux`, and `globalSetup` short-circuits there too so unit
+tests still run normally on Windows. (macOS's `socat` emits a different PTY
+path format than the helper's regex matches; rather than maintain a
+per-platform matrix without hardware to test on, the suite is gated to
+Linux.) First run on Linux takes ~5-15 sec extra for a `dist/` build
+(Worker threads can't load TS source under vitest+tsx, so the harness runs
+the production worker from compiled JS); subsequent runs skip the build.
+
+The remaining manual scenarios in this plan still require operator attention —
+they cover boundaries the integration suite intentionally doesn't:
+
+- Real-hardware end-to-end smoke against the bench rig
+- POLL_ACK protocol-level inspection with the real master firmware
+- Source-resolution against the real GitHub API (rate limits, network errors)
+- The Vue UI's rendering of progress + completion states
+
 ## Verification (run before opening the Part 2 PR)
 
 From `astros_api/`:
