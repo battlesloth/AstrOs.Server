@@ -82,6 +82,12 @@ Before each implementation commit, run in order:
 - Frame the prompt as "find anything wrong" rather than "verify X works." Pre-framed questions return confirmation of your framing, not the bugs outside it.
 - Explicitly request: dead-metadata sweep (declared fields with no read sites), doc-vs-code drift (spec/plan claims that don't match runtime behavior), and contract checks against consumers outside the diff.
 
+**When fixing review findings (partial-fix sweep):**
+
+- The cited line is rarely the only place the bug lives. Before marking a finding "fixed," sweep the related sites for the same drift: file/header docstrings, PR description, README, type-doc claims, sibling tests, test-skip lists. On the firmware-OTA harness branch, "macOS portability" came back across four review rounds because each fix patched the cited code site but left a stale claim somewhere else (header, test skip, PR description).
+- Treat doc/header text as code. If feedback says "header claims X but code does Y," fix whichever side is wrong AND verify the other isn't making sibling claims that just slipped past.
+- A reviewer flagging the same conceptual issue twice is a signal of an incomplete sweep, not a flaky reviewer. Re-grep the symbol/claim across the module before replying "fixed" the second time.
+
 **Carve-outs that may skip step 3:** plan-only commits (no source changes), trivial typo / comment-only fixes, and check-off-only updates to a plan file. Everything else — including any change to a `.ts` / `.tsx` / test file with logic — requires the review.
 
 ## Branching & PRs
