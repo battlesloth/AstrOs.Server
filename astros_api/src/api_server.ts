@@ -88,6 +88,7 @@ import { registerSystemStatusRoutes } from './controllers/system_status_controll
 import { WorkerSerialBus } from './firmware/serial_bus.js';
 import { FlashJobOrchestrator } from './firmware/flash_orchestrator.js';
 import { registerFirmwareFlashRoutes } from './controllers/firmware_flash_controller.js';
+import { registerFirmwareReleasesRoutes } from './controllers/firmware_releases_controller.js';
 import { FirmwareCache } from './firmware/firmware_cache.js';
 import { FirmwareUploadStore } from './firmware/firmware_upload_store.js';
 import { GitHubReleaseService } from './firmware/github_release_service.js';
@@ -570,6 +571,7 @@ export class ApiServer {
       config: this.flashOrchestratorConfig,
     });
     registerFirmwareFlashRoutes(this.router, this.authHandler, this.flashOrchestrator);
+    registerFirmwareReleasesRoutes(this.router, this.authHandler, this.githubReleaseService);
 
     try {
       this.serialPort = new SerialPort({
