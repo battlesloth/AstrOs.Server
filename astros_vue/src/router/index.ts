@@ -57,6 +57,11 @@ const router = createRouter({
       component: () => import('../views/ModulesView.vue'),
     },
     {
+      path: '/firmware',
+      name: 'firmware',
+      component: () => import('../views/FirmwareView.vue'),
+    },
+    {
       path: '/utility',
       name: 'utility',
       component: () => import('../views/UtilityView.vue'),

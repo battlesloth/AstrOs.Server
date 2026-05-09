@@ -38,8 +38,18 @@
     "playlists": "Playlists",
     "remote": "Remote",
     "modules": "Modules",
+    "firmware": "Firmware",
     "utility": "Utility",
     "logout": "Logout"
+  },
+  "firmware_view": {
+    "title": "Firmware",
+    "subtitle": {
+      "select": "Push firmware to your ESP fleet. The master receives the file then forwards to padawans over ESP-NOW.",
+      "flashing": "Update in progress — keep all controllers powered until reboot completes",
+      "done": "Update complete — all selected controllers are running the target firmware",
+      "failed": "Update finished with errors — review the failure below"
+    }
   },
   "placeholder": {
     "username": "username",

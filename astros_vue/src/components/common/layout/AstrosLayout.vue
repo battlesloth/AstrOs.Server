@@ -102,6 +102,9 @@ function logout() {
               <router-link to="/modules">{{ $t('nav.modules') }}</router-link>
             </li>
             <li>
+              <router-link to="/firmware">{{ $t('nav.firmware') }}</router-link>
+            </li>
+            <li>
               <router-link to="/utility">{{ $t('nav.utility') }}</router-link>
             </li>
             <li>
