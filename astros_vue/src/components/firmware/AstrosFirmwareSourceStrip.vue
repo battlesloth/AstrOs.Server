@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { storeToRefs } from 'pinia';
 import { useFirmwareStore } from '@/stores/firmware';
 import type { ReleaseInfo, FirmwareSourceMode } from '@/types/firmware';
-import FwBtn from './FwBtn.vue';
+import AstrosFirmwareButton from './AstrosFirmwareButton.vue';
 
 const { t } = useI18n();
 const firmware = useFirmwareStore();
@@ -68,16 +68,19 @@ const primaryAssetSize = computed<number | null>(() => {
 </script>
 
 <template>
-  <div class="source-strip">
+  <div class="astros-firmware-source-strip">
     <div
-      class="source-strip__toggle"
+      class="astros-firmware-source-strip__toggle"
       role="group"
       :aria-label="$t('firmware_view.source.toggle_aria')"
     >
       <button
         type="button"
         :aria-pressed="sourceMode === 'github'"
-        :class="['source-strip__toggle-segment', { 'is-active': sourceMode === 'github' }]"
+        :class="[
+          'astros-firmware-source-strip__toggle-segment',
+          { 'is-active': sourceMode === 'github' },
+        ]"
         @click="selectMode('github')"
       >
         {{ $t('firmware_view.source.toggle_github') }}
@@ -85,41 +88,46 @@ const primaryAssetSize = computed<number | null>(() => {
       <button
         type="button"
         :aria-pressed="sourceMode === 'upload'"
-        :class="['source-strip__toggle-segment', { 'is-active': sourceMode === 'upload' }]"
+        :class="[
+          'astros-firmware-source-strip__toggle-segment',
+          { 'is-active': sourceMode === 'upload' },
+        ]"
         @click="selectMode('upload')"
       >
         {{ $t('firmware_view.source.toggle_upload') }}
       </button>
     </div>
 
-    <div class="source-strip__middle">
+    <div class="astros-firmware-source-strip__middle">
       <template v-if="sourceMode === 'github'">
-        <span class="source-strip__eyebrow">{{ $t('firmware_view.source.eyebrow_release') }}</span>
+        <span class="astros-firmware-source-strip__eyebrow">{{
+          $t('firmware_view.source.eyebrow_release')
+        }}</span>
 
         <template v-if="selectedRelease">
-          <div class="source-strip__detail-row">
-            <span class="source-strip__tag">{{ selectedRelease.tag }}</span>
+          <div class="astros-firmware-source-strip__detail-row">
+            <span class="astros-firmware-source-strip__tag">{{ selectedRelease.tag }}</span>
             <span
               v-if="selectedRelease.tag === latestNonPrereleaseTag"
-              class="source-strip__pill source-strip__pill--latest"
+              class="astros-firmware-source-strip__pill astros-firmware-source-strip__pill--latest"
             >
               {{ $t('firmware_view.source.tag_pill_latest') }}
             </span>
             <span
               v-else-if="selectedRelease.prerelease"
-              class="source-strip__pill source-strip__pill--prerelease"
+              class="astros-firmware-source-strip__pill astros-firmware-source-strip__pill--prerelease"
             >
               {{ $t('firmware_view.source.tag_pill_prerelease') }}
             </span>
           </div>
-          <div class="source-strip__meta">
+          <div class="astros-firmware-source-strip__meta">
             <span>{{ formatDate(selectedRelease.publishedAt) }}</span>
             <span v-if="primaryAssetSize !== null">· {{ formatSize(primaryAssetSize) }}</span>
           </div>
         </template>
         <span
           v-else
-          class="source-strip__detail-empty"
+          class="astros-firmware-source-strip__detail-empty"
           >{{
             releasesLoadState === 'loading'
               ? $t('firmware_view.source.releases_loading')
@@ -129,7 +137,7 @@ const primaryAssetSize = computed<number | null>(() => {
 
         <p
           v-if="releasesLoadState === 'stale' && staleSince"
-          class="source-strip__warning source-strip__warning--stale"
+          class="astros-firmware-source-strip__warning astros-firmware-source-strip__warning--stale"
           role="status"
         >
           {{ $t('firmware_view.source.releases_stale_warning', { since: formatDate(staleSince) }) }}
@@ -139,7 +147,7 @@ const primaryAssetSize = computed<number | null>(() => {
              page-level action bar; until then the user has to refresh the route. -->
         <p
           v-else-if="releasesLoadState === 'error'"
-          class="source-strip__warning source-strip__warning--error"
+          class="astros-firmware-source-strip__warning astros-firmware-source-strip__warning--error"
           role="alert"
         >
           {{ $t('firmware_view.source.releases_load_error') }}
@@ -147,31 +155,33 @@ const primaryAssetSize = computed<number | null>(() => {
       </template>
 
       <template v-else>
-        <span class="source-strip__eyebrow">{{ $t('firmware_view.source.eyebrow_file') }}</span>
+        <span class="astros-firmware-source-strip__eyebrow">{{
+          $t('firmware_view.source.eyebrow_file')
+        }}</span>
         <span
           v-if="uploadedFilename"
-          class="source-strip__filename"
+          class="astros-firmware-source-strip__filename"
           >{{ uploadedFilename }}</span
         >
         <span
           v-else
-          class="source-strip__detail-empty"
+          class="astros-firmware-source-strip__detail-empty"
           >{{ $t('firmware_view.source.no_file_selected') }}</span
         >
       </template>
     </div>
 
-    <div class="source-strip__right">
+    <div class="astros-firmware-source-strip__right">
       <template v-if="sourceMode === 'github'">
         <label
-          for="source-strip-release-select"
+          for="astros-firmware-source-strip-release-select"
           class="sr-only"
         >
           {{ $t('firmware_view.source.label_select_release') }}
         </label>
         <select
-          id="source-strip-release-select"
-          class="source-strip__release-select"
+          id="astros-firmware-source-strip-release-select"
+          class="astros-firmware-source-strip__release-select"
           :value="selectedReleaseVersion ?? ''"
           @change="onReleaseChange"
         >
@@ -200,27 +210,27 @@ const primaryAssetSize = computed<number | null>(() => {
           :aria-label="$t('firmware_view.source.label_upload_file')"
           @change="onFilePick"
         />
-        <FwBtn
+        <AstrosFirmwareButton
           v-if="!uploadedFilename"
           kind="secondary"
           @click="fileInput?.click()"
         >
           {{ $t('firmware_view.source.browse_files') }}
-        </FwBtn>
-        <FwBtn
+        </AstrosFirmwareButton>
+        <AstrosFirmwareButton
           v-else
           kind="ghost"
           @click="clearUploadedFile"
         >
           {{ $t('firmware_view.source.remove') }}
-        </FwBtn>
+        </AstrosFirmwareButton>
       </template>
     </div>
   </div>
 </template>
 
 <style scoped>
-.source-strip {
+.astros-firmware-source-strip {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -232,7 +242,7 @@ const primaryAssetSize = computed<number | null>(() => {
 }
 
 /* Pill segmented toggle */
-.source-strip__toggle {
+.astros-firmware-source-strip__toggle {
   display: inline-flex;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 4px;
@@ -240,7 +250,7 @@ const primaryAssetSize = computed<number | null>(() => {
   flex-shrink: 0;
 }
 
-.source-strip__toggle-segment {
+.astros-firmware-source-strip__toggle-segment {
   appearance: none;
   border: none;
   background: transparent;
@@ -258,17 +268,17 @@ const primaryAssetSize = computed<number | null>(() => {
     color 0.15s linear;
 }
 
-.source-strip__toggle-segment.is-active {
+.astros-firmware-source-strip__toggle-segment.is-active {
   background: #fff;
   color: #0e1726;
 }
 
-.source-strip__toggle-segment:focus-visible {
+.astros-firmware-source-strip__toggle-segment:focus-visible {
   outline: 2px solid #7d92b8;
   outline-offset: 2px;
 }
 
-.source-strip__middle {
+.astros-firmware-source-strip__middle {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -276,7 +286,7 @@ const primaryAssetSize = computed<number | null>(() => {
   min-width: 0;
 }
 
-.source-strip__eyebrow {
+.astros-firmware-source-strip__eyebrow {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -284,20 +294,20 @@ const primaryAssetSize = computed<number | null>(() => {
   color: #7d92b8;
 }
 
-.source-strip__detail-row {
+.astros-firmware-source-strip__detail-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.source-strip__tag {
+.astros-firmware-source-strip__tag {
   font-size: 17px;
   font-weight: 700;
   font-family: ui-monospace, 'SF Mono', monospace;
   color: #fff;
 }
 
-.source-strip__pill {
+.astros-firmware-source-strip__pill {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -307,15 +317,15 @@ const primaryAssetSize = computed<number | null>(() => {
   color: #fff;
 }
 
-.source-strip__pill--latest {
+.astros-firmware-source-strip__pill--latest {
   background: #3aa676;
 }
 
-.source-strip__pill--prerelease {
+.astros-firmware-source-strip__pill--prerelease {
   background: #e5a93a;
 }
 
-.source-strip__meta {
+.astros-firmware-source-strip__meta {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -323,36 +333,36 @@ const primaryAssetSize = computed<number | null>(() => {
   color: #a8b8c4;
 }
 
-.source-strip__filename {
+.astros-firmware-source-strip__filename {
   font-size: 13px;
   font-family: ui-monospace, 'SF Mono', monospace;
   color: #fff;
 }
 
-.source-strip__detail-empty {
+.astros-firmware-source-strip__detail-empty {
   font-size: 13px;
   color: #a8b8c4;
 }
 
-.source-strip__warning {
+.astros-firmware-source-strip__warning {
   font-size: 11px;
   margin: 4px 0 0 0;
   font-weight: 500;
 }
 
-.source-strip__warning--stale {
+.astros-firmware-source-strip__warning--stale {
   color: #e5a93a;
 }
 
-.source-strip__warning--error {
+.astros-firmware-source-strip__warning--error {
   color: #cf4242;
 }
 
-.source-strip__right {
+.astros-firmware-source-strip__right {
   flex-shrink: 0;
 }
 
-.source-strip__release-select {
+.astros-firmware-source-strip__release-select {
   font-family: ui-monospace, 'SF Mono', monospace;
   font-size: 12px;
   min-width: 180px;
@@ -363,7 +373,7 @@ const primaryAssetSize = computed<number | null>(() => {
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.source-strip__release-select:focus-visible {
+.astros-firmware-source-strip__release-select:focus-visible {
   outline: 2px solid #7d92b8;
   outline-offset: 2px;
 }

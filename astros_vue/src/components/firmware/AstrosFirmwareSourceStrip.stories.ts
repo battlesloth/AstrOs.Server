@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { createPinia, setActivePinia } from 'pinia';
-import SourceStrip from './SourceStrip.vue';
+import AstrosFirmwareSourceStrip from './AstrosFirmwareSourceStrip.vue';
 import { useFirmwareStore } from '@/stores/firmware';
 import type { ReleaseInfo } from '@/types/firmware';
 
@@ -53,8 +53,8 @@ const sampleReleases: ReleaseInfo[] = [
 ];
 
 const meta = {
-  title: 'Components/Firmware/SourceStrip',
-  component: SourceStrip,
+  title: 'Components/Firmware/AstrosFirmwareSourceStrip',
+  component: AstrosFirmwareSourceStrip,
   parameters: { layout: 'padded' },
   decorators: [
     (story) => ({
@@ -63,14 +63,14 @@ const meta = {
         '<div style="background: #f2f7fa; padding: 24px; max-width: 1100px;"><story /></div>',
     }),
   ],
-} satisfies Meta<typeof SourceStrip>;
+} satisfies Meta<typeof AstrosFirmwareSourceStrip>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const GithubLoaded: Story = {
   render: () => ({
-    components: { SourceStrip },
+    components: { AstrosFirmwareSourceStrip },
     setup() {
       setActivePinia(createPinia());
       const store = useFirmwareStore();
@@ -81,13 +81,13 @@ export const GithubLoaded: Story = {
       store.selectedReleaseVersion = 'v1.4.2';
       return {};
     },
-    template: '<SourceStrip />',
+    template: '<AstrosFirmwareSourceStrip />',
   }),
 };
 
 export const GithubPrereleaseSelected: Story = {
   render: () => ({
-    components: { SourceStrip },
+    components: { AstrosFirmwareSourceStrip },
     setup() {
       setActivePinia(createPinia());
       const store = useFirmwareStore();
@@ -98,13 +98,13 @@ export const GithubPrereleaseSelected: Story = {
       store.selectedReleaseVersion = 'v1.4.3-rc.1';
       return {};
     },
-    template: '<SourceStrip />',
+    template: '<AstrosFirmwareSourceStrip />',
   }),
 };
 
 export const GithubNoSelection: Story = {
   render: () => ({
-    components: { SourceStrip },
+    components: { AstrosFirmwareSourceStrip },
     setup() {
       setActivePinia(createPinia());
       const store = useFirmwareStore();
@@ -115,13 +115,13 @@ export const GithubNoSelection: Story = {
       store.selectedReleaseVersion = null;
       return {};
     },
-    template: '<SourceStrip />',
+    template: '<AstrosFirmwareSourceStrip />',
   }),
 };
 
 export const GithubLoading: Story = {
   render: () => ({
-    components: { SourceStrip },
+    components: { AstrosFirmwareSourceStrip },
     setup() {
       setActivePinia(createPinia());
       const store = useFirmwareStore();
@@ -131,13 +131,13 @@ export const GithubLoading: Story = {
       store.sourceMode = 'github';
       return {};
     },
-    template: '<SourceStrip />',
+    template: '<AstrosFirmwareSourceStrip />',
   }),
 };
 
 export const GithubStale: Story = {
   render: () => ({
-    components: { SourceStrip },
+    components: { AstrosFirmwareSourceStrip },
     setup() {
       setActivePinia(createPinia());
       const store = useFirmwareStore();
@@ -148,13 +148,13 @@ export const GithubStale: Story = {
       store.selectedReleaseVersion = 'v1.4.2';
       return {};
     },
-    template: '<SourceStrip />',
+    template: '<AstrosFirmwareSourceStrip />',
   }),
 };
 
 export const GithubError: Story = {
   render: () => ({
-    components: { SourceStrip },
+    components: { AstrosFirmwareSourceStrip },
     setup() {
       setActivePinia(createPinia());
       const store = useFirmwareStore();
@@ -164,13 +164,13 @@ export const GithubError: Story = {
       store.sourceMode = 'github';
       return {};
     },
-    template: '<SourceStrip />',
+    template: '<AstrosFirmwareSourceStrip />',
   }),
 };
 
 export const UploadEmpty: Story = {
   render: () => ({
-    components: { SourceStrip },
+    components: { AstrosFirmwareSourceStrip },
     setup() {
       setActivePinia(createPinia());
       const store = useFirmwareStore();
@@ -180,13 +180,13 @@ export const UploadEmpty: Story = {
       store.uploadedFilename = null;
       return {};
     },
-    template: '<SourceStrip />',
+    template: '<AstrosFirmwareSourceStrip />',
   }),
 };
 
 export const UploadFileSelected: Story = {
   render: () => ({
-    components: { SourceStrip },
+    components: { AstrosFirmwareSourceStrip },
     setup() {
       setActivePinia(createPinia());
       const store = useFirmwareStore();
@@ -196,6 +196,6 @@ export const UploadFileSelected: Story = {
       store.uploadedFilename = 'astros-custom-build.bin';
       return {};
     },
-    template: '<SourceStrip />',
+    template: '<AstrosFirmwareSourceStrip />',
   }),
 };

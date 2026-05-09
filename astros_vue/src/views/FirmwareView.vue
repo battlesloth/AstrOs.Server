@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { AstrosLayout, SourceStrip } from '@/components';
+import { AstrosLayout, AstrosFirmwareSourceStrip } from '@/components';
 import { useFirmwareStore } from '@/stores/firmware';
 
 import '@fontsource/inter/400.css';
@@ -35,7 +35,7 @@ onMounted(() => {
         </div>
         <div class="firmware-view firmware-view__content">
           <p class="firmware-view__subtitle">{{ subtitle }}</p>
-          <SourceStrip v-if="phase === 'select'" />
+          <AstrosFirmwareSourceStrip v-if="phase === 'select'" />
         </div>
       </div>
     </template>

@@ -1,3 +1,3 @@
-export { default as FwBtn } from './FwBtn.vue';
-export { default as SourceStrip } from './SourceStrip.vue';
-export type { FwBtnKind } from './types';
+export { default as AstrosFirmwareButton } from './AstrosFirmwareButton.vue';
+export { default as AstrosFirmwareSourceStrip } from './AstrosFirmwareSourceStrip.vue';
+export type { AstrosFirmwareButtonKind } from './types';
