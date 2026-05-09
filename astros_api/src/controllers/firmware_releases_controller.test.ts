@@ -93,7 +93,13 @@ describe('Firmware Releases Controller', () => {
         error: 'release_lookup_failed',
         detail: upstreamMessage,
       });
-      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(upstreamMessage));
+      // Pass-through of the original Error preserves stack/cause; the
+      // contextual message goes in the second argument per pino's
+      // `(err, msg)` overload. This is what the flash controller does too.
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ message: upstreamMessage }),
+        'firmware releases fetch failed',
+      );
       errorSpy.mockRestore();
     });
   });
