@@ -20,35 +20,22 @@ const subtitle = computed(() => t(`firmware_view.subtitle.${phase.value}`));
 <template>
   <AstrosLayout>
     <template v-slot:main>
-      <main
-        class="firmware-view flex flex-col bg-base-200"
+      <div
+        class="flex flex-col overflow-hidden"
         style="height: calc(100vh - 64px)"
       >
-        <header class="firmware-view__header bg-r2-xlight">
-          <h1 class="firmware-view__title">{{ $t('firmware_view.title') }}</h1>
-        </header>
-        <div class="firmware-view__content">
+        <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0 mb-4">
+          <h1 class="text-2xl font-bold">{{ $t('firmware_view.title') }}</h1>
+        </div>
+        <div class="firmware-view firmware-view__content">
           <p class="firmware-view__subtitle">{{ subtitle }}</p>
         </div>
-      </main>
+      </div>
     </template>
   </AstrosLayout>
 </template>
 
 <style scoped>
-.firmware-view__header {
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--fw-border);
-  flex-shrink: 0;
-}
-
-.firmware-view__title {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0;
-  color: var(--fw-ink);
-}
-
 .firmware-view__subtitle {
   font-size: 13px;
   color: var(--fw-ink-soft);
