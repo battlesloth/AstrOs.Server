@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { AstrosLayout } from '@/components';
+import { AstrosLayout, AstrosFirmwareSourceStrip } from '@/components';
+import { useFirmwareStore } from '@/stores/firmware';
 
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
@@ -9,12 +10,17 @@ import '@fontsource/inter/600.css';
 import '@fontsource/inter/700.css';
 
 const { t } = useI18n();
+const firmware = useFirmwareStore();
 
 type Phase = 'select' | 'flashing' | 'done' | 'failed';
 
 const phase = ref<Phase>('select');
 
 const subtitle = computed(() => t(`firmware_view.subtitle.${phase.value}`));
+
+onMounted(() => {
+  firmware.fetchReleases();
+});
 </script>
 
 <template>
@@ -29,6 +35,7 @@ const subtitle = computed(() => t(`firmware_view.subtitle.${phase.value}`));
         </div>
         <div class="firmware-view firmware-view__content">
           <p class="firmware-view__subtitle">{{ subtitle }}</p>
+          <AstrosFirmwareSourceStrip v-if="phase === 'select'" />
         </div>
       </div>
     </template>

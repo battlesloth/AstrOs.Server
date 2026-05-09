@@ -1,17 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { createPinia, setActivePinia } from 'pinia';
-import SystemStatusBanner from './SystemStatusBanner.vue';
+import AstrosSystemStatusBanner from './AstrosSystemStatusBanner.vue';
 import { useSystemStatusStore } from '@/stores/systemStatus';
 import type { ReadOnlyReasonCode } from '@/types/systemStatus';
 
 const meta = {
-  title: 'Components/Common/SystemStatusBanner',
-  component: SystemStatusBanner,
+  title: 'Components/Common/AstrosSystemStatusBanner',
+  component: AstrosSystemStatusBanner,
   parameters: {
     layout: 'fullscreen',
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof SystemStatusBanner>;
+} satisfies Meta<typeof AstrosSystemStatusBanner>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -19,7 +19,7 @@ type Story = StoryObj<typeof meta>;
 function makeStory(reasonCode: ReadOnlyReasonCode | null | 'NOT_A_REAL_CODE'): Story {
   return {
     render: () => ({
-      components: { SystemStatusBanner },
+      components: { AstrosSystemStatusBanner },
       setup() {
         // Each story owns its Pinia instance so the readOnly state doesn't
         // bleed between stories in the same Storybook session.
@@ -31,21 +31,21 @@ function makeStory(reasonCode: ReadOnlyReasonCode | null | 'NOT_A_REAL_CODE'): S
         });
         return {};
       },
-      template: '<SystemStatusBanner />',
+      template: '<AstrosSystemStatusBanner />',
     }),
   };
 }
 
 export const Hidden: Story = {
   render: () => ({
-    components: { SystemStatusBanner },
+    components: { AstrosSystemStatusBanner },
     setup() {
       setActivePinia(createPinia());
       // Default state — readOnly=false; banner should render nothing.
       return {};
     },
     template:
-      '<div class="p-4 text-sm">Banner is hidden when readOnly=false. Nothing renders below this line.</div><SystemStatusBanner />',
+      '<div class="p-4 text-sm">Banner is hidden when readOnly=false. Nothing renders below this line.</div><AstrosSystemStatusBanner />',
   }),
 };
 

@@ -49,6 +49,26 @@
       "flashing": "Update in progress — keep all controllers powered until reboot completes",
       "done": "Update complete — all selected controllers are running the target firmware",
       "failed": "Update finished with errors — review the failure below"
+    },
+    "source": {
+      "toggle_aria": "Firmware source",
+      "toggle_github": "GitHub",
+      "toggle_upload": "Upload",
+      "eyebrow_release": "SELECTED RELEASE",
+      "eyebrow_file": "SELECTED FILE",
+      "no_release_selected": "No release selected",
+      "no_file_selected": "No file selected",
+      "browse_files": "Browse files…",
+      "remove": "Remove",
+      "tag_pill_latest": "Latest",
+      "tag_pill_prerelease": "Pre-release",
+      "release_option_latest_suffix": "(latest)",
+      "release_option_prerelease_suffix": "(pre-release)",
+      "label_select_release": "Select release",
+      "label_upload_file": "Upload firmware file",
+      "releases_load_error": "Failed to load releases. Try again.",
+      "releases_stale_warning": "Showing cached releases — couldn't reach GitHub since {since}.",
+      "releases_loading": "Loading releases…"
     }
   },
   "placeholder": {

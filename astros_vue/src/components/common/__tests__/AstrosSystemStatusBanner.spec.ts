@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createI18n } from 'vue-i18n';
 import enUS from '@/locales/enUS.json';
-import SystemStatusBanner from '@/components/common/SystemStatusBanner.vue';
+import AstrosSystemStatusBanner from '@/components/common/systemStatusBanner/AstrosSystemStatusBanner.vue';
 import { useSystemStatusStore } from '@/stores/systemStatus';
 
 function createTestI18n() {
@@ -16,14 +16,14 @@ function createTestI18n() {
 }
 
 function mountBanner() {
-  return mount(SystemStatusBanner, {
+  return mount(AstrosSystemStatusBanner, {
     global: {
       plugins: [createTestI18n()],
     },
   });
 }
 
-describe('SystemStatusBanner', () => {
+describe('AstrosSystemStatusBanner', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
