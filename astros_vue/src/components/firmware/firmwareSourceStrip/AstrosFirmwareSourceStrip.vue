@@ -377,4 +377,14 @@ const primaryAssetSize = computed<number | null>(() => {
   outline: 2px solid #7d92b8;
   outline-offset: 2px;
 }
+
+/* The open dropdown's options are rendered by the OS/browser native popup,
+   not the dark strip. Without explicit option styling they inherit the
+   select's white text and pair it with the OS default white background —
+   white-on-white. Force dark text on white so options are readable when
+   the dropdown is open, regardless of OS theme. */
+.astros-firmware-source-strip__release-select option {
+  color: #0e1726; /* ink */
+  background: #fff;
+}
 </style>
