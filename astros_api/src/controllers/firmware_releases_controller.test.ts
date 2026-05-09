@@ -89,7 +89,10 @@ describe('Firmware Releases Controller', () => {
 
       expect(service.getReleases).toHaveBeenCalledTimes(1);
       expect(res.status).toHaveBeenCalledWith(502);
-      expect(res.json).toHaveBeenCalledWith({ error: 'release_lookup_failed' });
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'release_lookup_failed',
+        detail: upstreamMessage,
+      });
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(upstreamMessage));
       errorSpy.mockRestore();
     });

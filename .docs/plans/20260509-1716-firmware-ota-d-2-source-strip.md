@@ -4,7 +4,7 @@
 
 Second slice of phase d (umbrella: `./20260507-2153-firmware-ota-d-vue-firmware-view.md`). Lands the `SourceStrip` component (the dark horizontal strip at the top of the firmware page body), the `FwBtn` button primitive used here and across d.4–d.5, and the server-side `GET /api/firmware/releases` endpoint that exposes the existing `GitHubReleaseService` to the browser.
 
-The umbrella plan describes d.2 as presentational, but a small server-side shim is required: `GitHubReleaseService` is instantiated in `api_server.ts:451` and used internally by the flash orchestrator, but no HTTP route exposes it to the frontend yet. That gap is closed here.
+The umbrella plan describes d.2 as presentational, but a small server-side shim is required: `GitHubReleaseService` is instantiated in `api_server.ts:452` and used internally by the flash orchestrator, but no HTTP route exposes it to the frontend yet. That gap is closed here.
 
 Risk surface: low. Server change is a thin shim (~20 lines) over an already-tested service with documented concurrency/staleness behavior. Frontend is presentational + one store action. Reviewers sign off on Storybook stories for `FwBtn` and `SourceStrip`; no live page demo needed yet (page assembly lands in d.5).
 
@@ -40,7 +40,7 @@ Risk surface: low. Server change is a thin shim (~20 lines) over an already-test
 - `SourceStrip` Storybook renders github + upload modes correctly with realistic data and stale-cache state.
 - `FirmwareView` shows `SourceStrip` in `select` phase; switching the github/upload toggle preserves each mode's state; selecting a release updates `firmwareStore.selectedReleaseVersion`.
 - `compareTags` tests cover prerelease ordering and malformed tags.
-- A11y: source toggle uses `role="tablist"` / `role="tab"`; release `<select>` has an associated `<label>`; upload `<input type=file>` has an associated `<label>` even though it's decoratively wired. Lighthouse a11y ≥ 95.
+- A11y: source toggle uses `role="group"` + `aria-pressed` per-button (binary mode toggle, not a tab/panel switch); release `<select>` has an associated visually-hidden `<label>`; upload `<input type=file>` is hidden with `aria-label`, the visible `<FwBtn>` is the operable control. Lighthouse a11y ≥ 95.
 - No console errors in dev or in any Storybook story.
 
 ## Out of scope (lands in later PRs)

@@ -19,6 +19,6 @@ export async function getReleases(service: GitHubReleaseService, _req: any, res:
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.error(`firmware releases fetch failed: ${detail}`);
-    res.status(502).json({ error: 'release_lookup_failed' });
+    res.status(502).json({ error: 'release_lookup_failed', detail });
   }
 }
