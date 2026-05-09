@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { storeToRefs } from 'pinia';
 import { useFirmwareStore } from '@/stores/firmware';
 import type { ReleaseInfo, FirmwareSourceMode } from '@/types/firmware';
-import AstrosFirmwareButton from './AstrosFirmwareButton.vue';
+import AstrosFirmwareButton from '../firmwareButton/AstrosFirmwareButton.vue';
 
 const { t } = useI18n();
 const firmware = useFirmwareStore();
