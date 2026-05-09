@@ -27,3 +27,5 @@ export const PLAYLISTS_RUN = 'api/playlists/run';
 export const REMOTE_CONFIG = 'api/remoteConfig';
 
 export const SYSTEM_STATUS = 'api/system/status';
+
+export const FIRMWARE_RELEASES = 'api/firmware/releases';
