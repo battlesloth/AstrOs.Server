@@ -11,7 +11,7 @@ const firmware = useFirmwareStore();
 const {
   releases,
   sourceMode,
-  selectedReleaseVersion,
+  selectedReleaseTag,
   uploadedFilename,
   releasesLoadState,
   staleSince,
@@ -20,7 +20,7 @@ const {
 const fileInput = ref<HTMLInputElement | null>(null);
 
 const selectedRelease = computed<ReleaseInfo | null>(
-  () => releases.value.find((r) => r.tag === selectedReleaseVersion.value) ?? null,
+  () => releases.value.find((r) => r.tag === selectedReleaseTag.value) ?? null,
 );
 
 const latestNonPrereleaseTag = computed<string | null>(
@@ -37,7 +37,7 @@ function selectMode(mode: FirmwareSourceMode) {
 
 function onReleaseChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value;
-  firmware.selectedReleaseVersion = value === '' ? null : value;
+  firmware.selectedReleaseTag = value === '' ? null : value;
 }
 
 function onFilePick(event: Event) {
@@ -182,7 +182,7 @@ const primaryAssetSize = computed<number | null>(() => {
         <select
           id="astros-firmware-source-strip-release-select"
           class="astros-firmware-source-strip__release-select"
-          :value="selectedReleaseVersion ?? ''"
+          :value="selectedReleaseTag ?? ''"
           @change="onReleaseChange"
         >
           <option

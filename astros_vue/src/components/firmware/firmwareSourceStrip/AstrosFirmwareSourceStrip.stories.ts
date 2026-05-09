@@ -78,7 +78,7 @@ export const GithubLoaded: Story = {
       store.releasesLoadState = 'loaded';
       store.staleSince = null;
       store.sourceMode = 'github';
-      store.selectedReleaseVersion = 'v1.4.2';
+      store.selectedReleaseTag = 'v1.4.2';
       return {};
     },
     template: '<AstrosFirmwareSourceStrip />',
@@ -95,7 +95,7 @@ export const GithubPrereleaseSelected: Story = {
       store.releasesLoadState = 'loaded';
       store.staleSince = null;
       store.sourceMode = 'github';
-      store.selectedReleaseVersion = 'v1.4.3-rc.1';
+      store.selectedReleaseTag = 'v1.4.3-rc.1';
       return {};
     },
     template: '<AstrosFirmwareSourceStrip />',
@@ -112,7 +112,7 @@ export const GithubNoSelection: Story = {
       store.releasesLoadState = 'loaded';
       store.staleSince = null;
       store.sourceMode = 'github';
-      store.selectedReleaseVersion = null;
+      store.selectedReleaseTag = null;
       return {};
     },
     template: '<AstrosFirmwareSourceStrip />',
@@ -145,7 +145,7 @@ export const GithubStale: Story = {
       store.releasesLoadState = 'stale';
       store.staleSince = '2026-04-25T12:00:00.000Z';
       store.sourceMode = 'github';
-      store.selectedReleaseVersion = 'v1.4.2';
+      store.selectedReleaseTag = 'v1.4.2';
       return {};
     },
     template: '<AstrosFirmwareSourceStrip />',

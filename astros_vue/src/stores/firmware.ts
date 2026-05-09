@@ -20,7 +20,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   // User selection
   const sourceMode = ref<FirmwareSourceMode>('github');
-  const selectedReleaseVersion = ref<string | null>(null);
+  const selectedReleaseTag = ref<string | null>(null);
   const uploadedFilename = ref<string | null>(null);
 
   async function fetchReleases(): Promise<void> {
@@ -43,7 +43,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     releasesLoadState,
     staleSince,
     sourceMode,
-    selectedReleaseVersion,
+    selectedReleaseTag,
     uploadedFilename,
     fetchReleases,
   };

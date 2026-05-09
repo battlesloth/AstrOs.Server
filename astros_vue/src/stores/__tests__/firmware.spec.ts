@@ -60,7 +60,7 @@ describe('firmware store', () => {
       expect(store.releasesLoadState).toBe('idle');
       expect(store.staleSince).toBeNull();
       expect(store.sourceMode).toBe('github');
-      expect(store.selectedReleaseVersion).toBeNull();
+      expect(store.selectedReleaseTag).toBeNull();
       expect(store.uploadedFilename).toBeNull();
     });
   });
@@ -140,7 +140,7 @@ describe('firmware store', () => {
   });
 
   describe('user selection state', () => {
-    it('allows direct mutation of sourceMode, selectedReleaseVersion, and uploadedFilename', () => {
+    it('allows direct mutation of sourceMode, selectedReleaseTag, and uploadedFilename', () => {
       const store = useFirmwareStore();
 
       store.sourceMode = 'upload';
@@ -149,9 +149,9 @@ describe('firmware store', () => {
       expect(store.uploadedFilename).toBe('custom-firmware.bin');
 
       store.sourceMode = 'github';
-      store.selectedReleaseVersion = 'v1.4.2';
+      store.selectedReleaseTag = 'v1.4.2';
       expect(store.sourceMode).toBe('github');
-      expect(store.selectedReleaseVersion).toBe('v1.4.2');
+      expect(store.selectedReleaseTag).toBe('v1.4.2');
       // Upload filename is preserved across mode switches per the design
       // handoff §Source toggle ("preserves their respective state").
       expect(store.uploadedFilename).toBe('custom-firmware.bin');
