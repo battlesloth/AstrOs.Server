@@ -22,19 +22,16 @@ Risk surface: low. Server change is a thin shim (~20 lines) over an already-test
 
 ## Tasks
 
-- [ ] Add `astros_api/src/controllers/firmware_releases_controller.ts` + `firmware_releases_controller.test.ts` (success / stale-cache / cold-failure cases). Wire registration in `api_server.ts`.
-- [ ] Move `compareTags` helper from JSX mockup into `astros_vue/src/utils/version.ts` (used in d.4 too); add unit tests in `astros_vue/src/utils/__tests__/version.spec.ts` covering normal compare, prerelease ordering (`v1.4.3-rc.1` < `v1.4.3`), and malformed tags.
-- [ ] Add `FIRMWARE_RELEASES` constant to `astros_vue/src/api/endpoints.ts`.
-- [ ] Create skeleton `astros_vue/src/stores/firmware.ts` with the d.2 subset of fields: `releases`, `sourceMode`, `selectedReleaseVersion`, `uploadedFilename`, `releasesLoadState: 'idle' | 'loading' | 'loaded' | 'stale' | 'error'`, plus `async fetchReleases()`. Other store fields (`currentJob` / `controllerStates` / `phase` / `selectedControllerIds` / etc.) are deferred to d.5/d.6 per the umbrella plan.
-- [ ] Create `astros_vue/src/components/firmware/FwBtn.vue` — `kind: 'primary' | 'secondary' | 'ghost' | 'danger'` + disabled prop. Defaults from design handoff §Buttons (8×16 padding, 4px radius, 13px / 600, 0.15s bg transition, 0.5 opacity when disabled).
-- [ ] Create `astros_vue/src/components/firmware/SourceStrip.vue` reading from `firmwareStore`. Pill segmented control (GitHub | Upload), eyebrow + tag + meta in GitHub mode, native `<select>` populated from `releases`, "Browse files…" placeholder for Upload mode (decorative until pre-d ships).
-- [ ] Add i18n keys to `astros_vue/src/locales/enUS.json`: source toggle labels, eyebrow labels, "No file selected", "Browse files…", "Remove", `(latest)` / `(pre-release)` suffixes, releases load-error copy, stale-cache warning copy.
-- [ ] Storybook: `FwBtn.stories.ts` (4 kinds × default + disabled), `SourceStrip.stories.ts` (github default / github stale / github empty / upload empty / upload selected).
-- [ ] Export `FwBtn`, `SourceStrip` from `astros_vue/src/components/index.ts`. Wire `SourceStrip` into `FirmwareView.vue` body for the `select` phase. Subtitle stays above; SourceStrip mounts below.
-- [ ] Pre-commit per `CLAUDE.md`:
-  - Frontend: `npm run format && npm run lint && npm run build && npx vitest run`.
-  - Backend: `npm run prettier:write && npm run lint:fix && npm run build && npx vitest run`.
-  - Invoke `superpowers:requesting-code-review` on diff vs `develop` before each implementation commit.
+- [x] Add `astros_api/src/controllers/firmware_releases_controller.ts` + `firmware_releases_controller.test.ts` (success / stale-cache / cold-failure cases). Wire registration in `api_server.ts`. (commit `293499e`)
+- [x] Move `compareTags` helper from JSX mockup into `astros_vue/src/utils/version.ts`; add unit tests covering normal compare, prerelease ordering (`v1.4.3-rc.1` < `v1.4.3`), and malformed tags. (commit `269dabb` — fixed JSX bug; 13 tests)
+- [x] Add `FIRMWARE_RELEASES` constant to `astros_vue/src/api/endpoints.ts`. (commit `dabc60c`)
+- [x] Create skeleton `astros_vue/src/stores/firmware.ts` with the d.2 subset of fields plus wire-protocol types in `src/types/firmware.ts`. (commit `dabc60c` — 6 tests)
+- [x] Create `astros_vue/src/components/firmware/FwBtn.vue` — 4 kinds + disabled. (commit `f03a8f2`)
+- [x] Create `astros_vue/src/components/firmware/SourceStrip.vue` reading from `firmwareStore`. (commit `979696c`)
+- [x] Add i18n keys to `astros_vue/src/locales/enUS.json`. (commit `979696c`)
+- [x] Storybook: `FwBtn.stories.ts` (7 stories — Primary/Secondary/Ghost/Danger/Disabled/FullWidth/AllKinds), `SourceStrip.stories.ts` (8 stories — github loaded/prerelease/no-selection/loading/stale/error + upload empty/selected). (commits `f03a8f2`, `979696c`)
+- [x] Export `FwBtn`, `SourceStrip` from `astros_vue/src/components/index.ts`. Wire `SourceStrip` into `FirmwareView.vue` body for the `select` phase. (commits `f03a8f2`, `979696c`, `3d951a9`)
+- [x] Pre-commit per `CLAUDE.md` — every implementation commit ran format + lint + build + tests + `requesting-code-review` before staging.
 
 ## Acceptance criteria
 
