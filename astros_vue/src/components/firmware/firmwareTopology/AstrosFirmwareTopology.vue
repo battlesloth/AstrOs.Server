@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { TopologyController, TopologyProps } from './types';
+import { strokeFor as computeStroke } from './strokeFor';
 
-const props = withDefaults(defineProps<TopologyProps>(), {
-  failedControllerId: null,
-  masterControllerId: 'body',
-});
+const props = defineProps<TopologyProps>();
 
 const { t } = useI18n();
 
@@ -21,61 +19,71 @@ const PADAWAN_POSITIONS = [
 const PADAWAN_SLOT_COUNT = PADAWAN_POSITIONS.length;
 
 const COLOR = {
-  unselected: '#cbd5dd',
-  success: '#3aa676',
-  failure: '#cf4242',
-  masterFlashing: '#e5a93a',
-  padawanFlashing: '#7d92b8',
-  selectedDefault: '#2a5a97',
   lineActive: '#e5a93a',
   lineSelected: '#9bb1bd',
   lineUnselected: '#e3edf2',
   nodeFillSelected: '#eef3fa',
   nodeFillUnselected: '#f2f7fa',
   sourceRectFill: '#f6f9fb',
+  failure: '#cf4242',
   inkSoft: '#4b5b73',
   ink: '#0e1726',
   border: '#d6e0e6',
 };
 
-const master = computed<TopologyController | undefined>(() =>
-  props.controllers.find((c) => c.id === props.masterControllerId),
-);
-
-interface PadawanLayout {
-  controller: TopologyController;
-  position: { x: number; y: number };
+if (import.meta.env.DEV) {
+  watchEffect(() => {
+    if (props.fleet.padawans.length > PADAWAN_SLOT_COUNT) {
+      const dropped = props.fleet.padawans
+        .slice(PADAWAN_SLOT_COUNT)
+        .map((c) => c.id)
+        .join(', ');
+      console.warn(
+        `[AstrosFirmwareTopology] ${props.fleet.padawans.length} padawans passed; ` +
+          `only ${PADAWAN_SLOT_COUNT} slots render. Dropped: ${dropped}.`,
+      );
+    }
+    if (props.phase !== 'select' && props.target == null) {
+      console.warn(
+        `[AstrosFirmwareTopology] target is null during phase="${props.phase}"; ` +
+          `parent must pass a target whenever phase !== 'select'.`,
+      );
+    }
+    if (props.failedControllerId !== undefined) {
+      const known = [props.fleet.master, ...props.fleet.padawans].some(
+        (c) => c.id === props.failedControllerId,
+      );
+      if (!known) {
+        console.warn(
+          `[AstrosFirmwareTopology] failedControllerId="${props.failedControllerId}" ` +
+            `does not match any controller in the fleet.`,
+        );
+      }
+    }
+  });
 }
 
-const padawanLayouts = computed<PadawanLayout[]>(() => {
-  const others = props.controllers.filter((c) => c.id !== props.masterControllerId);
-  const layouts: PadawanLayout[] = [];
-  for (let i = 0; i < PADAWAN_SLOT_COUNT; i++) {
-    const controller = others[i];
-    const position = PADAWAN_POSITIONS[i];
-    if (controller && position) {
-      layouts.push({ controller, position });
-    }
-  }
-  return layouts;
-});
+const padawanLayouts = computed(() =>
+  props.fleet.padawans.slice(0, PADAWAN_SLOT_COUNT).map((controller, i) => ({
+    controller,
+    position: PADAWAN_POSITIONS[i] as { x: number; y: number },
+  })),
+);
 
 const isFlashing = computed(() => props.phase === 'flashing');
 
 function isSelected(c: TopologyController): boolean {
-  return Boolean(props.selectedIds[c.id]);
+  return props.selectedIds.has(c.id);
 }
 
-function strokeFor(c: TopologyController | undefined): string {
-  if (!c) return COLOR.unselected;
-  if (!isSelected(c)) return COLOR.unselected;
-  if (props.phase === 'done') return COLOR.success;
-  if (props.phase === 'failed') {
-    return c.id === props.failedControllerId ? COLOR.failure : COLOR.success;
-  }
-  if (isFlashing.value && c.id === props.masterControllerId) return COLOR.masterFlashing;
-  if (isFlashing.value) return COLOR.padawanFlashing;
-  return COLOR.selectedDefault;
+function strokeFor(c: TopologyController, isMaster: boolean): string {
+  return computeStroke({
+    controllerId: c.id,
+    isSelected: isSelected(c),
+    isMaster,
+    phase: props.phase,
+    failedControllerId: props.failedControllerId,
+  });
 }
 
 function nodeFill(c: TopologyController): string {
@@ -163,14 +171,14 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
       />
 
       <!-- Master node -->
-      <g v-if="master">
-        <title>{{ nodeTitle(master, 'master') }}</title>
+      <g>
+        <title>{{ nodeTitle(fleet.master, 'master') }}</title>
         <circle
           :cx="MASTER_POS.x"
           :cy="MASTER_POS.y"
           r="22"
-          :fill="nodeFill(master)"
-          :stroke="strokeFor(master)"
+          :fill="nodeFill(fleet.master)"
+          :stroke="strokeFor(fleet.master, true)"
           stroke-width="2.5"
         />
         <text
@@ -181,7 +189,7 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
           font-weight="700"
           :fill="COLOR.ink"
         >
-          {{ master.label.toUpperCase() }}
+          {{ fleet.master.label.toUpperCase() }}
         </text>
         <text
           :x="MASTER_POS.x"
@@ -195,7 +203,7 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
           {{ $t('firmware_view.topology.role_master') }}
         </text>
         <text
-          v-if="phase === 'failed' && master.id === failedControllerId"
+          v-if="phase === 'failed' && fleet.master.id === failedControllerId"
           :x="MASTER_POS.x"
           :y="MASTER_POS.y - 30"
           text-anchor="middle"
@@ -249,7 +257,7 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
           :cy="layout.position.y"
           r="22"
           :fill="nodeFill(layout.controller)"
-          :stroke="strokeFor(layout.controller)"
+          :stroke="strokeFor(layout.controller, false)"
           stroke-width="2.5"
         />
         <text

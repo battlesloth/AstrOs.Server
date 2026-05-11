@@ -1,15 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import AstrosFirmwareTopology from './AstrosFirmwareTopology.vue';
-import type { TopologyController } from './types';
+import type { TopologyFleet } from './types';
 
-const SAMPLE_CONTROLLERS: TopologyController[] = [
-  { id: 'body', label: 'Body' },
-  { id: 'core', label: 'Core' },
-  { id: 'dome', label: 'Dome' },
-];
+const SAMPLE_FLEET: TopologyFleet = {
+  master: { id: 'body', label: 'Body' },
+  padawans: [
+    { id: 'core', label: 'Core' },
+    { id: 'dome', label: 'Dome' },
+  ],
+};
 
-const ALL_SELECTED = { body: true, core: true, dome: true };
-const NONE_SELECTED = { body: false, core: false, dome: false };
+const ALL_SELECTED = new Set(['body', 'core', 'dome']);
+const NONE_SELECTED: ReadonlySet<string> = new Set();
 
 const meta = {
   title: 'Components/Firmware/AstrosFirmwareTopology',
@@ -29,7 +31,7 @@ type Story = StoryObj<typeof meta>;
 
 export const SelectIdle: Story = {
   args: {
-    controllers: SAMPLE_CONTROLLERS,
+    fleet: SAMPLE_FLEET,
     selectedIds: NONE_SELECTED,
     target: null,
     phase: 'select',
@@ -38,7 +40,7 @@ export const SelectIdle: Story = {
 
 export const SelectAllSelected: Story = {
   args: {
-    controllers: SAMPLE_CONTROLLERS,
+    fleet: SAMPLE_FLEET,
     selectedIds: ALL_SELECTED,
     target: 'v1.4.2',
     phase: 'select',
@@ -47,7 +49,7 @@ export const SelectAllSelected: Story = {
 
 export const Flashing: Story = {
   args: {
-    controllers: SAMPLE_CONTROLLERS,
+    fleet: SAMPLE_FLEET,
     selectedIds: ALL_SELECTED,
     target: 'v1.4.2',
     phase: 'flashing',
@@ -56,7 +58,7 @@ export const Flashing: Story = {
 
 export const Done: Story = {
   args: {
-    controllers: SAMPLE_CONTROLLERS,
+    fleet: SAMPLE_FLEET,
     selectedIds: ALL_SELECTED,
     target: 'v1.4.2',
     phase: 'done',
@@ -65,10 +67,20 @@ export const Done: Story = {
 
 export const FailedCore: Story = {
   args: {
-    controllers: SAMPLE_CONTROLLERS,
+    fleet: SAMPLE_FLEET,
     selectedIds: ALL_SELECTED,
     target: 'v1.4.2',
     phase: 'failed',
     failedControllerId: 'core',
+  },
+};
+
+export const FailedMaster: Story = {
+  args: {
+    fleet: SAMPLE_FLEET,
+    selectedIds: ALL_SELECTED,
+    target: 'v1.4.2',
+    phase: 'failed',
+    failedControllerId: 'body',
   },
 };

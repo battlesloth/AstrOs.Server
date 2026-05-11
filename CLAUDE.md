@@ -99,7 +99,7 @@ All implementation work goes on a feature branch that merges into `develop` via 
 - Plan files commit to the feature branch too — the "commit the plan first" rule in the Planning section still applies.
 - Open the PR with `gh pr create --base develop` when the work is ready.
 
-**Exception — doc-only changes:** Edits limited to `CLAUDE.md`, `README.md`, or `.docs/` (with no code or config impact) may be committed directly to `develop`. PR overhead isn't justified for pure meta edits.
+**Exception — doc-only changes:** A "doc-only" branch is one whose entire diff is limited to `CLAUDE.md`, `README.md`, `.docs/`, or other prose files — with no `.ts`/`.tsx`/`.vue`/`.css`/`.json` config or asset changes. A plan file committed alongside implementation work does NOT make a branch doc-only. Doc-only branches may be committed directly to `develop` and skip the pre-push toolkit; PR overhead isn't justified for pure meta edits.
 
 ## Pre-push branch review
 
@@ -111,7 +111,7 @@ Before pushing a feature branch, run a comprehensive multi-agent review on the f
 
 **When required:** every PR that touches code, config, or assets — regardless of size, commit count, or which directories it touches. The per-commit reviewer sees one diff at a time; the pre-push run reframes the work as a whole-branch surface, which is where cross-commit drift, missing-test sweeps, and stale-comment regressions surface.
 
-**Carve-out — skip only when the branch is documentation-only.** A branch whose entire diff is limited to `CLAUDE.md`, `README.md`, `.docs/`, or other prose files (no `.ts`/`.tsx`/`.vue`/`.css`/`.json` config or asset changes) may skip the pre-push toolkit. Plan files committed alongside implementation work do NOT qualify — if any non-doc file is in the diff, run the toolkit.
+**Carve-out — skip only when the branch is documentation-only** (see definition under "Branching & PRs / Exception — doc-only changes" above).
 
 **What it does.** Dispatches 5 specialized agents in parallel against the full branch diff vs `develop`:
 
