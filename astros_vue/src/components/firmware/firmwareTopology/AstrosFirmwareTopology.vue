@@ -10,11 +10,12 @@ const { t } = useI18n();
 
 const VIEW_W = 360;
 const VIEW_H = 260;
+const NODE_RADIUS = 30;
 
-const MASTER_POS = { x: 180, y: 70 };
+const MASTER_POS = { x: 180, y: 80 };
 const PADAWAN_POSITIONS = [
-  { x: 90, y: 200 },
-  { x: 270, y: 200 },
+  { x: 75, y: 205 },
+  { x: 285, y: 205 },
 ] as const;
 const PADAWAN_SLOT_COUNT = PADAWAN_POSITIONS.length;
 
@@ -143,19 +144,19 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
     >
       <!-- Source rect at top -->
       <rect
-        x="140"
-        y="6"
-        width="80"
-        height="22"
+        x="130"
+        y="8"
+        width="100"
+        height="26"
         rx="4"
         :fill="COLOR.sourceRectFill"
         :stroke="COLOR.border"
       />
       <text
         x="180"
-        y="21"
+        y="26"
         text-anchor="middle"
-        font-size="10"
+        font-size="12"
         font-weight="700"
         :fill="COLOR.inkSoft"
         font-family="ui-monospace, 'SF Mono', monospace"
@@ -166,11 +167,11 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
       <!-- Source -> master line -->
       <line
         x1="180"
-        y1="28"
+        y1="34"
         :x2="MASTER_POS.x"
-        :y2="MASTER_POS.y - 22"
+        :y2="MASTER_POS.y - NODE_RADIUS"
         :stroke="sourceLineStroke"
-        stroke-width="2"
+        stroke-width="2.5"
         :stroke-dasharray="sourceLineDash"
         :class="{ 'astros-firmware-topology__line--flow-fast': isFlashing }"
       />
@@ -181,16 +182,16 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
         <circle
           :cx="MASTER_POS.x"
           :cy="MASTER_POS.y"
-          r="22"
+          :r="NODE_RADIUS"
           :fill="nodeFill(fleet.master)"
           :stroke="strokeFor(fleet.master, true)"
-          stroke-width="2.5"
+          stroke-width="3"
         />
         <text
           :x="MASTER_POS.x"
-          :y="MASTER_POS.y + 4"
+          :y="MASTER_POS.y + 5"
           text-anchor="middle"
-          font-size="11"
+          font-size="14"
           font-weight="700"
           :fill="COLOR.ink"
         >
@@ -199,9 +200,9 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
         <text
           v-if="phase === 'failed' && fleet.master.id === failedControllerId"
           :x="MASTER_POS.x"
-          :y="MASTER_POS.y - 30"
+          :y="MASTER_POS.y - NODE_RADIUS - 8"
           text-anchor="middle"
-          font-size="11"
+          font-size="14"
           font-weight="700"
           :fill="COLOR.failure"
           aria-hidden="true"
@@ -217,11 +218,11 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
       >
         <line
           :x1="MASTER_POS.x"
-          :y1="MASTER_POS.y + 24"
+          :y1="MASTER_POS.y + NODE_RADIUS"
           :x2="layout.position.x"
-          :y2="layout.position.y - 22"
+          :y2="layout.position.y - NODE_RADIUS"
           :stroke="padawanLineStroke(layout.controller)"
-          stroke-width="2"
+          stroke-width="2.5"
           :stroke-dasharray="padawanLineDash(layout.controller)"
           :class="{
             'astros-firmware-topology__line--flow-slow': padawanLineFlowing(layout.controller),
@@ -229,9 +230,9 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
         />
         <text
           :x="(MASTER_POS.x + layout.position.x) / 2"
-          :y="(MASTER_POS.y + 24 + layout.position.y - 22) / 2 - 4"
+          :y="(MASTER_POS.y + NODE_RADIUS + layout.position.y - NODE_RADIUS) / 2 - 6"
           text-anchor="middle"
-          font-size="8"
+          font-size="10"
           font-weight="700"
           letter-spacing="0.05em"
           :fill="COLOR.inkSoft"
@@ -249,16 +250,16 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
         <circle
           :cx="layout.position.x"
           :cy="layout.position.y"
-          r="22"
+          :r="NODE_RADIUS"
           :fill="nodeFill(layout.controller)"
           :stroke="strokeFor(layout.controller, false)"
-          stroke-width="2.5"
+          stroke-width="3"
         />
         <text
           :x="layout.position.x"
-          :y="layout.position.y + 4"
+          :y="layout.position.y + 5"
           text-anchor="middle"
-          font-size="11"
+          font-size="14"
           font-weight="700"
           :fill="COLOR.ink"
         >
@@ -267,9 +268,9 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
         <text
           v-if="phase === 'failed' && layout.controller.id === failedControllerId"
           :x="layout.position.x"
-          :y="layout.position.y - 30"
+          :y="layout.position.y - NODE_RADIUS - 8"
           text-anchor="middle"
-          font-size="11"
+          font-size="14"
           font-weight="700"
           :fill="COLOR.failure"
           aria-hidden="true"
