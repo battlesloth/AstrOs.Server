@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { compareTags } from '@/utils/version';
 import AstrosFirmwareVersionDelta from '../firmwareVersionDelta/AstrosFirmwareVersionDelta.vue';
 import AstrosFirmwareStatusPill from '../firmwareStatusPill/AstrosFirmwareStatusPill.vue';
-import type { FirmwareStatusPillKind } from '@/types/firmware';
+import { selectModePillKind as computePillKind } from './selectModePillKind';
 import type { ControllerRowProps } from './types';
 
 const props = defineProps<ControllerRowProps>();
@@ -12,27 +11,11 @@ const emit = defineEmits<{ toggle: [id: string] }>();
 
 const { t } = useI18n();
 
-const isOffline = computed(() => props.controller.status === 'down');
-
-const isDowngrade = computed(() => {
-  if (props.target === null) return false;
-  const cmp = compareTags(props.controller.current, props.target);
-  if (Number.isNaN(cmp)) return false;
-  return cmp > 0;
-});
-
-const isUpToDate = computed(
-  () => props.target !== null && props.target === props.controller.current,
+const pillKind = computed(() =>
+  computePillKind({ controller: props.controller, target: props.target }),
 );
 
-const blocked = computed(() => isOffline.value || isDowngrade.value);
-
-const selectModePillKind = computed<FirmwareStatusPillKind | null>(() => {
-  if (isOffline.value) return 'offline';
-  if (isDowngrade.value) return 'downgrade';
-  if (isUpToDate.value) return 'upToDate';
-  return null;
-});
+const blocked = computed(() => pillKind.value === 'offline' || pillKind.value === 'downgrade');
 
 const statusDotAriaLabel = computed(() => {
   const statusKey = `firmware_view.controllers.status_${
@@ -104,8 +87,8 @@ function onCheckboxChange() {
     <div class="astros-firmware-controller-row__right">
       <template v-if="mode === 'select'">
         <AstrosFirmwareStatusPill
-          v-if="selectModePillKind"
-          :kind="selectModePillKind"
+          v-if="pillKind"
+          :kind="pillKind"
         />
       </template>
       <template v-else-if="progressStatus">

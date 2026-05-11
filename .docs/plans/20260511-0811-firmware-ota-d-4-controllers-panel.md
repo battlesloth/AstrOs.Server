@@ -67,13 +67,20 @@ export type FirmwareStatusPillKind =
 
 ```ts
 // State
-const controllers = ref<FirmwareControllerView[]>([]);            // d.4: stories set this; d.5: action populates from controllers store
-const selectedControllerIds = ref<Set<string>>(new Set());
+const controllers = ref<FirmwareControllerView[]>([]);
+const selectedControllerIds = ref<ReadonlySet<string>>(new Set());
 
-// Selection actions
-function toggle(id: string): void { /* in-place mutate then replace ref to trigger reactivity */ }
-function selectAll(): void { selectedControllerIds.value = new Set(controllers.value.filter(/* not blocked */).map(c => c.id)); }
+// Selection actions — always build a fresh Set and assign; never mutate in place.
+function toggle(id: string): void {
+  const next = new Set(selectedControllerIds.value);
+  if (next.has(id)) next.delete(id); else next.add(id);
+  selectedControllerIds.value = next;
+}
+function selectAll(): void { /* fresh Set of non-blocked ids */ }
 function clear(): void { selectedControllerIds.value = new Set(); }
+
+// Reconcile: prune orphan selected ids when controllers is reassigned.
+watch(controllers, ...);
 
 // Computeds
 const target = computed<string | null>(() =>
@@ -83,22 +90,22 @@ const anyDowngradeBlocked = computed(() => /* iterate selected, check compareTag
 const canFlash = computed(() => target.value !== null && selectedControllerIds.value.size > 0 && !anyDowngradeBlocked.value);
 ```
 
-**Reactivity note:** `toggle` cannot mutate the Set in place — Vue tracks the ref value, not Set methods. Pattern: build a fresh Set from the prior one, then assign. (Same lesson as d.3 — captured in `feedback_safe_feature_branch_creation.md` …er, that one's about git, but the prop-shape memory from the d.3 round-2 review applies here too.)
+**Reactivity note:** `toggle/selectAll/clear` cannot mutate the Set in place — Vue tracks the ref value, not Set methods. Pattern: build a fresh Set from the prior one, then assign. The d.3 round-2 review surfaced this gotcha; d.4 applies the same fix and pins it with three reference-replacement tests.
 
 ---
 
 ## Tasks
 
-- [ ] Add i18n keys under `firmware_view.controllers.*`: `eyebrow_title`, `select_all`, `clear`, `master_pill`, `up_to_date`, `offline`, `downgrade_pill`, `action_bar.no_source`, `action_bar.no_selection`, `action_bar.push_summary` (named-interp), `action_bar.downgrade_blocked`, `action_bar.flash_button`, `result_bar.all_updated` (named-interp), `result_bar.failed_summary` (named-interp), `result_bar.view_logs`, `result_bar.done`, plus per-pill labels and status-dot aria-labels.
-- [ ] Define `FirmwareControllerView`, `ControllerOnlineStatus`, `FirmwareStatusPillKind` in `types/firmware.ts`.
-- [ ] Extend `firmwareStore`: `controllers`, `selectedControllerIds`, `target` computed, `anyDowngradeBlocked` computed, `canFlash` computed, `toggle/selectAll/clear` actions. Write unit tests covering the Set-replacement reactivity, downgrade detection, and canFlash combinatorics.
-- [ ] Implement `AstrosFirmwareStatusPill` (types.ts + .vue + stories). Single prop: `kind: FirmwareStatusPillKind` + slot for text.
-- [ ] Implement `AstrosFirmwareVersionDelta` (types.ts + .vue + stories + unit tests). Props: `current: string`, `target: string | null`. Renders `current · up to date` or `current → target` with conditional downgrade styling + pill.
-- [ ] Implement `AstrosFirmwareControllerRow` (types.ts + .vue + stories). Props: `controller: FirmwareControllerView`, `target: string | null`, `mode: 'select' | 'progress'`, `selected: boolean`, optional `status?: FirmwareStatusPillKind` for progress mode. Emits `@toggle`.
-- [ ] Implement `AstrosFirmwareControllersPanel` (.vue + stories). Reads from firmwareStore (`controllers`, `selectedControllerIds`, `target`, `canFlash`, `anyDowngradeBlocked`, current `phase` — note: `phase` not in store yet; pass as prop for d.4, hook to store in d.5). Renders header, rows, action/result bar.
-- [ ] Barrel export from `components/firmware/index.ts`.
-- [ ] Pre-commit gates: prettier, lint, build, vitest run, then commit (per CLAUDE.md "Code Review" workflow — invoke `superpowers:requesting-code-review` on diff vs prior commit before committing).
-- [ ] Pre-push: `/pr-review-toolkit:review-pr` (mandatory per the updated CLAUDE.md rule). Address Critical/Important findings before push.
+- [x] Add i18n keys under `firmware_view.controllers.*` (eyebrow, select-all/clear, master pill, downgrade pill, up-to-date suffix, status-dot aria, pill labels, action-bar copy, result-bar copy).
+- [x] Define `FirmwareControllerView`, `ControllerOnlineStatus`, `FirmwareStatusPillKind` in `types/firmware.ts`.
+- [x] Extend `firmwareStore`: `controllers`, `selectedControllerIds` (`ReadonlySet<string>`), `target`/`anyDowngradeBlocked`/`canFlash` computeds, `toggle/selectAll/clear` actions, plus a `watch(controllers)` reconciler that prunes orphan selected ids. Unit tests cover Set-replacement reactivity (all three actions), downgrade detection (NaN + cmp===0 boundary), canFlash combinatorics, and the reconciler.
+- [x] Implement `AstrosFirmwareStatusPill` (.vue + stories). Single prop: `kind: FirmwareStatusPillKind`.
+- [x] Implement `AstrosFirmwareVersionDelta` (.vue + stories + unit tests). Props: `current`, `target`. Renders `current · up to date` or `current → target` with conditional downgrade styling + pill.
+- [x] Implement `AstrosFirmwareControllerRow` (types.ts + .vue + stories). Props: `controller`, `target`, `mode: 'select' | 'progress'`, `selected: boolean`, optional `progressStatus`/`stageLabel` for progress mode. Emits `@toggle`. The select-mode right-column pill (`selectModePillKind`) is extracted to a sibling pure module with its own unit-test matrix (offline > downgrade > upToDate > null priority).
+- [x] Implement `AstrosFirmwareControllersPanel` (.vue + stories). Reads from firmwareStore (controllers, selectedControllerIds, target, canFlash, anyDowngradeBlocked). Takes `phase` as a prop (d.5 will move it to the store). Dev-mode `watchEffect` warns on null target / missing progress entries in non-select phases. Renders header, rows, action/result bar. Emits `@flash` / `@view-logs` / `@done`.
+- [x] Barrel export from `components/firmware/index.ts`.
+- [x] Pre-commit gates: prettier, lint, build, vitest run, per-commit `pr-review-toolkit:code-reviewer` agent pass, then commit.
+- [x] Pre-push: `/pr-review-toolkit:review-pr` 5-agent pass. Critical: 0. Important: addressed in a fixup commit (reconciler, dev warnings, JSDoc tightening, selectModePillKind extraction + tests, cmp===0 boundary test, dead i18n keys dropped, task-history comment removed, SelectTargetNoSelection story).
 
 ---
 

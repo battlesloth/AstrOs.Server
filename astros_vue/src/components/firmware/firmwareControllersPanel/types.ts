@@ -10,12 +10,12 @@ export interface ControllerProgressEntry {
 
 export interface ControllersPanelProps {
   phase: ControllersPanelPhase;
-  /** Per-controller progress state keyed by controller id. Required for non-`select` phases. */
+  /** Per-controller progress state keyed by controller id; read in non-select phases. */
   progressByControllerId?: Record<string, ControllerProgressEntry>;
-  /** Result bar — `done` phase: count of controllers updated. */
+  /** Result bar count in `done` phase; falls back to `selectedControllerIds.size`. */
   doneCount?: number;
-  /** Result bar — `failed` phase: failing controller's label. */
+  /** Result bar label in `failed` phase. */
   failedControllerLabel?: string;
-  /** Result bar — `failed` phase: stage during which the failure occurred. */
+  /** Result bar stage name in `failed` phase. */
   failedStage?: string;
 }

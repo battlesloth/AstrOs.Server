@@ -273,6 +273,18 @@ describe('firmware store', () => {
       expect(store.anyDowngradeBlocked).toBe(true);
     });
 
+    it('treats current === target as not a downgrade (boundary: cmp === 0)', () => {
+      // Pins the strict-inequality `cmp > 0` semantics in isDowngrade. A
+      // mutation to `cmp >= 0` would flag an equal version as a downgrade
+      // and this test would fail.
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.0';
+      store.toggle('core'); // core is v1.4.0; target is v1.4.0
+      expect(store.anyDowngradeBlocked).toBe(false);
+    });
+
     it('treats a malformed current version as not a downgrade (NaN > 0 is false)', () => {
       const store = useFirmwareStore();
       store.controllers = [
@@ -289,6 +301,34 @@ describe('firmware store', () => {
       store.selectedReleaseTag = 'v1.4.2';
       store.toggle('weird');
       expect(store.anyDowngradeBlocked).toBe(false);
+    });
+  });
+
+  describe('controllers reconciler', () => {
+    it('prunes selected ids that no longer exist after controllers is reassigned', async () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.toggle('body');
+      store.toggle('core');
+      expect(store.selectedControllerIds.size).toBe(2);
+
+      // Reassign with dome removed and core renamed.
+      store.controllers = [
+        { id: 'body', label: 'Body', glyph: 'B', current: 'v1.3.0', status: 'up', isMaster: true },
+      ];
+      // watch is async; flush via microtask.
+      await Promise.resolve();
+      expect([...store.selectedControllerIds]).toEqual(['body']);
+    });
+
+    it('does not touch the Set when no ids are orphaned', async () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.toggle('body');
+      const before = store.selectedControllerIds;
+      store.controllers = [...sampleControllers]; // new reference, same ids
+      await Promise.resolve();
+      expect(store.selectedControllerIds).toBe(before);
     });
   });
 

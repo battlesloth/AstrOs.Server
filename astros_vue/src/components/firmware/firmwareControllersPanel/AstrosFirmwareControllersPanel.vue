@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { storeToRefs } from 'pinia';
 import { useFirmwareStore } from '@/stores/firmware';
@@ -22,6 +22,37 @@ const { controllers, selectedControllerIds, target, canFlash, anyDowngradeBlocke
 const rowMode = computed<'select' | 'progress'>(() =>
   props.phase === 'select' ? 'select' : 'progress',
 );
+
+// Dev-only invariant warnings. Vite tree-shakes the block in production —
+// these surface wiring bugs during local dev / Storybook when the panel is
+// integrated with the WS dispatcher in d.5/d.6.
+if (import.meta.env.DEV) {
+  watchEffect(() => {
+    if (props.phase !== 'select' && target.value === null) {
+      console.warn(
+        `[AstrosFirmwareControllersPanel] target is null during phase="${props.phase}"; ` +
+          `parent should ensure a target is set whenever phase !== 'select'.`,
+      );
+    }
+    if (props.phase !== 'select' && props.progressByControllerId === undefined) {
+      console.warn(
+        `[AstrosFirmwareControllersPanel] progressByControllerId is undefined during ` +
+          `phase="${props.phase}"; rows will render with no status pill.`,
+      );
+    }
+    if (props.phase !== 'select' && props.progressByControllerId !== undefined) {
+      const missing = controllers.value
+        .filter((c) => props.progressByControllerId?.[c.id] === undefined)
+        .map((c) => c.id);
+      if (missing.length > 0) {
+        console.warn(
+          `[AstrosFirmwareControllersPanel] progressByControllerId is missing entries for ` +
+            `${missing.join(', ')} during phase="${props.phase}".`,
+        );
+      }
+    }
+  });
+}
 
 const actionBarMessage = computed(() => {
   if (target.value === null) return t('firmware_view.controllers.action_bar.no_source');
@@ -95,7 +126,7 @@ const actionBarMessage = computed(() => {
       <AstrosFirmwareButton
         kind="primary"
         :disabled="!canFlash"
-        @click="emit('flash')"
+        @click="canFlash && emit('flash')"
       >
         {{ t('firmware_view.controllers.action_bar.flash_button') }}
       </AstrosFirmwareButton>

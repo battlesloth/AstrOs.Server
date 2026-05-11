@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
 import apiService from '@/api/apiService';
 import { FIRMWARE_RELEASES } from '@/api/endpoints';
@@ -11,10 +11,6 @@ import type {
   ReleasesLoadState,
 } from '@/types/firmware';
 
-// d.2 added: releases, sourceMode, selectedReleaseTag, uploadedFilename.
-// d.4 adds: controllers, selectedControllerIds, target/canFlash/anyDowngradeBlocked
-// computeds, toggle/selectAll/clear actions. currentJob, controllerStates,
-// phase land in d.5/d.6 with the WS dispatcher and flash POST.
 export const useFirmwareStore = defineStore('firmware', () => {
   const releases = ref<ReleaseInfo[]>([]);
   const releasesLoadState = ref<ReleasesLoadState>('idle');
@@ -26,6 +22,23 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   const controllers = ref<FirmwareControllerView[]>([]);
   const selectedControllerIds = ref<ReadonlySet<string>>(new Set());
+
+  // Reconcile selection against the fleet — when `controllers` is reassigned
+  // (e.g. by a WS-driven refresh), prune any selected ids that no longer
+  // refer to a known controller. Prevents orphan ids from silently passing
+  // `canFlash` (size > 0) and skipping the downgrade check (find returns
+  // undefined → not blocked).
+  watch(controllers, (next) => {
+    if (selectedControllerIds.value.size === 0) return;
+    const known = new Set(next.map((c) => c.id));
+    const filtered = new Set<string>();
+    for (const id of selectedControllerIds.value) {
+      if (known.has(id)) filtered.add(id);
+    }
+    if (filtered.size !== selectedControllerIds.value.size) {
+      selectedControllerIds.value = filtered;
+    }
+  });
 
   const target = computed<string | null>(() => {
     if (sourceMode.value === 'github') return selectedReleaseTag.value;

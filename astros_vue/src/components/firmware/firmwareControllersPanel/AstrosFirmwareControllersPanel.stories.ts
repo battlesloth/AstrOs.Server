@@ -51,6 +51,18 @@ export const SelectInitial: Story = {
   args: { phase: 'select' },
 };
 
+export const SelectTargetNoSelection: Story = {
+  render: (args) => ({
+    components: { AstrosFirmwareControllersPanel },
+    setup() {
+      setupStore({ target: 'v1.4.2', selected: [] });
+      return { args };
+    },
+    template: '<AstrosFirmwareControllersPanel v-bind="args" />',
+  }),
+  args: { phase: 'select' },
+};
+
 export const SelectWithTarget: Story = {
   render: (args) => ({
     components: { AstrosFirmwareControllersPanel },
