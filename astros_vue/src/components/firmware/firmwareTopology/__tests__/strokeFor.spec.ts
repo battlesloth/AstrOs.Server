@@ -10,12 +10,24 @@ const base = {
 } as const;
 
 describe('strokeFor', () => {
-  it('returns unselected when not selected, regardless of phase', () => {
-    for (const phase of ['select', 'flashing', 'done', 'failed'] as TopologyPhase[]) {
-      expect(strokeFor({ ...base, isSelected: false, phase })).toBe(
-        TOPOLOGY_STROKE_COLORS.unselected,
-      );
+  it('returns unselected when not selected, regardless of phase or isMaster', () => {
+    // Mutation guard: if the `!isSelected` early-return were reordered below the
+    // `phase === 'flashing' && isMaster` branch, an unselected master would render
+    // as `masterFlashing`. The `isMaster: true` row here pins that ordering.
+    for (const phase of ['idle', 'select', 'flashing', 'done', 'failed'] as TopologyPhase[]) {
+      for (const isMaster of [false, true]) {
+        expect(strokeFor({ ...base, isSelected: false, isMaster, phase })).toBe(
+          TOPOLOGY_STROKE_COLORS.unselected,
+        );
+      }
     }
+  });
+
+  it('returns selectedDefault in `idle` phase for any selected controller', () => {
+    expect(strokeFor({ ...base, phase: 'idle' })).toBe(TOPOLOGY_STROKE_COLORS.selectedDefault);
+    expect(strokeFor({ ...base, isMaster: true, phase: 'idle' })).toBe(
+      TOPOLOGY_STROKE_COLORS.selectedDefault,
+    );
   });
 
   it('returns success for any selected node in `done`', () => {

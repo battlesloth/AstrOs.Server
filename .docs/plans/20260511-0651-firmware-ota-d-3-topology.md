@@ -13,7 +13,7 @@ Roadmap reference: `20260507-2153-firmware-ota-d-vue-firmware-view.md`. Design s
 - Storybook stories covering all four phases (6 stories: idle + all-selected for `select`, then `flashing`, `done`, `failed-core`, `failed-master`).
 - i18n keys for chrome strings ("UPDATE TOPOLOGY" eyebrow, hint, MASTER/PADAWAN role labels).
 - Barrel export in `components/firmware/index.ts`.
-- Unit-test the `strokeFor` mapping (8 branches) — extracted to a sibling pure module so it's testable in isolation.
+- Unit-test the `strokeFor` mapping (7 return paths) — extracted to a sibling pure module so it's testable in isolation.
 
 ## Out of scope
 
@@ -25,7 +25,7 @@ Roadmap reference: `20260507-2153-firmware-ota-d-vue-firmware-view.md`. Design s
 
 - [x] Add i18n keys under `firmware_view.topology.*` in `enUS.json` (`eyebrow_title`, `hint`, `role_master`, `role_padawan`, `figure_aria_label`, `node_title`).
 - [x] Create `astros_vue/src/components/firmware/firmwareTopology/types.ts` exporting `TopologyController`, `TopologyFleet`, `TopologyPhase`, `TopologyProps`.
-- [x] Extract `strokeFor` to a pure sibling module `strokeFor.ts` and unit-test all 8 branches in `__tests__/strokeFor.spec.ts`.
+- [x] Extract `strokeFor` to a pure sibling module `strokeFor.ts` and unit-test all 7 return paths in `__tests__/strokeFor.spec.ts`.
 - [x] Implement `astros_vue/src/components/firmware/firmwareTopology/AstrosFirmwareTopology.vue` with the SVG layout, `strokeFor` / `padawanLineStroke` / `nodeFill` / `sourceLineStroke` helpers, dev-mode `watchEffect` invariant warnings, and CSS `@keyframes` for `stroke-dashoffset`.
 - [x] Add Storybook stories `AstrosFirmwareTopology.stories.ts` for: `SelectIdle`, `SelectAllSelected`, `Flashing`, `Done`, `FailedCore`, `FailedMaster`.
 - [x] Export from `components/firmware/index.ts`; verify build + Storybook render manually.

@@ -2,7 +2,7 @@
 import { computed, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { TopologyController, TopologyProps } from './types';
-import { strokeFor as computeStroke } from './strokeFor';
+import { strokeFor as computeStroke, TOPOLOGY_STROKE_COLORS } from './strokeFor';
 
 const props = defineProps<TopologyProps>();
 
@@ -25,12 +25,15 @@ const COLOR = {
   nodeFillSelected: '#eef3fa',
   nodeFillUnselected: '#f2f7fa',
   sourceRectFill: '#f6f9fb',
-  failure: '#cf4242',
+  failure: TOPOLOGY_STROKE_COLORS.failure,
   inkSoft: '#4b5b73',
   ink: '#0e1726',
   border: '#d6e0e6',
 };
 
+// Dev-only invariant warnings. Vite tree-shakes this block in production builds —
+// invariants are documented on TopologyProps; this surfaces violations during local
+// dev / Storybook without imposing console noise on end users.
 if (import.meta.env.DEV) {
   watchEffect(() => {
     if (props.fleet.padawans.length > PADAWAN_SLOT_COUNT) {
@@ -64,16 +67,19 @@ if (import.meta.env.DEV) {
 }
 
 const padawanLayouts = computed(() =>
+  // Safe: slice cap (PADAWAN_SLOT_COUNT === PADAWAN_POSITIONS.length) bounds i within array length.
   props.fleet.padawans.slice(0, PADAWAN_SLOT_COUNT).map((controller, i) => ({
     controller,
     position: PADAWAN_POSITIONS[i] as { x: number; y: number },
   })),
 );
 
+const selectedSet = computed(() => new Set(props.selectedIds));
+
 const isFlashing = computed(() => props.phase === 'flashing');
 
 function isSelected(c: TopologyController): boolean {
-  return props.selectedIds.has(c.id);
+  return selectedSet.value.has(c.id);
 }
 
 function strokeFor(c: TopologyController, isMaster: boolean): string {

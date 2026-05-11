@@ -10,8 +10,8 @@ const SAMPLE_FLEET: TopologyFleet = {
   ],
 };
 
-const ALL_SELECTED = new Set(['body', 'core', 'dome']);
-const NONE_SELECTED: ReadonlySet<string> = new Set();
+const ALL_SELECTED: readonly string[] = ['body', 'core', 'dome'];
+const NONE_SELECTED: readonly string[] = [];
 
 const meta = {
   title: 'Components/Firmware/AstrosFirmwareTopology',
