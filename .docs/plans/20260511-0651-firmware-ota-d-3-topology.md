@@ -22,12 +22,12 @@ Roadmap reference: `20260507-2153-firmware-ota-d-vue-firmware-view.md`. Design s
 
 ## Tasks
 
-- [ ] Add i18n keys under `firmware_view.topology.*` in `enUS.json` (`eyebrow_title`, `hint`, `role_master`, `role_padawan`, `node_aria_label`).
-- [ ] Create `astros_vue/src/components/firmware/firmwareTopology/types.ts` exporting `TopologyController`, `TopologyPhase`, `TopologyProps`.
-- [ ] Implement `astros_vue/src/components/firmware/firmwareTopology/AstrosFirmwareTopology.vue` with the SVG layout, `dotFor`/`lineColorFor` computeds, and CSS `@keyframes` for `stroke-dashoffset`.
-- [ ] Add Storybook stories `AstrosFirmwareTopology.stories.ts` for: `SelectIdle` (no selection), `SelectAllSelected`, `Flashing`, `Done`, `FailedCore`.
-- [ ] Export from `components/firmware/index.ts`; verify build + Storybook render manually.
-- [ ] Pre-commit: prettier, lint, build, vitest run, `superpowers:requesting-code-review`, then commit.
+- [x] Add i18n keys under `firmware_view.topology.*` in `enUS.json` (`eyebrow_title`, `hint`, `role_master`, `role_padawan`, `figure_aria_label`, `node_title`).
+- [x] Create `astros_vue/src/components/firmware/firmwareTopology/types.ts` exporting `TopologyController`, `TopologyPhase`, `TopologyProps`.
+- [x] Implement `astros_vue/src/components/firmware/firmwareTopology/AstrosFirmwareTopology.vue` with the SVG layout, `dotFor`/`lineColorFor` computeds, and CSS `@keyframes` for `stroke-dashoffset`.
+- [x] Add Storybook stories `AstrosFirmwareTopology.stories.ts` for: `SelectIdle` (no selection), `SelectAllSelected`, `Flashing`, `Done`, `FailedCore`.
+- [x] Export from `components/firmware/index.ts`; verify build + Storybook render manually.
+- [x] Pre-commit: prettier, lint, build, vitest run, `superpowers:requesting-code-review`, then commit.
 
 ## Implementation notes
 
@@ -36,13 +36,10 @@ Roadmap reference: `20260507-2153-firmware-ota-d-vue-firmware-view.md`. Design s
 ```ts
 // firmwareTopology/types.ts
 export type TopologyPhase = 'select' | 'flashing' | 'done' | 'failed';
-export type ControllerStatus = 'up' | 'down' | 'needs_synced';
 
 export interface TopologyController {
   id: string;          // 'body' | 'core' | 'dome' (string for forward-compat)
   label: string;       // 'Body', 'Core', 'Dome'
-  current: string;     // semver tag, e.g. 'v1.4.0'
-  status: ControllerStatus;
 }
 
 export interface TopologyProps {
@@ -51,10 +48,13 @@ export interface TopologyProps {
   target: string | null;               // tag rendered in the source rect; '—' when null
   phase: TopologyPhase;
   failedControllerId?: string | null;  // which node shows the red '!' glyph when phase === 'failed'
+  masterControllerId?: string;         // defaults to 'body'
 }
 ```
 
 `failedControllerId` parameterizes the prototype's hardcoded `'core'` (per design handoff §"Topology stroke colors"). In d.6 this comes from the orchestrator's per-controller terminal state.
+
+Per-controller `current` / `status` fields are intentionally omitted — the topology doesn't read them. d.5 will define a richer `Controller` shape for the controllers panel that fans out into a minimal `TopologyController` for this component.
 
 ### Stroke-color rules (mirror of `dotFor` in `firmwareDirectionC.jsx:139`)
 

@@ -69,6 +69,14 @@
       "releases_load_error": "Failed to load releases. Try again.",
       "releases_stale_warning": "Showing cached releases — couldn't reach GitHub since {since}.",
       "releases_loading": "Loading releases…"
+    },
+    "topology": {
+      "eyebrow_title": "UPDATE TOPOLOGY",
+      "hint": "Master receives over serial → forwards to padawans",
+      "role_master": "MASTER",
+      "role_padawan": "PADAWAN",
+      "figure_aria_label": "Firmware update topology — master receives the file then forwards to padawan controllers over ESP-NOW",
+      "node_title": "{label} ({role})"
     }
   },
   "placeholder": {
