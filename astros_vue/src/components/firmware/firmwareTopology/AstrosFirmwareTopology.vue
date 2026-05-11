@@ -134,7 +134,6 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
       <span class="astros-firmware-topology__eyebrow">{{
         $t('firmware_view.topology.eyebrow_title')
       }}</span>
-      <span class="astros-firmware-topology__hint">{{ $t('firmware_view.topology.hint') }}</span>
     </div>
 
     <svg
@@ -295,10 +294,7 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
 }
 
 .astros-firmware-topology__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  text-align: center;
 }
 
 .astros-firmware-topology__eyebrow {
@@ -307,12 +303,6 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #4b5b73;
-}
-
-.astros-firmware-topology__hint {
-  font-size: 10px;
-  color: #4b5b73;
-  font-style: italic;
 }
 
 .astros-firmware-topology__svg {
