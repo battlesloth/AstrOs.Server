@@ -198,17 +198,6 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
           {{ fleet.master.label.toUpperCase() }}
         </text>
         <text
-          :x="MASTER_POS.x"
-          :y="MASTER_POS.y + 38"
-          text-anchor="middle"
-          font-size="9"
-          font-weight="700"
-          letter-spacing="0.08em"
-          :fill="COLOR.inkSoft"
-        >
-          {{ $t('firmware_view.topology.role_master') }}
-        </text>
-        <text
           v-if="phase === 'failed' && fleet.master.id === failedControllerId"
           :x="MASTER_POS.x"
           :y="MASTER_POS.y - 30"
@@ -275,17 +264,6 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
           :fill="COLOR.ink"
         >
           {{ layout.controller.label.toUpperCase() }}
-        </text>
-        <text
-          :x="layout.position.x"
-          :y="layout.position.y + 38"
-          text-anchor="middle"
-          font-size="9"
-          font-weight="700"
-          letter-spacing="0.08em"
-          :fill="COLOR.inkSoft"
-        >
-          {{ $t('firmware_view.topology.role_padawan') }}
         </text>
         <text
           v-if="phase === 'failed' && layout.controller.id === failedControllerId"
