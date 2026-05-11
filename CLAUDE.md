@@ -109,14 +109,9 @@ Before pushing a feature branch, run a comprehensive multi-agent review on the f
 /pr-review-toolkit:review-pr
 ```
 
-**When required:**
+**When required:** every PR that touches code, config, or assets — regardless of size, commit count, or which directories it touches. The per-commit reviewer sees one diff at a time; the pre-push run reframes the work as a whole-branch surface, which is where cross-commit drift, missing-test sweeps, and stale-comment regressions surface.
 
-- Branch touches any of: `astros_api/src/test_harness/`, `astros_api/src/firmware/`, `astros_api/src/serial/`, `astros_api/src/api_server.ts`, `astros_api/src/dal/database.ts`, `astros_api/src/job_lock/` (concurrency-heavy or production-critical paths).
-- Branch has more than 5 commits (cross-commit drift accumulates beyond what per-commit review can catch).
-
-**When optional:**
-
-- 1-2 commit fixes outside the directories above — the per-commit code review is sufficient.
+**Carve-out — skip only when the branch is documentation-only.** A branch whose entire diff is limited to `CLAUDE.md`, `README.md`, `.docs/`, or other prose files (no `.ts`/`.tsx`/`.vue`/`.css`/`.json` config or asset changes) may skip the pre-push toolkit. Plan files committed alongside implementation work do NOT qualify — if any non-doc file is in the diff, run the toolkit.
 
 **What it does.** Dispatches 5 specialized agents in parallel against the full branch diff vs `develop`:
 
