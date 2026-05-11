@@ -30,3 +30,27 @@ export interface ReleaseListResult {
 export type ReleasesLoadState = 'idle' | 'loading' | 'loaded' | 'stale' | 'error';
 
 export type FirmwareSourceMode = 'github' | 'upload';
+
+export type ControllerOnlineStatus = 'up' | 'down' | 'needsSynced';
+
+/** Presentation-layer view of a controller for the firmware-update flow. */
+export interface FirmwareControllerView {
+  id: string;
+  label: string;
+  /** Single-letter badge glyph: 'B', 'C', 'D'. */
+  glyph: string;
+  /** Semver tag currently running on the controller, e.g. 'v1.4.0'. */
+  current: string;
+  status: ControllerOnlineStatus;
+  isMaster: boolean;
+}
+
+export type FirmwareStatusPillKind =
+  | 'idle'
+  | 'queued'
+  | 'updating'
+  | 'done'
+  | 'failed'
+  | 'upToDate'
+  | 'offline'
+  | 'downgrade';

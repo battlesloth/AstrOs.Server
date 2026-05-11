@@ -1,27 +1,77 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import apiService from '@/api/apiService';
 import { FIRMWARE_RELEASES } from '@/api/endpoints';
+import { compareTags } from '@/utils/version';
 import type {
+  FirmwareControllerView,
   FirmwareSourceMode,
   ReleaseInfo,
   ReleaseListResult,
   ReleasesLoadState,
 } from '@/types/firmware';
 
-// d.2 subset of the firmware view's UI state. Other fields described in
-// the umbrella plan (currentJob, controllerStates, phase, etc.) land in
-// d.5/d.6 when the WS dispatcher and flash POST arrive.
+// d.2 added: releases, sourceMode, selectedReleaseTag, uploadedFilename.
+// d.4 adds: controllers, selectedControllerIds, target/canFlash/anyDowngradeBlocked
+// computeds, toggle/selectAll/clear actions. currentJob, controllerStates,
+// phase land in d.5/d.6 with the WS dispatcher and flash POST.
 export const useFirmwareStore = defineStore('firmware', () => {
-  // Server-pushed
   const releases = ref<ReleaseInfo[]>([]);
   const releasesLoadState = ref<ReleasesLoadState>('idle');
   const staleSince = ref<string | null>(null);
 
-  // User selection
   const sourceMode = ref<FirmwareSourceMode>('github');
   const selectedReleaseTag = ref<string | null>(null);
   const uploadedFilename = ref<string | null>(null);
+
+  const controllers = ref<FirmwareControllerView[]>([]);
+  const selectedControllerIds = ref<ReadonlySet<string>>(new Set());
+
+  const target = computed<string | null>(() => {
+    if (sourceMode.value === 'github') return selectedReleaseTag.value;
+    return uploadedFilename.value ? 'local-build' : null;
+  });
+
+  function isDowngrade(controllerId: string): boolean {
+    const t = target.value;
+    if (t === null) return false;
+    const c = controllers.value.find((x) => x.id === controllerId);
+    if (!c) return false;
+    const cmp = compareTags(c.current, t);
+    return cmp > 0;
+  }
+
+  function isBlocked(controllerId: string): boolean {
+    const c = controllers.value.find((x) => x.id === controllerId);
+    if (!c) return false;
+    return c.status === 'down' || isDowngrade(controllerId);
+  }
+
+  const anyDowngradeBlocked = computed(() => [...selectedControllerIds.value].some(isDowngrade));
+
+  const canFlash = computed(
+    () =>
+      target.value !== null && selectedControllerIds.value.size > 0 && !anyDowngradeBlocked.value,
+  );
+
+  // Selection actions always replace the Set (not mutate in place) so Vue
+  // tracks the change — refs track value reassignment, not Set methods.
+  function toggle(id: string): void {
+    const next = new Set(selectedControllerIds.value);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selectedControllerIds.value = next;
+  }
+
+  function selectAll(): void {
+    selectedControllerIds.value = new Set(
+      controllers.value.filter((c) => !isBlocked(c.id)).map((c) => c.id),
+    );
+  }
+
+  function clear(): void {
+    selectedControllerIds.value = new Set();
+  }
 
   async function fetchReleases(): Promise<void> {
     releasesLoadState.value = 'loading';
@@ -45,6 +95,14 @@ export const useFirmwareStore = defineStore('firmware', () => {
     sourceMode,
     selectedReleaseTag,
     uploadedFilename,
+    controllers,
+    selectedControllerIds,
+    target,
+    anyDowngradeBlocked,
+    canFlash,
+    toggle,
+    selectAll,
+    clear,
     fetchReleases,
   };
 });
