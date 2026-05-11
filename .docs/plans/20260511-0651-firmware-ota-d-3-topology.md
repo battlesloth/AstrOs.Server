@@ -113,10 +113,10 @@ Final coords (departed from prototype during d.3 sizing tweaks to enlarge the di
 - viewBox `0 0 360 260`.
 - `NODE_RADIUS = 30` (was 22 in prototype).
 - Source rect: `x=130 y=8 w=100 h=26 rx=4`, text centered `x=180 y=26`, font 12.
-- Master node center: `(180, 80)`, radius `NODE_RADIUS`.
+- Master node center: `(180, 95)`, radius `NODE_RADIUS`. (Master sits low enough that the failure `!` glyph at `master.y - NODE_RADIUS - 8 = 57` clears the source rect bottom at y=34.)
 - Padawan node centers: `(75, 205)` and `(285, 205)`, radius `NODE_RADIUS`.
-- Source→master line: `(180, 34) → (180, 50)` (`MASTER_POS.y - NODE_RADIUS`), stroke-width 2.5.
-- Master→padawan lines: `(180, 110)` (`MASTER_POS.y + NODE_RADIUS`) `→ (pX, pY - NODE_RADIUS)`, stroke-width 2.5.
+- Source→master line: `(180, 34) → (180, 65)` (`MASTER_POS.y - NODE_RADIUS`), stroke-width 2.5.
+- Master→padawan lines: `(180, 125)` (`MASTER_POS.y + NODE_RADIUS`) `→ (pX, pY - NODE_RADIUS)`, stroke-width 2.5.
 - ESP-NOW label: midpoint of the master→padawan segment, 6px above the line, font 10.
 - Failure `!` glyph: `(nodeX, nodeY - NODE_RADIUS - 8)`, font 14.
 - Node label text: `(nodeX, nodeY + 5)`, font 14.

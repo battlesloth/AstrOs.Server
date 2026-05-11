@@ -12,7 +12,7 @@ const VIEW_W = 360;
 const VIEW_H = 260;
 const NODE_RADIUS = 30;
 
-const MASTER_POS = { x: 180, y: 80 };
+const MASTER_POS = { x: 180, y: 95 };
 const PADAWAN_POSITIONS = [
   { x: 75, y: 205 },
   { x: 285, y: 205 },
