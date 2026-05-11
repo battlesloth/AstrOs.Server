@@ -142,7 +142,6 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
       class="astros-firmware-topology__svg"
       role="presentation"
     >
-      <!-- Source rect at top -->
       <rect
         x="130"
         y="8"
@@ -164,7 +163,6 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
         {{ target ?? '—' }}
       </text>
 
-      <!-- Source -> master line -->
       <line
         x1="180"
         y1="34"
@@ -176,7 +174,6 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
         :class="{ 'astros-firmware-topology__line--flow-fast': isFlashing }"
       />
 
-      <!-- Master node -->
       <g>
         <title>{{ nodeTitle(fleet.master, 'master') }}</title>
         <circle
@@ -211,7 +208,6 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
         </text>
       </g>
 
-      <!-- Master -> padawan lines + ESP-NOW labels -->
       <g
         v-for="layout in padawanLayouts"
         :key="`line-${layout.controller.id}`"
@@ -241,7 +237,6 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
         </text>
       </g>
 
-      <!-- Padawan nodes -->
       <g
         v-for="layout in padawanLayouts"
         :key="`node-${layout.controller.id}`"

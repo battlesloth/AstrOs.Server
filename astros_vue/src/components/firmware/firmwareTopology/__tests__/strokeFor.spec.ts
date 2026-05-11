@@ -11,9 +11,6 @@ const base = {
 
 describe('strokeFor', () => {
   it('returns unselected when not selected, regardless of phase or isMaster', () => {
-    // Mutation guard: if the `!isSelected` early-return were reordered below the
-    // `phase === 'flashing' && isMaster` branch, an unselected master would render
-    // as `masterFlashing`. The `isMaster: true` row here pins that ordering.
     for (const phase of ['idle', 'select', 'flashing', 'done', 'failed'] as TopologyPhase[]) {
       for (const isMaster of [false, true]) {
         expect(strokeFor({ ...base, isSelected: false, isMaster, phase })).toBe(
