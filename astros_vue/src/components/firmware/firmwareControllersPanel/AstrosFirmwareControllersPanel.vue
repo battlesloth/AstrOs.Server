@@ -16,8 +16,13 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const firmware = useFirmwareStore();
-const { controllers, selectedControllerIds, target, canFlash, anyDowngradeBlocked } =
+const { controllers, selectedControllerIds, target, canFlash, anyDowngradeBlocked, flashError } =
   storeToRefs(firmware);
+
+const flashErrorMessage = computed(() => {
+  if (flashError.value === null) return null;
+  return t(`firmware_view.flash_errors.${flashError.value.reason}`);
+});
 
 const rowMode = computed<'select' | 'progress'>(() =>
   props.phase === 'select' ? 'select' : 'progress',
@@ -109,6 +114,35 @@ const actionBarMessage = computed(() => {
         />
       </li>
     </ul>
+
+    <div
+      v-if="phase === 'select' && flashError !== null"
+      class="astros-firmware-controllers-panel__error-banner"
+      role="alert"
+      aria-live="polite"
+    >
+      <div class="astros-firmware-controllers-panel__error-text">
+        <span class="astros-firmware-controllers-panel__error-title">{{
+          t('firmware_view.controllers.flash_error_banner.title')
+        }}</span>
+        <span class="astros-firmware-controllers-panel__error-detail">{{ flashErrorMessage }}</span>
+      </div>
+      <div class="astros-firmware-controllers-panel__error-actions">
+        <AstrosFirmwareButton
+          kind="ghost"
+          @click="firmware.dismissError()"
+        >
+          {{ t('firmware_view.controllers.flash_error_banner.dismiss') }}
+        </AstrosFirmwareButton>
+        <AstrosFirmwareButton
+          kind="secondary"
+          :disabled="!canFlash"
+          @click="canFlash && emit('flash')"
+        >
+          {{ t('firmware_view.controllers.flash_error_banner.retry') }}
+        </AstrosFirmwareButton>
+      </div>
+    </div>
 
     <footer
       v-if="phase === 'select'"
@@ -317,5 +351,39 @@ const actionBarMessage = computed(() => {
 
 .astros-firmware-controllers-panel__result-text--failed {
   color: #9a2828;
+}
+
+.astros-firmware-controllers-panel__error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fbe0e0;
+  border-top: 1px solid #cf424255;
+}
+
+.astros-firmware-controllers-panel__error-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.astros-firmware-controllers-panel__error-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #9a2828;
+}
+
+.astros-firmware-controllers-panel__error-detail {
+  font-size: 11px;
+  color: #9a2828;
+}
+
+.astros-firmware-controllers-panel__error-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 </style>

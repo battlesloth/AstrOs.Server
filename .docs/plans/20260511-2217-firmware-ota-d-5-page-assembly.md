@@ -161,10 +161,12 @@ async function startFlash(): Promise<void> {
 }
 ```
 
-`mapHttpErrorToEnvelope` is a small helper in `firmwareStore` that:
-- Parses axios error.response.status + error.response.data into a `FlashErrorEnvelope`.
+`mapHttpErrorToFlashEnvelope` lives in `utils/firmwareFlashError.ts` (extracted to a pure module for unit-testability — same pattern as d.3's `strokeFor` and d.4's `selectModePillKind`). It:
+- Parses axios `error.response.status` + `error.response.data` into a `FlashErrorEnvelope`.
 - Falls back to `{ reason: 'network_error' }` on no-response.
 - Falls back to `{ reason: 'internal_server_error' }` on unrecognized response shape.
+
+6 unit tests in `utils/__tests__/firmwareFlashError.spec.ts` cover the no-response, malformed-response, recognized-reason, detail/currentJobId-preservation, and unknown-reason-fallback paths.
 
 ### Dev-only fleet mock
 

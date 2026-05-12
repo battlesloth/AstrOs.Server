@@ -14,6 +14,7 @@ function setupStore(opts: {
   target?: string | null;
   selected?: string[];
   controllers?: FirmwareControllerView[];
+  flashErrorReason?: string;
 }) {
   setActivePinia(createPinia());
   const store = useFirmwareStore();
@@ -21,6 +22,10 @@ function setupStore(opts: {
   store.sourceMode = 'github';
   store.selectedReleaseTag = opts.target ?? null;
   store.selectedControllerIds = new Set(opts.selected ?? []);
+  if (opts.flashErrorReason !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    store.flashError = { reason: opts.flashErrorReason as any };
+  }
 }
 
 const meta = {
@@ -80,6 +85,22 @@ export const SelectAllSelected: Story = {
     components: { AstrosFirmwareControllersPanel },
     setup() {
       setupStore({ target: 'v1.4.2', selected: ['body', 'core'] });
+      return { args };
+    },
+    template: '<AstrosFirmwareControllersPanel v-bind="args" />',
+  }),
+  args: { phase: 'select' },
+};
+
+export const SelectWithFlashError: Story = {
+  render: (args) => ({
+    components: { AstrosFirmwareControllersPanel },
+    setup() {
+      setupStore({
+        target: 'v1.4.2',
+        selected: ['body'],
+        flashErrorReason: 'job_already_running',
+      });
       return { args };
     },
     template: '<AstrosFirmwareControllersPanel v-bind="args" />',

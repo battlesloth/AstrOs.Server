@@ -1,11 +1,15 @@
 import { computed, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
-import apiService from '@/api/apiService';
-import { FIRMWARE_RELEASES } from '@/api/endpoints';
+import apiService, { apiClient } from '@/api/apiService';
+import { FIRMWARE_FLASH, FIRMWARE_RELEASES } from '@/api/endpoints';
 import { compareTags } from '@/utils/version';
+import { mapHttpErrorToFlashEnvelope } from '@/utils/firmwareFlashError';
 import type {
   FirmwareControllerView,
+  FirmwarePhase,
   FirmwareSourceMode,
+  FirmwareStage,
+  FlashErrorEnvelope,
   ReleaseInfo,
   ReleaseListResult,
   ReleasesLoadState,
@@ -22,6 +26,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   const controllers = ref<FirmwareControllerView[]>([]);
   const selectedControllerIds = ref<ReadonlySet<string>>(new Set());
+
+  const phase = ref<FirmwarePhase>('idle');
+  const currentStage = ref<FirmwareStage | null>(null);
+  const flashError = ref<FlashErrorEnvelope | null>(null);
+  const failedController = ref<{ id: string; label: string; stage: FirmwareStage } | null>(null);
 
   // Reconcile selection against the fleet — when `controllers` is reassigned
   // (e.g. by a WS-driven refresh), prune any selected ids that no longer
@@ -86,6 +95,51 @@ export const useFirmwareStore = defineStore('firmware', () => {
     selectedControllerIds.value = new Set();
   }
 
+  function setPhase(next: FirmwarePhase): void {
+    phase.value = next;
+  }
+
+  function resetToSelect(): void {
+    phase.value = 'select';
+    currentStage.value = null;
+    flashError.value = null;
+    failedController.value = null;
+  }
+
+  function dismissError(): void {
+    flashError.value = null;
+  }
+
+  async function startFlash(): Promise<void> {
+    if (!canFlash.value || phase.value === 'flashing') return;
+    flashError.value = null;
+    const body =
+      sourceMode.value === 'github'
+        ? { source: { kind: 'github' as const, version: selectedReleaseTag.value } }
+        : { source: { kind: 'upload' as const } };
+    phase.value = 'flashing';
+    try {
+      await apiService.post(FIRMWARE_FLASH, body);
+      // HTTP 200 means orchestrator.start() resolved synchronously. Subsequent
+      // state (per-controller stages, completion, failure) is owned by the WS
+      // dispatcher in d.6. In d.5 we remain in 'flashing' until the operator
+      // dismisses the view; this is the documented d.5 behavior.
+    } catch (error) {
+      phase.value = 'select';
+      flashError.value = mapHttpErrorToFlashEnvelope(error);
+    }
+  }
+
+  async function cancelFlash(reason: string = 'operator'): Promise<void> {
+    try {
+      await apiClient.delete(FIRMWARE_FLASH, { data: { reason } });
+    } catch (error) {
+      // Cancel is best-effort. A failure here is logged but doesn't transition
+      // phase — the WS dispatcher in d.6 owns post-cancel state truth.
+      console.warn('firmware.cancelFlash failed', error);
+    }
+  }
+
   async function fetchReleases(): Promise<void> {
     releasesLoadState.value = 'loading';
     try {
@@ -110,12 +164,21 @@ export const useFirmwareStore = defineStore('firmware', () => {
     uploadedFilename,
     controllers,
     selectedControllerIds,
+    phase,
+    currentStage,
+    flashError,
+    failedController,
     target,
     anyDowngradeBlocked,
     canFlash,
     toggle,
     selectAll,
     clear,
+    setPhase,
+    resetToSelect,
+    dismissError,
+    startFlash,
+    cancelFlash,
     fetchReleases,
   };
 });
