@@ -21,6 +21,11 @@ const dialogRef = ref<HTMLDialogElement | null>(null);
 
 // Native <dialog>.showModal() handles focus trap, ESC dismissal, and focus
 // restore for free. Sync .open prop to the imperative API.
+//
+// `immediate: true` + `flush: 'post'` ensures a component mounted with
+// `open: true` (Storybook args, or a parent that renders it initially open)
+// actually calls `.showModal()` — post-flush defers the first run until after
+// the dialog element is in the DOM so `dialogRef.value` is populated.
 watch(
   () => props.open,
   (open) => {
@@ -29,6 +34,7 @@ watch(
     if (open && !el.open) el.showModal();
     else if (!open && el.open) el.close();
   },
+  { immediate: true, flush: 'post' },
 );
 
 // Browser fires 'cancel' on ESC. Mirror it through our cancel emit so the
