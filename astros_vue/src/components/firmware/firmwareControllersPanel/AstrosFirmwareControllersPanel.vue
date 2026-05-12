@@ -21,16 +21,18 @@ const { controllers, selectedControllerIds, target, canFlash, anyDowngradeBlocke
 
 const flashErrorMessage = computed(() => {
   if (flashError.value === null) return null;
-  return t(`firmware_view.flash_errors.${flashError.value.reason}`);
+  return t(`firmware_view.flash_errors.${flashError.value.reason}`, {
+    jobId: flashError.value.currentJobId ?? '',
+    detail: flashError.value.detail ?? '',
+  });
 });
 
 const rowMode = computed<'select' | 'progress'>(() =>
   props.phase === 'select' ? 'select' : 'progress',
 );
 
-// Dev-only invariant warnings. Vite tree-shakes the block in production —
-// these surface wiring bugs during local dev / Storybook when the panel is
-// integrated with the WS dispatcher in d.5/d.6.
+// Dev-only invariant warnings. Surface wiring bugs when the panel is driven
+// by the WS dispatcher; production strips the block via Vite tree-shake.
 if (import.meta.env.DEV) {
   watchEffect(() => {
     if (props.phase !== 'select' && target.value === null) {

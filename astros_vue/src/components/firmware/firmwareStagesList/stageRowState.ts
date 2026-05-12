@@ -11,18 +11,6 @@ export interface StageRowStateInput {
   failedStage: FirmwareStage | null;
 }
 
-/**
- * Derive the visual state for a single stage row given the overall phase and
- * the current/failed stage pointers.
- *
- * Conventions:
- * - `done` phase → every stage is `done`.
- * - `failed` phase + `failedStage` matches → that row is `failed`; earlier
- *   rows are `done`; later rows are `idle`.
- * - `flashing` phase + `currentStage` matches → that row is `current`;
- *   earlier rows are `done`; later rows are `idle`.
- * - `idle` / `select` phases or unknown pointer values → all `idle`.
- */
 export function stageRowState(input: StageRowStateInput): StageRowState {
   const { stage, phase, currentStage, failedStage } = input;
   const index = FIRMWARE_STAGES.indexOf(stage);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { FIRMWARE_STAGES, stageRowState, type StageRowState } from './stageRowState';
 import type { FirmwarePhase, FirmwareStage } from '@/types/firmware';
@@ -11,6 +11,26 @@ const props = defineProps<{
 }>();
 
 const { t } = useI18n();
+
+if (import.meta.env.DEV) {
+  watchEffect(() => {
+    if (props.phase === 'flashing' && props.currentStage === null) {
+      console.warn(
+        '[AstrosFirmwareStagesList] phase="flashing" with currentStage=null — all rows ' +
+          'will render as idle. The dispatcher must set currentStage before transitioning.',
+      );
+    }
+    if (
+      props.phase === 'failed' &&
+      (props.failedStage === null || props.failedStage === undefined)
+    ) {
+      console.warn(
+        '[AstrosFirmwareStagesList] phase="failed" with failedStage=null — all rows ' +
+          'will render as idle. The dispatcher must set failedStage before transitioning.',
+      );
+    }
+  });
+}
 
 interface StageRow {
   stage: FirmwareStage;

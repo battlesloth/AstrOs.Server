@@ -97,16 +97,16 @@ export interface FlashErrorEnvelope {
 
 ## Tasks
 
-- [ ] Add i18n keys: `firmware_view.stages.*` (label + hint per stage + `in_progress` badge), `firmware_view.confirm_modal.*` (title, body copy, cancel, confirm, power-warning), `firmware_view.flash_errors.*` (one entry per `FlashErrorReason`).
-- [ ] Add `FirmwarePhase`, `FirmwareStage`, `FlashErrorReason`, `FlashErrorEnvelope` to `types/firmware.ts`. Add `FIRMWARE_FLASH` constant to `api/endpoints.ts`.
-- [ ] Extend `firmwareStore`: add `phase`, `currentStage`, `flashError`, `failedController` refs; add `setPhase`, `resetToSelect`, `dismissError`, `startFlash`, `cancelFlash` actions. Initial phase is `'idle'`; transitions to `'select'` when `controllers.length > 0` (handled by the dev-mock populate or by d.6's WS-snapshot). Unit-test phase transitions + flash POST error mapping (success → flashing; 409 → flashError.reason='job_already_running'; network failure → flashError.reason='network_error').
-- [ ] Implement `AstrosFirmwareStagesList` (`types.ts` + `.vue` + stories). Props: `currentStage: FirmwareStage | null`, `phase: FirmwarePhase`, `failedStage?: FirmwareStage`. Renders 5 stage rows with state-driven styling. Stories: `Idle`, `Flashing` (currentStage='transfer'), `Done`, `Failed` (failedStage='transfer').
-- [ ] Implement `AstrosFirmwareConfirmModal` (`types.ts` + `.vue` + stories). Props: `open: boolean`, `target: string | null`, `selectedControllers: FirmwareControllerView[]`. Emits `cancel` / `confirm`. A11y: focus trap (use `vue-focus-trap` if present, else implement manually with a `Tab` key listener), ESC closes, click-backdrop closes, focus restore to trigger on close. `aria-modal="true"`, `role="dialog"`, `aria-labelledby` points at title. Stories: `OpenSingleController`, `OpenAllControllers`, `OpenUploadSource`.
-- [ ] Add **flash error banner** rendering inside `AstrosFirmwareControllersPanel`. Reads `firmwareStore.flashError`. Renders above the action bar when non-null. Includes localized error copy + a "Try again" / "Dismiss" affordance. Update the panel's stories with a `SelectWithFlashError` variant.
-- [ ] Update `FirmwareView.vue`: subtitle from store phase; two-column layout (`Topology + StagesList` left, `ControllersPanel` right); below 960px → single column; mount `ConfirmModal` and wire `@flash` → open modal → on confirm → `firmwareStore.startFlash()`; dev-only fleet mock in `onMounted`.
-- [ ] Barrel exports: add `AstrosFirmwareStagesList`, `AstrosFirmwareConfirmModal` + their types to `components/firmware/index.ts`.
-- [ ] Pre-commit gates: format, lint, type-check, vitest, per-commit `pr-review-toolkit:code-reviewer` agent.
-- [ ] Pre-push: `/pr-review-toolkit:review-pr` 5-agent pass (mandatory per CLAUDE.md). Address Critical/Important findings before push.
+- [x] i18n keys: stages.*, confirm_modal.*, flash_errors.*, flash_error_banner.*.
+- [x] Types in `types/firmware.ts`: `FirmwarePhase`, `FirmwareStage`, `FlashErrorReason`, `FlashErrorEnvelope`. `FIRMWARE_FLASH` endpoint constant. **Consolidated:** `TopologyPhase = FirmwarePhase` and `ControllersPanelPhase = Exclude<FirmwarePhase, 'idle'>` — single source of truth.
+- [x] `firmwareStore`: phase/currentStage/flashError/failedController refs; setPhase/resetToSelect/dismissError/startFlash/cancelFlash actions. Initial phase is `'idle'`; transitions to `'select'` when `controllers.length > 0`. 15 unit tests cover phase transitions, body shapes, error mapping (incl. retry-clears-error), double-click guard, cancel default reason, swallow-on-error.
+- [x] `AstrosFirmwareStagesList` (+ `stageRowState` helper + 8 unit tests covering all 5 phase × 5 stage combos). Dev-warn for null currentStage/failedStage in matching phases.
+- [x] `AstrosFirmwareConfirmModal` — native `<dialog>` element + `.showModal()` provides focus trap, ESC, and focus restore for free. No hand-rolled focus sentinels needed. Click on backdrop = `event.target === dialog`. 3 stories.
+- [x] Flash error banner in `AstrosFirmwareControllersPanel` reads `firmwareStore.flashError`. `role="alert"` + `aria-live="polite"`. Wired `currentJobId` and `detail` through named i18n interpolation. `SelectWithFlashError` story.
+- [x] `FirmwareView.vue` page assembly: store-driven subtitle, two-column grid (380px / flex 1), single-column below 960px, dev-only fleet bootstrap, modal mount, dev-warn for missing master.
+- [x] Barrel: `AstrosFirmwareStagesList`, `AstrosFirmwareConfirmModal` + types.
+- [x] Pre-commit: format, lint, type-check, 116-test vitest run, per-commit code-reviewer agent — 0 Critical / 0 Important.
+- [x] Pre-push `/pr-review-toolkit:review-pr` 5-agent pass. 2 Critical (no axios timeout, fragile DELETE bypass) + ~10 Important addressed in a fixup commit before push.
 
 ---
 
@@ -131,12 +131,7 @@ Row state derivation lives in `stageRowState(stage, currentStage, phase, failedS
 
 ### ConfirmModal a11y
 
-Per CLAUDE.md a11y rules:
-- `role="dialog" aria-modal="true" aria-labelledby="<title-id>"` on the card.
-- ESC keydown listener attached when `open === true` only (avoid leaking listeners).
-- Click on backdrop (NOT card) closes via Cancel emit.
-- **Focus trap:** when modal opens, focus first focusable element (Cancel button). Tab and Shift-Tab cycle within modal. On close, restore focus to the element that had focus when the modal opened (the Flash button).
-- Don't use `vue-focus-trap` if not already installed — implement manually with a `<div ref="firstFocus" tabindex="0">` sentinel at start/end of the modal and `keydown.tab` handler. ~25 lines.
+Shipped using the native `<dialog>` element + `.showModal()`. The browser provides focus trap, ESC handling, focus restore, and implicit `role="dialog"`/`aria-modal="true"` for free — no hand-rolled focus-trap code. `aria-labelledby` is set explicitly to the title id. Click on the backdrop fires `event.target === dialog`, which the component handles as a cancel. ESC fires the native `cancel` event, which the component preventDefaults and re-emits through `@cancel` so the parent's `open` ref drives close (keeping the close path single-sourced).
 
 ### Flash POST flow
 

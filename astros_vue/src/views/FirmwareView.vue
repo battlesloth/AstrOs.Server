@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { storeToRefs } from 'pinia';
 import {
@@ -55,6 +55,17 @@ const selectedControllerList = computed<FirmwareControllerView[]>(() =>
 
 const failedControllerId = computed(() => failedController.value?.id);
 
+if (import.meta.env.DEV) {
+  watchEffect(() => {
+    if (controllers.value.length > 0 && !controllers.value.some((c) => c.isMaster)) {
+      console.warn(
+        '[FirmwareView] no controller is flagged isMaster — topology will not render. ' +
+          'Every fleet snapshot must include exactly one master.',
+      );
+    }
+  });
+}
+
 function openConfirm() {
   confirmOpen.value = true;
 }
@@ -80,9 +91,8 @@ const DEV_SAMPLE_FLEET: FirmwareControllerView[] = [
 
 onMounted(async () => {
   await firmware.fetchReleases();
-  // Dev-only fleet bootstrap. Vite strips the block in production. d.6 will
-  // populate `firmware.controllers` from the real controllers store on mount
-  // and via WS-driven snapshots.
+  // Dev-only placeholder fleet. Replace with the real controllers-store
+  // adapter once it exists.
   if (import.meta.env.DEV && firmware.controllers.length === 0) {
     firmware.controllers = DEV_SAMPLE_FLEET;
   }

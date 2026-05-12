@@ -3,14 +3,14 @@ import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AstrosFirmwareButton from '../firmwareButton/AstrosFirmwareButton.vue';
 import AstrosFirmwareVersionDelta from '../firmwareVersionDelta/AstrosFirmwareVersionDelta.vue';
-import type { FirmwareControllerView } from '@/types/firmware';
+import type { FirmwareControllerView, FirmwareSourceMode } from '@/types/firmware';
 
 const props = defineProps<{
   open: boolean;
   target: string | null;
   selectedControllers: FirmwareControllerView[];
   uploadedFilename?: string | null;
-  sourceMode: 'github' | 'upload';
+  sourceMode: FirmwareSourceMode;
 }>();
 
 const emit = defineEmits<{ cancel: []; confirm: [] }>();

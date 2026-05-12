@@ -110,6 +110,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
     flashError.value = null;
   }
 
+  // 30s timeout on the flash POST. axios's default is no timeout — a hung
+  // backend would otherwise leave phase stuck at 'flashing' with no UI
+  // recovery short of a page refresh.
+  const FLASH_POST_TIMEOUT_MS = 30_000;
+
   async function startFlash(): Promise<void> {
     if (!canFlash.value || phase.value === 'flashing') return;
     flashError.value = null;
@@ -119,11 +124,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
         : { source: { kind: 'upload' as const } };
     phase.value = 'flashing';
     try {
-      await apiService.post(FIRMWARE_FLASH, body);
-      // HTTP 200 means orchestrator.start() resolved synchronously. Subsequent
-      // state (per-controller stages, completion, failure) is owned by the WS
-      // dispatcher in d.6. In d.5 we remain in 'flashing' until the operator
-      // dismisses the view; this is the documented d.5 behavior.
+      // Direct apiClient call so we can attach a per-request timeout; the
+      // apiService.post wrapper doesn't expose the options bag.
+      await apiClient.post(FIRMWARE_FLASH, body, { timeout: FLASH_POST_TIMEOUT_MS });
+      // HTTP 200 only means orchestrator.start() resolved; per-controller stage
+      // progression, completion, and failure arrive on the WS surface. Until
+      // that dispatcher is wired in, phase stays 'flashing' until the operator
+      // resets.
     } catch (error) {
       phase.value = 'select';
       flashError.value = mapHttpErrorToFlashEnvelope(error);
@@ -132,10 +139,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   async function cancelFlash(reason: string = 'operator'): Promise<void> {
     try {
+      // Uses apiClient directly (not the apiService.delete wrapper) because
+      // the wrapper passes the second arg as `params`, not request body. The
+      // server reads `req.body?.reason`, so the body must transmit.
       await apiClient.delete(FIRMWARE_FLASH, { data: { reason } });
     } catch (error) {
-      // Cancel is best-effort. A failure here is logged but doesn't transition
-      // phase — the WS dispatcher in d.6 owns post-cancel state truth.
+      // Best-effort: failure here is logged but doesn't transition phase — the
+      // WS surface owns post-cancel state truth.
       console.warn('firmware.cancelFlash failed', error);
     }
   }

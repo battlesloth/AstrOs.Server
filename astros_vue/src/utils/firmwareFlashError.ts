@@ -43,10 +43,14 @@ export function mapHttpErrorToFlashEnvelope(error: unknown): FlashErrorEnvelope 
   const detailRaw = (body as { detail?: unknown }).detail;
   const currentJobIdRaw = (body as { currentJobId?: unknown }).currentJobId;
 
+  const isKnown = typeof reasonRaw === 'string' && KNOWN_REASONS.has(reasonRaw as FlashErrorReason);
+  if (!isKnown && typeof reasonRaw === 'string') {
+    console.warn(
+      `[firmwareFlashError] unrecognized server reason "${reasonRaw}"; mapping to internal_server_error`,
+    );
+  }
   const reason: FlashErrorReason = (
-    typeof reasonRaw === 'string' && KNOWN_REASONS.has(reasonRaw as FlashErrorReason)
-      ? reasonRaw
-      : 'internal_server_error'
+    isKnown ? reasonRaw : 'internal_server_error'
   ) as FlashErrorReason;
 
   const envelope: FlashErrorEnvelope = { reason };

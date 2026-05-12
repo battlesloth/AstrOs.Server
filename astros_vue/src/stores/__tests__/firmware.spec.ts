@@ -4,9 +4,9 @@ import { createPinia, setActivePinia } from 'pinia';
 vi.mock('@/api/apiService', () => ({
   default: {
     get: vi.fn(),
-    post: vi.fn(),
   },
   apiClient: {
+    post: vi.fn(),
     delete: vi.fn(),
   },
 }));
@@ -22,7 +22,7 @@ const sampleControllers: FirmwareControllerView[] = [
 ];
 
 const apiGet = apiService.get as ReturnType<typeof vi.fn>;
-const apiPost = apiService.post as ReturnType<typeof vi.fn>;
+const apiPost = apiClient.post as ReturnType<typeof vi.fn>;
 const apiDelete = apiClient.delete as ReturnType<typeof vi.fn>;
 
 const sampleReleases: ReleaseInfo[] = [
@@ -427,20 +427,22 @@ describe('firmware store', () => {
     }
 
     it("POSTs the github source shape and transitions to 'flashing' on 200", async () => {
-      apiPost.mockResolvedValueOnce({ jobId: 'job-1' });
+      apiPost.mockResolvedValueOnce({ data: { jobId: 'job-1' } });
       const store = readyStore();
 
       await store.startFlash();
 
-      expect(apiPost).toHaveBeenCalledWith('api/firmware/flash', {
-        source: { kind: 'github', version: 'v1.4.2' },
-      });
+      expect(apiPost).toHaveBeenCalledWith(
+        'api/firmware/flash',
+        { source: { kind: 'github', version: 'v1.4.2' } },
+        expect.objectContaining({ timeout: expect.any(Number) }),
+      );
       expect(store.phase).toBe('flashing');
       expect(store.flashError).toBeNull();
     });
 
     it("POSTs the upload source shape when sourceMode is 'upload'", async () => {
-      apiPost.mockResolvedValueOnce({ jobId: 'job-2' });
+      apiPost.mockResolvedValueOnce({ data: { jobId: 'job-2' } });
       const store = useFirmwareStore();
       store.controllers = sampleControllers;
       store.sourceMode = 'upload';
@@ -449,9 +451,23 @@ describe('firmware store', () => {
 
       await store.startFlash();
 
-      expect(apiPost).toHaveBeenCalledWith('api/firmware/flash', {
-        source: { kind: 'upload' },
-      });
+      expect(apiPost).toHaveBeenCalledWith(
+        'api/firmware/flash',
+        { source: { kind: 'upload' } },
+        expect.objectContaining({ timeout: expect.any(Number) }),
+      );
+      expect(store.phase).toBe('flashing');
+      expect(store.flashError).toBeNull();
+    });
+
+    it('clears a prior flashError when a retry POST succeeds', async () => {
+      apiPost.mockResolvedValueOnce({ data: { jobId: 'job-retry' } });
+      const store = readyStore();
+      store.flashError = { reason: 'job_already_running', currentJobId: 'job-x' };
+
+      await store.startFlash();
+
+      expect(store.flashError).toBeNull();
       expect(store.phase).toBe('flashing');
     });
 
