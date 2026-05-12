@@ -76,6 +76,42 @@
       "role_padawan": "PADAWAN",
       "figure_aria_label": "Firmware update topology — master receives the file then forwards to padawan controllers over ESP-NOW",
       "node_title": "{label} ({role})"
+    },
+    "controllers": {
+      "eyebrow_title": "CONTROLLERS",
+      "select_all": "Select all",
+      "clear": "Clear",
+      "master_pill": "Master",
+      "downgrade_pill": "DOWNGRADE",
+      "up_to_date_suffix": "· up to date",
+      "status_dot_aria": "{label} is {status}",
+      "status_up": "online",
+      "status_down": "offline",
+      "status_needs_synced": "needs sync",
+      "row_select_aria": "Select {label} for firmware update",
+      "pill": {
+        "idle": "Idle",
+        "queued": "Queued",
+        "updating": "Updating",
+        "done": "Done",
+        "failed": "Failed",
+        "up_to_date": "Up to date",
+        "offline": "Offline",
+        "downgrade": "Downgrade"
+      },
+      "action_bar": {
+        "no_source": "Pick a source",
+        "no_selection": "Pick at least one controller",
+        "push_summary": "Will push {target} to {count} controller(s)",
+        "downgrade_blocked": "⛔ Downgrade blocked",
+        "flash_button": "Flash firmware"
+      },
+      "result_bar": {
+        "all_updated": "✓ All {count} controller(s) updated",
+        "failed_summary": "⚠ {label} failed during {stage}",
+        "view_logs": "View logs",
+        "done": "Done"
+      }
     }
   },
   "placeholder": {

@@ -9,7 +9,13 @@ vi.mock('@/api/apiService', () => ({
 
 import apiService from '@/api/apiService';
 import { useFirmwareStore } from '../firmware';
-import type { ReleaseInfo, ReleaseListResult } from '@/types/firmware';
+import type { FirmwareControllerView, ReleaseInfo, ReleaseListResult } from '@/types/firmware';
+
+const sampleControllers: FirmwareControllerView[] = [
+  { id: 'body', label: 'Body', glyph: 'B', current: 'v1.3.0', status: 'up', isMaster: true },
+  { id: 'core', label: 'Core', glyph: 'C', current: 'v1.4.0', status: 'up', isMaster: false },
+  { id: 'dome', label: 'Dome', glyph: 'D', current: 'v1.4.0', status: 'down', isMaster: false },
+];
 
 const apiGet = apiService.get as ReturnType<typeof vi.fn>;
 
@@ -155,6 +161,210 @@ describe('firmware store', () => {
       // Upload filename is preserved across mode switches per the design
       // handoff §Source toggle ("preserves their respective state").
       expect(store.uploadedFilename).toBe('custom-firmware.bin');
+    });
+  });
+
+  describe('target computed', () => {
+    it('returns the selected release tag in github mode', () => {
+      const store = useFirmwareStore();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      expect(store.target).toBe('v1.4.2');
+    });
+
+    it('returns null in github mode with no release selected', () => {
+      const store = useFirmwareStore();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = null;
+      expect(store.target).toBeNull();
+    });
+
+    it("returns 'local-build' sentinel in upload mode with a filename", () => {
+      const store = useFirmwareStore();
+      store.sourceMode = 'upload';
+      store.uploadedFilename = 'custom.bin';
+      expect(store.target).toBe('local-build');
+    });
+
+    it('returns null in upload mode with no file', () => {
+      const store = useFirmwareStore();
+      store.sourceMode = 'upload';
+      store.uploadedFilename = null;
+      expect(store.target).toBeNull();
+    });
+  });
+
+  describe('selection actions', () => {
+    it('toggle adds an id when absent and removes it when present', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+
+      store.toggle('body');
+      expect([...store.selectedControllerIds]).toEqual(['body']);
+      store.toggle('core');
+      expect([...store.selectedControllerIds].sort()).toEqual(['body', 'core']);
+      store.toggle('body');
+      expect([...store.selectedControllerIds]).toEqual(['core']);
+    });
+
+    it('toggle replaces the Set reference so Vue reactivity observes the change', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      const before = store.selectedControllerIds;
+      store.toggle('body');
+      expect(store.selectedControllerIds).not.toBe(before);
+    });
+
+    it('selectAll picks every online, non-downgrade controller', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+
+      const before = store.selectedControllerIds;
+      store.selectAll();
+      // Body (v1.3.0 → v1.4.2: upgrade, online) included.
+      // Core (v1.4.0 → v1.4.2: upgrade, online) included.
+      // Dome offline → excluded.
+      expect([...store.selectedControllerIds].sort()).toEqual(['body', 'core']);
+      expect(store.selectedControllerIds).not.toBe(before);
+    });
+
+    it('selectAll skips controllers whose current version is newer than target (downgrade)', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+
+      store.selectAll();
+      // Body (v1.3.0 → v1.3.5: upgrade, online) included.
+      // Core (v1.4.0 → v1.3.5: downgrade) excluded.
+      // Dome offline excluded.
+      expect([...store.selectedControllerIds]).toEqual(['body']);
+    });
+
+    it('clear empties the selection and replaces the Set reference', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.toggle('body');
+      store.toggle('core');
+      const before = store.selectedControllerIds;
+      store.clear();
+      expect(store.selectedControllerIds.size).toBe(0);
+      expect(store.selectedControllerIds).not.toBe(before);
+    });
+  });
+
+  describe('anyDowngradeBlocked', () => {
+    it('returns false when nothing is selected', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      expect(store.anyDowngradeBlocked).toBe(false);
+    });
+
+    it('returns true when a selected controller would downgrade', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.toggle('core'); // core is v1.4.0; v1.4.0 > v1.3.5
+      expect(store.anyDowngradeBlocked).toBe(true);
+    });
+
+    it('treats current === target as not a downgrade (boundary: cmp === 0)', () => {
+      // Pins the strict-inequality `cmp > 0` semantics in isDowngrade. A
+      // mutation to `cmp >= 0` would flag an equal version as a downgrade
+      // and this test would fail.
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.0';
+      store.toggle('core'); // core is v1.4.0; target is v1.4.0
+      expect(store.anyDowngradeBlocked).toBe(false);
+    });
+
+    it('treats a malformed current version as not a downgrade (NaN > 0 is false)', () => {
+      const store = useFirmwareStore();
+      store.controllers = [
+        {
+          id: 'weird',
+          label: 'Weird',
+          glyph: 'W',
+          current: 'not-a-version',
+          status: 'up',
+          isMaster: false,
+        },
+      ];
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('weird');
+      expect(store.anyDowngradeBlocked).toBe(false);
+    });
+  });
+
+  describe('controllers reconciler', () => {
+    it('prunes selected ids that no longer exist after controllers is reassigned', async () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.toggle('body');
+      store.toggle('core');
+      expect(store.selectedControllerIds.size).toBe(2);
+
+      // Reassign with dome removed and core renamed.
+      store.controllers = [
+        { id: 'body', label: 'Body', glyph: 'B', current: 'v1.3.0', status: 'up', isMaster: true },
+      ];
+      // watch is async; flush via microtask.
+      await Promise.resolve();
+      expect([...store.selectedControllerIds]).toEqual(['body']);
+    });
+
+    it('does not touch the Set when no ids are orphaned', async () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.toggle('body');
+      const before = store.selectedControllerIds;
+      store.controllers = [...sampleControllers]; // new reference, same ids
+      await Promise.resolve();
+      expect(store.selectedControllerIds).toBe(before);
+    });
+  });
+
+  describe('canFlash', () => {
+    it('is false with no target', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.toggle('body');
+      expect(store.canFlash).toBe(false);
+    });
+
+    it('is false with target but no selection', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      expect(store.canFlash).toBe(false);
+    });
+
+    it('is true with target + at least one upgrade selection', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('body');
+      expect(store.canFlash).toBe(true);
+    });
+
+    it('is false with target + selection but any selected controller would downgrade', () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.toggle('body'); // upgrade
+      store.toggle('core'); // downgrade
+      expect(store.canFlash).toBe(false);
     });
   });
 });
