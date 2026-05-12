@@ -111,7 +111,64 @@
         "failed_summary": "⚠ {label} failed during {stage}",
         "view_logs": "View logs",
         "done": "Done"
+      },
+      "flash_error_banner": {
+        "title": "Flash failed to start",
+        "retry": "Try again",
+        "dismiss": "Dismiss"
       }
+    },
+    "stages": {
+      "eyebrow_title": "STAGES",
+      "in_progress": "IN PROGRESS",
+      "download": {
+        "label": "Download",
+        "hint": "Master receives file"
+      },
+      "transfer": {
+        "label": "Transfer",
+        "hint": "Forward to padawans"
+      },
+      "flash": {
+        "label": "Flash",
+        "hint": "Write firmware"
+      },
+      "verify": {
+        "label": "Verify",
+        "hint": "Checksum"
+      },
+      "reboot": {
+        "label": "Reboot",
+        "hint": "Restart"
+      }
+    },
+    "confirm_modal": {
+      "title": "Confirm firmware update",
+      "source_label": "Source",
+      "controllers_label": "Targets",
+      "power_warning": "Do not cut power to any selected controller until the update completes — interrupting a flash can leave a controller in a bricked state.",
+      "cancel": "Cancel",
+      "confirm": "Push firmware",
+      "delta_separator": "→"
+    },
+    "flash_errors": {
+      "invalid_body": "The request was malformed. This is a bug — please report it.",
+      "job_already_running": "Another flash job is already running. Wait for it to finish or cancel it before starting a new one.",
+      "job_already_running_with_id": "Flash job {jobId} is already running. Wait for it to finish or cancel it before starting a new one.",
+      "no_controllers": "No controllers were selected. Pick at least one before flashing.",
+      "variant_mismatch": "The selected release doesn't include a firmware variant for one or more of the selected controllers.",
+      "variant_unknown": "One of the selected controllers reports a variant the server doesn't recognize.",
+      "release_not_found": "The selected release could not be found on GitHub. Try refreshing the release list.",
+      "asset_not_found": "The selected release exists but is missing a firmware asset for the selected controllers.",
+      "no_upload": "Upload mode is selected but no firmware file has been uploaded yet.",
+      "release_lookup_failed": "Couldn't reach GitHub to fetch the release. Check the server's internet connection and try again.",
+      "source_resolution_failed": "Couldn't fetch the firmware binary from its source. Try again or pick a different release.",
+      "controllers_lookup_failed": "The server couldn't look up the selected controllers. Try again.",
+      "subscriber_attach_failed": "The server couldn't subscribe to deploy events. Try again or restart the server.",
+      "protocol_violation": "The serial protocol returned an unexpected message. Try again or restart the master controller.",
+      "streamer_unknown_error": "The firmware streamer failed with an unknown error. Try again.",
+      "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
+      "network_error": "Couldn't reach the server. Check your network connection and try again."
     }
   },
   "placeholder": {

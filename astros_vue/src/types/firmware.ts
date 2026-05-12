@@ -54,3 +54,37 @@ export type FirmwareStatusPillKind =
   | 'upToDate'
   | 'offline'
   | 'downgrade';
+
+export type FirmwarePhase = 'idle' | 'select' | 'flashing' | 'done' | 'failed';
+
+export type FirmwareStage = 'download' | 'transfer' | 'flash' | 'verify' | 'reboot';
+
+/**
+ * Subset of the server's FlashOrchestratorErrorReason that surfaces via the
+ * HTTP error response. Post-streamer failures (hash_mismatch,
+ * chunk_retry_exhausted, etc.) are deliberately omitted — those arrive on
+ * the WS surface, not via this envelope.
+ */
+export type FlashErrorReason =
+  | 'invalid_body'
+  | 'job_already_running'
+  | 'no_controllers'
+  | 'variant_mismatch'
+  | 'variant_unknown'
+  | 'release_not_found'
+  | 'asset_not_found'
+  | 'no_upload'
+  | 'release_lookup_failed'
+  | 'source_resolution_failed'
+  | 'controllers_lookup_failed'
+  | 'subscriber_attach_failed'
+  | 'protocol_violation'
+  | 'streamer_unknown_error'
+  | 'internal_server_error'
+  | 'network_error';
+
+export interface FlashErrorEnvelope {
+  reason: FlashErrorReason;
+  detail?: string;
+  currentJobId?: string;
+}

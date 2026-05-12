@@ -1,4 +1,6 @@
-export type TopologyPhase = 'idle' | 'select' | 'flashing' | 'done' | 'failed';
+import type { FirmwarePhase } from '@/types/firmware';
+
+export type TopologyPhase = FirmwarePhase;
 
 export interface TopologyController {
   id: string;

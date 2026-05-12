@@ -1,11 +1,15 @@
 import { computed, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
-import apiService from '@/api/apiService';
-import { FIRMWARE_RELEASES } from '@/api/endpoints';
+import apiService, { apiClient } from '@/api/apiService';
+import { FIRMWARE_FLASH, FIRMWARE_RELEASES } from '@/api/endpoints';
 import { compareTags } from '@/utils/version';
+import { mapHttpErrorToFlashEnvelope } from '@/utils/firmwareFlashError';
 import type {
   FirmwareControllerView,
+  FirmwarePhase,
   FirmwareSourceMode,
+  FirmwareStage,
+  FlashErrorEnvelope,
   ReleaseInfo,
   ReleaseListResult,
   ReleasesLoadState,
@@ -22,6 +26,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   const controllers = ref<FirmwareControllerView[]>([]);
   const selectedControllerIds = ref<ReadonlySet<string>>(new Set());
+
+  const phase = ref<FirmwarePhase>('idle');
+  const currentStage = ref<FirmwareStage | null>(null);
+  const flashError = ref<FlashErrorEnvelope | null>(null);
+  const failedController = ref<{ id: string; label: string; stage: FirmwareStage } | null>(null);
 
   // Reconcile selection against the fleet — when `controllers` is reassigned
   // (e.g. by a WS-driven refresh), prune any selected ids that no longer
@@ -86,6 +95,64 @@ export const useFirmwareStore = defineStore('firmware', () => {
     selectedControllerIds.value = new Set();
   }
 
+  function setPhase(next: FirmwarePhase): void {
+    phase.value = next;
+  }
+
+  function resetToSelect(): void {
+    phase.value = 'select';
+    currentStage.value = null;
+    flashError.value = null;
+    failedController.value = null;
+  }
+
+  function dismissError(): void {
+    flashError.value = null;
+  }
+
+  // 30s timeout on the flash POST. axios's default is no timeout — a hung
+  // backend would otherwise leave phase stuck at 'flashing' with no UI
+  // recovery short of a page refresh.
+  const FLASH_POST_TIMEOUT_MS = 30_000;
+
+  async function startFlash(): Promise<void> {
+    if (!canFlash.value || phase.value === 'flashing') return;
+    flashError.value = null;
+    const body =
+      sourceMode.value === 'github'
+        ? { source: { kind: 'github' as const, version: selectedReleaseTag.value } }
+        : { source: { kind: 'upload' as const } };
+    phase.value = 'flashing';
+    try {
+      // Direct apiClient call so we can attach a per-request timeout; the
+      // apiService.post wrapper doesn't expose the options bag.
+      await apiClient.post(FIRMWARE_FLASH, body, { timeout: FLASH_POST_TIMEOUT_MS });
+      // HTTP 200 only means orchestrator.start() resolved; per-controller stage
+      // progression, completion, and failure arrive on the WS surface. Until
+      // that dispatcher is wired in, phase stays 'flashing' until the operator
+      // resets.
+    } catch (error) {
+      // Direct apiClient.post bypasses apiService.post's console.error wrapper,
+      // so log here to preserve the dev breadcrumb for debugging real errors.
+      console.error('firmware.startFlash failed', error);
+      phase.value = 'select';
+      flashError.value = mapHttpErrorToFlashEnvelope(error);
+    }
+  }
+
+  async function cancelFlash(reason: string = 'operator'): Promise<void> {
+    try {
+      // Uses apiClient directly (not the apiService.delete wrapper) because
+      // the wrapper passes the second arg as `params`, not request body. The
+      // server reads `req.body?.reason`, so the body must transmit.
+      await apiClient.delete(FIRMWARE_FLASH, { data: { reason } });
+    } catch (error) {
+      // Best-effort: failure here is logged but doesn't transition phase — the
+      // WS surface owns post-cancel state truth.
+      console.warn('firmware.cancelFlash failed', error);
+    }
+  }
+
   async function fetchReleases(): Promise<void> {
     releasesLoadState.value = 'loading';
     try {
@@ -110,12 +177,21 @@ export const useFirmwareStore = defineStore('firmware', () => {
     uploadedFilename,
     controllers,
     selectedControllerIds,
+    phase,
+    currentStage,
+    flashError,
+    failedController,
     target,
     anyDowngradeBlocked,
     canFlash,
     toggle,
     selectAll,
     clear,
+    setPhase,
+    resetToSelect,
+    dismissError,
+    startFlash,
+    cancelFlash,
     fetchReleases,
   };
 });

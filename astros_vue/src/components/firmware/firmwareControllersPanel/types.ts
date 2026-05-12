@@ -1,6 +1,6 @@
-import type { FirmwareStatusPillKind } from '@/types/firmware';
+import type { FirmwarePhase, FirmwareStatusPillKind } from '@/types/firmware';
 
-export type ControllersPanelPhase = 'select' | 'flashing' | 'done' | 'failed';
+export type ControllersPanelPhase = Exclude<FirmwarePhase, 'idle'>;
 
 export interface ControllerProgressEntry {
   status: FirmwareStatusPillKind;

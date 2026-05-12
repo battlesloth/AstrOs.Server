@@ -29,3 +29,4 @@ export const REMOTE_CONFIG = 'api/remoteConfig';
 export const SYSTEM_STATUS = 'api/system/status';
 
 export const FIRMWARE_RELEASES = 'api/firmware/releases';
+export const FIRMWARE_FLASH = 'api/firmware/flash';

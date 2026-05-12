@@ -5,9 +5,13 @@ vi.mock('@/api/apiService', () => ({
   default: {
     get: vi.fn(),
   },
+  apiClient: {
+    post: vi.fn(),
+    delete: vi.fn(),
+  },
 }));
 
-import apiService from '@/api/apiService';
+import apiService, { apiClient } from '@/api/apiService';
 import { useFirmwareStore } from '../firmware';
 import type { FirmwareControllerView, ReleaseInfo, ReleaseListResult } from '@/types/firmware';
 
@@ -18,6 +22,8 @@ const sampleControllers: FirmwareControllerView[] = [
 ];
 
 const apiGet = apiService.get as ReturnType<typeof vi.fn>;
+const apiPost = apiClient.post as ReturnType<typeof vi.fn>;
+const apiDelete = apiClient.delete as ReturnType<typeof vi.fn>;
 
 const sampleReleases: ReleaseInfo[] = [
   {
@@ -56,6 +62,8 @@ describe('firmware store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     apiGet.mockReset();
+    apiPost.mockReset();
+    apiDelete.mockReset();
   });
 
   describe('initial state', () => {
@@ -365,6 +373,188 @@ describe('firmware store', () => {
       store.toggle('body'); // upgrade
       store.toggle('core'); // downgrade
       expect(store.canFlash).toBe(false);
+    });
+  });
+
+  describe('phase transitions', () => {
+    it("starts in 'idle'", () => {
+      const store = useFirmwareStore();
+      expect(store.phase).toBe('idle');
+    });
+
+    it('setPhase replaces the current phase', () => {
+      const store = useFirmwareStore();
+      store.setPhase('select');
+      expect(store.phase).toBe('select');
+      store.setPhase('flashing');
+      expect(store.phase).toBe('flashing');
+    });
+
+    it("resetToSelect clears currentStage, flashError, failedController and sets phase to 'select'", () => {
+      const store = useFirmwareStore();
+      store.setPhase('failed');
+      store.currentStage = 'transfer';
+      store.flashError = { reason: 'job_already_running' };
+      store.failedController = { id: 'core', label: 'Core', stage: 'transfer' };
+
+      store.resetToSelect();
+
+      expect(store.phase).toBe('select');
+      expect(store.currentStage).toBeNull();
+      expect(store.flashError).toBeNull();
+      expect(store.failedController).toBeNull();
+    });
+
+    it('dismissError clears flashError without changing phase', () => {
+      const store = useFirmwareStore();
+      store.setPhase('select');
+      store.flashError = { reason: 'release_not_found' };
+      store.dismissError();
+      expect(store.flashError).toBeNull();
+      expect(store.phase).toBe('select');
+    });
+  });
+
+  describe('startFlash', () => {
+    function readyStore() {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('body');
+      store.setPhase('select');
+      return store;
+    }
+
+    it("POSTs the github source shape and transitions to 'flashing' on 200", async () => {
+      apiPost.mockResolvedValueOnce({ data: { jobId: 'job-1' } });
+      const store = readyStore();
+
+      await store.startFlash();
+
+      expect(apiPost).toHaveBeenCalledWith(
+        'api/firmware/flash',
+        { source: { kind: 'github', version: 'v1.4.2' } },
+        expect.objectContaining({ timeout: 30_000 }),
+      );
+      expect(store.phase).toBe('flashing');
+      expect(store.flashError).toBeNull();
+    });
+
+    it("POSTs the upload source shape when sourceMode is 'upload'", async () => {
+      apiPost.mockResolvedValueOnce({ data: { jobId: 'job-2' } });
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'upload';
+      store.uploadedFilename = 'custom.bin';
+      store.toggle('body');
+
+      await store.startFlash();
+
+      expect(apiPost).toHaveBeenCalledWith(
+        'api/firmware/flash',
+        { source: { kind: 'upload' } },
+        expect.objectContaining({ timeout: 30_000 }),
+      );
+      expect(store.phase).toBe('flashing');
+      expect(store.flashError).toBeNull();
+    });
+
+    it('clears a prior flashError when a retry POST succeeds', async () => {
+      apiPost.mockResolvedValueOnce({ data: { jobId: 'job-retry' } });
+      const store = readyStore();
+      store.flashError = { reason: 'job_already_running', currentJobId: 'job-x' };
+
+      await store.startFlash();
+
+      expect(store.flashError).toBeNull();
+      expect(store.phase).toBe('flashing');
+    });
+
+    it('replaces a prior flashError when a retry POST fails with a different reason', async () => {
+      // Pins both that the prior envelope is cleared on retry AND that the
+      // new envelope reflects the latest failure (not the earlier one).
+      apiPost.mockRejectedValueOnce({
+        response: { status: 400, data: { error: 'release_not_found' } },
+      });
+      const store = readyStore();
+      store.flashError = { reason: 'job_already_running', currentJobId: 'job-x' };
+
+      await store.startFlash();
+
+      expect(store.flashError).toEqual({ reason: 'release_not_found' });
+    });
+
+    it("rolls phase back to 'select' and surfaces the error envelope on failure", async () => {
+      apiPost.mockRejectedValueOnce({
+        response: { status: 409, data: { error: 'job_already_running', currentJobId: 'job-x' } },
+      });
+      const store = readyStore();
+
+      await store.startFlash();
+
+      expect(store.phase).toBe('select');
+      expect(store.flashError).toEqual({
+        reason: 'job_already_running',
+        currentJobId: 'job-x',
+      });
+    });
+
+    it('surfaces network_error when the request never reaches the server', async () => {
+      apiPost.mockRejectedValueOnce(new Error('Network Error'));
+      const store = readyStore();
+
+      await store.startFlash();
+
+      expect(store.phase).toBe('select');
+      expect(store.flashError).toEqual({ reason: 'network_error' });
+    });
+
+    it('is a no-op when canFlash is false (e.g. no controllers selected)', async () => {
+      const store = useFirmwareStore();
+      store.controllers = sampleControllers;
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      // No selection.
+      await store.startFlash();
+      expect(apiPost).not.toHaveBeenCalled();
+      expect(store.phase).toBe('idle');
+    });
+
+    it("is a no-op when phase is already 'flashing' (double-click guard)", async () => {
+      const store = readyStore();
+      store.setPhase('flashing');
+      await store.startFlash();
+      expect(apiPost).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancelFlash', () => {
+    it('sends a DELETE with the provided reason in the request body', async () => {
+      apiDelete.mockResolvedValueOnce({ jobId: 'job-1', cancelled: true });
+      const store = useFirmwareStore();
+      await store.cancelFlash('operator-clicked-cancel');
+      expect(apiDelete).toHaveBeenCalledWith('api/firmware/flash', {
+        data: { reason: 'operator-clicked-cancel' },
+      });
+    });
+
+    it('defaults to reason="operator" when no reason is provided', async () => {
+      apiDelete.mockResolvedValueOnce({ jobId: 'job-1', cancelled: true });
+      const store = useFirmwareStore();
+      await store.cancelFlash();
+      expect(apiDelete).toHaveBeenCalledWith('api/firmware/flash', {
+        data: { reason: 'operator' },
+      });
+    });
+
+    it('swallows errors — cancel is best-effort and phase truth lives on WS', async () => {
+      apiDelete.mockRejectedValueOnce(new Error('network'));
+      const store = useFirmwareStore();
+      store.setPhase('flashing');
+      await store.cancelFlash();
+      // Did not throw; phase unchanged (WS dispatcher owns terminal state).
+      expect(store.phase).toBe('flashing');
     });
   });
 });
