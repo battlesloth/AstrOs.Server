@@ -24,12 +24,11 @@ function isAxiosLikeError(value: unknown): value is { response?: { data?: unknow
 }
 
 /**
- * Map an axios-style error thrown by `apiService.post(FIRMWARE_FLASH, ...)`
- * onto a `FlashErrorEnvelope` the UI can render via i18n keys.
+ * Map an axios-style error thrown by the flash POST onto a FlashErrorEnvelope.
  *
  * No-response → `network_error`. Response with an unrecognized `error` field
  * → `internal_server_error`. Server's `currentJobId` is preserved for the
- * 409 case so the banner can mention which job is in flight.
+ * 409 case so the banner can name the in-flight job.
  */
 export function mapHttpErrorToFlashEnvelope(error: unknown): FlashErrorEnvelope {
   if (!isAxiosLikeError(error) || error.response === undefined) {

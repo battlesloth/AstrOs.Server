@@ -55,6 +55,8 @@ const selectedControllerList = computed<FirmwareControllerView[]>(() =>
 
 const failedControllerId = computed(() => failedController.value?.id);
 
+// Dev-only invariant warning. Surfaces wiring bugs in the controllers-store
+// adapter; production strips the block via Vite tree-shake.
 if (import.meta.env.DEV) {
   watchEffect(() => {
     if (controllers.value.length > 0 && !controllers.value.some((c) => c.isMaster)) {

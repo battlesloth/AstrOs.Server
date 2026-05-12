@@ -435,7 +435,7 @@ describe('firmware store', () => {
       expect(apiPost).toHaveBeenCalledWith(
         'api/firmware/flash',
         { source: { kind: 'github', version: 'v1.4.2' } },
-        expect.objectContaining({ timeout: expect.any(Number) }),
+        expect.objectContaining({ timeout: 30_000 }),
       );
       expect(store.phase).toBe('flashing');
       expect(store.flashError).toBeNull();
@@ -454,7 +454,7 @@ describe('firmware store', () => {
       expect(apiPost).toHaveBeenCalledWith(
         'api/firmware/flash',
         { source: { kind: 'upload' } },
-        expect.objectContaining({ timeout: expect.any(Number) }),
+        expect.objectContaining({ timeout: 30_000 }),
       );
       expect(store.phase).toBe('flashing');
       expect(store.flashError).toBeNull();
@@ -469,6 +469,20 @@ describe('firmware store', () => {
 
       expect(store.flashError).toBeNull();
       expect(store.phase).toBe('flashing');
+    });
+
+    it('replaces a prior flashError when a retry POST fails with a different reason', async () => {
+      // Pins both that the prior envelope is cleared on retry AND that the
+      // new envelope reflects the latest failure (not the earlier one).
+      apiPost.mockRejectedValueOnce({
+        response: { status: 400, data: { error: 'release_not_found' } },
+      });
+      const store = readyStore();
+      store.flashError = { reason: 'job_already_running', currentJobId: 'job-x' };
+
+      await store.startFlash();
+
+      expect(store.flashError).toEqual({ reason: 'release_not_found' });
     });
 
     it("rolls phase back to 'select' and surfaces the error envelope on failure", async () => {
@@ -534,7 +548,7 @@ describe('firmware store', () => {
       });
     });
 
-    it('swallows errors — cancel is best-effort and phase truth lives on WS in d.6', async () => {
+    it('swallows errors — cancel is best-effort and phase truth lives on WS', async () => {
       apiDelete.mockRejectedValueOnce(new Error('network'));
       const store = useFirmwareStore();
       store.setPhase('flashing');

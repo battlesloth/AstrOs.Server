@@ -63,7 +63,7 @@ export type FirmwareStage = 'download' | 'transfer' | 'flash' | 'verify' | 'rebo
  * Subset of the server's FlashOrchestratorErrorReason that surfaces via the
  * HTTP error response. Post-streamer failures (hash_mismatch,
  * chunk_retry_exhausted, etc.) are deliberately omitted — those arrive on
- * the WS surface in d.6, not via this envelope.
+ * the WS surface, not via this envelope.
  */
 export type FlashErrorReason =
   | 'invalid_body'

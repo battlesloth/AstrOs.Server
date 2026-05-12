@@ -132,6 +132,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // that dispatcher is wired in, phase stays 'flashing' until the operator
       // resets.
     } catch (error) {
+      // Direct apiClient.post bypasses apiService.post's console.error wrapper,
+      // so log here to preserve the dev breadcrumb for debugging real errors.
+      console.error('firmware.startFlash failed', error);
       phase.value = 'select';
       flashError.value = mapHttpErrorToFlashEnvelope(error);
     }

@@ -12,6 +12,9 @@ const props = defineProps<{
 
 const { t } = useI18n();
 
+// Dev-only invariant warnings. Surface wiring bugs when the WS dispatcher
+// transitions phase before setting the stage pointer; production strips the
+// block via Vite tree-shake.
 if (import.meta.env.DEV) {
   watchEffect(() => {
     if (props.phase === 'flashing' && props.currentStage === null) {

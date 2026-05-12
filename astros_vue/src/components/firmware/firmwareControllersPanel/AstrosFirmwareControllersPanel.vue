@@ -20,11 +20,16 @@ const { controllers, selectedControllerIds, target, canFlash, anyDowngradeBlocke
   storeToRefs(firmware);
 
 const flashErrorMessage = computed(() => {
-  if (flashError.value === null) return null;
-  return t(`firmware_view.flash_errors.${flashError.value.reason}`, {
-    jobId: flashError.value.currentJobId ?? '',
-    detail: flashError.value.detail ?? '',
-  });
+  const err = flashError.value;
+  if (err === null) return null;
+  // The job_already_running key has a with-id variant that gracefully omits
+  // the parenthetical when the server doesn't include currentJobId.
+  if (err.reason === 'job_already_running' && err.currentJobId) {
+    return t('firmware_view.flash_errors.job_already_running_with_id', {
+      jobId: err.currentJobId,
+    });
+  }
+  return t(`firmware_view.flash_errors.${err.reason}`);
 });
 
 const rowMode = computed<'select' | 'progress'>(() =>

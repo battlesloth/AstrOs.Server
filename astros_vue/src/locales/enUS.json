@@ -153,7 +153,8 @@
     },
     "flash_errors": {
       "invalid_body": "The request was malformed. This is a bug — please report it.",
-      "job_already_running": "Flash job {jobId} is already running. Wait for it to finish or cancel it before starting a new one.",
+      "job_already_running": "Another flash job is already running. Wait for it to finish or cancel it before starting a new one.",
+      "job_already_running_with_id": "Flash job {jobId} is already running. Wait for it to finish or cancel it before starting a new one.",
       "no_controllers": "No controllers were selected. Pick at least one before flashing.",
       "variant_mismatch": "The selected release doesn't include a firmware variant for one or more of the selected controllers.",
       "variant_unknown": "One of the selected controllers reports a variant the server doesn't recognize.",

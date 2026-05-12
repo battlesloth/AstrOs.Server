@@ -99,13 +99,13 @@ export interface FlashErrorEnvelope {
 
 - [x] i18n keys: stages.*, confirm_modal.*, flash_errors.*, flash_error_banner.*.
 - [x] Types in `types/firmware.ts`: `FirmwarePhase`, `FirmwareStage`, `FlashErrorReason`, `FlashErrorEnvelope`. `FIRMWARE_FLASH` endpoint constant. **Consolidated:** `TopologyPhase = FirmwarePhase` and `ControllersPanelPhase = Exclude<FirmwarePhase, 'idle'>` — single source of truth.
-- [x] `firmwareStore`: phase/currentStage/flashError/failedController refs; setPhase/resetToSelect/dismissError/startFlash/cancelFlash actions. Initial phase is `'idle'`; transitions to `'select'` when `controllers.length > 0`. 15 unit tests cover phase transitions, body shapes, error mapping (incl. retry-clears-error), double-click guard, cancel default reason, swallow-on-error.
+- [x] `firmwareStore`: phase/currentStage/flashError/failedController refs; setPhase/resetToSelect/dismissError/startFlash/cancelFlash actions. Initial phase is `'idle'`; transitions to `'select'` when `controllers.length > 0`. Unit tests cover phase transitions, body shapes, error mapping (incl. retry-clears + retry-replaces), double-click guard, cancel default reason, swallow-on-error.
 - [x] `AstrosFirmwareStagesList` (+ `stageRowState` helper + 8 unit tests covering all 5 phase × 5 stage combos). Dev-warn for null currentStage/failedStage in matching phases.
 - [x] `AstrosFirmwareConfirmModal` — native `<dialog>` element + `.showModal()` provides focus trap, ESC, and focus restore for free. No hand-rolled focus sentinels needed. Click on backdrop = `event.target === dialog`. 3 stories.
 - [x] Flash error banner in `AstrosFirmwareControllersPanel` reads `firmwareStore.flashError`. `role="alert"` + `aria-live="polite"`. Wired `currentJobId` and `detail` through named i18n interpolation. `SelectWithFlashError` story.
 - [x] `FirmwareView.vue` page assembly: store-driven subtitle, two-column grid (380px / flex 1), single-column below 960px, dev-only fleet bootstrap, modal mount, dev-warn for missing master.
 - [x] Barrel: `AstrosFirmwareStagesList`, `AstrosFirmwareConfirmModal` + types.
-- [x] Pre-commit: format, lint, type-check, 116-test vitest run, per-commit code-reviewer agent — 0 Critical / 0 Important.
+- [x] Pre-commit: format, lint, type-check, full vitest run, per-commit code-reviewer agent — 0 Critical / 0 Important.
 - [x] Pre-push `/pr-review-toolkit:review-pr` 5-agent pass. 2 Critical (no axios timeout, fragile DELETE bypass) + ~10 Important addressed in a fixup commit before push.
 
 ---
@@ -135,26 +135,12 @@ Shipped using the native `<dialog>` element + `.showModal()`. The browser provid
 
 ### Flash POST flow
 
-```ts
-async function startFlash(): Promise<void> {
-  if (!canFlash.value) return; // defense in depth; button is also disabled
-  flashError.value = null;
-  const body = sourceMode.value === 'github'
-    ? { source: { kind: 'github', version: selectedReleaseTag.value } }
-    : { source: { kind: 'upload' } };
-  try {
-    setPhase('flashing');
-    await apiService.post(FIRMWARE_FLASH, body);
-    // Note: HTTP 200 means orchestrator.start() resolved; the WS dispatcher
-    // owns subsequent state. In d.5 with no WS wired, we stay in 'flashing'
-    // until the user manually resets — that's why d.5 only ships static
-    // story snapshots, not a running app preview.
-  } catch (error) {
-    setPhase('select');
-    flashError.value = mapHttpErrorToEnvelope(error);
-  }
-}
-```
+Shipped at `astros_vue/src/stores/firmware.ts:118-141`. Highlights:
+
+- Calls `apiClient.post(FIRMWARE_FLASH, body, { timeout: 30_000 })` directly (not `apiService.post`) so the per-request timeout option can attach. 30s timeout closes the "hung backend → forever flashing" hazard.
+- `flashError.value = null` and `phase.value = 'flashing'` set synchronously before the await, then on rejection the catch sets `phase.value = 'select'` and `flashError.value = mapHttpErrorToFlashEnvelope(error)`.
+- Double-click guard: returns early when `phase.value === 'flashing'` or `!canFlash.value`.
+- Catch block also `console.error`s the raw error for dev breadcrumb (the direct apiClient call bypasses apiService.post's auto-logging).
 
 `mapHttpErrorToFlashEnvelope` lives in `utils/firmwareFlashError.ts` (extracted to a pure module for unit-testability — same pattern as d.3's `strokeFor` and d.4's `selectModePillKind`). It:
 - Parses axios `error.response.status` + `error.response.data` into a `FlashErrorEnvelope`.
@@ -198,7 +184,7 @@ The mock is gated by `import.meta.env.DEV` — Vite strips the entire block in p
 ## Verification
 
 1. `npm run build` succeeds.
-2. `npx vitest run` — new tests for `firmwareStore` phase transitions, flash-error mapping, and `stageRowState` helper must pass; existing 89 tests keep passing.
+2. `npx vitest run` — new tests for `firmwareStore` phase transitions, flash-error mapping, and `stageRowState` helper must pass; existing tests keep passing.
 3. `npm run storybook` — visually confirm each new story:
    - `AstrosFirmwareStagesList`: `Idle`, `Flashing`, `Done`, `Failed`.
    - `AstrosFirmwareConfirmModal`: open, all three source variants render correctly; ESC + click-backdrop close; focus trap holds.
@@ -220,11 +206,11 @@ This PR touches **network I/O** (flash POST) and **modal lifecycle** (ConfirmMod
 
 | Hazard | Risk | Coverage |
 |---|---|---|
-| **Network**: POST /flash hangs forever | UI stuck in `flashing` with no recovery | axios timeout config (check existing apiService default); on timeout, set phase back to `select` with `network_error` envelope |
-| **Network**: POST returns unexpected payload shape | `mapHttpErrorToEnvelope` mis-classifies | helper falls back to `internal_server_error`; explicit unit test for malformed responses |
+| **Network**: POST /flash hangs forever | UI stuck in `flashing` with no recovery | 30s per-request `{ timeout }` on `apiClient.post`; mapper coerces `ECONNABORTED` (no response) → `network_error` envelope |
+| **Network**: POST returns unexpected payload shape | `mapHttpErrorToFlashEnvelope` mis-classifies | helper falls back to `internal_server_error` + `console.warn` with the unrecognized reason; explicit unit test |
 | **Concurrency**: User double-clicks Flash | Two POSTs in flight | `startFlash` returns early when `phase === 'flashing'`; button disabled while in flight; explicit test |
-| **Modal lifecycle**: ESC handler leaks after unmount | Memory leak / stray listener | listener attached/detached in `watchEffect` keyed on `open` prop; explicit unit test |
-| **Modal lifecycle**: Focus restore fails when trigger is unmounted | Focus stuck on body | `restoreFocus()` checks `triggerEl.isConnected` before refocusing |
+| **Modal lifecycle**: ESC handler leaks after unmount | Memory leak / stray listener | Native `<dialog>` element — no listener to leak; browser owns the handler lifecycle |
+| **Modal lifecycle**: Focus restore fails when trigger is unmounted | Focus stuck on body | Native `<dialog>.showModal()`/`.close()` handles focus restore; degrades gracefully on unmount |
 | **State**: User navigates away during `flashing` | View unmount discards phase state | acceptable — phase lives in Pinia store, survives route change; flash continues server-side |
 | **State**: Story Pinia setup leaks across renders | Stories show stale state | reuse the `setupStore()` pattern from d.4 stories (verified working) |
 
@@ -232,7 +218,7 @@ This PR touches **network I/O** (flash POST) and **modal lifecycle** (ConfirmMod
 
 ## Risks
 
-1. **Modal focus management** is hand-rolled. If `vue-focus-trap` (or similar) is already in deps, prefer it. Check `package.json` before writing manual implementation.
+1. **Modal a11y delegated to native `<dialog>.showModal()`.** Risk surface is browser-version-specific dialog quirks rather than implementation bugs.
 2. **`startFlash` HTTP error mapping** depends on the server returning a stable `error` field. The server controller is stable on develop (we just read it). Document any drift in the d.6 plan.
 3. **`phase` initial state.** Setting `phase = 'idle'` and transitioning to `'select'` in `FirmwareView.onMounted` couples the state machine to the view's lifecycle. If d.6 needs the store to enter `'flashing'` on cold-load with a job in flight (the late-join scenario from the master roadmap §"Late-join"), the store must be able to start in non-idle state. Mitigation: `fetchCurrentJob()` (d.6 work) is the natural place to set the initial phase from server state — d.5's idle→select transition is just the bootstrap path.
 4. **Dev fleet mock** could leak into prod if `import.meta.env.DEV` is mis-evaluated. Verify Vite strips the block in a production build (`npm run build`, then grep `dist/` for "Body / Core / Dome").
