@@ -518,6 +518,58 @@ describe('firmware store', () => {
       await store.startFlash();
       expect(apiPost).not.toHaveBeenCalled();
     });
+
+    it("re-asserts phase='flashing' if a malformed-WS rollback raced the pending POST", async () => {
+      // I5 race: useWebsocket.handleFlashJobStarted defensively calls
+      // setPhase('select') on a malformed WS payload. If that arrives during
+      // the POST window, the success path must re-assert 'flashing' so the
+      // UI reflects that the server actually accepted the job.
+      let resolvePost: (value: { data: { jobId: string } }) => void = () => {};
+      apiPost.mockReturnValueOnce(
+        new Promise((res) => {
+          resolvePost = res;
+        }),
+      );
+      const store = readyStore();
+
+      const inFlight = store.startFlash();
+      // Mid-flight: simulate the malformed-WS rollback.
+      store.setPhase('select');
+      store.flashError = {
+        reason: 'internal_server_error',
+        detail: 'Malformed flashJobStarted from server',
+      };
+
+      resolvePost({ data: { jobId: 'job-race' } });
+      await inFlight;
+
+      expect(store.phase).toBe('flashing');
+      expect(store.flashError).toBeNull();
+      expect(store.ownJobId).toBe('job-race');
+    });
+
+    it("preserves phase='done' if WS completion legitimately raced the pending POST", async () => {
+      // Negative side of the race-fix: if applyJobDone fired between the
+      // POST and the response (legitimate fast-flash), we must NOT clobber
+      // 'done' by re-asserting 'flashing'. The re-assertion only fires when
+      // phase has dropped to 'select'.
+      let resolvePost: (value: { data: { jobId: string } }) => void = () => {};
+      apiPost.mockReturnValueOnce(
+        new Promise((res) => {
+          resolvePost = res;
+        }),
+      );
+      const store = readyStore();
+
+      const inFlight = store.startFlash();
+      store.setPhase('done');
+
+      resolvePost({ data: { jobId: 'job-fast' } });
+      await inFlight;
+
+      expect(store.phase).toBe('done');
+      expect(store.ownJobId).toBe('job-fast');
+    });
   });
 
   describe('cancelFlash', () => {
@@ -918,6 +970,71 @@ describe('firmware store', () => {
       // applyJobStarted in production would follow; simulate it here.
       store.applyJobStarted(sampleJobState({ jobId: 'job-mine' }));
       expect(store.isOwnJob).toBe(true);
+    });
+  });
+
+  describe('progressByControllerId', () => {
+    it('emits an entry per controller with status; stageLabelKey is an i18n key path (not a literal label)', () => {
+      // The panel passes stageLabelKey to AstrosFirmwareControllerRow which
+      // resolves it with t(). If we leak a literal label like "Transfer" the
+      // row renders the raw English even on a non-en locale. The key must be
+      // a dotted path under firmware_view.stages.*.label.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
+
+      const map = store.progressByControllerId;
+      expect(map).toHaveProperty('body');
+      expect(map.body?.status).toBeDefined();
+      // SENDING guarantees controllerStageLabelKey returns a key, so this
+      // assertion is unconditional — a future regression where SENDING starts
+      // returning null would surface here instead of silently passing through
+      // a conditional guard. The dotted-path shape pins the producer/consumer
+      // contract so a literal label like "Transfer" can't slip through.
+      expect(map.body?.stageLabelKey).toMatch(/^firmware_view\.stages\.[a-z_]+\.label$/);
+    });
+
+    it('omits stageLabelKey for terminal states (done / failed) — only "updating" gets a stage label', () => {
+      // Mutation guard: a previous bug surfaced a stage label on done rows
+      // because controllerStageLabelKey wasn't checked against status. Pin
+      // the rule: the row's <span v-if="status === 'updating' && stageLabelKey">
+      // depends on this absence.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'VERSION_CONFIRMED',
+        finalVersion: 'v1.4.2',
+      });
+
+      const entry = store.progressByControllerId.body;
+      expect(entry?.status).toBe('done');
+      expect(entry?.stageLabelKey).toBeUndefined();
+    });
+  });
+
+  describe('controllers computed reactivity', () => {
+    it('re-derives FirmwareControllerView entries when controllerStore.bodyStatus flips mid-flow', async () => {
+      // Pins reactivity: the firmware view's row badges (up / down / needs-
+      // synced) are read off the controllerStore but exposed via the firmware
+      // store's `controllers` computed. If the computed didn't depend on the
+      // status refs, a real-time POLL_ACK -> DOWN transition would leave the
+      // row stuck at "up" until a page refresh.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      const before = store.controllers.find((c) => c.id === 'body');
+      expect(before?.status).toBe('up');
+
+      const { useControllerStore } = await import('@/stores/controller');
+      const { ControllerStatus } = await import('@/enums');
+      const controllerStore = useControllerStore();
+      controllerStore.bodyStatus = ControllerStatus.DOWN;
+
+      const after = store.controllers.find((c) => c.id === 'body');
+      expect(after?.status).toBe('down');
     });
   });
 });

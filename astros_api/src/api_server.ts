@@ -919,6 +919,7 @@ export class ApiServer {
         success: true,
         message: '',
         controllerId: controller.id,
+        controllerAddress: val.controller.address,
         controllerLocation: location.locationName,
         up: true,
         synced: val.controller.fingerprint === location.configFingerprint,

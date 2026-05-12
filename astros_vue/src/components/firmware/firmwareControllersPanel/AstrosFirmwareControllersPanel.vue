@@ -116,7 +116,7 @@ const actionBarMessage = computed(() => {
           :mode="rowMode"
           :selected="selectedControllerIds.has(c.id)"
           :progress-status="progressByControllerId?.[c.id]?.status"
-          :stage-label="progressByControllerId?.[c.id]?.stageLabel"
+          :stage-label-key="progressByControllerId?.[c.id]?.stageLabelKey"
           @toggle="firmware.toggle"
         />
       </li>

@@ -10,6 +10,6 @@ export interface ControllerRowProps {
   selected: boolean;
   /** Status pill shown in `progress` mode. */
   progressStatus?: FirmwareStatusPillKind;
-  /** Stage label rendered under the status pill in `progress` mode when updating. */
-  stageLabel?: string;
+  /** i18n key path for the stage label rendered under the status pill in `progress` mode when updating. */
+  stageLabelKey?: string;
 }

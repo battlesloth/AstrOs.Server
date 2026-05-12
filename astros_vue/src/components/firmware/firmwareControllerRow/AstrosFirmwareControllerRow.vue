@@ -94,9 +94,9 @@ function onCheckboxChange() {
       <template v-else-if="progressStatus">
         <AstrosFirmwareStatusPill :kind="progressStatus" />
         <span
-          v-if="progressStatus === 'updating' && stageLabel"
+          v-if="progressStatus === 'updating' && stageLabelKey"
           class="astros-firmware-controller-row__stage"
-          >{{ stageLabel }}</span
+          >{{ t(stageLabelKey) }}</span
         >
       </template>
     </div>

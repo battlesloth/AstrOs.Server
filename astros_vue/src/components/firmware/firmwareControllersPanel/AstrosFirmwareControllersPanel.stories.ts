@@ -136,7 +136,7 @@ export const Flashing: Story = {
   args: {
     phase: 'flashing',
     progressByControllerId: {
-      body: { status: 'updating', stageLabel: 'Transfer' },
+      body: { status: 'updating', stageLabelKey: 'firmware_view.stages.transfer.label' },
       core: { status: 'queued' },
       dome: { status: 'idle' },
     },

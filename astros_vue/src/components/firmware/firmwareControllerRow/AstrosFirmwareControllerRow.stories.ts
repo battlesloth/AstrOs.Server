@@ -84,7 +84,7 @@ export const ProgressModeUpdating: Story = {
     mode: 'progress',
     selected: true,
     progressStatus: 'updating',
-    stageLabel: 'Transfer',
+    stageLabelKey: 'firmware_view.stages.transfer.label',
   },
 };
 

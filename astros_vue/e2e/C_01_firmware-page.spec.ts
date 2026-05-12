@@ -43,6 +43,6 @@ test.describe('Firmware Page', () => {
   // NOTE: Driving a full flash flow (POST → WS-driven phase progression →
   // result bar) requires a WS-mock infrastructure that doesn't exist yet
   // in this codebase. Phase progression + apply* handlers are covered by
-  // 151 vitest tests; the full operator flow is covered by the manual QA
+  // 171 vitest tests; the full operator flow is covered by the manual QA
   // plan at `.docs/qa/firmware-ota-flash-ui.md`.
 });

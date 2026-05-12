@@ -64,24 +64,35 @@ export type FirmwareStage = 'download' | 'transfer' | 'flash' | 'verify' | 'rebo
  * HTTP error response. Post-streamer failures (hash_mismatch,
  * chunk_retry_exhausted, etc.) are deliberately omitted — those arrive on
  * the WS surface, not via this envelope.
+ *
+ * The tuple is the single source of truth: the `FlashErrorReason` union is
+ * derived from it, and `KNOWN_FLASH_ERROR_REASONS` is the corresponding
+ * runtime Set — both stay in sync because both come from this one list.
  */
-export type FlashErrorReason =
-  | 'invalid_body'
-  | 'job_already_running'
-  | 'no_controllers'
-  | 'variant_mismatch'
-  | 'variant_unknown'
-  | 'release_not_found'
-  | 'asset_not_found'
-  | 'no_upload'
-  | 'release_lookup_failed'
-  | 'source_resolution_failed'
-  | 'controllers_lookup_failed'
-  | 'subscriber_attach_failed'
-  | 'protocol_violation'
-  | 'streamer_unknown_error'
-  | 'internal_server_error'
-  | 'network_error';
+export const FLASH_ERROR_REASONS = [
+  'invalid_body',
+  'job_already_running',
+  'no_controllers',
+  'variant_mismatch',
+  'variant_unknown',
+  'release_not_found',
+  'asset_not_found',
+  'no_upload',
+  'release_lookup_failed',
+  'source_resolution_failed',
+  'controllers_lookup_failed',
+  'subscriber_attach_failed',
+  'protocol_violation',
+  'streamer_unknown_error',
+  'internal_server_error',
+  'network_error',
+] as const;
+
+export type FlashErrorReason = (typeof FLASH_ERROR_REASONS)[number];
+
+export const KNOWN_FLASH_ERROR_REASONS: ReadonlySet<FlashErrorReason> = new Set(
+  FLASH_ERROR_REASONS,
+);
 
 export interface FlashErrorEnvelope {
   reason: FlashErrorReason;

@@ -66,7 +66,7 @@
       "release_option_prerelease_suffix": "(pre-release)",
       "label_select_release": "Select release",
       "label_upload_file": "Upload firmware file",
-      "releases_load_error": "Failed to load releases. Try again.",
+      "releases_load_error": "Failed to load releases.",
       "releases_stale_warning": "Showing cached releases — couldn't reach GitHub since {since}.",
       "releases_loading": "Loading releases…"
     },

@@ -4,7 +4,11 @@ import apiService, { apiClient } from '@/api/apiService';
 import { FIRMWARE_FLASH, FIRMWARE_RELEASES } from '@/api/endpoints';
 import { compareTags } from '@/utils/version';
 import { mapHttpErrorToFlashEnvelope } from '@/utils/firmwareFlashError';
-import { controllerStatePillKind, mapServerStageToUiStage } from '@/utils/firmwareStageMapping';
+import {
+  controllerStageLabelKey,
+  controllerStatePillKind,
+  mapServerStageToUiStage,
+} from '@/utils/firmwareStageMapping';
 import { useControllerStore } from '@/stores/controller';
 import { ControllerStatus } from '@/enums';
 import type {
@@ -22,29 +26,7 @@ import type {
   ReleaseListResult,
   ReleasesLoadState,
 } from '@/types/firmware';
-
-// Recognized server-side flash error reasons. Used by applyJobFailed to
-// validate the WS payload's `reason` field before surfacing it to the UI —
-// unrecognized strings fall back to internal_server_error rather than
-// rendering as a missing-i18n-key path.
-const KNOWN_FLASH_ERROR_REASONS: ReadonlySet<FlashErrorReason> = new Set<FlashErrorReason>([
-  'invalid_body',
-  'job_already_running',
-  'no_controllers',
-  'variant_mismatch',
-  'variant_unknown',
-  'release_not_found',
-  'asset_not_found',
-  'no_upload',
-  'release_lookup_failed',
-  'source_resolution_failed',
-  'controllers_lookup_failed',
-  'subscriber_attach_failed',
-  'protocol_violation',
-  'streamer_unknown_error',
-  'internal_server_error',
-  'network_error',
-]);
+import { KNOWN_FLASH_ERROR_REASONS } from '@/types/firmware';
 
 // Master designation: Body is the ESP-NOW sentinel master per project
 // convention (see `project_master_esp_sentinel_mac` memory). If this ever
@@ -346,6 +328,17 @@ export const useFirmwareStore = defineStore('firmware', () => {
       if (responseBody?.jobId) {
         ownJobId.value = responseBody.jobId;
       }
+      // POST succeeded → the server has accepted the job. If a malformed-WS
+      // flashJobStarted arrived during the POST window, its handler rolled
+      // phase back to 'select' (useWebsocket.handleFlashJobStarted). Re-
+      // assert 'flashing' so the UI matches reality. Legitimate transitions
+      // during this window are 'done' or 'failed' (terminal) — never 'select'.
+      // The cast widens past TS's post-assignment narrowing — a WS handler
+      // can mutate the ref across the await boundary, but TS can't see that.
+      if ((phase.value as FirmwarePhase) === 'select') {
+        phase.value = 'flashing';
+        flashError.value = null;
+      }
       // From here on the WS surface owns phase transitions, per-controller
       // stage progression, completion, and failure. applyJobStarted is
       // idempotent so the matching WS event (which the server emits before
@@ -404,16 +397,22 @@ export const useFirmwareStore = defineStore('firmware', () => {
   }
 
   // Project the controllerStates Map into the shape the panel expects.
+  // `stageLabelKey` is an i18n key path (e.g. firmware_view.stages.transfer.label)
+  // that the row component resolves via t() — keeps localization out of the
+  // store and prevents the raw lowercase stage values from leaking to the UI.
   const progressByControllerId = computed(() => {
     const out: Record<
       string,
-      { status: ReturnType<typeof controllerStatePillKind>; stageLabel?: string }
+      {
+        status: ReturnType<typeof controllerStatePillKind>;
+        stageLabelKey?: string;
+      }
     > = {};
     for (const [id, state] of controllerStates.value) {
       out[id] = { status: controllerStatePillKind(state) };
-      const uiStage = mapServerStageToUiStage(state.stage);
-      if (uiStage !== null) {
-        out[id].stageLabel = uiStage;
+      const key = controllerStageLabelKey(state);
+      if (key !== null) {
+        out[id].stageLabelKey = key;
       }
     }
     return out;

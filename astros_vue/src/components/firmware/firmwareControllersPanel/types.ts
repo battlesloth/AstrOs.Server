@@ -4,8 +4,13 @@ export type ControllersPanelPhase = Exclude<FirmwarePhase, 'idle'>;
 
 export interface ControllerProgressEntry {
   status: FirmwareStatusPillKind;
-  /** Stage label shown under the status pill when status === 'updating'. */
-  stageLabel?: string;
+  /**
+   * i18n key path (e.g. `firmware_view.stages.transfer.label`) for the
+   * stage label shown under the status pill when status === 'updating'.
+   * The row component resolves this via t() — keeps localization at the
+   * consumer rather than the producer.
+   */
+  stageLabelKey?: string;
 }
 
 export interface ControllersPanelProps {

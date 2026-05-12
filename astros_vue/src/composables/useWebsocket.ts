@@ -181,9 +181,11 @@ export function useWebsocket() {
           break;
       }
       // Learn the MAC↔location mapping so the firmware view can translate
-      // WS `controllerId` (MAC) back to a slot for the progress projection.
-      if (data.controllerId) {
-        controllerStore.setControllerMac(data.controllerLocation, data.controllerId);
+      // FlashJobState's `controllerId` (MAC) back to a slot for the progress
+      // projection. The LocationStatus `controllerId` is a DB UUID — the
+      // MAC lives on `controllerAddress`.
+      if (data.controllerAddress) {
+        controllerStore.setControllerMac(data.controllerLocation, data.controllerAddress);
       }
     } catch (error) {
       console.error('Error handling status message:', error);

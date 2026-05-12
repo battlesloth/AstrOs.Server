@@ -215,20 +215,20 @@ Tooltip key: prefer `firmware_view.lock_active` when only `jobLock.locked`; exis
 
 ## Tasks
 
-- [ ] Mirror server types (`ServerFwStage`, `ControllerFlashState`, `FlashJobState`, `FlashJobFailedData`) into `types/firmware.ts`. Cross-reference comment at top pointing at the server file.
-- [ ] Add `FLASH_JOB_ACTIVE = 11` through `FLASH_JOB_FAILED = 16` to `WebsocketMessageType` enum. Cross-reference comment.
-- [ ] Implement `utils/firmwareStageMapping.ts` (`mapServerStageToUiStage` + `controllerStatePillKind`) with full unit-test coverage.
-- [ ] Extend `firmwareStore`: add `currentJob`, `controllerStates`, `ownJobId` refs; turn `controllers` into a `computed` over `useControllerStore()` (replaces the d.5 ref and `DEV_SAMPLE_FLEET` bootstrap); add `applyJobStarted/applyControllerUpdate/applyControllerResult/applyJobDone/applyJobFailed` actions; add `fetchCurrentJob`; update `startFlash` to capture `ownJobId` from the POST response and to NOT manage phase directly (WS owns phase from `flashing` onward). Comprehensive unit tests for each handler + idempotency + replace-not-merge + the **5 FMI hazards** below.
-- [ ] Update `useWebsocket.ts` `handleMessage` switch with 5 new cases; new `handleFlashJobStarted` / `handleFlashControllerUpdate` / `handleFlashControllerResult` / `handleFlashJobDone` / `handleFlashJobFailed` functions following the existing try/catch pattern.
-- [ ] Extend `AstrosWriteButton.vue` to OR-in `useJobLockStore().locked`. Update tooltip key resolution. Update existing 9 tests if needed, add 3 new for jobLock-only / both-active / neither cases.
-- [ ] Add lock banner to `AstrosLayout.vue` — sibling component or inline. New i18n key. Verify it doesn't double up with the system-status banner when both readonly + locked.
-- [ ] Update `FirmwareView.vue`: drop `DEV_SAMPLE_FLEET`, drop the `onMounted` bootstrap (controllers now come from the computed), add `fetchCurrentJob` on mount, add lock-conflict alert section that renders when `lockStore.locked && !isOwnJob`.
-- [ ] Update `ControllersPanel` consumer of `progressByControllerId` — d.5 took this as a prop; d.6 reads it from `firmwareStore.controllerStates`. Either keep the prop (parent maps store→prop) or read from store directly. **Decision in plan**: keep the prop, with `FirmwareView` mapping the store's `controllerStates` Map → `Record<id, { status, stageLabel }>`. Less store coupling at the leaf.
-- [ ] Update i18n: `firmware_view.lock_active` (button tooltip), `firmware_view.lock_banner` (layout banner), `firmware_view.lock_conflict` (FirmwareView alert).
-- [ ] Implement Playwright spec `astros_vue/tests/e2e/firmware-flash.spec.ts` covering the full operator flow + late-join + lock-conflict variants. Add a `tests/e2e/_helpers/mockFirmwareWs.ts` helper for emitting the WS event sequence.
-- [ ] Replace dev-only fleet warning in `FirmwareView` (no-master warn) with a permanent assertion — if the controllers-store yields no master, something is genuinely broken.
-- [ ] Pre-commit gates: format, lint, type-check, vitest, per-commit `pr-review-toolkit:code-reviewer` agent.
-- [ ] Pre-push `/pr-review-toolkit:review-pr` 5-agent pass (mandatory per CLAUDE.md and required per roadmap for d.6).
+- [x] Mirror server types (`ServerFwStage`, `ControllerFlashState`, `FlashJobState`, `FlashJobFailedData`) into `types/firmware.ts`. Cross-reference comment at top pointing at the server file.
+- [x] Add `FLASH_JOB_ACTIVE = 11` through `FLASH_JOB_FAILED = 16` to `WebsocketMessageType` enum. Cross-reference comment.
+- [x] Implement `utils/firmwareStageMapping.ts` (`mapServerStageToUiStage` + `controllerStatePillKind`) with full unit-test coverage.
+- [x] Extend `firmwareStore`: add `currentJob`, `controllerStates`, `ownJobId` refs; turn `controllers` into a `computed` over `useControllerStore()` (replaces the d.5 ref and `DEV_SAMPLE_FLEET` bootstrap); add `applyJobStarted/applyControllerUpdate/applyControllerResult/applyJobDone/applyJobFailed` actions; add `fetchCurrentJob`; update `startFlash` to capture `ownJobId` from the POST response and to NOT manage phase directly (WS owns phase from `flashing` onward). Comprehensive unit tests for each handler + idempotency + replace-not-merge + the **5 FMI hazards** below.
+- [x] Update `useWebsocket.ts` `handleMessage` switch with 5 new cases; new `handleFlashJobStarted` / `handleFlashControllerUpdate` / `handleFlashControllerResult` / `handleFlashJobDone` / `handleFlashJobFailed` functions following the existing try/catch pattern.
+- [x] Extend `AstrosWriteButton.vue` to OR-in `useJobLockStore().locked`. Update tooltip key resolution. Update existing 9 tests if needed, add 3 new for jobLock-only / both-active / neither cases.
+- [x] Add lock banner to `AstrosLayout.vue` — sibling component or inline. New i18n key. Verify it doesn't double up with the system-status banner when both readonly + locked.
+- [x] Update `FirmwareView.vue`: drop `DEV_SAMPLE_FLEET`, drop the `onMounted` bootstrap (controllers now come from the computed), add `fetchCurrentJob` on mount, add lock-conflict alert section that renders when `lockStore.locked && !isOwnJob`.
+- [x] Update `ControllersPanel` consumer of `progressByControllerId` — d.5 took this as a prop; d.6 reads it from `firmwareStore.controllerStates`. Either keep the prop (parent maps store→prop) or read from store directly. **Decision in plan**: keep the prop, with `FirmwareView` mapping the store's `controllerStates` Map → `Record<id, { status, stageLabel }>`. Less store coupling at the leaf.
+- [x] Update i18n: `firmware_view.lock_active` (button tooltip), `firmware_view.lock_banner` (layout banner), `firmware_view.lock_conflict` (FirmwareView alert).
+- [x] Ship the e2e Playwright smoke spec for the firmware page (`e2e/C_01_firmware-page.spec.ts` — page renders, lock banner suppresses while own job runs, write actions disabled). **Scope deferred**: a full operator-flow / late-join / lock-conflict e2e variant requires a WS-mock harness that doesn't exist in the codebase yet; the gap is documented in the QA plan and `C_01_firmware-page.spec.ts:43-47` (the manual QA plan at `.docs/qa/firmware-ota-flash-ui.md` covers the full operator flow). Re-evaluate if a future PR introduces a WS-mock helper.
+- [x] Replace dev-only fleet warning in `FirmwareView` (no-master warn) with a permanent assertion — if the controllers-store yields no master, something is genuinely broken.
+- [x] Pre-commit gates: format, lint, type-check, vitest, per-commit `pr-review-toolkit:code-reviewer` agent.
+- [x] Pre-push `/pr-review-toolkit:review-pr` 5-agent pass (mandatory per CLAUDE.md and required per roadmap for d.6).
 
 ---
 
