@@ -196,21 +196,11 @@ Tooltip key: prefer `firmware_view.lock_active` when only `jobLock.locked`; exis
 
 **`FirmwareView.vue`** — when `jobLock.locked && !isOwnJob`, render a `role="alert"` region above the SourceStrip with the lock owner and a "Try again later" hint. The Flash button is already disabled via the AstrosWriteButton extension; the alert just explains why.
 
-### E2E test (`tests/e2e/firmware-flash.spec.ts`)
+### E2E test (`e2e/C_01_firmware-page.spec.ts`)
 
-One Playwright spec:
-1. Launch dev server.
-2. Stub WS connection to emit a controlled sequence.
-3. Navigate to `/firmware`.
-4. Pick a release, select Body, click Flash → confirm modal opens.
-5. Confirm → expect POST to `/api/firmware/flash` (intercepted).
-6. Emit `flashJobStarted` → expect Topology/StagesList visible, phase `flashing`.
-7. Emit `flashControllerUpdate` with stage `UPLOADING_TO_MASTER` → expect StagesList shows `download` current.
-8. Emit `flashControllerResult` with stage `VERSION_CONFIRMED` → no row state change yet.
-9. Emit `flashJobDone` → expect result bar shows "All N controller(s) updated".
-10. Click Done → expect phase back to `select`, controllerStates cleared.
+**Scope shipped:** smoke spec covering page-chrome rendering, source-strip toggle visibility, controllers-panel header (Select all / Clear), and Flash-button initial disabled state. No WS-driven phase progression — that requires a WS-mock infrastructure the project doesn't have yet.
 
-Plus one variant: emit `flashJobStarted` BEFORE the user clicks Flash (simulating late-join while another operator's flash is in flight) → expect lock-conflict alert + Flash button disabled.
+**Coverage substitute:** the 5 `apply*` handlers, late-join idempotency, replace-not-merge, and lock-conflict logic are exhaustively covered by 21 new vitest tests in `firmware.spec.ts`. The end-to-end operator flow (cold-load, happy-path, failure path, late-join, lock-conflict, WS reconnect, network failure, reduced-motion, dev-warns) lives in the manual QA plan at `.docs/qa/firmware-ota-flash-ui.md` (12 scenarios).
 
 ---
 

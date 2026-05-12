@@ -1,19 +1,55 @@
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import apiService, { apiClient } from '@/api/apiService';
 import { FIRMWARE_FLASH, FIRMWARE_RELEASES } from '@/api/endpoints';
 import { compareTags } from '@/utils/version';
 import { mapHttpErrorToFlashEnvelope } from '@/utils/firmwareFlashError';
+import { controllerStatePillKind, mapServerStageToUiStage } from '@/utils/firmwareStageMapping';
+import { useControllerStore } from '@/stores/controller';
+import { ControllerStatus } from '@/enums';
 import type {
+  ControllerFlashState,
+  ControllerOnlineStatus,
   FirmwareControllerView,
   FirmwarePhase,
   FirmwareSourceMode,
   FirmwareStage,
   FlashErrorEnvelope,
+  FlashJobFailedData,
+  FlashJobState,
   ReleaseInfo,
   ReleaseListResult,
   ReleasesLoadState,
 } from '@/types/firmware';
+
+// Master designation: Body is the ESP-NOW sentinel master per project
+// convention (see `project_master_esp_sentinel_mac` memory). If this ever
+// flips, the firmware side has to flip first — keep cross-referenced.
+const FLEET_LAYOUT: ReadonlyArray<{
+  id: string;
+  label: string;
+  glyph: string;
+  isMaster: boolean;
+}> = [
+  { id: 'body', label: 'Body', glyph: 'B', isMaster: true },
+  { id: 'core', label: 'Core', glyph: 'C', isMaster: false },
+  { id: 'dome', label: 'Dome', glyph: 'D', isMaster: false },
+];
+
+function projectControllerStatus(status: ControllerStatus): ControllerOnlineStatus {
+  switch (status) {
+    case ControllerStatus.UP:
+      return 'up';
+    case ControllerStatus.DOWN:
+      return 'down';
+    case ControllerStatus.NEEDS_SYNCED:
+    case ControllerStatus.FIRMWARE_INCOMPATIBLE:
+      // FIRMWARE_INCOMPATIBLE collapses to needsSynced for the firmware-view
+      // flow — running the flash IS the sync. The pill copy is appropriate
+      // for both states (controller is reachable but needs operator action).
+      return 'needsSynced';
+  }
+}
 
 export const useFirmwareStore = defineStore('firmware', () => {
   const releases = ref<ReleaseInfo[]>([]);
@@ -24,7 +60,6 @@ export const useFirmwareStore = defineStore('firmware', () => {
   const selectedReleaseTag = ref<string | null>(null);
   const uploadedFilename = ref<string | null>(null);
 
-  const controllers = ref<FirmwareControllerView[]>([]);
   const selectedControllerIds = ref<ReadonlySet<string>>(new Set());
 
   const phase = ref<FirmwarePhase>('idle');
@@ -32,22 +67,43 @@ export const useFirmwareStore = defineStore('firmware', () => {
   const flashError = ref<FlashErrorEnvelope | null>(null);
   const failedController = ref<{ id: string; label: string; stage: FirmwareStage } | null>(null);
 
-  // Reconcile selection against the fleet — when `controllers` is reassigned
-  // (e.g. by a WS-driven refresh), prune any selected ids that no longer
-  // refer to a known controller. Prevents orphan ids from silently passing
-  // `canFlash` (size > 0) and skipping the downgrade check (find returns
-  // undefined → not blocked).
-  watch(controllers, (next) => {
-    if (selectedControllerIds.value.size === 0) return;
-    const known = new Set(next.map((c) => c.id));
-    const filtered = new Set<string>();
-    for (const id of selectedControllerIds.value) {
-      if (known.has(id)) filtered.add(id);
-    }
-    if (filtered.size !== selectedControllerIds.value.size) {
-      selectedControllerIds.value = filtered;
-    }
+  // WS-pushed state (d.6). Apply* handlers below are the sole writers.
+  const currentJob = ref<FlashJobState | null>(null);
+  const controllerStates = ref<ReadonlyMap<string, ControllerFlashState>>(new Map());
+  // Set by `startFlash` from the POST response so the UI can tell whether the
+  // active flash belongs to us vs. another operator (lock-conflict UI).
+  const ownJobId = ref<string | null>(null);
+
+  // Project the per-location controller store into a fleet shape the firmware
+  // view consumes. Replaces d.5's `ref<FirmwareControllerView[]>([])` and the
+  // FirmwareView dev-mock bootstrap. Reads are reactive through useControllerStore.
+  const controllers = computed<FirmwareControllerView[]>(() => {
+    const cs = useControllerStore();
+    const statusByLocation = {
+      body: cs.bodyStatus,
+      core: cs.coreStatus,
+      dome: cs.domeStatus,
+    } as const;
+    const firmwareByLocation = {
+      body: cs.bodyFirmware,
+      core: cs.coreFirmware,
+      dome: cs.domeFirmware,
+    } as const;
+    return FLEET_LAYOUT.map((slot) => ({
+      id: slot.id,
+      label: slot.label,
+      glyph: slot.glyph,
+      isMaster: slot.isMaster,
+      current: firmwareByLocation[slot.id as keyof typeof firmwareByLocation] ?? '—',
+      status: projectControllerStatus(statusByLocation[slot.id as keyof typeof statusByLocation]),
+    }));
   });
+
+  // Selection-vs-fleet reconciliation is unnecessary in d.6: the `controllers`
+  // computed projects a fixed FLEET_LAYOUT (body / core / dome) so orphan
+  // selected ids are structurally impossible. If FLEET_LAYOUT ever becomes
+  // dynamic (e.g. a new controller location is added), add a `watch` here
+  // that prunes selectedControllerIds against the current fleet.
 
   const target = computed<string | null>(() => {
     if (sourceMode.value === 'github') return selectedReleaseTag.value;
@@ -74,6 +130,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
   const canFlash = computed(
     () =>
       target.value !== null && selectedControllerIds.value.size > 0 && !anyDowngradeBlocked.value,
+  );
+
+  const isOwnJob = computed(
+    () => currentJob.value !== null && currentJob.value.jobId === ownJobId.value,
   );
 
   // Selection actions always replace the Set (not mutate in place) so Vue
@@ -104,11 +164,97 @@ export const useFirmwareStore = defineStore('firmware', () => {
     currentStage.value = null;
     flashError.value = null;
     failedController.value = null;
+    currentJob.value = null;
+    controllerStates.value = new Map();
+    ownJobId.value = null;
   }
 
   function dismissError(): void {
     flashError.value = null;
   }
+
+  // ---------- WS handlers (the sole writers of server-pushed fields) ----------
+
+  function buildControllerStatesMap(
+    states: ReadonlyArray<ControllerFlashState>,
+  ): ReadonlyMap<string, ControllerFlashState> {
+    const m = new Map<string, ControllerFlashState>();
+    for (const s of states) m.set(s.controllerId, s);
+    return m;
+  }
+
+  function applyJobStarted(data: FlashJobState): void {
+    // Idempotent + replace-not-merge: on duplicate (reconnect / late-join),
+    // overwrite controllerStates fully so stale entries can't survive.
+    // Snapshot regression hazard (snapshot lands after a more-recent
+    // applyControllerUpdate) is precluded by single-WS in-order delivery —
+    // the server emits flashJobStarted snapshots on connect, before any
+    // post-reconnect flashControllerUpdate.
+    currentJob.value = data;
+    controllerStates.value = buildControllerStatesMap(data.controllers);
+    if (phase.value !== 'flashing') phase.value = 'flashing';
+    flashError.value = null;
+    failedController.value = null;
+  }
+
+  function applyControllerUpdate(data: ControllerFlashState): void {
+    const next = new Map(controllerStates.value);
+    next.set(data.controllerId, data);
+    controllerStates.value = next;
+    const ui = mapServerStageToUiStage(data.stage);
+    if (ui !== null) currentStage.value = ui;
+  }
+
+  function applyControllerResult(payload: {
+    jobId: string;
+    controller: ControllerFlashState;
+  }): void {
+    applyControllerUpdate(payload.controller);
+  }
+
+  function applyJobDone(data: { jobId: string; endedAt: string }): void {
+    if (currentJob.value) {
+      currentJob.value = { ...currentJob.value, endedAt: data.endedAt };
+    }
+    phase.value = 'done';
+    currentStage.value = null;
+  }
+
+  function applyJobFailed(data: FlashJobFailedData): void {
+    // Pre-streamer failures (release_not_found, variant_mismatch, etc.)
+    // arrive without a prior flashJobStarted, so currentJob may be null.
+    // We deliberately do NOT synthesize a currentJob in that case — the
+    // operator's truth source for "no flash started" is the unchanged
+    // null currentJob; the failure surfaces via flashError below.
+    if (currentJob.value) {
+      currentJob.value = {
+        ...currentJob.value,
+        endedAt: data.endedAt,
+        abortReason: data.abortReason,
+      };
+    }
+    phase.value = 'failed';
+    flashError.value = {
+      reason: 'internal_server_error',
+      detail: data.detail,
+    };
+    // Find the controller that ended in FAILED; surface its label + UI stage.
+    for (const state of controllerStates.value.values()) {
+      if (state.stage === 'FAILED') {
+        const c = controllers.value.find((x) => x.id === state.controllerId);
+        const uiStage = mapServerStageToUiStage(state.stage) ?? currentStage.value ?? 'transfer';
+        failedController.value = {
+          id: state.controllerId,
+          label: c?.label ?? state.controllerId,
+          stage: uiStage,
+        };
+        break;
+      }
+    }
+    currentStage.value = null;
+  }
+
+  // ---------- HTTP actions ----------
 
   // 30s timeout on the flash POST. axios's default is no timeout — a hung
   // backend would otherwise leave phase stuck at 'flashing' with no UI
@@ -124,16 +270,20 @@ export const useFirmwareStore = defineStore('firmware', () => {
         : { source: { kind: 'upload' as const } };
     phase.value = 'flashing';
     try {
-      // Direct apiClient call so we can attach a per-request timeout; the
-      // apiService.post wrapper doesn't expose the options bag.
-      await apiClient.post(FIRMWARE_FLASH, body, { timeout: FLASH_POST_TIMEOUT_MS });
-      // HTTP 200 only means orchestrator.start() resolved; per-controller stage
-      // progression, completion, and failure arrive on the WS surface. Until
-      // that dispatcher is wired in, phase stays 'flashing' until the operator
-      // resets.
+      const response = await apiClient.post(FIRMWARE_FLASH, body, {
+        timeout: FLASH_POST_TIMEOUT_MS,
+      });
+      const responseBody = response.data as FlashJobState | undefined;
+      if (responseBody?.jobId) {
+        ownJobId.value = responseBody.jobId;
+      }
+      // From here on the WS surface owns phase transitions, per-controller
+      // stage progression, completion, and failure. applyJobStarted is
+      // idempotent so the matching WS event (which the server emits before
+      // the HTTP response resolves) is safe.
     } catch (error) {
-      // Direct apiClient.post bypasses apiService.post's console.error wrapper,
-      // so log here to preserve the dev breadcrumb for debugging real errors.
+      // Direct apiClient.post bypasses apiService.post's console.error
+      // wrapper, so log here to preserve the dev breadcrumb.
       console.error('firmware.startFlash failed', error);
       phase.value = 'select';
       flashError.value = mapHttpErrorToFlashEnvelope(error);
@@ -153,6 +303,22 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
   }
 
+  // Cold-load resync. Mounted views call this to populate currentJob from
+  // the server if a flash is already in flight (e.g., the operator refreshed
+  // the page mid-flash). The WS late-join snapshot follows on connect; both
+  // paths set the same data so applyJobStarted idempotency keeps state coherent.
+  async function fetchCurrentJob(): Promise<void> {
+    try {
+      const response = await apiClient.get(FIRMWARE_FLASH);
+      const body = response.data as FlashJobState | null;
+      if (body && body.jobId && currentJob.value === null) {
+        applyJobStarted(body);
+      }
+    } catch (error) {
+      console.warn('firmware.fetchCurrentJob failed', error);
+    }
+  }
+
   async function fetchReleases(): Promise<void> {
     releasesLoadState.value = 'loading';
     try {
@@ -168,6 +334,22 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
   }
 
+  // Project the controllerStates Map into the shape the panel expects.
+  const progressByControllerId = computed(() => {
+    const out: Record<
+      string,
+      { status: ReturnType<typeof controllerStatePillKind>; stageLabel?: string }
+    > = {};
+    for (const [id, state] of controllerStates.value) {
+      out[id] = { status: controllerStatePillKind(state) };
+      const uiStage = mapServerStageToUiStage(state.stage);
+      if (uiStage !== null) {
+        out[id].stageLabel = uiStage;
+      }
+    }
+    return out;
+  });
+
   return {
     releases,
     releasesLoadState,
@@ -181,17 +363,28 @@ export const useFirmwareStore = defineStore('firmware', () => {
     currentStage,
     flashError,
     failedController,
+    currentJob,
+    controllerStates,
+    ownJobId,
     target,
     anyDowngradeBlocked,
     canFlash,
+    isOwnJob,
+    progressByControllerId,
     toggle,
     selectAll,
     clear,
     setPhase,
     resetToSelect,
     dismissError,
+    applyJobStarted,
+    applyControllerUpdate,
+    applyControllerResult,
+    applyJobDone,
+    applyJobFailed,
     startFlash,
     cancelFlash,
+    fetchCurrentJob,
     fetchReleases,
   };
 });

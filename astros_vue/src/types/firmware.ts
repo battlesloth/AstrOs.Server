@@ -88,3 +88,59 @@ export interface FlashErrorEnvelope {
   detail?: string;
   currentJobId?: string;
 }
+
+/**
+ * Mirror of the server's `FwStage` enum (string-literal values from
+ * `astros_api/src/models/firmware/firmware_messages.ts`). Hand-maintained;
+ * keep cross-referenced with the server source when either side changes.
+ */
+export type ServerFwStage =
+  | 'QUEUED'
+  | 'UPLOADING_TO_MASTER'
+  | 'SENDING'
+  | 'VERIFYING'
+  | 'REBOOTING'
+  | 'VERSION_CONFIRMED'
+  | 'FAILED';
+
+/**
+ * Mirror of the server's `ControllerFlashState` discriminated union narrowed
+ * to fields the UI reads. Source:
+ * `astros_api/src/models/firmware/flash_job_state.ts`.
+ */
+export interface ControllerFlashState {
+  controllerId: string;
+  stage: ServerFwStage;
+  /** Set when stage === 'VERSION_CONFIRMED'. */
+  finalVersion?: string;
+  /** Set when stage === 'FAILED'. */
+  error?: string;
+}
+
+/**
+ * Mirror of the server's `FlashJobState`. The `source` shape matches the
+ * `FlashRequest` body the client posts.
+ */
+export interface FlashJobState {
+  jobId: string;
+  source: { kind: 'github'; version: string } | { kind: 'upload' };
+  controllers: ControllerFlashState[];
+  startedAt: string;
+  endedAt?: string;
+  abortReason?: string;
+}
+
+/**
+ * Mirror of the server's `FlashJobFailedData` (the payload of
+ * `flashJobFailed` WS events). `reason` may be any server-side
+ * `FlashOrchestratorErrorReason` including post-streamer reasons that
+ * aren't in our `FlashErrorReason` union — keep as string for forward-
+ * compatibility; the renderer falls back to a generic message for unknowns.
+ */
+export interface FlashJobFailedData {
+  jobId: string;
+  endedAt: string;
+  reason?: string;
+  detail?: string;
+  abortReason?: string;
+}

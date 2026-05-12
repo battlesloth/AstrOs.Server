@@ -11,6 +11,7 @@ import {
   AstrosFirmwareConfirmModal,
 } from '@/components';
 import { useFirmwareStore } from '@/stores/firmware';
+import { useJobLockStore } from '@/stores/jobLock';
 import type { FirmwareControllerView, TopologyFleet } from '@/components';
 
 import '@fontsource/inter/400.css';
@@ -20,6 +21,7 @@ import '@fontsource/inter/700.css';
 
 const { t } = useI18n();
 const firmware = useFirmwareStore();
+const jobLock = useJobLockStore();
 const {
   phase,
   controllers,
@@ -29,7 +31,10 @@ const {
   failedController,
   sourceMode,
   uploadedFilename,
+  progressByControllerId,
+  isOwnJob,
 } = storeToRefs(firmware);
+const { locked: lockLocked, since: lockSince } = storeToRefs(jobLock);
 
 const confirmOpen = ref(false);
 
@@ -54,6 +59,11 @@ const selectedControllerList = computed<FirmwareControllerView[]>(() =>
 );
 
 const failedControllerId = computed(() => failedController.value?.id);
+
+// A flash is in flight but it isn't ours — show a conflict alert and keep
+// the page in select mode (Flash button is already disabled via the
+// lock-aware AstrosWriteButton + ControllersPanel canFlash check).
+const lockConflict = computed(() => lockLocked.value && !isOwnJob.value);
 
 // Dev-only invariant warning. Surfaces wiring bugs in the controllers-store
 // adapter; production strips the block via Vite tree-shake.
@@ -85,20 +95,13 @@ function onResultBarDone() {
   firmware.resetToSelect();
 }
 
-const DEV_SAMPLE_FLEET: FirmwareControllerView[] = [
-  { id: 'body', label: 'Body', glyph: 'B', current: 'v1.3.0', status: 'up', isMaster: true },
-  { id: 'core', label: 'Core', glyph: 'C', current: 'v1.4.0', status: 'up', isMaster: false },
-  { id: 'dome', label: 'Dome', glyph: 'D', current: 'v1.4.0', status: 'up', isMaster: false },
-];
-
 onMounted(async () => {
-  await firmware.fetchReleases();
-  // Dev-only placeholder fleet. Replace with the real controllers-store
-  // adapter once it exists.
-  if (import.meta.env.DEV && firmware.controllers.length === 0) {
-    firmware.controllers = DEV_SAMPLE_FLEET;
-  }
-  if (firmware.controllers.length > 0 && firmware.phase === 'idle') {
+  // Cold-load resync: if a flash is already in flight (operator refreshed
+  // the page mid-flash), populate currentJob from the server. WS late-join
+  // snapshot follows on connect; both paths set the same data and the
+  // store's applyJobStarted idempotency keeps state coherent.
+  await Promise.all([firmware.fetchReleases(), firmware.fetchCurrentJob()]);
+  if (firmware.phase === 'idle') {
     firmware.setPhase('select');
   }
 });
@@ -117,10 +120,24 @@ onMounted(async () => {
         <div class="firmware-view firmware-view__content">
           <p class="firmware-view__subtitle">{{ subtitle }}</p>
 
-          <AstrosFirmwareSourceStrip v-if="phase === 'select'" />
+          <div
+            v-if="lockConflict"
+            class="firmware-view__lock-conflict"
+            role="alert"
+            aria-live="polite"
+          >
+            <span class="firmware-view__lock-conflict-title">{{
+              t('firmware_view.lock_conflict.title')
+            }}</span>
+            <span class="firmware-view__lock-conflict-body">{{
+              t('firmware_view.lock_conflict.body', { since: lockSince ?? '—' })
+            }}</span>
+          </div>
+
+          <AstrosFirmwareSourceStrip v-if="phase === 'select' && !lockConflict" />
 
           <div
-            v-if="phase !== 'idle'"
+            v-if="phase !== 'idle' && !lockConflict"
             class="firmware-view__grid"
           >
             <div class="firmware-view__left-column">
@@ -143,6 +160,7 @@ onMounted(async () => {
             <AstrosFirmwareControllersPanel
               class="firmware-view__panel"
               :phase="phase"
+              :progress-by-controller-id="progressByControllerId"
               :failed-controller-label="failedController?.label"
               :failed-stage="failedController?.stage"
               @flash="openConfirm"
@@ -183,6 +201,29 @@ onMounted(async () => {
   gap: 16px;
   box-sizing: border-box;
   overflow-y: auto;
+}
+
+.firmware-view__lock-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  background: #fff8e8;
+  border: 1px solid #e5a93a55;
+  border-radius: 6px;
+}
+
+.firmware-view__lock-conflict-title {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #7d5a14;
+}
+
+.firmware-view__lock-conflict-body {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  color: #7d5a14;
 }
 
 .firmware-view__grid {

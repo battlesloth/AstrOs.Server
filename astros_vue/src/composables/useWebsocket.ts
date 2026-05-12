@@ -13,6 +13,8 @@ import { useScriptsStore } from '@/stores/scripts';
 import { useScripterStore } from '@/stores/scripter';
 import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useJobLockStore } from '@/stores/jobLock';
+import { useFirmwareStore } from '@/stores/firmware';
+import type { ControllerFlashState, FlashJobFailedData, FlashJobState } from '@/types/firmware';
 
 const ws = ref<WebSocket | null>(null);
 const wsIsConnected = ref(false);
@@ -110,6 +112,26 @@ export function useWebsocket() {
       case WebsocketMessageType.LOCK_STATE_CHANGED:
         handleLockStateChanged(parsedMessage);
         break;
+      case WebsocketMessageType.FLASH_JOB_STARTED:
+        handleFlashJobStarted(parsedMessage);
+        break;
+      case WebsocketMessageType.FLASH_CONTROLLER_UPDATE:
+        handleFlashControllerUpdate(parsedMessage);
+        break;
+      case WebsocketMessageType.FLASH_CONTROLLER_RESULT:
+        handleFlashControllerResult(parsedMessage);
+        break;
+      case WebsocketMessageType.FLASH_JOB_DONE:
+        handleFlashJobDone(parsedMessage);
+        break;
+      case WebsocketMessageType.FLASH_JOB_FAILED:
+        handleFlashJobFailed(parsedMessage);
+        break;
+      case WebsocketMessageType.FLASH_JOB_ACTIVE:
+        // Server-side rejection echo for write-class messages sent during a
+        // flash; the UI doesn't act on this directly (the lock-aware
+        // AstrosWriteButton already disables write actions).
+        break;
       default:
         console.warn('Unhandled message type:', message);
         break;
@@ -187,6 +209,59 @@ export function useWebsocket() {
       });
     } catch (error) {
       console.error('Error handling lock state change:', error);
+    }
+  }
+
+  // Firmware-flash WS handlers. Each delegates to the firmwareStore's apply*
+  // action so the store remains the sole writer of server-pushed flash state.
+  // The try/catch is load-bearing: a malformed payload must not lock the UI
+  // in 'flashing' — store actions handle defensive cases internally.
+  function handleFlashJobStarted(message: BaseWsMessage) {
+    try {
+      const data = (message as unknown as { data: FlashJobState }).data;
+      useFirmwareStore().applyJobStarted(data);
+    } catch (error) {
+      console.error('Error handling flashJobStarted:', error);
+    }
+  }
+
+  function handleFlashControllerUpdate(message: BaseWsMessage) {
+    try {
+      const data = (message as unknown as { data: ControllerFlashState }).data;
+      useFirmwareStore().applyControllerUpdate(data);
+    } catch (error) {
+      console.error('Error handling flashControllerUpdate:', error);
+    }
+  }
+
+  function handleFlashControllerResult(message: BaseWsMessage) {
+    try {
+      const data = (
+        message as unknown as {
+          data: { jobId: string; controller: ControllerFlashState };
+        }
+      ).data;
+      useFirmwareStore().applyControllerResult(data);
+    } catch (error) {
+      console.error('Error handling flashControllerResult:', error);
+    }
+  }
+
+  function handleFlashJobDone(message: BaseWsMessage) {
+    try {
+      const data = (message as unknown as { data: { jobId: string; endedAt: string } }).data;
+      useFirmwareStore().applyJobDone(data);
+    } catch (error) {
+      console.error('Error handling flashJobDone:', error);
+    }
+  }
+
+  function handleFlashJobFailed(message: BaseWsMessage) {
+    try {
+      const data = (message as unknown as { data: FlashJobFailedData }).data;
+      useFirmwareStore().applyJobFailed(data);
+    } catch (error) {
+      console.error('Error handling flashJobFailed:', error);
     }
   }
 

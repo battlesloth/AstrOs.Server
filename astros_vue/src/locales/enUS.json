@@ -169,6 +169,12 @@
       "streamer_unknown_error": "The firmware streamer failed with an unknown error. Try again.",
       "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
       "network_error": "Couldn't reach the server. Check your network connection and try again."
+    },
+    "lock_active": "A firmware update is in progress — write actions are disabled until it completes.",
+    "lock_banner": "Firmware update in progress — write actions are disabled across the app.",
+    "lock_conflict": {
+      "title": "Firmware update in progress",
+      "body": "Another operator started a firmware update at {since}. Wait for it to finish before starting a new one."
     }
   },
   "placeholder": {

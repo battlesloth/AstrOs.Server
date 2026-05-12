@@ -5,6 +5,7 @@ import { createI18n } from 'vue-i18n';
 import enUS from '@/locales/enUS.json';
 import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import { useSystemStatusStore } from '@/stores/systemStatus';
+import { useJobLockStore } from '@/stores/jobLock';
 
 function createTestI18n() {
   return createI18n({
@@ -104,5 +105,47 @@ describe('AstrosWriteButton', () => {
     await wrapper.find('button').trigger('click');
     // Browsers suppress click on disabled buttons; jsdom respects this too.
     expect(wrapper.emitted('click')).toBeUndefined();
+  });
+
+  it('is disabled when jobLock.locked is true even if readOnly is false', async () => {
+    useJobLockStore().setState({
+      locked: true,
+      owner: 'flash-job-xyz',
+      since: '2026-05-12T08:00:00Z',
+    });
+    const wrapper = mountButton();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('button').attributes('disabled')).toBeDefined();
+  });
+
+  it('shows the lock-active tooltip when only jobLock.locked is true', async () => {
+    useJobLockStore().setState({
+      locked: true,
+      owner: 'flash-job-xyz',
+      since: '2026-05-12T08:00:00Z',
+    });
+    const wrapper = mountButton();
+    await wrapper.vm.$nextTick();
+    const wrapperDiv = wrapper.find('div');
+    expect(wrapperDiv.classes()).toContain('tooltip');
+    // The data-tip resolves to the firmware_view.lock_active i18n key.
+    expect(wrapperDiv.attributes('data-tip')).toBeTruthy();
+  });
+
+  it('prefers the read-only tooltip when both readOnly and jobLock.locked are true', async () => {
+    useSystemStatusStore().setStatus({ readOnly: true, reasonCode: 'BACKUP_FAILED' });
+    useJobLockStore().setState({
+      locked: true,
+      owner: 'flash-job-xyz',
+      since: '2026-05-12T08:00:00Z',
+    });
+    const wrapper = mountButton();
+    await wrapper.vm.$nextTick();
+    const wrapperDiv = wrapper.find('div');
+    expect(wrapperDiv.classes()).toContain('tooltip');
+    // Read-only is broader; takes precedence per the tooltipKey computed.
+    const readOnlyMsg = (enUS as { systemStatus?: { readOnly?: { disabled?: string } } })
+      ?.systemStatus?.readOnly?.disabled;
+    expect(wrapperDiv.attributes('data-tip')).toBe(readOnlyMsg);
   });
 });

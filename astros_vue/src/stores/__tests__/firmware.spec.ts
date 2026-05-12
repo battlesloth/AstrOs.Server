@@ -6,6 +6,7 @@ vi.mock('@/api/apiService', () => ({
     get: vi.fn(),
   },
   apiClient: {
+    get: vi.fn(),
     post: vi.fn(),
     delete: vi.fn(),
   },
@@ -13,15 +14,33 @@ vi.mock('@/api/apiService', () => ({
 
 import apiService, { apiClient } from '@/api/apiService';
 import { useFirmwareStore } from '../firmware';
-import type { FirmwareControllerView, ReleaseInfo, ReleaseListResult } from '@/types/firmware';
+import { useControllerStore } from '@/stores/controller';
+import { ControllerStatus } from '@/enums';
+import type {
+  ControllerFlashState,
+  FlashJobFailedData,
+  FlashJobState,
+  ReleaseInfo,
+  ReleaseListResult,
+} from '@/types/firmware';
 
-const sampleControllers: FirmwareControllerView[] = [
-  { id: 'body', label: 'Body', glyph: 'B', current: 'v1.3.0', status: 'up', isMaster: true },
-  { id: 'core', label: 'Core', glyph: 'C', current: 'v1.4.0', status: 'up', isMaster: false },
-  { id: 'dome', label: 'Dome', glyph: 'D', current: 'v1.4.0', status: 'down', isMaster: false },
-];
+/**
+ * Seed the controllerStore so the firmwareStore's `controllers` computed
+ * projects the expected fleet. Replaces direct `store.controllers = ...`
+ * assignments (the computed is read-only).
+ */
+function seedSampleFleet(opts: { domeStatus?: ControllerStatus } = {}) {
+  const cs = useControllerStore();
+  cs.bodyStatus = ControllerStatus.UP;
+  cs.bodyFirmware = 'v1.3.0';
+  cs.coreStatus = ControllerStatus.UP;
+  cs.coreFirmware = 'v1.4.0';
+  cs.domeStatus = opts.domeStatus ?? ControllerStatus.DOWN;
+  cs.domeFirmware = 'v1.4.0';
+}
 
 const apiGet = apiService.get as ReturnType<typeof vi.fn>;
+const apiClientGet = apiClient.get as ReturnType<typeof vi.fn>;
 const apiPost = apiClient.post as ReturnType<typeof vi.fn>;
 const apiDelete = apiClient.delete as ReturnType<typeof vi.fn>;
 
@@ -62,6 +81,7 @@ describe('firmware store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     apiGet.mockReset();
+    apiClientGet.mockReset();
     apiPost.mockReset();
     apiDelete.mockReset();
   });
@@ -205,7 +225,7 @@ describe('firmware store', () => {
   describe('selection actions', () => {
     it('toggle adds an id when absent and removes it when present', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
 
       store.toggle('body');
       expect([...store.selectedControllerIds]).toEqual(['body']);
@@ -217,7 +237,7 @@ describe('firmware store', () => {
 
     it('toggle replaces the Set reference so Vue reactivity observes the change', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       const before = store.selectedControllerIds;
       store.toggle('body');
       expect(store.selectedControllerIds).not.toBe(before);
@@ -225,7 +245,7 @@ describe('firmware store', () => {
 
     it('selectAll picks every online, non-downgrade controller', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.4.2';
 
@@ -240,7 +260,7 @@ describe('firmware store', () => {
 
     it('selectAll skips controllers whose current version is newer than target (downgrade)', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.3.5';
 
@@ -253,7 +273,7 @@ describe('firmware store', () => {
 
     it('clear empties the selection and replaces the Set reference', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.toggle('body');
       store.toggle('core');
       const before = store.selectedControllerIds;
@@ -266,7 +286,7 @@ describe('firmware store', () => {
   describe('anyDowngradeBlocked', () => {
     it('returns false when nothing is selected', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.3.5';
       expect(store.anyDowngradeBlocked).toBe(false);
@@ -274,7 +294,7 @@ describe('firmware store', () => {
 
     it('returns true when a selected controller would downgrade', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.3.5';
       store.toggle('core'); // core is v1.4.0; v1.4.0 > v1.3.5
@@ -286,7 +306,7 @@ describe('firmware store', () => {
       // mutation to `cmp >= 0` would flag an equal version as a downgrade
       // and this test would fail.
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.4.0';
       store.toggle('core'); // core is v1.4.0; target is v1.4.0
@@ -295,62 +315,27 @@ describe('firmware store', () => {
 
     it('treats a malformed current version as not a downgrade (NaN > 0 is false)', () => {
       const store = useFirmwareStore();
-      store.controllers = [
-        {
-          id: 'weird',
-          label: 'Weird',
-          glyph: 'W',
-          current: 'not-a-version',
-          status: 'up',
-          isMaster: false,
-        },
-      ];
+      const cs = useControllerStore();
+      seedSampleFleet();
+      cs.bodyFirmware = 'not-a-version';
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.4.2';
-      store.toggle('weird');
+      store.toggle('body');
       expect(store.anyDowngradeBlocked).toBe(false);
-    });
-  });
-
-  describe('controllers reconciler', () => {
-    it('prunes selected ids that no longer exist after controllers is reassigned', async () => {
-      const store = useFirmwareStore();
-      store.controllers = sampleControllers;
-      store.toggle('body');
-      store.toggle('core');
-      expect(store.selectedControllerIds.size).toBe(2);
-
-      // Reassign with dome removed and core renamed.
-      store.controllers = [
-        { id: 'body', label: 'Body', glyph: 'B', current: 'v1.3.0', status: 'up', isMaster: true },
-      ];
-      // watch is async; flush via microtask.
-      await Promise.resolve();
-      expect([...store.selectedControllerIds]).toEqual(['body']);
-    });
-
-    it('does not touch the Set when no ids are orphaned', async () => {
-      const store = useFirmwareStore();
-      store.controllers = sampleControllers;
-      store.toggle('body');
-      const before = store.selectedControllerIds;
-      store.controllers = [...sampleControllers]; // new reference, same ids
-      await Promise.resolve();
-      expect(store.selectedControllerIds).toBe(before);
     });
   });
 
   describe('canFlash', () => {
     it('is false with no target', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.toggle('body');
       expect(store.canFlash).toBe(false);
     });
 
     it('is false with target but no selection', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.4.2';
       expect(store.canFlash).toBe(false);
@@ -358,7 +343,7 @@ describe('firmware store', () => {
 
     it('is true with target + at least one upgrade selection', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.4.2';
       store.toggle('body');
@@ -367,7 +352,7 @@ describe('firmware store', () => {
 
     it('is false with target + selection but any selected controller would downgrade', () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.3.5';
       store.toggle('body'); // upgrade
@@ -418,7 +403,7 @@ describe('firmware store', () => {
   describe('startFlash', () => {
     function readyStore() {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.4.2';
       store.toggle('body');
@@ -444,7 +429,7 @@ describe('firmware store', () => {
     it("POSTs the upload source shape when sourceMode is 'upload'", async () => {
       apiPost.mockResolvedValueOnce({ data: { jobId: 'job-2' } });
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'upload';
       store.uploadedFilename = 'custom.bin';
       store.toggle('body');
@@ -512,7 +497,7 @@ describe('firmware store', () => {
 
     it('is a no-op when canFlash is false (e.g. no controllers selected)', async () => {
       const store = useFirmwareStore();
-      store.controllers = sampleControllers;
+      seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.4.2';
       // No selection.
@@ -555,6 +540,311 @@ describe('firmware store', () => {
       await store.cancelFlash();
       // Did not throw; phase unchanged (WS dispatcher owns terminal state).
       expect(store.phase).toBe('flashing');
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // d.6 — WebSocket-driven state
+  // ------------------------------------------------------------------
+
+  function sampleJobState(overrides: Partial<FlashJobState> = {}): FlashJobState {
+    return {
+      jobId: 'job-1',
+      source: { kind: 'github', version: 'v1.4.2' },
+      controllers: [
+        { controllerId: 'body', stage: 'QUEUED' },
+        { controllerId: 'core', stage: 'QUEUED' },
+      ],
+      startedAt: '2026-05-12T08:00:00Z',
+      ...overrides,
+    };
+  }
+
+  describe('applyJobStarted', () => {
+    it("transitions phase 'select' → 'flashing' and seeds controllerStates from data.controllers", () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.setPhase('select');
+
+      store.applyJobStarted(sampleJobState());
+
+      expect(store.phase).toBe('flashing');
+      expect(store.currentJob?.jobId).toBe('job-1');
+      expect(store.controllerStates.size).toBe(2);
+      expect(store.controllerStates.get('body')?.stage).toBe('QUEUED');
+    });
+
+    it('is idempotent when called twice with the same jobId (WS reconnect / late-join)', () => {
+      // FMI hazard: late-join + cold-load fetch race. Both fetchCurrentJob
+      // (HTTP) and the WS replay can fire on view enter; both must converge
+      // on identical state without merging or doubling effects.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyJobStarted(sampleJobState()); // distinct object, same jobId
+      expect(store.currentJob?.jobId).toBe('job-1');
+      expect(store.phase).toBe('flashing');
+      expect(store.controllerStates.size).toBe(2);
+    });
+
+    it('REPLACES (not merges) controllerStates on duplicate — stale entries do not survive', () => {
+      // FMI hazard: WS reconnect during flash. The server sends a fresh
+      // flashJobStarted snapshot; the client must NOT keep stale per-
+      // controller stages from before the disconnect.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({ controllerId: 'body', stage: 'SENDING' });
+      // Simulate reconnect with controllers in a different state.
+      const fresh: FlashJobState = sampleJobState({
+        controllers: [{ controllerId: 'body', stage: 'VERIFYING' }],
+      });
+      store.applyJobStarted(fresh);
+      expect(store.controllerStates.size).toBe(1);
+      expect(store.controllerStates.get('body')?.stage).toBe('VERIFYING');
+      expect(store.controllerStates.get('core')).toBeUndefined();
+    });
+
+    it('clears flashError and failedController so a previous failure does not bleed into the new job', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.flashError = { reason: 'internal_server_error' };
+      store.failedController = { id: 'core', label: 'Core', stage: 'transfer' };
+      store.applyJobStarted(sampleJobState());
+      expect(store.flashError).toBeNull();
+      expect(store.failedController).toBeNull();
+    });
+  });
+
+  describe('applyControllerUpdate', () => {
+    it('replaces the per-controller state in the map and projects the UI stage', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+
+      store.applyControllerUpdate({ controllerId: 'body', stage: 'UPLOADING_TO_MASTER' });
+      expect(store.controllerStates.get('body')?.stage).toBe('UPLOADING_TO_MASTER');
+      expect(store.currentStage).toBe('download');
+
+      store.applyControllerUpdate({ controllerId: 'body', stage: 'VERIFYING' });
+      expect(store.currentStage).toBe('verify');
+    });
+
+    it('leaves currentStage untouched for terminal stages (VERSION_CONFIRMED / FAILED / QUEUED)', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({ controllerId: 'body', stage: 'SENDING' });
+      const before = store.currentStage;
+      store.applyControllerUpdate({
+        controllerId: 'body',
+        stage: 'VERSION_CONFIRMED',
+        finalVersion: 'v1.4.2',
+      });
+      expect(store.currentStage).toBe(before);
+    });
+
+    it('replaces the Map reference (Vue reactivity)', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      const before = store.controllerStates;
+      store.applyControllerUpdate({ controllerId: 'body', stage: 'SENDING' });
+      expect(store.controllerStates).not.toBe(before);
+    });
+  });
+
+  describe('applyControllerResult', () => {
+    it('routes the contained controller state through applyControllerUpdate', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerResult({
+        jobId: 'job-1',
+        controller: { controllerId: 'core', stage: 'VERSION_CONFIRMED', finalVersion: 'v1.4.2' },
+      });
+      expect(store.controllerStates.get('core')?.stage).toBe('VERSION_CONFIRMED');
+    });
+  });
+
+  describe('applyJobDone', () => {
+    it("transitions phase 'flashing' → 'done' and stamps endedAt on currentJob", () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+      expect(store.phase).toBe('done');
+      expect(store.currentJob?.endedAt).toBe('2026-05-12T08:05:00Z');
+    });
+  });
+
+  describe('applyJobFailed', () => {
+    it("transitions phase to 'failed', stamps endedAt + abortReason, and surfaces flashError", () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      const data: FlashJobFailedData = {
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason: 'hash_mismatch',
+        detail: 'asset checksum mismatch on Core',
+        abortReason: 'hash_mismatch',
+      };
+      store.applyJobFailed(data);
+      expect(store.phase).toBe('failed');
+      expect(store.currentJob?.endedAt).toBe('2026-05-12T08:05:00Z');
+      expect(store.flashError?.reason).toBe('internal_server_error');
+      expect(store.flashError?.detail).toBe('asset checksum mismatch on Core');
+    });
+
+    it('derives failedController from the FAILED entry in controllerStates', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({
+        controllerId: 'core',
+        stage: 'FAILED',
+        error: 'hash_mismatch',
+      });
+      store.applyJobFailed({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+      expect(store.failedController?.id).toBe('core');
+      expect(store.failedController?.label).toBe('Core');
+    });
+
+    it('leaves failedController null when no controller transitioned to FAILED before job-failed (mid-deploy abort)', () => {
+      // Edge case: applyJobStarted runs, no per-controller updates land,
+      // then a mid-deploy abort (e.g., bus_send_failed) fires
+      // flashJobFailed. The store should still transition phase + set
+      // flashError, and the FirmwareView template guards on
+      // `failedController?.stage` so a null is safe to render.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason: 'bus_send_failed',
+        detail: 'Worker channel closed during firmware send',
+      });
+      expect(store.phase).toBe('failed');
+      expect(store.flashError?.detail).toBe('Worker channel closed during firmware send');
+      expect(store.failedController).toBeNull();
+    });
+
+    it('does not throw when called with no controllerStates and no currentJob (defensive)', () => {
+      // FMI hazard: WS handler errors swallow real bugs. A malformed
+      // flashJobFailed must still transition phase so the UI doesn't lock.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      expect(() =>
+        store.applyJobFailed({ jobId: 'job-x', endedAt: '2026-05-12T08:05:00Z' }),
+      ).not.toThrow();
+      expect(store.phase).toBe('failed');
+      expect(store.flashError).not.toBeNull();
+    });
+  });
+
+  describe('isOwnJob', () => {
+    it('is true when ownJobId matches currentJob.jobId', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.ownJobId = 'job-1';
+      store.applyJobStarted(sampleJobState({ jobId: 'job-1' }));
+      expect(store.isOwnJob).toBe(true);
+    });
+
+    it("is false when ownJobId is null (another operator's job)", () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState({ jobId: 'job-99' }));
+      expect(store.isOwnJob).toBe(false);
+    });
+
+    it('is false when no job is in flight', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.ownJobId = 'job-1';
+      expect(store.isOwnJob).toBe(false);
+    });
+  });
+
+  describe('fetchCurrentJob', () => {
+    it('populates currentJob via applyJobStarted when the server returns a job and store has none', async () => {
+      const data = sampleJobState();
+      apiClientGet.mockResolvedValueOnce({ data });
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      await store.fetchCurrentJob();
+
+      expect(apiClientGet).toHaveBeenCalledWith('api/firmware/flash');
+      expect(store.currentJob?.jobId).toBe('job-1');
+      expect(store.phase).toBe('flashing');
+    });
+
+    it('is a no-op when currentJob is already set (idempotent cold-load + late-join race guard)', async () => {
+      // FMI hazard: fetchCurrentJob + WS late-join race. If the WS replay
+      // sets currentJob first, the subsequent HTTP cold-load must not
+      // overwrite it.
+      apiClientGet.mockResolvedValueOnce({ data: sampleJobState({ jobId: 'job-from-http' }) });
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState({ jobId: 'job-from-ws' }));
+      await store.fetchCurrentJob();
+      expect(store.currentJob?.jobId).toBe('job-from-ws');
+    });
+
+    it('returns null without error when the server responds with no active job', async () => {
+      apiClientGet.mockResolvedValueOnce({ data: null });
+      const store = useFirmwareStore();
+      await store.fetchCurrentJob();
+      expect(store.currentJob).toBeNull();
+      expect(store.phase).toBe('idle');
+    });
+
+    it('swallows network errors (UI stays in current phase)', async () => {
+      apiClientGet.mockRejectedValueOnce(new Error('network'));
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      await store.fetchCurrentJob();
+      expect(store.currentJob).toBeNull();
+    });
+  });
+
+  describe('resetToSelect', () => {
+    it('clears controllerStates and ownJobId in addition to phase/currentStage/flashError', () => {
+      // FMI hazard: stale controllerStates after job ends. Operator clicks
+      // Done → next flash must not inherit prior per-controller stages.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.ownJobId = 'job-1';
+      store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+      store.resetToSelect();
+
+      expect(store.phase).toBe('select');
+      expect(store.controllerStates.size).toBe(0);
+      expect(store.currentJob).toBeNull();
+      expect(store.ownJobId).toBeNull();
+    });
+  });
+
+  describe('startFlash captures ownJobId from the POST response', () => {
+    it('records ownJobId so isOwnJob resolves once the WS snapshot lands', async () => {
+      apiPost.mockResolvedValueOnce({ data: sampleJobState({ jobId: 'job-mine' }) });
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('body');
+
+      await store.startFlash();
+
+      expect(store.ownJobId).toBe('job-mine');
+      // applyJobStarted in production would follow; simulate it here.
+      store.applyJobStarted(sampleJobState({ jobId: 'job-mine' }));
+      expect(store.isOwnJob).toBe(true);
     });
   });
 });

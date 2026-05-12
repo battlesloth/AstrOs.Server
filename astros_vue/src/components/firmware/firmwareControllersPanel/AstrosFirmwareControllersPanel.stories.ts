@@ -2,23 +2,27 @@ import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import { createPinia, setActivePinia } from 'pinia';
 import AstrosFirmwareControllersPanel from './AstrosFirmwareControllersPanel.vue';
 import { useFirmwareStore } from '@/stores/firmware';
-import type { FirmwareControllerView } from '@/types/firmware';
-
-const SAMPLE_CONTROLLERS: FirmwareControllerView[] = [
-  { id: 'body', label: 'Body', glyph: 'B', current: 'v1.3.0', status: 'up', isMaster: true },
-  { id: 'core', label: 'Core', glyph: 'C', current: 'v1.4.0', status: 'up', isMaster: false },
-  { id: 'dome', label: 'Dome', glyph: 'D', current: 'v1.4.0', status: 'down', isMaster: false },
-];
+import { useControllerStore } from '@/stores/controller';
+import { ControllerStatus } from '@/enums';
 
 function setupStore(opts: {
   target?: string | null;
   selected?: string[];
-  controllers?: FirmwareControllerView[];
   flashErrorReason?: string;
+  domeStatus?: ControllerStatus;
 }) {
   setActivePinia(createPinia());
+  // Seed the underlying controllerStore — the firmwareStore's `controllers`
+  // computed projects from there.
+  const cs = useControllerStore();
+  cs.bodyStatus = ControllerStatus.UP;
+  cs.bodyFirmware = 'v1.3.0';
+  cs.coreStatus = ControllerStatus.UP;
+  cs.coreFirmware = 'v1.4.0';
+  cs.domeStatus = opts.domeStatus ?? ControllerStatus.DOWN;
+  cs.domeFirmware = 'v1.4.0';
+
   const store = useFirmwareStore();
-  store.controllers = opts.controllers ?? SAMPLE_CONTROLLERS;
   store.sourceMode = 'github';
   store.selectedReleaseTag = opts.target ?? null;
   store.selectedControllerIds = new Set(opts.selected ?? []);
