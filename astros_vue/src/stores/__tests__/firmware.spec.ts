@@ -15,7 +15,7 @@ vi.mock('@/api/apiService', () => ({
 import apiService, { apiClient } from '@/api/apiService';
 import { useFirmwareStore } from '../firmware';
 import { useControllerStore } from '@/stores/controller';
-import { ControllerStatus } from '@/enums';
+import { ControllerStatus, Location } from '@/enums';
 import type {
   ControllerFlashState,
   FlashJobFailedData,
@@ -37,6 +37,12 @@ function seedSampleFleet(opts: { domeStatus?: ControllerStatus } = {}) {
   cs.coreFirmware = 'v1.4.0';
   cs.domeStatus = opts.domeStatus ?? ControllerStatus.DOWN;
   cs.domeFirmware = 'v1.4.0';
+  // Body uses the master sentinel MAC; padawan MACs would normally arrive
+  // via LocationStatus messages. Seed deterministic test MACs so the
+  // firmwareStore's resolver can translate WS controllerIds to slots.
+  cs.setControllerMac(Location.BODY, '00:00:00:00:00:00');
+  cs.setControllerMac(Location.CORE, 'aa:bb:cc:dd:ee:01');
+  cs.setControllerMac(Location.DOME, 'aa:bb:cc:dd:ee:02');
 }
 
 const apiGet = apiService.get as ReturnType<typeof vi.fn>;
@@ -544,16 +550,21 @@ describe('firmware store', () => {
   });
 
   // ------------------------------------------------------------------
-  // d.6 — WebSocket-driven state
+  // WebSocket-driven state
   // ------------------------------------------------------------------
+
+  // MAC values must match seedSampleFleet's setControllerMac() seeding so the
+  // firmwareStore's resolver translates them to body/core slot ids.
+  const BODY_MAC = '00:00:00:00:00:00';
+  const CORE_MAC = 'aa:bb:cc:dd:ee:01';
 
   function sampleJobState(overrides: Partial<FlashJobState> = {}): FlashJobState {
     return {
       jobId: 'job-1',
       source: { kind: 'github', version: 'v1.4.2' },
       controllers: [
-        { controllerId: 'body', stage: 'QUEUED' },
-        { controllerId: 'core', stage: 'QUEUED' },
+        { controllerId: BODY_MAC, stage: 'QUEUED' },
+        { controllerId: CORE_MAC, stage: 'QUEUED' },
       ],
       startedAt: '2026-05-12T08:00:00Z',
       ...overrides,
@@ -594,15 +605,60 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
-      store.applyControllerUpdate({ controllerId: 'body', stage: 'SENDING' });
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
       // Simulate reconnect with controllers in a different state.
       const fresh: FlashJobState = sampleJobState({
-        controllers: [{ controllerId: 'body', stage: 'VERIFYING' }],
+        controllers: [{ controllerId: BODY_MAC, stage: 'VERIFYING' }],
       });
       store.applyJobStarted(fresh);
       expect(store.controllerStates.size).toBe(1);
       expect(store.controllerStates.get('body')?.stage).toBe('VERIFYING');
       expect(store.controllerStates.get('core')).toBeUndefined();
+    });
+
+    it('translates MAC controllerIds to slot ids (body/core/dome) via the controllerStore resolver', () => {
+      // Server sends MAC addresses as controllerId; the firmwareStore must
+      // translate them to slot ids so the panel's progressByControllerId[c.id]
+      // lookup (where c.id is 'body'/'core'/'dome') resolves correctly.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      // sampleJobState sends BODY_MAC + CORE_MAC; after translation the Map
+      // is keyed by slot ids, NOT by the raw MAC strings.
+      expect(store.controllerStates.get('body')?.stage).toBe('QUEUED');
+      expect(store.controllerStates.get('core')?.stage).toBe('QUEUED');
+      expect(store.controllerStates.get(BODY_MAC)).toBeUndefined();
+      expect(store.controllerStates.get(CORE_MAC)).toBeUndefined();
+    });
+
+    it('drops entries with unknown controllerIds (MAC mapping not yet learned)', () => {
+      // Edge: applyJobStarted arrives BEFORE LocationStatus has populated
+      // MACs (e.g., cold-load with no prior status). Unknown MACs are
+      // dropped rather than silently keyed by raw MAC.
+      const store = useFirmwareStore();
+      // No seedSampleFleet() — no MAC mappings exist.
+      store.applyJobStarted({
+        ...sampleJobState(),
+        controllers: [{ controllerId: 'unknown-mac', stage: 'QUEUED' }],
+      });
+      expect(store.controllerStates.size).toBe(0);
+    });
+
+    it('does not throw when data.controllers is missing or malformed (defensive)', () => {
+      // FMI hazard: malformed flashJobStarted payload must not lock the UI
+      // in 'flashing' forever. buildControllerStatesMap accepts undefined.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      expect(() =>
+        store.applyJobStarted({
+          jobId: 'job-malformed',
+          source: { kind: 'github', version: 'v1.4.2' },
+          startedAt: '2026-05-12T08:00:00Z',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any),
+      ).not.toThrow();
+      expect(store.phase).toBe('flashing');
+      expect(store.controllerStates.size).toBe(0);
     });
 
     it('clears flashError and failedController so a previous failure does not bleed into the new job', () => {
@@ -622,11 +678,11 @@ describe('firmware store', () => {
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
 
-      store.applyControllerUpdate({ controllerId: 'body', stage: 'UPLOADING_TO_MASTER' });
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'UPLOADING_TO_MASTER' });
       expect(store.controllerStates.get('body')?.stage).toBe('UPLOADING_TO_MASTER');
       expect(store.currentStage).toBe('download');
 
-      store.applyControllerUpdate({ controllerId: 'body', stage: 'VERIFYING' });
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'VERIFYING' });
       expect(store.currentStage).toBe('verify');
     });
 
@@ -634,10 +690,10 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
-      store.applyControllerUpdate({ controllerId: 'body', stage: 'SENDING' });
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
       const before = store.currentStage;
       store.applyControllerUpdate({
-        controllerId: 'body',
+        controllerId: BODY_MAC,
         stage: 'VERSION_CONFIRMED',
         finalVersion: 'v1.4.2',
       });
@@ -649,7 +705,7 @@ describe('firmware store', () => {
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
       const before = store.controllerStates;
-      store.applyControllerUpdate({ controllerId: 'body', stage: 'SENDING' });
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
       expect(store.controllerStates).not.toBe(before);
     });
   });
@@ -661,7 +717,7 @@ describe('firmware store', () => {
       store.applyJobStarted(sampleJobState());
       store.applyControllerResult({
         jobId: 'job-1',
-        controller: { controllerId: 'core', stage: 'VERSION_CONFIRMED', finalVersion: 'v1.4.2' },
+        controller: { controllerId: CORE_MAC, stage: 'VERSION_CONFIRMED', finalVersion: 'v1.4.2' },
       });
       expect(store.controllerStates.get('core')?.stage).toBe('VERSION_CONFIRMED');
     });
@@ -686,15 +742,32 @@ describe('firmware store', () => {
       const data: FlashJobFailedData = {
         jobId: 'job-1',
         endedAt: '2026-05-12T08:05:00Z',
-        reason: 'hash_mismatch',
+        reason: 'hash_mismatch', // post-streamer reason — not in FlashErrorReason
         detail: 'asset checksum mismatch on Core',
         abortReason: 'hash_mismatch',
       };
       store.applyJobFailed(data);
       expect(store.phase).toBe('failed');
       expect(store.currentJob?.endedAt).toBe('2026-05-12T08:05:00Z');
+      // Unrecognized reason falls back to internal_server_error so the banner
+      // shows generic copy rather than a missing-i18n-key path.
       expect(store.flashError?.reason).toBe('internal_server_error');
       expect(store.flashError?.detail).toBe('asset checksum mismatch on Core');
+    });
+
+    it('maps recognized server reasons through to FlashErrorReason verbatim', () => {
+      // Pre-streamer reasons in FlashErrorReason should reach the banner so
+      // the operator sees specific copy (e.g., "Pick at least one controller"
+      // for `no_controllers`).
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason: 'release_not_found',
+      });
+      expect(store.flashError?.reason).toBe('release_not_found');
     });
 
     it('derives failedController from the FAILED entry in controllerStates', () => {
@@ -702,7 +775,7 @@ describe('firmware store', () => {
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
       store.applyControllerUpdate({
-        controllerId: 'core',
+        controllerId: CORE_MAC,
         stage: 'FAILED',
         error: 'hash_mismatch',
       });

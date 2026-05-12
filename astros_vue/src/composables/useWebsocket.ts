@@ -180,6 +180,11 @@ export function useWebsocket() {
           controllerStore.bodyFirmware = data.firmwareVersion;
           break;
       }
+      // Learn the MAC↔location mapping so the firmware view can translate
+      // WS `controllerId` (MAC) back to a slot for the progress projection.
+      if (data.controllerId) {
+        controllerStore.setControllerMac(data.controllerLocation, data.controllerId);
+      }
     } catch (error) {
       console.error('Error handling status message:', error);
     }
@@ -215,13 +220,26 @@ export function useWebsocket() {
   // Firmware-flash WS handlers. Each delegates to the firmwareStore's apply*
   // action so the store remains the sole writer of server-pushed flash state.
   // The try/catch is load-bearing: a malformed payload must not lock the UI
-  // in 'flashing' — store actions handle defensive cases internally.
+  // in 'flashing' — store actions handle defensive cases internally and the
+  // catch surfaces a flashError envelope on the failure path so the operator
+  // sees something rather than a wedged UI.
   function handleFlashJobStarted(message: BaseWsMessage) {
+    const store = useFirmwareStore();
     try {
-      const data = (message as unknown as { data: FlashJobState }).data;
-      useFirmwareStore().applyJobStarted(data);
+      const data = (message as unknown as { data: FlashJobState | undefined }).data;
+      if (!data || typeof data.jobId !== 'string') {
+        throw new Error('malformed flashJobStarted payload (missing data or jobId)');
+      }
+      store.applyJobStarted(data);
     } catch (error) {
       console.error('Error handling flashJobStarted:', error);
+      // Roll the UI back to select with a surfaced error so the operator
+      // isn't wedged in 'flashing' awaiting a snapshot we can't parse.
+      store.setPhase('select');
+      store.flashError = {
+        reason: 'internal_server_error',
+        detail: 'Malformed flashJobStarted from server',
+      };
     }
   }
 
@@ -257,11 +275,22 @@ export function useWebsocket() {
   }
 
   function handleFlashJobFailed(message: BaseWsMessage) {
+    const store = useFirmwareStore();
     try {
-      const data = (message as unknown as { data: FlashJobFailedData }).data;
-      useFirmwareStore().applyJobFailed(data);
+      const data = (message as unknown as { data: FlashJobFailedData | undefined }).data;
+      if (!data || typeof data.endedAt !== 'string') {
+        throw new Error('malformed flashJobFailed payload (missing data or endedAt)');
+      }
+      store.applyJobFailed(data);
     } catch (error) {
       console.error('Error handling flashJobFailed:', error);
+      // Force the UI out of 'flashing' so the operator isn't wedged when the
+      // payload can't be parsed. Envelope is generic; server logs are truth.
+      store.setPhase('failed');
+      store.flashError = {
+        reason: 'internal_server_error',
+        detail: 'Malformed flashJobFailed from server',
+      };
     }
   }
 

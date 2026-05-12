@@ -60,9 +60,9 @@ const selectedControllerList = computed<FirmwareControllerView[]>(() =>
 
 const failedControllerId = computed(() => failedController.value?.id);
 
-// A flash is in flight but it isn't ours — show a conflict alert and keep
-// the page in select mode (Flash button is already disabled via the
-// lock-aware AstrosWriteButton + ControllersPanel canFlash check).
+// A flash is in flight but it isn't ours — suppress the working UI. The
+// SourceStrip + grid v-ifs below gate on !lockConflict so the Flash button
+// isn't reachable while a foreign flash is in flight.
 const lockConflict = computed(() => lockLocked.value && !isOwnJob.value);
 
 // Dev-only invariant warning. Surfaces wiring bugs in the controllers-store

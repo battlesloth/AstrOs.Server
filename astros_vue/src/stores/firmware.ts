@@ -15,12 +15,36 @@ import type {
   FirmwareSourceMode,
   FirmwareStage,
   FlashErrorEnvelope,
+  FlashErrorReason,
   FlashJobFailedData,
   FlashJobState,
   ReleaseInfo,
   ReleaseListResult,
   ReleasesLoadState,
 } from '@/types/firmware';
+
+// Recognized server-side flash error reasons. Used by applyJobFailed to
+// validate the WS payload's `reason` field before surfacing it to the UI —
+// unrecognized strings fall back to internal_server_error rather than
+// rendering as a missing-i18n-key path.
+const KNOWN_FLASH_ERROR_REASONS: ReadonlySet<FlashErrorReason> = new Set<FlashErrorReason>([
+  'invalid_body',
+  'job_already_running',
+  'no_controllers',
+  'variant_mismatch',
+  'variant_unknown',
+  'release_not_found',
+  'asset_not_found',
+  'no_upload',
+  'release_lookup_failed',
+  'source_resolution_failed',
+  'controllers_lookup_failed',
+  'subscriber_attach_failed',
+  'protocol_violation',
+  'streamer_unknown_error',
+  'internal_server_error',
+  'network_error',
+]);
 
 // Master designation: Body is the ESP-NOW sentinel master per project
 // convention (see `project_master_esp_sentinel_mac` memory). If this ever
@@ -67,7 +91,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
   const flashError = ref<FlashErrorEnvelope | null>(null);
   const failedController = ref<{ id: string; label: string; stage: FirmwareStage } | null>(null);
 
-  // WS-pushed state (d.6). Apply* handlers below are the sole writers.
+  // WS-pushed state. Apply* handlers below are the sole writers.
   const currentJob = ref<FlashJobState | null>(null);
   const controllerStates = ref<ReadonlyMap<string, ControllerFlashState>>(new Map());
   // Set by `startFlash` from the POST response so the UI can tell whether the
@@ -75,8 +99,8 @@ export const useFirmwareStore = defineStore('firmware', () => {
   const ownJobId = ref<string | null>(null);
 
   // Project the per-location controller store into a fleet shape the firmware
-  // view consumes. Replaces d.5's `ref<FirmwareControllerView[]>([])` and the
-  // FirmwareView dev-mock bootstrap. Reads are reactive through useControllerStore.
+  // view consumes. Reads are reactive through useControllerStore — changes
+  // to per-location refs propagate through this computed automatically.
   const controllers = computed<FirmwareControllerView[]>(() => {
     const cs = useControllerStore();
     const statusByLocation = {
@@ -99,7 +123,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }));
   });
 
-  // Selection-vs-fleet reconciliation is unnecessary in d.6: the `controllers`
+  // Selection-vs-fleet reconciliation is unnecessary: the `controllers`
   // computed projects a fixed FLEET_LAYOUT (body / core / dome) so orphan
   // selected ids are structurally impossible. If FLEET_LAYOUT ever becomes
   // dynamic (e.g. a new controller location is added), add a `watch` here
@@ -175,11 +199,41 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   // ---------- WS handlers (the sole writers of server-pushed fields) ----------
 
+  /**
+   * Translate a wire-level controllerId (MAC) to a fleet slot id
+   * ('body' / 'core' / 'dome'). Returns null for unknown MACs — the caller
+   * surfaces a dev warning and drops the update so the panel can't render
+   * stale per-controller pills against an unknown row.
+   */
+  function resolveSlot(controllerId: string): string | null {
+    const cs = useControllerStore();
+    const loc = cs.controllerIdToLocation(controllerId);
+    return loc;
+  }
+
   function buildControllerStatesMap(
-    states: ReadonlyArray<ControllerFlashState>,
+    states: ReadonlyArray<ControllerFlashState> | undefined,
   ): ReadonlyMap<string, ControllerFlashState> {
     const m = new Map<string, ControllerFlashState>();
-    for (const s of states) m.set(s.controllerId, s);
+    // Defensive: a malformed flashJobStarted with no `controllers` field
+    // must not throw on iteration. The empty Map is a valid intermediate
+    // state — flashControllerUpdate events will populate it as they arrive.
+    if (!states) return m;
+    for (const s of states) {
+      const slot = resolveSlot(s.controllerId);
+      if (slot === null) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            `[firmwareStore] applyJobStarted: unknown controllerId="${s.controllerId}" ` +
+              `(no MAC → location mapping yet). Dropping this entry; LocationStatus must arrive first.`,
+          );
+        }
+        continue;
+      }
+      // Re-key by slot so the panel's progressByControllerId[c.id] lookup
+      // (where c.id is 'body'/'core'/'dome') resolves correctly.
+      m.set(slot, { ...s, controllerId: slot });
+    }
     return m;
   }
 
@@ -198,8 +252,18 @@ export const useFirmwareStore = defineStore('firmware', () => {
   }
 
   function applyControllerUpdate(data: ControllerFlashState): void {
+    const slot = resolveSlot(data.controllerId);
+    if (slot === null) {
+      if (import.meta.env.DEV) {
+        console.warn(
+          `[firmwareStore] applyControllerUpdate: unknown controllerId="${data.controllerId}". ` +
+            `Update ignored. LocationStatus must populate the MAC mapping first.`,
+        );
+      }
+      return;
+    }
     const next = new Map(controllerStates.value);
-    next.set(data.controllerId, data);
+    next.set(slot, { ...data, controllerId: slot });
     controllerStates.value = next;
     const ui = mapServerStageToUiStage(data.stage);
     if (ui !== null) currentStage.value = ui;
@@ -234,10 +298,15 @@ export const useFirmwareStore = defineStore('firmware', () => {
       };
     }
     phase.value = 'failed';
-    flashError.value = {
-      reason: 'internal_server_error',
-      detail: data.detail,
-    };
+    // Map server-side reason onto FlashErrorReason if recognized, otherwise
+    // fall back to internal_server_error. Forward-compat: a new server-side
+    // reason renders the generic banner until the client union is updated.
+    const reason: FlashErrorReason =
+      typeof data.reason === 'string' &&
+      KNOWN_FLASH_ERROR_REASONS.has(data.reason as FlashErrorReason)
+        ? (data.reason as FlashErrorReason)
+        : 'internal_server_error';
+    flashError.value = { reason, detail: data.detail };
     // Find the controller that ended in FAILED; surface its label + UI stage.
     for (const state of controllerStates.value.values()) {
       if (state.stage === 'FAILED') {
