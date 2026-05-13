@@ -851,6 +851,28 @@ describe('firmware store', () => {
       expect(store.controllerStates.get('core')?.stage).toBe('VERSION_CONFIRMED');
     });
 
+    it('emits a console.warn for each non-terminal stage normalized (round-6 C2 forensic breadcrumb)', () => {
+      // The normalize masks a real bug if the server emits flashJobDone
+      // prematurely. The warn is the post-incident breadcrumb so operators'
+      // dev console + production logs surface the contract drift.
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState());
+        // Body at SENDING, core left at QUEUED — both non-terminal.
+        store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
+        store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+        const warnText = warnSpy.mock.calls.flat().join(' ');
+        expect(warnText).toContain('normalizing non-terminal stage');
+        expect(warnText).toContain('slot="body"');
+        expect(warnText).toContain('slot="core"');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
     it('does NOT overwrite FAILED stages during the done normalize', () => {
       // The normalize should only touch in-flight stages, not terminal
       // ones. A controller that legitimately FAILED should stay FAILED
@@ -926,6 +948,13 @@ describe('firmware store', () => {
         controllerId: CORE_MAC,
         stage: 'FAILED',
         error: 'hash_mismatch',
+      });
+      // Mark body as VERSION_CONFIRMED so the round-6 C1 normalize doesn't
+      // demote it to FAILED (body would otherwise be QUEUED → demoted).
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'VERSION_CONFIRMED',
+        finalVersion: 'v1.4.2',
       });
       store.applyJobFailed({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
       expect(store.failedControllers).toHaveLength(1);
@@ -1004,15 +1033,18 @@ describe('firmware store', () => {
       }
     });
 
-    it('leaves failedControllers empty when no controller transitioned to FAILED before job-failed (mid-deploy abort)', () => {
-      // Edge case: applyJobStarted runs, no per-controller updates land,
-      // then a mid-deploy abort (e.g., bus_send_failed) fires
-      // flashJobFailed. The store should still transition phase + set
-      // flashError, and the FirmwareView template guards on
-      // `failedControllers[0]?.stage` so an empty array is safe to render.
+    it('leaves failedControllers empty when controllerStates is empty (pre-streamer abort with no snapshot)', () => {
+      // Pre-streamer failure (e.g., release_not_found, bus_send_failed
+      // before any controller-update): no flashJobStarted snapshot landed
+      // first, so controllerStates is empty. Nothing to demote; the array
+      // is empty. The FirmwareView template guards on
+      // `failedControllers[0]?.stage`, and the panel's result bar uses
+      // the multi-failure copy (via failedCount === 0 → multi key per I2).
+      // Note: round-6 C1 changes the post-applyJobStarted behavior — see
+      // the new "normalizes non-terminal stages to FAILED" test for that.
       const store = useFirmwareStore();
       seedSampleFleet();
-      store.applyJobStarted(sampleJobState());
+      // Deliberately skip applyJobStarted to leave controllerStates empty.
       store.applyJobFailed({
         jobId: 'job-1',
         endedAt: '2026-05-12T08:05:00Z',
@@ -1034,6 +1066,58 @@ describe('firmware store', () => {
       ).not.toThrow();
       expect(store.phase).toBe('failed');
       expect(store.flashError).not.toBeNull();
+    });
+
+    it('normalizes non-terminal per-controller stages to FAILED (round-6 C1 fix: parallel to applyJobDone)', () => {
+      // Symmetry: applyJobDone normalizes mid-flow stages to VERSION_CONFIRMED
+      // to prevent the "✓ all updated" result bar contradicting a still-
+      // spinning row. applyJobFailed had the inverse gap — a row stuck at
+      // SENDING when the job failed kept spinning under a "failed" banner.
+      // Now non-terminals are demoted to FAILED (with no error string,
+      // signaling "unattributed" vs server-emitted FAILED entries that
+      // carry the real reason).
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
+      // core left at QUEUED from sampleJobState
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason: 'bus_send_failed',
+      });
+
+      expect(store.controllerStates.get('body')?.stage).toBe('FAILED');
+      expect(store.controllerStates.get('core')?.stage).toBe('FAILED');
+      // The demoted entries carry no `error` string — they weren't
+      // server-reported as FAILED, they were normalized.
+      expect(store.controllerStates.get('body')?.error).toBeUndefined();
+      // failedControllers reflects the demoted entries.
+      const ids = store.failedControllers.map((c) => c.id);
+      expect(ids).toEqual(['body', 'core']);
+    });
+
+    it('preserves server-reported FAILED entries during the failed normalize (preserves their error string)', () => {
+      // A controller that legitimately FAILED (with the server's error
+      // reason) must keep its error attribute. The normalize must only
+      // touch non-terminal stages.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({
+        controllerId: CORE_MAC,
+        stage: 'FAILED',
+        error: 'hash_mismatch',
+      });
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason: 'bus_send_failed',
+      });
+
+      // CORE's error string survives; body is demoted with no error.
+      expect(store.controllerStates.get('core')?.error).toBe('hash_mismatch');
+      expect(store.controllerStates.get('body')?.error).toBeUndefined();
     });
 
     it('clears pendingByMac so a late LocationStatus cannot replay stale entries onto failed state (C2 fix)', () => {

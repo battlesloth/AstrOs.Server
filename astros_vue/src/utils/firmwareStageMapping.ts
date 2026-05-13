@@ -30,11 +30,15 @@ export function mapServerStageToUiStage(stage: ServerFwStage): FirmwareStage | n
       // Forward-compat: a future server-side `ServerFwStage` value would
       // otherwise fall through this switch and return undefined, breaking
       // downstream `if (ui !== null)` checks (undefined !== null is true).
-      // Treat unknown stages as "no UI stage" so the row simply stays at
-      // its previous pill state rather than mis-rendering.
+      // Treat unknown stages as "no UI stage" so the global stage indicator
+      // stays at its previous value rather than flipping to undefined.
       // The `_exhaustive: never` assignment is a compile-time guard: if a
       // new ServerFwStage value is added to the union without a matching
-      // case above, this line fails type-check. Runtime is unaffected.
+      // case above, this line fails type-check.
+      console.warn(
+        `[firmwareStageMapping] mapServerStageToUiStage: unknown stage="${stage}". ` +
+          `Server contract drift — global stage indicator will not advance until a recognized stage arrives.`,
+      );
       const _exhaustive: never = stage;
       void _exhaustive;
       return null;
@@ -60,9 +64,16 @@ export function controllerStatePillKind(state: ControllerFlashState): FirmwareSt
       // Forward-compat: an unknown ServerFwStage would otherwise return
       // undefined from this switch, and the row would render with an
       // undefined pill kind. Map to 'updating' as the safest fallback —
-      // the row keeps spinning until a recognized stage arrives. The
-      // `_exhaustive: never` assignment is a compile-time guard mirroring
-      // mapServerStageToUiStage above.
+      // the row remains in the 'updating' indicator until a recognized
+      // stage arrives. The `_exhaustive: never` assignment is a compile-
+      // time guard mirroring mapServerStageToUiStage above. The warn
+      // surfaces server contract drift in production logs: an unrecognized
+      // terminal stage (e.g. a future 'CANCELLED') would otherwise leave
+      // the row stuck on 'updating' forever with no breadcrumb.
+      console.warn(
+        `[firmwareStageMapping] controllerStatePillKind: unknown stage="${state.stage}" ` +
+          `for controllerId="${state.controllerId}". Server contract drift — row will stay on 'updating' until a recognized stage arrives.`,
+      );
       const _exhaustive: never = state.stage;
       void _exhaustive;
       return 'updating';

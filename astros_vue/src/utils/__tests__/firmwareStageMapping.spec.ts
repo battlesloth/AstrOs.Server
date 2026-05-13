@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   controllerStageLabelKey,
   controllerStatePillKind,
@@ -41,6 +41,18 @@ describe('mapServerStageToUiStage', () => {
     const unknown = 'WAITING_ON_NETWORK' as unknown as ServerFwStage;
     expect(mapServerStageToUiStage(unknown)).toBeNull();
   });
+
+  it('emits a console.warn for unknown stages so contract drift is debuggable (round-6 C3 breadcrumb)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const unknown = 'CANCELLED' as unknown as ServerFwStage;
+      mapServerStageToUiStage(unknown);
+      const warnText = warnSpy.mock.calls.flat().join(' ');
+      expect(warnText).toContain('unknown stage="CANCELLED"');
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });
 
 describe('controllerStatePillKind', () => {
@@ -61,6 +73,21 @@ describe('controllerStatePillKind', () => {
 
   it('returns failed for FAILED', () => {
     expect(controllerStatePillKind(state('FAILED'))).toBe('failed');
+  });
+
+  it('emits a console.warn for unknown stages (round-6 C3 breadcrumb)', () => {
+    // A future ServerFwStage like 'CANCELLED' would render an 'updating'
+    // pill forever (no terminal stage update will arrive). The warn
+    // surfaces the contract drift in dev console + production logs.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const unknown = 'CANCELLED' as unknown as ServerFwStage;
+      controllerStatePillKind(state(unknown));
+      const warnText = warnSpy.mock.calls.flat().join(' ');
+      expect(warnText).toContain('unknown stage="CANCELLED"');
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('returns updating (not undefined) for unknown future server stages (C3 forward-compat)', () => {

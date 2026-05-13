@@ -356,14 +356,25 @@ export const useFirmwareStore = defineStore('firmware', () => {
     currentStage.value = null;
     // Normalize any per-controller state that's still mid-flow to
     // VERSION_CONFIRMED. The server emits flashJobDone when the LAST
-    // VERSION_CONFIRMED is observed, but a flashControllerUpdate carrying
-    // that final stage may not have drained the WS buffer yet (or may
-    // never arrive in some race orderings). Without this normalize, the
-    // panel renders the "✓ all updated" result bar while individual rows
-    // still spin at "updating" — visibly contradictory operator state.
+    // VERSION_CONFIRMED is observed, but the carrying flashControllerResult
+    // may not have drained the WS buffer yet (or may never arrive in some
+    // race orderings). Without this normalize, the panel renders the "✓
+    // all updated" result bar while individual rows still spin at
+    // "updating" — visibly contradictory operator state.
+    //
+    // Trade-off: this MASKS a real bug if the server emits flashJobDone
+    // prematurely (orchestrator race, dropped final POLL_ACK, etc.). A
+    // non-terminal row would silently be relabeled VERSION_CONFIRMED. The
+    // console.warn below is the post-incident breadcrumb — operators
+    // won't see it, but server logs + dev console will surface drift.
     const normalized = new Map(controllerStates.value);
     for (const [slot, state] of normalized) {
       if (state.stage !== 'VERSION_CONFIRMED' && state.stage !== 'FAILED') {
+        console.warn(
+          `[firmwareStore] applyJobDone: normalizing non-terminal stage="${state.stage}" ` +
+            `for slot="${slot}" to VERSION_CONFIRMED. ` +
+            `Server emitted job-done before this controller reached terminal — verify the controller actually flashed.`,
+        );
         normalized.set(slot, { ...state, stage: 'VERSION_CONFIRMED' });
       }
     }
@@ -403,14 +414,31 @@ export const useFirmwareStore = defineStore('firmware', () => {
         ? (data.reason as FlashErrorReason)
         : 'internal_server_error';
     flashError.value = { reason, detail: data.detail };
-    // Collect ALL controllers that ended in FAILED. Multi-failure is realistic
-    // (e.g. bus-wide ESP-NOW failure fails both padawans at once); surfacing
-    // only the first would let the operator walk away from a bricked unit.
-    // The stage is taken from `currentStage` at the time of failure if known;
-    // otherwise null. The previous 'transfer' literal fallback misattributed
-    // every unknown-stage failure to the transfer step.
+    // Normalize any per-controller state still mid-flow to FAILED. Mirrors
+    // applyJobDone's normalize (round-5 I4) but for the failure path: a
+    // controller stuck at QUEUED/SENDING when the job ends has by
+    // definition NOT confirmed, so showing a spinning "updating" pill
+    // beneath the "failed" result bar is contradictory. Demote to FAILED
+    // with no `error` string — the absence signals "unattributed" vs the
+    // server-emitted FAILED entries that carry the real `error` reason.
+    const normalized = new Map(controllerStates.value);
+    for (const [slot, state] of normalized) {
+      if (state.stage !== 'VERSION_CONFIRMED' && state.stage !== 'FAILED') {
+        console.warn(
+          `[firmwareStore] applyJobFailed: demoting non-terminal stage="${state.stage}" ` +
+            `for slot="${slot}" to FAILED (unattributed). Job ended before this controller reached a terminal stage.`,
+        );
+        normalized.set(slot, { ...state, stage: 'FAILED' });
+      }
+    }
+    controllerStates.value = normalized;
+    // Collect ALL controllers that ended in FAILED (including the ones we
+    // just demoted). Multi-failure is realistic (bus-wide ESP-NOW failure
+    // fails both padawans); surfacing only the first would let the
+    // operator walk away from a bricked unit. The stage reflects
+    // `currentStage` at failure time — null when no stage was current.
     const failed: Array<{ id: string; label: string; stage: FirmwareStage | null }> = [];
-    for (const state of controllerStates.value.values()) {
+    for (const state of normalized.values()) {
       if (state.stage === 'FAILED') {
         const c = controllers.value.find((x) => x.id === state.controllerId);
         failed.push({
