@@ -1,6 +1,6 @@
 # Firmware OTA — Vue UI QA
 
-Manual operator-flow QA for the `/firmware` view shipped across phase D (PRs d.1–d.6). Run end-to-end after d.6 merges. Unit-level coverage of the WS dispatcher, store handlers, type mapping, and lock-aware components lives in vitest (171 tests at d.6 close).
+Manual operator-flow QA for the `/firmware` view shipped across phase D (PRs d.1–d.6). Run end-to-end after d.6 merges. Unit-level coverage of the WS dispatcher, store handlers, type mapping, and lock-aware components lives in vitest (202 tests at d.6 close).
 
 ## Preconditions
 

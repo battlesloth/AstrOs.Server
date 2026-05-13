@@ -109,6 +109,7 @@
       "result_bar": {
         "all_updated": "✓ All {count} controller(s) updated",
         "failed_summary": "⚠ {label} failed during {stage}",
+        "failed_summary_multi": "⚠ {labels} failed during the flash",
         "view_logs": "View logs",
         "done": "Done"
       },
@@ -176,7 +177,8 @@
       "title": "Firmware update in progress",
       "body": "Another operator started a firmware update at {since}. Wait for it to finish before starting a new one."
     },
-    "current_job_load_failed": "Could not confirm current firmware state. A flash may be in flight — refresh to retry."
+    "current_job_load_failed": "Could not confirm current firmware state. A flash may be in flight — refresh to retry.",
+    "flash_stream_suspended": "Live updates paused — reconnecting to the server. Progress shown may be stale."
   },
   "placeholder": {
     "username": "username",

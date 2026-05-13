@@ -722,6 +722,33 @@ describe('firmware store', () => {
       expect(store.flashError).toBeNull();
       expect(store.failedControllers).toEqual([]);
     });
+
+    it('clears currentJobLoadFailed — WS snapshot supersedes HTTP staleness (I4 fix)', () => {
+      // A failed fetchCurrentJob lit the staleness banner; when the WS late-
+      // join snapshot lands, live state is available again and the banner
+      // is no longer accurate.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.currentJobLoadFailed = true;
+      store.applyJobStarted(sampleJobState());
+      expect(store.currentJobLoadFailed).toBe(false);
+    });
+
+    it('clears pendingByMac so orphan entries from a prior job cannot replay against the new one (I10 fix)', () => {
+      // Operator runs flash A; a padawan's LocationStatus never arrived, so
+      // its entries stay queued. Flash A ends without resetToSelect (e.g.,
+      // server-initiated reconnect mid-job). Flash B's snapshot arrives.
+      // Without this clear, when LocationStatus finally arrives for that
+      // MAC, the queued entries would replay against the new job's state.
+      const store = useFirmwareStore();
+      store.applyControllerUpdate({ controllerId: 'orphan-mac', stage: 'SENDING' });
+      expect(store.pendingByMac.size).toBe(1);
+
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState({ jobId: 'job-B' }));
+
+      expect(store.pendingByMac.size).toBe(0);
+    });
   });
 
   describe('applyControllerUpdate', () => {
@@ -759,6 +786,28 @@ describe('firmware store', () => {
       const before = store.controllerStates;
       store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
       expect(store.controllerStates).not.toBe(before);
+    });
+
+    it('clears currentJobLoadFailed on a successful update — belt-and-suspenders (I4 fix)', () => {
+      // If applyJobStarted was missed (unusual reconnect ordering), a
+      // successful per-controller update is still proof that live state is
+      // flowing for a known controller. Clear the staleness banner.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.currentJobLoadFailed = true;
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
+      expect(store.currentJobLoadFailed).toBe(false);
+    });
+
+    it('does NOT clear currentJobLoadFailed when the update is queued (C1 fix)', () => {
+      // The clear MUST stay below the null-slot return. An unmapped MAC
+      // means we can't trust the update yet; clearing the banner here would
+      // silently dismiss the operator's only "something wrong" signal.
+      const store = useFirmwareStore();
+      // No seedSampleFleet — MAC mappings are absent.
+      store.currentJobLoadFailed = true;
+      store.applyControllerUpdate({ controllerId: 'unmapped-mac', stage: 'SENDING' });
+      expect(store.currentJobLoadFailed).toBe(true);
     });
   });
 
@@ -866,6 +915,13 @@ describe('firmware store', () => {
       expect(store.failedControllers).toHaveLength(2);
       const ids = store.failedControllers.map((c) => c.id).sort();
       expect(ids).toEqual(['body', 'core']);
+      // Pin the full record shape per entry: a mutation that surfaced only
+      // {id} (dropping label / stage) would otherwise pass this test.
+      const labels = store.failedControllers.map((c) => c.label).sort();
+      expect(labels).toEqual(['Body', 'Core']);
+      for (const entry of store.failedControllers) {
+        expect(entry.stage).toBeTruthy();
+      }
     });
 
     it('leaves failedControllers empty when no controller transitioned to FAILED before job-failed (mid-deploy abort)', () => {
@@ -959,12 +1015,31 @@ describe('firmware store', () => {
       expect(store.phase).toBe('idle');
     });
 
-    it('swallows network errors (UI stays in current phase)', async () => {
+    it('swallows network errors (UI stays in current phase) but sets currentJobLoadFailed', async () => {
       apiClientGet.mockRejectedValueOnce(new Error('network'));
       const store = useFirmwareStore();
       seedSampleFleet();
       await store.fetchCurrentJob();
       expect(store.currentJob).toBeNull();
+      expect(store.currentJobLoadFailed).toBe(true);
+    });
+
+    it('treats 404 as expected idle state — does NOT set currentJobLoadFailed (I3 fix)', async () => {
+      // 404 is the healthy idle response from /api/firmware/flash when no
+      // flash is in flight. Surfacing it as "could not confirm state" would
+      // falsely alarm operators on first page load. Only 5xx and network
+      // errors should trigger the staleness banner.
+      apiClientGet.mockRejectedValueOnce({ response: { status: 404 } });
+      const store = useFirmwareStore();
+      await store.fetchCurrentJob();
+      expect(store.currentJobLoadFailed).toBe(false);
+    });
+
+    it('treats 5xx as staleness — sets currentJobLoadFailed', async () => {
+      apiClientGet.mockRejectedValueOnce({ response: { status: 503 } });
+      const store = useFirmwareStore();
+      await store.fetchCurrentJob();
+      expect(store.currentJobLoadFailed).toBe(true);
     });
   });
 

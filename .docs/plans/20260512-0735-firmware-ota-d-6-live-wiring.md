@@ -200,7 +200,7 @@ Tooltip key: prefer `firmware_view.lock_active` when only `jobLock.locked`; exis
 
 **Scope shipped:** smoke spec covering page-chrome rendering, source-strip toggle visibility, controllers-panel header (Select all / Clear), and Flash-button initial disabled state. No WS-driven phase progression — that requires a WS-mock infrastructure the project doesn't have yet.
 
-**Coverage substitute:** the 5 `apply*` handlers, late-join idempotency, replace-not-merge, and lock-conflict logic are exhaustively covered by 21 new vitest tests in `firmware.spec.ts`. The end-to-end operator flow (cold-load, happy-path, failure path, late-join, lock-conflict, WS reconnect, network failure, reduced-motion, dev-warns) lives in the manual QA plan at `.docs/qa/firmware-ota-flash-ui.md` (12 scenarios).
+**Coverage substitute:** the 5 `apply*` handlers, late-join idempotency, replace-not-merge, lock-conflict logic, replay queue, multi-FAILED collection, and HTTP-staleness handling are exhaustively covered by the firmware/composables/views vitest suites (202 tests total at branch tip across rounds 1–4). The end-to-end operator flow (cold-load, happy-path, failure path, late-join, lock-conflict, WS reconnect, network failure, reduced-motion, dev-warns) lives in the manual QA plan at `.docs/qa/firmware-ota-flash-ui.md` (12 scenarios).
 
 ---
 
@@ -251,7 +251,7 @@ This is the concurrency-surface PR of phase D. Each row has explicit unit-test c
 ## Verification
 
 1. `npm run build` succeeds.
-2. `npx vitest run` — new unit tests for the 5 `applyXxx` handlers, `mapServerStageToUiStage`, `controllerStatePillKind`, `fetchCurrentJob`, and the 7 FMI hazards above. Plus updated `AstrosWriteButton` test suite (existing 9 + 3 new). Plus all 118 prior tests keep passing.
+2. `npx vitest run` — 202 tests pass at branch tip across the firmware/composables/views test suites. Includes coverage for the 5 `applyXxx` handlers, `mapServerStageToUiStage`, `controllerStatePillKind`, `fetchCurrentJob` (incl. 404 vs 5xx), the 7 original FMI hazards, replay queue + multi-FAILED, staleness banner, lock-conflict gating, and dispatcher rollback paths. Updated `AstrosWriteButton` (existing 9 + 3 new).
 3. `npx playwright test firmware-flash.spec.ts` — the e2e spec passes locally against the mocked WS.
 4. `npm run storybook` — visual regression of d.3/d.4/d.5 stories unchanged. New stories for the lock-conflict banner (FirmwareView and AstrosLayout siblings).
 5. Manual `npm run dev` smoke test:

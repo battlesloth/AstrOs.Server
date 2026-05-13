@@ -3,6 +3,8 @@
 // `types/` so neither the store nor the api service has to import from
 // each other to share these shapes.
 
+import { Location } from '@/enums';
+
 export interface AssetInfo {
   variant: string;
   version: string;
@@ -123,26 +125,12 @@ export type ServerFwStage =
   | 'FAILED';
 
 /**
- * Branded type for a controller's hardware MAC address (e.g.
- * `"aa:bb:cc:dd:ee:01"`). On the wire, the server uses MAC to identify
- * controllers in flash-related messages. Inside the firmware store, MAC
- * is translated to `SlotId` via the controllerStore's resolver.
- *
- * The brand is documentation-only — TS can't enforce nominality across
- * the WS boundary where payloads arrive as untyped JSON. The contract is:
- * if you see `Mac` in a type, the value is the raw wire identifier; if
- * you see `SlotId`, it has been translated.
- */
-export type Mac = string & { readonly __brand: 'Mac' };
-
-/**
  * Fleet slot identifier — the in-store key for per-controller state.
- * Matches the runtime values of `Location.BODY` / `Location.CORE` /
- * `Location.DOME` (which is why those enum values are loose strings).
- * `Location.UNKNOWN` is excluded by construction: an unknown slot can't
- * key per-controller state.
+ * Derived from `Location` so adding a new fleet location updates this type
+ * automatically. `Location.UNKNOWN` is excluded because an unknown slot
+ * can't key per-controller state.
  */
-export type SlotId = 'body' | 'core' | 'dome';
+export type SlotId = Exclude<Location, Location.UNKNOWN>;
 
 /**
  * Mirror of the server's `ControllerFlashState` discriminated union narrowed
@@ -151,8 +139,9 @@ export type SlotId = 'body' | 'core' | 'dome';
  *
  * NB: `controllerId` semantics depend on data-flow position. On the wire
  * (server → client), it's a MAC. After `buildControllerStatesMap` rewrites
- * it to the slot id, it's a `SlotId` (but still typed `string` because the
- * brand can't survive a `... as ControllerFlashState` JSON cast).
+ * it to the slot id, it's a `SlotId`. The field is typed `string` because
+ * TS can't enforce nominal MAC-vs-slot distinction across the JSON cast
+ * at the WS boundary — see the doc comment in `buildControllerStatesMap`.
  */
 export interface ControllerFlashState {
   controllerId: string;

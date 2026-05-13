@@ -6,6 +6,7 @@ import { useFirmwareStore } from '@/stores/firmware';
 import AstrosFirmwareControllerRow from '../firmwareControllerRow/AstrosFirmwareControllerRow.vue';
 import AstrosFirmwareButton from '../firmwareButton/AstrosFirmwareButton.vue';
 import type { ControllersPanelProps } from './types';
+import type { SlotId } from '@/types/firmware';
 
 const props = defineProps<ControllersPanelProps>();
 const emit = defineEmits<{
@@ -54,7 +55,7 @@ if (import.meta.env.DEV) {
     }
     if (props.phase !== 'select' && props.progressByControllerId !== undefined) {
       const missing = controllers.value
-        .filter((c) => props.progressByControllerId?.[c.id] === undefined)
+        .filter((c) => props.progressByControllerId?.[c.id as SlotId] === undefined)
         .map((c) => c.id);
       if (missing.length > 0) {
         console.warn(
@@ -115,8 +116,8 @@ const actionBarMessage = computed(() => {
           :target="target"
           :mode="rowMode"
           :selected="selectedControllerIds.has(c.id)"
-          :progress-status="progressByControllerId?.[c.id]?.status"
-          :stage-label-key="progressByControllerId?.[c.id]?.stageLabelKey"
+          :progress-status="progressByControllerId?.[c.id as SlotId]?.status"
+          :stage-label-key="progressByControllerId?.[c.id as SlotId]?.stageLabelKey"
           @toggle="firmware.toggle"
         />
       </li>
@@ -210,10 +211,17 @@ const actionBarMessage = computed(() => {
         class="astros-firmware-controllers-panel__result-text astros-firmware-controllers-panel__result-text--failed"
       >
         {{
-          t('firmware_view.controllers.result_bar.failed_summary', {
-            label: failedControllerLabel ?? '—',
-            stage: failedStage ? t(`firmware_view.stages.${failedStage}.label`) : '—',
-          })
+          // Use the multi-failure copy for >=2 AND for 0 (pre-streamer
+          // abort: job failed before any controller transitioned to FAILED;
+          // the singular key's `{stage}` placeholder would render '—').
+          (failedCount ?? 1) !== 1
+            ? t('firmware_view.controllers.result_bar.failed_summary_multi', {
+                labels: failedControllerLabel ?? '—',
+              })
+            : t('firmware_view.controllers.result_bar.failed_summary', {
+                label: failedControllerLabel ?? '—',
+                stage: failedStage ? t(`firmware_view.stages.${failedStage}.label`) : '—',
+              })
         }}
       </span>
       <div class="astros-firmware-controllers-panel__action-bar-buttons">

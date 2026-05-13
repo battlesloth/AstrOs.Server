@@ -250,11 +250,13 @@ export function useWebsocket() {
   }
 
   // Firmware-flash WS handlers. The happy path delegates to the firmwareStore's
-  // apply* actions (sole writer of server-pushed flash state). On a malformed
-  // payload the dispatcher falls back to a direct phase/flashError write so the
-  // UI exits 'flashing' rather than wedging — the store doesn't see invalid
-  // data so it can't recover by itself. Pin: a swallowed error must still
-  // produce a terminal phase transition for the three handlers that own one.
+  // apply* actions; the catch path may also write `store.flashError` directly
+  // (when the store can't see the malformed input to recover by itself). Pin:
+  // a swallowed error must still produce an operator-visible signal. The job-
+  // lifecycle handlers (Started/Done/Failed) transition phase in their catch
+  // (Started → 'select' rollback; Done → 'done'; Failed → 'failed'); the
+  // mid-stream handlers (controllerUpdate/Result) surface flashError without
+  // rolling phase since the next valid update can recover the row.
   function handleFlashJobStarted(message: BaseWsMessage) {
     const store = useFirmwareStore();
     try {

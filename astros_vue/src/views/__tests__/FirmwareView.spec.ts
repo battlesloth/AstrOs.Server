@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { ref } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { createI18n } from 'vue-i18n';
 import { createRouter, createMemoryHistory } from 'vue-router';
@@ -14,6 +15,18 @@ vi.mock('@/api/apiService', () => ({
     post: vi.fn(),
     delete: vi.fn(),
   },
+}));
+
+// Controllable WS state for the flash-stream-suspended banner tests.
+const mockWsIsConnected = ref(true);
+vi.mock('@/composables/useWebsocket', () => ({
+  useWebsocket: () => ({
+    wsIsConnected: mockWsIsConnected,
+    wsConnect: vi.fn(),
+    wsDisconnect: vi.fn(),
+    wsSendMessage: vi.fn(),
+    handleMessage: vi.fn(),
+  }),
 }));
 
 import FirmwareView from '@/views/FirmwareView.vue';
@@ -58,6 +71,7 @@ function mountFirmwareView() {
 describe('FirmwareView lock-conflict gating (I7)', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    mockWsIsConnected.value = true;
   });
 
   it('shows the in-page role="alert" lock-conflict region when lock is held by another operator', async () => {
@@ -117,5 +131,88 @@ describe('FirmwareView lock-conflict gating (I7)', () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+  });
+});
+
+describe('FirmwareView staleness banner (I5)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockWsIsConnected.value = true;
+  });
+
+  it('shows the role="status" staleness region when currentJobLoadFailed is true', async () => {
+    // Pin role="status" specifically (not "alert") — a regression that
+    // swapped the role would pass the lock-conflict alert tests above
+    // because they only assert visibility on `[role="alert"]`. The
+    // staleness banner is ambient, not interrupting.
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.currentJobLoadFailed = true;
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    // findAll + text-match: there are two role="status" banners now
+    // (current-job-load-failed + flash-stream-suspended). Match by text
+    // so a future banner-order change doesn't flake this test.
+    const statuses = wrapper.findAll('[role="status"]');
+    const stale = statuses.find((el) => el.text().includes('Could not confirm'));
+    expect(stale).toBeTruthy();
+  });
+
+  it('hides the staleness region when currentJobLoadFailed is false (negative baseline)', async () => {
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const statuses = wrapper.findAll('[role="status"]');
+    expect(statuses.find((el) => el.text().includes('Could not confirm'))).toBeUndefined();
+  });
+});
+
+describe('FirmwareView flash-stream-suspended banner (I1)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockWsIsConnected.value = true;
+  });
+
+  it('shows the "live updates paused" banner when phase==="flashing" and WS is disconnected', async () => {
+    // I1 fix: without this signal the operator stares at frozen progress
+    // bars with no indication the WS stream has stopped.
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('flashing');
+    mockWsIsConnected.value = false;
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const statuses = wrapper.findAll('[role="status"]');
+    const suspended = statuses.find((el) => el.text().includes('Live updates paused'));
+    expect(suspended).toBeTruthy();
+  });
+
+  it('hides the banner when WS is connected even if phase==="flashing"', async () => {
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('flashing');
+    mockWsIsConnected.value = true;
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const statuses = wrapper.findAll('[role="status"]');
+    expect(statuses.find((el) => el.text().includes('Live updates paused'))).toBeUndefined();
+  });
+
+  it('hides the banner when WS is disconnected but phase is not flashing', async () => {
+    // The banner is scoped to mid-flash: a disconnected WS during select/
+    // idle phases is recovered by reconnect with no operator action; the
+    // alarm cost would be too high.
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('select');
+    mockWsIsConnected.value = false;
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const statuses = wrapper.findAll('[role="status"]');
+    expect(statuses.find((el) => el.text().includes('Live updates paused'))).toBeUndefined();
   });
 });

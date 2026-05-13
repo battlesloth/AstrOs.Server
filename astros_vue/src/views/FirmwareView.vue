@@ -12,6 +12,7 @@ import {
 } from '@/components';
 import { useFirmwareStore } from '@/stores/firmware';
 import { useJobLockStore } from '@/stores/jobLock';
+import { useWebsocket } from '@/composables/useWebsocket';
 import type { FirmwareControllerView, TopologyFleet } from '@/components';
 
 import '@fontsource/inter/400.css';
@@ -36,6 +37,12 @@ const {
   currentJobLoadFailed,
 } = storeToRefs(firmware);
 const { locked: lockLocked, since: lockSince } = storeToRefs(jobLock);
+// WS connection state. Drives the "live updates suspended" banner when a
+// flash is in flight but the socket is down — without this signal the
+// operator would stare at frozen progress with no indication that the
+// stream has stopped.
+const { wsIsConnected } = useWebsocket();
+const flashStreamSuspended = computed(() => phase.value === 'flashing' && !wsIsConnected.value);
 
 const confirmOpen = ref(false);
 
@@ -81,8 +88,9 @@ const lockSinceFormatter = new Intl.DateTimeFormat(undefined, {
 const lockSinceFormatted = computed(() => {
   const raw = lockSince.value;
   if (raw === null) return '—';
-  // Defensive: a malformed ISO would throw on Date construction's NaN path.
-  // Fall back to the raw string so the operator at least sees something.
+  // Defensive: a malformed ISO produces an Invalid Date whose getTime()
+  // returns NaN. Fall back to the raw string so the operator at least
+  // sees something instead of a NaN/Invalid string from the formatter.
   const d = new Date(raw);
   return Number.isNaN(d.getTime()) ? raw : lockSinceFormatter.format(d);
 });
@@ -157,10 +165,18 @@ onMounted(async () => {
           </div>
 
           <div
+            v-if="flashStreamSuspended"
+            class="firmware-view__stale-warning"
+            role="status"
+            aria-live="polite"
+          >
+            {{ t('firmware_view.flash_stream_suspended') }}
+          </div>
+
+          <div
             v-if="lockConflict"
             class="firmware-view__lock-conflict"
             role="alert"
-            aria-live="polite"
           >
             <span class="firmware-view__lock-conflict-title">{{
               t('firmware_view.lock_conflict.title')
@@ -199,6 +215,7 @@ onMounted(async () => {
               :progress-by-controller-id="progressByControllerId"
               :failed-controller-label="failedControllerLabels || undefined"
               :failed-stage="failedStage ?? undefined"
+              :failed-count="failedControllers.length"
               @flash="openConfirm"
               @done="onResultBarDone"
             />

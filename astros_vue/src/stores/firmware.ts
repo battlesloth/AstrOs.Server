@@ -190,6 +190,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     controllerStates.value = new Map();
     ownJobId.value = null;
     pendingByMac.value = new Map();
+    currentJobLoadFailed.value = false;
   }
 
   function dismissError(): void {
@@ -255,6 +256,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
     // the server emits flashJobStarted snapshots on connect, before any
     // post-reconnect flashControllerUpdate.
     currentJob.value = data;
+    // Drop any pending entries from a prior job before processing the new
+    // snapshot. Without this clear, orphan entries (a MAC that never got
+    // its LocationStatus during the prior job) would persist and replay
+    // against the wrong job once their LocationStatus finally arrived.
+    pendingByMac.value = new Map();
     controllerStates.value = buildControllerStatesMap(data.controllers);
     if (phase.value !== 'flashing') phase.value = 'flashing';
     flashError.value = null;
@@ -280,8 +286,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
       return;
     }
     // Belt-and-suspenders: a successful WS update is proof that live state
-    // is flowing for a known controller. Clear the staleness banner in
-    // case fetchCurrentJob earlier failed and applyJobStarted never fired.
+    // is flowing for a known controller. The applyJobStarted clear is the
+    // primary path (server emits the snapshot before per-controller updates
+    // on reconnect per applyJobStarted's ordering note); this clear catches
+    // edge cases where HTTP fetch failed AND the snapshot was missed.
     currentJobLoadFailed.value = false;
     const next = new Map(controllerStates.value);
     next.set(slot, { ...data, controllerId: slot });
@@ -330,6 +338,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
     phase.value = 'done';
     currentStage.value = null;
+    // Terminal state — the staleness banner is no longer relevant. Without
+    // this clear, a fetchCurrentJob failure earlier in the session would
+    // leave the warning visible on top of the legitimate done-flash UI.
+    currentJobLoadFailed.value = false;
   }
 
   function applyJobFailed(data: FlashJobFailedData): void {
@@ -372,6 +384,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
     failedControllers.value = failed;
     currentStage.value = null;
+    // Terminal state — clear the staleness banner so it can't shadow the
+    // legitimate failed-flash UI.
+    currentJobLoadFailed.value = false;
   }
 
   // ---------- HTTP actions ----------
@@ -434,11 +449,16 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
   }
 
-  // Set true when fetchCurrentJob fails so the FirmwareView can warn that
-  // its phase is unconfirmed. The WS late-join snapshot normally covers
-  // this — but if BOTH HTTP and WS are down, the operator otherwise sees
-  // an apparently-idle page while a job may be in flight server-side.
-  // Cleared on any successful fetchCurrentJob or on the first applyJobStarted.
+  // Set true when fetchCurrentJob fails with a non-404 response so the
+  // FirmwareView can warn that its phase is unconfirmed. The WS late-join
+  // snapshot normally covers this — but if BOTH HTTP and WS are down, the
+  // operator otherwise sees an apparently-idle page while a job may be in
+  // flight server-side. 404 is the expected response from a healthy idle
+  // server and is treated as "no flash," not as staleness.
+  // Cleared on: any successful fetchCurrentJob (or 404), applyJobStarted
+  // (WS snapshot landed), applyControllerUpdate for a known controller
+  // (belt-and-suspenders), and the three terminal states (resetToSelect,
+  // applyJobDone, applyJobFailed) so the banner can't shadow a final state.
   const currentJobLoadFailed = ref(false);
 
   // Cold-load resync. Mounted views call this to populate currentJob from
@@ -455,7 +475,15 @@ export const useFirmwareStore = defineStore('firmware', () => {
       currentJobLoadFailed.value = false;
     } catch (error) {
       console.warn('firmware.fetchCurrentJob failed', error);
-      currentJobLoadFailed.value = true;
+      // 404 is the expected response from a healthy idle server (no flash
+      // in flight). Surfacing it as "could not confirm state" would falsely
+      // alarm operators on cold-load of an unused page. Only treat 5xx and
+      // network-level failures as a genuine staleness signal.
+      const status =
+        typeof error === 'object' && error !== null && 'response' in error
+          ? (error as { response?: { status?: number } }).response?.status
+          : undefined;
+      currentJobLoadFailed.value = status !== 404;
     }
   }
 
@@ -479,18 +507,23 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // that the row component resolves via t() — keeps localization out of the
   // store and prevents the raw lowercase stage values from leaking to the UI.
   const progressByControllerId = computed(() => {
-    const out: Record<
-      string,
-      {
-        status: ReturnType<typeof controllerStatePillKind>;
-        stageLabelKey?: FirmwareStageLabelKey;
-      }
+    const out: Partial<
+      Record<
+        SlotId,
+        {
+          status: ReturnType<typeof controllerStatePillKind>;
+          stageLabelKey?: FirmwareStageLabelKey;
+        }
+      >
     > = {};
     for (const [id, state] of controllerStates.value) {
-      out[id] = { status: controllerStatePillKind(state) };
+      // `id` is `SlotId` (set by buildControllerStatesMap / applyControllerUpdate)
+      // but the Map's key type is `string`, so a cast is required here.
+      const slot = id as SlotId;
+      out[slot] = { status: controllerStatePillKind(state) };
       const key = controllerStageLabelKey(state);
       if (key !== null) {
-        out[id].stageLabelKey = key;
+        out[slot]!.stageLabelKey = key;
       }
     }
     return out;
