@@ -265,15 +265,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
   }
 
   function applyControllerUpdate(data: ControllerFlashState): void {
-    // Belt-and-suspenders: a WS event arriving by itself (without a prior
-    // flashJobStarted snapshot) is enough proof that live state is flowing.
-    // Clear the staleness banner in case fetchCurrentJob earlier failed and
-    // applyJobStarted never fired (unusual but possible if the reconnect
-    // snapshot arrived as a controllerUpdate due to mid-job ordering).
-    currentJobLoadFailed.value = false;
     const slot = resolveSlot(data.controllerId);
     if (slot === null) {
-      // Queue for replay; see pendingByMac comment above.
+      // Queue for replay; see pendingByMac comment above. Critical: the
+      // staleness-banner clear MUST stay below this return — clearing it
+      // here would silently dismiss the operator-visible warning every
+      // time a WS update arrived for an unmapped controller (UNKNOWN
+      // location, contract drift, etc.).
       enqueuePending(data);
       console.warn(
         `[firmwareStore] applyControllerUpdate: unknown controllerId="${data.controllerId}". ` +
@@ -281,6 +279,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
       );
       return;
     }
+    // Belt-and-suspenders: a successful WS update is proof that live state
+    // is flowing for a known controller. Clear the staleness banner in
+    // case fetchCurrentJob earlier failed and applyJobStarted never fired.
+    currentJobLoadFailed.value = false;
     const next = new Map(controllerStates.value);
     next.set(slot, { ...data, controllerId: slot });
     controllerStates.value = next;

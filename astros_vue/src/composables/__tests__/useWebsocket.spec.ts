@@ -190,5 +190,89 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
       expect(firmware.controllerStates.get('core')?.stage).toBe('SENDING');
       expect(firmware.pendingByMac.has(MAC)).toBe(false);
     });
+
+    it('skips setControllerMac AND flushPendingForMac when location is UNKNOWN (C1 fix)', () => {
+      // Previously, the dispatcher fell through to the controllerAddress
+      // block on UNKNOWN, calling setControllerMac (no-op for UNKNOWN) and
+      // flushPendingForMac (which would re-queue endlessly because
+      // resolveSlot still returned null). Plus the firmwareStore's
+      // currentJobLoadFailed clear ran every time, silently dismissing
+      // the only operator-visible "something wrong" banner.
+      const { handleMessage } = useWebsocket();
+      const firmware = useFirmwareStore();
+      const controllerStore = useControllerStore();
+      const MAC = 'aa:bb:cc:dd:ee:99';
+
+      // Seed staleness flag (HTTP fetch had earlier failed).
+      firmware.currentJobLoadFailed = true;
+      // Queue an entry under MAC so we can prove flushPendingForMac
+      // is NOT called below (which would re-queue, but the size would
+      // still match).
+      firmware.applyControllerUpdate({ controllerId: MAC, stage: 'SENDING' });
+      expect(firmware.pendingByMac.get(MAC)).toHaveLength(1);
+
+      handleMessage(
+        JSON.stringify({
+          type: WebsocketMessageType.LOCATION_STATUS,
+          controllerLocation: Location.UNKNOWN,
+          controllerId: 'db-uuid-unknown',
+          controllerAddress: MAC,
+          up: true,
+          synced: true,
+          firmwareCompatible: true,
+        }),
+      );
+
+      expect(controllerStore.coreMac).toBeNull(); // no mapping written
+      expect(controllerStore.domeMac).toBeNull();
+      expect(controllerStore.bodyMac).toBe('00:00:00:00:00:00'); // sentinel unchanged
+      expect(firmware.currentJobLoadFailed).toBe(true); // banner preserved
+      // Pending queue unchanged — neither drained nor re-queued.
+      expect(firmware.pendingByMac.get(MAC)).toHaveLength(1);
+    });
+  });
+
+  describe('handleFlashControllerUpdate / handleFlashControllerResult error surfaces (C2 fix)', () => {
+    it('surfaces flashError when applyControllerUpdate throws so the operator sees a signal', () => {
+      // Previously this handler only console.error'd and continued; a thrown
+      // applyControllerUpdate would leave phase='flashing' with no signal
+      // and no error envelope. Pin the new flashError fallback.
+      const { handleMessage } = useWebsocket();
+      const firmware = useFirmwareStore();
+      firmware.setPhase('flashing');
+      firmware.applyControllerUpdate = (() => {
+        throw new Error('synthetic invariant violation');
+      }) as typeof firmware.applyControllerUpdate;
+
+      handleMessage(
+        JSON.stringify({
+          type: WebsocketMessageType.FLASH_CONTROLLER_UPDATE,
+          data: { controllerId: 'whatever', stage: 'SENDING' },
+        }),
+      );
+
+      // Phase intentionally NOT rolled — the next valid update should
+      // recover the row. But the operator-visible error must surface.
+      expect(firmware.flashError?.reason).toBe('internal_server_error');
+      expect(firmware.flashError?.detail).toBe('Malformed flashControllerUpdate from server');
+    });
+
+    it('surfaces flashError when applyControllerResult throws', () => {
+      const { handleMessage } = useWebsocket();
+      const firmware = useFirmwareStore();
+      firmware.setPhase('flashing');
+      firmware.applyControllerResult = (() => {
+        throw new Error('synthetic invariant violation');
+      }) as typeof firmware.applyControllerResult;
+
+      handleMessage(
+        JSON.stringify({
+          type: WebsocketMessageType.FLASH_CONTROLLER_RESULT,
+          data: { jobId: 'job-1', controller: { controllerId: 'whatever', stage: 'FAILED' } },
+        }),
+      );
+
+      expect(firmware.flashError?.detail).toBe('Malformed flashControllerResult from server');
+    });
   });
 });

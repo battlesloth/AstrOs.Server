@@ -166,18 +166,22 @@ export function useWebsocket() {
         }
       }
 
+      let validLocation = false;
       switch (data.controllerLocation) {
         case Location.DOME:
           controllerStore.domeStatus = status;
           controllerStore.domeFirmware = data.firmwareVersion;
+          validLocation = true;
           break;
         case Location.CORE:
           controllerStore.coreStatus = status;
           controllerStore.coreFirmware = data.firmwareVersion;
+          validLocation = true;
           break;
         case Location.BODY:
           controllerStore.bodyStatus = status;
           controllerStore.bodyFirmware = data.firmwareVersion;
+          validLocation = true;
           break;
         default:
           // An unrecognized location (server contract drift, misrouted
@@ -185,7 +189,7 @@ export function useWebsocket() {
           // this log. Combined with the MAC-mapping skip below, a stuck
           // controller row would otherwise have no breadcrumb.
           console.warn(
-            `[useWebsocket] handleStatusMessage: unrecognized controllerLocation="${data.controllerLocation}". Skipping status update.`,
+            `[useWebsocket] handleStatusMessage: unrecognized controllerLocation="${data.controllerLocation}". Skipping status + MAC mapping.`,
           );
       }
       // Learn the MAC↔location mapping so the firmware view can translate
@@ -197,8 +201,13 @@ export function useWebsocket() {
       // Distinguish undefined (rolling-deploy: old server hasn't been
       // updated to populate the field) from empty string (server bug:
       // populated as ''). Both must skip the resolver write, but empty
-      // string warrants a warn since it's not deploy-skew.
-      if (data.controllerAddress === undefined) {
+      // string warrants a warn since it's not deploy-skew. We also skip
+      // when the location was UNKNOWN/unrecognized: setControllerMac for
+      // UNKNOWN is a no-op, and flushPendingForMac with no resolvable
+      // mapping would re-queue the entries indefinitely.
+      if (!validLocation) {
+        // Skipped above; nothing to learn or flush.
+      } else if (data.controllerAddress === undefined) {
         // Silent: expected during a rolling deploy of the server.
       } else if (data.controllerAddress === '') {
         console.warn(
@@ -267,24 +276,38 @@ export function useWebsocket() {
   }
 
   function handleFlashControllerUpdate(message: BaseWsMessage) {
+    const store = useFirmwareStore();
     try {
       const data = (message as unknown as { data: ControllerFlashState }).data;
-      useFirmwareStore().applyControllerUpdate(data);
+      store.applyControllerUpdate(data);
     } catch (error) {
       console.error('Error handling flashControllerUpdate:', error);
+      // No phase rollback — the next valid update can recover the row —
+      // but surface a flashError so the operator isn't stuck staring at
+      // frozen progress with no signal that something went wrong.
+      store.flashError = {
+        reason: 'internal_server_error',
+        detail: 'Malformed flashControllerUpdate from server',
+      };
     }
   }
 
   function handleFlashControllerResult(message: BaseWsMessage) {
+    const store = useFirmwareStore();
     try {
       const data = (
         message as unknown as {
           data: { jobId: string; controller: ControllerFlashState };
         }
       ).data;
-      useFirmwareStore().applyControllerResult(data);
+      store.applyControllerResult(data);
     } catch (error) {
       console.error('Error handling flashControllerResult:', error);
+      // Mirrors handleFlashControllerUpdate: surface but don't transition.
+      store.flashError = {
+        reason: 'internal_server_error',
+        detail: 'Malformed flashControllerResult from server',
+      };
     }
   }
 
@@ -295,9 +318,11 @@ export function useWebsocket() {
       store.applyJobDone(data);
     } catch (error) {
       console.error('Error handling flashJobDone:', error);
-      // Force terminal: the server has marked the job done and the lock is
-      // released. Without this, an applyJobDone throw would leave phase at
-      // 'flashing' indefinitely. Generic envelope; server logs are truth.
+      // Force terminal: the server has emitted job-done; the lock release
+      // follows asynchronously on the next POLL_ACK heartbeat or the
+      // reboot-timer fallback (per flash_orchestrator.ts). Without this
+      // catch, an applyJobDone throw would leave phase at 'flashing'
+      // indefinitely. Generic envelope; server logs are truth.
       store.setPhase('done');
       store.flashError = {
         reason: 'internal_server_error',
