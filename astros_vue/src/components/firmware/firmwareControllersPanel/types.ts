@@ -1,4 +1,8 @@
-import type { FirmwarePhase, FirmwareStatusPillKind } from '@/types/firmware';
+import type {
+  FirmwarePhase,
+  FirmwareStageLabelKey,
+  FirmwareStatusPillKind,
+} from '@/types/firmware';
 
 export type ControllersPanelPhase = Exclude<FirmwarePhase, 'idle'>;
 
@@ -10,7 +14,7 @@ export interface ControllerProgressEntry {
    * The row component resolves this via t() — keeps localization at the
    * consumer rather than the producer.
    */
-  stageLabelKey?: string;
+  stageLabelKey?: FirmwareStageLabelKey;
 }
 
 export interface ControllersPanelProps {

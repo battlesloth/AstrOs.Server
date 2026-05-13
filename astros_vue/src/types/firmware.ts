@@ -60,6 +60,14 @@ export type FirmwarePhase = 'idle' | 'select' | 'flashing' | 'done' | 'failed';
 export type FirmwareStage = 'download' | 'transfer' | 'flash' | 'verify' | 'reboot';
 
 /**
+ * Template-literal type for the i18n key path of a stage label. Producer:
+ * `controllerStageLabelKey()`. Consumer: `AstrosFirmwareControllerRow.vue`
+ * via `t(stageLabelKey)`. Encoding the path as a type catches typos at
+ * the producer and consumer boundaries that a bare `string` would let slip.
+ */
+export type FirmwareStageLabelKey = `firmware_view.stages.${FirmwareStage}.label`;
+
+/**
  * Subset of the server's FlashOrchestratorErrorReason that surfaces via the
  * HTTP error response. Post-streamer failures (hash_mismatch,
  * chunk_retry_exhausted, etc.) are deliberately omitted — those arrive on
@@ -115,9 +123,36 @@ export type ServerFwStage =
   | 'FAILED';
 
 /**
+ * Branded type for a controller's hardware MAC address (e.g.
+ * `"aa:bb:cc:dd:ee:01"`). On the wire, the server uses MAC to identify
+ * controllers in flash-related messages. Inside the firmware store, MAC
+ * is translated to `SlotId` via the controllerStore's resolver.
+ *
+ * The brand is documentation-only — TS can't enforce nominality across
+ * the WS boundary where payloads arrive as untyped JSON. The contract is:
+ * if you see `Mac` in a type, the value is the raw wire identifier; if
+ * you see `SlotId`, it has been translated.
+ */
+export type Mac = string & { readonly __brand: 'Mac' };
+
+/**
+ * Fleet slot identifier — the in-store key for per-controller state.
+ * Matches the runtime values of `Location.BODY` / `Location.CORE` /
+ * `Location.DOME` (which is why those enum values are loose strings).
+ * `Location.UNKNOWN` is excluded by construction: an unknown slot can't
+ * key per-controller state.
+ */
+export type SlotId = 'body' | 'core' | 'dome';
+
+/**
  * Mirror of the server's `ControllerFlashState` discriminated union narrowed
  * to fields the UI reads. Source:
  * `astros_api/src/models/firmware/flash_job_state.ts`.
+ *
+ * NB: `controllerId` semantics depend on data-flow position. On the wire
+ * (server → client), it's a MAC. After `buildControllerStatesMap` rewrites
+ * it to the slot id, it's a `SlotId` (but still typed `string` because the
+ * brand can't survive a `... as ControllerFlashState` JSON cast).
  */
 export interface ControllerFlashState {
   controllerId: string;

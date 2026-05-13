@@ -10,7 +10,7 @@ import {
   mapServerStageToUiStage,
 } from '@/utils/firmwareStageMapping';
 import { useControllerStore } from '@/stores/controller';
-import { ControllerStatus } from '@/enums';
+import { ControllerStatus, Location } from '@/enums';
 import type {
   ControllerFlashState,
   ControllerOnlineStatus,
@@ -18,6 +18,8 @@ import type {
   FirmwarePhase,
   FirmwareSourceMode,
   FirmwareStage,
+  FirmwareStageLabelKey,
+  SlotId,
   FlashErrorEnvelope,
   FlashErrorReason,
   FlashJobFailedData,
@@ -197,15 +199,18 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // ---------- WS handlers (the sole writers of server-pushed fields) ----------
 
   /**
-   * Translate a wire-level controllerId (MAC) to a fleet slot id
-   * ('body' / 'core' / 'dome'). Returns null for unknown MACs — the caller
-   * surfaces a dev warning and drops the update so the panel can't render
-   * stale per-controller pills against an unknown row.
+   * Translate a wire-level controllerId (MAC) to a fleet `SlotId`. The
+   * underlying resolver returns `Location | null`; `Location.UNKNOWN` is
+   * not a valid slot key, so we map it to null. The returned `SlotId` is
+   * the key the panel uses in `progressByControllerId`. Null callers queue
+   * the payload for replay so the row can recover once LocationStatus
+   * learns the MAC.
    */
-  function resolveSlot(controllerId: string): string | null {
+  function resolveSlot(controllerId: string): SlotId | null {
     const cs = useControllerStore();
     const loc = cs.controllerIdToLocation(controllerId);
-    return loc;
+    if (loc === null || loc === Location.UNKNOWN) return null;
+    return loc as SlotId;
   }
 
   function enqueuePending(state: ControllerFlashState): void {
@@ -254,9 +259,18 @@ export const useFirmwareStore = defineStore('firmware', () => {
     if (phase.value !== 'flashing') phase.value = 'flashing';
     flashError.value = null;
     failedControllers.value = [];
+    // WS late-join landed → the HTTP staleness warning is no longer accurate
+    // even if HTTP itself failed. The store has live state again.
+    currentJobLoadFailed.value = false;
   }
 
   function applyControllerUpdate(data: ControllerFlashState): void {
+    // Belt-and-suspenders: a WS event arriving by itself (without a prior
+    // flashJobStarted snapshot) is enough proof that live state is flowing.
+    // Clear the staleness banner in case fetchCurrentJob earlier failed and
+    // applyJobStarted never fired (unusual but possible if the reconnect
+    // snapshot arrived as a controllerUpdate due to mid-job ordering).
+    currentJobLoadFailed.value = false;
     const slot = resolveSlot(data.controllerId);
     if (slot === null) {
       // Queue for replay; see pendingByMac comment above.
@@ -418,6 +432,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
   }
 
+  // Set true when fetchCurrentJob fails so the FirmwareView can warn that
+  // its phase is unconfirmed. The WS late-join snapshot normally covers
+  // this — but if BOTH HTTP and WS are down, the operator otherwise sees
+  // an apparently-idle page while a job may be in flight server-side.
+  // Cleared on any successful fetchCurrentJob or on the first applyJobStarted.
+  const currentJobLoadFailed = ref(false);
+
   // Cold-load resync. Mounted views call this to populate currentJob from
   // the server if a flash is already in flight (e.g., the operator refreshed
   // the page mid-flash). The WS late-join snapshot follows on connect; both
@@ -429,8 +450,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
       if (body && body.jobId && currentJob.value === null) {
         applyJobStarted(body);
       }
+      currentJobLoadFailed.value = false;
     } catch (error) {
       console.warn('firmware.fetchCurrentJob failed', error);
+      currentJobLoadFailed.value = true;
     }
   }
 
@@ -458,7 +481,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       string,
       {
         status: ReturnType<typeof controllerStatePillKind>;
-        stageLabelKey?: string;
+        stageLabelKey?: FirmwareStageLabelKey;
       }
     > = {};
     for (const [id, state] of controllerStates.value) {
@@ -488,6 +511,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     controllerStates,
     ownJobId,
     pendingByMac,
+    currentJobLoadFailed,
     target,
     anyDowngradeBlocked,
     canFlash,

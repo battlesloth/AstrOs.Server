@@ -175,7 +175,8 @@
     "lock_conflict": {
       "title": "Firmware update in progress",
       "body": "Another operator started a firmware update at {since}. Wait for it to finish before starting a new one."
-    }
+    },
+    "current_job_load_failed": "Could not confirm current firmware state. A flash may be in flight — refresh to retry."
   },
   "placeholder": {
     "username": "username",

@@ -1,4 +1,8 @@
-import type { FirmwareControllerView, FirmwareStatusPillKind } from '@/types/firmware';
+import type {
+  FirmwareControllerView,
+  FirmwareStageLabelKey,
+  FirmwareStatusPillKind,
+} from '@/types/firmware';
 
 export type ControllerRowMode = 'select' | 'progress';
 
@@ -11,5 +15,5 @@ export interface ControllerRowProps {
   /** Status pill shown in `progress` mode. */
   progressStatus?: FirmwareStatusPillKind;
   /** i18n key path for the stage label rendered under the status pill in `progress` mode when updating. */
-  stageLabelKey?: string;
+  stageLabelKey?: FirmwareStageLabelKey;
 }

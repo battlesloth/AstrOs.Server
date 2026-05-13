@@ -179,6 +179,14 @@ export function useWebsocket() {
           controllerStore.bodyStatus = status;
           controllerStore.bodyFirmware = data.firmwareVersion;
           break;
+        default:
+          // An unrecognized location (server contract drift, misrouted
+          // POLL_ACK, or Location.UNKNOWN) is invisible to the UI without
+          // this log. Combined with the MAC-mapping skip below, a stuck
+          // controller row would otherwise have no breadcrumb.
+          console.warn(
+            `[useWebsocket] handleStatusMessage: unrecognized controllerLocation="${data.controllerLocation}". Skipping status update.`,
+          );
       }
       // Learn the MAC↔location mapping so the firmware view can translate
       // FlashJobState's `controllerId` (MAC) back to a slot for the progress
@@ -186,7 +194,17 @@ export function useWebsocket() {
       // MAC lives on `controllerAddress`. After updating the resolver, drain
       // any flash events that were queued because this MAC wasn't mapped
       // yet (cold-load / late-join race).
-      if (data.controllerAddress) {
+      // Distinguish undefined (rolling-deploy: old server hasn't been
+      // updated to populate the field) from empty string (server bug:
+      // populated as ''). Both must skip the resolver write, but empty
+      // string warrants a warn since it's not deploy-skew.
+      if (data.controllerAddress === undefined) {
+        // Silent: expected during a rolling deploy of the server.
+      } else if (data.controllerAddress === '') {
+        console.warn(
+          `[useWebsocket] handleStatusMessage: empty controllerAddress for location="${data.controllerLocation}". Server contract bug.`,
+        );
+      } else {
         controllerStore.setControllerMac(data.controllerLocation, data.controllerAddress);
         useFirmwareStore().flushPendingForMac(data.controllerAddress);
       }
@@ -222,12 +240,12 @@ export function useWebsocket() {
     }
   }
 
-  // Firmware-flash WS handlers. Each delegates to the firmwareStore's apply*
-  // action so the store remains the sole writer of server-pushed flash state.
-  // The try/catch is load-bearing: a malformed payload must not lock the UI
-  // in 'flashing' — store actions handle defensive cases internally and the
-  // catch surfaces a flashError envelope on the failure path so the operator
-  // sees something rather than a wedged UI.
+  // Firmware-flash WS handlers. The happy path delegates to the firmwareStore's
+  // apply* actions (sole writer of server-pushed flash state). On a malformed
+  // payload the dispatcher falls back to a direct phase/flashError write so the
+  // UI exits 'flashing' rather than wedging — the store doesn't see invalid
+  // data so it can't recover by itself. Pin: a swallowed error must still
+  // produce a terminal phase transition for the three handlers that own one.
   function handleFlashJobStarted(message: BaseWsMessage) {
     const store = useFirmwareStore();
     try {
@@ -271,11 +289,20 @@ export function useWebsocket() {
   }
 
   function handleFlashJobDone(message: BaseWsMessage) {
+    const store = useFirmwareStore();
     try {
       const data = (message as unknown as { data: { jobId: string; endedAt: string } }).data;
-      useFirmwareStore().applyJobDone(data);
+      store.applyJobDone(data);
     } catch (error) {
       console.error('Error handling flashJobDone:', error);
+      // Force terminal: the server has marked the job done and the lock is
+      // released. Without this, an applyJobDone throw would leave phase at
+      // 'flashing' indefinitely. Generic envelope; server logs are truth.
+      store.setPhase('done');
+      store.flashError = {
+        reason: 'internal_server_error',
+        detail: 'Malformed flashJobDone from server',
+      };
     }
   }
 
@@ -320,5 +347,9 @@ export function useWebsocket() {
     wsDisconnect,
     wsIsConnected,
     wsSendMessage,
+    // Exposed for unit testing the dispatcher's malformed-payload guards
+    // and the firmware-flash handlers' rollback behavior. Production code
+    // never calls this directly — onmessage routes through it.
+    handleMessage,
   };
 }

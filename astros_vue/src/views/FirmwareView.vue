@@ -33,6 +33,7 @@ const {
   uploadedFilename,
   progressByControllerId,
   isOwnJob,
+  currentJobLoadFailed,
 } = storeToRefs(firmware);
 const { locked: lockLocked, since: lockSince } = storeToRefs(jobLock);
 
@@ -69,6 +70,22 @@ const failedControllerLabels = computed(() =>
   failedControllers.value.map((c) => c.label).join(', '),
 );
 const failedStage = computed(() => failedControllers.value[0]?.stage ?? null);
+
+// Formats lockSince's raw ISO timestamp for the operator. Without the
+// formatter, the lock-conflict body would interpolate "2026-05-12T08:00:00Z"
+// directly into the message body — a machine-readable string in operator UX.
+const lockSinceFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+const lockSinceFormatted = computed(() => {
+  const raw = lockSince.value;
+  if (raw === null) return '—';
+  // Defensive: a malformed ISO would throw on Date construction's NaN path.
+  // Fall back to the raw string so the operator at least sees something.
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? raw : lockSinceFormatter.format(d);
+});
 
 // A flash is in flight but it isn't ours — suppress the working UI. The
 // SourceStrip + grid v-ifs below gate on !lockConflict so the Flash button
@@ -131,6 +148,15 @@ onMounted(async () => {
           <p class="firmware-view__subtitle">{{ subtitle }}</p>
 
           <div
+            v-if="currentJobLoadFailed"
+            class="firmware-view__stale-warning"
+            role="status"
+            aria-live="polite"
+          >
+            {{ t('firmware_view.current_job_load_failed') }}
+          </div>
+
+          <div
             v-if="lockConflict"
             class="firmware-view__lock-conflict"
             role="alert"
@@ -140,7 +166,7 @@ onMounted(async () => {
               t('firmware_view.lock_conflict.title')
             }}</span>
             <span class="firmware-view__lock-conflict-body">{{
-              t('firmware_view.lock_conflict.body', { since: lockSince ?? '—' })
+              t('firmware_view.lock_conflict.body', { since: lockSinceFormatted })
             }}</span>
           </div>
 
@@ -211,6 +237,16 @@ onMounted(async () => {
   gap: 16px;
   box-sizing: border-box;
   overflow-y: auto;
+}
+
+.firmware-view__stale-warning {
+  padding: 10px 14px;
+  background: #fff8e8;
+  border: 1px solid #e5a93a55;
+  border-radius: 6px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  color: #7d5a14;
 }
 
 .firmware-view__lock-conflict {

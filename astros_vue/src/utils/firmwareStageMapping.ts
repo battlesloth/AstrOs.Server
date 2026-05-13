@@ -1,6 +1,7 @@
 import type {
   ControllerFlashState,
   FirmwareStage,
+  FirmwareStageLabelKey,
   FirmwareStatusPillKind,
   ServerFwStage,
 } from '@/types/firmware';
@@ -50,7 +51,7 @@ export function controllerStatePillKind(state: ControllerFlashState): FirmwareSt
  * pill during `updating` mode. Returns null for stages without a UI stage
  * (caller renders no label).
  */
-export function controllerStageLabelKey(state: ControllerFlashState): string | null {
+export function controllerStageLabelKey(state: ControllerFlashState): FirmwareStageLabelKey | null {
   const uiStage = mapServerStageToUiStage(state.stage);
   return uiStage === null ? null : `firmware_view.stages.${uiStage}.label`;
 }

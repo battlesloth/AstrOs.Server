@@ -212,7 +212,7 @@ const actionBarMessage = computed(() => {
         {{
           t('firmware_view.controllers.result_bar.failed_summary', {
             label: failedControllerLabel ?? '—',
-            stage: failedStage ?? '—',
+            stage: failedStage ? t(`firmware_view.stages.${failedStage}.label`) : '—',
           })
         }}
       </span>
