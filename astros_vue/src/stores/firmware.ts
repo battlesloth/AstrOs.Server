@@ -76,8 +76,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // All controllers that ended this job in stage='FAILED'. Multi-failure is
   // realistic (e.g. ESP-NOW bus failure fails both padawans simultaneously);
   // surfacing only the first would let the operator walk away from a bricked
-  // controller. Empty array means no FAILED entries were observed.
-  const failedControllers = ref<Array<{ id: string; label: string; stage: FirmwareStage }>>([]);
+  // controller. Empty array means no FAILED entries were observed. `stage`
+  // is `FirmwareStage | null` — null when we can't honestly attribute the
+  // failure to a specific stage (rather than fabricating 'transfer').
+  const failedControllers = ref<Array<{ id: string; label: string; stage: FirmwareStage | null }>>(
+    [],
+  );
 
   // WS-pushed state. Apply* handlers below are the sole writers.
   const currentJob = ref<FlashJobState | null>(null);
@@ -195,6 +199,18 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   function dismissError(): void {
     flashError.value = null;
+  }
+
+  /**
+   * Single writer for `flashError`. The dispatcher's malformed-payload
+   * catch blocks route through this rather than mutating the ref directly
+   * so a future "who wrote this flashError" investigation has one site to
+   * audit. The store's apply* handlers manage flashError internally per
+   * job-lifecycle (cleared on applyJobStarted; not auto-cleared by
+   * subsequent successful updates).
+   */
+  function setFlashError(envelope: FlashErrorEnvelope): void {
+    flashError.value = envelope;
   }
 
   // ---------- WS handlers (the sole writers of server-pushed fields) ----------
@@ -338,6 +354,20 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
     phase.value = 'done';
     currentStage.value = null;
+    // Normalize any per-controller state that's still mid-flow to
+    // VERSION_CONFIRMED. The server emits flashJobDone when the LAST
+    // VERSION_CONFIRMED is observed, but a flashControllerUpdate carrying
+    // that final stage may not have drained the WS buffer yet (or may
+    // never arrive in some race orderings). Without this normalize, the
+    // panel renders the "✓ all updated" result bar while individual rows
+    // still spin at "updating" — visibly contradictory operator state.
+    const normalized = new Map(controllerStates.value);
+    for (const [slot, state] of normalized) {
+      if (state.stage !== 'VERSION_CONFIRMED' && state.stage !== 'FAILED') {
+        normalized.set(slot, { ...state, stage: 'VERSION_CONFIRMED' });
+      }
+    }
+    controllerStates.value = normalized;
     // Terminal state — the staleness banner is no longer relevant. Without
     // this clear, a fetchCurrentJob failure earlier in the session would
     // leave the warning visible on top of the legitimate done-flash UI.
@@ -376,15 +406,17 @@ export const useFirmwareStore = defineStore('firmware', () => {
     // Collect ALL controllers that ended in FAILED. Multi-failure is realistic
     // (e.g. bus-wide ESP-NOW failure fails both padawans at once); surfacing
     // only the first would let the operator walk away from a bricked unit.
-    const failed: Array<{ id: string; label: string; stage: FirmwareStage }> = [];
+    // The stage is taken from `currentStage` at the time of failure if known;
+    // otherwise null. The previous 'transfer' literal fallback misattributed
+    // every unknown-stage failure to the transfer step.
+    const failed: Array<{ id: string; label: string; stage: FirmwareStage | null }> = [];
     for (const state of controllerStates.value.values()) {
       if (state.stage === 'FAILED') {
         const c = controllers.value.find((x) => x.id === state.controllerId);
-        const uiStage = mapServerStageToUiStage(state.stage) ?? currentStage.value ?? 'transfer';
         failed.push({
           id: state.controllerId,
           label: c?.label ?? state.controllerId,
-          stage: uiStage,
+          stage: currentStage.value,
         });
       }
     }
@@ -572,6 +604,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     setPhase,
     resetToSelect,
     dismissError,
+    setFlashError,
     applyJobStarted,
     applyControllerUpdate,
     applyControllerResult,

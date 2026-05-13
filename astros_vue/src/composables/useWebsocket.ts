@@ -18,6 +18,11 @@ import type { ControllerFlashState, FlashJobFailedData, FlashJobState } from '@/
 
 const ws = ref<WebSocket | null>(null);
 const wsIsConnected = ref(false);
+// Latched true on the first successful WS connect; never resets. Used by
+// the FirmwareView's flash-stream-suspended banner to distinguish "WS
+// hasn't connected YET" (early-mount, no operator alarm needed) from
+// "WS connected and then dropped" (genuine staleness signal).
+const wsHasEverConnected = ref(false);
 const retryInterval = 3000;
 let retryTimeout: number | null = null;
 let intentionallyClosed = false;
@@ -33,6 +38,7 @@ export function useWebsocket() {
 
     ws.value.onopen = () => {
       wsIsConnected.value = true;
+      wsHasEverConnected.value = true;
       console.log('WebSocket connected');
       if (retryTimeout) {
         clearTimeout(retryTimeout);
@@ -270,10 +276,10 @@ export function useWebsocket() {
       // Roll the UI back to select with a surfaced error so the operator
       // isn't wedged in 'flashing' awaiting a snapshot we can't parse.
       store.setPhase('select');
-      store.flashError = {
+      store.setFlashError({
         reason: 'internal_server_error',
         detail: 'Malformed flashJobStarted from server',
-      };
+      });
     }
   }
 
@@ -290,10 +296,10 @@ export function useWebsocket() {
       // operator dismisses it or a job-lifecycle event (applyJobStarted,
       // applyJobDone, applyJobFailed) clears flashError. The operator-
       // visible "something went wrong" signal is the load-bearing piece.
-      store.flashError = {
+      store.setFlashError({
         reason: 'internal_server_error',
         detail: 'Malformed flashControllerUpdate from server',
-      };
+      });
     }
   }
 
@@ -310,10 +316,10 @@ export function useWebsocket() {
       console.error('Error handling flashControllerResult:', error);
       // Mirrors handleFlashControllerUpdate: surface but don't transition.
       // The banner persists until operator-dismiss or a job-lifecycle clear.
-      store.flashError = {
+      store.setFlashError({
         reason: 'internal_server_error',
         detail: 'Malformed flashControllerResult from server',
-      };
+      });
     }
   }
 
@@ -330,10 +336,10 @@ export function useWebsocket() {
       // catch, an applyJobDone throw would leave phase at 'flashing'
       // indefinitely. Generic envelope; server logs are truth.
       store.setPhase('done');
-      store.flashError = {
+      store.setFlashError({
         reason: 'internal_server_error',
         detail: 'Malformed flashJobDone from server',
-      };
+      });
     }
   }
 
@@ -350,10 +356,10 @@ export function useWebsocket() {
       // Force the UI out of 'flashing' so the operator isn't wedged when the
       // payload can't be parsed. Envelope is generic; server logs are truth.
       store.setPhase('failed');
-      store.flashError = {
+      store.setFlashError({
         reason: 'internal_server_error',
         detail: 'Malformed flashJobFailed from server',
-      };
+      });
     }
   }
 
@@ -377,6 +383,7 @@ export function useWebsocket() {
     wsConnect,
     wsDisconnect,
     wsIsConnected,
+    wsHasEverConnected,
     wsSendMessage,
     // Exposed for unit testing the dispatcher's malformed-payload guards
     // and the firmware-flash handlers' rollback behavior. Production code

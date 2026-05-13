@@ -834,6 +834,37 @@ describe('firmware store', () => {
       expect(store.currentJob?.endedAt).toBe('2026-05-12T08:05:00Z');
     });
 
+    it('normalizes non-terminal per-controller stages to VERSION_CONFIRMED (I4 fix)', () => {
+      // Race: server emits flashJobDone when the LAST VERSION_CONFIRMED
+      // observed, but a flashControllerUpdate carrying that final stage
+      // may not have drained the WS buffer yet. Without this normalize,
+      // the panel renders "✓ all updated" while individual rows still
+      // spin at "updating" — visibly contradictory operator state.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'VERIFYING' });
+      // core is left at QUEUED (initial sample state)
+      store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+      expect(store.controllerStates.get('body')?.stage).toBe('VERSION_CONFIRMED');
+      expect(store.controllerStates.get('core')?.stage).toBe('VERSION_CONFIRMED');
+    });
+
+    it('does NOT overwrite FAILED stages during the done normalize', () => {
+      // The normalize should only touch in-flight stages, not terminal
+      // ones. A controller that legitimately FAILED should stay FAILED
+      // even if applyJobDone fires (rare, but possible if the server
+      // reports the job done after one of the controllers errored).
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({ controllerId: CORE_MAC, stage: 'FAILED' });
+      store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+      expect(store.controllerStates.get('core')?.stage).toBe('FAILED');
+    });
+
     it('clears pendingByMac so a late LocationStatus cannot replay stale entries onto done state (C2 fix)', () => {
       // Round-5 C2: without this clear, a queued entry whose MAC mapping
       // arrives after job-done would mutate controllerStates + currentStage,
@@ -889,6 +920,8 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
+      // Set a stage so the failed entry can attribute its failure honestly.
+      store.applyControllerUpdate({ controllerId: CORE_MAC, stage: 'VERIFYING' });
       store.applyControllerUpdate({
         controllerId: CORE_MAC,
         stage: 'FAILED',
@@ -898,6 +931,27 @@ describe('firmware store', () => {
       expect(store.failedControllers).toHaveLength(1);
       expect(store.failedControllers[0]?.id).toBe('core');
       expect(store.failedControllers[0]?.label).toBe('Core');
+      // I2 fix: stage comes from currentStage at failure time, not the
+      // literal 'transfer' fallback. Here VERIFYING set currentStage to
+      // 'verify' before the FAILED update.
+      expect(store.failedControllers[0]?.stage).toBe('verify');
+    });
+
+    it('records stage as null when no currentStage was observed before the FAILED update (I2 fix)', () => {
+      // The previous code fabricated 'transfer' here, silently misattributing
+      // pre-streamer-style failures. Now we record null and let the UI
+      // either render the stages list "—" fallback or omit the stage from
+      // the result bar.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({
+        controllerId: CORE_MAC,
+        stage: 'FAILED',
+        error: 'hash_mismatch',
+      });
+      store.applyJobFailed({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+      expect(store.failedControllers[0]?.stage).toBeNull();
     });
 
     it('collects ALL FAILED entries (multi-failure realistic on bus-wide ESP-NOW errors)', () => {
@@ -905,12 +959,11 @@ describe('firmware store', () => {
       // first FAILED entry by iteration order. With two padawans failing
       // simultaneously (e.g. master loses ESP-NOW), the operator would
       // walk away from a bricked unit. Pin all FAILEDs make the array.
-      // Array order is intentionally unspecified by the contract (Map.values()
-      // iteration is insertion-order, which the test couples to via sort()
-      // to decouple from incidental ordering).
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
+      // Seed a stage so the failed entries get a non-null `stage` field.
+      store.applyControllerUpdate({ controllerId: CORE_MAC, stage: 'SENDING' });
       store.applyControllerUpdate({
         controllerId: CORE_MAC,
         stage: 'FAILED',
@@ -927,14 +980,27 @@ describe('firmware store', () => {
         reason: 'bus_send_failed',
       });
       expect(store.failedControllers).toHaveLength(2);
-      const ids = store.failedControllers.map((c) => c.id).sort();
+      // I-test-1: pin insertion-order preservation (Map.values() is
+      // insertion-order; sampleJobState seeds body, then core). The
+      // FirmwareView's failedControllerLabels join depends on this — a
+      // regression that sorted alphabetically before joining would silently
+      // change the operator-visible message.
+      const ids = store.failedControllers.map((c) => c.id);
       expect(ids).toEqual(['body', 'core']);
       // Pin the full record shape per entry: a mutation that surfaced only
       // {id} (dropping label / stage) would otherwise pass this test.
-      const labels = store.failedControllers.map((c) => c.label).sort();
+      const labels = store.failedControllers.map((c) => c.label);
       expect(labels).toEqual(['Body', 'Core']);
+      // I2 fix: stage reflects the SHARED `currentStage` ref at the moment
+      // applyJobFailed runs (not a per-controller history). Both entries
+      // pick up 'transfer' here because CORE's SENDING update set the
+      // shared currentStage before either FAILED — even though body never
+      // had its own SENDING update. This documents the design: stage is
+      // "what the flash was doing when it failed," not "what each
+      // individual controller was doing." A future change to track stage
+      // per-controller would make body.stage null in this scenario.
       for (const entry of store.failedControllers) {
-        expect(entry.stage).toBeTruthy();
+        expect(entry.stage).toBe('transfer');
       }
     });
 

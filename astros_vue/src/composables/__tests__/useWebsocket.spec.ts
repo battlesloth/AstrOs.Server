@@ -255,6 +255,10 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
       // recover the row. But the operator-visible error must surface.
       expect(firmware.flashError?.reason).toBe('internal_server_error');
       expect(firmware.flashError?.detail).toBe('Malformed flashControllerUpdate from server');
+      // Pin the non-rollback contract: a regression that added
+      // setPhase('select' | 'failed') to this catch would pass the
+      // flashError assertion but break the recover-row design intent.
+      expect(firmware.phase).toBe('flashing');
     });
 
     it('surfaces flashError when applyControllerResult throws', () => {
@@ -273,6 +277,42 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
       );
 
       expect(firmware.flashError?.detail).toBe('Malformed flashControllerResult from server');
+      // Pin the non-rollback contract per applyControllerUpdate above.
+      expect(firmware.phase).toBe('flashing');
+    });
+
+    it('does NOT roll phase on unrecognized garbage controllerLocation in handleStatusMessage (I-test-4)', () => {
+      // The C1 test pins Location.UNKNOWN. Server contract drift could
+      // send any arbitrary string (e.g. `"head"` after a rename). The
+      // default branch covers this case structurally — pin it explicitly
+      // so a regression that hard-coded `if (location === UNKNOWN)` would
+      // fail.
+      const { handleMessage } = useWebsocket();
+      const firmware = useFirmwareStore();
+      const controllerStore = useControllerStore();
+      firmware.currentJobLoadFailed = true; // banner should survive
+      firmware.applyControllerUpdate({ controllerId: 'aa:bb:cc:00:00:01', stage: 'SENDING' });
+      expect(firmware.pendingByMac.size).toBe(1);
+
+      handleMessage(
+        JSON.stringify({
+          type: WebsocketMessageType.LOCATION_STATUS,
+          controllerLocation: 'unrecognized-location-string',
+          controllerId: 'db-uuid',
+          controllerAddress: 'aa:bb:cc:00:00:01',
+          up: true,
+          synced: true,
+          firmwareCompatible: true,
+        }),
+      );
+
+      // No mapping written, no flush triggered, banner preserved, queue
+      // entry unchanged.
+      expect(controllerStore.coreMac).toBeNull();
+      expect(controllerStore.domeMac).toBeNull();
+      expect(controllerStore.bodyMac).toBe('00:00:00:00:00:00');
+      expect(firmware.currentJobLoadFailed).toBe(true);
+      expect(firmware.pendingByMac.get('aa:bb:cc:00:00:01')).toHaveLength(1);
     });
   });
 });

@@ -41,19 +41,41 @@ const { locked: lockLocked, since: lockSince } = storeToRefs(jobLock);
 // WS connection state. Drives the "live updates suspended" banner when a
 // flash is in flight but the socket is down — without this signal the
 // operator would stare at frozen progress with no indication that the
-// stream has stopped.
-const { wsIsConnected } = useWebsocket();
-const flashStreamSuspended = computed(() => phase.value === 'flashing' && !wsIsConnected.value);
+// stream has stopped. Gated on `wsHasEverConnected` so the banner doesn't
+// flicker during the ~50ms between FirmwareView mount and the first
+// onopen: until the socket has ever connected, "disconnected" isn't yet
+// a meaningful staleness signal — it's the expected pre-connect state.
+const { wsIsConnected, wsHasEverConnected } = useWebsocket();
+const flashStreamSuspended = computed(
+  () => phase.value === 'flashing' && wsHasEverConnected.value && !wsIsConnected.value,
+);
 
-// Mid-flash error region. The panel's `flash_error_banner` is gated on
-// phase==='select' (it surfaces HTTP POST failures before the job lifecycle
-// owns phase). For errors raised by useWebsocket's mid-stream catch blocks
-// (handleFlashControllerUpdate / handleFlashControllerResult set flashError
-// without rolling phase), the panel banner is hidden — so without this
-// region, the store write goes to a ref no template reads.
+// Mid-flash + pre-streamer-abort error region. The panel's
+// `flash_error_banner` is gated on phase==='select' (it surfaces HTTP POST
+// failures before the job lifecycle owns phase). For errors raised by:
+//   - useWebsocket's mid-stream catch blocks (phase==='flashing')
+//   - applyJobFailed with empty failedControllers (pre-streamer abort —
+//     job failed before any controller transitioned to FAILED, so the
+//     panel's "⚠ — failed during the flash" result bar is uselessly vague)
+// the panel banner is hidden — without this region, flashError.detail
+// would go to a ref no template reads.
 const flashErrorDetail = computed(() => {
   if (flashError.value === null) return null;
   return flashError.value.detail ?? t(`firmware_view.flash_errors.${flashError.value.reason}`);
+});
+const showFlashErrorRegion = computed(() => {
+  if (flashError.value === null) return false;
+  if (phase.value === 'flashing') return true;
+  // In 'failed' phase, the panel's result bar carries label + stage but
+  // never surfaces `flashError.detail`. Show this region when either:
+  //   - no controllers were marked FAILED (pre-streamer abort: result bar
+  //     is uselessly vague without the detail), OR
+  //   - flashError has a non-null detail string (operator should see the
+  //     specific reason, not just "Core failed during Verify").
+  return (
+    phase.value === 'failed' &&
+    (failedControllers.value.length === 0 || flashError.value.detail != null)
+  );
 });
 
 const confirmOpen = ref(false);
@@ -193,7 +215,7 @@ onMounted(async () => {
             polite-the-announcement pattern matches WAI-ARIA guidance.
           -->
           <div
-            v-if="phase === 'flashing' && flashError !== null"
+            v-if="showFlashErrorRegion"
             class="firmware-view__flash-error"
             role="alert"
             aria-live="polite"

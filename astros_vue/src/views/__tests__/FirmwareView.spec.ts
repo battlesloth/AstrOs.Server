@@ -19,9 +19,11 @@ vi.mock('@/api/apiService', () => ({
 
 // Controllable WS state for the flash-stream-suspended banner tests.
 const mockWsIsConnected = ref(true);
+const mockWsHasEverConnected = ref(true);
 vi.mock('@/composables/useWebsocket', () => ({
   useWebsocket: () => ({
     wsIsConnected: mockWsIsConnected,
+    wsHasEverConnected: mockWsHasEverConnected,
     wsConnect: vi.fn(),
     wsDisconnect: vi.fn(),
     wsSendMessage: vi.fn(),
@@ -72,6 +74,7 @@ describe('FirmwareView lock-conflict gating (I7)', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockWsIsConnected.value = true;
+    mockWsHasEverConnected.value = true;
   });
 
   it('shows the in-page role="alert" lock-conflict region when lock is held by another operator', async () => {
@@ -138,6 +141,7 @@ describe('FirmwareView staleness banner (I5)', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockWsIsConnected.value = true;
+    mockWsHasEverConnected.value = true;
   });
 
   it('shows the role="status" staleness region when currentJobLoadFailed is true', async () => {
@@ -172,6 +176,7 @@ describe('FirmwareView flash-stream-suspended banner (I1)', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockWsIsConnected.value = true;
+    mockWsHasEverConnected.value = true;
   });
 
   it('shows the "live updates paused" banner when phase==="flashing" and WS is disconnected', async () => {
@@ -215,12 +220,32 @@ describe('FirmwareView flash-stream-suspended banner (I1)', () => {
     const statuses = wrapper.findAll('[role="status"]');
     expect(statuses.find((el) => el.text().includes('Live updates paused'))).toBeUndefined();
   });
+
+  it('does NOT flicker the banner during the pre-connect window before WS first connects (I3 fix)', async () => {
+    // Without the wsHasEverConnected gate, FirmwareView's onMounted runs
+    // before App.vue's wsConnect resolves the socket, so wsIsConnected is
+    // false. A mid-flash refresh hits applyJobStarted → phase='flashing',
+    // and the banner fires for ~50ms until the WS handshake completes.
+    // Training operators to dismiss it. The sentinel says "we've never
+    // connected yet, so disconnected is the expected state, not a signal."
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('flashing');
+    mockWsIsConnected.value = false;
+    mockWsHasEverConnected.value = false; // never connected yet
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const statuses = wrapper.findAll('[role="status"]');
+    expect(statuses.find((el) => el.text().includes('Live updates paused'))).toBeUndefined();
+  });
 });
 
 describe('FirmwareView mid-flash error region (C1)', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockWsIsConnected.value = true;
+    mockWsHasEverConnected.value = true;
   });
 
   it('renders the role="alert" mid-flash error region when flashError is set during flashing phase', async () => {
@@ -285,5 +310,41 @@ describe('FirmwareView mid-flash error region (C1)', () => {
     expect(region.exists()).toBe(true);
     await region.find('button').trigger('click');
     expect(firmwareStore.flashError).toBeNull();
+  });
+
+  it('shows the region in failed phase with detail even when failedControllers has entries (I1 widen)', async () => {
+    // The panel's result-bar carries label + stage but never surfaces
+    // flashError.detail. Without this region firing on the
+    // (failed + has-detail + non-empty failedControllers) combination, the
+    // operator sees e.g. "Core failed during Verify" but misses the
+    // specific reason like "asset checksum mismatch on Core".
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('failed');
+    firmwareStore.failedControllers = [{ id: 'core', label: 'Core', stage: 'verify' }];
+    firmwareStore.flashError = {
+      reason: 'internal_server_error',
+      detail: 'asset checksum mismatch on Core',
+    };
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const region = wrapper.find('[data-test="mid-flash-error"]');
+    expect(region.exists()).toBe(true);
+    expect(region.text()).toContain('asset checksum mismatch on Core');
+  });
+
+  it('hides the region in failed phase when failedControllers has entries and flashError has no detail', async () => {
+    // When the panel's result bar carries the whole story (label + stage)
+    // and there's no additional detail, the region is redundant.
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('failed');
+    firmwareStore.failedControllers = [{ id: 'core', label: 'Core', stage: 'verify' }];
+    firmwareStore.flashError = { reason: 'internal_server_error' }; // no detail
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="mid-flash-error"]').exists()).toBe(false);
   });
 });
