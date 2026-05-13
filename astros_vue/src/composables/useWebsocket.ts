@@ -284,9 +284,12 @@ export function useWebsocket() {
       store.applyControllerUpdate(data);
     } catch (error) {
       console.error('Error handling flashControllerUpdate:', error);
-      // No phase rollback — the next valid update can recover the row —
-      // but surface a flashError so the operator isn't stuck staring at
-      // frozen progress with no signal that something went wrong.
+      // No phase rollback — the next valid update can recover the per-row
+      // state. Note: the flashError banner is NOT auto-cleared by a
+      // subsequent successful applyControllerUpdate; it persists until the
+      // operator dismisses it or a job-lifecycle event (applyJobStarted,
+      // applyJobDone, applyJobFailed) clears flashError. The operator-
+      // visible "something went wrong" signal is the load-bearing piece.
       store.flashError = {
         reason: 'internal_server_error',
         detail: 'Malformed flashControllerUpdate from server',
@@ -306,6 +309,7 @@ export function useWebsocket() {
     } catch (error) {
       console.error('Error handling flashControllerResult:', error);
       // Mirrors handleFlashControllerUpdate: surface but don't transition.
+      // The banner persists until operator-dismiss or a job-lifecycle clear.
       store.flashError = {
         reason: 'internal_server_error',
         detail: 'Malformed flashControllerResult from server',

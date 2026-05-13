@@ -35,6 +35,7 @@ const {
   progressByControllerId,
   isOwnJob,
   currentJobLoadFailed,
+  flashError,
 } = storeToRefs(firmware);
 const { locked: lockLocked, since: lockSince } = storeToRefs(jobLock);
 // WS connection state. Drives the "live updates suspended" banner when a
@@ -43,6 +44,17 @@ const { locked: lockLocked, since: lockSince } = storeToRefs(jobLock);
 // stream has stopped.
 const { wsIsConnected } = useWebsocket();
 const flashStreamSuspended = computed(() => phase.value === 'flashing' && !wsIsConnected.value);
+
+// Mid-flash error region. The panel's `flash_error_banner` is gated on
+// phase==='select' (it surfaces HTTP POST failures before the job lifecycle
+// owns phase). For errors raised by useWebsocket's mid-stream catch blocks
+// (handleFlashControllerUpdate / handleFlashControllerResult set flashError
+// without rolling phase), the panel banner is hidden — so without this
+// region, the store write goes to a ref no template reads.
+const flashErrorDetail = computed(() => {
+  if (flashError.value === null) return null;
+  return flashError.value.detail ?? t(`firmware_view.flash_errors.${flashError.value.reason}`);
+});
 
 const confirmOpen = ref(false);
 
@@ -173,6 +185,33 @@ onMounted(async () => {
             {{ t('firmware_view.flash_stream_suspended') }}
           </div>
 
+          <!--
+            role="alert" implies aria-live="assertive" by default. We
+            explicitly override to "polite" because a flapping WS can
+            re-fire malformed events; assertive would announce each one
+            and drown the operator. The keep-the-role-for-semantics +
+            polite-the-announcement pattern matches WAI-ARIA guidance.
+          -->
+          <div
+            v-if="phase === 'flashing' && flashError !== null"
+            class="firmware-view__flash-error"
+            role="alert"
+            aria-live="polite"
+            data-test="mid-flash-error"
+          >
+            <span class="firmware-view__flash-error-title">{{
+              t('firmware_view.mid_flash_error.title')
+            }}</span>
+            <span class="firmware-view__flash-error-detail">{{ flashErrorDetail }}</span>
+            <button
+              type="button"
+              class="firmware-view__flash-error-dismiss"
+              @click="firmware.dismissError()"
+            >
+              {{ t('firmware_view.mid_flash_error.dismiss') }}
+            </button>
+          </div>
+
           <div
             v-if="lockConflict"
             class="firmware-view__lock-conflict"
@@ -254,6 +293,48 @@ onMounted(async () => {
   gap: 16px;
   box-sizing: border-box;
   overflow-y: auto;
+}
+
+.firmware-view__flash-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fbe0e0;
+  border: 1px solid #cf424255;
+  border-radius: 6px;
+}
+
+.firmware-view__flash-error-title {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9a2828;
+}
+
+.firmware-view__flash-error-detail {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  color: #9a2828;
+  flex: 1;
+}
+
+.firmware-view__flash-error-dismiss {
+  appearance: none;
+  background: transparent;
+  border: 1px solid #9a2828;
+  border-radius: 3px;
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #9a2828;
+  cursor: pointer;
+}
+
+.firmware-view__flash-error-dismiss:hover {
+  background: #9a2828;
+  color: #ffffff;
 }
 
 .firmware-view__stale-warning {

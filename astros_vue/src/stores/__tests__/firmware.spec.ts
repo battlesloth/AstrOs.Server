@@ -833,6 +833,20 @@ describe('firmware store', () => {
       expect(store.phase).toBe('done');
       expect(store.currentJob?.endedAt).toBe('2026-05-12T08:05:00Z');
     });
+
+    it('clears pendingByMac so a late LocationStatus cannot replay stale entries onto done state (C2 fix)', () => {
+      // Round-5 C2: without this clear, a queued entry whose MAC mapping
+      // arrives after job-done would mutate controllerStates + currentStage,
+      // visibly contradicting the result bar's "all updated" message.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyControllerUpdate({ controllerId: 'orphan-mac', stage: 'SENDING' });
+      expect(store.pendingByMac.size).toBe(1);
+
+      store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+      expect(store.pendingByMac.size).toBe(0);
+    });
   });
 
   describe('applyJobFailed', () => {
@@ -954,6 +968,21 @@ describe('firmware store', () => {
       ).not.toThrow();
       expect(store.phase).toBe('failed');
       expect(store.flashError).not.toBeNull();
+    });
+
+    it('clears pendingByMac so a late LocationStatus cannot replay stale entries onto failed state (C2 fix)', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyControllerUpdate({ controllerId: 'orphan-mac', stage: 'SENDING' });
+      expect(store.pendingByMac.size).toBe(1);
+
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason: 'bus_send_failed',
+      });
+
+      expect(store.pendingByMac.size).toBe(0);
     });
   });
 

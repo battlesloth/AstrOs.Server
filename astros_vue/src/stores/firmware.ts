@@ -342,6 +342,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
     // this clear, a fetchCurrentJob failure earlier in the session would
     // leave the warning visible on top of the legitimate done-flash UI.
     currentJobLoadFailed.value = false;
+    // Drain the replay queue so a late LocationStatus can't apply stale
+    // entries against terminal state. Without this, a queued entry whose
+    // MAC mapping arrives after job-done would call applyControllerUpdate,
+    // mutate controllerStates and currentStage, and visibly contradict the
+    // result bar.
+    pendingByMac.value = new Map();
   }
 
   function applyJobFailed(data: FlashJobFailedData): void {
@@ -387,6 +393,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
     // Terminal state — clear the staleness banner so it can't shadow the
     // legitimate failed-flash UI.
     currentJobLoadFailed.value = false;
+    // Same rationale as applyJobDone: a late LocationStatus must not
+    // replay stale entries onto a finalized failure state.
+    pendingByMac.value = new Map();
   }
 
   // ---------- HTTP actions ----------
@@ -449,16 +458,19 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
   }
 
-  // Set true when fetchCurrentJob fails with a non-404 response so the
+  // Set true when fetchCurrentJob fails with a 5xx or network error so the
   // FirmwareView can warn that its phase is unconfirmed. The WS late-join
   // snapshot normally covers this — but if BOTH HTTP and WS are down, the
   // operator otherwise sees an apparently-idle page while a job may be in
-  // flight server-side. 404 is the expected response from a healthy idle
-  // server and is treated as "no flash," not as staleness.
-  // Cleared on: any successful fetchCurrentJob (or 404), applyJobStarted
-  // (WS snapshot landed), applyControllerUpdate for a known controller
-  // (belt-and-suspenders), and the three terminal states (resetToSelect,
-  // applyJobDone, applyJobFailed) so the banner can't shadow a final state.
+  // flight server-side. The server's GET /api/firmware/flash returns
+  // 200 + body:null when idle (handled in the try block); a 404 explicit
+  // fallback below is forward-compat only — no current server route
+  // surfaces it on this endpoint.
+  // Cleared on: any successful fetchCurrentJob, the forward-compat 404
+  // fallback, applyJobStarted (WS snapshot landed), applyControllerUpdate
+  // for a known controller (belt-and-suspenders), and the three terminal
+  // states (resetToSelect, applyJobDone, applyJobFailed) so the banner
+  // can't shadow a final state.
   const currentJobLoadFailed = ref(false);
 
   // Cold-load resync. Mounted views call this to populate currentJob from
@@ -475,10 +487,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
       currentJobLoadFailed.value = false;
     } catch (error) {
       console.warn('firmware.fetchCurrentJob failed', error);
-      // 404 is the expected response from a healthy idle server (no flash
-      // in flight). Surfacing it as "could not confirm state" would falsely
-      // alarm operators on cold-load of an unused page. Only treat 5xx and
-      // network-level failures as a genuine staleness signal.
+      // The server's healthy-idle response is 200 + body:null, handled in
+      // the try block above. The 404 check below is forward-compat only: no
+      // current server route returns 404 on this endpoint, but a future
+      // change should not flip the staleness banner on for a benign idle
+      // response. Treat 5xx and network-level failures as the staleness
+      // signal; treat 404 (if it ever appears) as "no flash, not stale."
       const status =
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { status?: number } }).response?.status

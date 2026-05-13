@@ -178,7 +178,11 @@
       "body": "Another operator started a firmware update at {since}. Wait for it to finish before starting a new one."
     },
     "current_job_load_failed": "Could not confirm current firmware state. A flash may be in flight — refresh to retry.",
-    "flash_stream_suspended": "Live updates paused — reconnecting to the server. Progress shown may be stale."
+    "flash_stream_suspended": "Live updates paused — reconnecting to the server. Progress shown may be stale.",
+    "mid_flash_error": {
+      "title": "Flash warning:",
+      "dismiss": "Dismiss"
+    }
   },
   "placeholder": {
     "username": "username",

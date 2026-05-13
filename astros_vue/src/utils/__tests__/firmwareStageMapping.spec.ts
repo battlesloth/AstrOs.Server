@@ -32,6 +32,15 @@ describe('mapServerStageToUiStage', () => {
     expect(mapServerStageToUiStage('VERSION_CONFIRMED')).toBeNull();
     expect(mapServerStageToUiStage('FAILED')).toBeNull();
   });
+
+  it('returns null (not undefined) for unknown future server stages (C3 forward-compat)', () => {
+    // Round-5 C3 fix: without the default case, an unknown ServerFwStage
+    // value falls through the switch and returns undefined. Downstream
+    // `if (ui !== null)` guards would then write `undefined` to a
+    // FirmwareStage|null ref. The cast simulates a future enum value.
+    const unknown = 'WAITING_ON_NETWORK' as unknown as ServerFwStage;
+    expect(mapServerStageToUiStage(unknown)).toBeNull();
+  });
 });
 
 describe('controllerStatePillKind', () => {
@@ -52,6 +61,15 @@ describe('controllerStatePillKind', () => {
 
   it('returns failed for FAILED', () => {
     expect(controllerStatePillKind(state('FAILED'))).toBe('failed');
+  });
+
+  it('returns updating (not undefined) for unknown future server stages (C3 forward-compat)', () => {
+    // Without the default case, an unknown stage returned undefined, which
+    // the StatusPill component would receive as kind=undefined. Mapping
+    // unknowns to 'updating' keeps the row spinning safely until a
+    // recognized stage arrives.
+    const unknown = 'WAITING_ON_NETWORK' as unknown as ServerFwStage;
+    expect(controllerStatePillKind(state(unknown))).toBe('updating');
   });
 });
 

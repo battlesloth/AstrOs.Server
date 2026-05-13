@@ -216,3 +216,74 @@ describe('FirmwareView flash-stream-suspended banner (I1)', () => {
     expect(statuses.find((el) => el.text().includes('Live updates paused'))).toBeUndefined();
   });
 });
+
+describe('FirmwareView mid-flash error region (C1)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockWsIsConnected.value = true;
+  });
+
+  it('renders the role="alert" mid-flash error region when flashError is set during flashing phase', async () => {
+    // Round-5 C1 fix: handleFlashControllerUpdate / handleFlashControllerResult
+    // set flashError without rolling phase. The existing panel `flash_error_banner`
+    // is gated on phase==='select' so it never renders during flashing. Without
+    // this region, the store write goes to a ref no template reads.
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('flashing');
+    firmwareStore.flashError = {
+      reason: 'internal_server_error',
+      detail: 'Malformed flashControllerUpdate from server',
+    };
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const region = wrapper.find('[data-test="mid-flash-error"]');
+    expect(region.exists()).toBe(true);
+    expect(region.attributes('role')).toBe('alert');
+    expect(region.text()).toContain('Malformed flashControllerUpdate from server');
+  });
+
+  it('hides the mid-flash error region when flashError is null', async () => {
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('flashing');
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="mid-flash-error"]').exists()).toBe(false);
+  });
+
+  it('hides the mid-flash error region during select phase (panel banner owns that case)', async () => {
+    // The panel's flash_error_banner handles select-phase HTTP errors. This
+    // region must not double up.
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('select');
+    firmwareStore.flashError = {
+      reason: 'job_already_running',
+      currentJobId: 'job-x',
+    };
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="mid-flash-error"]').exists()).toBe(false);
+  });
+
+  it('dismiss button clears flashError via firmware.dismissError', async () => {
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('flashing');
+    firmwareStore.flashError = {
+      reason: 'internal_server_error',
+      detail: 'Malformed flashControllerUpdate from server',
+    };
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const region = wrapper.find('[data-test="mid-flash-error"]');
+    expect(region.exists()).toBe(true);
+    await region.find('button').trigger('click');
+    expect(firmwareStore.flashError).toBeNull();
+  });
+});

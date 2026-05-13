@@ -1,6 +1,6 @@
 # Firmware OTA — Vue UI QA
 
-Manual operator-flow QA for the `/firmware` view shipped across phase D (PRs d.1–d.6). Run end-to-end after d.6 merges. Unit-level coverage of the WS dispatcher, store handlers, type mapping, and lock-aware components lives in vitest (202 tests at d.6 close).
+Manual operator-flow QA for the `/firmware` view shipped across phase D (PRs d.1–d.6). Run end-to-end after d.6 merges. Unit-level coverage of the WS dispatcher, store handlers, type mapping, and lock-aware components lives in vitest (210 tests at d.6 close).
 
 ## Preconditions
 
@@ -163,7 +163,7 @@ Manual operator-flow QA for the `/firmware` view shipped across phase D (PRs d.1
 ## Regression check
 
 - All d.3 / d.4 / d.5 storybook stories still render correctly.
-- The 171 vitest tests still pass: `cd astros_vue && npx vitest run`.
+- The 210 vitest tests still pass: `cd astros_vue && npx vitest run`.
 - The smoke e2e spec passes locally: `npx playwright test e2e/C_01_firmware-page.spec.ts` (requires a running server).
 
 ## Known limitations (documented, not blockers)
