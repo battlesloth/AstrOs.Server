@@ -183,9 +183,12 @@ export function useWebsocket() {
       // Learn the MAC↔location mapping so the firmware view can translate
       // FlashJobState's `controllerId` (MAC) back to a slot for the progress
       // projection. The LocationStatus `controllerId` is a DB UUID — the
-      // MAC lives on `controllerAddress`.
+      // MAC lives on `controllerAddress`. After updating the resolver, drain
+      // any flash events that were queued because this MAC wasn't mapped
+      // yet (cold-load / late-join race).
       if (data.controllerAddress) {
         controllerStore.setControllerMac(data.controllerLocation, data.controllerAddress);
+        useFirmwareStore().flushPendingForMac(data.controllerAddress);
       }
     } catch (error) {
       console.error('Error handling status message:', error);

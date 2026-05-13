@@ -28,7 +28,7 @@ const {
   selectedControllerIds,
   target,
   currentStage,
-  failedController,
+  failedControllers,
   sourceMode,
   uploadedFilename,
   progressByControllerId,
@@ -58,7 +58,17 @@ const selectedControllerList = computed<FirmwareControllerView[]>(() =>
   controllers.value.filter((c) => selectedControllerIds.value.has(c.id)),
 );
 
-const failedControllerId = computed(() => failedController.value?.id);
+// Topology highlights the first FAILED controller (it animates one node, not
+// a set); the panel result bar joins ALL failed labels so multi-failure is
+// visible to the operator. Stage is taken from the first FAILED — all entries
+// share the same fallback stage in practice (`currentStage` at failure time).
+// `failedControllerLabels` returns `''` on no failures; the template coerces
+// to `undefined` via `|| undefined` so the panel's result bar skips rendering.
+const failedControllerId = computed(() => failedControllers.value[0]?.id);
+const failedControllerLabels = computed(() =>
+  failedControllers.value.map((c) => c.label).join(', '),
+);
+const failedStage = computed(() => failedControllers.value[0]?.stage ?? null);
 
 // A flash is in flight but it isn't ours — suppress the working UI. The
 // SourceStrip + grid v-ifs below gate on !lockConflict so the Flash button
@@ -153,7 +163,7 @@ onMounted(async () => {
                 v-if="phase === 'flashing' || phase === 'done' || phase === 'failed'"
                 :phase="phase"
                 :current-stage="currentStage"
-                :failed-stage="failedController?.stage ?? null"
+                :failed-stage="failedStage"
               />
             </div>
 
@@ -161,8 +171,8 @@ onMounted(async () => {
               class="firmware-view__panel"
               :phase="phase"
               :progress-by-controller-id="progressByControllerId"
-              :failed-controller-label="failedController?.label"
-              :failed-stage="failedController?.stage"
+              :failed-controller-label="failedControllerLabels || undefined"
+              :failed-stage="failedStage ?? undefined"
               @flash="openConfirm"
               @done="onResultBarDone"
             />

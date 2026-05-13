@@ -71,7 +71,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
   const phase = ref<FirmwarePhase>('idle');
   const currentStage = ref<FirmwareStage | null>(null);
   const flashError = ref<FlashErrorEnvelope | null>(null);
-  const failedController = ref<{ id: string; label: string; stage: FirmwareStage } | null>(null);
+  // All controllers that ended this job in stage='FAILED'. Multi-failure is
+  // realistic (e.g. ESP-NOW bus failure fails both padawans simultaneously);
+  // surfacing only the first would let the operator walk away from a bricked
+  // controller. Empty array means no FAILED entries were observed.
+  const failedControllers = ref<Array<{ id: string; label: string; stage: FirmwareStage }>>([]);
 
   // WS-pushed state. Apply* handlers below are the sole writers.
   const currentJob = ref<FlashJobState | null>(null);
@@ -79,6 +83,16 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // Set by `startFlash` from the POST response so the UI can tell whether the
   // active flash belongs to us vs. another operator (lock-conflict UI).
   const ownJobId = ref<string | null>(null);
+
+  // Queue of ControllerFlashState payloads dropped because their MAC wasn't
+  // yet in the controllerStore's resolver. The cold-load / late-join race:
+  // flashJobStarted (or flashControllerUpdate) for a padawan can arrive
+  // before its LocationStatus heartbeat has populated the MAC mapping.
+  // Without this queue, the dropped event is lost forever and the row
+  // freezes at its last-seen stage (or never gets a pill at all). The queue
+  // is keyed by raw MAC; `flushPendingForMac` replays on setControllerMac.
+  // Cleared on resetToSelect so stale drift from a prior flash can't bleed in.
+  const pendingByMac = ref<Map<string, ControllerFlashState[]>>(new Map());
 
   // Project the per-location controller store into a fleet shape the firmware
   // view consumes. Reads are reactive through useControllerStore — changes
@@ -169,10 +183,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
     phase.value = 'select';
     currentStage.value = null;
     flashError.value = null;
-    failedController.value = null;
+    failedControllers.value = [];
     currentJob.value = null;
     controllerStates.value = new Map();
     ownJobId.value = null;
+    pendingByMac.value = new Map();
   }
 
   function dismissError(): void {
@@ -193,6 +208,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return loc;
   }
 
+  function enqueuePending(state: ControllerFlashState): void {
+    const queue = pendingByMac.value.get(state.controllerId) ?? [];
+    queue.push(state);
+    pendingByMac.value.set(state.controllerId, queue);
+  }
+
   function buildControllerStatesMap(
     states: ReadonlyArray<ControllerFlashState> | undefined,
   ): ReadonlyMap<string, ControllerFlashState> {
@@ -204,12 +225,14 @@ export const useFirmwareStore = defineStore('firmware', () => {
     for (const s of states) {
       const slot = resolveSlot(s.controllerId);
       if (slot === null) {
-        if (import.meta.env.DEV) {
-          console.warn(
-            `[firmwareStore] applyJobStarted: unknown controllerId="${s.controllerId}" ` +
-              `(no MAC → location mapping yet). Dropping this entry; LocationStatus must arrive first.`,
-          );
-        }
+        // Queue for replay when LocationStatus eventually learns this MAC.
+        // Without queuing, late-arriving LocationStatus would never recover
+        // the dropped snapshot entry and the row would render with no pill.
+        enqueuePending(s);
+        console.warn(
+          `[firmwareStore] applyJobStarted: unknown controllerId="${s.controllerId}" ` +
+            `(no MAC → location mapping yet). Queued for replay.`,
+        );
         continue;
       }
       // Re-key by slot so the panel's progressByControllerId[c.id] lookup
@@ -230,18 +253,18 @@ export const useFirmwareStore = defineStore('firmware', () => {
     controllerStates.value = buildControllerStatesMap(data.controllers);
     if (phase.value !== 'flashing') phase.value = 'flashing';
     flashError.value = null;
-    failedController.value = null;
+    failedControllers.value = [];
   }
 
   function applyControllerUpdate(data: ControllerFlashState): void {
     const slot = resolveSlot(data.controllerId);
     if (slot === null) {
-      if (import.meta.env.DEV) {
-        console.warn(
-          `[firmwareStore] applyControllerUpdate: unknown controllerId="${data.controllerId}". ` +
-            `Update ignored. LocationStatus must populate the MAC mapping first.`,
-        );
-      }
+      // Queue for replay; see pendingByMac comment above.
+      enqueuePending(data);
+      console.warn(
+        `[firmwareStore] applyControllerUpdate: unknown controllerId="${data.controllerId}". ` +
+          `Queued for replay; LocationStatus must arrive to drain the queue.`,
+      );
       return;
     }
     const next = new Map(controllerStates.value);
@@ -249,6 +272,33 @@ export const useFirmwareStore = defineStore('firmware', () => {
     controllerStates.value = next;
     const ui = mapServerStageToUiStage(data.stage);
     if (ui !== null) currentStage.value = ui;
+  }
+
+  /**
+   * Drain queued ControllerFlashState payloads for `mac` and re-apply them.
+   * Called by `useWebsocket.handleStatusMessage` right after the controller
+   * store learns a new MAC mapping. Idempotent: a flush with no pending
+   * entries is a no-op. Replays in insertion order so the final state
+   * reflects the most recent server-pushed stage.
+   */
+  function flushPendingForMac(mac: string): void {
+    const queue = pendingByMac.value.get(mac);
+    if (!queue || queue.length === 0) return;
+    pendingByMac.value.delete(mac);
+    for (const entry of queue) {
+      applyControllerUpdate(entry);
+    }
+    // Re-queue detection: if applyControllerUpdate re-enqueued because
+    // resolveSlot still returned null (controllerStore/firmwareStore race
+    // gap), the entries are stuck. Distinct log so a production stuck-replay
+    // loop is visible — the bare warn in applyControllerUpdate can't
+    // distinguish first-queue from re-queue-during-flush.
+    if (pendingByMac.value.has(mac)) {
+      console.warn(
+        `[firmwareStore] flushPendingForMac: re-queued during flush for mac="${mac}". ` +
+          `MAC mapping inconsistency between controllerStore and firmwareStore.`,
+      );
+    }
   }
 
   function applyControllerResult(payload: {
@@ -289,19 +339,22 @@ export const useFirmwareStore = defineStore('firmware', () => {
         ? (data.reason as FlashErrorReason)
         : 'internal_server_error';
     flashError.value = { reason, detail: data.detail };
-    // Find the controller that ended in FAILED; surface its label + UI stage.
+    // Collect ALL controllers that ended in FAILED. Multi-failure is realistic
+    // (e.g. bus-wide ESP-NOW failure fails both padawans at once); surfacing
+    // only the first would let the operator walk away from a bricked unit.
+    const failed: Array<{ id: string; label: string; stage: FirmwareStage }> = [];
     for (const state of controllerStates.value.values()) {
       if (state.stage === 'FAILED') {
         const c = controllers.value.find((x) => x.id === state.controllerId);
         const uiStage = mapServerStageToUiStage(state.stage) ?? currentStage.value ?? 'transfer';
-        failedController.value = {
+        failed.push({
           id: state.controllerId,
           label: c?.label ?? state.controllerId,
           stage: uiStage,
-        };
-        break;
+        });
       }
     }
+    failedControllers.value = failed;
     currentStage.value = null;
   }
 
@@ -430,10 +483,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
     phase,
     currentStage,
     flashError,
-    failedController,
+    failedControllers,
     currentJob,
     controllerStates,
     ownJobId,
+    pendingByMac,
     target,
     anyDowngradeBlocked,
     canFlash,
@@ -450,6 +504,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     applyControllerResult,
     applyJobDone,
     applyJobFailed,
+    flushPendingForMac,
     startFlash,
     cancelFlash,
     fetchCurrentJob,

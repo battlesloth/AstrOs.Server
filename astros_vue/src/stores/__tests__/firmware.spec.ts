@@ -381,19 +381,19 @@ describe('firmware store', () => {
       expect(store.phase).toBe('flashing');
     });
 
-    it("resetToSelect clears currentStage, flashError, failedController and sets phase to 'select'", () => {
+    it("resetToSelect clears currentStage, flashError, failedControllers and sets phase to 'select'", () => {
       const store = useFirmwareStore();
       store.setPhase('failed');
       store.currentStage = 'transfer';
       store.flashError = { reason: 'job_already_running' };
-      store.failedController = { id: 'core', label: 'Core', stage: 'transfer' };
+      store.failedControllers = [{ id: 'core', label: 'Core', stage: 'transfer' }];
 
       store.resetToSelect();
 
       expect(store.phase).toBe('select');
       expect(store.currentStage).toBeNull();
       expect(store.flashError).toBeNull();
-      expect(store.failedController).toBeNull();
+      expect(store.failedControllers).toEqual([]);
     });
 
     it('dismissError clears flashError without changing phase', () => {
@@ -713,14 +713,14 @@ describe('firmware store', () => {
       expect(store.controllerStates.size).toBe(0);
     });
 
-    it('clears flashError and failedController so a previous failure does not bleed into the new job', () => {
+    it('clears flashError and failedControllers so a previous failure does not bleed into the new job', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.flashError = { reason: 'internal_server_error' };
-      store.failedController = { id: 'core', label: 'Core', stage: 'transfer' };
+      store.failedControllers = [{ id: 'core', label: 'Core', stage: 'transfer' }];
       store.applyJobStarted(sampleJobState());
       expect(store.flashError).toBeNull();
-      expect(store.failedController).toBeNull();
+      expect(store.failedControllers).toEqual([]);
     });
   });
 
@@ -822,7 +822,7 @@ describe('firmware store', () => {
       expect(store.flashError?.reason).toBe('release_not_found');
     });
 
-    it('derives failedController from the FAILED entry in controllerStates', () => {
+    it('derives failedControllers from the FAILED entries in controllerStates', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
@@ -832,16 +832,48 @@ describe('firmware store', () => {
         error: 'hash_mismatch',
       });
       store.applyJobFailed({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
-      expect(store.failedController?.id).toBe('core');
-      expect(store.failedController?.label).toBe('Core');
+      expect(store.failedControllers).toHaveLength(1);
+      expect(store.failedControllers[0]?.id).toBe('core');
+      expect(store.failedControllers[0]?.label).toBe('Core');
     });
 
-    it('leaves failedController null when no controller transitioned to FAILED before job-failed (mid-deploy abort)', () => {
+    it('collects ALL FAILED entries (multi-failure realistic on bus-wide ESP-NOW errors)', () => {
+      // C2 fix: a `break` in applyJobFailed previously surfaced only the
+      // first FAILED entry by iteration order. With two padawans failing
+      // simultaneously (e.g. master loses ESP-NOW), the operator would
+      // walk away from a bricked unit. Pin all FAILEDs make the array.
+      // Array order is intentionally unspecified by the contract (Map.values()
+      // iteration is insertion-order, which the test couples to via sort()
+      // to decouple from incidental ordering).
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyControllerUpdate({
+        controllerId: CORE_MAC,
+        stage: 'FAILED',
+        error: 'bus_send_failed',
+      });
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'FAILED',
+        error: 'bus_send_failed',
+      });
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason: 'bus_send_failed',
+      });
+      expect(store.failedControllers).toHaveLength(2);
+      const ids = store.failedControllers.map((c) => c.id).sort();
+      expect(ids).toEqual(['body', 'core']);
+    });
+
+    it('leaves failedControllers empty when no controller transitioned to FAILED before job-failed (mid-deploy abort)', () => {
       // Edge case: applyJobStarted runs, no per-controller updates land,
       // then a mid-deploy abort (e.g., bus_send_failed) fires
       // flashJobFailed. The store should still transition phase + set
       // flashError, and the FirmwareView template guards on
-      // `failedController?.stage` so a null is safe to render.
+      // `failedControllers[0]?.stage` so an empty array is safe to render.
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
@@ -853,7 +885,7 @@ describe('firmware store', () => {
       });
       expect(store.phase).toBe('failed');
       expect(store.flashError?.detail).toBe('Worker channel closed during firmware send');
-      expect(store.failedController).toBeNull();
+      expect(store.failedControllers).toEqual([]);
     });
 
     it('does not throw when called with no controllerStates and no currentJob (defensive)', () => {
@@ -1035,6 +1067,73 @@ describe('firmware store', () => {
 
       const after = store.controllers.find((c) => c.id === 'body');
       expect(after?.status).toBe('down');
+    });
+  });
+
+  describe('pending-update replay queue (late-MAC race)', () => {
+    // C1: WS flashControllerUpdate / flashJobStarted entries can arrive for
+    // a padawan before its LocationStatus heartbeat populates the MAC map.
+    // The store queues those payloads keyed by raw MAC and drains them when
+    // controllerStore.setControllerMac is later called (via the dispatcher).
+    const LATE_CORE_MAC = 'aa:bb:cc:dd:ee:01';
+
+    it('queues a flashControllerUpdate whose MAC is not yet mapped (no controllerStates entry produced)', () => {
+      const store = useFirmwareStore();
+      // No seedSampleFleet → core MAC unmapped.
+      store.applyControllerUpdate({ controllerId: LATE_CORE_MAC, stage: 'SENDING' });
+      expect(store.controllerStates.size).toBe(0);
+      expect(store.pendingByMac.get(LATE_CORE_MAC)).toHaveLength(1);
+    });
+
+    it('queues each dropped snapshot entry from applyJobStarted (not just live updates)', () => {
+      // Late-join: snapshot arrives before LocationStatus seeds the padawan
+      // MACs. Without the queue, the snapshot entries are lost and the rows
+      // render with no pill until further events land (which may never come
+      // for a fast-flashing controller).
+      const store = useFirmwareStore();
+      store.applyJobStarted({
+        jobId: 'job-late-join',
+        source: { kind: 'github', version: 'v1.4.2' },
+        controllers: [
+          { controllerId: LATE_CORE_MAC, stage: 'SENDING' },
+          { controllerId: 'aa:bb:cc:dd:ee:02', stage: 'QUEUED' },
+        ],
+        startedAt: '2026-05-13T08:00:00Z',
+      });
+      expect(store.controllerStates.size).toBe(0);
+      expect(store.pendingByMac.size).toBe(2);
+      expect(store.pendingByMac.get(LATE_CORE_MAC)).toHaveLength(1);
+    });
+
+    it('flushPendingForMac drains the queue and applies entries in order so the latest stage wins', () => {
+      // Mutation guard: a non-ordered replay (e.g., Map.values() with later
+      // iteration shuffling) would let an earlier SENDING overwrite the
+      // intended VERIFYING. Pin order.
+      const store = useFirmwareStore();
+      store.applyControllerUpdate({ controllerId: LATE_CORE_MAC, stage: 'SENDING' });
+      store.applyControllerUpdate({ controllerId: LATE_CORE_MAC, stage: 'VERIFYING' });
+      expect(store.pendingByMac.get(LATE_CORE_MAC)).toHaveLength(2);
+
+      // LocationStatus learns the MAC; useWebsocket would call both:
+      useControllerStore().setControllerMac(Location.CORE, LATE_CORE_MAC);
+      store.flushPendingForMac(LATE_CORE_MAC);
+
+      expect(store.controllerStates.get('core')?.stage).toBe('VERIFYING');
+      expect(store.pendingByMac.has(LATE_CORE_MAC)).toBe(false);
+    });
+
+    it('flushPendingForMac is a no-op for a MAC with no queued entries', () => {
+      const store = useFirmwareStore();
+      expect(() => store.flushPendingForMac(LATE_CORE_MAC)).not.toThrow();
+      expect(store.controllerStates.size).toBe(0);
+    });
+
+    it('resetToSelect clears the pending queue so prior-flash drift cannot leak into the next job', () => {
+      const store = useFirmwareStore();
+      store.applyControllerUpdate({ controllerId: LATE_CORE_MAC, stage: 'SENDING' });
+      expect(store.pendingByMac.size).toBe(1);
+      store.resetToSelect();
+      expect(store.pendingByMac.size).toBe(0);
     });
   });
 });
