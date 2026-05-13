@@ -38,7 +38,7 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
 
       expect(firmware.phase).toBe('select');
       expect(firmware.flashError).toEqual({
-        reason: 'internal_server_error',
+        reason: 'protocol_violation',
         detail: 'Malformed flashJobStarted from server',
       });
     });
@@ -58,7 +58,7 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
       );
 
       expect(firmware.phase).toBe('failed');
-      expect(firmware.flashError?.reason).toBe('internal_server_error');
+      expect(firmware.flashError?.reason).toBe('protocol_violation');
       expect(firmware.flashError?.detail).toBe('Malformed flashJobFailed from server');
     });
   });
@@ -85,7 +85,7 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
       );
 
       expect(firmware.phase).toBe('done');
-      expect(firmware.flashError?.reason).toBe('internal_server_error');
+      expect(firmware.flashError?.reason).toBe('protocol_violation');
       expect(firmware.flashError?.detail).toBe('Malformed flashJobDone from server');
     });
   });
@@ -253,7 +253,7 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
 
       // Phase intentionally NOT rolled — the next valid update should
       // recover the row. But the operator-visible error must surface.
-      expect(firmware.flashError?.reason).toBe('internal_server_error');
+      expect(firmware.flashError?.reason).toBe('protocol_violation');
       expect(firmware.flashError?.detail).toBe('Malformed flashControllerUpdate from server');
       // Pin the non-rollback contract: a regression that added
       // setPhase('select' | 'failed') to this catch would pass the

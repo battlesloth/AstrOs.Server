@@ -166,7 +166,7 @@
       "source_resolution_failed": "Couldn't fetch the firmware binary from its source. Try again or pick a different release.",
       "controllers_lookup_failed": "The server couldn't look up the selected controllers. Try again.",
       "subscriber_attach_failed": "The server couldn't subscribe to deploy events. Try again or restart the server.",
-      "protocol_violation": "The serial protocol returned an unexpected message. Try again or restart the master controller.",
+      "protocol_violation": "Unexpected message format from the server. Try again or restart the master controller.",
       "streamer_unknown_error": "The firmware streamer failed with an unknown error. Try again.",
       "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
       "network_error": "Couldn't reach the server. Check your network connection and try again."
@@ -180,7 +180,8 @@
     "current_job_load_failed": "Could not confirm current firmware state. A flash may be in flight — refresh to retry.",
     "flash_stream_suspended": "Live updates paused — reconnecting to the server. Progress shown may be stale.",
     "mid_flash_error": {
-      "title": "Flash warning:",
+      "title_warning": "Flash warning:",
+      "title_failed": "Flash failed:",
       "dismiss": "Dismiss"
     }
   },

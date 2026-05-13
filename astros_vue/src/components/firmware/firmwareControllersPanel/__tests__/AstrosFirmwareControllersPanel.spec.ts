@@ -80,6 +80,24 @@ describe('AstrosFirmwareControllersPanel failed-result-bar predicate (I-test-2)'
     expect(text).not.toMatch(/failed during Transfer/);
   });
 
+  it('defaults to singular copy when failedCount is omitted (?? 1 fallback)', async () => {
+    // I12: pin the `(failedCount ?? 1) !== 1` predicate's default path.
+    // A regression that changed `?? 1` to `?? 0` would render the multi
+    // copy when the parent forgets to pass failedCount.
+    const wrapper = mountPanel({
+      phase: 'failed',
+      progressByControllerId: {},
+      failedControllerLabel: 'Core',
+      failedStage: 'transfer',
+      // No failedCount prop — should fall through to singular via `?? 1`.
+    });
+    await wrapper.vm.$nextTick();
+    const text = wrapper.text();
+    expect(text).toContain('Core');
+    expect(text).toContain('Transfer');
+    expect(text).not.toMatch(/failed during the flash/);
+  });
+
   it('routes failedCount === 0 (pre-streamer abort) to the multi copy, not singular with — fallback', async () => {
     // I2 + I-test-2: a pre-streamer abort has no per-controller failure
     // record. The singular key would render "⚠ — failed during —". The

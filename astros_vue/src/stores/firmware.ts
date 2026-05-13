@@ -17,6 +17,7 @@ import type {
   FirmwareControllerView,
   FirmwarePhase,
   FirmwareSourceMode,
+  FailedControllerSummary,
   FirmwareStage,
   FirmwareStageLabelKey,
   SlotId,
@@ -34,14 +35,14 @@ import { KNOWN_FLASH_ERROR_REASONS } from '@/types/firmware';
 // convention (see `project_master_esp_sentinel_mac` memory). If this ever
 // flips, the firmware side has to flip first — keep cross-referenced.
 const FLEET_LAYOUT: ReadonlyArray<{
-  id: string;
+  id: SlotId;
   label: string;
   glyph: string;
   isMaster: boolean;
 }> = [
-  { id: 'body', label: 'Body', glyph: 'B', isMaster: true },
-  { id: 'core', label: 'Core', glyph: 'C', isMaster: false },
-  { id: 'dome', label: 'Dome', glyph: 'D', isMaster: false },
+  { id: Location.BODY, label: 'Body', glyph: 'B', isMaster: true },
+  { id: Location.CORE, label: 'Core', glyph: 'C', isMaster: false },
+  { id: Location.DOME, label: 'Dome', glyph: 'D', isMaster: false },
 ];
 
 function projectControllerStatus(status: ControllerStatus): ControllerOnlineStatus {
@@ -79,11 +80,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // controller. Empty array means no FAILED entries were observed. `stage`
   // is `FirmwareStage | null` — null when we can't honestly attribute the
   // failure to a specific stage (rather than fabricating 'transfer').
-  const failedControllers = ref<Array<{ id: string; label: string; stage: FirmwareStage | null }>>(
-    [],
-  );
+  const failedControllers = ref<FailedControllerSummary[]>([]);
 
-  // WS-pushed state. Apply* handlers below are the sole writers.
+  // WS-pushed state. Apply* handlers + resetToSelect are the writers
+  // (resetToSelect for the operator-driven clear; apply* for live state).
   const currentJob = ref<FlashJobState | null>(null);
   const controllerStates = ref<ReadonlyMap<string, ControllerFlashState>>(new Map());
   // Set by `startFlash` from the POST response so the UI can tell whether the
@@ -97,7 +97,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // Without this queue, the dropped event is lost forever and the row
   // freezes at its last-seen stage (or never gets a pill at all). The queue
   // is keyed by raw MAC; `flushPendingForMac` replays on setControllerMac.
-  // Cleared on resetToSelect so stale drift from a prior flash can't bleed in.
+  // Cleared on resetToSelect, applyJobStarted (replace-not-merge for the
+  // new job), and the two terminal handlers (applyJobDone, applyJobFailed)
+  // — see those sites for the per-call rationale.
   const pendingByMac = ref<Map<string, ControllerFlashState[]>>(new Map());
 
   // Project the per-location controller store into a fleet shape the firmware
@@ -188,7 +190,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
   function resetToSelect(): void {
     phase.value = 'select';
     currentStage.value = null;
-    flashError.value = null;
+    clearFlashError();
     failedControllers.value = [];
     currentJob.value = null;
     controllerStates.value = new Map();
@@ -197,20 +199,27 @@ export const useFirmwareStore = defineStore('firmware', () => {
     currentJobLoadFailed.value = false;
   }
 
-  function dismissError(): void {
-    flashError.value = null;
-  }
-
   /**
-   * Single writer for `flashError`. The dispatcher's malformed-payload
-   * catch blocks route through this rather than mutating the ref directly
-   * so a future "who wrote this flashError" investigation has one site to
-   * audit. The store's apply* handlers manage flashError internally per
-   * job-lifecycle (cleared on applyJobStarted; not auto-cleared by
-   * subsequent successful updates).
+   * Single writer for `flashError`. All sites that need to surface an
+   * error envelope route through this action: the dispatcher's malformed-
+   * payload catches, applyJobFailed's reason mapping, startFlash's HTTP
+   * error path, and the panel banner's retry-clear case. A future
+   * "who wrote this flashError" audit has one site to grep.
    */
   function setFlashError(envelope: FlashErrorEnvelope): void {
     flashError.value = envelope;
+  }
+
+  /**
+   * Paired clear for {@link setFlashError}. Used by the panel's dismiss
+   * button, applyJobStarted's per-job lifecycle reset, and resetToSelect.
+   */
+  function clearFlashError(): void {
+    flashError.value = null;
+  }
+
+  function dismissError(): void {
+    clearFlashError();
   }
 
   // ---------- WS handlers (the sole writers of server-pushed fields) ----------
@@ -279,7 +288,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     pendingByMac.value = new Map();
     controllerStates.value = buildControllerStatesMap(data.controllers);
     if (phase.value !== 'flashing') phase.value = 'flashing';
-    flashError.value = null;
+    clearFlashError();
     failedControllers.value = [];
     // WS late-join landed → the HTTP staleness warning is no longer accurate
     // even if HTTP itself failed. The store has live state again.
@@ -413,7 +422,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       KNOWN_FLASH_ERROR_REASONS.has(data.reason as FlashErrorReason)
         ? (data.reason as FlashErrorReason)
         : 'internal_server_error';
-    flashError.value = { reason, detail: data.detail };
+    setFlashError({ reason, detail: data.detail });
     // Normalize any per-controller state still mid-flow to FAILED. Mirrors
     // applyJobDone's normalize (round-5 I4) but for the failure path: a
     // controller stuck at QUEUED/SENDING when the job ends has by
@@ -437,13 +446,18 @@ export const useFirmwareStore = defineStore('firmware', () => {
     // fails both padawans); surfacing only the first would let the
     // operator walk away from a bricked unit. The stage reflects
     // `currentStage` at failure time — null when no stage was current.
-    const failed: Array<{ id: string; label: string; stage: FirmwareStage | null }> = [];
+    const failed: FailedControllerSummary[] = [];
     for (const state of normalized.values()) {
       if (state.stage === 'FAILED') {
-        const c = controllers.value.find((x) => x.id === state.controllerId);
+        // state.controllerId has been re-keyed to a SlotId by
+        // buildControllerStatesMap / applyControllerUpdate. The cast is the
+        // single attestation site — see types/firmware.ts ControllerFlashState
+        // doc comment for the pre/post-translation contract.
+        const slot = state.controllerId as SlotId;
+        const c = controllers.value.find((x) => x.id === slot);
         failed.push({
-          id: state.controllerId,
-          label: c?.label ?? state.controllerId,
+          id: slot,
+          label: c?.label ?? slot,
           stage: currentStage.value,
         });
       }
@@ -467,7 +481,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   async function startFlash(): Promise<void> {
     if (!canFlash.value || phase.value === 'flashing') return;
-    flashError.value = null;
+    clearFlashError();
     const body =
       sourceMode.value === 'github'
         ? { source: { kind: 'github' as const, version: selectedReleaseTag.value } }
@@ -490,7 +504,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // can mutate the ref across the await boundary, but TS can't see that.
       if ((phase.value as FirmwarePhase) === 'select') {
         phase.value = 'flashing';
-        flashError.value = null;
+        clearFlashError();
       }
       // From here on the WS surface owns phase transitions, per-controller
       // stage progression, completion, and failure. applyJobStarted is
@@ -501,7 +515,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // wrapper, so log here to preserve the dev breadcrumb.
       console.error('firmware.startFlash failed', error);
       phase.value = 'select';
-      flashError.value = mapHttpErrorToFlashEnvelope(error);
+      setFlashError(mapHttpErrorToFlashEnvelope(error));
     }
   }
 
@@ -633,6 +647,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     resetToSelect,
     dismissError,
     setFlashError,
+    clearFlashError,
     applyJobStarted,
     applyControllerUpdate,
     applyControllerResult,

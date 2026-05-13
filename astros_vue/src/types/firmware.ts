@@ -37,7 +37,7 @@ export type ControllerOnlineStatus = 'up' | 'down' | 'needsSynced';
 
 /** Presentation-layer view of a controller for the firmware-update flow. */
 export interface FirmwareControllerView {
-  id: string;
+  id: SlotId;
   label: string;
   /** Single-letter badge glyph: 'B', 'C', 'D'. */
   glyph: string;
@@ -45,6 +45,17 @@ export interface FirmwareControllerView {
   current: string;
   status: ControllerOnlineStatus;
   isMaster: boolean;
+}
+
+/**
+ * Summary record for a controller that ended a flash job in stage='FAILED'.
+ * The `stage` is taken from the shared `currentStage` at failure time
+ * (FirmwareStage | null) — see `applyJobFailed`'s normalize for details.
+ */
+export interface FailedControllerSummary {
+  id: SlotId;
+  label: string;
+  stage: FirmwareStage | null;
 }
 
 export type FirmwareStatusPillKind =

@@ -6,7 +6,6 @@ import { useFirmwareStore } from '@/stores/firmware';
 import AstrosFirmwareControllerRow from '../firmwareControllerRow/AstrosFirmwareControllerRow.vue';
 import AstrosFirmwareButton from '../firmwareButton/AstrosFirmwareButton.vue';
 import type { ControllersPanelProps } from './types';
-import type { SlotId } from '@/types/firmware';
 
 const props = defineProps<ControllersPanelProps>();
 const emit = defineEmits<{
@@ -55,7 +54,7 @@ if (import.meta.env.DEV) {
     }
     if (props.phase !== 'select' && props.progressByControllerId !== undefined) {
       const missing = controllers.value
-        .filter((c) => props.progressByControllerId?.[c.id as SlotId] === undefined)
+        .filter((c) => props.progressByControllerId?.[c.id] === undefined)
         .map((c) => c.id);
       if (missing.length > 0) {
         console.warn(
@@ -116,8 +115,8 @@ const actionBarMessage = computed(() => {
           :target="target"
           :mode="rowMode"
           :selected="selectedControllerIds.has(c.id)"
-          :progress-status="progressByControllerId?.[c.id as SlotId]?.status"
-          :stage-label-key="progressByControllerId?.[c.id as SlotId]?.stageLabelKey"
+          :progress-status="progressByControllerId?.[c.id]?.status"
+          :stage-label-key="progressByControllerId?.[c.id]?.stageLabelKey"
           @toggle="firmware.toggle"
         />
       </li>

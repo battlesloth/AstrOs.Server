@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { selectModePillKind } from '../selectModePillKind';
+import { Location } from '@/enums';
 import type { FirmwareControllerView } from '@/types/firmware';
 
 function ctrl(overrides: Partial<FirmwareControllerView> = {}): FirmwareControllerView {
   return {
-    id: 'core',
+    id: Location.CORE,
     label: 'Core',
     glyph: 'C',
     current: 'v1.4.0',

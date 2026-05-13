@@ -386,7 +386,7 @@ describe('firmware store', () => {
       store.setPhase('failed');
       store.currentStage = 'transfer';
       store.flashError = { reason: 'job_already_running' };
-      store.failedControllers = [{ id: 'core', label: 'Core', stage: 'transfer' }];
+      store.failedControllers = [{ id: Location.CORE, label: 'Core', stage: 'transfer' }];
 
       store.resetToSelect();
 
@@ -717,7 +717,7 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.flashError = { reason: 'internal_server_error' };
-      store.failedControllers = [{ id: 'core', label: 'Core', stage: 'transfer' }];
+      store.failedControllers = [{ id: Location.CORE, label: 'Core', stage: 'transfer' }];
       store.applyJobStarted(sampleJobState());
       expect(store.flashError).toBeNull();
       expect(store.failedControllers).toEqual([]);

@@ -50,15 +50,19 @@ const flashStreamSuspended = computed(
   () => phase.value === 'flashing' && wsHasEverConnected.value && !wsIsConnected.value,
 );
 
-// Mid-flash + pre-streamer-abort error region. The panel's
-// `flash_error_banner` is gated on phase==='select' (it surfaces HTTP POST
-// failures before the job lifecycle owns phase). For errors raised by:
+// Mid-flash + pre-streamer-abort + failed-with-detail error region. The
+// panel's `flash_error_banner` is gated on phase==='select' (it surfaces
+// HTTP POST failures before the job lifecycle owns phase). This region
+// fires on three additional paths:
 //   - useWebsocket's mid-stream catch blocks (phase==='flashing')
 //   - applyJobFailed with empty failedControllers (pre-streamer abort —
 //     job failed before any controller transitioned to FAILED, so the
 //     panel's "⚠ — failed during the flash" result bar is uselessly vague)
-// the panel banner is hidden — without this region, flashError.detail
-// would go to a ref no template reads.
+//   - applyJobFailed with non-empty failedControllers AND a detail string
+//     (the panel result bar shows the label + stage but never the detail,
+//     so a meaningful reason like "asset checksum mismatch on Core" would
+//     otherwise be dropped)
+// Without this region, flashError.detail would go to a ref no template reads.
 const flashErrorDetail = computed(() => {
   if (flashError.value === null) return null;
   return flashError.value.detail ?? t(`firmware_view.flash_errors.${flashError.value.reason}`);
@@ -222,7 +226,9 @@ onMounted(async () => {
             data-test="mid-flash-error"
           >
             <span class="firmware-view__flash-error-title">{{
-              t('firmware_view.mid_flash_error.title')
+              phase === 'failed'
+                ? t('firmware_view.mid_flash_error.title_failed')
+                : t('firmware_view.mid_flash_error.title_warning')
             }}</span>
             <span class="firmware-view__flash-error-detail">{{ flashErrorDetail }}</span>
             <button

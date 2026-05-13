@@ -273,11 +273,15 @@ export function useWebsocket() {
       store.applyJobStarted(data);
     } catch (error) {
       console.error('Error handling flashJobStarted:', error);
-      // Roll the UI back to select with a surfaced error so the operator
-      // isn't wedged in 'flashing' awaiting a snapshot we can't parse.
-      store.setPhase('select');
+      // Full reset: a malformed flashJobStarted means we can't trust
+      // anything that follows for this job. setPhase('select') alone
+      // leaves any prior `controllerStates` / `pendingByMac` / `currentJob`
+      // visible in 'select' phase (the panel's progress gate hides them,
+      // but the store invariant "select has no active job" would be
+      // violated). resetToSelect drops it all atomically.
+      store.resetToSelect();
       store.setFlashError({
-        reason: 'internal_server_error',
+        reason: 'protocol_violation',
         detail: 'Malformed flashJobStarted from server',
       });
     }
@@ -297,7 +301,7 @@ export function useWebsocket() {
       // applyJobDone, applyJobFailed) clears flashError. The operator-
       // visible "something went wrong" signal is the load-bearing piece.
       store.setFlashError({
-        reason: 'internal_server_error',
+        reason: 'protocol_violation',
         detail: 'Malformed flashControllerUpdate from server',
       });
     }
@@ -317,7 +321,7 @@ export function useWebsocket() {
       // Mirrors handleFlashControllerUpdate: surface but don't transition.
       // The banner persists until operator-dismiss or a job-lifecycle clear.
       store.setFlashError({
-        reason: 'internal_server_error',
+        reason: 'protocol_violation',
         detail: 'Malformed flashControllerResult from server',
       });
     }
@@ -337,7 +341,7 @@ export function useWebsocket() {
       // indefinitely. Generic envelope; server logs are truth.
       store.setPhase('done');
       store.setFlashError({
-        reason: 'internal_server_error',
+        reason: 'protocol_violation',
         detail: 'Malformed flashJobDone from server',
       });
     }
@@ -357,7 +361,7 @@ export function useWebsocket() {
       // payload can't be parsed. Envelope is generic; server logs are truth.
       store.setPhase('failed');
       store.setFlashError({
-        reason: 'internal_server_error',
+        reason: 'protocol_violation',
         detail: 'Malformed flashJobFailed from server',
       });
     }
