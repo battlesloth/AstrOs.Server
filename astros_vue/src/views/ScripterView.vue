@@ -421,8 +421,8 @@ onMounted(async () => {
       />
       <AstrosConfirmModal
         v-if="showModal === ModalType.CONFIRM"
-        @close="showModal = ModalType.CLOSE_ALL"
-        @confirm="confirm"
+        :on-close="() => (showModal = ModalType.CLOSE_ALL)"
+        :on-confirm="confirm"
         :message="modalMessage"
       />
       <AstrosAddChannelModal

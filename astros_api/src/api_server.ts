@@ -89,6 +89,7 @@ import { WorkerSerialBus } from './firmware/serial_bus.js';
 import { FlashJobOrchestrator } from './firmware/flash_orchestrator.js';
 import { registerFirmwareFlashRoutes } from './controllers/firmware_flash_controller.js';
 import { registerFirmwareReleasesRoutes } from './controllers/firmware_releases_controller.js';
+import { registerFirmwareLockStateRoutes } from './controllers/firmware_lock_state_controller.js';
 import { FirmwareCache } from './firmware/firmware_cache.js';
 import { FirmwareUploadStore } from './firmware/firmware_upload_store.js';
 import { GitHubReleaseService } from './firmware/github_release_service.js';
@@ -458,6 +459,14 @@ export class ApiServer {
   private setRoutes(): void {
     registerAuthRoutes(this.router);
     registerSystemStatusRoutes(this.router, this.systemStatus);
+    // Firmware routes whose dependencies are available before setupSerialPort()
+    // belong here so they stay registered when serial is skipped (test envs,
+    // future no-hardware boot modes). The flash route still lives in
+    // setupSerialPort() because flashOrchestrator needs the serial Worker.
+    //   - lock-state: depends on this.jobLock (field-init, line 193)
+    //   - releases:   depends on this.githubReleaseService (configApi, line 453)
+    registerFirmwareLockStateRoutes(this.router, this.jobLock);
+    registerFirmwareReleasesRoutes(this.router, this.authHandler, this.githubReleaseService);
     registerLocationRoutes(this.router, this.authHandler, this.db);
     registerScriptRoutes(this.router, this.authHandler, this.db);
     registerPlaylistRoutes(this.router, this.authHandler, this.db);
@@ -571,7 +580,6 @@ export class ApiServer {
       config: this.flashOrchestratorConfig,
     });
     registerFirmwareFlashRoutes(this.router, this.authHandler, this.flashOrchestrator);
-    registerFirmwareReleasesRoutes(this.router, this.authHandler, this.githubReleaseService);
 
     try {
       this.serialPort = new SerialPort({
