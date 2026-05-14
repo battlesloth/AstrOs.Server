@@ -168,7 +168,7 @@ Each task is one commit. Pre-commit toolkit (prettier → lint → build → vit
   5. **Mutation test (per `feedback_mutation_test_defensive_features`):** revert the `|| systemStatusReadOnly.value` clause and re-run the readonly tests — they must fail. Restore the fix.
   6. Pre-commit toolkit + commit.
 
-- [ ] **T7. Pre-push branch review.** Run `/pr-review-toolkit:review-pr` on the full diff vs `develop` per CLAUDE.md. Address Critical/Important. The hazard categories most likely to surface here:
+- [x] **T7. Pre-push branch review.** Run `/pr-review-toolkit:review-pr` on the full diff vs `develop` per CLAUDE.md. Address Critical/Important. The hazard categories most likely to surface here:
   - **Contract**: the new endpoint vs the writeGuard mounting order (writeGuard mounts on `/api` at line 408; the new route is registered after that in `setRoutes` at line 460. Confirm GET requests aren't gated by writeGuard — checked: writeGuard only filters write-class methods, so GET passes through.)
   - **Wiring drift**: any other `AstrosConfirmModal` callers? Pre-emptively grepped — only the three (Modules, Scripter, PlaylistEditor) plus the firmware view's separate `AstrosFirmwareConfirmModal`. Should still be re-checked at review time.
   - **Documentation drift**: d.7 plan's "Out of scope follow-ups" section names these three items — once they're shipped, do NOT edit that section (it documents what was in/out of scope for d.7 itself). Add a brief "Resolved in 20260514-1520..." line at the top of that section if useful, but don't rewrite history.
