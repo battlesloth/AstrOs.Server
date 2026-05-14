@@ -1488,9 +1488,9 @@ Decision: **wire into the failed-result bar.** The data is captured at `applyJob
 - Modify: `astros_vue/src/views/FirmwareView.vue` (failed-phase render block)
 - Modify: `astros_vue/src/locales/enUS.json` (add an i18n key for the abort label if needed)
 
-- [ ] **C.1.1:** Find the failed-result bar in `FirmwareView.vue` (search for `phase === 'failed'` template region or the `failedControllerLabels` rendering).
+- [x] **C.1.1:** Find the failed-result bar in `FirmwareView.vue` (search for `phase === 'failed'` template region or the `failedControllerLabels` rendering).
 
-- [ ] **C.1.2:** Add a render for `currentJob?.abortReason` near the failure detail. Example:
+- [x] **C.1.2:** Add a render for `currentJob?.abortReason` near the failure detail. Example:
 
 ```vue
 <div v-if="firmwareStore.phase === 'failed' && firmwareStore.currentJob?.abortReason"
@@ -1499,7 +1499,7 @@ Decision: **wire into the failed-result bar.** The data is captured at `applyJob
 </div>
 ```
 
-- [ ] **C.1.3:** Add the i18n key to `enUS.json`:
+- [x] **C.1.3:** Add the i18n key to `enUS.json`:
 
 ```json
 "firmware_view": {
@@ -1511,7 +1511,7 @@ Decision: **wire into the failed-result bar.** The data is captured at `applyJob
 
 (Place inside the existing `firmware_view.failed.*` block.)
 
-- [ ] **C.1.4:** Add a view test:
+- [x] **C.1.4:** Add a view test:
 
 ```ts
 // In FirmwareView.spec.ts:
@@ -1527,7 +1527,7 @@ it('renders abortReason in the failed-result bar when present', () => {
 
 Adjust `mountWithStore`/`makeJob` to match the file's existing helpers.
 
-- [ ] **C.1.5:** Run tests:
+- [x] **C.1.5:** Run tests:
 
 Run: `cd astros_vue && npx vitest run src/views/__tests__/FirmwareView.spec.ts`
 Expected: all pass.
@@ -1540,13 +1540,13 @@ Expected: all pass.
 - Modify: `astros_vue/src/components/common/__tests__/AstrosWriteButton.spec.ts:65`
 - Modify: `astros_vue/src/stores/__tests__/firmware.spec.ts:1023, 1100`
 
-- [ ] **C.2.1:** In `AstrosWriteButton.spec.ts:65`, rename the test from `'applies the tooltip class to the wrapper only when readOnly is true'` to `'applies the tooltip class to the wrapper when either readOnly OR jobLock.locked is true'`. Add a positive locked-tooltip assertion alongside the existing readOnly one (or split into two tests with accurate names).
+- [x] **C.2.1:** In `AstrosWriteButton.spec.ts:65`, rename the test from `'applies the tooltip class to the wrapper only when readOnly is true'` to `'applies the tooltip class to the wrapper when either readOnly OR jobLock.locked is true'`. Add a positive locked-tooltip assertion alongside the existing readOnly one (or split into two tests with accurate names).
 
-- [ ] **C.2.2:** In `firmware.spec.ts:1023`, rename `'collects ALL FAILED entries (multi-failure realistic on bus-wide ESP-NOW errors)'` to `'collects ALL FAILED entries AND attributes stage from the shared currentStage ref (not per-controller history)'`. Or split into two tests.
+- [x] **C.2.2:** In `firmware.spec.ts:1023`, rename `'collects ALL FAILED entries (multi-failure realistic on bus-wide ESP-NOW errors)'` to `'collects ALL FAILED entries AND attributes stage from the shared currentStage ref (not per-controller history)'`. Or split into two tests.
 
-- [ ] **C.2.3:** In `firmware.spec.ts:1100`, rename `'preserves server-reported FAILED entries during the failed normalize (preserves their error string)'` to `'preserves server-reported FAILED error strings AND leaves demoted entries without an error string (C1 normalize attribution)'`. Or split.
+- [x] **C.2.3:** In `firmware.spec.ts:1100`, rename `'preserves server-reported FAILED entries during the failed normalize (preserves their error string)'` to `'preserves server-reported FAILED error strings AND leaves demoted entries without an error string (C1 normalize attribution)'`. Or split.
 
-- [ ] **C.2.4:** Run all affected tests:
+- [x] **C.2.4:** Run all affected tests:
 
 Run: `cd astros_vue && npx vitest run src/components/common/__tests__/AstrosWriteButton.spec.ts src/stores/__tests__/firmware.spec.ts`
 Expected: all pass.
@@ -1558,7 +1558,7 @@ Expected: all pass.
 **Files:**
 - Modify: `astros_vue/src/composables/useWebsocket.ts:258-265`
 
-- [ ] **C.3.1:** Find the comment block at lines 258-265 (search for "directly" near the firmware-flash handler family doc). Replace `the catch path may also write store.flashError directly` with:
+- [x] **C.3.1:** Find the comment block at lines 258-265 (search for "directly" near the firmware-flash handler family doc). Replace `the catch path may also write store.flashError directly` with:
 
 ```ts
 // The catch path may also call store.setFlashError(...) to surface a
@@ -1567,7 +1567,7 @@ Expected: all pass.
 // (the round-6 sole-writer pattern — see firmware.ts:209 setFlashError).
 ```
 
-- [ ] **C.3.2:** Search for any other comments in `useWebsocket.ts` that reference `flashError =` or `store.flashError =`. Replace with `setFlashError` references.
+- [x] **C.3.2:** Search for any other comments in `useWebsocket.ts` that reference `flashError =` or `store.flashError =`. Replace with `setFlashError` references.
 
 Run: `grep -n "flashError\s*=" astros_vue/src/composables/useWebsocket.ts`
 Expected: no comment-level direct-write references remain (test files and stories are not in scope).
@@ -1579,7 +1579,7 @@ Expected: no comment-level direct-write references remain (test files and storie
 **Files:**
 - Modify: `astros_vue/src/types/firmware.ts:166-168`
 
-- [ ] **C.4.1:** Replace the docstring above `FlashJobState`:
+- [x] **C.4.1:** Replace the docstring above `FlashJobState`:
 
 ```ts
 /**
@@ -1600,17 +1600,17 @@ Expected: no comment-level direct-write references remain (test files and storie
 **Files:**
 - Modify: `.docs/plans/20260512-0735-firmware-ota-d-6-live-wiring.md`
 
-- [ ] **C.5.1:** Update L40 and L281: change `api_server.ts:652-660` → `api_server.ts:654-669`.
+- [x] **C.5.1:** Update L40 and L281: change `api_server.ts:652-660` → `api_server.ts:654-669`.
 
-- [ ] **C.5.2:** Update L203: change `"228 tests total at branch tip across rounds 1–4"` → `"228 tests total at branch tip across all six (now seven) fix rounds"`.
+- [x] **C.5.2:** Update L203: change `"228 tests total at branch tip across rounds 1–4"` → `"228 tests total at branch tip across all six (now seven) fix rounds"`.
 
-- [ ] **C.5.3:** Update L221: change `"5 FMI hazards"` → `"7 FMI hazards"` (or however many rows the table actually has — count and match).
+- [x] **C.5.3:** Update L221: change `"5 FMI hazards"` → `"7 FMI hazards"` (or however many rows the table actually has — count and match).
 
-- [ ] **C.5.4:** Update L246 (FMI item 6): change `'internal_server_error'` → `'protocol_violation'` for the WS-handler malformed-payload envelope. (Note: `internal_server_error` remains the correct envelope for the `applyJobFailed` unknown-server-reason fallback — clarify both.)
+- [x] **C.5.4:** Update L246 (FMI item 6): change `'internal_server_error'` → `'protocol_violation'` for the WS-handler malformed-payload envelope. (Note: `internal_server_error` remains the correct envelope for the `applyJobFailed` unknown-server-reason fallback — clarify both.)
 
-- [ ] **C.5.5:** Update L278: change `flash_job_state.ts:1-40` → `flash_job_state.ts:1-47` (or drop the line range entirely).
+- [x] **C.5.5:** Update L278: change `flash_job_state.ts:1-40` → `flash_job_state.ts:1-47` (or drop the line range entirely).
 
-- [ ] **C.5.6:** Add a new FMI inventory row capturing the CR-1 reboot-wait wedge race (per the round-7 review finding):
+- [x] **C.5.6:** Add a new FMI inventory row capturing the CR-1 reboot-wait wedge race (per the round-7 review finding):
 
 ```
 | 8 | HTTP cold-load during reboot-wait window | fetchCurrentJob applied an endedAt-set body, wedging phase at flashing | Mirrored server's decideLateJoinSnapshot filter; defense-in-depth in handleLockStateChanged forces phase=done on lock release |
@@ -1625,13 +1625,13 @@ Expected: no comment-level direct-write references remain (test files and storie
 **Files:**
 - Modify: `.docs/qa/firmware-ota-flash-ui.md`
 
-- [ ] **C.6.1:** Find line 166 (`"The 210 vitest tests still pass"`) and update to `"All vitest tests still pass"` (drop the number to avoid future drift), or update to the post-round-7 count once Phase C is complete.
+- [x] **C.6.1:** Find line 166 (`"The 210 vitest tests still pass"`) and update to `"All vitest tests still pass"` (drop the number to avoid future drift), or update to the post-round-7 count once Phase C is complete.
 
 Run: `cd astros_vue && npx vitest run 2>&1 | tail -5` to get the post-round-7 count.
 
-- [ ] **C.6.2:** Update line 3 if needed to match.
+- [x] **C.6.2:** Update line 3 if needed to match.
 
-- [ ] **C.6.3:** Add a QA test case §6.5 covering the reboot-wait wedge fix from CR-1:
+- [x] **C.6.3:** Add a QA test case §6.5 covering the reboot-wait wedge fix from CR-1:
 
 ```markdown
 ### 6.5 Refresh during the 15s reboot-wait window after a successful flash
@@ -1655,27 +1655,27 @@ Run: `cd astros_vue && npx vitest run 2>&1 | tail -5` to get the post-round-7 co
 
 CLAUDE.md emphasizes the "partial-fix sweep" pattern: fix the cited site AND every sibling. After Phase C's edits, grep for any remaining stale references.
 
-- [ ] **C.7.1:** Sweep for `"210"` in `.docs/`:
+- [x] **C.7.1:** Sweep for `"210"` in `.docs/`:
 
 Run: `grep -rn "210" .docs/ | grep -v node_modules`
 Inspect each match — any reference to "210 tests" or "210 passing" is stale; update.
 
-- [ ] **C.7.2:** Sweep for old API-server line refs:
+- [x] **C.7.2:** Sweep for old API-server line refs:
 
 Run: `grep -rn "api_server.ts:65" .docs/`
 Inspect each — confirm they point at the post-round-7 line numbers.
 
-- [ ] **C.7.3:** Sweep for `"rounds 1–4"` / `"rounds 1-4"` in `.docs/`:
+- [x] **C.7.3:** Sweep for `"rounds 1–4"` / `"rounds 1-4"` in `.docs/`:
 
 Run: `grep -rn "rounds 1.4\|round 4\|round-4" .docs/`
 Inspect — any "at branch tip" claim should reflect round 7.
 
-- [ ] **C.7.4:** Sweep `useWebsocket.ts` for any other stale direct-write claims:
+- [x] **C.7.4:** Sweep `useWebsocket.ts` for any other stale direct-write claims:
 
 Run: `grep -n "flashError\s*=" astros_vue/src/composables/useWebsocket.ts`
 Expected: no comment-level direct-write references; only `setFlashError(...)` calls.
 
-- [ ] **C.7.5:** Sweep the round-7 plan file itself for any line refs that may have shifted:
+- [x] **C.7.5:** Sweep the round-7 plan file itself for any line refs that may have shifted:
 
 Run: `grep -n "firmware.ts:\|useWebsocket.ts:\|api_server.ts:" .docs/plans/20260514-0734-firmware-ota-d-6-round-7-review-fixes.md`
 Inspect — confirm line numbers point at the post-Phase-B state (these are best-effort because the plan was written before the code shifted; flag any that are clearly off).
@@ -1684,18 +1684,18 @@ Inspect — confirm line numbers point at the post-Phase-B state (these are best
 
 ## Task C.8: Phase C wrap — verify, review, commit
 
-- [ ] **C.8.1:** Run prettier + lint + build + tests on Vue (no API changes in Phase C):
+- [x] **C.8.1:** Run prettier + lint + build + tests on Vue (no API changes in Phase C):
 
 Run: `cd astros_vue && npm run prettier:write && npm run lint:fix && npm run build && npx vitest run`
 Expected: all green.
 
-- [ ] **C.8.2:** Invoke `superpowers:requesting-code-review` on the Phase C diff. Prompt:
+- [x] **C.8.2:** Invoke `superpowers:requesting-code-review` on the Phase C diff. Prompt:
 
 > Review the changes since Commit B for Phase C of the round-7 review fixes. The diff implements 5 Important prose/cleanup findings: abortReason wired into the failed-result bar (IM-1), 3 test renames to fix format-string drifts (IM-4), dispatcher sole-writer comment update (IM-7), FlashJobState.source docstring correction (IM-6), 5 plan/QA prose drift fixes including a new FMI row and QA test case for the CR-1 wedge fix (IM-5). Look specifically for: any test rename that now lies in a different way, any sibling claim I missed in the prose sweep (CLAUDE.md partial-fix sweep), any rendered abortReason path that crashes on undefined.
 
 Address any Critical or Important findings.
 
-- [ ] **C.8.3:** Stage and commit Phase C:
+- [x] **C.8.3:** Stage and commit Phase C:
 
 ```bash
 git add astros_vue/src/views/FirmwareView.vue \
@@ -1739,7 +1739,7 @@ EOF
 )"
 ```
 
-- [ ] **C.8.4:** Check off Phase C in this plan, commit the update.
+- [x] **C.8.4:** Check off Phase C in this plan, commit the update.
 
 ---
 
