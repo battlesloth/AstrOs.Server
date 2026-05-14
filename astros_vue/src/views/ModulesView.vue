@@ -436,8 +436,8 @@ function controllerSelectChanged(location: string) {
       <AstrosConfirmModal
         v-if="showModal === ModalType.CONFIRM"
         :message="$t('module_view.confirm_remove')"
-        @confirm="handleRemoveModule"
-        @close="showModal = ModalType.CLOSE_ALL"
+        :on-confirm="handleRemoveModule"
+        :on-close="() => (showModal = ModalType.CLOSE_ALL)"
       />
       <AstrosLoadingModal
         v-if="showModal === ModalType.LOADING"

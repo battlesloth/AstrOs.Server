@@ -66,7 +66,7 @@ The Enable Test button is wrapped in `AstrosWriteButton` (which ORs both `system
 ### New
 - `astros_api/src/controllers/firmware_lock_state_controller.ts` — new endpoint
 - `astros_api/src/controllers/firmware_lock_state_controller.test.ts` — controller unit tests
-- `astros_vue/e2e/B_03_modules-confirm-remove.spec.ts` — Playwright regression for ConfirmModal wiring (one view exercised end-to-end; ScripterView confirm is manual-QA per CLAUDE.md UI-layout TDD exception)
+- `.docs/qa/firmware-ota-d-7-followups.md` — manual QA test plan for the two ConfirmModal consumers + the ServoTestModal readonly path
 
 ### Modified
 - `astros_api/src/api_server.ts` — import + `registerFirmwareLockStateRoutes(...)` call alongside `registerSystemStatusRoutes`
@@ -106,7 +106,7 @@ Each task is one commit. Pre-commit toolkit (prettier → lint → build → vit
   5. Wire into `astros_api/src/api_server.ts`: import + call adjacent to the existing firmware-family registrations (`registerFirmwareFlashRoutes` / `registerFirmwareReleasesRoutes` at ~line 573–574). The firmware family lives in a later phase of `setRoutes()` than `registerSystemStatusRoutes` because it depends on `this.jobLock` / `this.flashOrchestrator` / `this.githubReleaseService` being constructed first.
   6. Pre-commit toolkit + commit.
 
-- [ ] **T3. Client: jobLock store fetch action + endpoint constant (TDD).** Test-first:
+- [x] **T3. Client: jobLock store fetch action + endpoint constant (TDD).** Test-first:
   1. Add to `astros_vue/src/stores/__tests__/jobLock.spec.ts` a `describe('fetchLockState', ...)` block mirroring the three cases in `systemStatus.spec.ts:75-116`:
      - Locked GET response updates `locked` / `owner` / `since` and calls `apiService.get('api/firmware/lock-state')`.
      - Unlocked GET response after a pre-seeded locked state clears `owner` / `since`.
@@ -131,13 +131,13 @@ Each task is one commit. Pre-commit toolkit (prettier → lint → build → vit
   5. Run vitest — expect pass.
   6. Pre-commit toolkit + commit.
 
-- [ ] **T4. Client: App.vue hydrate wire-up.** No new test; this is one-liner UI-layout code per memory TDD-exceptions. Modify `astros_vue/src/App.vue`:
+- [x] **T4. Client: App.vue hydrate wire-up.** No new test; this is one-liner UI-layout code per memory TDD-exceptions. Modify `astros_vue/src/App.vue`:
   - Import `useJobLockStore` alongside `useSystemStatusStore`.
   - In `onMounted`, call `jobLockStore.fetchLockState()` immediately after `systemStatusStore.fetchStatus()` (both before `wsConnect()`).
   - Update the inline comment to cover both stores.
   Run `npm run build` to confirm typecheck. Pre-commit toolkit + commit.
 
-- [ ] **T5. Fix ConfirmModal consumer wiring + Playwright regression.** Code fix is template-only (UI-layout per CLAUDE.md TDD exceptions). Vue unit-test scaffolding for `ModulesView` / `ScripterView` does not exist — building it for a once-off `@`-vs-`:` typo would be disproportionate. Instead: one Playwright e2e covering ModulesView's remove flow; manual QA for ScripterView's confirm (single broken call site today: `modalAction` is only ever assigned to `() => doRemoveChannel(id)` at ScripterView.vue:93, so the affected user flow is "remove channel from the script").
+- [ ] **T5. Fix ConfirmModal consumer wiring + QA test plan.** Code fix is template-only (UI-layout per CLAUDE.md TDD exceptions). Vue unit-test scaffolding for `ModulesView` / `ScripterView` does not exist, the remove buttons in `AstrosUartModule.vue` / `AstrosI2cModule.vue` carry no `data-testid` attributes (Playwright e2e would require adding them — scope creep on a 2-line typo fix), and the existing d.7 `AstrosConfirmModal` unit tests already pin the modal's prop API correctly. The bug is in *consumer* wiring of a contract that's already tested; the regression-prevention path here is manual QA per CLAUDE.md `.docs/qa/` convention plus the protection of code review (which caught this exact issue in d.7's pre-push toolkit).
   1. Modify `astros_vue/src/views/ModulesView.vue:436-441` — swap to prop binding:
      ```vue
      <AstrosConfirmModal
@@ -149,10 +149,8 @@ Each task is one commit. Pre-commit toolkit (prettier → lint → build → vit
      ```
   2. Modify `astros_vue/src/views/ScripterView.vue:422-427` — same shape, with `confirm` and the matching `:on-close` arrow.
      Note: `confirm` is a reserved-ish name (shadows the browser global) — leave the function name as-is to minimize blast radius, but the inline arrow on `:on-close` avoids any naming collision.
-  3. Create `astros_vue/e2e/B_03_modules-confirm-remove.spec.ts`. Pattern after `B_02_modules-page.spec.ts`. Steps: log in, navigate to a location with a module, click the "remove" button on a module to open `AstrosConfirmModal`, click `[data-testid="modal-confirm"]`, assert the module disappears from the list (or the local Pinia state changes — pick whichever is cheapest to observe). The test will fail on `develop` today; this is the mutation-test gate per `feedback_mutation_test_defensive_features`.
-  4. Run `npm run test:e2e -- B_03_modules-confirm-remove` — expect pass against the fixed views; would have failed before T5's template fix.
-  5. Manual QA the ScripterView confirm flow (per CLAUDE.md QA test plans pattern, capture in `.docs/qa/firmware-ota-d-7-followups.md` if any unexpected behavior; otherwise tick it off without a new doc).
-  6. Pre-commit toolkit + commit.
+  3. Create `.docs/qa/firmware-ota-d-7-followups.md` covering the two affected confirm flows (Modules: remove UART/I2C module; Scripter: remove channel from script). The QA plan is also used to verify T6's ServoTestModal readonly path — see T6 below.
+  4. Pre-commit toolkit + commit.
 
 - [ ] **T6. Fix ServoTestModal readonly check (TDD).**
   1. Add to `astros_vue/src/components/modals/modules/__tests__/AstrosServoTestModal.spec.ts` two cases:
