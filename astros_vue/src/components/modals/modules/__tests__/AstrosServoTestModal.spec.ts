@@ -177,6 +177,39 @@ describe('AstrosServoTestModal — write-blocked gating (jobLock + readOnly)', (
     expect(notice.exists()).toBe(false);
   });
 
+  it('after a mid-session lock the active test stays disabled even after the lock releases', async () => {
+    // Pins the watcher's lock-release UX guarantee: when a flash interrupts an
+    // active servo test, the slider must not auto-fire when the lock later
+    // releases — the operator has to explicitly re-Enable. Without the
+    // watcher at writesBlocked-true (which resets disabled.value to true +
+    // label to 'enable_test'), this guarantee breaks because the handler-body
+    // early-return guard `disabled.value || writesBlocked.value` evaluates to
+    // false after the lock releases (both are false again), so the next slider
+    // input fires a SERVO_TEST. The other existing tests don't catch this
+    // because they only assert behavior during the locked window, when the
+    // writesBlocked half of the guard short-circuits.
+    const wrapper = mountModal();
+    const btn = wrapper.find('[data-testid="enable-test-button"]');
+    await btn.trigger('click');
+    stubSendMessage.mockClear();
+
+    const lockStore = useJobLockStore();
+    lockStore.setState({
+      locked: true,
+      owner: 'flash:job-A',
+      since: '2026-05-14T08:00:00Z',
+    });
+    await nextTick();
+    lockStore.setState({ locked: false, owner: null, since: null });
+    await nextTick();
+
+    const slider = wrapper.find('input[type="range"]');
+    await slider.trigger('input');
+    expect(stubSendMessage).not.toHaveBeenCalled();
+    // Label should also have reset to 'enable_test' (the watcher resets both).
+    expect(btn.text()).toContain('Enable');
+  });
+
   it('auto-disables an active test if readOnly flips on mid-session', async () => {
     const wrapper = mountModal();
     const btn = wrapper.find('[data-testid="enable-test-button"]');

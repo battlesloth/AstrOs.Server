@@ -44,7 +44,11 @@ const writesBlocked = computed(() => jobLockLocked.value || systemStatusReadOnly
 
 // If writes become blocked (firmware flash lock or system readonly) while
 // the modal is already open with the test active, auto-disable so further
-// slider/input is ignored locally as well.
+// slider/input is ignored locally as well — AND when the block later
+// releases, the test stays disabled until the operator explicitly
+// re-Enables it (the handler-body guards no longer short-circuit once
+// writesBlocked is false again, so without resetting disabled.value
+// here, the next slider input would re-emit SERVO_TEST unexpectedly).
 watch(writesBlocked, (nowBlocked) => {
   if (nowBlocked && !disabled.value) {
     disabled.value = true;

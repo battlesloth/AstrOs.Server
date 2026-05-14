@@ -459,11 +459,14 @@ export class ApiServer {
   private setRoutes(): void {
     registerAuthRoutes(this.router);
     registerSystemStatusRoutes(this.router, this.systemStatus);
-    // Lock-state hydrate is needed even when serial is skipped (test envs,
-    // future no-hardware boot modes). Only depends on `this.jobLock`, which is
-    // constructed at field-init time — unlike the flash/releases routes,
-    // which need flashOrchestrator/githubReleaseService built in setupSerialPort.
+    // Firmware routes whose dependencies are available before setupSerialPort()
+    // belong here so they stay registered when serial is skipped (test envs,
+    // future no-hardware boot modes). The flash route still lives in
+    // setupSerialPort() because flashOrchestrator needs the serial Worker.
+    //   - lock-state: depends on this.jobLock (field-init, line 193)
+    //   - releases:   depends on this.githubReleaseService (configApi, line 453)
     registerFirmwareLockStateRoutes(this.router, this.jobLock);
+    registerFirmwareReleasesRoutes(this.router, this.authHandler, this.githubReleaseService);
     registerLocationRoutes(this.router, this.authHandler, this.db);
     registerScriptRoutes(this.router, this.authHandler, this.db);
     registerPlaylistRoutes(this.router, this.authHandler, this.db);
@@ -577,7 +580,6 @@ export class ApiServer {
       config: this.flashOrchestratorConfig,
     });
     registerFirmwareFlashRoutes(this.router, this.authHandler, this.flashOrchestrator);
-    registerFirmwareReleasesRoutes(this.router, this.authHandler, this.githubReleaseService);
 
     try {
       this.serialPort = new SerialPort({

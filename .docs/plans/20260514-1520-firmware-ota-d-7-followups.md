@@ -103,7 +103,7 @@ Each task is one commit. Pre-commit toolkit (prettier → lint → build → vit
      ```
      Unauthenticated like `/system/status` — same UX justification (App.vue hydrate runs before any view navigates, and the response leaks no secrets).
   4. Run vitest — expect pass.
-  5. Wire into `astros_api/src/api_server.ts`: import + call adjacent to the existing firmware-family registrations (`registerFirmwareFlashRoutes` / `registerFirmwareReleasesRoutes` at ~line 573–574). The firmware family lives in a later phase of `setRoutes()` than `registerSystemStatusRoutes` because it depends on `this.jobLock` / `this.flashOrchestrator` / `this.githubReleaseService` being constructed first.
+  5. Wire into `astros_api/src/api_server.ts`: import + call inside `setRoutes()` adjacent to `registerSystemStatusRoutes`. The lock-state route only depends on `this.jobLock`, which is field-initialized (line 193), so it's available before `setRoutes()` runs — and crucially before `setupSerialPort()` may be skipped under `skipSerialSetup: true` (NODE_ENV=test default). **Historical note:** the first version of this branch placed the registration inside `setupSerialPort()` adjacent to `registerFirmwareFlashRoutes` / `registerFirmwareReleasesRoutes`. The pre-push toolkit caught this (the endpoint returned 404 under test/no-hardware boots). The fix-commit `9fae64f` moved the registration to `setRoutes()` and pinned the placement with `firmware_lock_state_controller.integration.test.ts`. The second-pass toolkit then surfaced the same mispattern on `registerFirmwareReleasesRoutes` — fix commit also moved that.
   6. Pre-commit toolkit + commit.
 
 - [x] **T3. Client: jobLock store fetch action + endpoint constant (TDD).** Test-first:

@@ -30,7 +30,13 @@ export const useJobLockStore = defineStore('jobLock', () => {
       // Leave state unchanged. The lockStateChanged WS push on (re)connect,
       // or the next acquire/release transition, will bring us back up to
       // date — assuming the WS path also works. If both paths fail, the UI
-      // stays at the default unlocked state with no operator-visible signal.
+      // stays at the default unlocked state and the operator only learns
+      // writes are blocked when they actually attempt one: writeGuard's 423
+      // response on a write-class request falls through to the caller's
+      // own per-call-site .catch(). Unlike the 503 readonly response, the
+      // codebase has no global 423 interceptor that surfaces a toast or
+      // updates this store — that's a separate follow-up worth filing if
+      // the gap matters in practice.
       console.warn('jobLock.fetchLockState failed', error);
     }
   }

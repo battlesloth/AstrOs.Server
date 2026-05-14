@@ -1,9 +1,10 @@
-// Pins the App.vue onMounted hydrate contract: both systemStatusStore.fetchStatus
-// AND jobLockStore.fetchLockState must fire before wsConnect, so the lock and
-// readonly banners are correct from the first paint on cold-mount / deep-link.
-// Without this test, a refactor that drops the jobLockStore.fetchLockState() line
-// (or innocently re-orders things so wsConnect awaits something it shouldn't)
-// silently regresses the entire d.7 follow-up #1 feature.
+// Pins the App.vue onMounted hydrate call surface: systemStatusStore.fetchStatus,
+// jobLockStore.fetchLockState, and wsConnect must all be synchronously enqueued
+// from onMounted on every mount (the HTTP fetches are fire-and-forget — actual
+// HTTP-response-vs-WS-handshake ordering is NOT pinned by this test). Without
+// this test, a refactor that drops jobLockStore.fetchLockState() silently
+// regresses the client-mount half of d.7 follow-up #1 (the server-side route
+// placement is guarded by firmware_lock_state_controller.integration.test.ts).
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { mount } from '@vue/test-utils';
