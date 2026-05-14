@@ -103,7 +103,7 @@ Each task is one commit. Pre-commit toolkit (prettier → lint → build → vit
      ```
      Unauthenticated like `/system/status` — same UX justification (App.vue hydrate runs before any view navigates, and the response leaks no secrets).
   4. Run vitest — expect pass.
-  5. Wire into `astros_api/src/api_server.ts`: import + call in `setRoutes()` adjacent to `registerSystemStatusRoutes` (around line 460).
+  5. Wire into `astros_api/src/api_server.ts`: import + call adjacent to the existing firmware-family registrations (`registerFirmwareFlashRoutes` / `registerFirmwareReleasesRoutes` at ~line 573–574). The firmware family lives in a later phase of `setRoutes()` than `registerSystemStatusRoutes` because it depends on `this.jobLock` / `this.flashOrchestrator` / `this.githubReleaseService` being constructed first.
   6. Pre-commit toolkit + commit.
 
 - [ ] **T3. Client: jobLock store fetch action + endpoint constant (TDD).** Test-first:
