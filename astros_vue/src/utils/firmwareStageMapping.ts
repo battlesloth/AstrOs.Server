@@ -65,16 +65,19 @@ export function controllerStatePillKind(state: ControllerFlashState): FirmwareSt
       // undefined from this switch, and the row would render with an
       // undefined pill kind. Map to 'updating' as the safest fallback —
       // the row remains in the 'updating' indicator until a recognized
-      // stage arrives. The `_exhaustive: never` assignment is a compile-
-      // time guard mirroring mapServerStageToUiStage above. The warn
-      // surfaces server contract drift in production logs: an unrecognized
-      // terminal stage (e.g. a future 'CANCELLED') would otherwise leave
-      // the row stuck on 'updating' forever with no breadcrumb.
+      // stage arrives. The `_exhaustive: never` assignment compiles
+      // because the switch covers all ServerFwStage variants of the
+      // IM-2 discriminated union; the default branch is reachable only
+      // when a runtime payload lies about its `stage` (e.g. a future
+      // 'CANCELLED' value cast through the type at the WS boundary).
+      // Read fields via a pre-narrowing shape so the warn message still
+      // surfaces server contract drift in production logs.
+      const stateAsAny = state as { stage: string; controllerId: string };
       console.warn(
-        `[firmwareStageMapping] controllerStatePillKind: unknown stage="${state.stage}" ` +
-          `for controllerId="${state.controllerId}". Server contract drift — row will stay on 'updating' until a recognized stage arrives.`,
+        `[firmwareStageMapping] controllerStatePillKind: unknown stage="${stateAsAny.stage}" ` +
+          `for controllerId="${stateAsAny.controllerId}". Server contract drift — row will stay on 'updating' until a recognized stage arrives.`,
       );
-      const _exhaustive: never = state.stage;
+      const _exhaustive: never = state;
       void _exhaustive;
       return 'updating';
     }

@@ -13,6 +13,7 @@ import { useControllerStore } from '@/stores/controller';
 import { ControllerStatus, Location } from '@/enums';
 import type {
   ControllerFlashState,
+  ControllerFlashStateBySlot,
   ControllerOnlineStatus,
   FirmwareControllerView,
   FirmwarePhase,
@@ -85,7 +86,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // WS-pushed state. Apply* handlers + resetToSelect are the writers
   // (resetToSelect for the operator-driven clear; apply* for live state).
   const currentJob = ref<FlashJobState | null>(null);
-  const controllerStates = ref<ReadonlyMap<string, ControllerFlashState>>(new Map());
+  // IM-11: in-store view is keyed by SlotId and uses the by-slot variant
+  // (controllerId is also SlotId). The wire-side ControllerFlashState
+  // (controllerId: MAC string) is translated to ControllerFlashStateBySlot
+  // at the buildControllerStatesMap / applyControllerUpdate boundary.
+  const controllerStates = ref<ReadonlyMap<SlotId, ControllerFlashStateBySlot>>(new Map());
   // Set by `startFlash` from the POST response so the UI can tell whether the
   // active flash belongs to us vs. another operator (lock-conflict UI).
   const ownJobId = ref<string | null>(null);
@@ -245,15 +250,32 @@ export const useFirmwareStore = defineStore('firmware', () => {
     pendingByMac.value.set(state.controllerId, queue);
   }
 
+  // IM-11: this is the ONLY MAC -> SlotId translation site. Returns the
+  // by-slot view; the wire-side ControllerFlashState's MAC `controllerId`
+  // is replaced by the resolved SlotId so downstream consumers don't need
+  // to cast.
   function buildControllerStatesMap(
     states: ReadonlyArray<ControllerFlashState> | undefined,
-  ): ReadonlyMap<string, ControllerFlashState> {
-    const m = new Map<string, ControllerFlashState>();
-    // Defensive: a malformed flashJobStarted with no `controllers` field
-    // must not throw on iteration. The empty Map is a valid intermediate
-    // state — flashControllerUpdate events will populate it as they arrive.
-    if (!states) return m;
+  ): ReadonlyMap<SlotId, ControllerFlashStateBySlot> {
+    const m = new Map<SlotId, ControllerFlashStateBySlot>();
+    // IM-3 defensive: reject non-array payloads. Without this guard, a
+    // string flows through `for...of` as per-character iteration and
+    // pollutes pendingByMac with garbage; an object iterates not-at-all
+    // (no Symbol.iterator). The empty Map is a valid intermediate state —
+    // flashControllerUpdate events will populate it as they arrive.
+    if (!Array.isArray(states)) return m;
     for (const s of states) {
+      // IM-3 element validation: a malformed entry with no/non-string
+      // controllerId would call `resolveSlot(undefined)` and queue under
+      // an `undefined` key, polluting pendingByMac. Skip + warn so ops
+      // can trace the malformed payload back to its server source.
+      if (!s || typeof s.controllerId !== 'string' || s.controllerId.length === 0) {
+        console.warn(
+          `[firmwareStore] buildControllerStatesMap: skipping element with invalid controllerId`,
+          s,
+        );
+        continue;
+      }
       const slot = resolveSlot(s.controllerId);
       if (slot === null) {
         // Queue for replay when LocationStatus eventually learns this MAC.
@@ -398,7 +420,16 @@ export const useFirmwareStore = defineStore('firmware', () => {
             `for slot="${slot}" to VERSION_CONFIRMED. ` +
             `Server emitted job-done before this controller reached terminal — verify the controller actually flashed.`,
         );
-        normalized.set(slot, { ...state, stage: 'VERSION_CONFIRMED' });
+        // IM-2 discriminated union: VERSION_CONFIRMED requires finalVersion.
+        // We don't have one (server never emitted the explicit transition),
+        // so use the placeholder string that the renderer can recognize as
+        // unattributed (the leading "unknown:" prefix is searchable in ops
+        // logs and distinct from any real version string).
+        normalized.set(slot, {
+          controllerId: state.controllerId,
+          stage: 'VERSION_CONFIRMED',
+          finalVersion: 'unknown:normalize-on-done',
+        });
       }
     }
     controllerStates.value = normalized;
@@ -458,7 +489,15 @@ export const useFirmwareStore = defineStore('firmware', () => {
           `[firmwareStore] applyJobFailed: demoting non-terminal stage="${state.stage}" ` +
             `for slot="${slot}" to FAILED (unattributed). Job ended before this controller reached a terminal stage.`,
         );
-        normalized.set(slot, { ...state, stage: 'FAILED' });
+        // IM-2 discriminated union: FAILED requires `error`. The absence
+        // of an `error` value here signals "unattributed normalize" vs
+        // the server-emitted FAILED entries that carry real `error`
+        // reasons. The marker string is searchable in ops logs.
+        normalized.set(slot, {
+          controllerId: state.controllerId,
+          stage: 'FAILED',
+          error: 'unattributed:normalize-on-failed',
+        });
       }
     }
     controllerStates.value = normalized;
@@ -470,15 +509,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
     const failed: FailedControllerSummary[] = [];
     for (const state of normalized.values()) {
       if (state.stage === 'FAILED') {
-        // state.controllerId has been re-keyed to a SlotId by
-        // buildControllerStatesMap / applyControllerUpdate — this cast
-        // attests the post-translation type. See types/firmware.ts
-        // ControllerFlashState doc comment for the pre/post-translation
-        // contract. A second `as SlotId` cast lives below (the CR-2
-        // unmapped-MAC sweep) — that one has different semantics: a raw
-        // MAC string is forced into the SlotId slot because the operator
-        // is better served seeing a real MAC than no entry at all.
-        const slot = state.controllerId as SlotId;
+        // IM-11: state.controllerId is structurally a SlotId here
+        // (ControllerFlashStateBySlot). No cast needed. A single `as SlotId`
+        // remains in the CR-2 sweep below — that's a known compromise where
+        // a raw MAC string is forced into the SlotId slot so the operator
+        // sees a real MAC rather than no entry at all.
+        const slot = state.controllerId;
         const c = controllers.value.find((x) => x.id === slot);
         failed.push({
           id: slot,
@@ -499,9 +535,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
             `[firmwareStore] applyJobFailed: FAILED entry for unmapped MAC="${mac}" ` +
               `surfaced from pendingByMac. LocationStatus never arrived; using MAC as label.`,
           );
-          // Second `as SlotId` cast site — IM-11 (Phase B) splits the
-          // wire vs slot views and removes this cast. Until then, the
-          // runtime warn above is the forensic breadcrumb.
+          // Intentional `as SlotId` cast: a raw MAC string is forced into
+          // the SlotId slot because the operator is better served seeing a
+          // real MAC than no entry at all. The runtime warn above is the
+          // forensic breadcrumb that traces back to the LocationStatus gap.
+          // This is the only remaining cast after IM-11; resolveSlot (the
+          // translation boundary) does the other.
           failed.push({
             id: mac as SlotId,
             label: mac,
@@ -574,9 +613,16 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // server reads `req.body?.reason`, so the body must transmit.
       await apiClient.delete(FIRMWARE_FLASH, { data: { reason } });
     } catch (error) {
-      // Best-effort: failure here is logged but doesn't transition phase — the
-      // WS surface owns post-cancel state truth.
+      // IM-10: cancel failure must reach the operator. Without a visible
+      // signal, clicking Cancel and seeing nothing happen leaves the UI
+      // stuck at 'flashing' with no breadcrumb — phase truth still comes
+      // from the WS surface (don't transition here), but a flashError
+      // tells the operator that the cancel didn't take effect.
       console.warn('firmware.cancelFlash failed', error);
+      setFlashError({
+        reason: 'network_error',
+        detail: 'Cancel request failed; the flash may still be running. Refresh to recheck status.',
+      });
     }
   }
 
@@ -662,13 +708,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
       >
     > = {};
     for (const [id, state] of controllerStates.value) {
-      // `id` is `SlotId` (set by buildControllerStatesMap / applyControllerUpdate)
-      // but the Map's key type is `string`, so a cast is required here.
-      const slot = id as SlotId;
-      out[slot] = { status: controllerStatePillKind(state) };
+      // IM-11: Map's key type is now SlotId. No cast needed.
+      out[id] = { status: controllerStatePillKind(state) };
       const key = controllerStageLabelKey(state);
       if (key !== null) {
-        out[slot]!.stageLabelKey = key;
+        out[id]!.stageLabelKey = key;
       }
     }
     return out;

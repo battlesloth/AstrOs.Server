@@ -34,9 +34,14 @@ function getWsUrl(): string {
 export function useWebsocket() {
   function wsConnect() {
     intentionallyClosed = false;
-    ws.value = new WebSocket(getWsUrl());
+    // IM-9: capture the new socket in a local so handlers don't close
+    // over ws.value (which is mutated by subsequent reconnects). Without
+    // this, a stale onerror from socket A could close socket B during
+    // HMR or an in-flight reconnect.
+    const socket = new WebSocket(getWsUrl());
+    ws.value = socket;
 
-    ws.value.onopen = () => {
+    socket.onopen = () => {
       wsIsConnected.value = true;
       wsHasEverConnected.value = true;
       console.log('WebSocket connected');
@@ -46,7 +51,7 @@ export function useWebsocket() {
       }
     };
 
-    ws.value.onclose = () => {
+    socket.onclose = () => {
       wsIsConnected.value = false;
       if (!intentionallyClosed) {
         console.log('WebSocket disconnected, retrying in 3 seconds...');
@@ -54,12 +59,14 @@ export function useWebsocket() {
       }
     };
 
-    ws.value.onerror = (error) => {
+    socket.onerror = (error) => {
       console.error('WebSocket error:', error);
-      ws.value?.close();
+      // Close the captured socket (not ws.value, which may have been
+      // reassigned to a new socket by a parallel wsConnect call).
+      socket.close();
     };
 
-    ws.value.onmessage = (event) => {
+    socket.onmessage = (event) => {
       handleMessage(event.data);
     };
   }

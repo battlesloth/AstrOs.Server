@@ -599,6 +599,17 @@ describe('firmware store', () => {
       // Did not throw; phase unchanged (WS dispatcher owns terminal state).
       expect(store.phase).toBe('flashing');
     });
+
+    it('IM-10: surfaces a network_error flashError when the cancel HTTP fails', async () => {
+      apiDelete.mockRejectedValueOnce(new Error('network down'));
+      const store = useFirmwareStore();
+      store.setPhase('flashing');
+      await store.cancelFlash();
+      expect(store.flashError?.reason).toBe('network_error');
+      expect(store.flashError?.detail).toContain('Cancel request failed');
+      // Phase still untouched — WS dispatcher owns terminal state.
+      expect(store.phase).toBe('flashing');
+    });
   });
 
   // ------------------------------------------------------------------
@@ -654,18 +665,32 @@ describe('firmware store', () => {
       // FMI hazard: WS reconnect during flash. The server sends a fresh
       // flashJobStarted snapshot; the client must NOT keep stale per-
       // controller stages from before the disconnect.
+      //
+      // IM-8 mutation-resistance: seed BOTH body AND core with a non-
+      // trivial stage before the duplicate flashJobStarted, then verify
+      // both are correctly replaced. A merge-by-id mutation would keep
+      // core at SENDING (since the fresh snapshot omits core entirely),
+      // which is exactly the failure mode this test must catch.
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
       store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
-      // Simulate reconnect with controllers in a different state.
+      store.applyControllerUpdate({ controllerId: CORE_MAC, stage: 'SENDING' });
+      // Both are now SENDING.
+      expect(store.controllerStates.get('body')?.stage).toBe('SENDING');
+      expect(store.controllerStates.get('core')?.stage).toBe('SENDING');
+      // New snapshot contains only body at VERIFYING. Replace semantics:
+      // core must be absent. Merge semantics: core would still be SENDING.
       const fresh: FlashJobState = sampleJobState({
         controllers: [{ controllerId: BODY_MAC, stage: 'VERIFYING' }],
       });
       store.applyJobStarted(fresh);
-      expect(store.controllerStates.size).toBe(1);
       expect(store.controllerStates.get('body')?.stage).toBe('VERIFYING');
       expect(store.controllerStates.get('core')).toBeUndefined();
+      // Pin size at exactly 1 (the new snapshot's count) — belt-and-
+      // suspenders against a merge that adds new entries without
+      // dropping stale ones.
+      expect(store.controllerStates.size).toBe(1);
     });
 
     it('translates MAC controllerIds to slot ids (body/core/dome) via the controllerStore resolver', () => {
@@ -676,11 +701,16 @@ describe('firmware store', () => {
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
       // sampleJobState sends BODY_MAC + CORE_MAC; after translation the Map
-      // is keyed by slot ids, NOT by the raw MAC strings.
+      // is keyed by slot ids, NOT by the raw MAC strings. IM-11 enforces
+      // this at the type level — the Map is now `Map<SlotId, ...>`, so a
+      // MAC-keyed lookup is a compile error. The runtime sanity check below
+      // is preserved via an unsafe cast so a regression that started silently
+      // double-keying by MAC would still be caught.
       expect(store.controllerStates.get('body')?.stage).toBe('QUEUED');
       expect(store.controllerStates.get('core')?.stage).toBe('QUEUED');
-      expect(store.controllerStates.get(BODY_MAC)).toBeUndefined();
-      expect(store.controllerStates.get(CORE_MAC)).toBeUndefined();
+      const mapAsAny = store.controllerStates as unknown as Map<string, unknown>;
+      expect(mapAsAny.get(BODY_MAC)).toBeUndefined();
+      expect(mapAsAny.get(CORE_MAC)).toBeUndefined();
     });
 
     it('drops entries with unknown controllerIds (MAC mapping not yet learned)', () => {
@@ -748,6 +778,85 @@ describe('firmware store', () => {
       store.applyJobStarted(sampleJobState({ jobId: 'job-B' }));
 
       expect(store.pendingByMac.size).toBe(0);
+    });
+
+    describe('IM-3: defensive validation of controllers payload', () => {
+      it('returns empty map when controllers is not an array (string)', () => {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted({
+          jobId: 'job-1',
+          source: { kind: 'github', version: 'v1' },
+          // @ts-expect-error — deliberately passing a non-array to verify
+          // the runtime guard. TS would normally block this; the guard
+          // protects against malformed wire payloads.
+          controllers: 'not-an-array',
+          startedAt: '2026-05-14T08:00:00Z',
+        });
+        expect(store.controllerStates.size).toBe(0);
+        expect(store.pendingByMac.size).toBe(0);
+      });
+
+      it('skips elements with missing controllerId and warns', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          const store = useFirmwareStore();
+          seedSampleFleet();
+          store.applyJobStarted({
+            jobId: 'job-1',
+            source: { kind: 'github', version: 'v1' },
+            controllers: [
+              // @ts-expect-error — missing controllerId
+              { stage: 'QUEUED' },
+            ],
+            startedAt: '2026-05-14T08:00:00Z',
+          });
+          expect(store.controllerStates.size).toBe(0);
+          expect(store.pendingByMac.size).toBe(0);
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain('invalid controllerId');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+
+      it('skips elements with non-string controllerId and warns', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          const store = useFirmwareStore();
+          seedSampleFleet();
+          store.applyJobStarted({
+            jobId: 'job-1',
+            source: { kind: 'github', version: 'v1' },
+            controllers: [
+              // @ts-expect-error — non-string controllerId
+              { controllerId: 123, stage: 'QUEUED' },
+            ],
+            startedAt: '2026-05-14T08:00:00Z',
+          });
+          expect(store.controllerStates.size).toBe(0);
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain('invalid controllerId');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+
+      it('skips elements with empty-string controllerId and warns', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          const store = useFirmwareStore();
+          seedSampleFleet();
+          store.applyJobStarted({
+            jobId: 'job-1',
+            source: { kind: 'github', version: 'v1' },
+            controllers: [{ controllerId: '', stage: 'QUEUED' }],
+            startedAt: '2026-05-14T08:00:00Z',
+          });
+          expect(store.controllerStates.size).toBe(0);
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain('invalid controllerId');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
     });
   });
 
@@ -903,7 +1012,11 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
-      store.applyControllerUpdate({ controllerId: CORE_MAC, stage: 'FAILED' });
+      store.applyControllerUpdate({
+        controllerId: CORE_MAC,
+        stage: 'FAILED',
+        error: 'flash_error',
+      });
       store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
 
       expect(store.controllerStates.get('core')?.stage).toBe('FAILED');
@@ -1127,9 +1240,17 @@ describe('firmware store', () => {
 
       expect(store.controllerStates.get('body')?.stage).toBe('FAILED');
       expect(store.controllerStates.get('core')?.stage).toBe('FAILED');
-      // The demoted entries carry no `error` string — they weren't
-      // server-reported as FAILED, they were normalized.
-      expect(store.controllerStates.get('body')?.error).toBeUndefined();
+      // IM-2 contract: FAILED entries always carry an `error` string.
+      // Demoted (non-server-reported) entries use the 'unattributed:*'
+      // marker so ops can distinguish them from server-reported failures.
+      const bodyState = store.controllerStates.get('body');
+      const coreState = store.controllerStates.get('core');
+      if (bodyState?.stage === 'FAILED') {
+        expect(bodyState.error).toContain('unattributed');
+      }
+      if (coreState?.stage === 'FAILED') {
+        expect(coreState.error).toContain('unattributed');
+      }
       // failedControllers reflects the demoted entries.
       const ids = store.failedControllers.map((c) => c.id);
       expect(ids).toEqual(['body', 'core']);
@@ -1153,9 +1274,22 @@ describe('firmware store', () => {
         reason: 'bus_send_failed',
       });
 
-      // CORE's error string survives; body is demoted with no error.
-      expect(store.controllerStates.get('core')?.error).toBe('hash_mismatch');
-      expect(store.controllerStates.get('body')?.error).toBeUndefined();
+      // CORE's server-reported error string survives; body's demoted
+      // entry carries the IM-2 'unattributed:*' marker (distinguishable
+      // from any server-emitted error reason).
+      const coreState = store.controllerStates.get('core');
+      const bodyState = store.controllerStates.get('body');
+      // Outer-stage assertions pin the post-condition before the narrow
+      // guards below — without these, a regression that left bodyState
+      // at QUEUED would skip the if blocks and pass silently.
+      expect(coreState?.stage).toBe('FAILED');
+      expect(bodyState?.stage).toBe('FAILED');
+      if (coreState?.stage === 'FAILED') {
+        expect(coreState.error).toBe('hash_mismatch');
+      }
+      if (bodyState?.stage === 'FAILED') {
+        expect(bodyState.error).toContain('unattributed');
+      }
     });
 
     it('clears pendingByMac so a late LocationStatus cannot replay stale entries onto failed state (C2 fix)', () => {
@@ -1489,6 +1623,24 @@ describe('firmware store', () => {
       expect(store.pendingByMac.size).toBe(1);
       store.resetToSelect();
       expect(store.pendingByMac.size).toBe(0);
+    });
+
+    it('IM-8: logs a distinct re-queue warning when flushPendingForMac re-enqueues during flush (forensic breadcrumb)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const store = useFirmwareStore();
+        // Queue an entry under an unmapped MAC.
+        store.applyControllerUpdate({ controllerId: 'aa:bb:cc:dd:ee:99', stage: 'SENDING' });
+        expect(store.pendingByMac.size).toBe(1);
+        // Flush without first mapping the MAC — applyControllerUpdate will
+        // re-enqueue because resolveSlot still returns null.
+        store.flushPendingForMac('aa:bb:cc:dd:ee:99');
+        const warnText = warnSpy.mock.calls.flat().join(' ');
+        expect(warnText).toContain('re-queued during flush');
+        expect(warnText).toContain('aa:bb:cc:dd:ee:99');
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 });

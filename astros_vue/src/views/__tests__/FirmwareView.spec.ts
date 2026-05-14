@@ -380,3 +380,59 @@ describe('FirmwareView mid-flash error region (C1)', () => {
     expect(wrapper.find('[data-test="mid-flash-error"]').exists()).toBe(false);
   });
 });
+
+describe('FirmwareView lockSinceFormatted defensive fallback (IM-8)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('renders a dash placeholder when jobLock.since is null', async () => {
+    const lock = useJobLockStore();
+    lock.setState({
+      locked: true,
+      owner: 'someone-else',
+      since: null,
+    });
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+    // The conflict banner body interpolates {since}; null path produces "—".
+    expect(wrapper.text()).not.toContain('Invalid Date');
+    expect(wrapper.text()).not.toContain('NaN');
+  });
+
+  it('falls back to the raw string when jobLock.since is malformed ISO', async () => {
+    const lock = useJobLockStore();
+    lock.setState({
+      locked: true,
+      owner: 'someone-else',
+      since: 'not-a-date',
+    });
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+    // The defensive fallback in lockSinceFormatted returns `raw` when
+    // Date(raw).getTime() is NaN. Positive assertion pins the raw-string
+    // passthrough (a mutation that returned '—' instead would pass the
+    // negative checks below but fail this one).
+    expect(wrapper.text()).toContain('not-a-date');
+    expect(wrapper.text()).not.toContain('Invalid Date');
+    expect(wrapper.text()).not.toContain('NaN');
+  });
+
+  it('renders a formatted date when jobLock.since is a valid ISO', async () => {
+    const lock = useJobLockStore();
+    lock.setState({
+      locked: true,
+      owner: 'someone-else',
+      since: '2026-05-14T08:00:00Z',
+    });
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+    // Positive assertion: the Intl.DateTimeFormat output should include
+    // a recognizable date segment (year or month). A mutation that fell
+    // through to the raw-string fallback would fail this because the
+    // raw ISO contains 'T08:00:00Z' which is the unformatted form.
+    expect(wrapper.text()).toMatch(/2026|May/);
+    expect(wrapper.text()).not.toContain('Invalid Date');
+    expect(wrapper.text()).not.toContain('NaN');
+  });
+});

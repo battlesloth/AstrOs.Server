@@ -141,27 +141,50 @@ export type ServerFwStage =
  * automatically. `Location.UNKNOWN` is excluded because an unknown slot
  * can't key per-controller state.
  */
-export type SlotId = Exclude<Location, Location.UNKNOWN>;
+// Use the template-literal extraction so SlotId is the underlying string
+// union ('body' | 'core' | 'dome') rather than the enum-member union.
+// String literals like 'body' widen to this naturally — important for
+// .get() calls and test assertions that pass string keys.
+export type SlotId = Exclude<`${Location}`, `${Location.UNKNOWN}`>;
 
 /**
- * Mirror of the server's `ControllerFlashState` discriminated union narrowed
- * to fields the UI reads. Source:
- * `astros_api/src/models/firmware/flash_job_state.ts`.
+ * Mirror of the server's `ControllerFlashState` discriminated union, narrowed
+ * to fields the UI reads. The server wire carries `bytesSent`, `totalBytes`,
+ * and `detail` on every variant; we omit those because no UI surface renders
+ * them.
  *
- * NB: `controllerId` semantics depend on data-flow position. On the wire
- * (server → client), it's a MAC. After `buildControllerStatesMap` rewrites
- * it to the slot id, it's a `SlotId`. The field is typed `string` because
- * TS can't enforce nominal MAC-vs-slot distinction across the JSON cast
- * at the WS boundary — see the doc comment in `buildControllerStatesMap`.
+ * Source of truth: `astros_api/src/models/firmware/flash_job_state.ts`.
+ *
+ * Discrimination: IM-2 makes `finalVersion`/`error` STRUCTURALLY required on
+ * their respective stages (matching the server). Reading `state.error` on a
+ * non-FAILED stage is a compile-time error.
+ *
+ * Wire vs slot (IM-11): on the wire, `controllerId` is a MAC. After
+ * `buildControllerStatesMap` / `applyControllerUpdate` re-key, it's a SlotId.
+ * The wire type uses `string` (MAC); the by-slot type uses `SlotId`. The
+ * translation happens at the single boundary in `buildControllerStatesMap`.
  */
-export interface ControllerFlashState {
-  controllerId: string;
-  stage: ServerFwStage;
-  /** Set when stage === 'VERSION_CONFIRMED'. */
-  finalVersion?: string;
-  /** Set when stage === 'FAILED'. */
-  error?: string;
-}
+export type ControllerFlashState =
+  | {
+      controllerId: string;
+      stage: 'QUEUED' | 'UPLOADING_TO_MASTER' | 'SENDING' | 'VERIFYING' | 'REBOOTING';
+    }
+  | { controllerId: string; stage: 'VERSION_CONFIRMED'; finalVersion: string }
+  | { controllerId: string; stage: 'FAILED'; error: string };
+
+/**
+ * In-store (post-translation) view of `ControllerFlashState`. After
+ * `buildControllerStatesMap`/`applyControllerUpdate` re-key the MAC into a
+ * SlotId, the store keys controllerStates by SlotId and the embedded
+ * controllerId field is also a SlotId. See IM-11 for the rationale.
+ */
+export type ControllerFlashStateBySlot =
+  | {
+      controllerId: SlotId;
+      stage: 'QUEUED' | 'UPLOADING_TO_MASTER' | 'SENDING' | 'VERIFYING' | 'REBOOTING';
+    }
+  | { controllerId: SlotId; stage: 'VERSION_CONFIRMED'; finalVersion: string }
+  | { controllerId: SlotId; stage: 'FAILED'; error: string };
 
 /**
  * Mirror of the server's `FlashJobState`. The `source` shape matches the

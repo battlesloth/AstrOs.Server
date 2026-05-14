@@ -7,6 +7,15 @@ import {
 import type { ControllerFlashState, ServerFwStage } from '@/types/firmware';
 
 function state(stage: ServerFwStage): ControllerFlashState {
+  // After IM-2 (discriminated union), VERSION_CONFIRMED requires
+  // finalVersion and FAILED requires error. Provide test placeholders
+  // so the function can be invoked with any stage.
+  if (stage === 'VERSION_CONFIRMED') {
+    return { controllerId: 'body', stage, finalVersion: 'v1.0.0-test' };
+  }
+  if (stage === 'FAILED') {
+    return { controllerId: 'body', stage, error: 'test:error' };
+  }
   return { controllerId: 'body', stage };
 }
 
@@ -112,5 +121,21 @@ describe('controllerStageLabelKey', () => {
     expect(controllerStageLabelKey(state('QUEUED'))).toBeNull();
     expect(controllerStageLabelKey(state('VERSION_CONFIRMED'))).toBeNull();
     expect(controllerStageLabelKey(state('FAILED'))).toBeNull();
+  });
+});
+
+describe('FlashErrorReason i18n key contract (IM-8)', () => {
+  // Every FlashErrorReason in the union must have a corresponding
+  // firmware_view.flash_errors.<reason> key in enUS.json. Without this
+  // pin, adding a new reason to the tuple without updating the locale
+  // file would render the literal key path in the operator's UI.
+  it('every FlashErrorReason has a corresponding firmware_view.flash_errors.* i18n key', async () => {
+    const { FLASH_ERROR_REASONS } = await import('@/types/firmware');
+    const enUS = (await import('@/locales/enUS.json')).default as unknown as {
+      firmware_view: { flash_errors: Record<string, string> };
+    };
+    for (const reason of FLASH_ERROR_REASONS) {
+      expect(enUS.firmware_view.flash_errors).toHaveProperty(reason);
+    }
   });
 });

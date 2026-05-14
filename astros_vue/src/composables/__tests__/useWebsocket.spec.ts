@@ -423,6 +423,94 @@ describe('handleLockStateChanged — CR-1b recovery defense', () => {
   });
 });
 
+describe('IM-8 coverage gaps — dispatcher happy paths + contract pins', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('routes well-formed FLASH_JOB_STARTED through applyJobStarted (IM-8: dispatcher happy path)', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_JOB_STARTED,
+        data: {
+          jobId: 'job-X',
+          source: { kind: 'github', version: 'v1.0' },
+          controllers: [],
+          startedAt: '2026-05-14T08:00:00Z',
+        },
+      }),
+    );
+    expect(firmware.currentJob?.jobId).toBe('job-X');
+    expect(firmware.phase).toBe('flashing');
+  });
+
+  it('routes FLASH_CONTROLLER_RESULT through applyControllerResult with the full payload (IM-8: dispatcher happy path)', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    const controllers = useControllerStore();
+    controllers.setControllerMac(Location.CORE, 'aa:bb:cc:dd:ee:01');
+    firmware.applyJobStarted({
+      jobId: 'job-1',
+      source: { kind: 'github', version: 'v1.4.2' },
+      controllers: [{ controllerId: 'aa:bb:cc:dd:ee:01', stage: 'VERIFYING' }],
+      startedAt: '2026-05-14T08:00:00Z',
+    });
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_CONTROLLER_RESULT,
+        data: {
+          jobId: 'job-1',
+          controller: {
+            controllerId: 'aa:bb:cc:dd:ee:01',
+            stage: 'VERSION_CONFIRMED',
+            finalVersion: 'v1.4.2',
+          },
+        },
+      }),
+    );
+    const core = firmware.controllerStates.get('core');
+    expect(core?.stage).toBe('VERSION_CONFIRMED');
+    if (core?.stage === 'VERSION_CONFIRMED') {
+      expect(core.finalVersion).toBe('v1.4.2');
+    }
+  });
+
+  it('FLASH_JOB_ACTIVE is a no-op: phase, flashError, controllerStates all unchanged (IM-8: contract pin)', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setPhase('flashing');
+    const phaseBefore = firmware.phase;
+    const errorBefore = firmware.flashError;
+    const statesSizeBefore = firmware.controllerStates.size;
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_JOB_ACTIVE,
+        data: { reason: 'write_during_flash' },
+      }),
+    );
+    expect(firmware.phase).toBe(phaseBefore);
+    expect(firmware.flashError).toBe(errorBefore);
+    expect(firmware.controllerStates.size).toBe(statesSizeBefore);
+  });
+
+  it('flashError persists across a subsequent successful applyControllerUpdate (operator must dismiss)', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    const controllers = useControllerStore();
+    controllers.setControllerMac(Location.CORE, 'aa:bb:cc:dd:ee:01');
+    firmware.setFlashError({ reason: 'protocol_violation', detail: 'earlier error' });
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_CONTROLLER_UPDATE,
+        data: { controllerId: 'aa:bb:cc:dd:ee:01', stage: 'VERIFYING' },
+      }),
+    );
+    expect(firmware.flashError?.reason).toBe('protocol_violation');
+  });
+});
+
 describe('WebsocketMessageType wire-numeric pinning (cross-process contract)', () => {
   it('pins the wire numeric values that the server emits — drift here breaks every WS message', () => {
     expect(WebsocketMessageType.SCRIPT).toBe(0);
