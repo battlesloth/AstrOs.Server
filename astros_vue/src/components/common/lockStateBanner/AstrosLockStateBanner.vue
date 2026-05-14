@@ -25,13 +25,6 @@ const visible = computed(
     route.path !== '/firmware' &&
     !systemStatusStore.readOnly,
 );
-
-// CTA is always shown when the banner itself is — the banner is now hidden
-// on /firmware, so any banner that renders is on a different route and
-// linking to /firmware is meaningful. Kept as a computed for forward
-// extensibility (e.g., suppressing on auth routes if those ever land in
-// the same outer layout).
-const showCta = computed(() => visible.value);
 </script>
 
 <template>
@@ -49,7 +42,6 @@ const showCta = computed(() => visible.value);
   >
     <span>{{ $t('firmware_view.lock_banner') }}</span>
     <RouterLink
-      v-if="showCta"
       to="/firmware"
       class="link link-hover font-semibold ml-2"
       data-testid="lock-banner-cta"

@@ -146,12 +146,29 @@ describe('AstrosLockStateBanner', () => {
     mockRoutePath.value = '/firmware';
     useJobLockStore().locked = true;
     // No applyJobStarted call → isOwnJob is false → banner would otherwise
-    // be visible everywhere except /firmware. The route guard is what
-    // suppresses it here.
+    // be visible everywhere except /firmware.
 
     const wrapper = mountBanner();
     await wrapper.vm.$nextTick();
 
+    expect(wrapper.find('[role="status"]').exists()).toBe(false);
+  });
+
+  it('reacts to route changes — banner disappears when navigation lands on /firmware', async () => {
+    // Pins that route.path is read REACTIVELY inside the `visible` computed,
+    // not snapshotted in script setup. A future refactor that captures
+    // `const path = route.path` once would compile, pass every other test
+    // in this file, but break runtime navigation suppression. This is the
+    // mutation we want to catch.
+    mockRoutePath.value = '/scripts';
+    useJobLockStore().locked = true;
+
+    const wrapper = mountBanner();
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[role="status"]').exists()).toBe(true);
+
+    mockRoutePath.value = '/firmware';
+    await wrapper.vm.$nextTick();
     expect(wrapper.find('[role="status"]').exists()).toBe(false);
   });
 });
