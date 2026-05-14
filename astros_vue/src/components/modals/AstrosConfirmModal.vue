@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
+
 const props = withDefaults(
   defineProps<{
     message: string;
@@ -26,13 +28,13 @@ const closeModal = () => {
         </div>
       </div>
       <div class="modal-action">
-        <button
+        <AstrosWriteButton
           data-testid="modal-confirm"
           class="btn btn-primary"
           @click="onConfirm"
         >
           {{ $t('modals.confirm.confirm') }}
-        </button>
+        </AstrosWriteButton>
         <button
           data-testid="modal-close"
           class="btn"
