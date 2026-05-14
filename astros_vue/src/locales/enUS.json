@@ -173,6 +173,7 @@
     },
     "lock_active": "A firmware update is in progress — write actions are disabled until it completes.",
     "lock_banner": "Firmware update in progress — write actions are disabled across the app.",
+    "lock_banner_cta": "View progress",
     "lock_conflict": {
       "title": "Firmware update in progress",
       "body": "Another operator started a firmware update at {since}. Wait for it to finish before starting a new one."

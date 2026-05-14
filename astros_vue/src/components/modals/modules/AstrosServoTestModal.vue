@@ -4,6 +4,7 @@ import { useWebsocket } from '@/composables/useWebsocket';
 import { useJobLockStore } from '@/stores/jobLock';
 import { storeToRefs } from 'pinia';
 import type { ServoTestEvent } from '@/models/events';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 
 const { wsSendMessage } = useWebsocket();
 const jobLock = useJobLockStore();
@@ -19,9 +20,13 @@ const disabled = ref(true);
 const label = ref('modals.servo_test.enable_test');
 const value = ref(props.homePosition);
 
-// ServoTest writes during a flash get silently rejected server-side.
-// Gate the slider + button so operators see disabled controls rather
-// than dragging into the void.
+// Slider-side lock gate + belt-and-suspenders for the handler bodies.
+// The Enable Test button itself is handled by AstrosWriteButton, which
+// consults the store directly. This computed feeds: the slider's
+// :disabled, onSliderChange's early-return, enableTest's early-return,
+// the mid-session auto-disable watcher, and the lock-active notice region
+// below. The handler-body guards protect against any programmatic
+// invocation path that bypasses the button's disabled state.
 const writesBlocked = computed(() => jobLockLocked.value);
 
 // If a flash starts while the modal is already open with the test active,
@@ -111,15 +116,13 @@ const closeModal = () => {
       </div>
       <div class="mt-5 flex flex-row">
         <div class="grow"></div>
-        <button
+        <AstrosWriteButton
           data-testid="enable-test-button"
-          :disabled="writesBlocked"
-          :title="writesBlocked ? $t('firmware_view.lock_active') : ''"
           class="btn btn-primary w-25 text-lg py-1.25 mx-1.25"
           @click="enableTest"
         >
           {{ $t(label) }}
-        </button>
+        </AstrosWriteButton>
         <button
           data-testid="close-button"
           class="btn w-25 text-lg py-1.25 mx-1.25"
