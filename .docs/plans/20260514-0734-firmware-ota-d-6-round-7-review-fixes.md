@@ -53,7 +53,7 @@ Single commit at end of phase. Message: `fix(firmware): round-7 Criticals — la
 
 Per CLAUDE.md, the plan file must be committed before any implementation code.
 
-- [ ] **A.0.1:** Stage and commit the plan file alone.
+- [x] **A.0.1:** Stage and commit the plan file alone.
 
 ```bash
 git add .docs/plans/20260514-0734-firmware-ota-d-6-round-7-review-fixes.md
@@ -77,11 +77,11 @@ Server `TransmissionType` has implicit numeric values, so mid-insertion silently
 **Files:**
 - Modify: `astros_api/src/models/enums.ts:82-100` (the `TransmissionType` enum)
 
-- [ ] **A.1.1:** Read the current enum to confirm position ordering.
+- [x] **A.1.1:** Read the current enum to confirm position ordering.
 
 Run: `grep -n "TransmissionType" astros_api/src/models/enums.ts`
 
-- [ ] **A.1.2:** Edit the enum to add explicit values 0-16. Find the existing `export enum TransmissionType {` block and replace its body with:
+- [x] **A.1.2:** Edit the enum to add explicit values 0-16. Find the existing `export enum TransmissionType {` block and replace its body with:
 
 ```ts
 export enum TransmissionType {
@@ -107,7 +107,7 @@ export enum TransmissionType {
 
 Verify the comment block above the enum still accurately reflects the wire-mirror contract; update if needed.
 
-- [ ] **A.1.3:** Run server build + tests to confirm no value mismatch.
+- [x] **A.1.3:** Run server build + tests to confirm no value mismatch.
 
 Run: `cd astros_api && npm run build && npx vitest run`
 Expected: clean build, all tests pass.
@@ -119,7 +119,7 @@ Expected: clean build, all tests pass.
 **Files:**
 - Modify: `astros_vue/src/composables/__tests__/useWebsocket.spec.ts`
 
-- [ ] **A.2.1:** Add a top-level `describe` block at the end of the file:
+- [x] **A.2.1:** Add a top-level `describe` block at the end of the file:
 
 ```ts
 describe('WebsocketMessageType wire-numeric pinning (cross-process contract)', () => {
@@ -147,7 +147,7 @@ describe('WebsocketMessageType wire-numeric pinning (cross-process contract)', (
 
 Verify `WebsocketMessageType` is already imported at the top of the spec file (it is — round-3 work imported it). If not, add `import { WebsocketMessageType } from '@/enums/WebsocketMessageType';`.
 
-- [ ] **A.2.2:** Run the test:
+- [x] **A.2.2:** Run the test:
 
 Run: `cd astros_vue && npx vitest run src/composables/__tests__/useWebsocket.spec.ts -t "wire-numeric pinning"`
 Expected: PASS (the client enum already has explicit values 0-16).
@@ -161,11 +161,11 @@ The dispatcher's `default` branch is a runtime `console.warn`. Convert to a `nev
 **Files:**
 - Modify: `astros_vue/src/composables/useWebsocket.ts` (the switch block around line 105-144)
 
-- [ ] **A.3.1:** Read the current switch block to confirm its shape.
+- [x] **A.3.1:** Read the current switch block to confirm its shape.
 
 Run: `grep -n "default:" astros_vue/src/composables/useWebsocket.ts`
 
-- [ ] **A.3.2:** In the dispatcher switch's `default` branch, add a `never` assignment to force TS exhaustiveness. The current default is:
+- [x] **A.3.2:** In the dispatcher switch's `default` branch, add a `never` assignment to force TS exhaustiveness. The current default is:
 
 ```ts
 default:
@@ -190,12 +190,12 @@ default: {
 
 Note the `as never` cast: today the switch's discriminator is a wide `WebsocketMessageType` enum and the case arms don't structurally narrow it (the parsed-message type is `BaseWsMessage`, not a true discriminated union). The `as never` is therefore an attestation, not a true compile-time check — but it documents intent and breaks loudly if someone refactors to a true discriminated union later. The full DU refactor is out of scope for this fix (it would require typing every handler's `data` payload, which is a bigger surface).
 
-- [ ] **A.3.3:** Confirm build still passes:
+- [x] **A.3.3:** Confirm build still passes:
 
 Run: `cd astros_vue && npm run build`
 Expected: success.
 
-- [ ] **A.3.4:** Run dispatcher tests:
+- [x] **A.3.4:** Run dispatcher tests:
 
 Run: `cd astros_vue && npx vitest run src/composables/__tests__/useWebsocket.spec.ts`
 Expected: all pass.
@@ -208,7 +208,7 @@ Expected: all pass.
 - Modify: `astros_vue/src/stores/firmware.ts` (`applyControllerResult` function around line 353)
 - Modify: `astros_vue/src/stores/__tests__/firmware.spec.ts` (add test)
 
-- [ ] **A.4.1:** Write the failing test in `firmware.spec.ts`. Find the `describe('applyControllerResult', ...)` block (search for it; it should exist near the multi-failure tests). Add inside that block:
+- [x] **A.4.1:** Write the failing test in `firmware.spec.ts`. Find the `describe('applyControllerResult', ...)` block (search for it; it should exist near the multi-failure tests). Add inside that block:
 
 ```ts
 it('drops stale events whose jobId does not match currentJob (post-reconnect race protection)', () => {
@@ -233,12 +233,12 @@ it('drops stale events whose jobId does not match currentJob (post-reconnect rac
 
 (If `seedSampleFleet`, `sampleJobState`, and `BODY_MAC` are not the exact helper names, grep the spec file and use the actual names — round-5 added these helpers.)
 
-- [ ] **A.4.2:** Run the test to confirm it fails:
+- [x] **A.4.2:** Run the test to confirm it fails:
 
 Run: `cd astros_vue && npx vitest run src/stores/__tests__/firmware.spec.ts -t "drops stale events whose jobId"`
 Expected: FAIL — stage was mutated, no warn fired.
 
-- [ ] **A.4.3:** Edit `applyControllerResult` in `firmware.ts`. The current implementation looks roughly like:
+- [x] **A.4.3:** Edit `applyControllerResult` in `firmware.ts`. The current implementation looks roughly like:
 
 ```ts
 function applyControllerResult(payload: { jobId: string; controller: ControllerFlashState }): void {
@@ -261,7 +261,7 @@ function applyControllerResult(payload: { jobId: string; controller: ControllerF
 }
 ```
 
-- [ ] **A.4.4:** Run the test to confirm it passes:
+- [x] **A.4.4:** Run the test to confirm it passes:
 
 Run: `cd astros_vue && npx vitest run src/stores/__tests__/firmware.spec.ts -t "drops stale events whose jobId"`
 Expected: PASS.
@@ -274,7 +274,7 @@ Expected: PASS.
 - Modify: `astros_vue/src/stores/firmware.ts` (`applyJobDone` function around line 360-401)
 - Modify: `astros_vue/src/stores/__tests__/firmware.spec.ts`
 
-- [ ] **A.5.1:** Add failing test inside `describe('applyJobDone', ...)`:
+- [x] **A.5.1:** Add failing test inside `describe('applyJobDone', ...)`:
 
 ```ts
 it('drops stale flashJobDone whose jobId does not match currentJob', () => {
@@ -293,12 +293,12 @@ it('drops stale flashJobDone whose jobId does not match currentJob', () => {
 });
 ```
 
-- [ ] **A.5.2:** Run to confirm failure:
+- [x] **A.5.2:** Run to confirm failure:
 
 Run: `cd astros_vue && npx vitest run -t "drops stale flashJobDone"`
 Expected: FAIL — phase transitioned to 'done'.
 
-- [ ] **A.5.3:** Add the guard at entry of `applyJobDone`:
+- [x] **A.5.3:** Add the guard at entry of `applyJobDone`:
 
 ```ts
 function applyJobDone(data: { jobId: string; endedAt: string }): void {
@@ -313,7 +313,7 @@ function applyJobDone(data: { jobId: string; endedAt: string }): void {
 }
 ```
 
-- [ ] **A.5.4:** Run to confirm pass:
+- [x] **A.5.4:** Run to confirm pass:
 
 Run: `cd astros_vue && npx vitest run -t "drops stale flashJobDone"`
 Expected: PASS.
@@ -326,7 +326,7 @@ Expected: PASS.
 - Modify: `astros_vue/src/stores/firmware.ts` (`applyJobFailed` function around line 403-473)
 - Modify: `astros_vue/src/stores/__tests__/firmware.spec.ts`
 
-- [ ] **A.6.1:** Add failing test inside `describe('applyJobFailed', ...)`:
+- [x] **A.6.1:** Add failing test inside `describe('applyJobFailed', ...)`:
 
 ```ts
 it('drops stale flashJobFailed whose jobId does not match currentJob', () => {
@@ -349,12 +349,12 @@ it('drops stale flashJobFailed whose jobId does not match currentJob', () => {
 });
 ```
 
-- [ ] **A.6.2:** Run to confirm failure:
+- [x] **A.6.2:** Run to confirm failure:
 
 Run: `cd astros_vue && npx vitest run -t "drops stale flashJobFailed"`
 Expected: FAIL.
 
-- [ ] **A.6.3:** Add the guard at entry of `applyJobFailed`:
+- [x] **A.6.3:** Add the guard at entry of `applyJobFailed`:
 
 ```ts
 function applyJobFailed(data: FlashJobFailedData & { jobId: string }): void {
@@ -371,7 +371,7 @@ function applyJobFailed(data: FlashJobFailedData & { jobId: string }): void {
 
 If `data` doesn't currently include `jobId` in the type, check the call site in `useWebsocket.ts:handleFlashJobFailed` — the server payload has `jobId` per the orchestrator contract; the store handler should accept it. Update both type and signature consistently.
 
-- [ ] **A.6.4:** Run to confirm pass:
+- [x] **A.6.4:** Run to confirm pass:
 
 Run: `cd astros_vue && npx vitest run -t "drops stale flashJobFailed"`
 Expected: PASS.
@@ -386,7 +386,7 @@ When `currentJob.endedAt` is set (15s reboot-wait window), the server skips emit
 - Modify: `astros_vue/src/stores/firmware.ts` (`fetchCurrentJob` function around line 554-576)
 - Modify: `astros_vue/src/stores/__tests__/firmware.spec.ts`
 
-- [ ] **A.7.1:** Add failing test inside `describe('fetchCurrentJob', ...)` block:
+- [x] **A.7.1:** Add failing test inside `describe('fetchCurrentJob', ...)` block:
 
 ```ts
 it('skips applying a body with endedAt set (mirrors server late-join filter for reboot-wait window)', async () => {
@@ -405,12 +405,12 @@ it('skips applying a body with endedAt set (mirrors server late-join filter for 
 
 (Adjust `apiClient` mock helper to match what the spec file already uses — round-5 wired in a vitest mock; reuse it.)
 
-- [ ] **A.7.2:** Run to confirm failure:
+- [x] **A.7.2:** Run to confirm failure:
 
 Run: `cd astros_vue && npx vitest run -t "skips applying a body with endedAt"`
 Expected: FAIL — `currentJob` was populated and phase moved to 'flashing'.
 
-- [ ] **A.7.3:** Edit `fetchCurrentJob`. Current guard is:
+- [x] **A.7.3:** Edit `fetchCurrentJob`. Current guard is:
 
 ```ts
 if (body && body.jobId && currentJob.value === null) {
@@ -434,7 +434,7 @@ if (body && body.jobId && body.endedAt === undefined && currentJob.value === nul
 }
 ```
 
-- [ ] **A.7.4:** Run to confirm pass:
+- [x] **A.7.4:** Run to confirm pass:
 
 Run: `cd astros_vue && npx vitest run -t "skips applying a body with endedAt"`
 Expected: PASS.
@@ -449,7 +449,7 @@ If the client somehow lands at `phase='flashing'` while the lock has released (o
 - Modify: `astros_vue/src/composables/useWebsocket.ts` (`handleLockStateChanged` function around line 244-256)
 - Modify: `astros_vue/src/composables/__tests__/useWebsocket.spec.ts`
 
-- [ ] **A.8.1:** Add failing test inside the `handleLockStateChanged`/lockStateChanged describe block:
+- [x] **A.8.1:** Add failing test inside the `handleLockStateChanged`/lockStateChanged describe block:
 
 ```ts
 it('forces firmware phase to done when lock releases but firmware is still flashing (recovery defense)', () => {
@@ -470,12 +470,12 @@ it('forces firmware phase to done when lock releases but firmware is still flash
 });
 ```
 
-- [ ] **A.8.2:** Run to confirm failure:
+- [x] **A.8.2:** Run to confirm failure:
 
 Run: `cd astros_vue && npx vitest run -t "forces firmware phase to done when lock releases"`
 Expected: FAIL — phase stayed 'flashing'.
 
-- [ ] **A.8.3:** Edit `handleLockStateChanged`. After the existing `jobLockStore` update, add:
+- [x] **A.8.3:** Edit `handleLockStateChanged`. After the existing `jobLockStore` update, add:
 
 ```ts
 // Defense-in-depth: if the server has released the lock while we still think
@@ -497,7 +497,7 @@ if (!data.locked) {
 
 Confirm `useFirmwareStore` is imported in the file. Confirm `setPhase` is an exported action. If `setPhase` doesn't exist, add it to the firmware store as a public action (one-line wrapper around the ref).
 
-- [ ] **A.8.4:** Run to confirm pass:
+- [x] **A.8.4:** Run to confirm pass:
 
 Run: `cd astros_vue && npx vitest run -t "forces firmware phase to done when lock releases"`
 Expected: PASS.
@@ -512,7 +512,7 @@ Bus-wide ESP-NOW failure can leave FAILED-stage entries queued in pendingByMac b
 - Modify: `astros_vue/src/stores/firmware.ts` (`applyJobFailed` around line 449-472)
 - Modify: `astros_vue/src/stores/__tests__/firmware.spec.ts`
 
-- [ ] **A.9.1:** Add failing test inside `describe('applyJobFailed', ...)`:
+- [x] **A.9.1:** Add failing test inside `describe('applyJobFailed', ...)`:
 
 ```ts
 it('preserves FAILED entries from pendingByMac in failedControllers (bus-wide failure with unmapped MAC)', () => {
@@ -545,12 +545,12 @@ it('preserves FAILED entries from pendingByMac in failedControllers (bus-wide fa
 });
 ```
 
-- [ ] **A.9.2:** Run to confirm failure:
+- [x] **A.9.2:** Run to confirm failure:
 
 Run: `cd astros_vue && npx vitest run -t "preserves FAILED entries from pendingByMac"`
 Expected: FAIL — failedControllers doesn't contain the unmapped MAC.
 
-- [ ] **A.9.3:** Edit `applyJobFailed`. Before the `pendingByMac.value = new Map()` clear (around line 472), insert:
+- [x] **A.9.3:** Edit `applyJobFailed`. Before the `pendingByMac.value = new Map()` clear (around line 472), insert:
 
 ```ts
 // Scan pendingByMac for FAILED entries that never got their LocationStatus
@@ -577,7 +577,7 @@ for (const [mac, queue] of pendingByMac.value) {
 
 (The `id: mac as SlotId` cast is a known structural-vs-nominal compromise — see IM-11 in Phase B for the proper fix. For this commit, the cast is acceptable because `failedControllers` consumers iterate `id` only for keying/labeling.)
 
-- [ ] **A.9.4:** Run to confirm pass + run all firmware.spec.ts tests to confirm no regression:
+- [x] **A.9.4:** Run to confirm pass + run all firmware.spec.ts tests to confirm no regression:
 
 Run: `cd astros_vue && npx vitest run src/stores/__tests__/firmware.spec.ts`
 Expected: all pass.
@@ -592,7 +592,7 @@ Expected: all pass.
 - Modify: `astros_vue/src/composables/useWebsocket.ts` (catches around lines 303-306, 323-326)
 - Modify: `astros_vue/src/composables/__tests__/useWebsocket.spec.ts`
 
-- [ ] **A.10.1:** Add failing test:
+- [x] **A.10.1:** Add failing test:
 
 ```ts
 it('does NOT overwrite a terminal flashError with protocol_violation from mid-stream catch', () => {
@@ -614,12 +614,12 @@ it('does NOT overwrite a terminal flashError with protocol_violation from mid-st
 });
 ```
 
-- [ ] **A.10.2:** Run to confirm failure:
+- [x] **A.10.2:** Run to confirm failure:
 
 Run: `cd astros_vue && npx vitest run -t "does NOT overwrite a terminal flashError"`
 Expected: FAIL — flashError was clobbered to protocol_violation.
 
-- [ ] **A.10.3:** Edit the catch blocks. For each of `handleFlashControllerUpdate` (line ~303) and `handleFlashControllerResult` (line ~323), change the catch from:
+- [x] **A.10.3:** Edit the catch blocks. For each of `handleFlashControllerUpdate` (line ~303) and `handleFlashControllerResult` (line ~323), change the catch from:
 
 ```ts
 } catch (error) {
@@ -651,7 +651,7 @@ to:
 
 Mirror the same pattern in `handleFlashControllerResult`'s catch (with `flashControllerResult` in the detail string).
 
-- [ ] **A.10.4:** Run to confirm pass + all dispatcher tests:
+- [x] **A.10.4:** Run to confirm pass + all dispatcher tests:
 
 Run: `cd astros_vue && npx vitest run src/composables/__tests__/useWebsocket.spec.ts`
 Expected: all pass.
@@ -666,7 +666,7 @@ ServoTest writes during flash get silently rejected by the server (`FLASH_JOB_AC
 - Modify: `astros_vue/src/components/modals/modules/AstrosServoTestModal.vue`
 - Create: `astros_vue/src/components/modals/modules/__tests__/AstrosServoTestModal.spec.ts`
 
-- [ ] **A.11.1:** Create the new spec file at `astros_vue/src/components/modals/modules/__tests__/AstrosServoTestModal.spec.ts`:
+- [x] **A.11.1:** Create the new spec file at `astros_vue/src/components/modals/modules/__tests__/AstrosServoTestModal.spec.ts`:
 
 ```ts
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -731,12 +731,12 @@ describe('AstrosServoTestModal', () => {
 });
 ```
 
-- [ ] **A.11.2:** Run the new spec to confirm it fails on missing `data-test` selectors / lock gate:
+- [x] **A.11.2:** Run the new spec to confirm it fails on missing `data-test` selectors / lock gate:
 
 Run: `cd astros_vue && npx vitest run src/components/modals/modules/__tests__/AstrosServoTestModal.spec.ts`
 Expected: FAIL (selectors not present, locked-case not gated).
 
-- [ ] **A.11.3:** Edit `AstrosServoTestModal.vue`. Update the `<script setup>` to import and consume the lock store:
+- [x] **A.11.3:** Edit `AstrosServoTestModal.vue`. Update the `<script setup>` to import and consume the lock store:
 
 ```vue
 <script setup lang="ts">
@@ -798,12 +798,12 @@ Then in the `<template>`, find the Enable Test button and the slider. Add `data-
 
 (Use the modal's existing button/slider markup and ADD the `data-test` and `:disabled` bindings — don't rewrite the whole template.)
 
-- [ ] **A.11.4:** Verify `common.write_locked` i18n key exists (it does — round-5 added it for `AstrosWriteButton`). If not, add to `enUS.json`.
+- [x] **A.11.4:** Verify `common.write_locked` i18n key exists (it does — round-5 added it for `AstrosWriteButton`). If not, add to `enUS.json`.
 
 Run: `grep -n "write_locked" astros_vue/src/locales/enUS.json`
 Expected: one or more matches.
 
-- [ ] **A.11.5:** Run the new spec to confirm it passes:
+- [x] **A.11.5:** Run the new spec to confirm it passes:
 
 Run: `cd astros_vue && npx vitest run src/components/modals/modules/__tests__/AstrosServoTestModal.spec.ts`
 Expected: PASS.
@@ -812,23 +812,23 @@ Expected: PASS.
 
 ## Task A.12: Phase A wrap — verify, review, commit
 
-- [ ] **A.12.1:** Run full Vue test suite + build:
+- [x] **A.12.1:** Run full Vue test suite + build:
 
 Run: `cd astros_vue && npm run prettier:write && npm run lint:fix && npm run build && npx vitest run`
 Expected: all green.
 
-- [ ] **A.12.2:** Run full API test suite + build:
+- [x] **A.12.2:** Run full API test suite + build:
 
 Run: `cd astros_api && npm run prettier:write && npm run lint:fix && npm run build && npx vitest run`
 Expected: all green.
 
-- [ ] **A.12.3:** Invoke code-review subagent on the Phase A diff. Use `superpowers:requesting-code-review` with a prompt that includes:
+- [x] **A.12.3:** Invoke code-review subagent on the Phase A diff. Use `superpowers:requesting-code-review` with a prompt that includes:
 
 > Review the changes since the commit `<plan-commit-sha>` for Phase A of the round-7 review fixes. The diff implements 6 Critical findings: dispatcher numeric pinning + never-exhaustiveness, jobId guards on applyControllerResult/applyJobDone/applyJobFailed, fetchCurrentJob endedAt filter, handleLockStateChanged defense-in-depth, applyJobFailed pendingByMac sweep for FAILED entries, mid-stream catch isolation (no flashError clobber), and AstrosServoTestModal lock-gating. Look for: any missed sibling claims (CLAUDE.md partial-fix sweep), test names that drift from what's tested, dead/unused additions, doc-vs-code drift in any header docstrings I touched.
 
 Address any **Critical** or **Important** findings from the reviewer before commit. Re-run tests after each fix.
 
-- [ ] **A.12.4:** Stage and commit Phase A:
+- [x] **A.12.4:** Stage and commit Phase A:
 
 ```bash
 git add astros_api/src/models/enums.ts \
@@ -873,7 +873,7 @@ EOF
 )"
 ```
 
-- [ ] **A.12.5:** Update this plan to check off Phase A. Commit the plan update:
+- [x] **A.12.5:** Update this plan to check off Phase A. Commit the plan update:
 
 ```bash
 git add .docs/plans/20260514-0734-firmware-ota-d-6-round-7-review-fixes.md
