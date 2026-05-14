@@ -85,9 +85,9 @@ The Enable Test button is wrapped in `AstrosWriteButton` (which ORs both `system
 
 Each task is one commit. Pre-commit toolkit (prettier → lint → build → vitest → `superpowers:requesting-code-review`) runs on every task before the commit.
 
-- [ ] **T1. Create branch + commit this plan.** Branch off the latest `origin/develop` using the safe pattern (per memory: `git fetch origin && git switch develop && git pull && git switch -c feature/firmware-ota-d-7-followups` — do NOT use `git checkout -b feature/<slug> origin/develop`, which makes the branch track develop and lets VS Code push commits straight to develop). Commit just this plan file. Carve-out: plan-only commit skips the pre-commit code review per CLAUDE.md.
+- [x] **T1. Create branch + commit this plan.** Branch off the latest `origin/develop` using the safe pattern (per memory: `git fetch origin && git switch develop && git pull && git switch -c feature/firmware-ota-d-7-followups` — do NOT use `git checkout -b feature/<slug> origin/develop`, which makes the branch track develop and lets VS Code push commits straight to develop). Commit just this plan file. Carve-out: plan-only commit skips the pre-commit code review per CLAUDE.md.
 
-- [ ] **T2. Server: GET /api/firmware/lock-state endpoint (TDD).** Test-first:
+- [x] **T2. Server: GET /api/firmware/lock-state endpoint (TDD).** Test-first:
   1. Create `astros_api/src/controllers/firmware_lock_state_controller.test.ts`. Cases: unlocked → 200 with `{ locked: false, owner: null, since: null }`; locked → 200 with the populated state from `JobLock.acquire(...)`. Build the route with a fresh `JobLock` instance + `express` + `supertest` (same pattern as `system_status_controller.test.ts` if it exists, else mirror `firmware_releases_controller.test.ts`).
   2. Run `npx vitest run astros_api/src/controllers/firmware_lock_state_controller.test.ts` — expect failure.
   3. Create `astros_api/src/controllers/firmware_lock_state_controller.ts` exporting `registerFirmwareLockStateRoutes(router: Router, jobLock: JobLock)`:
