@@ -892,7 +892,7 @@ Single commit at end of phase. Message: `fix(firmware): round-7 Importants (code
 - Modify: `astros_vue/src/stores/firmware.ts` (`buildControllerStatesMap` around line 248-274; also `handleFlashJobStarted` guard upstream)
 - Modify: `astros_vue/src/stores/__tests__/firmware.spec.ts`
 
-- [ ] **B.1.1:** Add failing test:
+- [x] **B.1.1:** Add failing test:
 
 ```ts
 describe('buildControllerStatesMap defensive validation (IM-3)', () => {
@@ -932,12 +932,12 @@ describe('buildControllerStatesMap defensive validation (IM-3)', () => {
 });
 ```
 
-- [ ] **B.1.2:** Run to confirm failure.
+- [x] **B.1.2:** Run to confirm failure.
 
 Run: `cd astros_vue && npx vitest run -t "buildControllerStatesMap defensive validation"`
 Expected: FAIL.
 
-- [ ] **B.1.3:** Edit `buildControllerStatesMap`. Replace the guard `if (!states) return m;` with:
+- [x] **B.1.3:** Edit `buildControllerStatesMap`. Replace the guard `if (!states) return m;` with:
 
 ```ts
 function buildControllerStatesMap(
@@ -961,7 +961,7 @@ function buildControllerStatesMap(
 
 Preserve the existing per-element body (resolveSlot → enqueuePending fallback) — only the guards above change.
 
-- [ ] **B.1.4:** Run to confirm pass + full firmware suite:
+- [x] **B.1.4:** Run to confirm pass + full firmware suite:
 
 Run: `cd astros_vue && npx vitest run src/stores/__tests__/firmware.spec.ts`
 Expected: all pass.
@@ -978,11 +978,11 @@ Server's `ControllerFlashState` is a discriminated union: `VersionConfirmed/fina
 - Modify: `astros_vue/src/utils/firmwareStageMapping.ts` (consumers of `state.stage`)
 - Modify: `astros_vue/src/components/firmware/firmwareControllerRow/AstrosFirmwareControllerRow.vue` (consumers of finalVersion / error)
 
-- [ ] **B.2.1:** Read the server-side discriminated union to mirror exactly.
+- [x] **B.2.1:** Read the server-side discriminated union to mirror exactly.
 
 Run: `grep -n "type ControllerFlashState\|interface ControllerFlashState\|FwStage\.Failed\|FwStage\.VersionConfirmed" astros_api/src/models/firmware/flash_job_state.ts`
 
-- [ ] **B.2.2:** Replace the client `ControllerFlashState` interface in `types/firmware.ts:157-164`:
+- [x] **B.2.2:** Replace the client `ControllerFlashState` interface in `types/firmware.ts:157-164`:
 
 ```ts
 /**
@@ -1003,19 +1003,19 @@ export type ControllerFlashState =
   | { controllerId: string; stage: 'FAILED'; error: string };
 ```
 
-- [ ] **B.2.3:** Run TS build to find every site that breaks:
+- [x] **B.2.3:** Run TS build to find every site that breaks:
 
 Run: `cd astros_vue && npm run build`
 Expected: failures at consumer sites that read `state.error` or `state.finalVersion` without first narrowing on `stage`. Fix each by checking `state.stage === 'FAILED'` or `state.stage === 'VERSION_CONFIRMED'` first.
 
-- [ ] **B.2.4:** For each compile error, narrow at the read site. Examples:
+- [x] **B.2.4:** For each compile error, narrow at the read site. Examples:
   - `controllerStatePillKind(state)` in `selectModePillKind.ts` or `firmwareStageMapping.ts` — narrow inside the switch on `state.stage`
   - `state.finalVersion` reads in `AstrosFirmwareControllerRow.vue` — gate on `state.stage === 'VERSION_CONFIRMED'`
   - `state.error` reads — gate on `state.stage === 'FAILED'`
 
 For each narrowing, prefer a small `if`-gate over an `as` cast.
 
-- [ ] **B.2.5:** Run build + tests:
+- [x] **B.2.5:** Run build + tests:
 
 Run: `cd astros_vue && npm run build && npx vitest run`
 Expected: all green.
@@ -1030,7 +1030,7 @@ The current `controllerId: string` field carries either MAC or SlotId depending 
 - Modify: `astros_vue/src/types/firmware.ts`
 - Modify: `astros_vue/src/stores/firmware.ts`
 
-- [ ] **B.3.1:** Add a new `ControllerFlashStateBySlot` type next to the existing `ControllerFlashState` (which becomes wire-side only):
+- [x] **B.3.1:** Add a new `ControllerFlashStateBySlot` type next to the existing `ControllerFlashState` (which becomes wire-side only):
 
 ```ts
 /**
@@ -1044,17 +1044,17 @@ export type ControllerFlashStateBySlot =
   | { controllerId: SlotId; stage: 'FAILED'; error: string };
 ```
 
-- [ ] **B.3.2:** Update `firmware.ts`:
+- [x] **B.3.2:** Update `firmware.ts`:
   - The store's `controllerStates` map becomes `ReadonlyMap<SlotId, ControllerFlashStateBySlot>`.
   - `buildControllerStatesMap` returns `Map<SlotId, ControllerFlashStateBySlot>` and is the translation site.
   - `applyControllerUpdate` translates incoming `ControllerFlashState` to `ControllerFlashStateBySlot` by replacing `controllerId` with the resolved slot.
 
-- [ ] **B.3.3:** Run build:
+- [x] **B.3.3:** Run build:
 
 Run: `cd astros_vue && npm run build`
 Expected: cast count at line 239/456/610 drops to one (the translation in `buildControllerStatesMap`). Fix any new compile errors at consumer sites.
 
-- [ ] **B.3.4:** Run tests:
+- [x] **B.3.4:** Run tests:
 
 Run: `cd astros_vue && npx vitest run`
 Expected: all pass.
@@ -1068,7 +1068,7 @@ Expected: all pass.
 - Modify: `astros_vue/src/components/firmware/firmwareControllersPanel/AstrosFirmwareControllersPanel.vue`
 - Modify: `astros_vue/src/views/FirmwareView.vue` (the call site)
 
-- [ ] **B.4.1:** Replace `ControllersPanelProps` with a discriminated union:
+- [x] **B.4.1:** Replace `ControllersPanelProps` with a discriminated union:
 
 ```ts
 import type { FirmwareStage, ControllerProgressEntry, SlotId } from '@/types/firmware';
@@ -1088,7 +1088,7 @@ export type ControllersPanelProps =
     };
 ```
 
-- [ ] **B.4.2:** Update `AstrosFirmwareControllersPanel.vue`. Replace the existing `defineProps<ControllersPanelProps>()` and the dev-only `watchEffect` warnings (since TS now enforces the constraints). Use TS narrowing throughout the template:
+- [x] **B.4.2:** Update `AstrosFirmwareControllersPanel.vue`. Replace the existing `defineProps<ControllersPanelProps>()` and the dev-only `watchEffect` warnings (since TS now enforces the constraints). Use TS narrowing throughout the template:
 
 ```ts
 const props = defineProps<ControllersPanelProps>();
@@ -1098,7 +1098,7 @@ const props = defineProps<ControllersPanelProps>();
 
 In the template, narrow by phase before reading phase-specific props.
 
-- [ ] **B.4.3:** Update the call site in `FirmwareView.vue`. The current `<AstrosFirmwareControllersPanel ... />` call passes all optional props; update to pass only the phase-appropriate set, conditionally:
+- [x] **B.4.3:** Update the call site in `FirmwareView.vue`. The current `<AstrosFirmwareControllersPanel ... />` call passes all optional props; update to pass only the phase-appropriate set, conditionally:
 
 ```vue
 <AstrosFirmwareControllersPanel
@@ -1126,7 +1126,7 @@ In the template, narrow by phase before reading phase-specific props.
 />
 ```
 
-- [ ] **B.4.4:** Run build + the panel's existing spec:
+- [x] **B.4.4:** Run build + the panel's existing spec:
 
 Run: `cd astros_vue && npm run build && npx vitest run src/components/firmware/firmwareControllersPanel/__tests__/AstrosFirmwareControllersPanel.spec.ts`
 Expected: all pass. If the existing tests passed flat-shape props, update them to pass discriminated shape.
@@ -1140,11 +1140,11 @@ Handler closures reference `ws.value` (mutable). Re-connect during HMR or progra
 **Files:**
 - Modify: `astros_vue/src/composables/useWebsocket.ts:35-65`
 
-- [ ] **B.5.1:** Read the current `wsConnect` to confirm shape:
+- [x] **B.5.1:** Read the current `wsConnect` to confirm shape:
 
 Run: `grep -n "function wsConnect\|onopen\|onerror\|onmessage\|onclose" astros_vue/src/composables/useWebsocket.ts`
 
-- [ ] **B.5.2:** Refactor `wsConnect` to capture the socket locally:
+- [x] **B.5.2:** Refactor `wsConnect` to capture the socket locally:
 
 ```ts
 function wsConnect() {
@@ -1174,7 +1174,7 @@ function wsConnect() {
 
 Preserve the existing handler body content; only swap `ws.value?.` references to `socket.` and confirm setTimeout/intentionallyClosed flow is preserved.
 
-- [ ] **B.5.3:** Run tests:
+- [x] **B.5.3:** Run tests:
 
 Run: `cd astros_vue && npx vitest run src/composables/__tests__/useWebsocket.spec.ts`
 Expected: all pass.
@@ -1189,7 +1189,7 @@ Decision: surface (not delete). The action is exported and intended for future C
 - Modify: `astros_vue/src/stores/firmware.ts` (`cancelFlash` around line 522-533)
 - Modify: `astros_vue/src/stores/__tests__/firmware.spec.ts`
 
-- [ ] **B.6.1:** Add failing test:
+- [x] **B.6.1:** Add failing test:
 
 ```ts
 it('surfaces flashError when the cancel HTTP fails (operator visibility)', async () => {
@@ -1201,9 +1201,9 @@ it('surfaces flashError when the cancel HTTP fails (operator visibility)', async
 });
 ```
 
-- [ ] **B.6.2:** Run to confirm failure.
+- [x] **B.6.2:** Run to confirm failure.
 
-- [ ] **B.6.3:** Update `cancelFlash` catch:
+- [x] **B.6.3:** Update `cancelFlash` catch:
 
 ```ts
 async function cancelFlash(): Promise<void> {
@@ -1220,7 +1220,7 @@ async function cancelFlash(): Promise<void> {
 }
 ```
 
-- [ ] **B.6.4:** Run tests:
+- [x] **B.6.4:** Run tests:
 
 Run: `cd astros_vue && npx vitest run -t "surfaces flashError when the cancel HTTP fails"`
 Expected: PASS.
@@ -1237,7 +1237,7 @@ Bundle these into one task since each is small. Each follows: write the test →
 - Modify: `astros_vue/src/utils/__tests__/firmwareStageMapping.spec.ts`
 - Modify: `astros_vue/src/views/__tests__/FirmwareView.spec.ts`
 
-- [ ] **B.7.1:** Add `FLASH_CONTROLLER_RESULT` happy-path dispatcher test (pr-test-analyzer C2):
+- [x] **B.7.1:** Add `FLASH_CONTROLLER_RESULT` happy-path dispatcher test (pr-test-analyzer C2):
 
 ```ts
 // In useWebsocket.spec.ts inside the existing dispatcher describe:
@@ -1265,7 +1265,7 @@ it('routes FLASH_CONTROLLER_RESULT through applyControllerResult with the full p
 });
 ```
 
-- [ ] **B.7.2:** Add `FLASH_JOB_ACTIVE` no-op contract test (pr-test-analyzer C3):
+- [x] **B.7.2:** Add `FLASH_JOB_ACTIVE` no-op contract test (pr-test-analyzer C3):
 
 ```ts
 it('FLASH_JOB_ACTIVE is a no-op: phase, flashError, controllerStates all unchanged', () => {
@@ -1285,7 +1285,7 @@ it('FLASH_JOB_ACTIVE is a no-op: phase, flashError, controllerStates all unchang
 });
 ```
 
-- [ ] **B.7.3:** Add `flushPendingForMac` re-queue forensic warn test (pr-test-analyzer C4):
+- [x] **B.7.3:** Add `flushPendingForMac` re-queue forensic warn test (pr-test-analyzer C4):
 
 ```ts
 // In firmware.spec.ts inside an appropriate describe:
@@ -1309,7 +1309,7 @@ it('logs a distinct re-queue warning when flushPendingForMac re-enqueues during 
 
 (`flushPendingForMac` must be exposed on the store for this test. If it isn't, expose it as a public action — round-5 may have already done so.)
 
-- [ ] **B.7.4:** Strengthen `applyJobStarted` replace-not-merge mutation test (pr-test-analyzer C6). Find the existing test at `firmware.spec.ts:653` and replace its body:
+- [x] **B.7.4:** Strengthen `applyJobStarted` replace-not-merge mutation test (pr-test-analyzer C6). Find the existing test at `firmware.spec.ts:653` and replace its body:
 
 ```ts
 it('REPLACES (not merges) controllerStates on duplicate flashJobStarted', () => {
@@ -1329,7 +1329,7 @@ it('REPLACES (not merges) controllerStates on duplicate flashJobStarted', () => 
 });
 ```
 
-- [ ] **B.7.5:** Add `FLASH_JOB_STARTED` dispatcher happy-path test (pr-test-analyzer I3):
+- [x] **B.7.5:** Add `FLASH_JOB_STARTED` dispatcher happy-path test (pr-test-analyzer I3):
 
 ```ts
 it('routes well-formed FLASH_JOB_STARTED through applyJobStarted', () => {
@@ -1349,7 +1349,7 @@ it('routes well-formed FLASH_JOB_STARTED through applyJobStarted', () => {
 });
 ```
 
-- [ ] **B.7.6:** Add i18n key contract test (pr-test-analyzer I4):
+- [x] **B.7.6:** Add i18n key contract test (pr-test-analyzer I4):
 
 ```ts
 // In firmwareStageMapping.spec.ts or a new firmwareFlashError.spec.ts:
@@ -1363,7 +1363,7 @@ it('every FlashErrorReason has a corresponding firmware_view.flash_errors.* i18n
 });
 ```
 
-- [ ] **B.7.7:** Add `flashError` persists-across-success test (pr-test-analyzer I7):
+- [x] **B.7.7:** Add `flashError` persists-across-success test (pr-test-analyzer I7):
 
 ```ts
 // In useWebsocket.spec.ts:
@@ -1381,7 +1381,7 @@ it('flashError persists across a subsequent successful applyControllerUpdate (op
 });
 ```
 
-- [ ] **B.7.8:** Add `lockSinceFormatted` defensive NaN-fallback test (pr-test-analyzer I8):
+- [x] **B.7.8:** Add `lockSinceFormatted` defensive NaN-fallback test (pr-test-analyzer I8):
 
 ```ts
 // In FirmwareView.spec.ts:
@@ -1394,7 +1394,7 @@ it('lockSinceFormatted renders a fallback (not "Invalid Date") for malformed ISO
 
 (Fill in the test body using the existing FirmwareView mount helper pattern. The assertion goes against the rendered banner text.)
 
-- [ ] **B.7.9:** Run all tests:
+- [x] **B.7.9:** Run all tests:
 
 Run: `cd astros_vue && npx vitest run`
 Expected: all pass.
@@ -1403,7 +1403,7 @@ Expected: all pass.
 
 ## Task B.8: Phase B wrap — verify, review, commit
 
-- [ ] **B.8.1:** Run prettier + lint + build + tests on both projects.
+- [x] **B.8.1:** Run prettier + lint + build + tests on both projects.
 
 Run:
 ```bash
@@ -1412,13 +1412,13 @@ cd ../astros_api && npm run prettier:write && npm run lint:fix && npm run build 
 ```
 Expected: all green.
 
-- [ ] **B.8.2:** Invoke `superpowers:requesting-code-review` on the Phase B diff. Prompt:
+- [x] **B.8.2:** Invoke `superpowers:requesting-code-review` on the Phase B diff. Prompt:
 
 > Review the changes since Commit A for Phase B of the round-7 review fixes. The diff implements 7 Important findings: array/element validation in buildControllerStatesMap (IM-3), discriminated-union ControllerFlashState (IM-2), SlotId wire-vs-by-slot split (IM-11), ControllersPanelProps discriminated union (IM-12), useWebsocket closure capture (IM-9), cancelFlash error surfacing (IM-10), plus 8 test coverage additions (IM-8). Look for: type-narrowing sites that should use a discriminated check instead of an `as` cast, missed sibling claims after the type changes (CLAUDE.md partial-fix sweep — header docstrings, plan refs), any test added that's vacuous (would pass if production code was reverted).
 
 Address any Critical or Important findings.
 
-- [ ] **B.8.3:** Stage and commit Phase B:
+- [x] **B.8.3:** Stage and commit Phase B:
 
 ```bash
 git add astros_vue/src/types/firmware.ts \
@@ -1472,7 +1472,7 @@ EOF
 )"
 ```
 
-- [ ] **B.8.4:** Check off Phase B in this plan, commit the update.
+- [x] **B.8.4:** Check off Phase B in this plan, commit the update.
 
 ---
 
