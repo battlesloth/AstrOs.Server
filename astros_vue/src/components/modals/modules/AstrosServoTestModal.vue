@@ -19,9 +19,9 @@ const disabled = ref(true);
 const label = ref('modals.servo_test.enable_test');
 const value = ref(props.homePosition);
 
-// CR-5: ServoTest writes during a flash get silently rejected by the
-// server (FLASH_JOB_ACTIVE). Gate the slider + button so the operator
-// gets clear visual feedback rather than dragging into the void.
+// ServoTest writes during a flash get silently rejected server-side.
+// Gate the slider + button so operators see disabled controls rather
+// than dragging into the void.
 const writesBlocked = computed(() => jobLockLocked.value);
 
 // If a flash starts while the modal is already open with the test active,

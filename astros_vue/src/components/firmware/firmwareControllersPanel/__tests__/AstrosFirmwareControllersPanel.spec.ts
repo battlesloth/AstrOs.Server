@@ -40,7 +40,7 @@ function mountPanel(props: Record<string, unknown>) {
   });
 }
 
-describe('AstrosFirmwareControllersPanel failed-result-bar predicate (I-test-2)', () => {
+describe('AstrosFirmwareControllersPanel failed-result-bar predicate', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     seedFleet();
@@ -99,10 +99,10 @@ describe('AstrosFirmwareControllersPanel failed-result-bar predicate (I-test-2)'
   });
 
   it('routes failedCount === 0 (pre-streamer abort) to the multi copy, not singular with — fallback', async () => {
-    // I2 + I-test-2: a pre-streamer abort has no per-controller failure
-    // record. The singular key would render "⚠ — failed during —". The
-    // multi key with empty labels renders "⚠ — failed during the flash"
-    // which is less misleading.
+    // A pre-streamer abort has no per-controller failure record. The
+    // singular key would render "⚠ — failed during —". The multi key
+    // with empty labels renders "⚠ — failed during the flash" — less
+    // misleading.
     const wrapper = mountPanel({
       phase: 'failed',
       progressByControllerId: {},

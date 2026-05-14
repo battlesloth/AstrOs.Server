@@ -63,12 +63,11 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
     });
   });
 
-  describe('handleFlashJobDone fallback (I1 fix)', () => {
+  describe('handleFlashJobDone fallback', () => {
     it("forces phase to 'done' if the store's applyJobDone throws", () => {
-      // Previously this handler only console.error'd and continued — a throw
-      // would leave phase at 'flashing' indefinitely with the server having
-      // marked the job done. Pin: catch transitions to 'done' so the UI
-      // exits the flashing state regardless.
+      // Without the catch fallback, a thrown applyJobDone would leave phase
+      // at 'flashing' indefinitely even though the server marked the job
+      // done. The catch transitions to 'done' so the UI exits regardless.
       const { handleMessage } = useWebsocket();
       const firmware = useFirmwareStore();
       firmware.setPhase('flashing');
@@ -90,7 +89,7 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
     });
   });
 
-  describe('handleStatusMessage controllerAddress branches (I4 fix)', () => {
+  describe('handleStatusMessage controllerAddress branches', () => {
     it('learns the MAC mapping when controllerAddress is a non-empty string', () => {
       const { handleMessage } = useWebsocket();
       const controllerStore = useControllerStore();
@@ -156,12 +155,13 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
     });
   });
 
-  describe('handleStatusMessage drains the firmware-store pending queue after setControllerMac (C1 integration)', () => {
+  describe('handleStatusMessage drains the firmware-store pending queue after setControllerMac', () => {
     it('replays queued ControllerFlashState entries once the matching LocationStatus arrives', () => {
-      // The late-MAC race fix: a flashControllerUpdate for an unmapped MAC
-      // is queued; the next LocationStatus for that MAC drains the queue.
-      // Pin the integration via the dispatcher — store-only tests can't
-      // catch a regression where useWebsocket forgets to call flushPendingForMac.
+      // Late-MAC race: a flashControllerUpdate for an unmapped MAC is
+      // queued; the next LocationStatus for that MAC drains the queue.
+      // This test pins the integration via the dispatcher — store-only
+      // tests can't catch a regression where useWebsocket forgets to
+      // call flushPendingForMac.
       const { handleMessage } = useWebsocket();
       const firmware = useFirmwareStore();
       const MAC = 'aa:bb:cc:dd:ee:01';
@@ -191,13 +191,12 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
       expect(firmware.pendingByMac.has(MAC)).toBe(false);
     });
 
-    it('skips setControllerMac AND flushPendingForMac when location is UNKNOWN (C1 fix)', () => {
-      // Previously, the dispatcher fell through to the controllerAddress
-      // block on UNKNOWN, calling setControllerMac (no-op for UNKNOWN) and
-      // flushPendingForMac (which would re-queue endlessly because
-      // resolveSlot still returned null). Plus the firmwareStore's
-      // currentJobLoadFailed clear ran every time, silently dismissing
-      // the only operator-visible "something wrong" banner.
+    it('skips setControllerMac AND flushPendingForMac when location is UNKNOWN', () => {
+      // For UNKNOWN locations, setControllerMac is a no-op and
+      // flushPendingForMac would re-queue endlessly because resolveSlot
+      // still returns null. Skipping both also prevents the firmware
+      // store's staleness banner from being silently dismissed on every
+      // UNKNOWN update.
       const { handleMessage } = useWebsocket();
       const firmware = useFirmwareStore();
       const controllerStore = useControllerStore();
@@ -232,11 +231,11 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
     });
   });
 
-  describe('handleFlashControllerUpdate / handleFlashControllerResult error surfaces (C2 fix)', () => {
+  describe('handleFlashControllerUpdate / handleFlashControllerResult error surfaces', () => {
     it('surfaces flashError when applyControllerUpdate throws so the operator sees a signal', () => {
-      // Previously this handler only console.error'd and continued; a thrown
-      // applyControllerUpdate would leave phase='flashing' with no signal
-      // and no error envelope. Pin the new flashError fallback.
+      // Without the flashError fallback, a thrown applyControllerUpdate
+      // would leave phase='flashing' with no envelope and no operator-
+      // visible signal that anything went wrong.
       const { handleMessage } = useWebsocket();
       const firmware = useFirmwareStore();
       firmware.setPhase('flashing');
@@ -281,12 +280,11 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
       expect(firmware.phase).toBe('flashing');
     });
 
-    it('does NOT roll phase on unrecognized garbage controllerLocation in handleStatusMessage (I-test-4)', () => {
-      // The C1 test pins Location.UNKNOWN. Server contract drift could
-      // send any arbitrary string (e.g. `"head"` after a rename). The
-      // default branch covers this case structurally — pin it explicitly
-      // so a regression that hard-coded `if (location === UNKNOWN)` would
-      // fail.
+    it('does NOT roll phase on unrecognized garbage controllerLocation in handleStatusMessage', () => {
+      // The UNKNOWN-location test covers the enum case. Server contract
+      // drift could also send any arbitrary string (e.g. "head" after a
+      // rename). Pin the default-branch coverage so a regression that
+      // hard-coded `if (location === UNKNOWN)` would fail.
       const { handleMessage } = useWebsocket();
       const firmware = useFirmwareStore();
       const controllerStore = useControllerStore();
@@ -317,7 +315,7 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
   });
 });
 
-describe('CR-3 mid-stream catch does not clobber terminal flashError', () => {
+describe('mid-stream catch does not clobber terminal flashError', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
@@ -370,14 +368,11 @@ describe('CR-3 mid-stream catch does not clobber terminal flashError', () => {
     expect(firmware.flashError?.reason).toBe('protocol_violation');
   });
 
-  it('does NOT set protocol_violation when phase=done and flashError is null (round-8 NEW-C1)', () => {
-    // After a clean flash completion, phase='done' with no flashError. A
-    // stray malformed mid-stream frame (e.g., server retransmit during
-    // reboot-wait) must NOT clobber the happy "✓ all updated" UI with a
-    // red protocol_violation banner. The CR-3 guard was originally `||`
-    // (set if EITHER is OK) which allowed this; tightening to `&&` (set
-    // only when BOTH conditions hold — mid-flow AND no existing error)
-    // closes the visual contradiction.
+  it('does NOT set protocol_violation when phase=done and flashError is null', () => {
+    // After a clean completion, a stray malformed mid-stream frame (e.g.,
+    // server retransmit during reboot-wait) must not clobber the "all
+    // updated" UI with a protocol_violation banner. The guard requires
+    // BOTH mid-flow phase AND no existing flashError before writing.
     const { handleMessage } = useWebsocket();
     const firmware = useFirmwareStore();
     firmware.setPhase('done');
@@ -403,7 +398,7 @@ describe('CR-3 mid-stream catch does not clobber terminal flashError', () => {
   });
 });
 
-describe('handleLockStateChanged — CR-1b recovery defense', () => {
+describe('handleLockStateChanged — lock-release recovery defense', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
@@ -454,11 +449,10 @@ describe('handleLockStateChanged — CR-1b recovery defense', () => {
     expect(firmware.phase).toBe('flashing');
   });
 
-  it('NEW-C2: recovery normalizes controllerStates (delegates to applyJobDone, not bare setPhase)', () => {
-    // Round-8 NEW-C2: without normalization, the panel renders "✓ done"
-    // while rows still show "Updating" pills + stage labels. Forcing the
-    // recovery through applyJobDone runs the demote-non-terminal-stages
-    // loop so the per-row UI matches the terminal phase.
+  it('recovery normalizes controllerStates (delegates to applyJobDone, not bare setPhase)', () => {
+    // Without normalization, the panel renders "all updated" while rows
+    // still show "Updating" pills. Delegating to applyJobDone runs the
+    // demote-non-terminal-stages loop so per-row UI matches phase.
     const controllers = useControllerStore();
     controllers.setControllerMac(Location.BODY, '00:00:00:00:00:00');
     controllers.setControllerMac(Location.CORE, 'aa:bb:cc:dd:ee:01');
@@ -492,7 +486,7 @@ describe('handleLockStateChanged — CR-1b recovery defense', () => {
     expect(firmware.controllerStates.get('core')?.stage).toBe('VERSION_CONFIRMED');
   });
 
-  it('NEW-C2: recovery surfaces a protocol_violation flashError breadcrumb so operators see the recovery', () => {
+  it('recovery surfaces a protocol_violation flashError breadcrumb so operators see the recovery', () => {
     const { handleMessage } = useWebsocket();
     const firmware = useFirmwareStore();
     firmware.setPhase('flashing');
@@ -509,12 +503,12 @@ describe('handleLockStateChanged — CR-1b recovery defense', () => {
   });
 });
 
-describe('IM-8 coverage gaps — dispatcher happy paths + contract pins', () => {
+describe('dispatcher happy paths + contract pins', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  it('routes well-formed FLASH_JOB_STARTED through applyJobStarted (IM-8: dispatcher happy path)', () => {
+  it('routes well-formed FLASH_JOB_STARTED through applyJobStarted', () => {
     const { handleMessage } = useWebsocket();
     const firmware = useFirmwareStore();
     handleMessage(
@@ -532,7 +526,7 @@ describe('IM-8 coverage gaps — dispatcher happy paths + contract pins', () => 
     expect(firmware.phase).toBe('flashing');
   });
 
-  it('routes FLASH_CONTROLLER_RESULT through applyControllerResult with the full payload (IM-8: dispatcher happy path)', () => {
+  it('routes FLASH_CONTROLLER_RESULT through applyControllerResult with the full payload', () => {
     const { handleMessage } = useWebsocket();
     const firmware = useFirmwareStore();
     const controllers = useControllerStore();
@@ -563,7 +557,7 @@ describe('IM-8 coverage gaps — dispatcher happy paths + contract pins', () => 
     }
   });
 
-  it('FLASH_JOB_ACTIVE is a no-op: phase, flashError, controllerStates all unchanged (IM-8: contract pin)', () => {
+  it('FLASH_JOB_ACTIVE is a no-op: phase, flashError, controllerStates all unchanged', () => {
     const { handleMessage } = useWebsocket();
     const firmware = useFirmwareStore();
     firmware.setPhase('flashing');

@@ -7,9 +7,9 @@ import {
 import type { ControllerFlashState, ServerFwStage } from '@/types/firmware';
 
 function state(stage: ServerFwStage): ControllerFlashState {
-  // After IM-2 (discriminated union), VERSION_CONFIRMED requires
-  // finalVersion and FAILED requires error. Provide test placeholders
-  // so the function can be invoked with any stage.
+  // The discriminated union requires finalVersion on VERSION_CONFIRMED
+  // and error on FAILED. Provide test placeholders so the helper can
+  // build a valid state for any stage.
   if (stage === 'VERSION_CONFIRMED') {
     return { controllerId: 'body', stage, finalVersion: 'v1.0.0-test' };
   }
@@ -42,16 +42,16 @@ describe('mapServerStageToUiStage', () => {
     expect(mapServerStageToUiStage('FAILED')).toBeNull();
   });
 
-  it('returns null (not undefined) for unknown future server stages (C3 forward-compat)', () => {
-    // Round-5 C3 fix: without the default case, an unknown ServerFwStage
-    // value falls through the switch and returns undefined. Downstream
-    // `if (ui !== null)` guards would then write `undefined` to a
-    // FirmwareStage|null ref. The cast simulates a future enum value.
+  it('returns null (not undefined) for unknown future server stages (forward-compat)', () => {
+    // Without the default case, an unknown stage falls through and
+    // returns undefined; downstream `if (ui !== null)` guards would
+    // then write undefined to a FirmwareStage|null ref. The cast
+    // simulates a future enum value.
     const unknown = 'WAITING_ON_NETWORK' as unknown as ServerFwStage;
     expect(mapServerStageToUiStage(unknown)).toBeNull();
   });
 
-  it('emits a console.warn for unknown stages so contract drift is debuggable (round-6 C3 breadcrumb)', () => {
+  it('emits a console.warn for unknown stages so contract drift is debuggable', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const unknown = 'CANCELLED' as unknown as ServerFwStage;
@@ -84,7 +84,7 @@ describe('controllerStatePillKind', () => {
     expect(controllerStatePillKind(state('FAILED'))).toBe('failed');
   });
 
-  it('emits a console.warn for unknown stages (round-6 C3 breadcrumb)', () => {
+  it('emits a console.warn for unknown stages', () => {
     // A future ServerFwStage like 'CANCELLED' would render an 'updating'
     // pill forever (no terminal stage update will arrive). The warn
     // surfaces the contract drift in dev console + production logs.
@@ -99,7 +99,7 @@ describe('controllerStatePillKind', () => {
     }
   });
 
-  it('returns updating (not undefined) for unknown future server stages (C3 forward-compat)', () => {
+  it('returns updating (not undefined) for unknown future server stages (forward-compat)', () => {
     // Without the default case, an unknown stage returned undefined, which
     // the StatusPill component would receive as kind=undefined. Mapping
     // unknowns to 'updating' keeps the row spinning safely until a
@@ -124,7 +124,7 @@ describe('controllerStageLabelKey', () => {
   });
 });
 
-describe('FlashErrorReason i18n key contract (IM-8)', () => {
+describe('FlashErrorReason i18n key contract', () => {
   // Every FlashErrorReason in the union must have a corresponding
   // firmware_view.flash_errors.<reason> key in enUS.json. Without this
   // pin, adding a new reason to the tuple without updating the locale

@@ -520,10 +520,10 @@ describe('firmware store', () => {
     });
 
     it("re-asserts phase='flashing' if a malformed-WS rollback raced the pending POST", async () => {
-      // I5 race: useWebsocket.handleFlashJobStarted defensively calls
-      // setPhase('select') on a malformed WS payload. If that arrives during
-      // the POST window, the success path must re-assert 'flashing' so the
-      // UI reflects that the server actually accepted the job.
+      // useWebsocket.handleFlashJobStarted defensively calls
+      // setPhase('select') on a malformed WS payload. If that arrives
+      // during the POST window, the success path must re-assert
+      // 'flashing' so the UI reflects that the server accepted the job.
       let resolvePost: (value: { data: { jobId: string } }) => void = () => {};
       apiPost.mockReturnValueOnce(
         new Promise((res) => {
@@ -600,7 +600,7 @@ describe('firmware store', () => {
       expect(store.phase).toBe('flashing');
     });
 
-    it('IM-10: surfaces a network_error flashError when the cancel HTTP fails', async () => {
+    it('surfaces a network_error flashError when the cancel HTTP fails', async () => {
       apiDelete.mockRejectedValueOnce(new Error('network down'));
       const store = useFirmwareStore();
       store.setPhase('flashing');
@@ -666,11 +666,11 @@ describe('firmware store', () => {
       // flashJobStarted snapshot; the client must NOT keep stale per-
       // controller stages from before the disconnect.
       //
-      // IM-8 mutation-resistance: seed BOTH body AND core with a non-
-      // trivial stage before the duplicate flashJobStarted, then verify
-      // both are correctly replaced. A merge-by-id mutation would keep
-      // core at SENDING (since the fresh snapshot omits core entirely),
-      // which is exactly the failure mode this test must catch.
+      // Seed BOTH body AND core with a non-trivial stage before the
+      // duplicate flashJobStarted, then verify both are replaced. A
+      // merge-by-id mutation would keep core at SENDING (the fresh
+      // snapshot omits core entirely) — exactly the failure mode this
+      // test must catch.
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
@@ -700,12 +700,11 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
-      // sampleJobState sends BODY_MAC + CORE_MAC; after translation the Map
-      // is keyed by slot ids, NOT by the raw MAC strings. IM-11 enforces
-      // this at the type level — the Map is now `Map<SlotId, ...>`, so a
-      // MAC-keyed lookup is a compile error. The runtime sanity check below
-      // is preserved via an unsafe cast so a regression that started silently
-      // double-keying by MAC would still be caught.
+      // sampleJobState sends BODY_MAC + CORE_MAC; after translation the
+      // Map is keyed by slot ids, NOT raw MACs. The Map's type
+      // (`Map<SlotId, ...>`) makes a MAC-keyed lookup a compile error;
+      // the unsafe cast below preserves the runtime check so a
+      // regression that started silently double-keying would still fail.
       expect(store.controllerStates.get('body')?.stage).toBe('QUEUED');
       expect(store.controllerStates.get('core')?.stage).toBe('QUEUED');
       const mapAsAny = store.controllerStates as unknown as Map<string, unknown>;
@@ -753,7 +752,7 @@ describe('firmware store', () => {
       expect(store.failedControllers).toEqual([]);
     });
 
-    it('clears currentJobLoadFailed — WS snapshot supersedes HTTP staleness (I4 fix)', () => {
+    it('clears currentJobLoadFailed — WS snapshot supersedes HTTP staleness', () => {
       // A failed fetchCurrentJob lit the staleness banner; when the WS late-
       // join snapshot lands, live state is available again and the banner
       // is no longer accurate.
@@ -780,7 +779,7 @@ describe('firmware store', () => {
       expect(store.pendingByMac.size).toBe(0);
     });
 
-    describe('IM-3: defensive validation of controllers payload', () => {
+    describe('defensive validation of controllers payload', () => {
       it('returns empty map when controllers is not an array (string)', () => {
         const store = useFirmwareStore();
         seedSampleFleet();
@@ -897,7 +896,7 @@ describe('firmware store', () => {
       expect(store.controllerStates).not.toBe(before);
     });
 
-    it('clears currentJobLoadFailed on a successful update — belt-and-suspenders (I4 fix)', () => {
+    it('clears currentJobLoadFailed on a successful update — belt-and-suspenders', () => {
       // If applyJobStarted was missed (unusual reconnect ordering), a
       // successful per-controller update is still proof that live state is
       // flowing for a known controller. Clear the staleness banner.
@@ -908,7 +907,7 @@ describe('firmware store', () => {
       expect(store.currentJobLoadFailed).toBe(false);
     });
 
-    it('does NOT clear currentJobLoadFailed when the update is queued (C1 fix)', () => {
+    it('does NOT clear currentJobLoadFailed when the update is queued', () => {
       // The clear MUST stay below the null-slot return. An unmapped MAC
       // means we can't trust the update yet; clearing the banner here would
       // silently dismiss the operator's only "something wrong" signal.
@@ -919,7 +918,7 @@ describe('firmware store', () => {
       expect(store.currentJobLoadFailed).toBe(true);
     });
 
-    describe('NEW-IM1: element validation (mirror of IM-3 from buildControllerStatesMap)', () => {
+    describe('element validation (mirrors buildControllerStatesMap)', () => {
       it('skips and warns when data.controllerId is missing', () => {
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         try {
@@ -952,7 +951,7 @@ describe('firmware store', () => {
       });
     });
 
-    describe('NEW-IM3: terminal-phase guard (drops trailing updates after done/failed)', () => {
+    describe('terminal-phase guard (drops trailing updates after done/failed)', () => {
       it('drops trailing applyControllerUpdate when phase is done', () => {
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
         try {
@@ -1039,7 +1038,7 @@ describe('firmware store', () => {
       expect(store.currentJob?.endedAt).toBe('2026-05-12T08:05:00Z');
     });
 
-    it('normalizes non-terminal per-controller stages to VERSION_CONFIRMED (I4 fix)', () => {
+    it('normalizes non-terminal per-controller stages to VERSION_CONFIRMED', () => {
       // Race: server emits flashJobDone when the LAST VERSION_CONFIRMED
       // observed, but a flashControllerUpdate carrying that final stage
       // may not have drained the WS buffer yet. Without this normalize,
@@ -1056,7 +1055,7 @@ describe('firmware store', () => {
       expect(store.controllerStates.get('core')?.stage).toBe('VERSION_CONFIRMED');
     });
 
-    it('emits a console.warn for each non-terminal stage normalized (round-6 C2 forensic breadcrumb)', () => {
+    it('emits a console.warn for each non-terminal stage normalized (forensic breadcrumb)', () => {
       // The normalize masks a real bug if the server emits flashJobDone
       // prematurely. The warn is the post-incident breadcrumb so operators'
       // dev console + production logs surface the contract drift.
@@ -1096,9 +1095,9 @@ describe('firmware store', () => {
       expect(store.controllerStates.get('core')?.stage).toBe('FAILED');
     });
 
-    it('clears pendingByMac so a late LocationStatus cannot replay stale entries onto done state (C2 fix)', () => {
-      // Round-5 C2: without this clear, a queued entry whose MAC mapping
-      // arrives after job-done would mutate controllerStates + currentStage,
+    it('clears pendingByMac so a late LocationStatus cannot replay stale entries onto done state', () => {
+      // Without this clear, a queued entry whose MAC mapping arrives
+      // after job-done would mutate controllerStates + currentStage,
       // visibly contradicting the result bar's "all updated" message.
       const store = useFirmwareStore();
       seedSampleFleet();
@@ -1110,7 +1109,7 @@ describe('firmware store', () => {
       expect(store.pendingByMac.size).toBe(0);
     });
 
-    it('drops stale flashJobDone whose jobId does not match currentJob (CR-4)', () => {
+    it('drops stale flashJobDone whose jobId does not match currentJob', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
         const store = useFirmwareStore();
@@ -1174,8 +1173,8 @@ describe('firmware store', () => {
         stage: 'FAILED',
         error: 'hash_mismatch',
       });
-      // Mark body as VERSION_CONFIRMED so the round-6 C1 normalize doesn't
-      // demote it to FAILED (body would otherwise be QUEUED → demoted).
+      // Mark body as VERSION_CONFIRMED so applyJobFailed's normalize loop
+      // doesn't demote it to FAILED (body would otherwise be QUEUED).
       store.applyControllerUpdate({
         controllerId: BODY_MAC,
         stage: 'VERSION_CONFIRMED',
@@ -1185,13 +1184,12 @@ describe('firmware store', () => {
       expect(store.failedControllers).toHaveLength(1);
       expect(store.failedControllers[0]?.id).toBe('core');
       expect(store.failedControllers[0]?.label).toBe('Core');
-      // I2 fix: stage comes from currentStage at failure time, not the
-      // literal 'transfer' fallback. Here VERIFYING set currentStage to
-      // 'verify' before the FAILED update.
+      // Stage comes from currentStage at failure time, not a literal
+      // 'transfer' fallback. VERIFYING set currentStage to 'verify'.
       expect(store.failedControllers[0]?.stage).toBe('verify');
     });
 
-    it('records stage as null when no currentStage was observed before the FAILED update (I2 fix)', () => {
+    it('records stage as null when no currentStage was observed before the FAILED update', () => {
       // The previous code fabricated 'transfer' here, silently misattributing
       // pre-streamer-style failures. Now we record null and let the UI
       // either render the stages list "—" fallback or omit the stage from
@@ -1209,10 +1207,10 @@ describe('firmware store', () => {
     });
 
     it('collects ALL FAILED entries AND attributes stage from the shared currentStage ref (not per-controller history)', () => {
-      // C2 fix: a `break` in applyJobFailed previously surfaced only the
-      // first FAILED entry by iteration order. With two padawans failing
-      // simultaneously (e.g. master loses ESP-NOW), the operator would
-      // walk away from a bricked unit. Pin all FAILEDs make the array.
+      // Pin that the iteration collects every FAILED entry, not just the
+      // first — with two padawans failing simultaneously (e.g. master
+      // loses ESP-NOW) the operator should see both, not walk away from
+      // a bricked unit.
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
@@ -1234,25 +1232,24 @@ describe('firmware store', () => {
         reason: 'bus_send_failed',
       });
       expect(store.failedControllers).toHaveLength(2);
-      // I-test-1: pin insertion-order preservation (Map.values() is
-      // insertion-order; sampleJobState seeds body, then core). The
-      // FirmwareView's failedControllerLabels join depends on this — a
-      // regression that sorted alphabetically before joining would silently
-      // change the operator-visible message.
+      // Pin insertion-order preservation: Map.values() is
+      // insertion-order; sampleJobState seeds body, then core. The
+      // FirmwareView's failedControllerLabels join depends on this —
+      // a regression that sorted alphabetically before joining would
+      // silently change the operator-visible message.
       const ids = store.failedControllers.map((c) => c.id);
       expect(ids).toEqual(['body', 'core']);
       // Pin the full record shape per entry: a mutation that surfaced only
       // {id} (dropping label / stage) would otherwise pass this test.
       const labels = store.failedControllers.map((c) => c.label);
       expect(labels).toEqual(['Body', 'Core']);
-      // I2 fix: stage reflects the SHARED `currentStage` ref at the moment
-      // applyJobFailed runs (not a per-controller history). Both entries
-      // pick up 'transfer' here because CORE's SENDING update set the
-      // shared currentStage before either FAILED — even though body never
-      // had its own SENDING update. This documents the design: stage is
-      // "what the flash was doing when it failed," not "what each
-      // individual controller was doing." A future change to track stage
-      // per-controller would make body.stage null in this scenario.
+      // Stage reflects the SHARED currentStage at the moment
+      // applyJobFailed runs, not per-controller history. Both entries
+      // pick up 'transfer' because CORE's SENDING update set
+      // currentStage before either FAILED — even though body never had
+      // its own SENDING update. Design intent: stage means "what the
+      // flash was doing when it failed," not "what each controller was
+      // doing." Per-controller tracking would make body.stage null here.
       for (const entry of store.failedControllers) {
         expect(entry.stage).toBe('transfer');
       }
@@ -1264,9 +1261,9 @@ describe('firmware store', () => {
       // first, so controllerStates is empty. Nothing to demote; the array
       // is empty. The FirmwareView template guards on
       // `failedControllers[0]?.stage`, and the panel's result bar uses
-      // the multi-failure copy (via failedCount === 0 → multi key per I2).
-      // Note: round-6 C1 changes the post-applyJobStarted behavior — see
-      // the new "normalizes non-terminal stages to FAILED" test for that.
+      // the multi-failure copy (via failedCount === 0 → multi key).
+      // Compare with the "normalizes non-terminal stages to FAILED" test
+      // for the post-applyJobStarted behavior.
       const store = useFirmwareStore();
       seedSampleFleet();
       // Deliberately skip applyJobStarted to leave controllerStates empty.
@@ -1293,7 +1290,7 @@ describe('firmware store', () => {
       expect(store.flashError).not.toBeNull();
     });
 
-    it('normalizes non-terminal per-controller stages to FAILED (round-6 C1 fix: parallel to applyJobDone)', () => {
+    it('normalizes non-terminal per-controller stages to FAILED (parallel to applyJobDone)', () => {
       // Symmetry: applyJobDone normalizes mid-flow stages to VERSION_CONFIRMED
       // to prevent the "✓ all updated" result bar contradicting a still-
       // spinning row. applyJobFailed had the inverse gap — a row stuck at
@@ -1314,9 +1311,10 @@ describe('firmware store', () => {
 
       expect(store.controllerStates.get('body')?.stage).toBe('FAILED');
       expect(store.controllerStates.get('core')?.stage).toBe('FAILED');
-      // IM-2 contract: FAILED entries always carry an `error` string.
-      // Demoted (non-server-reported) entries use the 'unattributed:*'
-      // marker so ops can distinguish them from server-reported failures.
+      // The discriminated union requires every FAILED entry to carry an
+      // `error` string. Demoted (non-server-reported) entries use the
+      // 'unattributed:*' marker so ops can distinguish them from
+      // server-reported failures.
       const bodyState = store.controllerStates.get('body');
       const coreState = store.controllerStates.get('core');
       if (bodyState?.stage === 'FAILED') {
@@ -1330,7 +1328,7 @@ describe('firmware store', () => {
       expect(ids).toEqual(['body', 'core']);
     });
 
-    it('preserves server-reported FAILED error strings AND demoted entries get the unattributed marker (IM-2 normalize attribution)', () => {
+    it('preserves server-reported FAILED error strings AND demoted entries get the unattributed marker', () => {
       // A controller that legitimately FAILED (with the server's error
       // reason) must keep its error attribute. The normalize must only
       // touch non-terminal stages.
@@ -1349,8 +1347,8 @@ describe('firmware store', () => {
       });
 
       // CORE's server-reported error string survives; body's demoted
-      // entry carries the IM-2 'unattributed:*' marker (distinguishable
-      // from any server-emitted error reason).
+      // entry carries the 'unattributed:*' marker, distinguishable from
+      // any server-emitted error reason.
       const coreState = store.controllerStates.get('core');
       const bodyState = store.controllerStates.get('body');
       // Outer-stage assertions pin the post-condition before the narrow
@@ -1366,7 +1364,7 @@ describe('firmware store', () => {
       }
     });
 
-    it('clears pendingByMac so a late LocationStatus cannot replay stale entries onto failed state (C2 fix)', () => {
+    it('clears pendingByMac so a late LocationStatus cannot replay stale entries onto failed state', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyControllerUpdate({ controllerId: 'orphan-mac', stage: 'SENDING' });
@@ -1381,7 +1379,7 @@ describe('firmware store', () => {
       expect(store.pendingByMac.size).toBe(0);
     });
 
-    it('drops stale flashJobFailed whose jobId does not match currentJob (CR-4)', () => {
+    it('drops stale flashJobFailed whose jobId does not match currentJob', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
         const store = useFirmwareStore();
@@ -1400,7 +1398,7 @@ describe('firmware store', () => {
       }
     });
 
-    it('preserves FAILED entries from pendingByMac in failedControllers (CR-2: bus-wide failure with unmapped MAC)', () => {
+    it('preserves FAILED entries from pendingByMac in failedControllers (bus-wide failure with unmapped MAC)', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
         const store = useFirmwareStore();
@@ -1493,7 +1491,7 @@ describe('firmware store', () => {
       expect(store.currentJobLoadFailed).toBe(true);
     });
 
-    it('treats 404 as expected idle state — does NOT set currentJobLoadFailed (I3 fix)', async () => {
+    it('treats 404 as expected idle state — does NOT set currentJobLoadFailed', async () => {
       // 404 is the healthy idle response from /api/firmware/flash when no
       // flash is in flight. Surfacing it as "could not confirm state" would
       // falsely alarm operators on first page load. Only 5xx and network
@@ -1511,7 +1509,7 @@ describe('firmware store', () => {
       expect(store.currentJobLoadFailed).toBe(true);
     });
 
-    it('skips applying a body with endedAt set (CR-1: mirrors server late-join filter for reboot-wait window)', async () => {
+    it('skips applying a body with endedAt set (mirrors server late-join filter for reboot-wait window)', async () => {
       // Server's decideLateJoinSnapshot skips emitting flashJobStarted on
       // WS reconnect when currentJob.endedAt is set (the 15s reboot-wait
       // window). HTTP must mirror that filter; otherwise a refresh during
@@ -1530,7 +1528,7 @@ describe('firmware store', () => {
       expect(store.currentJobLoadFailed).toBe(false);
     });
 
-    it('NEW-IM2: skips and warns when body.jobId is empty string (server contract violation)', async () => {
+    it('skips and warns when body.jobId is empty string (server contract violation)', async () => {
       // Pre-fix, the `body.jobId` truthy check let empty-string fall
       // through silently — no apply, no warn. A server contract bug
       // emitting `{jobId: ''}` would be invisible. Tightened to an
@@ -1654,10 +1652,11 @@ describe('firmware store', () => {
   });
 
   describe('pending-update replay queue (late-MAC race)', () => {
-    // C1: WS flashControllerUpdate / flashJobStarted entries can arrive for
-    // a padawan before its LocationStatus heartbeat populates the MAC map.
-    // The store queues those payloads keyed by raw MAC and drains them when
-    // controllerStore.setControllerMac is later called (via the dispatcher).
+    // WS flashControllerUpdate / flashJobStarted entries can arrive
+    // for a padawan before its LocationStatus heartbeat populates the
+    // MAC map. The store queues those payloads keyed by raw MAC and
+    // drains them when controllerStore.setControllerMac is later
+    // called (via the dispatcher).
     const LATE_CORE_MAC = 'aa:bb:cc:dd:ee:01';
 
     it('queues a flashControllerUpdate whose MAC is not yet mapped (no controllerStates entry produced)', () => {
@@ -1719,7 +1718,7 @@ describe('firmware store', () => {
       expect(store.pendingByMac.size).toBe(0);
     });
 
-    it('IM-8: logs a distinct re-queue warning when flushPendingForMac re-enqueues during flush (forensic breadcrumb)', () => {
+    it('logs a distinct re-queue warning when flushPendingForMac re-enqueues during flush (forensic breadcrumb)', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       try {
         const store = useFirmwareStore();

@@ -148,21 +148,17 @@ export type ServerFwStage =
 export type SlotId = Exclude<`${Location}`, `${Location.UNKNOWN}`>;
 
 /**
- * Mirror of the server's `ControllerFlashState` discriminated union, narrowed
- * to fields the UI reads. The server wire carries `bytesSent`, `totalBytes`,
- * and `detail` on every variant; we omit those because no UI surface renders
- * them.
+ * Wire-side mirror of the server's `ControllerFlashState` discriminated union,
+ * narrowed to fields the UI reads (server wire also carries `bytesSent`,
+ * `totalBytes`, `detail`; we drop those — no UI surface renders them).
  *
  * Source of truth: `astros_api/src/models/firmware/flash_job_state.ts`.
  *
- * Discrimination: IM-2 makes `finalVersion`/`error` STRUCTURALLY required on
- * their respective stages (matching the server). Reading `state.error` on a
- * non-FAILED stage is a compile-time error.
- *
- * Wire vs slot (IM-11): on the wire, `controllerId` is a MAC. After
- * `buildControllerStatesMap` / `applyControllerUpdate` re-key, it's a SlotId.
- * The wire type uses `string` (MAC); the by-slot type uses `SlotId`. The
- * translation happens at the single boundary in `buildControllerStatesMap`.
+ * `finalVersion`/`error` are structurally required on their respective stages,
+ * matching the server. Reading `state.error` on a non-FAILED stage is a
+ * compile error. On the wire `controllerId` is a MAC string; the in-store
+ * variant (ControllerFlashStateBySlot) uses SlotId after translation in
+ * `buildControllerStatesMap`.
  */
 export type ControllerFlashState =
   | {
@@ -173,10 +169,9 @@ export type ControllerFlashState =
   | { controllerId: string; stage: 'FAILED'; error: string };
 
 /**
- * In-store (post-translation) view of `ControllerFlashState`. After
- * `buildControllerStatesMap`/`applyControllerUpdate` re-key the MAC into a
- * SlotId, the store keys controllerStates by SlotId and the embedded
- * controllerId field is also a SlotId. See IM-11 for the rationale.
+ * In-store (post-translation) view. `buildControllerStatesMap` re-keys
+ * the wire MAC into a SlotId; both the Map key and the embedded
+ * controllerId are SlotIds.
  */
 export type ControllerFlashStateBySlot =
   | {

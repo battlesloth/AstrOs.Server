@@ -61,17 +61,12 @@ export function controllerStatePillKind(state: ControllerFlashState): FirmwareSt
     case 'FAILED':
       return 'failed';
     default: {
-      // Forward-compat: an unknown ServerFwStage would otherwise return
-      // undefined from this switch, and the row would render with an
-      // undefined pill kind. Map to 'updating' as the safest fallback —
-      // the row remains in the 'updating' indicator until a recognized
-      // stage arrives. The `_exhaustive: never` assignment compiles
-      // because the switch covers all ServerFwStage variants of the
-      // IM-2 discriminated union; the default branch is reachable only
-      // when a runtime payload lies about its `stage` (e.g. a future
-      // 'CANCELLED' value cast through the type at the WS boundary).
-      // Read fields via a pre-narrowing shape so the warn message still
-      // surfaces server contract drift in production logs.
+      // Forward-compat for future server stages. The `never` exhaustiveness
+      // covers every ServerFwStage variant, so this branch only fires when
+      // a runtime payload lies about its `stage` (e.g. a future 'CANCELLED'
+      // cast through the type at the WS boundary). Fall back to 'updating'
+      // so the row stays in an unambiguous in-progress indicator until a
+      // recognized stage arrives; the warn surfaces the contract drift.
       const stateAsAny = state as { stage: string; controllerId: string };
       console.warn(
         `[firmwareStageMapping] controllerStatePillKind: unknown stage="${stateAsAny.stage}" ` +

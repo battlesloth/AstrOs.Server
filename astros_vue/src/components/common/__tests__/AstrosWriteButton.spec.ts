@@ -74,9 +74,8 @@ describe('AstrosWriteButton', () => {
     await wrapper.vm.$nextTick();
     expect(wrapper.find('div').classes()).toContain('tooltip');
 
-    // Lock-active (no readOnly): tooltip class also present. After
-    // round-5 added lock-aware UI, the tooltip wrapper fires for
-    // either trigger, not exclusively readOnly.
+    // Lock-active (no readOnly): tooltip class also present. The
+    // tooltip wrapper fires for either trigger, not exclusively readOnly.
     setActivePinia(createPinia());
     useJobLockStore().setState({
       locked: true,

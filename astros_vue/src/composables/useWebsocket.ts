@@ -34,10 +34,10 @@ function getWsUrl(): string {
 export function useWebsocket() {
   function wsConnect() {
     intentionallyClosed = false;
-    // IM-9: capture the new socket in a local so handlers don't close
-    // over ws.value (which is mutated by subsequent reconnects). Without
-    // this, a stale onerror from socket A could close socket B during
-    // HMR or an in-flight reconnect.
+    // Capture the new socket in a local so handlers don't close over
+    // ws.value, which is mutated by subsequent reconnects. Without this,
+    // a stale onerror from one socket could close a newer one during HMR
+    // or an in-flight reconnect.
     const socket = new WebSocket(getWsUrl());
     ws.value = socket;
 
@@ -61,8 +61,6 @@ export function useWebsocket() {
 
     socket.onerror = (error) => {
       console.error('WebSocket error:', error);
-      // Close the captured socket (not ws.value, which may have been
-      // reassigned to a new socket by a parallel wsConnect call).
       socket.close();
     };
 
@@ -142,18 +140,15 @@ export function useWebsocket() {
         break;
       case WebsocketMessageType.FLASH_JOB_ACTIVE:
         // Server-side rejection echo for write-class messages sent during a
-        // flash; the UI doesn't act on this directly. Lock-aware UI
-        // elements (AstrosWriteButton, AstrosServoTestModal) gate writes
-        // during a flash so this rejection should never fire in normal use.
+        // flash. Lock-aware UI elements gate writes so this should never
+        // fire in normal operation.
         break;
       default: {
-        // Compile-time exhaustiveness attestation: adding a new
-        // WebsocketMessageType variant the dispatcher doesn't handle should
-        // be visible at refactor time. The `as never` is an attestation
-        // (the switch discriminator is the wide enum, not a true
-        // discriminated union), but it breaks loudly if someone later
-        // refactors to a structural DU. The runtime warn stays for
-        // forward-compat with future server-side values not yet typed.
+        // `as never` attestation: the switch discriminator is the wide
+        // enum, not a structural discriminated union, so this isn't a real
+        // compile-time exhaustiveness check — but it documents intent and
+        // breaks if someone later refactors to a true DU. The runtime warn
+        // is the actual forward-compat path.
         const _exhaustive: never = parsedMessage.type as never;
         void _exhaustive;
         console.warn('Unhandled message type:', message);
@@ -268,15 +263,13 @@ export function useWebsocket() {
         owner: data.owner,
         since: data.since,
       });
-      // CR-1b defense-in-depth: if the server has released the lock while
-      // the firmware store still thinks we're 'flashing', a terminal-event
-      // (flashJobDone / flashJobFailed) was lost or arrived out of order.
-      // Recover via applyJobDone so per-controller states are normalized
-      // (round-8 NEW-C2 — bare setPhase left the per-row UI showing
-      // "Updating" pills while the footer claimed "✓ All updated"). Also
-      // surface a protocol_violation flashError so operators see a visible
-      // breadcrumb that recovery fired — they should verify controllers
-      // actually flashed before treating the result as authoritative.
+      // Defense-in-depth: a lock release while we still think we're
+      // flashing means a terminal event was lost or arrived out of order.
+      // Delegate to applyJobDone so per-controller states normalize (a
+      // bare setPhase would leave rows showing "Updating" beneath an
+      // "All updated" footer). The protocol_violation breadcrumb is the
+      // operator-visible signal that recovery fired — they should verify
+      // controllers actually flashed before trusting the result.
       if (!data.locked) {
         const firmware = useFirmwareStore();
         if (firmware.phase === 'flashing') {
@@ -300,23 +293,19 @@ export function useWebsocket() {
     }
   }
 
-  // Firmware-flash WS handlers. The happy path delegates to the firmwareStore's
-  // apply* actions; the catch path may also call `store.setFlashError(...)`
-  // to surface a generic envelope (when the store can't see the malformed
-  // input to recover by itself). All flashError writes route through
-  // setFlashError — the round-6 sole-writer pattern, see firmware.ts
-  // setFlashError/clearFlashError. Pin: a swallowed error must still produce
-  // an operator-visible signal. The job-lifecycle handlers (Started/Done/
-  // Failed) transition phase in their catch (Started → 'select' rollback;
-  // Done → 'done'; Failed → 'failed'); the mid-stream handlers
-  // (controllerUpdate/Result) surface flashError without rolling phase, BUT
-  // skip the write when EITHER (a) we're no longer mid-flow (phase !=
-  // 'flashing') so a stray malformed frame after completion can't clobber
-  // a clean "✓ all updated" UI, OR (b) an existing flashError already
-  // carries the specific job-lifecycle reason (preserves it vs. clobbering
-  // with protocol_violation). CR-3 guard tightened from `||` to `&&` in
-  // round-8 NEW-C1 — both conditions must hold for the catch to write.
-  // The next valid update can still recover the per-row state.
+  // Firmware-flash WS handlers. Happy path delegates to the firmwareStore's
+  // apply* actions; catch paths call `store.setFlashError(...)` to surface
+  // a generic envelope when the store can't recover from malformed input.
+  // All flashError writes route through setFlashError (sole-writer pattern;
+  // see firmware.ts setFlashError/clearFlashError).
+  //
+  // Job-lifecycle handlers (Started/Done/Failed) transition phase in their
+  // catch (Started → 'select' rollback; Done → 'done'; Failed → 'failed').
+  // Mid-stream handlers (controllerUpdate/Result) surface flashError without
+  // rolling phase, but only write when BOTH phase === 'flashing' AND no
+  // existing flashError is set — protects clean "all updated" UIs from
+  // stray malformed frames AND preserves any specific job-lifecycle reason
+  // already in place.
   function handleFlashJobStarted(message: BaseWsMessage) {
     const store = useFirmwareStore();
     try {
@@ -345,31 +334,21 @@ export function useWebsocket() {
     const store = useFirmwareStore();
     try {
       const data = (message as unknown as { data: ControllerFlashState }).data;
-      // Dispatcher-level wire-shape validation: a malformed envelope (no
-      // data, missing controllerId) must reach the catch so the operator
-      // sees a protocol_violation breadcrumb. The store's NEW-IM1 guard
-      // is silent — that's correct for the "internal caller passes bad
-      // data" path but wrong for the "WS payload is malformed" path that
-      // this dispatcher catch was designed to surface.
+      // Wire-shape validation throws so the catch surfaces a
+      // protocol_violation breadcrumb. The store's own guard returns
+      // silently for the rare internal-caller-with-bad-data path; the
+      // throw here covers the WS-payload-malformed path that needs an
+      // operator-visible signal.
       if (!data || typeof data.controllerId !== 'string' || data.controllerId.length === 0) {
         throw new Error('malformed flashControllerUpdate: missing/invalid controllerId');
       }
       store.applyControllerUpdate(data);
     } catch (error) {
       console.error('Error handling flashControllerUpdate:', error);
-      // No phase rollback — the next valid update can recover the per-row
-      // state. Note: the flashError banner is NOT auto-cleared by a
-      // subsequent successful applyControllerUpdate; it persists until the
-      // operator dismisses it or a job-lifecycle event (applyJobStarted,
-      // applyJobDone, applyJobFailed) clears flashError. The operator-
-      // visible "something went wrong" signal is the load-bearing piece.
-      //
-      // CR-3 guard (tightened in round-8 NEW-C1): only set the
-      // protocol_violation envelope when BOTH (a) we're still mid-flow AND
-      // (b) no existing flashError is already in place. Round-7's `||` was
-      // too permissive — after a clean completion (phase='done',
-      // flashError=null), a stray malformed frame would set a red
-      // protocol_violation banner over the happy "✓ all updated" UI.
+      // No phase rollback — the next valid update can recover per-row
+      // state. flashError persists until operator-dismiss or a
+      // job-lifecycle event overwrites it (applyJobStarted clears;
+      // applyJobFailed sets a specific reason).
       if (store.flashError === null && store.phase === 'flashing') {
         store.setFlashError({
           reason: 'protocol_violation',
@@ -387,8 +366,6 @@ export function useWebsocket() {
           data: { jobId: string; controller: ControllerFlashState };
         }
       ).data;
-      // Dispatcher-level wire-shape validation — see
-      // handleFlashControllerUpdate for the rationale.
       if (
         !data ||
         !data.controller ||
@@ -400,10 +377,6 @@ export function useWebsocket() {
       store.applyControllerResult(data);
     } catch (error) {
       console.error('Error handling flashControllerResult:', error);
-      // Mirrors handleFlashControllerUpdate: surface but don't transition.
-      // The banner persists until operator-dismiss or a job-lifecycle clear.
-      // CR-3 guard (round-8 NEW-C1 tightened to `&&`) — see
-      // handleFlashControllerUpdate for the full rationale.
       if (store.flashError === null && store.phase === 'flashing') {
         store.setFlashError({
           reason: 'protocol_violation',

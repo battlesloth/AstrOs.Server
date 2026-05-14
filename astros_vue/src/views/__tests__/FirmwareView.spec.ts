@@ -71,7 +71,7 @@ function mountFirmwareView() {
   });
 }
 
-describe('FirmwareView lock-conflict gating (I7)', () => {
+describe('FirmwareView lock-conflict gating', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockWsIsConnected.value = true;
@@ -138,7 +138,7 @@ describe('FirmwareView lock-conflict gating (I7)', () => {
   });
 });
 
-describe('FirmwareView staleness banner (I5)', () => {
+describe('FirmwareView staleness banner', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockWsIsConnected.value = true;
@@ -173,7 +173,7 @@ describe('FirmwareView staleness banner (I5)', () => {
   });
 });
 
-describe('FirmwareView flash-stream-suspended banner (I1)', () => {
+describe('FirmwareView flash-stream-suspended banner', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockWsIsConnected.value = true;
@@ -181,8 +181,8 @@ describe('FirmwareView flash-stream-suspended banner (I1)', () => {
   });
 
   it('shows the "live updates paused" banner when phase==="flashing" and WS is disconnected', async () => {
-    // I1 fix: without this signal the operator stares at frozen progress
-    // bars with no indication the WS stream has stopped.
+    // Without this signal, the operator stares at frozen progress bars
+    // with no indication the WS stream has stopped.
     const firmwareStore = useFirmwareStore();
     firmwareStore.setPhase('flashing');
     mockWsIsConnected.value = false;
@@ -240,7 +240,7 @@ describe('FirmwareView flash-stream-suspended banner (I1)', () => {
     expect(suspended).toBeTruthy();
   });
 
-  it('does NOT flicker the banner during the pre-connect window before WS first connects (I3 fix)', async () => {
+  it('does NOT flicker the banner during the pre-connect window before WS first connects', async () => {
     // Without the wsHasEverConnected gate, FirmwareView's onMounted runs
     // before App.vue's wsConnect resolves the socket, so wsIsConnected is
     // false. A mid-flash refresh hits applyJobStarted → phase='flashing',
@@ -260,7 +260,7 @@ describe('FirmwareView flash-stream-suspended banner (I1)', () => {
   });
 });
 
-describe('FirmwareView mid-flash error region (C1)', () => {
+describe('FirmwareView mid-flash error region', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     mockWsIsConnected.value = true;
@@ -268,10 +268,10 @@ describe('FirmwareView mid-flash error region (C1)', () => {
   });
 
   it('renders the role="alert" mid-flash error region when flashError is set during flashing phase', async () => {
-    // Round-5 C1 fix: handleFlashControllerUpdate / handleFlashControllerResult
-    // set flashError without rolling phase. The existing panel `flash_error_banner`
-    // is gated on phase==='select' so it never renders during flashing. Without
-    // this region, the store write goes to a ref no template reads.
+    // handleFlashControllerUpdate / handleFlashControllerResult set
+    // flashError without rolling phase. The panel's `flash_error_banner`
+    // is gated on phase==='select' so it never renders during flashing.
+    // Without this region, the store write goes to a ref no template reads.
     const firmwareStore = useFirmwareStore();
     firmwareStore.setPhase('flashing');
     firmwareStore.flashError = {
@@ -331,7 +331,7 @@ describe('FirmwareView mid-flash error region (C1)', () => {
     expect(firmwareStore.flashError).toBeNull();
   });
 
-  it('shows the region in failed phase with detail even when failedControllers has entries (I1 widen)', async () => {
+  it('shows the region in failed phase with detail even when failedControllers has entries', async () => {
     // The panel's result-bar carries label + stage but never surfaces
     // flashError.detail. Without this region firing on the
     // (failed + has-detail + non-empty failedControllers) combination, the
@@ -380,7 +380,7 @@ describe('FirmwareView mid-flash error region (C1)', () => {
     expect(wrapper.find('[data-test="mid-flash-error"]').exists()).toBe(false);
   });
 
-  it('IM-1: renders abortReason in the failed-phase flash-error region when present', async () => {
+  it('renders abortReason in the failed-phase flash-error region when present', async () => {
     const firmwareStore = useFirmwareStore();
     firmwareStore.setPhase('failed');
     firmwareStore.failedControllers = [{ id: Location.CORE, label: 'Core', stage: 'verify' }];
@@ -405,7 +405,7 @@ describe('FirmwareView mid-flash error region (C1)', () => {
     expect(abortRegion.text()).toContain('user_cancel');
   });
 
-  it('IM-1: does NOT render abortReason in failed phase when currentJob.abortReason is undefined', async () => {
+  it('does NOT render abortReason in failed phase when currentJob.abortReason is undefined', async () => {
     const firmwareStore = useFirmwareStore();
     firmwareStore.setPhase('failed');
     firmwareStore.failedControllers = [{ id: Location.CORE, label: 'Core', stage: 'verify' }];
@@ -427,11 +427,11 @@ describe('FirmwareView mid-flash error region (C1)', () => {
     expect(wrapper.find('[data-test="abort-reason"]').exists()).toBe(false);
   });
 
-  it('NEW-IM4: renders flash-error region in phase="done" when flashError is non-null (done-with-warning)', async () => {
-    // Round-8 NEW-IM4: previously showFlashErrorRegion returned false for
-    // phase='done', silently swallowing any flashError that landed during
-    // a successful flash. The CR-1b recovery, malformed flashJobDone catch,
-    // and cancel-while-completing paths all leave the store in this state.
+  it('renders flash-error region in phase="done" when flashError is non-null (done-with-warning)', async () => {
+    // Without surfacing flashError in done-phase, paths that set it on
+    // an otherwise-successful completion (lock-release recovery,
+    // malformed flashJobDone catch, cancel-while-completing) would
+    // silently swallow the breadcrumb.
     const firmwareStore = useFirmwareStore();
     firmwareStore.setPhase('done');
     firmwareStore.flashError = {
@@ -448,7 +448,7 @@ describe('FirmwareView mid-flash error region (C1)', () => {
     expect(region.text()).toContain('Recovered from lost terminal event');
   });
 
-  it('NEW-IM4: hides flash-error region in phase="done" when flashError is null (negative baseline)', async () => {
+  it('hides flash-error region in phase="done" when flashError is null (negative baseline)', async () => {
     const firmwareStore = useFirmwareStore();
     firmwareStore.setPhase('done');
     firmwareStore.flashError = null;
@@ -460,7 +460,7 @@ describe('FirmwareView mid-flash error region (C1)', () => {
   });
 });
 
-describe('FirmwareView lockSinceFormatted defensive fallback (IM-8)', () => {
+describe('FirmwareView lockSinceFormatted defensive fallback', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });

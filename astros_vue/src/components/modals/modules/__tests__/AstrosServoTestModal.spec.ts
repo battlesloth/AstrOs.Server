@@ -37,7 +37,7 @@ function mountModal(): VueWrapper {
   });
 }
 
-describe('AstrosServoTestModal — CR-5 lock-aware gating', () => {
+describe('AstrosServoTestModal — lock-aware gating', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     stubSendMessage.mockClear();

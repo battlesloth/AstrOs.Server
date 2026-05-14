@@ -80,18 +80,16 @@ const showFlashErrorRegion = computed(() => {
   if (phase.value === 'failed') {
     return failedControllers.value.length === 0 || flashError.value.detail != null;
   }
-  // NEW-IM4: phase='done' with a non-null flashError means a non-blocking
-  // warning landed during/after a successful flash (cancel HTTP failed
-  // but flash completed; malformed mid-stream frame; CR-1b recovery
-  // breadcrumb). Surface the region so the operator sees the signal
-  // alongside the "✓ all updated" footer rather than the flashError
-  // being silently swallowed by phase='done'.
+  // phase='done' with a non-null flashError means a non-blocking warning
+  // landed during/after a successful flash (cancel HTTP failed but flash
+  // completed; lock-release recovery breadcrumb; malformed terminal-event
+  // catch). Surface it alongside the "all updated" footer rather than
+  // swallowing the signal.
   return phase.value === 'done';
 });
 
-// NEW-IM4: distinct title for the done-phase warning case so operators
-// don't see a red "Flash failed:" title over a green "✓ all updated"
-// footer. The done variant reads as a warning, not an error.
+// Distinct title for the done-phase warning case — a red "Flash failed:"
+// over an "all updated" footer would be visually contradictory.
 const flashErrorTitleKey = computed(() => {
   if (phase.value === 'failed') return 'firmware_view.mid_flash_error.title_failed';
   if (phase.value === 'done') return 'firmware_view.mid_flash_error.title_done_warning';

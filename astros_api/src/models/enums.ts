@@ -82,8 +82,9 @@ export enum ControllerStatus {
 // Wire-format numeric IDs. Hand-mirrored by the Vue client's
 // `WebsocketMessageType` enum — adding or reordering values here without
 // updating the client mirror silently breaks every WS message. Explicit
-// `= N` annotations pin the numeric values so a mid-insertion is a
-// compile-time conflict rather than a silent renumber.
+// `= N` annotations make mid-block insertions visible in diffs rather
+// than silently renumbering downstream values; the runtime contract is
+// pinned by the wire-numeric test in useWebsocket.spec.ts.
 export enum TransmissionType {
   script = 0,
   sync = 1,

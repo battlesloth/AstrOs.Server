@@ -22,17 +22,16 @@ export interface ControllerProgressEntry {
 /**
  * Props for AstrosFirmwareControllersPanel.
  *
- * Phase-vs-fields correlation (documented; only `progressByControllerId`
- * is enforced at runtime by the dev-only watchEffect in the panel
- * component — the result-bar fields below are documentation-only and
- * the consumer is responsible for setting them in the right phase):
- *  - `progressByControllerId`: required in non-select phases (flashing/done/failed) — runtime-checked in dev
+ * Phase-vs-fields correlation (documentation-only except where noted):
+ *  - `progressByControllerId`: required in non-select phases; runtime-checked
+ *    in dev by a watchEffect inside the panel
  *  - `doneCount`: only meaningful in `phase === 'done'`
- *  - `failedControllerLabel`, `failedStage`, `failedCount`: only meaningful in `phase === 'failed'`
+ *  - `failedControllerLabel`, `failedStage`, `failedCount`: only meaningful
+ *    in `phase === 'failed'`
  *
- * IM-12: `failedStage` is narrowed to `FirmwareStage` so the panel
+ * `failedStage` is narrowed to `FirmwareStage` (not `string`) so the panel
  * template's `t('firmware_view.stages.${failedStage}.label')` always
- * resolves to a known i18n key path.
+ * resolves to a valid i18n key.
  */
 export interface ControllersPanelProps {
   phase: ControllersPanelPhase;
