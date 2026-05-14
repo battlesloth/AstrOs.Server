@@ -98,10 +98,10 @@ If neither is convenient, this section can be **skipped with explicit note** bec
 
 | # | Action | Expected |
 |---|--------|----------|
-| 3.1 | With `systemStatus.readOnly = false` and `jobLock.locked = false`: open the Servo Test modal on any servo channel. Click **Enable Test**, drag the slider. | WS `SERVO_TEST` messages fire on each slider input. |
-| 3.2 | With test active, flip `systemStatus.readOnly = true`. | Slider auto-disables. **Enable Test** button is disabled with the readonly tooltip. The "lock-active-notice" region (firmware-lock-specific copy) is **NOT** shown — readonly is explained by the button tooltip alone. |
-| 3.3 | With `jobLock.locked = true` (start a flash in another session): open the Servo Test modal. Try to **Enable Test**. | Button disabled with the firmware-lock tooltip. Lock-active-notice region IS shown below the slider with copy `firmware_view.lock_active`. |
-| 3.4 | While modal is open with test active, transition jobLock from unlocked → locked (start a foreign flash). | Slider auto-disables. Label reverts to "Enable Test". Notice region appears. |
+| 3.1 | With `systemStatus.readOnly = false` and `jobLock.locked = false`: open the Servo Test modal on any servo channel. Click **Enable Test**, drag the slider, also type a value into the adjacent number input. | WS `SERVO_TEST` messages fire on each slider input AND on each number-input change. |
+| 3.2 | With test active, flip `systemStatus.readOnly = true`. | Slider and number input both auto-disable (visually greyed). **Enable Test** button is disabled with the readonly tooltip. The "lock-active-notice" region (firmware-lock-specific copy) is **NOT** shown — readonly is explained by the button tooltip alone. |
+| 3.3 | With `jobLock.locked = true` (start a flash in another session): open the Servo Test modal. Try to **Enable Test**. | Button disabled with the firmware-lock tooltip. Slider and number input both visually disabled. Lock-active-notice region IS shown below the slider with copy `firmware_view.lock_active`. |
+| 3.4 | While modal is open with test active, transition jobLock from unlocked → locked (start a foreign flash). | Slider and number input both auto-disable. Label reverts to "Enable Test". Notice region appears. |
 
 ---
 

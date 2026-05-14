@@ -137,7 +137,7 @@ Each task is one commit. Pre-commit toolkit (prettier → lint → build → vit
   - Update the inline comment to cover both stores.
   Run `npm run build` to confirm typecheck. Pre-commit toolkit + commit.
 
-- [ ] **T5. Fix ConfirmModal consumer wiring + QA test plan.** Code fix is template-only (UI-layout per CLAUDE.md TDD exceptions). Vue unit-test scaffolding for `ModulesView` / `ScripterView` does not exist, the remove buttons in `AstrosUartModule.vue` / `AstrosI2cModule.vue` carry no `data-testid` attributes (Playwright e2e would require adding them — scope creep on a 2-line typo fix), and the existing d.7 `AstrosConfirmModal` unit tests already pin the modal's prop API correctly. The bug is in *consumer* wiring of a contract that's already tested; the regression-prevention path here is manual QA per CLAUDE.md `.docs/qa/` convention plus the protection of code review (which caught this exact issue in d.7's pre-push toolkit).
+- [x] **T5. Fix ConfirmModal consumer wiring + QA test plan.** Code fix is template-only (UI-layout per CLAUDE.md TDD exceptions). Vue unit-test scaffolding for `ModulesView` / `ScripterView` does not exist, the remove buttons in `AstrosUartModule.vue` / `AstrosI2cModule.vue` carry no `data-testid` attributes (Playwright e2e would require adding them — scope creep on a 2-line typo fix), and the existing d.7 `AstrosConfirmModal` unit tests already pin the modal's prop API correctly. The bug is in *consumer* wiring of a contract that's already tested; the regression-prevention path here is manual QA per CLAUDE.md `.docs/qa/` convention plus the protection of code review (which caught this exact issue in d.7's pre-push toolkit).
   1. Modify `astros_vue/src/views/ModulesView.vue:436-441` — swap to prop binding:
      ```vue
      <AstrosConfirmModal
@@ -152,7 +152,7 @@ Each task is one commit. Pre-commit toolkit (prettier → lint → build → vit
   3. Create `.docs/qa/firmware-ota-d-7-followups.md` covering the two affected confirm flows (Modules: remove UART/I2C module; Scripter: remove channel from script). The QA plan is also used to verify T6's ServoTestModal readonly path — see T6 below.
   4. Pre-commit toolkit + commit.
 
-- [ ] **T6. Fix ServoTestModal readonly check (TDD).**
+- [x] **T6. Fix ServoTestModal readonly check (TDD).**
   1. Add to `astros_vue/src/components/modals/modules/__tests__/AstrosServoTestModal.spec.ts` two cases:
      - `systemStatusStore.readOnly = true` (jobLock unlocked) → slider `[disabled]` is true, `onSliderChange` does not call `wsSendMessage`, `enableTest` is a no-op.
      - Mid-session readonly flip with the test active → the auto-disable watcher fires, slider goes to `disabled`, the `lock-active-notice` region is NOT shown (per the design note: notice is job-lock-only).

@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { useWebsocket } from '@/composables/useWebsocket';
 import { useJobLockStore } from '@/stores/jobLock';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 import { storeToRefs } from 'pinia';
 import type { ServoTestEvent } from '@/models/events';
 import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
@@ -9,6 +10,8 @@ import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 const { wsSendMessage } = useWebsocket();
 const jobLock = useJobLockStore();
 const { locked: jobLockLocked } = storeToRefs(jobLock);
+const systemStatus = useSystemStatusStore();
+const { readOnly: systemStatusReadOnly } = storeToRefs(systemStatus);
 
 const props = defineProps<ServoTestEvent>();
 
@@ -20,17 +23,25 @@ const disabled = ref(true);
 const label = ref('modals.servo_test.enable_test');
 const value = ref(props.homePosition);
 
-// Slider-side lock gate + belt-and-suspenders for the handler bodies.
+// Slider-side write gate + belt-and-suspenders for the handler bodies.
 // The Enable Test button itself is handled by AstrosWriteButton, which
-// consults the store directly. This computed feeds: the slider's
-// :disabled, onSliderChange's early-return, enableTest's early-return,
-// the mid-session auto-disable watcher, and the lock-active notice region
-// below. The handler-body guards protect against any programmatic
+// consults both stores directly. This computed mirrors that OR so the
+// slider :disabled, onSliderChange's early-return, enableTest's
+// early-return, and the mid-session auto-disable watcher all stay in
+// sync. The handler-body guards protect against any programmatic
 // invocation path that bypasses the button's disabled state.
-const writesBlocked = computed(() => jobLockLocked.value);
+//
+// Note: the firmware-flash notice region (`lock-active-notice` below) is
+// intentionally gated on `jobLockLocked` alone, not `writesBlocked`. Its
+// copy is firmware-flash-specific (firmware_view.lock_active); readonly
+// is already explained by AstrosWriteButton's tooltip on the Enable
+// button, so a redundant "flash active" notice during a non-flash
+// readonly state would be misleading.
+const writesBlocked = computed(() => jobLockLocked.value || systemStatusReadOnly.value);
 
-// If a flash starts while the modal is already open with the test active,
-// auto-disable so further slider input is ignored locally as well.
+// If writes become blocked (firmware flash lock or system readonly) while
+// the modal is already open with the test active, auto-disable so further
+// slider/input is ignored locally as well.
 watch(writesBlocked, (nowBlocked) => {
   if (nowBlocked && !disabled.value) {
     disabled.value = true;
@@ -89,6 +100,7 @@ const closeModal = () => {
             min="500"
             max="2500"
             v-model.number="value"
+            :disabled="disabled || writesBlocked"
             @input="onSliderChange"
             class="input input-bordered w-24 text-center"
           />
@@ -105,7 +117,7 @@ const closeModal = () => {
           step="1"
         />
         <div
-          v-if="writesBlocked"
+          v-if="jobLockLocked"
           role="status"
           aria-live="polite"
           class="text-sm text-warning text-center mt-2"

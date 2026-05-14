@@ -6,6 +6,7 @@ import { nextTick } from 'vue';
 import enUS from '@/locales/enUS.json';
 import AstrosServoTestModal from '@/components/modals/modules/AstrosServoTestModal.vue';
 import { useJobLockStore } from '@/stores/jobLock';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 
 const stubSendMessage = vi.fn();
 vi.mock('@/composables/useWebsocket', () => ({
@@ -93,7 +94,7 @@ describe('AstrosServoTestModal — lock-aware gating', () => {
     expect(notice.attributes('aria-live')).toBe('polite');
   });
 
-  it('disables the slider when locked', async () => {
+  it('disables both the slider and the number input when locked', async () => {
     const lockStore = useJobLockStore();
     lockStore.setState({
       locked: true,
@@ -103,7 +104,9 @@ describe('AstrosServoTestModal — lock-aware gating', () => {
     const wrapper = mountModal();
     await nextTick();
     const slider = wrapper.find('input[type="range"]');
+    const numberInput = wrapper.find('input[type="number"]');
     expect(slider.attributes('disabled')).toBeDefined();
+    expect(numberInput.attributes('disabled')).toBeDefined();
   });
 
   it('auto-disables an active test if a lock acquires mid-session', async () => {
@@ -122,6 +125,58 @@ describe('AstrosServoTestModal — lock-aware gating', () => {
     });
     await nextTick();
     // Slider change should be a no-op now
+    const slider = wrapper.find('input[type="range"]');
+    await slider.trigger('input');
+    expect(stubSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('disables the slider, number input, and Enable button when systemStatus.readOnly is true', async () => {
+    const systemStatus = useSystemStatusStore();
+    systemStatus.setStatus({ readOnly: true, reasonCode: 'BACKUP_FAILED' });
+    const wrapper = mountModal();
+    await nextTick();
+
+    const btn = wrapper.find('[data-testid="enable-test-button"]');
+    const slider = wrapper.find('input[type="range"]');
+    const numberInput = wrapper.find('input[type="number"]');
+    expect(btn.attributes('disabled')).toBeDefined();
+    expect(slider.attributes('disabled')).toBeDefined();
+    expect(numberInput.attributes('disabled')).toBeDefined();
+  });
+
+  it('does NOT send servoTest when enableTest is invoked while readonly', async () => {
+    const systemStatus = useSystemStatusStore();
+    systemStatus.setStatus({ readOnly: true, reasonCode: 'BACKUP_FAILED' });
+    const wrapper = mountModal();
+    await nextTick();
+    const btn = wrapper.find('[data-testid="enable-test-button"]');
+    await btn.trigger('click');
+    expect(stubSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('does NOT render the firmware-flash notice region when readonly-only (no jobLock)', async () => {
+    const systemStatus = useSystemStatusStore();
+    systemStatus.setStatus({ readOnly: true, reasonCode: 'BACKUP_FAILED' });
+    const wrapper = mountModal();
+    await nextTick();
+    // The notice copy is firmware-flash-specific (firmware_view.lock_active).
+    // AstrosWriteButton's own tooltip already explains readonly to the user;
+    // we don't want a misleading "flash active" notice when there's no flash.
+    const notice = wrapper.find('[data-testid="lock-active-notice"]');
+    expect(notice.exists()).toBe(false);
+  });
+
+  it('auto-disables an active test if readOnly flips on mid-session', async () => {
+    const wrapper = mountModal();
+    const btn = wrapper.find('[data-testid="enable-test-button"]');
+    await btn.trigger('click');
+    expect(stubSendMessage).toHaveBeenCalledTimes(1);
+    stubSendMessage.mockClear();
+
+    const systemStatus = useSystemStatusStore();
+    systemStatus.setStatus({ readOnly: true, reasonCode: 'BACKUP_FAILED' });
+    await nextTick();
+
     const slider = wrapper.find('input[type="range"]');
     await slider.trigger('input');
     expect(stubSendMessage).not.toHaveBeenCalled();
