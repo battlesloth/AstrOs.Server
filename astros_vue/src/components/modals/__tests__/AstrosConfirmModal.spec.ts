@@ -64,18 +64,24 @@ describe('AstrosConfirmModal — lock-aware primary action', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
-  it('close (cancel) button stays enabled even during a flash — operator must always be able to dismiss', async () => {
+  it('close (cancel) button stays enabled and still fires onClose during a flash — operator must always be able to dismiss', async () => {
     // Cancel/Close paths are intentionally NOT lock-aware: an operator who
     // hits Confirm by mistake and lands on a modal during a flash should
-    // always be able to back out. The close button stays as a raw <button>.
+    // always be able to back out. The close button stays as a raw <button>
+    // AND its callback must actually fire — the disabled-absence check on
+    // its own can't catch a future refactor that adds an in-callback
+    // `if (locked) return;` short-circuit.
     useJobLockStore().setState({
       locked: true,
       owner: 'flash:other',
       since: '2026-05-14T08:00:00.000Z',
     });
-    const wrapper = mountModal();
+    const onClose = vi.fn();
+    const wrapper = mountModal({ onClose });
     await nextTick();
     const close = wrapper.find('[data-testid="modal-close"]');
     expect(close.attributes('disabled')).toBeUndefined();
+    await close.trigger('click');
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

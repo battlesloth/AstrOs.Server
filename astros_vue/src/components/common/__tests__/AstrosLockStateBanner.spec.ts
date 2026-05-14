@@ -25,11 +25,12 @@ vi.mock('vue-router', async (importOriginal) => {
 });
 
 // Two separate mocks are needed:
-//   - vi.mock('vue-router') above intercepts the script-side `useRoute()`
-//     import that the banner's <script setup> calls.
-//   - global.stubs.RouterLink (registered on mount) provides the template-side
-//     <RouterLink> component, which Vue resolves by name at compile time and
-//     doesn't read from the vi.mock module export.
+//   - The vi.mock('vue-router', ...) call intercepts the script-side
+//     `useRoute()` import that the banner's <script setup> calls.
+//   - The global.stubs.RouterLink registration (in mountBanner's mount
+//     options) provides the template-side <RouterLink> component, which
+//     Vue resolves by name at compile time and doesn't read from the
+//     vi.mock module export.
 // Both are live — removing either breaks the tests.
 const RouterLinkStub = {
   name: 'RouterLink',
@@ -135,20 +136,22 @@ describe('AstrosLockStateBanner', () => {
     expect(cta.text()).toContain('View progress');
   });
 
-  it('suppresses the CTA link when the current route is already /firmware', async () => {
-    // Defensive guard: isOwnJob already covers the common case, but the
-    // banner can briefly be visible on /firmware if the firmware store has
-    // already cleared currentJob while the lock state lags. Don't offer a
-    // link to the page the operator is already on.
+  it('hides the banner entirely when the current route is /firmware', async () => {
+    // FirmwareView has its own role="alert" lock-conflict region for the
+    // active-job/lock-held cases. Suppressing the global banner there
+    // avoids two contradictions: (a) a self-link CTA, and (b) — more
+    // importantly — a banner claiming "in progress" while FirmwareView's
+    // own UI may show no active job during the heartbeat-resolved release
+    // race (lock outlasts currentJob by a tick).
     mockRoutePath.value = '/firmware';
     useJobLockStore().locked = true;
-    // No applyJobStarted call → isOwnJob is false → banner would otherwise be
-    // visible. This is the race-window we are guarding against.
+    // No applyJobStarted call → isOwnJob is false → banner would otherwise
+    // be visible everywhere except /firmware. The route guard is what
+    // suppresses it here.
 
     const wrapper = mountBanner();
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find('[role="status"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="lock-banner-cta"]').exists()).toBe(false);
+    expect(wrapper.find('[role="status"]').exists()).toBe(false);
   });
 });

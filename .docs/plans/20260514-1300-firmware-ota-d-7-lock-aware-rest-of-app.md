@@ -65,15 +65,19 @@ d.7 closes the remaining cross-cutting gaps:
 
 **New:**
 
-- `astros_vue/src/components/common/lockStateBanner/AstrosLockStateBanner.spec.ts`
 - `astros_vue/src/components/common/lockStateBanner/AstrosLockStateBanner.stories.ts`
+- `astros_vue/src/components/modals/__tests__/AstrosConfirmModal.spec.ts`
+- `astros_vue/src/components/modals/modules/__tests__/AstrosAddModuleModal.spec.ts` (form-validation only — see Task 3 audit history)
 
 **Modified:**
 
-- `astros_vue/src/components/common/lockStateBanner/AstrosLockStateBanner.vue` (readonly precedence + CTA link)
+- `astros_vue/src/components/common/lockStateBanner/AstrosLockStateBanner.vue` (readonly precedence + CTA link + /firmware-route suppression)
+- `astros_vue/src/components/common/__tests__/AstrosLockStateBanner.spec.ts` (extended 3 → 6 tests)
+- `astros_vue/.storybook/preview.ts` (in-memory vue-router for stories that touch `useRoute()` or `<RouterLink>`)
 - `astros_vue/src/locales/enUS.json` (new key `firmware_view.lock_banner_cta`)
-- Modal files per audit (primary-button conversions; see Tasks §3).
-- 3 modal `*.spec.ts` files (lock-awareness tests).
+- `astros_vue/src/components/modals/AstrosConfirmModal.vue` (Confirm → AstrosWriteButton)
+- `astros_vue/src/components/modals/modules/AstrosServoTestModal.vue` (Enable Test refactored to use AstrosWriteButton; writesBlocked retained for slider + handler-body guards)
+- `astros_vue/src/components/modals/scripter/AstrosScriptTestModal.vue` (Run → AstrosWriteButton)
 
 ## Risk + reviewer notes
 

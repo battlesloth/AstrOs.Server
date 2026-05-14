@@ -20,10 +20,13 @@ const disabled = ref(true);
 const label = ref('modals.servo_test.enable_test');
 const value = ref(props.homePosition);
 
-// Slider-side lock gate. The Enable Test button is handled by
-// AstrosWriteButton, which consults the store directly; this computed
-// only gates the slider's :disabled, the watcher's auto-disable, and the
-// lock-active notice region below.
+// Slider-side lock gate + belt-and-suspenders for the handler bodies.
+// The Enable Test button itself is handled by AstrosWriteButton, which
+// consults the store directly. This computed feeds: the slider's
+// :disabled, onSliderChange's early-return, enableTest's early-return,
+// the mid-session auto-disable watcher, and the lock-active notice region
+// below. The handler-body guards protect against any programmatic
+// invocation path that bypasses the button's disabled state.
 const writesBlocked = computed(() => jobLockLocked.value);
 
 // If a flash starts while the modal is already open with the test active,

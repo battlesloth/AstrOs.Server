@@ -18,8 +18,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 // Each story owns its Pinia instance so lock / firmware / readonly state
-// doesn't bleed between renders. RouterLink is registered globally in
-// `.storybook/preview.ts` as an inert <a> stub.
+// doesn't bleed between renders. <RouterLink> resolves against the
+// in-memory vue-router instance installed in `.storybook/preview.ts`
+// (wildcard catch-all route), so the CTA renders as a real <a href>
+// without exercising navigation.
 
 export const Visible: Story = {
   name: 'Visible (locked, non-own job)',

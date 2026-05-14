@@ -12,18 +12,26 @@ const route = useRoute();
 
 // Show the banner when a flash is in flight UNLESS:
 // - this view owns the flash (FirmwareView shows its own in-context UI), or
+// - the operator is currently on /firmware (it has its own role="alert"
+//   lock-conflict region; doubling up risks contradicting it when
+//   firmwareStore.currentJob clears just before jobLockStore.locked flips
+//   false during heartbeat-resolved release), or
 // - systemStatus.readOnly is already telling the operator writes are off
 //   (broader condition wins — same precedence as AstrosWriteButton's tooltip).
 const visible = computed(
-  () => jobLockStore.locked && !firmwareStore.isOwnJob && !systemStatusStore.readOnly,
+  () =>
+    jobLockStore.locked &&
+    !firmwareStore.isOwnJob &&
+    route.path !== '/firmware' &&
+    !systemStatusStore.readOnly,
 );
 
-// Don't link to /firmware when the operator is already there. isOwnJob
-// covers the common case, but the lock can briefly outlast the firmware
-// store's currentJob during the heartbeat-resolved release path; in that
-// race window the banner can render on /firmware itself and the CTA would
-// be a self-link.
-const showCta = computed(() => route.path !== '/firmware');
+// CTA is always shown when the banner itself is — the banner is now hidden
+// on /firmware, so any banner that renders is on a different route and
+// linking to /firmware is meaningful. Kept as a computed for forward
+// extensibility (e.g., suppressing on auth routes if those ever land in
+// the same outer layout).
+const showCta = computed(() => visible.value);
 </script>
 
 <template>
