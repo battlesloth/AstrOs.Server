@@ -4,7 +4,6 @@ import { Location } from '@/enums/modules/Location';
 import { ModuleType } from '@/enums/modules/ModuleType';
 import { ModuleSubType } from '@/enums/modules/ModuleSubType';
 import type { AddModuleEvent } from '@/models/events';
-import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 
 interface ModuleSubTypeSelection {
   id: ModuleSubType;
@@ -117,14 +116,14 @@ const closeModal = () => {
       </div>
 
       <div class="modal-action">
-        <AstrosWriteButton
+        <button
           data-testid="modal-add-module"
           class="btn btn-primary"
           :disabled="selectedSubType === ModuleSubType.NONE"
           @click="addModule"
         >
           {{ $t('modals.add_module.add_button') }}
-        </AstrosWriteButton>
+        </button>
         <button
           data-testid="modal-close"
           class="btn"
