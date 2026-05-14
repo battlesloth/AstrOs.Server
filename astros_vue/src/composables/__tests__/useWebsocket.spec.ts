@@ -316,3 +316,131 @@ describe('useWebsocket handleMessage — firmware-flash dispatcher', () => {
     });
   });
 });
+
+describe('CR-3 mid-stream catch does not clobber terminal flashError', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('handleFlashControllerUpdate catch preserves a terminal flashError', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setFlashError({
+      reason: 'internal_server_error',
+      detail: 'asset checksum mismatch on Core',
+    });
+    firmware.setPhase('failed');
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_CONTROLLER_UPDATE,
+        // missing/null data => triggers the catch
+      }),
+    );
+    expect(firmware.flashError?.reason).toBe('internal_server_error');
+    expect(firmware.flashError?.detail).toBe('asset checksum mismatch on Core');
+  });
+
+  it('handleFlashControllerResult catch preserves a terminal flashError', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setFlashError({
+      reason: 'internal_server_error',
+      detail: 'verify failed on Body',
+    });
+    firmware.setPhase('failed');
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_CONTROLLER_RESULT,
+        // missing/null data => triggers the catch
+      }),
+    );
+    expect(firmware.flashError?.reason).toBe('internal_server_error');
+    expect(firmware.flashError?.detail).toBe('verify failed on Body');
+  });
+
+  it('handleFlashControllerUpdate catch DOES set protocol_violation when no existing flashError', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setPhase('flashing');
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_CONTROLLER_UPDATE,
+      }),
+    );
+    expect(firmware.flashError?.reason).toBe('protocol_violation');
+  });
+});
+
+describe('handleLockStateChanged — CR-1b recovery defense', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('forces firmware phase=done when lock releases but firmware is still flashing', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setPhase('flashing');
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.LOCK_STATE_CHANGED,
+        locked: false,
+        owner: null,
+        since: null,
+      }),
+    );
+    expect(firmware.phase).toBe('done');
+    expect(warnSpy.mock.calls.flat().join(' ')).toContain('phase=flashing with lock released');
+  });
+
+  it('does NOT force phase=done when firmware is not flashing (no spurious transitions)', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setPhase('select');
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.LOCK_STATE_CHANGED,
+        locked: false,
+        owner: null,
+        since: null,
+      }),
+    );
+    expect(firmware.phase).toBe('select');
+  });
+
+  it('does NOT force phase transition when locked=true (no inverse trigger)', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setPhase('flashing');
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.LOCK_STATE_CHANGED,
+        locked: true,
+        owner: 'other-op',
+        since: '2026-05-14T08:00:00Z',
+      }),
+    );
+    expect(firmware.phase).toBe('flashing');
+  });
+});
+
+describe('WebsocketMessageType wire-numeric pinning (cross-process contract)', () => {
+  it('pins the wire numeric values that the server emits — drift here breaks every WS message', () => {
+    expect(WebsocketMessageType.SCRIPT).toBe(0);
+    expect(WebsocketMessageType.CONFIGURATION_SYNC).toBe(1);
+    expect(WebsocketMessageType.LOCATION_STATUS).toBe(2);
+    expect(WebsocketMessageType.CONTROLLERS_SYNC).toBe(3);
+    expect(WebsocketMessageType.RUN).toBe(4);
+    expect(WebsocketMessageType.PANIC).toBe(5);
+    expect(WebsocketMessageType.DIRECT_COMMAND).toBe(6);
+    expect(WebsocketMessageType.FORMAT_SD).toBe(7);
+    expect(WebsocketMessageType.SERVO_TEST).toBe(8);
+    expect(WebsocketMessageType.SYSTEM_STATUS).toBe(9);
+    expect(WebsocketMessageType.LOCK_STATE_CHANGED).toBe(10);
+    expect(WebsocketMessageType.FLASH_JOB_ACTIVE).toBe(11);
+    expect(WebsocketMessageType.FLASH_JOB_STARTED).toBe(12);
+    expect(WebsocketMessageType.FLASH_CONTROLLER_UPDATE).toBe(13);
+    expect(WebsocketMessageType.FLASH_CONTROLLER_RESULT).toBe(14);
+    expect(WebsocketMessageType.FLASH_JOB_DONE).toBe(15);
+    expect(WebsocketMessageType.FLASH_JOB_FAILED).toBe(16);
+  });
+});

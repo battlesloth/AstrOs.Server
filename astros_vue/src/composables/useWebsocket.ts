@@ -135,12 +135,23 @@ export function useWebsocket() {
         break;
       case WebsocketMessageType.FLASH_JOB_ACTIVE:
         // Server-side rejection echo for write-class messages sent during a
-        // flash; the UI doesn't act on this directly (the lock-aware
-        // AstrosWriteButton already disables write actions).
+        // flash; the UI doesn't act on this directly. Lock-aware UI
+        // elements (AstrosWriteButton, AstrosServoTestModal) gate writes
+        // during a flash so this rejection should never fire in normal use.
         break;
-      default:
+      default: {
+        // Compile-time exhaustiveness attestation: adding a new
+        // WebsocketMessageType variant the dispatcher doesn't handle should
+        // be visible at refactor time. The `as never` is an attestation
+        // (the switch discriminator is the wide enum, not a true
+        // discriminated union), but it breaks loudly if someone later
+        // refactors to a structural DU. The runtime warn stays for
+        // forward-compat with future server-side values not yet typed.
+        const _exhaustive: never = parsedMessage.type as never;
+        void _exhaustive;
         console.warn('Unhandled message type:', message);
         break;
+      }
     }
   }
 
@@ -250,19 +261,40 @@ export function useWebsocket() {
         owner: data.owner,
         since: data.since,
       });
+      // CR-1b defense-in-depth: if the server has released the lock while
+      // the firmware store still thinks we're 'flashing', a terminal-event
+      // (flashJobDone / flashJobFailed) was lost or arrived out of order.
+      // Force phase='done' so the UI doesn't wedge. Combined with the
+      // fetchCurrentJob endedAt filter (CR-1a), this closes the reboot-
+      // wait wedge identified in the round-7 review.
+      if (!data.locked) {
+        const firmware = useFirmwareStore();
+        if (firmware.phase === 'flashing') {
+          console.warn(
+            '[useWebsocket] handleLockStateChanged: phase=flashing with lock released. ' +
+              'Forcing phase=done as recovery; a terminal-event may have been lost.',
+          );
+          firmware.setPhase('done');
+        }
+      }
     } catch (error) {
       console.error('Error handling lock state change:', error);
     }
   }
 
   // Firmware-flash WS handlers. The happy path delegates to the firmwareStore's
-  // apply* actions; the catch path may also write `store.flashError` directly
-  // (when the store can't see the malformed input to recover by itself). Pin:
-  // a swallowed error must still produce an operator-visible signal. The job-
-  // lifecycle handlers (Started/Done/Failed) transition phase in their catch
-  // (Started → 'select' rollback; Done → 'done'; Failed → 'failed'); the
-  // mid-stream handlers (controllerUpdate/Result) surface flashError without
-  // rolling phase since the next valid update can recover the row.
+  // apply* actions; the catch path may also call `store.setFlashError(...)`
+  // to surface a generic envelope (when the store can't see the malformed
+  // input to recover by itself). All flashError writes route through
+  // setFlashError — the round-6 sole-writer pattern, see firmware.ts
+  // setPhase/setFlashError. Pin: a swallowed error must still produce an
+  // operator-visible signal. The job-lifecycle handlers (Started/Done/Failed)
+  // transition phase in their catch (Started → 'select' rollback; Done →
+  // 'done'; Failed → 'failed'); the mid-stream handlers (controllerUpdate/
+  // Result) surface flashError without rolling phase, AND skip the write
+  // when a terminal flashError is already in place (CR-3 guard — preserves
+  // the specific job-lifecycle reason vs. clobbering with protocol_violation).
+  // The next valid update can still recover the per-row state.
   function handleFlashJobStarted(message: BaseWsMessage) {
     const store = useFirmwareStore();
     try {
@@ -300,10 +332,17 @@ export function useWebsocket() {
       // operator dismisses it or a job-lifecycle event (applyJobStarted,
       // applyJobDone, applyJobFailed) clears flashError. The operator-
       // visible "something went wrong" signal is the load-bearing piece.
-      store.setFlashError({
-        reason: 'protocol_violation',
-        detail: 'Malformed flashControllerUpdate from server',
-      });
+      //
+      // CR-3 guard: don't clobber a terminal flashError that already carries
+      // the actual root cause (applyJobFailed sets specific reasons; a
+      // malformed mid-stream frame's protocol_violation is less informative).
+      // Only write when there's no existing error OR we're still mid-flow.
+      if (store.flashError === null || store.phase === 'flashing') {
+        store.setFlashError({
+          reason: 'protocol_violation',
+          detail: 'Malformed flashControllerUpdate from server',
+        });
+      }
     }
   }
 
@@ -320,10 +359,13 @@ export function useWebsocket() {
       console.error('Error handling flashControllerResult:', error);
       // Mirrors handleFlashControllerUpdate: surface but don't transition.
       // The banner persists until operator-dismiss or a job-lifecycle clear.
-      store.setFlashError({
-        reason: 'protocol_violation',
-        detail: 'Malformed flashControllerResult from server',
-      });
+      // CR-3 guard — see handleFlashControllerUpdate.
+      if (store.flashError === null || store.phase === 'flashing') {
+        store.setFlashError({
+          reason: 'protocol_violation',
+          detail: 'Malformed flashControllerResult from server',
+        });
+      }
     }
   }
 

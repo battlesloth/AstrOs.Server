@@ -822,6 +822,28 @@ describe('firmware store', () => {
       });
       expect(store.controllerStates.get('core')?.stage).toBe('VERSION_CONFIRMED');
     });
+
+    it('drops stale events whose jobId does not match currentJob (post-reconnect race protection)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState({ jobId: 'job-B' }));
+        const beforeStage = store.controllerStates.get('core')?.stage;
+        store.applyControllerResult({
+          jobId: 'job-A',
+          controller: {
+            controllerId: CORE_MAC,
+            stage: 'VERSION_CONFIRMED',
+            finalVersion: 'v9.9.9',
+          },
+        });
+        expect(store.controllerStates.get('core')?.stage).toBe(beforeStage);
+        expect(warnSpy.mock.calls.flat().join(' ')).toContain('jobId mismatch');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
   });
 
   describe('applyJobDone', () => {
@@ -899,6 +921,22 @@ describe('firmware store', () => {
       store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
 
       expect(store.pendingByMac.size).toBe(0);
+    });
+
+    it('drops stale flashJobDone whose jobId does not match currentJob (CR-4)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState({ jobId: 'job-B' }));
+        expect(store.phase).toBe('flashing');
+        store.applyJobDone({ jobId: 'job-A', endedAt: '2026-05-14T08:00:00Z' });
+        expect(store.phase).toBe('flashing');
+        expect(store.currentJob?.endedAt).toBeUndefined();
+        expect(warnSpy.mock.calls.flat().join(' ')).toContain('jobId mismatch');
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 
@@ -1134,6 +1172,50 @@ describe('firmware store', () => {
 
       expect(store.pendingByMac.size).toBe(0);
     });
+
+    it('drops stale flashJobFailed whose jobId does not match currentJob (CR-4)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState({ jobId: 'job-B' }));
+        store.applyJobFailed({
+          jobId: 'job-A',
+          endedAt: '2026-05-14T08:00:00Z',
+          reason: 'internal_server_error',
+        });
+        expect(store.phase).toBe('flashing');
+        expect(store.flashError).toBeNull();
+        expect(warnSpy.mock.calls.flat().join(' ')).toContain('jobId mismatch');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('preserves FAILED entries from pendingByMac in failedControllers (CR-2: bus-wide failure with unmapped MAC)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState({ jobId: 'job-1' }));
+        store.applyControllerUpdate({
+          controllerId: 'aa:bb:cc:dd:ee:99',
+          stage: 'FAILED',
+          error: 'esp_now timeout',
+        });
+        expect(store.pendingByMac.get('aa:bb:cc:dd:ee:99')?.length).toBe(1);
+        store.applyJobFailed({
+          jobId: 'job-1',
+          endedAt: '2026-05-14T08:01:00Z',
+          reason: 'internal_server_error',
+        });
+        const failedIds = store.failedControllers.map((c) => c.id);
+        expect(failedIds).toContain('aa:bb:cc:dd:ee:99');
+        expect(warnSpy.mock.calls.flat().join(' ')).toContain('FAILED entry for unmapped MAC');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
   });
 
   describe('isOwnJob', () => {
@@ -1219,6 +1301,25 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       await store.fetchCurrentJob();
       expect(store.currentJobLoadFailed).toBe(true);
+    });
+
+    it('skips applying a body with endedAt set (CR-1: mirrors server late-join filter for reboot-wait window)', async () => {
+      // Server's decideLateJoinSnapshot skips emitting flashJobStarted on
+      // WS reconnect when currentJob.endedAt is set (the 15s reboot-wait
+      // window). HTTP must mirror that filter; otherwise a refresh during
+      // reboot-wait would populate the store at phase='flashing' with no
+      // subsequent WS event to transition us out, wedging the UI.
+      const endedJob = sampleJobState({
+        jobId: 'job-completed',
+        endedAt: '2026-05-14T08:00:15Z',
+      });
+      apiClientGet.mockResolvedValueOnce({ data: endedJob });
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      await store.fetchCurrentJob();
+      expect(store.currentJob).toBeNull();
+      expect(store.phase).toBe('idle');
+      expect(store.currentJobLoadFailed).toBe(false);
     });
   });
 

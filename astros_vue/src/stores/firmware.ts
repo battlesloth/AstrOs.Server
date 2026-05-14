@@ -354,10 +354,24 @@ export const useFirmwareStore = defineStore('firmware', () => {
     jobId: string;
     controller: ControllerFlashState;
   }): void {
+    if (currentJob.value !== null && payload.jobId !== currentJob.value.jobId) {
+      console.warn(
+        `[firmwareStore] applyControllerResult: jobId mismatch ` +
+          `(payload="${payload.jobId}" current="${currentJob.value.jobId}"). Dropping stale event.`,
+      );
+      return;
+    }
     applyControllerUpdate(payload.controller);
   }
 
   function applyJobDone(data: { jobId: string; endedAt: string }): void {
+    if (currentJob.value !== null && data.jobId !== currentJob.value.jobId) {
+      console.warn(
+        `[firmwareStore] applyJobDone: jobId mismatch ` +
+          `(event="${data.jobId}" current="${currentJob.value.jobId}"). Dropping stale event.`,
+      );
+      return;
+    }
     if (currentJob.value) {
       currentJob.value = { ...currentJob.value, endedAt: data.endedAt };
     }
@@ -401,6 +415,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
   }
 
   function applyJobFailed(data: FlashJobFailedData): void {
+    if (currentJob.value !== null && data.jobId !== currentJob.value.jobId) {
+      console.warn(
+        `[firmwareStore] applyJobFailed: jobId mismatch ` +
+          `(event="${data.jobId}" current="${currentJob.value.jobId}"). Dropping stale event.`,
+      );
+      return;
+    }
     // Pre-streamer failures (release_not_found, variant_mismatch, etc.)
     // arrive without a prior flashJobStarted, so currentJob may be null.
     // We deliberately do NOT synthesize a currentJob in that case — the
@@ -450,9 +471,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
     for (const state of normalized.values()) {
       if (state.stage === 'FAILED') {
         // state.controllerId has been re-keyed to a SlotId by
-        // buildControllerStatesMap / applyControllerUpdate. The cast is the
-        // single attestation site — see types/firmware.ts ControllerFlashState
-        // doc comment for the pre/post-translation contract.
+        // buildControllerStatesMap / applyControllerUpdate — this cast
+        // attests the post-translation type. See types/firmware.ts
+        // ControllerFlashState doc comment for the pre/post-translation
+        // contract. A second `as SlotId` cast lives below (the CR-2
+        // unmapped-MAC sweep) — that one has different semantics: a raw
+        // MAC string is forced into the SlotId slot because the operator
+        // is better served seeing a real MAC than no entry at all.
         const slot = state.controllerId as SlotId;
         const c = controllers.value.find((x) => x.id === slot);
         failed.push({
@@ -460,6 +485,29 @@ export const useFirmwareStore = defineStore('firmware', () => {
           label: c?.label ?? slot,
           stage: currentStage.value,
         });
+      }
+    }
+    // CR-2 sweep: pendingByMac may hold FAILED entries that never got
+    // LocationStatus mapping (bus-wide ESP-NOW failures can mark a
+    // padawan FAILED before its heartbeat arrives). Surface them via
+    // MAC as the label so the operator sees the full bricked-controller
+    // list, not just the mapped subset.
+    for (const [mac, queue] of pendingByMac.value) {
+      for (const entry of queue) {
+        if (entry.stage === 'FAILED') {
+          console.warn(
+            `[firmwareStore] applyJobFailed: FAILED entry for unmapped MAC="${mac}" ` +
+              `surfaced from pendingByMac. LocationStatus never arrived; using MAC as label.`,
+          );
+          // Second `as SlotId` cast site — IM-11 (Phase B) splits the
+          // wire vs slot views and removes this cast. Until then, the
+          // runtime warn above is the forensic breadcrumb.
+          failed.push({
+            id: mac as SlotId,
+            label: mac,
+            stage: currentStage.value,
+          });
+        }
       }
     }
     failedControllers.value = failed;
@@ -555,8 +603,17 @@ export const useFirmwareStore = defineStore('firmware', () => {
     try {
       const response = await apiClient.get(FIRMWARE_FLASH);
       const body = response.data as FlashJobState | null;
-      if (body && body.jobId && currentJob.value === null) {
+      // Mirror server-side decideLateJoinSnapshot: a job with endedAt is in
+      // the reboot-wait window. The server will NOT emit a subsequent
+      // flashJobStarted on the WS, so populating the store here would
+      // wedge phase at 'flashing' indefinitely until the next refresh.
+      if (body && body.jobId && body.endedAt === undefined && currentJob.value === null) {
         applyJobStarted(body);
+      } else if (body && body.jobId && body.endedAt !== undefined) {
+        console.info(
+          `[firmwareStore] fetchCurrentJob: server returned job in reboot-wait window ` +
+            `(jobId="${body.jobId}", endedAt="${body.endedAt}"). Skipping apply to avoid wedge.`,
+        );
       }
       currentJobLoadFailed.value = false;
     } catch (error) {
