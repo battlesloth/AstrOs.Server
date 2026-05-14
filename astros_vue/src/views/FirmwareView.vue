@@ -77,10 +77,25 @@ const showFlashErrorRegion = computed(() => {
   //     is uselessly vague without the detail), OR
   //   - flashError has a non-null detail string (operator should see the
   //     specific reason, not just "Core failed during Verify").
-  return (
-    phase.value === 'failed' &&
-    (failedControllers.value.length === 0 || flashError.value.detail != null)
-  );
+  if (phase.value === 'failed') {
+    return failedControllers.value.length === 0 || flashError.value.detail != null;
+  }
+  // NEW-IM4: phase='done' with a non-null flashError means a non-blocking
+  // warning landed during/after a successful flash (cancel HTTP failed
+  // but flash completed; malformed mid-stream frame; CR-1b recovery
+  // breadcrumb). Surface the region so the operator sees the signal
+  // alongside the "✓ all updated" footer rather than the flashError
+  // being silently swallowed by phase='done'.
+  return phase.value === 'done';
+});
+
+// NEW-IM4: distinct title for the done-phase warning case so operators
+// don't see a red "Flash failed:" title over a green "✓ all updated"
+// footer. The done variant reads as a warning, not an error.
+const flashErrorTitleKey = computed(() => {
+  if (phase.value === 'failed') return 'firmware_view.mid_flash_error.title_failed';
+  if (phase.value === 'done') return 'firmware_view.mid_flash_error.title_done_warning';
+  return 'firmware_view.mid_flash_error.title_warning';
 });
 
 const confirmOpen = ref(false);
@@ -226,11 +241,7 @@ onMounted(async () => {
             aria-live="polite"
             data-test="mid-flash-error"
           >
-            <span class="firmware-view__flash-error-title">{{
-              phase === 'failed'
-                ? t('firmware_view.mid_flash_error.title_failed')
-                : t('firmware_view.mid_flash_error.title_warning')
-            }}</span>
+            <span class="firmware-view__flash-error-title">{{ t(flashErrorTitleKey) }}</span>
             <span class="firmware-view__flash-error-detail">{{ flashErrorDetail }}</span>
             <span
               v-if="phase === 'failed' && currentJob?.abortReason"

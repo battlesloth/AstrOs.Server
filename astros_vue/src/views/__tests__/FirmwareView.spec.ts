@@ -426,6 +426,38 @@ describe('FirmwareView mid-flash error region (C1)', () => {
 
     expect(wrapper.find('[data-test="abort-reason"]').exists()).toBe(false);
   });
+
+  it('NEW-IM4: renders flash-error region in phase="done" when flashError is non-null (done-with-warning)', async () => {
+    // Round-8 NEW-IM4: previously showFlashErrorRegion returned false for
+    // phase='done', silently swallowing any flashError that landed during
+    // a successful flash. The CR-1b recovery, malformed flashJobDone catch,
+    // and cancel-while-completing paths all leave the store in this state.
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('done');
+    firmwareStore.flashError = {
+      reason: 'protocol_violation',
+      detail: 'Recovered from lost terminal event — verify each controller actually flashed.',
+    };
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const region = wrapper.find('[data-test="mid-flash-error"]');
+    expect(region.exists()).toBe(true);
+    expect(region.text()).toContain('Flash completed with a warning');
+    expect(region.text()).toContain('Recovered from lost terminal event');
+  });
+
+  it('NEW-IM4: hides flash-error region in phase="done" when flashError is null (negative baseline)', async () => {
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('done');
+    firmwareStore.flashError = null;
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="mid-flash-error"]').exists()).toBe(false);
+  });
 });
 
 describe('FirmwareView lockSinceFormatted defensive fallback (IM-8)', () => {

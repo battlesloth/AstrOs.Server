@@ -918,6 +918,80 @@ describe('firmware store', () => {
       store.applyControllerUpdate({ controllerId: 'unmapped-mac', stage: 'SENDING' });
       expect(store.currentJobLoadFailed).toBe(true);
     });
+
+    describe('NEW-IM1: element validation (mirror of IM-3 from buildControllerStatesMap)', () => {
+      it('skips and warns when data.controllerId is missing', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          const store = useFirmwareStore();
+          seedSampleFleet();
+          store.applyJobStarted(sampleJobState());
+          const sizeBefore = store.pendingByMac.size;
+          // @ts-expect-error — deliberately omit controllerId
+          store.applyControllerUpdate({ stage: 'SENDING' });
+          expect(store.pendingByMac.size).toBe(sizeBefore);
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain('invalid controllerId');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+
+      it('skips and warns when data.controllerId is empty string', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          const store = useFirmwareStore();
+          seedSampleFleet();
+          store.applyJobStarted(sampleJobState());
+          const sizeBefore = store.pendingByMac.size;
+          store.applyControllerUpdate({ controllerId: '', stage: 'SENDING' });
+          expect(store.pendingByMac.size).toBe(sizeBefore);
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain('invalid controllerId');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+    });
+
+    describe('NEW-IM3: terminal-phase guard (drops trailing updates after done/failed)', () => {
+      it('drops trailing applyControllerUpdate when phase is done', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          const store = useFirmwareStore();
+          seedSampleFleet();
+          store.applyJobStarted(sampleJobState());
+          store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-14T08:05:00Z' });
+          expect(store.phase).toBe('done');
+          const bodyBefore = store.controllerStates.get('body');
+          store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
+          // State unchanged.
+          expect(store.controllerStates.get('body')).toEqual(bodyBefore);
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain('terminal phase');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+
+      it('drops trailing applyControllerUpdate when phase is failed', () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          const store = useFirmwareStore();
+          seedSampleFleet();
+          store.applyJobStarted(sampleJobState());
+          store.applyJobFailed({
+            jobId: 'job-1',
+            endedAt: '2026-05-14T08:05:00Z',
+            reason: 'internal_server_error',
+          });
+          expect(store.phase).toBe('failed');
+          const bodyBefore = store.controllerStates.get('body');
+          store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'REBOOTING' });
+          expect(store.controllerStates.get('body')).toEqual(bodyBefore);
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain('terminal phase');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+    });
   });
 
   describe('applyControllerResult', () => {
@@ -1454,6 +1528,26 @@ describe('firmware store', () => {
       expect(store.currentJob).toBeNull();
       expect(store.phase).toBe('idle');
       expect(store.currentJobLoadFailed).toBe(false);
+    });
+
+    it('NEW-IM2: skips and warns when body.jobId is empty string (server contract violation)', async () => {
+      // Pre-fix, the `body.jobId` truthy check let empty-string fall
+      // through silently — no apply, no warn. A server contract bug
+      // emitting `{jobId: ''}` would be invisible. Tightened to an
+      // explicit non-empty-string check + forensic warn.
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        apiClientGet.mockResolvedValueOnce({
+          data: { ...sampleJobState(), jobId: '' },
+        });
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        await store.fetchCurrentJob();
+        expect(store.currentJob).toBeNull();
+        expect(warnSpy.mock.calls.flat().join(' ')).toContain('empty jobId');
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 

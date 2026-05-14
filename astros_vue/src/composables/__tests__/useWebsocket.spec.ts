@@ -369,6 +369,38 @@ describe('CR-3 mid-stream catch does not clobber terminal flashError', () => {
     );
     expect(firmware.flashError?.reason).toBe('protocol_violation');
   });
+
+  it('does NOT set protocol_violation when phase=done and flashError is null (round-8 NEW-C1)', () => {
+    // After a clean flash completion, phase='done' with no flashError. A
+    // stray malformed mid-stream frame (e.g., server retransmit during
+    // reboot-wait) must NOT clobber the happy "✓ all updated" UI with a
+    // red protocol_violation banner. The CR-3 guard was originally `||`
+    // (set if EITHER is OK) which allowed this; tightening to `&&` (set
+    // only when BOTH conditions hold — mid-flow AND no existing error)
+    // closes the visual contradiction.
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setPhase('done');
+    expect(firmware.flashError).toBeNull();
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_CONTROLLER_UPDATE,
+      }),
+    );
+    expect(firmware.flashError).toBeNull();
+  });
+
+  it('does NOT set protocol_violation when phase=done via FLASH_CONTROLLER_RESULT malformed frame', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setPhase('done');
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_CONTROLLER_RESULT,
+      }),
+    );
+    expect(firmware.flashError).toBeNull();
+  });
 });
 
 describe('handleLockStateChanged — CR-1b recovery defense', () => {
@@ -420,6 +452,60 @@ describe('handleLockStateChanged — CR-1b recovery defense', () => {
       }),
     );
     expect(firmware.phase).toBe('flashing');
+  });
+
+  it('NEW-C2: recovery normalizes controllerStates (delegates to applyJobDone, not bare setPhase)', () => {
+    // Round-8 NEW-C2: without normalization, the panel renders "✓ done"
+    // while rows still show "Updating" pills + stage labels. Forcing the
+    // recovery through applyJobDone runs the demote-non-terminal-stages
+    // loop so the per-row UI matches the terminal phase.
+    const controllers = useControllerStore();
+    controllers.setControllerMac(Location.BODY, '00:00:00:00:00:00');
+    controllers.setControllerMac(Location.CORE, 'aa:bb:cc:dd:ee:01');
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.applyJobStarted({
+      jobId: 'job-1',
+      source: { kind: 'github', version: 'v1.0' },
+      controllers: [
+        { controllerId: '00:00:00:00:00:00', stage: 'SENDING' },
+        { controllerId: 'aa:bb:cc:dd:ee:01', stage: 'QUEUED' },
+      ],
+      startedAt: '2026-05-14T08:00:00Z',
+    });
+    // Mid-flow states present.
+    expect(firmware.controllerStates.get('body')?.stage).toBe('SENDING');
+    expect(firmware.controllerStates.get('core')?.stage).toBe('QUEUED');
+
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.LOCK_STATE_CHANGED,
+        locked: false,
+        owner: null,
+        since: null,
+      }),
+    );
+
+    expect(firmware.phase).toBe('done');
+    // Both per-controller states normalized to VERSION_CONFIRMED.
+    expect(firmware.controllerStates.get('body')?.stage).toBe('VERSION_CONFIRMED');
+    expect(firmware.controllerStates.get('core')?.stage).toBe('VERSION_CONFIRMED');
+  });
+
+  it('NEW-C2: recovery surfaces a protocol_violation flashError breadcrumb so operators see the recovery', () => {
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setPhase('flashing');
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.LOCK_STATE_CHANGED,
+        locked: false,
+        owner: null,
+        since: null,
+      }),
+    );
+    expect(firmware.flashError?.reason).toBe('protocol_violation');
+    expect(firmware.flashError?.detail).toContain('terminal event');
   });
 });
 

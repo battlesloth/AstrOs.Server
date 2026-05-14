@@ -318,6 +318,30 @@ export const useFirmwareStore = defineStore('firmware', () => {
   }
 
   function applyControllerUpdate(data: ControllerFlashState): void {
+    // NEW-IM1: mirror IM-3's element validation from buildControllerStatesMap.
+    // A malformed mid-stream flashControllerUpdate (no controllerId / non-
+    // string / empty) would otherwise call resolveSlot(undefined) and
+    // pollute pendingByMac under an undefined key — the CR-2 sweep then
+    // surfaces `{id: 'undefined', label: 'undefined'}` in failedControllers.
+    if (!data || typeof data.controllerId !== 'string' || data.controllerId.length === 0) {
+      console.warn(
+        `[firmwareStore] applyControllerUpdate: skipping element with invalid controllerId`,
+        data,
+      );
+      return;
+    }
+    // NEW-IM3: terminal-phase guard. After applyJobDone normalizes states
+    // to VERSION_CONFIRMED (or applyJobFailed demotes to FAILED), a trailing
+    // flashControllerUpdate from the same job (server retransmit, buffered
+    // event flush) would mutate controllerStates and silently flip a row's
+    // pill from 'done' back to 'updating' while the footer still claims
+    // "✓ all updated".
+    if (phase.value === 'done' || phase.value === 'failed') {
+      console.warn(
+        `[firmwareStore] applyControllerUpdate: dropping update for controllerId="${data.controllerId}" — job already at terminal phase="${phase.value}"`,
+      );
+      return;
+    }
     const slot = resolveSlot(data.controllerId);
     if (slot === null) {
       // Queue for replay; see pendingByMac comment above. Critical: the
@@ -649,13 +673,25 @@ export const useFirmwareStore = defineStore('firmware', () => {
     try {
       const response = await apiClient.get(FIRMWARE_FLASH);
       const body = response.data as FlashJobState | null;
+      // NEW-IM2: explicit non-empty-string check on body.jobId. The prior
+      // truthy short-circuit silently passed `{jobId: ''}` server contract
+      // violations through with no warn and no apply. Now we surface a
+      // forensic warn so ops can trace the bad payload back to its source.
+      const hasValidJobId =
+        body !== null && typeof body.jobId === 'string' && body.jobId.length > 0;
+      if (body !== null && !hasValidJobId) {
+        console.warn(
+          `[firmwareStore] fetchCurrentJob: server returned non-null body with empty jobId — contract violation; skipping apply.`,
+          body,
+        );
+      }
       // Mirror server-side decideLateJoinSnapshot: a job with endedAt is in
       // the reboot-wait window. The server will NOT emit a subsequent
       // flashJobStarted on the WS, so populating the store here would
       // wedge phase at 'flashing' indefinitely until the next refresh.
-      if (body && body.jobId && body.endedAt === undefined && currentJob.value === null) {
+      if (hasValidJobId && body.endedAt === undefined && currentJob.value === null) {
         applyJobStarted(body);
-      } else if (body && body.jobId && body.endedAt !== undefined) {
+      } else if (hasValidJobId && body.endedAt !== undefined) {
         console.info(
           `[firmwareStore] fetchCurrentJob: server returned job in reboot-wait window ` +
             `(jobId="${body.jobId}", endedAt="${body.endedAt}"). Skipping apply to avoid wedge.`,

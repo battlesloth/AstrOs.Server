@@ -271,17 +271,28 @@ export function useWebsocket() {
       // CR-1b defense-in-depth: if the server has released the lock while
       // the firmware store still thinks we're 'flashing', a terminal-event
       // (flashJobDone / flashJobFailed) was lost or arrived out of order.
-      // Force phase='done' so the UI doesn't wedge. Combined with the
-      // fetchCurrentJob endedAt filter (CR-1a), this closes the reboot-
-      // wait wedge identified in the round-7 review.
+      // Recover via applyJobDone so per-controller states are normalized
+      // (round-8 NEW-C2 — bare setPhase left the per-row UI showing
+      // "Updating" pills while the footer claimed "✓ All updated"). Also
+      // surface a protocol_violation flashError so operators see a visible
+      // breadcrumb that recovery fired — they should verify controllers
+      // actually flashed before treating the result as authoritative.
       if (!data.locked) {
         const firmware = useFirmwareStore();
         if (firmware.phase === 'flashing') {
           console.warn(
             '[useWebsocket] handleLockStateChanged: phase=flashing with lock released. ' +
-              'Forcing phase=done as recovery; a terminal-event may have been lost.',
+              'Recovering via applyJobDone; a terminal-event may have been lost.',
           );
-          firmware.setPhase('done');
+          firmware.applyJobDone({
+            jobId: firmware.currentJob?.jobId ?? '<recovery>',
+            endedAt: new Date().toISOString(),
+          });
+          firmware.setFlashError({
+            reason: 'protocol_violation',
+            detail:
+              'Recovered from lost terminal event — verify each controller actually flashed before treating the result as authoritative.',
+          });
         }
       }
     } catch (error) {
@@ -294,13 +305,17 @@ export function useWebsocket() {
   // to surface a generic envelope (when the store can't see the malformed
   // input to recover by itself). All flashError writes route through
   // setFlashError — the round-6 sole-writer pattern, see firmware.ts
-  // setPhase/setFlashError. Pin: a swallowed error must still produce an
-  // operator-visible signal. The job-lifecycle handlers (Started/Done/Failed)
-  // transition phase in their catch (Started → 'select' rollback; Done →
-  // 'done'; Failed → 'failed'); the mid-stream handlers (controllerUpdate/
-  // Result) surface flashError without rolling phase, AND skip the write
-  // when a terminal flashError is already in place (CR-3 guard — preserves
-  // the specific job-lifecycle reason vs. clobbering with protocol_violation).
+  // setFlashError/clearFlashError. Pin: a swallowed error must still produce
+  // an operator-visible signal. The job-lifecycle handlers (Started/Done/
+  // Failed) transition phase in their catch (Started → 'select' rollback;
+  // Done → 'done'; Failed → 'failed'); the mid-stream handlers
+  // (controllerUpdate/Result) surface flashError without rolling phase, BUT
+  // skip the write when EITHER (a) we're no longer mid-flow (phase !=
+  // 'flashing') so a stray malformed frame after completion can't clobber
+  // a clean "✓ all updated" UI, OR (b) an existing flashError already
+  // carries the specific job-lifecycle reason (preserves it vs. clobbering
+  // with protocol_violation). CR-3 guard tightened from `||` to `&&` in
+  // round-8 NEW-C1 — both conditions must hold for the catch to write.
   // The next valid update can still recover the per-row state.
   function handleFlashJobStarted(message: BaseWsMessage) {
     const store = useFirmwareStore();
@@ -330,6 +345,15 @@ export function useWebsocket() {
     const store = useFirmwareStore();
     try {
       const data = (message as unknown as { data: ControllerFlashState }).data;
+      // Dispatcher-level wire-shape validation: a malformed envelope (no
+      // data, missing controllerId) must reach the catch so the operator
+      // sees a protocol_violation breadcrumb. The store's NEW-IM1 guard
+      // is silent — that's correct for the "internal caller passes bad
+      // data" path but wrong for the "WS payload is malformed" path that
+      // this dispatcher catch was designed to surface.
+      if (!data || typeof data.controllerId !== 'string' || data.controllerId.length === 0) {
+        throw new Error('malformed flashControllerUpdate: missing/invalid controllerId');
+      }
       store.applyControllerUpdate(data);
     } catch (error) {
       console.error('Error handling flashControllerUpdate:', error);
@@ -340,11 +364,13 @@ export function useWebsocket() {
       // applyJobDone, applyJobFailed) clears flashError. The operator-
       // visible "something went wrong" signal is the load-bearing piece.
       //
-      // CR-3 guard: don't clobber a terminal flashError that already carries
-      // the actual root cause (applyJobFailed sets specific reasons; a
-      // malformed mid-stream frame's protocol_violation is less informative).
-      // Only write when there's no existing error OR we're still mid-flow.
-      if (store.flashError === null || store.phase === 'flashing') {
+      // CR-3 guard (tightened in round-8 NEW-C1): only set the
+      // protocol_violation envelope when BOTH (a) we're still mid-flow AND
+      // (b) no existing flashError is already in place. Round-7's `||` was
+      // too permissive — after a clean completion (phase='done',
+      // flashError=null), a stray malformed frame would set a red
+      // protocol_violation banner over the happy "✓ all updated" UI.
+      if (store.flashError === null && store.phase === 'flashing') {
         store.setFlashError({
           reason: 'protocol_violation',
           detail: 'Malformed flashControllerUpdate from server',
@@ -361,13 +387,24 @@ export function useWebsocket() {
           data: { jobId: string; controller: ControllerFlashState };
         }
       ).data;
+      // Dispatcher-level wire-shape validation — see
+      // handleFlashControllerUpdate for the rationale.
+      if (
+        !data ||
+        !data.controller ||
+        typeof data.controller.controllerId !== 'string' ||
+        data.controller.controllerId.length === 0
+      ) {
+        throw new Error('malformed flashControllerResult: missing/invalid controller payload');
+      }
       store.applyControllerResult(data);
     } catch (error) {
       console.error('Error handling flashControllerResult:', error);
       // Mirrors handleFlashControllerUpdate: surface but don't transition.
       // The banner persists until operator-dismiss or a job-lifecycle clear.
-      // CR-3 guard — see handleFlashControllerUpdate.
-      if (store.flashError === null || store.phase === 'flashing') {
+      // CR-3 guard (round-8 NEW-C1 tightened to `&&`) — see
+      // handleFlashControllerUpdate for the full rationale.
+      if (store.flashError === null && store.phase === 'flashing') {
         store.setFlashError({
           reason: 'protocol_violation',
           detail: 'Malformed flashControllerResult from server',

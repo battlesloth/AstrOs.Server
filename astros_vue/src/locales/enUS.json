@@ -182,6 +182,7 @@
     "mid_flash_error": {
       "title_warning": "Flash warning:",
       "title_failed": "Flash failed:",
+      "title_done_warning": "Flash completed with a warning:",
       "abort_reason": "Abort reason: {reason}",
       "dismiss": "Dismiss"
     }
