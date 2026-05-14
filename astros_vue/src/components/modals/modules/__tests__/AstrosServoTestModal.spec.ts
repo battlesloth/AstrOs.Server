@@ -38,7 +38,7 @@ function mountModal(): VueWrapper {
   });
 }
 
-describe('AstrosServoTestModal — lock-aware gating', () => {
+describe('AstrosServoTestModal — write-blocked gating (jobLock + readOnly)', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     stubSendMessage.mockClear();
@@ -130,16 +130,27 @@ describe('AstrosServoTestModal — lock-aware gating', () => {
     expect(stubSendMessage).not.toHaveBeenCalled();
   });
 
-  it('disables the slider, number input, and Enable button when systemStatus.readOnly is true', async () => {
-    const systemStatus = useSystemStatusStore();
-    systemStatus.setStatus({ readOnly: true, reasonCode: 'BACKUP_FAILED' });
+  it('keeps slider/number input disabled when readOnly flips on AFTER the test is enabled', async () => {
+    // This test exercises the writesBlocked widening directly. Without the
+    // `|| systemStatusReadOnly.value` clause, the initial disabled=true
+    // ref already keeps both inputs disabled at mount, so a naive "disabled
+    // when readonly is true" assertion passes vacuously. We instead enable
+    // the test first (disabled flips to false), then flip readOnly true and
+    // assert both inputs go back to disabled — which only holds if
+    // writesBlocked feeds the :disabled bindings.
     const wrapper = mountModal();
-    await nextTick();
-
     const btn = wrapper.find('[data-testid="enable-test-button"]');
+    await btn.trigger('click');
+
     const slider = wrapper.find('input[type="range"]');
     const numberInput = wrapper.find('input[type="number"]');
-    expect(btn.attributes('disabled')).toBeDefined();
+    expect(slider.attributes('disabled')).toBeUndefined();
+    expect(numberInput.attributes('disabled')).toBeUndefined();
+
+    const systemStatus = useSystemStatusStore();
+    systemStatus.setStatus({ readOnly: true, reasonCode: 'BACKUP_FAILED' });
+    await nextTick();
+
     expect(slider.attributes('disabled')).toBeDefined();
     expect(numberInput.attributes('disabled')).toBeDefined();
   });

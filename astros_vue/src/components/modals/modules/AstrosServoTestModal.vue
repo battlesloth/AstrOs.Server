@@ -23,20 +23,23 @@ const disabled = ref(true);
 const label = ref('modals.servo_test.enable_test');
 const value = ref(props.homePosition);
 
-// Slider-side write gate + belt-and-suspenders for the handler bodies.
+// Value-entry write gate + belt-and-suspenders for the handler bodies.
 // The Enable Test button itself is handled by AstrosWriteButton, which
 // consults both stores directly. This computed mirrors that OR so the
-// slider :disabled, onSliderChange's early-return, enableTest's
-// early-return, and the mid-session auto-disable watcher all stay in
-// sync. The handler-body guards protect against any programmatic
-// invocation path that bypasses the button's disabled state.
+// number-input :disabled, the slider :disabled, onSliderChange's
+// early-return, enableTest's early-return, and the mid-session
+// auto-disable watcher all stay in sync. The handler-body guards
+// protect against any programmatic invocation path that bypasses the
+// elements' disabled state.
 //
 // Note: the firmware-flash notice region (`lock-active-notice` below) is
 // intentionally gated on `jobLockLocked` alone, not `writesBlocked`. Its
 // copy is firmware-flash-specific (firmware_view.lock_active); readonly
-// is already explained by AstrosWriteButton's tooltip on the Enable
-// button, so a redundant "flash active" notice during a non-flash
-// readonly state would be misleading.
+// is surfaced elsewhere in the UI through AstrosWriteButton's tooltip
+// (whichever priority that component currently assigns), so a redundant
+// "flash active" notice during a non-flash readonly state would be
+// misleading. If AstrosWriteButton ever drops its readonly tooltip, this
+// modal will need its own readonly notice copy.
 const writesBlocked = computed(() => jobLockLocked.value || systemStatusReadOnly.value);
 
 // If writes become blocked (firmware flash lock or system readonly) while

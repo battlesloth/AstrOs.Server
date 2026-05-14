@@ -16,19 +16,21 @@ export const useJobLockStore = defineStore('jobLock', () => {
   }
 
   async function fetchLockState(): Promise<void> {
-    // HTTP hydrate is belt-and-braces alongside the lockStateChanged WS push:
-    // App.vue fires both in parallel on mount, and whichever resolves last
-    // wins the final setState call. On local LAN the WS snapshot from
-    // onopen typically arrives first; the HTTP response then overwrites
-    // with whatever the server reported at the time of the GET. Both
-    // snapshots reflect the same authoritative JobLock state on the
-    // server, so the residual race is millisecond-scale and benign in
-    // practice. Mirrors systemStatus.fetchStatus.
+    // HTTP hydrate closes the cold-mount / deep-link window before the WS
+    // handshake's on-connect snapshot arrives (the server emits the snapshot
+    // inside its `ws.on('connection', ...)` handler in api_server.ts; it
+    // surfaces client-side via `useWebsocket.handleLockStateChanged`). Both
+    // paths converge on `setState` with the same authoritative `JobLock`
+    // state from the server, so whichever resolves last wins and the result
+    // is the same. Mirrors systemStatus.fetchStatus.
     try {
       const response = (await apiService.get(FIRMWARE_LOCK_STATE)) as LockState;
       setState(response);
     } catch (error) {
-      // Leave state unchanged — the WS push remains as the primary source.
+      // Leave state unchanged. The lockStateChanged WS push on (re)connect,
+      // or the next acquire/release transition, will bring us back up to
+      // date — assuming the WS path also works. If both paths fail, the UI
+      // stays at the default unlocked state with no operator-visible signal.
       console.warn('jobLock.fetchLockState failed', error);
     }
   }
