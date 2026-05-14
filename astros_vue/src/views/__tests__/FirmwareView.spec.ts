@@ -379,6 +379,53 @@ describe('FirmwareView mid-flash error region (C1)', () => {
 
     expect(wrapper.find('[data-test="mid-flash-error"]').exists()).toBe(false);
   });
+
+  it('IM-1: renders abortReason in the failed-phase flash-error region when present', async () => {
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('failed');
+    firmwareStore.failedControllers = [{ id: Location.CORE, label: 'Core', stage: 'verify' }];
+    firmwareStore.flashError = {
+      reason: 'internal_server_error',
+      detail: 'asset checksum mismatch',
+    };
+    firmwareStore.currentJob = {
+      jobId: 'job-1',
+      source: { kind: 'github', version: 'v1.4.2' },
+      controllers: [],
+      startedAt: '2026-05-14T08:00:00Z',
+      endedAt: '2026-05-14T08:05:00Z',
+      abortReason: 'user_cancel',
+    };
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    const abortRegion = wrapper.find('[data-test="abort-reason"]');
+    expect(abortRegion.exists()).toBe(true);
+    expect(abortRegion.text()).toContain('user_cancel');
+  });
+
+  it('IM-1: does NOT render abortReason in failed phase when currentJob.abortReason is undefined', async () => {
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('failed');
+    firmwareStore.failedControllers = [{ id: Location.CORE, label: 'Core', stage: 'verify' }];
+    firmwareStore.flashError = {
+      reason: 'internal_server_error',
+      detail: 'something failed',
+    };
+    firmwareStore.currentJob = {
+      jobId: 'job-1',
+      source: { kind: 'github', version: 'v1.4.2' },
+      controllers: [],
+      startedAt: '2026-05-14T08:00:00Z',
+      // no abortReason
+    };
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="abort-reason"]').exists()).toBe(false);
+  });
 });
 
 describe('FirmwareView lockSinceFormatted defensive fallback (IM-8)', () => {

@@ -36,6 +36,7 @@ const {
   isOwnJob,
   currentJobLoadFailed,
   flashError,
+  currentJob,
 } = storeToRefs(firmware);
 const { locked: lockLocked, since: lockSince } = storeToRefs(jobLock);
 // WS connection state. Drives the "live updates suspended" banner when a
@@ -231,6 +232,17 @@ onMounted(async () => {
                 : t('firmware_view.mid_flash_error.title_warning')
             }}</span>
             <span class="firmware-view__flash-error-detail">{{ flashErrorDetail }}</span>
+            <span
+              v-if="phase === 'failed' && currentJob?.abortReason"
+              class="firmware-view__flash-error-abort-reason"
+              data-test="abort-reason"
+            >
+              {{
+                t('firmware_view.mid_flash_error.abort_reason', {
+                  reason: currentJob.abortReason,
+                })
+              }}
+            </span>
             <button
               type="button"
               class="firmware-view__flash-error-dismiss"

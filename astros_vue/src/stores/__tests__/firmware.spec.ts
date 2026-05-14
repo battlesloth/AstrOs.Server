@@ -1134,7 +1134,7 @@ describe('firmware store', () => {
       expect(store.failedControllers[0]?.stage).toBeNull();
     });
 
-    it('collects ALL FAILED entries (multi-failure realistic on bus-wide ESP-NOW errors)', () => {
+    it('collects ALL FAILED entries AND attributes stage from the shared currentStage ref (not per-controller history)', () => {
       // C2 fix: a `break` in applyJobFailed previously surfaced only the
       // first FAILED entry by iteration order. With two padawans failing
       // simultaneously (e.g. master loses ESP-NOW), the operator would
@@ -1256,7 +1256,7 @@ describe('firmware store', () => {
       expect(ids).toEqual(['body', 'core']);
     });
 
-    it('preserves server-reported FAILED entries during the failed normalize (preserves their error string)', () => {
+    it('preserves server-reported FAILED error strings AND demoted entries get the unattributed marker (IM-2 normalize attribution)', () => {
       // A controller that legitimately FAILED (with the server's error
       // reason) must keep its error attribute. The normalize must only
       // touch non-terminal stages.

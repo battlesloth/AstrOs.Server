@@ -37,7 +37,7 @@ Type 11 (`flashJobActive`) is a server-side rejection echo for write-class WS me
 
 ### Late-join contract
 
-`astros_api/src/api_server.ts:652-660` sends one `flashJobStarted` snapshot on connect when a job is in flight. The Vue client's `useWebsocket` reconnects every 3s on disconnect. **Net contract:** every WS connection that opens while a flash is in progress receives a fresh `flashJobStarted`. The store's `applyJobStarted` must be **idempotent and replace-not-merge**.
+`astros_api/src/api_server.ts:654-669` sends one `flashJobStarted` snapshot on connect when a job is in flight, EXCEPT when `currentJob.endedAt` is set (the 15s reboot-wait window — round-7 CR-1 mirrored this filter on the HTTP side too). The Vue client's `useWebsocket` reconnects every 3s on disconnect. **Net contract:** every WS connection that opens while a flash is in progress receives a fresh `flashJobStarted`. The store's `applyJobStarted` must be **idempotent and replace-not-merge**.
 
 ---
 
@@ -200,7 +200,7 @@ Tooltip key: prefer `firmware_view.lock_active` when only `jobLock.locked`; exis
 
 **Scope shipped:** smoke spec covering page-chrome rendering, source-strip toggle visibility, controllers-panel header (Select all / Clear), and Flash-button initial disabled state. No WS-driven phase progression — that requires a WS-mock infrastructure the project doesn't have yet.
 
-**Coverage substitute:** the 5 `apply*` handlers, late-join idempotency, replace-not-merge, lock-conflict logic, replay queue, multi-FAILED collection, and HTTP-staleness handling are exhaustively covered by the firmware/composables/views vitest suites (228 tests total at branch tip across rounds 1–4). The end-to-end operator flow (cold-load, happy-path, failure path, late-join, lock-conflict, WS reconnect, network failure, reduced-motion, dev-warns) lives in the manual QA plan at `.docs/qa/firmware-ota-flash-ui.md` (12 scenarios).
+**Coverage substitute:** the 5 `apply*` handlers, late-join idempotency, replace-not-merge, lock-conflict logic, replay queue, multi-FAILED collection, and HTTP-staleness handling are exhaustively covered by the firmware/composables/views vitest suites (vue test count grows across rounds; see latest `npx vitest run` for current). The end-to-end operator flow (cold-load, happy-path, failure path, late-join, lock-conflict, WS reconnect, network failure, reduced-motion, dev-warns) lives in the manual QA plan at `.docs/qa/firmware-ota-flash-ui.md`.
 
 ---
 
@@ -218,7 +218,7 @@ Tooltip key: prefer `firmware_view.lock_active` when only `jobLock.locked`; exis
 - [x] Mirror server types (`ServerFwStage`, `ControllerFlashState`, `FlashJobState`, `FlashJobFailedData`) into `types/firmware.ts`. Cross-reference comment at top pointing at the server file.
 - [x] Add `FLASH_JOB_ACTIVE = 11` through `FLASH_JOB_FAILED = 16` to `WebsocketMessageType` enum. Cross-reference comment.
 - [x] Implement `utils/firmwareStageMapping.ts` (`mapServerStageToUiStage` + `controllerStatePillKind`) with full unit-test coverage.
-- [x] Extend `firmwareStore`: add `currentJob`, `controllerStates`, `ownJobId` refs; turn `controllers` into a `computed` over `useControllerStore()` (replaces the d.5 ref and `DEV_SAMPLE_FLEET` bootstrap); add `applyJobStarted/applyControllerUpdate/applyControllerResult/applyJobDone/applyJobFailed` actions; add `fetchCurrentJob`; update `startFlash` to capture `ownJobId` from the POST response and to NOT manage phase directly (WS owns phase from `flashing` onward). Comprehensive unit tests for each handler + idempotency + replace-not-merge + the **5 FMI hazards** below.
+- [x] Extend `firmwareStore`: add `currentJob`, `controllerStates`, `ownJobId` refs; turn `controllers` into a `computed` over `useControllerStore()` (replaces the d.5 ref and `DEV_SAMPLE_FLEET` bootstrap); add `applyJobStarted/applyControllerUpdate/applyControllerResult/applyJobDone/applyJobFailed` actions; add `fetchCurrentJob`; update `startFlash` to capture `ownJobId` from the POST response and to NOT manage phase directly (WS owns phase from `flashing` onward). Comprehensive unit tests for each handler + idempotency + replace-not-merge + the **8 FMI hazards** below (the inventory grew during the round-3..round-7 review iterations; the 8th hazard for the reboot-wait wedge was added in round-7).
 - [x] Update `useWebsocket.ts` `handleMessage` switch with 5 new cases; new `handleFlashJobStarted` / `handleFlashControllerUpdate` / `handleFlashControllerResult` / `handleFlashJobDone` / `handleFlashJobFailed` functions following the existing try/catch pattern.
 - [x] Extend `AstrosWriteButton.vue` to OR-in `useJobLockStore().locked`. Update tooltip key resolution. Update existing 9 tests if needed, add 3 new for jobLock-only / both-active / neither cases.
 - [x] Add lock banner to `AstrosLayout.vue` — sibling component or inline. New i18n key. Verify it doesn't double up with the system-status banner when both readonly + locked.
@@ -243,7 +243,8 @@ This is the concurrency-surface PR of phase D. Each row has explicit unit-test c
 | **Tab-close mid-flash** | Browser navigation/close is NOT a flash-cancel signal — server holds the lock until heartbeat / 15s timer | UI must NOT trigger cancel on `beforeunload`. Code review: no `beforeunload` listener added in FirmwareView or firmwareStore. On view re-enter, `fetchCurrentJob` + WS late-join populate state. Manual QA via e2e. |
 | **Stale `controllerStates` after job ends** | Next flash inherits stale per-controller stages | `resetToSelect()` clears `controllerStates`. Called when operator clicks "Done" in result bar. Unit test: failed phase → resetToSelect → controllerStates empty. |
 | **Enum drift between Vue and server** | `WebsocketMessageType` is a hand-maintained mirror; if server adds a value, the Vue switch silently misroutes | Comment cross-reference at top of `WebsocketMessageType.ts` AND `types/firmware.ts` pointing at server sources. Runtime `default:` warn-on-unknown in `handleMessage` (already present). |
-| **WS handler errors swallow real bugs** | Existing handlers `catch + log`; firmware handlers must also reset `phase` → `failed` (with envelope) on `flashJobFailed` even if the payload is malformed | `applyJobFailed` extracts what it can from a partial payload and surfaces `{ reason: 'internal_server_error' }` when fields are missing. Unit test: malformed `flashJobFailed` → phase = `failed`, `flashError` non-null. |
+| **WS handler errors swallow real bugs** | Existing handlers `catch + log`; firmware handlers must also reset `phase` → `failed` (with envelope) on `flashJobFailed` even if the payload is malformed | `applyJobFailed` extracts what it can from a partial payload and surfaces `{ reason: 'internal_server_error' }` when fields are missing (unknown-server-reason fallback). Round-7 added a separate `'protocol_violation'` envelope for malformed WS-handler payloads (dispatcher catch blocks). Unit test: malformed `flashJobFailed` → phase = `failed`, `flashError` non-null. |
+| **Reboot-wait wedge after refresh** (round-7 CR-1) | A refresh during the 15s reboot-wait window (between `flashJobDone` and lock-release) would `applyJobStarted` an `endedAt`-set job, but the WS late-join filter skips emitting `flashJobStarted` for such jobs — UI wedged at phase='flashing' forever. | `fetchCurrentJob` mirrors `decideLateJoinSnapshot`'s `endedAt` filter. Defense-in-depth: `handleLockStateChanged` forces phase='done' when lock releases while phase still 'flashing'. Unit tests: fetchCurrentJob skips endedAt body; lockStateChanged recovers stuck phase. |
 | **`ownJobId` race with WS late-join** | If the WS `flashJobStarted` arrives before the HTTP POST returns (server emits before responding), `ownJobId` is briefly null and the UI shows lock-conflict for our own flash | `startFlash` sets `ownJobId` **before** the POST resolves (use a tentative-id pattern), OR delay phase-from-WS until POST resolves. **Decision in plan**: `applyJobStarted` is idempotent — accept that for ~50ms post-WS-pre-HTTP-response, the lock-conflict banner may flicker. Document as known limitation; if it visually flickers, add a 200ms debounce on the alert render. Unit test: simulate WS-first, then POST-resolves; assert final state is `isOwnJob === true`. |
 
 ---
@@ -251,7 +252,7 @@ This is the concurrency-surface PR of phase D. Each row has explicit unit-test c
 ## Verification
 
 1. `npm run build` succeeds.
-2. `npx vitest run` — 228 tests pass at branch tip across the firmware/composables/views test suites. Includes coverage for the 5 `applyXxx` handlers, `mapServerStageToUiStage`, `controllerStatePillKind`, `fetchCurrentJob` (incl. 404 vs 5xx), the 7 original FMI hazards, replay queue + multi-FAILED, staleness banner, lock-conflict gating, and dispatcher rollback paths. Updated `AstrosWriteButton` (existing 9 + 3 new).
+2. `npx vitest run` — all tests pass at branch tip across the firmware/composables/views test suites. Includes coverage for the 5 `applyXxx` handlers, `mapServerStageToUiStage`, `controllerStatePillKind`, `fetchCurrentJob` (incl. 404 vs 5xx and round-7 endedAt filter), the 7 FMI hazards plus the round-7 reboot-wait wedge, replay queue + multi-FAILED, staleness banner, lock-conflict gating, dispatcher rollback paths, jobId-mismatch guards, ServoTest modal lock-gating, and the wire-numeric pinning contract.
 3. `npx playwright test firmware-flash.spec.ts` — the e2e spec passes locally against the mocked WS.
 4. `npm run storybook` — visual regression of d.3/d.4/d.5 stories unchanged. New stories for the lock-conflict banner (FirmwareView and AstrosLayout siblings).
 5. Manual `npm run dev` smoke test:
@@ -275,10 +276,10 @@ This is the concurrency-surface PR of phase D. Each row has explicit unit-test c
 ## Critical files
 
 - `astros_api/src/firmware/flash_orchestrator.ts:335-344` — `FlashOrchestratorWsMessage` discriminated union (read-only, source of truth).
-- `astros_api/src/models/firmware/flash_job_state.ts:1-40` — `FlashJobState` and `ControllerFlashState` (read-only).
+- `astros_api/src/models/firmware/flash_job_state.ts:1-47` — `FlashJobState` and `ControllerFlashState` (read-only).
 - `astros_api/src/models/firmware/firmware_messages.ts` — `FwStage` enum (read-only).
 - `astros_api/src/models/enums.ts:82` — `TransmissionType` numeric values (read-only).
-- `astros_api/src/api_server.ts:652-660` — late-join `flashJobStarted` snapshot (read-only).
+- `astros_api/src/api_server.ts:654-669` — late-join `flashJobStarted` snapshot (read-only).
 - `astros_vue/src/composables/useWebsocket.ts:87-117` — dispatcher extension point.
 - `astros_vue/src/enums/WebsocketMessageType.ts` — add 5 new values.
 - `astros_vue/src/stores/firmware.ts` — phase from WS, new state, new actions, computed controllers.

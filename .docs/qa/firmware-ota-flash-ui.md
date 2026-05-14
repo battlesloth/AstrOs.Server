@@ -1,6 +1,6 @@
 # Firmware OTA — Vue UI QA
 
-Manual operator-flow QA for the `/firmware` view shipped across phase D (PRs d.1–d.6). Run end-to-end after d.6 merges. Unit-level coverage of the WS dispatcher, store handlers, type mapping, and lock-aware components lives in vitest (228 tests at d.6 close).
+Manual operator-flow QA for the `/firmware` view shipped across phase D (PRs d.1–d.6). Run end-to-end after d.6 merges. Unit-level coverage of the WS dispatcher, store handlers, type mapping, and lock-aware components lives in vitest (see latest `cd astros_vue && npx vitest run` for current count).
 
 ## Preconditions
 
@@ -163,8 +163,22 @@ Manual operator-flow QA for the `/firmware` view shipped across phase D (PRs d.1
 ## Regression check
 
 - All d.3 / d.4 / d.5 storybook stories still render correctly.
-- The 210 vitest tests still pass: `cd astros_vue && npx vitest run`.
+- All vitest tests still pass: `cd astros_vue && npx vitest run`.
 - The smoke e2e spec passes locally: `npx playwright test e2e/C_01_firmware-page.spec.ts` (requires a running server).
+
+## 6.5 Refresh during the 15s reboot-wait window (round-7 CR-1 regression check)
+
+**Preconditions:** A flash has just completed; the result bar shows "✓ all updated"; the server is in the reboot-wait window (lock still held — typically the ~15s after a successful flash).
+
+**Steps:**
+1. Refresh the browser tab during this window.
+
+**Expected (post-round-7):**
+- Page shows phase='idle' / Select panel.
+- Lock-conflict banner may briefly appear if the lock hasn't released yet; it disappears within ~15s as the server releases the lock.
+- No UI wedge at phase='flashing'.
+
+**Regression signal (pre-fix):** Page rendered phase='flashing' indefinitely until a second refresh after the lock released. Round-7 CR-1a (fetchCurrentJob endedAt filter) + CR-1b (handleLockStateChanged defense) close this.
 
 ## Known limitations (documented, not blockers)
 

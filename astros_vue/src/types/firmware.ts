@@ -187,8 +187,13 @@ export type ControllerFlashStateBySlot =
   | { controllerId: SlotId; stage: 'FAILED'; error: string };
 
 /**
- * Mirror of the server's `FlashJobState`. The `source` shape matches the
- * `FlashRequest` body the client posts.
+ * Mirror of the server's `FlashJobState`, narrowed to UI-readable fields.
+ * The server transmits the full `FlashSource` shape (sha256, sizeBytes,
+ * displayName); we keep only what the UI needs. Source of truth:
+ * `astros_api/src/models/firmware/flash_job_state.ts`.
+ *
+ * Note: `endedAt` is set on both success and failure terminal states.
+ * `abortReason` is set only on cancel/streamer-rejection paths.
  */
 export interface FlashJobState {
   jobId: string;
