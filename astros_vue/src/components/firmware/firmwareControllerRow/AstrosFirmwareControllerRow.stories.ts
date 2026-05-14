@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/vue3-vite';
 import AstrosFirmwareControllerRow from './AstrosFirmwareControllerRow.vue';
+import { Location } from '@/enums';
 import type { FirmwareControllerView } from '@/types/firmware';
 
 const body: FirmwareControllerView = {
-  id: 'body',
+  id: Location.BODY,
   label: 'Body',
   glyph: 'B',
   current: 'v1.3.0',
@@ -11,7 +12,7 @@ const body: FirmwareControllerView = {
   isMaster: true,
 };
 const core: FirmwareControllerView = {
-  id: 'core',
+  id: Location.CORE,
   label: 'Core',
   glyph: 'C',
   current: 'v1.4.0',
@@ -19,7 +20,7 @@ const core: FirmwareControllerView = {
   isMaster: false,
 };
 const domeOffline: FirmwareControllerView = {
-  id: 'dome',
+  id: Location.DOME,
   label: 'Dome',
   glyph: 'D',
   current: 'v1.4.0',
@@ -84,7 +85,7 @@ export const ProgressModeUpdating: Story = {
     mode: 'progress',
     selected: true,
     progressStatus: 'updating',
-    stageLabel: 'Transfer',
+    stageLabelKey: 'firmware_view.stages.transfer.label',
   },
 };
 

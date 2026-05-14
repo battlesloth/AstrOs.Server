@@ -46,7 +46,7 @@ Source: `astros_api/src/firmware/flash_orchestrator.ts:323-344` (the `FlashOrche
 
 `lockStateChanged` (type=10) is already wired and is **flat** (`{type, locked, owner, since}`) — no change.
 
-Late-join: `astros_api/src/api_server.ts:652-660` sends one `flashJobStarted` snapshot on connect when a job is in flight; `firmwareStore.applyJobStarted` must be idempotent.
+Late-join: `astros_api/src/api_server.ts:654-669` sends one `flashJobStarted` snapshot on connect when a job is in flight; `firmwareStore.applyJobStarted` must be idempotent.
 
 ---
 
@@ -150,7 +150,7 @@ All concurrency hazards land in d.6. Apply `/pr-review-toolkit:review-pr` before
 
 - **Server-side WS contract (read-only):** `astros_api/src/firmware/flash_orchestrator.ts:323-344`, `astros_api/src/models/firmware/flash_job_state.ts`, `astros_api/src/models/enums.ts:82`.
 - **Server-side HTTP contract (read-only):** `astros_api/src/controllers/firmware_flash_controller.ts`.
-- **Late-join entry point (read-only):** `astros_api/src/api_server.ts:652-660`.
+- **Late-join entry point (read-only):** `astros_api/src/api_server.ts:654-669`.
 - **Vue patterns to mirror:** `astros_vue/src/stores/jobLock.ts`, `astros_vue/src/composables/useWebsocket.ts`, `astros_vue/src/views/ModulesView.vue` (chrome).
 - **Design source of truth:** `../design_handoff_firmware_update/README.md` + `firmwareDirectionC.jsx` + `firmwareShared.jsx`.
 - **Existing lock-aware button:** `astros_vue/src/components/common/AstrosWriteButton.vue` (extension point for d.6).

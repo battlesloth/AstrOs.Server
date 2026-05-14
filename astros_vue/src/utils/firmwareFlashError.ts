@@ -1,23 +1,8 @@
-import type { FlashErrorEnvelope, FlashErrorReason } from '@/types/firmware';
-
-const KNOWN_REASONS: ReadonlySet<FlashErrorReason> = new Set<FlashErrorReason>([
-  'invalid_body',
-  'job_already_running',
-  'no_controllers',
-  'variant_mismatch',
-  'variant_unknown',
-  'release_not_found',
-  'asset_not_found',
-  'no_upload',
-  'release_lookup_failed',
-  'source_resolution_failed',
-  'controllers_lookup_failed',
-  'subscriber_attach_failed',
-  'protocol_violation',
-  'streamer_unknown_error',
-  'internal_server_error',
-  'network_error',
-]);
+import {
+  KNOWN_FLASH_ERROR_REASONS,
+  type FlashErrorEnvelope,
+  type FlashErrorReason,
+} from '@/types/firmware';
 
 function isAxiosLikeError(value: unknown): value is { response?: { data?: unknown } } {
   return typeof value === 'object' && value !== null && 'response' in value;
@@ -42,7 +27,8 @@ export function mapHttpErrorToFlashEnvelope(error: unknown): FlashErrorEnvelope 
   const detailRaw = (body as { detail?: unknown }).detail;
   const currentJobIdRaw = (body as { currentJobId?: unknown }).currentJobId;
 
-  const isKnown = typeof reasonRaw === 'string' && KNOWN_REASONS.has(reasonRaw as FlashErrorReason);
+  const isKnown =
+    typeof reasonRaw === 'string' && KNOWN_FLASH_ERROR_REASONS.has(reasonRaw as FlashErrorReason);
   if (!isKnown && typeof reasonRaw === 'string') {
     console.warn(
       `[firmwareFlashError] unrecognized server reason "${reasonRaw}"; mapping to internal_server_error`,

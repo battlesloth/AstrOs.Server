@@ -142,9 +142,6 @@ const primaryAssetSize = computed<number | null>(() => {
         >
           {{ $t('firmware_view.source.releases_stale_warning', { since: formatDate(staleSince) }) }}
         </p>
-        <!-- TODO(d.5): the i18n string says "Try again." but there's no retry control here.
-             Add a retry button that calls firmware.fetchReleases() once d.5 lands the
-             page-level action bar; until then the user has to refresh the route. -->
         <p
           v-else-if="releasesLoadState === 'error'"
           class="astros-firmware-source-strip__warning astros-firmware-source-strip__warning--error"

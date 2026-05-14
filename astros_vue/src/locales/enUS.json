@@ -66,7 +66,7 @@
       "release_option_prerelease_suffix": "(pre-release)",
       "label_select_release": "Select release",
       "label_upload_file": "Upload firmware file",
-      "releases_load_error": "Failed to load releases. Try again.",
+      "releases_load_error": "Failed to load releases.",
       "releases_stale_warning": "Showing cached releases — couldn't reach GitHub since {since}.",
       "releases_loading": "Loading releases…"
     },
@@ -109,6 +109,7 @@
       "result_bar": {
         "all_updated": "✓ All {count} controller(s) updated",
         "failed_summary": "⚠ {label} failed during {stage}",
+        "failed_summary_multi": "⚠ {labels} failed during the flash",
         "view_logs": "View logs",
         "done": "Done"
       },
@@ -165,10 +166,25 @@
       "source_resolution_failed": "Couldn't fetch the firmware binary from its source. Try again or pick a different release.",
       "controllers_lookup_failed": "The server couldn't look up the selected controllers. Try again.",
       "subscriber_attach_failed": "The server couldn't subscribe to deploy events. Try again or restart the server.",
-      "protocol_violation": "The serial protocol returned an unexpected message. Try again or restart the master controller.",
+      "protocol_violation": "Unexpected message format from the server. Try again or restart the master controller.",
       "streamer_unknown_error": "The firmware streamer failed with an unknown error. Try again.",
       "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
       "network_error": "Couldn't reach the server. Check your network connection and try again."
+    },
+    "lock_active": "A firmware update is in progress — write actions are disabled until it completes.",
+    "lock_banner": "Firmware update in progress — write actions are disabled across the app.",
+    "lock_conflict": {
+      "title": "Firmware update in progress",
+      "body": "Another operator started a firmware update at {since}. Wait for it to finish before starting a new one."
+    },
+    "current_job_load_failed": "Could not confirm current firmware state. A flash may be in flight — refresh to retry.",
+    "flash_stream_suspended": "Live updates paused — reconnecting to the server. Progress shown may be stale.",
+    "mid_flash_error": {
+      "title_warning": "Flash warning:",
+      "title_failed": "Flash failed:",
+      "title_done_warning": "Flash completed with a warning:",
+      "abort_reason": "Abort reason: {reason}",
+      "dismiss": "Dismiss"
     }
   },
   "placeholder": {

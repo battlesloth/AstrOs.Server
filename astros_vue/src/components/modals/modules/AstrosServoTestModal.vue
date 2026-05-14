@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useWebsocket } from '@/composables/useWebsocket';
+import { useJobLockStore } from '@/stores/jobLock';
+import { storeToRefs } from 'pinia';
 import type { ServoTestEvent } from '@/models/events';
 
 const { wsSendMessage } = useWebsocket();
+const jobLock = useJobLockStore();
+const { locked: jobLockLocked } = storeToRefs(jobLock);
 
 const props = defineProps<ServoTestEvent>();
 
@@ -15,8 +19,22 @@ const disabled = ref(true);
 const label = ref('modals.servo_test.enable_test');
 const value = ref(props.homePosition);
 
+// ServoTest writes during a flash get silently rejected server-side.
+// Gate the slider + button so operators see disabled controls rather
+// than dragging into the void.
+const writesBlocked = computed(() => jobLockLocked.value);
+
+// If a flash starts while the modal is already open with the test active,
+// auto-disable so further slider input is ignored locally as well.
+watch(writesBlocked, (nowBlocked) => {
+  if (nowBlocked && !disabled.value) {
+    disabled.value = true;
+    label.value = 'modals.servo_test.enable_test';
+  }
+});
+
 const onSliderChange = () => {
-  if (disabled.value) {
+  if (disabled.value || writesBlocked.value) {
     return;
   }
   wsSendMessage(JSON.stringify(servoTestMessage()));
@@ -37,6 +55,7 @@ function servoTestMessage() {
 }
 
 const enableTest = () => {
+  if (writesBlocked.value) return;
   disabled.value = !disabled.value;
   if (!disabled.value) {
     label.value = 'modals.servo_test.disable_test';
@@ -75,16 +94,27 @@ const closeModal = () => {
           min="500"
           max="2500"
           v-model.number="value"
-          :disabled="disabled"
+          :disabled="disabled || writesBlocked"
           @input="onSliderChange"
           class="range range-primary mt-4"
           step="1"
         />
+        <div
+          v-if="writesBlocked"
+          role="status"
+          aria-live="polite"
+          class="text-sm text-warning text-center mt-2"
+          data-testid="lock-active-notice"
+        >
+          {{ $t('firmware_view.lock_active') }}
+        </div>
       </div>
       <div class="mt-5 flex flex-row">
         <div class="grow"></div>
         <button
           data-testid="enable-test-button"
+          :disabled="writesBlocked"
+          :title="writesBlocked ? $t('firmware_view.lock_active') : ''"
           class="btn btn-primary w-25 text-lg py-1.25 mx-1.25"
           @click="enableTest"
         >

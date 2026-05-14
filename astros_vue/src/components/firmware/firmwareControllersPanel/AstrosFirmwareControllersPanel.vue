@@ -116,7 +116,7 @@ const actionBarMessage = computed(() => {
           :mode="rowMode"
           :selected="selectedControllerIds.has(c.id)"
           :progress-status="progressByControllerId?.[c.id]?.status"
-          :stage-label="progressByControllerId?.[c.id]?.stageLabel"
+          :stage-label-key="progressByControllerId?.[c.id]?.stageLabelKey"
           @toggle="firmware.toggle"
         />
       </li>
@@ -210,10 +210,17 @@ const actionBarMessage = computed(() => {
         class="astros-firmware-controllers-panel__result-text astros-firmware-controllers-panel__result-text--failed"
       >
         {{
-          t('firmware_view.controllers.result_bar.failed_summary', {
-            label: failedControllerLabel ?? '—',
-            stage: failedStage ?? '—',
-          })
+          // Use the multi-failure copy for >=2 AND for 0 (pre-streamer
+          // abort: job failed before any controller transitioned to FAILED;
+          // the singular key's `{stage}` placeholder would render '—').
+          (failedCount ?? 1) !== 1
+            ? t('firmware_view.controllers.result_bar.failed_summary_multi', {
+                labels: failedControllerLabel ?? '—',
+              })
+            : t('firmware_view.controllers.result_bar.failed_summary', {
+                label: failedControllerLabel ?? '—',
+                stage: failedStage ? t(`firmware_view.stages.${failedStage}.label`) : '—',
+              })
         }}
       </span>
       <div class="astros-firmware-controllers-panel__action-bar-buttons">

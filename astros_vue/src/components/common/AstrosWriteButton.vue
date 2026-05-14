@@ -2,11 +2,13 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useSystemStatusStore } from '@/stores/systemStatus';
+import { useJobLockStore } from '@/stores/jobLock';
 
 interface Props {
   // Optional caller-supplied disabled state (loading, validation, etc.).
-  // ORed with the system read-only state so callers don't lose capability
-  // vs. the hand-rolled inline pattern this component replaces.
+  // ORed with the system read-only state and the firmware-job lock so
+  // callers don't lose capability vs. the hand-rolled inline pattern this
+  // component replaces.
   disabled?: boolean;
 }
 
@@ -14,9 +16,21 @@ const props = withDefaults(defineProps<Props>(), { disabled: false });
 
 const { t } = useI18n();
 const systemStatusStore = useSystemStatusStore();
+const jobLockStore = useJobLockStore();
 
 const isReadOnlyDisabled = computed(() => systemStatusStore.readOnly);
-const isDisabled = computed(() => props.disabled || isReadOnlyDisabled.value);
+const isJobLockDisabled = computed(() => jobLockStore.locked);
+const isDisabled = computed(
+  () => props.disabled || isReadOnlyDisabled.value || isJobLockDisabled.value,
+);
+
+// Tooltip priority: system read-only is broader than a flash lock, so it
+// takes precedence when both are active.
+const tooltipKey = computed(() => {
+  if (isReadOnlyDisabled.value) return 'systemStatus.readOnly.disabled';
+  if (isJobLockDisabled.value) return 'firmware_view.lock_active';
+  return null;
+});
 
 // Route every other attribute (class, data-testid, type, aria-*) onto the
 // inner button rather than the wrapper div. Without this, Vue would default
@@ -27,8 +41,8 @@ defineOptions({ inheritAttrs: false });
 
 <template>
   <div
-    :class="isReadOnlyDisabled ? 'tooltip' : ''"
-    :data-tip="t('systemStatus.readOnly.disabled')"
+    :class="tooltipKey !== null ? 'tooltip' : ''"
+    :data-tip="tooltipKey !== null ? t(tooltipKey) : undefined"
   >
     <button
       v-bind="$attrs"

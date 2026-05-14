@@ -3,6 +3,7 @@ import router from '@/router';
 import apiService from '@/api/apiService';
 import { ref, watch } from 'vue';
 import AstrosSystemStatusBanner from '@/components/common/systemStatusBanner/AstrosSystemStatusBanner.vue';
+import AstrosLockStateBanner from '@/components/common/lockStateBanner/AstrosLockStateBanner.vue';
 
 const props = defineProps({
   isSidebarOpen: {
@@ -46,6 +47,7 @@ function logout() {
     />
     <div class="drawer-content">
       <AstrosSystemStatusBanner />
+      <AstrosLockStateBanner />
       <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-none pl-2 flex items-center">
           <label
