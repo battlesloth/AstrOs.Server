@@ -530,19 +530,19 @@ export class ChunkStreamer {
 
     const handleChunkNak = (nak: FwChunkNak): void => {
       // Bounds guard: a malformed master that sends nextExpectedSeq beyond
-      // the valid chunk range would otherwise set nextToSend out of range,
-      // stall topUpWindow (its loop bound is nextToSend <= lastSeq), and
-      // leave the transfer to die via the whole-transfer watchdog with an
-      // opaque "transfer_timeout" error. Fail loudly with a master_io_error
+      // the valid chunk range would otherwise set nextToSend out of range
+      // and stall the streamer. Concretely: setting nextToSend = totalChunks
+      // (or higher) makes topUpWindow's `nextToSend <= lastSeq` loop exit
+      // immediately with no chunks sent. inFlight stays empty, so no ACK
+      // ever arrives, so resolveChunkPhaseDone is never called. The only
+      // exit is the whole-transfer watchdog firing with the opaque
+      // `transfer_timeout` error. Fail loudly with `master_io_error` here
       // so the operator log says exactly what happened.
       //
       // Valid seq range is 0..=lastSeq (= 0..=totalChunks-1). Any
-      // nextExpectedSeq >= totalChunks asks for a chunk that doesn't exist:
-      // nextExpectedSeq == totalChunks would point one past the last chunk,
-      // causing topUpWindow's `nextToSend <= lastSeq` to exit immediately
-      // with no chunks sent and no resolve path. The `>=` (not `>`) catches
-      // this fencepost; ACKs use `>= totalChunks` differently to detect
-      // completion but a NAK at that boundary is structurally invalid.
+      // nextExpectedSeq >= totalChunks asks for a chunk that doesn't exist;
+      // the `>=` (not `>`) catches the exact fencepost where
+      // nextExpectedSeq == totalChunks would point one past the last chunk.
       //
       // FLASH_FULL is exempt — it ends the transfer either way.
       if (nak.nextExpectedSeq >= totalChunks && nak.reasonCode !== 'FLASH_FULL') {
@@ -550,7 +550,7 @@ export class ChunkStreamer {
           new TransferError(
             'master_io_error',
             spec.transferId,
-            `FW_CHUNK_NAK nextExpectedSeq=${nak.nextExpectedSeq} is not a valid chunk (totalChunks=${totalChunks}, valid range 0..${totalChunks - 1})`,
+            `FW_CHUNK_NAK nextExpectedSeq=${nak.nextExpectedSeq} is not a valid chunk (totalChunks=${totalChunks}, valid range 0..${totalChunks - 1} inclusive)`,
           ),
         );
         return;
@@ -598,11 +598,17 @@ export class ChunkStreamer {
         // chunk-phase awaiter; the outer try/catch/finally propagates the
         // error and the finally block clears in-flight state and disposes
         // the subscriber.
+        //
+        // Both seq fields are surfaced in the detail string: a misbehaving
+        // master could send FLASH_FULL with a bogus nextExpectedSeq (the
+        // bounds guard above intentionally exempts FLASH_FULL because it's
+        // terminal either way). Logging both fields means cross-firmware
+        // debugging doesn't require a separate protocol trace.
         rejectChunkPhase?.(
           new TransferError(
             'flash_full',
             spec.transferId,
-            `master refused chunk after seq=${nak.lastGoodSeq}: FLASH_FULL`,
+            `master refused chunk after seq=${nak.lastGoodSeq} (nextExpectedSeq=${nak.nextExpectedSeq}): FLASH_FULL`,
           ),
         );
         return;

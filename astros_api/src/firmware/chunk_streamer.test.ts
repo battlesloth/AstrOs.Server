@@ -108,8 +108,9 @@ function chunkAck(highest: number, next: number): FwInboundAck {
 function chunkNak(
   lastGoodSeq: number,
   reasonCode: FwChunkNakReason,
-  // Defaults to lastGoodSeq + 1 which is the normal "advance one" semantic.
-  // First-chunk NAK callers pass explicit nextExpectedSeq=0 because
+  // Defaults to `lastGoodSeq + 1` for caller convenience — this matches what
+  // a conformant master would send on a regular NAK, not a protocol guarantee.
+  // First-chunk NAK callers must pass explicit nextExpectedSeq=0 because
   // lastGoodSeq=0 means "nothing committed" rather than "seq 0 committed".
   nextExpectedSeq: number = lastGoodSeq + 1,
 ): FwInboundAck {
@@ -745,7 +746,7 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
   });
 
   it('silently drops a duplicate first-chunk NAK after seq 0 has been ACKed', async () => {
-    // Regression for the stale-NAK guard at line 545. After a first-chunk
+    // Regression for the `isStale` guard in handleChunkNak. After a first-chunk
     // NAK recovery completes (seq 0 NAK → resend → ACK), a late-arriving
     // duplicate of the original NAK0 must be classified as stale and not
     // trigger a second Go-Back-N. Pre-fix, the guard was
