@@ -669,8 +669,11 @@ export class StubMaster {
         // (including for the retransmitted failAtSeq chunk).
         if (cfg.failAtSeq !== undefined && seq === cfg.failAtSeq && !cfg.hasFailedOnce) {
           cfg.hasFailedOnce = true;
-          // lastGoodSeq: the last committed seq. On seq 0 nothing was
-          // committed yet, so we report 0 (the protocol-amended convention).
+          // lastGoodSeq: the last committed seq. On seq=0 nothing has been
+          // committed yet, so we emit 0 — the only value the master can put
+          // in an unsigned field for "nothing committed." That value is
+          // ambiguous on its own, which is exactly why the protocol carries
+          // nextExpectedSeq alongside it.
           // nextExpectedSeq: the seq we want next — always `seq` (the NAK'd
           // chunk is what should be retransmitted).
           this.writeFwChunkNak({

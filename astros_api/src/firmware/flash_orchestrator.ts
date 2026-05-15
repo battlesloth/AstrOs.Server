@@ -659,11 +659,13 @@ export class FlashJobOrchestrator {
             localThrottle.submit(c.controllerId, c);
           }
         },
-        onChunkNak: (lastGoodSeq, reason) => {
+        onChunkNak: (lastGoodSeq, nextExpectedSeq, reason) => {
           // c.6b's streamer handles Go-Back-N retransmission internally.
           // The orchestrator observes the NAK for diagnostic logging only;
           // controller state is unchanged.
-          logger.info(`flash orchestrator: onChunkNak lastGoodSeq=${lastGoodSeq} reason=${reason}`);
+          logger.info(
+            `flash orchestrator: onChunkNak lastGoodSeq=${lastGoodSeq} nextExpectedSeq=${nextExpectedSeq} reason=${reason}`,
+          );
         },
         // onTransferEnd: the deploy phase is driven off the awaited
         // `streamer.run()` resolution below, not from this hook.

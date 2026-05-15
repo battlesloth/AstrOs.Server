@@ -17,7 +17,12 @@ export interface TransferSpec {
 export interface StreamObserver {
   onTransferBegun?: (ack: FwTransferBeginAck) => void;
   onChunkAck?: (highestContiguousSeq: number, bytesSent: number) => void;
-  onChunkNak?: (lastGoodSeq: number, reason: FwChunkNakReason) => void;
+  // nextExpectedSeq is the seq the streamer is resuming from after this NAK.
+  // On a regular NAK it equals lastGoodSeq + 1; on a first-chunk NAK both
+  // values are 0 and nextExpectedSeq is the unambiguous "send seq 0 again"
+  // signal — surfacing it here lets observers distinguish "nothing committed"
+  // from "seq 0 was committed" without re-parsing protocol state.
+  onChunkNak?: (lastGoodSeq: number, nextExpectedSeq: number, reason: FwChunkNakReason) => void;
   onRetry?: (seq: number, attempt: number) => void;
   onBackpressure?: (paused: boolean) => void;
   onTransferEnd?: (ack: FwTransferEndAck) => void;

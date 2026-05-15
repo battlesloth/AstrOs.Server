@@ -680,9 +680,9 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
 
       expect(result.totalChunks).toBe(totalChunks);
       expect(result.endAck.status).toBe('OK');
-      // Observer fired with (lastGoodSeq, reason).
+      // Observer fired with (lastGoodSeq, nextExpectedSeq, reason).
       expect(onChunkNak).toHaveBeenCalledTimes(1);
-      expect(onChunkNak).toHaveBeenCalledWith(5, 'CRC');
+      expect(onChunkNak).toHaveBeenCalledWith(5, 6, 'CRC');
       // Total sends: 16 initial + 14 Go-Back-N refill = 30 FW_CHUNK entries.
       expect(chunkSendCount(bus)).toBe(30);
       expect(bus.subscribers.size).toBe(0);
@@ -744,6 +744,105 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
     }
   });
 
+  it('silently drops a duplicate first-chunk NAK after seq 0 has been ACKed', async () => {
+    // Regression for the stale-NAK guard at line 545. After a first-chunk
+    // NAK recovery completes (seq 0 NAK → resend → ACK), a late-arriving
+    // duplicate of the original NAK0 must be classified as stale and not
+    // trigger a second Go-Back-N. Pre-fix, the guard was
+    //   isStale = nak.lastGoodSeq < highestAcked
+    // which on the duplicate evaluates `0 < 0 = false` and the streamer
+    // re-rewound the transfer despite seq 0 already being committed.
+    // Post-fix, the guard uses nextExpectedSeq:
+    //   isStale = nak.nextExpectedSeq <= highestAcked
+    // which on the duplicate evaluates `0 <= 0 = true` and the stale NAK
+    // is correctly skipped.
+    const chunkSize = 100;
+    const totalChunks = 5;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x88);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const onChunkNak = vi.fn();
+
+      const driver = (async (): Promise<void> => {
+        await driveBeginAndAwaitInitialFill(bus, 5);
+        expect(chunkSendCount(bus)).toBe(5);
+
+        // First-chunk NAK and recovery: send-count goes 5 → 10.
+        bus.deliver(TRANSFER_ID, chunkNak(0, 'CRC', /*nextExpectedSeq=*/ 0));
+        await waitFor(() => chunkSendCount(bus) >= 10, 'Go-Back-N refill from seq 0');
+        expect(chunkSendCount(bus)).toBe(10);
+
+        // Cumulative ACK retiring seq 0 → highestAcked advances to 0.
+        bus.deliver(TRANSFER_ID, chunkAck(0, 1));
+
+        // Snapshot before stale NAK.
+        const sendsBeforeStale = chunkSendCount(bus);
+        const nakCallsBeforeStale = onChunkNak.mock.calls.length;
+
+        // Stale duplicate of the original first-chunk NAK. Pre-fix, this
+        // would re-rewind: bump send-count by 4 (refill seq 1..4) and
+        // fire onChunkNak a second time. Post-fix, both should be no-ops.
+        bus.deliver(TRANSFER_ID, chunkNak(0, 'CRC', /*nextExpectedSeq=*/ 0));
+
+        // Synchronous assertion: the dispatcher path is synchronous through
+        // the stale-NAK guard, so any state mutation would have happened
+        // by now.
+        expect(chunkSendCount(bus)).toBe(sendsBeforeStale);
+        expect(onChunkNak.mock.calls.length).toBe(nakCallsBeforeStale);
+
+        // Drain the rest with a cumulative ACK and resolve the transfer.
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), { onChunkNak });
+      await driver;
+
+      expect(result.endAck.status).toBe('OK');
+      // onChunkNak fired exactly once (the original NAK), not twice.
+      expect(onChunkNak).toHaveBeenCalledTimes(1);
+      expect(onChunkNak).toHaveBeenCalledWith(0, 0, 'CRC');
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('rejects FW_CHUNK_NAK with nextExpectedSeq > totalChunks as master_io_error', async () => {
+    // A malformed master that sends nextExpectedSeq beyond the transfer
+    // bounds would otherwise stall the streamer (topUpWindow's loop bound
+    // is nextToSend <= lastSeq) until the whole-transfer watchdog fires
+    // with the opaque "transfer_timeout" error. The bounds guard at the
+    // top of handleChunkNak surfaces the bug immediately with a clear
+    // master_io_error reason.
+    const chunkSize = 100;
+    const totalChunks = 5;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x99);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+
+      const driver = (async (): Promise<void> => {
+        await driveBeginAndAwaitInitialFill(bus, 5);
+        // nextExpectedSeq=99 is way past totalChunks=5. Master is misbehaving.
+        bus.deliver(TRANSFER_ID, chunkNak(4, 'CRC', /*nextExpectedSeq=*/ 99));
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'master_io_error',
+      });
+      await driver;
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
   it('consecutive NAKs converge: second NAK acknowledges progress made by first refill', async () => {
     // 30 chunks at 100 bytes. Initial fill: seq 0..15. First NAK at
     // lastGoodSeq=3 (master accepted 0..3, rejected 4): refill from seq 4.
@@ -799,8 +898,8 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
       expect(result.totalChunks).toBe(totalChunks);
       expect(result.endAck.status).toBe('OK');
       expect(onChunkNak).toHaveBeenCalledTimes(2);
-      expect(onChunkNak.mock.calls[0]).toEqual([3, 'CRC']);
-      expect(onChunkNak.mock.calls[1]).toEqual([7, 'OUT_OF_ORDER']);
+      expect(onChunkNak.mock.calls[0]).toEqual([3, 4, 'CRC']);
+      expect(onChunkNak.mock.calls[1]).toEqual([7, 8, 'OUT_OF_ORDER']);
       expect(bus.subscribers.size).toBe(0);
     } finally {
       await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
@@ -837,7 +936,7 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
 
       // Observer was notified before rejection.
       expect(onChunkNak).toHaveBeenCalledTimes(1);
-      expect(onChunkNak).toHaveBeenCalledWith(2, 'FLASH_FULL');
+      expect(onChunkNak).toHaveBeenCalledWith(2, 3, 'FLASH_FULL');
       // Cleanup must have run on the reject path.
       expect(bus.subscribers.size).toBe(0);
     } finally {
@@ -904,7 +1003,7 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
         expect(chunkSendCount(bus)).toBe(sentAfterAck);
         // Observer still fired only once (for the original NAK).
         expect(onChunkNak).toHaveBeenCalledTimes(1);
-        expect(onChunkNak).toHaveBeenCalledWith(5, 'CRC');
+        expect(onChunkNak).toHaveBeenCalledWith(5, 6, 'CRC');
 
         // Drain the rest with one cumulative ack covering seq 0..19.
         bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
@@ -925,7 +1024,7 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
       expect(result.endAck.status).toBe('OK');
       // Final assertion: still only one onChunkNak call across the full run.
       expect(onChunkNak).toHaveBeenCalledTimes(1);
-      expect(onChunkNak).toHaveBeenCalledWith(5, 'CRC');
+      expect(onChunkNak).toHaveBeenCalledWith(5, 6, 'CRC');
       // Total FW_CHUNK sends: 16 initial + 14 refill = 30. Stale NAK added 0.
       expect(chunkSendCount(bus)).toBe(30);
       expect(bus.subscribers.size).toBe(0);
@@ -969,7 +1068,7 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
         await driver;
 
         expect(result.endAck.status).toBe('OK');
-        expect(onChunkNak).toHaveBeenCalledWith(2, reason);
+        expect(onChunkNak).toHaveBeenCalledWith(2, 3, reason);
       } finally {
         await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
       }
