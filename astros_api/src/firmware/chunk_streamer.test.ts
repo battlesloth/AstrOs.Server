@@ -105,11 +105,19 @@ function chunkAck(highest: number, next: number): FwInboundAck {
   } satisfies { kind: 'chunkAck' } & FwChunkAck;
 }
 
-function chunkNak(lastGoodSeq: number, reasonCode: FwChunkNakReason): FwInboundAck {
+function chunkNak(
+  lastGoodSeq: number,
+  reasonCode: FwChunkNakReason,
+  // Defaults to lastGoodSeq + 1 which is the normal "advance one" semantic.
+  // First-chunk NAK callers pass explicit nextExpectedSeq=0 because
+  // lastGoodSeq=0 means "nothing committed" rather than "seq 0 committed".
+  nextExpectedSeq: number = lastGoodSeq + 1,
+): FwInboundAck {
   return {
     kind: 'chunkNak',
     transferId: TRANSFER_ID,
     lastGoodSeq,
+    nextExpectedSeq,
     reasonCode,
   } satisfies { kind: 'chunkNak' } & FwChunkNak;
 }
@@ -678,6 +686,59 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
       // Total sends: 16 initial + 14 Go-Back-N refill = 30 FW_CHUNK entries.
       expect(chunkSendCount(bus)).toBe(30);
       expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('first-chunk NAK with nextExpectedSeq=0 resumes from seq 0 (not seq 1)', async () => {
+    // Regression for the cross-repo protocol bug fixed by adding
+    // next-expected-seq to FW_CHUNK_NAK. On the very first chunk's NAK, the
+    // master sends lastGoodSeq=0 because nothing has been committed yet.
+    // A naive `nextToSend = lastGoodSeq + 1 = 1` would skip seq 0 entirely
+    // and deadlock the transfer (master keeps NAKing missing seq 0, sender
+    // keeps sending from seq 1). The streamer now uses nak.nextExpectedSeq
+    // directly, which the master sets to 0 in this case.
+    const chunkSize = 100;
+    const totalChunks = 5;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0x77);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+
+      const driver = (async (): Promise<void> => {
+        await driveBeginAndAwaitInitialFill(bus, 5); // window=16 caps at totalChunks=5
+        const sentBeforeNak = chunkSendCount(bus);
+        expect(sentBeforeNak).toBe(5);
+
+        // First-chunk NAK: master rejects seq 0 (CRC failure on the wire).
+        // lastGoodSeq=0, nextExpectedSeq=0 — the disambiguating value.
+        bus.deliver(TRANSFER_ID, chunkNak(0, 'CRC', /*nextExpectedSeq=*/ 0));
+
+        // Streamer must refill the window starting at seq 0 — NOT seq 1.
+        // After the Go-Back-N: 5 (initial) + 5 (refill from seq 0) = 10.
+        await waitFor(() => chunkSendCount(bus) >= 10, 'Go-Back-N refill from seq 0');
+        expect(chunkSendCount(bus)).toBe(10);
+
+        bus.deliver(TRANSFER_ID, chunkAck(totalChunks - 1, totalChunks));
+        await waitFor(
+          () => bus.sent.some((s) => s.payload.includes('FW_TRANSFER_END')),
+          'END sent',
+        );
+        bus.deliver(TRANSFER_ID, endAck('OK'));
+      })();
+
+      const result = await streamer.run(specFor(tempPath, buf.length), {});
+      await driver;
+
+      expect(result.totalChunks).toBe(totalChunks);
+      expect(result.endAck.status).toBe('OK');
+      // 5 initial + 5 refill starting at seq 0 = 10. If the bug regressed
+      // (nextToSend=1), the refill would only resend seq 1..4 = 4 chunks
+      // and seq 0 would be missing → END would fail with a NAK that
+      // would never get satisfied.
+      expect(chunkSendCount(bus)).toBe(10);
     } finally {
       await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
     }

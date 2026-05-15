@@ -4,7 +4,8 @@
 //   - sliding window of WINDOW_SIZE chunks in flight, retired by
 //     cumulative FW_CHUNK_ACK
 //   - FW_CHUNK_NAK with FLASH_FULL is terminal; CRC / SIZE / OUT_OF_ORDER
-//     trigger Go-Back-N from `lastGoodSeq + 1`
+//     trigger Go-Back-N from `nak.nextExpectedSeq` (NOT `lastGoodSeq + 1`
+//     — that breaks on first-chunk NAK; see handleChunkNak for details)
 //   - per-chunk ack timer with `maxRetriesPerChunk` budget; whole-transfer
 //     watchdog as a second-level safety net
 //   - FW_BACKPRESSURE PAUSE halts new sends but in-flight ACKs still drain;
@@ -569,10 +570,23 @@ export class ChunkStreamer {
       }
 
       // CRC / SIZE / OUT_OF_ORDER → Go-Back-N. Wipe the in-flight window,
-      // rewind cursors so the next top-up retransmits from lastGoodSeq + 1,
-      // and let topUpWindow refill. The `inFlight.clear()` here makes the
+      // rewind cursors to resume from `nak.nextExpectedSeq`, and let
+      // topUpWindow refill. The `inFlight.clear()` here makes the
       // finally-block's `inFlight.clear()` a no-op on the post-NAK happy
       // path, which is fine — clearing an empty Map is cheap.
+      //
+      // We must use `nextExpectedSeq` and NOT `lastGoodSeq + 1`. On the
+      // first-chunk NAK the master sends lastGoodSeq=0 (since no chunk
+      // has been committed yet), so `lastGoodSeq + 1 = 1` would skip
+      // seq 0 and the transfer would deadlock — master keeps NAKing the
+      // missing seq 0; sender keeps sending from seq 1. The protocol
+      // amendment that added `next-expected-seq` to FW_CHUNK_NAK exists
+      // precisely to make this case unambiguous.
+      //
+      // highestAcked tracks committed seqs: if the master never committed
+      // a chunk, lastGoodSeq is meaningless as a "last committed" pointer
+      // (master sends 0 by convention). Compute committed-pointer as
+      // `nextExpectedSeq - 1`, with `-1` meaning "nothing committed yet."
       //
       // chunkTimers must be drained in lockstep with inFlight. Otherwise a
       // stale per-chunk timer for a now-discarded seq would fire after the
@@ -584,8 +598,8 @@ export class ChunkStreamer {
       for (const timer of chunkTimers.values()) clearTimeout(timer);
       chunkTimers.clear();
       inFlight.clear();
-      nextToSend = nak.lastGoodSeq + 1;
-      highestAcked = nak.lastGoodSeq;
+      nextToSend = nak.nextExpectedSeq;
+      highestAcked = nak.nextExpectedSeq - 1;
       topUpWindow();
     };
 

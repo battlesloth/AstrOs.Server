@@ -464,9 +464,9 @@ describe('Serial Message Handler Tests', () => {
     expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
   });
 
-  it('handle FW_CHUNK_NAK parses last-good-seq + reason', () => {
+  it('handle FW_CHUNK_NAK parses last-good-seq + next-expected-seq + reason', () => {
     const handler = new MessageHandler();
-    const payload = `xfer-1${US}42${US}CRC`;
+    const payload = `xfer-1${US}42${US}43${US}CRC`;
 
     const response = handler.handleFwChunkNak(payload);
 
@@ -474,13 +474,33 @@ describe('Serial Message Handler Tests', () => {
     expect(response.payload).toEqual({
       transferId: 'xfer-1',
       lastGoodSeq: 42,
+      nextExpectedSeq: 43,
+      reasonCode: 'CRC',
+    });
+  });
+
+  it('handle FW_CHUNK_NAK parses first-chunk NAK (lastGoodSeq=0, nextExpectedSeq=0)', () => {
+    // The disambiguating case the protocol amendment was added for: on the
+    // very first chunk's NAK, lastGoodSeq=0 alone could mean either "seq 0
+    // committed, send seq 1" or "nothing committed, send seq 0". The
+    // explicit nextExpectedSeq=0 resolves it.
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}0${US}0${US}CRC`;
+
+    const response = handler.handleFwChunkNak(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.FW_CHUNK_NAK);
+    expect(response.payload).toEqual({
+      transferId: 'xfer-1',
+      lastGoodSeq: 0,
+      nextExpectedSeq: 0,
       reasonCode: 'CRC',
     });
   });
 
   it('handle FW_CHUNK_NAK rejects unknown reason codes', () => {
     const handler = new MessageHandler();
-    const payload = `xfer-1${US}42${US}NONSENSE`;
+    const payload = `xfer-1${US}42${US}43${US}NONSENSE`;
 
     const response = handler.handleFwChunkNak(payload);
 
@@ -489,7 +509,27 @@ describe('Serial Message Handler Tests', () => {
 
   it('handle FW_CHUNK_NAK rejects lastGoodSeq with trailing garbage', () => {
     const handler = new MessageHandler();
-    const payload = `xfer-1${US}42junk${US}CRC`;
+    const payload = `xfer-1${US}42junk${US}43${US}CRC`;
+
+    const response = handler.handleFwChunkNak(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handle FW_CHUNK_NAK rejects nextExpectedSeq with trailing garbage', () => {
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}42${US}43junk${US}CRC`;
+
+    const response = handler.handleFwChunkNak(payload);
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handle FW_CHUNK_NAK rejects wrong field count (legacy 3-field form)', () => {
+    // Pre-amendment 3-field form is no longer accepted — the wire format
+    // now requires the next-expected-seq field.
+    const handler = new MessageHandler();
+    const payload = `xfer-1${US}42${US}CRC`;
 
     const response = handler.handleFwChunkNak(payload);
 

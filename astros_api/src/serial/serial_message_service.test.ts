@@ -183,7 +183,7 @@ describe('SerialMessageService', () => {
       const msg = buildMessage(
         SerialMessageType.FW_CHUNK_NAK,
         'msg-fw-chunk-nak',
-        `xfer-1${US}3${US}CRC`,
+        `xfer-1${US}3${US}4${US}CRC`,
       );
 
       const result = service.handleMessage(msg);
@@ -192,6 +192,7 @@ describe('SerialMessageService', () => {
       if (result.type === SerialWorkerResponseType.FW_CHUNK_NAK) {
         expect(result.payload.transferId).toBe('xfer-1');
         expect(result.payload.lastGoodSeq).toBe(3);
+        expect(result.payload.nextExpectedSeq).toBe(4);
         expect(result.payload.reasonCode).toBe('CRC');
       }
     });
