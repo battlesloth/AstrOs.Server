@@ -1489,7 +1489,7 @@ describe('FlashJobOrchestrator', () => {
 
       // NAK arrives. Per the orchestrator contract, log only — no controller
       // state change, no flashControllerUpdate, no stage transition.
-      run.observer.onChunkNak?.(1, 'CRC');
+      run.observer.onChunkNak?.(1, 2, 'CRC');
 
       expect(controllerUpdates(fx.emitWs)).toHaveLength(baselineUpdates);
       const job = fx.orchestrator.getCurrentJob();

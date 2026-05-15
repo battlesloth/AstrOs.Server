@@ -838,6 +838,41 @@ describe('ChunkStreamer — NAK + Go-Back-N', () => {
         code: 'master_io_error',
       });
       await driver;
+      // Subscriber cleanup runs in the streamer's finally block; verify
+      // the bounds-guard early-return path does not leak.
+      expect(bus.subscribers.size).toBe(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('rejects FW_CHUNK_NAK with nextExpectedSeq == totalChunks as master_io_error', async () => {
+    // Boundary case: nextExpectedSeq == totalChunks asks the sender to
+    // retransmit a chunk that doesn't exist (valid seqs are 0..lastSeq,
+    // where lastSeq = totalChunks - 1). The bounds guard must reject this
+    // equality value too — a previous form used `> totalChunks` which let
+    // this through, then silently stalled topUpWindow because
+    // `nextToSend (= totalChunks) <= lastSeq (= totalChunks - 1)` is false,
+    // and the transfer would die with the opaque whole-transfer watchdog.
+    const chunkSize = 100;
+    const totalChunks = 5;
+    const buf = Buffer.alloc(chunkSize * totalChunks, 0xaa);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+
+      const driver = (async (): Promise<void> => {
+        await driveBeginAndAwaitInitialFill(bus, 5);
+        // nextExpectedSeq=5 (= totalChunks) is one past the last valid seq.
+        bus.deliver(TRANSFER_ID, chunkNak(4, 'CRC', /*nextExpectedSeq=*/ 5));
+      })();
+
+      await expect(streamer.run(specFor(tempPath, buf.length), {})).rejects.toMatchObject({
+        code: 'master_io_error',
+      });
+      await driver;
+      expect(bus.subscribers.size).toBe(0);
     } finally {
       await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
     }

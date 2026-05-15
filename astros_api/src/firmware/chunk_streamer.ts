@@ -530,18 +530,27 @@ export class ChunkStreamer {
 
     const handleChunkNak = (nak: FwChunkNak): void => {
       // Bounds guard: a malformed master that sends nextExpectedSeq beyond
-      // the transfer's chunk count would otherwise set nextToSend out of
-      // range, stall topUpWindow (its loop bound is nextToSend <= lastSeq),
-      // and leave the transfer to die via the whole-transfer watchdog with
-      // an opaque "transfer_timeout" error. Fail loudly with a transfer-
-      // protocol error so the operator log says exactly what happened.
+      // the valid chunk range would otherwise set nextToSend out of range,
+      // stall topUpWindow (its loop bound is nextToSend <= lastSeq), and
+      // leave the transfer to die via the whole-transfer watchdog with an
+      // opaque "transfer_timeout" error. Fail loudly with a master_io_error
+      // so the operator log says exactly what happened.
+      //
+      // Valid seq range is 0..=lastSeq (= 0..=totalChunks-1). Any
+      // nextExpectedSeq >= totalChunks asks for a chunk that doesn't exist:
+      // nextExpectedSeq == totalChunks would point one past the last chunk,
+      // causing topUpWindow's `nextToSend <= lastSeq` to exit immediately
+      // with no chunks sent and no resolve path. The `>=` (not `>`) catches
+      // this fencepost; ACKs use `>= totalChunks` differently to detect
+      // completion but a NAK at that boundary is structurally invalid.
+      //
       // FLASH_FULL is exempt — it ends the transfer either way.
-      if (nak.nextExpectedSeq > totalChunks && nak.reasonCode !== 'FLASH_FULL') {
+      if (nak.nextExpectedSeq >= totalChunks && nak.reasonCode !== 'FLASH_FULL') {
         rejectChunkPhase?.(
           new TransferError(
             'master_io_error',
             spec.transferId,
-            `FW_CHUNK_NAK nextExpectedSeq=${nak.nextExpectedSeq} exceeds totalChunks=${totalChunks}`,
+            `FW_CHUNK_NAK nextExpectedSeq=${nak.nextExpectedSeq} is not a valid chunk (totalChunks=${totalChunks}, valid range 0..${totalChunks - 1})`,
           ),
         );
         return;
@@ -561,7 +570,8 @@ export class ChunkStreamer {
       // cursor (since the amendment that added it). The previous guard
       // form was vulnerable to the equality case after a first-chunk NAK
       // recovery — a duplicate first-chunk NAK arriving with
-      // lastGoodSeq=0 when highestAcked had advanced to 0 would compute
+      // lastGoodSeq=0 when highestAcked had advanced to 0 (because the
+      // post-NAK Go-Back-N refill of seq 0 was ACKed) would compute
       // `0 < 0 = false` and be processed as fresh, silently rewinding
       // the transfer. Using nextExpectedSeq closes that hole.
       //
@@ -578,8 +588,9 @@ export class ChunkStreamer {
       // to handleChunkAck calling onChunkAck before the early return on
       // completion. Pass both lastGoodSeq (diagnostic) and nextExpectedSeq
       // (operational — the seq we're actually resuming from) so the
-      // observer can distinguish first-chunk NAK from a regular NAK at
-      // seq 0.
+      // observer can distinguish a first-chunk NAK (nothing yet committed,
+      // nextExpectedSeq=0) from a NAK where seq 0 was previously committed
+      // and a later chunk failed (nextExpectedSeq > 0).
       observer.onChunkNak?.(nak.lastGoodSeq, nak.nextExpectedSeq, nak.reasonCode);
 
       if (nak.reasonCode === 'FLASH_FULL') {

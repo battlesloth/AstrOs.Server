@@ -18,10 +18,14 @@ export interface StreamObserver {
   onTransferBegun?: (ack: FwTransferBeginAck) => void;
   onChunkAck?: (highestContiguousSeq: number, bytesSent: number) => void;
   // nextExpectedSeq is the seq the streamer is resuming from after this NAK.
-  // On a regular NAK it equals lastGoodSeq + 1; on a first-chunk NAK both
-  // values are 0 and nextExpectedSeq is the unambiguous "send seq 0 again"
-  // signal — surfacing it here lets observers distinguish "nothing committed"
-  // from "seq 0 was committed" without re-parsing protocol state.
+  // A conformant master sets it to lastGoodSeq + 1 on a regular NAK and to
+  // 0 on a first-chunk NAK (where lastGoodSeq is also 0). Observers should
+  // NOT assert `nextExpectedSeq === lastGoodSeq + 1` as a structural
+  // invariant — the streamer honors whatever the master sends (subject to
+  // the >= totalChunks bounds guard), so a misbehaving master could in
+  // principle violate it. Surfacing this value here lets observers
+  // distinguish "nothing committed" (nextExpectedSeq=0) from "seq 0 was
+  // committed" (nextExpectedSeq=1) without re-parsing protocol state.
   onChunkNak?: (lastGoodSeq: number, nextExpectedSeq: number, reason: FwChunkNakReason) => void;
   onRetry?: (seq: number, attempt: number) => void;
   onBackpressure?: (paused: boolean) => void;
