@@ -523,9 +523,7 @@ export class StubMaster {
       );
     }
     if (opts?.failAtSeq !== undefined && opts.failAtSeq < 0) {
-      throw new Error(
-        `StubMaster.autoAckUpload: failAtSeq must be >= 0 (got ${opts.failAtSeq})`,
-      );
+      throw new Error(`StubMaster.autoAckUpload: failAtSeq must be >= 0 (got ${opts.failAtSeq})`);
     }
 
     this.autoAckUploadCfg = {
