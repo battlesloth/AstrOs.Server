@@ -4,7 +4,8 @@
 //   - sliding window of WINDOW_SIZE chunks in flight, retired by
 //     cumulative FW_CHUNK_ACK
 //   - FW_CHUNK_NAK with FLASH_FULL is terminal; CRC / SIZE / OUT_OF_ORDER
-//     trigger Go-Back-N from `lastGoodSeq + 1`
+//     trigger Go-Back-N from `nak.nextExpectedSeq` (NOT `lastGoodSeq + 1`
+//     — that breaks on first-chunk NAK; see handleChunkNak for details)
 //   - per-chunk ack timer with `maxRetriesPerChunk` budget; whole-transfer
 //     watchdog as a second-level safety net
 //   - FW_BACKPRESSURE PAUSE halts new sends but in-flight ACKs still drain;
@@ -528,21 +529,56 @@ export class ChunkStreamer {
     };
 
     const handleChunkNak = (nak: FwChunkNak): void => {
-      // Stale-NAK guard: a NAK whose lastGoodSeq is below our current
-      // highestAcked is from a retransmit-pair the streamer has already
-      // moved past (master retransmitted the NAK; both arrive after we
-      // already restarted). Both the observer call AND the Go-Back-N
-      // mutation must be skipped: rewinding nextToSend / highestAcked
-      // here would roll back the monotonic cumulative-progress cursor
-      // (handleChunkAck has the symmetric guard at the top of its
-      // observer/early-return path), and firing observer.onChunkNak
-      // would surface a phantom error to the UI for a NAK we've already
-      // recovered from.
+      // Bounds guard: a malformed master that sends nextExpectedSeq beyond
+      // the valid chunk range would otherwise set nextToSend out of range
+      // and stall the streamer. Concretely: setting nextToSend = totalChunks
+      // (or higher) makes topUpWindow's `nextToSend <= lastSeq` loop exit
+      // immediately with no chunks sent. inFlight stays empty, so no ACK
+      // ever arrives, so resolveChunkPhaseDone is never called. The only
+      // exit is the whole-transfer watchdog firing with the opaque
+      // `transfer_timeout` error. Fail loudly with `master_io_error` here
+      // so the operator log says exactly what happened.
+      //
+      // Valid seq range is 0..=lastSeq (= 0..=totalChunks-1). Any
+      // nextExpectedSeq >= totalChunks asks for a chunk that doesn't exist;
+      // the `>=` (not `>`) catches the exact fencepost where
+      // nextExpectedSeq == totalChunks would point one past the last chunk.
+      //
+      // FLASH_FULL is exempt — it ends the transfer either way.
+      if (nak.nextExpectedSeq >= totalChunks && nak.reasonCode !== 'FLASH_FULL') {
+        rejectChunkPhase?.(
+          new TransferError(
+            'master_io_error',
+            spec.transferId,
+            `FW_CHUNK_NAK nextExpectedSeq=${nak.nextExpectedSeq} is not a valid chunk (totalChunks=${totalChunks}, valid range 0..${totalChunks - 1} inclusive)`,
+          ),
+        );
+        return;
+      }
+
+      // Stale-NAK guard: a NAK whose nextExpectedSeq is at or behind our
+      // current highestAcked is from a retransmit-pair the streamer has
+      // already moved past (master retransmitted the NAK; both arrive
+      // after we already restarted). Both the observer call AND the Go-
+      // Back-N mutation must be skipped: rewinding nextToSend / highest-
+      // Acked here would roll back the monotonic cumulative-progress
+      // cursor and fire a phantom onChunkNak to the UI for a NAK we've
+      // already recovered from.
+      //
+      // Why `nextExpectedSeq <= highestAcked` and not `lastGoodSeq <
+      // highestAcked`: nextExpectedSeq is now the authoritative resume
+      // cursor (since the amendment that added it). The previous guard
+      // form was vulnerable to the equality case after a first-chunk NAK
+      // recovery — a duplicate first-chunk NAK arriving with
+      // lastGoodSeq=0 when highestAcked had advanced to 0 (because the
+      // post-NAK Go-Back-N refill of seq 0 was ACKed) would compute
+      // `0 < 0 = false` and be processed as fresh, silently rewinding
+      // the transfer. Using nextExpectedSeq closes that hole.
       //
       // FLASH_FULL is exempt — it's terminal regardless of when the master
       // sent it. A late-arriving FLASH_FULL still means flash is exhausted;
       // we must reject the transfer rather than silently swallow it.
-      const isStale = nak.lastGoodSeq < highestAcked;
+      const isStale = nak.nextExpectedSeq <= highestAcked;
       if (isStale && nak.reasonCode !== 'FLASH_FULL') {
         return;
       }
@@ -550,29 +586,52 @@ export class ChunkStreamer {
       // Observer fires before any state mutation so listeners see the NAK
       // even when FLASH_FULL is about to terminate the transfer. Symmetric
       // to handleChunkAck calling onChunkAck before the early return on
-      // completion.
-      observer.onChunkNak?.(nak.lastGoodSeq, nak.reasonCode);
+      // completion. Pass both lastGoodSeq (diagnostic) and nextExpectedSeq
+      // (operational — the seq we're actually resuming from) so the
+      // observer can distinguish a first-chunk NAK (nothing yet committed,
+      // nextExpectedSeq=0) from a NAK where seq 0 was previously committed
+      // and a later chunk failed (nextExpectedSeq > 0).
+      observer.onChunkNak?.(nak.lastGoodSeq, nak.nextExpectedSeq, nak.reasonCode);
 
       if (nak.reasonCode === 'FLASH_FULL') {
         // Master's flash is exhausted — there's no recovery path. Reject the
         // chunk-phase awaiter; the outer try/catch/finally propagates the
         // error and the finally block clears in-flight state and disposes
         // the subscriber.
+        //
+        // Both seq fields are surfaced in the detail string: a misbehaving
+        // master could send FLASH_FULL with a bogus nextExpectedSeq (the
+        // bounds guard above intentionally exempts FLASH_FULL because it's
+        // terminal either way). Logging both fields means cross-firmware
+        // debugging doesn't require a separate protocol trace.
         rejectChunkPhase?.(
           new TransferError(
             'flash_full',
             spec.transferId,
-            `master refused chunk after seq=${nak.lastGoodSeq}: FLASH_FULL`,
+            `master refused chunk after seq=${nak.lastGoodSeq} (nextExpectedSeq=${nak.nextExpectedSeq}): FLASH_FULL`,
           ),
         );
         return;
       }
 
       // CRC / SIZE / OUT_OF_ORDER → Go-Back-N. Wipe the in-flight window,
-      // rewind cursors so the next top-up retransmits from lastGoodSeq + 1,
-      // and let topUpWindow refill. The `inFlight.clear()` here makes the
+      // rewind cursors to resume from `nak.nextExpectedSeq`, and let
+      // topUpWindow refill. The `inFlight.clear()` here makes the
       // finally-block's `inFlight.clear()` a no-op on the post-NAK happy
       // path, which is fine — clearing an empty Map is cheap.
+      //
+      // We must use `nextExpectedSeq` and NOT `lastGoodSeq + 1`. On the
+      // first-chunk NAK the master sends lastGoodSeq=0 (the only value
+      // it can — unsigned, no chunk committed yet) and nextExpectedSeq=0.
+      // Computing `lastGoodSeq + 1 = 1` would skip seq 0 entirely and
+      // the transfer would deadlock — master keeps NAKing missing seq 0;
+      // sender keeps sending from seq 1. The protocol amendment that
+      // added `next-expected-seq` to FW_CHUNK_NAK exists precisely to
+      // make this case unambiguous.
+      //
+      // highestAcked = nextExpectedSeq - 1 produces -1 on first-chunk
+      // NAK, matching the initial value at the top of run() — semantically
+      // "nothing committed yet."
       //
       // chunkTimers must be drained in lockstep with inFlight. Otherwise a
       // stale per-chunk timer for a now-discarded seq would fire after the
@@ -584,8 +643,8 @@ export class ChunkStreamer {
       for (const timer of chunkTimers.values()) clearTimeout(timer);
       chunkTimers.clear();
       inFlight.clear();
-      nextToSend = nak.lastGoodSeq + 1;
-      highestAcked = nak.lastGoodSeq;
+      nextToSend = nak.nextExpectedSeq;
+      highestAcked = nak.nextExpectedSeq - 1;
       topUpWindow();
     };
 

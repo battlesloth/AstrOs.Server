@@ -85,6 +85,11 @@ export type FwChunkNakReason = (typeof FW_CHUNK_NAK_REASONS)[number];
 export interface FwChunkNak {
   transferId: string;
   lastGoodSeq: number;
+  // The seq the sender must (re)send next. Disambiguates the first-chunk
+  // NAK case where lastGoodSeq=0 alone cannot distinguish "seq 0 committed,
+  // want seq 1" from "nothing committed, want seq 0". chunk_streamer resumes
+  // from nextExpectedSeq directly — do NOT compute as lastGoodSeq + 1.
+  nextExpectedSeq: number;
   reasonCode: FwChunkNakReason;
 }
 

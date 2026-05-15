@@ -136,7 +136,7 @@ describe('WorkerSerialBus', () => {
 
       const msg: FwChunkNakResponse = {
         type: SerialWorkerResponseType.FW_CHUNK_NAK,
-        payload: { transferId: 'xfer-1', lastGoodSeq: 42, reasonCode: 'CRC' },
+        payload: { transferId: 'xfer-1', lastGoodSeq: 42, nextExpectedSeq: 43, reasonCode: 'CRC' },
       };
       worker.emit('message', msg);
 
@@ -145,6 +145,7 @@ describe('WorkerSerialBus', () => {
       expect(ack.kind).toBe('chunkNak');
       if (ack.kind === 'chunkNak') {
         expect(ack.lastGoodSeq).toBe(42);
+        expect(ack.nextExpectedSeq).toBe(43);
         expect(ack.reasonCode).toBe('CRC');
       }
     });
@@ -479,7 +480,7 @@ describe('WorkerSerialBus', () => {
       };
       const chunkNak: FwChunkNakResponse = {
         type: SerialWorkerResponseType.FW_CHUNK_NAK,
-        payload: { transferId: 'xfer-1', lastGoodSeq: 0, reasonCode: 'CRC' },
+        payload: { transferId: 'xfer-1', lastGoodSeq: 0, nextExpectedSeq: 0, reasonCode: 'CRC' },
       };
       const endAck: FwTransferEndAckResponse = {
         type: SerialWorkerResponseType.FW_TRANSFER_END_ACK,

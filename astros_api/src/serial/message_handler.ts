@@ -242,7 +242,7 @@ export class MessageHandler {
 
   handleFwChunkNak(msg: string): FwChunkNakResponse | UnknownSerialResponse {
     const parts = msg.split(MessageHelper.US);
-    if (parts.length !== 3) {
+    if (parts.length !== 4) {
       logger.error(`Invalid FW_CHUNK_NAK: ${msg}`);
       return { type: SerialWorkerResponseType.UNKNOWN };
     }
@@ -253,15 +253,21 @@ export class MessageHandler {
       return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
-    const reason = parts[2] as FwChunkNakReason;
+    const nextExpectedSeq = MessageHelper.parseUint(parts[2]);
+    if (nextExpectedSeq === null) {
+      logger.error(`FW_CHUNK_NAK nextExpectedSeq is not a valid unsigned integer: ${msg}`);
+      return { type: SerialWorkerResponseType.UNKNOWN };
+    }
+
+    const reason = parts[3] as FwChunkNakReason;
     if (!FW_CHUNK_NAK_REASON_SET.has(reason)) {
-      logger.error(`FW_CHUNK_NAK has unknown reason: ${parts[2]}`);
+      logger.error(`FW_CHUNK_NAK has unknown reason: ${parts[3]}`);
       return { type: SerialWorkerResponseType.UNKNOWN };
     }
 
     return {
       type: SerialWorkerResponseType.FW_CHUNK_NAK,
-      payload: { transferId: parts[0], lastGoodSeq, reasonCode: reason },
+      payload: { transferId: parts[0], lastGoodSeq, nextExpectedSeq, reasonCode: reason },
     };
   }
 

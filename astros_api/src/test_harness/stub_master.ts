@@ -116,6 +116,11 @@ export interface FwChunkAckArgs {
 export interface FwChunkNakArgs {
   transferId: string;
   lastGoodSeq: number;
+  // The seq the master wants the sender to (re)send next. Disambiguates the
+  // first-chunk NAK: lastGoodSeq=0 alone cannot distinguish "seq 0 committed,
+  // send seq 1" from "nothing committed, send seq 0". nextExpectedSeq is
+  // unambiguous.
+  nextExpectedSeq: number;
   // Reason codes come from FW_CHUNK_NAK_REASONS in firmware_messages.ts —
   // that const tuple is the protocol source of truth. Allowed values:
   // 'CRC' | 'SIZE' | 'OUT_OF_ORDER' | 'FLASH_FULL'.
@@ -431,9 +436,12 @@ export class StubMaster {
   }
 
   writeFwChunkNak(args: FwChunkNakArgs): void {
-    const payload = [args.transferId, String(args.lastGoodSeq), args.reasonCode].join(
-      MessageHelper.US,
-    );
+    const payload = [
+      args.transferId,
+      String(args.lastGoodSeq),
+      String(args.nextExpectedSeq),
+      args.reasonCode,
+    ].join(MessageHelper.US);
     this.writeFrame(SerialMessageType.FW_CHUNK_NAK, args.msgId, payload);
   }
 
@@ -503,20 +511,19 @@ export class StubMaster {
     //     `windowRemaining` exceeding the configured sliding window
     //     (message_handler.ts:225-230). Every FW_CHUNK_ACK would route to
     //     UNKNOWN and the streamer would never advance.
-    //   - failAtSeq <= 0: lastGoodSeq=failAtSeq-1 would serialize as a
-    //     negative integer, which parseUint rejects in handleFwChunkNak.
-    //     The streamer would never see the NAK so the retransmit branch
-    //     wouldn't exercise.
+    //   - failAtSeq < 0: negative seq is meaningless on the wire.
+    //
+    // failAtSeq=0 IS now valid (this is the first-chunk NAK case). With
+    // the protocol amendment that added next-expected-seq to FW_CHUNK_NAK,
+    // a NAK at seq 0 emits lastGoodSeq=0, nextExpectedSeq=0 — unambiguous.
     const windowSize = opts?.windowSize ?? FW_SERIAL_SLIDING_WINDOW;
     if (windowSize <= 0 || windowSize > FW_SERIAL_SLIDING_WINDOW) {
       throw new Error(
         `StubMaster.autoAckUpload: windowSize must be in (0, ${FW_SERIAL_SLIDING_WINDOW}]; got ${windowSize}`,
       );
     }
-    if (opts?.failAtSeq !== undefined && opts.failAtSeq <= 0) {
-      throw new Error(
-        `StubMaster.autoAckUpload: failAtSeq must be > 0 (got ${opts.failAtSeq}); a NAK at seq=0 would emit lastGoodSeq=-1, which the server parses as UNKNOWN`,
-      );
+    if (opts?.failAtSeq !== undefined && opts.failAtSeq < 0) {
+      throw new Error(`StubMaster.autoAckUpload: failAtSeq must be >= 0 (got ${opts.failAtSeq})`);
     }
 
     this.autoAckUploadCfg = {
@@ -660,9 +667,17 @@ export class StubMaster {
         // (including for the retransmitted failAtSeq chunk).
         if (cfg.failAtSeq !== undefined && seq === cfg.failAtSeq && !cfg.hasFailedOnce) {
           cfg.hasFailedOnce = true;
+          // lastGoodSeq: the last committed seq. On seq=0 nothing has been
+          // committed yet, so we emit 0 — the only value the master can put
+          // in an unsigned field for "nothing committed." That value is
+          // ambiguous on its own, which is exactly why the protocol carries
+          // nextExpectedSeq alongside it.
+          // nextExpectedSeq: the seq we want next — always `seq` (the NAK'd
+          // chunk is what should be retransmitted).
           this.writeFwChunkNak({
             transferId,
-            lastGoodSeq: seq - 1,
+            lastGoodSeq: seq === 0 ? 0 : seq - 1,
+            nextExpectedSeq: seq,
             reasonCode: 'CRC',
           });
         } else {

@@ -380,7 +380,8 @@ describe('StubMaster (PTY-backed)', () => {
           expect(ack1.payload.nextExpectedSeq).toBe(2);
         }
 
-        // seq 2 (first occurrence) → NAK with lastGoodSeq=1, reasonCode='CRC'
+        // seq 2 (first occurrence) → NAK with lastGoodSeq=1, nextExpectedSeq=2,
+        // reasonCode='CRC'
         const fn2 = requireFrame(frames, 2);
         expect(fn2.type).toBe(SerialMessageType.FW_CHUNK_NAK);
         const nak = handler.handleFwChunkNak(fn2.data);
@@ -388,6 +389,7 @@ describe('StubMaster (PTY-backed)', () => {
         if (nak.type === SerialWorkerResponseType.FW_CHUNK_NAK) {
           expect(nak.payload.transferId).toBe(XFER);
           expect(nak.payload.lastGoodSeq).toBe(1);
+          expect(nak.payload.nextExpectedSeq).toBe(2);
           expect(nak.payload.reasonCode).toBe('CRC');
         }
 
@@ -675,10 +677,18 @@ describe('StubMaster (PTY-backed)', () => {
     expect(() => stub.autoAckUpload({ windowSize: -1 })).toThrow(/windowSize must be in/);
   });
 
-  it('autoAckUpload: rejects failAtSeq <= 0 (would emit invalid lastGoodSeq)', () => {
+  it('autoAckUpload: rejects negative failAtSeq', () => {
+    // failAtSeq=0 is now valid — the protocol amendment that added
+    // next-expected-seq to FW_CHUNK_NAK makes the first-chunk-NAK case
+    // unambiguous on the wire. Negative seq is still meaningless.
     const stub = new StubMaster({ ptyPath: '/dev/null' });
-    expect(() => stub.autoAckUpload({ failAtSeq: 0 })).toThrow(/failAtSeq must be > 0/);
-    expect(() => stub.autoAckUpload({ failAtSeq: -5 })).toThrow(/failAtSeq must be > 0/);
+    expect(() => stub.autoAckUpload({ failAtSeq: -5 })).toThrow(/failAtSeq must be >= 0/);
+    expect(() => stub.autoAckUpload({ failAtSeq: -1 })).toThrow(/failAtSeq must be >= 0/);
+  });
+
+  it('autoAckUpload: accepts failAtSeq=0 (first-chunk NAK case)', () => {
+    const stub = new StubMaster({ ptyPath: '/dev/null' });
+    expect(() => stub.autoAckUpload({ failAtSeq: 0 })).not.toThrow();
   });
 
   it('autoAckUpload: accepts windowSize at the FW_SERIAL_SLIDING_WINDOW boundary', () => {
