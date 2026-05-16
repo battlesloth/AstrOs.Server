@@ -39,7 +39,7 @@ import type {
   TransferErrorCode,
   TransferSpec,
 } from '../models/firmware/chunk_streamer.js';
-import { TransferError } from '../models/firmware/chunk_streamer.js';
+import { TransferError, mintTransferId } from '../models/firmware/chunk_streamer.js';
 import type { AssetInfo, ReleaseInfo, ReleaseListResult } from '../models/firmware/release.js';
 import type { CachedAsset } from '../models/firmware/cache.js';
 import type { StoredUpload } from '../models/firmware/upload.js';
@@ -301,25 +301,38 @@ export function createFlashProgressThrottle(opts: {
 //     — source binary acquisition.
 //   * c.3 `GitHubReleaseService` — release/asset enumeration.
 //
-// All error paths funnel through `failJob(jobId, reason, detail, opts?)`. That
-// helper is the single site where `flashJobFailed` is emitted, non-terminal
-// controllers are transitioned to Failed, the lock is released, and (for
-// streamer-rejection failures) `currentJob.abortReason` is stamped. Three
-// disjoint entry points feed `failJob`:
+// All error paths funnel through `failJob(jobId, reason, detail, opts?)`.
+// That helper is the single site where `flashJobFailed` is emitted, non-
+// terminal controllers are transitioned to Failed, the lock is released,
+// and (for streamer-rejection / cancel paths) `currentJob.abortReason` is
+// stamped. Four entry points feed `failJob`:
 //
-//   * `start()`'s catch block — covers FlashOrchestratorError (validation +
-//     source resolution + bus_send_failed + subscriber_attach_failed),
-//     TransferError (the 12 c.6b error codes — bucket "B"), and unknown
-//     streamer rejections (mapped to `streamer_unknown_error`).
-//   * `handleDeployEvent` via `failDeployPhase` — covers `protocol_violation`
-//     surfaced by FW_PROGRESS / FW_DEPLOY_DONE wire validation.
-//   * `cancel()` during the deploy phase — best-effort inline cleanup
-//     (separate path because `cancel()` carries its own `abortReason`
-//     semantics rather than a typed reason).
+//   * `start()`'s sync catch — covers the pre-spawn FlashOrchestratorError
+//     reasons (validation, source resolution). `job_already_running` is
+//     thrown BEFORE this try (at the lock-acquire site) and never reaches
+//     `failJob` — there's no lock to release on that failure, so the HTTP
+//     layer surfaces it directly via the controller's catch.
+//   * The background `runInProgress` IIFE's catch — covers everything
+//     thrown AFTER sync setup completes: TransferError (the 12 c.6b error
+//     codes — bucket "B" — including `'aborted'` from a cancel-during-
+//     upload), `FlashOrchestratorError('bus_send_failed')` and
+//     `FlashOrchestratorError('subscriber_attach_failed')` raised inside
+//     the IIFE body, and unknown streamer rejections (mapped to
+//     `streamer_unknown_error`).
+//   * `handleDeployEvent` via `failDeployPhase` — covers
+//     `protocol_violation` surfaced by FW_PROGRESS / FW_DEPLOY_DONE wire
+//     validation.
+//   * `cancel()` during the deploy phase — calls `failJob(jobId,
+//     'aborted', reason, { abortReason: reason })` so a cancel after
+//     streamer success produces the same wire shape as a cancel during
+//     upload. Both cancel paths surface a typed `reason: 'aborted'`,
+//     which Vue's `KNOWN_FLASH_ERROR_REASONS` recognizes and maps to the
+//     operator-facing "Cancelled" banner.
 //
-// The first two converge through `failJob`; the cancel-deploy path remains
-// distinct because its emit shape carries `abortReason` rather than `reason`
-// (per spec §"Error paths" rows D/E vs the rest).
+// Both `start()`'s sync catch and the IIFE's catch route through the
+// shared `routeStartFailure` helper, so the failure shape stays uniform
+// regardless of whether the error fires before or after HTTP has
+// responded.
 
 const DEFAULT_REBOOT_TIMEOUT_MS = 15_000;
 const DEFAULT_THROTTLE_WINDOW_MS = 250;
@@ -358,12 +371,14 @@ export type FlashOrchestratorWsMessage =
 // as missing) and surfaces `'variant_unknown'` so the impl doesn't have
 // to write coercion boilerplate at the cache boundary.
 export interface FlashControllersStore {
-  // `requestedIds` is the operator-selected MAC list from the HTTP request.
-  // Implementations return only entries whose MAC is in this set; the
-  // orchestrator decides what to do about a requested MAC that isn't
-  // present (it throws `controllers_unknown` with the missing MACs as
-  // detail). Empty `requestedIds` is a contract violation — the HTTP
-  // validator must reject before this point.
+  // `requestedIds` is the operator-selected MAC list from the HTTP
+  // request. Implementations return only entries whose MAC is in this
+  // set; the orchestrator decides what to do about a requested MAC that
+  // isn't present (it throws `controllers_unknown` with the missing MACs
+  // as detail). Empty / empty-string entries are a contract violation —
+  // BOTH the HTTP validator AND the orchestrator boundary assert reject
+  // before this point (the duplicate rejection is defense-in-depth for
+  // internal callers that might bypass the HTTP layer).
   listFlashTargets(
     requestedIds: readonly string[],
   ): Promise<Array<{ id: string; variant: string | undefined }>>;
@@ -451,47 +466,53 @@ const defaultClock: Clock = {
   clearTimeout: (t) => globalThis.clearTimeout(t),
 };
 
-function defaultStreamerFactory(opts: { bus: SerialBus }): Streamer {
-  // Production deployment overrides `windowSize` to 1 — stop-and-wait —
-  // because the AstrOs master is processing-bound (astrosRxTask shares
-  // CPU with poll / heartbeat / I2C work and lands ~1 chunk/sec, not
-  // wire-rate ~2 chunks/sec). A larger window doesn't earn throughput
-  // when processing is the bottleneck, and it actively creates
-  // OUT_OF_ORDER NAK cascades when timers fire on chunks still queued
-  // behind earlier ones on the host's UART out. With one chunk in
-  // flight, that cascade is structurally impossible.
-  //
-  // `ackTimeoutMs: 5_000` gives ~5× margin over the observed ~1 s
-  // round-trip; `maxRetriesPerChunk: 3` × 5 s = 15 s before
-  // chunk_retry_exhausted.
-  //
-  // `transferTimeoutMs: 600_000` (10 min) — bumped from the streamer's
-  // 300_000 default. A 1.2 MB image is 294 chunks at ~1 s observed
-  // processing rate per chunk = ~295 s, which sits right at the 300 s
-  // default's edge. One unlucky chunk_retry that adds 5-15 s pushes the
-  // run past the watchdog and the whole transfer fails late (we hit
-  // exactly this at chunk 195 of 294). Doubling to 10 min gives
-  // ~2× headroom over the observed steady-state rate without making
-  // genuine hang detection meaningfully slower. The real cost ceiling
-  // is `maxRetriesPerChunk × ackTimeoutMs = 15 s` per stuck chunk; the
-  // whole-transfer watchdog is the second-level safety net for the
-  // pathological case where the per-chunk retry budget doesn't fire
-  // (e.g., the master ACKs slowly enough to stay under 5 s but never
-  // catches up). Revisit if the master's per-chunk rate changes.
-  //
-  // If the master ever gets fast enough for the wire to become the
-  // bottleneck, bump `windowSize` (and recompute the matching
-  // `ackTimeoutMs`). The streamer's sliding-window machinery is fully
-  // exercised by its tests against `TRANSPORT_DEFAULTS.windowSize=16`,
-  // so this is a one-line config change rather than a feature rebuild.
+// Production streamer config — exported as a constant so a pinning test can
+// assert on the values without re-instantiating the factory. Production
+// deployment overrides `windowSize` to 1 — stop-and-wait — because the AstrOs
+// master is processing-bound (astrosRxTask shares CPU with poll / heartbeat /
+// I2C work and lands ~1 chunk/sec, not wire-rate ~2 chunks/sec). A larger
+// window doesn't earn throughput when processing is the bottleneck, and it
+// actively creates OUT_OF_ORDER NAK cascades when timers fire on chunks still
+// queued behind earlier ones on the host's UART out. With one chunk in
+// flight, that cascade is structurally impossible.
+//
+// `ackTimeoutMs: 5_000` gives ~5× margin over the observed ~1 s round-trip;
+// `maxRetriesPerChunk: 3` × 5 s = 15 s before chunk_retry_exhausted.
+//
+// `transferTimeoutMs: 600_000` (10 min) — bumped from the streamer's 300_000
+// default. A 1.2 MB image is 294 chunks at ~1 s observed processing rate per
+// chunk = ~295 s, which sits right at the 300 s default's edge. One unlucky
+// chunk_retry that adds 5-15 s pushes the run past the watchdog and the whole
+// transfer fails late (we hit exactly this at chunk 195 of 294). Doubling to
+// 10 min gives ~2× headroom over the observed steady-state rate without
+// making genuine hang detection meaningfully slower. The real cost ceiling is
+// `maxRetriesPerChunk × ackTimeoutMs = 15 s` per stuck chunk; the whole-
+// transfer watchdog is the second-level safety net for the pathological case
+// where the per-chunk retry budget doesn't fire (e.g., the master ACKs slowly
+// enough to stay under 5 s but never catches up). Revisit if the master's
+// per-chunk rate changes.
+//
+// If the master ever gets fast enough for the wire to become the bottleneck,
+// bump `windowSize` (and recompute the matching `ackTimeoutMs`). The
+// streamer's sliding-window machinery is fully exercised by its tests against
+// `TRANSPORT_DEFAULTS.windowSize=16`, so this is a one-line config change
+// rather than a feature rebuild.
+export const DEFAULT_STREAMER_CONFIG = {
+  windowSize: 1,
+  ackTimeoutMs: 5_000,
+  maxRetriesPerChunk: 3,
+  transferTimeoutMs: 600_000,
+} as const;
+
+// Exported so a unit test can construct it with a fake bus and inspect
+// the resulting ChunkStreamer's config — pins the production wiring
+// against a regression that drops the `config` override and falls back to
+// TRANSPORT_DEFAULTS silently. Production code path is unchanged: the
+// orchestrator's constructor default still wires it up.
+export function defaultStreamerFactory(opts: { bus: SerialBus }): Streamer {
   return new ChunkStreamer({
     bus: opts.bus,
-    config: {
-      windowSize: 1,
-      ackTimeoutMs: 5_000,
-      maxRetriesPerChunk: 3,
-      transferTimeoutMs: 600_000,
-    },
+    config: { ...DEFAULT_STREAMER_CONFIG },
   });
 }
 
@@ -637,6 +658,21 @@ export class FlashJobOrchestrator {
     this.broadcastLockState();
 
     try {
+      // Boundary defense for `controllers`: the HTTP validator already rejects
+      // empty arrays / empty-string entries with a 400, but the `string[]`
+      // type itself admits them. Any future internal caller (admin endpoint,
+      // script-driven flash, refactored validator) that bypasses the HTTP
+      // path would otherwise reach `listFlashTargets([])` and surface as
+      // `no_controllers` only after the DB round-trip. Pin the invariant
+      // here so the failure mode matches the HTTP contract regardless of
+      // call site.
+      if (
+        request.controllers.length === 0 ||
+        !request.controllers.every((c) => typeof c === 'string' && c.length > 0)
+      ) {
+        throw new FlashOrchestratorError('no_controllers');
+      }
+
       // Wrap the controllers-store lookup so a raw fs/db/etc throw surfaces as
       // a typed FlashOrchestratorError rather than bypassing the failJob emit
       // path. Mirrors the `mapResolveError` wrap on resolveFlashSource: any
@@ -674,7 +710,7 @@ export class FlashJobOrchestrator {
         throw mapResolveError(err);
       }
 
-      const transferId = String(this.nextTransferId);
+      const transferId = mintTransferId(this.nextTransferId);
       this.nextTransferId = (this.nextTransferId + 1) & 0xff;
       const targetIds = targetsList.map((c) => c.id);
       const startedAt = new Date(this.clock.now()).toISOString();
@@ -881,9 +917,11 @@ export class FlashJobOrchestrator {
   // (which re-throws so the controller can map to HTTP status) and the
   // background IIFE's catch (which absorbs because HTTP has already
   // responded). Three error sources land here:
-  //   * `FlashOrchestratorError` — typed validation, source-resolution,
-  //     and mid-deploy (`bus_send_failed`, `subscriber_attach_failed`)
-  //     failures the orchestrator throws synchronously.
+  //   * `FlashOrchestratorError` — typed validation and source-resolution
+  //     failures thrown synchronously from `start()` BEFORE the IIFE
+  //     spawns, plus `bus_send_failed` and `subscriber_attach_failed`
+  //     thrown from inside the IIFE body itself (after streamer success,
+  //     during deploy-begin send / subscriber attach).
   //   * `TransferError` — c.6b's 12 streamer-rejection codes (bucket B
   //     in spec §"Error paths"). The code is stamped onto
   //     `currentJob.abortReason` AND surfaced as the `reason` on the
@@ -902,6 +940,20 @@ export class FlashJobOrchestrator {
       this.failJob(jobId, 'streamer_unknown_error', detail, {
         abortReason: 'streamer_unknown_error',
       });
+    }
+  }
+
+  /**
+   * Test-only: await the background IIFE assigned to `runInProgress`
+   * settling (success or failJob-routed rejection). Returns immediately
+   * when no background work is in flight. Production code MUST NOT call
+   * this — see the `runInProgress` field's docstring for why. Named with
+   * a `ForTest` suffix so a `grep` for the name surfaces accidental
+   * production use.
+   */
+  async awaitRunInProgressForTest(): Promise<void> {
+    if (this.runInProgress !== null) {
+      await this.runInProgress;
     }
   }
 
@@ -930,19 +982,6 @@ export class FlashJobOrchestrator {
    *     operator with a "cancelled" response for a job that already
    *     finished.
    */
-  /**
-   * Test-only: await the background `runUploadAndDeploy` IIFE settling
-   * (success or failJob-routed rejection). Returns immediately when no
-   * background work is in flight. Production code MUST NOT call this — see
-   * the `runInProgress` field's docstring for why. Named with a `ForTest`
-   * suffix so a `grep` for the name surfaces accidental production use.
-   */
-  async awaitRunInProgressForTest(): Promise<void> {
-    if (this.runInProgress !== null) {
-      await this.runInProgress;
-    }
-  }
-
   async cancel(reason: string): Promise<{ jobId: string } | null> {
     if (this.currentJob === null) return null;
     // Cancel-during-reboot-wait: the job already emitted `flashJobDone`,
@@ -954,7 +993,8 @@ export class FlashJobOrchestrator {
       // Hand off to the streamer rejection path. The streamer's own abort
       // listener (chunk_streamer.ts) rejects `run()` with
       // `TransferError('aborted', transferId, ...)`; that rejection lands
-      // in `start()`'s catch block, which calls `releaseLock(jobId)` —
+      // in the background `runInProgress` IIFE's catch, which routes
+      // through `routeStartFailure` → `failJob` → `releaseLock(jobId)`,
       // dropping the streamer reference, throttle, subscriber (if any),
       // and the AbortController itself. We don't release here; doing so
       // would race the streamer's still-pending rejection.
@@ -964,22 +1004,19 @@ export class FlashJobOrchestrator {
       return { jobId };
     }
 
-    // phase === 'deploy' — inline cleanup. The streamer has already
-    // resolved (we're past `await streamer.run`); aborting the controller
-    // now would be a no-op against a settled run. Run the deploy-cancel
-    // sequence directly.
-    if (this.deployUnsubscriber !== null) {
-      this.deployUnsubscriber();
-      this.deployUnsubscriber = null;
-    }
-    this.currentJob = { ...this.currentJob, abortReason: reason };
-    this.failNonTerminalControllers(reason);
-    const endedAt = new Date(this.clock.now()).toISOString();
-    this.safeEmitWs({
-      type: TransmissionType.flashJobFailed,
-      data: { jobId, abortReason: reason, endedAt },
-    });
-    this.releaseLock(jobId);
+    // phase === 'deploy' — route through `failJob` with `reason='aborted'`.
+    // The streamer has already resolved (we're past `await streamer.run`),
+    // so aborting the controller now would be a no-op against a settled
+    // run. `failJob` stamps `abortReason` on `currentJob`, transitions
+    // every non-terminal controller to Failed, emits the WS event, and
+    // disposes the deploy subscriber via `releaseLock`. Pre-c.6c.1 this
+    // path emitted inline without a `reason` field; the Vue side then
+    // mapped the missing reason to `'internal_server_error'`, which
+    // surfaced an operator's own cancel as a generic server error.
+    // Routing through `failJob` produces a typed `reason: 'aborted'` on
+    // the wire, which Vue's `KNOWN_FLASH_ERROR_REASONS` recognizes and
+    // maps to the operator-facing "Cancelled" copy.
+    this.failJob(jobId, 'aborted', reason, { abortReason: reason });
     return { jobId };
   }
 
@@ -1041,20 +1078,25 @@ export class FlashJobOrchestrator {
     this.safeEmitWs(buildLockStateResponse(this.jobLock.getState()));
   }
 
-  // Canonical "tear down everything" exit path. Called from:
-  //   * the synchronous catch in `start()` after a typed error throws
-  //   * `failDeployPhase` after a mid-deploy protocol violation
-  //   * the reboot-timer fallback (post-flashJobDone)
-  //   * `notifyMasterHeartbeat` (post-flashJobDone primary path)
+  // Canonical "tear down everything" exit path. Direct callers (the only
+  // sites that invoke `releaseLock` themselves; everywhere else goes
+  // through `failJob`):
+  //   * `failJob` — the canonical fail-path consolidation point. All error
+  //     entry points (sync catch, IIFE catch, failDeployPhase, cancel-
+  //     during-deploy) reach `releaseLock` through this hop.
+  //   * the reboot-timer fallback (post-flashJobDone, master never
+  //     heartbeats back).
+  //   * `notifyMasterHeartbeat` (post-flashJobDone primary path, master
+  //     POLL_ACKs with the new version).
   //
   // Every cleanup step is idempotent: when an earlier site has already
   // disposed a resource (e.g., the deploy-done branch disposed
   // `deployUnsubscriber` before arming the reboot timer; the heartbeat /
-  // timer paths null `rebootTimer` before invoking this helper), the field
-  // is already null and the corresponding step is a no-op. The duplicate
-  // cleanup keeps every entry-point self-contained — callers don't have to
-  // remember which resources they need to dispose vs. which the helper
-  // handles.
+  // timer paths null `rebootTimer` before invoking this helper), the
+  // field is already null and the corresponding step is a no-op. The
+  // duplicate cleanup keeps every entry-point self-contained — callers
+  // don't have to remember which resources they need to dispose vs.
+  // which the helper handles.
   private releaseLock(jobId: string): void {
     if (this.rebootTimer !== null) {
       this.clock.clearTimeout(this.rebootTimer);
@@ -1256,13 +1298,14 @@ export class FlashJobOrchestrator {
 
   // Mid-deploy failure entry point — called from `handleDeployEvent` when
   // FW_PROGRESS / FW_DEPLOY_DONE wire validation trips
-  // `protocol_violation`. The async deploy path can't throw out of
-  // `start()`'s try/catch because that promise has already resolved, so
-  // this thin wrapper delegates to `failJob` to keep the failure shape
-  // identical to the synchronous bucket. `bus_send_failed` and
-  // `subscriber_attach_failed` no longer route through here — they throw
-  // a `FlashOrchestratorError` from inside `start()`'s try block and let
-  // the catch route to `failJob` directly.
+  // `protocol_violation`. The deploy subscriber fires asynchronously off
+  // a serial event, so it cannot throw out of any `try`/`catch` the
+  // orchestrator owns; this thin wrapper delegates to `failJob` to keep
+  // the failure shape identical to the synchronous bucket.
+  // `bus_send_failed` and `subscriber_attach_failed` do NOT route through
+  // here — they're thrown from inside the background IIFE's try block
+  // (during deploy-begin send / subscriber attach) and routed to
+  // `failJob` via the IIFE catch's `routeStartFailure`.
   private failDeployPhase(reason: FlashOrchestratorErrorReason, detail: string): void {
     if (this.currentJob === null) return;
     this.failJob(this.currentJob.jobId, reason, detail);
@@ -1322,10 +1365,10 @@ export class FlashJobOrchestrator {
 
   // Transitions every currently-non-terminal controller to Failed with the
   // supplied error string AND emits flashControllerResult per affected
-  // controller (bypasses throttle — terminal results never coalesce).
-  // Two callers: `failJob` (typed-failure path) and `cancel()`'s
-  // deploy-branch (which builds its own `abortReason`-carrying
-  // flashJobFailed inline because that emit shape differs from failJob's).
+  // controller (bypasses throttle — terminal results never coalesce). The
+  // sole caller is `failJob`; all error paths (validation, source-resolve,
+  // streamer-rejection, mid-deploy protocol-violation, AND cancel-deploy)
+  // funnel through that helper so the failure shape stays uniform.
   private failNonTerminalControllers(error: string): void {
     if (this.currentJob === null) return;
     const jobId = this.currentJob.jobId;

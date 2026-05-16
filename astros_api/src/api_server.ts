@@ -26,6 +26,7 @@ import passport from 'passport';
 import { expressjwt as jwt } from 'express-jwt';
 import cors from 'cors';
 import fileUpload from 'express-fileupload';
+import { tmpdir } from 'node:os';
 
 import Express, { Router, Application, RequestHandler as ReqHandler } from 'express';
 import { WebSocketServer as Server, WebSocket } from 'ws';
@@ -401,7 +402,22 @@ export class ApiServer {
         credentials: true,
       }),
     );
-    this.app.use(fileUpload());
+    // 50 MB ceiling: AstrOs.ESP binaries are ~1.2 MB; this leaves an order of
+    // magnitude of headroom for future growth while preventing an authenticated
+    // operator from buffering a multi-GB POST into memory. `useTempFiles`
+    // streams the multipart body to disk during parse, so `.mv()` in the
+    // upload controller becomes a fast rename rather than a buffer-to-disk
+    // write. `abortOnLimit` rejects oversize uploads with 413 instead of
+    // silently truncating the buffer.
+    this.app.use(
+      fileUpload({
+        limits: { fileSize: 50 * 1024 * 1024 },
+        abortOnLimit: true,
+        responseOnLimit: 'firmware upload exceeds 50 MB limit',
+        useTempFiles: true,
+        tempFileDir: tmpdir(),
+      }),
+    );
     this.app.use(Express.json());
     this.app.use(Express.urlencoded({ extended: false }));
     this.app.use(cookieParser());

@@ -178,6 +178,7 @@ const sourceDisplay = (): string => {
         <AstrosFirmwareButton
           kind="primary"
           :disabled="confirmDisabled"
+          data-test="confirm-button"
           @click="emit('confirm')"
         >
           {{ t('firmware_view.confirm_modal.confirm') }}

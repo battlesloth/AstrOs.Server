@@ -49,6 +49,50 @@ export interface UploadedFirmware {
   sizeBytes: number;
 }
 
+/**
+ * Mirror of the server's `StoredUploadMeta`
+ * (`astros_api/src/models/firmware/upload.ts`). Hand-maintained; same
+ * convention as `ServerFwStage` below.
+ */
+export interface FirmwareUploadMeta {
+  uploadId: string;
+  originalFilename: string;
+  projectName: string;
+  version: string;
+  uploadedAt: string;
+  sizeBytes: number;
+}
+
+/**
+ * Mirror of the server's `FirmwareUploadResponse`
+ * (success body of POST /api/firmware/upload). Source of truth:
+ * `astros_api/src/models/firmware/upload.ts`.
+ */
+export interface FirmwareUploadResponse {
+  sha256: string;
+  sizeBytes: number;
+  meta: FirmwareUploadMeta;
+}
+
+/**
+ * Hand-mirrored from the server's `FIRMWARE_UPLOAD_ERROR_CODES`
+ * (`astros_api/src/models/firmware/upload.ts`). Today the Vue store
+ * maps any upload failure through `FlashErrorReason` directly — the
+ * server's sub-discriminator (`FirmwareUploadValidationCode`) is logged
+ * server-side but never propagated to the wire, so this union exists
+ * only to type the controller's `error` field on the error envelope.
+ */
+export type FirmwareUploadErrorCode =
+  | 'invalid_body'
+  | 'upload_io_failed'
+  | 'invalid_firmware'
+  | 'upload_persist_failed';
+
+export interface FirmwareUploadErrorResponse {
+  error: FirmwareUploadErrorCode;
+  detail: string;
+}
+
 export type ControllerOnlineStatus = 'up' | 'down' | 'needsSynced';
 
 /** Presentation-layer view of a controller for the firmware-update flow. */
@@ -125,6 +169,12 @@ export const FLASH_ERROR_REASONS = [
   'subscriber_attach_failed',
   'protocol_violation',
   'streamer_unknown_error',
+  // 'aborted' surfaces when the operator (or another job-owner) cancels an
+  // in-flight flash. Both cancel paths — upload-phase and deploy-phase —
+  // route through `failJob` with reason='aborted', so the banner shows
+  // operator-facing "Cancelled" copy rather than the generic
+  // "internal_server_error" fallback.
+  'aborted',
   'internal_server_error',
   'network_error',
 ] as const;

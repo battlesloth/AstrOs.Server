@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createFlashProgressThrottle,
+  DEFAULT_STREAMER_CONFIG,
+  defaultStreamerFactory,
   FlashJobOrchestrator,
   FlashOrchestratorError,
   resolveFlashSource,
@@ -541,6 +543,48 @@ describe('createFlashProgressThrottle', () => {
 
 // --- FlashJobOrchestrator ---------------------------------------------------
 
+describe('DEFAULT_STREAMER_CONFIG (production wiring)', () => {
+  it('pins the four production-tuned values against silent regression to TRANSPORT_DEFAULTS', () => {
+    // These values are chosen against the master's processing-bound ~1
+    // chunk/sec rate observed at the bench (see the inline rationale
+    // block in the orchestrator next to the export and the stop-and-wait
+    // plan at .docs/plans/20260516-1433-chunk-streamer-ack-timeout-for-
+    // full-window.md). A mutation that dropped the config override —
+    // reverting to TRANSPORT_DEFAULTS (windowSize=16, ackTimeoutMs=15_000,
+    // maxRetriesPerChunk=5, transferTimeoutMs=300_000) — would silently
+    // regress the 10-min watchdog to 5 min and reintroduce the
+    // OUT_OF_ORDER NAK cascade. Pin so the regression shows up in CI
+    // rather than in the next bench run.
+    expect(DEFAULT_STREAMER_CONFIG).toEqual({
+      windowSize: 1,
+      ackTimeoutMs: 5_000,
+      maxRetriesPerChunk: 3,
+      transferTimeoutMs: 600_000,
+    });
+  });
+
+  it('defaultStreamerFactory spreads DEFAULT_STREAMER_CONFIG into the constructed ChunkStreamer (factory-drop-through pin)', () => {
+    // A mutation that dropped the `config: { ... }` argument from the
+    // factory (e.g., `new ChunkStreamer({ bus })` alone) would leave
+    // DEFAULT_STREAMER_CONFIG correct on its own but silently revert
+    // production to TRANSPORT_DEFAULTS. Inspect the constructed
+    // streamer's private `config` field (test-only escape — the field is
+    // typed as `private readonly` but accessible at runtime) to pin the
+    // factory→streamer wiring, not just the constant.
+    const bus = {
+      send: () => undefined,
+      subscribeFwAcks: () => () => undefined,
+      subscribeDeployEvents: () => () => undefined,
+    } as unknown as SerialBus;
+    const streamer = defaultStreamerFactory({ bus });
+    const config = (streamer as unknown as { config: Record<string, number> }).config;
+    expect(config.windowSize).toBe(DEFAULT_STREAMER_CONFIG.windowSize);
+    expect(config.ackTimeoutMs).toBe(DEFAULT_STREAMER_CONFIG.ackTimeoutMs);
+    expect(config.maxRetriesPerChunk).toBe(DEFAULT_STREAMER_CONFIG.maxRetriesPerChunk);
+    expect(config.transferTimeoutMs).toBe(DEFAULT_STREAMER_CONFIG.transferTimeoutMs);
+  });
+});
+
 describe('FlashJobOrchestrator', () => {
   // FakeSerialBus mirrors the c.6b chunk_streamer.test pattern: record every
   // `send`, expose maps keyed by transferId for both ack and deploy-event
@@ -827,6 +871,38 @@ describe('FlashJobOrchestrator', () => {
     expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
   });
 
+  it('start() resolves BEFORE streamer.run() settles — HTTP must not block on the long transfer', async () => {
+    // Headline contract of the c.6c.1 async-start refactor (see
+    // `.docs/plans/20260516-1617-flash-orchestrator-async-start.md`):
+    // start() returns once the synchronous setup (lock acquire, source
+    // resolve, flashJobStarted emit, AbortController arm, streamer spawn)
+    // is done. The upload + deploy-arming work runs in a background IIFE
+    // assigned to `runInProgress`. Pre-refactor, start() awaited
+    // streamer.run() inline, wedging the HTTP handler for the full 5–10
+    // minute transfer.
+    //
+    // Every OTHER test in this file resolves the streamer BEFORE awaiting
+    // startPromise, so a regression that re-awaited streamer.run() inline
+    // would silently pass them all. Pin the contract by racing startPromise
+    // against a deadline with the streamer INTENTIONALLY UNSETTLED. The
+    // sync setup runs in single-digit milliseconds; 250 ms is generous and
+    // still well under the test-runner's default failure timeout.
+    const fx = setupHappyPath();
+
+    const startPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+
+    const sentinel = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('start() blocked on streamer.run()')), 250),
+    );
+    const result = await Promise.race([startPromise, sentinel]);
+    expect(result.jobId).toMatch(/^[0-9a-f-]{36}$/);
+    // Background work is still in flight — settle the streamer and drain
+    // the IIFE so this test doesn't leak state into the next one.
+    fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+    await fx.orchestrator.awaitRunInProgressForTest();
+  });
+
   it('transferId rotates as a uint8 counter across successive jobs (wire-format protocol contract)', async () => {
     // Pin the counter-not-constant invariant: two back-to-back start()
     // calls must produce DIFFERENT transferIds, in sequential order. A
@@ -1102,8 +1178,15 @@ describe('FlashJobOrchestrator', () => {
     }
     expect(caught).toBeInstanceOf(FlashOrchestratorError);
     expect((caught as FlashOrchestratorError).reason).toBe('controllers_unknown');
-    expect((caught as FlashOrchestratorError).detail).toContain('controller-ghost-1');
-    expect((caught as FlashOrchestratorError).detail).toContain('controller-ghost-2');
+    // Exact format: `${ghost1}, ${ghost2}` — comma-space separator, in the
+    // order the request listed them. The HTTP layer surfaces this verbatim
+    // in the response body's `detail`; the operator-facing copy depends on
+    // a parseable separator. A mutation from `.join(', ')` to `.join(' ')`
+    // or `.join('\n')` would still pass a `.toContain` check but produce
+    // unparseable diagnostic copy on the wire.
+    expect((caught as FlashOrchestratorError).detail).toBe(
+      'controller-ghost-1, controller-ghost-2',
+    );
     // Lock released, no orphaned currentJob.
     expect(fx.jobLock.isLocked()).toBe(false);
     expect(fx.orchestrator.getCurrentJob()).toBeNull();
@@ -2830,13 +2913,11 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('failJob is load-bearing: TransferError without bucket-B handling would skip controller cleanup (mutation-discipline pin)', async () => {
-      // If start()'s catch block only emitted flashJobFailed for
-      // FlashOrchestratorError (the pre-Task 11 behavior), a TransferError
-      // would fall through with NO flashJobFailed and NO per-controller
-      // failNonTerminal cleanup. This test pins both: TransferError fires
-      // a typed flashJobFailed AND transitions every controller to Failed.
-      // A regression that drops the `else if (err instanceof TransferError)`
-      // branch fails this assertion.
+      // If `routeStartFailure` dropped its `else if (err instanceof
+      // TransferError)` branch, a streamer rejection would fall through
+      // with NO flashJobFailed and NO per-controller failNonTerminal
+      // cleanup. This test pins both: TransferError fires a typed
+      // flashJobFailed AND transitions every controller to Failed.
       const fx = setupHappyPath();
       const startPromise = fx.orchestrator.start(fx.request);
       await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
@@ -3019,23 +3100,30 @@ describe('FlashJobOrchestrator', () => {
       // Subscriber disposed.
       expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
 
-      // Each non-terminal controller transitioned to Failed with the cancel
-      // reason as the error string + got a flashControllerResult emission.
+      // Each non-terminal controller transitioned to Failed; the error
+      // string carries `${reason}: ${detail}` from failJob — `aborted` is
+      // the typed FlashOrchestratorErrorReason, `operator-cancel` is the
+      // operator-supplied cancel trigger.
       const newResults = controllerResults(fx.emitWs).slice(baselineResults);
       expect(newResults).toHaveLength(2);
       for (const r of newResults) {
         expect(r.jobId).toBe(armed.jobId);
         expect(r.controller.stage).toBe(FwStage.Failed);
         if (r.controller.stage === FwStage.Failed) {
-          expect(r.controller.error).toBe('operator-cancel');
+          expect(r.controller.error).toBe('aborted: operator-cancel');
         }
       }
 
-      // flashJobFailed emitted with abortReason carrying the cancel reason.
+      // flashJobFailed emitted with reason='aborted' AND abortReason
+      // carrying the cancel trigger. Pre-c.6c.1 (round-2 review) this path
+      // emitted only `abortReason` — the missing `reason` made the Vue
+      // banner fall back to `internal_server_error` for the operator's own
+      // cancel. Routing through failJob with reason='aborted' fixes that.
       const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
       expect(failed).toHaveLength(1);
       expect(failed[0].data).toMatchObject({
         jobId: armed.jobId,
+        reason: 'aborted',
         abortReason: 'operator-cancel',
       });
       expect((failed[0].data as { endedAt: string }).endedAt).toMatch(/^\d{4}-/);

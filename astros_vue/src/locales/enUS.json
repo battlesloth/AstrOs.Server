@@ -178,6 +178,7 @@
       "subscriber_attach_failed": "The server couldn't subscribe to deploy events. Try again or restart the server.",
       "protocol_violation": "Unexpected message format from the server. Try again or restart the master controller.",
       "streamer_unknown_error": "The firmware streamer failed with an unknown error. Try again.",
+      "aborted": "Flash cancelled. The controllers were not updated.",
       "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
       "network_error": "Couldn't reach the server. Check your network connection and try again."
     },

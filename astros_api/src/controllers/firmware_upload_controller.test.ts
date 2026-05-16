@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { handleFirmwareUpload } from './firmware_upload_controller.js';
-import type { FirmwareUploadStore } from '../firmware/firmware_upload_store.js';
+import {
+  FirmwareUploadValidationError,
+  type FirmwareUploadStore,
+} from '../firmware/firmware_upload_store.js';
 import type { StoredUpload } from '../models/firmware/upload.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -138,12 +141,16 @@ describe('Firmware Upload Controller — POST /api/firmware/upload', () => {
     expect(store.store).not.toHaveBeenCalled();
   });
 
-  it('returns 400 invalid_firmware when store() throws a validation error (project mismatch)', async () => {
-    // The store's actual throw messages drive the controller's 400-vs-500
-    // routing. Pin both well-known validation paths so a regression that
-    // swallows the "project name mismatch" wording would silently 500.
+  it('returns 400 invalid_firmware when store() throws FirmwareUploadValidationError (project mismatch)', async () => {
+    // Controller routes 400 vs 500 by `instanceof FirmwareUploadValidationError`,
+    // not by message text. Pin all four validation codes so a regression that
+    // promoted one to a plain Error (or threw the wrong class) would 500
+    // instead of giving the operator a fixable 400.
     store.store.mockRejectedValueOnce(
-      new Error('firmware upload project name mismatch: got "Other", expected "AstrOs.ESP"'),
+      new FirmwareUploadValidationError(
+        'project_mismatch',
+        'firmware upload project name mismatch: got "Other", expected "AstrOs.ESP"',
+      ),
     );
     const req = { files: { file: fakeFile() } };
     const res = mockRes();
@@ -158,18 +165,33 @@ describe('Firmware Upload Controller — POST /api/firmware/upload', () => {
     });
   });
 
-  it('returns 400 invalid_firmware when store() throws "version unparseable"', async () => {
-    store.store.mockRejectedValueOnce(
-      new Error('firmware upload version unparseable: "not-a-version"'),
-    );
-    const req = { files: { file: fakeFile() } };
-    const res = mockRes();
+  it('returns 400 invalid_firmware on unparseable_version, too_short, and invalid_header codes', async () => {
+    const cases: {
+      code: 'unparseable_version' | 'too_short' | 'invalid_header';
+      detail: string;
+    }[] = [
+      {
+        code: 'unparseable_version',
+        detail: 'firmware upload version unparseable: "not-a-version"',
+      },
+      { code: 'too_short', detail: 'firmware upload too short: read 100 bytes, need at least 304' },
+      {
+        code: 'invalid_header',
+        detail: 'esp_app_desc magic word mismatch: got 0x0, expected 0xabcd5432',
+      },
+    ];
+    for (const { code, detail } of cases) {
+      store.store.mockRejectedValueOnce(new FirmwareUploadValidationError(code, detail));
+      const req = { files: { file: fakeFile() } };
+      const res = mockRes();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await handleFirmwareUpload(store as unknown as FirmwareUploadStore, req as any, res);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await handleFirmwareUpload(store as unknown as FirmwareUploadStore, req as any, res);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json.mock.calls[0][0].error).toBe('invalid_firmware');
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toBe('invalid_firmware');
+      expect(res.json.mock.calls[0][0].detail).toBe(detail);
+    }
   });
 
   it('returns 500 upload_persist_failed on an unknown store() error', async () => {

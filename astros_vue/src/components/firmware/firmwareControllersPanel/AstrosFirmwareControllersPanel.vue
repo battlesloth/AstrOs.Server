@@ -107,6 +107,7 @@ const actionBarMessage = computed(() => {
         <label
           v-if="anyFleetDowngrade"
           class="astros-firmware-controllers-panel__allow-downgrade"
+          data-test="allow-downgrade-toggle"
         >
           <input
             type="checkbox"

@@ -4,7 +4,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { v4 as uuid_v4 } from 'uuid';
 import { logger } from '../logger.js';
-import type { FirmwareUploadStore } from '../firmware/firmware_upload_store.js';
+import {
+  FirmwareUploadValidationError,
+  type FirmwareUploadStore,
+} from '../firmware/firmware_upload_store.js';
+import type {
+  FirmwareUploadErrorResponse,
+  FirmwareUploadResponse,
+} from '../models/firmware/upload.js';
 
 const route = '/firmware/upload';
 
@@ -39,7 +46,11 @@ export async function handleFirmwareUpload(
   res: any,
 ): Promise<void> {
   if (!req.files || !req.files.file) {
-    res.status(400).json({ error: 'invalid_body', detail: 'multipart `file` field is required' });
+    const body: FirmwareUploadErrorResponse = {
+      error: 'invalid_body',
+      detail: 'multipart `file` field is required',
+    };
+    res.status(400).json(body);
     return;
   }
 
@@ -58,7 +69,8 @@ export async function handleFirmwareUpload(
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.error(err, 'firmware upload: failed to stage temp file');
-    res.status(500).json({ error: 'upload_io_failed', detail });
+    const body: FirmwareUploadErrorResponse = { error: 'upload_io_failed', detail };
+    res.status(500).json(body);
     return;
   }
 
@@ -67,25 +79,28 @@ export async function handleFirmwareUpload(
     // Operator-facing response strips `path` (server-internal location)
     // and keeps only the fields the UI needs to surface "server accepted
     // this binary, here's what it parsed."
-    res.status(200).json({
+    const body: FirmwareUploadResponse = {
       sha256: stored.sha256,
       sizeBytes: stored.sizeBytes,
       meta: stored.meta,
-    });
+    };
+    res.status(200).json(body);
   } catch (err) {
-    // store() throws Error on validation (project mismatch, unparseable
-    // version, header parse) AND on IO failures (mkdir, rename, fs read).
-    // The two are operator-distinguishable today only by message text;
-    // route validation failures to 400 and treat the unknown bucket as
-    // 500. The store has already unlinked tempPath on its way out.
+    // FirmwareUploadValidationError = operator-fixable (bad header, project
+    // mismatch, unparseable version) → 400. Anything else = server-side IO
+    // (mkdir, rename, fs read) → 500. The store has already unlinked
+    // tempPath on its way out. Routing on `instanceof` rather than message
+    // text means a future rename of an error string can't silently flip the
+    // status code.
     const detail = err instanceof Error ? err.message : String(err);
-    const isValidation = /project name mismatch|unparseable|too short|esp_app_desc/i.test(detail);
-    if (isValidation) {
-      logger.warn(`firmware upload rejected: ${detail}`);
-      res.status(400).json({ error: 'invalid_firmware', detail });
+    if (err instanceof FirmwareUploadValidationError) {
+      logger.warn(`firmware upload rejected (${err.code}): ${detail}`);
+      const body: FirmwareUploadErrorResponse = { error: 'invalid_firmware', detail };
+      res.status(400).json(body);
       return;
     }
     logger.error(err, 'firmware upload: store() failed');
-    res.status(500).json({ error: 'upload_persist_failed', detail });
+    const body: FirmwareUploadErrorResponse = { error: 'upload_persist_failed', detail };
+    res.status(500).json(body);
   }
 }

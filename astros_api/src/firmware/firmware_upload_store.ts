@@ -71,6 +71,30 @@ function pathsFor(rootDir: string, uploadId: string): UploadPathTriple {
   };
 }
 
+// Typed error for operator-fixable upload failures — the four
+// `FirmwareUploadValidationCode` cases listed below: bad esp_app_desc
+// header (any failure mode parseEspAppDesc can throw), buffer too short
+// to reach the descriptor offset, project-name mismatch, or unparseable
+// version. The controller maps `instanceof FirmwareUploadValidationError`
+// to HTTP 400; any other throw (IO, permissions, EXDEV) maps to 500.
+// Replacing the previous "regex on error-message text" coupling — a
+// rename of the message string would otherwise silently flip a 400 to a
+// 500.
+export type FirmwareUploadValidationCode =
+  | 'invalid_header'
+  | 'too_short'
+  | 'project_mismatch'
+  | 'unparseable_version';
+
+export class FirmwareUploadValidationError extends Error {
+  readonly code: FirmwareUploadValidationCode;
+  constructor(code: FirmwareUploadValidationCode, message: string) {
+    super(message);
+    this.name = 'FirmwareUploadValidationError';
+    this.code = code;
+  }
+}
+
 // Catches the partial-write case where `.meta.json` is parseable JSON
 // but missing fields — type narrowing here, null-miss in latest().
 function isValidUploadMeta(value: unknown): value is StoredUploadMeta {
@@ -140,17 +164,29 @@ export class FirmwareUploadStore {
       try {
         const { bytesRead } = await fh.read(headBuf, 0, PARSE_BUFFER_LEN, 0);
         if (bytesRead < PARSE_BUFFER_LEN) {
-          throw new Error(
+          throw new FirmwareUploadValidationError(
+            'too_short',
             `firmware upload too short: read ${bytesRead} bytes, need at least ${PARSE_BUFFER_LEN}`,
           );
         }
       } finally {
         await fh.close();
       }
-      const desc = parseEspAppDesc(headBuf);
+      // parseEspAppDesc throws plain Error on magic/control/null-term/UTF-8/
+      // buffer-too-short failures — wrap as a typed validation error so the
+      // controller's 400-vs-500 dispatch keys off `instanceof` rather than
+      // message text.
+      let desc;
+      try {
+        desc = parseEspAppDesc(headBuf);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        throw new FirmwareUploadValidationError('invalid_header', detail);
+      }
 
       if (desc.projectName !== this.expectedProjectName) {
-        throw new Error(
+        throw new FirmwareUploadValidationError(
+          'project_mismatch',
           `firmware upload project name mismatch: got ${JSON.stringify(desc.projectName)}, expected ${JSON.stringify(this.expectedProjectName)}`,
         );
       }
@@ -160,7 +196,8 @@ export class FirmwareUploadStore {
       const normalizedVersion = normalizeEspVersion(desc.version);
       // compareVersions returns NaN for unparseable input — self-compare is 0 iff well-formed.
       if (Number.isNaN(compareVersions(normalizedVersion, normalizedVersion))) {
-        throw new Error(
+        throw new FirmwareUploadValidationError(
+          'unparseable_version',
           `firmware upload version unparseable: ${JSON.stringify(desc.version)} (normalized: ${JSON.stringify(normalizedVersion)})`,
         );
       }

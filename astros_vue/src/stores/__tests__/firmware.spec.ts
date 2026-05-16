@@ -1500,6 +1500,27 @@ describe('firmware store', () => {
       expect(store.flashError?.reason).toBe('release_not_found');
     });
 
+    it("maps reason='aborted' through verbatim (operator-cancel does not surface as 'internal_server_error')", () => {
+      // Mutation pin for the cancel-banner Critical (round-2 review).
+      // Pre-fix, cancel-deploy emitted ONLY `abortReason` with no `reason`;
+      // the WS-side fallback then mapped the missing reason to
+      // `'internal_server_error'`. Routing cancel-deploy through `failJob`
+      // (and adding `'aborted'` to FLASH_ERROR_REASONS) means the operator
+      // sees the typed "Cancelled" banner. A regression that dropped
+      // `'aborted'` from the tuple OR reverted cancel-deploy's emit shape
+      // would fall back to `'internal_server_error'` here.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason: 'aborted',
+        abortReason: 'operator',
+      });
+      expect(store.flashError?.reason).toBe('aborted');
+    });
+
     it('derives failedControllers from the FAILED entries in controllerStates', () => {
       const store = useFirmwareStore();
       seedSampleFleet();

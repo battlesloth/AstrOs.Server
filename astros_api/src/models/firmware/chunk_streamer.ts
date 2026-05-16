@@ -9,9 +9,29 @@ import type {
 import type { FwDeployEvent } from './flash_orchestrator.js';
 
 export interface TransferSpec {
+  // Wire-protocol `uint8 transfer-id` per AstrOs.ESP `.docs/protocol.md`.
+  // The firmware's OtaReceiver parses with `parseStrictU8` and rejects
+  // anything outside `'0'..'255'` (including UUIDs, hex strings, leading
+  // zeros). The type stays `string` for compatibility with the stub-master
+  // / fake-bus test fixtures that key subscriptions by arbitrary id; the
+  // production mint helper `mintTransferId` is the actual invariant gate.
   transferId: string;
   source: { path: string; sha256: string; sizeBytes: number };
   targets: string[];
+}
+
+/**
+ * Producer-side helper for transfer-ids. Asserts the uint8 wire-protocol
+ * range at the mint site so a mutation that drops the `& 0xff` mask in the
+ * counter (or a future code path that stringifies a non-uint8 number)
+ * trips a hard error here rather than reaching the firmware as a value
+ * `parseStrictU8` would silently reject.
+ */
+export function mintTransferId(n: number): string {
+  if (!Number.isInteger(n) || n < 0 || n > 255) {
+    throw new Error(`transferId out of uint8 range: ${n}`);
+  }
+  return String(n);
 }
 
 export interface StreamObserver {

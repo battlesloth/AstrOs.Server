@@ -163,6 +163,29 @@ describe('Firmware Flash Controller', () => {
       });
     });
 
+    it('returns 400 with the missing-MAC list on controllers_unknown', async () => {
+      // Pin the HTTP-status routing for `controllers_unknown` — the
+      // exhaustive `Record<FlashOrchestratorErrorReason, HttpStatus>` type
+      // catches a removal from the map at compile time, but a value
+      // mutation (`controllers_unknown: 500`) would only show up in
+      // production. The orchestrator-side test already covers the throw;
+      // this pins the HTTP leg.
+      orchestrator.start.mockRejectedValueOnce(
+        new FlashOrchestratorError('controllers_unknown', 'aa:bb:cc:dd:ee:01, aa:bb:cc:dd:ee:02'),
+      );
+
+      const req: any = { body: validGithubBody };
+      const res = mockRes();
+
+      await startFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'controllers_unknown',
+        detail: 'aa:bb:cc:dd:ee:01, aa:bb:cc:dd:ee:02',
+      });
+    });
+
     it('returns 400 on asset_not_found', async () => {
       orchestrator.start.mockRejectedValueOnce(
         new FlashOrchestratorError('asset_not_found', 'lolin_d32_pro'),

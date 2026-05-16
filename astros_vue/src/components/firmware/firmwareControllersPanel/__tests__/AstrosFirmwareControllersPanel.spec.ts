@@ -143,7 +143,7 @@ describe('AstrosFirmwareControllersPanel allow-downgrade toggle', () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false);
-    expect(wrapper.text()).not.toContain('Allow downgrades');
+    expect(wrapper.find('[data-test="allow-downgrade-toggle"]').exists()).toBe(false);
   });
 
   it('renders the toggle when at least one fleet member would be downgraded', async () => {
@@ -162,7 +162,7 @@ describe('AstrosFirmwareControllersPanel allow-downgrade toggle', () => {
     await wrapper.vm.$nextTick();
 
     expect(wrapper.find('input[type="checkbox"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain('Allow downgrades');
+    expect(wrapper.find('[data-test="allow-downgrade-toggle"]').exists()).toBe(true);
   });
 
   it("flips firmware.allowDowngrade on @change so the store's policy gate clears", async () => {
@@ -245,6 +245,6 @@ describe('AstrosFirmwareControllersPanel allow-downgrade toggle', () => {
     const wrapper = mountPanel({ phase: 'flashing', progressByControllerId: {} });
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.text()).not.toContain('Allow downgrades');
+    expect(wrapper.find('[data-test="allow-downgrade-toggle"]').exists()).toBe(false);
   });
 });

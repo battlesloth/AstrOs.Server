@@ -21,6 +21,7 @@ import type {
   FailedControllerSummary,
   FirmwareStage,
   FirmwareStageLabelKey,
+  FirmwareUploadResponse,
   SlotId,
   FlashErrorEnvelope,
   FlashErrorReason,
@@ -753,10 +754,21 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // server reads `req.body?.reason`, so the body must transmit.
       await apiClient.delete(FIRMWARE_FLASH, { data: { reason } });
     } catch (error) {
-      // Phase truth comes from the WS surface (don't transition here),
-      // but a flashError tells the operator the cancel didn't take effect.
-      // Without this, clicking Cancel and seeing nothing would leave the
-      // UI stuck at 'flashing' with no breadcrumb.
+      // 404 = the server has no active job (terminal-reaped, race with
+      // heartbeat-driven lock release, or never-started). The WS surface
+      // has already driven the UI to its terminal state; surfacing a
+      // "flash may still be running" warning here would be actively wrong.
+      // Swallow silently.
+      const status =
+        typeof error === 'object' && error !== null && 'response' in error
+          ? (error as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (status === 404) {
+        return;
+      }
+      // Any other failure (network, 5xx) still warrants the breadcrumb —
+      // phase truth comes from the WS surface (don't transition here), but
+      // a flashError tells the operator the cancel didn't take effect.
       console.warn('firmware.cancelFlash failed', error);
       setFlashError({
         reason: 'network_error',
@@ -871,11 +883,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       const response = await apiClient.post(FIRMWARE_UPLOAD, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      const body = response.data as {
-        sha256: string;
-        sizeBytes: number;
-        meta: { originalFilename: string; version: string; sizeBytes: number };
-      };
+      const body = response.data as FirmwareUploadResponse;
       uploadedFile.value = {
         version: body.meta.version,
         displayName: body.meta.originalFilename,

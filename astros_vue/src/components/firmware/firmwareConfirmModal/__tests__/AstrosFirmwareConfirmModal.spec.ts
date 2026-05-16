@@ -104,7 +104,7 @@ describe('AstrosFirmwareConfirmModal downgrade ack region', () => {
       target: 'v1.4.2',
       selectedControllers: [],
     });
-    const confirm = wrapper.findAll('button').find((b) => b.text().includes('Push firmware'));
+    const confirm = wrapper.find('[data-test="confirm-button"]');
     expect(confirm?.attributes('disabled')).toBeDefined();
   });
 
@@ -125,15 +125,14 @@ describe('AstrosFirmwareConfirmModal downgrade ack region', () => {
       target: 'v1.3.5',
       selectedControllers: [downgradeCore],
     });
-    // AstrosFirmwareButton stub renders a real <button :disabled>. The Confirm
-    // button is the second one (after Cancel).
-    const buttons = wrapper.findAll('button');
-    const confirm = buttons.find((b) => b.text().includes('Push firmware'));
-    expect(confirm).toBeTruthy();
-    expect(confirm?.attributes('disabled')).toBeDefined();
+    const confirm = wrapper.find('[data-test="confirm-button"]');
+    expect(confirm.exists()).toBe(true);
+    expect(confirm.attributes('disabled')).toBeDefined();
 
     await wrapper.find('[data-test="downgrade-ack-checkbox"]').setValue(true);
-    expect(confirm?.attributes('disabled')).toBeUndefined();
+    // Re-query after the DOM update — the wrapper handle from before the
+    // setValue may not reflect post-reactivity attribute state.
+    expect(wrapper.find('[data-test="confirm-button"]').attributes('disabled')).toBeUndefined();
   });
 
   it('Confirm click is a no-op while ack is unticked (no emit)', async () => {
@@ -141,7 +140,7 @@ describe('AstrosFirmwareConfirmModal downgrade ack region', () => {
       target: 'v1.3.5',
       selectedControllers: [downgradeCore],
     });
-    const confirm = wrapper.findAll('button').find((b) => b.text().includes('Push firmware'));
+    const confirm = wrapper.find('[data-test="confirm-button"]');
     await confirm?.trigger('click');
     expect(wrapper.emitted('confirm')).toBeUndefined();
   });
@@ -152,7 +151,7 @@ describe('AstrosFirmwareConfirmModal downgrade ack region', () => {
       selectedControllers: [downgradeCore],
     });
     await wrapper.find('[data-test="downgrade-ack-checkbox"]').setValue(true);
-    const confirm = wrapper.findAll('button').find((b) => b.text().includes('Push firmware'));
+    const confirm = wrapper.find('[data-test="confirm-button"]');
     await confirm?.trigger('click');
     expect(wrapper.emitted('confirm')).toHaveLength(1);
   });
@@ -167,13 +166,13 @@ describe('AstrosFirmwareConfirmModal downgrade ack region', () => {
       selectedControllers: [downgradeCore],
     });
     await wrapper.find('[data-test="downgrade-ack-checkbox"]').setValue(true);
-    const confirmBefore = wrapper.findAll('button').find((b) => b.text().includes('Push firmware'));
+    const confirmBefore = wrapper.find('[data-test="confirm-button"]');
     expect(confirmBefore?.attributes('disabled')).toBeUndefined();
 
     await wrapper.setProps({ open: false });
     await wrapper.setProps({ open: true });
 
-    const confirmAfter = wrapper.findAll('button').find((b) => b.text().includes('Push firmware'));
+    const confirmAfter = wrapper.find('[data-test="confirm-button"]');
     expect(confirmAfter?.attributes('disabled')).toBeDefined();
     const checkbox = wrapper.find<HTMLInputElement>('[data-test="downgrade-ack-checkbox"]');
     expect(checkbox.element.checked).toBe(false);

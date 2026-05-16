@@ -51,15 +51,13 @@ describe('crc16CcittFalseHex', () => {
     expect(crc16CcittFalseHex(Buffer.from('123456789', 'ascii'))).toBe('29b1');
   });
 
-  it('pads a small CRC to 4 chars', () => {
-    // Construct an input whose CRC has high bits zero so the formatter has
-    // to pad. crc16CcittFalse(0x00) = 0xE1F0 — not under 0x1000. Need to
-    // pick something that produces under 0x1000. We don't actually need a
-    // construction here; assert directly on the formatter behavior by
-    // calling the underlying function and checking the format property:
-    const buf = Buffer.from([0x00]);
-    const hex = crc16CcittFalseHex(buf);
-    expect(hex).toMatch(/^[0-9a-f]{4}$/);
-    expect(hex.length).toBe(4);
+  it('pads a small CRC to 4 chars (two leading zeros)', () => {
+    // Pick an input whose CRC actually needs padding. crc16CcittFalse(0x0E)
+    // = 0x003E (verified externally against the standard CRC-16/CCITT-FALSE
+    // poly=0x1021/init=0xFFFF reference). The output must be '003e', not
+    // '3e' — a regression that dropped the `.padStart(4, '0')` formatter
+    // call would diverge here even though the wire-protocol-canonical
+    // '29b1' case above never exercises the pad.
+    expect(crc16CcittFalseHex(Buffer.from([0x0e]))).toBe('003e');
   });
 });
