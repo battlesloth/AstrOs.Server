@@ -1291,7 +1291,10 @@ describe('FlashJobOrchestrator', () => {
 
     fx.streamerControls.reject(new Error('something exploded'));
 
-    await expect(startPromise).rejects.toThrow('something exploded');
+    // Post-async-start: streamer rejection lands in background runInProgress,
+    // not in start() itself. start() resolves with the initial state.
+    await startPromise;
+    await fx.orchestrator.awaitRunInProgressForTest();
 
     expect(fx.orchestrator.getCurrentJob()).toBeNull();
     expect(fx.jobLock.isLocked()).toBe(false);
@@ -2046,16 +2049,11 @@ describe('FlashJobOrchestrator', () => {
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       fx.streamerControls.resolve(makeTransferResult(run.spec));
 
-      // start() rejects with bus_send_failed.
-      let caught: unknown;
-      try {
-        await startPromise;
-      } catch (err) {
-        caught = err;
-      }
-      expect(caught).toBeInstanceOf(FlashOrchestratorError);
-      expect((caught as FlashOrchestratorError).reason).toBe('bus_send_failed');
-      expect((caught as FlashOrchestratorError).detail).toContain('worker channel closed');
+      // Post-async-start: the deploy-begin bus.send throw lands in the
+      // background runInProgress, routes through failJob → flashJobFailed.
+      // start() resolved with the initial state when sync setup completed.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
       // flashJobFailed emitted; lock released; currentJob cleared.
       const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
@@ -2531,6 +2529,16 @@ describe('FlashJobOrchestrator', () => {
     // streamer-awaiting state, rejects with that TransferError, and
     // verifies the bucket-B emit shape (typed reason === code, abortReason
     // === code, controllers cleaned up, lock released).
+    //
+    // Note on the await pattern: post-async-start refactor, `start()`
+    // resolves with the initial `{ jobId, transferId, ... }` as soon as
+    // the sync setup completes — the streamer.run() failure surfaces via
+    // `runInProgress` (the background work promise), NOT via `start()`'s
+    // own rejection. The bucket-B `TransferError` is no longer thrown to
+    // the HTTP caller; it's routed through `failJob` → `flashJobFailed`
+    // on WS, exactly as the operator-facing UI consumes it. Tests await
+    // `runInProgress` to synchronize on "background settled" before
+    // asserting on terminal WS / lock state.
     for (const code of TRANSFER_ERROR_CODES) {
       it(`TransferError '${code}' → flashJobFailed with reason+abortReason=${code}; controllers Failed; lock released`, async () => {
         const fx = setupHappyPath();
@@ -2543,14 +2551,11 @@ describe('FlashJobOrchestrator', () => {
 
         fx.streamerControls.reject(new TransferError(code, transferId, 'upstream detail'));
 
-        let caught: unknown;
-        try {
-          await startPromise;
-        } catch (err) {
-          caught = err;
-        }
-        expect(caught).toBeInstanceOf(TransferError);
-        expect((caught as TransferError).code).toBe(code);
+        // Sync setup already done — startPromise resolves with the initial
+        // state; runInProgress resolves after the background failure routes
+        // through failJob.
+        await startPromise;
+        await fx.orchestrator.awaitRunInProgressForTest();
 
         // flashJobFailed: typed reason === code, abortReason === code, detail.
         const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
@@ -2597,15 +2602,10 @@ describe('FlashJobOrchestrator', () => {
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       fx.streamerControls.resolve(makeTransferResult(run.spec));
 
-      let caught: unknown;
-      try {
-        await startPromise;
-      } catch (err) {
-        caught = err;
-      }
-      expect(caught).toBeInstanceOf(FlashOrchestratorError);
-      expect((caught as FlashOrchestratorError).reason).toBe('subscriber_attach_failed');
-      expect((caught as FlashOrchestratorError).detail).toContain('listener limit reached');
+      // Post-async-start: the subscriber-attach throw lands in the background
+      // runInProgress, routes through failJob → flashJobFailed.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
       const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
       expect(failed).toHaveLength(1);
@@ -2715,7 +2715,10 @@ describe('FlashJobOrchestrator', () => {
           fx.streamerControls.reject(
             new TransferError('begin_timeout', fx.streamerControls.runs[0].spec.transferId),
           );
-          await startPromise.catch(() => undefined);
+          // Post-async-start: rejection lands in background runInProgress,
+          // not in start() itself.
+          await startPromise;
+          await fx.orchestrator.awaitRunInProgressForTest();
         },
       },
       {
@@ -2724,7 +2727,9 @@ describe('FlashJobOrchestrator', () => {
           const startPromise = fx.orchestrator.start(fx.request);
           await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
           fx.streamerControls.reject(new Error('mystery'));
-          await startPromise.catch(() => undefined);
+          // Post-async-start: rejection lands in background runInProgress.
+          await startPromise;
+          await fx.orchestrator.awaitRunInProgressForTest();
         },
       },
     ];
@@ -2759,14 +2764,10 @@ describe('FlashJobOrchestrator', () => {
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       fx.streamerControls.resolve(makeTransferResult(run.spec));
 
-      let caught: unknown;
-      try {
-        await startPromise;
-      } catch (err) {
-        caught = err;
-      }
-      expect(caught).toBeInstanceOf(FlashOrchestratorError);
-      expect((caught as FlashOrchestratorError).reason).toBe('bus_send_failed');
+      // Post-async-start: the deploy-begin bus.send throw lands in the
+      // background runInProgress, routes through failJob → flashJobFailed.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
       // Exactly one flashJobFailed frame — pinning that the catch block
       // doesn't double-emit (it would if the inline failNonTerminalControllers
@@ -2842,7 +2843,9 @@ describe('FlashJobOrchestrator', () => {
       const run = fx.streamerControls.runs[0];
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       fx.streamerControls.reject(new TransferError('hash_mismatch', run.spec.transferId, 'h'));
-      await expect(startPromise).rejects.toBeInstanceOf(TransferError);
+      // Post-async-start: TransferError lands in background runInProgress.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
       const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
       expect(failed).toHaveLength(1);
@@ -2943,17 +2946,14 @@ describe('FlashJobOrchestrator', () => {
       // the real ChunkStreamer rejects with on signal-fire.
       fx.streamerControls.reject(new TransferError('aborted', run.spec.transferId));
 
-      // start() rethrows the streamer rejection.
-      let caught: unknown;
-      try {
-        await startPromise;
-      } catch (err) {
-        caught = err;
-      }
-      expect(caught).toBeInstanceOf(TransferError);
-      expect((caught as TransferError).code).toBe('aborted');
+      // Post-async-start refactor: startPromise resolves with the initial
+      // state (sync setup completed before the cancel); the streamer
+      // rejection lands in the background `runInProgress` promise, which
+      // settles after `routeStartFailure` → `failJob` runs.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
-      // After the catch block: lock released, currentJob cleared.
+      // After the background catch: lock released, currentJob cleared.
       expect(fx.jobLock.isLocked()).toBe(false);
       expect(fx.orchestrator.getCurrentJob()).toBeNull();
       // No deploy subscriber was attached (we never reached deploy phase).

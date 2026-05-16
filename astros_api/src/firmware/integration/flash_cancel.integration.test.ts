@@ -124,11 +124,14 @@ describe('integration: cancel during upload + deploy', () => {
       expect(failedEvent.data.reason).toBe('aborted');
       expect(failedEvent.data.abortReason).toBe('aborted');
 
-      // The deferred POST resolves once the streamer rejects with the
-      // abort. Per controller mapping, `aborted` → 500. Drain the body
-      // so the connection isn't left dangling at suite teardown.
+      // Post-async-start: HTTP returned 200 immediately when sync setup
+      // completed (lock acquired, source resolved, flashJobStarted emitted).
+      // The streamer rejection from the abort lands in the background
+      // runInProgress and surfaces via the `flashJobFailed` WS event the
+      // test already asserted on above — NOT via the HTTP response. Drain
+      // the body so the connection isn't left dangling at suite teardown.
       const flashRes = await flashPromise;
-      expect(flashRes.status).toBe(500);
+      expect(flashRes.status).toBe(200);
       await flashRes.json().catch(() => undefined);
 
       // 8. Lock release via the cancel/failJob path (NOT the heartbeat path —

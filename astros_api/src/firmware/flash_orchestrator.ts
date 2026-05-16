@@ -549,6 +549,16 @@ export class FlashJobOrchestrator {
   // queued via the timer or will fire via the next heartbeat. Cleared back
   // to `null` in `releaseLock`.
   private phase: 'upload' | 'deploy' | 'done' | null = null;
+  // The background upload + deploy-arming work that `start()` spawns and
+  // returns from without awaiting. Production callers MUST NOT await this —
+  // the WS event surface (`flashJobStarted` → `flashControllerUpdate` →
+  // `flashJobDone` / `flashJobFailed`) is the canonical truth source for
+  // flash progress; awaiting this from the HTTP layer would reintroduce the
+  // 7-minute block this refactor exists to prevent. Private + accessed only
+  // via `awaitRunInProgressForTest()` so the contract is mechanically
+  // enforced by TS rather than just commented. Cleared in `releaseLock` so a
+  // finished job's resolved promise can't leak across job lifecycles.
+  private runInProgress: Promise<void> | null = null;
   private readonly messageGenerator = new MessageGenerator();
 
   // Rotating uint8 transfer-id. Protocol-doc canonical (`uint8 transfer-id`
@@ -575,17 +585,34 @@ export class FlashJobOrchestrator {
   }
 
   /**
-   * Acquire `JobLock`, validate targets, resolve source, run the streamer
-   * with the upload-phase observer, then arm the deploy phase by sending
-   * FW_DEPLOY_BEGIN and subscribing to per-controller FW_PROGRESS + the
-   * job-wide FW_DEPLOY_DONE. The returned promise resolves once the deploy
-   * phase is armed — the operator-facing HTTP layer gets a fast
-   * "flash started, jobId=X" response while the deploy events drive the
-   * rest asynchronously through `handleDeployEvent`. After all controllers
-   * reach a terminal stage, `handleDeployDone` emits `flashJobDone` and
-   * arms the reboot-timer fallback; lock release happens via
-   * `notifyMasterHeartbeat` (primary, post-deploy POLL_ACK) or the timer
-   * (fallback for master malfunction).
+   * Acquire `JobLock`, validate targets, resolve source, broadcast
+   * `flashJobStarted`, then spawn the upload + deploy-arming work as a
+   * fire-and-forget background promise and return immediately. The returned
+   * promise resolves as soon as the sync setup completes (~1-10 s for the
+   * source resolve + immediate I/O), NOT when the flash itself completes —
+   * the HTTP layer gets `{ jobId, transferId, source, targets }` in the
+   * response body and the operator's UI drives off the WS event surface
+   * (`flashJobStarted` → `flashControllerUpdate` → `flashJobDone` /
+   * `flashJobFailed`) for the rest. Awaiting this promise on the HTTP
+   * caller path is what we explicitly do NOT want: a ~7-minute upload
+   * would block the response far past any client timeout.
+   *
+   * Sync errors (lock-acquire conflict, controllers lookup failure, source
+   * resolve failure) propagate to the HTTP caller as today — the outer
+   * try/catch maps them to typed `FlashOrchestratorError` and the
+   * controller's catch block maps THAT to the right HTTP status code.
+   * Background errors (streamer rejection, deploy-begin bus_send_failed,
+   * subscriber_attach_failed) route through `failJob` exactly the same
+   * way the prior all-sync catch did, but emit on the WS surface only —
+   * by the time they fire, HTTP has already responded 200.
+   *
+   * After all controllers reach a terminal stage, `handleDeployDone`
+   * emits `flashJobDone` and arms the reboot-timer fallback; lock release
+   * happens via `notifyMasterHeartbeat` (primary, post-deploy POLL_ACK)
+   * or the timer (fallback for master malfunction).
+   *
+   * `this.runInProgress` exposes the background promise as a test seam.
+   * Production code MUST NOT await it.
    */
   async start(request: FlashRequest): Promise<{
     jobId: string;
@@ -743,63 +770,93 @@ export class FlashJobOrchestrator {
         // onTransferEnd: the deploy phase is driven off the awaited
         // `streamer.run()` resolution below, not from this hook.
       };
-      await streamer.run(transferSpec, observer, { signal: this.abortController.signal });
-      this.phase = 'deploy';
+      // Spawn the upload + deploy-arming work as a fire-and-forget
+      // background promise and return immediately. Production callers
+      // (the HTTP controller) get the initial response in ~1-10 s instead
+      // of waiting ~7 minutes for the upload to complete; the operator's
+      // UI drives off the WS event surface. The promise itself is stored
+      // on `this.runInProgress` only as a test seam — see the field's
+      // docstring.
+      //
+      // The IIFE captures `streamer` / `transferSpec` / `observer` /
+      // `localThrottle` / `targetIds` / `transferId` / `signal` by closure.
+      // The synchronous setup above (lock + lookups + flashJobStarted +
+      // throttle + abort controller) has already completed by the time
+      // this fires, so cancel-during-upload via `abortController.abort()`
+      // works the same as before. The signal is captured in a local so
+      // TypeScript can see it's non-null inside the IIFE without a `!`
+      // assertion — the underlying AbortController stays on `this` for
+      // `cancel()`'s benefit.
+      const signal = this.abortController.signal;
+      this.runInProgress = (async () => {
+        try {
+          await streamer.run(transferSpec, observer, { signal });
+          this.phase = 'deploy';
 
-      // Streamer succeeded → deploy phase. Transition every controller to
-      // Sending (force=true emits flush any pending throttle state and emit
-      // the transition immediately), send FW_DEPLOY_BEGIN to the master, then
-      // subscribe to per-controller FW_PROGRESS + the job-wide FW_DEPLOY_DONE.
-      // The subscriber drives the rest of the job asynchronously; `start()`
-      // returns once the deploy phase is armed so the HTTP layer
-      // gets a fast "started" response. Lock release happens via
-      // `notifyMasterHeartbeat` or the reboot-timer fallback armed in
-      // `handleDeployDone`.
-      if (this.currentJob !== null) {
-        const sending = this.currentJob.controllers.map((c) =>
-          c.stage === FwStage.UploadingToMaster ? transitionControllerState(c, FwStage.Sending) : c,
-        );
-        this.currentJob = { ...this.currentJob, controllers: sending };
-        for (const c of sending) {
-          localThrottle.submit(c.controllerId, c, true);
+          // Streamer succeeded → deploy phase. Transition every controller
+          // to Sending (force=true flushes any pending throttle state and
+          // emits the transition immediately), send FW_DEPLOY_BEGIN to the
+          // master, then subscribe to per-controller FW_PROGRESS + the
+          // job-wide FW_DEPLOY_DONE. The subscriber drives the rest of the
+          // job asynchronously through `handleDeployEvent`. Lock release
+          // happens via `notifyMasterHeartbeat` or the reboot-timer
+          // fallback armed in `handleDeployDone`.
+          if (this.currentJob !== null) {
+            const sending = this.currentJob.controllers.map((c) =>
+              c.stage === FwStage.UploadingToMaster
+                ? transitionControllerState(c, FwStage.Sending)
+                : c,
+            );
+            this.currentJob = { ...this.currentJob, controllers: sending };
+            for (const c of sending) {
+              localThrottle.submit(c.controllerId, c, true);
+            }
+          }
+
+          const beginPayload: FwDeployBegin = { transferId, order: targetIds };
+          const beginMsg = this.messageGenerator.generateMessage(
+            SerialMessageType.FW_DEPLOY_BEGIN,
+            uuid_v4(),
+            beginPayload,
+          );
+          try {
+            this.bus.send(beginMsg.msg, { kind: 'firmware' });
+          } catch (err) {
+            // Per FMI §1: a Worker channel / IPC failure on the deploy-begin
+            // send leaves controllers stuck in Sending. Throw the typed
+            // reason so the IIFE catch routes it through `failJob`, which
+            // fails the non-terminal controllers, emits flashJobFailed, and
+            // releases the lock — keeping cleanup uniform with the other
+            // error paths.
+            const detail = err instanceof Error ? err.message : String(err);
+            throw new FlashOrchestratorError('bus_send_failed', detail);
+          }
+
+          // FMI §1: subscribeDeployEvents shouldn't throw under normal
+          // conditions, but a defensive wrap keeps a hypothetical listener-
+          // limit / disposed-bus failure from leaving controllers stuck in
+          // Sending with the master mid-deploy. Same cleanup shape as
+          // bus_send_failed: fail the non-terminal controllers, emit
+          // flashJobFailed, release the lock. Note that by this point we've
+          // already sent FW_DEPLOY_BEGIN — the master may proceed without an
+          // observer; the operator-facing UI shows Failed and the lock is
+          // released either way.
+          try {
+            this.deployUnsubscriber = this.bus.subscribeDeployEvents(transferId, (event) =>
+              this.handleDeployEvent(event),
+            );
+          } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            throw new FlashOrchestratorError('subscriber_attach_failed', detail);
+          }
+        } catch (err) {
+          // Background failure — route through `failJob` the same way the
+          // sync catch below does, but do NOT re-throw. HTTP has already
+          // responded 200 by now; the operator's truth source for the
+          // failure is the `flashJobFailed` WS event that `failJob` emits.
+          this.routeStartFailure(jobId, err);
         }
-      }
-
-      const beginPayload: FwDeployBegin = { transferId, order: targetIds };
-      const beginMsg = this.messageGenerator.generateMessage(
-        SerialMessageType.FW_DEPLOY_BEGIN,
-        uuid_v4(),
-        beginPayload,
-      );
-      try {
-        this.bus.send(beginMsg.msg, { kind: 'firmware' });
-      } catch (err) {
-        // Per FMI §1: a Worker channel / IPC failure on the deploy-begin
-        // send leaves controllers stuck in Sending. Throw the typed reason
-        // so the outer catch routes it through `failJob`, which fails the
-        // non-terminal controllers, emits flashJobFailed, and releases the
-        // lock — keeping cleanup uniform with the other error paths.
-        const detail = err instanceof Error ? err.message : String(err);
-        throw new FlashOrchestratorError('bus_send_failed', detail);
-      }
-
-      // FMI §1: subscribeDeployEvents shouldn't throw under normal
-      // conditions, but a defensive wrap keeps a hypothetical listener-
-      // limit / disposed-bus failure from leaving controllers stuck in
-      // Sending with the master mid-deploy. Same cleanup shape as
-      // bus_send_failed: fail the non-terminal controllers, emit
-      // flashJobFailed, release the lock. Note that by this point we've
-      // already sent FW_DEPLOY_BEGIN — the master may proceed without an
-      // observer; the operator-facing UI shows Failed and the lock is
-      // released either way.
-      try {
-        this.deployUnsubscriber = this.bus.subscribeDeployEvents(transferId, (event) =>
-          this.handleDeployEvent(event),
-        );
-      } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
-        throw new FlashOrchestratorError('subscriber_attach_failed', detail);
-      }
+      })();
 
       return {
         jobId,
@@ -808,32 +865,43 @@ export class FlashJobOrchestrator {
         targets: targetIds,
       };
     } catch (err) {
-      // Any post-acquire failure routes through `failJob` for uniform
-      // cleanup (per-controller Failed transitions when `currentJob` is
-      // set, single `flashJobFailed` emit, lock release). Three error
-      // sources land here:
-      //   * `FlashOrchestratorError` — typed validation, source-resolution,
-      //     and mid-deploy (`bus_send_failed`, `subscriber_attach_failed`)
-      //     failures the orchestrator throws synchronously.
-      //   * `TransferError` — c.6b's 12 streamer-rejection codes (bucket B
-      //     in spec §"Error paths"). The code is stamped onto
-      //     `currentJob.abortReason` AND surfaced as the `reason` on the
-      //     emit; both fields exist on bucket-B emits.
-      //   * Anything else — a defensive fallback for non-`TransferError`
-      //     streamer rejections. Mapped to `streamer_unknown_error` so
-      //     the operator at least sees a typed reason rather than a bare
-      //     lockStateChanged with no context.
-      if (err instanceof FlashOrchestratorError) {
-        this.failJob(jobId, err.reason, err.detail);
-      } else if (err instanceof TransferError) {
-        this.failJob(jobId, err.code, err.detail, { abortReason: err.code });
-      } else {
-        const detail = err instanceof Error ? err.message : String(err);
-        this.failJob(jobId, 'streamer_unknown_error', detail, {
-          abortReason: 'streamer_unknown_error',
-        });
-      }
+      // Sync-phase failure (lock-acquire — handled before this try, so
+      // never here; controllers lookup; source resolve; throttle / abort
+      // / observer setup). Route through `failJob` for uniform cleanup
+      // AND re-throw so the controller's catch can map the typed
+      // FlashOrchestratorError to an HTTP status code. The background
+      // IIFE's catch (above) handles the post-spawn errors — same
+      // routing, no re-throw.
+      this.routeStartFailure(jobId, err);
       throw err;
+    }
+  }
+
+  // Shared error-routing path used by both the sync catch in `start()`
+  // (which re-throws so the controller can map to HTTP status) and the
+  // background IIFE's catch (which absorbs because HTTP has already
+  // responded). Three error sources land here:
+  //   * `FlashOrchestratorError` — typed validation, source-resolution,
+  //     and mid-deploy (`bus_send_failed`, `subscriber_attach_failed`)
+  //     failures the orchestrator throws synchronously.
+  //   * `TransferError` — c.6b's 12 streamer-rejection codes (bucket B
+  //     in spec §"Error paths"). The code is stamped onto
+  //     `currentJob.abortReason` AND surfaced as the `reason` on the
+  //     emit; both fields exist on bucket-B emits.
+  //   * Anything else — defensive fallback for non-`TransferError`
+  //     streamer rejections. Mapped to `streamer_unknown_error` so the
+  //     operator sees a typed reason rather than a bare lockStateChanged
+  //     with no context.
+  private routeStartFailure(jobId: string, err: unknown): void {
+    if (err instanceof FlashOrchestratorError) {
+      this.failJob(jobId, err.reason, err.detail);
+    } else if (err instanceof TransferError) {
+      this.failJob(jobId, err.code, err.detail, { abortReason: err.code });
+    } else {
+      const detail = err instanceof Error ? err.message : String(err);
+      this.failJob(jobId, 'streamer_unknown_error', detail, {
+        abortReason: 'streamer_unknown_error',
+      });
     }
   }
 
@@ -845,8 +913,10 @@ export class FlashJobOrchestrator {
    * Behavior by phase:
    *   * `'upload'` — fire `abortController.abort(reason)`. The streamer's
    *     own abort listener rejects `streamer.run()` with
-   *     `TransferError('aborted', ...)`; the rejection bubbles up to
-   *     `start()`'s catch block which routes through `failJob` to emit
+   *     `TransferError('aborted', ...)`; the rejection lands in the
+   *     background `runInProgress` IIFE's catch (start() returned to the
+   *     HTTP layer back when sync setup finished), which calls
+   *     `routeStartFailure` → `failJob` to emit
    *     `flashJobFailed { reason: 'aborted', abortReason: 'aborted' }`,
    *     fail non-terminal controllers, and release the lock.
    *   * `'deploy'` — inline cleanup: dispose the deploy subscriber, set
@@ -860,6 +930,19 @@ export class FlashJobOrchestrator {
    *     operator with a "cancelled" response for a job that already
    *     finished.
    */
+  /**
+   * Test-only: await the background `runUploadAndDeploy` IIFE settling
+   * (success or failJob-routed rejection). Returns immediately when no
+   * background work is in flight. Production code MUST NOT call this — see
+   * the `runInProgress` field's docstring for why. Named with a `ForTest`
+   * suffix so a `grep` for the name surfaces accidental production use.
+   */
+  async awaitRunInProgressForTest(): Promise<void> {
+    if (this.runInProgress !== null) {
+      await this.runInProgress;
+    }
+  }
+
   async cancel(reason: string): Promise<{ jobId: string } | null> {
     if (this.currentJob === null) return null;
     // Cancel-during-reboot-wait: the job already emitted `flashJobDone`,
@@ -988,6 +1071,10 @@ export class FlashJobOrchestrator {
     this.abortController = null;
     this.phase = null;
     this.currentJob = null;
+    // The background promise has already settled by the time releaseLock
+    // runs on any normal path (failJob / handleDeployDone / cancel-during-
+    // deploy) — null it out so it can't leak across job lifecycles.
+    this.runInProgress = null;
     this.jobLock.release(jobId);
     this.broadcastLockState();
   }
