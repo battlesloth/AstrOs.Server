@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { ref } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { createI18n } from 'vue-i18n';
@@ -513,5 +513,36 @@ describe('FirmwareView lockSinceFormatted defensive fallback', () => {
     expect(wrapper.text()).toMatch(/2026|May/);
     expect(wrapper.text()).not.toContain('Invalid Date');
     expect(wrapper.text()).not.toContain('NaN');
+  });
+});
+
+describe('FirmwareView fast-paint on cold load', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockWsIsConnected.value = true;
+    mockWsHasEverConnected.value = true;
+  });
+
+  it('renders the source strip before fetchReleases resolves', async () => {
+    // Regression: a prior implementation awaited Promise.all([fetchReleases,
+    // fetchCurrentJob]) before transitioning phase out of 'idle', so a cold
+    // GitHub cache (up to 10s) would hold back the entire page. The source
+    // strip's own `releases_loading` affordance is the right place to surface
+    // that wait, but only if phase transitions to 'select' first.
+    const firmwareStore = useFirmwareStore();
+    const pendingReleases = vi
+      .spyOn(firmwareStore, 'fetchReleases')
+      .mockReturnValue(new Promise(() => {}));
+
+    const wrapper = mountFirmwareView();
+    // flushPromises drains the awaited fetchCurrentJob microtask chain in
+    // onMounted; $nextTick then lets the resulting setPhase('select') flow
+    // through Vue's reactivity and repaint the stubbed source strip.
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+
+    expect(pendingReleases).toHaveBeenCalled();
+    expect(firmwareStore.phase).toBe('select');
+    expect(wrapper.find('[data-test="source-strip"]').exists()).toBe(true);
   });
 });

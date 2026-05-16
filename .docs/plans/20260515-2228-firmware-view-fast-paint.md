@@ -21,10 +21,10 @@ Decouple the page-render gate from the GitHub fetch. The page paints as soon as 
 
 ## Tasks
 
-- [ ] Update `FirmwareView.vue#onMounted` so `fetchCurrentJob` is awaited (gates phase transition), but `fetchReleases` runs as fire-and-forget. The page transitions to `'select'` as soon as the job check resolves, regardless of whether GitHub has replied.
-- [ ] In `AstrosFirmwareSourceStrip.vue`, disable the release `<select>` while `releasesLoadState === 'loading'` so the operator doesn't try to pick a release that isn't there yet. (The `releases_loading` text already shows where the tag/date would be.)
-- [ ] Add a regression test in `FirmwareView.spec.ts` confirming the view transitions out of `'idle'` even when `fetchReleases` is pending — using a pending promise for the releases call, the source strip should render before the promise resolves.
-- [ ] Pre-commit: `npm run prettier:write && npm run lint:fix && npm run build && npx vitest run` from `astros_vue/`, then `superpowers:requesting-code-review` on the diff. Manual QA: restart the API server, navigate to `/firmware`, confirm topology/panel paint immediately while the source strip shows "Loading releases…".
+- [x] Update `FirmwareView.vue#onMounted` so `fetchCurrentJob` is awaited (gates phase transition), but `fetchReleases` runs as fire-and-forget. The page transitions to `'select'` as soon as the job check resolves, regardless of whether GitHub has replied.
+- [x] In `AstrosFirmwareSourceStrip.vue`, disable the release `<select>` while `releasesLoadState === 'loading'` so the operator doesn't try to pick a release that isn't there yet. (The `releases_loading` text already shows where the tag/date would be.)
+- [x] Add a regression test in `FirmwareView.spec.ts` confirming the view transitions out of `'idle'` even when `fetchReleases` is pending — using a pending promise for the releases call, the source strip should render before the promise resolves.
+- [x] Pre-commit: `npm run prettier:write && npm run lint:fix && npm run build && npx vitest run` from `astros_vue/`, then `superpowers:requesting-code-review` on the diff. Manual QA: restart the API server, navigate to `/firmware`, confirm topology/panel paint immediately while the source strip shows "Loading releases…".
 
 ## Files touched
 

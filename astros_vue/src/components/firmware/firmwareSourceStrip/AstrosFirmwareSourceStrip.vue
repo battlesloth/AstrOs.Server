@@ -180,6 +180,7 @@ const primaryAssetSize = computed<number | null>(() => {
           id="astros-firmware-source-strip-release-select"
           class="astros-firmware-source-strip__release-select"
           :value="selectedReleaseTag ?? ''"
+          :disabled="releases.length === 0"
           @change="onReleaseChange"
         >
           <option
