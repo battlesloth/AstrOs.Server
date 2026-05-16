@@ -142,6 +142,19 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return uploadedFilename.value ? 'local-build' : null;
   });
 
+  // Operator-set escape hatch for the downgrade policy. Defaults to false
+  // (routine flashing rejects downgrades); flipping to true makes downgrade
+  // controllers selectable, allows canFlash to proceed with downgrades in
+  // the selection, and shifts the modal into "ask for explicit ack" mode.
+  // Per-session only — page reload resets it to false. See
+  // `.docs/plans/20260515-2253-firmware-allow-downgrade.md` for rationale.
+  //
+  // Note: uploaded firmware (target === 'local-build') is moot for this
+  // toggle — `compareTags(current, 'local-build')` returns NaN and
+  // `NaN > 0` is false, so uploaded firmware is never classified as
+  // a downgrade. The toggle is a no-op in that mode.
+  const allowDowngrade = ref(false);
+
   function isDowngrade(controllerId: string): boolean {
     const t = target.value;
     if (t === null) return false;
@@ -151,17 +164,52 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return cmp > 0;
   }
 
-  function isBlocked(controllerId: string): boolean {
+  // `down` is reality (controller is unreachable); `isDowngrade` is policy
+  // (we choose not to install older firmware by default). Splitting them
+  // lets the allowDowngrade toggle relax the policy without overriding the
+  // reality.
+  function isHardBlocked(controllerId: string): boolean {
     const c = controllers.value.find((x) => x.id === controllerId);
-    if (!c) return false;
-    return c.status === 'down' || isDowngrade(controllerId);
+    return c?.status === 'down';
   }
 
-  const anyDowngradeBlocked = computed(() => [...selectedControllerIds.value].some(isDowngrade));
+  function isSelectable(controllerId: string): boolean {
+    if (isHardBlocked(controllerId)) return false;
+    if (!allowDowngrade.value && isDowngrade(controllerId)) return false;
+    return true;
+  }
+
+  // Selection-based: are any selected controllers currently policy-blocked
+  // as downgrades? Drives the action-bar "downgrade blocked" warning copy.
+  // When allowDowngrade flips to true, this clears even if downgrades stay
+  // selected — the policy block is gone.
+  const anyDowngradeBlocked = computed(
+    () => !allowDowngrade.value && [...selectedControllerIds.value].some(isDowngrade),
+  );
+
+  // Selection-based: are any selected controllers downgrade targets,
+  // regardless of toggle state? Drives the confirm-modal ack region —
+  // even with the toggle on, the operator must explicitly acknowledge that
+  // they're about to install older firmware on a specific machine.
+  const anyDowngradeSelected = computed(() => [...selectedControllerIds.value].some(isDowngrade));
+
+  // Fleet-based: would any controller in the fleet be downgraded by the
+  // current target? Drives the contextual reveal of the "Allow downgrades"
+  // toggle in the controllers-panel header — when no downgrade scenario
+  // exists at all (pure-upgrade target), the toggle stays hidden to keep
+  // the routine path uncluttered.
+  const anyFleetDowngrade = computed(() => controllers.value.some((c) => isDowngrade(c.id)));
+
+  const anyHardBlockedSelected = computed(() =>
+    [...selectedControllerIds.value].some(isHardBlocked),
+  );
 
   const canFlash = computed(
     () =>
-      target.value !== null && selectedControllerIds.value.size > 0 && !anyDowngradeBlocked.value,
+      target.value !== null &&
+      selectedControllerIds.value.size > 0 &&
+      !anyHardBlockedSelected.value &&
+      !anyDowngradeBlocked.value,
   );
 
   const isOwnJob = computed(
@@ -179,7 +227,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   function selectAll(): void {
     selectedControllerIds.value = new Set(
-      controllers.value.filter((c) => !isBlocked(c.id)).map((c) => c.id),
+      controllers.value.filter((c) => isSelectable(c.id)).map((c) => c.id),
     );
   }
 
@@ -753,7 +801,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
     pendingByMac,
     currentJobLoadFailed,
     target,
+    allowDowngrade,
     anyDowngradeBlocked,
+    anyDowngradeSelected,
+    anyFleetDowngrade,
     canFlash,
     isOwnJob,
     progressByControllerId,

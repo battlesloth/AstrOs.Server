@@ -365,6 +365,123 @@ describe('firmware store', () => {
       store.toggle('core'); // downgrade
       expect(store.canFlash).toBe(false);
     });
+
+    it('is true when allowDowngrade=true permits an otherwise-blocked downgrade selection', () => {
+      // Pins the new opt-in: enabling allowDowngrade unblocks canFlash even
+      // when at least one selected controller would downgrade. A mutation
+      // that dropped the `!allowDowngrade.value` clause in anyDowngradeBlocked
+      // (always treating downgrades as blocked) would fail this case.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.toggle('body'); // upgrade (1.3.0 → 1.3.5)
+      store.toggle('core'); // downgrade (1.4.0 → 1.3.5)
+      store.allowDowngrade = true;
+      expect(store.canFlash).toBe(true);
+    });
+
+    it('stays false when allowDowngrade=true but a hard-blocked (down) controller is selected', () => {
+      // allowDowngrade must NOT bypass a 'down' status. Hard-blocked is
+      // reality (controller unreachable); downgrade is policy. The toggle
+      // relaxes the policy, not the reality.
+      const store = useFirmwareStore();
+      seedSampleFleet(); // dome defaults to DOWN
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('dome'); // hard-blocked: status === 'down'
+      store.allowDowngrade = true;
+      expect(store.canFlash).toBe(false);
+    });
+  });
+
+  describe('allowDowngrade toggle', () => {
+    it('defaults to false on a fresh store', () => {
+      const store = useFirmwareStore();
+      expect(store.allowDowngrade).toBe(false);
+    });
+
+    it('anyDowngradeSelected is true whenever a downgrade is selected, regardless of toggle', () => {
+      // anyDowngradeSelected drives the modal ack — it must NOT be gated on
+      // the toggle. Operator might have toggle on AND a downgrade selected;
+      // the modal still needs to ask for explicit ack.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.toggle('core'); // downgrade
+      expect(store.anyDowngradeSelected).toBe(true);
+      store.allowDowngrade = true;
+      expect(store.anyDowngradeSelected).toBe(true);
+    });
+
+    it('anyDowngradeSelected is false on a pure-upgrade selection', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('body'); // upgrade
+      expect(store.anyDowngradeSelected).toBe(false);
+    });
+
+    it('anyFleetDowngrade is true when any controller in the fleet would downgrade, regardless of selection', () => {
+      // Drives the contextual-reveal of the toggle in the panel header.
+      // Even if nothing is selected yet, the toggle should be discoverable
+      // when the target would downgrade some controller.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5'; // core@1.4.0 and dome@1.4.0 would downgrade
+      expect(store.selectedControllerIds.size).toBe(0);
+      expect(store.anyFleetDowngrade).toBe(true);
+    });
+
+    it('anyFleetDowngrade is false on a pure-upgrade target', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      expect(store.anyFleetDowngrade).toBe(false);
+    });
+
+    it('anyDowngradeBlocked clears when allowDowngrade flips to true with downgrade still selected', () => {
+      // Semantic shift: anyDowngradeBlocked is now "selected + policy-blocked"
+      // not "selected + would-downgrade". The action-bar copy "X controllers
+      // running newer firmware" should disappear once the operator enables
+      // the toggle.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.toggle('core');
+      expect(store.anyDowngradeBlocked).toBe(true);
+      store.allowDowngrade = true;
+      expect(store.anyDowngradeBlocked).toBe(false);
+    });
+
+    it('selectAll() with allowDowngrade=true includes downgrade controllers but still excludes hard-blocked', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet(); // body 1.3.0 (UP), core 1.4.0 (UP), dome 1.4.0 (DOWN)
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5'; // body upgrade, core downgrade, dome downgrade+down
+      store.allowDowngrade = true;
+      store.selectAll();
+      // body + core get picked. dome stays out: down trumps the toggle.
+      expect(store.selectedControllerIds.has('body')).toBe(true);
+      expect(store.selectedControllerIds.has('core')).toBe(true);
+      expect(store.selectedControllerIds.has('dome')).toBe(false);
+    });
+
+    it('selectAll() with allowDowngrade=false (default) excludes downgrade controllers — backwards-compat', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.selectAll();
+      expect(store.selectedControllerIds.has('body')).toBe(true); // upgrade
+      expect(store.selectedControllerIds.has('core')).toBe(false); // downgrade
+      expect(store.selectedControllerIds.has('dome')).toBe(false); // downgrade+down
+    });
   });
 
   describe('phase transitions', () => {
