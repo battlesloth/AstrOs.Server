@@ -33,6 +33,22 @@ export type ReleasesLoadState = 'idle' | 'loading' | 'loaded' | 'stale' | 'error
 
 export type FirmwareSourceMode = 'github' | 'upload';
 
+/** Upload state machine — drives the source strip's in-progress affordance
+ *  and gates `canFlash` on a real (server-acknowledged) upload rather than
+ *  the operator's just-picked filename. */
+export type UploadState = 'idle' | 'uploading' | 'uploaded' | 'error';
+
+/** Server's projection of a successful upload — what the operator sees
+ *  after the .bin parses and the artifact is promoted into the slot.
+ *  `version` is the esp_app_desc-reported version (normalized); `sizeBytes`
+ *  matches the on-disk artifact; `displayName` is the operator's original
+ *  filename (never path-interpolated server-side, so safe to render). */
+export interface UploadedFirmware {
+  version: string;
+  displayName: string;
+  sizeBytes: number;
+}
+
 export type ControllerOnlineStatus = 'up' | 'down' | 'needsSynced';
 
 /** Presentation-layer view of a controller for the firmware-update flow. */
@@ -95,6 +111,9 @@ export const FLASH_ERROR_REASONS = [
   'job_already_running',
   'no_controllers',
   'controllers_unknown',
+  'invalid_firmware',
+  'upload_io_failed',
+  'upload_persist_failed',
   'variant_mismatch',
   'variant_unknown',
   'release_not_found',

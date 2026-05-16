@@ -90,6 +90,7 @@ import { FlashJobOrchestrator } from './firmware/flash_orchestrator.js';
 import { registerFirmwareFlashRoutes } from './controllers/firmware_flash_controller.js';
 import { registerFirmwareReleasesRoutes } from './controllers/firmware_releases_controller.js';
 import { registerFirmwareLockStateRoutes } from './controllers/firmware_lock_state_controller.js';
+import { registerFirmwareUploadRoutes } from './controllers/firmware_upload_controller.js';
 import { FirmwareCache } from './firmware/firmware_cache.js';
 import { FirmwareUploadStore } from './firmware/firmware_upload_store.js';
 import { GitHubReleaseService } from './firmware/github_release_service.js';
@@ -467,6 +468,7 @@ export class ApiServer {
     //   - releases:   depends on this.githubReleaseService (configApi, line 453)
     registerFirmwareLockStateRoutes(this.router, this.jobLock);
     registerFirmwareReleasesRoutes(this.router, this.authHandler, this.githubReleaseService);
+    registerFirmwareUploadRoutes(this.router, this.authHandler, this.firmwareUploadStore);
     registerLocationRoutes(this.router, this.authHandler, this.db);
     registerScriptRoutes(this.router, this.authHandler, this.db);
     registerPlaylistRoutes(this.router, this.authHandler, this.db);

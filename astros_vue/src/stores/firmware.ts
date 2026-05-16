@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import apiService, { apiClient } from '@/api/apiService';
-import { FIRMWARE_FLASH, FIRMWARE_RELEASES } from '@/api/endpoints';
+import { FIRMWARE_FLASH, FIRMWARE_RELEASES, FIRMWARE_UPLOAD } from '@/api/endpoints';
 import { compareTags } from '@/utils/version';
 import { mapHttpErrorToFlashEnvelope } from '@/utils/firmwareFlashError';
 import {
@@ -29,6 +29,8 @@ import type {
   ReleaseInfo,
   ReleaseListResult,
   ReleasesLoadState,
+  UploadedFirmware,
+  UploadState,
 } from '@/types/firmware';
 import { KNOWN_FLASH_ERROR_REASONS } from '@/types/firmware';
 
@@ -68,7 +70,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   const sourceMode = ref<FirmwareSourceMode>('github');
   const selectedReleaseTag = ref<string | null>(null);
+  // Operator-supplied filename (cosmetic — surfaced in the source strip
+  // eyebrow while the upload is in flight). `uploadedFile` below is the
+  // server-acknowledged metadata; `canFlash` gates on `uploadedFile`, not
+  // this ref — picking a filename doesn't mean the server has the binary.
   const uploadedFilename = ref<string | null>(null);
+  const uploadState = ref<UploadState>('idle');
+  const uploadedFile = ref<UploadedFirmware | null>(null);
 
   const selectedControllerIds = ref<ReadonlySet<string>>(new Set());
 
@@ -139,7 +147,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   const target = computed<string | null>(() => {
     if (sourceMode.value === 'github') return selectedReleaseTag.value;
-    return uploadedFilename.value ? 'local-build' : null;
+    // Gate on the server-acknowledged upload, not the local filename — a
+    // filename in `uploadedFilename` could be mid-flight or errored. The
+    // operator should only see "ready to flash" after the server has
+    // parsed and promoted the artifact.
+    return uploadedFile.value ? 'local-build' : null;
   });
 
   // Operator-set escape hatch for the downgrade policy. Defaults to false;
@@ -801,6 +813,68 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
   }
 
+  /**
+   * POST a firmware binary to the server's upload slot. The server validates
+   * the esp_app_desc header (project name, version) before promoting the
+   * artifact; only a successful response sets `uploadedFile`, which is what
+   * `canFlash` gates on. A filename in `uploadedFilename` is cosmetic — used
+   * only by the source strip eyebrow to surface "you picked X, uploading…"
+   * while the request is in flight.
+   *
+   * Failures route through the existing `flashError` envelope so the panel's
+   * error banner renders uniformly. The server returns three error reasons:
+   *   - `invalid_firmware` (400): bad project name / unparseable version
+   *   - `upload_io_failed` (500): could not stage the temp file
+   *   - `upload_persist_failed` (500): store() failed at the persist step
+   */
+  async function uploadFirmware(file: File): Promise<void> {
+    uploadState.value = 'uploading';
+    uploadedFile.value = null;
+    uploadedFilename.value = file.name;
+    clearFlashError();
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await apiClient.post(FIRMWARE_UPLOAD, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const body = response.data as {
+        sha256: string;
+        sizeBytes: number;
+        meta: { originalFilename: string; version: string; sizeBytes: number };
+      };
+      uploadedFile.value = {
+        version: body.meta.version,
+        displayName: body.meta.originalFilename,
+        sizeBytes: body.meta.sizeBytes,
+      };
+      uploadState.value = 'uploaded';
+    } catch (error) {
+      console.warn('firmware.uploadFirmware failed', error);
+      uploadState.value = 'error';
+      // Re-use the existing flash-error envelope + banner surface. The
+      // panel's banner v-ifs on `flashError !== null && phase === 'select'`
+      // — both true at upload time, so no extra UI plumbing needed.
+      setFlashError(mapHttpErrorToFlashEnvelope(error));
+    }
+  }
+
+  /**
+   * Reset the upload slot. Operator-driven (the source strip's "Remove"
+   * button calls this). Cleans the local filename, server-acknowledged
+   * metadata, and any error envelope. Does NOT issue a DELETE to the server
+   * — the server's slot is overwritten on the next successful upload, and
+   * the unused artifact doesn't affect the flash flow.
+   */
+  function clearUpload(): void {
+    uploadedFilename.value = null;
+    uploadedFile.value = null;
+    uploadState.value = 'idle';
+    if (flashError.value !== null) clearFlashError();
+  }
+
   // Project the controllerStates Map into the shape the panel expects.
   // `stageLabelKey` is an i18n key path (e.g. firmware_view.stages.transfer.label)
   // that the row component resolves via t() — keeps localization out of the
@@ -832,6 +906,8 @@ export const useFirmwareStore = defineStore('firmware', () => {
     sourceMode,
     selectedReleaseTag,
     uploadedFilename,
+    uploadState,
+    uploadedFile,
     controllers,
     selectedControllerIds,
     phase,
@@ -868,5 +944,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     cancelFlash,
     fetchCurrentJob,
     fetchReleases,
+    uploadFirmware,
+    clearUpload,
   };
 });

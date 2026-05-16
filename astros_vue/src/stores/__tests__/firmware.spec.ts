@@ -213,11 +213,29 @@ describe('firmware store', () => {
       expect(store.target).toBeNull();
     });
 
-    it("returns 'local-build' sentinel in upload mode with a filename", () => {
+    it("returns 'local-build' sentinel in upload mode with a server-acknowledged upload", () => {
+      // target gates on `uploadedFile` (the server's post-store projection),
+      // not the raw filename — picking a file and uploading it are two
+      // different things, and the Flash button should only enable after the
+      // server has parsed and promoted the artifact.
+      const store = useFirmwareStore();
+      store.sourceMode = 'upload';
+      store.uploadedFile = {
+        version: '1.4.2',
+        displayName: 'custom.bin',
+        sizeBytes: 1_000_000,
+      };
+      expect(store.target).toBe('local-build');
+    });
+
+    it('returns null in upload mode with only a picked filename (upload not yet completed)', () => {
+      // Pin the boundary: a filename alone is NOT sufficient. This catches a
+      // regression that re-derived target from `uploadedFilename` and would
+      // let canFlash light up before the server accepts the artifact.
       const store = useFirmwareStore();
       store.sourceMode = 'upload';
       store.uploadedFilename = 'custom.bin';
-      expect(store.target).toBe('local-build');
+      expect(store.target).toBeNull();
     });
 
     it('returns null in upload mode with no file', () => {
@@ -570,6 +588,147 @@ describe('firmware store', () => {
     });
   });
 
+  describe('uploadFirmware', () => {
+    // Tiny File polyfill — jsdom's File constructor exists but the tests don't
+    // exercise its read API; pinning just .name + .size matches what FormData
+    // passes through to apiClient.post.
+    function makeFile(name = 'firmware.bin', size = 1_234_567): File {
+      return new File([new Uint8Array(size)], name, { type: 'application/octet-stream' });
+    }
+
+    const sampleUploadResponse = {
+      data: {
+        sha256: 'a'.repeat(64),
+        sizeBytes: 1_234_567,
+        meta: {
+          uploadId: 'abc',
+          originalFilename: 'firmware.bin',
+          projectName: 'AstrOs.ESP',
+          version: '1.4.2',
+          uploadedAt: '2026-05-16T08:00:00Z',
+          sizeBytes: 1_234_567,
+        },
+      },
+    };
+
+    it("POSTs the file as multipart/form-data and transitions uploadState to 'uploaded' on 200", async () => {
+      apiPost.mockResolvedValueOnce(sampleUploadResponse);
+      const store = useFirmwareStore();
+      const file = makeFile('astros-esp-1.4.2-lolin_d32_pro-app.bin');
+
+      await store.uploadFirmware(file);
+
+      expect(apiPost).toHaveBeenCalledWith(
+        'api/firmware/upload',
+        expect.any(FormData),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Content-Type': 'multipart/form-data' }),
+        }),
+      );
+      expect(store.uploadState).toBe('uploaded');
+      expect(store.uploadedFile).toEqual({
+        version: '1.4.2',
+        displayName: 'firmware.bin',
+        sizeBytes: 1_234_567,
+      });
+      expect(store.uploadedFilename).toBe('astros-esp-1.4.2-lolin_d32_pro-app.bin');
+      expect(store.flashError).toBeNull();
+    });
+
+    it("optimistically sets uploadState to 'uploading' before the request resolves", async () => {
+      // Pin the in-flight state so the source strip can render the
+      // "Uploading…" affordance — a mutation that only set uploadState on
+      // success would break the operator's signal that work is happening.
+      let resolveOuter: (v: typeof sampleUploadResponse) => void = () => {};
+      apiPost.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOuter = resolve;
+        }),
+      );
+      const store = useFirmwareStore();
+      const uploadPromise = store.uploadFirmware(makeFile());
+      // No await yet — the synchronous prefix of uploadFirmware has run,
+      // setting uploadState to 'uploading'.
+      expect(store.uploadState).toBe('uploading');
+      expect(store.uploadedFile).toBeNull();
+
+      resolveOuter(sampleUploadResponse);
+      await uploadPromise;
+      expect(store.uploadState).toBe('uploaded');
+    });
+
+    it("transitions to 'error' state and sets flashError envelope on HTTP failure", async () => {
+      apiPost.mockRejectedValueOnce({
+        response: {
+          status: 400,
+          data: { error: 'invalid_firmware', detail: 'project name mismatch' },
+        },
+      });
+      const store = useFirmwareStore();
+
+      await store.uploadFirmware(makeFile());
+
+      expect(store.uploadState).toBe('error');
+      expect(store.uploadedFile).toBeNull();
+      expect(store.flashError).not.toBeNull();
+      expect(store.flashError?.reason).toBe('invalid_firmware');
+    });
+
+    it('target gates on uploadedFile (server-acknowledged), not uploadedFilename (operator-picked)', async () => {
+      // Pin the core contract this branch enforces: a filename on its own
+      // doesn't make `target` truthy — only a successful upload does. A
+      // mutation that re-introduced `uploadedFilename ? 'local-build' : null`
+      // would break this.
+      const store = useFirmwareStore();
+      store.sourceMode = 'upload';
+      store.uploadedFilename = 'firmware.bin'; // operator picked, not uploaded yet
+      expect(store.target).toBe(null);
+
+      apiPost.mockResolvedValueOnce(sampleUploadResponse);
+      await store.uploadFirmware(makeFile());
+      expect(store.target).toBe('local-build');
+    });
+
+    it('canFlash stays false while uploadState is uploading even with a selection', async () => {
+      // Re-derives from `target` → which derives from `uploadedFile`. While
+      // uploading, uploadedFile is null → target is null → canFlash is false.
+      let resolveOuter: (v: typeof sampleUploadResponse) => void = () => {};
+      apiPost.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOuter = resolve;
+        }),
+      );
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'upload';
+      store.toggle('body');
+      const uploadPromise = store.uploadFirmware(makeFile());
+      expect(store.uploadState).toBe('uploading');
+      expect(store.canFlash).toBe(false);
+
+      resolveOuter(sampleUploadResponse);
+      await uploadPromise;
+      expect(store.canFlash).toBe(true);
+    });
+
+    it('clearUpload() resets every upload-related ref AND clears flashError if present', async () => {
+      const store = useFirmwareStore();
+      // Seed the post-error state by faking an upload failure.
+      apiPost.mockRejectedValueOnce({
+        response: { status: 400, data: { error: 'invalid_firmware', detail: 'bad' } },
+      });
+      await store.uploadFirmware(makeFile());
+      expect(store.uploadState).toBe('error');
+      expect(store.flashError).not.toBeNull();
+
+      store.clearUpload();
+      expect(store.uploadState).toBe('idle');
+      expect(store.uploadedFile).toBeNull();
+      expect(store.uploadedFilename).toBeNull();
+      expect(store.flashError).toBeNull();
+    });
+  });
+
   describe('startFlash', () => {
     function readyStore() {
       const store = useFirmwareStore();
@@ -603,12 +762,20 @@ describe('firmware store', () => {
       expect(store.flashError).toBeNull();
     });
 
-    it("POSTs the upload source shape when sourceMode is 'upload'", async () => {
+    it("POSTs the upload source shape when sourceMode is 'upload' and an upload has been accepted", async () => {
+      // startFlash gates on canFlash → target → uploadedFile. A bare filename
+      // is no longer enough; the server must have acknowledged the upload
+      // (test-side: setting uploadedFile directly simulates the post-store
+      // state without going through the FormData round-trip).
       apiPost.mockResolvedValueOnce({ data: { jobId: 'job-2' } });
       const store = useFirmwareStore();
       seedSampleFleet();
       store.sourceMode = 'upload';
-      store.uploadedFilename = 'custom.bin';
+      store.uploadedFile = {
+        version: '1.4.2',
+        displayName: 'custom.bin',
+        sizeBytes: 1_000_000,
+      };
       store.toggle('body');
 
       await store.startFlash();

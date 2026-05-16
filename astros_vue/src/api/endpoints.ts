@@ -30,4 +30,5 @@ export const SYSTEM_STATUS = 'api/system/status';
 
 export const FIRMWARE_RELEASES = 'api/firmware/releases';
 export const FIRMWARE_FLASH = 'api/firmware/flash';
+export const FIRMWARE_UPLOAD = 'api/firmware/upload';
 export const FIRMWARE_LOCK_STATE = 'api/firmware/lock-state';
