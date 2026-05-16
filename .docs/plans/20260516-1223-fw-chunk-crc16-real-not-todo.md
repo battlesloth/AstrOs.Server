@@ -23,11 +23,11 @@ Format: 4 lowercase hex chars, no `0x` prefix. The firmware's `parseHex16` accep
 
 ## Tasks
 
-- [ ] **New utility + tests.** `astros_api/src/utility/crc16.ts` exports the two functions. `crc16.test.ts` covers: the canonical check vector (`"123456789"` → `0x29B1`); the empty-input edge case (returns init value `0xFFFFu`); known-good vectors for round-trip with the firmware impl; hex formatter pads to 4 chars (`0x00AB` → `"00ab"`). No mutation-test gate needed beyond the canonical-value test — the algorithm is fixed.
+- [x] **New utility + tests.** `astros_api/src/utility/crc16.ts` exports the two functions. `crc16.test.ts` covers: the canonical check vector (`"123456789"` → `0x29B1`); the empty-input edge case (returns init value `0xFFFFu`); known-good vectors for round-trip with the firmware impl; hex formatter pads to 4 chars (`0x00AB` → `"00ab"`). No mutation-test gate needed beyond the canonical-value test — the algorithm is fixed.
 
-- [ ] **Wire into chunk_streamer.** Replace `crc16Hex: 'TODO_TASK_4_CRC16'` at `chunk_streamer.ts:324` with `crc16Hex: crc16CcittFalseHex(chunkBytes)`. Drop the TODO comment block above it (it was load-bearing while the placeholder existed; with the real impl in place the comment becomes drift).
+- [x] **Wire into chunk_streamer.** Replace `crc16Hex: 'TODO_TASK_4_CRC16'` at `chunk_streamer.ts:324` with `crc16Hex: crc16CcittFalseHex(chunkBytes)`. Drop the TODO comment block above it (it was load-bearing while the placeholder existed; with the real impl in place the comment becomes drift).
 
-- [ ] **Pipeline + commit.** Same active branch. Format + lint + build + vitest. Manual: bench-side, retry the flash — expect the master to ACK chunks instead of "Invalid message," and the RX buffer overflow warnings to subside as the streamer's sliding window drains naturally via ACKs.
+- [x] **Pipeline + commit.** Same active branch. Format + lint + build + vitest. Manual: bench-side, retry the flash — expect the master to ACK chunks instead of "Invalid message," and the RX buffer overflow warnings to subside as the streamer's sliding window drains naturally via ACKs.
 
 ## Files touched
 

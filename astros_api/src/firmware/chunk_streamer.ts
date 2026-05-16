@@ -21,10 +21,10 @@
 //
 // Wire-payload encoding split:
 //   - Framing (line-delimited GS/RS/US bytes) lives in MessageGenerator
-//   - Bytes-level encoding (base64 of chunk slice, CRC-16) is the streamer's
-//     responsibility. CRC currently uses the `'TODO_TASK_4_CRC16'` greppable
-//     placeholder — non-numeric so a buggy validator can't silently accept it
-//     as a valid all-zero CRC. Replaced when the master starts checking it.
+//   - Bytes-level encoding (base64 of chunk slice, CRC-16/CCITT-FALSE) is
+//     the streamer's responsibility. CRC is computed over the decoded
+//     chunk bytes via `crc16CcittFalseHex` and emitted as 4 lowercase hex
+//     chars; the firmware's `parseHex16` requires exactly that shape.
 //
 // `fs.promises.readFile` is the only fs touch — `TransferSpec.source.path`
 // resolves to a Buffer at run() entry. 1.2 MB ESP firmware fits in memory;
@@ -38,6 +38,7 @@
 
 import { promises as fsp } from 'fs';
 import { v4 as uuid_v4 } from 'uuid';
+import { crc16CcittFalseHex } from '../utility/crc16.js';
 import type {
   FwInboundAck,
   SerialBus,
@@ -316,12 +317,11 @@ export class ChunkStreamer {
         seq,
         payloadLen: chunkBytes.length,
         base64Bytes: chunkBytes.toString('base64'),
-        // CRC-16 placeholder. Non-numeric greppable marker (NOT '0000') so
-        // a buggy validator can't silently accept it as a valid all-zero
-        // CRC — any well-formed CRC parser will reject this. Replaced with
-        // the real CRC-16/CCITT-FALSE helper when the master starts
-        // checking it.
-        crc16Hex: 'TODO_TASK_4_CRC16',
+        // CRC-16/CCITT-FALSE over the DECODED chunk bytes (protocol-doc
+        // serial scope: "over the decoded payload bytes" — not the base64
+        // envelope). 4-char lowercase hex matches the firmware's
+        // parseHex16 contract.
+        crc16Hex: crc16CcittFalseHex(chunkBytes),
       };
       const chunkMsg = this.messageGenerator.generateMessage(
         SerialMessageType.FW_CHUNK,
