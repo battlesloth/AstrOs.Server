@@ -38,6 +38,33 @@ Two pieces of attendant drift to fix while in here:
 1. **Stale comment** at `chunk_streamer.ts:939` says "1500 ms ackTimeoutMs"; the default is 5000 today and 15000 after this fix.
 2. **Stale test constant** at `chunk_streamer.test.ts:1169-1172`: `const ACK_TIMEOUT_MS = 1500` with comment "Default ackTimeoutMs from TRANSPORT_DEFAULTS." The tests construct the streamer *without* an `ackTimeoutMs` override (line 1215, 1281), then `advanceTimersByTimeAsync(ACK_TIMEOUT_MS)` expecting the default timer to fire. That worked when the default was 1500, breaks silently as soon as the default diverges. Fix is to **pass an explicit small override per test** (`config: { chunkSizeBytes, ackTimeoutMs: 1500 }`) — tests then advertise their own time budget, the default can move freely, and the suite stays fast.
 
+## Revised approach — switch to stop-and-wait (windowSize=1)
+
+The bench run after `bc762fd` (the 15 000 ms / window=16 commit) still cascaded — same OUT_OF_ORDER NAK pattern, just deferred to seq=29 instead of seq=21. Fresh measurements:
+
+- ESP-side: 16 chunks took **15.5 s** to arrive (seq=0 at ESP ts 3997420, seq=15 at 4012980). That's ~970 ms per chunk, not the ~480 ms wire time.
+- Host-side (pid 151445): ACK for seq=13 arrived T+15226 ms after BEGIN_ACK, ACK for seq=15 arrived T+16416 ms. With `ackTimeoutMs: 15 000`, timers for seq=13..15 all fire ~200-1400 ms *before* their ACKs land.
+
+The wire is running at ~50% capacity. The bottleneck isn't bandwidth — it's the master's per-chunk processing rate (likely `astrosRxTask` doing other work between FW_CHUNKs, with polling and POLL_ACK traffic eating CPU on a 2 s cycle). The sliding window of 16 was designed for the case where the wire is the bottleneck and pipelining hides round-trip latency. That premise doesn't hold here.
+
+Worse: with multiple chunks in flight, a single spurious retransmit (timer-fired-before-ACK) creates a guaranteed OUT_OF_ORDER NAK when the duplicate lands behind the original, and the host's `handleChunkNak` Go-Back-N path responds by re-flooding the window — cascade.
+
+**Switch to stop-and-wait: `windowSize: 1`.** With only one chunk ever outstanding, the cascade is structurally impossible (no "behind" chunk for a duplicate to arrive after). The existing sliding-window machinery handles `windowSize=1` correctly — `topUpWindow`'s `while (inFlight.size < 1 && ...)` becomes "send one, wait for ACK, send next." No code-path rewrite needed.
+
+Trade-off: theoretical throughput drops from "pipelined wire-rate" to "stop-and-wait at processing-rate," but we're already processing-bound, so the *actual* throughput is the same. 1.2 MB / ~5500 bytes/sec ≈ **3.5 minutes** for a full image — same as what the broken sliding-window run was achieving in its good intervals.
+
+The sliding-window code becomes dead-in-production but stays exercised by tests (which can opt into `windowSize > 1` via explicit config override). That's intentional: if `astrosRxTask` later becomes fast enough that the wire IS the bottleneck, the path back to a larger window is a one-line config change, not a rewrite. Refactor / delete the dead window machinery only after the simpler protocol has proven itself on the bench.
+
+Reverts (or re-tunes back toward) most of `bc762fd`'s value changes since their justification ("size for full-window wire time") no longer applies:
+
+- `ackTimeoutMs: 15 000 → 5_000` (5× margin over the observed ~1 s round trip)
+- `maxRetriesPerChunk: 5 → 3` (back to original)
+- `windowSize: 16 → 1` (the actual semantic change)
+- Comment block rewritten to explain "processing-bound, not wire-bound, so window=1 avoids retransmit-cascade surface area without losing throughput"
+- END_ACK race comment back to "5 000 ms"
+
+Tests that exercise multi-chunk in-flight behavior need to explicitly opt into a larger `windowSize` (consistent with the existing per-test config-override pattern from task 2).
+
 ## Tasks
 
 - [x] **Bump default + refresh stale comment.** In `chunk_streamer.ts`: changed `ackTimeoutMs: 5000` → `15_000` and added a sizing-rationale block comment above `TRANSPORT_DEFAULTS` (15 × 480 ms wire time = 7.2 s; 15 000 ms gives ~2× margin). Updated the stale "1500 ms ackTimeoutMs" reference at the END_ACK race comment.
@@ -46,20 +73,31 @@ Two pieces of attendant drift to fix while in here:
 
 - [x] **Verify the suite.** `npm run prettier:write` (clean), `npm run lint:fix` (clean), `npm run build` (clean), `npx vitest run src/firmware/chunk_streamer.test.ts` (57/57 passed), full `npx vitest run` (771/771 passed, 63 test files). Code-reviewer agent dispatched on the diff per CLAUDE.md pre-commit checklist — no Critical / Important findings.
 
-- [ ] **Bench validation.** Build, push to the master, retry the 1.2 MB flash from the UI. **Keep the DIAG logging in place for this step** — the next task removes it once the cascade is confirmed gone. Watch `~/.config/astrosserver/logs/astros.*.log` for `flash orchestrator: onChunkNak` events during the upload phase — the cascade should disappear. ESP-side `.tmp/ESP.log` should show monotonically increasing seq with no retransmits below `highestSeq`. Capture both logs into the issue notes as the "after" comparison.
+- [ ] **Bench validation (superseded — see task 6).** Original plan was to bench-validate `bc762fd`. That bench run still cascaded, which triggered the revised approach above. Skip directly to task 4 below.
 
-- [ ] **Revert investigation DIAG logging.** Once bench validation confirms the cascade is gone, revert the unstaged diagnostics in `api_server.ts` (the `DIAG serial-rx` block at line 610-618) and `message_handler.ts` (the `DIAG handleFwChunkAck raw=...` line at 213). These were scratch for the ack-loss hunt and were never intended to ship. Easiest path: `git checkout HEAD -- astros_api/src/api_server.ts astros_api/src/serial/message_handler.ts` after the bench run, then re-run lint + build to confirm nothing else depended on the removals.
+- [ ] **Switch to `windowSize: 1` + revert value drift.** In `chunk_streamer.ts`: set `windowSize: 1`, `ackTimeoutMs: 5_000`, `maxRetriesPerChunk: 3`. Rewrite the rationale comment above `TRANSPORT_DEFAULTS` to explain stop-and-wait + processing-bound link (not the old wire-time math). Revert the END_ACK race comment at the former line ~939 to reference 5 000 ms.
+
+- [ ] **Audit tests for multi-chunk-in-flight assumptions.** Sweep `chunk_streamer.test.ts` for tests that depend on `windowSize > 1` — primarily the "concurrent in-flight chunks time out independently" test (~line 1320) and any backpressure tests that pipeline multiple chunks. Each such test must explicitly pass `windowSize: <N>` in its `config:` override (consistent with the per-test `ackTimeoutMs` / `maxRetriesPerChunk` pinning pattern). Also revisit the watchdog describe comment math one more time — with the smaller defaults, `maxRetriesPerChunk: 3 × ackTimeoutMs: 5_000 = 15 000 ms`, much less than the 75 s we just put in.
+
+- [ ] **Verify the suite + code review.** `prettier:write && lint:fix && build && vitest run`. Dispatch the code-reviewer agent on the new diff vs `bc762fd`. Same gating as task 3 — no Critical / Important findings allowed before commit.
+
+- [ ] **Bench validation (stop-and-wait).** Rebuild server, re-flash. Expected: zero `onChunkNak OUT_OF_ORDER` events, ESP-side monotonic seq progression with no retransmits below `highestSeq`, total transfer time ~3-4 minutes.
+
+- [ ] **Revert investigation DIAG logging.** Once bench validation confirms the cascade is gone, revert the unstaged diagnostics in `api_server.ts` and `message_handler.ts`. Easiest path: `git checkout HEAD -- astros_api/src/api_server.ts astros_api/src/serial/message_handler.ts` after the bench run, then re-run lint + build.
+
+- [ ] **(Future, separate plan)** Refactor / delete the sliding-window machinery in `chunk_streamer.ts` once stop-and-wait has proven itself in production. With `windowSize` pinned to 1, the `inFlight` Map could collapse to a single entry, `topUpWindow`'s loop becomes an `if`, the Go-Back-N branch in `handleChunkNak` becomes trivial, and cumulative-ACK retire logic simplifies to "retire the one in-flight seq when its ACK arrives." Out of scope for this plan; capture as a follow-up after enough bench / production runs to be confident the wire-bottleneck case isn't coming back.
 
 ## Files touched
 
-- `astros_api/src/firmware/chunk_streamer.ts` — `ackTimeoutMs` default + two comment refresh sites (also carries the already-applied `maxRetriesPerChunk: 3 → 5` bump from the working tree; it stays in this commit)
-- `astros_api/src/firmware/chunk_streamer.test.ts` — pass explicit `ackTimeoutMs` in the per-chunk-timeout describe block; drop stale "Default from TRANSPORT_DEFAULTS" claim
+- `astros_api/src/firmware/chunk_streamer.ts` — `windowSize: 1`, `ackTimeoutMs: 5_000`, `maxRetriesPerChunk: 3`, rewritten rationale comment, reverted END_ACK race comment
+- `astros_api/src/firmware/chunk_streamer.test.ts` — explicit `windowSize` override on multi-chunk tests; refreshed watchdog comment math
 - `astros_api/src/api_server.ts` — revert investigation DIAG logging (final cleanup task)
 - `astros_api/src/serial/message_handler.ts` — revert investigation DIAG logging (final cleanup task)
 
 ## Out of scope
 
-- **OUT_OF_ORDER NAK cascade hardening.** Even with a correctly sized timeout, a real lossy wire could still produce OUT_OF_ORDER NAKs for chunks the host has moved past. The host could be smarter: if a NAK arrives with `reasonCode === 'OUT_OF_ORDER'` AND `nextExpectedSeq <= nextToSend`, suppress the Go-Back-N rewind (the host has already sent that seq forward) and just clear any matching in-flight entry. Reserve for a follow-up plan once the timeout fix is shipped and we have data on residual NAK churn.
-- **Arming the timer on UART drain rather than `bus.send` return.** Structurally cleaner — it's what every other reliable-transport library does — but needs a "bytes-on-wire" callback path from the worker / `SerialPort.write`'s drain event back into the streamer, threaded by message-id. Material refactor; not worth it when a default bump achieves the same effect.
-- **Reducing `windowSize` instead.** Window of 2 would also fit comfortably under a 5 s timeout, but at the cost of throughput (each chunk gates on its predecessor's round trip). The whole point of a 16-deep window is to overlap wire time with firmware processing — keep it.
+- **OUT_OF_ORDER NAK cascade hardening.** With stop-and-wait, the cascade is structurally impossible, so the smarter NAK handler (suppress Go-Back-N when host is ahead of `nextExpectedSeq`) is no longer load-bearing. Keep on the radar for if/when the window is ever re-enlarged.
+- **Arming the timer on UART drain rather than `bus.send` return.** Same logic — at window=1, timer race is irrelevant. Was structurally cleaner but no longer needed.
+- **Removing the sliding-window machinery.** Sliding-window code stays in for now even though `windowSize=1` makes it dead-in-production. Reasons: (a) it's still exercised by tests that opt into `windowSize > 1`, so it doesn't bit-rot; (b) re-enabling on a future faster master is a one-line config change rather than a feature rebuild; (c) the simpler protocol needs bench-time before we commit to ripping out the alternative. Tracked as the final (deferred) task.
+- **Diagnosing the master's processing-rate bottleneck.** ESP-side `astrosRxTask` is the actual reason throughput is processing-bound. Worth a separate firmware investigation — could yield faster transfers if the per-chunk processing time can be reduced. Not blocking on this for the OTA stabilization fix.
 - **Cutting a separate branch for this fix.** Folded into the current `feature/firmware-allow-downgrade` branch — no point shipping a downgrade feature that can't reliably push a firmware image across the wire. Both changes are firmware-flash stabilization; they ride together.
