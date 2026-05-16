@@ -569,12 +569,18 @@ export class ApiServer {
       releaseService: this.githubReleaseService,
       controllersStore: {
         // Snapshot per call so validateControllers doesn't race a concurrent
-        // POLL_ACK update of the underlying Map.
-        listFlashTargets: async () =>
-          Array.from(this.controllerVariantCache.entries()).map(([id, variant]) => ({
-            id,
-            variant,
-          })),
+        // POLL_ACK update of the underlying Map. Filter to the operator's
+        // requested MAC set so the flash scopes to what the UI selected
+        // (rather than every controller the server has ever heard from).
+        // The orchestrator detects requested-but-missing MACs and throws
+        // `controllers_unknown` with detail; this side just returns the
+        // intersection.
+        listFlashTargets: async (requestedIds) => {
+          const wanted = new Set(requestedIds);
+          return Array.from(this.controllerVariantCache.entries())
+            .filter(([id]) => wanted.has(id))
+            .map(([id, variant]) => ({ id, variant }));
+        },
       },
       emitWs: (msg) => this.updateClients(msg),
       config: this.flashOrchestratorConfig,

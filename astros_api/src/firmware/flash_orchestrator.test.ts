@@ -668,7 +668,10 @@ describe('FlashJobOrchestrator', () => {
   // parameter through the shared helper avoids the duplicate.
   interface SetupOpts {
     controllers?: Array<{ id: string; variant: string | undefined }>;
-    request?: FlashRequest;
+    // `request` accepts a partial (controllers optional) so the bulk of
+    // tests don't have to thread an explicit selection list — the wrapper
+    // defaults `request.controllers` to the fixture's id set when omitted.
+    request?: Pick<FlashRequest, 'source'> & { controllers?: string[] };
     cachedAsset?: CachedAsset;
     storedUpload?: StoredUpload | null;
     releases?: ReleaseInfo[];
@@ -684,7 +687,16 @@ describe('FlashJobOrchestrator', () => {
     const cachedAsset = opts.cachedAsset ?? makeCachedAsset();
     const storedUpload = opts.storedUpload === undefined ? makeStoredUpload() : opts.storedUpload;
     const releases = opts.releases ?? [makeRelease()];
-    const request: FlashRequest = opts.request ?? { source: { kind: 'github', version: '1.4.0' } };
+    // Default the wire `controllers` field to the fixture's id list so tests
+    // that don't override `opts.request` get a coherent request shape. When
+    // opts.request is supplied without controllers, fall back to the same
+    // default — the test author rarely cares about per-controller selection.
+    const defaultControllerIds = controllers.map((c) => c.id);
+    const baseRequest = opts.request ?? { source: { kind: 'github', version: '1.4.0' } };
+    const request: FlashRequest = {
+      source: baseRequest.source,
+      controllers: baseRequest.controllers ?? defaultControllerIds,
+    } as FlashRequest;
 
     const bus = new FakeSerialBus();
     const cache = { fetch: vi.fn().mockResolvedValue(cachedAsset) };
@@ -1031,6 +1043,37 @@ describe('FlashJobOrchestrator', () => {
     await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
     fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
     await startPromise;
+  });
+
+  it('rejects with controllers_unknown when the requested MAC list contains entries missing from the variant store', async () => {
+    // The operator's selection in the UI carries MACs that the server's
+    // variant cache must contain — otherwise the chunk_streamer can't address
+    // the controller and the operator should see a specific error. The
+    // detail string enumerates the missing MACs so the operator can diagnose
+    // ("wait one poll cycle for the late-joining controller" vs "the device
+    // is offline"). Distinct from `no_controllers` (which now correctly
+    // means the HTTP body had an empty array).
+    const fx = setupHappyPath({
+      controllers: [{ id: 'controller-a', variant: 'lolin_d32_pro' }],
+      request: {
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: ['controller-a', 'controller-ghost-1', 'controller-ghost-2'],
+      },
+    });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('controllers_unknown');
+    expect((caught as FlashOrchestratorError).detail).toContain('controller-ghost-1');
+    expect((caught as FlashOrchestratorError).detail).toContain('controller-ghost-2');
+    // Lock released, no orphaned currentJob.
+    expect(fx.jobLock.isLocked()).toBe(false);
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
   });
 
   it('rejects with controllers_lookup_failed when controllersStore.listFlashTargets rejects; lock released, flashJobFailed emitted', async () => {
@@ -3082,7 +3125,10 @@ describe('FlashJobOrchestrator', () => {
       });
 
       // Kick off start(); it will block in releaseService.getReleases().
-      const startPromise = orchestrator.start({ source: { kind: 'github', version: '1.4.0' } });
+      const startPromise = orchestrator.start({
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: ['controller-a', 'controller-b'],
+      });
       // Yield enough microtasks for the orchestrator to land in the
       // `getReleases()` await — controllersStore + lock acquisition are
       // synchronous and the resolveFlashSource entry point hits the

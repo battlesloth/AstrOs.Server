@@ -14,9 +14,15 @@ import type { StreamObserver, TransferResult, TransferSpec } from './chunk_strea
 // both `release.tag` and `release.version` so operators submitting
 // either form work. Field is named `version` rather than
 // `tagOrVersion` to match the Vue / operator mental model.
-export type FlashRequest =
-  | { source: { kind: 'github'; version: string } }
-  | { source: { kind: 'upload' } };
+//
+// `controllers` is the operator-selected MAC list. The server filters its
+// variant cache to these entries; a requested MAC missing from the cache
+// surfaces as `controllers_unknown` (a 400) so the operator sees a clear
+// "this controller hasn't reported its firmware variant yet" signal rather
+// than the misleading legacy `no_controllers`. Must be non-empty.
+type BaseFlashRequest = { controllers: string[] };
+export type FlashRequest = BaseFlashRequest &
+  ({ source: { kind: 'github'; version: string } } | { source: { kind: 'upload' } });
 
 // Typed channel for what `subscribeDeployEvents` delivers. The orchestrator
 // fans serial deploy-phase messages (FW_PROGRESS, FW_DEPLOY_DONE) out as

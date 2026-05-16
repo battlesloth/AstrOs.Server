@@ -589,7 +589,14 @@ describe('firmware store', () => {
 
       expect(apiPost).toHaveBeenCalledWith(
         'api/firmware/flash',
-        { source: { kind: 'github', version: 'v1.4.2' } },
+        {
+          source: { kind: 'github', version: 'v1.4.2' },
+          // `body` slot resolves to the master sentinel MAC seeded in
+          // seedSampleFleet(); the wire payload now scopes the flash to
+          // the operator's selection rather than letting the server flash
+          // every cached controller.
+          controllers: ['00:00:00:00:00:00'],
+        },
         expect.objectContaining({ timeout: 30_000 }),
       );
       expect(store.phase).toBe('flashing');
@@ -608,7 +615,7 @@ describe('firmware store', () => {
 
       expect(apiPost).toHaveBeenCalledWith(
         'api/firmware/flash',
-        { source: { kind: 'upload' } },
+        { source: { kind: 'upload' }, controllers: ['00:00:00:00:00:00'] },
         expect.objectContaining({ timeout: 30_000 }),
       );
       expect(store.phase).toBe('flashing');

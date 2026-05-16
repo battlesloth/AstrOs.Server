@@ -90,7 +90,11 @@ export interface ResolvedFlashSource {
  *                github path; ignored for upload.
  */
 export async function resolveFlashSource(
-  request: FlashRequest,
+  // Narrowed from `FlashRequest` to the source-only shape this function
+  // actually reads — the per-controller selection list is irrelevant to
+  // binary resolution and full `FlashRequest` would force test callers to
+  // construct a controllers array they don't need.
+  request: Pick<FlashRequest, 'source'>,
   cache: { fetch(release: ReleaseInfo, asset: AssetInfo): Promise<CachedAsset> },
   upload: { latest(): Promise<StoredUpload | null> },
   releaseService: { getReleases(): Promise<ReleaseListResult> },
@@ -354,7 +358,15 @@ export type FlashOrchestratorWsMessage =
 // as missing) and surfaces `'variant_unknown'` so the impl doesn't have
 // to write coercion boilerplate at the cache boundary.
 export interface FlashControllersStore {
-  listFlashTargets(): Promise<Array<{ id: string; variant: string | undefined }>>;
+  // `requestedIds` is the operator-selected MAC list from the HTTP request.
+  // Implementations return only entries whose MAC is in this set; the
+  // orchestrator decides what to do about a requested MAC that isn't
+  // present (it throws `controllers_unknown` with the missing MACs as
+  // detail). Empty `requestedIds` is a contract violation — the HTTP
+  // validator must reject before this point.
+  listFlashTargets(
+    requestedIds: readonly string[],
+  ): Promise<Array<{ id: string; variant: string | undefined }>>;
 }
 
 // Reasons surfaced as `FlashOrchestratorError.reason`. Three buckets:
@@ -385,6 +397,7 @@ export interface FlashControllersStore {
 export type FlashOrchestratorErrorReason =
   | 'job_already_running'
   | 'no_controllers'
+  | 'controllers_unknown'
   | 'variant_mismatch'
   | 'variant_unknown'
   | 'release_not_found'
@@ -555,10 +568,20 @@ export class FlashJobOrchestrator {
       // event so WS consumers reliably see job rejection reasons.
       let targetsList: Array<{ id: string; variant: string | undefined }>;
       try {
-        targetsList = await this.controllersStore.listFlashTargets();
+        targetsList = await this.controllersStore.listFlashTargets(request.controllers);
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
         throw new FlashOrchestratorError('controllers_lookup_failed', detail);
+      }
+      // Surface the gap between requested-MACs and what the store actually
+      // returned: a requested MAC missing here means the operator selected
+      // a controller whose variant the server hasn't learned yet (cold
+      // variantCache after restart, pre-c.6c.1 firmware, etc). Distinct
+      // from `no_controllers` (which now correctly means "empty request").
+      const foundIds = new Set(targetsList.map((t) => t.id));
+      const missing = request.controllers.filter((id) => !foundIds.has(id));
+      if (missing.length > 0) {
+        throw new FlashOrchestratorError('controllers_unknown', missing.join(', '));
       }
       const variant = validateControllers(targetsList);
 

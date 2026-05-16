@@ -94,6 +94,7 @@ export const FLASH_ERROR_REASONS = [
   'invalid_body',
   'job_already_running',
   'no_controllers',
+  'controllers_unknown',
   'variant_mismatch',
   'variant_unknown',
   'release_not_found',

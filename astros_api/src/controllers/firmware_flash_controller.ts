@@ -25,6 +25,7 @@ const REASON_HTTP_STATUS: Record<FlashOrchestratorErrorReason, HttpStatus> = {
   job_already_running: 409,
 
   no_controllers: 400,
+  controllers_unknown: 400,
   variant_mismatch: 400,
   variant_unknown: 400,
   release_not_found: 400,
@@ -167,16 +168,26 @@ function validateFlashRequest(body: unknown): ValidationResult {
   if (source === null || typeof source !== 'object') {
     return { ok: false, detail: 'source must be an object' };
   }
+  const controllers = (body as { controllers?: unknown }).controllers;
+  if (!Array.isArray(controllers)) {
+    return { ok: false, detail: 'controllers must be an array' };
+  }
+  if (controllers.length === 0) {
+    return { ok: false, detail: 'controllers must be non-empty' };
+  }
+  if (!controllers.every((c) => typeof c === 'string' && c.length > 0)) {
+    return { ok: false, detail: 'controllers must be an array of non-empty strings' };
+  }
   const kind = (source as { kind?: unknown }).kind;
   if (kind === 'github') {
     const version = (source as { version?: unknown }).version;
     if (typeof version !== 'string' || version.length === 0) {
       return { ok: false, detail: 'source.version must be a non-empty string' };
     }
-    return { ok: true, request: { source: { kind: 'github', version } } };
+    return { ok: true, request: { source: { kind: 'github', version }, controllers } };
   }
   if (kind === 'upload') {
-    return { ok: true, request: { source: { kind: 'upload' } } };
+    return { ok: true, request: { source: { kind: 'upload' }, controllers } };
   }
   return { ok: false, detail: "source.kind must be 'github' or 'upload'" };
 }

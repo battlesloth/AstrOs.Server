@@ -74,7 +74,10 @@ describe('integration: concurrent flash rejection', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${harness.authToken}`,
         },
-        body: JSON.stringify({ source: { kind: 'upload' } }),
+        body: JSON.stringify({
+          source: { kind: 'upload' },
+          controllers: [MASTER_SENTINEL_MAC],
+        }),
       });
       expect(firstFlashRes.status).toBe(200);
       const firstFlashBody = (await firstFlashRes.json()) as { jobId: string };
@@ -91,7 +94,10 @@ describe('integration: concurrent flash rejection', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${harness.authToken}`,
         },
-        body: JSON.stringify({ source: { kind: 'upload' } }),
+        body: JSON.stringify({
+          source: { kind: 'upload' },
+          controllers: [MASTER_SENTINEL_MAC],
+        }),
       });
       expect(secondFlashRes.status).toBe(409);
       const conflictBody = (await secondFlashRes.json()) as {

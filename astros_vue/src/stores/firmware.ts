@@ -625,10 +625,51 @@ export const useFirmwareStore = defineStore('firmware', () => {
   async function startFlash(): Promise<void> {
     if (!canFlash.value || phase.value === 'flashing') return;
     clearFlashError();
+
+    // Map slot ids → MAC addresses (the server's identity space). The flash
+    // wire contract carries MACs end-to-end: controllerVariantCache is keyed
+    // by MAC, the chunk_streamer addresses ESP-NOW peers by MAC. Slot id is
+    // the UI-side abstraction only.
+    //
+    // A selected slot with no known MAC client-side is structurally unusual
+    // (selection requires a controller row to exist, which requires a
+    // LocationStatus broadcast, which carries the MAC). Skip + warn rather
+    // than silently include an empty string — the server's validator would
+    // reject anyway, and the warn gives ops a forensic breadcrumb.
+    const cs = useControllerStore();
+    const macBySlot: Record<string, string | null> = {
+      [Location.BODY]: cs.bodyMac,
+      [Location.CORE]: cs.coreMac,
+      [Location.DOME]: cs.domeMac,
+    };
+    const controllerMacs: string[] = [];
+    for (const slot of selectedControllerIds.value) {
+      const mac = macBySlot[slot];
+      if (mac === null || mac === undefined) {
+        console.warn(
+          `[firmwareStore] startFlash: selected slot "${slot}" has no known MAC; skipping. ` +
+            `Selection should not have been reachable without a LocationStatus heartbeat — possible store-state drift.`,
+        );
+        continue;
+      }
+      controllerMacs.push(mac);
+    }
+    if (controllerMacs.length === 0) {
+      // Defensive: canFlash already gated on selectedControllerIds.size > 0,
+      // so the only way here is every selected slot lost its MAC since the
+      // gate fired. Surface a flash-error envelope so the panel banner
+      // explains rather than silently no-op'ing.
+      setFlashError({ reason: 'no_controllers' });
+      return;
+    }
+
     const body =
       sourceMode.value === 'github'
-        ? { source: { kind: 'github' as const, version: selectedReleaseTag.value } }
-        : { source: { kind: 'upload' as const } };
+        ? {
+            source: { kind: 'github' as const, version: selectedReleaseTag.value },
+            controllers: controllerMacs,
+          }
+        : { source: { kind: 'upload' as const }, controllers: controllerMacs };
     phase.value = 'flashing';
     try {
       const response = await apiClient.post(FIRMWARE_FLASH, body, {

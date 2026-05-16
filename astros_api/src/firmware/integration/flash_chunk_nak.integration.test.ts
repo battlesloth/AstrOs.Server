@@ -109,7 +109,10 @@ describe('integration: chunk NAK + Go-Back-N recovery', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${harness.authToken}`,
         },
-        body: JSON.stringify({ source: { kind: 'upload' } }),
+        body: JSON.stringify({
+          source: { kind: 'upload' },
+          controllers: [MASTER_SENTINEL_MAC],
+        }),
       });
       expect(flashRes.status).toBe(200);
       const flashBody = (await flashRes.json()) as { jobId: string };

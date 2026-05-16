@@ -78,7 +78,10 @@ describe('integration: cancel during upload + deploy', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${harness.authToken}`,
         },
-        body: JSON.stringify({ source: { kind: 'upload' } }),
+        body: JSON.stringify({
+          source: { kind: 'upload' },
+          controllers: [MASTER_SENTINEL_MAC],
+        }),
       });
 
       // 5. Wait for flashJobStarted to confirm the job is in flight. This
@@ -192,7 +195,10 @@ describe('integration: cancel during upload + deploy', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${harness.authToken}`,
         },
-        body: JSON.stringify({ source: { kind: 'upload' } }),
+        body: JSON.stringify({
+          source: { kind: 'upload' },
+          controllers: [MASTER_SENTINEL_MAC],
+        }),
       });
       expect(flashRes.status).toBe(200);
       const flashBody = (await flashRes.json()) as { jobId: string };
