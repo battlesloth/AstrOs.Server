@@ -193,6 +193,14 @@ const sourceDisplay = (): string => {
   padding: 0;
   background: transparent;
   font-family: 'Inter', system-ui, sans-serif;
+  /* UA stylesheet's `margin: auto` on modal dialogs only resolves in the
+     inline axis for auto-height boxes, leaving the dialog pinned to the
+     viewport top. Transform centers in both axes regardless of intrinsic
+     size; max-height caps tall content so it doesn't overflow off-screen. */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-height: calc(100vh - 32px);
 }
 
 .astros-firmware-confirm-modal::backdrop {
