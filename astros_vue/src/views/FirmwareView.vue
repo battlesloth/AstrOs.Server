@@ -187,7 +187,20 @@ onMounted(async () => {
   // the page mid-flash), populate currentJob from the server. WS late-join
   // snapshot follows on connect; both paths set the same data and the
   // store's applyJobStarted idempotency keeps state coherent.
-  await Promise.all([firmware.fetchReleases(), firmware.fetchCurrentJob()]);
+  //
+  // fetchReleases is fire-and-forget — kicking it off in parallel without
+  // awaiting it. The releases endpoint can take up to 10s on a cold cache
+  // (GitHub round-trip after a server restart), and gating phase on it
+  // would leave the operator staring at a blank page. The source strip
+  // already renders a `releases_loading` affordance while
+  // releasesLoadState === 'loading', so the wait is communicated in-place
+  // once phase moves to 'select'. fetchCurrentJob, by contrast, must be
+  // awaited: if it were also fire-and-forget, the `phase === 'idle'` guard
+  // below would fire while the job lookup was still in flight and briefly
+  // paint the 'select' UI before applyJobStarted snapped phase to
+  // 'flashing' on a mid-flash refresh.
+  void firmware.fetchReleases();
+  await firmware.fetchCurrentJob();
   if (firmware.phase === 'idle') {
     firmware.setPhase('select');
   }
