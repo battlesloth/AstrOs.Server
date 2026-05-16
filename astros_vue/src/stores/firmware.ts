@@ -102,6 +102,16 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // active flash belongs to us vs. another operator (lock-conflict UI).
   const ownJobId = ref<string | null>(null);
 
+  // True from `startFlash()` entry until either the POST resolves+
+  // `currentJob.jobId === ownJobId` AND we've passed the lockStateChanged
+  // race window, OR the start fails / the flash terminates. Closes the
+  // race where the server's `lockStateChanged{locked:true}` arrives before
+  // its `flashJobStarted` (and before the HTTP response carrying `jobId`)
+  // — without this flag, the operator's own in-flight flash satisfies
+  // `lockLocked && !isOwnJob` and the page wrongly shows the foreign-
+  // operator conflict banner. Cleared on every terminal transition.
+  const pendingOwnFlashStart = ref(false);
+
   // Queue of ControllerFlashState payloads dropped because their MAC wasn't
   // yet in the controllerStore's resolver. The cold-load / late-join race:
   // flashJobStarted (or flashControllerUpdate) for a padawan can arrive
@@ -227,7 +237,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
   );
 
   const isOwnJob = computed(
-    () => currentJob.value !== null && currentJob.value.jobId === ownJobId.value,
+    () =>
+      pendingOwnFlashStart.value ||
+      (currentJob.value !== null && currentJob.value.jobId === ownJobId.value),
   );
 
   // Selection actions always replace the Set (not mutate in place) so Vue
@@ -261,6 +273,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     currentJob.value = null;
     controllerStates.value = new Map();
     ownJobId.value = null;
+    pendingOwnFlashStart.value = false;
     pendingByMac.value = new Map();
     currentJobLoadFailed.value = false;
   }
@@ -477,6 +490,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
     phase.value = 'done';
     currentStage.value = null;
+    // Job terminated — clear the start-pending flag. Subsequent
+    // lock-conflict checks fall back to the equality clause, which is
+    // load-bearing for foreign-flash detection.
+    pendingOwnFlashStart.value = false;
     // Normalize any per-controller state that's still mid-flow to
     // VERSION_CONFIRMED. The server emits flashJobDone when the LAST
     // VERSION_CONFIRMED is observed, but the carrying flashControllerResult
@@ -543,6 +560,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
       };
     }
     phase.value = 'failed';
+    // Terminal: clear the start-pending flag so subsequent lock-conflict
+    // checks rely on the equality clause (load-bearing for foreign-flash
+    // detection on any next operator action).
+    pendingOwnFlashStart.value = false;
     // Map server-side reason onto FlashErrorReason if recognized, otherwise
     // fall back to internal_server_error. Forward-compat: a new server-side
     // reason renders the generic banner until the client union is updated.
@@ -682,6 +703,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
             controllers: controllerMacs,
           }
         : { source: { kind: 'upload' as const }, controllers: controllerMacs };
+    // Set the pending flag BEFORE the optimistic phase change so the
+    // first `lockStateChanged{locked:true}` WS event (which the server
+    // emits immediately on lock acquisition, well before the HTTP
+    // response or `flashJobStarted` arrives) sees isOwnJob=true and
+    // does NOT trigger the lock-conflict banner on our own flash.
+    pendingOwnFlashStart.value = true;
     phase.value = 'flashing';
     try {
       const response = await apiClient.post(FIRMWARE_FLASH, body, {
@@ -710,6 +737,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // Direct apiClient.post bypasses apiService.post's console.error
       // wrapper, so log here to preserve the dev breadcrumb.
       console.error('firmware.startFlash failed', error);
+      // Clear the pending flag on POST rejection — we're not the lock
+      // holder. The terminal handlers (applyJobDone/Failed, cancelFlash,
+      // resetToSelect) clear it for the success/terminal paths.
+      pendingOwnFlashStart.value = false;
       phase.value = 'select';
       setFlashError(mapHttpErrorToFlashEnvelope(error));
     }

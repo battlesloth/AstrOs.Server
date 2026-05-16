@@ -1784,6 +1784,62 @@ describe('firmware store', () => {
       store.ownJobId = 'job-1';
       expect(store.isOwnJob).toBe(false);
     });
+
+    it('is true during the startFlash optimistic window (race fix)', async () => {
+      // Regression pin: the server emits lockStateChanged{locked:true}
+      // BEFORE flashJobStarted (and before the HTTP response carries
+      // ownJobId). In that window, isOwnJob must already be true so the
+      // operator's own flash doesn't get classified as a foreign-operator
+      // lockout. Before the pendingOwnFlashStart fix, this test would
+      // observe `isOwnJob === false`.
+      apiPost.mockReturnValueOnce(new Promise(() => {})); // pending forever
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('body');
+
+      void store.startFlash();
+      // Synchronous prefix has run — POST is in flight, no WS messages
+      // have arrived yet. currentJob is null, ownJobId is null.
+      expect(store.currentJob).toBeNull();
+      expect(store.ownJobId).toBeNull();
+      // ...but isOwnJob is true thanks to the pending flag.
+      expect(store.isOwnJob).toBe(true);
+    });
+
+    it('foreign-flash detection still works (pendingOwnFlashStart is false unless we started a flash)', () => {
+      // Pin that the new clause doesn't accidentally hide real foreign-
+      // flash conflicts. The flag is set ONLY by startFlash; for a
+      // foreign operator's flash, isOwnJob must still report false.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState({ jobId: 'foreign-job' }));
+      // ownJobId never set (we never POSTed).
+      expect(store.isOwnJob).toBe(false);
+    });
+
+    it('clears pendingOwnFlashStart on applyJobDone — falls back to the equality clause for subsequent checks', async () => {
+      // After our own flash terminates, isOwnJob's equality clause is
+      // load-bearing for any future foreign-flash detection. Mutation
+      // pin: removing the clear from applyJobDone would leak the flag
+      // forward, classifying the next foreign flash as our own.
+      apiPost.mockResolvedValueOnce({ data: { jobId: 'job-1' } });
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('body');
+      await store.startFlash();
+      store.applyJobStarted(sampleJobState({ jobId: 'job-1' }));
+      store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-16T10:00:00Z' });
+
+      // Simulate a foreign flash starting later: clear currentJob (the
+      // applyJobDone leaves it set as terminal state; resetToSelect or
+      // the next applyJobStarted re-uses it).
+      store.applyJobStarted(sampleJobState({ jobId: 'foreign-next' }));
+      expect(store.isOwnJob).toBe(false);
+    });
   });
 
   describe('fetchCurrentJob', () => {

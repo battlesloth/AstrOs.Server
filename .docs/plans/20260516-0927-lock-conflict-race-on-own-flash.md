@@ -34,14 +34,14 @@ While `pendingOwnFlashStart` is true, `isOwnJob` is true regardless of whether `
 
 ## Tasks
 
-- [ ] **Store: add `pendingOwnFlashStart` + update `isOwnJob`.** New ref defaults to `false`. Set true at the top of `startFlash()` (before `phase='flashing'`). Clear in `startFlash`'s catch block. Clear in `applyJobDone`, `applyJobFailed`, `cancelFlash`, `resetToSelect`. Update `isOwnJob` to the disjunction above.
+- [x] **Store: add `pendingOwnFlashStart` + update `isOwnJob`.** New ref defaults to `false`. Set true at the top of `startFlash()` (before `phase='flashing'`). Clear in `startFlash`'s catch block. Clear in `applyJobDone`, `applyJobFailed`, `cancelFlash`, `resetToSelect`. Update `isOwnJob` to the disjunction above.
 
-- [ ] **Tests pinning the race + the terminal-clear contract.** Three cases in `firmware.spec.ts`:
+- [x] **Tests pinning the race + the terminal-clear contract.** Three cases in `firmware.spec.ts`:
   1. Mid-startFlash race: simulate a pending POST (never-resolving promise), fire `lockStateChanged{locked:true}` via the existing lock-store fixture, assert `lockConflict === false` (the bug today: true).
   2. Foreign-flash detection still works: `startFlash` never called, `lockLocked=true`, `currentJob` set with a foreign `jobId`, `ownJobId` null → `lockConflict === true`. Pins that the flag doesn't accidentally hide real conflicts.
   3. Terminal clear: after `applyJobDone`, `pendingOwnFlashStart === false`. Mutation-verify: revert the clear in `applyJobDone` and confirm a downstream test (foreign-flash detection after our own job ended) fails.
 
-- [ ] **Pipeline + commit.** format + lint + build + vitest. Light plan, no QA-plan update needed — manual verification is the same upload-mode flash that surfaced the bug.
+- [x] **Pipeline + commit.** format + lint + build + vitest. Light plan, no QA-plan update needed — manual verification is the same upload-mode flash that surfaced the bug.
 
 ## Files touched
 
