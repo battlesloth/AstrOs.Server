@@ -86,12 +86,9 @@ export async function handleFirmwareUpload(
     };
     res.status(200).json(body);
   } catch (err) {
-    // FirmwareUploadValidationError = operator-fixable (bad header, project
-    // mismatch, unparseable version) → 400. Anything else = server-side IO
-    // (mkdir, rename, fs read) → 500. The store has already unlinked
-    // tempPath on its way out. Routing on `instanceof` rather than message
-    // text means a future rename of an error string can't silently flip the
-    // status code.
+    // Operator-fixable validation → 400; server-side IO → 500. The store
+    // has already unlinked tempPath. Routing on `instanceof` (not
+    // message text) so a renamed error string can't flip the status.
     const detail = err instanceof Error ? err.message : String(err);
     if (err instanceof FirmwareUploadValidationError) {
       logger.warn(`firmware upload rejected (${err.code}): ${detail}`);

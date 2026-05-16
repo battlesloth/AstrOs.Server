@@ -380,11 +380,8 @@ describe('FirmwareUploadStore.store()', () => {
   });
 
   it('throws FirmwareUploadValidationError with the right discriminator code for each operator-fixable failure', async () => {
-    // The controller routes 400 vs 500 by `instanceof FirmwareUploadValidationError`.
-    // Pin both the class and the `code` discriminator so a regression that
-    // threw a plain Error (or threw the wrong code) would silently promote a
-    // 400 to a 500 — masking an operator's "fix your file and retry" path
-    // behind a generic server error.
+    // The controller routes 400 vs 500 by `instanceof`. A regression that
+    // threw a plain Error (or the wrong code) would silently promote 400 → 500.
     const cases: { name: string; tempPath: string; expectedCode: string }[] = [
       {
         name: 'too_short',

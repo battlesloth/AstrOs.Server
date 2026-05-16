@@ -754,11 +754,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // server reads `req.body?.reason`, so the body must transmit.
       await apiClient.delete(FIRMWARE_FLASH, { data: { reason } });
     } catch (error) {
-      // 404 = the server has no active job (terminal-reaped, race with
-      // heartbeat-driven lock release, or never-started). The WS surface
-      // has already driven the UI to its terminal state; surfacing a
-      // "flash may still be running" warning here would be actively wrong.
-      // Swallow silently.
+      // 404 = no active job server-side (terminal-reaped, race with
+      // heartbeat release, or never-started). WS already drove the UI to
+      // a terminal state — silent swallow.
       const status =
         typeof error === 'object' && error !== null && 'response' in error
           ? (error as { response?: { status?: number } }).response?.status
@@ -766,9 +764,8 @@ export const useFirmwareStore = defineStore('firmware', () => {
       if (status === 404) {
         return;
       }
-      // Any other failure (network, 5xx) still warrants the breadcrumb —
-      // phase truth comes from the WS surface (don't transition here), but
-      // a flashError tells the operator the cancel didn't take effect.
+      // Network / 5xx still warrants a breadcrumb so the operator knows
+      // the cancel didn't take.
       console.warn('firmware.cancelFlash failed', error);
       setFlashError({
         reason: 'network_error',

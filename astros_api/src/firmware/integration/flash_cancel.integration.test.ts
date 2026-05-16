@@ -71,14 +71,9 @@ describe('integration: cancel during upload + deploy', () => {
       //    for FW_TRANSFER_BEGIN_ACK indefinitely (well, the streamer's
       //    1500ms begin-ack timeout — but we cancel well before that fires).
 
-      // 4. POST flash. Post-async-start, `orchestrator.start()` returns
-      //    once sync setup completes (lock + source resolve + flashJobStarted
-      //    emit + streamer spawn); the upload + deploy-arming run in a
-      //    background IIFE. The streamer rejection from a later abort lands
-      //    in that IIFE's catch and surfaces ONLY on the WS surface, not
-      //    on the HTTP response (which has already been 200'd). Kick the
-      //    POST off without awaiting and use the `flashJobStarted` WS
-      //    event as the "job is in flight" signal.
+      // 4. POST flash. `start()` returns once sync setup finishes; the
+      //    upload runs in a background IIFE. The abort rejection lands in
+      //    that IIFE's catch and surfaces via WS, not on the HTTP response.
       const flashPromise = fetch(`${harness.httpBaseUrl}/api/firmware/flash`, {
         method: 'POST',
         headers: {
@@ -131,12 +126,9 @@ describe('integration: cancel during upload + deploy', () => {
       expect(failedEvent.data.reason).toBe('aborted');
       expect(failedEvent.data.abortReason).toBe('aborted');
 
-      // Post-async-start: HTTP returned 200 immediately when sync setup
-      // completed (lock acquired, source resolved, flashJobStarted emitted).
-      // The streamer rejection from the abort lands in the background
-      // runInProgress and surfaces via the `flashJobFailed` WS event the
-      // test already asserted on above — NOT via the HTTP response. Drain
-      // the body so the connection isn't left dangling at suite teardown.
+      // HTTP returned 200 from sync setup; the abort surfaces via WS
+      // (already asserted above). Drain the body so the connection
+      // doesn't dangle at teardown.
       const flashRes = await flashPromise;
       expect(flashRes.status).toBe(200);
       await flashRes.json().catch(() => undefined);

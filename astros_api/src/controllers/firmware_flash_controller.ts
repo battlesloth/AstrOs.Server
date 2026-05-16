@@ -88,27 +88,13 @@ export async function startFlashJob(
     res.status(200);
     res.json(result);
   } catch (error) {
-    // After the async-start refactor (c.6c.1), only PRE-spawn failures
-    // surface synchronously here. The sync-reachable typed
-    // FlashOrchestratorError reasons are: controllers validation
-    // (`no_controllers`, `controllers_unknown`, `variant_mismatch`,
-    // `variant_unknown`), source resolution (`release_not_found`,
-    // `asset_not_found`, `no_upload`, `release_lookup_failed`,
-    // `source_resolution_failed`), `controllers_lookup_failed` (DB
-    // failure from `listFlashTargets`), and `job_already_running` (thrown
-    // BEFORE the orchestrator's try at the lock-acquire site). Of those,
-    // `controllers_lookup_failed` is the sync-reachable 500;
-    // `release_lookup_failed` and `source_resolution_failed` are the
-    // sync-reachable 502s.
-    //
-    // Post-`flashJobStarted` failures (`bus_send_failed`,
-    // `subscriber_attach_failed`, `protocol_violation`, the 12 c.6b
-    // TransferErrorCodes, `streamer_unknown_error`) all fire inside the
-    // orchestrator's background IIFE, AFTER `start()` has already
-    // resolved and HTTP has returned 200. They cannot reach this catch;
-    // the operator-facing truth source for them is the `flashJobFailed`
-    // WS event emitted by `failJob`. The corresponding entries in
-    // `REASON_HTTP_STATUS` remain for type exhaustiveness.
+    // Only pre-spawn failures reach this catch — controllers validation,
+    // source resolution, `controllers_lookup_failed`, and
+    // `job_already_running`. Post-`flashJobStarted` failures fire inside
+    // the orchestrator's background IIFE, after `start()` resolved and
+    // HTTP returned 200; the operator-facing truth source for them is
+    // the `flashJobFailed` WS event. Those entries remain in
+    // `REASON_HTTP_STATUS` only for type exhaustiveness.
     if (error instanceof FlashOrchestratorError) {
       const status = REASON_HTTP_STATUS[error.reason];
       if (status === 409) {

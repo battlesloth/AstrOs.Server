@@ -35,21 +35,14 @@ export interface StoredUpload {
   meta: StoredUploadMeta;
 }
 
-// Wire shape of POST /api/firmware/upload — the success body the
-// controller returns to the operator. `Omit<…, 'path'>` strips the
-// server-internal absolute filesystem path while keeping the rest of
-// `StoredUpload` definitionally derived: any field added to
-// `StoredUpload` (or to `StoredUploadMeta`, since `meta` is included
-// here) propagates onto the wire automatically. Renaming `path` would
-// require updating this clause; adding a non-path field requires nothing.
+// Success body for POST /api/firmware/upload. `Omit<…, 'path'>` strips
+// the server-internal filesystem path; any other `StoredUpload` field
+// added later propagates onto the wire automatically.
 export type FirmwareUploadResponse = Omit<StoredUpload, 'path'>;
 
-// Discriminated codes the controller writes into the `error` field on a
-// failure response. The Vue side (`FIRMWARE_UPLOAD_ERROR_CODES` in
-// `astros_vue/src/types/firmware.ts`) is a hand-maintained mirror —
-// adding or renaming a code here does NOT trigger a compile error on the
-// Vue side; both sides have to be updated together, same convention as
-// every other hand-mirrored type in the codebase.
+// Error-response discriminator codes. Hand-mirrored on the Vue side
+// (`FIRMWARE_UPLOAD_ERROR_CODES` in `astros_vue/src/types/firmware.ts`);
+// both sides must be updated together.
 export const FIRMWARE_UPLOAD_ERROR_CODES = [
   'invalid_body',
   'upload_io_failed',

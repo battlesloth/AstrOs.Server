@@ -130,8 +130,7 @@ describe('AstrosFirmwareConfirmModal downgrade ack region', () => {
     expect(confirm.attributes('disabled')).toBeDefined();
 
     await wrapper.find('[data-test="downgrade-ack-checkbox"]').setValue(true);
-    // Re-query after the DOM update — the wrapper handle from before the
-    // setValue may not reflect post-reactivity attribute state.
+    // Re-query so the wrapper sees the post-reactivity disabled attr.
     expect(wrapper.find('[data-test="confirm-button"]').attributes('disabled')).toBeUndefined();
   });
 

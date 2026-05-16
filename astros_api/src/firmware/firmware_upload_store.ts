@@ -71,15 +71,9 @@ function pathsFor(rootDir: string, uploadId: string): UploadPathTriple {
   };
 }
 
-// Typed error for operator-fixable upload failures — the four
-// `FirmwareUploadValidationCode` cases listed below: bad esp_app_desc
-// header (any failure mode parseEspAppDesc can throw), buffer too short
-// to reach the descriptor offset, project-name mismatch, or unparseable
-// version. The controller maps `instanceof FirmwareUploadValidationError`
-// to HTTP 400; any other throw (IO, permissions, EXDEV) maps to 500.
-// Replacing the previous "regex on error-message text" coupling — a
-// rename of the message string would otherwise silently flip a 400 to a
-// 500.
+// Typed error for operator-fixable upload failures. The controller maps
+// `instanceof FirmwareUploadValidationError` to HTTP 400; everything
+// else (IO, permissions, EXDEV) maps to 500.
 export type FirmwareUploadValidationCode =
   | 'invalid_header'
   | 'too_short'

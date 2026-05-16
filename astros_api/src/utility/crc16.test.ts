@@ -52,12 +52,7 @@ describe('crc16CcittFalseHex', () => {
   });
 
   it('pads a small CRC to 4 chars (two leading zeros)', () => {
-    // Pick an input whose CRC actually needs padding. crc16CcittFalse(0x0E)
-    // = 0x003E (verified externally against the standard CRC-16/CCITT-FALSE
-    // poly=0x1021/init=0xFFFF reference). The output must be '003e', not
-    // '3e' — a regression that dropped the `.padStart(4, '0')` formatter
-    // call would diverge here even though the wire-protocol-canonical
-    // '29b1' case above never exercises the pad.
+    // crc16([0x0E]) = 0x003E — actually exercises `.padStart(4, '0')`.
     expect(crc16CcittFalseHex(Buffer.from([0x0e]))).toBe('003e');
   });
 });

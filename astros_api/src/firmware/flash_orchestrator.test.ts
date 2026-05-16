@@ -545,16 +545,6 @@ describe('createFlashProgressThrottle', () => {
 
 describe('DEFAULT_STREAMER_CONFIG (production wiring)', () => {
   it('pins the four production-tuned values against silent regression to TRANSPORT_DEFAULTS', () => {
-    // These values are chosen against the master's processing-bound ~1
-    // chunk/sec rate observed at the bench (see the inline rationale
-    // block in the orchestrator next to the export and the stop-and-wait
-    // plan at .docs/plans/20260516-1433-chunk-streamer-ack-timeout-for-
-    // full-window.md). A mutation that dropped the config override —
-    // reverting to TRANSPORT_DEFAULTS (windowSize=16, ackTimeoutMs=15_000,
-    // maxRetriesPerChunk=5, transferTimeoutMs=300_000) — would silently
-    // regress the 10-min watchdog to 5 min and reintroduce the
-    // OUT_OF_ORDER NAK cascade. Pin so the regression shows up in CI
-    // rather than in the next bench run.
     expect(DEFAULT_STREAMER_CONFIG).toEqual({
       windowSize: 1,
       ackTimeoutMs: 5_000,
@@ -564,13 +554,10 @@ describe('DEFAULT_STREAMER_CONFIG (production wiring)', () => {
   });
 
   it('defaultStreamerFactory spreads DEFAULT_STREAMER_CONFIG into the constructed ChunkStreamer (factory-drop-through pin)', () => {
-    // A mutation that dropped the `config: { ... }` argument from the
-    // factory (e.g., `new ChunkStreamer({ bus })` alone) would leave
-    // DEFAULT_STREAMER_CONFIG correct on its own but silently revert
-    // production to TRANSPORT_DEFAULTS. Inspect the constructed
-    // streamer's private `config` field (test-only escape — the field is
-    // typed as `private readonly` but accessible at runtime) to pin the
-    // factory→streamer wiring, not just the constant.
+    // The constant alone doesn't catch a `new ChunkStreamer({ bus })`
+    // that drops the override and silently reverts to TRANSPORT_DEFAULTS.
+    // Inspect the constructed streamer's private `config` field (test-
+    // only runtime escape; the field is typed `private readonly`).
     const bus = {
       send: () => undefined,
       subscribeFwAcks: () => () => undefined,
@@ -872,21 +859,10 @@ describe('FlashJobOrchestrator', () => {
   });
 
   it('start() resolves BEFORE streamer.run() settles — HTTP must not block on the long transfer', async () => {
-    // Headline contract of the c.6c.1 async-start refactor (see
-    // `.docs/plans/20260516-1617-flash-orchestrator-async-start.md`):
-    // start() returns once the synchronous setup (lock acquire, source
-    // resolve, flashJobStarted emit, AbortController arm, streamer spawn)
-    // is done. The upload + deploy-arming work runs in a background IIFE
-    // assigned to `runInProgress`. Pre-refactor, start() awaited
-    // streamer.run() inline, wedging the HTTP handler for the full 5–10
-    // minute transfer.
-    //
-    // Every OTHER test in this file resolves the streamer BEFORE awaiting
-    // startPromise, so a regression that re-awaited streamer.run() inline
-    // would silently pass them all. Pin the contract by racing startPromise
-    // against a deadline with the streamer INTENTIONALLY UNSETTLED. The
-    // sync setup runs in single-digit milliseconds; 250 ms is generous and
-    // still well under the test-runner's default failure timeout.
+    // Every other test resolves the streamer before awaiting startPromise,
+    // so a regression that re-awaited streamer.run() inline would still
+    // pass them. Race startPromise against a deadline with the streamer
+    // intentionally unsettled to pin the early-return contract.
     const fx = setupHappyPath();
 
     const startPromise = fx.orchestrator.start(fx.request);
@@ -897,8 +873,7 @@ describe('FlashJobOrchestrator', () => {
     );
     const result = await Promise.race([startPromise, sentinel]);
     expect(result.jobId).toMatch(/^[0-9a-f-]{36}$/);
-    // Background work is still in flight — settle the streamer and drain
-    // the IIFE so this test doesn't leak state into the next one.
+    // Drain the still-in-flight IIFE so state doesn't leak into the next test.
     fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
     await fx.orchestrator.awaitRunInProgressForTest();
   });
@@ -1155,13 +1130,9 @@ describe('FlashJobOrchestrator', () => {
   });
 
   it('rejects with controllers_unknown when the requested MAC list contains entries missing from the variant store', async () => {
-    // The operator's selection in the UI carries MACs that the server's
-    // variant cache must contain — otherwise the chunk_streamer can't address
-    // the controller and the operator should see a specific error. The
-    // detail string enumerates the missing MACs so the operator can diagnose
-    // ("wait one poll cycle for the late-joining controller" vs "the device
-    // is offline"). Distinct from `no_controllers` (which now correctly
-    // means the HTTP body had an empty array).
+    // Distinct from `no_controllers` (empty request). Detail enumerates
+    // the missing MACs so the operator can diagnose late-joining vs
+    // offline controllers.
     const fx = setupHappyPath({
       controllers: [{ id: 'controller-a', variant: 'lolin_d32_pro' }],
       request: {
@@ -1178,12 +1149,8 @@ describe('FlashJobOrchestrator', () => {
     }
     expect(caught).toBeInstanceOf(FlashOrchestratorError);
     expect((caught as FlashOrchestratorError).reason).toBe('controllers_unknown');
-    // Exact format: `${ghost1}, ${ghost2}` — comma-space separator, in the
-    // order the request listed them. The HTTP layer surfaces this verbatim
-    // in the response body's `detail`; the operator-facing copy depends on
-    // a parseable separator. A mutation from `.join(', ')` to `.join(' ')`
-    // or `.join('\n')` would still pass a `.toContain` check but produce
-    // unparseable diagnostic copy on the wire.
+    // Exact comma-space separator in request order — `.toContain` would
+    // miss a join-separator mutation that produces unparseable copy.
     expect((caught as FlashOrchestratorError).detail).toBe(
       'controller-ghost-1, controller-ghost-2',
     );
@@ -2913,11 +2880,9 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('failJob is load-bearing: TransferError without bucket-B handling would skip controller cleanup (mutation-discipline pin)', async () => {
-      // If `routeStartFailure` dropped its `else if (err instanceof
-      // TransferError)` branch, a streamer rejection would fall through
-      // with NO flashJobFailed and NO per-controller failNonTerminal
-      // cleanup. This test pins both: TransferError fires a typed
-      // flashJobFailed AND transitions every controller to Failed.
+      // If `routeStartFailure` lost its `instanceof TransferError` branch,
+      // the rejection would fall through with no flashJobFailed and no
+      // per-controller failNonTerminal cleanup.
       const fx = setupHappyPath();
       const startPromise = fx.orchestrator.start(fx.request);
       await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
@@ -3100,10 +3065,8 @@ describe('FlashJobOrchestrator', () => {
       // Subscriber disposed.
       expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
 
-      // Each non-terminal controller transitioned to Failed; the error
-      // string carries `${reason}: ${detail}` from failJob — `aborted` is
-      // the typed FlashOrchestratorErrorReason, `operator-cancel` is the
-      // operator-supplied cancel trigger.
+      // Each non-terminal controller → Failed with `${reason}: ${detail}`
+      // from failJob (aborted = typed reason, operator-cancel = trigger).
       const newResults = controllerResults(fx.emitWs).slice(baselineResults);
       expect(newResults).toHaveLength(2);
       for (const r of newResults) {
@@ -3114,11 +3077,9 @@ describe('FlashJobOrchestrator', () => {
         }
       }
 
-      // flashJobFailed emitted with reason='aborted' AND abortReason
-      // carrying the cancel trigger. Pre-c.6c.1 (round-2 review) this path
-      // emitted only `abortReason` — the missing `reason` made the Vue
-      // banner fall back to `internal_server_error` for the operator's own
-      // cancel. Routing through failJob with reason='aborted' fixes that.
+      // flashJobFailed carries the typed reason so the Vue banner maps
+      // through `KNOWN_FLASH_ERROR_REASONS` instead of the
+      // `internal_server_error` fallback.
       const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
       expect(failed).toHaveLength(1);
       expect(failed[0].data).toMatchObject({

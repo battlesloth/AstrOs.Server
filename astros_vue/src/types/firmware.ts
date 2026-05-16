@@ -49,11 +49,7 @@ export interface UploadedFirmware {
   sizeBytes: number;
 }
 
-/**
- * Mirror of the server's `StoredUploadMeta`
- * (`astros_api/src/models/firmware/upload.ts`). Hand-maintained; same
- * convention as `ServerFwStage` below.
- */
+/** Mirror of the server's `StoredUploadMeta`. Hand-maintained. */
 export interface FirmwareUploadMeta {
   uploadId: string;
   originalFilename: string;
@@ -63,25 +59,15 @@ export interface FirmwareUploadMeta {
   sizeBytes: number;
 }
 
-/**
- * Mirror of the server's `FirmwareUploadResponse`
- * (success body of POST /api/firmware/upload). Source of truth:
- * `astros_api/src/models/firmware/upload.ts`.
- */
+/** Mirror of the server's `FirmwareUploadResponse` (POST
+ *  /api/firmware/upload success body). */
 export interface FirmwareUploadResponse {
   sha256: string;
   sizeBytes: number;
   meta: FirmwareUploadMeta;
 }
 
-/**
- * Hand-mirrored from the server's `FIRMWARE_UPLOAD_ERROR_CODES`
- * (`astros_api/src/models/firmware/upload.ts`). Today the Vue store
- * maps any upload failure through `FlashErrorReason` directly — the
- * server's sub-discriminator (`FirmwareUploadValidationCode`) is logged
- * server-side but never propagated to the wire, so this union exists
- * only to type the controller's `error` field on the error envelope.
- */
+/** Mirror of the server's `FIRMWARE_UPLOAD_ERROR_CODES`. Hand-maintained. */
 export type FirmwareUploadErrorCode =
   | 'invalid_body'
   | 'upload_io_failed'
@@ -169,11 +155,8 @@ export const FLASH_ERROR_REASONS = [
   'subscriber_attach_failed',
   'protocol_violation',
   'streamer_unknown_error',
-  // 'aborted' surfaces when the operator (or another job-owner) cancels an
-  // in-flight flash. Both cancel paths — upload-phase and deploy-phase —
-  // route through `failJob` with reason='aborted', so the banner shows
-  // operator-facing "Cancelled" copy rather than the generic
-  // "internal_server_error" fallback.
+  // Both cancel paths route through `failJob` with reason='aborted' so
+  // the banner shows "Cancelled" copy rather than `internal_server_error`.
   'aborted',
   'internal_server_error',
   'network_error',

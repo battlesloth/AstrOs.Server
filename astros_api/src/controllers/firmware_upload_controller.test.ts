@@ -142,10 +142,7 @@ describe('Firmware Upload Controller — POST /api/firmware/upload', () => {
   });
 
   it('returns 400 invalid_firmware when store() throws FirmwareUploadValidationError (project mismatch)', async () => {
-    // Controller routes 400 vs 500 by `instanceof FirmwareUploadValidationError`,
-    // not by message text. Pin all four validation codes so a regression that
-    // promoted one to a plain Error (or threw the wrong class) would 500
-    // instead of giving the operator a fixable 400.
+    // Controller routes 400 vs 500 by `instanceof`, not message text.
     store.store.mockRejectedValueOnce(
       new FirmwareUploadValidationError(
         'project_mismatch',

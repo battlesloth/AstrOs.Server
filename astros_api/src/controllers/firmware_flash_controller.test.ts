@@ -164,12 +164,8 @@ describe('Firmware Flash Controller', () => {
     });
 
     it('returns 400 with the missing-MAC list on controllers_unknown', async () => {
-      // Pin the HTTP-status routing for `controllers_unknown` — the
-      // exhaustive `Record<FlashOrchestratorErrorReason, HttpStatus>` type
-      // catches a removal from the map at compile time, but a value
-      // mutation (`controllers_unknown: 500`) would only show up in
-      // production. The orchestrator-side test already covers the throw;
-      // this pins the HTTP leg.
+      // Type-level exhaustiveness catches removal from REASON_HTTP_STATUS;
+      // this pin catches a value mutation (e.g., 400 → 500).
       orchestrator.start.mockRejectedValueOnce(
         new FlashOrchestratorError('controllers_unknown', 'aa:bb:cc:dd:ee:01, aa:bb:cc:dd:ee:02'),
       );
