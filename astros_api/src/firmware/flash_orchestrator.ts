@@ -452,7 +452,28 @@ const defaultClock: Clock = {
 };
 
 function defaultStreamerFactory(opts: { bus: SerialBus }): Streamer {
-  return new ChunkStreamer({ bus: opts.bus });
+  // Production deployment overrides `windowSize` to 1 — stop-and-wait —
+  // because the AstrOs master is processing-bound (astrosRxTask shares
+  // CPU with poll / heartbeat / I2C work and lands ~1 chunk/sec, not
+  // wire-rate ~2 chunks/sec). A larger window doesn't earn throughput
+  // when processing is the bottleneck, and it actively creates
+  // OUT_OF_ORDER NAK cascades when timers fire on chunks still queued
+  // behind earlier ones on the host's UART out. With one chunk in
+  // flight, that cascade is structurally impossible.
+  //
+  // `ackTimeoutMs: 5_000` gives ~5× margin over the observed ~1 s
+  // round-trip; `maxRetriesPerChunk: 3` × 5 s = 15 s before
+  // chunk_retry_exhausted (well under the 300 s transfer watchdog).
+  //
+  // If the master ever gets fast enough for the wire to become the
+  // bottleneck, bump `windowSize` (and recompute the matching
+  // `ackTimeoutMs`). The streamer's sliding-window machinery is fully
+  // exercised by its tests against `TRANSPORT_DEFAULTS.windowSize=16`,
+  // so this is a one-line config change rather than a feature rebuild.
+  return new ChunkStreamer({
+    bus: opts.bus,
+    config: { windowSize: 1, ackTimeoutMs: 5_000, maxRetriesPerChunk: 3 },
+  });
 }
 
 export class FlashJobOrchestrator {

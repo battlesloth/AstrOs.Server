@@ -75,11 +75,11 @@ Tests that exercise multi-chunk in-flight behavior need to explicitly opt into a
 
 - [ ] **Bench validation (superseded — see task 6).** Original plan was to bench-validate `bc762fd`. That bench run still cascaded, which triggered the revised approach above. Skip directly to task 4 below.
 
-- [ ] **Switch to `windowSize: 1` + revert value drift.** In `chunk_streamer.ts`: set `windowSize: 1`, `ackTimeoutMs: 5_000`, `maxRetriesPerChunk: 3`. Rewrite the rationale comment above `TRANSPORT_DEFAULTS` to explain stop-and-wait + processing-bound link (not the old wire-time math). Revert the END_ACK race comment at the former line ~939 to reference 5 000 ms.
+- [x] **Switch to `windowSize: 1` — placement choice.** First attempt put the change in `TRANSPORT_DEFAULTS`, which broke 23/57 streamer tests (sliding-window machinery is the streamer's documented surface, exercised throughout). Pivoted: leave `TRANSPORT_DEFAULTS` at the bc762fd state (windowSize=16, ackTimeoutMs=15_000, maxRetriesPerChunk=5) and put the production override in `defaultStreamerFactory` at `flash_orchestrator.ts:454`. Cleaner division — the streamer stays a general sliding-window transport; the AstrOs deployment selects stop-and-wait. Added a cross-reference comment in `TRANSPORT_DEFAULTS` pointing readers to the factory.
 
-- [ ] **Audit tests for multi-chunk-in-flight assumptions.** Sweep `chunk_streamer.test.ts` for tests that depend on `windowSize > 1` — primarily the "concurrent in-flight chunks time out independently" test (~line 1320) and any backpressure tests that pipeline multiple chunks. Each such test must explicitly pass `windowSize: <N>` in its `config:` override (consistent with the per-test `ackTimeoutMs` / `maxRetriesPerChunk` pinning pattern). Also revisit the watchdog describe comment math one more time — with the smaller defaults, `maxRetriesPerChunk: 3 × ackTimeoutMs: 5_000 = 15 000 ms`, much less than the 75 s we just put in.
+- [x] **Audit tests for multi-chunk-in-flight assumptions.** Moot under the placement choice above — `TRANSPORT_DEFAULTS` is unchanged, so tests continue to exercise sliding-window behavior. Full suite passes (771/771).
 
-- [ ] **Verify the suite + code review.** `prettier:write && lint:fix && build && vitest run`. Dispatch the code-reviewer agent on the new diff vs `bc762fd`. Same gating as task 3 — no Critical / Important findings allowed before commit.
+- [ ] **Code review + commit.** Dispatch the code-reviewer agent on the diff vs `bc762fd`. Same gating as task 3 — no Critical / Important findings allowed before commit. Build + lint + test already green.
 
 - [ ] **Bench validation (stop-and-wait).** Rebuild server, re-flash. Expected: zero `onChunkNak OUT_OF_ORDER` events, ESP-side monotonic seq progression with no retransmits below `highestSeq`, total transfer time ~3-4 minutes.
 
@@ -89,10 +89,11 @@ Tests that exercise multi-chunk in-flight behavior need to explicitly opt into a
 
 ## Files touched
 
-- `astros_api/src/firmware/chunk_streamer.ts` — `windowSize: 1`, `ackTimeoutMs: 5_000`, `maxRetriesPerChunk: 3`, rewritten rationale comment, reverted END_ACK race comment
-- `astros_api/src/firmware/chunk_streamer.test.ts` — explicit `windowSize` override on multi-chunk tests; refreshed watchdog comment math
-- `astros_api/src/api_server.ts` — revert investigation DIAG logging (final cleanup task)
-- `astros_api/src/serial/message_handler.ts` — revert investigation DIAG logging (final cleanup task)
+- `astros_api/src/firmware/chunk_streamer.ts` — cross-reference NOTE in `TRANSPORT_DEFAULTS` comment pointing to `defaultStreamerFactory`. Defaults unchanged from bc762fd.
+- `astros_api/src/firmware/flash_orchestrator.ts` — `defaultStreamerFactory` passes `{ windowSize: 1, ackTimeoutMs: 5_000, maxRetriesPerChunk: 3 }` with rationale comment explaining the AstrOs deployment's processing-bound link.
+- `astros_api/src/firmware/chunk_streamer.test.ts` — no change in this round (the placement pivot avoided test churn).
+- `astros_api/src/api_server.ts` — revert investigation DIAG logging (final cleanup task).
+- `astros_api/src/serial/message_handler.ts` — revert investigation DIAG logging (final cleanup task).
 
 ## Out of scope
 

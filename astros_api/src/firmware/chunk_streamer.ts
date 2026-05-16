@@ -69,6 +69,13 @@ import { SerialMessageType } from '../serial/serial_message.js';
 // ~480 ms on the wire, so a windowSize=16 fill puts the last chunk
 // ~7.2 s behind its timer-arm time. 15 000 ms gives ~2× margin over that
 // bound. If `windowSize` or the link baud changes materially, recompute.
+//
+// NOTE: production wiring overrides `windowSize` to 1 (stop-and-wait) at
+// `defaultStreamerFactory` in `flash_orchestrator.ts` — see the comment
+// there for why the current AstrOs master+UART deployment doesn't benefit
+// from a wider window. These defaults stay tuned for the general
+// sliding-window case so the streamer's tests (which exercise window > 1
+// behavior) keep working without per-test overrides.
 export const TRANSPORT_DEFAULTS: TransportConfig = {
   chunkSizeBytes: 4096,
   windowSize: 16,
