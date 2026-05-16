@@ -511,6 +511,15 @@ export class FlashJobOrchestrator {
   private phase: 'upload' | 'deploy' | 'done' | null = null;
   private readonly messageGenerator = new MessageGenerator();
 
+  // Rotating uint8 transfer-id. Protocol-doc canonical (`uint8 transfer-id`
+  // — see AstrOs.ESP `.docs/protocol.md` ESP-NOW section + every serial
+  // field-layout entry). Single-slot semantics (JobLock prevents concurrent
+  // transfers) means 256-deep collision-free history; a wrap-around would
+  // only collide with an already-completed transfer, and the firmware's
+  // BulkReceiver clears active state on transfer end. Resets to 0 on
+  // server boot — no in-flight transfer survives restart anyway.
+  private nextTransferId = 0;
+
   constructor(opts: FlashJobOrchestratorOpts) {
     this.bus = opts.bus;
     this.jobLock = opts.jobLock;
@@ -598,7 +607,8 @@ export class FlashJobOrchestrator {
         throw mapResolveError(err);
       }
 
-      const transferId = uuid_v4();
+      const transferId = String(this.nextTransferId);
+      this.nextTransferId = (this.nextTransferId + 1) & 0xff;
       const targetIds = targetsList.map((c) => c.id);
       const startedAt = new Date(this.clock.now()).toISOString();
       const initialControllers: ControllerFlashState[] = targetIds.map((id) => ({

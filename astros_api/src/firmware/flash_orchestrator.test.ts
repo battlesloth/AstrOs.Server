@@ -770,7 +770,13 @@ describe('FlashJobOrchestrator', () => {
 
     // Return value carries jobId, transferId, source, targets.
     expect(result.jobId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(result.transferId).toMatch(/^[0-9a-f-]{36}$/);
+    // Protocol-doc canonical: `uint8 transfer-id`. Wire is a string of
+    // digits (0..255). The firmware's OtaReceiver parses with
+    // parseStrictU8 and rejects anything else (including a UUID, which is
+    // the bug this assertion previously masked).
+    expect(result.transferId).toMatch(/^[0-9]{1,3}$/);
+    const tid = Number(result.transferId);
+    expect(Number.isInteger(tid) && tid >= 0 && tid <= 255).toBe(true);
     expect(result.source).toEqual({
       kind: 'github',
       version: '1.4.0',
@@ -819,6 +825,33 @@ describe('FlashJobOrchestrator', () => {
     expect(fx.jobLock.isLocked()).toBe(true);
     expect(fx.jobLock.getOwner()).toBe(result.jobId);
     expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+  });
+
+  it('transferId rotates as a uint8 counter across successive jobs (wire-format protocol contract)', async () => {
+    // Pin the counter-not-constant invariant: two back-to-back start()
+    // calls must produce DIFFERENT transferIds, in sequential order. A
+    // mutation that hardcoded `transferId = "0"` (or any constant) would
+    // pass the format regex above but fail this — two transfers with the
+    // same id would confuse the firmware's BulkReceiver across job
+    // boundaries.
+    const fx = setupHappyPath();
+
+    const firstPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+    fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+    const first = await firstPromise;
+    // Complete the deploy phase + reboot wait so the next start() can
+    // acquire the lock. cancelFlash() forces an abort and releases.
+    await fx.orchestrator.cancel('test-cleanup');
+
+    const secondPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(2));
+    fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[1].spec));
+    const second = await secondPromise;
+
+    const firstId = Number(first.transferId);
+    const secondId = Number(second.transferId);
+    expect(secondId).toBe((firstId + 1) & 0xff);
   });
 
   it('happy path (upload source): displayName comes from upload originalFilename; FW_DEPLOY_BEGIN sent', async () => {

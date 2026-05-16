@@ -123,9 +123,7 @@ describe('Firmware Upload Controller — POST /api/firmware/upload', () => {
 
   it('returns 500 upload_io_failed when file.mv() rejects', async () => {
     const file = fakeFile();
-    file.mv = vi.fn((_path: string, cb: (err: Error | null) => void) =>
-      cb(new Error('disk full')),
-    );
+    file.mv = vi.fn((_path: string, cb: (err: Error | null) => void) => cb(new Error('disk full')));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const req: any = { files: { file } };
     const res = mockRes();

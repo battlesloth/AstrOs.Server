@@ -14,11 +14,11 @@ Keep `transferId: string` everywhere in the TS type surface — the wire is a st
 
 ## Tasks
 
-- [ ] **Orchestrator: rotating uint8 transfer-id.** Replace `const transferId = uuid_v4();` at `flash_orchestrator.ts:601` with a `this.nextTransferId` counter (private field, initialized to 0). On each new transfer: take the current value (as `String(n)`), then increment + wrap (`(n + 1) & 0xff`).
+- [x] **Orchestrator: rotating uint8 transfer-id.** Replace `const transferId = uuid_v4();` at `flash_orchestrator.ts:601` with a `this.nextTransferId` counter (private field, initialized to 0). On each new transfer: take the current value (as `String(n)`), then increment + wrap (`(n + 1) & 0xff`).
 
-- [ ] **Update the test that pins UUID format.** `flash_orchestrator.test.ts:773` asserts the UUID regex. Replace with `/^[0-9]{1,3}$/` AND a numeric range assertion (`Number(result.transferId) >= 0 && < 256`). Add a sibling test for the rotation invariant: two successive flash starts produce sequential transferIds (mutation-verifies that the counter is actually counter-like, not a constant).
+- [x] **Update the test that pins UUID format.** `flash_orchestrator.test.ts:773` asserts the UUID regex. Replace with `/^[0-9]{1,3}$/` AND a numeric range assertion (`Number(result.transferId) >= 0 && < 256`). Add a sibling test for the rotation invariant: two successive flash starts produce sequential transferIds (mutation-verifies that the counter is actually counter-like, not a constant).
 
-- [ ] **Pipeline + commit.** Same active branch (mid-test feedback). Format + lint + build + vitest. Manual: bench-side, restart server, retry flash — the OtaReceiver error should be gone.
+- [x] **Pipeline + commit.** Same active branch (mid-test feedback). Format + lint + build + vitest. Manual: bench-side, restart server, retry flash — the OtaReceiver error should be gone.
 
 ## Files touched
 

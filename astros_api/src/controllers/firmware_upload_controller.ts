@@ -79,8 +79,7 @@ export async function handleFirmwareUpload(
     // route validation failures to 400 and treat the unknown bucket as
     // 500. The store has already unlinked tempPath on its way out.
     const detail = err instanceof Error ? err.message : String(err);
-    const isValidation =
-      /project name mismatch|unparseable|too short|esp_app_desc/i.test(detail);
+    const isValidation = /project name mismatch|unparseable|too short|esp_app_desc/i.test(detail);
     if (isValidation) {
       logger.warn(`firmware upload rejected: ${detail}`);
       res.status(400).json({ error: 'invalid_firmware', detail });
