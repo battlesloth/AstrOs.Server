@@ -10,6 +10,7 @@ function setupStore(opts: {
   selected?: string[];
   flashErrorReason?: string;
   domeStatus?: ControllerStatus;
+  allowDowngrade?: boolean;
 }) {
   setActivePinia(createPinia());
   // Seed the underlying controllerStore — the firmwareStore's `controllers`
@@ -26,6 +27,7 @@ function setupStore(opts: {
   store.sourceMode = 'github';
   store.selectedReleaseTag = opts.target ?? null;
   store.selectedControllerIds = new Set(opts.selected ?? []);
+  if (opts.allowDowngrade) store.allowDowngrade = true;
   if (opts.flashErrorReason !== undefined) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     store.flashError = { reason: opts.flashErrorReason as any };
@@ -117,6 +119,18 @@ export const SelectWithDowngrade: Story = {
     components: { AstrosFirmwareControllersPanel },
     setup() {
       setupStore({ target: 'v1.3.5', selected: ['body', 'core'] });
+      return { args };
+    },
+    template: '<AstrosFirmwareControllersPanel v-bind="args" />',
+  }),
+  args: { phase: 'select' },
+};
+
+export const SelectWithDowngradeAllowed: Story = {
+  render: (args) => ({
+    components: { AstrosFirmwareControllersPanel },
+    setup() {
+      setupStore({ target: 'v1.3.5', selected: ['body', 'core'], allowDowngrade: true });
       return { args };
     },
     template: '<AstrosFirmwareControllersPanel v-bind="args" />',

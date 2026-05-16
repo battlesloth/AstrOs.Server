@@ -106,6 +106,10 @@
         "downgrade_blocked": "⛔ Downgrade blocked",
         "flash_button": "Flash firmware"
       },
+      "allow_downgrade": {
+        "toggle_label": "Allow downgrades",
+        "toggle_help": "Lets you select controllers running newer firmware than the chosen target. Resets when you reload the page."
+      },
       "result_bar": {
         "all_updated": "✓ All {count} controller(s) updated",
         "failed_summary": "⚠ {label} failed during {stage}",

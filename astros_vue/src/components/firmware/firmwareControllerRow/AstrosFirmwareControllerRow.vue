@@ -15,7 +15,15 @@ const pillKind = computed(() =>
   computePillKind({ controller: props.controller, target: props.target }),
 );
 
-const blocked = computed(() => pillKind.value === 'offline' || pillKind.value === 'downgrade');
+// 'offline' (status === 'down') is always blocking — controller is unreachable.
+// 'downgrade' is blocking only when the operator hasn't opted in via the panel's
+// "Allow downgrades" toggle. The split mirrors the store's isHardBlocked vs
+// isDowngrade distinction (reality vs policy).
+const blocked = computed(() => {
+  if (pillKind.value === 'offline') return true;
+  if (pillKind.value === 'downgrade') return !props.allowDowngrade;
+  return false;
+});
 
 const statusDotAriaLabel = computed(() => {
   const statusKey = `firmware_view.controllers.status_${

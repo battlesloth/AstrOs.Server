@@ -5,6 +5,7 @@ import { createI18n } from 'vue-i18n';
 import enUS from '@/locales/enUS.json';
 import AstrosFirmwareControllersPanel from '../AstrosFirmwareControllersPanel.vue';
 import { useControllerStore } from '@/stores/controller';
+import { useFirmwareStore } from '@/stores/firmware';
 import { ControllerStatus } from '@/enums';
 
 function createTestI18n() {
@@ -113,5 +114,99 @@ describe('AstrosFirmwareControllersPanel failed-result-bar predicate', () => {
     const text = wrapper.text();
     expect(text).toContain('failed during the flash');
     expect(text).not.toMatch(/failed during —/);
+  });
+});
+
+describe('AstrosFirmwareControllersPanel allow-downgrade toggle', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('does NOT render the toggle in pure-upgrade flows (anyFleetDowngrade=false)', async () => {
+    // Contextual-reveal contract: when no controller in the fleet would be
+    // downgraded by the target, the toggle stays hidden so the routine path
+    // is uncluttered. A regression that always-rendered the toggle would
+    // teach operators to ignore it.
+    const cs = useControllerStore();
+    cs.bodyStatus = ControllerStatus.UP;
+    cs.coreStatus = ControllerStatus.UP;
+    cs.domeStatus = ControllerStatus.UP;
+    cs.bodyFirmware = 'v1.3.0';
+    cs.coreFirmware = 'v1.3.0';
+    cs.domeFirmware = 'v1.3.0';
+    const fw = useFirmwareStore();
+    fw.sourceMode = 'github';
+    fw.selectedReleaseTag = 'v1.4.2'; // upgrade for all
+
+    const wrapper = mountPanel({ phase: 'select', progressByControllerId: {} });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('Allow downgrades');
+  });
+
+  it('renders the toggle when at least one fleet member would be downgraded', async () => {
+    const cs = useControllerStore();
+    cs.bodyStatus = ControllerStatus.UP;
+    cs.coreStatus = ControllerStatus.UP;
+    cs.domeStatus = ControllerStatus.UP;
+    cs.bodyFirmware = 'v1.3.0';
+    cs.coreFirmware = 'v1.4.0'; // would downgrade to v1.3.5
+    cs.domeFirmware = 'v1.3.0';
+    const fw = useFirmwareStore();
+    fw.sourceMode = 'github';
+    fw.selectedReleaseTag = 'v1.3.5';
+
+    const wrapper = mountPanel({ phase: 'select', progressByControllerId: {} });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Allow downgrades');
+  });
+
+  it("flips firmware.allowDowngrade on @change so the store's policy gate clears", async () => {
+    // Pin the binding direction: a regression that read the store ref but
+    // forgot to write it on change would render the checkbox state correctly
+    // for one render but the click would no-op. This test catches that
+    // exact mutation.
+    const cs = useControllerStore();
+    cs.bodyStatus = ControllerStatus.UP;
+    cs.coreStatus = ControllerStatus.UP;
+    cs.domeStatus = ControllerStatus.UP;
+    cs.bodyFirmware = 'v1.4.0';
+    cs.coreFirmware = 'v1.4.0';
+    cs.domeFirmware = 'v1.4.0';
+    const fw = useFirmwareStore();
+    fw.sourceMode = 'github';
+    fw.selectedReleaseTag = 'v1.3.5'; // all downgrades
+
+    const wrapper = mountPanel({ phase: 'select', progressByControllerId: {} });
+    await wrapper.vm.$nextTick();
+    expect(fw.allowDowngrade).toBe(false);
+
+    await wrapper.find('input[type="checkbox"]').setValue(true);
+    expect(fw.allowDowngrade).toBe(true);
+  });
+
+  it('does NOT render the toggle in non-select phases (flashing/done/failed)', async () => {
+    // The `phase === 'select'` gate around header-actions hides the whole
+    // group during a live flash; the toggle inherits that hiding. Pin so a
+    // refactor that lifts the toggle out of the gate doesn't leak it into
+    // the live-flash header.
+    const cs = useControllerStore();
+    cs.bodyStatus = ControllerStatus.UP;
+    cs.coreStatus = ControllerStatus.UP;
+    cs.domeStatus = ControllerStatus.UP;
+    cs.bodyFirmware = 'v1.4.0';
+    cs.coreFirmware = 'v1.4.0';
+    cs.domeFirmware = 'v1.4.0';
+    const fw = useFirmwareStore();
+    fw.sourceMode = 'github';
+    fw.selectedReleaseTag = 'v1.3.5';
+
+    const wrapper = mountPanel({ phase: 'flashing', progressByControllerId: {} });
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).not.toContain('Allow downgrades');
   });
 });
