@@ -56,7 +56,7 @@ Why source resolution stays in the sync portion: source-not-found is an HTTP-mea
 
 - [x] **Pipeline + code review.** prettier/lint/build/vitest all green. Code-reviewer agent dispatched on the diff vs `e642f9e` — caught a missing test update at `lockReleaseScenarios` ('streamer TransferError' + 'streamer unknown error' drives), a stale `cancel()` upload-phase comment referencing the old `start()` catch path, and the `runInProgress` field's public-by-default visibility despite a comment claiming "MUST NOT be awaited." All three addressed. Full suite: 771/771 passed.
 
-- [ ] **Bench validation.** Re-run an OTA flash. Expected: HTTP POST returns in <2 s (lock + source + flashJobStarted) instead of 7+ min. UI shows "Flashing" immediately with the progress bar driven by `flashControllerUpdate` WS events. Lock-conflict banner does NOT appear at any point (the 30 s POST-timeout window is closed). Flash completes via the same `flashJobDone` / `flashJobFailed` paths as today.
+- [x] **Bench validation.** Confirmed end-to-end on the post-`4b0e081` flash run: HTTP POST returns immediately (no more 30 s `apiClient.post` timeout), UI transitions to "Flashing" without lock-conflict banner appearing, upload progresses to completion. The previously-load-bearing UX bug (banner shows for operator's own flash after 30 s) is closed at the source. One UI bug surfaced during this run unrelated to the orchestrator contract — the "transfer" step rendered green even though the firmware-side transfer-handling isn't implemented yet (Phase 3 is wire-up only; flash-write comes later) — captured as a separate follow-up.
 
 ## Files touched
 
