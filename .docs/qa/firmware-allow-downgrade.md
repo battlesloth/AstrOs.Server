@@ -88,6 +88,10 @@ Tests for the "Allow downgrades" feature: a contextual toggle in the controllers
 
 ## Notes
 
-- The toggle is intentionally session-only; persisting it across reloads would defeat the "deliberate intent" framing. If you'd like persistence (e.g., for a long dev session), say so — it's a small additive change.
+- The toggle is intentionally session-only; persisting it across reloads would defeat the "deliberate intent" framing. The toggle DOES survive `resetToSelect()` (cross-flash retention) — the modal ack remains the last-chance gate on each individual flash, and the toggle's checked state stays visible to the operator so the armed state is observable.
 - The ack region is intentionally rendered as `role="alert"` so screen-reader users hear it announced when it appears. The toggle is `role="checkbox"` (native input) with `aria-describedby` pointing to a `sr-only` help span.
 - No firmware or backend changes are required for this feature; the policy lives entirely in the Vue store and UI.
+
+## Known limitation — pre-existing, not introduced by this feature
+
+If a controller is reachable (status='up' or 'needsSynced') but its firmware version is unknown / unparseable, `compareTags` returns NaN and the downgrade gate fails open: the row is selectable, the toggle doesn't appear (no fleet downgrade detected), and the modal ack region doesn't render. The operator may flash without realizing they are downgrading. This is a long-standing latent issue (predates this feature) — surfaced during the pre-push review. Mitigations being considered for a follow-up: treat unparseable-current as hard-block (`isHardBlocked`), or surface a distinct "unknown firmware" ack in the modal. The em-dash sentinel for `current` (line 129 of `stores/firmware.ts`) is the canonical reproduction.

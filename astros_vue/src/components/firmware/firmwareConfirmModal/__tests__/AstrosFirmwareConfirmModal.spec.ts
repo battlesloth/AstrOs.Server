@@ -77,8 +77,35 @@ describe('AstrosFirmwareConfirmModal downgrade ack region', () => {
       target: 'v1.3.5',
       selectedControllers: [upgradeBody, downgradeCore],
     });
-    expect(wrapper.find('[data-test="downgrade-ack-region"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain('1 controller(s)');
+    const region = wrapper.find('[data-test="downgrade-ack-region"]');
+    expect(region.exists()).toBe(true);
+    // Assert on the interpolated count via word-boundary regex so a future
+    // pluralization refactor (`{count, plural, …}`) doesn't break the test.
+    expect(region.text()).toMatch(/\b1\b/);
+  });
+
+  it('does NOT render the ack region when target is null', () => {
+    // Defensive: target=null is a misuse path (the view doesn't open the
+    // modal until a target is set), but the modal must not crash and the
+    // ack region must stay hidden — there's no downgrade to ack against.
+    const wrapper = mountModal({
+      target: null,
+      selectedControllers: [downgradeCore],
+    });
+    expect(wrapper.find('[data-test="downgrade-ack-region"]').exists()).toBe(false);
+  });
+
+  it('disables Confirm when selectedControllers is empty (defensive)', () => {
+    // Without this gate, opening the modal with no selection (misuse from a
+    // future caller or a test fixture) would render a clickable Confirm.
+    // The parent's canFlash gate stops the actual flash, but the modal
+    // shouldn't lie about its enabled state.
+    const wrapper = mountModal({
+      target: 'v1.4.2',
+      selectedControllers: [],
+    });
+    const confirm = wrapper.findAll('button').find((b) => b.text().includes('Push firmware'));
+    expect(confirm?.attributes('disabled')).toBeDefined();
   });
 
   it('does NOT render the ack region for local-build (upload) target', () => {

@@ -401,27 +401,37 @@ describe('firmware store', () => {
       expect(store.allowDowngrade).toBe(false);
     });
 
-    it('anyDowngradeSelected is true whenever a downgrade is selected, regardless of toggle', () => {
-      // anyDowngradeSelected drives the modal ack — it must NOT be gated on
-      // the toggle. Operator might have toggle on AND a downgrade selected;
-      // the modal still needs to ask for explicit ack.
+    it('survives resetToSelect — cross-flash retention by design', () => {
+      // The toggle is "per-session," not "per-flash." If the operator opts
+      // into dev/debug mode, completing one downgrade flash shouldn't make
+      // them re-tick the toggle for the next one. The modal ack still gates
+      // each individual flash, and the visible toggle state makes the
+      // armed status observable. Only a page reload clears it.
+      const store = useFirmwareStore();
+      store.allowDowngrade = true;
+      store.resetToSelect();
+      expect(store.allowDowngrade).toBe(true);
+    });
+
+    it('stays armed across target changes that transit a pure-upgrade window', () => {
+      // Operator picks a downgrade target → enables toggle → switches to an
+      // upgrade target (toggle disappears via anyFleetDowngrade=false) →
+      // switches back to a downgrade target. The toggle should reappear
+      // already-on (the operator's intent persists), not silently re-disable.
       const store = useFirmwareStore();
       seedSampleFleet();
       store.sourceMode = 'github';
       store.selectedReleaseTag = 'v1.3.5';
-      store.toggle('core'); // downgrade
-      expect(store.anyDowngradeSelected).toBe(true);
       store.allowDowngrade = true;
-      expect(store.anyDowngradeSelected).toBe(true);
-    });
+      expect(store.anyFleetDowngrade).toBe(true);
 
-    it('anyDowngradeSelected is false on a pure-upgrade selection', () => {
-      const store = useFirmwareStore();
-      seedSampleFleet();
-      store.sourceMode = 'github';
-      store.selectedReleaseTag = 'v1.4.2';
-      store.toggle('body'); // upgrade
-      expect(store.anyDowngradeSelected).toBe(false);
+      store.selectedReleaseTag = 'v1.4.2'; // pure-upgrade
+      expect(store.anyFleetDowngrade).toBe(false);
+      expect(store.allowDowngrade).toBe(true);
+
+      store.selectedReleaseTag = 'v1.3.5'; // back to downgrade
+      expect(store.anyFleetDowngrade).toBe(true);
+      expect(store.allowDowngrade).toBe(true);
     });
 
     it('anyFleetDowngrade is true when any controller in the fleet would downgrade, regardless of selection', () => {

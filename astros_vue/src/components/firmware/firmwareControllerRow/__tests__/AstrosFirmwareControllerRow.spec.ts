@@ -54,13 +54,26 @@ describe('AstrosFirmwareControllerRow allow-downgrade interaction', () => {
     setActivePinia(createPinia());
   });
 
-  it('disables the checkbox on downgrade when allowDowngrade is false (or omitted)', () => {
+  it('disables the checkbox on downgrade when allowDowngrade is omitted', () => {
+    // Optional prop defaults to falsy; the row should treat that as "policy
+    // still blocks." A separate test below covers explicit `false`.
     const wrapper = mountRow({
       controller: downgradeController,
-      target: 'v1.3.5', // downgrade
+      target: 'v1.3.5',
       mode: 'select',
       selected: false,
-      // allowDowngrade omitted — defaults to falsy
+    });
+    const checkbox = wrapper.find('input[type="checkbox"]');
+    expect(checkbox.attributes('disabled')).toBeDefined();
+  });
+
+  it('disables the checkbox on downgrade when allowDowngrade is explicitly false', () => {
+    const wrapper = mountRow({
+      controller: downgradeController,
+      target: 'v1.3.5',
+      mode: 'select',
+      selected: false,
+      allowDowngrade: false,
     });
     const checkbox = wrapper.find('input[type="checkbox"]');
     expect(checkbox.attributes('disabled')).toBeDefined();

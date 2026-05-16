@@ -56,14 +56,18 @@ const downgradeControllers = computed<FirmwareControllerView[]>(() => {
   });
 });
 
-// Per-mount ack ref. Reset on each modal open (see watcher above). The
-// Confirm button gates on this ref iff any selected controller is a
-// downgrade; pure-upgrade flows render the modal unchanged.
 const downgradeAck = ref(false);
 
 const requiresDowngradeAck = computed(() => downgradeControllers.value.length > 0);
 
-const confirmDisabled = computed(() => requiresDowngradeAck.value && !downgradeAck.value);
+// Confirm is disabled when (a) the operator has opened the modal with an
+// empty selection (a misuse path the parent gate prevents in practice,
+// but the modal shouldn't render a clickable Confirm with nothing to do),
+// or (b) the selection contains a downgrade and the ack isn't ticked.
+const confirmDisabled = computed(
+  () =>
+    props.selectedControllers.length === 0 || (requiresDowngradeAck.value && !downgradeAck.value),
+);
 
 // Browser fires 'cancel' on ESC. Mirror it through our cancel emit so the
 // parent's open ref flips to false.

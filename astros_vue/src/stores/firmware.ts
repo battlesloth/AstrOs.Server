@@ -142,17 +142,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return uploadedFilename.value ? 'local-build' : null;
   });
 
-  // Operator-set escape hatch for the downgrade policy. Defaults to false
-  // (routine flashing rejects downgrades); flipping to true makes downgrade
-  // controllers selectable, allows canFlash to proceed with downgrades in
-  // the selection, and shifts the modal into "ask for explicit ack" mode.
-  // Per-session only — page reload resets it to false. See
-  // `.docs/plans/20260515-2253-firmware-allow-downgrade.md` for rationale.
-  //
-  // Note: uploaded firmware (target === 'local-build') is moot for this
-  // toggle — `compareTags(current, 'local-build')` returns NaN and
-  // `NaN > 0` is false, so uploaded firmware is never classified as
-  // a downgrade. The toggle is a no-op in that mode.
+  // Operator-set escape hatch for the downgrade policy. Defaults to false;
+  // flipping to true makes downgrade rows selectable and shifts the modal
+  // into ack-required mode. Per-session: only a page reload resets it.
+  // Deliberately survives resetToSelect (cross-flash dev workflows) — the
+  // modal ack remains the last-chance gate on each individual flash.
+  // Uploaded firmware ('local-build') is never classified as a downgrade
+  // (compareTags returns NaN), so the toggle is a no-op in upload mode.
   const allowDowngrade = ref(false);
 
   function isDowngrade(controllerId: string): boolean {
@@ -167,10 +163,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // `down` is reality (controller is unreachable); `isDowngrade` is policy
   // (we choose not to install older firmware by default). Splitting them
   // lets the allowDowngrade toggle relax the policy without overriding the
-  // reality.
+  // reality. Unknown ids fail-closed: today FLEET_LAYOUT is static so this
+  // can't fire, but if FLEET_LAYOUT goes dynamic an orphan selectedId would
+  // otherwise slip past canFlash and dispatch a phantom flash target.
   function isHardBlocked(controllerId: string): boolean {
     const c = controllers.value.find((x) => x.id === controllerId);
-    return c?.status === 'down';
+    if (c === undefined) return true;
+    return c.status === 'down';
   }
 
   function isSelectable(controllerId: string): boolean {
@@ -186,12 +185,6 @@ export const useFirmwareStore = defineStore('firmware', () => {
   const anyDowngradeBlocked = computed(
     () => !allowDowngrade.value && [...selectedControllerIds.value].some(isDowngrade),
   );
-
-  // Selection-based: are any selected controllers downgrade targets,
-  // regardless of toggle state? Drives the confirm-modal ack region —
-  // even with the toggle on, the operator must explicitly acknowledge that
-  // they're about to install older firmware on a specific machine.
-  const anyDowngradeSelected = computed(() => [...selectedControllerIds.value].some(isDowngrade));
 
   // Fleet-based: would any controller in the fleet be downgraded by the
   // current target? Drives the contextual reveal of the "Allow downgrades"
@@ -803,7 +796,6 @@ export const useFirmwareStore = defineStore('firmware', () => {
     target,
     allowDowngrade,
     anyDowngradeBlocked,
-    anyDowngradeSelected,
     anyFleetDowngrade,
     canFlash,
     isOwnJob,

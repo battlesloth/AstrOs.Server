@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { createI18n } from 'vue-i18n';
 import enUS from '@/locales/enUS.json';
 import AstrosFirmwareControllersPanel from '../AstrosFirmwareControllersPanel.vue';
+import AstrosFirmwareControllerRow from '../../firmwareControllerRow/AstrosFirmwareControllerRow.vue';
 import { useControllerStore } from '@/stores/controller';
 import { useFirmwareStore } from '@/stores/firmware';
 import { ControllerStatus } from '@/enums';
@@ -186,6 +187,43 @@ describe('AstrosFirmwareControllersPanel allow-downgrade toggle', () => {
 
     await wrapper.find('input[type="checkbox"]').setValue(true);
     expect(fw.allowDowngrade).toBe(true);
+  });
+
+  it('propagates firmware.allowDowngrade down as the row :allow-downgrade prop', async () => {
+    // Integration: the row stub elsewhere in this file masks the actual
+    // binding. Mount with the real row, flip the store ref, and assert the
+    // child receives the updated prop. A regression that dropped or renamed
+    // :allow-downgrade on the row would silently pass every other test.
+    const cs = useControllerStore();
+    cs.bodyStatus = ControllerStatus.UP;
+    cs.coreStatus = ControllerStatus.UP;
+    cs.domeStatus = ControllerStatus.UP;
+    cs.bodyFirmware = 'v1.4.0';
+    cs.coreFirmware = 'v1.4.0';
+    cs.domeFirmware = 'v1.4.0';
+    const fw = useFirmwareStore();
+    fw.sourceMode = 'github';
+    fw.selectedReleaseTag = 'v1.3.5'; // all downgrades
+
+    const wrapper = mount(AstrosFirmwareControllersPanel, {
+      props: { phase: 'select', progressByControllerId: {} } as never,
+      global: {
+        plugins: [createTestI18n()],
+        // No row stub — render the real row so we can read its props.
+        stubs: { AstrosFirmwareButton: { template: '<button><slot /></button>' } },
+      },
+    });
+    await wrapper.vm.$nextTick();
+
+    const rows = wrapper.findAllComponents(AstrosFirmwareControllerRow);
+    const firstRow = rows[0];
+    expect(firstRow).toBeDefined();
+    if (firstRow === undefined) return;
+    expect(firstRow.props('allowDowngrade')).toBe(false);
+
+    fw.allowDowngrade = true;
+    await wrapper.vm.$nextTick();
+    expect(firstRow.props('allowDowngrade')).toBe(true);
   });
 
   it('does NOT render the toggle in non-select phases (flashing/done/failed)', async () => {
