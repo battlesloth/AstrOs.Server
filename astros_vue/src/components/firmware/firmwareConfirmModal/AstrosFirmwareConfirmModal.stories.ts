@@ -60,3 +60,15 @@ export const UploadSource: Story = {
     selectedControllers: [body, core],
   },
 };
+
+export const DowngradeAckRequired: Story = {
+  args: {
+    open: true,
+    target: 'v1.3.5',
+    sourceMode: 'github',
+    // Body 1.3.0 → 1.3.5 (upgrade); Core 1.4.0 → 1.3.5 (downgrade). The
+    // ack region renders with count=1 and Confirm stays disabled until
+    // the operator ticks the checkbox.
+    selectedControllers: [body, core],
+  },
+};

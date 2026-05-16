@@ -152,6 +152,7 @@
       "source_label": "Source",
       "controllers_label": "Targets",
       "power_warning": "Do not cut power to any selected controller until the update completes — interrupting a flash can leave a controller in a bricked state.",
+      "downgrade_ack": "I understand this will install OLDER firmware on {count} controller(s).",
       "cancel": "Cancel",
       "confirm": "Push firmware",
       "delta_separator": "→"
