@@ -61,12 +61,20 @@ import { SerialMessageType } from '../serial/serial_message.js';
 
 // Module-level defaults for the transport. Concrete numbers come from the
 // design spec; the streamer merges any caller overrides on top.
+//
+// `ackTimeoutMs` is sized for the worst-case round trip when the sliding
+// window is full: the timer is armed at `bus.send` return, but bytes then
+// sit in the worker IPC + Node SerialPort write queue + kernel TTY buffer
+// before reaching the UART. At 115200 baud a ~5.5 KB FW_CHUNK takes
+// ~480 ms on the wire, so a windowSize=16 fill puts the last chunk
+// ~7.2 s behind its timer-arm time. 15 000 ms gives ~2× margin over that
+// bound. If `windowSize` or the link baud changes materially, recompute.
 export const TRANSPORT_DEFAULTS: TransportConfig = {
   chunkSizeBytes: 4096,
   windowSize: 16,
-  ackTimeoutMs: 1500,
+  ackTimeoutMs: 15_000,
   transferTimeoutMs: 300_000,
-  maxRetriesPerChunk: 3,
+  maxRetriesPerChunk: 5,
 };
 
 export interface ChunkStreamerOpts {
@@ -936,7 +944,7 @@ export class ChunkStreamer {
       // explicit teardown makes the post-condition obvious. The
       // whole-transfer watchdog is still armed and would also fire
       // eventually, but with a much longer budget (300_000 ms default vs
-      // 1500 ms ackTimeoutMs); the end_timeout race surfaces a faster,
+      // 15 000 ms ackTimeoutMs); the end_timeout race surfaces a faster,
       // more specific code so the operator gets "the master didn't reply
       // to END" rather than the catch-all "the whole transfer hung."
       let endAckTimer: NodeJS.Timeout | null = null;

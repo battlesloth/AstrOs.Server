@@ -1166,9 +1166,10 @@ describe('ChunkStreamer — END_ACK non-OK rejects with cleanup', () => {
 });
 
 describe('ChunkStreamer — per-chunk timeout + retry', () => {
-  // Default ackTimeoutMs from TRANSPORT_DEFAULTS. Hard-coded here rather than
-  // imported so the test stays self-contained and a future config tweak that
-  // changes the default would force these tests to be reviewed deliberately.
+  // Test-local timer budget. Pinned via per-construction `config: { ackTimeoutMs }`
+  // so the tests don't drift when TRANSPORT_DEFAULTS moves (the production
+  // default is sized for full-window wire time; the suite runs orders of
+  // magnitude faster with a small value under fake timers).
   const ACK_TIMEOUT_MS = 1500;
 
   // Date and setImmediate stay un-faked (only setTimeout/clearTimeout are
@@ -1212,7 +1213,10 @@ describe('ChunkStreamer — per-chunk timeout + retry', () => {
     const tempPath = await writeTempFirmware(buf);
     try {
       const bus = new FakeSerialBus();
-      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const streamer = new ChunkStreamer({
+        bus,
+        config: { chunkSizeBytes: chunkSize, ackTimeoutMs: ACK_TIMEOUT_MS },
+      });
       const onRetry = vi.fn();
       const onChunkAck = vi.fn();
 
@@ -1271,7 +1275,13 @@ describe('ChunkStreamer — per-chunk timeout + retry', () => {
     const tempPath = await writeTempFirmware(buf);
     try {
       const bus = new FakeSerialBus();
-      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      // Pin `maxRetriesPerChunk: 3` here — this test counts on exactly three
+      // timeouts exhausting the budget. The production default may move; the
+      // test's contract is the count, not the default.
+      const streamer = new ChunkStreamer({
+        bus,
+        config: { chunkSizeBytes: chunkSize, ackTimeoutMs: ACK_TIMEOUT_MS, maxRetriesPerChunk: 3 },
+      });
       const onRetry = vi.fn();
 
       const driver = (async (): Promise<void> => {
@@ -1329,7 +1339,10 @@ describe('ChunkStreamer — per-chunk timeout + retry', () => {
     const tempPath = await writeTempFirmware(buf);
     try {
       const bus = new FakeSerialBus();
-      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const streamer = new ChunkStreamer({
+        bus,
+        config: { chunkSizeBytes: chunkSize, ackTimeoutMs: ACK_TIMEOUT_MS },
+      });
       const onRetry = vi.fn();
 
       const driver = (async (): Promise<void> => {
@@ -1389,7 +1402,10 @@ describe('ChunkStreamer — per-chunk timeout + retry', () => {
     const tempPath = await writeTempFirmware(buf);
     try {
       const bus = new FakeSerialBus();
-      const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+      const streamer = new ChunkStreamer({
+        bus,
+        config: { chunkSizeBytes: chunkSize, ackTimeoutMs: ACK_TIMEOUT_MS },
+      });
       const onRetry = vi.fn();
 
       let timerCountAfterAck = -1;
@@ -1681,7 +1697,18 @@ describe('ChunkStreamer — backpressure pause/resume', () => {
       const tempPath = await writeTempFirmware(buf);
       try {
         const bus = new FakeSerialBus();
-        const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+        // Pin `maxRetriesPerChunk: 3` and `ackTimeoutMs: ACK_TIMEOUT_MS`: the test
+        // counts exactly three timer-fires under PAUSE exhausting the budget, and
+        // advances fake time by ACK_TIMEOUT_MS each round. Both must match what
+        // the streamer is using, regardless of TRANSPORT_DEFAULTS.
+        const streamer = new ChunkStreamer({
+          bus,
+          config: {
+            chunkSizeBytes: chunkSize,
+            ackTimeoutMs: ACK_TIMEOUT_MS,
+            maxRetriesPerChunk: 3,
+          },
+        });
         const onBackpressure = vi.fn();
         const onRetry = vi.fn();
 
@@ -1769,7 +1796,10 @@ describe('ChunkStreamer — backpressure pause/resume', () => {
       const tempPath = await writeTempFirmware(buf);
       try {
         const bus = new FakeSerialBus();
-        const streamer = new ChunkStreamer({ bus, config: { chunkSizeBytes: chunkSize } });
+        const streamer = new ChunkStreamer({
+          bus,
+          config: { chunkSizeBytes: chunkSize, ackTimeoutMs: ACK_TIMEOUT_MS },
+        });
         const onBackpressure = vi.fn();
         const onRetry = vi.fn();
 
@@ -1867,14 +1897,15 @@ describe('ChunkStreamer — whole-transfer watchdog', () => {
 
   it('hung transfer past transferTimeoutMs rejects with transfer_timeout and cleans up', async () => {
     // Setup the watchdog deadline (500ms) shorter than the per-chunk
-    // ackTimeoutMs (1500ms) so the watchdog wins the race against
-    // `chunk_retry_exhausted`. Without this gating, a 1-chunk transfer that
-    // never receives a chunkAck would burn through 3 retries (~4.5s) and
-    // surface as `chunk_retry_exhausted` long before the production-default
-    // 5-min watchdog could fire — making the test untestable in fake-time
-    // without contortions. The gating mirrors how production deployments
-    // would actually configure the two budgets if the watchdog were ever
-    // shorter than the chunk-retry budget.
+    // ackTimeoutMs (TRANSPORT_DEFAULTS = 15 000 ms) so the watchdog wins the
+    // race against `chunk_retry_exhausted`. Without this gating, a 1-chunk
+    // transfer that never receives a chunkAck would burn through
+    // maxRetriesPerChunk (5) × ackTimeoutMs (15 000 ms) = 75 s and surface
+    // as `chunk_retry_exhausted` long before the production-default 5-min
+    // watchdog could fire — making the test untestable in fake-time without
+    // contortions. The gating mirrors how production deployments would
+    // actually configure the two budgets if the watchdog were ever shorter
+    // than the chunk-retry budget.
     const transferTimeoutMs = 500;
     const chunkSize = 100;
     const buf = Buffer.alloc(chunkSize, 0x10);
