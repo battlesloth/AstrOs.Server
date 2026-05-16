@@ -81,7 +81,9 @@ Tests that exercise multi-chunk in-flight behavior need to explicitly opt into a
 
 - [ ] **Code review + commit.** Dispatch the code-reviewer agent on the diff vs `bc762fd`. Same gating as task 3 — no Critical / Important findings allowed before commit. Build + lint + test already green.
 
-- [ ] **Bench validation (stop-and-wait).** Rebuild server, re-flash. Expected: zero `onChunkNak OUT_OF_ORDER` events, ESP-side monotonic seq progression with no retransmits below `highestSeq`, total transfer time ~3-4 minutes.
+- [ ] **Bench validation (stop-and-wait).** Rebuild server, re-flash. Expected: zero `onChunkNak OUT_OF_ORDER` events, ESP-side monotonic seq progression with no retransmits below `highestSeq`, total transfer time ~3-5 minutes.
+
+- [x] **Bump `transferTimeoutMs` to 10 min in the orchestrator override.** First bench-validation attempt revealed the 300 s default sits right at the edge of the observed ~1 s/chunk × 294 chunks ≈ 295 s budget — and a few cascade-induced retries pushed the transfer past the watchdog at chunk 195/294 (`transfer_timeout: transfer exceeded 300000ms watchdog`, host log line 4596). Bumped `transferTimeoutMs` to 600_000 in the same `defaultStreamerFactory` override block alongside the windowSize/ackTimeoutMs/maxRetries config. Even with stop-and-wait eliminating the cascade, leaving a 2× headroom on the whole-transfer watchdog keeps a single unlucky `chunk_retry` from killing the entire flash. Rationale comment refreshed to document the math. Note: that bench failure was on the bc762fd codepath — pid 151445 loaded the older dist before our `ab17995` build completed, so the run was still running windowSize=16 and the cascade WAS firing. Server restart needed for the actual stop-and-wait validation.
 
 - [ ] **Revert investigation DIAG logging.** Once bench validation confirms the cascade is gone, revert the unstaged diagnostics in `api_server.ts` and `message_handler.ts`. Easiest path: `git checkout HEAD -- astros_api/src/api_server.ts astros_api/src/serial/message_handler.ts` after the bench run, then re-run lint + build.
 

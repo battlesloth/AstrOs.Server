@@ -463,7 +463,21 @@ function defaultStreamerFactory(opts: { bus: SerialBus }): Streamer {
   //
   // `ackTimeoutMs: 5_000` gives ~5× margin over the observed ~1 s
   // round-trip; `maxRetriesPerChunk: 3` × 5 s = 15 s before
-  // chunk_retry_exhausted (well under the 300 s transfer watchdog).
+  // chunk_retry_exhausted.
+  //
+  // `transferTimeoutMs: 600_000` (10 min) — bumped from the streamer's
+  // 300_000 default. A 1.2 MB image is 294 chunks at ~1 s observed
+  // processing rate per chunk = ~295 s, which sits right at the 300 s
+  // default's edge. One unlucky chunk_retry that adds 5-15 s pushes the
+  // run past the watchdog and the whole transfer fails late (we hit
+  // exactly this at chunk 195 of 294). Doubling to 10 min gives
+  // ~2× headroom over the observed steady-state rate without making
+  // genuine hang detection meaningfully slower. The real cost ceiling
+  // is `maxRetriesPerChunk × ackTimeoutMs = 15 s` per stuck chunk; the
+  // whole-transfer watchdog is the second-level safety net for the
+  // pathological case where the per-chunk retry budget doesn't fire
+  // (e.g., the master ACKs slowly enough to stay under 5 s but never
+  // catches up). Revisit if the master's per-chunk rate changes.
   //
   // If the master ever gets fast enough for the wire to become the
   // bottleneck, bump `windowSize` (and recompute the matching
@@ -472,7 +486,12 @@ function defaultStreamerFactory(opts: { bus: SerialBus }): Streamer {
   // so this is a one-line config change rather than a feature rebuild.
   return new ChunkStreamer({
     bus: opts.bus,
-    config: { windowSize: 1, ackTimeoutMs: 5_000, maxRetriesPerChunk: 3 },
+    config: {
+      windowSize: 1,
+      ackTimeoutMs: 5_000,
+      maxRetriesPerChunk: 3,
+      transferTimeoutMs: 600_000,
+    },
   });
 }
 
