@@ -144,9 +144,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   // Operator-set escape hatch for the downgrade policy. Defaults to false;
   // flipping to true makes downgrade rows selectable and shifts the modal
-  // into ack-required mode. Per-session: only a page reload resets it.
-  // Deliberately survives resetToSelect (cross-flash dev workflows) — the
-  // modal ack remains the last-chance gate on each individual flash.
+  // into ack-required mode. Intentionally NOT cleared by resetToSelect —
+  // only a page reload clears it. The modal ack remains the last-chance
+  // gate on each individual flash. If a future flow ever adds a second
+  // reset path (logout, session timeout), the non-clearing of this ref is
+  // a deliberate decision, not an oversight — re-confirm before changing.
   // Uploaded firmware ('local-build') is never classified as a downgrade
   // (compareTags returns NaN), so the toggle is a no-op in upload mode.
   const allowDowngrade = ref(false);
@@ -165,10 +167,17 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // lets the allowDowngrade toggle relax the policy without overriding the
   // reality. Unknown ids fail-closed: today FLEET_LAYOUT is static so this
   // can't fire, but if FLEET_LAYOUT goes dynamic an orphan selectedId would
-  // otherwise slip past canFlash and dispatch a phantom flash target.
+  // otherwise slip past canFlash and dispatch a phantom flash target. The
+  // warn breadcrumb keeps a future dynamic-fleet bug from manifesting as a
+  // silently stuck "cannot flash" with no diagnostic clue.
   function isHardBlocked(controllerId: string): boolean {
     const c = controllers.value.find((x) => x.id === controllerId);
-    if (c === undefined) return true;
+    if (c === undefined) {
+      console.warn(
+        `[firmwareStore] isHardBlocked: unknown controllerId="${controllerId}" treated as hard-blocked. Stale selection or contract drift.`,
+      );
+      return true;
+    }
     return c.status === 'down';
   }
 

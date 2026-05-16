@@ -482,6 +482,43 @@ describe('firmware store', () => {
       expect(store.selectedControllerIds.has('dome')).toBe(false);
     });
 
+    it('isHardBlocked fails closed for unknown controller ids (canFlash blocks a phantom selection)', () => {
+      // Defensive: today FLEET_LAYOUT is static so an unknown id is structurally
+      // impossible, but if FLEET_LAYOUT ever goes dynamic a stale selectedId
+      // would otherwise slip past canFlash and dispatch a phantom flash target.
+      // Mutation: flipping the `c === undefined` branch to `return false` would
+      // make canFlash return true here.
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.sourceMode = 'github';
+        store.selectedReleaseTag = 'v1.4.2';
+        store.selectedControllerIds = new Set(['ghost-slot']);
+        expect(store.canFlash).toBe(false);
+      } finally {
+        consoleWarnSpy.mockRestore();
+      }
+    });
+
+    it('canFlash flips back to false when allowDowngrade flips off after a downgrade was selected', () => {
+      // Operator selects a downgrade with the toggle on, then unticks the
+      // toggle. Selection persists (we don't auto-clear it), but canFlash
+      // must immediately re-block. A mutation that cached canFlash against
+      // allowDowngrade at selection time would slip through other tests.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.allowDowngrade = true;
+      store.toggle('core'); // downgrade
+      expect(store.canFlash).toBe(true);
+
+      store.allowDowngrade = false;
+      expect(store.canFlash).toBe(false);
+      expect(store.selectedControllerIds.has('core')).toBe(true); // selection persists
+    });
+
     it('selectAll() with allowDowngrade=false (default) excludes downgrade controllers — backwards-compat', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
