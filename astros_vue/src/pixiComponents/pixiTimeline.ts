@@ -1,4 +1,4 @@
-import { Container, FillGradient, Graphics, TextStyle, Text } from 'pixi.js';
+import { Container, Graphics, TextStyle, Text } from 'pixi.js';
 import { ZOOM_LEVELS, type ZoomLevelConfig } from '@/composables/useZoomState';
 
 export interface PixiTimelineOptions {
@@ -86,14 +86,10 @@ export class PixiTimeline extends Container {
       const seconds = second % 60;
       const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-      const fill = new FillGradient(0, 0, 1, 1);
-      fill.addColorStop(0, 0xffffff);
-      fill.addColorStop(1, 0xffffff);
-
       const style = new TextStyle({
         fontFamily: 'Arial',
         fontSize: 20,
-        fill: fill,
+        fill: 0xffffff,
       });
 
       const timeLabel = new Text({
