@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Application, Container, Graphics } from 'pixi.js';
-import { onUnmounted, ref, watch } from 'vue';
+import { onUnmounted, ref, shallowRef, watch } from 'vue';
 
 // Import composables
 import { useZoomState, ZOOM_LEVELS } from '@/composables/useZoomState';
@@ -57,7 +57,11 @@ import type { ScriptEvent } from '@/models';
 // APPLICATION REFS
 // ============================================================================
 
-const app = ref<Application | null>(null);
+// Pixi objects must use shallowRef. Deep reactive proxies (from ref()) wrap
+// every nested property access through Vue's Proxy machinery, which breaks
+// PixiJS internal identity checks like `texture === Texture.WHITE` at render
+// time and causes `createPattern` to be called with a raw Uint8Array fallback.
+const app = shallowRef<Application | null>(null);
 const pixiContainer = ref<HTMLDivElement | null>(null);
 const channels = ref<Channel[]>([]);
 
@@ -65,20 +69,20 @@ const channels = ref<Channel[]>([]);
 // PIXI CONTAINERS & GRAPHICS REFS
 // ============================================================================
 
-const mainContainer = ref<Container | null>(null);
-const scrollableContentContainer = ref<Container | null>(null);
-const uiLayer = ref<Container | null>(null);
-const channelListContainer = ref<PixiChannelList | null>(null);
-const timeline = ref<PixiTimeline | null>(null);
-const channelRowContainers = ref(new Map<string, PixiChannelEventRow>());
+const mainContainer = shallowRef<Container | null>(null);
+const scrollableContentContainer = shallowRef<Container | null>(null);
+const uiLayer = shallowRef<Container | null>(null);
+const channelListContainer = shallowRef<PixiChannelList | null>(null);
+const timeline = shallowRef<PixiTimeline | null>(null);
+const channelRowContainers = shallowRef(new Map<string, PixiChannelEventRow>());
 
 // Scrollbar graphics
-const horizontalScrollBar = ref<PixiScrollBar | null>(null);
-const verticalScrollBar = ref<PixiScrollBar | null>(null);
+const horizontalScrollBar = shallowRef<PixiScrollBar | null>(null);
+const verticalScrollBar = shallowRef<PixiScrollBar | null>(null);
 
 // UI buttons
-const plusButton = ref<Container | null>(null);
-const minusButton = ref<Container | null>(null);
+const plusButton = shallowRef<Container | null>(null);
+const minusButton = shallowRef<Container | null>(null);
 
 // ============================================================================
 // Exposed Methods
@@ -418,10 +422,14 @@ onUnmounted(() => {
   }
   channelRowContainers.value.clear();
 
+  // Do NOT pass texture/textureSource — the SVG icons (swapIcon, deleteIcon,
+  // etc.) are owned by PixiJS's Assets cache and must be released through
+  // `Assets.unload*()`, not destroyed via the app cascade. The cache also
+  // intentionally outlives this Application instance so revisits to the
+  // scripter don't re-decode every SVG. `children: true` still tears down
+  // every Container/Graphics/Sprite we created.
   app.value?.destroy(true, {
     children: true,
-    texture: true,
-    textureSource: true,
     context: true,
   });
   app.value = null;
@@ -620,7 +628,6 @@ function createChannelRowContainer(
 
   scrollableContentContainer.value.addChild(eventRow as unknown as Container);
 
-  // @ts-expect-error - Vue ref unwrapping causes type incompatibility with nested Ref types
   channelRowContainers.value.set(channelId, eventRow);
 
   // Update positions of any existing event boxes for this channel

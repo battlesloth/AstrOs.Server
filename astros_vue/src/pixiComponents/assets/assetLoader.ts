@@ -14,23 +14,32 @@ import none from '@/pixiComponents/assets/none.svg';
 import servo from '@/pixiComponents/assets/servo.svg';
 import servo_arm from '@/pixiComponents/assets/servo_arm.svg';
 
+// PixiJS `Assets` is a global singleton — its bundle/resolver registry
+// persists across Application instances and across Vue route navigations.
+// Register the bundle once per page lifetime to avoid "Resolver already has
+// key" warnings on every revisit to the scripter.
+let bundleRegistered = false;
+
 export async function loadAssets() {
-  Assets.addBundle('assets', [
-    { alias: 'swapIcon', src: swapIcon },
-    { alias: 'deleteIcon', src: deleteIcon },
-    { alias: 'playIcon', src: playIcon },
-    { alias: 'arrowDown', src: arrowDown },
-    { alias: 'arrowUp', src: arrowUp },
-    { alias: 'home', src: home },
-    { alias: 'i2c', src: i2c },
-    { alias: 'start', src: start },
-    { alias: 'serial', src: serial },
-    { alias: 'dial', src: dial },
-    { alias: 'pointer', src: pointer },
-    { alias: 'none', src: none },
-    { alias: 'servo', src: servo },
-    { alias: 'servo_arm', src: servo_arm },
-  ]);
+  if (!bundleRegistered) {
+    Assets.addBundle('assets', [
+      { alias: 'swapIcon', src: swapIcon },
+      { alias: 'deleteIcon', src: deleteIcon },
+      { alias: 'playIcon', src: playIcon },
+      { alias: 'arrowDown', src: arrowDown },
+      { alias: 'arrowUp', src: arrowUp },
+      { alias: 'home', src: home },
+      { alias: 'i2c', src: i2c },
+      { alias: 'start', src: start },
+      { alias: 'serial', src: serial },
+      { alias: 'dial', src: dial },
+      { alias: 'pointer', src: pointer },
+      { alias: 'none', src: none },
+      { alias: 'servo', src: servo },
+      { alias: 'servo_arm', src: servo_arm },
+    ]);
+    bundleRegistered = true;
+  }
 
   await Assets.loadBundle('assets');
 }
