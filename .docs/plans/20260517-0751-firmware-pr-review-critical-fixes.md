@@ -26,7 +26,7 @@ The existing comment at `types/firmware.ts:130-133` claims these "arrive on the 
 
 - [x] **C1** — delete `view-logs` emit declaration + the two `<AstrosFirmwareButton>` instances + the `firmware_view.controllers.result_bar.view_logs` locale key. Update any spec snapshot that references the removed buttons.
 - [x] **C2** — extend `FLASH_ERROR_REASONS` with the 11 streamer reasons. Add `firmware_view.flash_errors.*` strings for each (bench-actionable, name the symptom not the code). Rewrite `types/firmware.ts:129-138` comment. Add a parameterized store test that each new reason renders the expected locale-key path through `applyJobFailed`.
-- [ ] **C3** — switch `api_server.ts` to `limitHandler` returning JSON `{error:'payload_too_large', detail}`. Add `payload_too_large` to `FLASH_ERROR_REASONS` + locale. Add an integration test (or controller test) that POSTing >50 MB returns `Content-Type: application/json` with `error: 'payload_too_large'`. Add a Vue `firmwareFlashError` test that a 413 JSON response maps to `payload_too_large`.
+- [x] **C3** — switch `api_server.ts` to `limitHandler` returning JSON `{error:'payload_too_large', detail}`. Add `payload_too_large` to `FLASH_ERROR_REASONS` + locale. Add an integration test (or controller test) that POSTing >50 MB returns `Content-Type: application/json` with `error: 'payload_too_large'`. Add a Vue `firmwareFlashError` test that a 413 JSON response maps to `payload_too_large`.
 - [ ] **Pre-commit gate (per task)** — `npm run prettier:write && npm run lint:fix` (both workspaces touched), `npm run build`, `npx vitest run`, then `superpowers:requesting-code-review` on the diff. Address Critical/Important findings before committing.
 
 ## Out of scope (filed separately)

@@ -79,8 +79,15 @@ Verifies the new POST `/api/firmware/upload` endpoint + UI handler. Before this 
 
 The existing `/audio/savefile` route (`file_controller.ts`) uses the same `express-fileupload` middleware. Verify the new firmware-upload route doesn't break it by exercising audio upload from wherever the audio-upload UI lives. **Pass:** audio upload still works as before. (If you don't have audio-upload UX exposed, skip — the route is independent.)
 
+### 9. Oversize file rejected with actionable copy (>50 MB)
+
+1. Generate a >50 MB binary (e.g., `dd if=/dev/urandom of=/tmp/big.bin bs=1M count=60`).
+2. Pick the file in the source strip.
+3. **Pass:** the panel banner reads *"The selected firmware file is larger than the server's 50 MB limit. Pick a smaller binary — check it isn't a combined app+partitions+spiffs image."* (i.e., the `payload_too_large` copy, NOT the generic `internal_server_error` "check the server logs" message).
+4. **Fail:** banner reads "check the server logs" — indicates a regression where the 413 body lost its JSON shape and the Vue mapper fell through.
+
 ## Notes
 
 - Server-side `FirmwareUploadStore` is single-slot by design; uploading a second file atomically replaces the first. No history is kept.
-- Error envelope routing: the server's three distinct errors (`invalid_firmware`, `upload_io_failed`, `upload_persist_failed`) all surface through the existing `flashError` panel banner — `invalid_firmware` carries the most actionable detail and is the operator's typical encounter.
+- Error envelope routing: the server's four distinct errors (`invalid_firmware`, `upload_io_failed`, `upload_persist_failed`, `payload_too_large`) all surface through the existing `flashError` panel banner — `invalid_firmware` carries the most actionable detail and is the operator's typical encounter.
 - This work specifically does NOT include a progress indicator beyond the binary `Uploading…` flag. Files are ~1-2 MB, typically < 1 s on local. If a slower link makes the lack of progress feedback annoying, ask and we'll add an XHR + `progress` event wiring.

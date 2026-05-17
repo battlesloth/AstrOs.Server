@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { handleFirmwareUpload } from './firmware_upload_controller.js';
+import {
+  FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES,
+  firmwareUploadLimitHandler,
+  handleFirmwareUpload,
+} from './firmware_upload_controller.js';
 import {
   FirmwareUploadValidationError,
   type FirmwareUploadStore,
@@ -208,5 +212,33 @@ describe('Firmware Upload Controller — POST /api/firmware/upload', () => {
       error: 'upload_persist_failed',
       detail: expect.stringContaining('EACCES'),
     });
+  });
+});
+
+describe('firmwareUploadLimitHandler — oversize multipart body', () => {
+  it('emits 413 with JSON error=payload_too_large so the Vue mapper recognizes it', () => {
+    // Mutation guard: if a regression switches back to `responseOnLimit`
+    // with a plain string, `mapHttpErrorToFlashEnvelope` falls through to
+    // `internal_server_error` and the operator loses the actionable copy.
+    // This pins the wire shape (JSON, typed error code, integer status).
+    const res = mockRes();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    firmwareUploadLimitHandler({} as any, res, vi.fn());
+
+    expect(res.status).toHaveBeenCalledWith(413);
+    expect(res.json).toHaveBeenCalledTimes(1);
+    const body = res.json.mock.calls[0][0];
+    expect(body.error).toBe('payload_too_large');
+    // Detail names the limit so the operator can size their file correctly
+    // without reading server logs or source code.
+    expect(body.detail).toMatch(/\d+\s*MB/);
+  });
+
+  it('exports the size limit so api_server can wire it onto fileUpload({limits})', () => {
+    // The constant lives with the handler that produces the matching error
+    // body. Pinning the value here would force a churn on every limit bump;
+    // pinning it's a positive integer is the right granularity.
+    expect(Number.isInteger(FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES)).toBe(true);
+    expect(FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES).toBeGreaterThan(0);
   });
 });

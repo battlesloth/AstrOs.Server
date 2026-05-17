@@ -15,6 +15,28 @@ import type {
 
 const route = '/firmware/upload';
 
+export const FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES = 50 * 1024 * 1024;
+
+// express-fileupload's default `responseOnLimit` returns text/plain, which
+// the Vue mapper (`mapHttpErrorToFlashEnvelope`) treats as unparseable and
+// collapses to `internal_server_error`. Wire this as `limitHandler` so the
+// 413 body is structured JSON the mapper recognizes as `payload_too_large`,
+// giving the operator the actual reason instead of "check server logs."
+export function firmwareUploadLimitHandler(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _req: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  res: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _next: any,
+): void {
+  const body: FirmwareUploadErrorResponse = {
+    error: 'payload_too_large',
+    detail: `Firmware upload exceeds the ${Math.round(FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES / (1024 * 1024))} MB limit.`,
+  };
+  res.status(413).json(body);
+}
+
 // `FirmwareUploadStore.store()`'s public contract:
 //   - tempPath is unconditionally consumed (renamed on success, unlinked on
 //     any failure including validation throws).

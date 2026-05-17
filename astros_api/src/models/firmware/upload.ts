@@ -42,12 +42,15 @@ export type FirmwareUploadResponse = Omit<StoredUpload, 'path'>;
 
 // Error-response discriminator codes. Hand-mirrored on the Vue side
 // (`FIRMWARE_UPLOAD_ERROR_CODES` in `astros_vue/src/types/firmware.ts`);
-// both sides must be updated together.
+// both sides must be updated together. `payload_too_large` is emitted by
+// the express-fileupload `limitHandler` in `api_server.ts` (NOT by the
+// controller) when the multipart body exceeds the configured ceiling.
 export const FIRMWARE_UPLOAD_ERROR_CODES = [
   'invalid_body',
   'upload_io_failed',
   'invalid_firmware',
   'upload_persist_failed',
+  'payload_too_large',
 ] as const;
 export type FirmwareUploadErrorCode = (typeof FIRMWARE_UPLOAD_ERROR_CODES)[number];
 

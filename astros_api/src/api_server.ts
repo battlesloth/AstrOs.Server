@@ -91,7 +91,11 @@ import { FlashJobOrchestrator } from './firmware/flash_orchestrator.js';
 import { registerFirmwareFlashRoutes } from './controllers/firmware_flash_controller.js';
 import { registerFirmwareReleasesRoutes } from './controllers/firmware_releases_controller.js';
 import { registerFirmwareLockStateRoutes } from './controllers/firmware_lock_state_controller.js';
-import { registerFirmwareUploadRoutes } from './controllers/firmware_upload_controller.js';
+import {
+  FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES,
+  firmwareUploadLimitHandler,
+  registerFirmwareUploadRoutes,
+} from './controllers/firmware_upload_controller.js';
 import { FirmwareCache } from './firmware/firmware_cache.js';
 import { FirmwareUploadStore } from './firmware/firmware_upload_store.js';
 import { GitHubReleaseService } from './firmware/github_release_service.js';
@@ -407,13 +411,14 @@ export class ApiServer {
     // operator from buffering a multi-GB POST into memory. `useTempFiles`
     // streams the multipart body to disk during parse, so `.mv()` in the
     // upload controller becomes a fast rename rather than a buffer-to-disk
-    // write. `abortOnLimit` rejects oversize uploads with 413 instead of
-    // silently truncating the buffer.
+    // write. `abortOnLimit` rejects oversize uploads with 413 (its
+    // `closeConnection` is a no-op once `limitHandler` has sent the response
+    // body) and runs the lib's tmp-file cleanup either way.
     this.app.use(
       fileUpload({
-        limits: { fileSize: 50 * 1024 * 1024 },
+        limits: { fileSize: FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES },
         abortOnLimit: true,
-        responseOnLimit: 'firmware upload exceeds 50 MB limit',
+        limitHandler: firmwareUploadLimitHandler,
         useTempFiles: true,
         tempFileDir: tmpdir(),
       }),

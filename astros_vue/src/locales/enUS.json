@@ -166,6 +166,7 @@
       "invalid_firmware": "The selected file isn't a valid AstrOs firmware binary. Check the project name and version match an AstrOs build.",
       "upload_io_failed": "Couldn't stage the uploaded firmware on the server. Try again or check the server's disk space.",
       "upload_persist_failed": "The server couldn't save the uploaded firmware. Check the server logs and try again.",
+      "payload_too_large": "The selected firmware file is larger than the server's 50 MB limit. Pick a smaller binary — check it isn't a combined app+partitions+spiffs image.",
       "variant_mismatch": "The selected release doesn't include a firmware variant for one or more of the selected controllers.",
       "variant_unknown": "One of the selected controllers reports a variant the server doesn't recognize.",
       "release_not_found": "The selected release could not be found on GitHub. Try refreshing the release list.",

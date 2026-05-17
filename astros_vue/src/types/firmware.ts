@@ -72,7 +72,8 @@ export type FirmwareUploadErrorCode =
   | 'invalid_body'
   | 'upload_io_failed'
   | 'invalid_firmware'
-  | 'upload_persist_failed';
+  | 'upload_persist_failed'
+  | 'payload_too_large';
 
 export interface FirmwareUploadErrorResponse {
   error: FirmwareUploadErrorCode;
@@ -148,6 +149,7 @@ export const FLASH_ERROR_REASONS = [
   'invalid_firmware',
   'upload_io_failed',
   'upload_persist_failed',
+  'payload_too_large',
   'variant_mismatch',
   'variant_unknown',
   'release_not_found',
