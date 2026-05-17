@@ -296,7 +296,11 @@ export function createFlashProgressThrottle(opts: {
 //   * c.0 `JobLock` — synchronous boolean gate; only one flash at a time.
 //   * c.6a `transitionControllerState` / `deriveJobLifecycle` — per-controller
 //     per-controller FSM machinery.
-//   * c.6b `ChunkStreamer` — sliding-window upload to the master ESP32.
+//   * c.6b `ChunkStreamer` — chunked upload to the master ESP32. The
+//     streamer's sliding-window machinery is exercised by its own tests,
+//     but production wiring overrides `windowSize` to 1 (stop-and-wait)
+//     via `DEFAULT_STREAMER_CONFIG` below — the current master+UART
+//     deployment doesn't benefit from pipelining.
 //   * c.4 `FirmwareCache` + c.5 `FirmwareUploadStore` (via `resolveFlashSource`)
 //     — source binary acquisition.
 //   * c.3 `GitHubReleaseService` — release/asset enumeration.
@@ -894,8 +898,18 @@ export class FlashJobOrchestrator {
    *
    * Upload phase: aborts the streamer; its rejection flows through the
    * IIFE catch → `routeStartFailure` → `failJob`. Deploy phase: routes
-   * through `failJob` directly with reason='aborted'. Both produce the
-   * same `flashJobFailed { reason: 'aborted', abortReason }` wire shape.
+   * through `failJob` directly with reason='aborted'.
+   *
+   * Both paths emit `flashJobFailed { reason: 'aborted', abortReason }`,
+   * but the `abortReason` payload differs: upload-phase carries the
+   * `TransferError.code` (always the literal string `'aborted'` for
+   * operator-cancel — see `routeStartFailure` for the TransferError
+   * routing); deploy-phase carries the operator's free-form `reason`
+   * string. The UI renders the deploy-phase value verbatim under the
+   * "Abort reason:" label, so the deploy path gives the operator a more
+   * informative banner. Carrying the operator string through the
+   * upload-phase TransferError would equalize the two — tracked
+   * separately if the UX gap becomes a real issue.
    */
   async cancel(reason: string): Promise<{ jobId: string } | null> {
     if (this.currentJob === null) return null;

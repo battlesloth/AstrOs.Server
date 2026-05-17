@@ -68,8 +68,10 @@ describe('integration: cancel during upload + deploy', () => {
 
       // 3. Stub master is intentionally NOT configured with autoAckUpload.
       //    The streamer will send FW_TRANSFER_BEGIN over the PTY and wait
-      //    for FW_TRANSFER_BEGIN_ACK indefinitely (well, the streamer's
-      //    1500ms begin-ack timeout — but we cancel well before that fires).
+      //    for FW_TRANSFER_BEGIN_ACK indefinitely (well, until
+      //    DEFAULT_STREAMER_CONFIG.ackTimeoutMs — 5 000 ms in the
+      //    production wiring this harness mirrors — fires, but we cancel
+      //    well before that).
 
       // 4. POST flash. `start()` returns once sync setup finishes; the
       //    upload runs in a background IIFE. The abort rejection lands in

@@ -1901,11 +1901,12 @@ describe('ChunkStreamer — whole-transfer watchdog', () => {
     // race against `chunk_retry_exhausted`. Without this gating, a 1-chunk
     // transfer that never receives a chunkAck would burn through
     // maxRetriesPerChunk (5) × ackTimeoutMs (15 000 ms) = 75 s and surface
-    // as `chunk_retry_exhausted` long before the production-default 5-min
+    // as `chunk_retry_exhausted` long before the TRANSPORT_DEFAULTS 5-min
     // watchdog could fire — making the test untestable in fake-time without
-    // contortions. The gating mirrors how production deployments would
-    // actually configure the two budgets if the watchdog were ever shorter
-    // than the chunk-retry budget.
+    // contortions. (Production overrides the watchdog to 10 min via
+    // DEFAULT_STREAMER_CONFIG; the math is the same.) The gating mirrors
+    // how production deployments would actually configure the two budgets
+    // if the watchdog were ever shorter than the chunk-retry budget.
     const transferTimeoutMs = 500;
     const chunkSize = 100;
     const buf = Buffer.alloc(chunkSize, 0x10);

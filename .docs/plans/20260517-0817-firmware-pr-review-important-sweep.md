@@ -16,7 +16,7 @@ Filed as new stubs (see "File deferred stubs" task): **Type I5** (server-side do
 ## Tasks
 
 - [x] **Silent I1** — `.catch()` belt on the background IIFE at `flash_orchestrator.ts:762-819`. If `routeStartFailure` ever throws (only path today is the FSM's "illegal flash-job transition" Error from `transitionControllerState`'s `LEGAL_NEXT_STAGES` guard), it becomes an unhandled rejection and the lock stays held. Add a `.catch` that logs + force-releases `JobLock` directly. Add a test that mutates `routeStartFailure` to throw and asserts the lock is released.
-- [ ] **Code I1 + Comment sweep** — single commit covering:
+- [x] **Code I1 + Comment sweep** — single commit covering:
   - `flash_orchestrator.ts:877-878` — rewrite the `cancel()` docstring (claims upload + deploy produce same `abortReason`; in reality upload-cancel gives tautological `"aborted"`, deploy-cancel gives the operator's reason).
   - `flash_cancel.integration.test.ts:72` — replace stale "1500ms begin-ack timeout" comment with current 5_000 ms value and cross-reference `DEFAULT_STREAMER_CONFIG`.
   - `flash_orchestrator.ts:299` — add stop-and-wait disclaimer to the class header (matches the pattern in `chunk_streamer.ts:73-78`).
