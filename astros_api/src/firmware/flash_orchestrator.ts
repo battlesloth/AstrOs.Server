@@ -816,7 +816,25 @@ export class FlashJobOrchestrator {
           // `failJob`. Don't re-throw — this is fire-and-forget.
           this.routeStartFailure(jobId, err);
         }
-      })();
+      })().catch((err) => {
+        // Final-fallback belt: routeStartFailure → failJob →
+        // failNonTerminalControllers → transitionControllerState raises
+        // the FSM's "illegal flash-job transition" Error if upstream ever
+        // leaves a controller in a stage the state machine's LEGAL_NEXT_STAGES
+        // guard rejects. Without this belt the promise rejects unhandled,
+        // Node logs a warning, and (because failJob didn't reach
+        // releaseLock) the JobLock stays held — the next operator flash
+        // sees `job_already_running` forever. Force the lock release
+        // directly; the operator's UI will miss the flashJobFailed event
+        // but at least the system is unwedged. JobLock.release returns a
+        // boolean and never throws (listener errors are swallowed inside
+        // notify), so no inner try is needed.
+        logger.error(
+          err,
+          `flash orchestrator: routeStartFailure threw for job=${jobId}; forcing JobLock.release. The operator UI may have missed the flashJobFailed event.`,
+        );
+        this.jobLock.release(jobId);
+      });
 
       return {
         jobId,
@@ -855,11 +873,13 @@ export class FlashJobOrchestrator {
 
   /**
    * Test-only: await the background IIFE assigned to `runInProgress`
-   * settling (success or failJob-routed rejection). Returns immediately
-   * when no background work is in flight. Production code MUST NOT call
-   * this — see the `runInProgress` field's docstring for why. Named with
-   * a `ForTest` suffix so a `grep` for the name surfaces accidental
-   * production use.
+   * settling. The IIFE is wrapped with a `.catch` belt that absorbs any
+   * rejection from `routeStartFailure`, so this always observes a fulfilled
+   * promise — tests look at `jobLock`/`emitWs` for the post-settle state
+   * rather than catching here. Returns immediately when no background work
+   * is in flight. Production code MUST NOT call this — see the
+   * `runInProgress` field's docstring for why. Named with a `ForTest`
+   * suffix so a `grep` for the name surfaces accidental production use.
    */
   async awaitRunInProgressForTest(): Promise<void> {
     if (this.runInProgress !== null) {

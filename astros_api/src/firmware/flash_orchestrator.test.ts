@@ -2906,6 +2906,43 @@ describe('FlashJobOrchestrator', () => {
       expect(results).toHaveLength(2);
       expect(results.every((r) => r.controller.stage === FwStage.Failed)).toBe(true);
     });
+
+    it('background-IIFE .catch belt: if routeStartFailure throws, JobLock is still released so the next operator flash is not wedged', async () => {
+      // Forcing the inner catch to throw simulates the narrow but real path
+      // where failJob → failNonTerminalControllers → transitionControllerState
+      // raises the FSM's "illegal flash-job transition" Error on a malformed
+      // controller shape. Pre-belt, the rejection went unhandled and the
+      // lock stayed held (failJob never reached its releaseLock line). The
+      // belt force-releases JobLock directly so the system unwedges.
+      const fx = setupHappyPath();
+      (
+        fx.orchestrator as unknown as {
+          routeStartFailure: (jobId: string, err: unknown) => void;
+        }
+      ).routeStartFailure = vi.fn(() => {
+        throw new Error('synthetic routeStartFailure failure');
+      });
+
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      // Trigger the inner catch with a TransferError so routeStartFailure
+      // would normally consume it. Our spy throws instead — the belt is
+      // the only thing standing between this and a wedged lock.
+      fx.streamerControls.reject(new TransferError('hash_mismatch', run.spec.transferId, 'h'));
+
+      await startPromise;
+      // The belt's `.catch` absorbs the rejection, so this awaits a
+      // fulfilled promise. A regression that removes the belt would either
+      // reject here OR leave the lock held — the next assertion catches the
+      // second mode either way.
+      await fx.orchestrator.awaitRunInProgressForTest();
+
+      // The contract: lock is released regardless of routeStartFailure
+      // throwing. Without the belt this would still be true === locked.
+      expect(fx.jobLock.isLocked()).toBe(false);
+    });
   });
 
   describe('cancel', () => {
