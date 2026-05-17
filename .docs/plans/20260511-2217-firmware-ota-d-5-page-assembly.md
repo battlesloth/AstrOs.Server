@@ -82,6 +82,8 @@ export interface FlashErrorEnvelope {
 
 `FlashErrorReason` is the union of server `FlashOrchestratorErrorReason` values that map to HTTP statuses the client cares about (400/409/500), plus `internal_server_error` (catch-all 500) and `network_error` (no response received). Post-streamer reasons (`hash_mismatch`, `chunk_retry_exhausted`, etc.) are deliberately omitted — those surface on WS in d.6, not via the HTTP error envelope.
 
+> **Superseded 2026-05-17 by `.docs/plans/20260517-0751-firmware-pr-review-critical-fixes.md` (C2):** post-streamer reasons (the full `TransferErrorCode` set) are now in `FLASH_ERROR_REASONS` and the HTTP envelope + WS `flashJobFailed` share the same locale path. The original "deliberately omitted" decision left operators with "internal server error" copy for every distinct mid-flash failure; C2 surfaces each with bench-actionable copy.
+
 ---
 
 ## Out of scope

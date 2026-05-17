@@ -1469,12 +1469,16 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
+      // Use a fictional reason the union doesn't include so the fallback
+      // path is the one under test. Real streamer reasons (hash_mismatch,
+      // chunk_retry_exhausted, etc.) are now in FLASH_ERROR_REASONS and
+      // map through verbatim — exercised by the parameterized test below.
       const data: FlashJobFailedData = {
         jobId: 'job-1',
         endedAt: '2026-05-12T08:05:00Z',
-        reason: 'hash_mismatch', // post-streamer reason — not in FlashErrorReason
-        detail: 'asset checksum mismatch on Core',
-        abortReason: 'hash_mismatch',
+        reason: 'frobnitz_failed' as FlashJobFailedData['reason'],
+        detail: 'unrecognized reason from a future server',
+        abortReason: 'frobnitz_failed',
       };
       store.applyJobFailed(data);
       expect(store.phase).toBe('failed');
@@ -1482,7 +1486,37 @@ describe('firmware store', () => {
       // Unrecognized reason falls back to internal_server_error so the banner
       // shows generic copy rather than a missing-i18n-key path.
       expect(store.flashError?.reason).toBe('internal_server_error');
-      expect(store.flashError?.detail).toBe('asset checksum mismatch on Core');
+      expect(store.flashError?.detail).toBe('unrecognized reason from a future server');
+    });
+
+    // Pin each streamer reason maps through verbatim. The set comes from
+    // TransferErrorCode in astros_api/src/models/firmware/chunk_streamer.ts;
+    // if a code is removed from FLASH_ERROR_REASONS it will silently
+    // collapse to 'internal_server_error' and the operator loses
+    // bench-actionable copy (e.g., "the master's SD card is full" becomes
+    // "check the server logs"). This guards that contract.
+    it.each([
+      'source_read_failed',
+      'source_size_mismatch',
+      'begin_timeout',
+      'begin_rejected',
+      'chunk_retry_exhausted',
+      'flash_full',
+      'transfer_timeout',
+      'end_timeout',
+      'hash_mismatch',
+      'master_io_error',
+      'bus_send_failed',
+    ] as const)("maps streamer reason '%s' through verbatim", (reason) => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason,
+      });
+      expect(store.flashError?.reason).toBe(reason);
     });
 
     it('maps recognized server reasons through to FlashErrorReason verbatim', () => {

@@ -127,14 +127,18 @@ export type FirmwareStage = 'download' | 'transfer' | 'flash' | 'verify' | 'rebo
 export type FirmwareStageLabelKey = `firmware_view.stages.${FirmwareStage}.label`;
 
 /**
- * Subset of the server's FlashOrchestratorErrorReason that surfaces via the
- * HTTP error response. Post-streamer failures (hash_mismatch,
- * chunk_retry_exhausted, etc.) are deliberately omitted — those arrive on
- * the WS surface, not via this envelope.
+ * Mirror of the server's `FlashOrchestratorErrorReason` plus a couple of
+ * client-side reasons that the server never emits (`network_error`,
+ * `internal_server_error` fallback). The HTTP envelope and the WS
+ * `flashJobFailed` event share this surface — the same reason lands on
+ * either path and the operator sees the same `firmware_view.flash_errors.*`
+ * copy regardless of which one fired.
  *
  * The tuple is the single source of truth: the `FlashErrorReason` union is
  * derived from it, and `KNOWN_FLASH_ERROR_REASONS` is the corresponding
  * runtime Set — both stay in sync because both come from this one list.
+ * A locale-coverage test pins that every reason has a matching
+ * `firmware_view.flash_errors.<reason>` key.
  */
 export const FLASH_ERROR_REASONS = [
   'invalid_body',
@@ -155,6 +159,23 @@ export const FLASH_ERROR_REASONS = [
   'subscriber_attach_failed',
   'protocol_violation',
   'streamer_unknown_error',
+  // Streamer-emitted reasons (mirror of TransferErrorCode in
+  // astros_api/src/models/firmware/chunk_streamer.ts). The orchestrator
+  // routes these onto `flashJobFailed` so the same envelope/locale path
+  // serves both pre-streamer and mid-streamer failures. Operator needs to
+  // distinguish "master crashed" from "SD card full" from "cable unseated"
+  // — each gets its own bench-actionable copy.
+  'source_read_failed',
+  'source_size_mismatch',
+  'begin_timeout',
+  'begin_rejected',
+  'chunk_retry_exhausted',
+  'flash_full',
+  'transfer_timeout',
+  'end_timeout',
+  'hash_mismatch',
+  'master_io_error',
+  'bus_send_failed',
   // Both cancel paths route through `failJob` with reason='aborted' so
   // the banner shows "Cancelled" copy rather than `internal_server_error`.
   'aborted',
