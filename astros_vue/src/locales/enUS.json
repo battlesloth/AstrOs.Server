@@ -115,7 +115,6 @@
         "all_updated": "✓ All {count} controller(s) updated",
         "failed_summary": "⚠ {label} failed during {stage}",
         "failed_summary_multi": "⚠ {labels} failed during the flash",
-        "view_logs": "View logs",
         "done": "Done"
       },
       "flash_error_banner": {

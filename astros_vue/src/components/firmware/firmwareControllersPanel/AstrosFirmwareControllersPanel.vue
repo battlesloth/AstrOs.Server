@@ -10,7 +10,6 @@ import type { ControllersPanelProps } from './types';
 const props = defineProps<ControllersPanelProps>();
 const emit = defineEmits<{
   flash: [];
-  'view-logs': [];
   done: [];
 }>();
 
@@ -232,12 +231,6 @@ const actionBarMessage = computed(() => {
       </span>
       <div class="astros-firmware-controllers-panel__action-bar-buttons">
         <AstrosFirmwareButton
-          kind="secondary"
-          @click="emit('view-logs')"
-        >
-          {{ t('firmware_view.controllers.result_bar.view_logs') }}
-        </AstrosFirmwareButton>
-        <AstrosFirmwareButton
           kind="primary"
           @click="emit('done')"
         >
@@ -268,12 +261,6 @@ const actionBarMessage = computed(() => {
         }}
       </span>
       <div class="astros-firmware-controllers-panel__action-bar-buttons">
-        <AstrosFirmwareButton
-          kind="secondary"
-          @click="emit('view-logs')"
-        >
-          {{ t('firmware_view.controllers.result_bar.view_logs') }}
-        </AstrosFirmwareButton>
         <AstrosFirmwareButton
           kind="primary"
           @click="emit('done')"

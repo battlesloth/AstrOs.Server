@@ -39,7 +39,7 @@ Manual operator-flow QA for the `/firmware` view shipped across phase D (PRs d.1
 - After confirm: phase transitions to `flashing`. Topology shows animated dashed lines on connected segments; StagesList appears below with `download` (or whichever stage the server first emits) as current.
 - ControllerRow on the right switches from checkbox mode to status pill ("Updating" for active, "Queued" otherwise).
 - WebSocket events `flashControllerUpdate` flow in as stages progress: `UPLOADING_TO_MASTER → SENDING → VERIFYING → REBOOTING → VERSION_CONFIRMED`.
-- On completion: phase → `done`. Result bar shows "✓ All N controller(s) updated" on green background. View logs + Done buttons.
+- On completion: phase → `done`. Result bar shows "✓ All N controller(s) updated" on green background. Done button.
 - Click Done → returns to `select` phase, panel resets, controllerStates cleared.
 
 ### 3. Failure path — server returns 4xx synchronously
