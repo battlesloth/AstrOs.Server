@@ -97,10 +97,13 @@ export interface ChunkStreamerRunOpts {
   signal?: AbortSignal;
 }
 
-// Compact discriminator alias for the waiter machinery. Listing the kinds we
-// actually wait on (BEGIN_ACK / CHUNK_ACK / END_ACK) keeps the inferred
-// types tight and lets `Extract<FwInboundAck, ...>` resolve cleanly.
-type WaitableKind = 'beginAck' | 'chunkAck' | 'transferEndAck';
+// Compact discriminator alias for the waiter machinery. `waitFor` is only
+// ever called with these two phases — chunk-phase acks go through the
+// separate `chunkPhaseActive` machine (the block comment on currentWaiter
+// below explains why). Keeping the union narrow lets `Extract<FwInboundAck,
+// ...>` resolve cleanly and stops a future caller from mistakenly using
+// the single-slot waiter for chunk acks.
+type WaitableKind = 'beginAck' | 'transferEndAck';
 
 // `reject` is the external-reject path for the single-slot waiter used
 // by BEGIN-wait and END-wait. `rejectRun` reaches into `currentWaiter.reject`

@@ -21,7 +21,7 @@ Filed as new stubs (see "File deferred stubs" task): **Type I5** (server-side do
   - `flash_cancel.integration.test.ts:72` — replace stale "1500ms begin-ack timeout" comment with current 5_000 ms value and cross-reference `DEFAULT_STREAMER_CONFIG`.
   - `flash_orchestrator.ts:299` — add stop-and-wait disclaimer to the class header (matches the pattern in `chunk_streamer.ts:73-78`).
   - `chunk_streamer.test.ts:1904` — fix "production-default 5-min watchdog" (production is now 10 min via `DEFAULT_STREAMER_CONFIG`).
-- [ ] **Comment I2 + Code I2** — single commit removing dead members:
+- [x] **Comment I2 + Code I2** — single commit removing dead members:
   - `chunk_streamer.ts:100-103` — drop `'chunkAck'` from `WaitableKind` union (no `waitFor` caller uses it; chunk acks go through `chunkPhaseActive`).
   - `models/firmware/upload.ts:46-52` — drop `export` on `FIRMWARE_UPLOAD_ERROR_CODES` (the type derivation on the next line is the only consumer).
 - [ ] **File stubs for deferred Important items** — new plan files:
