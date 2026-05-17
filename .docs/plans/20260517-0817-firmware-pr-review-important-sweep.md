@@ -24,9 +24,9 @@ Filed as new stubs (see "File deferred stubs" task): **Type I5** (server-side do
 - [x] **Comment I2 + Code I2** — single commit removing dead members:
   - `chunk_streamer.ts:100-103` — drop `'chunkAck'` from `WaitableKind` union (no `waitFor` caller uses it; chunk acks go through `chunkPhaseActive`).
   - `models/firmware/upload.ts:46-52` — drop `export` on `FIRMWARE_UPLOAD_ERROR_CODES` (the type derivation on the next line is the only consumer).
-- [ ] **File stubs for deferred Important items** — new plan files:
-  - **Type I5** — server-side `DowngradePolicy` discriminated union + `validateFlashRequest` cross-check. Currently `allowDowngrade` toggle (store) + `downgradeAck` checkbox (modal) are independent booleans with no server-side gate. A future CLI/alternate-UI caller could push a downgrade without acknowledgement.
-  - **Silent I4** — `clearUpload` DELETE endpoint. Operator removes file A, uploads B, B fails → server still serves A on next flash → wrong firmware lands on controllers. Wire DELETE `/api/firmware/upload` + adjust store.
+- [x] **File stubs for deferred Important items** — new plan files:
+  - **Type I5** — `.docs/plans/20260517-0833-firmware-downgrade-ack-server-enforcement.md`
+  - **Silent I4** — `.docs/plans/20260517-0833-firmware-clear-upload-delete-endpoint.md`
 - [ ] **Pre-commit gate per task** — prettier + lint:fix + build + vitest (`npx vitest run`) + `superpowers:requesting-code-review` on the diff. Address Critical/Important findings before committing.
 
 ## Carried-forward stubs already captured
