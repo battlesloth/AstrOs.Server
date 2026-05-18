@@ -406,21 +406,42 @@ export class ApiServer {
         credentials: true,
       }),
     );
-    // 50 MB ceiling: AstrOs.ESP binaries are ~1.2 MB; this leaves an order of
-    // magnitude of headroom for future growth while preventing an authenticated
-    // operator from buffering a multi-GB POST into memory. `useTempFiles`
-    // streams the multipart body to disk during parse, so `.mv()` in the
-    // upload controller becomes a fast rename rather than a buffer-to-disk
-    // write. `abortOnLimit` rejects oversize uploads with 413 (its
-    // `closeConnection` is a no-op once `limitHandler` has sent the response
-    // body) and runs the lib's tmp-file cleanup either way.
+    // Path-scoped `fileUpload` mounts so the firmware-route limits and
+    // the firmware-themed `limitHandler` only apply to `/api/firmware/upload`.
+    // A single global `app.use(fileUpload(...))` would also catch
+    // `/api/audio/savefile`, where the 413 body shape (typed JSON) and copy
+    // ("Firmware upload exceeds…") don't match the audio UI's contract.
+    //
+    // Both routes need `useTempFiles` so `.mv()` becomes a rename rather
+    // than a buffer-to-disk write. Both impose a 50 MB ceiling — the audio
+    // route uses express-fileupload's default `responseOnLimit` (plain
+    // text "File size limit has been reached") rather than the
+    // firmware-typed JSON handler.
+    //
+    // 50 MB ceiling rationale: AstrOs.ESP binaries are ~1.2 MB; this
+    // leaves an order of magnitude of headroom while preventing an
+    // authenticated operator from buffering a multi-GB POST. Audio
+    // assets historically fit comfortably under the same ceiling.
+    // `abortOnLimit` rejects oversize uploads with 413 (its
+    // `closeConnection` is a no-op once `limitHandler` has sent the
+    // response body) and runs the lib's tmp-file cleanup either way.
     this.app.use(
+      '/api/firmware/upload',
       fileUpload({
+        useTempFiles: true,
+        tempFileDir: tmpdir(),
         limits: { fileSize: FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES },
         abortOnLimit: true,
         limitHandler: firmwareUploadLimitHandler,
+      }),
+    );
+    this.app.use(
+      '/api/audio/savefile',
+      fileUpload({
         useTempFiles: true,
         tempFileDir: tmpdir(),
+        limits: { fileSize: FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES },
+        abortOnLimit: true,
       }),
     );
     this.app.use(Express.json());

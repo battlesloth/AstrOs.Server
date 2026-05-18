@@ -77,7 +77,7 @@ Verifies the new POST `/api/firmware/upload` endpoint + UI handler. Before this 
 
 ### 8. Audio file uploads still work (regression smoke)
 
-The existing `/audio/savefile` route (`file_controller.ts`) uses the same `express-fileupload` middleware. Verify the new firmware-upload route doesn't break it by exercising audio upload from wherever the audio-upload UI lives. **Pass:** audio upload still works as before. (If you don't have audio-upload UX exposed, skip — the route is independent.)
+The existing `/audio/savefile` route (`file_controller.ts`) has its own path-scoped `express-fileupload` mount (route-scoped in `api_server.ts` so the firmware-typed JSON 413 body doesn't apply to audio). Verify the audio route still works: **Pass:** audio upload still completes. Oversize audio uploads (>50 MB) return HTTP 413 with the default `text/plain` body "File size limit has been reached" — distinct from the firmware route's typed JSON. (If you don't have audio-upload UX exposed, skip — the route is independent.)
 
 ### 9. Oversize file rejected with actionable copy (>50 MB)
 
