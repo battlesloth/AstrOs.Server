@@ -9,7 +9,8 @@ Sticks to mechanical / single-file / sub-10-LOC fixes. Skips:
 - **Silent I2** (`cancelFlash` 404 swallow when WS dropped) — needs WS connection state plumbing + new banner UX. Defer to follow-up; current swallow is rare-in-practice.
 - **Silent I5** (`fetchReleases` error invisible) — needs a staleness banner + locale + plumbing. Defer.
 - **Silent I6** (`wipePriorUploads` degraded:true) — needs a new response flag + UI affordance. Defer.
-- **Type I1** (`TransferId` brand), **Type I2** (`ProdTransportConfig`), **Type I3/I4** (`Upload`/`OwnFlash` discriminated unions), **Type I6** (cross-boundary type drift) — already captured in `20260516-1734-firmware-store-discriminated-unions-followup.md`.
+- **Type I3/I4** (`Upload`/`OwnFlash` discriminated unions) — captured in `20260516-1734-firmware-store-discriminated-unions-followup.md` as items I9/I10.
+- **Type I1** (`TransferId` brand), **Type I2** (`ProdTransportConfig`), **Type I6** (cross-boundary drift) — orphaned at the time this plan was written; the 2026-05-18 pre-push toolkit re-run caught the partial-fix-sweep miss. Now captured in `.docs/plans/20260518-0926-firmware-type-design-orphaned-followups.md`.
 
 Filed as new stubs (see "File deferred stubs" task): **Type I5** (server-side downgrade-ack enforcement) and **Silent I4** (`clearUpload` DELETE endpoint).
 
