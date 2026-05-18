@@ -6,6 +6,7 @@ import {
   FlashJobOrchestrator,
   FlashOrchestratorError,
   resolveFlashSource,
+  type FlashJobFailedData,
   type FlashOrchestratorWsMessage,
 } from './flash_orchestrator.js';
 import type { Clock, FlashRequest, Streamer } from '../models/firmware/flash_orchestrator.js';
@@ -2907,13 +2908,18 @@ describe('FlashJobOrchestrator', () => {
       expect(results.every((r) => r.controller.stage === FwStage.Failed)).toBe(true);
     });
 
-    it('background-IIFE .catch belt: if routeStartFailure throws, JobLock is still released so the next operator flash is not wedged', async () => {
+    it('background-IIFE .catch belt: if routeStartFailure throws, belt emits flashJobFailed, nulls per-job state, releases JobLock, and logs', async () => {
       // Forcing the inner catch to throw simulates the narrow but real path
       // where failJob → failNonTerminalControllers → transitionControllerState
       // raises the FSM's "illegal flash-job transition" Error on a malformed
       // controller shape. Pre-belt, the rejection went unhandled and the
-      // lock stayed held (failJob never reached its releaseLock line). The
-      // belt force-releases JobLock directly so the system unwedges.
+      // lock stayed held (failJob never reached its releaseLock line).
+      //
+      // Pin all four belt obligations:
+      //   - flashJobFailed best-effort emit so UI exits `phase='flashing'`
+      //   - per-job state nulled (next start() gets a clean slate)
+      //   - lock released
+      //   - logger.error breadcrumb fires (ops triage)
       const fx = setupHappyPath();
       (
         fx.orchestrator as unknown as {
@@ -2922,26 +2928,76 @@ describe('FlashJobOrchestrator', () => {
       ).routeStartFailure = vi.fn(() => {
         throw new Error('synthetic routeStartFailure failure');
       });
+      const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
-      const startPromise = fx.orchestrator.start(fx.request);
-      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
-      const run = fx.streamerControls.runs[0];
-      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
-      // Trigger the inner catch with a TransferError so routeStartFailure
-      // would normally consume it. Our spy throws instead — the belt is
-      // the only thing standing between this and a wedged lock.
-      fx.streamerControls.reject(new TransferError('hash_mismatch', run.spec.transferId, 'h'));
+      try {
+        const startPromise = fx.orchestrator.start(fx.request);
+        await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+        const run = fx.streamerControls.runs[0];
+        run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+        // Trigger the inner catch with a TransferError so routeStartFailure
+        // would normally consume it. Our spy throws instead — the belt is
+        // the only thing standing between this and a wedged lock.
+        fx.streamerControls.reject(new TransferError('hash_mismatch', run.spec.transferId, 'h'));
 
-      await startPromise;
-      // The belt's `.catch` absorbs the rejection, so this awaits a
-      // fulfilled promise. A regression that removes the belt would either
-      // reject here OR leave the lock held — the next assertion catches the
-      // second mode either way.
-      await fx.orchestrator.awaitRunInProgressForTest();
+        const result = await startPromise;
+        // The belt's `.catch` absorbs the rejection, so this awaits a
+        // fulfilled promise. A regression that removes the belt would either
+        // reject here OR leave the lock held — the next assertion catches the
+        // second mode either way.
+        await fx.orchestrator.awaitRunInProgressForTest();
 
-      // The contract: lock is released regardless of routeStartFailure
-      // throwing. Without the belt this would still be true === locked.
-      expect(fx.jobLock.isLocked()).toBe(false);
+        // Obligation 1: lock is released.
+        expect(fx.jobLock.isLocked()).toBe(false);
+
+        // Obligation 2: best-effort flashJobFailed emit fired so the UI
+        // can exit `phase='flashing'`. The belt-emitted frame carries
+        // `streamer_unknown_error` (distinct from `hash_mismatch`) so a
+        // future regression that re-routes through `safeEmitWs` instead
+        // of the belt's direct emit would surface here as a missing or
+        // wrong-reason frame.
+        const failedFrames = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+        const beltFrame = failedFrames.find(
+          (f) =>
+            (f.data as FlashJobFailedData).jobId === result.jobId &&
+            (f.data as FlashJobFailedData).reason === 'streamer_unknown_error',
+        );
+        expect(beltFrame).toBeDefined();
+        expect((beltFrame!.data as FlashJobFailedData).detail).toContain(
+          'Verify each controller manually',
+        );
+
+        // Obligation 3: per-job state fields nulled so the next start()
+        // gets a clean slate. Reading via the `as unknown as` cast — the
+        // fields are private, the cast is the established test idiom.
+        const internals = fx.orchestrator as unknown as {
+          runInProgress: Promise<void> | null;
+          currentJob: FlashJobState | null;
+          phase: 'upload' | 'deploy' | 'done' | null;
+          deployUnsubscriber: (() => void) | null;
+          throttle: unknown;
+          abortController: AbortController | null;
+        };
+        expect(internals.runInProgress).toBeNull();
+        expect(internals.currentJob).toBeNull();
+        expect(internals.phase).toBeNull();
+        expect(internals.deployUnsubscriber).toBeNull();
+        expect(internals.throttle).toBeNull();
+        expect(internals.abortController).toBeNull();
+
+        // Obligation 4: logger.error breadcrumb fires. The belt logs the
+        // captured throw with a job-id-tagged message. Ops monitoring
+        // tooling grep this for `force-released JobLock`.
+        expect(loggerErrorSpy).toHaveBeenCalled();
+        const errorCalls = loggerErrorSpy.mock.calls;
+        const beltLog = errorCalls.find((call) => {
+          const msg = call.find((arg) => typeof arg === 'string') as string | undefined;
+          return msg !== undefined && msg.includes('force-released JobLock');
+        });
+        expect(beltLog).toBeDefined();
+      } finally {
+        loggerErrorSpy.mockRestore();
+      }
     });
   });
 

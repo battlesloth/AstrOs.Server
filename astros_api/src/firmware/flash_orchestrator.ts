@@ -821,23 +821,72 @@ export class FlashJobOrchestrator {
           this.routeStartFailure(jobId, err);
         }
       })().catch((err) => {
-        // Final-fallback belt: routeStartFailure → failJob →
-        // failNonTerminalControllers → transitionControllerState raises
-        // the FSM's "illegal flash-job transition" Error if upstream ever
-        // leaves a controller in a stage the state machine's LEGAL_NEXT_STAGES
-        // guard rejects. Without this belt the promise rejects unhandled,
-        // Node logs a warning, and (because failJob didn't reach
-        // releaseLock) the JobLock stays held — the next operator flash
-        // sees `job_already_running` forever. Force the lock release
-        // directly; the operator's UI will miss the flashJobFailed event
-        // but at least the system is unwedged. JobLock.release returns a
-        // boolean and never throws (listener errors are swallowed inside
-        // notify), so no inner try is needed.
+        // Final-fallback belt for the narrow path where `routeStartFailure`
+        // itself throws: `failJob → failNonTerminalControllers →
+        // transitionControllerState` raises the FSM's "illegal flash-job
+        // transition" Error if upstream ever leaves a controller in a
+        // stage the `LEGAL_NEXT_STAGES` guard rejects. (Disposer throws
+        // from `releaseLock` are isolated by per-disposer try/catch
+        // there, so they don't reach this belt — keeping the belt's
+        // coverage exactly to the FSM-throw path means we won't emit a
+        // duplicate `flashJobFailed` that would overwrite a real
+        // diagnostic banner on the operator's UI.)
+        //
+        // Without this belt the promise rejects unhandled, and (because
+        // `failJob` didn't reach `releaseLock`) the JobLock stays held —
+        // the next operator flash sees `job_already_running` forever.
+        //
+        // Three things have to happen for the system to be usable again:
+        //
+        // 1. Best-effort terminal WS emit so the operator's UI can exit
+        //    `phase='flashing'`. Bypass `safeEmitWs` — that swallows-and-
+        //    logs, which would re-fire the log on whatever threw the belt
+        //    in the first place. The inner try/catch swallows any emit
+        //    failure; the local `emitOk` flag tells the final log message
+        //    whether the operator's UI was actually notified.
+        // 2. Null the per-job state fields WITHOUT invoking their
+        //    disposers. The disposers may be exactly what threw, so re-
+        //    invoking them risks an infinite-throw loop. The references
+        //    leak (one unsubscribe + one throttle never run); the next
+        //    `start()` gets a clean slate.
+        // 3. Release the JobLock. The return value tells us whether the
+        //    lock was actually held when the belt fired: `true` means
+        //    `failJob` never reached its `releaseLock` line and the belt
+        //    saved the system; `false` is reserved for a future broader
+        //    coverage path (today, the FSM-throw path always leaves the
+        //    lock held, so `released` is always `true`).
+        let emitOk = false;
+        try {
+          this.emitWs({
+            type: TransmissionType.flashJobFailed,
+            data: {
+              jobId,
+              endedAt: new Date(this.clock.now()).toISOString(),
+              reason: 'streamer_unknown_error',
+              detail:
+                'Internal cleanup failure; flash state is unknown. Verify each controller manually.',
+            },
+          });
+          emitOk = true;
+        } catch {
+          // Belt path is already failing; the emit may also throw. Swallow.
+        }
+        this.runInProgress = null;
+        this.currentJob = null;
+        this.phase = null;
+        this.deployUnsubscriber = null;
+        this.throttle = null;
+        this.abortController = null;
+        const released = this.jobLock.release(jobId);
+        const uiNote = emitOk
+          ? 'UI was notified via best-effort flashJobFailed emit.'
+          : 'UI emit also failed; operator must verify controllers manually.';
         logger.error(
           err,
-          `flash orchestrator: routeStartFailure threw for job=${jobId}; forcing JobLock.release. The operator UI may have missed the flashJobFailed event.`,
+          released
+            ? `flash orchestrator: routeStartFailure threw for job=${jobId}; force-released JobLock. ${uiNote}`
+            : `flash orchestrator: routeStartFailure threw for job=${jobId}; lock was already free. ${uiNote}`,
         );
-        this.jobLock.release(jobId);
       });
 
       return {
@@ -1003,12 +1052,36 @@ export class FlashJobOrchestrator {
       this.clock.clearTimeout(this.rebootTimer);
       this.rebootTimer = null;
     }
+    // Disposer calls run in their own try/catch so a misbehaving
+    // subscriber or throttle can't propagate up through `failJob` into
+    // the background-IIFE `.catch` belt. Without this guard, a throw
+    // here (AFTER `failJob` already emitted the real `flashJobFailed`)
+    // would reach the belt, which would emit a SECOND `flashJobFailed`
+    // with the generic `streamer_unknown_error` placeholder — the
+    // operator's UI would see the real diagnostic banner replaced by
+    // the catch-all message. Logging keeps the disposer failure
+    // diagnosable; the per-step null still runs so the next job gets
+    // a clean slate.
     if (this.deployUnsubscriber !== null) {
-      this.deployUnsubscriber();
+      try {
+        this.deployUnsubscriber();
+      } catch (err) {
+        logger.error(
+          err,
+          `flash orchestrator: deployUnsubscriber threw during releaseLock for job=${jobId}`,
+        );
+      }
       this.deployUnsubscriber = null;
     }
     if (this.throttle !== null) {
-      this.throttle.dispose();
+      try {
+        this.throttle.dispose();
+      } catch (err) {
+        logger.error(
+          err,
+          `flash orchestrator: throttle.dispose threw during releaseLock for job=${jobId}`,
+        );
+      }
       this.throttle = null;
     }
     this.abortController = null;
