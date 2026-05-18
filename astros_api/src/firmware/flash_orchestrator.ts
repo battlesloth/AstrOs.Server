@@ -294,7 +294,7 @@ export function createFlashProgressThrottle(opts: {
 //
 // Single-flight orchestrator for OTA flash jobs. Composes:
 //   * c.0 `JobLock` — synchronous boolean gate; only one flash at a time.
-//   * c.6a `transitionControllerState` / `deriveJobLifecycle` — per-controller
+//   * c.6a `transitionControllerState` / `deriveJobLifecycle` —
 //     per-controller FSM machinery.
 //   * c.6b `ChunkStreamer` — chunked upload to the master ESP32. The
 //     streamer's sliding-window machinery is exercised by its own tests,

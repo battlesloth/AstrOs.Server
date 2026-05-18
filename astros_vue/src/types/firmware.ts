@@ -67,19 +67,6 @@ export interface FirmwareUploadResponse {
   meta: FirmwareUploadMeta;
 }
 
-/** Mirror of the server's `FIRMWARE_UPLOAD_ERROR_CODES`. Hand-maintained. */
-export type FirmwareUploadErrorCode =
-  | 'invalid_body'
-  | 'upload_io_failed'
-  | 'invalid_firmware'
-  | 'upload_persist_failed'
-  | 'payload_too_large';
-
-export interface FirmwareUploadErrorResponse {
-  error: FirmwareUploadErrorCode;
-  detail: string;
-}
-
 export type ControllerOnlineStatus = 'up' | 'down' | 'needsSynced';
 
 /** Presentation-layer view of a controller for the firmware-update flow. */
