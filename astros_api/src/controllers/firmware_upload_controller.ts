@@ -28,6 +28,16 @@ export const FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES = 50 * 1024 * 1024;
 // option declares `limitHandler: RequestHandler` and matching here means a
 // future signature change on either side surfaces at compile time.
 export const firmwareUploadLimitHandler: RequestHandler = (req, res, _next) => {
+  // Idempotency guard: express-fileupload invokes `limitHandler` once
+  // per oversize file in a multipart payload. The firmware UI only ever
+  // posts a single file so this is a hostile-input concern rather than
+  // a real operator path, but without the guard a second call hits
+  // `res.status(413).json(body)` on an already-sent response and
+  // throws "Cannot set headers after they are sent" — surfacing as a
+  // 500 on top of the 413 the client already received. The warn log
+  // still fires for the first call (admin breadcrumb); subsequent
+  // calls return silently.
+  if (res.headersSent) return;
   // Log the rejection so an admin chasing "my upload keeps failing"
   // has a server-side breadcrumb. The operator sees the 413 + JSON
   // body on the client; without this log the only evidence on the

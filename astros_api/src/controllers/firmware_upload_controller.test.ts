@@ -267,6 +267,44 @@ describe('firmwareUploadLimitHandler — oversize multipart body', () => {
     }
   });
 
+  it('is idempotent: a second call after the first response is sent returns silently (no double-send throw)', () => {
+    // express-fileupload calls `limitHandler` once per oversize file. A
+    // hostile multi-file POST would invoke this twice; the second call
+    // hitting `res.status().json()` on an already-sent response throws
+    // "Cannot set headers after they are sent" — surfacing as a 500 on
+    // top of the operator's 413. The `headersSent` guard makes the
+    // second call a no-op.
+    const loggerWarnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const res = mockRes();
+      const req = {
+        headers: { 'content-length': '99999999' },
+        ip: '127.0.0.1',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
+
+      // First call: full path runs (status + json + log).
+      firmwareUploadLimitHandler(req, res, vi.fn());
+      expect(res.status).toHaveBeenCalledTimes(1);
+      expect(res.json).toHaveBeenCalledTimes(1);
+      const firstLogCount = loggerWarnSpy.mock.calls.length;
+      expect(firstLogCount).toBeGreaterThan(0);
+
+      // Simulate Express's post-send state.
+      res.headersSent = true;
+
+      // Second call: must early-return without touching res or logger.
+      firmwareUploadLimitHandler(req, res, vi.fn());
+      expect(res.status).toHaveBeenCalledTimes(1);
+      expect(res.json).toHaveBeenCalledTimes(1);
+      // The warn log doesn't fire on the second pass either — the
+      // breadcrumb is already in the server log from the first call.
+      expect(loggerWarnSpy.mock.calls.length).toBe(firstLogCount);
+    } finally {
+      loggerWarnSpy.mockRestore();
+    }
+  });
+
   it('exports the size limit so api_server can wire it onto fileUpload({limits})', () => {
     // The constant lives with the handler that produces the matching error
     // body. Pinning the value here would force a churn on every limit bump;

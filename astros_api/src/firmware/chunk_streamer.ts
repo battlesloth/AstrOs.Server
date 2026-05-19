@@ -1,8 +1,9 @@
 // ChunkStreamer — sliding-window FW_CHUNK transport over a SerialBus.
 //
 // One transfer drives `BEGIN → chunk loop → END`:
-//   - sliding window of WINDOW_SIZE chunks in flight, retired by
-//     cumulative FW_CHUNK_ACK
+//   - sliding window of `windowSize` chunks in flight, retired by
+//     cumulative FW_CHUNK_ACK (production wiring overrides to
+//     `windowSize: 1` for stop-and-wait — see `DEFAULT_STREAMER_CONFIG`)
 //   - FW_CHUNK_NAK with FLASH_FULL is terminal; CRC / SIZE / OUT_OF_ORDER
 //     trigger Go-Back-N from `nak.nextExpectedSeq` (NOT `lastGoodSeq + 1`
 //     — that breaks on first-chunk NAK; see handleChunkNak for details)
