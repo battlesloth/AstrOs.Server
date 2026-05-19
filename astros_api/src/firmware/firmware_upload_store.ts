@@ -311,7 +311,23 @@ export class FirmwareUploadStore {
       if (parsed.uploadId !== uploadId) return null;
       if (parsed.sizeBytes !== binStat.size) return null;
       return { path: p.bin, sha256, sizeBytes: binStat.size, meta: parsed };
-    } catch {
+    } catch (err) {
+      // Intentional broad catch: ENOENT / JSON parse / shape-validation
+      // misses all map to null per the method's contract (operator sees
+      // "no upload available; pick a firmware binary"). But EACCES /
+      // EISDIR / EIO mean the on-disk state is something the operator
+      // can't fix from the UI alone — log so an admin can distinguish
+      // "no sidecar" from "permission denied on the uploads dir." Use
+      // warn (not error) because the path is part of normal "no upload
+      // yet" startup state; an admin reading the logs sorts by error
+      // code, not by frequency.
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== undefined && code !== 'ENOENT') {
+        logger.warn(
+          { uploadId, code, err },
+          'firmware_upload_store.latest(): treating non-ENOENT failure as a null miss',
+        );
+      }
       return null;
     }
   }

@@ -557,6 +557,37 @@ describe('dispatcher happy paths + contract pins', () => {
     }
   });
 
+  it('routes well-formed FLASH_JOB_FAILED through applyJobFailed with the reason intact', () => {
+    // The store-level `it.each` over streamer reasons asserts that
+    // applyJobFailed passes the reason through verbatim — but that test
+    // calls applyJobFailed directly, bypassing the WS dispatch layer.
+    // A regression that re-routed FLASH_JOB_FAILED through a different
+    // handler (or accidentally set flashError via setFlashError only,
+    // skipping applyJobFailed's normalization) would still pass every
+    // store-level assertion. Pin the seam here.
+    const { handleMessage } = useWebsocket();
+    const firmware = useFirmwareStore();
+    firmware.setPhase('flashing');
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.FLASH_JOB_FAILED,
+        data: {
+          jobId: 'job-rt',
+          endedAt: '2026-05-19T10:00:00Z',
+          reason: 'hash_mismatch',
+          detail: 'sha mismatch on Body',
+        },
+      }),
+    );
+    expect(firmware.flashError?.reason).toBe('hash_mismatch');
+    expect(firmware.flashError?.detail).toBe('sha mismatch on Body');
+    // applyJobFailed transitions to phase='failed' and stamps the
+    // currentJob's endedAt — pin both so a future regression that
+    // bypasses applyJobFailed fails this test rather than passing on
+    // the flashError side alone.
+    expect(firmware.phase).toBe('failed');
+  });
+
   it('FLASH_JOB_ACTIVE is a no-op: phase, flashError, controllerStates all unchanged', () => {
     const { handleMessage } = useWebsocket();
     const firmware = useFirmwareStore();

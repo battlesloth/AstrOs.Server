@@ -18,6 +18,7 @@ import { useControllerStore } from '@/stores/controller';
 import { ControllerStatus, Location } from '@/enums';
 import type {
   ControllerFlashState,
+  FlashErrorReason,
   FlashJobFailedData,
   FlashJobState,
   ReleaseInfo,
@@ -1489,13 +1490,20 @@ describe('firmware store', () => {
       expect(store.flashError?.detail).toBe('unrecognized reason from a future server');
     });
 
-    // Pin each streamer reason maps through verbatim. The set comes from
-    // TransferErrorCode in astros_api/src/models/firmware/chunk_streamer.ts;
-    // if a code is removed from FLASH_ERROR_REASONS it will silently
-    // collapse to 'internal_server_error' and the operator loses
-    // bench-actionable copy (e.g., "the master's SD card is full" becomes
-    // "check the server logs"). This guards that contract.
-    it.each([
+    // Pin each streamer reason maps through verbatim. Typed against
+    // FlashErrorReason (which is `(typeof FLASH_ERROR_REASONS)[number]`)
+    // so a future regression that REMOVED a member from the tuple while
+    // leaving it in this array fails to compile — the protection is
+    // compile-time, not runtime.
+    //
+    // The streamer-subset list is still hand-maintained against
+    // TransferErrorCode in astros_api/src/models/firmware/chunk_streamer.ts:
+    // there is no compile-time tether across that server-client boundary
+    // today (tracked as Type I6 in
+    // .docs/plans/20260518-0926-firmware-type-design-orphaned-followups.md).
+    // The `aborted` member is excluded here because it has its own
+    // dedicated test below (covers the cancel-vs-error discriminator).
+    const STREAMER_REASONS: ReadonlyArray<FlashErrorReason> = [
       'source_read_failed',
       'source_size_mismatch',
       'begin_timeout',
@@ -1507,7 +1515,8 @@ describe('firmware store', () => {
       'hash_mismatch',
       'master_io_error',
       'bus_send_failed',
-    ] as const)("maps streamer reason '%s' through verbatim", (reason) => {
+    ];
+    it.each(STREAMER_REASONS)("maps streamer reason '%s' through verbatim", (reason) => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());

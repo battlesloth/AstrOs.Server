@@ -38,6 +38,7 @@
 
 import { promises as fsp } from 'fs';
 import { v4 as uuid_v4 } from 'uuid';
+import { logger } from '../logger.js';
 import { crc16CcittFalseHex } from '../utility/crc16.js';
 import type {
   FwInboundAck,
@@ -1034,7 +1035,20 @@ export class ChunkStreamer {
       for (const timer of chunkTimers.values()) clearTimeout(timer);
       chunkTimers.clear();
       inFlight.clear();
-      unsubscribe();
+      // Wrap unsubscribe so a bus mid-shutdown / double-disposed handle
+      // can't replace the run's settled state with a TypeError that
+      // would surface as the catch-all `streamer_unknown_error` rather
+      // than the real terminal code. The dispatcher is already detached
+      // logically (chunkPhaseActive=false above), so a throw here is
+      // post-resolve and safe to log + swallow.
+      try {
+        unsubscribe();
+      } catch (err) {
+        logger.error(
+          err,
+          `chunk streamer: subscriber unsubscribe threw during run cleanup for transferId=${spec.transferId}`,
+        );
+      }
     }
   }
 }

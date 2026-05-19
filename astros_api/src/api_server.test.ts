@@ -86,6 +86,73 @@ describe('ApiServer route-scoped fileUpload wiring', () => {
     expect(globalMount.test(apiServerSource)).toBe(false);
   });
 
+  it('api_server source contains the literal listFlashTargets intersection filter expression', () => {
+    // Companion pin to the logic-correctness test below. The logic test
+    // mirrors the closure and asserts it computes the right answer; this
+    // grep asserts the production code STILL USES that closure shape. A
+    // refactor that swapped `.filter(([id]) => wanted.has(id))` for a
+    // bare `Array.from(this.controllerVariantCache.entries())` (or any
+    // form that drops the intersection) would pass the logic test but
+    // fail here. The two tests together close the wiring vs. logic gap.
+    expect(apiServerSource).toMatch(/listFlashTargets:\s*async\s*\(\s*requestedIds\s*\)/);
+    expect(apiServerSource).toMatch(/const\s+wanted\s*=\s*new\s+Set\s*\(\s*requestedIds\s*\)/);
+    expect(apiServerSource).toMatch(
+      /\.filter\s*\(\s*\(\s*\[\s*id\s*\]\s*\)\s*=>\s*wanted\.has\s*\(\s*id\s*\)\s*\)/,
+    );
+  });
+
+  it('listFlashTargets inline filter returns the intersection of cache and requestedIds (request-scoped flash)', () => {
+    // The api_server-side inline `listFlashTargets` callback at lines
+    // 619-625 was added by commit 0f91582 to make per-controller flash
+    // selection actually scope the flash (rather than always flashing
+    // every cached controller). Integration tests use a single master
+    // controller and never exercise the `cache has N, request has K<N`
+    // shape the filter exists to handle, so a regression that dropped
+    // the `.filter(wanted.has)` (or substituted a stale default) would
+    // pass every existing test.
+    //
+    // Mirror the production filter inline and exercise it against the
+    // three discriminating shapes: subset, single-item match,
+    // unrequested cache entries excluded. The api_server's
+    // controllerVariantCache is a Map<string, string>; requestedIds is
+    // a readonly string[].
+    const cache = new Map<string, string>([
+      ['aa:bb:cc:00:00:01', 'lolin_d32_pro'],
+      ['aa:bb:cc:00:00:02', 'lolin_d32_pro'],
+      ['aa:bb:cc:00:00:03', 'esp32_wroom'],
+    ]);
+    const intersectionFilter = (requestedIds: readonly string[]) => {
+      const wanted = new Set(requestedIds);
+      return Array.from(cache.entries())
+        .filter(([id]) => wanted.has(id))
+        .map(([id, variant]) => ({ id, variant }));
+    };
+
+    // Subset: request 2 of 3, expect those 2 back, third excluded.
+    const subset = intersectionFilter(['aa:bb:cc:00:00:01', 'aa:bb:cc:00:00:03']);
+    expect(subset).toEqual([
+      { id: 'aa:bb:cc:00:00:01', variant: 'lolin_d32_pro' },
+      { id: 'aa:bb:cc:00:00:03', variant: 'esp32_wroom' },
+    ]);
+
+    // Single-item request: only that entry comes back.
+    expect(intersectionFilter(['aa:bb:cc:00:00:02'])).toEqual([
+      { id: 'aa:bb:cc:00:00:02', variant: 'lolin_d32_pro' },
+    ]);
+
+    // Empty request: empty intersection (the orchestrator surfaces this
+    // as `no_controllers`; HTTP validator should reject before reaching
+    // the filter, but the filter is correct under that input).
+    expect(intersectionFilter([])).toEqual([]);
+
+    // Request that includes an unknown MAC: filter silently excludes it.
+    // The orchestrator's missing-id check (controllers_unknown) is what
+    // surfaces the operator-facing error.
+    expect(intersectionFilter(['aa:bb:cc:00:00:01', 'unknown-mac'])).toEqual([
+      { id: 'aa:bb:cc:00:00:01', variant: 'lolin_d32_pro' },
+    ]);
+  });
+
   it('only the /api/firmware/upload mount wires firmwareUploadLimitHandler', () => {
     // For each `this.app.use('<path>', fileUpload(...))` block, slice from
     // the path literal to the matching mount terminator (`}));`) and grep

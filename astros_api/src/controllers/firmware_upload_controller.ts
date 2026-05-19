@@ -27,7 +27,18 @@ export const FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES = 50 * 1024 * 1024;
 // is type-checked against Express's Response shape; the express-fileupload
 // option declares `limitHandler: RequestHandler` and matching here means a
 // future signature change on either side surfaces at compile time.
-export const firmwareUploadLimitHandler: RequestHandler = (_req, res, _next) => {
+export const firmwareUploadLimitHandler: RequestHandler = (req, res, _next) => {
+  // Log the rejection so an admin chasing "my upload keeps failing"
+  // has a server-side breadcrumb. The operator sees the 413 + JSON
+  // body on the client; without this log the only evidence on the
+  // server is a missing controller invocation, which is harder to
+  // grep for than a tagged warn line. Include `content-length` (when
+  // the client supplied it) so an admin can confirm the limit is the
+  // actual cause rather than misattributed.
+  const contentLength = req.headers['content-length'] ?? 'unknown';
+  logger.warn(
+    `firmware upload rejected as payload_too_large: ip=${req.ip ?? 'unknown'} content-length=${contentLength} limit=${FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES}`,
+  );
   const body: FirmwareUploadErrorResponse = {
     error: 'payload_too_large',
     detail: `Firmware upload exceeds the ${Math.round(FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES / (1024 * 1024))} MB limit.`,

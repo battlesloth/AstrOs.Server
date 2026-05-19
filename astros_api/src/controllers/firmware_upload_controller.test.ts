@@ -9,6 +9,7 @@ import {
   type FirmwareUploadStore,
 } from '../firmware/firmware_upload_store.js';
 import type { StoredUpload } from '../models/firmware/upload.js';
+import { logger } from '../logger.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mockRes(): any {
@@ -222,8 +223,16 @@ describe('firmwareUploadLimitHandler — oversize multipart body', () => {
     // `internal_server_error` and the operator loses the actionable copy.
     // This pins the wire shape (JSON, typed error code, integer status).
     const res = mockRes();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    firmwareUploadLimitHandler({} as any, res, vi.fn());
+    // Minimum shape express-fileupload's RequestHandler signature
+    // requires: `headers` is always present on a real Request (Express
+    // populates it; the cast just satisfies the type-check). `ip` is
+    // optional in the production code via `?? 'unknown'`, so omit here.
+    const req = {
+      headers: { 'content-length': '52428801' },
+      ip: '127.0.0.1',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    firmwareUploadLimitHandler(req, res, vi.fn());
 
     expect(res.status).toHaveBeenCalledWith(413);
     expect(res.json).toHaveBeenCalledTimes(1);
@@ -232,6 +241,30 @@ describe('firmwareUploadLimitHandler — oversize multipart body', () => {
     // Detail names the limit so the operator can size their file correctly
     // without reading server logs or source code.
     expect(body.detail).toMatch(/\d+\s*MB/);
+  });
+
+  it('logs a server-side breadcrumb with ip + content-length when emitting 413', () => {
+    // The 413 JSON body is the operator's signal; the server log line is
+    // the admin's signal. Without this log, "my upload keeps failing"
+    // tickets have no server-side trace to grep for. Pin the breadcrumb
+    // shape so a future regression that drops the log (or strips the
+    // content-length / ip context) fails this test.
+    const loggerWarnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    try {
+      const res = mockRes();
+      const req = {
+        headers: { 'content-length': '99999999' },
+        ip: '203.0.113.7',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any;
+      firmwareUploadLimitHandler(req, res, vi.fn());
+      const warnCalls = loggerWarnSpy.mock.calls.flat().join(' ');
+      expect(warnCalls).toContain('payload_too_large');
+      expect(warnCalls).toContain('203.0.113.7');
+      expect(warnCalls).toContain('99999999');
+    } finally {
+      loggerWarnSpy.mockRestore();
+    }
   });
 
   it('exports the size limit so api_server can wire it onto fileUpload({limits})', () => {

@@ -818,6 +818,17 @@ describe('FlashJobOrchestrator', () => {
     });
     expect(result.targets).toEqual(['controller-a', 'controller-b']);
 
+    // Request-scoped controllers contract pin: the orchestrator MUST
+    // forward request.controllers verbatim to listFlashTargets. A
+    // regression that filtered or substituted (e.g. passing `[]` or
+    // a stale default) would let the api_server's inline `wanted.has(id)`
+    // filter (api_server.ts:619-625) emit no_controllers OR flash the
+    // wrong subset — the existing controllers_unknown / no_controllers
+    // negative tests use mocks that return their configured arrays
+    // regardless of caller args, so they don't catch this drift.
+    expect(fx.controllersStore.listFlashTargets).toHaveBeenCalledTimes(1);
+    expect(fx.controllersStore.listFlashTargets).toHaveBeenCalledWith(fx.request.controllers);
+
     // TransferSpec carried both the on-disk path (from CachedAsset) and the
     // controllers' IDs as targets.
     expect(spec.source.path).toBe(fx.cachedAsset.path);
