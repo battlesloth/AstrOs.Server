@@ -33,6 +33,40 @@ export type ReleasesLoadState = 'idle' | 'loading' | 'loaded' | 'stale' | 'error
 
 export type FirmwareSourceMode = 'github' | 'upload';
 
+/** Upload state machine — drives the source strip's in-progress affordance
+ *  and gates `canFlash` on a real (server-acknowledged) upload rather than
+ *  the operator's just-picked filename. */
+export type UploadState = 'idle' | 'uploading' | 'uploaded' | 'error';
+
+/** Server's projection of a successful upload — what the operator sees
+ *  after the .bin parses and the artifact is promoted into the slot.
+ *  `version` is the esp_app_desc-reported version (normalized); `sizeBytes`
+ *  matches the on-disk artifact; `displayName` is the operator's original
+ *  filename (never path-interpolated server-side, so safe to render). */
+export interface UploadedFirmware {
+  version: string;
+  displayName: string;
+  sizeBytes: number;
+}
+
+/** Mirror of the server's `StoredUploadMeta`. Hand-maintained. */
+export interface FirmwareUploadMeta {
+  uploadId: string;
+  originalFilename: string;
+  projectName: string;
+  version: string;
+  uploadedAt: string;
+  sizeBytes: number;
+}
+
+/** Mirror of the server's `FirmwareUploadResponse` (POST
+ *  /api/firmware/upload success body). */
+export interface FirmwareUploadResponse {
+  sha256: string;
+  sizeBytes: number;
+  meta: FirmwareUploadMeta;
+}
+
 export type ControllerOnlineStatus = 'up' | 'down' | 'needsSynced';
 
 /** Presentation-layer view of a controller for the firmware-update flow. */
@@ -81,19 +115,59 @@ export type FirmwareStage = 'download' | 'transfer' | 'flash' | 'verify' | 'rebo
 export type FirmwareStageLabelKey = `firmware_view.stages.${FirmwareStage}.label`;
 
 /**
- * Subset of the server's FlashOrchestratorErrorReason that surfaces via the
- * HTTP error response. Post-streamer failures (hash_mismatch,
- * chunk_retry_exhausted, etc.) are deliberately omitted — those arrive on
- * the WS surface, not via this envelope.
+ * Unified mirror of every server-emitted error code that lands on a
+ * flash-error envelope (HTTP body or WS `flashJobFailed`). Server side,
+ * the codes originate in three distinct authoring surfaces — keep both
+ * sides updated together when adding to any of them:
  *
- * The tuple is the single source of truth: the `FlashErrorReason` union is
- * derived from it, and `KNOWN_FLASH_ERROR_REASONS` is the corresponding
- * runtime Set — both stay in sync because both come from this one list.
+ *   1. `FlashOrchestratorErrorReason`
+ *      (`astros_api/src/firmware/flash_orchestrator.ts`) — pre-streamer
+ *      validation + source resolution (e.g. `no_controllers`,
+ *      `variant_mismatch`, `release_not_found`), the orchestrator's
+ *      own mid-flow envelope reasons (`aborted`, `streamer_unknown_error`,
+ *      `protocol_violation`, `subscriber_attach_failed`), AND the
+ *      streamer transport codes from `TransferErrorCode` which are
+ *      absorbed into this union via `| TransferErrorCode`. The
+ *      orchestrator's `routeStartFailure` is the single fail-path
+ *      consolidation for both pre-streamer and mid-streamer errors.
+ *   2. `TransferErrorCode` (`astros_api/src/models/firmware/chunk_streamer.ts`)
+ *      — listed here because the codes are *authored* in this file
+ *      (e.g. `hash_mismatch`, `transfer_timeout`, `bus_send_failed`)
+ *      even though the type itself flows in via the orchestrator union
+ *      above. Adding a new transport code requires updating this tuple.
+ *   3. `FirmwareUploadErrorCode` (`astros_api/src/models/firmware/upload.ts`)
+ *      — HTTP error bodies from `POST /api/firmware/upload`, plus
+ *      `payload_too_large` emitted by `firmwareUploadLimitHandler`
+ *      inside express-fileupload's `limitHandler`. Independent of the
+ *      orchestrator union.
+ *
+ * Plus two client-side reasons the server never emits: `network_error`
+ * (transport-layer failures) and `internal_server_error` (catch-all
+ * fallback when the wire reason doesn't appear in this tuple).
+ *
+ * The HTTP envelope and the WS `flashJobFailed` event share this
+ * surface — the same reason lands on either path and the operator sees
+ * the same `firmware_view.flash_errors.*` copy regardless of which one
+ * fired.
+ *
+ * The tuple is the single source of truth: the `FlashErrorReason` union
+ * is derived from it, and `KNOWN_FLASH_ERROR_REASONS` is the
+ * corresponding runtime Set — both stay in sync because both come from
+ * this one list. A locale-coverage test pins that every reason has a
+ * matching `firmware_view.flash_errors.<reason>` key. Drift between the
+ * server surfaces and this tuple is NOT compile-time enforced today
+ * (see `.docs/plans/20260518-0926-firmware-type-design-orphaned-followups.md`
+ * Type I6 for the planned tether).
  */
 export const FLASH_ERROR_REASONS = [
   'invalid_body',
   'job_already_running',
   'no_controllers',
+  'controllers_unknown',
+  'invalid_firmware',
+  'upload_io_failed',
+  'upload_persist_failed',
+  'payload_too_large',
   'variant_mismatch',
   'variant_unknown',
   'release_not_found',
@@ -105,6 +179,26 @@ export const FLASH_ERROR_REASONS = [
   'subscriber_attach_failed',
   'protocol_violation',
   'streamer_unknown_error',
+  // Streamer-emitted reasons (mirror of TransferErrorCode in
+  // astros_api/src/models/firmware/chunk_streamer.ts). The orchestrator
+  // routes these onto `flashJobFailed` so the same envelope/locale path
+  // serves both pre-streamer and mid-streamer failures. Operator needs to
+  // distinguish "master crashed" from "SD card full" from "cable unseated"
+  // — each gets its own bench-actionable copy.
+  'source_read_failed',
+  'source_size_mismatch',
+  'begin_timeout',
+  'begin_rejected',
+  'chunk_retry_exhausted',
+  'flash_full',
+  'transfer_timeout',
+  'end_timeout',
+  'hash_mismatch',
+  'master_io_error',
+  'bus_send_failed',
+  // Both cancel paths route through `failJob` with reason='aborted' so
+  // the banner shows "Cancelled" copy rather than `internal_server_error`.
+  'aborted',
   'internal_server_error',
   'network_error',
 ] as const;

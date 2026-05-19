@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import apiService, { apiClient } from '@/api/apiService';
-import { FIRMWARE_FLASH, FIRMWARE_RELEASES } from '@/api/endpoints';
+import { FIRMWARE_FLASH, FIRMWARE_RELEASES, FIRMWARE_UPLOAD } from '@/api/endpoints';
 import { compareTags } from '@/utils/version';
 import { mapHttpErrorToFlashEnvelope } from '@/utils/firmwareFlashError';
 import {
@@ -21,6 +21,7 @@ import type {
   FailedControllerSummary,
   FirmwareStage,
   FirmwareStageLabelKey,
+  FirmwareUploadResponse,
   SlotId,
   FlashErrorEnvelope,
   FlashErrorReason,
@@ -29,6 +30,8 @@ import type {
   ReleaseInfo,
   ReleaseListResult,
   ReleasesLoadState,
+  UploadedFirmware,
+  UploadState,
 } from '@/types/firmware';
 import { KNOWN_FLASH_ERROR_REASONS } from '@/types/firmware';
 
@@ -68,7 +71,13 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   const sourceMode = ref<FirmwareSourceMode>('github');
   const selectedReleaseTag = ref<string | null>(null);
+  // Operator-supplied filename (cosmetic — surfaced in the source strip
+  // eyebrow while the upload is in flight). `uploadedFile` below is the
+  // server-acknowledged metadata; `canFlash` gates on `uploadedFile`, not
+  // this ref — picking a filename doesn't mean the server has the binary.
   const uploadedFilename = ref<string | null>(null);
+  const uploadState = ref<UploadState>('idle');
+  const uploadedFile = ref<UploadedFirmware | null>(null);
 
   const selectedControllerIds = ref<ReadonlySet<string>>(new Set());
 
@@ -93,6 +102,16 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // Set by `startFlash` from the POST response so the UI can tell whether the
   // active flash belongs to us vs. another operator (lock-conflict UI).
   const ownJobId = ref<string | null>(null);
+
+  // True from `startFlash()` entry until either the POST resolves+
+  // `currentJob.jobId === ownJobId` AND we've passed the lockStateChanged
+  // race window, OR the start fails / the flash terminates. Closes the
+  // race where the server's `lockStateChanged{locked:true}` arrives before
+  // its `flashJobStarted` (and before the HTTP response carrying `jobId`)
+  // — without this flag, the operator's own in-flight flash satisfies
+  // `lockLocked && !isOwnJob` and the page wrongly shows the foreign-
+  // operator conflict banner. Cleared on every terminal transition.
+  const pendingOwnFlashStart = ref(false);
 
   // Queue of ControllerFlashState payloads dropped because their MAC wasn't
   // yet in the controllerStore's resolver. The cold-load / late-join race:
@@ -139,8 +158,23 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   const target = computed<string | null>(() => {
     if (sourceMode.value === 'github') return selectedReleaseTag.value;
-    return uploadedFilename.value ? 'local-build' : null;
+    // Gate on the server-acknowledged upload, not the local filename — a
+    // filename in `uploadedFilename` could be mid-flight or errored. The
+    // operator should only see "ready to flash" after the server has
+    // parsed and promoted the artifact.
+    return uploadedFile.value ? 'local-build' : null;
   });
+
+  // Operator-set escape hatch for the downgrade policy. Defaults to false;
+  // flipping to true makes downgrade rows selectable and shifts the modal
+  // into ack-required mode. Intentionally NOT cleared by resetToSelect —
+  // only a page reload clears it. The modal ack remains the last-chance
+  // gate on each individual flash. If a future flow ever adds a second
+  // reset path (logout, session timeout), the non-clearing of this ref is
+  // a deliberate decision, not an oversight — re-confirm before changing.
+  // Uploaded firmware ('local-build') is never classified as a downgrade
+  // (compareTags returns NaN), so the toggle is a no-op in upload mode.
+  const allowDowngrade = ref(false);
 
   function isDowngrade(controllerId: string): boolean {
     const t = target.value;
@@ -151,21 +185,62 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return cmp > 0;
   }
 
-  function isBlocked(controllerId: string): boolean {
+  // `down` is reality (controller is unreachable); `isDowngrade` is policy
+  // (we choose not to install older firmware by default). Splitting them
+  // lets the allowDowngrade toggle relax the policy without overriding the
+  // reality. Unknown ids fail-closed: today FLEET_LAYOUT is static so this
+  // can't fire, but if FLEET_LAYOUT goes dynamic an orphan selectedId would
+  // otherwise slip past canFlash and dispatch a phantom flash target. The
+  // warn breadcrumb keeps a future dynamic-fleet bug from manifesting as a
+  // silently stuck "cannot flash" with no diagnostic clue.
+  function isHardBlocked(controllerId: string): boolean {
     const c = controllers.value.find((x) => x.id === controllerId);
-    if (!c) return false;
-    return c.status === 'down' || isDowngrade(controllerId);
+    if (c === undefined) {
+      console.warn(
+        `[firmwareStore] isHardBlocked: unknown controllerId="${controllerId}" treated as hard-blocked. Stale selection or contract drift.`,
+      );
+      return true;
+    }
+    return c.status === 'down';
   }
 
-  const anyDowngradeBlocked = computed(() => [...selectedControllerIds.value].some(isDowngrade));
+  function isSelectable(controllerId: string): boolean {
+    if (isHardBlocked(controllerId)) return false;
+    if (!allowDowngrade.value && isDowngrade(controllerId)) return false;
+    return true;
+  }
+
+  // Selection-based: are any selected controllers currently policy-blocked
+  // as downgrades? Drives the action-bar "downgrade blocked" warning copy.
+  // When allowDowngrade flips to true, this clears even if downgrades stay
+  // selected — the policy block is gone.
+  const anyDowngradeBlocked = computed(
+    () => !allowDowngrade.value && [...selectedControllerIds.value].some(isDowngrade),
+  );
+
+  // Fleet-based: would any controller in the fleet be downgraded by the
+  // current target? Drives the contextual reveal of the "Allow downgrades"
+  // toggle in the controllers-panel header — when no downgrade scenario
+  // exists at all (pure-upgrade target), the toggle stays hidden to keep
+  // the routine path uncluttered.
+  const anyFleetDowngrade = computed(() => controllers.value.some((c) => isDowngrade(c.id)));
+
+  const anyHardBlockedSelected = computed(() =>
+    [...selectedControllerIds.value].some(isHardBlocked),
+  );
 
   const canFlash = computed(
     () =>
-      target.value !== null && selectedControllerIds.value.size > 0 && !anyDowngradeBlocked.value,
+      target.value !== null &&
+      selectedControllerIds.value.size > 0 &&
+      !anyHardBlockedSelected.value &&
+      !anyDowngradeBlocked.value,
   );
 
   const isOwnJob = computed(
-    () => currentJob.value !== null && currentJob.value.jobId === ownJobId.value,
+    () =>
+      pendingOwnFlashStart.value ||
+      (currentJob.value !== null && currentJob.value.jobId === ownJobId.value),
   );
 
   // Selection actions always replace the Set (not mutate in place) so Vue
@@ -179,7 +254,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
 
   function selectAll(): void {
     selectedControllerIds.value = new Set(
-      controllers.value.filter((c) => !isBlocked(c.id)).map((c) => c.id),
+      controllers.value.filter((c) => isSelectable(c.id)).map((c) => c.id),
     );
   }
 
@@ -199,6 +274,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     currentJob.value = null;
     controllerStates.value = new Map();
     ownJobId.value = null;
+    pendingOwnFlashStart.value = false;
     pendingByMac.value = new Map();
     currentJobLoadFailed.value = false;
   }
@@ -415,6 +491,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
     phase.value = 'done';
     currentStage.value = null;
+    // Job terminated — clear the start-pending flag. Subsequent
+    // lock-conflict checks fall back to the equality clause, which is
+    // load-bearing for foreign-flash detection.
+    pendingOwnFlashStart.value = false;
     // Normalize any per-controller state that's still mid-flow to
     // VERSION_CONFIRMED. The server emits flashJobDone when the LAST
     // VERSION_CONFIRMED is observed, but the carrying flashControllerResult
@@ -481,6 +561,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
       };
     }
     phase.value = 'failed';
+    // Terminal: clear the start-pending flag so subsequent lock-conflict
+    // checks rely on the equality clause (load-bearing for foreign-flash
+    // detection on any next operator action).
+    pendingOwnFlashStart.value = false;
     // Map server-side reason onto FlashErrorReason if recognized, otherwise
     // fall back to internal_server_error. Forward-compat: a new server-side
     // reason renders the generic banner until the client union is updated.
@@ -575,10 +659,57 @@ export const useFirmwareStore = defineStore('firmware', () => {
   async function startFlash(): Promise<void> {
     if (!canFlash.value || phase.value === 'flashing') return;
     clearFlashError();
+
+    // Map slot ids → MAC addresses (the server's identity space). The flash
+    // wire contract carries MACs end-to-end: controllerVariantCache is keyed
+    // by MAC, the chunk_streamer addresses ESP-NOW peers by MAC. Slot id is
+    // the UI-side abstraction only.
+    //
+    // A selected slot with no known MAC client-side is structurally unusual
+    // (selection requires a controller row to exist, which requires a
+    // LocationStatus broadcast, which carries the MAC). Skip + warn rather
+    // than silently include an empty string — the server's validator would
+    // reject anyway, and the warn gives ops a forensic breadcrumb.
+    const cs = useControllerStore();
+    const macBySlot: Record<string, string | null> = {
+      [Location.BODY]: cs.bodyMac,
+      [Location.CORE]: cs.coreMac,
+      [Location.DOME]: cs.domeMac,
+    };
+    const controllerMacs: string[] = [];
+    for (const slot of selectedControllerIds.value) {
+      const mac = macBySlot[slot];
+      if (mac === null || mac === undefined) {
+        console.warn(
+          `[firmwareStore] startFlash: selected slot "${slot}" has no known MAC; skipping. ` +
+            `Selection should not have been reachable without a LocationStatus heartbeat — possible store-state drift.`,
+        );
+        continue;
+      }
+      controllerMacs.push(mac);
+    }
+    if (controllerMacs.length === 0) {
+      // Defensive: canFlash already gated on selectedControllerIds.size > 0,
+      // so the only way here is every selected slot lost its MAC since the
+      // gate fired. Surface a flash-error envelope so the panel banner
+      // explains rather than silently no-op'ing.
+      setFlashError({ reason: 'no_controllers' });
+      return;
+    }
+
     const body =
       sourceMode.value === 'github'
-        ? { source: { kind: 'github' as const, version: selectedReleaseTag.value } }
-        : { source: { kind: 'upload' as const } };
+        ? {
+            source: { kind: 'github' as const, version: selectedReleaseTag.value },
+            controllers: controllerMacs,
+          }
+        : { source: { kind: 'upload' as const }, controllers: controllerMacs };
+    // Set the pending flag BEFORE the optimistic phase change so the
+    // first `lockStateChanged{locked:true}` WS event (which the server
+    // emits immediately on lock acquisition, well before the HTTP
+    // response or `flashJobStarted` arrives) sees isOwnJob=true and
+    // does NOT trigger the lock-conflict banner on our own flash.
+    pendingOwnFlashStart.value = true;
     phase.value = 'flashing';
     try {
       const response = await apiClient.post(FIRMWARE_FLASH, body, {
@@ -607,6 +738,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // Direct apiClient.post bypasses apiService.post's console.error
       // wrapper, so log here to preserve the dev breadcrumb.
       console.error('firmware.startFlash failed', error);
+      // Clear the pending flag on POST rejection — we're not the lock
+      // holder. The terminal handlers (applyJobDone/Failed, cancelFlash,
+      // resetToSelect) clear it for the success/terminal paths.
+      pendingOwnFlashStart.value = false;
       phase.value = 'select';
       setFlashError(mapHttpErrorToFlashEnvelope(error));
     }
@@ -619,10 +754,18 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // server reads `req.body?.reason`, so the body must transmit.
       await apiClient.delete(FIRMWARE_FLASH, { data: { reason } });
     } catch (error) {
-      // Phase truth comes from the WS surface (don't transition here),
-      // but a flashError tells the operator the cancel didn't take effect.
-      // Without this, clicking Cancel and seeing nothing would leave the
-      // UI stuck at 'flashing' with no breadcrumb.
+      // 404 = no active job server-side (terminal-reaped, race with
+      // heartbeat release, or never-started). WS already drove the UI to
+      // a terminal state — silent swallow.
+      const status =
+        typeof error === 'object' && error !== null && 'response' in error
+          ? (error as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (status === 404) {
+        return;
+      }
+      // Network / 5xx still warrants a breadcrumb so the operator knows
+      // the cancel didn't take.
       console.warn('firmware.cancelFlash failed', error);
       setFlashError({
         reason: 'network_error',
@@ -710,6 +853,64 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
   }
 
+  /**
+   * POST a firmware binary to the server's upload slot. The server validates
+   * the esp_app_desc header (project name, version) before promoting the
+   * artifact; only a successful response sets `uploadedFile`, which is what
+   * `canFlash` gates on. A filename in `uploadedFilename` is cosmetic — used
+   * only by the source strip eyebrow to surface "you picked X, uploading…"
+   * while the request is in flight.
+   *
+   * Failures route through the existing `flashError` envelope so the panel's
+   * error banner renders uniformly. The server returns three error reasons:
+   *   - `invalid_firmware` (400): bad project name / unparseable version
+   *   - `upload_io_failed` (500): could not stage the temp file
+   *   - `upload_persist_failed` (500): store() failed at the persist step
+   */
+  async function uploadFirmware(file: File): Promise<void> {
+    uploadState.value = 'uploading';
+    uploadedFile.value = null;
+    uploadedFilename.value = file.name;
+    clearFlashError();
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await apiClient.post(FIRMWARE_UPLOAD, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const body = response.data as FirmwareUploadResponse;
+      uploadedFile.value = {
+        version: body.meta.version,
+        displayName: body.meta.originalFilename,
+        sizeBytes: body.meta.sizeBytes,
+      };
+      uploadState.value = 'uploaded';
+    } catch (error) {
+      console.warn('firmware.uploadFirmware failed', error);
+      uploadState.value = 'error';
+      // Re-use the existing flash-error envelope + banner surface. The
+      // panel's banner v-ifs on `flashError !== null && phase === 'select'`
+      // — both true at upload time, so no extra UI plumbing needed.
+      setFlashError(mapHttpErrorToFlashEnvelope(error));
+    }
+  }
+
+  /**
+   * Reset the upload slot. Operator-driven (the source strip's "Remove"
+   * button calls this). Cleans the local filename, server-acknowledged
+   * metadata, and any error envelope. Does NOT issue a DELETE to the server
+   * — the server's slot is overwritten on the next successful upload, and
+   * the unused artifact doesn't affect the flash flow.
+   */
+  function clearUpload(): void {
+    uploadedFilename.value = null;
+    uploadedFile.value = null;
+    uploadState.value = 'idle';
+    if (flashError.value !== null) clearFlashError();
+  }
+
   // Project the controllerStates Map into the shape the panel expects.
   // `stageLabelKey` is an i18n key path (e.g. firmware_view.stages.transfer.label)
   // that the row component resolves via t() — keeps localization out of the
@@ -741,6 +942,8 @@ export const useFirmwareStore = defineStore('firmware', () => {
     sourceMode,
     selectedReleaseTag,
     uploadedFilename,
+    uploadState,
+    uploadedFile,
     controllers,
     selectedControllerIds,
     phase,
@@ -753,7 +956,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
     pendingByMac,
     currentJobLoadFailed,
     target,
+    allowDowngrade,
     anyDowngradeBlocked,
+    anyFleetDowngrade,
     canFlash,
     isOwnJob,
     progressByControllerId,
@@ -775,5 +980,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     cancelFlash,
     fetchCurrentJob,
     fetchReleases,
+    uploadFirmware,
+    clearUpload,
   };
 });

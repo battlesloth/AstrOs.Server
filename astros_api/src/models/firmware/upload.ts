@@ -34,3 +34,41 @@ export interface StoredUpload {
   sizeBytes: number;
   meta: StoredUploadMeta;
 }
+
+// Success body for POST /api/firmware/upload. `Omit<…, 'path'>` strips
+// the server-internal filesystem path; any other `StoredUpload` field
+// added later propagates onto the wire automatically.
+export type FirmwareUploadResponse = Omit<StoredUpload, 'path'>;
+
+// Error-response discriminator codes. The Vue side absorbs these codes
+// as a subset of `FLASH_ERROR_REASONS` in `astros_vue/src/types/firmware.ts`
+// (the unified union covering HTTP envelope + WS flashJobFailed +
+// upload-controller codes), so adding a member here also requires adding
+// it to that tuple and to the `firmware_view.flash_errors.<code>` locale
+// keys in `astros_vue/src/locales/enUS.json`. The Vue-side
+// locale-coverage test pins the locale-vs-tuple drift.
+//
+// `payload_too_large` is emitted by the `firmwareUploadLimitHandler`
+// function (defined in `controllers/firmware_upload_controller.ts`,
+// wired into express-fileupload's `limitHandler` option in
+// `api_server.ts`). It fires inside the middleware BEFORE the
+// controller's handler runs, so the controller's own error mapping
+// never sees this code.
+//
+// The tuple is `as const` so the type derivation captures the literal
+// union, but it isn't exported — the only consumer is the type derived
+// on the next line; the controller emits the codes as string literals
+// directly (typed via FirmwareUploadErrorResponse.error).
+const FIRMWARE_UPLOAD_ERROR_CODES = [
+  'invalid_body',
+  'upload_io_failed',
+  'invalid_firmware',
+  'upload_persist_failed',
+  'payload_too_large',
+] as const;
+export type FirmwareUploadErrorCode = (typeof FIRMWARE_UPLOAD_ERROR_CODES)[number];
+
+export interface FirmwareUploadErrorResponse {
+  error: FirmwareUploadErrorCode;
+  detail: string;
+}

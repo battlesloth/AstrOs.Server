@@ -25,6 +25,7 @@ const REASON_HTTP_STATUS: Record<FlashOrchestratorErrorReason, HttpStatus> = {
   job_already_running: 409,
 
   no_controllers: 400,
+  controllers_unknown: 400,
   variant_mismatch: 400,
   variant_unknown: 400,
   release_not_found: 400,
@@ -87,14 +88,13 @@ export async function startFlashJob(
     res.status(200);
     res.json(result);
   } catch (error) {
-    // Pre-streamer failures (controllers / source resolve / lock-acquire
-    // race) surface synchronously here as typed FlashOrchestratorError.
-    // Post-`flashJobStarted` failures (mid-deploy bus_send_failed,
-    // protocol_violation, the 12 c.6b TransferErrorCodes,
-    // streamer_unknown_error) are routed through the orchestrator's
-    // failJob path and broadcast on WS as `flashJobFailed`; HTTP returns
-    // 500 here only as a generic "synchronous failure" marker — the WS
-    // surface is the operator's truth source for those cases.
+    // Only pre-spawn failures reach this catch — controllers validation,
+    // source resolution, `controllers_lookup_failed`, and
+    // `job_already_running`. Post-`flashJobStarted` failures fire inside
+    // the orchestrator's background IIFE, after `start()` resolved and
+    // HTTP returned 200; the operator-facing truth source for them is
+    // the `flashJobFailed` WS event. Those entries remain in
+    // `REASON_HTTP_STATUS` only for type exhaustiveness.
     if (error instanceof FlashOrchestratorError) {
       const status = REASON_HTTP_STATUS[error.reason];
       if (status === 409) {
@@ -104,6 +104,11 @@ export async function startFlashJob(
       }
       if (status === 500) {
         logger.error(error);
+      } else if (status === 502) {
+        // Upstream-dependency failures (GitHub release lookup, cache fetch IO).
+        // The operator sees a 502 with `detail`; without this log, server-side
+        // has no breadcrumb to correlate against the user-visible failure.
+        logger.warn(error, 'flash request: upstream dependency failed');
       }
       res.status(status);
       res.json({ error: error.reason, detail: error.detail });
@@ -167,16 +172,26 @@ function validateFlashRequest(body: unknown): ValidationResult {
   if (source === null || typeof source !== 'object') {
     return { ok: false, detail: 'source must be an object' };
   }
+  const controllers = (body as { controllers?: unknown }).controllers;
+  if (!Array.isArray(controllers)) {
+    return { ok: false, detail: 'controllers must be an array' };
+  }
+  if (controllers.length === 0) {
+    return { ok: false, detail: 'controllers must be non-empty' };
+  }
+  if (!controllers.every((c) => typeof c === 'string' && c.length > 0)) {
+    return { ok: false, detail: 'controllers must be an array of non-empty strings' };
+  }
   const kind = (source as { kind?: unknown }).kind;
   if (kind === 'github') {
     const version = (source as { version?: unknown }).version;
     if (typeof version !== 'string' || version.length === 0) {
       return { ok: false, detail: 'source.version must be a non-empty string' };
     }
-    return { ok: true, request: { source: { kind: 'github', version } } };
+    return { ok: true, request: { source: { kind: 'github', version }, controllers } };
   }
   if (kind === 'upload') {
-    return { ok: true, request: { source: { kind: 'upload' } } };
+    return { ok: true, request: { source: { kind: 'upload' }, controllers } };
   }
   return { ok: false, detail: "source.kind must be 'github' or 'upload'" };
 }

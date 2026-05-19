@@ -150,7 +150,10 @@ describe('integration: happy github flash + heartbeat release', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${harness.authToken}`,
         },
-        body: JSON.stringify({ source: { kind: 'github', version: POST_FLASH_FW } }),
+        body: JSON.stringify({
+          source: { kind: 'github', version: POST_FLASH_FW },
+          controllers: [MASTER_SENTINEL_MAC],
+        }),
       });
       expect(flashRes.status).toBe(200);
       const flashBody = (await flashRes.json()) as {

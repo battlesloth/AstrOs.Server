@@ -18,6 +18,7 @@ import { useControllerStore } from '@/stores/controller';
 import { ControllerStatus, Location } from '@/enums';
 import type {
   ControllerFlashState,
+  FlashErrorReason,
   FlashJobFailedData,
   FlashJobState,
   ReleaseInfo,
@@ -213,11 +214,29 @@ describe('firmware store', () => {
       expect(store.target).toBeNull();
     });
 
-    it("returns 'local-build' sentinel in upload mode with a filename", () => {
+    it("returns 'local-build' sentinel in upload mode with a server-acknowledged upload", () => {
+      // target gates on `uploadedFile` (the server's post-store projection),
+      // not the raw filename — picking a file and uploading it are two
+      // different things, and the Flash button should only enable after the
+      // server has parsed and promoted the artifact.
+      const store = useFirmwareStore();
+      store.sourceMode = 'upload';
+      store.uploadedFile = {
+        version: '1.4.2',
+        displayName: 'custom.bin',
+        sizeBytes: 1_000_000,
+      };
+      expect(store.target).toBe('local-build');
+    });
+
+    it('returns null in upload mode with only a picked filename (upload not yet completed)', () => {
+      // Pin the boundary: a filename alone is NOT sufficient. This catches a
+      // regression that re-derived target from `uploadedFilename` and would
+      // let canFlash light up before the server accepts the artifact.
       const store = useFirmwareStore();
       store.sourceMode = 'upload';
       store.uploadedFilename = 'custom.bin';
-      expect(store.target).toBe('local-build');
+      expect(store.target).toBeNull();
     });
 
     it('returns null in upload mode with no file', () => {
@@ -365,6 +384,170 @@ describe('firmware store', () => {
       store.toggle('core'); // downgrade
       expect(store.canFlash).toBe(false);
     });
+
+    it('is true when allowDowngrade=true permits an otherwise-blocked downgrade selection', () => {
+      // Pins the new opt-in: enabling allowDowngrade unblocks canFlash even
+      // when at least one selected controller would downgrade. A mutation
+      // that dropped the `!allowDowngrade.value` clause in anyDowngradeBlocked
+      // (always treating downgrades as blocked) would fail this case.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.toggle('body'); // upgrade (1.3.0 → 1.3.5)
+      store.toggle('core'); // downgrade (1.4.0 → 1.3.5)
+      store.allowDowngrade = true;
+      expect(store.canFlash).toBe(true);
+    });
+
+    it('stays false when allowDowngrade=true but a hard-blocked (down) controller is selected', () => {
+      // allowDowngrade must NOT bypass a 'down' status. Hard-blocked is
+      // reality (controller unreachable); downgrade is policy. The toggle
+      // relaxes the policy, not the reality.
+      const store = useFirmwareStore();
+      seedSampleFleet(); // dome defaults to DOWN
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('dome'); // hard-blocked: status === 'down'
+      store.allowDowngrade = true;
+      expect(store.canFlash).toBe(false);
+    });
+  });
+
+  describe('allowDowngrade toggle', () => {
+    it('defaults to false on a fresh store', () => {
+      const store = useFirmwareStore();
+      expect(store.allowDowngrade).toBe(false);
+    });
+
+    it('survives resetToSelect — cross-flash retention by design', () => {
+      // The toggle is "per-session," not "per-flash." If the operator opts
+      // into dev/debug mode, completing one downgrade flash shouldn't make
+      // them re-tick the toggle for the next one. The modal ack still gates
+      // each individual flash, and the visible toggle state makes the
+      // armed status observable. Only a page reload clears it.
+      const store = useFirmwareStore();
+      store.allowDowngrade = true;
+      store.resetToSelect();
+      expect(store.allowDowngrade).toBe(true);
+    });
+
+    it('stays armed across target changes that transit a pure-upgrade window', () => {
+      // Operator picks a downgrade target → enables toggle → switches to an
+      // upgrade target (toggle disappears via anyFleetDowngrade=false) →
+      // switches back to a downgrade target. The toggle should reappear
+      // already-on (the operator's intent persists), not silently re-disable.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.allowDowngrade = true;
+      expect(store.anyFleetDowngrade).toBe(true);
+
+      store.selectedReleaseTag = 'v1.4.2'; // pure-upgrade
+      expect(store.anyFleetDowngrade).toBe(false);
+      expect(store.allowDowngrade).toBe(true);
+
+      store.selectedReleaseTag = 'v1.3.5'; // back to downgrade
+      expect(store.anyFleetDowngrade).toBe(true);
+      expect(store.allowDowngrade).toBe(true);
+    });
+
+    it('anyFleetDowngrade is true when any controller in the fleet would downgrade, regardless of selection', () => {
+      // Drives the contextual-reveal of the toggle in the panel header.
+      // Even if nothing is selected yet, the toggle should be discoverable
+      // when the target would downgrade some controller.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5'; // core@1.4.0 and dome@1.4.0 would downgrade
+      expect(store.selectedControllerIds.size).toBe(0);
+      expect(store.anyFleetDowngrade).toBe(true);
+    });
+
+    it('anyFleetDowngrade is false on a pure-upgrade target', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      expect(store.anyFleetDowngrade).toBe(false);
+    });
+
+    it('anyDowngradeBlocked clears when allowDowngrade flips to true with downgrade still selected', () => {
+      // Semantic shift: anyDowngradeBlocked is now "selected + policy-blocked"
+      // not "selected + would-downgrade". The action-bar copy "X controllers
+      // running newer firmware" should disappear once the operator enables
+      // the toggle.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.toggle('core');
+      expect(store.anyDowngradeBlocked).toBe(true);
+      store.allowDowngrade = true;
+      expect(store.anyDowngradeBlocked).toBe(false);
+    });
+
+    it('selectAll() with allowDowngrade=true includes downgrade controllers but still excludes hard-blocked', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet(); // body 1.3.0 (UP), core 1.4.0 (UP), dome 1.4.0 (DOWN)
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5'; // body upgrade, core downgrade, dome downgrade+down
+      store.allowDowngrade = true;
+      store.selectAll();
+      // body + core get picked. dome stays out: down trumps the toggle.
+      expect(store.selectedControllerIds.has('body')).toBe(true);
+      expect(store.selectedControllerIds.has('core')).toBe(true);
+      expect(store.selectedControllerIds.has('dome')).toBe(false);
+    });
+
+    it('isHardBlocked fails closed for unknown controller ids (canFlash blocks a phantom selection)', () => {
+      // Defensive: today FLEET_LAYOUT is static so an unknown id is structurally
+      // impossible, but if FLEET_LAYOUT ever goes dynamic a stale selectedId
+      // would otherwise slip past canFlash and dispatch a phantom flash target.
+      // Mutation: flipping the `c === undefined` branch to `return false` would
+      // make canFlash return true here.
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.sourceMode = 'github';
+        store.selectedReleaseTag = 'v1.4.2';
+        store.selectedControllerIds = new Set(['ghost-slot']);
+        expect(store.canFlash).toBe(false);
+      } finally {
+        consoleWarnSpy.mockRestore();
+      }
+    });
+
+    it('canFlash flips back to false when allowDowngrade flips off after a downgrade was selected', () => {
+      // Operator selects a downgrade with the toggle on, then unticks the
+      // toggle. Selection persists (we don't auto-clear it), but canFlash
+      // must immediately re-block. A mutation that cached canFlash against
+      // allowDowngrade at selection time would slip through other tests.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.allowDowngrade = true;
+      store.toggle('core'); // downgrade
+      expect(store.canFlash).toBe(true);
+
+      store.allowDowngrade = false;
+      expect(store.canFlash).toBe(false);
+      expect(store.selectedControllerIds.has('core')).toBe(true); // selection persists
+    });
+
+    it('selectAll() with allowDowngrade=false (default) excludes downgrade controllers — backwards-compat', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.3.5';
+      store.selectAll();
+      expect(store.selectedControllerIds.has('body')).toBe(true); // upgrade
+      expect(store.selectedControllerIds.has('core')).toBe(false); // downgrade
+      expect(store.selectedControllerIds.has('dome')).toBe(false); // downgrade+down
+    });
   });
 
   describe('phase transitions', () => {
@@ -406,6 +589,147 @@ describe('firmware store', () => {
     });
   });
 
+  describe('uploadFirmware', () => {
+    // Tiny File polyfill — jsdom's File constructor exists but the tests don't
+    // exercise its read API; pinning just .name + .size matches what FormData
+    // passes through to apiClient.post.
+    function makeFile(name = 'firmware.bin', size = 1_234_567): File {
+      return new File([new Uint8Array(size)], name, { type: 'application/octet-stream' });
+    }
+
+    const sampleUploadResponse = {
+      data: {
+        sha256: 'a'.repeat(64),
+        sizeBytes: 1_234_567,
+        meta: {
+          uploadId: 'abc',
+          originalFilename: 'firmware.bin',
+          projectName: 'AstrOs.ESP',
+          version: '1.4.2',
+          uploadedAt: '2026-05-16T08:00:00Z',
+          sizeBytes: 1_234_567,
+        },
+      },
+    };
+
+    it("POSTs the file as multipart/form-data and transitions uploadState to 'uploaded' on 200", async () => {
+      apiPost.mockResolvedValueOnce(sampleUploadResponse);
+      const store = useFirmwareStore();
+      const file = makeFile('astros-esp-1.4.2-lolin_d32_pro-app.bin');
+
+      await store.uploadFirmware(file);
+
+      expect(apiPost).toHaveBeenCalledWith(
+        'api/firmware/upload',
+        expect.any(FormData),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Content-Type': 'multipart/form-data' }),
+        }),
+      );
+      expect(store.uploadState).toBe('uploaded');
+      expect(store.uploadedFile).toEqual({
+        version: '1.4.2',
+        displayName: 'firmware.bin',
+        sizeBytes: 1_234_567,
+      });
+      expect(store.uploadedFilename).toBe('astros-esp-1.4.2-lolin_d32_pro-app.bin');
+      expect(store.flashError).toBeNull();
+    });
+
+    it("optimistically sets uploadState to 'uploading' before the request resolves", async () => {
+      // Pin the in-flight state so the source strip can render the
+      // "Uploading…" affordance — a mutation that only set uploadState on
+      // success would break the operator's signal that work is happening.
+      let resolveOuter: (v: typeof sampleUploadResponse) => void = () => {};
+      apiPost.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOuter = resolve;
+        }),
+      );
+      const store = useFirmwareStore();
+      const uploadPromise = store.uploadFirmware(makeFile());
+      // No await yet — the synchronous prefix of uploadFirmware has run,
+      // setting uploadState to 'uploading'.
+      expect(store.uploadState).toBe('uploading');
+      expect(store.uploadedFile).toBeNull();
+
+      resolveOuter(sampleUploadResponse);
+      await uploadPromise;
+      expect(store.uploadState).toBe('uploaded');
+    });
+
+    it("transitions to 'error' state and sets flashError envelope on HTTP failure", async () => {
+      apiPost.mockRejectedValueOnce({
+        response: {
+          status: 400,
+          data: { error: 'invalid_firmware', detail: 'project name mismatch' },
+        },
+      });
+      const store = useFirmwareStore();
+
+      await store.uploadFirmware(makeFile());
+
+      expect(store.uploadState).toBe('error');
+      expect(store.uploadedFile).toBeNull();
+      expect(store.flashError).not.toBeNull();
+      expect(store.flashError?.reason).toBe('invalid_firmware');
+    });
+
+    it('target gates on uploadedFile (server-acknowledged), not uploadedFilename (operator-picked)', async () => {
+      // Pin the core contract this branch enforces: a filename on its own
+      // doesn't make `target` truthy — only a successful upload does. A
+      // mutation that re-introduced `uploadedFilename ? 'local-build' : null`
+      // would break this.
+      const store = useFirmwareStore();
+      store.sourceMode = 'upload';
+      store.uploadedFilename = 'firmware.bin'; // operator picked, not uploaded yet
+      expect(store.target).toBe(null);
+
+      apiPost.mockResolvedValueOnce(sampleUploadResponse);
+      await store.uploadFirmware(makeFile());
+      expect(store.target).toBe('local-build');
+    });
+
+    it('canFlash stays false while uploadState is uploading even with a selection', async () => {
+      // Re-derives from `target` → which derives from `uploadedFile`. While
+      // uploading, uploadedFile is null → target is null → canFlash is false.
+      let resolveOuter: (v: typeof sampleUploadResponse) => void = () => {};
+      apiPost.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOuter = resolve;
+        }),
+      );
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'upload';
+      store.toggle('body');
+      const uploadPromise = store.uploadFirmware(makeFile());
+      expect(store.uploadState).toBe('uploading');
+      expect(store.canFlash).toBe(false);
+
+      resolveOuter(sampleUploadResponse);
+      await uploadPromise;
+      expect(store.canFlash).toBe(true);
+    });
+
+    it('clearUpload() resets every upload-related ref AND clears flashError if present', async () => {
+      const store = useFirmwareStore();
+      // Seed the post-error state by faking an upload failure.
+      apiPost.mockRejectedValueOnce({
+        response: { status: 400, data: { error: 'invalid_firmware', detail: 'bad' } },
+      });
+      await store.uploadFirmware(makeFile());
+      expect(store.uploadState).toBe('error');
+      expect(store.flashError).not.toBeNull();
+
+      store.clearUpload();
+      expect(store.uploadState).toBe('idle');
+      expect(store.uploadedFile).toBeNull();
+      expect(store.uploadedFilename).toBeNull();
+      expect(store.flashError).toBeNull();
+    });
+  });
+
   describe('startFlash', () => {
     function readyStore() {
       const store = useFirmwareStore();
@@ -425,26 +749,41 @@ describe('firmware store', () => {
 
       expect(apiPost).toHaveBeenCalledWith(
         'api/firmware/flash',
-        { source: { kind: 'github', version: 'v1.4.2' } },
+        {
+          source: { kind: 'github', version: 'v1.4.2' },
+          // `body` slot resolves to the master sentinel MAC seeded in
+          // seedSampleFleet(); the wire payload now scopes the flash to
+          // the operator's selection rather than letting the server flash
+          // every cached controller.
+          controllers: ['00:00:00:00:00:00'],
+        },
         expect.objectContaining({ timeout: 30_000 }),
       );
       expect(store.phase).toBe('flashing');
       expect(store.flashError).toBeNull();
     });
 
-    it("POSTs the upload source shape when sourceMode is 'upload'", async () => {
+    it("POSTs the upload source shape when sourceMode is 'upload' and an upload has been accepted", async () => {
+      // startFlash gates on canFlash → target → uploadedFile. A bare filename
+      // is no longer enough; the server must have acknowledged the upload
+      // (test-side: setting uploadedFile directly simulates the post-store
+      // state without going through the FormData round-trip).
       apiPost.mockResolvedValueOnce({ data: { jobId: 'job-2' } });
       const store = useFirmwareStore();
       seedSampleFleet();
       store.sourceMode = 'upload';
-      store.uploadedFilename = 'custom.bin';
+      store.uploadedFile = {
+        version: '1.4.2',
+        displayName: 'custom.bin',
+        sizeBytes: 1_000_000,
+      };
       store.toggle('body');
 
       await store.startFlash();
 
       expect(apiPost).toHaveBeenCalledWith(
         'api/firmware/flash',
-        { source: { kind: 'upload' } },
+        { source: { kind: 'upload' }, controllers: ['00:00:00:00:00:00'] },
         expect.objectContaining({ timeout: 30_000 }),
       );
       expect(store.phase).toBe('flashing');
@@ -1131,12 +1470,16 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.applyJobStarted(sampleJobState());
+      // Use a fictional reason the union doesn't include so the fallback
+      // path is the one under test. Real streamer reasons (hash_mismatch,
+      // chunk_retry_exhausted, etc.) are now in FLASH_ERROR_REASONS and
+      // map through verbatim — exercised by the parameterized test below.
       const data: FlashJobFailedData = {
         jobId: 'job-1',
         endedAt: '2026-05-12T08:05:00Z',
-        reason: 'hash_mismatch', // post-streamer reason — not in FlashErrorReason
-        detail: 'asset checksum mismatch on Core',
-        abortReason: 'hash_mismatch',
+        reason: 'frobnitz_failed' as FlashJobFailedData['reason'],
+        detail: 'unrecognized reason from a future server',
+        abortReason: 'frobnitz_failed',
       };
       store.applyJobFailed(data);
       expect(store.phase).toBe('failed');
@@ -1144,7 +1487,45 @@ describe('firmware store', () => {
       // Unrecognized reason falls back to internal_server_error so the banner
       // shows generic copy rather than a missing-i18n-key path.
       expect(store.flashError?.reason).toBe('internal_server_error');
-      expect(store.flashError?.detail).toBe('asset checksum mismatch on Core');
+      expect(store.flashError?.detail).toBe('unrecognized reason from a future server');
+    });
+
+    // Pin each streamer reason maps through verbatim. Typed against
+    // FlashErrorReason (which is `(typeof FLASH_ERROR_REASONS)[number]`)
+    // so a future regression that REMOVED a member from the tuple while
+    // leaving it in this array fails to compile — the protection is
+    // compile-time, not runtime.
+    //
+    // The streamer-subset list is still hand-maintained against
+    // TransferErrorCode in astros_api/src/models/firmware/chunk_streamer.ts:
+    // there is no compile-time tether across that server-client boundary
+    // today (tracked as Type I6 in
+    // .docs/plans/20260518-0926-firmware-type-design-orphaned-followups.md).
+    // The `aborted` member is excluded here because it has its own
+    // dedicated test below (covers the cancel-vs-error discriminator).
+    const STREAMER_REASONS: ReadonlyArray<FlashErrorReason> = [
+      'source_read_failed',
+      'source_size_mismatch',
+      'begin_timeout',
+      'begin_rejected',
+      'chunk_retry_exhausted',
+      'flash_full',
+      'transfer_timeout',
+      'end_timeout',
+      'hash_mismatch',
+      'master_io_error',
+      'bus_send_failed',
+    ];
+    it.each(STREAMER_REASONS)("maps streamer reason '%s' through verbatim", (reason) => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason,
+      });
+      expect(store.flashError?.reason).toBe(reason);
     });
 
     it('maps recognized server reasons through to FlashErrorReason verbatim', () => {
@@ -1160,6 +1541,23 @@ describe('firmware store', () => {
         reason: 'release_not_found',
       });
       expect(store.flashError?.reason).toBe('release_not_found');
+    });
+
+    it("maps reason='aborted' through verbatim (operator-cancel does not surface as 'internal_server_error')", () => {
+      // Pins both halves: `'aborted'` must stay in FLASH_ERROR_REASONS
+      // AND cancel-deploy must include `reason` (not just `abortReason`).
+      // Either regression collapses back to the `internal_server_error`
+      // fallback.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState());
+      store.applyJobFailed({
+        jobId: 'job-1',
+        endedAt: '2026-05-12T08:05:00Z',
+        reason: 'aborted',
+        abortReason: 'operator',
+      });
+      expect(store.flashError?.reason).toBe('aborted');
     });
 
     it('derives failedControllers from the FAILED entries in controllerStates', () => {
@@ -1444,6 +1842,62 @@ describe('firmware store', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.ownJobId = 'job-1';
+      expect(store.isOwnJob).toBe(false);
+    });
+
+    it('is true during the startFlash optimistic window (race fix)', async () => {
+      // Regression pin: the server emits lockStateChanged{locked:true}
+      // BEFORE flashJobStarted (and before the HTTP response carries
+      // ownJobId). In that window, isOwnJob must already be true so the
+      // operator's own flash doesn't get classified as a foreign-operator
+      // lockout. Before the pendingOwnFlashStart fix, this test would
+      // observe `isOwnJob === false`.
+      apiPost.mockReturnValueOnce(new Promise(() => {})); // pending forever
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('body');
+
+      void store.startFlash();
+      // Synchronous prefix has run — POST is in flight, no WS messages
+      // have arrived yet. currentJob is null, ownJobId is null.
+      expect(store.currentJob).toBeNull();
+      expect(store.ownJobId).toBeNull();
+      // ...but isOwnJob is true thanks to the pending flag.
+      expect(store.isOwnJob).toBe(true);
+    });
+
+    it('foreign-flash detection still works (pendingOwnFlashStart is false unless we started a flash)', () => {
+      // Pin that the new clause doesn't accidentally hide real foreign-
+      // flash conflicts. The flag is set ONLY by startFlash; for a
+      // foreign operator's flash, isOwnJob must still report false.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.applyJobStarted(sampleJobState({ jobId: 'foreign-job' }));
+      // ownJobId never set (we never POSTed).
+      expect(store.isOwnJob).toBe(false);
+    });
+
+    it('clears pendingOwnFlashStart on applyJobDone — falls back to the equality clause for subsequent checks', async () => {
+      // After our own flash terminates, isOwnJob's equality clause is
+      // load-bearing for any future foreign-flash detection. Mutation
+      // pin: removing the clear from applyJobDone would leak the flag
+      // forward, classifying the next foreign flash as our own.
+      apiPost.mockResolvedValueOnce({ data: { jobId: 'job-1' } });
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.sourceMode = 'github';
+      store.selectedReleaseTag = 'v1.4.2';
+      store.toggle('body');
+      await store.startFlash();
+      store.applyJobStarted(sampleJobState({ jobId: 'job-1' }));
+      store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-16T10:00:00Z' });
+
+      // Simulate a foreign flash starting later: clear currentJob (the
+      // applyJobDone leaves it set as terminal state; resetToSelect or
+      // the next applyJobStarted re-uses it).
+      store.applyJobStarted(sampleJobState({ jobId: 'foreign-next' }));
       expect(store.isOwnJob).toBe(false);
     });
   });

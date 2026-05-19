@@ -9,9 +9,21 @@ import type {
 import type { FwDeployEvent } from './flash_orchestrator.js';
 
 export interface TransferSpec {
+  // Wire-protocol `uint8 transfer-id` per AstrOs.ESP `.docs/protocol.md`
+  // (`'0'..'255'`). Type stays `string` for test-fixture compatibility;
+  // `mintTransferId` is the runtime gate on production callers.
   transferId: string;
   source: { path: string; sha256: string; sizeBytes: number };
   targets: string[];
+}
+
+/** Producer-side uint8 mint — asserts the wire-protocol range so an
+ *  out-of-range value can't reach the firmware. */
+export function mintTransferId(n: number): string {
+  if (!Number.isInteger(n) || n < 0 || n > 255) {
+    throw new Error(`transferId out of uint8 range: ${n}`);
+  }
+  return String(n);
 }
 
 export interface StreamObserver {

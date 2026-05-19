@@ -10,14 +10,21 @@ import type { ControllersPanelProps } from './types';
 const props = defineProps<ControllersPanelProps>();
 const emit = defineEmits<{
   flash: [];
-  'view-logs': [];
   done: [];
 }>();
 
 const { t } = useI18n();
 const firmware = useFirmwareStore();
-const { controllers, selectedControllerIds, target, canFlash, anyDowngradeBlocked, flashError } =
-  storeToRefs(firmware);
+const {
+  controllers,
+  selectedControllerIds,
+  target,
+  canFlash,
+  anyDowngradeBlocked,
+  anyFleetDowngrade,
+  allowDowngrade,
+  flashError,
+} = storeToRefs(firmware);
 
 const flashErrorMessage = computed(() => {
   const err = flashError.value;
@@ -87,6 +94,41 @@ const actionBarMessage = computed(() => {
         v-if="phase === 'select'"
         class="astros-firmware-controllers-panel__header-actions"
       >
+        <!--
+          Contextual reveal: the "Allow downgrades" toggle only renders when
+          the current target would actually downgrade at least one fleet
+          member. For pure-upgrade flows the toggle stays hidden — keeps the
+          routine path uncluttered and makes the affordance discoverable
+          exactly where the disabled-checkbox frustration would surface.
+          The phase=='select' gate is inherited from the wrapping v-if on
+          header-actions; no second guard needed here.
+        -->
+        <label
+          v-if="anyFleetDowngrade"
+          class="astros-firmware-controllers-panel__allow-downgrade"
+          data-test="allow-downgrade-toggle"
+        >
+          <input
+            type="checkbox"
+            class="astros-firmware-controllers-panel__allow-downgrade-checkbox"
+            :checked="allowDowngrade"
+            aria-describedby="astros-firmware-controllers-panel__allow-downgrade-help"
+            @change="firmware.allowDowngrade = ($event.target as HTMLInputElement).checked"
+          />
+          <span>{{ t('firmware_view.controllers.allow_downgrade.toggle_label') }}</span>
+          <!--
+            Help text is sr-only because the toggle's visible label is
+            already self-explanatory; the description is for AT users who
+            land on the checkbox via keyboard navigation. A `title=` would
+            duplicate this text to AT (announced via accessible-description),
+            causing the screen reader to stutter — so we omit it.
+          -->
+          <span
+            id="astros-firmware-controllers-panel__allow-downgrade-help"
+            class="sr-only"
+            >{{ t('firmware_view.controllers.allow_downgrade.toggle_help') }}</span
+          >
+        </label>
         <button
           type="button"
           class="astros-firmware-controllers-panel__ghost-btn"
@@ -115,6 +157,7 @@ const actionBarMessage = computed(() => {
           :target="target"
           :mode="rowMode"
           :selected="selectedControllerIds.has(c.id)"
+          :allow-downgrade="allowDowngrade"
           :progress-status="progressByControllerId?.[c.id]?.status"
           :stage-label-key="progressByControllerId?.[c.id]?.stageLabelKey"
           @toggle="firmware.toggle"
@@ -188,12 +231,6 @@ const actionBarMessage = computed(() => {
       </span>
       <div class="astros-firmware-controllers-panel__action-bar-buttons">
         <AstrosFirmwareButton
-          kind="secondary"
-          @click="emit('view-logs')"
-        >
-          {{ t('firmware_view.controllers.result_bar.view_logs') }}
-        </AstrosFirmwareButton>
-        <AstrosFirmwareButton
           kind="primary"
           @click="emit('done')"
         >
@@ -224,12 +261,6 @@ const actionBarMessage = computed(() => {
         }}
       </span>
       <div class="astros-firmware-controllers-panel__action-bar-buttons">
-        <AstrosFirmwareButton
-          kind="secondary"
-          @click="emit('view-logs')"
-        >
-          {{ t('firmware_view.controllers.result_bar.view_logs') }}
-        </AstrosFirmwareButton>
         <AstrosFirmwareButton
           kind="primary"
           @click="emit('done')"
@@ -274,7 +305,38 @@ const actionBarMessage = computed(() => {
 
 .astros-firmware-controllers-panel__header-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+.astros-firmware-controllers-panel__allow-downgrade {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4b5b73;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  transition: background 0.15s linear;
+}
+
+.astros-firmware-controllers-panel__allow-downgrade:hover {
+  background: #eef3fa;
+}
+
+.astros-firmware-controllers-panel__allow-downgrade-checkbox {
+  accent-color: #9a2828;
+  margin: 0;
+  cursor: pointer;
+}
+
+.astros-firmware-controllers-panel__allow-downgrade:focus-within {
+  outline: 2px solid #7d92b8;
+  outline-offset: 2px;
 }
 
 .astros-firmware-controllers-panel__ghost-btn {

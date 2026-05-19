@@ -58,6 +58,7 @@
       "eyebrow_file": "SELECTED FILE",
       "no_release_selected": "No release selected",
       "no_file_selected": "No file selected",
+      "uploading": "Uploading…",
       "browse_files": "Browse files…",
       "remove": "Remove",
       "tag_pill_latest": "Latest",
@@ -106,11 +107,14 @@
         "downgrade_blocked": "⛔ Downgrade blocked",
         "flash_button": "Flash firmware"
       },
+      "allow_downgrade": {
+        "toggle_label": "Allow downgrades",
+        "toggle_help": "Lets you select controllers running newer firmware than the chosen target. Resets when you reload the page."
+      },
       "result_bar": {
         "all_updated": "✓ All {count} controller(s) updated",
         "failed_summary": "⚠ {label} failed during {stage}",
         "failed_summary_multi": "⚠ {labels} failed during the flash",
-        "view_logs": "View logs",
         "done": "Done"
       },
       "flash_error_banner": {
@@ -148,6 +152,7 @@
       "source_label": "Source",
       "controllers_label": "Targets",
       "power_warning": "Do not cut power to any selected controller until the update completes — interrupting a flash can leave a controller in a bricked state.",
+      "downgrade_ack": "I understand this will install OLDER firmware on {count} controller(s).",
       "cancel": "Cancel",
       "confirm": "Push firmware",
       "delta_separator": "→"
@@ -157,6 +162,11 @@
       "job_already_running": "Another flash job is already running. Wait for it to finish or cancel it before starting a new one.",
       "job_already_running_with_id": "Flash job {jobId} is already running. Wait for it to finish or cancel it before starting a new one.",
       "no_controllers": "No controllers were selected. Pick at least one before flashing.",
+      "controllers_unknown": "Some selected controllers haven't reported their firmware variant yet — wait a poll cycle and try again.",
+      "invalid_firmware": "The selected file isn't a valid AstrOs firmware binary. Check the project name and version match an AstrOs build.",
+      "upload_io_failed": "Couldn't stage the uploaded firmware on the server. Try again or check the server's disk space.",
+      "upload_persist_failed": "The server couldn't save the uploaded firmware. Check the server logs and try again.",
+      "payload_too_large": "The selected firmware file is larger than the server's 50 MB limit. Pick a smaller binary — check it isn't a combined app+partitions+spiffs image.",
       "variant_mismatch": "The selected release doesn't include a firmware variant for one or more of the selected controllers.",
       "variant_unknown": "One of the selected controllers reports a variant the server doesn't recognize.",
       "release_not_found": "The selected release could not be found on GitHub. Try refreshing the release list.",
@@ -168,6 +178,18 @@
       "subscriber_attach_failed": "The server couldn't subscribe to deploy events. Try again or restart the server.",
       "protocol_violation": "Unexpected message format from the server. Try again or restart the master controller.",
       "streamer_unknown_error": "The firmware streamer failed with an unknown error. Try again.",
+      "source_read_failed": "The server couldn't read the staged firmware file from disk. Re-upload or re-fetch the binary and try again.",
+      "source_size_mismatch": "The firmware file's actual size doesn't match its declared size. Re-upload or re-fetch the binary and try again.",
+      "begin_timeout": "The master controller didn't acknowledge the transfer start. Check that the master is powered on and connected, then try again.",
+      "begin_rejected": "The master controller rejected the firmware transfer. Check that the master has free SD card space, then try again.",
+      "chunk_retry_exhausted": "Lost contact with the master controller during transfer (too many failed retries). Check the USB cable and the master's power, then try again.",
+      "flash_full": "The master controller's SD card is full. Free space (delete older scripts or run FORMAT SD), then try again.",
+      "transfer_timeout": "The firmware transfer didn't complete in time. Power-cycle the master controller, then try again.",
+      "end_timeout": "The master controller didn't acknowledge transfer completion. Check the master, then try again.",
+      "hash_mismatch": "The firmware that arrived at the master doesn't match the source binary (corrupted in transit). Try the flash again — if it persists, re-upload the binary.",
+      "master_io_error": "Serial I/O error talking to the master controller. Check the USB cable and the master's power, then try again.",
+      "bus_send_failed": "The server couldn't send to the master over the serial bus. Restart the server, then try again.",
+      "aborted": "Flash cancelled. The controllers were not updated.",
       "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
       "network_error": "Couldn't reach the server. Check your network connection and try again."
     },

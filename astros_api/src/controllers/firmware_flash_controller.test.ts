@@ -27,8 +27,14 @@ function fakeOrchestrator(): FakeOrchestrator {
   };
 }
 
-const validGithubBody = { source: { kind: 'github', version: '1.4.0' } };
-const validUploadBody = { source: { kind: 'upload' } };
+const validGithubBody = {
+  source: { kind: 'github', version: '1.4.0' },
+  controllers: ['ctrl-a', 'ctrl-b'],
+};
+const validUploadBody = {
+  source: { kind: 'upload' },
+  controllers: ['ctrl-a'],
+};
 
 describe('Firmware Flash Controller', () => {
   let orchestrator: FakeOrchestrator;
@@ -60,6 +66,7 @@ describe('Firmware Flash Controller', () => {
 
       expect(orchestrator.start).toHaveBeenCalledWith({
         source: { kind: 'github', version: '1.4.0' },
+        controllers: ['ctrl-a', 'ctrl-b'],
       });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(envelope);
@@ -85,7 +92,10 @@ describe('Firmware Flash Controller', () => {
 
       await startFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());
 
-      expect(orchestrator.start).toHaveBeenCalledWith({ source: { kind: 'upload' } });
+      expect(orchestrator.start).toHaveBeenCalledWith({
+        source: { kind: 'upload' },
+        controllers: ['ctrl-a'],
+      });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(envelope);
     });
@@ -150,6 +160,25 @@ describe('Firmware Flash Controller', () => {
       expect(res.json).toHaveBeenCalledWith({
         error: 'variant_unknown',
         detail: 'ctrl-a, ctrl-c',
+      });
+    });
+
+    it('returns 400 with the missing-MAC list on controllers_unknown', async () => {
+      // Type-level exhaustiveness catches removal from REASON_HTTP_STATUS;
+      // this pin catches a value mutation (e.g., 400 → 500).
+      orchestrator.start.mockRejectedValueOnce(
+        new FlashOrchestratorError('controllers_unknown', 'aa:bb:cc:dd:ee:01, aa:bb:cc:dd:ee:02'),
+      );
+
+      const req: any = { body: validGithubBody };
+      const res = mockRes();
+
+      await startFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'controllers_unknown',
+        detail: 'aa:bb:cc:dd:ee:01, aa:bb:cc:dd:ee:02',
       });
     });
 
@@ -275,8 +304,53 @@ describe('Firmware Flash Controller', () => {
       expect(typeof payload.detail).toBe('string');
     });
 
+    it('returns 400 with invalid_body when controllers is missing', async () => {
+      const req: any = { body: { source: { kind: 'github', version: '1.4.0' } } };
+      const res = mockRes();
+
+      await startFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());
+
+      expect(orchestrator.start).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.error).toBe('invalid_body');
+      expect(payload.detail).toMatch(/controllers/);
+    });
+
+    it('returns 400 with invalid_body when controllers is empty', async () => {
+      const req: any = {
+        body: { source: { kind: 'github', version: '1.4.0' }, controllers: [] },
+      };
+      const res = mockRes();
+
+      await startFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());
+
+      expect(orchestrator.start).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.error).toBe('invalid_body');
+      expect(payload.detail).toMatch(/non-empty/);
+    });
+
+    it('returns 400 with invalid_body when controllers contains non-string entries', async () => {
+      const req: any = {
+        body: {
+          source: { kind: 'github', version: '1.4.0' },
+          controllers: ['valid-mac', 42],
+        },
+      };
+      const res = mockRes();
+
+      await startFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());
+
+      expect(orchestrator.start).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(400);
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.error).toBe('invalid_body');
+    });
+
     it('returns 400 with invalid_body when source.kind is unknown', async () => {
-      const req: any = { body: { source: { kind: 'magic' } } };
+      const req: any = { body: { source: { kind: 'magic' }, controllers: ['ctrl-a'] } };
       const res = mockRes();
 
       await startFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());
@@ -288,7 +362,9 @@ describe('Firmware Flash Controller', () => {
     });
 
     it('returns 400 with invalid_body when github source.version is empty', async () => {
-      const req: any = { body: { source: { kind: 'github', version: '' } } };
+      const req: any = {
+        body: { source: { kind: 'github', version: '' }, controllers: ['ctrl-a'] },
+      };
       const res = mockRes();
 
       await startFlashJob(orchestrator as unknown as FlashJobOrchestrator, req, res, vi.fn());

@@ -26,6 +26,7 @@ import passport from 'passport';
 import { expressjwt as jwt } from 'express-jwt';
 import cors from 'cors';
 import fileUpload from 'express-fileupload';
+import { tmpdir } from 'node:os';
 
 import Express, { Router, Application, RequestHandler as ReqHandler } from 'express';
 import { WebSocketServer as Server, WebSocket } from 'ws';
@@ -90,6 +91,11 @@ import { FlashJobOrchestrator } from './firmware/flash_orchestrator.js';
 import { registerFirmwareFlashRoutes } from './controllers/firmware_flash_controller.js';
 import { registerFirmwareReleasesRoutes } from './controllers/firmware_releases_controller.js';
 import { registerFirmwareLockStateRoutes } from './controllers/firmware_lock_state_controller.js';
+import {
+  FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES,
+  firmwareUploadLimitHandler,
+  registerFirmwareUploadRoutes,
+} from './controllers/firmware_upload_controller.js';
 import { FirmwareCache } from './firmware/firmware_cache.js';
 import { FirmwareUploadStore } from './firmware/firmware_upload_store.js';
 import { GitHubReleaseService } from './firmware/github_release_service.js';
@@ -400,7 +406,44 @@ export class ApiServer {
         credentials: true,
       }),
     );
-    this.app.use(fileUpload());
+    // Path-scoped `fileUpload` mounts so the firmware-route limits and
+    // the firmware-themed `limitHandler` only apply to `/api/firmware/upload`.
+    // A single global `app.use(fileUpload(...))` would also catch
+    // `/api/audio/savefile`, where the 413 body shape (typed JSON) and copy
+    // ("Firmware upload exceeds…") don't match the audio UI's contract.
+    //
+    // Both routes need `useTempFiles` so `.mv()` becomes a rename rather
+    // than a buffer-to-disk write. Both impose a 50 MB ceiling — the audio
+    // route uses express-fileupload's default `responseOnLimit` (plain
+    // text "File size limit has been reached") rather than the
+    // firmware-typed JSON handler.
+    //
+    // 50 MB ceiling rationale: AstrOs.ESP binaries are ~1.2 MB; this
+    // leaves an order of magnitude of headroom while preventing an
+    // authenticated operator from buffering a multi-GB POST. Audio
+    // assets historically fit comfortably under the same ceiling.
+    // `abortOnLimit` rejects oversize uploads with 413 (its
+    // `closeConnection` is a no-op once `limitHandler` has sent the
+    // response body) and runs the lib's tmp-file cleanup either way.
+    this.app.use(
+      '/api/firmware/upload',
+      fileUpload({
+        useTempFiles: true,
+        tempFileDir: tmpdir(),
+        limits: { fileSize: FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES },
+        abortOnLimit: true,
+        limitHandler: firmwareUploadLimitHandler,
+      }),
+    );
+    this.app.use(
+      '/api/audio/savefile',
+      fileUpload({
+        useTempFiles: true,
+        tempFileDir: tmpdir(),
+        limits: { fileSize: FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES },
+        abortOnLimit: true,
+      }),
+    );
     this.app.use(Express.json());
     this.app.use(Express.urlencoded({ extended: false }));
     this.app.use(cookieParser());
@@ -467,6 +510,7 @@ export class ApiServer {
     //   - releases:   depends on this.githubReleaseService (configApi, line 453)
     registerFirmwareLockStateRoutes(this.router, this.jobLock);
     registerFirmwareReleasesRoutes(this.router, this.authHandler, this.githubReleaseService);
+    registerFirmwareUploadRoutes(this.router, this.authHandler, this.firmwareUploadStore);
     registerLocationRoutes(this.router, this.authHandler, this.db);
     registerScriptRoutes(this.router, this.authHandler, this.db);
     registerPlaylistRoutes(this.router, this.authHandler, this.db);
@@ -569,12 +613,18 @@ export class ApiServer {
       releaseService: this.githubReleaseService,
       controllersStore: {
         // Snapshot per call so validateControllers doesn't race a concurrent
-        // POLL_ACK update of the underlying Map.
-        listFlashTargets: async () =>
-          Array.from(this.controllerVariantCache.entries()).map(([id, variant]) => ({
-            id,
-            variant,
-          })),
+        // POLL_ACK update of the underlying Map. Filter to the operator's
+        // requested MAC set so the flash scopes to what the UI selected
+        // (rather than every controller the server has ever heard from).
+        // The orchestrator detects requested-but-missing MACs and throws
+        // `controllers_unknown` with detail; this side just returns the
+        // intersection.
+        listFlashTargets: async (requestedIds) => {
+          const wanted = new Set(requestedIds);
+          return Array.from(this.controllerVariantCache.entries())
+            .filter(([id]) => wanted.has(id))
+            .map(([id, variant]) => ({ id, variant }));
+        },
       },
       emitWs: (msg) => this.updateClients(msg),
       config: this.flashOrchestratorConfig,

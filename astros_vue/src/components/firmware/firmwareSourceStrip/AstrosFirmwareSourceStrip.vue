@@ -13,6 +13,8 @@ const {
   sourceMode,
   selectedReleaseTag,
   uploadedFilename,
+  uploadState,
+  uploadedFile,
   releasesLoadState,
   staleSince,
 } = storeToRefs(firmware);
@@ -42,11 +44,16 @@ function onReleaseChange(event: Event) {
 
 function onFilePick(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
-  if (file) firmware.uploadedFilename = file.name;
+  if (!file) return;
+  // Fire-and-forget — the store transitions through uploadState and the
+  // template reactively renders the in-progress / success / error states.
+  // Errors route through the flashError envelope which the panel banner
+  // already renders, so we don't need to await + handle here.
+  void firmware.uploadFirmware(file);
 }
 
 function clearUploadedFile() {
-  firmware.uploadedFilename = null;
+  firmware.clearUpload();
   if (fileInput.value) fileInput.value.value = '';
 }
 
@@ -155,11 +162,36 @@ const primaryAssetSize = computed<number | null>(() => {
         <span class="astros-firmware-source-strip__eyebrow">{{
           $t('firmware_view.source.eyebrow_file')
         }}</span>
-        <span
-          v-if="uploadedFilename"
-          class="astros-firmware-source-strip__filename"
-          >{{ uploadedFilename }}</span
-        >
+        <!--
+          Three display states, in priority order:
+          1. `uploadState === 'uploaded'` — show server-acknowledged version
+             + size (the operator can confirm the right artifact landed).
+          2. `uploadState === 'uploading'` — show operator's filename +
+             "Uploading…" line so they know the request is in flight.
+          3. else — show the operator's filename if a pick is in progress
+             OR has errored, otherwise the "no file selected" placeholder.
+             Error-detail copy is in the panel's flash-error banner; no
+             duplicate surface here.
+        -->
+        <template v-if="uploadState === 'uploaded' && uploadedFile">
+          <span class="astros-firmware-source-strip__filename">{{ uploadedFile.displayName }}</span>
+          <div class="astros-firmware-source-strip__meta">
+            <span>v{{ uploadedFile.version }}</span>
+            <span>· {{ formatSize(uploadedFile.sizeBytes) }}</span>
+          </div>
+        </template>
+        <template v-else-if="uploadState === 'uploading'">
+          <span class="astros-firmware-source-strip__filename">{{ uploadedFilename }}</span>
+          <span
+            class="astros-firmware-source-strip__detail-empty"
+            role="status"
+            aria-live="polite"
+            >{{ $t('firmware_view.source.uploading') }}</span
+          >
+        </template>
+        <template v-else-if="uploadedFilename">
+          <span class="astros-firmware-source-strip__filename">{{ uploadedFilename }}</span>
+        </template>
         <span
           v-else
           class="astros-firmware-source-strip__detail-empty"
@@ -208,6 +240,12 @@ const primaryAssetSize = computed<number | null>(() => {
           :aria-label="$t('firmware_view.source.label_upload_file')"
           @change="onFilePick"
         />
+        <!--
+          Browse-files button shows when there's nothing in flight or staged.
+          Disabled mid-upload so a second pick can't race the in-flight POST.
+          Once the upload errors or succeeds, the right column becomes
+          the "Remove" / clear affordance (operator can re-pick after that).
+        -->
         <AstrosFirmwareButton
           v-if="!uploadedFilename"
           kind="secondary"
@@ -218,6 +256,7 @@ const primaryAssetSize = computed<number | null>(() => {
         <AstrosFirmwareButton
           v-else
           kind="ghost"
+          :disabled="uploadState === 'uploading'"
           @click="clearUploadedFile"
         >
           {{ $t('firmware_view.source.remove') }}

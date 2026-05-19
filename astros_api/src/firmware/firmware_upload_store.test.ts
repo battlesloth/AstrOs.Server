@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import fs, { promises as fsp } from 'fs';
 import os from 'os';
 import path from 'path';
-import { FirmwareUploadStore } from './firmware_upload_store.js';
+import { FirmwareUploadStore, FirmwareUploadValidationError } from './firmware_upload_store.js';
 import { ESP_APP_DESC_OFFSET, ESP_APP_DESC_SIZE, ESP_APP_DESC_MAGIC } from './esp_app_desc.js';
 import type { StoredUploadMeta } from '../models/firmware/upload.js';
 
@@ -377,6 +377,47 @@ describe('FirmwareUploadStore.store()', () => {
 
     await expect(store.store(badTempPath, 'bad.bin')).rejects.toThrow(/null terminator/i);
     expect(fs.existsSync(badTempPath)).toBe(false);
+  });
+
+  it('throws FirmwareUploadValidationError with the right discriminator code for each operator-fixable failure', async () => {
+    // The controller routes 400 vs 500 by `instanceof`. A regression that
+    // threw a plain Error (or the wrong code) would silently promote 400 → 500.
+    const cases: { name: string; tempPath: string; expectedCode: string }[] = [
+      {
+        name: 'too_short',
+        tempPath: writeTempBin(tempDir, Buffer.alloc(100), 'short.tmp'),
+        expectedCode: 'too_short',
+      },
+      {
+        name: 'invalid_header (magic)',
+        tempPath: writeTempBin(tempDir, makeFirmwareBytes({ magic: 0 }), 'magic.tmp'),
+        expectedCode: 'invalid_header',
+      },
+      {
+        name: 'project_mismatch',
+        tempPath: writeTempBin(
+          tempDir,
+          makeFirmwareBytes({ projectName: 'evil-esp' }),
+          'project.tmp',
+        ),
+        expectedCode: 'project_mismatch',
+      },
+      {
+        name: 'unparseable_version',
+        tempPath: writeTempBin(tempDir, makeFirmwareBytes({ version: 'latest' }), 'version.tmp'),
+        expectedCode: 'unparseable_version',
+      },
+    ];
+    for (const { name, tempPath, expectedCode } of cases) {
+      let caught: unknown;
+      try {
+        await store.store(tempPath, `${name}.bin`);
+      } catch (err) {
+        caught = err;
+      }
+      expect(caught, `${name}: expected a throw`).toBeInstanceOf(FirmwareUploadValidationError);
+      expect((caught as FirmwareUploadValidationError).code).toBe(expectedCode);
+    }
   });
 
   it('wipes malformed siblings whose ids/extensions fall outside the canonical UUID + lowercase shape', async () => {

@@ -117,7 +117,10 @@ describe('integration: per-controller deploy mixed OK/FAILED', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${harness.authToken}`,
         },
-        body: JSON.stringify({ source: { kind: 'upload' } }),
+        body: JSON.stringify({
+          source: { kind: 'upload' },
+          controllers: [MASTER_SENTINEL_MAC, PADAWAN_MAC],
+        }),
       });
       expect(flashRes.status).toBe(200);
       const flashBody = (await flashRes.json()) as {

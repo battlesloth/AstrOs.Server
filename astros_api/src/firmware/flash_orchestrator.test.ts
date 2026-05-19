@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createFlashProgressThrottle,
+  DEFAULT_STREAMER_CONFIG,
+  defaultStreamerFactory,
   FlashJobOrchestrator,
   FlashOrchestratorError,
   resolveFlashSource,
+  type FlashJobFailedData,
   type FlashOrchestratorWsMessage,
 } from './flash_orchestrator.js';
 import type { Clock, FlashRequest, Streamer } from '../models/firmware/flash_orchestrator.js';
@@ -541,6 +544,35 @@ describe('createFlashProgressThrottle', () => {
 
 // --- FlashJobOrchestrator ---------------------------------------------------
 
+describe('DEFAULT_STREAMER_CONFIG (production wiring)', () => {
+  it('pins the four production-tuned values against silent regression to TRANSPORT_DEFAULTS', () => {
+    expect(DEFAULT_STREAMER_CONFIG).toEqual({
+      windowSize: 1,
+      ackTimeoutMs: 5_000,
+      maxRetriesPerChunk: 3,
+      transferTimeoutMs: 600_000,
+    });
+  });
+
+  it('defaultStreamerFactory spreads DEFAULT_STREAMER_CONFIG into the constructed ChunkStreamer (factory-drop-through pin)', () => {
+    // The constant alone doesn't catch a `new ChunkStreamer({ bus })`
+    // that drops the override and silently reverts to TRANSPORT_DEFAULTS.
+    // Inspect the constructed streamer's private `config` field (test-
+    // only runtime escape; the field is typed `private readonly`).
+    const bus = {
+      send: () => undefined,
+      subscribeFwAcks: () => () => undefined,
+      subscribeDeployEvents: () => () => undefined,
+    } as unknown as SerialBus;
+    const streamer = defaultStreamerFactory({ bus });
+    const config = (streamer as unknown as { config: Record<string, number> }).config;
+    expect(config.windowSize).toBe(DEFAULT_STREAMER_CONFIG.windowSize);
+    expect(config.ackTimeoutMs).toBe(DEFAULT_STREAMER_CONFIG.ackTimeoutMs);
+    expect(config.maxRetriesPerChunk).toBe(DEFAULT_STREAMER_CONFIG.maxRetriesPerChunk);
+    expect(config.transferTimeoutMs).toBe(DEFAULT_STREAMER_CONFIG.transferTimeoutMs);
+  });
+});
+
 describe('FlashJobOrchestrator', () => {
   // FakeSerialBus mirrors the c.6b chunk_streamer.test pattern: record every
   // `send`, expose maps keyed by transferId for both ack and deploy-event
@@ -668,7 +700,10 @@ describe('FlashJobOrchestrator', () => {
   // parameter through the shared helper avoids the duplicate.
   interface SetupOpts {
     controllers?: Array<{ id: string; variant: string | undefined }>;
-    request?: FlashRequest;
+    // `request` accepts a partial (controllers optional) so the bulk of
+    // tests don't have to thread an explicit selection list — the wrapper
+    // defaults `request.controllers` to the fixture's id set when omitted.
+    request?: Pick<FlashRequest, 'source'> & { controllers?: string[] };
     cachedAsset?: CachedAsset;
     storedUpload?: StoredUpload | null;
     releases?: ReleaseInfo[];
@@ -684,7 +719,16 @@ describe('FlashJobOrchestrator', () => {
     const cachedAsset = opts.cachedAsset ?? makeCachedAsset();
     const storedUpload = opts.storedUpload === undefined ? makeStoredUpload() : opts.storedUpload;
     const releases = opts.releases ?? [makeRelease()];
-    const request: FlashRequest = opts.request ?? { source: { kind: 'github', version: '1.4.0' } };
+    // Default the wire `controllers` field to the fixture's id list so tests
+    // that don't override `opts.request` get a coherent request shape. When
+    // opts.request is supplied without controllers, fall back to the same
+    // default — the test author rarely cares about per-controller selection.
+    const defaultControllerIds = controllers.map((c) => c.id);
+    const baseRequest = opts.request ?? { source: { kind: 'github', version: '1.4.0' } };
+    const request: FlashRequest = {
+      source: baseRequest.source,
+      controllers: baseRequest.controllers ?? defaultControllerIds,
+    } as FlashRequest;
 
     const bus = new FakeSerialBus();
     const cache = { fetch: vi.fn().mockResolvedValue(cachedAsset) };
@@ -758,7 +802,13 @@ describe('FlashJobOrchestrator', () => {
 
     // Return value carries jobId, transferId, source, targets.
     expect(result.jobId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(result.transferId).toMatch(/^[0-9a-f-]{36}$/);
+    // Protocol-doc canonical: `uint8 transfer-id`. Wire is a string of
+    // digits (0..255). The firmware's OtaReceiver parses with
+    // parseStrictU8 and rejects anything else (including a UUID, which is
+    // the bug this assertion previously masked).
+    expect(result.transferId).toMatch(/^[0-9]{1,3}$/);
+    const tid = Number(result.transferId);
+    expect(Number.isInteger(tid) && tid >= 0 && tid <= 255).toBe(true);
     expect(result.source).toEqual({
       kind: 'github',
       version: '1.4.0',
@@ -767,6 +817,17 @@ describe('FlashJobOrchestrator', () => {
       displayName: 'astros-esp 1.4.0 (lolin_d32_pro)',
     });
     expect(result.targets).toEqual(['controller-a', 'controller-b']);
+
+    // Request-scoped controllers contract pin: the orchestrator MUST
+    // forward request.controllers verbatim to listFlashTargets. A
+    // regression that filtered or substituted (e.g. passing `[]` or
+    // a stale default) would let the api_server's inline `wanted.has(id)`
+    // filter (api_server.ts:619-625) emit no_controllers OR flash the
+    // wrong subset — the existing controllers_unknown / no_controllers
+    // negative tests use mocks that return their configured arrays
+    // regardless of caller args, so they don't catch this drift.
+    expect(fx.controllersStore.listFlashTargets).toHaveBeenCalledTimes(1);
+    expect(fx.controllersStore.listFlashTargets).toHaveBeenCalledWith(fx.request.controllers);
 
     // TransferSpec carried both the on-disk path (from CachedAsset) and the
     // controllers' IDs as targets.
@@ -807,6 +868,53 @@ describe('FlashJobOrchestrator', () => {
     expect(fx.jobLock.isLocked()).toBe(true);
     expect(fx.jobLock.getOwner()).toBe(result.jobId);
     expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+  });
+
+  it('start() resolves BEFORE streamer.run() settles — HTTP must not block on the long transfer', async () => {
+    // Every other test resolves the streamer before awaiting startPromise,
+    // so a regression that re-awaited streamer.run() inline would still
+    // pass them. Race startPromise against a deadline with the streamer
+    // intentionally unsettled to pin the early-return contract.
+    const fx = setupHappyPath();
+
+    const startPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+
+    const sentinel = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('start() blocked on streamer.run()')), 250),
+    );
+    const result = await Promise.race([startPromise, sentinel]);
+    expect(result.jobId).toMatch(/^[0-9a-f-]{36}$/);
+    // Drain the still-in-flight IIFE so state doesn't leak into the next test.
+    fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+    await fx.orchestrator.awaitRunInProgressForTest();
+  });
+
+  it('transferId rotates as a uint8 counter across successive jobs (wire-format protocol contract)', async () => {
+    // Pin the counter-not-constant invariant: two back-to-back start()
+    // calls must produce DIFFERENT transferIds, in sequential order. A
+    // mutation that hardcoded `transferId = "0"` (or any constant) would
+    // pass the format regex above but fail this — two transfers with the
+    // same id would confuse the firmware's BulkReceiver across job
+    // boundaries.
+    const fx = setupHappyPath();
+
+    const firstPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+    fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[0].spec));
+    const first = await firstPromise;
+    // Complete the deploy phase + reboot wait so the next start() can
+    // acquire the lock. cancelFlash() forces an abort and releases.
+    await fx.orchestrator.cancel('test-cleanup');
+
+    const secondPromise = fx.orchestrator.start(fx.request);
+    await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(2));
+    fx.streamerControls.resolve(makeTransferResult(fx.streamerControls.runs[1].spec));
+    const second = await secondPromise;
+
+    const firstId = Number(first.transferId);
+    const secondId = Number(second.transferId);
+    expect(secondId).toBe((firstId + 1) & 0xff);
   });
 
   it('happy path (upload source): displayName comes from upload originalFilename; FW_DEPLOY_BEGIN sent', async () => {
@@ -1033,6 +1141,36 @@ describe('FlashJobOrchestrator', () => {
     await startPromise;
   });
 
+  it('rejects with controllers_unknown when the requested MAC list contains entries missing from the variant store', async () => {
+    // Distinct from `no_controllers` (empty request). Detail enumerates
+    // the missing MACs so the operator can diagnose late-joining vs
+    // offline controllers.
+    const fx = setupHappyPath({
+      controllers: [{ id: 'controller-a', variant: 'lolin_d32_pro' }],
+      request: {
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: ['controller-a', 'controller-ghost-1', 'controller-ghost-2'],
+      },
+    });
+
+    let caught: unknown;
+    try {
+      await fx.orchestrator.start(fx.request);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(FlashOrchestratorError);
+    expect((caught as FlashOrchestratorError).reason).toBe('controllers_unknown');
+    // Exact comma-space separator in request order — `.toContain` would
+    // miss a join-separator mutation that produces unparseable copy.
+    expect((caught as FlashOrchestratorError).detail).toBe(
+      'controller-ghost-1, controller-ghost-2',
+    );
+    // Lock released, no orphaned currentJob.
+    expect(fx.jobLock.isLocked()).toBe(false);
+    expect(fx.orchestrator.getCurrentJob()).toBeNull();
+  });
+
   it('rejects with controllers_lookup_failed when controllersStore.listFlashTargets rejects; lock released, flashJobFailed emitted', async () => {
     // Per PR feedback: a controllersStore rejection (DB error, fs read
     // failure, etc.) must surface as a typed FlashOrchestratorError so the
@@ -1215,7 +1353,10 @@ describe('FlashJobOrchestrator', () => {
 
     fx.streamerControls.reject(new Error('something exploded'));
 
-    await expect(startPromise).rejects.toThrow('something exploded');
+    // Post-async-start: streamer rejection lands in background runInProgress,
+    // not in start() itself. start() resolves with the initial state.
+    await startPromise;
+    await fx.orchestrator.awaitRunInProgressForTest();
 
     expect(fx.orchestrator.getCurrentJob()).toBeNull();
     expect(fx.jobLock.isLocked()).toBe(false);
@@ -1970,16 +2111,11 @@ describe('FlashJobOrchestrator', () => {
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       fx.streamerControls.resolve(makeTransferResult(run.spec));
 
-      // start() rejects with bus_send_failed.
-      let caught: unknown;
-      try {
-        await startPromise;
-      } catch (err) {
-        caught = err;
-      }
-      expect(caught).toBeInstanceOf(FlashOrchestratorError);
-      expect((caught as FlashOrchestratorError).reason).toBe('bus_send_failed');
-      expect((caught as FlashOrchestratorError).detail).toContain('worker channel closed');
+      // Post-async-start: the deploy-begin bus.send throw lands in the
+      // background runInProgress, routes through failJob → flashJobFailed.
+      // start() resolved with the initial state when sync setup completed.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
       // flashJobFailed emitted; lock released; currentJob cleared.
       const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
@@ -2455,6 +2591,16 @@ describe('FlashJobOrchestrator', () => {
     // streamer-awaiting state, rejects with that TransferError, and
     // verifies the bucket-B emit shape (typed reason === code, abortReason
     // === code, controllers cleaned up, lock released).
+    //
+    // Note on the await pattern: post-async-start refactor, `start()`
+    // resolves with the initial `{ jobId, transferId, ... }` as soon as
+    // the sync setup completes — the streamer.run() failure surfaces via
+    // `runInProgress` (the background work promise), NOT via `start()`'s
+    // own rejection. The bucket-B `TransferError` is no longer thrown to
+    // the HTTP caller; it's routed through `failJob` → `flashJobFailed`
+    // on WS, exactly as the operator-facing UI consumes it. Tests await
+    // `runInProgress` to synchronize on "background settled" before
+    // asserting on terminal WS / lock state.
     for (const code of TRANSFER_ERROR_CODES) {
       it(`TransferError '${code}' → flashJobFailed with reason+abortReason=${code}; controllers Failed; lock released`, async () => {
         const fx = setupHappyPath();
@@ -2467,14 +2613,11 @@ describe('FlashJobOrchestrator', () => {
 
         fx.streamerControls.reject(new TransferError(code, transferId, 'upstream detail'));
 
-        let caught: unknown;
-        try {
-          await startPromise;
-        } catch (err) {
-          caught = err;
-        }
-        expect(caught).toBeInstanceOf(TransferError);
-        expect((caught as TransferError).code).toBe(code);
+        // Sync setup already done — startPromise resolves with the initial
+        // state; runInProgress resolves after the background failure routes
+        // through failJob.
+        await startPromise;
+        await fx.orchestrator.awaitRunInProgressForTest();
 
         // flashJobFailed: typed reason === code, abortReason === code, detail.
         const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
@@ -2521,15 +2664,10 @@ describe('FlashJobOrchestrator', () => {
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       fx.streamerControls.resolve(makeTransferResult(run.spec));
 
-      let caught: unknown;
-      try {
-        await startPromise;
-      } catch (err) {
-        caught = err;
-      }
-      expect(caught).toBeInstanceOf(FlashOrchestratorError);
-      expect((caught as FlashOrchestratorError).reason).toBe('subscriber_attach_failed');
-      expect((caught as FlashOrchestratorError).detail).toContain('listener limit reached');
+      // Post-async-start: the subscriber-attach throw lands in the background
+      // runInProgress, routes through failJob → flashJobFailed.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
       const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
       expect(failed).toHaveLength(1);
@@ -2639,7 +2777,10 @@ describe('FlashJobOrchestrator', () => {
           fx.streamerControls.reject(
             new TransferError('begin_timeout', fx.streamerControls.runs[0].spec.transferId),
           );
-          await startPromise.catch(() => undefined);
+          // Post-async-start: rejection lands in background runInProgress,
+          // not in start() itself.
+          await startPromise;
+          await fx.orchestrator.awaitRunInProgressForTest();
         },
       },
       {
@@ -2648,7 +2789,9 @@ describe('FlashJobOrchestrator', () => {
           const startPromise = fx.orchestrator.start(fx.request);
           await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
           fx.streamerControls.reject(new Error('mystery'));
-          await startPromise.catch(() => undefined);
+          // Post-async-start: rejection lands in background runInProgress.
+          await startPromise;
+          await fx.orchestrator.awaitRunInProgressForTest();
         },
       },
     ];
@@ -2683,14 +2826,10 @@ describe('FlashJobOrchestrator', () => {
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       fx.streamerControls.resolve(makeTransferResult(run.spec));
 
-      let caught: unknown;
-      try {
-        await startPromise;
-      } catch (err) {
-        caught = err;
-      }
-      expect(caught).toBeInstanceOf(FlashOrchestratorError);
-      expect((caught as FlashOrchestratorError).reason).toBe('bus_send_failed');
+      // Post-async-start: the deploy-begin bus.send throw lands in the
+      // background runInProgress, routes through failJob → flashJobFailed.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
       // Exactly one flashJobFailed frame — pinning that the catch block
       // doesn't double-emit (it would if the inline failNonTerminalControllers
@@ -2753,20 +2892,18 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('failJob is load-bearing: TransferError without bucket-B handling would skip controller cleanup (mutation-discipline pin)', async () => {
-      // If start()'s catch block only emitted flashJobFailed for
-      // FlashOrchestratorError (the pre-Task 11 behavior), a TransferError
-      // would fall through with NO flashJobFailed and NO per-controller
-      // failNonTerminal cleanup. This test pins both: TransferError fires
-      // a typed flashJobFailed AND transitions every controller to Failed.
-      // A regression that drops the `else if (err instanceof TransferError)`
-      // branch fails this assertion.
+      // If `routeStartFailure` lost its `instanceof TransferError` branch,
+      // the rejection would fall through with no flashJobFailed and no
+      // per-controller failNonTerminal cleanup.
       const fx = setupHappyPath();
       const startPromise = fx.orchestrator.start(fx.request);
       await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
       const run = fx.streamerControls.runs[0];
       run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
       fx.streamerControls.reject(new TransferError('hash_mismatch', run.spec.transferId, 'h'));
-      await expect(startPromise).rejects.toBeInstanceOf(TransferError);
+      // Post-async-start: TransferError lands in background runInProgress.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
       const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
       expect(failed).toHaveLength(1);
@@ -2780,6 +2917,384 @@ describe('FlashJobOrchestrator', () => {
       // call from the catch).
       expect(results).toHaveLength(2);
       expect(results.every((r) => r.controller.stage === FwStage.Failed)).toBe(true);
+    });
+
+    it('background-IIFE .catch belt: if routeStartFailure throws, belt emits flashJobFailed, nulls per-job state, releases JobLock, broadcasts lock-state, and logs', async () => {
+      // Forcing the inner catch to throw simulates the narrow but real path
+      // where failJob → failNonTerminalControllers → transitionControllerState
+      // raises the FSM's "illegal flash-job transition" Error on a malformed
+      // controller shape. Pre-belt, the rejection went unhandled and the
+      // lock stayed held (failJob never reached its releaseLock line).
+      //
+      // Pin all five belt obligations:
+      //   - flashJobFailed best-effort emit so UI exits `phase='flashing'`
+      //   - per-job state nulled (next start() gets a clean slate)
+      //   - lock released
+      //   - lockStateChanged broadcast (other tabs / operators exit the
+      //     stale "Firmware update in progress" banner without a refresh)
+      //   - logger.error breadcrumb fires (ops triage)
+      const fx = setupHappyPath();
+      (
+        fx.orchestrator as unknown as {
+          routeStartFailure: (jobId: string, err: unknown) => void;
+        }
+      ).routeStartFailure = vi.fn(() => {
+        throw new Error('synthetic routeStartFailure failure');
+      });
+      const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+      try {
+        const startPromise = fx.orchestrator.start(fx.request);
+        await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+        const run = fx.streamerControls.runs[0];
+        run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+        // Trigger the inner catch with a TransferError so routeStartFailure
+        // would normally consume it. Our spy throws instead — the belt is
+        // the only thing standing between this and a wedged lock.
+        fx.streamerControls.reject(new TransferError('hash_mismatch', run.spec.transferId, 'h'));
+
+        const result = await startPromise;
+        // The belt's `.catch` absorbs the rejection, so this awaits a
+        // fulfilled promise. A regression that removes the belt would either
+        // reject here OR leave the lock held — the next assertion catches the
+        // second mode either way.
+        await fx.orchestrator.awaitRunInProgressForTest();
+
+        // Assertions follow the header's obligation order (emit → null
+        // state → lock → broadcast → log), with `expect(jobLock.isLocked)`
+        // first only for early-failure readability — it's the single
+        // strongest "did the belt run at all?" signal.
+
+        // Obligation 3: lock is released.
+        expect(fx.jobLock.isLocked()).toBe(false);
+
+        // Obligation 1: best-effort flashJobFailed emit fired so the UI
+        // can exit `phase='flashing'`. The belt-emitted frame carries
+        // `streamer_unknown_error` (distinct from `hash_mismatch`) so a
+        // future regression that re-routes through `safeEmitWs` instead
+        // of the belt's direct emit would surface here as a missing or
+        // wrong-reason frame.
+        const failedFrames = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+        const beltFrame = failedFrames.find(
+          (f) =>
+            (f.data as FlashJobFailedData).jobId === result.jobId &&
+            (f.data as FlashJobFailedData).reason === 'streamer_unknown_error',
+        );
+        expect(beltFrame).toBeDefined();
+        expect((beltFrame!.data as FlashJobFailedData).detail).toContain(
+          'Verify each controller manually',
+        );
+
+        // Obligation 2: per-job state fields nulled so the next start()
+        // gets a clean slate. Reading via the `as unknown as` cast — the
+        // fields are private, the cast is the established test idiom.
+        const internals = fx.orchestrator as unknown as {
+          runInProgress: Promise<void> | null;
+          currentJob: FlashJobState | null;
+          phase: 'upload' | 'deploy' | 'done' | null;
+          deployUnsubscriber: (() => void) | null;
+          throttle: unknown;
+          abortController: AbortController | null;
+        };
+        expect(internals.runInProgress).toBeNull();
+        expect(internals.currentJob).toBeNull();
+        expect(internals.phase).toBeNull();
+        expect(internals.deployUnsubscriber).toBeNull();
+        expect(internals.throttle).toBeNull();
+        expect(internals.abortController).toBeNull();
+
+        // Obligation 4: lockStateChanged broadcast (consistent with the
+        // sibling acquire/release sites). In production, every connected
+        // client's UI also receives this via the JobLock's own
+        // notify-on-release subscriber wired in api_server.ts:282; the
+        // orchestrator's direct broadcast is what the unit-test fixture
+        // observes because it doesn't wire the subscriber.
+        // LockStateResponse is a flat BaseResponse-shaped frame (no
+        // `data` wrapper) so `locked` is read at the top level.
+        const lockStateFrames = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged);
+        expect(lockStateFrames.length).toBeGreaterThan(0);
+        // The terminal broadcast is the last one — it carries the released
+        // state. Pinning the last frame catches a regression where the belt
+        // broadcasts the pre-release state by accident.
+        const finalLockState = lockStateFrames[lockStateFrames.length - 1] as unknown as {
+          locked: boolean;
+        };
+        expect(finalLockState.locked).toBe(false);
+
+        // Obligation 5: logger.error breadcrumb fires. The belt logs the
+        // captured throw with a job-id-tagged message. Ops monitoring
+        // tooling grep this for `force-released JobLock`.
+        expect(loggerErrorSpy).toHaveBeenCalled();
+        const errorCalls = loggerErrorSpy.mock.calls;
+        const beltLog = errorCalls.find((call) => {
+          const msg = call.find((arg) => typeof arg === 'string') as string | undefined;
+          return msg !== undefined && msg.includes('force-released JobLock');
+        });
+        expect(beltLog).toBeDefined();
+      } finally {
+        loggerErrorSpy.mockRestore();
+      }
+    });
+
+    it('background-IIFE .catch belt: when emitWs throws on the streamer_unknown_error emit, belt still releases lock + broadcasts + logs the failed-emit branch', async () => {
+      // The belt's inner `try { this.emitWs(...) } catch {}` exists so a
+      // ws-down condition during the catch belt doesn't re-fire the belt
+      // into a second rejection — but until now no test exercised it. The
+      // `emitOk ? 'UI was notified...' : 'UI emit also failed...'` log
+      // branch was effectively unreached.
+      //
+      // Strategy: make emitWs throw selectively for the streamer_unknown_error
+      // frame only. Earlier emits (per-controller results, etc.) flow through
+      // `safeEmitWs` which catches; the belt's direct emit is the only path
+      // that observes the throw.
+      const fx = setupHappyPath();
+
+      const originalEmit = fx.emitWs;
+      const throwingEmit = vi.fn<[FlashOrchestratorWsMessage], void>((msg) => {
+        if (
+          msg.type === TransmissionType.flashJobFailed &&
+          (msg.data as FlashJobFailedData).reason === 'streamer_unknown_error'
+        ) {
+          throw new Error('synthetic ws-down during belt emit');
+        }
+        originalEmit(msg);
+      });
+      (fx.orchestrator as unknown as { emitWs: (msg: FlashOrchestratorWsMessage) => void }).emitWs =
+        throwingEmit;
+
+      (
+        fx.orchestrator as unknown as {
+          routeStartFailure: (jobId: string, err: unknown) => void;
+        }
+      ).routeStartFailure = vi.fn(() => {
+        throw new Error('synthetic routeStartFailure failure');
+      });
+      const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+      try {
+        const startPromise = fx.orchestrator.start(fx.request);
+        await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+        const run = fx.streamerControls.runs[0];
+        run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+        fx.streamerControls.reject(new TransferError('hash_mismatch', run.spec.transferId, 'h'));
+
+        const result = await startPromise;
+        await fx.orchestrator.awaitRunInProgressForTest();
+
+        // Lock release still happens — the inner try/catch around the
+        // belt emit must not skip the cleanup that follows.
+        expect(fx.jobLock.isLocked()).toBe(false);
+
+        // Per-job state nulled.
+        const internals = fx.orchestrator as unknown as {
+          runInProgress: Promise<void> | null;
+          currentJob: FlashJobState | null;
+          phase: 'upload' | 'deploy' | 'done' | null;
+        };
+        expect(internals.runInProgress).toBeNull();
+        expect(internals.currentJob).toBeNull();
+        expect(internals.phase).toBeNull();
+
+        // The broadcastLockState call uses safeEmitWs which catches its
+        // own throws, so it cannot re-fire the belt. Pin the LAST
+        // lockStateChanged frame to `locked: false` — `start()` itself
+        // broadcasts one frame with `locked: true` at acquire, so a
+        // `length > 0` check would pass even if the belt's broadcast
+        // were removed. Asserting the terminal frame's `locked` field
+        // catches the mutation.
+        const lockStateFrames = emittedFrames(originalEmit, TransmissionType.lockStateChanged);
+        expect(lockStateFrames.length).toBeGreaterThan(0);
+        const finalLockState = lockStateFrames[lockStateFrames.length - 1] as unknown as {
+          locked: boolean;
+        };
+        expect(finalLockState.locked).toBe(false);
+
+        // The log message branches on `emitOk` — this path takes the
+        // "UI emit also failed" wording so an operator triaging without
+        // a UI banner knows the truth source for state.
+        const failedEmitLog = loggerErrorSpy.mock.calls.find((call) => {
+          const msg = call.find((arg) => typeof arg === 'string') as string | undefined;
+          return msg !== undefined && msg.includes('UI emit also failed');
+        });
+        expect(failedEmitLog).toBeDefined();
+        // The job-id tag also lands on this log so ops can correlate.
+        expect(failedEmitLog![1] as string).toContain(result.jobId);
+      } finally {
+        loggerErrorSpy.mockRestore();
+      }
+    });
+
+    it('releaseLock disposer isolation: when deployUnsubscriber throws during cancel-driven failJob, the throw stays trapped and the lock still releases', async () => {
+      // Mutation-discipline pin for the per-disposer try/catch around
+      // `this.deployUnsubscriber()` in `releaseLock`. This test drives
+      // `cancel()` from foreground (which calls failJob synchronously),
+      // so the throw path is `releaseLock → failJob → cancel → out to
+      // the test's await`. The wrap converts the throw to a
+      // logger.error breadcrumb so failJob continues past releaseLock
+      // and the lock is released.
+      //
+      // Removing the wrap manifests differently from the belt path:
+      //   - `await cancel(...)` rejects synchronously
+      //   - failJob returns before reaching its `releaseLock` line —
+      //     so the lock stays held (`jobLock.isLocked()` would be true)
+      //   - the wrap's "deployUnsubscriber threw" log doesn't fire
+      // The belt would only see this throw if a deploy-event-triggered
+      // failJob fired AFTER the background IIFE settled (it would
+      // propagate up through the bus dispatcher into the worker
+      // EventEmitter, not the belt). See `handleDeployDone disposer
+      // wrap` test for the deploy-event-side coverage.
+      const fx = setupHappyPath();
+
+      // Drive into the deploy phase so `deployUnsubscriber` is assigned.
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      const armed = await startPromise;
+
+      // Now `deployUnsubscriber` is set to the real bus disposer. Swap it
+      // for a thrower so releaseLock observes a throwing disposer.
+      const throwingDisposer = vi.fn(() => {
+        throw new Error('synthetic bus disposer failure');
+      });
+      (
+        fx.orchestrator as unknown as { deployUnsubscriber: (() => void) | null }
+      ).deployUnsubscriber = throwingDisposer;
+
+      const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+      try {
+        // Cancel routes through failJob('aborted', ...) → releaseLock.
+        // The disposer throw fires inside releaseLock; the wrap there
+        // catches and logs so failJob's caller never sees it.
+        await fx.orchestrator.cancel('disposer-throws');
+
+        // Exactly ONE flashJobFailed emit — the real `aborted` from
+        // cancel. The belt is NOT supposed to fire a duplicate.
+        const failedFrames = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+        expect(failedFrames).toHaveLength(1);
+        expect((failedFrames[0].data as FlashJobFailedData).jobId).toBe(armed.jobId);
+        // Reason discriminator: `aborted` (real) vs `streamer_unknown_error`
+        // (belt). A regression that lets the throw escape would flip this.
+        expect((failedFrames[0].data as FlashJobFailedData).reason).toBe('aborted');
+
+        // Lock is released (disposer wrap continues past the throw).
+        expect(fx.jobLock.isLocked()).toBe(false);
+
+        // Disposer was invoked exactly once (no retry / no double-call).
+        expect(throwingDisposer).toHaveBeenCalledTimes(1);
+
+        // Logger.error fired with the wrap's specific message — without
+        // this breadcrumb a misbehaving bus disposer is silent on the
+        // server side even though the UI looks normal.
+        const disposerLog = loggerErrorSpy.mock.calls.find((call) => {
+          const msg = call.find((arg) => typeof arg === 'string') as string | undefined;
+          return msg !== undefined && msg.includes('deployUnsubscriber threw');
+        });
+        expect(disposerLog).toBeDefined();
+      } finally {
+        loggerErrorSpy.mockRestore();
+      }
+    });
+
+    it('handleDeployDone disposer wrap: when deployUnsubscriber throws on the success path, flashJobDone still emits and the reboot timer still arms', async () => {
+      // Mutation-discipline pin for the new try/catch around
+      // `this.deployUnsubscriber()` in `handleDeployDone`. The success
+      // path is conceptually identical to the `releaseLock` wrap but
+      // fires from a different lifecycle hook (the deploy-event
+      // dispatcher rather than failJob), and without protection a
+      // disposer throw would propagate up through the bus's event
+      // emit — leaving `flashJobDone` unemitted, `rebootTimer` unarmed,
+      // and the JobLock held forever. The wrap lets the success path
+      // continue past the bad disposer.
+      const fx = setupHappyPath();
+
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      const armed = await startPromise;
+
+      // Override the disposer set during subscribeDeployEvents with a
+      // thrower. The orchestrator now thinks it has a valid subscriber
+      // for the rest of the deploy phase.
+      const throwingDisposer = vi.fn(() => {
+        throw new Error('synthetic bus disposer failure on success path');
+      });
+      (
+        fx.orchestrator as unknown as { deployUnsubscriber: (() => void) | null }
+      ).deployUnsubscriber = throwingDisposer;
+
+      const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+      try {
+        // Drive controllers through Verifying → Rebooting so the
+        // FW_DEPLOY_DONE results are accepted by the FSM as terminal
+        // transitions. Without the pre-progress, the OK outcome would
+        // trip the LEGAL_NEXT_STAGES guard.
+        for (const controllerId of armed.targets) {
+          for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+            fx.bus.deliverDeployEvent(armed.transferId, {
+              kind: 'progress',
+              payload: {
+                transferId: armed.transferId,
+                controllerId,
+                stage,
+                bytesSent: 0,
+                totalBytes: 0,
+                detail: '',
+              },
+            });
+          }
+        }
+
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'done',
+          payload: {
+            transferId: armed.transferId,
+            results: armed.targets.map((id) => ({
+              controllerId: id,
+              outcome: 'OK',
+              finalVersion: '1.4.0',
+              error: '',
+            })),
+          },
+        });
+
+        // flashJobDone emitted — success path continued past the throw.
+        const doneFrames = emittedFrames(fx.emitWs, TransmissionType.flashJobDone);
+        expect(doneFrames).toHaveLength(1);
+        expect((doneFrames[0].data as { jobId: string }).jobId).toBe(armed.jobId);
+
+        // Disposer was called exactly once (the wrap caught + nulled).
+        expect(throwingDisposer).toHaveBeenCalledTimes(1);
+
+        // The orchestrator transitioned to `phase='done'` and armed the
+        // reboot timer — neither would happen if the throw escaped.
+        const internals = fx.orchestrator as unknown as {
+          phase: 'upload' | 'deploy' | 'done' | null;
+          rebootTimer: unknown;
+          deployUnsubscriber: (() => void) | null;
+        };
+        expect(internals.phase).toBe('done');
+        expect(internals.rebootTimer).not.toBeNull();
+        expect(internals.deployUnsubscriber).toBeNull();
+
+        // The wrap's specific log message fires — the breadcrumb names
+        // `handleDeployDone` so triage distinguishes this site from the
+        // sibling `releaseLock` wrap.
+        const disposerLog = loggerErrorSpy.mock.calls.find((call) => {
+          const msg = call.find((arg) => typeof arg === 'string') as string | undefined;
+          return (
+            msg !== undefined && msg.includes('deployUnsubscriber threw during handleDeployDone')
+          );
+        });
+        expect(disposerLog).toBeDefined();
+      } finally {
+        loggerErrorSpy.mockRestore();
+      }
     });
   });
 
@@ -2867,17 +3382,14 @@ describe('FlashJobOrchestrator', () => {
       // the real ChunkStreamer rejects with on signal-fire.
       fx.streamerControls.reject(new TransferError('aborted', run.spec.transferId));
 
-      // start() rethrows the streamer rejection.
-      let caught: unknown;
-      try {
-        await startPromise;
-      } catch (err) {
-        caught = err;
-      }
-      expect(caught).toBeInstanceOf(TransferError);
-      expect((caught as TransferError).code).toBe('aborted');
+      // Post-async-start refactor: startPromise resolves with the initial
+      // state (sync setup completed before the cancel); the streamer
+      // rejection lands in the background `runInProgress` promise, which
+      // settles after `routeStartFailure` → `failJob` runs.
+      await startPromise;
+      await fx.orchestrator.awaitRunInProgressForTest();
 
-      // After the catch block: lock released, currentJob cleared.
+      // After the background catch: lock released, currentJob cleared.
       expect(fx.jobLock.isLocked()).toBe(false);
       expect(fx.orchestrator.getCurrentJob()).toBeNull();
       // No deploy subscriber was attached (we never reached deploy phase).
@@ -2943,23 +3455,26 @@ describe('FlashJobOrchestrator', () => {
       // Subscriber disposed.
       expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
 
-      // Each non-terminal controller transitioned to Failed with the cancel
-      // reason as the error string + got a flashControllerResult emission.
+      // Each non-terminal controller → Failed with `${reason}: ${detail}`
+      // from failJob (aborted = typed reason, operator-cancel = trigger).
       const newResults = controllerResults(fx.emitWs).slice(baselineResults);
       expect(newResults).toHaveLength(2);
       for (const r of newResults) {
         expect(r.jobId).toBe(armed.jobId);
         expect(r.controller.stage).toBe(FwStage.Failed);
         if (r.controller.stage === FwStage.Failed) {
-          expect(r.controller.error).toBe('operator-cancel');
+          expect(r.controller.error).toBe('aborted: operator-cancel');
         }
       }
 
-      // flashJobFailed emitted with abortReason carrying the cancel reason.
+      // flashJobFailed carries the typed reason so the Vue banner maps
+      // through `KNOWN_FLASH_ERROR_REASONS` instead of the
+      // `internal_server_error` fallback.
       const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
       expect(failed).toHaveLength(1);
       expect(failed[0].data).toMatchObject({
         jobId: armed.jobId,
+        reason: 'aborted',
         abortReason: 'operator-cancel',
       });
       expect((failed[0].data as { endedAt: string }).endedAt).toMatch(/^\d{4}-/);
@@ -3082,7 +3597,10 @@ describe('FlashJobOrchestrator', () => {
       });
 
       // Kick off start(); it will block in releaseService.getReleases().
-      const startPromise = orchestrator.start({ source: { kind: 'github', version: '1.4.0' } });
+      const startPromise = orchestrator.start({
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: ['controller-a', 'controller-b'],
+      });
       // Yield enough microtasks for the orchestrator to land in the
       // `getReleases()` await — controllersStore + lock acquisition are
       // synchronous and the resolveFlashSource entry point hits the

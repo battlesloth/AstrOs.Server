@@ -7,14 +7,19 @@
 // healthy worker), but the WS event shape differs between them:
 //
 //   - Upload-cancel: AbortController.abort('http') → streamer rejects with
-//     TransferError('aborted', ...) → orchestrator's catch block routes
-//     through `failJob` which stamps BOTH `reason: 'aborted'` and
-//     `abortReason: 'aborted'` on the flashJobFailed emit.
+//     TransferError('aborted', ...) → rejection lands in the background
+//     `runInProgress` IIFE's catch (start() has already returned 200 by
+//     this point), which routes through `routeStartFailure` → `failJob`,
+//     stamping BOTH `reason: 'aborted'` and `abortReason: 'aborted'` on
+//     the flashJobFailed emit.
 //   - Deploy-cancel: streamer is already settled, so abort is a no-op.
-//     Orchestrator runs the inline deploy-cancel sequence and emits
-//     flashJobFailed with ONLY `abortReason: 'http'` (no `reason` field).
+//     `cancel()`'s deploy branch routes through `failJob` with
+//     reason='aborted' (the operator-supplied cancel trigger rides on
+//     `abortReason`). Same wire shape as upload-cancel — both paths
+//     surface a typed `reason: 'aborted'` so the Vue banner renders the
+//     operator-facing "Cancelled" copy.
 //
-// See flash_orchestrator.ts:788-826 for both cancel codepaths.
+// See `cancel()` and the `runInProgress` IIFE in flash_orchestrator.ts.
 
 import { describe, it, expect, afterEach } from 'vitest';
 import {
@@ -63,22 +68,24 @@ describe('integration: cancel during upload + deploy', () => {
 
       // 3. Stub master is intentionally NOT configured with autoAckUpload.
       //    The streamer will send FW_TRANSFER_BEGIN over the PTY and wait
-      //    for FW_TRANSFER_BEGIN_ACK indefinitely (well, the streamer's
-      //    1500ms begin-ack timeout — but we cancel well before that fires).
+      //    for FW_TRANSFER_BEGIN_ACK indefinitely (well, until
+      //    DEFAULT_STREAMER_CONFIG.ackTimeoutMs — 5 000 ms in the
+      //    production wiring this harness mirrors — fires, but we cancel
+      //    well before that).
 
-      // 4. POST flash. `orchestrator.start()` awaits `streamer.run`, so the
-      //    HTTP response WILL NOT return until the streamer settles (success,
-      //    typed error, or — in this test — `AbortController.abort` →
-      //    TransferError('aborted',...) → 500). Kick the POST off without
-      //    awaiting and use the `flashJobStarted` WS event as the
-      //    "job is in flight" signal instead.
+      // 4. POST flash. `start()` returns once sync setup finishes; the
+      //    upload runs in a background IIFE. The abort rejection lands in
+      //    that IIFE's catch and surfaces via WS, not on the HTTP response.
       const flashPromise = fetch(`${harness.httpBaseUrl}/api/firmware/flash`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           authorization: `Bearer ${harness.authToken}`,
         },
-        body: JSON.stringify({ source: { kind: 'upload' } }),
+        body: JSON.stringify({
+          source: { kind: 'upload' },
+          controllers: [MASTER_SENTINEL_MAC],
+        }),
       });
 
       // 5. Wait for flashJobStarted to confirm the job is in flight. This
@@ -121,11 +128,11 @@ describe('integration: cancel during upload + deploy', () => {
       expect(failedEvent.data.reason).toBe('aborted');
       expect(failedEvent.data.abortReason).toBe('aborted');
 
-      // The deferred POST resolves once the streamer rejects with the
-      // abort. Per controller mapping, `aborted` → 500. Drain the body
-      // so the connection isn't left dangling at suite teardown.
+      // HTTP returned 200 from sync setup; the abort surfaces via WS
+      // (already asserted above). Drain the body so the connection
+      // doesn't dangle at teardown.
       const flashRes = await flashPromise;
-      expect(flashRes.status).toBe(500);
+      expect(flashRes.status).toBe(200);
       await flashRes.json().catch(() => undefined);
 
       // 8. Lock release via the cancel/failJob path (NOT the heartbeat path —
@@ -192,7 +199,10 @@ describe('integration: cancel during upload + deploy', () => {
           'content-type': 'application/json',
           authorization: `Bearer ${harness.authToken}`,
         },
-        body: JSON.stringify({ source: { kind: 'upload' } }),
+        body: JSON.stringify({
+          source: { kind: 'upload' },
+          controllers: [MASTER_SENTINEL_MAC],
+        }),
       });
       expect(flashRes.status).toBe(200);
       const flashBody = (await flashRes.json()) as { jobId: string };
@@ -221,9 +231,11 @@ describe('integration: cancel during upload + deploy', () => {
       expect(cancelBody.cancelled).toBe(true);
       expect(cancelBody.jobId).toBe(flashBody.jobId);
 
-      // 6. flashJobFailed with abortReason='http' and NO `reason` field.
-      //    The deploy-cancel path emits inline (flash_orchestrator.ts:820-823),
-      //    bypassing `failJob` and its `reason` stamping.
+      // 6. flashJobFailed with reason='aborted' AND abortReason='http'.
+      //    The deploy-cancel branch of `cancel()` routes through `failJob`
+      //    with reason='aborted' (the cancel trigger 'http' rides on
+      //    `abortReason`). Vue's `KNOWN_FLASH_ERROR_REASONS` recognizes
+      //    `aborted` and maps it to the operator-facing "Cancelled" banner.
       const failedEvent = await harness.waitForWsMessage<{
         type: number;
         data: { jobId: string; reason?: string; abortReason?: string };
@@ -233,8 +245,8 @@ describe('integration: cancel during upload + deploy', () => {
         deleteSnapshot,
       );
       expect(failedEvent.data.jobId).toBe(flashBody.jobId);
+      expect(failedEvent.data.reason).toBe('aborted');
       expect(failedEvent.data.abortReason).toBe('http');
-      expect(failedEvent.data.reason).toBeUndefined();
 
       // 7. flashControllerResult emitted before flashJobFailed for the
       //    master, transitioning Sending → Failed. Per orchestrator's

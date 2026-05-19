@@ -48,4 +48,19 @@ describe('mapHttpErrorToFlashEnvelope', () => {
       { reason: 'internal_server_error' },
     );
   });
+
+  it('maps the upload-middleware 413 body to payload_too_large (not internal_server_error)', () => {
+    // Regression guard for C3: the express-fileupload default returns a
+    // text/plain body that lands at the `typeof body !== 'object'` branch
+    // above. Switching back to that would silently degrade the operator's
+    // copy from "the file is too big" to "check the server logs."
+    expect(
+      mapHttpErrorToFlashEnvelope({
+        response: {
+          status: 413,
+          data: { error: 'payload_too_large', detail: 'Firmware upload exceeds the 50 MB limit.' },
+        },
+      }),
+    ).toEqual({ reason: 'payload_too_large', detail: 'Firmware upload exceeds the 50 MB limit.' });
+  });
 });

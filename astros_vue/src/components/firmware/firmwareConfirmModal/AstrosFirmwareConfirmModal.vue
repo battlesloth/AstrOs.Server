@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import AstrosFirmwareButton from '../firmwareButton/AstrosFirmwareButton.vue';
 import AstrosFirmwareVersionDelta from '../firmwareVersionDelta/AstrosFirmwareVersionDelta.vue';
+import { compareTags } from '@/utils/version';
 import type { FirmwareControllerView, FirmwareSourceMode } from '@/types/firmware';
 
 const props = defineProps<{
@@ -33,8 +34,39 @@ watch(
     if (!el) return;
     if (open && !el.open) el.showModal();
     else if (!open && el.open) el.close();
+    // Reset the downgrade-ack each time the modal opens so the operator
+    // must re-confirm on every flash attempt. Otherwise a previous "yes I
+    // understand" would silently re-arm the Confirm button for a fresh
+    // selection that may or may not contain downgrades.
+    if (open) downgradeAck.value = false;
   },
   { immediate: true, flush: 'post' },
+);
+
+// Selected controllers that are running newer firmware than the target.
+// `compareTags` returns NaN for malformed input or local-build target; both
+// safely fall through (`NaN > 0` is false), so this list is naturally empty
+// for upload flows and pure-upgrade flows alike.
+const downgradeControllers = computed<FirmwareControllerView[]>(() => {
+  const t = props.target;
+  if (t === null) return [];
+  return props.selectedControllers.filter((c) => {
+    const cmp = compareTags(c.current, t);
+    return !Number.isNaN(cmp) && cmp > 0;
+  });
+});
+
+const downgradeAck = ref(false);
+
+const requiresDowngradeAck = computed(() => downgradeControllers.value.length > 0);
+
+// Confirm is disabled when (a) the operator has opened the modal with an
+// empty selection (a misuse path the parent gate prevents in practice,
+// but the modal shouldn't render a clickable Confirm with nothing to do),
+// or (b) the selection contains a downgrade and the ack isn't ticked.
+const confirmDisabled = computed(
+  () =>
+    props.selectedControllers.length === 0 || (requiresDowngradeAck.value && !downgradeAck.value),
 );
 
 // Browser fires 'cancel' on ESC. Mirror it through our cancel emit so the
@@ -105,6 +137,37 @@ const sourceDisplay = (): string => {
         {{ t('firmware_view.confirm_modal.power_warning') }}
       </p>
 
+      <!--
+        Downgrade ack region: rendered only when at least one selected
+        controller is running newer firmware than the target. The pure-
+        upgrade modal stays unchanged (no extra friction). The checkbox
+        is the last-chance confirmation — even with the panel's "Allow
+        downgrades" toggle on, the operator must explicitly acknowledge
+        the specific controllers about to receive older firmware.
+        Confirm is disabled until ticked.
+      -->
+      <div
+        v-if="requiresDowngradeAck"
+        class="astros-firmware-confirm-modal__downgrade-ack"
+        role="alert"
+        data-test="downgrade-ack-region"
+      >
+        <label class="astros-firmware-confirm-modal__downgrade-ack-label">
+          <input
+            type="checkbox"
+            class="astros-firmware-confirm-modal__downgrade-ack-checkbox"
+            :checked="downgradeAck"
+            data-test="downgrade-ack-checkbox"
+            @change="downgradeAck = ($event.target as HTMLInputElement).checked"
+          />
+          <span>{{
+            t('firmware_view.confirm_modal.downgrade_ack', {
+              count: downgradeControllers.length,
+            })
+          }}</span>
+        </label>
+      </div>
+
       <div class="astros-firmware-confirm-modal__actions">
         <AstrosFirmwareButton
           kind="secondary"
@@ -114,6 +177,8 @@ const sourceDisplay = (): string => {
         </AstrosFirmwareButton>
         <AstrosFirmwareButton
           kind="primary"
+          :disabled="confirmDisabled"
+          data-test="confirm-button"
           @click="emit('confirm')"
         >
           {{ t('firmware_view.confirm_modal.confirm') }}
@@ -129,6 +194,14 @@ const sourceDisplay = (): string => {
   padding: 0;
   background: transparent;
   font-family: 'Inter', system-ui, sans-serif;
+  /* UA stylesheet's `margin: auto` on modal dialogs only resolves in the
+     inline axis for auto-height boxes, leaving the dialog pinned to the
+     viewport top. Transform centers in both axes regardless of intrinsic
+     size; max-height caps tall content so it doesn't overflow off-screen. */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-height: calc(100vh - 32px);
 }
 
 .astros-firmware-confirm-modal::backdrop {
@@ -217,5 +290,33 @@ const sourceDisplay = (): string => {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.astros-firmware-confirm-modal__downgrade-ack {
+  background: #fff2e2;
+  border: 1px solid #cf424299;
+  border-radius: 4px;
+  padding: 10px 12px;
+}
+
+.astros-firmware-confirm-modal__downgrade-ack-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  color: #7a2222;
+  cursor: pointer;
+  user-select: none;
+}
+
+.astros-firmware-confirm-modal__downgrade-ack-checkbox {
+  accent-color: #9a2828;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+.astros-firmware-confirm-modal__downgrade-ack-label:focus-within {
+  outline: 2px solid #7d92b8;
+  outline-offset: 2px;
 }
 </style>

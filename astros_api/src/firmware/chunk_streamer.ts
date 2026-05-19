@@ -1,8 +1,9 @@
 // ChunkStreamer — sliding-window FW_CHUNK transport over a SerialBus.
 //
 // One transfer drives `BEGIN → chunk loop → END`:
-//   - sliding window of WINDOW_SIZE chunks in flight, retired by
-//     cumulative FW_CHUNK_ACK
+//   - sliding window of `windowSize` chunks in flight, retired by
+//     cumulative FW_CHUNK_ACK (production wiring overrides to
+//     `windowSize: 1` for stop-and-wait — see `DEFAULT_STREAMER_CONFIG`)
 //   - FW_CHUNK_NAK with FLASH_FULL is terminal; CRC / SIZE / OUT_OF_ORDER
 //     trigger Go-Back-N from `nak.nextExpectedSeq` (NOT `lastGoodSeq + 1`
 //     — that breaks on first-chunk NAK; see handleChunkNak for details)
@@ -21,10 +22,10 @@
 //
 // Wire-payload encoding split:
 //   - Framing (line-delimited GS/RS/US bytes) lives in MessageGenerator
-//   - Bytes-level encoding (base64 of chunk slice, CRC-16) is the streamer's
-//     responsibility. CRC currently uses the `'TODO_TASK_4_CRC16'` greppable
-//     placeholder — non-numeric so a buggy validator can't silently accept it
-//     as a valid all-zero CRC. Replaced when the master starts checking it.
+//   - Bytes-level encoding (base64 of chunk slice, CRC-16/CCITT-FALSE) is
+//     the streamer's responsibility. CRC is computed over the decoded
+//     chunk bytes via `crc16CcittFalseHex` and emitted as 4 lowercase hex
+//     chars; the firmware's `parseHex16` requires exactly that shape.
 //
 // `fs.promises.readFile` is the only fs touch — `TransferSpec.source.path`
 // resolves to a Buffer at run() entry. 1.2 MB ESP firmware fits in memory;
@@ -38,6 +39,8 @@
 
 import { promises as fsp } from 'fs';
 import { v4 as uuid_v4 } from 'uuid';
+import { logger } from '../logger.js';
+import { crc16CcittFalseHex } from '../utility/crc16.js';
 import type {
   FwInboundAck,
   SerialBus,
@@ -60,12 +63,27 @@ import { SerialMessageType } from '../serial/serial_message.js';
 
 // Module-level defaults for the transport. Concrete numbers come from the
 // design spec; the streamer merges any caller overrides on top.
+//
+// `ackTimeoutMs` is sized for the worst-case round trip when the sliding
+// window is full: the timer is armed at `bus.send` return, but bytes then
+// sit in the worker IPC + Node SerialPort write queue + kernel TTY buffer
+// before reaching the UART. At 115200 baud a ~5.5 KB FW_CHUNK takes
+// ~480 ms on the wire, so a windowSize=16 fill puts the last chunk
+// ~7.2 s behind its timer-arm time. 15 000 ms gives ~2× margin over that
+// bound. If `windowSize` or the link baud changes materially, recompute.
+//
+// NOTE: production wiring overrides `windowSize` to 1 (stop-and-wait) at
+// `defaultStreamerFactory` in `flash_orchestrator.ts` — see the comment
+// there for why the current AstrOs master+UART deployment doesn't benefit
+// from a wider window. These defaults stay tuned for the general
+// sliding-window case so the streamer's tests (which exercise window > 1
+// behavior) keep working without per-test overrides.
 export const TRANSPORT_DEFAULTS: TransportConfig = {
   chunkSizeBytes: 4096,
   windowSize: 16,
-  ackTimeoutMs: 1500,
+  ackTimeoutMs: 15_000,
   transferTimeoutMs: 300_000,
-  maxRetriesPerChunk: 3,
+  maxRetriesPerChunk: 5,
 };
 
 export interface ChunkStreamerOpts {
@@ -81,10 +99,13 @@ export interface ChunkStreamerRunOpts {
   signal?: AbortSignal;
 }
 
-// Compact discriminator alias for the waiter machinery. Listing the kinds we
-// actually wait on (BEGIN_ACK / CHUNK_ACK / END_ACK) keeps the inferred
-// types tight and lets `Extract<FwInboundAck, ...>` resolve cleanly.
-type WaitableKind = 'beginAck' | 'chunkAck' | 'transferEndAck';
+// Compact discriminator alias for the waiter machinery. `waitFor` is only
+// ever called with these two phases — chunk-phase acks go through the
+// separate `chunkPhaseActive` machine (the block comment on currentWaiter
+// below explains why). Keeping the union narrow lets `Extract<FwInboundAck,
+// ...>` resolve cleanly and stops a future caller from mistakenly using
+// the single-slot waiter for chunk acks.
+type WaitableKind = 'beginAck' | 'transferEndAck';
 
 // `reject` is the external-reject path for the single-slot waiter used
 // by BEGIN-wait and END-wait. `rejectRun` reaches into `currentWaiter.reject`
@@ -316,12 +337,11 @@ export class ChunkStreamer {
         seq,
         payloadLen: chunkBytes.length,
         base64Bytes: chunkBytes.toString('base64'),
-        // CRC-16 placeholder. Non-numeric greppable marker (NOT '0000') so
-        // a buggy validator can't silently accept it as a valid all-zero
-        // CRC — any well-formed CRC parser will reject this. Replaced with
-        // the real CRC-16/CCITT-FALSE helper when the master starts
-        // checking it.
-        crc16Hex: 'TODO_TASK_4_CRC16',
+        // CRC-16/CCITT-FALSE over the DECODED chunk bytes (protocol-doc
+        // serial scope: "over the decoded payload bytes" — not the base64
+        // envelope). 4-char lowercase hex matches the firmware's
+        // parseHex16 contract.
+        crc16Hex: crc16CcittFalseHex(chunkBytes),
       };
       const chunkMsg = this.messageGenerator.generateMessage(
         SerialMessageType.FW_CHUNK,
@@ -933,12 +953,20 @@ export class ChunkStreamer {
       // We also clear the single-slot waiter on the timeout path — the
       // dispatcher would otherwise resolve a stale waiter into the
       // (already-rejected) Promise on a late ack arrival; harmless, but
-      // explicit teardown makes the post-condition obvious. The
-      // whole-transfer watchdog is still armed and would also fire
-      // eventually, but with a much longer budget (300_000 ms default vs
-      // 1500 ms ackTimeoutMs); the end_timeout race surfaces a faster,
-      // more specific code so the operator gets "the master didn't reply
-      // to END" rather than the catch-all "the whole transfer hung."
+      // explicit teardown makes the post-condition obvious.
+      //
+      // The whole-transfer watchdog is still armed and would also fire
+      // eventually, but with a much longer budget. `TRANSPORT_DEFAULTS`
+      // carries the streamer's test invariants (`ackTimeoutMs: 15_000`,
+      // `transferTimeoutMs: 300_000`); production overrides via
+      // `DEFAULT_STREAMER_CONFIG` in `flash_orchestrator.ts`
+      // (`ackTimeoutMs: 5_000`, `transferTimeoutMs: 600_000`). The
+      // end_timeout race surfaces a faster, more specific code so the
+      // operator gets "the master didn't reply to END" rather than the
+      // catch-all "the whole transfer hung." The ack/watchdog gap stays
+      // wide on both: ~20× under test defaults (15 s ack vs 5 min
+      // watchdog) and ~120× in production (5 s ack vs 10 min watchdog),
+      // so the end_timeout race wins in every realistic case.
       let endAckTimer: NodeJS.Timeout | null = null;
       let endAck;
       try {
@@ -1008,7 +1036,20 @@ export class ChunkStreamer {
       for (const timer of chunkTimers.values()) clearTimeout(timer);
       chunkTimers.clear();
       inFlight.clear();
-      unsubscribe();
+      // Wrap unsubscribe so a bus mid-shutdown / double-disposed handle
+      // can't replace the run's settled state with a TypeError that
+      // would surface as the catch-all `streamer_unknown_error` rather
+      // than the real terminal code. The dispatcher is already detached
+      // logically (chunkPhaseActive=false above), so a throw here is
+      // post-resolve and safe to log + swallow.
+      try {
+        unsubscribe();
+      } catch (err) {
+        logger.error(
+          err,
+          `chunk streamer: subscriber unsubscribe threw during run cleanup for transferId=${spec.transferId}`,
+        );
+      }
     }
   }
 }
