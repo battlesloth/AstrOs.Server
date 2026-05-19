@@ -836,7 +836,7 @@ export class FlashJobOrchestrator {
         // `failJob` didn't reach `releaseLock`) the JobLock stays held —
         // the next operator flash sees `job_already_running` forever.
         //
-        // Three things have to happen for the system to be usable again:
+        // Four things have to happen for the system to be usable again:
         //
         // 1. Best-effort terminal WS emit so the operator's UI can exit
         //    `phase='flashing'`. Bypass `safeEmitWs` — that swallows-and-
@@ -846,15 +846,31 @@ export class FlashJobOrchestrator {
         //    whether the operator's UI was actually notified.
         // 2. Null the per-job state fields WITHOUT invoking their
         //    disposers. The disposers may be exactly what threw, so re-
-        //    invoking them risks an infinite-throw loop. The references
-        //    leak (one unsubscribe + one throttle never run); the next
-        //    `start()` gets a clean slate.
+        //    invoking them risks an infinite-throw loop. In practice
+        //    `deployUnsubscriber` is null on every belt-reachable path
+        //    (the subscriber is assigned after both `streamer.run()` and
+        //    `bus.send()` succeed; any failure earlier short-circuits
+        //    before assignment), so only the `throttle` reference is real
+        //    leak surface here.
         // 3. Release the JobLock. The return value tells us whether the
         //    lock was actually held when the belt fired: `true` means
         //    `failJob` never reached its `releaseLock` line and the belt
         //    saved the system; `false` is reserved for a future broader
         //    coverage path (today, the FSM-throw path always leaves the
         //    lock held, so `released` is always `true`).
+        // 4. Broadcast the post-release lock state for consistency with
+        //    sibling release sites (`acquireLock` line 612, `releaseLock`
+        //    line 1118). In production the actual "other tabs see the
+        //    lock free" mechanism is the `JobLock.notify()` subscriber
+        //    wired up in `api_server.ts:282-284` — the lock's own
+        //    listener already broadcasts `lockStateChanged` on every
+        //    `release()` call. Calling `broadcastLockState()` here is
+        //    duplicative in production but matches the pattern unit
+        //    tests rely on (the test fixture's `emitWs` only sees the
+        //    orchestrator's direct broadcasts, since tests don't wire
+        //    up the api_server subscriber). Skipping the call would
+        //    leave tests asserting "exactly N lockStateChanged frames"
+        //    silently undercounting the belt path.
         let emitOk = false;
         try {
           this.emitWs({
@@ -878,6 +894,10 @@ export class FlashJobOrchestrator {
         this.throttle = null;
         this.abortController = null;
         const released = this.jobLock.release(jobId);
+        // `broadcastLockState` uses `safeEmitWs` which swallows-and-logs
+        // on emit failure, so it can't throw the belt back into the rejection
+        // path; safe to call without an inner try/catch.
+        this.broadcastLockState();
         const uiNote = emitOk
           ? 'UI was notified via best-effort flashJobFailed emit.'
           : 'UI emit also failed; operator must verify controllers manually.';
@@ -1049,7 +1069,21 @@ export class FlashJobOrchestrator {
   // cleanup keeps every entry-point self-contained.
   private releaseLock(jobId: string): void {
     if (this.rebootTimer !== null) {
-      this.clock.clearTimeout(this.rebootTimer);
+      // Production `Clock.clearTimeout` doesn't throw, but a test clock or
+      // a future custom clock could. `releaseLock` with `rebootTimer !==
+      // null` is reachable from `failJob` called by a late deploy event
+      // (`handleDeployEvent → failDeployPhase → failJob`), so without this
+      // wrap a throw would propagate up through the bus's deploy-event
+      // dispatcher into the worker's EventEmitter as an uncaught
+      // exception — taking down the worker rather than failing one job.
+      try {
+        this.clock.clearTimeout(this.rebootTimer);
+      } catch (err) {
+        logger.error(
+          err,
+          `flash orchestrator: clock.clearTimeout threw during releaseLock for job=${jobId}`,
+        );
+      }
       this.rebootTimer = null;
     }
     // Disposer calls run in their own try/catch so a misbehaving
@@ -1226,9 +1260,21 @@ export class FlashJobOrchestrator {
     }
     this.currentJob = { ...this.currentJob, controllers: updated };
     // Done is terminal for the deploy phase — drop the subscriber so a
-    // late retransmit doesn't double-process.
+    // late retransmit doesn't double-process. Wrap the disposer call to
+    // match the protection in `releaseLock`: a bus mid-shutdown or a
+    // double-disposed handle could throw, and on this success path that
+    // throw would escape into the bus's deploy-event dispatcher — leaving
+    // `flashJobDone` unemitted, `rebootTimer` unarmed, and the JobLock
+    // held forever. Log + continue so the rest of the success path runs.
     if (this.deployUnsubscriber !== null) {
-      this.deployUnsubscriber();
+      try {
+        this.deployUnsubscriber();
+      } catch (err) {
+        logger.error(
+          err,
+          `flash orchestrator: deployUnsubscriber threw during handleDeployDone for job=${this.currentJob.jobId}`,
+        );
+      }
       this.deployUnsubscriber = null;
     }
 
