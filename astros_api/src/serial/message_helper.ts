@@ -51,12 +51,12 @@ export class MessageHelper {
     [SerialMessageType.RUN_SCRIPT, 5000],
     [SerialMessageType.RUN_COMMAND, 5000],
 
-    // Firmware OTA outgoing types. FW_CHUNK uses the protocol's per-frame
-    // ACK timeout (1500 ms); the others are job-level handshakes.
-    [SerialMessageType.FW_TRANSFER_BEGIN, 5000],
-    [SerialMessageType.FW_CHUNK, 1500],
-    [SerialMessageType.FW_TRANSFER_END, 5000],
-    [SerialMessageType.FW_DEPLOY_BEGIN, 5000],
+    // Firmware OTA outgoing types intentionally absent: the OTA path
+    // (`chunk_streamer.ts`, `flash_orchestrator.ts`) sends via `bus.send`
+    // directly and manages its own per-chunk + per-handshake timers via
+    // `DEFAULT_STREAMER_CONFIG` (5 s ackTimeoutMs, 10 min watchdog under
+    // production wiring). Adding FW_* entries here would arm a parallel
+    // SerialMessageTracker timer that nothing acks, leaking trackers.
   ]);
 
   static uint8ArrayToNum(arr: Uint8Array): number {

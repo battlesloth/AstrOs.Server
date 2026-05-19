@@ -4,7 +4,7 @@
 
 The 2026-05-18 pre-push toolkit re-run caught the partial-fix-sweep miss: the 1734 stub uses its own internal numbering (I9, I10, I15, I21) covering `OwnFlash`, `Upload`, integration tests, and typed Request/Response. **Three Important type-design items have no tracker:**
 
-- **Type I1 — `TransferId` brand**
+- **Type I1 — `TransferId` brand** (covers `TransferSpec.transferId` AND the orchestrator's `nextTransferId: number` counter — see below)
 - **Type I2 — `ProdTransportConfig` (production windowSize=1 literal type)**
 - **Type I6 — Cross-boundary type drift across the three server unions feeding `FLASH_ERROR_REASONS`**
 
@@ -12,9 +12,11 @@ This stub captures them so they don't fall out of memory.
 
 ## Type I1 — `TransferId` brand
 
-**Origin:** type-design review run-1 finding I1.
+**Origin:** type-design review run-1 finding I1; extended by run-3 type-design Important #3 to include the orchestrator's `nextTransferId` counter.
 
 **Problem.** `TransferSpec.transferId: string` (`astros_api/src/models/firmware/chunk_streamer.ts:11-18`) discards the uint8 brand at every internal seam. `mintTransferId(n)` runtime-validates `[0..255]` (`chunk_streamer.ts:22-27`), but the field type is bare `string` — a test fixture or alternate producer could construct a `TransferSpec` literal with `'foo'` and bypass the range check.
+
+The orchestrator's own `private nextTransferId: number = 0` counter (`astros_api/src/firmware/flash_orchestrator.ts`, search `nextTransferId`) shares the same uint8 invariant. Range is enforced only at the increment site (`& 0xff` mask) and inside `mintTransferId(n)`. Any brand sweep should also tighten the producer field's type so a future caller couldn't bypass the modulo by assigning `999` directly.
 
 **Proposed approach.** Introduce a nominal brand:
 
@@ -42,7 +44,7 @@ export function mintTransferId(n: number): TransferId {
 
 **Origin:** type-design review run-1 finding I2.
 
-**Problem.** `TransportConfig.windowSize: number` (`models/firmware/chunk_streamer.ts:113`) is unconstrained. The stop-and-wait production invariant lives in a single constant (`DEFAULT_STREAMER_CONFIG.windowSize: 1` at `flash_orchestrator.ts:452-457`). A future refactor that pulled the streamer config into env vars or settings would silently accept any positive integer and let production flip to sliding-window without a compile-time hint.
+**Problem.** `TransportConfig.windowSize: number` (`models/firmware/chunk_streamer.ts:113`) is unconstrained. The stop-and-wait production invariant lives in a single constant (`DEFAULT_STREAMER_CONFIG.windowSize: 1` at `flash_orchestrator.ts:456-461`). A future refactor that pulled the streamer config into env vars or settings would silently accept any positive integer and let production flip to sliding-window without a compile-time hint.
 
 **Proposed approach.** Introduce a production-only type that pins `windowSize: 1` at the assignment line, without overconstraining the streamer's general-purpose code:
 
@@ -67,10 +69,10 @@ A regression that flipped it to 2 fails at the assignment, not at the bench.
 
 **Problem.** Three independent server unions feed one Vue union:
 
-- `FlashOrchestratorErrorReason` (server, 14 members) at `astros_api/src/firmware/flash_orchestrator.ts:384`
+- `FlashOrchestratorErrorReason` (server, 14 members) at `astros_api/src/firmware/flash_orchestrator.ts:388`
 - `TransferErrorCode` (server, 12 members) at `astros_api/src/models/firmware/chunk_streamer.ts:84`
-- `FirmwareUploadErrorCode` (server, 5 members) at `astros_api/src/models/firmware/upload.ts:46`
-- `FLASH_ERROR_REASONS` (Vue, 33 members + locale keys) at `astros_vue/src/types/firmware.ts:139-186`
+- `FirmwareUploadErrorCode` (server, 5 members) at `astros_api/src/models/firmware/upload.ts:69` (derived from the const tuple `FIRMWARE_UPLOAD_ERROR_CODES` at line 63)
+- `FLASH_ERROR_REASONS` (Vue, 33 members + locale keys) at `astros_vue/src/types/firmware.ts:154-196`
 
 The Vue union must contain every server-emitted reason or `mapHttpErrorToFlashEnvelope` falls through to `internal_server_error` and the operator sees the catch-all banner. Today there is **no compile-time tether** — a new `TransferErrorCode` member on the server passes `tsc` server-side, fails silently client-side.
 

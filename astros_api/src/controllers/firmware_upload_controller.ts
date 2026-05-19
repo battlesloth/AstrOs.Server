@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { UploadedFile } from 'express-fileupload';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,20 +22,18 @@ export const FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES = 50 * 1024 * 1024;
 // collapses to `internal_server_error`. Wire this as `limitHandler` so the
 // 413 body is structured JSON the mapper recognizes as `payload_too_large`,
 // giving the operator the actual reason instead of "check server logs."
-export function firmwareUploadLimitHandler(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _req: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  res: any,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  _next: any,
-): void {
+//
+// Typed as Express's `RequestHandler` so the `res.status().json()` chain
+// is type-checked against Express's Response shape; the express-fileupload
+// option declares `limitHandler: RequestHandler` and matching here means a
+// future signature change on either side surfaces at compile time.
+export const firmwareUploadLimitHandler: RequestHandler = (_req, res, _next) => {
   const body: FirmwareUploadErrorResponse = {
     error: 'payload_too_large',
     detail: `Firmware upload exceeds the ${Math.round(FIRMWARE_UPLOAD_SIZE_LIMIT_BYTES / (1024 * 1024))} MB limit.`,
   };
   res.status(413).json(body);
-}
+};
 
 // `FirmwareUploadStore.store()`'s public contract:
 //   - tempPath is unconditionally consumed (renamed on success, unlinked on

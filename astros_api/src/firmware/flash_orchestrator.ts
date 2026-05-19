@@ -363,9 +363,9 @@ export interface FlashControllersStore {
 // Reasons surfaced as `FlashOrchestratorError.reason`. Three buckets:
 //
 //   * Pre-streamer validation + source resolution: `job_already_running`,
-//     `no_controllers`, `variant_mismatch`, `variant_unknown`,
-//     `release_not_found`, `asset_not_found`, `no_upload`,
-//     `release_lookup_failed`, `source_resolution_failed`,
+//     `no_controllers`, `controllers_unknown`, `variant_mismatch`,
+//     `variant_unknown`, `release_not_found`, `asset_not_found`,
+//     `no_upload`, `release_lookup_failed`, `source_resolution_failed`,
 //     `controllers_lookup_failed`. These never set `currentJob` and the
 //     `flashJobFailed` emit carries `{ reason, detail }` only.
 //

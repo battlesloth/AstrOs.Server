@@ -14,16 +14,16 @@ All 5 fixes are small (<30 LOC each, <50 for the belt rewrite). No new behavior;
 
 ## Tasks
 
-- [ ] **Belt second pass** (code-reviewer I2 + silent-failure New-1/2 + test-analyzer I1) — rewrite `flash_orchestrator.ts:823-841` to:
+- [x] **Belt second pass** (code-reviewer I2 + silent-failure New-1/2 + test-analyzer I1) — rewrite `flash_orchestrator.ts:823-841` to:
   - Wrap a best-effort `emitWs(flashJobFailed)` in its own inner try/catch BEFORE releasing the lock (UI exits `flashing` phase even when belt fires).
   - Null `runInProgress`, `currentJob`, `phase`, `deployUnsubscriber`, `throttle`, `abortController` WITHOUT invoking disposers (disposers may be what threw).
   - Check `release()` return value; log "force-released" vs "lock was already released" accordingly.
   - Extend the existing belt test to `vi.spyOn(logger, 'error')` and assert the emit was attempted (count `flashJobFailed` frames on `fx.emitWs`).
-- [ ] **Route-scope upload size limit** (code-reviewer I1) — replace the global `app.use(fileUpload(...))` mount with path-prefixed mounts: 50MB+`limitHandler` for `/api/firmware/upload`, no size limit for `/api/audio/savefile`. Preserve `useTempFiles` + `tempFileDir` on both.
-- [ ] **Rewrite misleading limitHandler disclaimer** in `models/firmware/upload.ts:43-48`. Acknowledge `firmwareUploadLimitHandler` is *defined* in `firmware_upload_controller.ts` and *wired* into express-fileupload's options in `api_server.ts`.
-- [ ] **File orphaned type-design stub** for the three uncaptured run-1 Importants. Also fix the incorrect claim in the `20260517-0817-...md:12` line.
-- [ ] **Prose + dead-type sweep**: drop one of the duplicated "per-controller" words at `flash_orchestrator.ts:297-298`; rewrite the "math is the same" comment at `chunk_streamer.test.ts:1906` to call out the inverted relationship; delete unused `FirmwareUploadErrorResponse` + `FirmwareUploadErrorCode` Vue types.
-- [ ] **Pre-commit gate per task** — prettier + lint + build + vitest + `superpowers:requesting-code-review` for any non-prose-only diff.
+- [x] **Route-scope upload size limit** (code-reviewer I1) — replace the global `app.use(fileUpload(...))` mount with path-prefixed mounts: 50MB+`limitHandler` for `/api/firmware/upload`, 50MB ceiling (express-fileupload's default plain-text `responseOnLimit`) for `/api/audio/savefile`. Preserve `useTempFiles` + `tempFileDir` on both. (Implementation note: both routes ended up sharing the same 50 MB ceiling — operators historically fit audio assets well under that — but only the firmware route uses the JSON-typed `limitHandler`.)
+- [x] **Rewrite misleading limitHandler disclaimer** in `models/firmware/upload.ts:43-48`. Acknowledge `firmwareUploadLimitHandler` is *defined* in `firmware_upload_controller.ts` and *wired* into express-fileupload's options in `api_server.ts`.
+- [x] **File orphaned type-design stub** for the three uncaptured run-1 Importants. Also fix the incorrect claim in the `20260517-0817-...md:12` line.
+- [x] **Prose + dead-type sweep**: drop one of the duplicated "per-controller" words at `flash_orchestrator.ts:297-298`; rewrite the "math is the same" comment at `chunk_streamer.test.ts:1906` to call out the inverted relationship; delete unused `FirmwareUploadErrorResponse` + `FirmwareUploadErrorCode` Vue types.
+- [x] **Pre-commit gate per task** — prettier + lint + build + vitest + `superpowers:requesting-code-review` for any non-prose-only diff.
 
 ## Out of scope (deferred)
 

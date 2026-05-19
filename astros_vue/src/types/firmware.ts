@@ -115,18 +115,49 @@ export type FirmwareStage = 'download' | 'transfer' | 'flash' | 'verify' | 'rebo
 export type FirmwareStageLabelKey = `firmware_view.stages.${FirmwareStage}.label`;
 
 /**
- * Mirror of the server's `FlashOrchestratorErrorReason` plus a couple of
- * client-side reasons that the server never emits (`network_error`,
- * `internal_server_error` fallback). The HTTP envelope and the WS
- * `flashJobFailed` event share this surface — the same reason lands on
- * either path and the operator sees the same `firmware_view.flash_errors.*`
- * copy regardless of which one fired.
+ * Unified mirror of every server-emitted error code that lands on a
+ * flash-error envelope (HTTP body or WS `flashJobFailed`). Server side,
+ * the codes originate in three distinct authoring surfaces — keep both
+ * sides updated together when adding to any of them:
  *
- * The tuple is the single source of truth: the `FlashErrorReason` union is
- * derived from it, and `KNOWN_FLASH_ERROR_REASONS` is the corresponding
- * runtime Set — both stay in sync because both come from this one list.
- * A locale-coverage test pins that every reason has a matching
- * `firmware_view.flash_errors.<reason>` key.
+ *   1. `FlashOrchestratorErrorReason`
+ *      (`astros_api/src/firmware/flash_orchestrator.ts`) — pre-streamer
+ *      validation + source resolution (e.g. `no_controllers`,
+ *      `variant_mismatch`, `release_not_found`), the orchestrator's
+ *      own mid-flow envelope reasons (`aborted`, `streamer_unknown_error`,
+ *      `protocol_violation`, `subscriber_attach_failed`), AND the
+ *      streamer transport codes from `TransferErrorCode` which are
+ *      absorbed into this union via `| TransferErrorCode`. The
+ *      orchestrator's `routeStartFailure` is the single fail-path
+ *      consolidation for both pre-streamer and mid-streamer errors.
+ *   2. `TransferErrorCode` (`astros_api/src/models/firmware/chunk_streamer.ts`)
+ *      — listed here because the codes are *authored* in this file
+ *      (e.g. `hash_mismatch`, `transfer_timeout`, `bus_send_failed`)
+ *      even though the type itself flows in via the orchestrator union
+ *      above. Adding a new transport code requires updating this tuple.
+ *   3. `FirmwareUploadErrorCode` (`astros_api/src/models/firmware/upload.ts`)
+ *      — HTTP error bodies from `POST /api/firmware/upload`, plus
+ *      `payload_too_large` emitted by `firmwareUploadLimitHandler`
+ *      inside express-fileupload's `limitHandler`. Independent of the
+ *      orchestrator union.
+ *
+ * Plus two client-side reasons the server never emits: `network_error`
+ * (transport-layer failures) and `internal_server_error` (catch-all
+ * fallback when the wire reason doesn't appear in this tuple).
+ *
+ * The HTTP envelope and the WS `flashJobFailed` event share this
+ * surface — the same reason lands on either path and the operator sees
+ * the same `firmware_view.flash_errors.*` copy regardless of which one
+ * fired.
+ *
+ * The tuple is the single source of truth: the `FlashErrorReason` union
+ * is derived from it, and `KNOWN_FLASH_ERROR_REASONS` is the
+ * corresponding runtime Set — both stay in sync because both come from
+ * this one list. A locale-coverage test pins that every reason has a
+ * matching `firmware_view.flash_errors.<reason>` key. Drift between the
+ * server surfaces and this tuple is NOT compile-time enforced today
+ * (see `.docs/plans/20260518-0926-firmware-type-design-orphaned-followups.md`
+ * Type I6 for the planned tether).
  */
 export const FLASH_ERROR_REASONS = [
   'invalid_body',

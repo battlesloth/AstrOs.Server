@@ -951,12 +951,20 @@ export class ChunkStreamer {
       // We also clear the single-slot waiter on the timeout path — the
       // dispatcher would otherwise resolve a stale waiter into the
       // (already-rejected) Promise on a late ack arrival; harmless, but
-      // explicit teardown makes the post-condition obvious. The
-      // whole-transfer watchdog is still armed and would also fire
-      // eventually, but with a much longer budget (300_000 ms default vs
-      // 15 000 ms ackTimeoutMs); the end_timeout race surfaces a faster,
-      // more specific code so the operator gets "the master didn't reply
-      // to END" rather than the catch-all "the whole transfer hung."
+      // explicit teardown makes the post-condition obvious.
+      //
+      // The whole-transfer watchdog is still armed and would also fire
+      // eventually, but with a much longer budget. `TRANSPORT_DEFAULTS`
+      // carries the streamer's test invariants (`ackTimeoutMs: 15_000`,
+      // `transferTimeoutMs: 300_000`); production overrides via
+      // `DEFAULT_STREAMER_CONFIG` in `flash_orchestrator.ts`
+      // (`ackTimeoutMs: 5_000`, `transferTimeoutMs: 600_000`). The
+      // end_timeout race surfaces a faster, more specific code so the
+      // operator gets "the master didn't reply to END" rather than the
+      // catch-all "the whole transfer hung." The ack/watchdog gap stays
+      // wide on both: ~20× under test defaults (15 s ack vs 5 min
+      // watchdog) and ~120× in production (5 s ack vs 10 min watchdog),
+      // so the end_timeout race wins in every realistic case.
       let endAckTimer: NodeJS.Timeout | null = null;
       let endAck;
       try {
