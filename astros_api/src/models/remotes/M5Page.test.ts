@@ -14,6 +14,17 @@ describe('M5Page', () => {
       expect(page.name).toBe('Quick Actions');
     });
 
+    it('defaults name to empty string when none is supplied', () => {
+      const page = new M5Page();
+      expect(page.name).toBe('');
+    });
+
+    it('assigns distinct ids to back-to-back default-constructed pages', () => {
+      const a = new M5Page();
+      const b = new M5Page();
+      expect(a.id).not.toBe(b.id);
+    });
+
     it('defaults all 9 buttons to id "0"', () => {
       const page = new M5Page();
       for (let n = 1; n <= 9; n++) {
@@ -24,7 +35,13 @@ describe('M5Page', () => {
   });
 
   describe('hasSettings()', () => {
-    it('returns false for a default page even when id and name are populated strings — vacuous-fix guard for the old `for...in this` reflection bug, which would treat id/name as PageButtons and report true', () => {
+    it('returns false for a default page even when id and name are populated strings', () => {
+      // Guards against regressing hasSettings() to the old `for (const key in this)`
+      // form, which enumerated id/name alongside the 9 buttons and short-circuited
+      // true on the very first iteration (string.id is undefined, undefined != '0'
+      // is true). The fixed form iterates an explicit BUTTON_KEYS list.
+      // Verified mechanically: reverting the loop to `for...in this` makes this
+      // test fail (returns true instead of false).
       const page = new M5Page('populated-uuid-string', 'Quick Actions');
       expect(page.hasSettings()).toBe(false);
     });

@@ -27,9 +27,10 @@ const scripts = ref<SelectionItem[]>([]);
 const playlists = ref<SelectionItem[]>([]);
 const currentPage = ref<RemoteControlPage | null>(null);
 const currentIndex = ref(0);
+const loadFailed = ref(false);
 
 onMounted(async () => {
-  await Promise.all([
+  const [, , loadResult] = await Promise.all([
     scriptStore.loadScripts(),
     playlistStore.loadData(),
     remoteControlStore.loadRemoteControl(),
@@ -37,6 +38,15 @@ onMounted(async () => {
 
   scripts.value = scriptStore.scripts.map((s) => ({ id: s.id, name: s.scriptName }));
   playlists.value = playlistStore.playlists.map((p) => ({ id: p.id, name: p.playlistName }));
+
+  // Surface load failures and skip default-seeding so a save can't overwrite real
+  // stored data with an empty page (the store's saveRemoteControl filter drops
+  // all-empty pages, so a seeded-then-saved state would PUT [] over real config).
+  if (!loadResult.success) {
+    loadFailed.value = true;
+    error(t('remote_view.load_error'));
+    return;
+  }
 
   if (remoteControlStore.remoteControlPages.length === 0) {
     remoteControlStore.remoteControlPages.push(createDefaultPage(0));
@@ -70,11 +80,14 @@ function pageBackward() {
 }
 
 async function saveConfig() {
-  try {
-    await remoteControlStore.saveRemoteControl();
+  // The store catches its own errors and resolves with `{success: false, error}`
+  // rather than rejecting — so a bare `await` here would never throw and every
+  // failed PUT would render as a green success toast. Inspect the flag instead.
+  const result = await remoteControlStore.saveRemoteControl();
+  if (result.success) {
     success(t('remote_view.save_success'));
-  } catch (err) {
-    console.error('Error saving remote control configuration:', err);
+  } else {
+    console.error('Error saving remote control configuration:', result.error);
     error(t('remote_view.save_error'));
   }
 }
@@ -90,6 +103,7 @@ const buttonNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
       <AstrosWriteButton
         data-testid="save_module_settings"
         class="btn btn-primary w-24"
+        :disabled="loadFailed"
         @click="saveConfig"
       >
         {{ $t('remote_view.save') }}

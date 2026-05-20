@@ -1,5 +1,8 @@
 import crypto from 'crypto';
 
+// `satisfies` pins the tuple to the M5Page's button slots — if `RemoteControlPage`
+// ever grows a `button10`, the type checker forces this tuple to follow rather
+// than silently dropping the new slot from the iteration.
 const BUTTON_KEYS = [
   'button1',
   'button2',
@@ -10,7 +13,7 @@ const BUTTON_KEYS = [
   'button7',
   'button8',
   'button9',
-] as const;
+] as const satisfies readonly (keyof Omit<M5Page, 'id' | 'name' | 'hasSettings'>)[];
 
 type ButtonKey = (typeof BUTTON_KEYS)[number];
 

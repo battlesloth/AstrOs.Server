@@ -37,10 +37,15 @@ function migrateButton(btn: PageButton): PageButton {
 }
 
 function isPageButtonShape(raw: unknown): raw is PageButton {
-  // Migration is the only entry point for legacy stored payloads; anything that
-  // isn't an object with an `id` string gets replaced with a default button rather
-  // than spread into the result (a string spread would produce {0:'a',1:'b',...}).
-  return typeof raw === 'object' && raw !== null && typeof (raw as PageButton).id === 'string';
+  // `Partial<RemoteControlPage>` is a TypeScript fiction here — the value comes
+  // from JSON.parse of stored config and could be anything. Validate per-slot
+  // before letting it reach migrateButton, which spreads `{...btn, type}` — a
+  // string slot would otherwise produce `{0:'a',1:'b',..., type:'script'}` and
+  // a no-`name` slot would surface `undefined` to the M5 firmware (which drops
+  // it on JSON.stringify, breaking the {name, command} sync contract).
+  if (typeof raw !== 'object' || raw === null) return false;
+  const candidate = raw as Partial<PageButton>;
+  return typeof candidate.id === 'string' && typeof candidate.name === 'string';
 }
 
 export function migratePage(page: Partial<RemoteControlPage>, idx: number): RemoteControlPage {
@@ -50,7 +55,18 @@ export function migratePage(page: Partial<RemoteControlPage>, idx: number): Remo
   } as RemoteControlPage;
   for (const key of BUTTON_KEYS) {
     const raw = page[key];
-    migrated[key] = isPageButtonShape(raw) ? migrateButton(raw) : defaultButton('None');
+    if (isPageButtonShape(raw)) {
+      migrated[key] = migrateButton(raw);
+    } else {
+      // Surface the substitution so a user-reported "my Page N slot reset
+      // itself" complaint has a DevTools breadcrumb. The user-facing behavior
+      // stays silent-degrade (no toast); this is for diagnosis only.
+      console.warn(
+        `[remoteControl] migratePage: page ${idx} slot "${key}" had malformed shape; replaced with default. raw:`,
+        raw,
+      );
+      migrated[key] = defaultButton('None');
+    }
   }
   return migrated;
 }

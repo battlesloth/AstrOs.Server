@@ -77,25 +77,51 @@ describe('remoteControl store', () => {
       }
     });
 
-    it('replaces malformed button slots with default buttons (object without id, empty object, primitive)', () => {
+    it('replaces malformed button slots with default buttons', () => {
       // Manually-edited or corrupt stored payloads might have button slots that
       // are not the expected { id, name } shape. Migration is the boundary
       // enforcement point — anything not matching the shape becomes a default
       // button rather than getting spread (a string spread would produce
-      // {0:'a',1:'b',...}).
+      // {0:'a',1:'b',...}, and a no-`name` slot would surface `undefined` to
+      // the M5 firmware on sync).
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const malformed = {
         ...legacyPage(),
         button2: {} as unknown as { id: string; name: string },
         button3: 'oops' as unknown as { id: string; name: string },
         button4: { name: 'NoIdField' } as unknown as { id: string; name: string },
+        button5: { id: 'script-x' } as unknown as { id: string; name: string },
       };
       const migrated = migratePage(malformed as Partial<RemoteControlPage>, 0);
       expect(migrated.button2).toEqual({ id: '0', name: 'None', type: 'none' });
       expect(migrated.button3).toEqual({ id: '0', name: 'None', type: 'none' });
       expect(migrated.button4).toEqual({ id: '0', name: 'None', type: 'none' });
-      // Sibling slots that were valid stay intact.
+      expect(migrated.button5).toEqual({ id: '0', name: 'None', type: 'none' });
       expect(migrated.button1.id).toBe('0');
       expect(migrated.button1.type).toBe('none');
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('BUTTON_KEYS contract', () => {
+    // Pinning the literal here protects against silent mutation: if production
+    // code shrinks BUTTON_KEYS to 8 entries, the migration loop would still
+    // run, the assertions in other tests (which themselves iterate BUTTON_KEYS)
+    // would pass on a mutated set, and the bug would slip through. This is the
+    // anchor.
+    it('contains exactly button1..button9 in order', () => {
+      expect([...BUTTON_KEYS]).toEqual([
+        'button1',
+        'button2',
+        'button3',
+        'button4',
+        'button5',
+        'button6',
+        'button7',
+        'button8',
+        'button9',
+      ]);
     });
   });
 
@@ -155,6 +181,40 @@ describe('remoteControl store', () => {
       expect(store.remoteControlPages[1]!.id).toBe('persistent-id-B');
       expect(store.remoteControlPages[1]!.name).toBe('Songs');
     });
+
+    it('assigns distinct ids to each migrated page', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+
+      await store.loadRemoteControl();
+
+      const ids = store.remoteControlPages.map((p) => p.id);
+      expect(new Set(ids).size).toBe(3);
+    });
+
+    it('returns {success:false} and leaves pages untouched when the stored config is not an array', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify({ corrupt: true }));
+      const store = useRemoteControlStore();
+
+      const result = await store.loadRemoteControl();
+
+      expect(result.success).toBe(false);
+      expect(store.remoteControlPages).toEqual([]);
+      errSpy.mockRestore();
+    });
+
+    it('returns {success:false, error} when the API rejects', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockRejectedValue(new Error('network down'));
+      const store = useRemoteControlStore();
+
+      const result = await store.loadRemoteControl();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('network down');
+      errSpy.mockRestore();
+    });
   });
 
   describe('saveRemoteControl', () => {
@@ -164,7 +224,6 @@ describe('remoteControl store', () => {
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
 
-      // Mutate the seeded default page so button1 is wired up.
       store.remoteControlPages[0]!.button1 = {
         id: 'script-id-7',
         name: 'Wave',
@@ -179,17 +238,37 @@ describe('remoteControl store', () => {
       expect(parsed).toHaveLength(1);
     });
 
-    it('drops a page where all 9 buttons are id="0" — even when the page id/name are populated strings (vacuous-fix guard for Object.values reflection bug)', async () => {
+    it('serializes id and name on retained pages so they round-trip through storage', async () => {
       apiGet.mockResolvedValue(JSON.stringify([]));
       apiPut.mockResolvedValue(undefined);
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
 
-      // The seeded default page already has a populated UUID id and a "Page 1" name
-      // but all buttons are id="0". The OLD filter (`Object.values(page).some(b => b.id !== '0')`)
-      // would treat page.id (the UUID string) as a button and short-circuit true on
-      // `someUuid.id !== '0'` (which is `undefined !== '0'` = true), retaining the page.
-      // The fixed filter iterates BUTTON_KEYS only, so this all-empty page is dropped.
+      const seededId = store.remoteControlPages[0]!.id;
+      store.remoteControlPages[0]!.name = 'Quick Actions';
+      store.remoteControlPages[0]!.button1 = { id: 'script-1', name: 'Wave', type: 'script' };
+
+      await store.saveRemoteControl();
+
+      const sent = apiPut.mock.calls[0]![1] as { config: string };
+      const parsed = JSON.parse(sent.config) as RemoteControlPage[];
+      expect(parsed[0]!.id).toBe(seededId);
+      expect(parsed[0]!.name).toBe('Quick Actions');
+    });
+
+    it('drops a page where all 9 buttons are id="0" even when page id/name are populated strings', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      apiPut.mockResolvedValue(undefined);
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      // Guards against regressing the BUTTON_KEYS filter to a reflection-style
+      // `Object.values(page).some(b => b.id !== '0')`. The seeded page has a
+      // populated UUID id and "Page 1" name; the old form would short-circuit
+      // true on `someUuid.id !== '0'` (undefined !== '0' is true) and retain
+      // the page. The fixed form iterates BUTTON_KEYS only and drops it.
+      // Verified mechanically: reverting the filter to Object.values makes
+      // this test fail (parsed.length === 1).
       expect(store.remoteControlPages).toHaveLength(1);
       expect(store.remoteControlPages[0]!.id).toMatch(UUID_LIKE);
       expect(store.remoteControlPages[0]!.name).toBe('Page 1');
@@ -199,6 +278,21 @@ describe('remoteControl store', () => {
       const sent = apiPut.mock.calls[0]![1] as { config: string };
       const parsed = JSON.parse(sent.config) as RemoteControlPage[];
       expect(parsed).toHaveLength(0);
+    });
+
+    it('returns {success:false, error} when the API rejects', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      apiPut.mockRejectedValue(new Error('save failed'));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.remoteControlPages[0]!.button1 = { id: 'script-1', name: 'Wave', type: 'script' };
+
+      const result = await store.saveRemoteControl();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('save failed');
+      errSpy.mockRestore();
     });
   });
 });

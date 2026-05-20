@@ -440,6 +440,7 @@
     "forward": "Next page",
     "save_success": "Remote control configuration saved successfully.",
     "save_error": "Failed to save remote control configuration.",
+    "load_error": "Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.",
     "script_select": "Script selection",
     "tab_scripts": "Script",
     "tab_playlists": "Playlist",
