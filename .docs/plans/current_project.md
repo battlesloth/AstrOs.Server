@@ -12,8 +12,8 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
 
 ## Phases
 
-- [ ] **Phase 0 — Tracking convention bootstrap**: Add the `current_project.md` template,
-      this file, and the CLAUDE.md amendment.
+- [x] **Phase 0 — Tracking convention bootstrap**: Add the `current_project.md` template,
+      this file, and the CLAUDE.md amendment. — completed 2026-05-19
 - [ ] **Phase 1 — Page id/name data model**: Add `id` + `name` to RemoteControlPage and
       M5Page, migrate existing data on load/save, hold M5Stack-compatible JSON shape.
 - [ ] **Phase 2 — Direction B editor port**: Rebuild RemoteControlConfig view as a 3-pane
