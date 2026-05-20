@@ -38,7 +38,7 @@ to iterate only buttons.
 
 ## Tasks
 
-- [ ] **Task 1 — Frontend: types + button-keys helper + migration + filter fix.** Extend
+- [x] **Task 1 — Frontend: types + button-keys helper + migration + filter fix.** Extend
       `RemoteControlPage` with `id: string` and `name: string`. Add `BUTTON_KEYS` const to
       `astros_vue/src/models/remoteControl/pageButton.ts` (or a sibling). Update
       `stores/remoteControl.ts`: `createDefaultPage(idx)` takes an index for naming; new
@@ -48,14 +48,14 @@ to iterate only buttons.
       in `components/remoteControl/AstrosRemoteControl.vue` (Phase 2 will rewrite it, but
       TS will fail without id/name today). Pages pushed by `pageForward()` get a fresh id
       and an index-derived name.
-- [ ] **Task 2 — Backend: M5Page id/name fields + hasSettings() fix.** Add `id: string`
+- [x] **Task 2 — Backend: M5Page id/name fields + hasSettings() fix.** Add `id: string`
       and `name: string` to `M5Page` with constructor params and sensible defaults
       (`crypto.randomUUID()` and an empty name — backend construction is rare; the editor
       is the source of truth for names). Rewrite `hasSettings()` to iterate over an
       explicit `BUTTON_KEYS` list (defined locally on the class or in
       `astros_api/src/models/remotes/M5Page.ts`). `remote_config_controller.ts` is
       unchanged — it never references id/name on the page (only on buttons).
-- [ ] **Task 3 — Tests: migratePage + save filter (frontend).** New
+- [x] **Task 3 — Tests: migratePage + save filter (frontend).** New
       `astros_vue/src/stores/__tests__/remoteControl.spec.ts` covering:
       - `migratePage` adds id (UUID-shaped) and name (`Page N`) when missing.
       - `migratePage` preserves existing id/name (does not overwrite).
@@ -66,7 +66,7 @@ to iterate only buttons.
         id/name are populated strings. **This is the vacuous-fix guard:** if the filter
         regresses to `Object.values(page).some(...)`, this test must fail. Per memory rule,
         revert the fix locally once and confirm the test fails before keeping the fix in.
-- [ ] **Task 4 — Backend test: M5Page.hasSettings().** New
+- [x] **Task 4 — Backend test: M5Page.hasSettings().** New
       `astros_api/src/models/remotes/M5Page.test.ts` covering: default page (id+name set,
       all buttons `'0'`) → `hasSettings() === false`. Page with one non-default button →
       `true`. **Vacuous-fix guard:** revert the loop fix and confirm the false-case test fails.
