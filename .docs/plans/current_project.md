@@ -25,6 +25,12 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
       WebSocket PANIC, connection chip from WS state.
 - [ ] **Phase 5 — Page drag-reorder**: Install `vuedraggable` (or `vue-draggable-plus`),
       wire row reorder, persist new order on save.
+- [ ] **Phase 6 — Backend M5 → Remote rename + DB key migration**: Rename `M5Page` /
+      `M5Button` / `M5ScriptList` backend types to `RemotePage` / `RemoteButton` /
+      `RemoteScriptList` (frontend already uses generic names). Migrate the
+      `remote_config.type` DB string from `astrOsScreen` → `remoteConfig` via a new
+      reversible migration. Sequence: AFTER Phase 1 ships and bench-passes, so the M5
+      contract Phase 1 verifies isn't perturbed by the rename. Light plan tier.
 
 ## Notes & Decisions
 
@@ -46,3 +52,9 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
 - Master plan with full phase sketches lives outside the repo at
   `~/.claude/plans/take-a-look-at-optimized-blossom.md`. Each phase from 1 onward will
   produce its own timestamped plan file in `.docs/plans/` when work on it begins.
+- **Phase 6 added 2026-05-19 (post-approval).** The master plan only covered Phases 0–5;
+  Phase 6 is the backend M5 → Remote type/DB rename. M5Stack stopped being the only
+  consumer of the remote-config endpoint (the upcoming mobile remote in Phase 4 also
+  consumes it), so the `M5*` prefix is a leftover from when M5Stack was the only target.
+  Decisions: prefix is `Remote*`, DB key migrates from `astrOsScreen` → `remoteConfig`,
+  sequenced after Phase 1's M5 bench verification.
