@@ -2,11 +2,11 @@
 import { ref, onMounted } from 'vue';
 import AstrosRemoteButton from './AstrosRemoteButton.vue';
 import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
-import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
+import type { RemoteControlPage, ButtonKey } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import { useScriptsStore } from '@/stores/scripts';
 import { usePlaylistsStore } from '@/stores/playlists';
-import { useRemoteControlStore } from '@/stores/remoteControl';
+import { useRemoteControlStore, createDefaultPage } from '@/stores/remoteControl';
 import { useToast } from '@/composables/useToast';
 import { useI18n } from 'vue-i18n';
 
@@ -39,31 +39,13 @@ onMounted(async () => {
   playlists.value = playlistStore.playlists.map((p) => ({ id: p.id, name: p.playlistName }));
 
   if (remoteControlStore.remoteControlPages.length === 0) {
-    remoteControlStore.remoteControlPages.push(createEmptyPage());
+    remoteControlStore.remoteControlPages.push(createDefaultPage(0));
   }
   currentPage.value = remoteControlStore.remoteControlPages[0]!;
 });
 
-function createEmptyButton(): PageButton {
-  return { id: '0', name: 'None', type: 'none' };
-}
-
-function createEmptyPage(): RemoteControlPage {
-  return {
-    button1: createEmptyButton(),
-    button2: createEmptyButton(),
-    button3: createEmptyButton(),
-    button4: createEmptyButton(),
-    button5: createEmptyButton(),
-    button6: createEmptyButton(),
-    button7: createEmptyButton(),
-    button8: createEmptyButton(),
-    button9: createEmptyButton(),
-  };
-}
-
 function selectionChange(button: number, value: PageButton) {
-  const buttonKey = `button${button}` as keyof RemoteControlPage;
+  const buttonKey = `button${button}` as ButtonKey;
   if (!currentPage.value) return;
   currentPage.value[buttonKey] = value;
 }
@@ -71,7 +53,7 @@ function selectionChange(button: number, value: PageButton) {
 function pageForward() {
   currentIndex.value++;
   if (remoteControlStore.remoteControlPages.length < currentIndex.value + 1) {
-    remoteControlStore.remoteControlPages.push(createEmptyPage());
+    remoteControlStore.remoteControlPages.push(createDefaultPage(currentIndex.value));
   }
   currentPage.value = remoteControlStore.remoteControlPages[currentIndex.value]!;
   pageNumber.value = currentIndex.value + 1;
@@ -150,7 +132,7 @@ const buttonNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
         v-for="n in buttonNumbers"
         :key="n"
         :buttonNumber="n"
-        :currentValue="currentPage[`button${n}` as keyof RemoteControlPage]"
+        :currentValue="currentPage[`button${n}` as ButtonKey]"
         :scripts="scripts"
         :playlists="playlists"
         @changed="(value) => selectionChange(n, value)"
