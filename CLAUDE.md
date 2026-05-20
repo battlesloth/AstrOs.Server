@@ -160,6 +160,10 @@ For larger features or work that spans multiple layers:
 5. As each task is completed, update the plan file to check off the box (`- [x]`) and commit the update. This makes the plan the single source of truth for progress.
 6. If a session is interrupted, the next session should read the plan file to determine what has been done and what remains.
 
+### Multi-phase projects — `current_project.md`
+
+When a feature spans 3+ independently shippable phases (typical signal: the Scope guard below recommends splitting), create `.docs/plans/current_project.md` from the template at [`.docs/templates/current_project.md`](./.docs/templates/current_project.md). This file is the top-level checklist linking to each phase's individual plan file. Update the checkbox + add the archive link when each phase ships. Move the file to `.docs/completed_plans/YYYY/MM/DD/` when the whole project ships. Single-project at a time: if another multi-phase project starts, finish or rename the existing tracker first.
+
 ### Scope guard — break up large work
 
 During planning, evaluate the total scope. If a feature involves **more than ~8 discrete tasks**, or spans **3+ layers** (migration + API + shared types + store + UI + tests + QA), it is probably too large for a single plan. In that case:
