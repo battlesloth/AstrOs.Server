@@ -56,8 +56,8 @@ function isPageButtonShape(raw: unknown): raw is Pick<PageButton, 'id' | 'name'>
 
 export function migratePage(page: Partial<RemoteControlPage>, idx: number): RemoteControlPage {
   const migrated = {
-    id: page.id ?? crypto.randomUUID(),
-    name: page.name ?? defaultPageName(idx),
+    id: typeof page.id === 'string' ? page.id : crypto.randomUUID(),
+    name: typeof page.name === 'string' ? page.name : defaultPageName(idx),
   } as RemoteControlPage;
   for (const key of BUTTON_KEYS) {
     const raw = page[key];
