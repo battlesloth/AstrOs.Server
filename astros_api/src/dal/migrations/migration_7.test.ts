@@ -120,6 +120,35 @@ describe('migration_7: rename remote_config.type astrOsScreen → remoteConfig',
     expect(after[0].value).toBe(before[0].value);
   });
 
+  it('does not touch other remote_config rows (guards against over-broad WHERE)', async () => {
+    // The single-row "rename" test above only seeds one row, so a mutation
+    // that drops the WHERE clause or replaces it with `WHERE 1=1` would still
+    // pass: it would set the only row's type to 'remoteConfig', which is what
+    // the assertion checks. This test seeds a SECOND, unrelated row and
+    // verifies migration_7 leaves it alone — distinguishing the correct
+    // `WHERE type = 'astrOsScreen'` from `WHERE 1=1` or no-WHERE-at-all.
+    await applyV6();
+    await simulateLegacySeed('{"legacy":true}');
+    // The `type` column is UNIQUE NOT NULL, so a second row needs a
+    // distinct key.
+    await db
+      .insertInto('remote_config')
+      .values({ type: 'unrelatedKey', value: '{"keep":true}' })
+      .execute();
+
+    await applyV7();
+
+    const rows = await db.selectFrom('remote_config').selectAll().orderBy('type').execute();
+    expect(rows).toHaveLength(2);
+    // The astrOsScreen row was renamed; the unrelated row is untouched.
+    const renamed = rows.find((r) => r.type === 'remoteConfig');
+    const untouched = rows.find((r) => r.type === 'unrelatedKey');
+    expect(renamed?.value).toBe('{"legacy":true}');
+    expect(untouched?.value).toBe('{"keep":true}');
+    // No astrOsScreen row remains (the rename was complete).
+    expect(rows.find((r) => r.type === 'astrOsScreen')).toBeUndefined();
+  });
+
   it('down reverses the rename back to astrOsScreen and preserves value', async () => {
     await applyV6();
     await simulateLegacySeed('{"k":"v"}');

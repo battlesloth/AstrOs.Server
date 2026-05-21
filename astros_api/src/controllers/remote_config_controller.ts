@@ -26,7 +26,7 @@ export function registerRemoteConfigRoutes(
   );
 }
 
-async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
   logger.info('Syncing remote config to device');
 
   try {
@@ -36,7 +36,10 @@ async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any, next: 
 
     const val = JSON.parse(scripts?.value || '[]') as Array<RemotePage>;
 
-    if (!val || val.length === 0) {
+    // Defensive: migration_0 seeds the row with value '{}' (an object, not
+    // an array) on fresh installs. Until a user saves their first config,
+    // val is the parsed object and val.forEach below would throw.
+    if (!Array.isArray(val) || val.length === 0) {
       res.status(200);
       res.json({ pages: [] } as RemoteScriptList);
       return;

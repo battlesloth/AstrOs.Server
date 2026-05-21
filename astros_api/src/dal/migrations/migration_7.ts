@@ -3,10 +3,11 @@ import { Database } from 'src/dal/types.js';
 import { logger } from 'src/logger.js';
 
 // Renames the single `remote_config` row whose `type` was the M5Stack-era key
-// `astrOsScreen` to the generic key `remoteConfig`. M5Stack stopped being the
-// only consumer of the remote-config endpoint once the mobile web remote
-// (Phase 4 of the Remote Control Redesign) started consuming it, so the
-// `astrOsScreen` key was an anachronism.
+// `astrOsScreen` to the generic key `remoteConfig`. M5Stack is no longer
+// assumed to be the only consumer of the remote-config endpoint — Phase 4 of
+// the Remote Control Redesign introduces a mobile web remote that will hit
+// the same endpoint — so the `astrOsScreen` key was a leftover from when
+// M5Stack was the only target.
 //
 // The `type` column is UNIQUE NOT NULL (migration_0), so the rename is a
 // single atomic UPDATE. On a fresh install, migration_0's seed already uses
