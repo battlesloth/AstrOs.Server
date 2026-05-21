@@ -60,12 +60,12 @@ export function useHoldGesture(options: UseHoldGestureOptions = {}): UseHoldGest
     }
   }
 
-  // MUST be idempotent: consumers (e.g., AstrosMobileRemote) rely on
-  // re-entrant `start()` being a no-op so the synthesized mousedown that
-  // browsers emit after a touch sequence absorbs cleanly. A future refactor
-  // that weakens the not-idle guard would silently introduce double-fire.
-  // See `AstrosMobileRemote.vue`'s `handlePanicDown` comment for the
-  // browser-event rationale.
+  // MUST be idempotent: re-entrant start() is a no-op so consumers can
+  // wire it to multiple event listeners (e.g., a touchstart that races
+  // its synthesized mousedown) without queuing a second arm timer. A
+  // future refactor that weakens the not-idle guard would silently
+  // introduce double-fire. Real-world consumer: `AstrosMobileRemote.vue`'s
+  // `handlePanicDown`.
   function start() {
     if (state.value !== 'idle') return;
     state.value = 'arming';

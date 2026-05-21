@@ -59,9 +59,12 @@ watch(
   },
 );
 
-// Clamp idx when pages shrinks below the current index — otherwise the
-// component falls into the empty-state branch even though there are still
-// valid pages (e.g., parent deletes pages without updating initialIdx).
+// Settle idx when pages shrinks. The read-time `currentIdx` clamp keeps
+// rendering correct on its own, but the watcher must mutate `idx.value`
+// so the user doesn't teleport to a stale position if the parent later
+// grows `pages` back. Product intent: a shrink is a reset — when pages
+// return, the user stays on the post-shrink page rather than jumping to
+// some prior index they never re-navigated to.
 watch(
   () => props.pages.length,
   (newLen) => {

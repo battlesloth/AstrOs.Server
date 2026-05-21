@@ -213,9 +213,9 @@ describe('AstrosMobileRemote', () => {
   });
 
   it('clamps an out-of-range initialIdx at mount so pagination UI does not lie', async () => {
-    // Pins the I1 fix from the pre-push review. Without the init-time
-    // clamp, the pagination header would render "11 / 3" and the next
-    // button would be enabled-but-no-op.
+    // Without the init-time clamp, the pagination header would render
+    // "11 / 3" and the next button would be enabled-but-no-op when a
+    // parent passes initialIdx beyond pages.length-1.
     const pages = [
       pageWith('p1', 'Greetings', scriptButton('a', 'A')),
       pageWith('p2', 'Performance', scriptButton('b', 'B')),
@@ -235,5 +235,57 @@ describe('AstrosMobileRemote', () => {
 
     // The displayed page is the last one in the array.
     expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Idle');
+  });
+
+  it('reseats the displayed page when the parent updates initialIdx after mount', async () => {
+    // Vacuous-fix guard: removing the `watch(() => props.initialIdx, ...)`
+    // block makes this test fail. The read-time currentIdx clamp does NOT
+    // mask the regression here because clampIdx only fires when idx.value
+    // itself changes — without the watcher, an in-range initialIdx update
+    // is silently ignored.
+    const pages = [
+      pageWith('p1', 'Greetings', scriptButton('a', 'A')),
+      pageWith('p2', 'Performance', scriptButton('b', 'B')),
+      pageWith('p3', 'Idle', scriptButton('c', 'C')),
+    ];
+    const wrapper = render({ pages, initialIdx: 0 });
+    await flushPromises();
+    expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Greetings');
+
+    await wrapper.setProps({ initialIdx: 2 });
+    await flushPromises();
+    expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Idle');
+    expect(wrapper.find('.astros-mobile-remote__page-pagination').text()).toBe('3 / 3');
+  });
+
+  it('settles idx after a shrink so a subsequent grow-back does not teleport the user to a stale page', async () => {
+    // Vacuous-fix guard for the pages.length watcher. The read-time
+    // currentIdx clamp masks the shrink itself (rendering looks fine
+    // either way), but the watcher's load-bearing job is to mutate
+    // idx.value so a later grow-back doesn't reveal the stale raw
+    // index. Without the watcher, the shrink-then-grow sequence below
+    // jumps the user back to page 3 (idx stayed at 2) instead of
+    // staying on page 1 (idx settled to 0 by the watcher).
+    const all = [
+      pageWith('p1', 'Greetings', scriptButton('a', 'A')),
+      pageWith('p2', 'Performance', scriptButton('b', 'B')),
+      pageWith('p3', 'Idle', scriptButton('c', 'C')),
+    ];
+    const wrapper = render({ pages: all, initialIdx: 2 });
+    await flushPromises();
+    expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Idle');
+
+    // Shrink: only the first page remains.
+    await wrapper.setProps({ pages: all.slice(0, 1) });
+    await flushPromises();
+    expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Greetings');
+
+    // Grow back to all three. With the watcher, idx is now 0 (settled
+    // during the shrink), so the user stays on the first page. Without
+    // the watcher, idx is still 2 and we teleport back to "Idle".
+    await wrapper.setProps({ pages: all });
+    await flushPromises();
+    expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Greetings');
+    expect(wrapper.find('.astros-mobile-remote__page-pagination').text()).toBe('1 / 3');
   });
 });
