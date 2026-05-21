@@ -14,8 +14,9 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
 
 - [x] **Phase 0 — Tracking convention bootstrap**: Add the `current_project.md` template,
       this file, and the CLAUDE.md amendment. — completed 2026-05-19
-- [ ] **Phase 1 — Page id/name data model**: Add `id` + `name` to RemoteControlPage and
-      M5Page, migrate existing data on load/save, hold M5Stack-compatible JSON shape.
+- [x] **Phase 1 — Page id/name data model**: Add `id` + `name` to RemoteControlPage and
+      M5Page, migrate existing data on load/save, hold M5Stack-compatible JSON shape. —
+      shipped 2026-05-21 via PR #90 (merge `9b52df5`), M5 bench-verified before merge.
 - [ ] **Phase 2 — Direction B editor port**: Rebuild RemoteControlConfig view as a 3-pane
       layout (page list + 3×3 grid + live preview), inline button editor, inline page CRUD.
 - [ ] **Phase 3 — Shared `AstrosMobileRemote` component**: Build the handheld UI in Vue;
