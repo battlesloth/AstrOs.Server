@@ -6,7 +6,7 @@ import { BUTTON_KEYS } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import { useHoldGesture } from '@/composables/useHoldGesture';
 import { useSwipeGesture } from '@/composables/useSwipeGesture';
-import type { AstrosMobileRemotePressEvent } from './types';
+import { isFilledPageButton, type AstrosMobileRemotePressEvent } from './types';
 
 const props = defineProps({
   pages: {
@@ -141,7 +141,7 @@ const slots = computed(() => {
 });
 
 function handlePress(button: PageButton) {
-  if (button.type === 'none') return;
+  if (!isFilledPageButton(button)) return;
   // 'arming' is NOT blocked here: the user may change their mind mid-hold
   // and the 600ms window is short enough that "two-handed" presses aren't
   // a real failure mode. Only the committed 'active' lockout (the 2.2s
@@ -163,10 +163,7 @@ function handlePress(button: PageButton) {
     toastClearTimer = null;
   }, 1600);
 
-  // Type narrowed by the `button.type === 'none'` early-return above; the
-  // emit's typed payload (AstrosMobileRemotePressEvent = FilledPageButton)
-  // excludes 'none' so the parent gets a script-or-playlist discriminator.
-  emit('press', button as AstrosMobileRemotePressEvent);
+  emit('press', button);
 }
 
 function goPrev() {
