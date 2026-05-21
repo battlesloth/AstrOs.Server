@@ -84,7 +84,11 @@ load-time data update.
       `astros_vue/src/stores/__tests__/remoteControl.spec.ts:86` to "remote firmware" or
       "remote consumer" — whichever reads naturally in context. Comment-only; no logic
       change.
-- [ ] **Task 5 — Verification + pre-push toolkit.**
+- [x] **Task 5 — Verification + pre-push toolkit.** Pre-push toolkit run
+      (5 agents) returned 1 Critical (syncRemoteConfig forEach on `'{}'` seed) +
+      3 Important (over-broad-WHERE test gap, missing wire-shape e2e test,
+      past-tense Phase 4 comment). All four landed in commit 80c3a81. Manual M5
+      smoke test pending push.
       - `npm run prettier:write` + `npm run lint:fix` on both packages.
       - `npm run build` (vue + api) succeeds.
       - `npx vitest run` clean on both packages — migration_7 test passes; existing
