@@ -1,8 +1,5 @@
 import crypto from 'crypto';
 
-// `satisfies` pins the tuple to the M5Page's button slots — if `RemoteControlPage`
-// ever grows a `button10`, the type checker forces this tuple to follow rather
-// than silently dropping the new slot from the iteration.
 const BUTTON_KEYS = [
   'button1',
   'button2',

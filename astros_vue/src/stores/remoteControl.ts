@@ -30,13 +30,15 @@ export function createDefaultPage(idx: number): RemoteControlPage {
   };
 }
 
-function migrateButton(btn: PageButton): PageButton {
-  if (btn.type) return btn;
+function migrateButton(
+  btn: Pick<PageButton, 'id' | 'name'> & { type?: PageButtonType },
+): PageButton {
+  if (btn.type) return btn as PageButton;
   const type: PageButtonType = btn.id === '0' ? 'none' : 'script';
   return { ...btn, type };
 }
 
-function isPageButtonShape(raw: unknown): raw is PageButton {
+function isPageButtonShape(raw: unknown): raw is Pick<PageButton, 'id' | 'name'> {
   // `Partial<RemoteControlPage>` is a TypeScript fiction here — the value comes
   // from JSON.parse of stored config and could be anything. Validate per-slot
   // before letting it reach migrateButton, which spreads `{...btn, type}` — a
@@ -83,6 +85,7 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
       const result = JSON.parse(response) as Partial<RemoteControlPage>[];
 
       if (!Array.isArray(result)) {
+        isLoading.value = false;
         throw new Error('No remote control configuration found');
       }
 
@@ -91,9 +94,11 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
       } else {
         remoteControlPages.value = [createDefaultPage(0)];
       }
+      isLoading.value = false;
       return { success: true, data: result };
     } catch (error) {
       console.error('Failed to load remote control configuration:', error);
+      isLoading.value = false;
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
