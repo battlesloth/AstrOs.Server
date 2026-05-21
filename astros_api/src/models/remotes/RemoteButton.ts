@@ -1,4 +1,4 @@
-export interface M5Button {
+export interface RemoteButton {
   name: string;
   command: string;
 }

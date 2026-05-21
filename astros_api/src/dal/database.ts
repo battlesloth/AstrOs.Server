@@ -22,6 +22,7 @@ import {
   migration_4,
   migration_5,
   migration_6,
+  migration_7,
 } from './migrations/index.js';
 import { SystemStatus } from '../system_status.js';
 import {
@@ -53,6 +54,7 @@ const defaultMigrationProvider: MigrationProvider = new (class implements Migrat
       '4_add_random_wait': migration_4,
       '5_fix_controller_locations_type': migration_5,
       '6_add_foreign_keys': migration_6,
+      '7_rename_remote_config_key': migration_7,
     };
   }
 })();

@@ -19,11 +19,12 @@ import {
   migration_4,
   migration_5,
   migration_6,
+  migration_7,
 } from './migrations/index.js';
 
 // Mirrors the production provider so injected test migrations layer on top of
 // the real baseline rather than truncating it. Without this, kysely sees
-// migrations 5/6 in kysely_migration but missing from the provider and throws
+// migrations in kysely_migration but missing from the provider and throws
 // "corrupted migrations" before any extra migration runs — which would short-
 // circuit tests that intend to exercise post-migration paths.
 function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider {
@@ -37,6 +38,7 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
         '4_add_random_wait': migration_4,
         '5_fix_controller_locations_type': migration_5,
         '6_add_foreign_keys': migration_6,
+        '7_rename_remote_config_key': migration_7,
         ...extra,
       };
     }
@@ -94,15 +96,15 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   });
 
   it('takes a backup when there is a last-applied migration AND a pending migration', async () => {
-    // First run: migrate to v4
+    // First run: migrate baseline to current production latest (v7).
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a new migration on top of the real v6 baseline.
+    // Inject a new migration on top of the real production baseline (currently v7).
     __setMigrationProviderForTest(
       buildProvider({
-        '7_safe_addition': {
+        '8_safe_addition': {
           async up(db) {
             await db.schema.createTable('safe_addition').addColumn('id', 'integer').execute();
           },
@@ -116,16 +118,16 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
 
-    // Backup file named after the previous last-applied migration (v6) should exist.
+    // Backup file named after the previous last-applied migration (v7) should exist.
     const backupFiles = fs
       .readdirSync(tmpDir)
       .filter((f) => f.startsWith('database.sqlite3.backup-'));
-    expect(backupFiles).toEqual(['database.sqlite3.backup-6_add_foreign_keys']);
+    expect(backupFiles).toEqual(['database.sqlite3.backup-7_rename_remote_config_key']);
     expect(status.isReadOnly()).toBe(false);
   });
 
   it('failed migration triggers restore from backup AND enters read-only with MIGRATION_FAILED_RESTORED', async () => {
-    // Migrate baseline to v6 first
+    // Migrate baseline to current production latest (v7) first.
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
@@ -138,10 +140,10 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
       sqlite.close();
     }
 
-    // Inject a migration on top of the real v6 baseline that throws.
+    // Inject a migration on top of the production baseline that throws.
     __setMigrationProviderForTest(
       buildProvider({
-        '7_will_fail': {
+        '8_will_fail': {
           async up() {
             throw new Error('intentional migration failure');
           },
@@ -155,7 +157,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     status = new SystemStatus();
     const db = await initializeDatabase(status, { dbPath });
 
-    // Restore brought the file back to v6, but a migration still failed —
+    // Restore brought the file back to v7, but a migration still failed —
     // the system enters read-only with MIGRATION_FAILED_RESTORED so operators
     // notice and investigate before redeploying. Writes against the rolled-
     // back schema while the migration is broken could compound the problem.
@@ -177,10 +179,10 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a pending migration on top of v6 so a backup attempt happens.
+    // Inject a pending migration on top of the production baseline so a backup attempt happens.
     __setMigrationProviderForTest(
       buildProvider({
-        '7_pending': {
+        '8_pending': {
           async up(db) {
             await db.schema.createTable('pending_table').addColumn('id', 'integer').execute();
           },
@@ -207,15 +209,15 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   });
 
   it('failed migration + failed restore → enters read-only', async () => {
-    // Migrate baseline to current latest (v6)
+    // Migrate baseline to current production latest (v7)
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a migration on top of v6 that throws
+    // Inject a migration on top of the production baseline that throws
     __setMigrationProviderForTest(
       buildProvider({
-        '7_will_fail': {
+        '8_will_fail': {
           async up() {
             throw new Error('intentional migration failure');
           },
@@ -262,14 +264,14 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // foreign_key_check must detect it, throw, and Phase 1's
     // restore-from-backup must revert to the pre-migration state.
 
-    // Bring DB to v6 (current latest, with FKs on script_channels.script_id).
+    // Bring DB to the current production latest (v7).
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
     __setMigrationProviderForTest(
       buildProvider({
-        '7_introduces_orphan': {
+        '8_introduces_orphan': {
           async up(db) {
             // Insert a script_channels row with a fabricated script_id —
             // valid SQL because FKs are off during the migration window.
@@ -290,7 +292,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     status = new SystemStatus();
     const db = await initializeDatabase(status, { dbPath });
 
-    // Restore brought us back to v6 AND the system enters read-only with
+    // Restore brought us back to v7 AND the system enters read-only with
     // MIGRATION_FAILED_RESTORED so operators notice — the same end-state as
     // any other migration failure that successfully recovered.
     expect(status.isReadOnly()).toBe(true);
@@ -305,11 +307,11 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
       .execute();
     expect(survivors).toHaveLength(0);
 
-    // And the migration history shows v6 as the latest, not v7.
+    // And the migration history shows v7 as the latest, not v8.
     const result = await sql<{ name: string }>`
       SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
     `.execute(db);
-    expect(result.rows[0]?.name).toBe('6_add_foreign_keys');
+    expect(result.rows[0]?.name).toBe('7_rename_remote_config_key');
   });
 
   it('initial open failure → enters read-only with STARTUP_OPEN_FAILED and returns a usable in-memory db', async () => {

@@ -1,4 +1,4 @@
-import type { M5Page, M5ScriptList, M5Button } from 'src/models/index.js';
+import type { RemotePage, RemoteScriptList, RemoteButton } from 'src/models/index.js';
 import { RemoteConfigRepository } from 'src/dal/repositories/remote_config_repository.js';
 import { logger } from 'src/logger.js';
 import { Kysely } from 'kysely';
@@ -26,25 +26,28 @@ export function registerRemoteConfigRoutes(
   );
 }
 
-async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
   logger.info('Syncing remote config to device');
 
   try {
     const repo = new RemoteConfigRepository(db);
 
-    const scripts = await repo.getConfig('astrOsScreen');
+    const scripts = await repo.getConfig('remoteConfig');
 
-    const val = JSON.parse(scripts?.value || '[]') as Array<M5Page>;
+    const val = JSON.parse(scripts?.value || '[]') as Array<RemotePage>;
 
-    if (!val || val.length === 0) {
+    // Defensive: migration_0 seeds the row with value '{}' (an object, not
+    // an array) on fresh installs. Until a user saves their first config,
+    // val is the parsed object and val.forEach below would throw.
+    if (!Array.isArray(val) || val.length === 0) {
       res.status(200);
-      res.json({ pages: [] } as M5ScriptList);
+      res.json({ pages: [] } as RemoteScriptList);
       return;
     }
 
-    const response: M5ScriptList = { pages: [] };
+    const response: RemoteScriptList = { pages: [] };
     val.forEach((x) => {
-      const list = new Array<M5Button>();
+      const list = new Array<RemoteButton>();
       list.push({ name: x.button1.name, command: x.button1.id });
       list.push({ name: x.button2.name, command: x.button2.id });
       list.push({ name: x.button3.name, command: x.button3.id });
@@ -73,7 +76,7 @@ async function getRemoteConfig(db: Kysely<Database>, req: any, res: any, next: a
   try {
     const repo = new RemoteConfigRepository(db);
 
-    const scripts = await repo.getConfig('astrOsScreen');
+    const scripts = await repo.getConfig('remoteConfig');
 
     res.status(200);
     res.json(scripts?.value || { value: '[]' });
@@ -91,7 +94,7 @@ async function saveRemoteConfig(db: Kysely<Database>, req: any, res: any, next: 
   try {
     const repo = new RemoteConfigRepository(db);
 
-    if (await repo.saveConfig('astrOsScreen', req.body.config)) {
+    if (await repo.saveConfig('remoteConfig', req.body.config)) {
       res.status(200);
       res.json({ message: 'success' });
     } else {
