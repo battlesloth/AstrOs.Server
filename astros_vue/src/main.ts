@@ -17,7 +17,7 @@ import {
   IoAdd,
   IoHelpCircleOutline,
 } from 'oh-vue-icons/icons';
-import { MdDraghandle } from 'oh-vue-icons/icons/md';
+import { MdDraghandle, MdDescription, MdFolder } from 'oh-vue-icons/icons/md';
 import App from './App.vue';
 import router from './router';
 import i18n from './i18n';
@@ -38,6 +38,8 @@ addIcons(
   IoAdd,
   IoHelpCircleOutline,
   MdDraghandle,
+  MdDescription,
+  MdFolder,
 );
 
 const app = createApp(App);
