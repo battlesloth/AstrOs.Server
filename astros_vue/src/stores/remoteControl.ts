@@ -30,10 +30,14 @@ export function createDefaultPage(idx: number): RemoteControlPage {
   };
 }
 
+function isPageButtonType(type: unknown): type is PageButtonType {
+  return type === 'none' || type === 'script' || type === 'playlist';
+}
+
 function migrateButton(
   btn: Pick<PageButton, 'id' | 'name'> & { type?: PageButtonType },
 ): PageButton {
-  if (btn.type) return btn as PageButton;
+  if (isPageButtonType(btn.type)) return btn as PageButton;
   const type: PageButtonType = btn.id === '0' ? 'none' : 'script';
   return { ...btn, type };
 }
