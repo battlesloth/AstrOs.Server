@@ -5,6 +5,7 @@ import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage
 import { BUTTON_KEYS } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import { useHoldGesture } from '@/composables/useHoldGesture';
+import { useSwipeGesture } from '@/composables/useSwipeGesture';
 import type { AstrosMobileRemotePressEvent } from './types';
 
 const props = defineProps({
@@ -95,17 +96,35 @@ const panic = useHoldGesture({
   holdMs: 600,
   cooldownMs: 2200,
   onFire: () => {
-    toastMessage.value = t('mobile_remote.panic_toast');
+    // Cancel any in-flight press toast so it doesn't clear the panic toast
+    // partway through. The reverse direction (press during active) is
+    // blocked by the state guard in handlePress.
+    clearToastTimer();
     clearPanicToastTimer();
+    toastMessage.value = t('mobile_remote.panic_toast');
     panicToastTimer = setTimeout(() => {
       toastMessage.value = null;
       panicToastTimer = null;
     }, 1800);
+    // Phase 4 contract: the parent must gate on delivery confirmation before
+    // letting the operator trust the STOPPED visual. The component shows
+    // success-side feedback unconditionally; Phase 4 must override (e.g., set
+    // a panicStatus prop or emit an error event) if the WS panic message
+    // fails to send. See plan's "Phase 4 contract requirements" section.
     emit('panic');
   },
 });
 
-const currentPage = computed<RemoteControlPage | null>(() => props.pages[idx.value] ?? null);
+// Defensive clamp at read-time so initial-mount or mid-prop-update windows
+// (where idx is set but the matching watcher hasn't yet fired) don't surface
+// the empty-state branch when valid pages exist. The clamp also covers the
+// out-of-range initialIdx case at construction (the watchers below clamp on
+// changes but not on the initial value).
+const currentPage = computed<RemoteControlPage | null>(() => {
+  if (props.pages.length === 0) return null;
+  const safeIdx = Math.min(Math.max(0, idx.value), props.pages.length - 1);
+  return props.pages[safeIdx] ?? null;
+});
 const totalPages = computed(() => props.pages.length);
 
 // BUTTON_KEYS is the canonical 1..9 ordering shared with the backend; iterating
@@ -140,7 +159,10 @@ function handlePress(button: PageButton) {
     toastClearTimer = null;
   }, 1600);
 
-  emit('press', button);
+  // Type narrowed by the `button.type === 'none'` early-return above; the
+  // emit's typed payload (AstrosMobileRemotePressEvent = FilledPageButton)
+  // excludes 'none' so the parent gets a script-or-playlist discriminator.
+  emit('press', button as AstrosMobileRemotePressEvent);
 }
 
 function goPrev() {
@@ -155,63 +177,25 @@ function selectPage(target: number) {
   if (target >= 0 && target < totalPages.value) idx.value = target;
 }
 
-// Swipe-to-paginate on the 3x3 grid surface. Tracking starts on touchstart
-// and the delta is computed on touchend; anything beyond the horizontal
-// threshold AND under the vertical threshold counts as a swipe. The grid is
-// the only swipe surface so the top bar / pagination row / panic button stay
-// unaffected.
-const SWIPE_HORIZONTAL_THRESHOLD_PX = 60;
-const SWIPE_VERTICAL_MAX_PX = 40;
-let swipeStartX: number | null = null;
-let swipeStartY: number | null = null;
-
-function handleGridTouchStart(event: TouchEvent) {
-  if (event.touches.length !== 1) {
-    // A second finger landed mid-gesture (e.g., two-handed grip, accidental
-    // pinch). Abort any in-progress swipe so the eventual touchend doesn't
-    // evaluate a delta from the first-finger start to the second-finger end.
-    swipeStartX = null;
-    swipeStartY = null;
-    return;
-  }
-  const touch = event.touches[0];
-  if (!touch) return;
-  swipeStartX = touch.clientX;
-  swipeStartY = touch.clientY;
-}
-
-function handleGridTouchEnd(event: TouchEvent) {
-  if (swipeStartX === null || swipeStartY === null) return;
-  const touch = event.changedTouches[0];
-  if (!touch) return;
-  const deltaX = touch.clientX - swipeStartX;
-  const deltaY = touch.clientY - swipeStartY;
-  swipeStartX = null;
-  swipeStartY = null;
-
-  if (Math.abs(deltaX) < SWIPE_HORIZONTAL_THRESHOLD_PX) return;
-  if (Math.abs(deltaY) > SWIPE_VERTICAL_MAX_PX) return;
-
-  // Suppress the synthesized click so a swipe that crosses a button slot
-  // doesn't also fire that button's press handler.
-  event.preventDefault();
-
-  // Convention matches iOS Photos / Twitter / Instagram: the content moves
-  // opposite the finger. Swipe LEFT → next page; swipe RIGHT → prev page.
-  if (deltaX < 0) goNext();
-  else goPrev();
-}
-
-function handleGridTouchCancel() {
-  swipeStartX = null;
-  swipeStartY = null;
-}
+// Swipe-to-paginate on the 3x3 grid surface (composable encapsulates the
+// distance threshold, vertical-max guard, multi-touch abort, and the
+// preventDefault that suppresses synthesized clicks on swipe). Direction
+// convention matches iOS Photos / Twitter / Instagram: the content moves
+// opposite the finger, so swipe LEFT → next page, swipe RIGHT → previous.
+const swipe = useSwipeGesture({
+  horizontalThresholdPx: 60,
+  verticalMaxPx: 40,
+  onSwipeLeft: () => goNext(),
+  onSwipeRight: () => goPrev(),
+});
 
 function handlePanicDown(event: Event) {
-  // Touch handlers preventDefault to suppress the synthetic mousedown that
-  // follows on most mobile browsers; without this the hold gesture would
-  // fire start() twice and the second call is a no-op anyway, but the
-  // touch path is the authoritative one.
+  // The preventDefault on touchstart is a Vue 3 passive-listener no-op in
+  // most builds, so the synthesized mousedown still fires and reaches this
+  // handler a second time. The safety net is useHoldGesture.start()'s own
+  // idempotency: it returns early when state !== 'idle', so the duplicate
+  // call is benign. A future composable refactor that breaks idempotency
+  // would expose this — re-evaluate then.
   if (event.type === 'touchstart') event.preventDefault();
   panic.start();
 }
@@ -285,9 +269,9 @@ const stopAllLabel = computed(() => {
     <div
       v-if="currentPage"
       class="astros-mobile-remote__grid"
-      @touchstart="handleGridTouchStart"
-      @touchend="handleGridTouchEnd"
-      @touchcancel="handleGridTouchCancel"
+      @touchstart="swipe.onTouchStart"
+      @touchend="swipe.onTouchEnd"
+      @touchcancel="swipe.onTouchCancel"
     >
       <button
         v-for="(button, i) in slots"
@@ -388,6 +372,7 @@ const stopAllLabel = computed(() => {
         @mouseleave="handlePanicUp"
         @touchstart="handlePanicDown"
         @touchend="handlePanicUp"
+        @touchcancel="handlePanicUp"
       >
         <!-- Arming fill -->
         <span

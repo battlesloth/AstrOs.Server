@@ -1,5 +1,12 @@
-import { ref, onScopeDispose, type Ref } from 'vue';
+import { readonly, ref, onScopeDispose, type Ref } from 'vue';
 
+// Refined from the plan's 4-state model (idle | arming | active | cooldown):
+// the design's "active" IS the cooldown — the button shows STOPPED for the
+// entire lockout window and resets to idle when it expires. There's no
+// observable difference between an `active` and a separate `cooldown` state,
+// so the simpler 3-state machine is equivalent. If a future visual treatment
+// needs to distinguish "just-fired" from "cooling-down", reintroduce
+// `cooldown` here and update the consumer's state checks.
 export type HoldGestureState = 'idle' | 'arming' | 'active';
 
 export interface UseHoldGestureOptions {
@@ -12,17 +19,14 @@ export interface UseHoldGestureOptions {
 }
 
 export interface UseHoldGestureReturn {
-  state: Ref<HoldGestureState>;
+  // Readonly to enforce that consumers go through start()/cancel()/reset()
+  // rather than poking state.value directly and bypassing the timer machine.
+  state: Readonly<Ref<HoldGestureState>>;
   start: () => void;
   cancel: () => void;
   reset: () => void;
 }
 
-// Refined from the plan's 4-state model (idle | arming | active | cooldown):
-// in the actual design, "active" IS the cooldown — the button shows STOPPED
-// for the entire lockout window and resets to idle when it expires. There's
-// no observable difference between an `active` and a separate `cooldown`
-// state, so the simpler 3-state machine is equivalent.
 export function useHoldGesture(options: UseHoldGestureOptions = {}): UseHoldGestureReturn {
   const { holdMs = 600, cooldownMs = 2200, onFire } = options;
 
@@ -50,11 +54,23 @@ export function useHoldGesture(options: UseHoldGestureOptions = {}): UseHoldGest
     armTimer = setTimeout(() => {
       armTimer = null;
       state.value = 'active';
-      onFire?.();
-      cooldownTimer = setTimeout(() => {
-        cooldownTimer = null;
-        state.value = 'idle';
-      }, cooldownMs);
+      // try/finally so a throwing onFire doesn't strand the gesture in
+      // 'active' forever (the cooldown timer must always schedule, otherwise
+      // the panic button shows STOPPED indefinitely and the operator has no
+      // recovery path). The error is logged for operator visibility — this
+      // is NOT silent failure even though we swallow the throw, because
+      // (a) the cooldown recovers the gesture, and (b) the consumer's UI
+      // already showed the success-side feedback before onFire ran.
+      try {
+        onFire?.();
+      } catch (err) {
+        console.error('useHoldGesture: onFire callback threw', err);
+      } finally {
+        cooldownTimer = setTimeout(() => {
+          cooldownTimer = null;
+          state.value = 'idle';
+        }, cooldownMs);
+      }
     }, holdMs);
   }
 
@@ -75,5 +91,5 @@ export function useHoldGesture(options: UseHoldGestureOptions = {}): UseHoldGest
     clearCooldownTimer();
   });
 
-  return { state, start, cancel, reset };
+  return { state: readonly(state), start, cancel, reset };
 }

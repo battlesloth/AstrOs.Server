@@ -1,7 +1,13 @@
-import type { PageButton } from '@/models/remoteControl/pageButton';
+import type { PageButton, PageButtonType } from '@/models/remoteControl/pageButton';
 
-// Emitted by AstrosMobileRemote when an operator taps a filled (non-`none`)
-// button. Carries the PageButton verbatim so the parent (the standalone
-// operator route in Phase 4) can route by `type` (script vs playlist) and
-// fire the matching backend endpoint.
-export type AstrosMobileRemotePressEvent = PageButton;
+// A PageButton narrowed to the filled variants — emitted by AstrosMobileRemote
+// when an operator taps a non-empty button. The component filters out
+// `type: 'none'` slots before emitting (see handlePress in AstrosMobileRemote.vue),
+// so the parent never needs to re-check; TypeScript narrows `type` to
+// 'script' | 'playlist' directly and the parent can switch on it without a
+// dead `none` branch.
+export type FilledPageButton = PageButton & {
+  type: Exclude<PageButtonType, 'none'>;
+};
+
+export type AstrosMobileRemotePressEvent = FilledPageButton;

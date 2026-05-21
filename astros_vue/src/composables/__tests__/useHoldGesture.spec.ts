@@ -48,15 +48,15 @@ describe('useHoldGesture', () => {
   });
 
   it('cancel() during arming returns to idle and does NOT fire onFire', () => {
-    // Vacuous-fix guard: if clearArmTimer() were dropped from cancel(), the
-    // arm timer would stay queued and fire when vi.advanceTimersByTime(600)
-    // runs below — calling onFire and failing the final assertion. Verified
-    // mechanically: removing the clearArmTimer call from cancel() makes the
-    // expect(onFire).not.toHaveBeenCalled() line fail.
-    // (Note on the fake-timer environment: a 0ms setTimeout would NOT fire
-    // automatically here — fake timers only run when time is advanced — so
-    // the real mutation the guard catches is the missing clearArmTimer call,
-    // not the delay value.)
+    // Vacuous-fix guard — verified mechanically. This test fails under
+    // either of the following mutations to the production code:
+    //   (a) Drop the clearArmTimer() call from cancel(): the queued arm
+    //       timer fires when vi.advanceTimersByTime(600) runs below, calling
+    //       onFire and tripping the final assertion.
+    //   (b) Change holdMs's setTimeout delay to 0: the timer fires during
+    //       vi.advanceTimersByTime(300) BEFORE cancel() executes, flipping
+    //       state to 'active' and calling onFire — tripping both the state
+    //       and onFire assertions.
     const onFire = vi.fn();
     const { result } = runInScope(() => useHoldGesture({ holdMs: 600, onFire }));
     result.start();
@@ -97,16 +97,28 @@ describe('useHoldGesture', () => {
   });
 
   it('start() while not idle is a no-op (does not re-arm or extend timers)', () => {
+    // Vacuous-fix guard: this catches a refactor that weakens the
+    // `state !== 'idle'` guard to e.g. `state === 'active'`, which would
+    // allow the second start() to queue a SECOND arm timer. The first timer
+    // would still fire at +600ms (test passes the first two assertions),
+    // but the second timer would fire at +900ms and call onFire AGAIN. The
+    // final onFire-count assertion catches it.
     const onFire = vi.fn();
     const { result } = runInScope(() => useHoldGesture({ holdMs: 600, onFire }));
     result.start();
     vi.advanceTimersByTime(300);
-    // Second start() — should NOT reset the 600ms timer
+    // Second start() — should NOT queue another arm timer.
     result.start();
     expect(result.state.value).toBe('arming');
     vi.advanceTimersByTime(300);
-    // 600ms total elapsed from first start() — should have fired
+    // 600ms total elapsed from first start() — should have fired exactly once.
     expect(result.state.value).toBe('active');
+    expect(onFire).toHaveBeenCalledTimes(1);
+    // Advance past where a stray second arm timer (queued at +300ms) would
+    // fire at +600ms-from-its-start = +900ms-from-first-start. The state
+    // assertion above checks the immediate post-fire state; this one pins
+    // that no orphan timer fires a second onFire later in the cooldown.
+    vi.advanceTimersByTime(600);
     expect(onFire).toHaveBeenCalledTimes(1);
   });
 
@@ -145,6 +157,60 @@ describe('useHoldGesture', () => {
     // The original cooldown timer must NOT fire again and flip something later.
     vi.advanceTimersByTime(3000);
     expect(result.state.value).toBe('idle');
+  });
+
+  it('reset() while active does NOT leave an orphan cooldown timer that clobbers a later cycle', () => {
+    // Vacuous-fix guard for the clearCooldownTimer() call in reset(). Without
+    // this test, removing that line passes all other tests (the orphan
+    // cooldown's callback sets state to 'idle' — a no-op when state is
+    // already 'idle'). The bug it would allow: an orphan timer firing
+    // mid-second-cycle clobbers the new 'active' lockout, dropping the
+    // STOPPED visual early.
+    const onFire = vi.fn();
+    const { result } = runInScope(() => useHoldGesture({ holdMs: 600, cooldownMs: 2200, onFire }));
+    result.start();
+    vi.advanceTimersByTime(600);
+    expect(result.state.value).toBe('active');
+    result.reset(); // Must kill the cooldown timer.
+    vi.advanceTimersByTime(1000); // 1.0s — still inside the original 2.2s cooldown window.
+    result.start(); // Begin a new cycle from idle.
+    vi.advanceTimersByTime(600);
+    expect(result.state.value).toBe('active');
+    vi.advanceTimersByTime(600); // Hits +2200ms mark of the ORIGINAL timer; must NOT fire.
+    expect(result.state.value).toBe('active');
+    vi.advanceTimersByTime(1600); // Hits +2200ms of cycle 2.
+    expect(result.state.value).toBe('idle');
+  });
+
+  it('a throwing onFire still schedules the cooldown and recovers to idle', () => {
+    // Phase 4 will wire emit('panic') to a WebSocket send; if the parent's
+    // handler throws, the gesture must NOT strand in 'active' forever. The
+    // production code wraps onFire in try/finally so the cooldown timer is
+    // always scheduled, and console.error surfaces the throw for operators.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { result } = runInScope(() =>
+        useHoldGesture({
+          holdMs: 600,
+          cooldownMs: 2200,
+          onFire: () => {
+            throw new Error('listener boom');
+          },
+        }),
+      );
+      result.start();
+      vi.advanceTimersByTime(600);
+      expect(result.state.value).toBe('active');
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('onFire callback threw'),
+        expect.any(Error),
+      );
+      // The cooldown timer MUST have been scheduled by the finally block.
+      vi.advanceTimersByTime(2200);
+      expect(result.state.value).toBe('idle');
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('respects custom holdMs and cooldownMs values', () => {
