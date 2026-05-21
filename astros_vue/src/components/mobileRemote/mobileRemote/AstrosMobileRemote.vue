@@ -74,7 +74,6 @@ const toastMessage = ref<string | null>(null);
 
 let pressClearTimer: ReturnType<typeof setTimeout> | null = null;
 let toastClearTimer: ReturnType<typeof setTimeout> | null = null;
-let panicToastTimer: ReturnType<typeof setTimeout> | null = null;
 
 function clearPressTimer() {
   if (pressClearTimer !== null) {
@@ -83,17 +82,23 @@ function clearPressTimer() {
   }
 }
 
-function clearToastTimer() {
+// Single owner of the toast slot. Replaces any in-flight toast so press and
+// panic don't race to clear each other's message — previously two separate
+// timer pairs wrote to the same DOM slot, and forgetting to cancel one
+// before showing the other clipped the new toast early.
+function showToast(message: string, durationMs: number) {
+  if (toastClearTimer !== null) clearTimeout(toastClearTimer);
+  toastMessage.value = message;
+  toastClearTimer = setTimeout(() => {
+    toastMessage.value = null;
+    toastClearTimer = null;
+  }, durationMs);
+}
+
+function clearToast() {
   if (toastClearTimer !== null) {
     clearTimeout(toastClearTimer);
     toastClearTimer = null;
-  }
-}
-
-function clearPanicToastTimer() {
-  if (panicToastTimer !== null) {
-    clearTimeout(panicToastTimer);
-    panicToastTimer = null;
   }
 }
 
@@ -101,16 +106,7 @@ const panic = useHoldGesture({
   holdMs: 600,
   cooldownMs: 2200,
   onFire: () => {
-    // Cancel any in-flight press toast so it doesn't clear the panic toast
-    // partway through. The reverse direction (press during active) is
-    // blocked by the state guard in handlePress.
-    clearToastTimer();
-    clearPanicToastTimer();
-    toastMessage.value = t('mobile_remote.panic_toast');
-    panicToastTimer = setTimeout(() => {
-      toastMessage.value = null;
-      panicToastTimer = null;
-    }, 1800);
+    showToast(t('mobile_remote.panic_toast'), 1800);
     // Fire-and-forget by design: the toast says "sending…" because this
     // emit does not wait for delivery. Parents that need a "sent vs failed"
     // visual must gate on their own delivery confirmation (prop or wrapper),
@@ -131,9 +127,8 @@ const currentPage = computed<RemoteControlPage | null>(() => {
 });
 const totalPages = computed(() => props.pages.length);
 
-// BUTTON_KEYS is the canonical 1..9 ordering shared with the backend; iterating
-// it once into a slots array means each template binding reads one variable
-// instead of re-calling a function per attribute expression.
+// Memoize the per-slot lookup so each template binding reads a stable array
+// slot instead of re-deriving from BUTTON_KEYS in every attribute expression.
 const slots = computed(() => {
   const page = currentPage.value;
   if (page === null) return [];
@@ -149,19 +144,13 @@ function handlePress(button: PageButton) {
   if (panic.state.value === 'active') return;
 
   pressedButtonId.value = button.id;
-  toastMessage.value = t('mobile_remote.press_toast', { name: button.name });
-
   clearPressTimer();
   pressClearTimer = setTimeout(() => {
     pressedButtonId.value = null;
     pressClearTimer = null;
   }, 220);
 
-  clearToastTimer();
-  toastClearTimer = setTimeout(() => {
-    toastMessage.value = null;
-    toastClearTimer = null;
-  }, 1600);
+  showToast(t('mobile_remote.press_toast', { name: button.name }), 1600);
 
   emit('press', button);
 }
@@ -208,8 +197,7 @@ function handlePanicUp(event: Event) {
 
 onBeforeUnmount(() => {
   clearPressTimer();
-  clearToastTimer();
-  clearPanicToastTimer();
+  clearToast();
   // The useHoldGesture composable cleans up its own timers via onScopeDispose.
 });
 
@@ -372,7 +360,6 @@ const stopAllLabel = computed(() => {
         :aria-pressed="panic.state.value === 'active'"
         @mousedown="handlePanicDown"
         @mouseup="handlePanicUp"
-        @mouseleave="handlePanicUp"
         @touchstart="handlePanicDown"
         @touchend="handlePanicUp"
         @touchcancel="handlePanicUp"
@@ -455,10 +442,8 @@ const stopAllLabel = computed(() => {
   font-size: 14px;
 }
 
-/* Capital A and O scale up to enforce the "AstrOs" branding rhythm — the
- * proprietary wordmark renders the caps as larger glyphs and this approximates
- * that until the real woff replaces distant_galaxyregular. Uses em (not px)
- * so the compact and full sizes both scale proportionally. */
+/* Capital A and O scale up to enforce the "AstrOs" branding rhythm. Uses
+ * em (not px) so the compact and full sizes both scale proportionally. */
 .astros-mobile-remote__wordmark-cap {
   font-size: 1.25em;
 }

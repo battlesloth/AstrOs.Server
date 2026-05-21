@@ -101,8 +101,8 @@ describe('AstrosMobileRemote', () => {
     // This test fails under either mutation:
     //   (a) Drop clearPressTimer() from onBeforeUnmount → pressClearTimer
     //       (220ms) is still pending at unmount → count >= 1.
-    //   (b) Drop clearToastTimer() from onBeforeUnmount → toastClearTimer
-    //       (1600ms) is still pending at unmount → count >= 1.
+    //   (b) Drop clearToast() from onBeforeUnmount → the showToast-owned
+    //       toast timer (1600ms) is still pending at unmount → count >= 1.
     const wrapper = render({
       pages: [pageWith('p1', 'Greetings', scriptButton('script-wave', 'Wave Hello'))],
     });
@@ -121,12 +121,13 @@ describe('AstrosMobileRemote', () => {
 
   it('panic-path timers are cleared on unmount before they fire', async () => {
     // Companion to the press-path test. Drives the panic gesture into the
-    // 'active' state so panicToastTimer (1.8s) and the composable's
-    // cooldownTimer (2.2s) are both pending at unmount.
+    // 'active' state so the showToast-owned toast timer (1.8s) and the
+    // composable's cooldownTimer (2.2s) are both pending at unmount.
     //
     // This test fails under the mutation:
-    //   (c) Drop clearPanicToastTimer() from onBeforeUnmount →
-    //       panicToastTimer still pending after unmount → count >= 1.
+    //   (c) Drop clearToast() from onBeforeUnmount → the showToast-owned
+    //       toast timer (set to 1800ms by panic onFire) still pending
+    //       after unmount → count >= 1.
     //   It also re-verifies useHoldGesture.onScopeDispose: dropping the
     //   onScopeDispose hook in the composable leaves cooldownTimer
     //   pending → count >= 1.
@@ -137,7 +138,7 @@ describe('AstrosMobileRemote', () => {
     await wrapper.find('.astros-mobile-remote__panic').trigger('mousedown');
     vi.advanceTimersByTime(600);
     await flushPromises();
-    // Now active: panicToastTimer (1800ms remaining) + cooldownTimer
+    // Now active: toast timer (1800ms remaining) + cooldownTimer
     // (2200ms remaining) are pending.
     expect(vi.getTimerCount() - baseline).toBe(2);
 
@@ -162,14 +163,16 @@ describe('AstrosMobileRemote', () => {
     vi.advanceTimersByTime(200);
     await wrapper.find('.astros-mobile-remote__panic').trigger('mousedown');
 
-    // T=800ms: panic fires; onFire clears the press-toast timer and shows
-    // the panic toast. Press toast WOULD have cleared at T=1600ms.
+    // T=800ms: panic fires; onFire calls showToast which implicitly cancels
+    // the in-flight press-toast timer and schedules the panic-toast clear
+    // 1800ms out. Press toast WOULD have cleared at T=1600ms.
     vi.advanceTimersByTime(600);
     await flushPromises();
     expect(wrapper.find('.astros-mobile-remote__toast').text()).toBe('STOP ALL — sending…');
 
-    // T=1601ms (past the press toast's original clear time). Without the
-    // clearToastTimer call in onFire, the panic toast would now be null.
+    // T=1601ms (past the press toast's original clear time). Without
+    // showToast's implicit cancel of the in-flight press timer, the panic
+    // toast would now be null.
     vi.advanceTimersByTime(801);
     await flushPromises();
     expect(wrapper.find('.astros-mobile-remote__toast').text()).toBe('STOP ALL — sending…');

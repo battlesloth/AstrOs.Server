@@ -200,6 +200,48 @@ describe('useSwipeGesture', () => {
     expect(onSwipeRight).toHaveBeenCalledTimes(1);
   });
 
+  it('fires when horizontal delta is exactly at the threshold (canonical off-by-one)', () => {
+    // The production code uses `Math.abs(deltaX) < threshold` to skip, so a
+    // delta of exactly `threshold` DOES fire. Mutating `<` to `<=` would
+    // make this case stop firing. Catches that off-by-one in both
+    // directions.
+    const onSwipeLeft = vi.fn();
+    const onSwipeRight = vi.fn();
+    const { onTouchStart, onTouchEnd } = useSwipeGesture({
+      horizontalThresholdPx: 60,
+      verticalMaxPx: 40,
+      onSwipeLeft,
+      onSwipeRight,
+    });
+
+    // Exactly +60 → onSwipeRight.
+    onTouchStart(touchEvent('touchstart', [{ clientX: 100, clientY: 200 }]));
+    onTouchEnd(touchEvent('touchend', [], [{ clientX: 160, clientY: 200 }]));
+    expect(onSwipeRight).toHaveBeenCalledTimes(1);
+
+    // Exactly -60 → onSwipeLeft.
+    onTouchStart(touchEvent('touchstart', [{ clientX: 200, clientY: 200 }]));
+    onTouchEnd(touchEvent('touchend', [], [{ clientX: 140, clientY: 200 }]));
+    expect(onSwipeLeft).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires when vertical delta is exactly at the verticalMax (still considered horizontal)', () => {
+    // The production code uses `Math.abs(deltaY) > verticalMax` to skip, so
+    // a vertical drift of exactly `verticalMax` is still treated as a clean
+    // horizontal swipe. Mutating `>` to `>=` would make exact-40 reject and
+    // the swipe never fire.
+    const onSwipeLeft = vi.fn();
+    const { onTouchStart, onTouchEnd } = useSwipeGesture({
+      horizontalThresholdPx: 60,
+      verticalMaxPx: 40,
+      onSwipeLeft,
+    });
+
+    onTouchStart(touchEvent('touchstart', [{ clientX: 200, clientY: 200 }]));
+    onTouchEnd(touchEvent('touchend', [], [{ clientX: 100, clientY: 240 }]));
+    expect(onSwipeLeft).toHaveBeenCalledTimes(1);
+  });
+
   it('respects custom horizontalThresholdPx and verticalMaxPx', () => {
     const onSwipeLeft = vi.fn();
     const { onTouchStart, onTouchEnd } = useSwipeGesture({
