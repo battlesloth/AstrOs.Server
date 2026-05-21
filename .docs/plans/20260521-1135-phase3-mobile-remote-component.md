@@ -55,7 +55,7 @@ in `current_project.md`.
 
 ## Tasks
 
-- [ ] **Task 1 — `useHoldGesture` composable + TDD tests.** Create
+- [x] **Task 1 — `useHoldGesture` composable + TDD tests.** Create
       `astros_vue/src/composables/useHoldGesture.ts` exposing a state machine:
       `'idle' | 'arming' | 'active' | 'cooldown'`. API:
       `useHoldGesture({ holdMs: 600, cooldownMs: 2200, onFire })` returns
@@ -67,7 +67,7 @@ in `current_project.md`.
       arming is a no-op, `cancel()` after fire stays in cooldown, `reset()` clears
       pending timers. **Vacuous-fix guard:** revert the `holdMs` timeout to fire at 0ms
       and verify the "releases before holdMs cancels cleanly" test fails.
-- [ ] **Task 2 — `AstrosMobileRemote.vue` component file.** Create
+- [x] **Task 2 — `AstrosMobileRemote.vue` component file.** Create
       `astros_vue/src/components/mobileRemote/mobileRemote/AstrosMobileRemote.vue` with
       the props/emits and full layout from the handoff. Props:
       `pages: RemoteControlPage[]`, `initialIdx?: number = 0`, `compact?: boolean = false`,
@@ -86,7 +86,7 @@ in `current_project.md`.
       `transform: scale(0.96)` press animation). Component-scoped types in
       sibling `types.ts` (mainly `PressEvent` type alias). **Unmount cleanup** for
       press-flash + toast timers (see Hidden gotcha 3).
-- [ ] **Task 3 — Storybook stories + icon registration + i18n.** Create
+- [x] **Task 3 — Storybook stories + icon registration + i18n.** Create
       `AstrosMobileRemote.stories.ts` next to the component with four variants:
       "Page 1 — mixed" (uses Phase 1's `createDefaultPage` + populated buttons),
       "Page 2 — sparse" (3 buttons assigned), "Page 3 — empty" (all `'0'` slots),
@@ -105,6 +105,23 @@ in `current_project.md`.
       here — the layout is visual. Per memory [[feedback-tdd-exceptions]] UI layout
       doesn't get unit tests; the composable in Task 1 does. Confirm in dev tools
       that unmounting mid-press / mid-toast doesn't leak timer warnings.
+
+## Post-Task-3 design feedback (folded in)
+
+These came out of iterative visual review after Tasks 1-3 shipped. Each is
+small enough to ship without a separate plan tier:
+
+- **AstrOs wordmark per-letter cap scaling** (1.25× the body letter size on
+  capital A and O) — enforces the proprietary branding rhythm. Implemented
+  with per-letter `<span>` + `aria-label="AstrOs"` so screen readers
+  announce the word as a single token.
+- **Button label font shrink** — 18px → 15px (full) and 12px → 11px
+  (compact) to fit longer script/playlist titles within the 3-line clamp.
+- **Swipe-to-paginate on the 3×3 grid** — touchstart/touchend handlers,
+  60px horizontal threshold, 40px vertical max, swipe-LEFT → next page
+  (iOS Photos convention). Multi-touch guard clears any in-progress
+  start coords when a second finger lands so two-handed grips don't
+  trigger spurious page flips.
 
 ## Out of scope
 

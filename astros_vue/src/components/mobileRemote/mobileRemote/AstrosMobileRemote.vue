@@ -155,6 +155,58 @@ function selectPage(target: number) {
   if (target >= 0 && target < totalPages.value) idx.value = target;
 }
 
+// Swipe-to-paginate on the 3x3 grid surface. Tracking starts on touchstart
+// and the delta is computed on touchend; anything beyond the horizontal
+// threshold AND under the vertical threshold counts as a swipe. The grid is
+// the only swipe surface so the top bar / pagination row / panic button stay
+// unaffected.
+const SWIPE_HORIZONTAL_THRESHOLD_PX = 60;
+const SWIPE_VERTICAL_MAX_PX = 40;
+let swipeStartX: number | null = null;
+let swipeStartY: number | null = null;
+
+function handleGridTouchStart(event: TouchEvent) {
+  if (event.touches.length !== 1) {
+    // A second finger landed mid-gesture (e.g., two-handed grip, accidental
+    // pinch). Abort any in-progress swipe so the eventual touchend doesn't
+    // evaluate a delta from the first-finger start to the second-finger end.
+    swipeStartX = null;
+    swipeStartY = null;
+    return;
+  }
+  const touch = event.touches[0];
+  if (!touch) return;
+  swipeStartX = touch.clientX;
+  swipeStartY = touch.clientY;
+}
+
+function handleGridTouchEnd(event: TouchEvent) {
+  if (swipeStartX === null || swipeStartY === null) return;
+  const touch = event.changedTouches[0];
+  if (!touch) return;
+  const deltaX = touch.clientX - swipeStartX;
+  const deltaY = touch.clientY - swipeStartY;
+  swipeStartX = null;
+  swipeStartY = null;
+
+  if (Math.abs(deltaX) < SWIPE_HORIZONTAL_THRESHOLD_PX) return;
+  if (Math.abs(deltaY) > SWIPE_VERTICAL_MAX_PX) return;
+
+  // Suppress the synthesized click so a swipe that crosses a button slot
+  // doesn't also fire that button's press handler.
+  event.preventDefault();
+
+  // Convention matches iOS Photos / Twitter / Instagram: the content moves
+  // opposite the finger. Swipe LEFT → next page; swipe RIGHT → prev page.
+  if (deltaX < 0) goNext();
+  else goPrev();
+}
+
+function handleGridTouchCancel() {
+  swipeStartX = null;
+  swipeStartY = null;
+}
+
 function handlePanicDown(event: Event) {
   // Touch handlers preventDefault to suppress the synthetic mousedown that
   // follows on most mobile browsers; without this the hold gesture would
@@ -192,7 +244,15 @@ const stopAllLabel = computed(() => {
   >
     <!-- Top bar -->
     <div class="astros-mobile-remote__top-bar">
-      <span class="astros-mobile-remote__wordmark font-starwars">AstrOs</span>
+      <span
+        class="astros-mobile-remote__wordmark font-starwars"
+        aria-label="AstrOs"
+      >
+        <span class="astros-mobile-remote__wordmark-cap">A</span>str<span
+          class="astros-mobile-remote__wordmark-cap"
+          >O</span
+        >s
+      </span>
       <span
         v-if="connected"
         class="astros-mobile-remote__connection"
@@ -225,6 +285,9 @@ const stopAllLabel = computed(() => {
     <div
       v-if="currentPage"
       class="astros-mobile-remote__grid"
+      @touchstart="handleGridTouchStart"
+      @touchend="handleGridTouchEnd"
+      @touchcancel="handleGridTouchCancel"
     >
       <button
         v-for="(button, i) in slots"
@@ -396,9 +459,20 @@ const stopAllLabel = computed(() => {
 .astros-mobile-remote__wordmark {
   font-size: 22px;
   letter-spacing: 0.02em;
+  /* Per-letter line-height tightens to keep the larger caps from stretching
+   * the top bar height when the size factor scales above 1.2. */
+  line-height: 1;
 }
 .astros-mobile-remote--compact .astros-mobile-remote__wordmark {
   font-size: 14px;
+}
+
+/* Capital A and O scale up to enforce the "AstrOs" branding rhythm — the
+ * proprietary wordmark renders the caps as larger glyphs and this approximates
+ * that until the real woff replaces distant_galaxyregular. Uses em (not px)
+ * so the compact and full sizes both scale proportionally. */
+.astros-mobile-remote__wordmark-cap {
+  font-size: 1.25em;
 }
 
 .astros-mobile-remote__connection {
@@ -489,7 +563,10 @@ const stopAllLabel = computed(() => {
   background: var(--mr-base-200);
   color: var(--mr-ink-soft);
   font-family: inherit;
-  font-size: 18px;
+  /* Reduced from the handoff's 18px / 12px to accommodate longer script and
+   * playlist titles before the 3-line clamp truncates. Bold (700) keeps the
+   * labels readable at arm's length on the handheld remote. */
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.15;
   cursor: default;
@@ -500,7 +577,7 @@ const stopAllLabel = computed(() => {
   gap: 3px;
   padding: 6px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .astros-mobile-remote__slot--filled {
