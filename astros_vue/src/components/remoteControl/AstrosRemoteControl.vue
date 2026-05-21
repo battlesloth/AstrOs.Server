@@ -118,6 +118,7 @@ const buttonNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
           class="btn btn-circle btn-ghost text-2xl"
           :title="$t('remote_view.backward')"
           :aria-label="$t('remote_view.backward')"
+          :disabled="loadFailed"
           @click="pageBackward"
         >
           &#8249;
@@ -129,6 +130,7 @@ const buttonNumbers = [1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
           class="btn btn-circle btn-ghost text-2xl"
           :title="$t('remote_view.forward')"
           :aria-label="$t('remote_view.forward')"
+          :disabled="loadFailed"
           @click="pageForward"
         >
           &#8250;
