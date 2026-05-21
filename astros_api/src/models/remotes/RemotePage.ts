@@ -10,11 +10,11 @@ const BUTTON_KEYS = [
   'button7',
   'button8',
   'button9',
-] as const satisfies readonly (keyof Omit<M5Page, 'id' | 'name' | 'hasSettings'>)[];
+] as const satisfies readonly (keyof Omit<RemotePage, 'id' | 'name' | 'hasSettings'>)[];
 
 type ButtonKey = (typeof BUTTON_KEYS)[number];
 
-export class M5Page {
+export class RemotePage {
   id: string;
   name: string;
   button1: PageButton;

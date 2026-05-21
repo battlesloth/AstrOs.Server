@@ -47,8 +47,8 @@ function isPageButtonShape(raw: unknown): raw is Pick<PageButton, 'id' | 'name'>
   // from JSON.parse of stored config and could be anything. Validate per-slot
   // before letting it reach migrateButton, which spreads `{...btn, type}` — a
   // string slot would otherwise produce `{0:'a',1:'b',..., type:'script'}` and
-  // a no-`name` slot would surface `undefined` to the M5 firmware (which drops
-  // it on JSON.stringify, breaking the {name, command} sync contract).
+  // a no-`name` slot would surface `undefined` to remote consumers — dropped
+  // by JSON.stringify on the wire, breaking the {name, command} sync contract.
   if (typeof raw !== 'object' || raw === null) return false;
   const candidate = raw as Partial<PageButton>;
   return typeof candidate.id === 'string' && typeof candidate.name === 'string';

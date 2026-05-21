@@ -83,7 +83,8 @@ describe('remoteControl store', () => {
       // enforcement point — anything not matching the shape becomes a default
       // button rather than getting spread (a string spread would produce
       // {0:'a',1:'b',...}, and a no-`name` slot would surface `undefined` to
-      // the M5 firmware on sync).
+      // remote consumers on sync — dropped by JSON.stringify on the wire,
+      // breaking the {name, command} contract).
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const malformed = {
         ...legacyPage(),

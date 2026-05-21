@@ -185,7 +185,7 @@ export const migration_0: Migration = {
     await db.insertInto('users').values(adminUser).execute();
 
     const remoteConfig = <NewRemoteConfig>{
-      type: 'astrOsScreen',
+      type: 'remoteConfig',
       value: '{}',
     };
 
