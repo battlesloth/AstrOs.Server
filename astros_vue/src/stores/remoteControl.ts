@@ -68,7 +68,7 @@ export function migratePage(page: Partial<RemoteControlPage>, idx: number): Remo
       // itself" complaint has a DevTools breadcrumb. The user-facing behavior
       // stays silent-degrade (no toast); this is for diagnosis only.
       console.warn(
-        `[remoteControl] migratePage: page ${idx} slot "${key}" had malformed shape; replaced with default. raw:`,
+        `[remoteControl] migratePage: page ${idx + 1} slot "${key}" had malformed shape; replaced with default. raw:`,
         raw,
       );
       migrated[key] = defaultButton('None');
