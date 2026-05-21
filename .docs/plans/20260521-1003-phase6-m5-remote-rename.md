@@ -48,7 +48,7 @@ load-time data update.
 
 ## Tasks
 
-- [ ] **Task 1 — Backend type rename: files, symbols, barrel exports.** Rename
+- [x] **Task 1 — Backend type rename: files, symbols, barrel exports.** Rename
       `astros_api/src/models/remotes/M5Page.ts` → `RemotePage.ts`,
       `M5Button.ts` → `RemoteButton.ts`, `M5ScriptList.ts` → `RemoteScriptList.ts`, and
       the Phase-1-added `M5Page.test.ts` → `RemotePage.test.ts`. Inside each file rename
@@ -59,7 +59,7 @@ load-time data update.
       `controllers/remote_config_controller.ts` imports and all usages
       (`Array<M5Page>` → `Array<RemotePage>`, `M5ScriptList` → `RemoteScriptList`,
       `new Array<M5Button>()` → `new Array<RemoteButton>()`).
-- [ ] **Task 2 — DB key call-site update + migration_7.** Switch the three
+- [x] **Task 2 — DB key call-site update + migration_7.** Switch the three
       `repo.getConfig('astrOsScreen')` / `repo.saveConfig('astrOsScreen', ...)` call sites
       in `remote_config_controller.ts` to `'remoteConfig'`. Add
       `astros_api/src/dal/migrations/migration_7.ts` that runs `UPDATE remote_config SET
@@ -69,7 +69,7 @@ load-time data update.
       `migrations/index.ts` and in both migration providers in `dal/database.ts` (look for
       the `'6_add_foreign_keys'` line — copy the pattern). Update migration_0's seed
       `type: 'astrOsScreen'` → `type: 'remoteConfig'` so fresh installs land clean.
-- [ ] **Task 3 — Migration test.** New
+- [x] **Task 3 — Migration test.** New
       `astros_api/src/dal/migrations/migration_7.test.ts` following the pattern from
       `migration_6.test.ts` (build a v6 provider with migrations 0–6, apply, seed an
       `astrOsScreen` row, then apply a v7 provider with migration_7 added). Cover:
@@ -79,7 +79,7 @@ load-time data update.
       migration_0's new seed already produced `remoteConfig`); (d) **vacuous-fix guard:**
       revert the `WHERE` clause to a typo (`'astroScreen'`) locally and confirm test (a)
       fails — per memory rule, prevents a green-but-broken migration.
-- [ ] **Task 4 — Vue comment sweep.** Update the two stale "M5 firmware" comment-only
+- [x] **Task 4 — Vue comment sweep.** Update the two stale "M5 firmware" comment-only
       references at `astros_vue/src/stores/remoteControl.ts:50` and
       `astros_vue/src/stores/__tests__/remoteControl.spec.ts:86` to "remote firmware" or
       "remote consumer" — whichever reads naturally in context. Comment-only; no logic
