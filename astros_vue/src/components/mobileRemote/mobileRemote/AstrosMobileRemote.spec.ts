@@ -179,14 +179,13 @@ describe('AstrosMobileRemote', () => {
   });
 
   it('emit("press") narrows to FilledPageButton — never includes type: "none"', async () => {
-    // Pins the emit-shape contract that Phase 4 will switch on. A
-    // regression that weakens the !isFilledPageButton early-return in
-    // handlePress would let an empty slot leak into the emit payload.
+    // A regression that weakens the !isFilledPageButton early-return in
+    // handlePress would let an empty slot leak into the emit payload to a
+    // consumer that expects to switch on the discriminator.
     const wrapper = render({
       pages: [pageWith('p1', 'Greetings', scriptButton('script-wave', 'Wave Hello'))],
     });
 
-    // Click the filled button.
     await wrapper.find('.astros-mobile-remote__slot--filled').trigger('click');
     await flushPromises();
 

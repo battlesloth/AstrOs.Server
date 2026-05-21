@@ -4,8 +4,8 @@ import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage
 import { createDefaultPage } from '@/stores/remoteControl';
 
 // The mobile remote is sized to fill its parent. Wrap each story in a
-// phone-shaped container so the layout reads the way it would inside the
-// MiniPhone bezel that Phase 2's preview rail provides.
+// phone-shaped container so the layout reads the way it would when
+// embedded in a parent component's bezel.
 const phoneWrapper = `
   <div style="
     width: 320px;

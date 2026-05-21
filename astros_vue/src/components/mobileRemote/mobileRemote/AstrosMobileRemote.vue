@@ -25,9 +25,9 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  // Phase 4 will drive this from the WebSocket connection store. Default to
-  // `true` so the standalone-component case (and Storybook) renders the
-  // intended "Connected" chip.
+  // Defaults to `true` so the standalone-component case (and Storybook)
+  // render the intended "Connected" chip when a parent doesn't pipe in a
+  // live connection signal.
   connected: {
     type: Boolean,
     default: true,
@@ -143,7 +143,7 @@ function handlePress(button: PageButton) {
   // 'arming' is NOT blocked here: the user may change their mind mid-hold
   // and the 600ms window is short enough that "two-handed" presses aren't
   // a real failure mode. Only the committed 'active' lockout (the 2.2s
-  // post-fire window) suppresses presses. Matches the handoff JSX.
+  // post-fire window) suppresses presses.
   if (panic.state.value === 'active') return;
 
   pressedButtonId.value = button.id;

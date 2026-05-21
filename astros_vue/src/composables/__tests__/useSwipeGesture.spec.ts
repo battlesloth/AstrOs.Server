@@ -94,13 +94,11 @@ describe('useSwipeGesture', () => {
   });
 
   it('multi-touch start aborts the in-progress gesture (two-handed grip)', () => {
-    // Vacuous-fix guard for the multi-touch guard. Per memory rule for
-    // defensive features: revert the `event.touches.length !== 1` guard
-    // (let the second touchstart fall through without clearing start
-    // coords) and this test fails — the eventual touchend computes delta
-    // from first-finger start to second-finger end and fires a spurious
-    // swipe. Verified mechanically: removing the guard makes this test
-    // fail.
+    // Vacuous-fix guard — verified mechanically. Reverting the
+    // `event.touches.length !== 1` guard (so the second touchstart falls
+    // through without clearing start coords) makes this test fail: the
+    // eventual touchend computes delta from first-finger start to
+    // second-finger end and fires a spurious swipe.
     const onSwipeLeft = vi.fn();
     const onSwipeRight = vi.fn();
     const { onTouchStart, onTouchEnd } = useSwipeGesture({

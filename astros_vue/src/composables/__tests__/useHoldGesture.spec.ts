@@ -183,10 +183,10 @@ describe('useHoldGesture', () => {
   });
 
   it('a throwing onFire still schedules the cooldown and recovers to idle', () => {
-    // Phase 4 will wire emit('panic') to a WebSocket send; if the parent's
-    // handler throws, the gesture must NOT strand in 'active' forever. The
-    // production code wraps onFire in try/finally so the cooldown timer is
-    // always scheduled, and console.error surfaces the throw for operators.
+    // If a consumer's onFire handler throws, the gesture must NOT strand in
+    // 'active' forever. The production code wraps onFire in try/finally so
+    // the cooldown timer is always scheduled, and console.error surfaces
+    // the throw for operators.
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const { result } = runInScope(() =>
