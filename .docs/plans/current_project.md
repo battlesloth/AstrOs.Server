@@ -26,12 +26,19 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
       WebSocket PANIC, connection chip from WS state.
 - [ ] **Phase 5 — Page drag-reorder**: Install `vuedraggable` (or `vue-draggable-plus`),
       wire row reorder, persist new order on save.
-- [ ] **Phase 6 — Backend M5 → Remote rename + DB key migration**: Rename `M5Page` /
+- [x] **Phase 6 — Backend M5 → Remote rename + DB key migration**: Rename `M5Page` /
       `M5Button` / `M5ScriptList` backend types to `RemotePage` / `RemoteButton` /
       `RemoteScriptList` (frontend already uses generic names). Migrate the
       `remote_config.type` DB string from `astrOsScreen` → `remoteConfig` via a new
       reversible migration. Sequence: AFTER Phase 1 ships and bench-passes, so the M5
-      contract Phase 1 verifies isn't perturbed by the rename. Light plan tier.
+      contract Phase 1 verifies isn't perturbed by the rename. Light plan tier. —
+      shipped 2026-05-21 via PR #91 (merge `983d104`), wire shape pinned by new
+      `remote_config_controller.test.ts`.
+
+**Sequencing note added 2026-05-21:** Phase 3 ships ahead of Phase 2. Phase 2's
+live-preview rail imports the `AstrosMobileRemote` component built in Phase 3; doing
+them in original order would force a stub-then-replace cycle. See Phase 3 plan for
+rationale.
 
 ## Notes & Decisions
 

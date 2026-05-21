@@ -20,6 +20,7 @@ import {
   IoAdd,
   IoHelpCircleOutline,
 } from 'oh-vue-icons/icons';
+import { MdDescription, MdFolder } from 'oh-vue-icons/icons/md';
 
 initialize();
 
@@ -40,6 +41,8 @@ setup((app) => {
     IoChevronDown,
     IoAdd,
     IoHelpCircleOutline,
+    MdDescription,
+    MdFolder,
   );
 
   app.component('v-icon', OhVueIcon);

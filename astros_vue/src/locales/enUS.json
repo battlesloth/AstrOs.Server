@@ -450,6 +450,23 @@
     "button_label": "Button {number}",
     "button_select": "Button assignment"
   },
+  "mobile_remote": {
+    "region_label": "Mobile remote",
+    "connected_label": "Connected",
+    "chip_script": "Script",
+    "chip_playlist": "List",
+    "press_toast": "Sent: {name}",
+    "panic_toast": "STOP ALL — sending…",
+    "stop_all_idle": "Stop All",
+    "stop_all_arming": "Hold…",
+    "stop_all_active": "STOPPED",
+    "stop_all_caption": "Hold to halt every running action",
+    "empty_slot_aria": "Empty slot {number}",
+    "prev_page_aria": "Previous page",
+    "next_page_aria": "Next page",
+    "dot_aria": "Go to page {number}",
+    "no_pages": "No remote pages configured"
+  },
   "utility_view": {
     "title": "Utility",
     "api_key": "API Key",
