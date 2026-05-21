@@ -44,7 +44,9 @@ in `current_project.md`.
 3. **Toast and panic-active timers must clean up on unmount.** The 1.6s press-toast and
    2.2s panic-active lockout both use `setTimeout`. If the component unmounts mid-timer
    (e.g., page route change), the timer's setState would leak. Use `onBeforeUnmount` to
-   clear pending handles, and gate the timer callbacks on a mounted ref.
+   clear pending handles. (As shipped, `clearTimeout` alone is sufficient — Vue 3 ignores
+   ref writes after unmount, so the additional mounted-ref gate the plan originally
+   suggested is not needed.)
 4. **`MobileRemote.jsx` uses both mouse and touch handlers** with `preventDefault` on
    touch to suppress synthetic mouse events. Vue's standard `@mousedown` / `@touchstart`
    bindings won't auto-deduplicate; the composable must accept both.
@@ -213,8 +215,6 @@ the standalone-route wiring or the operator UX will be misleading or unsafe.
 - Wiring `@press` to `apiService.get('api/scripts/run', ...)` and `@panic` to a WebSocket
   PANIC message — Phase 4.
 - A standalone route or view for the component — Phase 4.
-- Replacing the `Audiowide` placeholder with the proprietary AstrOs wordmark font —
-  open question for the design phase, not blocking.
 - Touch-vs-mouse event coalescing optimization beyond the basic `preventDefault` on
   touch handlers — defer to Phase 4 bench-testing on real hardware.
 
@@ -223,7 +223,7 @@ the standalone-route wiring or the operator UX will be misleading or unsafe.
 - `npm run build` (vue) clean.
 - `npx vitest run` clean — includes new `useHoldGesture.spec.ts`.
 - `npm run lint` + `npm run format` clean.
-- `npm run storybook` — all four stories render visually correct against the handoff
+- `npm run storybook` — all six stories render visually correct against the handoff
   screenshots (`.tmp/design_handoff_remote_control/screenshots/03-mobile-page1.png`
   through `05-mobile-empty.png`).
 - Invoke `superpowers:requesting-code-review` on each implementation commit.
