@@ -16,6 +16,15 @@ export interface UseHoldGestureOptions {
   cooldownMs?: number;
   /** Called once when the gesture transitions from `arming` to `active`. */
   onFire?: () => void;
+  /**
+   * Called if `onFire` throws. Without this the composable falls back to
+   * `console.error` — but a deployed operator never sees `console.error`.
+   * Consumers running in a production UI should pass a handler that routes
+   * to their real logger/toast/error-boundary. A throwing `onError` itself
+   * is caught and its error is logged alongside the original — the cooldown
+   * always schedules either way so the gesture cannot strand in `active`.
+   */
+  onError?: (err: unknown) => void;
 }
 
 export interface UseHoldGestureReturn {
@@ -28,7 +37,7 @@ export interface UseHoldGestureReturn {
 }
 
 export function useHoldGesture(options: UseHoldGestureOptions = {}): UseHoldGestureReturn {
-  const { holdMs = 600, cooldownMs = 2200, onFire } = options;
+  const { holdMs = 600, cooldownMs = 2200, onFire, onError } = options;
 
   const state = ref<HoldGestureState>('idle');
   let armTimer: ReturnType<typeof setTimeout> | null = null;
@@ -48,6 +57,12 @@ export function useHoldGesture(options: UseHoldGestureOptions = {}): UseHoldGest
     }
   }
 
+  // MUST be idempotent: consumers (e.g., AstrosMobileRemote) rely on
+  // re-entrant `start()` being a no-op so the synthesized mousedown that
+  // browsers emit after a touch sequence absorbs cleanly. A future refactor
+  // that weakens the not-idle guard would silently introduce double-fire.
+  // See `AstrosMobileRemote.vue`'s `handlePanicDown` comment for the
+  // browser-event rationale.
   function start() {
     if (state.value !== 'idle') return;
     state.value = 'arming';
@@ -64,7 +79,15 @@ export function useHoldGesture(options: UseHoldGestureOptions = {}): UseHoldGest
       try {
         onFire?.();
       } catch (err) {
-        console.error('useHoldGesture: onFire callback threw', err);
+        try {
+          if (onError) onError(err);
+          else console.error('useHoldGesture: onFire callback threw', err);
+        } catch (handlerErr) {
+          // A throwing onError must not escape into the setTimeout callback
+          // path (where it would surface only as an unhandled rejection /
+          // window.onerror) and must not hide the original error.
+          console.error('useHoldGesture: onError handler threw', handlerErr, 'original:', err);
+        }
       } finally {
         cooldownTimer = setTimeout(() => {
           cooldownTimer = null;

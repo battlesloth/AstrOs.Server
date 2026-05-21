@@ -106,11 +106,10 @@ const panic = useHoldGesture({
       toastMessage.value = null;
       panicToastTimer = null;
     }, 1800);
-    // Phase 4 contract: the parent must gate on delivery confirmation before
-    // letting the operator trust the STOPPED visual. The component shows
-    // success-side feedback unconditionally; Phase 4 must override (e.g., set
-    // a panicStatus prop or emit an error event) if the WS panic message
-    // fails to send. See plan's "Phase 4 contract requirements" section.
+    // Fire-and-forget by design: the toast says "sending…" because this
+    // emit does not wait for delivery. Parents that need a "sent vs failed"
+    // visual must gate on their own delivery confirmation (prop or wrapper),
+    // not on this emit firing.
     emit('panic');
   },
 });

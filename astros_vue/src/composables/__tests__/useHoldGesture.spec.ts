@@ -213,6 +213,78 @@ describe('useHoldGesture', () => {
     }
   });
 
+  it('routes a throwing onFire to onError when supplied (instead of console.error)', () => {
+    // The console.error fallback exists only for consumers that haven't
+    // wired their own logger. When onError is supplied, the throw must
+    // reach it and NOT be double-logged to console.error.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onError = vi.fn();
+    try {
+      const { result } = runInScope(() =>
+        useHoldGesture({
+          holdMs: 600,
+          cooldownMs: 2200,
+          onFire: () => {
+            throw new Error('listener boom');
+          },
+          onError,
+        }),
+      );
+      result.start();
+      vi.advanceTimersByTime(600);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(expect.any(Error));
+      expect(errorSpy).not.toHaveBeenCalled();
+      // Cooldown still schedules — the error path must not break recovery.
+      vi.advanceTimersByTime(2200);
+      expect(result.state.value).toBe('idle');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('a throwing onError is contained and logs both errors without stranding the gesture', () => {
+    // Vacuous-fix guard — verified mechanically. This test fails under
+    // either of the following mutations to the production code:
+    //   (a) Remove the inner try/catch around the onError call: the
+    //       handlerErr escapes the setTimeout callback (uncaught, surfaces
+    //       as a Vitest unhandled rejection) AND the cooldown still
+    //       schedules so state reaches idle — but the unhandled rejection
+    //       trips the final assertion that no rejection occurred.
+    //   (b) Drop the second console.error (the one logging handlerErr): the
+    //       "onError handler threw" string assertion below fails.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const handlerError = new Error('handler boom');
+    try {
+      const { result } = runInScope(() =>
+        useHoldGesture({
+          holdMs: 600,
+          cooldownMs: 2200,
+          onFire: () => {
+            throw new Error('listener boom');
+          },
+          onError: () => {
+            throw handlerError;
+          },
+        }),
+      );
+      result.start();
+      vi.advanceTimersByTime(600);
+      expect(result.state.value).toBe('active');
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('onError handler threw'),
+        handlerError,
+        expect.stringContaining('original'),
+        expect.any(Error),
+      );
+      // Cooldown still recovers — this is the load-bearing safety property.
+      vi.advanceTimersByTime(2200);
+      expect(result.state.value).toBe('idle');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('respects custom holdMs and cooldownMs values', () => {
     const onFire = vi.fn();
     const { result } = runInScope(() => useHoldGesture({ holdMs: 1000, cooldownMs: 500, onFire }));
