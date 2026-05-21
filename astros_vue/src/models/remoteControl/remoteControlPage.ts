@@ -24,6 +24,6 @@ export const BUTTON_KEYS = [
   'button7',
   'button8',
   'button9',
-] as const satisfies readonly (keyof RemoteControlPage)[];
+] as const satisfies readonly (keyof Omit<RemoteControlPage, 'id' | 'name'>)[];
 
 export type ButtonKey = (typeof BUTTON_KEYS)[number];
