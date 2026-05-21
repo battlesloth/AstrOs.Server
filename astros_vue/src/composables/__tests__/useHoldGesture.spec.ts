@@ -285,6 +285,46 @@ describe('useHoldGesture', () => {
     }
   });
 
+  it('an async onError whose promise rejects is caught and logged with the original error', async () => {
+    // Vacuous-fix guard — verified mechanically. Removing the
+    // Promise.resolve(...).catch(...) wrap around the onError call lets the
+    // returned rejected promise become an unhandled rejection on
+    // window.onerror — the synchronous try/catch only catches sync throws,
+    // not awaited rejections. This test fails under that mutation because
+    // the "onError handler rejected" string assertion never matches.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const handlerError = new Error('async handler boom');
+    try {
+      const { result } = runInScope(() =>
+        useHoldGesture({
+          holdMs: 600,
+          cooldownMs: 2200,
+          onFire: () => {
+            throw new Error('listener boom');
+          },
+          onError: async () => {
+            throw handlerError;
+          },
+        }),
+      );
+      result.start();
+      vi.advanceTimersByTime(600);
+      // Let the microtask queue drain so the rejected promise's catch runs.
+      await Promise.resolve();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('onError handler rejected'),
+        handlerError,
+        expect.stringContaining('original'),
+        expect.any(Error),
+      );
+      // Cooldown still recovers — the load-bearing safety property.
+      vi.advanceTimersByTime(2200);
+      expect(result.state.value).toBe('idle');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('respects custom holdMs and cooldownMs values', () => {
     const onFire = vi.fn();
     const { result } = runInScope(() => useHoldGesture({ holdMs: 1000, cooldownMs: 500, onFire }));

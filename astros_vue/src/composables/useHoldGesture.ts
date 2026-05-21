@@ -20,11 +20,14 @@ export interface UseHoldGestureOptions {
    * Called if `onFire` throws. Without this the composable falls back to
    * `console.error` — but a deployed operator never sees `console.error`.
    * Consumers running in a production UI should pass a handler that routes
-   * to their real logger/toast/error-boundary. A throwing `onError` itself
-   * is caught and its error is logged alongside the original — the cooldown
-   * always schedules either way so the gesture cannot strand in `active`.
+   * to their real logger/toast/error-boundary.
+   *
+   * May be async; both synchronous throws and rejected promises returned
+   * from the handler are caught and logged alongside the original error,
+   * so the cooldown always schedules and the gesture cannot strand in
+   * `active`.
    */
-  onError?: (err: unknown) => void;
+  onError?: (err: unknown) => void | Promise<void>;
 }
 
 export interface UseHoldGestureReturn {
@@ -79,14 +82,26 @@ export function useHoldGesture(options: UseHoldGestureOptions = {}): UseHoldGest
       try {
         onFire?.();
       } catch (err) {
-        try {
-          if (onError) onError(err);
-          else console.error('useHoldGesture: onFire callback threw', err);
-        } catch (handlerErr) {
-          // A throwing onError must not escape into the setTimeout callback
-          // path (where it would surface only as an unhandled rejection /
-          // window.onerror) and must not hide the original error.
-          console.error('useHoldGesture: onError handler threw', handlerErr, 'original:', err);
+        if (onError) {
+          // Promise.resolve handles both sync throws (already in catch via
+          // the outer try) and async rejections returned from the handler.
+          // Without this wrap, an async onError whose promise rejects
+          // becomes an unhandled rejection on window.onerror and the
+          // original onFire error is lost.
+          try {
+            Promise.resolve(onError(err)).catch((handlerErr: unknown) => {
+              console.error(
+                'useHoldGesture: onError handler rejected',
+                handlerErr,
+                'original:',
+                err,
+              );
+            });
+          } catch (handlerErr) {
+            console.error('useHoldGesture: onError handler threw', handlerErr, 'original:', err);
+          }
+        } else {
+          console.error('useHoldGesture: onFire callback threw', err);
         }
       } finally {
         cooldownTimer = setTimeout(() => {
