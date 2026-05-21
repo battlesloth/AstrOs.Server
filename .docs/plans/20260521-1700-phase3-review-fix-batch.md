@@ -33,7 +33,7 @@ code-review step per the carve-out.
 
 - [x] **Commit 1 — Plan file (this file).** Plan-only commit; ships before any
       source change per the Planning section.
-- [ ] **Commit 2 — C1 + I4: panic delivery contract + composable safety
+- [x] **Commit 2 — C1 + I4: panic delivery contract + composable safety
       docstring.** (a) Change `mobile_remote.panic_toast` from `"STOP ALL — sent"`
       to `"STOP ALL — sending…"` in `enUS.json`. (b) Add an `onError?: (err:
       unknown) => void` option to `UseHoldGestureOptions`; the existing
@@ -44,7 +44,7 @@ code-review step per the carve-out.
       after touchstart." (d) Trim the `// Phase 4 contract:` block in
       `AstrosMobileRemote.vue` `onFire` to a single WHY line about
       fire-and-forget; the toast copy carries the rest.
-- [ ] **Commit 3 — I1 + M7: clamp `idx` at init.** Replace `const idx =
+- [x] **Commit 3 — I1 + M7: clamp `idx` at init.** Replace `const idx =
       ref(props.initialIdx)` with a clamp using `Math.min/Math.max`. Introduce a
       `currentIdx` computed (or reuse `safeIdx` from the existing
       `currentPage` computed by extracting it) and route the pagination header
@@ -52,15 +52,15 @@ code-review step per the carve-out.
       so out-of-range `initialIdx` no longer leaks into pagination UI. Side
       effect: the EmptyPagesArray story's Next button correctly disables.
       Update the read-time clamp comment to reflect the new structure.
-- [ ] **Commit 4 — I2: i18n the wordmark aria-label.** Replace
+- [x] **Commit 4 — I2: i18n the wordmark aria-label.** Replace
       `aria-label="AstrOs"` with `:aria-label="$t('astros')"`. Key already
       exists at `enUS.json:2`.
-- [ ] **Commit 5 — I6: `isFilledPageButton` type guard.** Add the predicate in
+- [x] **Commit 5 — I6: `isFilledPageButton` type guard.** Add the predicate in
       `types.ts`; replace the `button as AstrosMobileRemotePressEvent` cast in
       `handlePress` with the guard so TypeScript proves the narrowing. Remove
       the now-redundant cast-narrowing comment block (handles M6's
       `handlePress` what-comment as a side effect).
-- [ ] **Commit 6 — I3: `AstrosMobileRemote` component tests.** New
+- [x] **Commit 6 — I3: `AstrosMobileRemote` component tests.** New
       `AstrosMobileRemote.spec.ts` covering:
       - press-during-`active` lockout is suppressed (mounts, fires panic,
         advances 600ms, clicks a button, asserts no `press` emit).
@@ -77,7 +77,7 @@ code-review step per the carve-out.
         button is disabled (validates the Commit 3 fix).
       Follows the existing `AstrosFirmwareVersionDelta.spec.ts` i18n-stub
       pattern.
-- [ ] **Commit 7 — Cleanup batch (M1, M2, M3, M4, M5, M6, M8).**
+- [x] **Commit 7 — Cleanup batch (M1, M2, M3, M4, M5, M6, M8).**
       - **M1**: drop `@mouseleave="handlePanicUp"` from the panic button so a
         drag-off mid-hold doesn't silently cancel. Matches touch-end-anywhere
         UX and is more forgiving for a safety gesture.
@@ -97,7 +97,7 @@ code-review step per the carve-out.
       - **M8**: add exactly-at-threshold boundary tests to
         `useSwipeGesture.spec.ts` (deltaX = ±60 fires; deltaY = 40 still
         fires for a horizontal swipe).
-- [ ] **Commit 8 — I5: plan-vs-code drift fixes (plan-only).** Edit
+- [x] **Commit 8 — I5: plan-vs-code drift fixes (plan-only).** Edit
       `20260521-1135-phase3-mobile-remote-component.md`:
       - Hidden gotcha #3 (line 46-47): drop "and gate the timer callbacks on
         a mounted ref"; shipped code uses `clearTimeout` alone.
@@ -106,6 +106,59 @@ code-review step per the carve-out.
         proprietary wordmark and no swap is pending.
       - Verification gate (line 226): change "all four stories" to "all six
         stories" (or "all stories"). Six shipped per the deviations section.
+
+## Round 3 follow-ups (`/pr-review-toolkit:review-pr` re-run after Commits 1-8 shipped)
+
+The third toolkit run on 2026-05-21 surfaced 1 Critical (a CLAUDE.md
+caller-reference violation), 6 Important, and 14 Minor. The must-fix
+subset bundles into three more commits below; Minors defer to a Phase-4
+hardening pass per the YAGNI triage section above.
+
+- [x] **Commit A — Plan catch-up (this commit).** Flip the eight shipped
+      `[ ]` boxes to `[x]` (addresses round-3 M13: the plan claimed no
+      work shipped when in fact all of Commits 2-8 did) and add this
+      Round 3 follow-ups section.
+- [ ] **Commit B — I1 + I2: exhaustive predicate + async-safe onError.**
+      - **I1**: convert `isFilledPageButton` (`types.ts:9-11`) to an
+        exhaustive `switch` with a `never`-typed default branch. A new
+        `PageButtonType` variant now breaks the build at the predicate
+        instead of silently classifying as filled and routing through
+        the press emit. Three round-3 agents converged on this gap.
+      - **I2**: wrap the `onError` call in `useHoldGesture.ts:81-90`
+        with `Promise.resolve(...).catch(...)` so an async handler
+        whose returned promise rejects (e.g., `async (err) => { await
+        logToSentry(err); }`) doesn't drop the rejection on the floor.
+        The docstring already invites the async use case. Add a
+        regression test for an `onError` that throws via promise
+        rejection.
+- [ ] **Commit C — I3 + C1 + I5: missing watcher tests + comment trims.**
+      - **I3a**: `setProps({ initialIdx: N })` test pinning the
+        post-mount `initialIdx` watcher. A mutation that drops the
+        watcher block passes all current tests because the read-time
+        `currentIdx` clamp masks the bug.
+      - **I3b**: `setProps({ pages: shorterPages })` test pinning the
+        `pages.length` shrink watcher.
+      - **C1**: drop the "Pins the I1 fix from the pre-push review"
+        reference at `AstrosMobileRemote.spec.ts:216` — direct
+        CLAUDE.md caller-reference violation.
+      - **I5**: the `useHoldGesture.start()` docstring and
+        `AstrosMobileRemote.vue`'s `handlePanicDown` comment currently
+        form a circular reference (each says "see the other"). Trim
+        the composable docstring to just the invariant; let the
+        consumer comment carry the browser-event rationale (touchstart
+        → synthesized mousedown).
+- [ ] **Commit D — I4 + I6: original-plan drift fixes (plan-only).**
+      - **I4**: `20260521-1135-phase3-mobile-remote-component.md:103`
+        still says "all four stories" — Task 4 is still unchecked, so
+        this is load-bearing for the QA verifier. Fix to "all six
+        stories" (matches the verification-gate fix from Commit 8).
+      - **I6a**: same plan, gotcha #4 (lines 48-50) still claims "the
+        composable must accept both [mouse/touch]" — shipped composable
+        is event-type-agnostic. Rewrite.
+      - **I6b**: same plan, Task 2 description (lines 78-79) says
+        `press(buttonValue: PageButton)` when the shipped emit narrows
+        to `FilledPageButton` after the I6 fix in Commit 5. Update the
+        type.
 
 ## Verification gates
 
