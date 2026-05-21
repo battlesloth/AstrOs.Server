@@ -1,4 +1,22 @@
+import crypto from 'crypto';
+
+const BUTTON_KEYS = [
+  'button1',
+  'button2',
+  'button3',
+  'button4',
+  'button5',
+  'button6',
+  'button7',
+  'button8',
+  'button9',
+] as const satisfies readonly (keyof Omit<M5Page, 'id' | 'name' | 'hasSettings'>)[];
+
+type ButtonKey = (typeof BUTTON_KEYS)[number];
+
 export class M5Page {
+  id: string;
+  name: string;
   button1: PageButton;
   button2: PageButton;
   button3: PageButton;
@@ -9,7 +27,9 @@ export class M5Page {
   button8: PageButton;
   button9: PageButton;
 
-  constructor() {
+  constructor(id?: string, name?: string) {
+    this.id = id ?? crypto.randomUUID();
+    this.name = name ?? '';
     this.button1 = new PageButton('0', 'None');
     this.button2 = new PageButton('0', 'None');
     this.button3 = new PageButton('0', 'None');
@@ -22,15 +42,7 @@ export class M5Page {
   }
 
   hasSettings(): boolean {
-    for (const key in this) {
-      if (Object.prototype.hasOwnProperty.call(this, key)) {
-        const element = this[key] as unknown as PageButton;
-        if (element.id != '0') {
-          return true;
-        }
-      }
-    }
-    return false;
+    return BUTTON_KEYS.some((key: ButtonKey) => this[key].id !== '0');
   }
 }
 
