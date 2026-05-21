@@ -234,7 +234,7 @@ const stopAllLabel = computed(() => {
     <div class="astros-mobile-remote__top-bar">
       <span
         class="astros-mobile-remote__wordmark font-starwars"
-        aria-label="AstrOs"
+        :aria-label="$t('astros')"
       >
         <span class="astros-mobile-remote__wordmark-cap">A</span>str<span
           class="astros-mobile-remote__wordmark-cap"
