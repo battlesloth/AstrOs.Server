@@ -121,7 +121,92 @@ small enough to ship without a separate plan tier:
   60px horizontal threshold, 40px vertical max, swipe-LEFT → next page
   (iOS Photos convention). Multi-touch guard clears any in-progress
   start coords when a second finger lands so two-handed grips don't
-  trigger spurious page flips.
+  trigger spurious page flips. (Subsequently extracted into the
+  `useSwipeGesture` composable — see "Deviations from original plan"
+  below.)
+
+## Deviations from original plan (as shipped)
+
+The task descriptions above describe the original intent. The implementation
+diverged in a handful of small ways; each is noted here so a future reader
+isn't misled by the original text. Commit messages on each implementation
+commit also document these.
+
+- **`useHoldGesture` is a 3-state machine, not 4-state.** Task 1's
+  description sketches `'idle' | 'arming' | 'active' | 'cooldown'`. The
+  implementation collapsed the trailing two into a single `'active'`
+  state because the design's STOPPED visual covers the entire lockout
+  window with no observable distinction between "just-fired" and
+  "cooling down". See `useHoldGesture.ts` header comment for the
+  rationale. Re-introducing `'cooldown'` is straightforward if a future
+  visual treatment needs to distinguish them.
+- **Vacuous-fix guard mutation in Task 1's description was wrong.** The
+  plan claimed reverting `holdMs` to 0 would make the cancel-during-arming
+  test fail, but under `vi.useFakeTimers()` a 0ms callback only fires when
+  time is advanced — and the test DOES advance 300ms before cancel, so
+  the mutation IS caught. The real mutation the test pins is "drop the
+  `clearArmTimer()` from cancel". The spec file's inline comment now
+  enumerates both mutations the test catches.
+- **i18n keys and icon registration landed in Task 2, not Task 3.** Task
+  3's description lists `mobile_remote.*` keys and `MdDescription` /
+  `MdFolder` registration; in practice they shipped in Task 2 because the
+  component cannot render without them. Task 3 became "Storybook stories
+  only" plus the manual visual verification step.
+- **Storybook has six stories, not four.** Task 3 listed Page 1 mixed,
+  Page 2 sparse, Page 3 empty, Compact preview. The implementation also
+  includes `Disconnected` and `EmptyPagesArray` (safety-branch coverage).
+- **CSS approach is scoped BEM with `--mr-*` CSS variables, not Tailwind
+  utility classes.** Task 2's description suggested Tailwind-first with
+  inline style only as fallback; in practice the design needs ~10
+  mobile-remote-specific tokens (panic red, toast slate, base-100/200,
+  border-strong, etc.) that aren't in the global Tailwind config, so
+  scoped-CSS-with-variables is cleaner than ten `bg-[#hex]` arbitrary
+  values per slot. Local to this component; no styles.css change.
+- **Wordmark font is `distant_galaxyregular` (existing) via the
+  `font-starwars` class, not `Audiowide`.** The handoff used Audiowide as
+  a placeholder for the proprietary AstrOs wordmark. The existing
+  `distant_galaxyregular` woff (already loaded by styles.css) IS that
+  proprietary wordmark, so the component uses it directly — no font swap
+  pending.
+- **Icon names are `md-description` / `md-folder` (oh-vue-icons MD set),
+  not `Icon.Doc` / `Icon.Folder`.** The latter was the handoff's React
+  vocabulary; oh-vue-icons's Material Design set uses the
+  `md-description` / `md-folder` IDs.
+- **Swipe gesture extracted to `useSwipeGesture` composable.** Initially
+  inlined into the component (~40 lines). After the pre-push toolkit
+  flagged the multi-touch guard as a defensive feature requiring mutation-
+  test coverage, the swipe state machine was extracted into
+  `composables/useSwipeGesture.ts` with an 11-test spec file. Mirrors the
+  `useHoldGesture` pattern.
+
+## Phase 4 contract requirements (load-bearing for next phase)
+
+These items are intentionally deferred to Phase 4 but must be respected by
+the standalone-route wiring or the operator UX will be misleading or unsafe.
+
+- **Panic delivery confirmation.** The component fires `emit('panic')` and
+  shows the STOPPED visual + "STOP ALL — sent" toast unconditionally. Phase
+  4 MUST gate the STOPPED visual on websocket-PANIC delivery
+  confirmation (either via a `panicStatus: 'idle' | 'sending' | 'sent' |
+  'failed'` prop the component reflects in the toast/visual, or by emitting
+  the panic synchronously and showing the lockout only on success). Safety-
+  critical: a failed panic with confirmed-success feedback would convince
+  the operator the droid stopped when it didn't.
+- **Press delivery confirmation.** Same shape: `emit('press', button)` is
+  fire-and-forget. Phase 4 must surface API/WS failures so the "Sent: {name}"
+  toast doesn't lie. Less critical than panic but still violates the
+  project's no-silent-failure rule.
+- **`connected` prop coupling.** Phase 4 will drive `connected: boolean`
+  from the WebSocket connection store. If the team wants a tri-state
+  (`'connected' | 'connecting' | 'disconnected'`) to show a connecting
+  spinner during retry windows, widen the prop in Phase 4 — the type
+  change is non-breaking for current consumers since `true` still works as
+  the default.
+- **Component-level a11y pass.** Forward-looking per memory's a11y rule:
+  `aria-pressed="mixed"` during arming, `aria-describedby` linking the
+  panic button to its caption, i18n on the wordmark `aria-label`, and
+  considering `role="img"` on the empty-slot buttons since they are not
+  actionable. Batch into the planned a11y pass rather than this PR.
 
 ## Out of scope
 
