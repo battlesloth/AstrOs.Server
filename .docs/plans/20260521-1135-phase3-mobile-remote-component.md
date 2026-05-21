@@ -49,7 +49,11 @@ in `current_project.md`.
    suggested is not needed.)
 4. **`MobileRemote.jsx` uses both mouse and touch handlers** with `preventDefault` on
    touch to suppress synthetic mouse events. Vue's standard `@mousedown` / `@touchstart`
-   bindings won't auto-deduplicate; the composable must accept both.
+   bindings won't auto-deduplicate; the consumer must wire both event types to the same
+   handler and the composable's `start()` must be idempotent so the re-entrant call from
+   the synthesized mousedown absorbs cleanly. (As shipped: `useHoldGesture` is
+   event-type-agnostic — it exposes `start()` / `cancel()` / `reset()` and the consumer
+   does the wiring.)
 5. **The `compact` mode is mostly sizing tweaks**, not a different layout. Specifically:
    `paddingTop` shrinks, font sizes and gap/radius values reduce, the panic button label
    gets tighter. Express as Tailwind class branches via `:class="compact ? ... : ..."`
@@ -73,8 +77,11 @@ in `current_project.md`.
       `astros_vue/src/components/mobileRemote/mobileRemote/AstrosMobileRemote.vue` with
       the props/emits and full layout from the handoff. Props:
       `pages: RemoteControlPage[]`, `initialIdx?: number = 0`, `compact?: boolean = false`,
-      `connected?: boolean = true`. Emits: `press(buttonValue: PageButton)`,
-      `panic()`. Local state: `idx`, `pressed` (button id during 220ms press flash),
+      `connected?: boolean = true`. Emits: `press(buttonValue: FilledPageButton)`,
+      `panic()`. (As shipped: the press payload is narrowed to `FilledPageButton`
+      via the `isFilledPageButton` type guard so consumers can switch on a
+      script-or-playlist discriminator without a dead `none` branch.)
+      Local state: `idx`, `pressed` (button id during 220ms press flash),
       `toastMessage`. Uses `useHoldGesture` for the panic button. Layout: orange top bar
       (`bg-r2-complement` — wordmark "AstrOs" in `Audiowide`, conditional Connected
       chip with `bg-success` dot), page header (page name + "{idx+1} / {total}"
@@ -100,7 +107,8 @@ in `current_project.md`.
       `mobile_remote.stop_all_caption`, `mobile_remote.empty_slot_aria`. Add barrel
       export in `astros_vue/src/components/mobileRemote/index.ts`.
 - [ ] **Task 4 — Manual visual verification + Storybook check.** Run `npm run
-      storybook` and verify all four stories render: filled buttons show the correct
+      storybook` and verify all six stories render (Page1Mixed, Page2Sparse,
+      Page3Empty, CompactPreview, Disconnected, EmptyPagesArray): filled buttons show the correct
       type chip, empty slots show the dashed-border em-dash, the pagination dot
       elongates on the active page, the panic button arming-fill animation runs to
       completion in 600ms and the active state locks for 2.2s. No automated coverage
