@@ -13,6 +13,10 @@ const props = defineProps({
     type: Array as PropType<RemoteControlPage[]>,
     required: true,
   },
+  // Out-of-range values (negative, or >= pages.length) clamp to the nearest
+  // valid page rather than no-op. Parents that want "leave the current page
+  // alone" should omit the prop or pass the existing current index, not a
+  // sentinel like -1.
   initialIdx: {
     type: Number,
     default: 0,
@@ -37,16 +41,21 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-const idx = ref(props.initialIdx);
-// Keep idx in sync if the parent reseats initialIdx (mirrors the React
-// useEffect in mobileRemote.jsx). Important for Phase 2's preview rail
-// where the editor switches selected page.
+function clampIdx(value: number, pageCount: number): number {
+  if (pageCount <= 0) return 0;
+  return Math.min(Math.max(0, value), pageCount - 1);
+}
+
+// Initial-mount clamp: an out-of-range initialIdx (parent passes 10 with
+// pages.length=3) used to leak into the pagination header text and the
+// next-button disabled check until the first prop change fired the watcher.
+const idx = ref(clampIdx(props.initialIdx, props.pages.length));
+
+// Reseat idx if the parent updates initialIdx after mount.
 watch(
   () => props.initialIdx,
   (next) => {
-    if (next >= 0 && next < props.pages.length) {
-      idx.value = next;
-    }
+    idx.value = clampIdx(next, props.pages.length);
   },
 );
 
@@ -56,11 +65,7 @@ watch(
 watch(
   () => props.pages.length,
   (newLen) => {
-    if (newLen === 0) {
-      idx.value = 0;
-      return;
-    }
-    if (idx.value >= newLen) idx.value = newLen - 1;
+    idx.value = clampIdx(idx.value, newLen);
   },
 );
 
@@ -114,15 +119,15 @@ const panic = useHoldGesture({
   },
 });
 
-// Defensive clamp at read-time so initial-mount or mid-prop-update windows
-// (where idx is set but the matching watcher hasn't yet fired) don't surface
-// the empty-state branch when valid pages exist. The clamp also covers the
-// out-of-range initialIdx case at construction (the watchers below clamp on
-// changes but not on the initial value).
+// Defensive clamp at read-time so mid-prop-update windows (idx is set but
+// the matching watcher hasn't yet fired) don't surface the empty-state
+// branch when valid pages exist. All template bindings that need to show
+// the current index — pagination header, prev/next disabled, dot highlight
+// — read through `currentIdx` so an out-of-range raw idx can never leak.
+const currentIdx = computed(() => clampIdx(idx.value, props.pages.length));
 const currentPage = computed<RemoteControlPage | null>(() => {
   if (props.pages.length === 0) return null;
-  const safeIdx = Math.min(Math.max(0, idx.value), props.pages.length - 1);
-  return props.pages[safeIdx] ?? null;
+  return props.pages[currentIdx.value] ?? null;
 });
 const totalPages = computed(() => props.pages.length);
 
@@ -165,11 +170,11 @@ function handlePress(button: PageButton) {
 }
 
 function goPrev() {
-  if (idx.value > 0) idx.value -= 1;
+  if (currentIdx.value > 0) idx.value = currentIdx.value - 1;
 }
 
 function goNext() {
-  if (idx.value < totalPages.value - 1) idx.value += 1;
+  if (currentIdx.value < totalPages.value - 1) idx.value = currentIdx.value + 1;
 }
 
 function selectPage(target: number) {
@@ -254,7 +259,9 @@ const stopAllLabel = computed(() => {
       class="astros-mobile-remote__page-header"
     >
       <span class="astros-mobile-remote__page-name">{{ currentPage.name }}</span>
-      <span class="astros-mobile-remote__page-pagination"> {{ idx + 1 }} / {{ totalPages }} </span>
+      <span class="astros-mobile-remote__page-pagination">
+        {{ currentIdx + 1 }} / {{ totalPages }}
+      </span>
     </div>
     <div
       v-else
@@ -317,7 +324,7 @@ const stopAllLabel = computed(() => {
       <button
         type="button"
         class="astros-mobile-remote__page-nav"
-        :disabled="idx === 0"
+        :disabled="totalPages === 0 || currentIdx === 0"
         :aria-label="$t('mobile_remote.prev_page_aria')"
         @click="goPrev"
       >
@@ -329,16 +336,16 @@ const stopAllLabel = computed(() => {
           :key="page.id"
           type="button"
           class="astros-mobile-remote__dot"
-          :class="{ 'astros-mobile-remote__dot--active': i === idx }"
+          :class="{ 'astros-mobile-remote__dot--active': i === currentIdx }"
           :aria-label="$t('mobile_remote.dot_aria', { number: i + 1 })"
-          :aria-current="i === idx ? 'page' : undefined"
+          :aria-current="i === currentIdx ? 'page' : undefined"
           @click="selectPage(i)"
         ></button>
       </div>
       <button
         type="button"
         class="astros-mobile-remote__page-nav"
-        :disabled="idx === totalPages - 1"
+        :disabled="totalPages === 0 || currentIdx === totalPages - 1"
         :aria-label="$t('mobile_remote.next_page_aria')"
         @click="goNext"
       >
