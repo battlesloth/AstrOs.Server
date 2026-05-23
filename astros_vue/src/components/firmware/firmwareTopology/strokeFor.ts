@@ -24,8 +24,15 @@ export function strokeFor(input: StrokeForInput): string {
   if (phase === 'failed') {
     // Set-based membership so the multi-failure case (deploy bails on every
     // target, bus-wide ESP-NOW failure) paints every failed node red rather
-    // than only the first one.
-    return failedControllerIds?.has(controllerId)
+    // than only the first one. When attribution is missing entirely
+    // (undefined set, or empty set on a job whose every FAILED entry got
+    // swept from pendingByMac with the raw MAC) we paint the failure stroke
+    // anyway — the failed phase is authoritative, and rendering green on a
+    // failed job is the exact regression class this surface exists to prevent.
+    if (failedControllerIds === undefined || failedControllerIds.size === 0) {
+      return TOPOLOGY_STROKE_COLORS.failure;
+    }
+    return failedControllerIds.has(controllerId)
       ? TOPOLOGY_STROKE_COLORS.failure
       : TOPOLOGY_STROKE_COLORS.success;
   }

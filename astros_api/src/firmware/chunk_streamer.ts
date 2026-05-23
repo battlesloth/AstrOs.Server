@@ -201,17 +201,27 @@ export class ChunkStreamer {
         `source size mismatch for ${spec.source.path}: expected ${spec.source.sizeBytes} bytes, read ${sourceBuffer.length}`,
       );
     }
-    // Diagnostic: re-hash sourceBuffer and compare to spec.source.sha256.
-    // If they diverge, the on-disk .bin was modified between cache.fetch()
-    // and this readFile — proves a cache-sha-drift bug rather than a
-    // wire-layer fault when the master later reports HASH_MISMATCH.
-    {
-      const reHash = crypto.createHash('sha256').update(sourceBuffer).digest('hex');
-      if (reHash !== spec.source.sha256) {
-        logger.warn(
-          `cache-sha-drift transferId=${spec.transferId} path=${spec.source.path} sizeBytes=${spec.source.sizeBytes} specSha=${spec.source.sha256} reHash=${reHash}`,
-        );
-      }
+    // Re-hash sourceBuffer and fast-fail if it diverges from spec.source.sha256.
+    // Drift means the on-disk .bin was modified between cache.fetch() and this
+    // readFile — distinct from a wire-layer fault. Streaming the bad bytes
+    // would still abort at the master (HASH_MISMATCH on END_ACK), but that
+    // costs a full UART transfer (~minutes on 1+ MB images) and presents the
+    // operator with a "retry" remediation when the right one is "re-cache".
+    // The 'source_sha_mismatch' code routes through the orchestrator
+    // identically to 'source_size_mismatch' (pre-subscribe path, no cleanup
+    // needed) and carries its own locale string telling the operator to
+    // re-fetch rather than retry. The logger.warn line is preserved as a
+    // grep-friendly forensic breadcrumb in addition to the typed error.
+    const reHash = crypto.createHash('sha256').update(sourceBuffer).digest('hex');
+    if (reHash !== spec.source.sha256) {
+      logger.warn(
+        `cache-sha-drift transferId=${spec.transferId} path=${spec.source.path} sizeBytes=${spec.source.sizeBytes} specSha=${spec.source.sha256} reHash=${reHash}`,
+      );
+      throw new TransferError(
+        'source_sha_mismatch',
+        spec.transferId,
+        `cache-sha-drift for ${spec.source.path}: manifest sha=${spec.source.sha256} reHash=${reHash}`,
+      );
     }
     const totalChunks = Math.max(1, Math.ceil(sourceBuffer.length / this.config.chunkSizeBytes));
     const lastSeq = totalChunks - 1;

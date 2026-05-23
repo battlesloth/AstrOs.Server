@@ -187,6 +187,7 @@ export const FLASH_ERROR_REASONS = [
   // — each gets its own bench-actionable copy.
   'source_read_failed',
   'source_size_mismatch',
+  'source_sha_mismatch',
   'begin_timeout',
   'begin_rejected',
   'chunk_retry_exhausted',

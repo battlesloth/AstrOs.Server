@@ -59,11 +59,16 @@ describe('strokeFor', () => {
     ).toBe(TOPOLOGY_STROKE_COLORS.success);
   });
 
-  it('returns success for any selected controller in `failed` when failedControllerIds is undefined or empty', () => {
-    expect(strokeFor({ ...base, phase: 'failed' })).toBe(TOPOLOGY_STROKE_COLORS.success);
+  it('paints failure (not success) when phase is `failed` but attribution is missing', () => {
+    // Pessimistic default: a job in the failed phase whose per-controller
+    // attribution was lost (e.g., every FAILED entry was unmapped and got
+    // swept from pendingByMac into a raw-MAC list the topology can't match,
+    // or the parent passed undefined) must NOT render the selected nodes
+    // green. The failed phase is authoritative.
+    expect(strokeFor({ ...base, phase: 'failed' })).toBe(TOPOLOGY_STROKE_COLORS.failure);
     expect(
       strokeFor({ ...base, phase: 'failed', failedControllerIds: new Set<string>() }),
-    ).toBe(TOPOLOGY_STROKE_COLORS.success);
+    ).toBe(TOPOLOGY_STROKE_COLORS.failure);
   });
 
   it('returns masterFlashing only for the master while flashing', () => {

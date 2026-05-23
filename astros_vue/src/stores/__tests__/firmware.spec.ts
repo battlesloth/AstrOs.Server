@@ -1541,6 +1541,37 @@ describe('firmware store', () => {
         expect(store.phase).toBe('done');
         expect(store.failedControllers).toEqual([]);
       });
+
+      it('preserves FAILED entries from pendingByMac in failedControllers (parallel to applyJobFailed)', () => {
+        // Without this sweep, a deploy-time FAILED for an unmapped padawan
+        // would sit in pendingByMac, get wiped by the pendingByMac.value =
+        // new Map() at the bottom of applyJobDone, and the job would render
+        // as green-success — the exact green-on-failure regression class
+        // this re-routing was added to prevent.
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          const store = useFirmwareStore();
+          seedSampleFleet();
+          store.applyJobStarted(sampleJobState({ jobId: 'job-1' }));
+          store.applyControllerUpdate({
+            controllerId: 'aa:bb:cc:dd:ee:99',
+            stage: 'FAILED',
+            error: 'esp_now timeout',
+          });
+          expect(store.pendingByMac.get('aa:bb:cc:dd:ee:99')?.length).toBe(1);
+
+          store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-14T08:01:00Z' });
+
+          expect(store.phase).toBe('failed');
+          const failedIds = store.failedControllers.map((c) => c.id);
+          expect(failedIds).toContain('aa:bb:cc:dd:ee:99');
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain(
+            'FAILED entry for unmapped MAC',
+          );
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
     });
   });
 

@@ -538,21 +538,40 @@ export const useFirmwareStore = defineStore('firmware', () => {
     // "all updated". `currentStage.value` is preserved at this point so
     // the FailedControllerSummary's stage field reflects where the job
     // actually stopped (e.g. 'transfer' when a deploy step bails).
-    const finalStates = [...normalized.values()];
-    const anyFailed = finalStates.some((s) => s.stage === 'FAILED');
-    if (anyFailed) {
-      const failed: FailedControllerSummary[] = [];
-      for (const state of normalized.values()) {
-        if (state.stage === 'FAILED') {
-          const slot = state.controllerId;
-          const c = controllers.value.find((x) => x.id === slot);
+    const failed: FailedControllerSummary[] = [];
+    for (const state of normalized.values()) {
+      if (state.stage === 'FAILED') {
+        const slot = state.controllerId;
+        const c = controllers.value.find((x) => x.id === slot);
+        failed.push({
+          id: slot,
+          label: c?.label ?? slot,
+          stage: currentStage.value,
+        });
+      }
+    }
+    // Sweep pendingByMac for FAILED entries whose MAC never got mapped to a
+    // slot (LocationStatus race — same hazard `applyJobFailed` handles below).
+    // Without this, a deploy-time FAILED for an unmapped padawan would land
+    // in pendingByMac, get dropped by the wipe at the bottom of this function,
+    // and the job would render as green-success — the exact regression class
+    // this branch was added to prevent.
+    for (const [mac, queue] of pendingByMac.value) {
+      for (const entry of queue) {
+        if (entry.stage === 'FAILED') {
+          console.warn(
+            `[firmwareStore] applyJobDone: FAILED entry for unmapped MAC="${mac}" ` +
+              `surfaced from pendingByMac. LocationStatus never arrived; using MAC as label.`,
+          );
           failed.push({
-            id: slot,
-            label: c?.label ?? slot,
+            id: mac as SlotId,
+            label: mac,
             stage: currentStage.value,
           });
         }
       }
+    }
+    if (failed.length > 0) {
       failedControllers.value = failed;
       phase.value = 'failed';
     } else {
