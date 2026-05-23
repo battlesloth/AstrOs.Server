@@ -55,9 +55,7 @@ if (import.meta.env.DEV) {
       );
     }
     if (props.failedControllerIds !== undefined) {
-      const fleetIds = new Set(
-        [props.fleet.master, ...props.fleet.padawans].map((c) => c.id),
-      );
+      const fleetIds = new Set([props.fleet.master, ...props.fleet.padawans].map((c) => c.id));
       const unknown = [...props.failedControllerIds].filter((id) => !fleetIds.has(id));
       if (unknown.length > 0) {
         console.warn(
@@ -111,9 +109,7 @@ function padawanLineStroke(c: TopologyController): string {
 // `isPadawanLineActive` encodes the serial-upload vs. deploy distinction
 // (see its docstring for the stage mapping). Selection is layered on here
 // because an unselected padawan never animates regardless of sub-phase.
-const padawanLineActive = computed(() =>
-  isPadawanLineActive(props.phase, props.currentStage),
-);
+const padawanLineActive = computed(() => isPadawanLineActive(props.phase, props.currentStage));
 
 function padawanLineDash(c: TopologyController): string {
   return padawanLineActive.value && isSelected(c) ? '4 4' : '0';

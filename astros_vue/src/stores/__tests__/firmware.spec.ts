@@ -1565,9 +1565,7 @@ describe('firmware store', () => {
           expect(store.phase).toBe('failed');
           const failedIds = store.failedControllers.map((c) => c.id);
           expect(failedIds).toContain('aa:bb:cc:dd:ee:99');
-          expect(warnSpy.mock.calls.flat().join(' ')).toContain(
-            'FAILED entry for unmapped MAC',
-          );
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain('FAILED entry for unmapped MAC');
         } finally {
           warnSpy.mockRestore();
         }

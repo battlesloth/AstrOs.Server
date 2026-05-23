@@ -116,8 +116,7 @@ const rows = computed<StageRow[]>(() =>
           v-if="row.state === 'current'"
           class="astros-firmware-stages-list__in-progress"
         >
-          <template
-            v-if="row.stage === 'download' && typeof downloadPercent === 'number'"
+          <template v-if="row.stage === 'download' && typeof downloadPercent === 'number'"
             >{{ downloadPercent }}%</template
           >
           <template v-else>{{ t('firmware_view.stages.in_progress') }}</template>

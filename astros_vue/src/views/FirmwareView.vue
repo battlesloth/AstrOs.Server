@@ -126,9 +126,7 @@ const selectedControllerList = computed<FirmwareControllerView[]>(() =>
 // FailedControllerSummary build sites in applyJobDone / applyJobFailed).
 // `failedControllerLabels` returns `''` on no failures; the template coerces
 // to `undefined` via `|| undefined` so the panel's result bar skips rendering.
-const failedControllerIds = computed(
-  () => new Set(failedControllers.value.map((c) => c.id)),
-);
+const failedControllerIds = computed(() => new Set(failedControllers.value.map((c) => c.id)));
 const failedControllerLabels = computed(() =>
   failedControllers.value.map((c) => c.label).join(', '),
 );

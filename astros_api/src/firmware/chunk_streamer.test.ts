@@ -87,11 +87,7 @@ async function writeTempFirmware(bytes: Buffer): Promise<string> {
 // file doesn't exist on disk — that branch is what the source_read_failed
 // tests intentionally exercise; re-throwing the ENOENT here would fail
 // those tests before the streamer ever ran.
-function specFor(
-  filePath: string,
-  sizeBytes: number,
-  opts?: { sha256?: string },
-): TransferSpec {
+function specFor(filePath: string, sizeBytes: number, opts?: { sha256?: string }): TransferSpec {
   let sha256 = opts?.sha256;
   if (sha256 === undefined) {
     try {
