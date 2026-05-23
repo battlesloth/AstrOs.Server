@@ -1,6 +1,7 @@
-import type { FirmwarePhase } from '@/types/firmware';
+import type { FirmwarePhase, FirmwareStage } from '@/types/firmware';
 
 export type TopologyPhase = FirmwarePhase;
+export type TopologyStage = FirmwareStage;
 
 export interface TopologyController {
   id: string;
@@ -23,6 +24,15 @@ export interface TopologyProps {
   /** Must be non-null whenever `phase !== 'select'`. */
   target: string | null;
   phase: TopologyPhase;
+  /**
+   * Sub-phase signal used only when `phase === 'flashing'` to distinguish
+   * the serial-upload step (`'download'`, or `null` before the first
+   * controller-update lands) from later steps. During serial upload only
+   * the source → master line animates; the master → padawan lines stay
+   * solid because no ESP-NOW traffic is flowing yet. Optional in
+   * non-flashing phases.
+   */
+  currentStage?: TopologyStage | null;
   /** Consulted only when `phase === 'failed'`. Stroke turns red only if this id is also in `selectedIds`. */
   failedControllerId?: string;
 }

@@ -47,12 +47,29 @@ export const SelectAllSelected: Story = {
   },
 };
 
-export const Flashing: Story = {
+// Serial-upload sub-phase: server → master via UART. The source → master
+// line animates; the master → padawan lines must stay solid because no
+// ESP-NOW traffic is flowing yet.
+export const FlashingSerialUpload: Story = {
   args: {
     fleet: SAMPLE_FLEET,
     selectedIds: ALL_SELECTED,
     target: 'v1.4.2',
     phase: 'flashing',
+    currentStage: 'download',
+  },
+};
+
+// Deploy sub-phase: master → padawans via ESP-NOW. Selected padawan lines
+// animate; the source → master line continues to render the "this is the
+// firmware being delivered" association.
+export const FlashingDeployTransfer: Story = {
+  args: {
+    fleet: SAMPLE_FLEET,
+    selectedIds: ALL_SELECTED,
+    target: 'v1.4.2',
+    phase: 'flashing',
+    currentStage: 'transfer',
   },
 };
 

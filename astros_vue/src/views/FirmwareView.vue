@@ -300,6 +300,7 @@ onMounted(async () => {
                 :selected-ids="[...selectedControllerIds]"
                 :target="target"
                 :phase="phase"
+                :current-stage="currentStage"
                 :failed-controller-id="failedControllerId"
               />
               <AstrosFirmwareStagesList

@@ -3,6 +3,7 @@ import { computed, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { TopologyController, TopologyProps } from './types';
 import { strokeFor as computeStroke, TOPOLOGY_STROKE_COLORS } from './strokeFor';
+import { isPadawanLineActive } from './padawanLineActive';
 
 const props = defineProps<TopologyProps>();
 
@@ -106,12 +107,19 @@ function padawanLineStroke(c: TopologyController): string {
   return COLOR.lineUnselected;
 }
 
+// `isPadawanLineActive` encodes the serial-upload vs. deploy distinction
+// (see its docstring for the stage mapping). Selection is layered on here
+// because an unselected padawan never animates regardless of sub-phase.
+const padawanLineActive = computed(() =>
+  isPadawanLineActive(props.phase, props.currentStage),
+);
+
 function padawanLineDash(c: TopologyController): string {
-  return isFlashing.value && isSelected(c) ? '4 4' : '0';
+  return padawanLineActive.value && isSelected(c) ? '4 4' : '0';
 }
 
 function padawanLineFlowing(c: TopologyController): boolean {
-  return isFlashing.value && isSelected(c);
+  return padawanLineActive.value && isSelected(c);
 }
 
 function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
