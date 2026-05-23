@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { PageButton } from '@/models/remoteControl/pageButton';
+import { NONE_BUTTON, type PageButton } from '@/models/remoteControl/pageButton';
 import type { EditorTab, EditorListItem } from './types';
 
 const { t } = useI18n();
@@ -9,8 +9,8 @@ const { t } = useI18n();
 const props = defineProps<{
   buttonNumber: number;
   currentValue: PageButton;
-  scripts: EditorListItem[];
-  playlists: EditorListItem[];
+  scripts: readonly EditorListItem[];
+  playlists: readonly EditorListItem[];
 }>();
 
 const emit = defineEmits<{
@@ -18,12 +18,40 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-const initialTab: EditorTab = props.currentValue.type === 'playlist' ? 'playlist' : 'script';
-const tab = ref<EditorTab>(initialTab);
+function resolveInitialTab(type: PageButton['type']): EditorTab {
+  switch (type) {
+    case 'playlist':
+      return 'playlist';
+    case 'script':
+    case 'none':
+      return 'script';
+    default: {
+      // Exhaustiveness check — a new PageButtonType variant breaks the build
+      // here and forces the editor's tab logic to be updated explicitly.
+      const _exhaustive: never = type;
+      return _exhaustive;
+    }
+  }
+}
+
+const tab = ref<EditorTab>(resolveInitialTab(props.currentValue.type));
 const query = ref('');
 
-const items = computed<EditorListItem[]>(() => {
-  const source = tab.value === 'script' ? props.scripts : props.playlists;
+function sourceForTab(t: EditorTab): readonly EditorListItem[] {
+  switch (t) {
+    case 'script':
+      return props.scripts;
+    case 'playlist':
+      return props.playlists;
+    default: {
+      const _exhaustive: never = t;
+      return _exhaustive;
+    }
+  }
+}
+
+const items = computed<readonly EditorListItem[]>(() => {
+  const source = sourceForTab(tab.value);
   const q = query.value.trim().toLowerCase();
   if (q.length === 0) return source;
   return source.filter((i) => i.name.toLowerCase().includes(q));
@@ -34,7 +62,7 @@ function selectItem(item: EditorListItem) {
 }
 
 function selectNone() {
-  emit('change', { id: '0', name: 'None', type: 'none' });
+  emit('change', NONE_BUTTON);
 }
 
 const rootRef = ref<HTMLDivElement | null>(null);

@@ -2,7 +2,7 @@
 import { computed, onMounted, onScopeDispose, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
-import type { PageButton } from '@/models/remoteControl/pageButton';
+import { NONE_BUTTON, type PageButton } from '@/models/remoteControl/pageButton';
 import type { EditorListItem } from '../remoteButtonEditor/types';
 import AstrosRemoteButtonEditor from '../remoteButtonEditor/AstrosRemoteButtonEditor.vue';
 
@@ -11,8 +11,8 @@ const { t } = useI18n();
 const props = defineProps<{
   buttonNumber: number;
   value: PageButton;
-  scripts: EditorListItem[];
-  playlists: EditorListItem[];
+  scripts: readonly EditorListItem[];
+  playlists: readonly EditorListItem[];
 }>();
 
 const emit = defineEmits<{
@@ -21,16 +21,36 @@ const emit = defineEmits<{
 
 const isAssigned = computed(() => props.value.type !== 'none');
 
-const typeChipClasses = computed(() =>
-  props.value.type === 'playlist'
-    ? 'bg-warning/15 text-warning-content border border-warning/40'
-    : 'bg-primary/15 text-primary border border-primary/40',
-);
+// Switch (not ternary) so a new PageButtonType variant breaks the build here
+// and forces both chip styling and chip labelling to be updated explicitly.
+const typeChipClasses = computed(() => {
+  switch (props.value.type) {
+    case 'playlist':
+      return 'bg-warning/15 text-warning-content border border-warning/40';
+    case 'script':
+      return 'bg-primary/15 text-primary border border-primary/40';
+    case 'none':
+      return '';
+    default: {
+      const _exhaustive: never = props.value.type;
+      return _exhaustive;
+    }
+  }
+});
 
 const typeChipLabel = computed(() => {
-  if (props.value.type === 'script') return t('remote_control_config.card.type_script');
-  if (props.value.type === 'playlist') return t('remote_control_config.card.type_playlist');
-  return '';
+  switch (props.value.type) {
+    case 'script':
+      return t('remote_control_config.card.type_script');
+    case 'playlist':
+      return t('remote_control_config.card.type_playlist');
+    case 'none':
+      return '';
+    default: {
+      const _exhaustive: never = props.value.type;
+      return _exhaustive;
+    }
+  }
 });
 
 const popoverOpen = ref(false);
@@ -57,7 +77,7 @@ function handleChange(value: PageButton) {
 }
 
 function clearAssignment() {
-  emit('change', { id: '0', name: 'None', type: 'none' });
+  emit('change', NONE_BUTTON);
 }
 
 function handleClickOutside(e: MouseEvent) {
