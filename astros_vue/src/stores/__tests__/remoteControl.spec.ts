@@ -672,13 +672,14 @@ describe('remoteControl store', () => {
   });
 
   describe('renamePage', () => {
-    it('updates the name at the given index', async () => {
+    it('updates the name at the given index and returns true', async () => {
       apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
 
-      store.renamePage(0, 'Quick Actions');
+      const applied = store.renamePage(0, 'Quick Actions');
 
+      expect(applied).toBe(true);
       expect(store.remoteControlPages[0]!.name).toBe('Quick Actions');
     });
 
@@ -692,38 +693,45 @@ describe('remoteControl store', () => {
       expect(store.remoteControlPages[0]!.name).toBe('Performance');
     });
 
-    it('no-ops on empty string (does not overwrite existing name or set dirty)', async () => {
+    it('returns false and no-ops on empty string', async () => {
       apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'Original' }]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
 
-      store.renamePage(0, '');
+      const applied = store.renamePage(0, '');
 
+      expect(applied).toBe(false);
       expect(store.remoteControlPages[0]!.name).toBe('Original');
       expect(store.isDirty).toBe(false);
     });
 
-    it('no-ops on whitespace-only string', async () => {
+    it('returns false and no-ops on whitespace-only string', async () => {
       apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'Original' }]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
 
-      store.renamePage(0, '   \t  ');
+      const applied = store.renamePage(0, '   \t  ');
 
+      expect(applied).toBe(false);
       expect(store.remoteControlPages[0]!.name).toBe('Original');
       expect(store.isDirty).toBe(false);
     });
 
-    it('no-ops on out-of-range idx', async () => {
+    it('returns false, warns, and no-ops on out-of-range idx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
 
-      store.renamePage(99, 'NewName');
-      store.renamePage(-1, 'NewName');
+      const high = store.renamePage(99, 'NewName');
+      const low = store.renamePage(-1, 'NewName');
 
+      expect(high).toBe(false);
+      expect(low).toBe(false);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
       expect(store.remoteControlPages[0]!.name).toBe('Page 1');
       expect(store.isDirty).toBe(false);
+      warnSpy.mockRestore();
     });
 
     it('flips isDirty to true on a valid rename', async () => {
