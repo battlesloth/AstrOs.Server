@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onScopeDispose, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { makeNoneButton, type PageButton } from '@/models/remoteControl/pageButton';
+import { assertNever } from '@/utils/assertNever';
 import type { EditorListItem } from '../remoteButtonEditor/types';
 import AstrosRemoteButtonEditor from '../remoteButtonEditor/AstrosRemoteButtonEditor.vue';
 
@@ -31,10 +32,8 @@ const typeChipClasses = computed(() => {
       return 'bg-primary/15 text-primary border border-primary/40';
     case 'none':
       return '';
-    default: {
-      const _exhaustive: never = props.value.type;
-      return _exhaustive;
-    }
+    default:
+      return assertNever(props.value.type);
   }
 });
 
@@ -46,10 +45,8 @@ const typeChipLabel = computed(() => {
       return t('remote_control_config.card.type_playlist');
     case 'none':
       return '';
-    default: {
-      const _exhaustive: never = props.value.type;
-      return _exhaustive;
-    }
+    default:
+      return assertNever(props.value.type);
   }
 });
 

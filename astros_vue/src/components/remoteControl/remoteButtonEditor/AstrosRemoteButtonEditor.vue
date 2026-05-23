@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { makeNoneButton, type PageButton } from '@/models/remoteControl/pageButton';
+import { assertNever } from '@/utils/assertNever';
 import type { EditorTab, EditorListItem } from './types';
 
 const { t } = useI18n();
@@ -25,12 +26,8 @@ function resolveInitialTab(type: PageButton['type']): EditorTab {
     case 'script':
     case 'none':
       return 'script';
-    default: {
-      // Exhaustiveness check — a new PageButtonType variant breaks the build
-      // here and forces the editor's tab logic to be updated explicitly.
-      const _exhaustive: never = type;
-      return _exhaustive;
-    }
+    default:
+      return assertNever(type);
   }
 }
 
@@ -43,10 +40,8 @@ function sourceForTab(t: EditorTab): readonly EditorListItem[] {
       return props.scripts;
     case 'playlist':
       return props.playlists;
-    default: {
-      const _exhaustive: never = t;
-      return _exhaustive;
-    }
+    default:
+      return assertNever(t);
   }
 }
 
