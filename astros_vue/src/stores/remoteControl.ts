@@ -164,7 +164,12 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
 
   function duplicatePage(idx: number) {
     const src = remoteControlPages.value[idx];
-    if (!src) return;
+    if (!src) {
+      console.warn(
+        `[remoteControl] duplicatePage: idx ${idx} out of range (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
     const copy: RemoteControlPage = {
       ...src,
       id: crypto.randomUUID(),

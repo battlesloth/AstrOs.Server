@@ -515,7 +515,45 @@ describe('remoteControl store', () => {
       expect(store.isDirty).toBe(true);
     });
 
-    it('no-ops on out-of-range index (negative or beyond end)', async () => {
+    it('inserts the copy at idx+1 and selects it when duplicating a non-zero index', async () => {
+      // Pins the `splice(idx + 1, 0, copy)` and `selectedIdx = idx + 1`
+      // math. The previous coverage only exercised idx=0, where a mutation
+      // to a constant `1` would still pass.
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(1);
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'B (copy)', 'C']);
+      expect(store.selectedIdx).toBe(2);
+    });
+
+    it('moves selection to the copy even when a higher page was previously selected', async () => {
+      // The selectedIdx-above-target case: when the user is on page C (idx=2)
+      // and duplicates page A (idx=0), the implementation jumps selection to
+      // the copy at idx=1. This pins that contract — discoverability of the
+      // new page wins over preserving the user's prior selection. Phase 2d
+      // UI can revisit if the surprise becomes a usability issue.
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      store.duplicatePage(0);
+
+      expect(store.selectedIdx).toBe(1);
+      expect(store.remoteControlPages).toHaveLength(4);
+    });
+
+    it('warns and no-ops on out-of-range index (negative or beyond end)', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
@@ -525,6 +563,8 @@ describe('remoteControl store', () => {
 
       expect(store.remoteControlPages).toHaveLength(1);
       expect(store.isDirty).toBe(false);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      warnSpy.mockRestore();
     });
   });
 
