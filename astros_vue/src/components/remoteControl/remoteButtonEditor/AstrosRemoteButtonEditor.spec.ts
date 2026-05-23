@@ -104,6 +104,47 @@ describe('AstrosRemoteButtonEditor', () => {
     expect(wrapper.find('[data-testid="editor-empty"]').exists()).toBe(true);
   });
 
+  it('treats a whitespace-only query as empty (pins the .trim() in items)', async () => {
+    // A query of '   ' should render all items, not the empty state.
+    // Without .trim() in the items computed, three spaces become a real
+    // filter and no item names contain three consecutive spaces.
+    const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
+      props: {
+        buttonNumber: 5,
+        currentValue: mkNoneButton(),
+        scripts: SCRIPTS,
+        playlists: PLAYLISTS,
+      },
+    });
+    await wrapper.get('[data-testid="editor-search"]').setValue('   ');
+    expect(wrapper.text()).toContain('Wave Hello');
+    expect(wrapper.text()).toContain('Bow');
+    expect(wrapper.find('[data-testid="editor-empty"]').exists()).toBe(false);
+  });
+
+  it('preserves the search query when the user switches tabs', async () => {
+    // Pins the current behavior: tab switch does NOT clear the search query.
+    // The query filters whichever tab's list is active at filter time.
+    const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
+      props: {
+        buttonNumber: 5,
+        currentValue: mkNoneButton(),
+        scripts: SCRIPTS,
+        playlists: [...PLAYLISTS, { id: 'p3', name: 'Wave Routine' }],
+      },
+    });
+    await wrapper.get('[data-testid="editor-search"]').setValue('wave');
+    expect(wrapper.text()).toContain('Wave Hello');
+
+    await wrapper.get('[data-testid="editor-tab-playlist"]').trigger('click');
+
+    expect(wrapper.text()).toContain('Wave Routine');
+    expect(wrapper.text()).not.toContain('Morning Routine');
+    expect(wrapper.text()).not.toContain('Wave Hello');
+  });
+
   it('tab switch does NOT auto-clear current value', async () => {
     // Pins the no-auto-clear behavior so a future "clear on tab switch" change
     // can't slip through silently.
