@@ -557,7 +557,29 @@ describe('remoteControl store', () => {
       expect(store.isDirty).toBe(false);
     });
 
-    it('clamps selectedIdx when deleting the currently-selected last page', async () => {
+    it('moves selectedIdx back when deleting the currently-selected mid-list page', async () => {
+      // Contract: when the user deletes the page they're viewing, selection
+      // moves to the PREVIOUS sibling — the user's mental position is
+      // preserved rather than jumping forward to whichever page took the
+      // deleted slot. Cf. most file managers / tab strips.
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(1);
+
+      store.deletePage(1);
+
+      expect(store.selectedIdx).toBe(0);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('A');
+    });
+
+    it('moves selectedIdx back to previous page when deleting the currently-selected last page', async () => {
       apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
@@ -566,6 +588,39 @@ describe('remoteControl store', () => {
       store.deletePage(2);
 
       expect(store.selectedIdx).toBe(1);
+    });
+
+    it('keeps selectedIdx at 0 when deleting the first (selected) page', async () => {
+      // Edge of the "move back" rule: there is no page further back, so
+      // selection stays at 0 (the page that USED to be at idx 1 is now at 0).
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(0);
+
+      store.deletePage(0);
+
+      expect(store.selectedIdx).toBe(0);
+      expect(store.remoteControlPages[0]!.name).toBe('B');
+    });
+
+    it('warns on out-of-range deletePage idx (programming-error breadcrumb)', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(-1);
+      store.deletePage(99);
+
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      warnSpy.mockRestore();
     });
 
     it('shifts selectedIdx down when deleting a page below the current selection', async () => {
@@ -602,6 +657,7 @@ describe('remoteControl store', () => {
     });
 
     it('no-ops on out-of-range idx without changing pages or isDirty', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
@@ -611,6 +667,7 @@ describe('remoteControl store', () => {
 
       expect(store.remoteControlPages).toHaveLength(2);
       expect(store.isDirty).toBe(false);
+      warnSpy.mockRestore();
     });
   });
 

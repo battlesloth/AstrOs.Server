@@ -138,12 +138,20 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
 
   function deletePage(idx: number) {
     if (remoteControlPages.value.length <= 1) return;
-    if (idx < 0 || idx >= remoteControlPages.value.length) return;
+    if (idx < 0 || idx >= remoteControlPages.value.length) {
+      console.warn(
+        `[remoteControl] deletePage: idx ${idx} out of range (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
     remoteControlPages.value.splice(idx, 1);
     if (selectedIdx.value > idx) {
       selectedIdx.value -= 1;
-    } else if (selectedIdx.value >= remoteControlPages.value.length) {
-      selectedIdx.value = remoteControlPages.value.length - 1;
+    } else if (selectedIdx.value === idx) {
+      // The selected page itself was deleted — move back to the previous
+      // sibling so the user's mental position is preserved. Stays at 0 when
+      // there's nothing further back.
+      selectedIdx.value = Math.max(idx - 1, 0);
     }
     isDirty.value = true;
   }
