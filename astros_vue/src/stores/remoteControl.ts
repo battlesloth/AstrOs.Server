@@ -217,22 +217,19 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     isDirty.value = true;
   }
 
-  function setButton(slotIdx: number, buttonKey: ButtonKey, value: PageButton) {
-    // Wraps the slot write + isDirty flip so consumers can't forget the
-    // dirty mark on direct page mutations. Originally the spec deferred this
-    // method on the rationale that there'd be a single consumer; surfaced
-    // during PR review as a forget-prone protocol regardless of consumer
-    // count, so we collapse the two writes into one entry point.
-    if (!Number.isInteger(slotIdx)) {
+  function setButton(pageIdx: number, buttonKey: ButtonKey, value: PageButton) {
+    // Wrap the slot write + isDirty flip so consumers have a single, safe entry
+    // point for updating a page's button configuration.
+    if (!Number.isInteger(pageIdx)) {
       console.warn(
-        `[remoteControl] setButton: slotIdx ${slotIdx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+        `[remoteControl] setButton: pageIdx ${pageIdx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
       );
       return;
     }
-    const page = remoteControlPages.value[slotIdx];
+    const page = remoteControlPages.value[pageIdx];
     if (!page) {
       console.warn(
-        `[remoteControl] setButton: slotIdx ${slotIdx} out of range (pages: ${remoteControlPages.value.length})`,
+        `[remoteControl] setButton: pageIdx ${pageIdx} out of range (pages: ${remoteControlPages.value.length})`,
       );
       return;
     }
