@@ -1,7 +1,7 @@
 import apiService from '@/api/apiService';
 import { REMOTE_CONFIG } from '@/api/endpoints';
 import type { RemoteControlPage } from '@/models';
-import { BUTTON_KEYS } from '@/models/remoteControl/remoteControlPage';
+import { BUTTON_KEYS, type ButtonKey } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton, PageButtonType } from '@/models/remoteControl/pageButton';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
@@ -213,6 +213,29 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     isDirty.value = true;
   }
 
+  function setButton(slotIdx: number, buttonKey: ButtonKey, value: PageButton) {
+    // Wraps the slot write + isDirty flip so consumers can't forget the
+    // dirty mark on direct page mutations. Originally the spec deferred this
+    // method on the rationale that there'd be a single consumer; surfaced
+    // during PR review as a forget-prone protocol regardless of consumer
+    // count, so we collapse the two writes into one entry point.
+    if (!Number.isInteger(slotIdx)) {
+      console.warn(
+        `[remoteControl] setButton: slotIdx ${slotIdx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    const page = remoteControlPages.value[slotIdx];
+    if (!page) {
+      console.warn(
+        `[remoteControl] setButton: slotIdx ${slotIdx} out of range (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    page[buttonKey] = value;
+    isDirty.value = true;
+  }
+
   async function saveRemoteControl() {
     const payload = JSON.stringify(remoteControlPages.value);
 
@@ -238,5 +261,6 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     duplicatePage,
     deletePage,
     renamePage,
+    setButton,
   };
 });

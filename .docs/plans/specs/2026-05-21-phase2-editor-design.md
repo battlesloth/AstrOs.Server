@@ -170,13 +170,14 @@ isDirty: Ref<boolean>;                                 // false until first muta
 addPage();                                             // pushes default page; selectedIdx = new index
 duplicatePage(idx: number);                            // splices "(copy)" suffix copy after idx; selects it
 deletePage(idx: number);                               // no-op if pages.length <= 1; clamps selectedIdx
-renamePage(idx: number, name: string);                 // trims; no-op on empty/whitespace
+renamePage(idx: number, name: string): boolean;        // trims; no-op on empty/whitespace; returns true if applied
 selectPage(idx: number);                               // clamps to valid range; does NOT set isDirty
+setButton(slotIdx: number, key: ButtonKey, value: PageButton);  // writes slot + flips isDirty; warns on out-of-range
 ```
 
 **Dirty tracking is a plain flag, not a snapshot comparison.** Each mutation method sets `isDirty = true`; `loadRemoteControl` (on success) and `saveRemoteControl` (on 200) set it back to `false`. Rationale: snapshot-comparison via `JSON.stringify` has two edge cases (badge flashes before first load resolves; failed-load leaves snapshot null so subsequent mutations never flip dirty). Flag-based tracking avoids both. The minor pessimism — mutate-then-revert-to-original keeps `isDirty` true — is acceptable; user clicks Save, save succeeds (a no-op PUT with unchanged payload), flag clears.
 
-**Slot mutations** — button assignments from `AstrosRemoteButtonCard.change` are written by `RemoteControlConfigView` directly to `store.remoteControlPages[selectedIdx][buttonKey]`. The view sets `store.isDirty = true` after the mutation. (Alternative: a `setButton(slotIdx, buttonKey, value)` store method that wraps both writes; chosen against because it adds a one-line method for a one-call-site mutation. Revisit if a second consumer appears.)
+**Slot mutations** — button assignments from `AstrosRemoteButtonCard.change` are written by `RemoteControlConfigView` via `store.setButton(selectedIdx, buttonKey, value)`. The method atomically writes the slot and sets `isDirty = true`. (This spec originally deferred `setButton` on the rationale of a one-call-site mutation; surfaced during Phase 2a PR review as a forget-prone protocol regardless of consumer count, so the helper was added to make the dirty mark impossible to forget.)
 
 ---
 
@@ -206,7 +207,7 @@ User clicks "Configure →" on empty BUTTON 5
 User types "wave", filters, clicks "Wave Hello"
   → editor emits 'change' { id:'wave', name:'Wave Hello', type:'script' }
   → card re-emits 'change', closes popover
-  → view handler: store.remoteControlPages[selectedIdx].button5 = newValue
+  → view handler: store.setButton(selectedIdx, 'button5', newValue)
   → subscribers re-render:
       • That card: assigned state (tinted blue, chip, name)
       • Live preview: button 5 now filled

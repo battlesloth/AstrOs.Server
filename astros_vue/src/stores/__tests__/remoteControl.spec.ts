@@ -876,4 +876,59 @@ describe('remoteControl store', () => {
       expect(store.isDirty).toBe(true);
     });
   });
+
+  describe('setButton', () => {
+    it('writes the button value to the given slot on the given page', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.setButton(1, 'button3', { id: 'script-7', name: 'Wave', type: 'script' });
+
+      expect(store.remoteControlPages[1]!.button3).toEqual({
+        id: 'script-7',
+        name: 'Wave',
+        type: 'script',
+      });
+      expect(store.remoteControlPages[0]!.button3.id).toBe('0');
+    });
+
+    it('flips isDirty to true on a successful write', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(false);
+
+      store.setButton(0, 'button1', { id: 's1', name: 'Wave', type: 'script' });
+
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('warns and no-ops on out-of-range slotIdx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      const originalButton = { ...store.remoteControlPages[0]!.button1 };
+
+      store.setButton(99, 'button1', { id: 's1', name: 'Wave', type: 'script' });
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages[0]!.button1).toEqual(originalButton);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on NaN slotIdx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.setButton(NaN, 'button1', { id: 's1', name: 'Wave', type: 'script' });
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages[0]!.button1.id).toBe('0');
+      expect(store.isDirty).toBe(false);
+    });
+  });
 });
