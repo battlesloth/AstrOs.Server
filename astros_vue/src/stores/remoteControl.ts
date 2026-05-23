@@ -95,12 +95,18 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
         throw new Error('No remote control configuration found');
       }
 
-      if (result.length > 0) {
-        remoteControlPages.value = result.map((page, idx) => migratePage(page, idx));
-      } else {
-        remoteControlPages.value = [createDefaultPage(0)];
-      }
-      isDirty.value = false;
+      const isFreshSeed = result.length === 0;
+      remoteControlPages.value = isFreshSeed
+        ? [createDefaultPage(0)]
+        : result.map((page, idx) => migratePage(page, idx));
+      // When we seed a default page because the server had nothing stored, the
+      // seeded page is NOT yet persisted — flag it dirty so the Save button
+      // lights up and the user explicitly opts in. Before the all-empty save
+      // filter was removed, this case was protected by the filter dropping the
+      // seeded default on save; without that filter, clicking Save without
+      // dirtying first would have silently written a random-UUID page the user
+      // never authored.
+      isDirty.value = isFreshSeed;
       selectedIdx.value = 0;
       isLoading.value = false;
       return { success: true, data: result };

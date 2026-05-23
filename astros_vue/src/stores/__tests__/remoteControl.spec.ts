@@ -328,21 +328,34 @@ describe('remoteControl store', () => {
       expect(store.isDirty).toBe(false);
     });
 
-    it('stays false after a successful load', async () => {
-      apiGet.mockResolvedValue(JSON.stringify([]));
+    it('stays false after a successful load of stored pages', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
       expect(store.isDirty).toBe(false);
     });
 
-    it('clears to false when a successful load follows a dirty state', async () => {
+    it('flips true after a successful load of empty stored config (seeded default needs opt-in to persist)', async () => {
+      // Empty stored config triggers the seed-default-page path. The seeded
+      // page is NOT yet on the server; setting isDirty=true makes the Save
+      // button enable so the user explicitly opts in to persisting the
+      // freshly-minted default. Without this, clicking Save on a fresh
+      // install would silently write a random-UUID page the user never
+      // authored.
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('clears to false when a successful load of stored pages follows a dirty state', async () => {
       apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
       store.addPage();
       expect(store.isDirty).toBe(true);
 
-      apiGet.mockResolvedValue(JSON.stringify([]));
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
       await store.loadRemoteControl();
 
       expect(store.isDirty).toBe(false);
