@@ -82,7 +82,6 @@ describe('AstrosRemoteButtonCard — display state', () => {
     await wrapper.get('[data-testid="card-clear"]').trigger('click');
 
     expect(wrapper.emitted('change')![0]![0]).toEqual({ id: '0', name: 'None', type: 'none' });
-    // The editor popover must NOT have rendered (no editor element in DOM).
     expect(document.querySelector('[data-testid="editor-search"]')).toBeNull();
   });
 });

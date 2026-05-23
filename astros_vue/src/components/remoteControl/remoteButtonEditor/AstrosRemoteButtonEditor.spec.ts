@@ -104,10 +104,9 @@ describe('AstrosRemoteButtonEditor', () => {
     expect(wrapper.find('[data-testid="editor-empty"]').exists()).toBe(true);
   });
 
-  it('tab switch does NOT auto-clear current value (per spec §4)', async () => {
-    // If the user opens the editor on a script and switches to playlist tab,
-    // no `change` event should fire from the tab switch alone. Pin this so a
-    // future "auto-clear on tab switch" change can't slip through.
+  it('tab switch does NOT auto-clear current value', async () => {
+    // Pins the no-auto-clear behavior so a future "clear on tab switch" change
+    // can't slip through silently.
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {

@@ -91,8 +91,8 @@ function handleClickOutside(e: MouseEvent) {
 }
 
 onMounted(() => {
-  // Capture phase as a defensive default — guarantees this fires regardless
-  // of whether future child handlers stop propagation.
+  // Capture phase so the outside-click fires before any child popover handler
+  // can call stopPropagation and swallow the close.
   document.addEventListener('click', handleClickOutside, true);
 });
 

@@ -7,9 +7,10 @@ export type EditorTab = Exclude<PageButton['type'], 'none'>;
 
 // Lightweight item shape for the script/playlist lists passed to the editor.
 // Intentionally NOT a full Script/Playlist model — the editor only needs id
-// + name to render the result rows. Decoupling here lets Phase 2d pass any
-// derivation of either store without forcing the editor to know about the
-// rest of the model.
+// + name to render the result rows. The consumer must adapt the store
+// models (Script.scriptName / Playlist.playlistName) into this shape:
+//   scripts.map(s => ({ id: s.id, name: s.scriptName }))
+//   playlists.map(p => ({ id: p.id, name: p.playlistName }))
 export interface EditorListItem {
   id: string;
   name: string;
