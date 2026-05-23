@@ -120,6 +120,13 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     selectedIdx.value = Math.min(Math.max(idx, 0), lastIdx);
   }
 
+  function addPage() {
+    const newIdx = remoteControlPages.value.length;
+    remoteControlPages.value.push(createDefaultPage(newIdx));
+    selectedIdx.value = newIdx;
+    isDirty.value = true;
+  }
+
   async function saveRemoteControl() {
     const contentPages = remoteControlPages.value.filter((page) =>
       BUTTON_KEYS.some((key) => page[key].id !== '0'),
@@ -144,5 +151,6 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     loadRemoteControl,
     saveRemoteControl,
     selectPage,
+    addPage,
   };
 });

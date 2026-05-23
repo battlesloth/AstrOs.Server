@@ -389,4 +389,39 @@ describe('remoteControl store', () => {
       expect(store.selectedIdx).toBe(0);
     });
   });
+
+  describe('addPage', () => {
+    it('appends a default page with auto-numbered name', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.addPage();
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      expect(store.remoteControlPages[1]!.name).toBe('Page 2');
+      expect(store.remoteControlPages[1]!.id).toMatch(UUID_LIKE);
+    });
+
+    it('selects the newly added page', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.addPage();
+
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('flips isDirty to true', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(false);
+
+      store.addPage();
+
+      expect(store.isDirty).toBe(true);
+    });
+  });
 });
