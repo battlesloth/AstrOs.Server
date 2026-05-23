@@ -26,8 +26,12 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
         shipped 2026-05-23 via PR #94 (merge `3d6e3a4`). Two pre-push toolkit rounds; 67 store
         tests including mutation-guards on every defensive branch; `setButton` helper added
         post-PR-review to make the slot-write + isDirty flip atomic.
-  - [ ] **2b** — `AstrosRemoteButtonCard` + `AstrosRemoteButtonEditor` (paired). Storybook
-        is the verification gate; no app integration.
+  - [x] **2b** — `AstrosRemoteButtonCard` + `AstrosRemoteButtonEditor` (paired). Storybook
+        is the verification gate; no app integration. — shipped 2026-05-23 via PR #95
+        (merge `9b488d2`). Two pre-push toolkit rounds + 3 Storybook polish commits; 32
+        component tests with mutation-guards on every defensive branch; `makeNoneButton()`
+        factory + `assertNever` helper extracted post-review; focus capture/restore added
+        for a11y; `@floating-ui/vue` added for popover anchoring.
   - [ ] **2c** — `AstrosRemotePageList`. Storybook gate; no app integration.
   - [ ] **2d** — `AstrosRemoteLivePreview` + `RemoteControlConfigView` assembly + router
         swap + delete-confirm modal + i18n sweep + manual QA + old code deletion.
