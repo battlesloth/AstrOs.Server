@@ -80,6 +80,7 @@ export function migratePage(page: Partial<RemoteControlPage>, idx: number): Remo
 export const useRemoteControlStore = defineStore('remoteControl', () => {
   const remoteControlPages = ref<RemoteControlPage[]>([]);
   const isLoading = ref(false);
+  const isDirty = ref(false);
 
   async function loadRemoteControl() {
     isLoading.value = true;
@@ -98,6 +99,7 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
       } else {
         remoteControlPages.value = [createDefaultPage(0)];
       }
+      isDirty.value = false;
       isLoading.value = false;
       return { success: true, data: result };
     } catch (error) {
@@ -126,6 +128,7 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
   return {
     remoteControlPages,
     isLoading,
+    isDirty,
     loadRemoteControl,
     saveRemoteControl,
   };

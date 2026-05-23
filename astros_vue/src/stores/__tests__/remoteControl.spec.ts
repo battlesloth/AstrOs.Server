@@ -296,4 +296,38 @@ describe('remoteControl store', () => {
       errSpy.mockRestore();
     });
   });
+
+  describe('isDirty flag', () => {
+    it('starts false on a fresh store', () => {
+      const store = useRemoteControlStore();
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('stays false after a successful load', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('clears to false when a successful load follows a dirty state', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      const store = useRemoteControlStore();
+      // Poke directly because the mutation methods that flip the flag land
+      // in later tasks; this isolates "load clears it" behavior.
+      (store as unknown as { isDirty: boolean }).isDirty = true;
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('does NOT clear isDirty when load fails (network)', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockRejectedValue(new Error('network down'));
+      const store = useRemoteControlStore();
+      (store as unknown as { isDirty: boolean }).isDirty = true;
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(true);
+      errSpy.mockRestore();
+    });
+  });
 });
