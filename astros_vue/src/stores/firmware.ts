@@ -325,6 +325,59 @@ export const useFirmwareStore = defineStore('firmware', () => {
     pendingByMac.value.set(state.controllerId, queue);
   }
 
+  /**
+   * Build the FailedControllerSummary[] used by both applyJobDone (when any
+   * controller is FAILED despite a job-done lifecycle event) and
+   * applyJobFailed. Both surfaces need the same two-pass collection:
+   *
+   *   1. Mapped slots from `controllerStates` — every FAILED entry, labeled
+   *      via the controllers list, falling back to slot id.
+   *   2. Unmapped MACs from `pendingByMac` — bus-wide ESP-NOW failures can
+   *      mark a padawan FAILED before its LocationStatus heartbeat arrives.
+   *      Without surfacing these, the wipe of `pendingByMac` at the bottom
+   *      of each caller would silently drop the entry and the job would
+   *      render as green-success — the regression class this exists to
+   *      prevent.
+   *
+   * `currentStage.value` is read at call time (callers invoke this BEFORE
+   * resetting currentStage), so the resulting `stage` field reflects where
+   * the job actually stopped.
+   *
+   * `callerTag` is only used to prefix the forensic console.warn for the
+   * unmapped-MAC branch — kept distinct so log grep can attribute the warn
+   * to either the done-with-failures path or the explicit-fail path.
+   */
+  function collectFailedControllers(
+    callerTag: 'applyJobDone' | 'applyJobFailed',
+  ): FailedControllerSummary[] {
+    const failed: FailedControllerSummary[] = [];
+    for (const state of controllerStates.value.values()) {
+      if (state.stage === 'FAILED') {
+        // controllerId is structurally a SlotId here (the in-store view
+        // is ControllerFlashStateBySlot).
+        const slot = state.controllerId;
+        const c = controllers.value.find((x) => x.id === slot);
+        failed.push({ id: slot, label: c?.label ?? slot, stage: currentStage.value });
+      }
+    }
+    for (const [mac, queue] of pendingByMac.value) {
+      for (const entry of queue) {
+        if (entry.stage === 'FAILED') {
+          console.warn(
+            `[firmwareStore] ${callerTag}: FAILED entry for unmapped MAC="${mac}" ` +
+              `surfaced from pendingByMac. LocationStatus never arrived; using MAC as label.`,
+          );
+          // Intentional cast: a raw MAC isn't structurally a SlotId, but
+          // surfacing the MAC string as the row label is more useful to
+          // operators than dropping the entry. The console.warn above is
+          // the forensic breadcrumb.
+          failed.push({ id: mac as SlotId, label: mac, stage: currentStage.value });
+        }
+      }
+    }
+    return failed;
+  }
+
   // The single MAC → SlotId translation site. The returned map and
   // every embedded controllerId is keyed by SlotId; downstream consumers
   // don't need to translate.
@@ -538,39 +591,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     // "all updated". `currentStage.value` is preserved at this point so
     // the FailedControllerSummary's stage field reflects where the job
     // actually stopped (e.g. 'transfer' when a deploy step bails).
-    const failed: FailedControllerSummary[] = [];
-    for (const state of normalized.values()) {
-      if (state.stage === 'FAILED') {
-        const slot = state.controllerId;
-        const c = controllers.value.find((x) => x.id === slot);
-        failed.push({
-          id: slot,
-          label: c?.label ?? slot,
-          stage: currentStage.value,
-        });
-      }
-    }
-    // Sweep pendingByMac for FAILED entries whose MAC never got mapped to a
-    // slot (LocationStatus race — same hazard `applyJobFailed` handles below).
-    // Without this, a deploy-time FAILED for an unmapped padawan would land
-    // in pendingByMac, get dropped by the wipe at the bottom of this function,
-    // and the job would render as green-success — the exact regression class
-    // this branch was added to prevent.
-    for (const [mac, queue] of pendingByMac.value) {
-      for (const entry of queue) {
-        if (entry.stage === 'FAILED') {
-          console.warn(
-            `[firmwareStore] applyJobDone: FAILED entry for unmapped MAC="${mac}" ` +
-              `surfaced from pendingByMac. LocationStatus never arrived; using MAC as label.`,
-          );
-          failed.push({
-            id: mac as SlotId,
-            label: mac,
-            stage: currentStage.value,
-          });
-        }
-      }
-    }
+    const failed = collectFailedControllers('applyJobDone');
     if (failed.length > 0) {
       failedControllers.value = failed;
       phase.value = 'failed';
@@ -648,48 +669,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
     controllerStates.value = normalized;
     // Collect ALL controllers that ended in FAILED (including the ones we
-    // just demoted). Multi-failure is realistic (bus-wide ESP-NOW failure
-    // fails both padawans); surfacing only the first would let the
-    // operator walk away from a bricked unit. The stage reflects
-    // `currentStage` at failure time — null when no stage was current.
-    const failed: FailedControllerSummary[] = [];
-    for (const state of normalized.values()) {
-      if (state.stage === 'FAILED') {
-        // controllerId is structurally a SlotId here (the in-store view
-        // is ControllerFlashStateBySlot).
-        const slot = state.controllerId;
-        const c = controllers.value.find((x) => x.id === slot);
-        failed.push({
-          id: slot,
-          label: c?.label ?? slot,
-          stage: currentStage.value,
-        });
-      }
-    }
-    // Sweep pendingByMac for FAILED entries that never got LocationStatus
-    // mapping — bus-wide ESP-NOW failures can mark a padawan FAILED before
-    // its heartbeat arrives. Surface them via the raw MAC so the operator
-    // sees the full bricked-controller list, not just the mapped subset.
-    for (const [mac, queue] of pendingByMac.value) {
-      for (const entry of queue) {
-        if (entry.stage === 'FAILED') {
-          console.warn(
-            `[firmwareStore] applyJobFailed: FAILED entry for unmapped MAC="${mac}" ` +
-              `surfaced from pendingByMac. LocationStatus never arrived; using MAC as label.`,
-          );
-          // Intentional cast: a raw MAC isn't structurally a SlotId, but
-          // surfacing the MAC string as the row label is more useful to
-          // operators than dropping the entry. The console.warn above is
-          // the forensic breadcrumb.
-          failed.push({
-            id: mac as SlotId,
-            label: mac,
-            stage: currentStage.value,
-          });
-        }
-      }
-    }
-    failedControllers.value = failed;
+    // just demoted) plus any unmapped MACs from pendingByMac. Multi-failure
+    // is realistic (bus-wide ESP-NOW failure fails both padawans); surfacing
+    // only the first would let the operator walk away from a bricked unit.
+    failedControllers.value = collectFailedControllers('applyJobFailed');
     currentStage.value = null;
     // Terminal state — clear the staleness banner so it can't shadow the
     // legitimate failed-flash UI.
@@ -998,11 +981,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
       const sent = state.bytesSent;
       if (typeof total !== 'number' || total <= 0) return null;
       if (typeof sent !== 'number') return null;
-      const ratio = sent / total;
       // Clamp defensively: a server-side off-by-one or stale bytesSent
       // shouldn't render as "117%".
-      const pct = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
-      return pct;
+      return Math.round(Math.max(0, Math.min(1, sent / total)) * 100);
     }
     return null;
   });

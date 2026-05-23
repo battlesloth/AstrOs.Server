@@ -82,19 +82,16 @@ async function writeTempFirmware(bytes: Buffer): Promise<string> {
 
 // Computes the actual sha-256 of the file at `filePath` by default so the
 // streamer's cache-sha-drift fast-fail (source_sha_mismatch) doesn't fire on
-// every test. `opts.sha256` lets a test deliberately mismatch to exercise
-// the drift path itself.
+// every happy-path test. `opts.sha256` lets a test deliberately mismatch to
+// exercise the drift path itself. Falls back to the placeholder when the
+// file doesn't exist on disk — that branch is what the source_read_failed
+// tests intentionally exercise; re-throwing the ENOENT here would fail
+// those tests before the streamer ever ran.
 function specFor(
   filePath: string,
   sizeBytes: number,
   opts?: { sha256?: string },
 ): TransferSpec {
-  // Default: compute the actual sha-256 of the file so the streamer's
-  // cache-sha-drift fast-fail (source_sha_mismatch) doesn't trip on every
-  // happy-path test. Fall back to the placeholder when the file doesn't
-  // exist on disk — that branch is what the source_read_failed tests
-  // intentionally exercise; if we re-threw the ENOENT here, those tests
-  // would fail before the streamer ever ran.
   let sha256 = opts?.sha256;
   if (sha256 === undefined) {
     try {
