@@ -37,24 +37,38 @@ function selectNone() {
 
 <template>
   <div
-    class="astros-remote-button-editor"
+    class="astros-remote-button-editor flex flex-col gap-2"
     tabindex="-1"
     @keydown.escape="emit('close')"
   >
-    <header>
-      <span>BTN {{ buttonNumber }} · EDITING</span>
+    <header class="flex items-center justify-between">
+      <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-base-content/60">
+        BTN {{ buttonNumber }} · EDITING
+      </span>
       <button
         type="button"
+        class="btn btn-ghost btn-xs btn-square"
+        aria-label="Close"
         data-testid="editor-close"
         @click="emit('close')"
       >
         ×
       </button>
     </header>
-    <div role="tablist">
+
+    <div
+      role="tablist"
+      class="flex gap-1"
+    >
       <button
         type="button"
         role="tab"
+        class="flex-1 rounded-md py-1 text-xs font-semibold capitalize"
+        :class="
+          tab === 'script'
+            ? 'bg-primary/10 text-primary'
+            : 'bg-transparent text-base-content/60 hover:bg-base-200'
+        "
         :aria-selected="tab === 'script'"
         data-testid="editor-tab-script"
         @click="tab = 'script'"
@@ -64,6 +78,12 @@ function selectNone() {
       <button
         type="button"
         role="tab"
+        class="flex-1 rounded-md py-1 text-xs font-semibold capitalize"
+        :class="
+          tab === 'playlist'
+            ? 'bg-primary/10 text-primary'
+            : 'bg-transparent text-base-content/60 hover:bg-base-200'
+        "
         :aria-selected="tab === 'playlist'"
         data-testid="editor-tab-playlist"
         @click="tab = 'playlist'"
@@ -71,16 +91,22 @@ function selectNone() {
         Playlists
       </button>
     </div>
+
     <input
       v-model="query"
       type="search"
+      class="input input-sm input-bordered w-full text-xs"
       placeholder="Search…"
       data-testid="editor-search"
     />
-    <ul>
+
+    <ul
+      class="flex max-h-56 min-h-24 flex-col gap-px overflow-y-auto rounded-md border border-base-300 p-1 text-xs"
+    >
       <li>
         <button
           type="button"
+          class="flex w-full items-center rounded px-2 py-1 text-left italic text-base-content/60 hover:bg-base-200"
           data-testid="editor-none"
           @click="selectNone"
         >
@@ -93,6 +119,7 @@ function selectNone() {
       >
         <button
           type="button"
+          class="flex w-full items-center rounded px-2 py-1 text-left hover:bg-base-200"
           :data-testid="`editor-item-${item.id}`"
           @click="selectItem(item)"
         >
@@ -101,6 +128,7 @@ function selectNone() {
       </li>
       <li
         v-if="items.length === 0"
+        class="px-2 py-3 text-center text-[11px] text-base-content/50"
         data-testid="editor-empty"
       >
         No matches
