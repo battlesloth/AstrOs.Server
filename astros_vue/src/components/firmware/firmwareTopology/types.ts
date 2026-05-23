@@ -33,6 +33,14 @@ export interface TopologyProps {
    * non-flashing phases.
    */
   currentStage?: TopologyStage | null;
-  /** Consulted only when `phase === 'failed'`. Stroke turns red only if this id is also in `selectedIds`. */
-  failedControllerId?: string;
+  /**
+   * Set of controller ids that failed. Consulted only when
+   * `phase === 'failed'` — every id in this set whose controller is also
+   * in `selectedIds` renders with the failure stroke; selected controllers
+   * NOT in the set render as success (succeeded alongside the failed
+   * sibling). The set form is required because multi-failure is realistic
+   * (e.g. bus-wide ESP-NOW failure or the not-implemented deploy stub
+   * marking every target FAILED).
+   */
+  failedControllerIds?: ReadonlySet<string>;
 }

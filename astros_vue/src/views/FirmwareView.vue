@@ -125,7 +125,9 @@ const selectedControllerList = computed<FirmwareControllerView[]>(() =>
 // share the same fallback stage in practice (`currentStage` at failure time).
 // `failedControllerLabels` returns `''` on no failures; the template coerces
 // to `undefined` via `|| undefined` so the panel's result bar skips rendering.
-const failedControllerId = computed(() => failedControllers.value[0]?.id);
+const failedControllerIds = computed(
+  () => new Set(failedControllers.value.map((c) => c.id)),
+);
 const failedControllerLabels = computed(() =>
   failedControllers.value.map((c) => c.label).join(', '),
 );
@@ -302,7 +304,7 @@ onMounted(async () => {
                 :target="target"
                 :phase="phase"
                 :current-stage="currentStage"
-                :failed-controller-id="failedControllerId"
+                :failed-controller-ids="failedControllerIds"
               />
               <AstrosFirmwareStagesList
                 v-if="phase === 'flashing' || phase === 'done' || phase === 'failed'"

@@ -489,8 +489,6 @@ export const useFirmwareStore = defineStore('firmware', () => {
     if (currentJob.value) {
       currentJob.value = { ...currentJob.value, endedAt: data.endedAt };
     }
-    phase.value = 'done';
-    currentStage.value = null;
     // Job terminated — clear the start-pending flag. Subsequent
     // lock-conflict checks fall back to the equality clause, which is
     // load-bearing for foreign-flash detection.
@@ -528,6 +526,39 @@ export const useFirmwareStore = defineStore('firmware', () => {
       }
     }
     controllerStates.value = normalized;
+
+    // The orchestrator's flashJobDone means "every controller reached a
+    // terminal state" — NOT "every controller succeeded" (see
+    // flash_orchestrator.ts handleDeployDone: "Per-controller failures are
+    // local — the job-wide event is `flashJobDone` even when some
+    // controllers failed"). Reconstitute a UI outcome here: any FAILED
+    // entry routes through the same surface as applyJobFailed
+    // (phase='failed' + failedControllers populated) so the result bar,
+    // topology, and stages list render the failure rather than a green
+    // "all updated". `currentStage.value` is preserved at this point so
+    // the FailedControllerSummary's stage field reflects where the job
+    // actually stopped (e.g. 'transfer' when a deploy step bails).
+    const finalStates = [...normalized.values()];
+    const anyFailed = finalStates.some((s) => s.stage === 'FAILED');
+    if (anyFailed) {
+      const failed: FailedControllerSummary[] = [];
+      for (const state of normalized.values()) {
+        if (state.stage === 'FAILED') {
+          const slot = state.controllerId;
+          const c = controllers.value.find((x) => x.id === slot);
+          failed.push({
+            id: slot,
+            label: c?.label ?? slot,
+            stage: currentStage.value,
+          });
+        }
+      }
+      failedControllers.value = failed;
+      phase.value = 'failed';
+    } else {
+      phase.value = 'done';
+    }
+    currentStage.value = null;
     // Terminal state — the staleness banner is no longer relevant. Without
     // this clear, a fetchCurrentJob failure earlier in the session would
     // leave the warning visible on top of the legitimate done-flash UI.

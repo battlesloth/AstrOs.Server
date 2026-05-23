@@ -14,15 +14,18 @@ export interface StrokeForInput {
   isSelected: boolean;
   isMaster: boolean;
   phase: TopologyPhase;
-  failedControllerId: string | undefined;
+  failedControllerIds: ReadonlySet<string> | undefined;
 }
 
 export function strokeFor(input: StrokeForInput): string {
-  const { controllerId, isSelected, isMaster, phase, failedControllerId } = input;
+  const { controllerId, isSelected, isMaster, phase, failedControllerIds } = input;
   if (!isSelected) return TOPOLOGY_STROKE_COLORS.unselected;
   if (phase === 'done') return TOPOLOGY_STROKE_COLORS.success;
   if (phase === 'failed') {
-    return controllerId === failedControllerId
+    // Set-based membership so the multi-failure case (deploy bails on every
+    // target, bus-wide ESP-NOW failure) paints every failed node red rather
+    // than only the first one.
+    return failedControllerIds?.has(controllerId)
       ? TOPOLOGY_STROKE_COLORS.failure
       : TOPOLOGY_STROKE_COLORS.success;
   }

@@ -88,7 +88,7 @@ export const FailedCore: Story = {
     selectedIds: ALL_SELECTED,
     target: 'v1.4.2',
     phase: 'failed',
-    failedControllerId: 'core',
+    failedControllerIds: new Set(['core']),
   },
 };
 
@@ -98,6 +98,19 @@ export const FailedMaster: Story = {
     selectedIds: ALL_SELECTED,
     target: 'v1.4.2',
     phase: 'failed',
-    failedControllerId: 'body',
+    failedControllerIds: new Set(['body']),
+  },
+};
+
+// Realistic when the deploy step fails for every target — e.g. the
+// not-implemented deploy stub marking master + padawan FAILED. Both
+// nodes should render red, not just one.
+export const FailedAllControllers: Story = {
+  args: {
+    fleet: SAMPLE_FLEET,
+    selectedIds: ALL_SELECTED,
+    target: 'v1.4.2',
+    phase: 'failed',
+    failedControllerIds: new Set(['body', 'core']),
   },
 };

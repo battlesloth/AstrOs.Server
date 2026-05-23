@@ -23,40 +23,11 @@ describe('stageRowState', () => {
     expect(rowsForPhase({ phase: 'select' })).toEqual(['idle', 'idle', 'idle', 'idle', 'idle']);
   });
 
-  it("on phase 'done', marks stages at or before currentStage 'done' and beyond 'idle'", () => {
-    // Happy path: controllers all reached VersionConfirmed; the last UI-stage
-    // currentStage advanced to is 'reboot' (VersionConfirmed maps to null and
-    // doesn't advance), so every row is 'done'.
-    expect(rowsForPhase({ phase: 'done', currentStage: 'reboot' })).toEqual([
-      'done',
-      'done',
-      'done',
-      'done',
-      'done',
-    ]);
-  });
-
-  it("on phase 'done' with a mid-flight currentStage, does not paint unreached stages green", () => {
-    // Regression: deploy stub returns all-FAILED so the job is lifecycle-done
-    // but only ever reached 'transfer'. Stages 'flash'/'verify'/'reboot' must
-    // NOT render green just because the job ended.
-    expect(rowsForPhase({ phase: 'done', currentStage: 'transfer' })).toEqual([
-      'done',
-      'done',
-      'idle',
-      'idle',
-      'idle',
-    ]);
-  });
-
-  it("returns all 'idle' on phase 'done' with no currentStage", () => {
-    expect(rowsForPhase({ phase: 'done', currentStage: null })).toEqual([
-      'idle',
-      'idle',
-      'idle',
-      'idle',
-      'idle',
-    ]);
+  it("marks every stage 'done' when phase is 'done'", () => {
+    // 'done' is a fully-successful job — any controller failure routes
+    // through phase='failed' in the store, so the stages list only sees
+    // phase='done' when every stage legitimately completed.
+    expect(rowsForPhase({ phase: 'done' })).toEqual(['done', 'done', 'done', 'done', 'done']);
   });
 
   it("marks earlier stages 'done', the matching stage 'current', later stages 'idle' when flashing", () => {

@@ -54,14 +54,15 @@ if (import.meta.env.DEV) {
           `parent must pass a target whenever phase !== 'select'.`,
       );
     }
-    if (props.failedControllerId !== undefined) {
-      const known = [props.fleet.master, ...props.fleet.padawans].some(
-        (c) => c.id === props.failedControllerId,
+    if (props.failedControllerIds !== undefined) {
+      const fleetIds = new Set(
+        [props.fleet.master, ...props.fleet.padawans].map((c) => c.id),
       );
-      if (!known) {
+      const unknown = [...props.failedControllerIds].filter((id) => !fleetIds.has(id));
+      if (unknown.length > 0) {
         console.warn(
-          `[AstrosFirmwareTopology] failedControllerId="${props.failedControllerId}" ` +
-            `does not match any controller in the fleet.`,
+          `[AstrosFirmwareTopology] failedControllerIds contains entries not in the fleet: ` +
+            `[${unknown.join(', ')}].`,
         );
       }
     }
@@ -90,7 +91,7 @@ function strokeFor(c: TopologyController, isMaster: boolean): string {
     isSelected: isSelected(c),
     isMaster,
     phase: props.phase,
-    failedControllerId: props.failedControllerId,
+    failedControllerIds: props.failedControllerIds,
   });
 }
 
@@ -203,7 +204,7 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
           {{ fleet.master.label.toUpperCase() }}
         </text>
         <text
-          v-if="phase === 'failed' && fleet.master.id === failedControllerId"
+          v-if="phase === 'failed' && failedControllerIds?.has(fleet.master.id)"
           :x="MASTER_POS.x"
           :y="MASTER_POS.y - NODE_RADIUS - 8"
           text-anchor="middle"
@@ -269,7 +270,7 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
           {{ layout.controller.label.toUpperCase() }}
         </text>
         <text
-          v-if="phase === 'failed' && layout.controller.id === failedControllerId"
+          v-if="phase === 'failed' && failedControllerIds?.has(layout.controller.id)"
           :x="layout.position.x"
           :y="layout.position.y - NODE_RADIUS - 8"
           text-anchor="middle"

@@ -1463,6 +1463,85 @@ describe('firmware store', () => {
         warnSpy.mockRestore();
       }
     });
+
+    describe('any-FAILED routes to phase="failed" (orchestrator emits flashJobDone for lifecycle-complete, not success)', () => {
+      it('routes to phase="failed" and populates failedControllers when every controller is FAILED', () => {
+        // Regression: deploy stub returns all-FAILED. The orchestrator still
+        // emits flashJobDone (lifecycle is "done"); UI must render failure.
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState());
+        store.applyControllerUpdate({
+          controllerId: BODY_MAC,
+          stage: 'SENDING', // sets currentStage to 'transfer'
+        });
+        store.applyControllerUpdate({
+          controllerId: BODY_MAC,
+          stage: 'FAILED',
+          error: 'not_implemented',
+        });
+        store.applyControllerUpdate({
+          controllerId: CORE_MAC,
+          stage: 'FAILED',
+          error: 'not_implemented',
+        });
+
+        store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+        expect(store.phase).toBe('failed');
+        expect(store.failedControllers).toHaveLength(2);
+        const ids = store.failedControllers.map((f) => f.id).sort();
+        expect(ids).toEqual(['body', 'core']);
+        // stage at failure time was 'transfer' (the highest reached UI stage
+        // before SENDING→FAILED mapped to null).
+        for (const f of store.failedControllers) {
+          expect(f.stage).toBe('transfer');
+        }
+      });
+
+      it('routes to phase="failed" when ONLY SOME controllers are FAILED (partial failure)', () => {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState());
+        store.applyControllerUpdate({
+          controllerId: BODY_MAC,
+          stage: 'VERSION_CONFIRMED',
+          finalVersion: '1.4.2',
+        });
+        store.applyControllerUpdate({
+          controllerId: CORE_MAC,
+          stage: 'FAILED',
+          error: 'flash_error',
+        });
+
+        store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+        expect(store.phase).toBe('failed');
+        expect(store.failedControllers).toHaveLength(1);
+        expect(store.failedControllers[0]?.id).toBe('core');
+      });
+
+      it('keeps phase="done" when every controller succeeded (full success)', () => {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState());
+        store.applyControllerUpdate({
+          controllerId: BODY_MAC,
+          stage: 'VERSION_CONFIRMED',
+          finalVersion: '1.4.2',
+        });
+        store.applyControllerUpdate({
+          controllerId: CORE_MAC,
+          stage: 'VERSION_CONFIRMED',
+          finalVersion: '1.4.2',
+        });
+
+        store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+        expect(store.phase).toBe('done');
+        expect(store.failedControllers).toEqual([]);
+      });
+    });
   });
 
   describe('applyJobFailed', () => {

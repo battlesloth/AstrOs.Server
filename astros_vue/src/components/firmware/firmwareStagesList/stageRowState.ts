@@ -14,19 +14,11 @@ export interface StageRowStateInput {
 export function stageRowState(input: StageRowStateInput): StageRowState {
   const { stage, phase, currentStage, failedStage } = input;
   const index = FIRMWARE_STAGES.indexOf(stage);
-  if (phase === 'done') {
-    // `phase === 'done'` means the job's lifecycle is terminal — not that
-    // every stage completed successfully. Painting unreached stages green
-    // misleads the operator when controllers fail before reaching the end
-    // (e.g. the deploy stub returns all-FAILED at the `transfer` step).
-    // Mirror the `flashing` branch: stages at or before `currentStage` are
-    // `done`, beyond are `idle`. Per-controller failure still surfaces via
-    // the row's pill.
-    if (currentStage === null) return 'idle';
-    const currentIndex = FIRMWARE_STAGES.indexOf(currentStage);
-    if (currentIndex === -1) return 'idle';
-    return index <= currentIndex ? 'done' : 'idle';
-  }
+  // `phase === 'done'` is a fully-successful job — any controller failure
+  // gets routed to `phase === 'failed'` by the firmware store at
+  // applyJobDone time, where the failedStage branch below renders the
+  // partial-completion correctly.
+  if (phase === 'done') return 'done';
   if (phase === 'failed') {
     if (failedStage === null) return 'idle';
     const failedIndex = FIRMWARE_STAGES.indexOf(failedStage);
