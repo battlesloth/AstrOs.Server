@@ -330,4 +330,63 @@ describe('remoteControl store', () => {
       errSpy.mockRestore();
     });
   });
+
+  describe('selectedIdx + selectPage', () => {
+    it('starts at 0', () => {
+      const store = useRemoteControlStore();
+      expect(store.selectedIdx).toBe(0);
+    });
+
+    it('selectPage(2) sets selectedIdx to 2 when 3 pages exist', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.selectPage(2);
+
+      expect(store.selectedIdx).toBe(2);
+    });
+
+    it('clamps selectPage(99) to last index when out of range high', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.selectPage(99);
+
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('clamps selectPage(-3) to 0 when negative', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.selectPage(-3);
+
+      expect(store.selectedIdx).toBe(0);
+    });
+
+    it('does NOT set isDirty', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.selectPage(1);
+
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('loadRemoteControl resets selectedIdx to 0', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      await store.loadRemoteControl();
+
+      expect(store.selectedIdx).toBe(0);
+    });
+  });
 });

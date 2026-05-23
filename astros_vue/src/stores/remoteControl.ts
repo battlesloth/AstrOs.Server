@@ -81,6 +81,7 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
   const remoteControlPages = ref<RemoteControlPage[]>([]);
   const isLoading = ref(false);
   const isDirty = ref(false);
+  const selectedIdx = ref(0);
 
   async function loadRemoteControl() {
     isLoading.value = true;
@@ -100,6 +101,7 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
         remoteControlPages.value = [createDefaultPage(0)];
       }
       isDirty.value = false;
+      selectedIdx.value = 0;
       isLoading.value = false;
       return { success: true, data: result };
     } catch (error) {
@@ -107,6 +109,15 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
       isLoading.value = false;
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
+  }
+
+  function selectPage(idx: number) {
+    if (remoteControlPages.value.length === 0) {
+      selectedIdx.value = 0;
+      return;
+    }
+    const lastIdx = remoteControlPages.value.length - 1;
+    selectedIdx.value = Math.min(Math.max(idx, 0), lastIdx);
   }
 
   async function saveRemoteControl() {
@@ -129,7 +140,9 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     remoteControlPages,
     isLoading,
     isDirty,
+    selectedIdx,
     loadRemoteControl,
     saveRemoteControl,
+    selectPage,
   };
 });
