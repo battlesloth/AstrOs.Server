@@ -1,2 +1,4 @@
 export { default as AstrosRemoteButton } from './AstrosRemoteButton.vue';
 export { default as AstrosRemoteControl } from './AstrosRemoteControl.vue';
+export { default as AstrosRemoteButtonCard } from './remoteButtonCard/AstrosRemoteButtonCard.vue';
+export { default as AstrosRemoteButtonEditor } from './remoteButtonEditor/AstrosRemoteButtonEditor.vue';
