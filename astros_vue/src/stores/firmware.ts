@@ -935,6 +935,28 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return out;
   });
 
+  // Integer percentage (0..100) of the serial-upload-to-master step, derived
+  // from any in-flight controller in UPLOADING_TO_MASTER (all share bytesSent
+  // because the streamer transfers a single binary to the master — see
+  // flash_orchestrator.ts onTransferBegun comment). null when no controller
+  // is in that stage, or when totalBytes is missing / non-positive. The UI
+  // falls back to its generic in-progress label when this is null.
+  const downloadPercent = computed<number | null>(() => {
+    for (const state of controllerStates.value.values()) {
+      if (state.stage !== 'UPLOADING_TO_MASTER') continue;
+      const total = state.totalBytes;
+      const sent = state.bytesSent;
+      if (typeof total !== 'number' || total <= 0) return null;
+      if (typeof sent !== 'number') return null;
+      const ratio = sent / total;
+      // Clamp defensively: a server-side off-by-one or stale bytesSent
+      // shouldn't render as "117%".
+      const pct = Math.round(Math.max(0, Math.min(1, ratio)) * 100);
+      return pct;
+    }
+    return null;
+  });
+
   return {
     releases,
     releasesLoadState,
@@ -962,6 +984,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     canFlash,
     isOwnJob,
     progressByControllerId,
+    downloadPercent,
     toggle,
     selectAll,
     clear,

@@ -243,8 +243,11 @@ export type SlotId = Exclude<`${Location}`, `${Location.UNKNOWN}`>;
 
 /**
  * Wire-side mirror of the server's `ControllerFlashState` discriminated union,
- * narrowed to fields the UI reads (server wire also carries `bytesSent`,
- * `totalBytes`, `detail`; we drop those — no UI surface renders them).
+ * narrowed to fields the UI reads. `bytesSent`/`totalBytes` are kept as
+ * optional on in-flight stages so the download-stage progress tracker can
+ * compute a percentage. They're never authoritative — a row simply renders
+ * its in-progress badge without a percentage when the fields aren't present.
+ * `detail` is dropped — no UI surface renders it.
  *
  * Source of truth: `astros_api/src/models/firmware/flash_job_state.ts`.
  *
@@ -258,6 +261,8 @@ export type ControllerFlashState =
   | {
       controllerId: string;
       stage: 'QUEUED' | 'UPLOADING_TO_MASTER' | 'SENDING' | 'VERIFYING' | 'REBOOTING';
+      bytesSent?: number;
+      totalBytes?: number;
     }
   | { controllerId: string; stage: 'VERSION_CONFIRMED'; finalVersion: string }
   | { controllerId: string; stage: 'FAILED'; error: string };
@@ -271,6 +276,8 @@ export type ControllerFlashStateBySlot =
   | {
       controllerId: SlotId;
       stage: 'QUEUED' | 'UPLOADING_TO_MASTER' | 'SENDING' | 'VERIFYING' | 'REBOOTING';
+      bytesSent?: number;
+      totalBytes?: number;
     }
   | { controllerId: SlotId; stage: 'VERSION_CONFIRMED'; finalVersion: string }
   | { controllerId: SlotId; stage: 'FAILED'; error: string };

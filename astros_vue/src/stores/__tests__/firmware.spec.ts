@@ -2190,4 +2190,99 @@ describe('firmware store', () => {
       }
     });
   });
+
+  describe('downloadPercent', () => {
+    const BODY_MAC = '00:00:00:00:00:00';
+    const CORE_MAC = 'aa:bb:cc:dd:ee:01';
+
+    function startUploadingJob(): ReturnType<typeof useFirmwareStore> {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.setPhase('select');
+      store.applyJobStarted({
+        jobId: 'job-1',
+        source: { kind: 'github', version: 'v1.4.2' },
+        controllers: [
+          { controllerId: BODY_MAC, stage: 'QUEUED' },
+          { controllerId: CORE_MAC, stage: 'QUEUED' },
+        ],
+        startedAt: '2026-05-12T08:00:00Z',
+      });
+      return store;
+    }
+
+    it('is null before any controller enters UPLOADING_TO_MASTER', () => {
+      const store = startUploadingJob();
+      // Still in QUEUED — no percent to report yet.
+      expect(store.downloadPercent).toBeNull();
+    });
+
+    it('reports the integer percent computed from bytesSent / totalBytes', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 250_000,
+        totalBytes: 1_000_000,
+      });
+      expect(store.downloadPercent).toBe(25);
+    });
+
+    it('rounds to nearest integer (no fractional percents)', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 333_333,
+        totalBytes: 1_000_000,
+      });
+      // 33.3333… rounds down to 33.
+      expect(store.downloadPercent).toBe(33);
+    });
+
+    it('clamps a stale-byte-count overflow to 100 rather than emitting > 100', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 1_200_000,
+        totalBytes: 1_000_000,
+      });
+      expect(store.downloadPercent).toBe(100);
+    });
+
+    it('is null when totalBytes is missing or non-positive', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 100,
+        // totalBytes intentionally omitted.
+      });
+      expect(store.downloadPercent).toBeNull();
+
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 100,
+        totalBytes: 0,
+      });
+      expect(store.downloadPercent).toBeNull();
+    });
+
+    it('is null once controllers have moved past UPLOADING_TO_MASTER', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 500_000,
+        totalBytes: 1_000_000,
+      });
+      expect(store.downloadPercent).toBe(50);
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
+      store.applyControllerUpdate({ controllerId: CORE_MAC, stage: 'SENDING' });
+      // No controllers in UPLOADING_TO_MASTER anymore — percent gone.
+      expect(store.downloadPercent).toBeNull();
+    });
+  });
 });
