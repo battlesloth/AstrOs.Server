@@ -127,6 +127,22 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     isDirty.value = true;
   }
 
+  function duplicatePage(idx: number) {
+    const src = remoteControlPages.value[idx];
+    if (!src) return;
+    const copy: RemoteControlPage = {
+      ...src,
+      id: crypto.randomUUID(),
+      name: `${src.name} (copy)`,
+    };
+    for (const key of BUTTON_KEYS) {
+      copy[key] = { ...src[key] };
+    }
+    remoteControlPages.value.splice(idx + 1, 0, copy);
+    selectedIdx.value = idx + 1;
+    isDirty.value = true;
+  }
+
   async function saveRemoteControl() {
     const contentPages = remoteControlPages.value.filter((page) =>
       BUTTON_KEYS.some((key) => page[key].id !== '0'),
@@ -152,5 +168,6 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     saveRemoteControl,
     selectPage,
     addPage,
+    duplicatePage,
   };
 });

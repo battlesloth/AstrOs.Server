@@ -424,4 +424,83 @@ describe('remoteControl store', () => {
       expect(store.isDirty).toBe(true);
     });
   });
+
+  describe('duplicatePage', () => {
+    it('splices a copy right after the source index with a fresh id', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      const srcId = store.remoteControlPages[0]!.id;
+
+      store.duplicatePage(0);
+
+      expect(store.remoteControlPages).toHaveLength(3);
+      expect(store.remoteControlPages[1]!.id).not.toBe(srcId);
+      expect(store.remoteControlPages[1]!.id).toMatch(UUID_LIKE);
+    });
+
+    it('names the copy "<src> (copy)"', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'Performance' }]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(0);
+
+      expect(store.remoteControlPages[1]!.name).toBe('Performance (copy)');
+    });
+
+    it('deep-copies button slots (mutating source button in place does not affect copy)', async () => {
+      // Slot reassignment (`page.button1 = {...}`) would always isolate the copy
+      // even without a deep copy — it just rebinds the source's slot reference.
+      // The real shared-reference hazard is in-place property mutation, which
+      // is what a Pinia consumer would do via `page.button1.name = '...'` or
+      // `page.button1.id = '...'`. This test pokes that path.
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.remoteControlPages[0]!.button1 = { id: 's1', name: 'Wave', type: 'script' };
+
+      store.duplicatePage(0);
+      store.remoteControlPages[0]!.button1.name = 'Bow';
+      store.remoteControlPages[0]!.button1.id = 's2';
+
+      expect(store.remoteControlPages[1]!.button1).toEqual({
+        id: 's1',
+        name: 'Wave',
+        type: 'script',
+      });
+    });
+
+    it('selects the copy', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(0);
+
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('flips isDirty to true', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(0);
+
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('no-ops on out-of-range index (negative or beyond end)', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(-1);
+      store.duplicatePage(99);
+
+      expect(store.remoteControlPages).toHaveLength(1);
+      expect(store.isDirty).toBe(false);
+    });
+  });
 });
