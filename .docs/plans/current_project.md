@@ -21,8 +21,11 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
       layout (page list + 3×3 grid + live preview), inline button editor, inline page CRUD.
       Design: [`specs/2026-05-21-phase2-editor-design.md`](./specs/2026-05-21-phase2-editor-design.md).
       Split into 4 PRs:
-  - [ ] **2a** — Store CRUD foundation (addPage / duplicatePage / deletePage / renamePage /
-        selectPage; isDirty flag; drop all-empty save filter). No UI changes.
+  - [x] **2a** — Store CRUD foundation (addPage / duplicatePage / deletePage / renamePage /
+        selectPage / setButton; isDirty flag; drop all-empty save filter). No UI changes. —
+        shipped 2026-05-23 via PR #94 (merge `3d6e3a4`). Two pre-push toolkit rounds; 67 store
+        tests including mutation-guards on every defensive branch; `setButton` helper added
+        post-PR-review to make the slot-write + isDirty flip atomic.
   - [ ] **2b** — `AstrosRemoteButtonCard` + `AstrosRemoteButtonEditor` (paired). Storybook
         is the verification gate; no app integration.
   - [ ] **2c** — `AstrosRemotePageList`. Storybook gate; no app integration.
