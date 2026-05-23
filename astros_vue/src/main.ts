@@ -17,7 +17,15 @@ import {
   IoAdd,
   IoHelpCircleOutline,
 } from 'oh-vue-icons/icons';
-import { MdDraghandle, MdDescription, MdFolder } from 'oh-vue-icons/icons/md';
+import {
+  MdAdd,
+  MdContentcopy,
+  MdDelete,
+  MdDescription,
+  MdDraghandle,
+  MdEdit,
+  MdFolder,
+} from 'oh-vue-icons/icons/md';
 import App from './App.vue';
 import router from './router';
 import i18n from './i18n';
@@ -37,8 +45,12 @@ addIcons(
   IoChevronDown,
   IoAdd,
   IoHelpCircleOutline,
-  MdDraghandle,
+  MdAdd,
+  MdContentcopy,
+  MdDelete,
   MdDescription,
+  MdDraghandle,
+  MdEdit,
   MdFolder,
 );
 
