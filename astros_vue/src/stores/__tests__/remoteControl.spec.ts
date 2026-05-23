@@ -257,19 +257,14 @@ describe('remoteControl store', () => {
       expect(parsed[0]!.name).toBe('Quick Actions');
     });
 
-    it('drops a page where all 9 buttons are id="0" even when page id/name are populated strings', async () => {
+    it('persists every page including ones where all 9 buttons are id="0"', async () => {
+      // Decision 3 of the Phase 2 design spec: the all-empty save filter is
+      // removed. Empty pages persist; users delete pages explicitly via the UI.
       apiGet.mockResolvedValue(JSON.stringify([]));
       apiPut.mockResolvedValue(undefined);
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
 
-      // Guards against regressing the BUTTON_KEYS filter to a reflection-style
-      // `Object.values(page).some(b => b.id !== '0')`. The seeded page has a
-      // populated UUID id and "Page 1" name; the old form would short-circuit
-      // true on `someUuid.id !== '0'` (undefined !== '0' is true) and retain
-      // the page. The fixed form iterates BUTTON_KEYS only and drops it.
-      // Verified mechanically: reverting the filter to Object.values makes
-      // this test fail (parsed.length === 1).
       expect(store.remoteControlPages).toHaveLength(1);
       expect(store.remoteControlPages[0]!.id).toMatch(UUID_LIKE);
       expect(store.remoteControlPages[0]!.name).toBe('Page 1');
@@ -278,7 +273,36 @@ describe('remoteControl store', () => {
 
       const sent = apiPut.mock.calls[0]![1] as { config: string };
       const parsed = JSON.parse(sent.config) as RemoteControlPage[];
-      expect(parsed).toHaveLength(0);
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0]!.id).toBe(store.remoteControlPages[0]!.id);
+      expect(parsed[0]!.name).toBe('Page 1');
+    });
+
+    it('clears isDirty to false on save success', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      apiPut.mockResolvedValue(undefined);
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+      expect(store.isDirty).toBe(true);
+
+      await store.saveRemoteControl();
+
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('does NOT clear isDirty when save fails', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      apiPut.mockRejectedValue(new Error('save failed'));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+
+      await store.saveRemoteControl();
+
+      expect(store.isDirty).toBe(true);
+      errSpy.mockRestore();
     });
 
     it('returns {success:false, error} when the API rejects', async () => {

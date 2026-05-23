@@ -165,14 +165,11 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
   }
 
   async function saveRemoteControl() {
-    const contentPages = remoteControlPages.value.filter((page) =>
-      BUTTON_KEYS.some((key) => page[key].id !== '0'),
-    );
-
-    const payload = JSON.stringify(contentPages);
+    const payload = JSON.stringify(remoteControlPages.value);
 
     try {
       await apiService.put(REMOTE_CONFIG, { config: payload });
+      isDirty.value = false;
       return { success: true };
     } catch (error) {
       console.error('Failed to save remote control configuration:', error);
