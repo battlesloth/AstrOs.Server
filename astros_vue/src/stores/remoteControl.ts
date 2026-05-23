@@ -127,6 +127,18 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     isDirty.value = true;
   }
 
+  function deletePage(idx: number) {
+    if (remoteControlPages.value.length <= 1) return;
+    if (idx < 0 || idx >= remoteControlPages.value.length) return;
+    remoteControlPages.value.splice(idx, 1);
+    if (selectedIdx.value > idx) {
+      selectedIdx.value -= 1;
+    } else if (selectedIdx.value >= remoteControlPages.value.length) {
+      selectedIdx.value = remoteControlPages.value.length - 1;
+    }
+    isDirty.value = true;
+  }
+
   function duplicatePage(idx: number) {
     const src = remoteControlPages.value[idx];
     if (!src) return;
@@ -169,5 +181,6 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     selectPage,
     addPage,
     duplicatePage,
+    deletePage,
   };
 });

@@ -503,4 +503,90 @@ describe('remoteControl store', () => {
       expect(store.isDirty).toBe(false);
     });
   });
+
+  describe('deletePage', () => {
+    it('removes the page at the given index', async () => {
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(1);
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'C']);
+    });
+
+    it('no-ops when only one page remains', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(0);
+
+      expect(store.remoteControlPages).toHaveLength(1);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('clamps selectedIdx when deleting the currently-selected last page', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      store.deletePage(2);
+
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('shifts selectedIdx down when deleting a page below the current selection', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      store.deletePage(0);
+
+      // Was idx 2, now at idx 1 because the page below it was removed.
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('keeps selectedIdx unchanged when deleting a page above the current selection', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(0);
+
+      store.deletePage(2);
+
+      expect(store.selectedIdx).toBe(0);
+    });
+
+    it('flips isDirty to true', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(0);
+
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('no-ops on out-of-range idx without changing pages or isDirty', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(-1);
+      store.deletePage(99);
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      expect(store.isDirty).toBe(false);
+    });
+  });
 });
