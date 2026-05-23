@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import type { EditorListItem } from '../remoteButtonEditor/types';
+import AstrosRemoteButtonEditor from '../remoteButtonEditor/AstrosRemoteButtonEditor.vue';
 
 const props = defineProps<{
   buttonNumber: number;
@@ -22,19 +24,57 @@ const typeChipClasses = computed(() =>
     : 'bg-primary/15 text-primary border border-primary/40',
 );
 
+const popoverOpen = ref(false);
+const cardRef = ref<HTMLElement | null>(null);
+const popoverRef = ref<HTMLElement | null>(null);
+
+const { floatingStyles } = useFloating(cardRef, popoverRef, {
+  placement: 'bottom',
+  middleware: [offset(8), flip(), shift({ padding: 8 })],
+  whileElementsMounted: autoUpdate,
+});
+
+function openEditor() {
+  popoverOpen.value = true;
+}
+
+function closeEditor() {
+  popoverOpen.value = false;
+}
+
+function handleChange(value: PageButton) {
+  emit('change', value);
+  closeEditor();
+}
+
 function clearAssignment() {
   emit('change', { id: '0', name: 'None', type: 'none' });
 }
 
-// Suppress unused-prop warnings for scripts/playlists — they're forwarded
-// to the editor popover in the next task. Reading them here keeps Vue's
-// reactivity from warning about unused destructure.
-void props.scripts;
-void props.playlists;
+function handleClickOutside(e: MouseEvent) {
+  if (!popoverOpen.value) return;
+  const target = e.target as Node;
+  if (cardRef.value?.contains(target)) return;
+  if (popoverRef.value?.contains(target)) return;
+  closeEditor();
+}
+
+onMounted(() => {
+  // Capture phase so the outside-click fires before any child handler can
+  // stopPropagation. Without capture, a click on the editor's None row
+  // (which calls preventDefault/stopPropagation internally) could swallow
+  // the close-on-outside check.
+  document.addEventListener('click', handleClickOutside, true);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleClickOutside, true);
+});
 </script>
 
 <template>
   <div
+    ref="cardRef"
     class="astros-remote-button-card flex min-h-32 flex-col gap-2 rounded-xl border-2 p-3 transition-colors"
     :class="
       isAssigned
@@ -65,6 +105,7 @@ void props.playlists;
           type="button"
           class="btn btn-sm btn-outline flex-1"
           data-testid="card-edit"
+          @click="openEditor"
         >
           Edit
         </button>
@@ -83,9 +124,28 @@ void props.playlists;
         type="button"
         class="btn btn-sm btn-ghost mt-auto w-full justify-center text-base-content/60"
         data-testid="card-configure"
+        @click="openEditor"
       >
         Configure →
       </button>
     </template>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="popoverOpen"
+      ref="popoverRef"
+      :style="floatingStyles"
+      class="z-50 w-64 rounded-xl border-2 border-primary bg-base-100 p-3 shadow-xl"
+    >
+      <AstrosRemoteButtonEditor
+        :button-number="buttonNumber"
+        :current-value="value"
+        :scripts="scripts"
+        :playlists="playlists"
+        @change="handleChange"
+        @close="closeEditor"
+      />
+    </div>
+  </Teleport>
 </template>

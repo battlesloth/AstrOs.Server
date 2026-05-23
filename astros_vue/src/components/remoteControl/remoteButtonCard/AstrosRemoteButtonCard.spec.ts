@@ -68,6 +68,96 @@ describe('AstrosRemoteButtonCard — display state', () => {
 
     expect(wrapper.emitted('change')![0]![0]).toEqual({ id: '0', name: 'None', type: 'none' });
     // The editor popover must NOT have rendered (no editor element in DOM).
-    expect(wrapper.find('[data-testid="editor-search"]').exists()).toBe(false);
+    expect(document.querySelector('[data-testid="editor-search"]')).toBeNull();
+  });
+});
+
+describe('AstrosRemoteButtonCard — popover host', () => {
+  it('opens the editor popover when Configure is clicked on an unassigned card', async () => {
+    const wrapper = mount(AstrosRemoteButtonCard, {
+      attachTo: document.body,
+      props: { buttonNumber: 5, value: mkNone(), scripts: SCRIPTS, playlists: PLAYLISTS },
+    });
+    await wrapper.get('[data-testid="card-configure"]').trigger('click');
+
+    expect(document.querySelector('[data-testid="editor-search"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it('opens the editor popover when Edit is clicked on an assigned card', async () => {
+    const wrapper = mount(AstrosRemoteButtonCard, {
+      attachTo: document.body,
+      props: { buttonNumber: 5, value: mkScript(), scripts: SCRIPTS, playlists: PLAYLISTS },
+    });
+    await wrapper.get('[data-testid="card-edit"]').trigger('click');
+
+    expect(document.querySelector('[data-testid="editor-search"]')).not.toBeNull();
+    wrapper.unmount();
+  });
+
+  it('forwards the editor change event up and closes the popover', async () => {
+    const wrapper = mount(AstrosRemoteButtonCard, {
+      attachTo: document.body,
+      props: { buttonNumber: 5, value: mkNone(), scripts: SCRIPTS, playlists: PLAYLISTS },
+    });
+    await wrapper.get('[data-testid="card-configure"]').trigger('click');
+    const item = document.querySelector('[data-testid="editor-item-s1"]') as HTMLElement;
+    item.click();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.emitted('change')![0]![0]).toEqual({
+      id: 's1',
+      name: 'Wave Hello',
+      type: 'script',
+    });
+    expect(document.querySelector('[data-testid="editor-search"]')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it('closes the popover when the editor emits close (× button)', async () => {
+    const wrapper = mount(AstrosRemoteButtonCard, {
+      attachTo: document.body,
+      props: { buttonNumber: 5, value: mkNone(), scripts: SCRIPTS, playlists: PLAYLISTS },
+    });
+    await wrapper.get('[data-testid="card-configure"]').trigger('click');
+    expect(document.querySelector('[data-testid="editor-search"]')).not.toBeNull();
+
+    const close = document.querySelector('[data-testid="editor-close"]') as HTMLElement;
+    close.click();
+    await wrapper.vm.$nextTick();
+
+    expect(document.querySelector('[data-testid="editor-search"]')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it('closes the popover when a click outside both card and popover happens', async () => {
+    const wrapper = mount(AstrosRemoteButtonCard, {
+      attachTo: document.body,
+      props: { buttonNumber: 5, value: mkNone(), scripts: SCRIPTS, playlists: PLAYLISTS },
+    });
+    await wrapper.get('[data-testid="card-configure"]').trigger('click');
+
+    const outside = document.createElement('div');
+    document.body.appendChild(outside);
+    outside.click();
+    await wrapper.vm.$nextTick();
+
+    expect(document.querySelector('[data-testid="editor-search"]')).toBeNull();
+    outside.remove();
+    wrapper.unmount();
+  });
+
+  it('removes the document click listener on unmount (no leak / no error)', async () => {
+    const wrapper = mount(AstrosRemoteButtonCard, {
+      attachTo: document.body,
+      props: { buttonNumber: 5, value: mkNone(), scripts: SCRIPTS, playlists: PLAYLISTS },
+    });
+    await wrapper.get('[data-testid="card-configure"]').trigger('click');
+    wrapper.unmount();
+
+    expect(() => {
+      const evt = new MouseEvent('click', { bubbles: true });
+      document.body.dispatchEvent(evt);
+    }).not.toThrow();
   });
 });
