@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onScopeDispose, ref } from 'vue';
+import { computed, nextTick, onMounted, onScopeDispose, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { makeNoneButton, type PageButton } from '@/models/remoteControl/pageButton';
@@ -56,6 +56,11 @@ const typeChipLabel = computed(() => {
 const popoverOpen = ref(false);
 const cardRef = ref<HTMLElement | null>(null);
 const popoverRef = ref<HTMLElement | null>(null);
+// Captured on openEditor so closeEditor can restore keyboard focus to the
+// element that opened the popover. Without this, every popover dismissal
+// dumps focus to <body> and a keyboard user has to Tab back to where they
+// were.
+let triggerEl: HTMLElement | null = null;
 
 const { floatingStyles } = useFloating(cardRef, popoverRef, {
   placement: 'bottom',
@@ -64,11 +69,17 @@ const { floatingStyles } = useFloating(cardRef, popoverRef, {
 });
 
 function openEditor() {
+  triggerEl = document.activeElement as HTMLElement | null;
   popoverOpen.value = true;
 }
 
 function closeEditor() {
   popoverOpen.value = false;
+  // Restore focus AFTER the popover unmounts so the trigger button can
+  // re-receive focus cleanly. nextTick lets Vue flush the v-if removal.
+  const target = triggerEl;
+  triggerEl = null;
+  nextTick(() => target?.focus());
 }
 
 function handleChange(value: PageButton) {

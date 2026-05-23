@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
+import { nextTick } from 'vue';
 import AstrosRemoteButtonEditor from './AstrosRemoteButtonEditor.vue';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import enUS from '@/locales/enUS.json';
@@ -242,6 +243,30 @@ describe('AstrosRemoteButtonEditor', () => {
     await wrapper.trigger('keydown', { key: 'Escape' });
 
     expect(wrapper.emitted('close')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('moves focus to the editor root on mount (so wrapper @keydown.escape can fire)', async () => {
+    // Pins the focus-on-mount behavior in isolation. The card-level Escape
+    // integration test exercises it transitively, but this unit test asserts
+    // the focus contract directly — if a future refactor strips tabindex=-1
+    // or drops the onMounted/nextTick/focus chain, this test fails loudly
+    // rather than only being visible as a downstream integration regression.
+    const wrapper = mount(AstrosRemoteButtonEditor, {
+      attachTo: document.body,
+      global: { plugins: [i18n] },
+      props: {
+        buttonNumber: 5,
+        currentValue: mkNoneButton(),
+        scripts: SCRIPTS,
+        playlists: PLAYLISTS,
+      },
+    });
+    // onMounted fires after mount; the focus call is wrapped in nextTick.
+    await nextTick();
+    await nextTick();
+
+    expect(document.activeElement).toBe(wrapper.element);
     wrapper.unmount();
   });
 

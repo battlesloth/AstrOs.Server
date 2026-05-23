@@ -168,10 +168,15 @@ describe('AstrosRemoteButtonCard — popover host', () => {
     });
     await wrapper.get('[data-testid="card-configure"]').trigger('click');
     await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
     expect(document.querySelector('[data-testid="editor-search"]')).not.toBeNull();
+    // Pin the focus contract explicitly — if a future refactor drops the
+    // tabindex or breaks the focus chain, this assertion fires before the
+    // Escape dispatch makes the rest of the test ambiguous.
+    expect(document.activeElement).not.toBe(document.body);
 
     const escEvent = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
-    (document.activeElement ?? document.body).dispatchEvent(escEvent);
+    document.activeElement!.dispatchEvent(escEvent);
     await wrapper.vm.$nextTick();
 
     expect(document.querySelector('[data-testid="editor-search"]')).toBeNull();
@@ -214,11 +219,13 @@ describe('AstrosRemoteButtonCard — popover host', () => {
     wrapper.unmount();
   });
 
-  it('removes the EXACT document click listener registered on mount (proves cleanup actually ran)', async () => {
+  it('removes every click+capture document listener registered on mount (proves cleanup actually ran)', async () => {
     // The previous "doesn't throw on post-unmount click" form was vacuous —
-    // the handler has no throwable path even when leaked. Spying on
-    // add/removeEventListener and comparing handler identity proves the
-    // listener was actually unregistered, AND pins the capture-phase third arg.
+    // the handler has no throwable path even when leaked. Spy on
+    // add/removeEventListener and assert every click+capture handler
+    // registered is also removed. Filter-and-subset (not .find()) so a
+    // future Floating UI upgrade that adds its own click+capture listener
+    // doesn't silently corrupt this test by hiding behind the first match.
     const addSpy = vi.spyOn(document, 'addEventListener');
     const removeSpy = vi.spyOn(document, 'removeEventListener');
 
@@ -227,13 +234,17 @@ describe('AstrosRemoteButtonCard — popover host', () => {
       global: { plugins: [i18n] },
       props: { buttonNumber: 5, value: mkNone(), scripts: SCRIPTS, playlists: PLAYLISTS },
     });
-    const addCall = addSpy.mock.calls.find(([type, , opts]) => type === 'click' && opts === true);
-    expect(addCall).toBeDefined();
-    const installedHandler = addCall![1];
+    const addedHandlers = addSpy.mock.calls
+      .filter(([type, , opts]) => type === 'click' && opts === true)
+      .map(([, handler]) => handler);
+    expect(addedHandlers.length).toBeGreaterThan(0);
 
     wrapper.unmount();
 
-    expect(removeSpy).toHaveBeenCalledWith('click', installedHandler, true);
+    const removedHandlers = removeSpy.mock.calls
+      .filter(([type, , opts]) => type === 'click' && opts === true)
+      .map(([, handler]) => handler);
+    expect(removedHandlers).toEqual(expect.arrayContaining(addedHandlers));
   });
 
   it('closes the popover via capture phase even when an outside element stops bubble propagation', async () => {
@@ -289,7 +300,10 @@ describe('AstrosRemoteButtonCard — popover host', () => {
       global: { plugins: [i18n] },
       props: { buttonNumber: 5, value: mkNone(), scripts: SCRIPTS, playlists: PLAYLISTS },
     });
+    // Pre-assert both the Configure-visible AND chip-absent baseline so a
+    // regression that renders the chip unconditionally would surface here.
     expect(wrapper.find('[data-testid="card-configure"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="card-type-chip"]').exists()).toBe(false);
 
     await wrapper.setProps({ value: mkScript() });
 
@@ -297,5 +311,33 @@ describe('AstrosRemoteButtonCard — popover host', () => {
     expect(wrapper.find('[data-testid="card-edit"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="card-type-chip"]').text()).toMatch(/SCRIPT/i);
     expect(wrapper.text()).toContain('Wave Hello');
+  });
+
+  it('restores keyboard focus to the trigger button when the popover closes', async () => {
+    // Pins the a11y contract — without focus capture/restore, every popover
+    // dismissal (Escape, close button, click outside, selection) drops
+    // focus to <body> and a keyboard user has to Tab back to where they were.
+    const wrapper = mount(AstrosRemoteButtonCard, {
+      attachTo: document.body,
+      global: { plugins: [i18n] },
+      props: { buttonNumber: 5, value: mkNone(), scripts: SCRIPTS, playlists: PLAYLISTS },
+    });
+    const configureBtn = wrapper.get('[data-testid="card-configure"]').element as HTMLElement;
+    configureBtn.focus();
+    expect(document.activeElement).toBe(configureBtn);
+
+    await configureBtn.click();
+    await wrapper.vm.$nextTick();
+    // Editor's focus-on-mount stole focus from the trigger.
+    expect(document.activeElement).not.toBe(configureBtn);
+
+    // Close via the editor's × button.
+    const close = document.querySelector('[data-testid="editor-close"]') as HTMLElement;
+    close.click();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+
+    expect(document.activeElement).toBe(configureBtn);
+    wrapper.unmount();
   });
 });
