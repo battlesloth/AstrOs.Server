@@ -3,8 +3,16 @@ import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import AstrosRemotePageList from './AstrosRemotePageList.vue';
 import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
-import { makeNoneButton } from '@/models/remoteControl/pageButton';
+import { BUTTON_KEYS } from '@/models/remoteControl/remoteControlPage';
+import { makeNoneButton, type PageButton } from '@/models/remoteControl/pageButton';
 import enUS from '@/locales/enUS.json';
+
+function mkScriptBtn(): PageButton {
+  return { id: 's1', name: 'Wave', type: 'script' };
+}
+function mkPlaylistBtn(): PageButton {
+  return { id: 'p1', name: 'Routine', type: 'playlist' };
+}
 
 const i18n = createI18n({
   legacy: false,
@@ -116,5 +124,50 @@ describe('AstrosRemotePageList — select + add emits', () => {
     expect(wrapper.emitted('select')).toHaveLength(2);
     expect(wrapper.emitted('select')![0]).toEqual([0]);
     expect(wrapper.emitted('select')![1]).toEqual([0]);
+  });
+});
+
+describe('AstrosRemotePageList — mini 3x3 preview', () => {
+  it('renders a 9-dot preview per row, one dot per button slot', () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    const dotsInFirstRow = wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .findAll('[data-testid="page-list-dot"]');
+    expect(dotsInFirstRow).toHaveLength(9);
+  });
+
+  it('uses the script class on script-typed slots, playlist on playlist-typed, none on empty', () => {
+    const mixed: RemoteControlPage = {
+      ...mkPage('mixed', 'Mixed'),
+      button1: mkScriptBtn(),
+      button5: mkPlaylistBtn(),
+    };
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: [mixed], selectedIdx: 0 },
+    });
+    const dots = wrapper.findAll('[data-testid="page-list-dot"]');
+    expect(dots[0]!.attributes('data-type')).toBe('script');
+    expect(dots[4]!.attributes('data-type')).toBe('playlist');
+    expect(dots[1]!.attributes('data-type')).toBe('none');
+  });
+
+  it('iterates BUTTON_KEYS in order (positions 3 + 7 reach the right slots)', () => {
+    const mixed: RemoteControlPage = {
+      ...mkPage('mixed', 'Mixed'),
+      button3: mkScriptBtn(),
+      button7: mkPlaylistBtn(),
+    };
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: [mixed], selectedIdx: 0 },
+    });
+    const dots = wrapper.findAll('[data-testid="page-list-dot"]');
+    expect(dots[2]!.attributes('data-type')).toBe('script');
+    expect(dots[6]!.attributes('data-type')).toBe('playlist');
+    expect(dots.length).toBe(BUTTON_KEYS.length);
   });
 });

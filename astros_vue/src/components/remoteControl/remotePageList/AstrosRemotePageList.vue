@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
-import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
+import {
+  BUTTON_KEYS,
+  type ButtonKey,
+  type RemoteControlPage,
+} from '@/models/remoteControl/remoteControlPage';
+import type { PageButton } from '@/models/remoteControl/pageButton';
+import { assertNever } from '@/utils/assertNever';
 
 const { t } = useI18n();
 
@@ -13,6 +19,19 @@ const emit = defineEmits<{
   select: [idx: number];
   add: [];
 }>();
+
+function dotClass(type: PageButton['type']): string {
+  switch (type) {
+    case 'script':
+      return 'bg-primary';
+    case 'playlist':
+      return 'bg-orange-500';
+    case 'none':
+      return 'bg-base-300';
+    default:
+      return assertNever(type);
+  }
+}
 </script>
 
 <template>
@@ -52,6 +71,18 @@ const emit = defineEmits<{
         data-testid="page-list-row"
         @click="emit('select', idx)"
       >
+        <div
+          class="grid flex-shrink-0 grid-cols-3 gap-px"
+          aria-hidden="true"
+        >
+          <span
+            v-for="key in BUTTON_KEYS"
+            :key="key"
+            :class="['block h-1.5 w-1.5 rounded-sm', dotClass(page[key as ButtonKey].type)]"
+            :data-type="page[key as ButtonKey].type"
+            data-testid="page-list-dot"
+          />
+        </div>
         <span
           :class="[
             'min-w-0 flex-1 truncate text-xs',
