@@ -81,3 +81,40 @@ describe('AstrosRemotePageList — header + rows', () => {
     expect(nameEl.attributes('title')).toBe('A Really Quite Long Page Name That Will Truncate');
   });
 });
+
+describe('AstrosRemotePageList — select + add emits', () => {
+  it('emits select(idx) when a row is clicked', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper.findAll('[data-testid="page-list-row"]')[2]!.trigger('click');
+
+    expect(wrapper.emitted('select')).toHaveLength(1);
+    expect(wrapper.emitted('select')![0]).toEqual([2]);
+  });
+
+  it('emits add() when the Add button is clicked', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper.get('[data-testid="page-list-add"]').trigger('click');
+
+    expect(wrapper.emitted('add')).toHaveLength(1);
+    expect(wrapper.emitted('add')![0]).toEqual([]);
+  });
+
+  it('emits select on every click (consumer dedupes if needed)', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper.findAll('[data-testid="page-list-row"]')[0]!.trigger('click');
+    await wrapper.findAll('[data-testid="page-list-row"]')[0]!.trigger('click');
+
+    expect(wrapper.emitted('select')).toHaveLength(2);
+    expect(wrapper.emitted('select')![0]).toEqual([0]);
+    expect(wrapper.emitted('select')![1]).toEqual([0]);
+  });
+});

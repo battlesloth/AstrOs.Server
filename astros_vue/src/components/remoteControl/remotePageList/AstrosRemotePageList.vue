@@ -9,7 +9,10 @@ defineProps<{
   selectedIdx: number;
 }>();
 
-// Emits land in Task 2.
+const emit = defineEmits<{
+  select: [idx: number];
+  add: [];
+}>();
 </script>
 
 <template>
@@ -26,6 +29,7 @@ defineProps<{
         :aria-label="t('remote_control_config.pageList.add')"
         :title="t('remote_control_config.pageList.add')"
         data-testid="page-list-add"
+        @click="emit('add')"
       >
         +
       </button>
@@ -46,6 +50,7 @@ defineProps<{
             : 'border border-transparent hover:bg-base-200',
         ]"
         data-testid="page-list-row"
+        @click="emit('select', idx)"
       >
         <span
           :class="[
