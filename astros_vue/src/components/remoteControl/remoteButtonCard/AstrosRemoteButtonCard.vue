@@ -125,7 +125,7 @@ onScopeDispose(() => {
   >
     <div
       v-if="isAssigned"
-      class="flex justify-end"
+      class="flex justify-center"
     >
       <span
         :class="[
