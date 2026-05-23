@@ -101,7 +101,6 @@ describe('remoteControl store', () => {
       expect(migrated.button1.id).toBe('0');
       expect(migrated.button1.type).toBe('none');
       expect(warnSpy).toHaveBeenCalled();
-      warnSpy.mockRestore();
     });
   });
 
@@ -202,7 +201,6 @@ describe('remoteControl store', () => {
 
       expect(result.success).toBe(false);
       expect(store.remoteControlPages).toEqual([]);
-      errSpy.mockRestore();
     });
 
     it('returns {success:false, error} when the API rejects', async () => {
@@ -214,7 +212,6 @@ describe('remoteControl store', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('network down');
-      errSpy.mockRestore();
     });
   });
 
@@ -303,7 +300,6 @@ describe('remoteControl store', () => {
       await store.saveRemoteControl();
 
       expect(store.isDirty).toBe(true);
-      errSpy.mockRestore();
     });
 
     it('returns {success:false, error} when the API rejects', async () => {
@@ -318,7 +314,6 @@ describe('remoteControl store', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('save failed');
-      errSpy.mockRestore();
     });
   });
 
@@ -373,7 +368,6 @@ describe('remoteControl store', () => {
       await store.loadRemoteControl();
 
       expect(store.isDirty).toBe(true);
-      errSpy.mockRestore();
     });
   });
 
@@ -597,7 +591,6 @@ describe('remoteControl store', () => {
       expect(store.remoteControlPages).toHaveLength(1);
       expect(store.isDirty).toBe(false);
       expect(warnSpy).toHaveBeenCalledTimes(2);
-      warnSpy.mockRestore();
     });
   });
 
@@ -703,7 +696,6 @@ describe('remoteControl store', () => {
       expect(store.remoteControlPages).toHaveLength(2);
       expect(store.remoteControlPages[0]!.name).toBe('A');
       expect(warnSpy).toHaveBeenCalled();
-      warnSpy.mockRestore();
     });
 
     it('warns and no-ops on fractional idx (would otherwise truncate inside splice)', async () => {
@@ -720,7 +712,6 @@ describe('remoteControl store', () => {
       store.deletePage(0.7);
 
       expect(store.remoteControlPages).toHaveLength(2);
-      warnSpy.mockRestore();
     });
 
     it('warns on out-of-range deletePage idx (programming-error breadcrumb)', async () => {
@@ -733,7 +724,6 @@ describe('remoteControl store', () => {
       store.deletePage(99);
 
       expect(warnSpy).toHaveBeenCalledTimes(2);
-      warnSpy.mockRestore();
     });
 
     it('shifts selectedIdx down when deleting a page below the current selection', async () => {
@@ -780,7 +770,6 @@ describe('remoteControl store', () => {
 
       expect(store.remoteControlPages).toHaveLength(2);
       expect(store.isDirty).toBe(false);
-      warnSpy.mockRestore();
     });
   });
 
@@ -844,7 +833,6 @@ describe('remoteControl store', () => {
       expect(warnSpy).toHaveBeenCalledTimes(2);
       expect(store.remoteControlPages[0]!.name).toBe('Page 1');
       expect(store.isDirty).toBe(false);
-      warnSpy.mockRestore();
     });
 
     it('flips isDirty to true on a valid rename', async () => {
