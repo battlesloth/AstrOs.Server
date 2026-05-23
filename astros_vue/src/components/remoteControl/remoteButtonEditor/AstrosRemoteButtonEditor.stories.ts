@@ -34,7 +34,7 @@ const popoverWrapper = `
 `;
 
 const meta: Meta<typeof AstrosRemoteButtonEditor> = {
-  title: 'RemoteControl/AstrosRemoteButtonEditor',
+  title: 'components/remoteControl/AstrosRemoteButtonEditor',
   component: AstrosRemoteButtonEditor,
   render: (args) => ({
     components: { AstrosRemoteButtonEditor },

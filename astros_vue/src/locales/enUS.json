@@ -582,7 +582,6 @@
   },
   "remote_control_config": {
     "card": {
-      "label": "BUTTON {n}",
       "configure": "Configure →",
       "edit": "Edit",
       "clear": "Clear",

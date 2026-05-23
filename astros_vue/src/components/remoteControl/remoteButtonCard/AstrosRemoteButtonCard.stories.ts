@@ -28,7 +28,7 @@ const gridCellWrapper = `
 `;
 
 const meta: Meta<typeof AstrosRemoteButtonCard> = {
-  title: 'RemoteControl/AstrosRemoteButtonCard',
+  title: 'components/remoteControl/AstrosRemoteButtonCard',
   component: AstrosRemoteButtonCard,
   render: (args) => ({
     components: { AstrosRemoteButtonCard },

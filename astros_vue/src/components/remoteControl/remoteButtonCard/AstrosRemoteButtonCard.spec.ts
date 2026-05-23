@@ -26,14 +26,6 @@ function mkPlaylist(): PageButton {
 }
 
 describe('AstrosRemoteButtonCard — display state', () => {
-  it('renders BUTTON N label in unassigned state', () => {
-    const wrapper = mount(AstrosRemoteButtonCard, {
-      global: { plugins: [i18n] },
-      props: { buttonNumber: 5, value: mkNone(), scripts: SCRIPTS, playlists: PLAYLISTS },
-    });
-    expect(wrapper.text()).toMatch(/BUTTON 5|BTN 5/i);
-  });
-
   it('shows a Configure button when value.type is none', () => {
     const wrapper = mount(AstrosRemoteButtonCard, {
       global: { plugins: [i18n] },

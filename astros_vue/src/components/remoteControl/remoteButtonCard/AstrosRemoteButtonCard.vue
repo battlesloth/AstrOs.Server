@@ -123,12 +123,11 @@ onScopeDispose(() => {
         : 'border-base-300 bg-base-100 hover:border-base-content/30'
     "
   >
-    <div class="flex items-center justify-between">
-      <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-base-content/60">
-        {{ t('remote_control_config.card.label', { n: buttonNumber }) }}
-      </span>
+    <div
+      v-if="isAssigned"
+      class="flex justify-end"
+    >
       <span
-        v-if="isAssigned"
         :class="[
           'rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider',
           typeChipClasses,
