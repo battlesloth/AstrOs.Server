@@ -120,9 +120,13 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
   function selectPage(idx: number) {
     if (!Number.isInteger(idx)) {
       // NaN, fractional, or Infinity — typically a UI bug computing idx from
-      // a stale/missing ref. Clamp to 0 so the store stays in a valid state
-      // (otherwise selectedIdx becomes NaN and pages[selectedIdx] is always
-      // undefined for the rest of the session).
+      // a stale/missing ref.
+      console.warn(
+        `[remoteControl] selectPage: idx ${idx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      // Clamp to 0 so the store stays in a valid state (otherwise selectedIdx
+      // becomes NaN and pages[selectedIdx] is always undefined for the rest of
+      // the session).
       selectedIdx.value = 0;
       return;
     }
