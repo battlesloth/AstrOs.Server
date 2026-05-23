@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onMounted, onScopeDispose, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import type { PageButton } from '@/models/remoteControl/pageButton';
@@ -62,21 +62,25 @@ function clearAssignment() {
 
 function handleClickOutside(e: MouseEvent) {
   if (!popoverOpen.value) return;
-  const target = e.target as Node;
-  if (cardRef.value?.contains(target)) return;
-  if (popoverRef.value?.contains(target)) return;
+  // composedPath walks through Shadow DOM boundaries too, so a future
+  // shadow-hosted child of the popover wouldn't get treated as "outside."
+  const path = e.composedPath();
+  if (cardRef.value && path.includes(cardRef.value)) return;
+  if (popoverRef.value && path.includes(popoverRef.value)) return;
   closeEditor();
 }
 
 onMounted(() => {
-  // Capture phase so the outside-click fires before any child handler can
-  // stopPropagation. Without capture, a click on the editor's None row
-  // (which calls preventDefault/stopPropagation internally) could swallow
-  // the close-on-outside check.
+  // Capture phase as a defensive default — guarantees this fires regardless
+  // of whether future child handlers stop propagation.
   document.addEventListener('click', handleClickOutside, true);
 });
 
-onBeforeUnmount(() => {
+// onScopeDispose (not onBeforeUnmount) so the listener is also torn down on
+// non-standard teardown paths (parent throws mid-render, Suspense cancels a
+// pending mount after onMounted already fired). Same pattern used by the
+// mobileRemote composables.
+onScopeDispose(() => {
   document.removeEventListener('click', handleClickOutside, true);
 });
 </script>

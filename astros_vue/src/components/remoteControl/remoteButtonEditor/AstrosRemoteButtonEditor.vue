@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import type { EditorTab, EditorListItem } from './types';
@@ -36,10 +36,21 @@ function selectItem(item: EditorListItem) {
 function selectNone() {
   emit('change', { id: '0', name: 'None', type: 'none' });
 }
+
+const rootRef = ref<HTMLDivElement | null>(null);
+
+// Focus the editor root on open so the @keydown.escape on the wrapper div
+// actually fires when the user presses Escape. Without an explicit focus,
+// focus stays on the Edit/Configure button that opened the popover and
+// the editor's keydown handler never sees the event.
+onMounted(() => {
+  nextTick(() => rootRef.value?.focus());
+});
 </script>
 
 <template>
   <div
+    ref="rootRef"
     class="astros-remote-button-editor flex flex-col gap-2"
     tabindex="-1"
     @keydown.escape="emit('close')"
@@ -97,7 +108,7 @@ function selectNone() {
 
     <input
       v-model="query"
-      type="search"
+      type="text"
       class="input input-sm input-bordered w-full text-xs"
       :placeholder="t('remote_control_config.editor.search_placeholder')"
       data-testid="editor-search"

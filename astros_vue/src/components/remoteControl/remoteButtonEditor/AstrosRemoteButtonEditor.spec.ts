@@ -188,7 +188,7 @@ describe('AstrosRemoteButtonEditor', () => {
     expect(wrapper.emitted('close')).toHaveLength(1);
   });
 
-  it('emits close on Escape keydown', async () => {
+  it('emits close on Escape keydown from the editor root', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       attachTo: document.body,
       global: { plugins: [i18n] },
@@ -200,6 +200,26 @@ describe('AstrosRemoteButtonEditor', () => {
       },
     });
     await wrapper.trigger('keydown', { key: 'Escape' });
+
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('emits close on Escape pressed while focus is in the search input', async () => {
+    // The search input gets typed-into; Escape from there must also close.
+    // type="text" (not "search") avoids the browser's native "first Escape
+    // clears input" consumption that would otherwise make this fragile.
+    const wrapper = mount(AstrosRemoteButtonEditor, {
+      attachTo: document.body,
+      global: { plugins: [i18n] },
+      props: {
+        buttonNumber: 5,
+        currentValue: mkNoneButton(),
+        scripts: SCRIPTS,
+        playlists: PLAYLISTS,
+      },
+    });
+    await wrapper.get('[data-testid="editor-search"]').trigger('keydown', { key: 'Escape' });
 
     expect(wrapper.emitted('close')).toHaveLength(1);
     wrapper.unmount();
