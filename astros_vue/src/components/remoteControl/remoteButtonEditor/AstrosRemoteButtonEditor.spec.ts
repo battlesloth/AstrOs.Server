@@ -105,4 +105,83 @@ describe('AstrosRemoteButtonEditor', () => {
     await wrapper.get('[data-testid="editor-tab-playlist"]').trigger('click');
     expect(wrapper.emitted('change')).toBeUndefined();
   });
+
+  it('emits change with the selected item and the current tab type', async () => {
+    const wrapper = mount(AstrosRemoteButtonEditor, {
+      props: {
+        buttonNumber: 5,
+        currentValue: mkNoneButton(),
+        scripts: SCRIPTS,
+        playlists: PLAYLISTS,
+      },
+    });
+    await wrapper.get('[data-testid="editor-item-s2"]').trigger('click');
+
+    const events = wrapper.emitted('change');
+    expect(events).toHaveLength(1);
+    expect(events![0]![0]).toEqual({ id: 's2', name: 'Bow', type: 'script' });
+  });
+
+  it('emits change with type:playlist when a playlist item is picked', async () => {
+    const wrapper = mount(AstrosRemoteButtonEditor, {
+      props: {
+        buttonNumber: 5,
+        currentValue: mkNoneButton(),
+        scripts: SCRIPTS,
+        playlists: PLAYLISTS,
+      },
+    });
+    await wrapper.get('[data-testid="editor-tab-playlist"]').trigger('click');
+    await wrapper.get('[data-testid="editor-item-p1"]').trigger('click');
+
+    expect(wrapper.emitted('change')![0]![0]).toEqual({
+      id: 'p1',
+      name: 'Morning Routine',
+      type: 'playlist',
+    });
+  });
+
+  it('emits change with the None sentinel when None row is clicked', async () => {
+    const wrapper = mount(AstrosRemoteButtonEditor, {
+      props: {
+        buttonNumber: 5,
+        currentValue: mkScriptButton(),
+        scripts: SCRIPTS,
+        playlists: PLAYLISTS,
+      },
+    });
+    await wrapper.get('[data-testid="editor-none"]').trigger('click');
+
+    expect(wrapper.emitted('change')![0]![0]).toEqual({ id: '0', name: 'None', type: 'none' });
+  });
+
+  it('emits close when × button is clicked', async () => {
+    const wrapper = mount(AstrosRemoteButtonEditor, {
+      props: {
+        buttonNumber: 5,
+        currentValue: mkNoneButton(),
+        scripts: SCRIPTS,
+        playlists: PLAYLISTS,
+      },
+    });
+    await wrapper.get('[data-testid="editor-close"]').trigger('click');
+
+    expect(wrapper.emitted('close')).toHaveLength(1);
+  });
+
+  it('emits close on Escape keydown', async () => {
+    const wrapper = mount(AstrosRemoteButtonEditor, {
+      attachTo: document.body,
+      props: {
+        buttonNumber: 5,
+        currentValue: mkNoneButton(),
+        scripts: SCRIPTS,
+        playlists: PLAYLISTS,
+      },
+    });
+    await wrapper.trigger('keydown', { key: 'Escape' });
+
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    wrapper.unmount();
+  });
 });

@@ -36,7 +36,11 @@ function selectNone() {
 </script>
 
 <template>
-  <div class="astros-remote-button-editor">
+  <div
+    class="astros-remote-button-editor"
+    tabindex="-1"
+    @keydown.escape="emit('close')"
+  >
     <header>
       <span>BTN {{ buttonNumber }} · EDITING</span>
       <button
