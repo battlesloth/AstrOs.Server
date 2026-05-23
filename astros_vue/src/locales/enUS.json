@@ -579,5 +579,24 @@
       "MIGRATION_FAILED_RESTORE_FAILED": "A schema migration failed and the automatic restore also failed. Manual recovery is required.",
       "UNKNOWN": "The database is currently unavailable for writes."
     }
+  },
+  "remote_control_config": {
+    "card": {
+      "label": "BUTTON {n}",
+      "configure": "Configure →",
+      "edit": "Edit",
+      "clear": "Clear",
+      "type_script": "SCRIPT",
+      "type_playlist": "PLAYLIST"
+    },
+    "editor": {
+      "header": "BTN {n} · EDITING",
+      "close": "Close",
+      "tab_script": "Scripts",
+      "tab_playlist": "Playlists",
+      "search_placeholder": "Search…",
+      "none_row": "None",
+      "empty_state": "No matches"
+    }
   }
 }

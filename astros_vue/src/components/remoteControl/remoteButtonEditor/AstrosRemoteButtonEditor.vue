@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import type { EditorTab, EditorListItem } from './types';
+
+const { t } = useI18n();
 
 const props = defineProps<{
   buttonNumber: number;
@@ -43,12 +46,12 @@ function selectNone() {
   >
     <header class="flex items-center justify-between">
       <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-base-content/60">
-        BTN {{ buttonNumber }} · EDITING
+        {{ t('remote_control_config.editor.header', { n: buttonNumber }) }}
       </span>
       <button
         type="button"
         class="btn btn-ghost btn-xs btn-square"
-        aria-label="Close"
+        :aria-label="t('remote_control_config.editor.close')"
         data-testid="editor-close"
         @click="emit('close')"
       >
@@ -73,7 +76,7 @@ function selectNone() {
         data-testid="editor-tab-script"
         @click="tab = 'script'"
       >
-        Scripts
+        {{ t('remote_control_config.editor.tab_script') }}
       </button>
       <button
         type="button"
@@ -88,7 +91,7 @@ function selectNone() {
         data-testid="editor-tab-playlist"
         @click="tab = 'playlist'"
       >
-        Playlists
+        {{ t('remote_control_config.editor.tab_playlist') }}
       </button>
     </div>
 
@@ -96,7 +99,7 @@ function selectNone() {
       v-model="query"
       type="search"
       class="input input-sm input-bordered w-full text-xs"
-      placeholder="Search…"
+      :placeholder="t('remote_control_config.editor.search_placeholder')"
       data-testid="editor-search"
     />
 
@@ -110,7 +113,7 @@ function selectNone() {
           data-testid="editor-none"
           @click="selectNone"
         >
-          None
+          {{ t('remote_control_config.editor.none_row') }}
         </button>
       </li>
       <li
@@ -131,7 +134,7 @@ function selectNone() {
         class="px-2 py-3 text-center text-[11px] text-base-content/50"
         data-testid="editor-empty"
       >
-        No matches
+        {{ t('remote_control_config.editor.empty_state') }}
       </li>
     </ul>
   </div>

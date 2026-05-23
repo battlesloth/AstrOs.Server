@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import type { EditorListItem } from '../remoteButtonEditor/types';
 import AstrosRemoteButtonEditor from '../remoteButtonEditor/AstrosRemoteButtonEditor.vue';
+
+const { t } = useI18n();
 
 const props = defineProps<{
   buttonNumber: number;
@@ -23,6 +26,12 @@ const typeChipClasses = computed(() =>
     ? 'bg-warning/15 text-warning-content border border-warning/40'
     : 'bg-primary/15 text-primary border border-primary/40',
 );
+
+const typeChipLabel = computed(() => {
+  if (props.value.type === 'script') return t('remote_control_config.card.type_script');
+  if (props.value.type === 'playlist') return t('remote_control_config.card.type_playlist');
+  return '';
+});
 
 const popoverOpen = ref(false);
 const cardRef = ref<HTMLElement | null>(null);
@@ -84,7 +93,7 @@ onBeforeUnmount(() => {
   >
     <div class="flex items-center justify-between">
       <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-base-content/60">
-        BUTTON {{ buttonNumber }}
+        {{ t('remote_control_config.card.label', { n: buttonNumber }) }}
       </span>
       <span
         v-if="isAssigned"
@@ -94,7 +103,7 @@ onBeforeUnmount(() => {
         ]"
         data-testid="card-type-chip"
       >
-        {{ value.type }}
+        {{ typeChipLabel }}
       </span>
     </div>
 
@@ -107,7 +116,7 @@ onBeforeUnmount(() => {
           data-testid="card-edit"
           @click="openEditor"
         >
-          Edit
+          {{ t('remote_control_config.card.edit') }}
         </button>
         <button
           type="button"
@@ -115,7 +124,7 @@ onBeforeUnmount(() => {
           data-testid="card-clear"
           @click="clearAssignment"
         >
-          Clear
+          {{ t('remote_control_config.card.clear') }}
         </button>
       </div>
     </template>
@@ -126,7 +135,7 @@ onBeforeUnmount(() => {
         data-testid="card-configure"
         @click="openEditor"
       >
-        Configure →
+        {{ t('remote_control_config.card.configure') }}
       </button>
     </template>
   </div>

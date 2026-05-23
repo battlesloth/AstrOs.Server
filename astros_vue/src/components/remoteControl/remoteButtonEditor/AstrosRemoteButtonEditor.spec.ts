@@ -1,7 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { createI18n } from 'vue-i18n';
 import AstrosRemoteButtonEditor from './AstrosRemoteButtonEditor.vue';
 import type { PageButton } from '@/models/remoteControl/pageButton';
+import enUS from '@/locales/enUS.json';
+
+// Use the real enUS.json so any missing key surfaces as a test failure.
+const i18n = createI18n({
+  legacy: false,
+  locale: 'en-US',
+  messages: { 'en-US': enUS },
+});
 
 const SCRIPTS = [
   { id: 's1', name: 'Wave Hello' },
@@ -27,6 +36,7 @@ function mkPlaylistButton(id = 'p1', name = 'Morning Routine'): PageButton {
 describe('AstrosRemoteButtonEditor', () => {
   it('opens with the script tab when current value is type:none', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkNoneButton(),
@@ -39,6 +49,7 @@ describe('AstrosRemoteButtonEditor', () => {
 
   it('opens with the playlist tab when current value is type:playlist', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkPlaylistButton(),
@@ -51,6 +62,7 @@ describe('AstrosRemoteButtonEditor', () => {
 
   it('switches to playlist tab on click and shows playlist items', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkNoneButton(),
@@ -65,6 +77,7 @@ describe('AstrosRemoteButtonEditor', () => {
 
   it('filters results case-insensitively as user types in search', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkNoneButton(),
@@ -79,6 +92,7 @@ describe('AstrosRemoteButtonEditor', () => {
 
   it('renders an empty-state message when filter has no matches', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkNoneButton(),
@@ -95,6 +109,7 @@ describe('AstrosRemoteButtonEditor', () => {
     // no `change` event should fire from the tab switch alone. Pin this so a
     // future "auto-clear on tab switch" change can't slip through.
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkScriptButton(),
@@ -108,6 +123,7 @@ describe('AstrosRemoteButtonEditor', () => {
 
   it('emits change with the selected item and the current tab type', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkNoneButton(),
@@ -124,6 +140,7 @@ describe('AstrosRemoteButtonEditor', () => {
 
   it('emits change with type:playlist when a playlist item is picked', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkNoneButton(),
@@ -143,6 +160,7 @@ describe('AstrosRemoteButtonEditor', () => {
 
   it('emits change with the None sentinel when None row is clicked', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkScriptButton(),
@@ -157,6 +175,7 @@ describe('AstrosRemoteButtonEditor', () => {
 
   it('emits close when × button is clicked', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkNoneButton(),
@@ -172,6 +191,7 @@ describe('AstrosRemoteButtonEditor', () => {
   it('emits close on Escape keydown', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       attachTo: document.body,
+      global: { plugins: [i18n] },
       props: {
         buttonNumber: 5,
         currentValue: mkNoneButton(),
