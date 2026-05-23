@@ -192,6 +192,24 @@ describe('remoteControl store', () => {
       expect(new Set(ids).size).toBe(3);
     });
 
+    it('replaces existing pages when loading over a populated store', async () => {
+      // Pin the "load REPLACES" contract — the refactored isDirty tests
+      // implicitly rely on this (they addPage then re-load), but it should
+      // be tested in isolation so a load-merges-instead-of-replaces
+      // regression surfaces here rather than as a confused dirty-flag
+      // failure elsewhere.
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.remoteControlPages).toHaveLength(2);
+
+      apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'X' }]));
+      await store.loadRemoteControl();
+
+      expect(store.remoteControlPages).toHaveLength(1);
+      expect(store.remoteControlPages[0]!.name).toBe('X');
+    });
+
     it('returns {success:false} and leaves pages untouched when the stored config is not an array', async () => {
       const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       apiGet.mockResolvedValue(JSON.stringify({ corrupt: true }));
@@ -401,6 +419,11 @@ describe('remoteControl store', () => {
       apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
+      // Move off the post-load default of 0 so a no-op mutation of
+      // selectPage (which would leave selectedIdx unchanged) doesn't
+      // pass this test by accident.
+      store.selectPage(1);
+      expect(store.selectedIdx).toBe(1);
 
       store.selectPage(-3);
 
@@ -565,18 +588,26 @@ describe('remoteControl store', () => {
     it('moves selection to the copy even when a higher page was previously selected', async () => {
       // The selectedIdx-above-target case: when the user is on page C (idx=2)
       // and duplicates page A (idx=0), the implementation jumps selection to
-      // the copy at idx=1. This pins that contract — discoverability of the
-      // new page wins over preserving the user's prior selection. Phase 2d
-      // UI can revisit if the surprise becomes a usability issue.
-      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      // the copy at idx=1. Discoverability of the new page wins over
+      // preserving the user's prior selection.
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
       const store = useRemoteControlStore();
       await store.loadRemoteControl();
       store.selectPage(2);
 
       store.duplicatePage(0);
 
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'A (copy)', 'B', 'C']);
       expect(store.selectedIdx).toBe(1);
-      expect(store.remoteControlPages).toHaveLength(4);
+      // The page formerly at idx 2 (C) is now at idx 3 — selection didn't
+      // "follow" the user's prior page; it jumped to the copy.
+      expect(store.remoteControlPages[3]!.name).toBe('C');
     });
 
     it('warns and no-ops on out-of-range index (negative or beyond end)', async () => {
