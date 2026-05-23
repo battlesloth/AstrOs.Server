@@ -2,7 +2,7 @@
 import { computed, onMounted, onScopeDispose, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
-import { NONE_BUTTON, type PageButton } from '@/models/remoteControl/pageButton';
+import { makeNoneButton, type PageButton } from '@/models/remoteControl/pageButton';
 import type { EditorListItem } from '../remoteButtonEditor/types';
 import AstrosRemoteButtonEditor from '../remoteButtonEditor/AstrosRemoteButtonEditor.vue';
 
@@ -77,7 +77,7 @@ function handleChange(value: PageButton) {
 }
 
 function clearAssignment() {
-  emit('change', NONE_BUTTON);
+  emit('change', makeNoneButton());
 }
 
 function handleClickOutside(e: MouseEvent) {
@@ -99,7 +99,7 @@ onMounted(() => {
 // onScopeDispose (not onBeforeUnmount) so the listener is also torn down on
 // non-standard teardown paths (parent throws mid-render, Suspense cancels a
 // pending mount after onMounted already fired). Same pattern used by the
-// mobileRemote composables.
+// useHoldGesture composable.
 onScopeDispose(() => {
   document.removeEventListener('click', handleClickOutside, true);
 });

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { NONE_BUTTON, type PageButton } from '@/models/remoteControl/pageButton';
+import { makeNoneButton, type PageButton } from '@/models/remoteControl/pageButton';
 import type { EditorTab, EditorListItem } from './types';
 
 const { t } = useI18n();
@@ -62,7 +62,7 @@ function selectItem(item: EditorListItem) {
 }
 
 function selectNone() {
-  emit('change', NONE_BUTTON);
+  emit('change', makeNoneButton());
 }
 
 const rootRef = ref<HTMLDivElement | null>(null);

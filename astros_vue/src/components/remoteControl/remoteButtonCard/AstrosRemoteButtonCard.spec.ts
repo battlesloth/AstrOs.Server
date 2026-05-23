@@ -84,6 +84,29 @@ describe('AstrosRemoteButtonCard — display state', () => {
     expect(wrapper.emitted('change')![0]![0]).toEqual({ id: '0', name: 'None', type: 'none' });
     expect(document.querySelector('[data-testid="editor-search"]')).toBeNull();
   });
+
+  it('Clear emits a FRESH none-button object on each click (no shared identity across clicks)', async () => {
+    // Anti-regression for the shared-NONE_BUTTON-sentinel hazard. If both
+    // emits returned the same module-level const, an in-place mutation by
+    // any downstream consumer (`page.button1.name = 'X'` — a documented
+    // pattern in the store spec) would poison every other slot whose value
+    // came from the same sentinel.
+    const wrapper = mount(AstrosRemoteButtonCard, {
+      global: { plugins: [i18n] },
+      props: { buttonNumber: 5, value: mkScript(), scripts: SCRIPTS, playlists: PLAYLISTS },
+    });
+
+    await wrapper.get('[data-testid="card-clear"]').trigger('click');
+    await wrapper.setProps({ value: mkPlaylist() });
+    await wrapper.get('[data-testid="card-clear"]').trigger('click');
+
+    const events = wrapper.emitted('change');
+    expect(events).toHaveLength(2);
+    const first = events![0]![0];
+    const second = events![1]![0];
+    expect(first).toEqual(second);
+    expect(first).not.toBe(second);
+  });
 });
 
 describe('AstrosRemoteButtonCard — popover host', () => {
