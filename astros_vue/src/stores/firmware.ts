@@ -580,17 +580,14 @@ export const useFirmwareStore = defineStore('firmware', () => {
     }
     controllerStates.value = normalized;
 
-    // The orchestrator's flashJobDone means "every controller reached a
-    // terminal state" — NOT "every controller succeeded" (see
-    // flash_orchestrator.ts handleDeployDone: "Per-controller failures are
-    // local — the job-wide event is `flashJobDone` even when some
-    // controllers failed"). Reconstitute a UI outcome here: any FAILED
-    // entry routes through the same surface as applyJobFailed
-    // (phase='failed' + failedControllers populated) so the result bar,
-    // topology, and stages list render the failure rather than a green
-    // "all updated". `currentStage.value` is preserved at this point so
-    // the FailedControllerSummary's stage field reflects where the job
-    // actually stopped (e.g. 'transfer' when a deploy step bails).
+    // flashJobDone is a lifecycle event ("every controller reached a
+    // terminal state"), NOT a success signal — see
+    // flash_orchestrator.ts handleDeployDone. Reconstitute a UI outcome:
+    // any FAILED entry routes through the applyJobFailed surface so the
+    // result bar, topology, and stages list render the failure rather than
+    // a green "all updated". `currentStage.value` is preserved at this
+    // point so each FailedControllerSummary captures the UI stage the job
+    // was on when the failure landed.
     const failed = collectFailedControllers('applyJobDone');
     if (failed.length > 0) {
       failedControllers.value = failed;
@@ -968,12 +965,11 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return out;
   });
 
-  // Integer percentage (0..100) of the serial-upload-to-master step, derived
-  // from any in-flight controller in UPLOADING_TO_MASTER (all share bytesSent
-  // because the streamer transfers a single binary to the master — see
-  // flash_orchestrator.ts onTransferBegun comment). null when no controller
-  // is in that stage, or when totalBytes is missing / non-positive. The UI
-  // falls back to its generic in-progress label when this is null.
+  // Integer percentage 0..100 for the serial-upload step. All controllers
+  // share bytesSent during upload (single binary to the master — see
+  // flash_orchestrator.ts onTransferBegun), so picking any one in
+  // UPLOADING_TO_MASTER is sufficient. null falls through to the UI's
+  // generic in-progress label.
   const downloadPercent = computed<number | null>(() => {
     for (const state of controllerStates.value.values()) {
       if (state.stage !== 'UPLOADING_TO_MASTER') continue;
@@ -981,8 +977,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
       const sent = state.bytesSent;
       if (typeof total !== 'number' || total <= 0) return null;
       if (typeof sent !== 'number') return null;
-      // Clamp defensively: a server-side off-by-one or stale bytesSent
-      // shouldn't render as "117%".
+      // Clamp so a stale bytesSent overflow can't render as "117%".
       return Math.round(Math.max(0, Math.min(1, sent / total)) * 100);
     }
     return null;

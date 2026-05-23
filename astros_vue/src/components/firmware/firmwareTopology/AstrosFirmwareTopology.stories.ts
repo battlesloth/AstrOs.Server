@@ -102,9 +102,9 @@ export const FailedMaster: Story = {
   },
 };
 
-// Realistic when the deploy step fails for every target — e.g. the
-// not-implemented deploy stub marking master + padawan FAILED. Both
-// nodes should render red, not just one.
+// Bus-wide failure case (every selected node FAILED). Both nodes should
+// render red, not just one — regression pin against the prior singular
+// `failedControllerId` shape that only painted the first.
 export const FailedAllControllers: Story = {
   args: {
     fleet: SAMPLE_FLEET,

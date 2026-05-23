@@ -35,12 +35,11 @@ export interface TopologyProps {
   currentStage?: TopologyStage | null;
   /**
    * Set of controller ids that failed. Consulted only when
-   * `phase === 'failed'` — every id in this set whose controller is also
+   * `phase === 'failed'` — every id in the set whose controller is also
    * in `selectedIds` renders with the failure stroke; selected controllers
    * NOT in the set render as success (succeeded alongside the failed
-   * sibling). The set form is required because multi-failure is realistic
-   * (e.g. bus-wide ESP-NOW failure or the not-implemented deploy stub
-   * marking every target FAILED).
+   * sibling). The set form is load-bearing because multi-failure is
+   * realistic (bus-wide ESP-NOW failure marking every padawan FAILED).
    */
   failedControllerIds?: ReadonlySet<string>;
 }
