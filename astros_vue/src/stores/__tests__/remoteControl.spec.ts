@@ -589,4 +589,70 @@ describe('remoteControl store', () => {
       expect(store.isDirty).toBe(false);
     });
   });
+
+  describe('renamePage', () => {
+    it('updates the name at the given index', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.renamePage(0, 'Quick Actions');
+
+      expect(store.remoteControlPages[0]!.name).toBe('Quick Actions');
+    });
+
+    it('trims surrounding whitespace before saving', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.renamePage(0, '   Performance   ');
+
+      expect(store.remoteControlPages[0]!.name).toBe('Performance');
+    });
+
+    it('no-ops on empty string (does not overwrite existing name or set dirty)', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'Original' }]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.renamePage(0, '');
+
+      expect(store.remoteControlPages[0]!.name).toBe('Original');
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('no-ops on whitespace-only string', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'Original' }]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.renamePage(0, '   \t  ');
+
+      expect(store.remoteControlPages[0]!.name).toBe('Original');
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('no-ops on out-of-range idx', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.renamePage(99, 'NewName');
+      store.renamePage(-1, 'NewName');
+
+      expect(store.remoteControlPages[0]!.name).toBe('Page 1');
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('flips isDirty to true on a valid rename', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.renamePage(0, 'New');
+
+      expect(store.isDirty).toBe(true);
+    });
+  });
 });

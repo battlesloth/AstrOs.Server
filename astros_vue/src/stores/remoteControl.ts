@@ -127,6 +127,15 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     isDirty.value = true;
   }
 
+  function renamePage(idx: number, name: string) {
+    const target = remoteControlPages.value[idx];
+    if (!target) return;
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return;
+    target.name = trimmed;
+    isDirty.value = true;
+  }
+
   function deletePage(idx: number) {
     if (remoteControlPages.value.length <= 1) return;
     if (idx < 0 || idx >= remoteControlPages.value.length) return;
@@ -182,5 +191,6 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     addPage,
     duplicatePage,
     deletePage,
+    renamePage,
   };
 });
