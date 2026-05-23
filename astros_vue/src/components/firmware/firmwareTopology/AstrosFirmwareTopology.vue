@@ -3,6 +3,7 @@ import { computed, watchEffect } from 'vue';
 import { useI18n } from 'vue-i18n';
 import type { TopologyController, TopologyProps } from './types';
 import { strokeFor as computeStroke, TOPOLOGY_STROKE_COLORS } from './strokeFor';
+import { isPadawanLineActive } from './padawanLineActive';
 
 const props = defineProps<TopologyProps>();
 
@@ -53,14 +54,13 @@ if (import.meta.env.DEV) {
           `parent must pass a target whenever phase !== 'select'.`,
       );
     }
-    if (props.failedControllerId !== undefined) {
-      const known = [props.fleet.master, ...props.fleet.padawans].some(
-        (c) => c.id === props.failedControllerId,
-      );
-      if (!known) {
+    if (props.failedControllerIds !== undefined) {
+      const fleetIds = new Set([props.fleet.master, ...props.fleet.padawans].map((c) => c.id));
+      const unknown = [...props.failedControllerIds].filter((id) => !fleetIds.has(id));
+      if (unknown.length > 0) {
         console.warn(
-          `[AstrosFirmwareTopology] failedControllerId="${props.failedControllerId}" ` +
-            `does not match any controller in the fleet.`,
+          `[AstrosFirmwareTopology] failedControllerIds contains entries not in the fleet: ` +
+            `[${unknown.join(', ')}].`,
         );
       }
     }
@@ -89,7 +89,7 @@ function strokeFor(c: TopologyController, isMaster: boolean): string {
     isSelected: isSelected(c),
     isMaster,
     phase: props.phase,
-    failedControllerId: props.failedControllerId,
+    failedControllerIds: props.failedControllerIds,
   });
 }
 
@@ -106,12 +106,17 @@ function padawanLineStroke(c: TopologyController): string {
   return COLOR.lineUnselected;
 }
 
+// `isPadawanLineActive` encodes the serial-upload vs. deploy distinction
+// (see its docstring for the stage mapping). Selection is layered on here
+// because an unselected padawan never animates regardless of sub-phase.
+const padawanLineActive = computed(() => isPadawanLineActive(props.phase, props.currentStage));
+
 function padawanLineDash(c: TopologyController): string {
-  return isFlashing.value && isSelected(c) ? '4 4' : '0';
+  return padawanLineActive.value && isSelected(c) ? '4 4' : '0';
 }
 
 function padawanLineFlowing(c: TopologyController): boolean {
-  return isFlashing.value && isSelected(c);
+  return padawanLineActive.value && isSelected(c);
 }
 
 function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
@@ -195,7 +200,7 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
           {{ fleet.master.label.toUpperCase() }}
         </text>
         <text
-          v-if="phase === 'failed' && fleet.master.id === failedControllerId"
+          v-if="phase === 'failed' && failedControllerIds?.has(fleet.master.id)"
           :x="MASTER_POS.x"
           :y="MASTER_POS.y - NODE_RADIUS - 8"
           text-anchor="middle"
@@ -261,7 +266,7 @@ function nodeTitle(c: TopologyController, role: 'master' | 'padawan'): string {
           {{ layout.controller.label.toUpperCase() }}
         </text>
         <text
-          v-if="phase === 'failed' && layout.controller.id === failedControllerId"
+          v-if="phase === 'failed' && failedControllerIds?.has(layout.controller.id)"
           :x="layout.position.x"
           :y="layout.position.y - NODE_RADIUS - 8"
           text-anchor="middle"

@@ -8,6 +8,14 @@ const props = defineProps<{
   phase: FirmwarePhase;
   currentStage: FirmwareStage | null;
   failedStage?: FirmwareStage | null;
+  /**
+   * Integer percentage (0..100) of the serial-upload-to-master step. Rendered
+   * in place of the in-progress label on the `download` row while that row is
+   * the current step. Null/undefined hides the percentage and falls back to
+   * the generic in-progress badge — i.e. before the first chunk-ack arrives,
+   * or for stages without a meaningful byte total.
+   */
+  downloadPercent?: number | null;
 }>();
 
 const { t } = useI18n();
@@ -108,7 +116,10 @@ const rows = computed<StageRow[]>(() =>
           v-if="row.state === 'current'"
           class="astros-firmware-stages-list__in-progress"
         >
-          {{ t('firmware_view.stages.in_progress') }}
+          <template v-if="row.stage === 'download' && typeof downloadPercent === 'number'"
+            >{{ downloadPercent }}%</template
+          >
+          <template v-else>{{ t('firmware_view.stages.in_progress') }}</template>
         </span>
       </li>
     </ul>

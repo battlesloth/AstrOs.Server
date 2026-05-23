@@ -19,8 +19,19 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
       shipped 2026-05-21 via PR #90 (merge `9b52df5`), M5 bench-verified before merge.
 - [ ] **Phase 2 — Direction B editor port**: Rebuild RemoteControlConfig view as a 3-pane
       layout (page list + 3×3 grid + live preview), inline button editor, inline page CRUD.
-- [ ] **Phase 3 — Shared `AstrosMobileRemote` component**: Build the handheld UI in Vue;
-      consume it from Phase 2's preview rail in compact mode.
+      Design: [`specs/2026-05-21-phase2-editor-design.md`](./specs/2026-05-21-phase2-editor-design.md).
+      Split into 4 PRs:
+  - [ ] **2a** — Store CRUD foundation (addPage / duplicatePage / deletePage / renamePage /
+        selectPage; isDirty flag; drop all-empty save filter). No UI changes.
+  - [ ] **2b** — `AstrosRemoteButtonCard` + `AstrosRemoteButtonEditor` (paired). Storybook
+        is the verification gate; no app integration.
+  - [ ] **2c** — `AstrosRemotePageList`. Storybook gate; no app integration.
+  - [ ] **2d** — `AstrosRemoteLivePreview` + `RemoteControlConfigView` assembly + router
+        swap + delete-confirm modal + i18n sweep + manual QA + old code deletion.
+- [x] **Phase 3 — Shared `AstrosMobileRemote` component**: Build the handheld UI in Vue;
+      consume it from Phase 2's preview rail in compact mode. — shipped 2026-05-21 via
+      PR #92 (merge `547a7af`). Three pre-push toolkit rounds; 39 PR-added tests;
+      `useHoldGesture` + `useSwipeGesture` composables extracted for mutation-test coverage.
 - [ ] **Phase 4 — Mobile operator route**: New `/m` route, full-bleed phone layout, wires
       button presses to existing `/scripts/run` & `/playlists/run` endpoints, Stop All via
       WebSocket PANIC, connection chip from WS state.

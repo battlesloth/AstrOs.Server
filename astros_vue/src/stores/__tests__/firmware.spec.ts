@@ -1463,6 +1463,114 @@ describe('firmware store', () => {
         warnSpy.mockRestore();
       }
     });
+
+    describe('any-FAILED routes to phase="failed" (orchestrator emits flashJobDone for lifecycle-complete, not success)', () => {
+      it('routes to phase="failed" and populates failedControllers when every controller is FAILED', () => {
+        // Regression: deploy stub returns all-FAILED. The orchestrator still
+        // emits flashJobDone (lifecycle is "done"); UI must render failure.
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState());
+        store.applyControllerUpdate({
+          controllerId: BODY_MAC,
+          stage: 'SENDING', // sets currentStage to 'transfer'
+        });
+        store.applyControllerUpdate({
+          controllerId: BODY_MAC,
+          stage: 'FAILED',
+          error: 'not_implemented',
+        });
+        store.applyControllerUpdate({
+          controllerId: CORE_MAC,
+          stage: 'FAILED',
+          error: 'not_implemented',
+        });
+
+        store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+        expect(store.phase).toBe('failed');
+        expect(store.failedControllers).toHaveLength(2);
+        const ids = store.failedControllers.map((f) => f.id).sort();
+        expect(ids).toEqual(['body', 'core']);
+        // stage at failure time was 'transfer' (the highest reached UI stage
+        // before SENDING→FAILED mapped to null).
+        for (const f of store.failedControllers) {
+          expect(f.stage).toBe('transfer');
+        }
+      });
+
+      it('routes to phase="failed" when ONLY SOME controllers are FAILED (partial failure)', () => {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState());
+        store.applyControllerUpdate({
+          controllerId: BODY_MAC,
+          stage: 'VERSION_CONFIRMED',
+          finalVersion: '1.4.2',
+        });
+        store.applyControllerUpdate({
+          controllerId: CORE_MAC,
+          stage: 'FAILED',
+          error: 'flash_error',
+        });
+
+        store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+        expect(store.phase).toBe('failed');
+        expect(store.failedControllers).toHaveLength(1);
+        expect(store.failedControllers[0]?.id).toBe('core');
+      });
+
+      it('keeps phase="done" when every controller succeeded (full success)', () => {
+        const store = useFirmwareStore();
+        seedSampleFleet();
+        store.applyJobStarted(sampleJobState());
+        store.applyControllerUpdate({
+          controllerId: BODY_MAC,
+          stage: 'VERSION_CONFIRMED',
+          finalVersion: '1.4.2',
+        });
+        store.applyControllerUpdate({
+          controllerId: CORE_MAC,
+          stage: 'VERSION_CONFIRMED',
+          finalVersion: '1.4.2',
+        });
+
+        store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-12T08:05:00Z' });
+
+        expect(store.phase).toBe('done');
+        expect(store.failedControllers).toEqual([]);
+      });
+
+      it('preserves FAILED entries from pendingByMac in failedControllers (parallel to applyJobFailed)', () => {
+        // Without this sweep, a deploy-time FAILED for an unmapped padawan
+        // would sit in pendingByMac, get wiped by the pendingByMac.value =
+        // new Map() at the bottom of applyJobDone, and the job would render
+        // as green-success — the exact green-on-failure regression class
+        // this re-routing was added to prevent.
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          const store = useFirmwareStore();
+          seedSampleFleet();
+          store.applyJobStarted(sampleJobState({ jobId: 'job-1' }));
+          store.applyControllerUpdate({
+            controllerId: 'aa:bb:cc:dd:ee:99',
+            stage: 'FAILED',
+            error: 'esp_now timeout',
+          });
+          expect(store.pendingByMac.get('aa:bb:cc:dd:ee:99')?.length).toBe(1);
+
+          store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-14T08:01:00Z' });
+
+          expect(store.phase).toBe('failed');
+          const failedIds = store.failedControllers.map((c) => c.id);
+          expect(failedIds).toContain('aa:bb:cc:dd:ee:99');
+          expect(warnSpy.mock.calls.flat().join(' ')).toContain('FAILED entry for unmapped MAC');
+        } finally {
+          warnSpy.mockRestore();
+        }
+      });
+    });
   });
 
   describe('applyJobFailed', () => {
@@ -2188,6 +2296,101 @@ describe('firmware store', () => {
       } finally {
         warnSpy.mockRestore();
       }
+    });
+  });
+
+  describe('downloadPercent', () => {
+    const BODY_MAC = '00:00:00:00:00:00';
+    const CORE_MAC = 'aa:bb:cc:dd:ee:01';
+
+    function startUploadingJob(): ReturnType<typeof useFirmwareStore> {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.setPhase('select');
+      store.applyJobStarted({
+        jobId: 'job-1',
+        source: { kind: 'github', version: 'v1.4.2' },
+        controllers: [
+          { controllerId: BODY_MAC, stage: 'QUEUED' },
+          { controllerId: CORE_MAC, stage: 'QUEUED' },
+        ],
+        startedAt: '2026-05-12T08:00:00Z',
+      });
+      return store;
+    }
+
+    it('is null before any controller enters UPLOADING_TO_MASTER', () => {
+      const store = startUploadingJob();
+      // Still in QUEUED — no percent to report yet.
+      expect(store.downloadPercent).toBeNull();
+    });
+
+    it('reports the integer percent computed from bytesSent / totalBytes', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 250_000,
+        totalBytes: 1_000_000,
+      });
+      expect(store.downloadPercent).toBe(25);
+    });
+
+    it('rounds to nearest integer (no fractional percents)', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 333_333,
+        totalBytes: 1_000_000,
+      });
+      // 33.3333… rounds down to 33.
+      expect(store.downloadPercent).toBe(33);
+    });
+
+    it('clamps a stale-byte-count overflow to 100 rather than emitting > 100', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 1_200_000,
+        totalBytes: 1_000_000,
+      });
+      expect(store.downloadPercent).toBe(100);
+    });
+
+    it('is null when totalBytes is missing or non-positive', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 100,
+        // totalBytes intentionally omitted.
+      });
+      expect(store.downloadPercent).toBeNull();
+
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 100,
+        totalBytes: 0,
+      });
+      expect(store.downloadPercent).toBeNull();
+    });
+
+    it('is null once controllers have moved past UPLOADING_TO_MASTER', () => {
+      const store = startUploadingJob();
+      store.applyControllerUpdate({
+        controllerId: BODY_MAC,
+        stage: 'UPLOADING_TO_MASTER',
+        bytesSent: 500_000,
+        totalBytes: 1_000_000,
+      });
+      expect(store.downloadPercent).toBe(50);
+      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
+      store.applyControllerUpdate({ controllerId: CORE_MAC, stage: 'SENDING' });
+      // No controllers in UPLOADING_TO_MASTER anymore — percent gone.
+      expect(store.downloadPercent).toBeNull();
     });
   });
 });

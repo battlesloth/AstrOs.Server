@@ -33,6 +33,7 @@ const {
   sourceMode,
   uploadedFilename,
   progressByControllerId,
+  downloadPercent,
   isOwnJob,
   currentJobLoadFailed,
   flashError,
@@ -118,13 +119,14 @@ const selectedControllerList = computed<FirmwareControllerView[]>(() =>
   controllers.value.filter((c) => selectedControllerIds.value.has(c.id)),
 );
 
-// Topology highlights the first FAILED controller (it animates one node, not
-// a set); the panel result bar joins ALL failed labels so multi-failure is
-// visible to the operator. Stage is taken from the first FAILED — all entries
-// share the same fallback stage in practice (`currentStage` at failure time).
+// Topology highlights every FAILED controller via Set membership in
+// `strokeFor`; the panel result bar joins ALL failed labels so multi-failure
+// is visible to the operator. `failedStage` is taken from `[0]` only because
+// all entries share `currentStage` at failure time (see the
+// FailedControllerSummary build sites in applyJobDone / applyJobFailed).
 // `failedControllerLabels` returns `''` on no failures; the template coerces
 // to `undefined` via `|| undefined` so the panel's result bar skips rendering.
-const failedControllerId = computed(() => failedControllers.value[0]?.id);
+const failedControllerIds = computed(() => new Set(failedControllers.value.map((c) => c.id)));
 const failedControllerLabels = computed(() =>
   failedControllers.value.map((c) => c.label).join(', '),
 );
@@ -300,13 +302,15 @@ onMounted(async () => {
                 :selected-ids="[...selectedControllerIds]"
                 :target="target"
                 :phase="phase"
-                :failed-controller-id="failedControllerId"
+                :current-stage="currentStage"
+                :failed-controller-ids="failedControllerIds"
               />
               <AstrosFirmwareStagesList
                 v-if="phase === 'flashing' || phase === 'done' || phase === 'failed'"
                 :phase="phase"
                 :current-stage="currentStage"
                 :failed-stage="failedStage"
+                :download-percent="downloadPercent"
               />
             </div>
 

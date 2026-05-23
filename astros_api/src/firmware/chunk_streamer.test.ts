@@ -1,4 +1,5 @@
-import { promises as fsp } from 'fs';
+import crypto from 'crypto';
+import { promises as fsp, readFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -79,10 +80,25 @@ async function writeTempFirmware(bytes: Buffer): Promise<string> {
   return file;
 }
 
-function specFor(filePath: string, sizeBytes: number): TransferSpec {
+// Computes the actual sha-256 of the file at `filePath` by default so the
+// streamer's cache-sha-drift fast-fail (source_sha_mismatch) doesn't fire on
+// every happy-path test. `opts.sha256` lets a test deliberately mismatch to
+// exercise the drift path itself. Falls back to the placeholder when the
+// file doesn't exist on disk — that branch is what the source_read_failed
+// tests intentionally exercise; re-throwing the ENOENT here would fail
+// those tests before the streamer ever ran.
+function specFor(filePath: string, sizeBytes: number, opts?: { sha256?: string }): TransferSpec {
+  let sha256 = opts?.sha256;
+  if (sha256 === undefined) {
+    try {
+      sha256 = crypto.createHash('sha256').update(readFileSync(filePath)).digest('hex');
+    } catch {
+      sha256 = SHA256_PLACEHOLDER;
+    }
+  }
   return {
     transferId: TRANSFER_ID,
-    source: { path: filePath, sha256: SHA256_PLACEHOLDER, sizeBytes },
+    source: { path: filePath, sha256, sizeBytes },
     targets: ['core', 'master'],
   };
 }
@@ -2421,6 +2437,44 @@ describe('ChunkStreamer — pre-transfer error codes', () => {
       // Critical: validation runs BEFORE subscribeFwAcks and BEFORE
       // FW_TRANSFER_BEGIN is generated. The streamer must not have
       // touched the bus at all.
+      expect(bus.subscribers.size).toBe(0);
+      expect(bus.sent).toHaveLength(0);
+    } finally {
+      await fsp.rm(path.dirname(tempPath), { recursive: true, force: true });
+    }
+  });
+
+  it('source_sha_mismatch: on-disk bytes hash to a different sha than the spec, fails fast before BEGIN is sent', async () => {
+    // Real failure mode: the cache manifest says the bytes hash to X but
+    // the on-disk file actually hashes to Y. Distinct from source_size_mismatch
+    // because the size still matches — only the content drifted (cache file
+    // overwritten in place, post-download corruption, manual tamper).
+    // Without the fast-fail, the streamer would put ~MB on the wire and
+    // wait for the master's END_ACK to report HASH_MISMATCH — wasting
+    // minutes of UART time and surfacing the wrong remediation ("retry"
+    // vs. "re-cache").
+    const buf = Buffer.alloc(100, 0xcd);
+    const tempPath = await writeTempFirmware(buf);
+    try {
+      const bus = new FakeSerialBus();
+      const streamer = new ChunkStreamer({ bus });
+
+      // Pass a deliberately-wrong sha (the placeholder all-`a` hash) while
+      // the file's bytes hash to something else. The size still matches,
+      // so we know the sha check is what's firing, not the size check.
+      const err = (await streamer
+        .run(specFor(tempPath, buf.length, { sha256: SHA256_PLACEHOLDER }), {})
+        .catch((e) => e)) as Error & { code?: string; transferId?: string; detail?: string };
+
+      expect(err.code).toBe('source_sha_mismatch');
+      expect(err.transferId).toBe(TRANSFER_ID);
+      // Both hashes in detail so the orchestrator can present a precise
+      // diagnosis (manifest claimed X, on-disk computes Y → re-cache).
+      expect(err.detail).toContain(SHA256_PLACEHOLDER);
+      expect(err.detail).toContain(tempPath);
+
+      // Critical: drift check runs BEFORE subscribeFwAcks and BEFORE
+      // FW_TRANSFER_BEGIN goes on the wire. No bus activity.
       expect(bus.subscribers.size).toBe(0);
       expect(bus.sent).toHaveLength(0);
     } finally {

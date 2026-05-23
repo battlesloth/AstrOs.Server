@@ -42,6 +42,7 @@ const REASON_HTTP_STATUS: Record<FlashOrchestratorErrorReason, HttpStatus> = {
 
   source_read_failed: 500,
   source_size_mismatch: 500,
+  source_sha_mismatch: 500,
   begin_timeout: 500,
   begin_rejected: 500,
   chunk_retry_exhausted: 500,

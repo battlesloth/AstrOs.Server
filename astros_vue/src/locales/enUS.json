@@ -180,6 +180,7 @@
       "streamer_unknown_error": "The firmware streamer failed with an unknown error. Try again.",
       "source_read_failed": "The server couldn't read the staged firmware file from disk. Re-upload or re-fetch the binary and try again.",
       "source_size_mismatch": "The firmware file's actual size doesn't match its declared size. Re-upload or re-fetch the binary and try again.",
+      "source_sha_mismatch": "The firmware file's bytes don't match its cached hash — the cache is stale. Re-fetch (GitHub releases) or re-upload (local upload) the binary and try again; retrying without re-caching won't help.",
       "begin_timeout": "The master controller didn't acknowledge the transfer start. Check that the master is powered on and connected, then try again.",
       "begin_rejected": "The master controller rejected the firmware transfer. Check that the master has free SD card space, then try again.",
       "chunk_retry_exhausted": "Lost contact with the master controller during transfer (too many failed retries). Check the USB cable and the master's power, then try again.",

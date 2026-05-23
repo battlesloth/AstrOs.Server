@@ -6,7 +6,7 @@ const base = {
   controllerId: 'core',
   isSelected: true,
   isMaster: false,
-  failedControllerId: undefined,
+  failedControllerIds: undefined,
 } as const;
 
 describe('strokeFor', () => {
@@ -34,20 +34,41 @@ describe('strokeFor', () => {
     );
   });
 
-  it('returns failure for the failed controller in `failed`', () => {
-    expect(strokeFor({ ...base, phase: 'failed', failedControllerId: 'core' })).toBe(
+  it('returns failure for a controller in the failed-set during `failed`', () => {
+    expect(strokeFor({ ...base, phase: 'failed', failedControllerIds: new Set(['core']) })).toBe(
       TOPOLOGY_STROKE_COLORS.failure,
     );
   });
 
+  it('returns failure for every controller in the failed-set (multi-failure)', () => {
+    // Regression: previously only the first failed id rendered red; the
+    // not-implemented deploy stub bails on every target so multi-failure
+    // is the realistic case.
+    const failed = new Set(['core', 'body']);
+    expect(
+      strokeFor({ ...base, controllerId: 'core', phase: 'failed', failedControllerIds: failed }),
+    ).toBe(TOPOLOGY_STROKE_COLORS.failure);
+    expect(
+      strokeFor({ ...base, controllerId: 'body', phase: 'failed', failedControllerIds: failed }),
+    ).toBe(TOPOLOGY_STROKE_COLORS.failure);
+  });
+
   it('returns success for non-failing controllers in `failed`', () => {
-    expect(strokeFor({ ...base, phase: 'failed', failedControllerId: 'dome' })).toBe(
+    expect(strokeFor({ ...base, phase: 'failed', failedControllerIds: new Set(['dome']) })).toBe(
       TOPOLOGY_STROKE_COLORS.success,
     );
   });
 
-  it('returns success for any selected controller in `failed` when failedControllerId is undefined', () => {
-    expect(strokeFor({ ...base, phase: 'failed' })).toBe(TOPOLOGY_STROKE_COLORS.success);
+  it('paints failure (not success) when phase is `failed` but attribution is missing', () => {
+    // Pessimistic default: a job in the failed phase whose per-controller
+    // attribution was lost (e.g., every FAILED entry was unmapped and got
+    // swept from pendingByMac into a raw-MAC list the topology can't match,
+    // or the parent passed undefined) must NOT render the selected nodes
+    // green. The failed phase is authoritative.
+    expect(strokeFor({ ...base, phase: 'failed' })).toBe(TOPOLOGY_STROKE_COLORS.failure);
+    expect(strokeFor({ ...base, phase: 'failed', failedControllerIds: new Set<string>() })).toBe(
+      TOPOLOGY_STROKE_COLORS.failure,
+    );
   });
 
   it('returns masterFlashing only for the master while flashing', () => {
@@ -67,11 +88,15 @@ describe('strokeFor', () => {
     );
   });
 
-  it('failedControllerId is ignored in non-failed phases', () => {
+  it('failedControllerIds is ignored in non-failed phases', () => {
     // Mutation guard: if the phase-check were dropped from the failed branch,
     // this test would start returning `failure` for a flashing controller.
-    expect(strokeFor({ ...base, phase: 'flashing', failedControllerId: 'core' })).toBe(
-      TOPOLOGY_STROKE_COLORS.padawanFlashing,
-    );
+    expect(
+      strokeFor({
+        ...base,
+        phase: 'flashing',
+        failedControllerIds: new Set(['core']),
+      }),
+    ).toBe(TOPOLOGY_STROKE_COLORS.padawanFlashing);
   });
 });

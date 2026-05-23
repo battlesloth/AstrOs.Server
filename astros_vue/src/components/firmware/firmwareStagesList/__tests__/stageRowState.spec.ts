@@ -24,6 +24,9 @@ describe('stageRowState', () => {
   });
 
   it("marks every stage 'done' when phase is 'done'", () => {
+    // 'done' is a fully-successful job — any controller failure routes
+    // through phase='failed' in the store, so the stages list only sees
+    // phase='done' when every stage legitimately completed.
     expect(rowsForPhase({ phase: 'done' })).toEqual(['done', 'done', 'done', 'done', 'done']);
   });
 

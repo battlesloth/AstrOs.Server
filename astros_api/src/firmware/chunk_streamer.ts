@@ -37,6 +37,7 @@
 // outer `finally` regardless of which path throws. The "Cleanup invariants
 // verification" describe block in `chunk_streamer.test.ts` pins this.
 
+import crypto from 'crypto';
 import { promises as fsp } from 'fs';
 import { v4 as uuid_v4 } from 'uuid';
 import { logger } from '../logger.js';
@@ -198,6 +199,22 @@ export class ChunkStreamer {
         'source_size_mismatch',
         spec.transferId,
         `source size mismatch for ${spec.source.path}: expected ${spec.source.sizeBytes} bytes, read ${sourceBuffer.length}`,
+      );
+    }
+    // Re-hash and fast-fail on drift between disk bytes and spec.source.sha256.
+    // Streaming the bad bytes would still abort at the master via END_ACK
+    // HASH_MISMATCH, but that costs minutes of UART time and surfaces the
+    // wrong remediation ("retry" vs the correct "re-cache"). The warn line
+    // stays alongside the throw as a grep-friendly forensic breadcrumb.
+    const reHash = crypto.createHash('sha256').update(sourceBuffer).digest('hex');
+    if (reHash !== spec.source.sha256) {
+      logger.warn(
+        `cache-sha-drift transferId=${spec.transferId} path=${spec.source.path} sizeBytes=${spec.source.sizeBytes} specSha=${spec.source.sha256} reHash=${reHash}`,
+      );
+      throw new TransferError(
+        'source_sha_mismatch',
+        spec.transferId,
+        `cache-sha-drift for ${spec.source.path}: manifest sha=${spec.source.sha256} reHash=${reHash}`,
       );
     }
     const totalChunks = Math.max(1, Math.ceil(sourceBuffer.length / this.config.chunkSizeBytes));

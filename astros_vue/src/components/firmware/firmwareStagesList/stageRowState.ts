@@ -14,6 +14,10 @@ export interface StageRowStateInput {
 export function stageRowState(input: StageRowStateInput): StageRowState {
   const { stage, phase, currentStage, failedStage } = input;
   const index = FIRMWARE_STAGES.indexOf(stage);
+  // `phase === 'done'` is a fully-successful job — any controller failure
+  // gets routed to `phase === 'failed'` by the firmware store at
+  // applyJobDone time, where the failedStage branch below renders the
+  // partial-completion correctly.
   if (phase === 'done') return 'done';
   if (phase === 'failed') {
     if (failedStage === null) return 'idle';

@@ -84,6 +84,7 @@ export interface SerialBus {
 export type TransferErrorCode =
   | 'source_read_failed'
   | 'source_size_mismatch'
+  | 'source_sha_mismatch'
   | 'begin_timeout'
   | 'begin_rejected'
   | 'chunk_retry_exhausted'
