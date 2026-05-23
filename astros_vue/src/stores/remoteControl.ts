@@ -112,6 +112,14 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
   }
 
   function selectPage(idx: number) {
+    if (!Number.isInteger(idx)) {
+      // NaN, fractional, or Infinity — typically a UI bug computing idx from
+      // a stale/missing ref. Clamp to 0 so the store stays in a valid state
+      // (otherwise selectedIdx becomes NaN and pages[selectedIdx] is always
+      // undefined for the rest of the session).
+      selectedIdx.value = 0;
+      return;
+    }
     if (remoteControlPages.value.length === 0) {
       selectedIdx.value = 0;
       return;
@@ -128,6 +136,12 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
   }
 
   function renamePage(idx: number, name: string): boolean {
+    if (!Number.isInteger(idx)) {
+      console.warn(
+        `[remoteControl] renamePage: idx ${idx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      return false;
+    }
     const target = remoteControlPages.value[idx];
     if (!target) {
       console.warn(
@@ -144,7 +158,11 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
 
   function deletePage(idx: number) {
     if (remoteControlPages.value.length <= 1) return;
-    if (idx < 0 || idx >= remoteControlPages.value.length) {
+    if (!Number.isInteger(idx) || idx < 0 || idx >= remoteControlPages.value.length) {
+      // The Number.isInteger check covers NaN and fractional idx — both slip
+      // past the comparison-based guard (NaN comparisons all return false,
+      // fractional idx truncates inside splice and would silently delete the
+      // wrong page).
       console.warn(
         `[remoteControl] deletePage: idx ${idx} out of range (pages: ${remoteControlPages.value.length})`,
       );
@@ -163,6 +181,12 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
   }
 
   function duplicatePage(idx: number) {
+    if (!Number.isInteger(idx)) {
+      console.warn(
+        `[remoteControl] duplicatePage: idx ${idx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
     const src = remoteControlPages.value[idx];
     if (!src) {
       console.warn(

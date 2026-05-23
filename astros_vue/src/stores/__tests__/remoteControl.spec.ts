@@ -400,6 +400,17 @@ describe('remoteControl store', () => {
       expect(store.selectedIdx).toBe(0);
     });
 
+    it('clamps NaN idx to 0 (avoids selectedIdx = NaN unreachable state)', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      store.selectPage(NaN);
+
+      expect(store.selectedIdx).toBe(0);
+    });
+
     it('does NOT set isDirty', async () => {
       apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
       const store = useRemoteControlStore();
@@ -657,6 +668,46 @@ describe('remoteControl store', () => {
 
       expect(store.selectedIdx).toBe(0);
       expect(store.remoteControlPages[0]!.name).toBe('B');
+    });
+
+    it('warns and no-ops on NaN idx (would otherwise become splice(0,1) and delete page[0])', async () => {
+      // splice(NaN, 1) is silently treated as splice(0, 1) per ECMA's
+      // ToInteger spec. The comparison-based guard (idx < 0 || idx >= length)
+      // misses NaN because all NaN comparisons return false. The
+      // Number.isInteger check is what closes the gap.
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(NaN);
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      expect(store.remoteControlPages[0]!.name).toBe('A');
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('warns and no-ops on fractional idx (would otherwise truncate inside splice)', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(0.7);
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      warnSpy.mockRestore();
     });
 
     it('warns on out-of-range deletePage idx (programming-error breadcrumb)', async () => {
