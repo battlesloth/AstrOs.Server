@@ -219,7 +219,7 @@ describe('remoteControl store', () => {
   });
 
   describe('saveRemoteControl', () => {
-    it('retains a page that has at least one non-default button', async () => {
+    it('serializes a page that has at least one non-default button to the wire payload', async () => {
       apiGet.mockResolvedValue(JSON.stringify([]));
       apiPut.mockResolvedValue(undefined);
       const store = useRemoteControlStore();
@@ -239,7 +239,7 @@ describe('remoteControl store', () => {
       expect(parsed).toHaveLength(1);
     });
 
-    it('serializes id and name on retained pages so they round-trip through storage', async () => {
+    it('serializes id and name through saveRemoteControl so they round-trip through storage', async () => {
       apiGet.mockResolvedValue(JSON.stringify([]));
       apiPut.mockResolvedValue(undefined);
       const store = useRemoteControlStore();
@@ -258,8 +258,9 @@ describe('remoteControl store', () => {
     });
 
     it('persists every page including ones where all 9 buttons are id="0"', async () => {
-      // Decision 3 of the Phase 2 design spec: the all-empty save filter is
-      // removed. Empty pages persist; users delete pages explicitly via the UI.
+      // Anti-regression for the old "drop pages where all 9 buttons have
+      // id=0" save filter. Empty pages now persist; users delete pages
+      // explicitly via the UI.
       apiGet.mockResolvedValue(JSON.stringify([]));
       apiPut.mockResolvedValue(undefined);
       const store = useRemoteControlStore();
@@ -335,21 +336,29 @@ describe('remoteControl store', () => {
     });
 
     it('clears to false when a successful load follows a dirty state', async () => {
-      apiGet.mockResolvedValue(JSON.stringify([]));
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
       const store = useRemoteControlStore();
-      // Poke directly because the mutation methods that flip the flag land
-      // in later tasks; this isolates "load clears it" behavior.
-      (store as unknown as { isDirty: boolean }).isDirty = true;
       await store.loadRemoteControl();
+      store.addPage();
+      expect(store.isDirty).toBe(true);
+
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      await store.loadRemoteControl();
+
       expect(store.isDirty).toBe(false);
     });
 
     it('does NOT clear isDirty when load fails (network)', async () => {
       const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      apiGet.mockRejectedValue(new Error('network down'));
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
       const store = useRemoteControlStore();
-      (store as unknown as { isDirty: boolean }).isDirty = true;
       await store.loadRemoteControl();
+      store.addPage();
+      expect(store.isDirty).toBe(true);
+
+      apiGet.mockRejectedValue(new Error('network down'));
+      await store.loadRemoteControl();
+
       expect(store.isDirty).toBe(true);
       errSpy.mockRestore();
     });
