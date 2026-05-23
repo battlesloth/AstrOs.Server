@@ -37,6 +37,7 @@
 // outer `finally` regardless of which path throws. The "Cleanup invariants
 // verification" describe block in `chunk_streamer.test.ts` pins this.
 
+import crypto from 'crypto';
 import { promises as fsp } from 'fs';
 import { v4 as uuid_v4 } from 'uuid';
 import { logger } from '../logger.js';
@@ -199,6 +200,18 @@ export class ChunkStreamer {
         spec.transferId,
         `source size mismatch for ${spec.source.path}: expected ${spec.source.sizeBytes} bytes, read ${sourceBuffer.length}`,
       );
+    }
+    // Diagnostic: re-hash sourceBuffer and compare to spec.source.sha256.
+    // If they diverge, the on-disk .bin was modified between cache.fetch()
+    // and this readFile — proves a cache-sha-drift bug rather than a
+    // wire-layer fault when the master later reports HASH_MISMATCH.
+    {
+      const reHash = crypto.createHash('sha256').update(sourceBuffer).digest('hex');
+      if (reHash !== spec.source.sha256) {
+        logger.warn(
+          `cache-sha-drift transferId=${spec.transferId} path=${spec.source.path} sizeBytes=${spec.source.sizeBytes} specSha=${spec.source.sha256} reHash=${reHash}`,
+        );
+      }
     }
     const totalChunks = Math.max(1, Math.ceil(sourceBuffer.length / this.config.chunkSizeBytes));
     const lastSeq = totalChunks - 1;
