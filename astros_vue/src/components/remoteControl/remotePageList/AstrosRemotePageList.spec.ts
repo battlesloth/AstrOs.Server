@@ -171,3 +171,76 @@ describe('AstrosRemotePageList — mini 3x3 preview', () => {
     expect(dots.length).toBe(BUTTON_KEYS.length);
   });
 });
+
+describe('AstrosRemotePageList — action icons', () => {
+  it('renders rename / duplicate / delete buttons on every row', () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    const rows = wrapper.findAll('[data-testid="page-list-row"]');
+    for (const row of rows) {
+      expect(row.find('[data-testid="page-list-rename"]').exists()).toBe(true);
+      expect(row.find('[data-testid="page-list-duplicate"]').exists()).toBe(true);
+      expect(row.find('[data-testid="page-list-delete"]').exists()).toBe(true);
+    }
+  });
+
+  it('emits duplicate(idx) when the duplicate icon is clicked', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .find('[data-testid="page-list-duplicate"]')
+      .trigger('click');
+
+    expect(wrapper.emitted('duplicate')![0]).toEqual([1]);
+  });
+
+  it('emits delete(idx) when the delete icon is clicked', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[2]!
+      .find('[data-testid="page-list-delete"]')
+      .trigger('click');
+
+    expect(wrapper.emitted('delete')![0]).toEqual([2]);
+  });
+
+  it('action click does NOT also emit select (stopPropagation guard)', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[2]!
+      .find('[data-testid="page-list-duplicate"]')
+      .trigger('click');
+
+    expect(wrapper.emitted('select')).toBeUndefined();
+  });
+
+  it('disables the delete button when pages.length === 1', () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: [mkPage('only', 'Only Page')], selectedIdx: 0 },
+    });
+    const del = wrapper.get('[data-testid="page-list-delete"]');
+    expect(del.attributes('disabled')).toBeDefined();
+  });
+
+  it('does NOT emit delete when the delete button is disabled (length === 1)', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: [mkPage('only', 'Only Page')], selectedIdx: 0 },
+    });
+    await wrapper.get('[data-testid="page-list-delete"]').trigger('click');
+
+    expect(wrapper.emitted('delete')).toBeUndefined();
+  });
+});

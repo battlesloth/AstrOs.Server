@@ -18,6 +18,8 @@ defineProps<{
 const emit = defineEmits<{
   select: [idx: number];
   add: [];
+  duplicate: [idx: number];
+  delete: [idx: number];
 }>();
 
 function dotClass(type: PageButton['type']): string {
@@ -93,6 +95,48 @@ function dotClass(type: PageButton['type']): string {
         >
           {{ page.name }}
         </span>
+        <div class="flex flex-shrink-0 items-center gap-px">
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs btn-square text-base-content/60"
+            :aria-label="t('remote_control_config.pageList.rename')"
+            :title="t('remote_control_config.pageList.rename')"
+            data-testid="page-list-rename"
+            @click.stop
+          >
+            <v-icon
+              name="md-edit"
+              scale="0.7"
+            />
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs btn-square text-base-content/60"
+            :aria-label="t('remote_control_config.pageList.duplicate')"
+            :title="t('remote_control_config.pageList.duplicate')"
+            data-testid="page-list-duplicate"
+            @click.stop="emit('duplicate', idx)"
+          >
+            <v-icon
+              name="md-contentcopy"
+              scale="0.7"
+            />
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs btn-square text-base-content/60"
+            :aria-label="t('remote_control_config.pageList.delete')"
+            :title="t('remote_control_config.pageList.delete')"
+            :disabled="pages.length <= 1"
+            data-testid="page-list-delete"
+            @click.stop="emit('delete', idx)"
+          >
+            <v-icon
+              name="md-delete"
+              scale="0.7"
+            />
+          </button>
+        </div>
       </li>
     </ul>
   </div>
