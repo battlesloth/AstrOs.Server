@@ -85,11 +85,10 @@ export const useFirmwareStore = defineStore('firmware', () => {
   const currentStage = ref<FirmwareStage | null>(null);
   const flashError = ref<FlashErrorEnvelope | null>(null);
   // All controllers that ended this job in stage='FAILED'. Multi-failure is
-  // realistic (e.g. ESP-NOW bus failure fails both padawans simultaneously);
+  // realistic (bus-wide ESP-NOW failure fails both padawans simultaneously);
   // surfacing only the first would let the operator walk away from a bricked
-  // controller. Empty array means no FAILED entries were observed. `stage`
-  // is `FirmwareStage | null` — null when we can't honestly attribute the
-  // failure to a specific stage (rather than fabricating 'transfer').
+  // controller. `stage` is `FirmwareStage | null` — null when we can't
+  // honestly attribute the failure to a specific stage.
   const failedControllers = ref<FailedControllerSummary[]>([]);
 
   // WS-pushed state. Apply* handlers + resetToSelect are the writers
@@ -118,16 +117,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // flashJobStarted (or flashControllerUpdate) for a padawan can arrive
   // before its LocationStatus heartbeat has populated the MAC mapping.
   // Without this queue, the dropped event is lost forever and the row
-  // freezes at its last-seen stage (or never gets a pill at all). The queue
-  // is keyed by raw MAC; `flushPendingForMac` replays on setControllerMac.
-  // Cleared on resetToSelect, applyJobStarted (replace-not-merge for the
-  // new job), and the two terminal handlers (applyJobDone, applyJobFailed)
-  // — see those sites for the per-call rationale.
+  // freezes at its last-seen stage (or never gets a pill at all). Keyed by
+  // raw MAC; `flushPendingForMac` replays on setControllerMac.
   const pendingByMac = ref<Map<string, ControllerFlashState[]>>(new Map());
 
   // Project the per-location controller store into a fleet shape the firmware
-  // view consumes. Reads are reactive through useControllerStore — changes
-  // to per-location refs propagate through this computed automatically.
+  // view consumes.
   const controllers = computed<FirmwareControllerView[]>(() => {
     const cs = useControllerStore();
     const statusByLocation = {
@@ -210,19 +205,16 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return true;
   }
 
-  // Selection-based: are any selected controllers currently policy-blocked
-  // as downgrades? Drives the action-bar "downgrade blocked" warning copy.
-  // When allowDowngrade flips to true, this clears even if downgrades stay
-  // selected — the policy block is gone.
+  // True iff a selected controller would downgrade AND the policy override
+  // isn't on. Goes false when allowDowngrade flips to true — the policy
+  // block is gone regardless of selection.
   const anyDowngradeBlocked = computed(
     () => !allowDowngrade.value && [...selectedControllerIds.value].some(isDowngrade),
   );
 
-  // Fleet-based: would any controller in the fleet be downgraded by the
-  // current target? Drives the contextual reveal of the "Allow downgrades"
-  // toggle in the controllers-panel header — when no downgrade scenario
-  // exists at all (pure-upgrade target), the toggle stays hidden to keep
-  // the routine path uncluttered.
+  // Whether the fleet contains any controller a downgrade is even possible
+  // for. Gates the "Allow downgrades" toggle's visibility — pure-upgrade
+  // targets keep the toggle hidden.
   const anyFleetDowngrade = computed(() => controllers.value.some((c) => isDowngrade(c.id)));
 
   const anyHardBlockedSelected = computed(() =>
@@ -279,21 +271,12 @@ export const useFirmwareStore = defineStore('firmware', () => {
     currentJobLoadFailed.value = false;
   }
 
-  /**
-   * Single writer for `flashError`. All sites that need to surface an
-   * error envelope route through this action: the dispatcher's malformed-
-   * payload catches, applyJobFailed's reason mapping, startFlash's HTTP
-   * error path, and the panel banner's retry-clear case. A future
-   * "who wrote this flashError" audit has one site to grep.
-   */
+  /** Single writer for `flashError` — keeps the "who set this" audit one-site. */
   function setFlashError(envelope: FlashErrorEnvelope): void {
     flashError.value = envelope;
   }
 
-  /**
-   * Paired clear for {@link setFlashError}. Used by the panel's dismiss
-   * button, applyJobStarted's per-job lifecycle reset, and resetToSelect.
-   */
+  /** Paired clear for {@link setFlashError}. */
   function clearFlashError(): void {
     flashError.value = null;
   }
@@ -305,12 +288,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // ---------- WS handlers (the sole writers of server-pushed fields) ----------
 
   /**
-   * Translate a wire-level controllerId (MAC) to a fleet `SlotId`. The
-   * underlying resolver returns `Location | null`; `Location.UNKNOWN` is
-   * not a valid slot key, so we map it to null. The returned `SlotId` is
-   * the key the panel uses in `progressByControllerId`. Null callers queue
-   * the payload for replay so the row can recover once LocationStatus
-   * learns the MAC.
+   * Translate a wire-level controllerId (MAC) to a fleet `SlotId`. Returns
+   * null when the MAC has no mapping yet OR when the mapped Location is
+   * `UNKNOWN` (not a valid slot key). Null is the queue-for-replay signal.
    */
   function resolveSlot(controllerId: string): SlotId | null {
     const cs = useControllerStore();
@@ -414,8 +394,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
         );
         continue;
       }
-      // Re-key by slot so the panel's progressByControllerId[c.id] lookup
-      // (where c.id is 'body'/'core'/'dome') resolves correctly.
+      // Re-key by slot so the panel's slot-keyed lookups resolve.
       m.set(slot, { ...s, controllerId: slot });
     }
     return m;
@@ -491,11 +470,9 @@ export const useFirmwareStore = defineStore('firmware', () => {
   }
 
   /**
-   * Drain queued ControllerFlashState payloads for `mac` and re-apply them.
-   * Called by `useWebsocket.handleStatusMessage` right after the controller
-   * store learns a new MAC mapping. Idempotent: a flush with no pending
-   * entries is a no-op. Replays in insertion order so the final state
-   * reflects the most recent server-pushed stage.
+   * Drain queued ControllerFlashState payloads for `mac` and re-apply them
+   * in insertion order so the final state reflects the most recent
+   * server-pushed stage. Idempotent.
    */
   function flushPendingForMac(mac: string): void {
     const queue = pendingByMac.value.get(mac);
@@ -768,9 +745,8 @@ export const useFirmwareStore = defineStore('firmware', () => {
       // Direct apiClient.post bypasses apiService.post's console.error
       // wrapper, so log here to preserve the dev breadcrumb.
       console.error('firmware.startFlash failed', error);
-      // Clear the pending flag on POST rejection — we're not the lock
-      // holder. The terminal handlers (applyJobDone/Failed, cancelFlash,
-      // resetToSelect) clear it for the success/terminal paths.
+      // POST rejected — we're not the lock holder; clear the pending flag.
+      // Terminal handlers cover the success/terminal paths separately.
       pendingOwnFlashStart.value = false;
       phase.value = 'select';
       setFlashError(mapHttpErrorToFlashEnvelope(error));
@@ -808,15 +784,8 @@ export const useFirmwareStore = defineStore('firmware', () => {
   // FirmwareView can warn that its phase is unconfirmed. The WS late-join
   // snapshot normally covers this — but if BOTH HTTP and WS are down, the
   // operator otherwise sees an apparently-idle page while a job may be in
-  // flight server-side. The server's GET /api/firmware/flash returns
-  // 200 + body:null when idle (handled in the try block); a 404 explicit
-  // fallback below is forward-compat only — no current server route
-  // surfaces it on this endpoint.
-  // Cleared on: any successful fetchCurrentJob, the forward-compat 404
-  // fallback, applyJobStarted (WS snapshot landed), applyControllerUpdate
-  // for a known controller (belt-and-suspenders), and the three terminal
-  // states (resetToSelect, applyJobDone, applyJobFailed) so the banner
-  // can't shadow a final state.
+  // flight server-side. Cleared by any later signal that the store has
+  // live state again (successful fetch, WS snapshot, terminal transition).
   const currentJobLoadFailed = ref(false);
 
   // Cold-load resync. Mounted views call this to populate currentJob from
@@ -920,9 +889,8 @@ export const useFirmwareStore = defineStore('firmware', () => {
     } catch (error) {
       console.warn('firmware.uploadFirmware failed', error);
       uploadState.value = 'error';
-      // Re-use the existing flash-error envelope + banner surface. The
-      // panel's banner v-ifs on `flashError !== null && phase === 'select'`
-      // — both true at upload time, so no extra UI plumbing needed.
+      // Re-use the existing flashError surface so the panel banner renders
+      // uniformly with flash-time HTTP failures.
       setFlashError(mapHttpErrorToFlashEnvelope(error));
     }
   }
