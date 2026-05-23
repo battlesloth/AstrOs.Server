@@ -70,12 +70,15 @@ function openEditor() {
   popoverOpen.value = true;
 }
 
-function closeEditor() {
+function closeEditor(options: { restoreFocus?: boolean } = {}) {
   popoverOpen.value = false;
+
+  const restoreFocus = options.restoreFocus !== false;
+  const target = restoreFocus ? triggerEl : null;
+  triggerEl = null;
+
   // Restore focus AFTER the popover unmounts so the trigger button can
   // re-receive focus cleanly. nextTick lets Vue flush the v-if removal.
-  const target = triggerEl;
-  triggerEl = null;
   nextTick(() => target?.focus());
 }
 
@@ -95,7 +98,7 @@ function handleClickOutside(e: MouseEvent) {
   const path = e.composedPath();
   if (cardRef.value && path.includes(cardRef.value)) return;
   if (popoverRef.value && path.includes(popoverRef.value)) return;
-  closeEditor();
+  closeEditor({ restoreFocus: false });
 }
 
 onMounted(() => {
