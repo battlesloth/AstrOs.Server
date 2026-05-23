@@ -27,7 +27,7 @@ const isAssigned = computed(() => props.value.type !== 'none');
 const typeChipClasses = computed(() => {
   switch (props.value.type) {
     case 'playlist':
-      return 'bg-warning/15 text-warning-content border border-warning/40';
+      return 'bg-orange-500/15 text-orange-700 border border-orange-500/40';
     case 'script':
       return 'bg-primary/15 text-primary border border-primary/40';
     case 'none':
