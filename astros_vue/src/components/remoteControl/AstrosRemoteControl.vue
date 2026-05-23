@@ -39,9 +39,9 @@ onMounted(async () => {
   scripts.value = scriptStore.scripts.map((s) => ({ id: s.id, name: s.scriptName }));
   playlists.value = playlistStore.playlists.map((p) => ({ id: p.id, name: p.playlistName }));
 
-  // Surface load failures and skip default-seeding so a save can't overwrite real
-  // stored data with an empty page (the store's saveRemoteControl filter drops
-  // all-empty pages, so a seeded-then-saved state would PUT [] over real config).
+  // Surface load failures and skip default-seeding when load fails — we don't
+  // know what's actually on the server, so seeding a fresh default risks the
+  // user saving it over real-but-unloaded config.
   if (!loadResult.success) {
     loadFailed.value = true;
     error(t('remote_view.load_error'));

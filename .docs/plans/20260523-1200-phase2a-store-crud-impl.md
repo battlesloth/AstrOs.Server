@@ -18,7 +18,7 @@
 
 - Branch off the latest `origin/develop`. The previous branch name `feature/phase2a-store-crud-foundation` is burned (PR #93 already used it).
 - Per memory `feedback_safe_feature_branch_creation`: **do NOT** use `git checkout -b feature/phase2a-store-crud-impl origin/develop` — that form makes the branch track `develop` and VS Code will push commits straight to develop. Use `git fetch origin && git switch develop && git pull && git switch -c feature/phase2a-store-crud-impl` (no upstream argument — the branch ends up with no upstream, which is what we want).
-- Per memory `feedback_prettier_pre_commit`: `npm run prettier:write` runs **before** every commit, alongside `npm run lint:fix`.
+- Per memory `feedback_prettier_pre_commit`: `npm run format` (the Vue project's prettier script — equivalent to the API's `prettier:write`) runs **before** every commit, alongside `npm run lint` (Vue's lint script already runs eslint with `--fix`).
 - Per memory `feedback_mutation_test_defensive_features`: for every defensive guard added (`deletePage`'s `pages.length <= 1`, `renamePage`'s trim/empty check, `selectPage`'s clamp, `addPage`'s `selectedIdx` invariant, the `isDirty=false` clears in load/save), revert the guard, re-run the relevant test, confirm it FAILS, then restore the guard. The plan calls this out per-task.
 - All test commands run from `astros_vue/`. The watch-mode default (`npm run test:unit`) is fine for local iteration; the plan uses `npx vitest run path/to/spec.ts -t "test name"` for one-shot runs and verification.
 
@@ -183,8 +183,8 @@ Restore the line.
 
 ```bash
 npx vitest run src/stores/__tests__/remoteControl.spec.ts
-npm run prettier:write
-npm run lint:fix
+npm run format
+npm run lint
 git add astros_vue/src/stores/remoteControl.ts astros_vue/src/stores/__tests__/remoteControl.spec.ts
 git commit -m "feat(remote-store): add isDirty flag cleared on load success"
 ```
@@ -333,8 +333,8 @@ Expected: both "clamps" tests FAIL. Restore the clamp.
 
 ```bash
 npx vitest run src/stores/__tests__/remoteControl.spec.ts
-npm run prettier:write
-npm run lint:fix
+npm run format
+npm run lint
 git add astros_vue/src/stores/remoteControl.ts astros_vue/src/stores/__tests__/remoteControl.spec.ts
 git commit -m "feat(remote-store): add selectedIdx with clamping selectPage and load reset"
 ```
@@ -430,8 +430,8 @@ Expected: that test FAILS. Restore.
 
 ```bash
 npx vitest run src/stores/__tests__/remoteControl.spec.ts
-npm run prettier:write
-npm run lint:fix
+npm run format
+npm run lint
 git add astros_vue/src/stores/remoteControl.ts astros_vue/src/stores/__tests__/remoteControl.spec.ts
 git commit -m "feat(remote-store): add addPage method"
 ```
@@ -582,8 +582,8 @@ Expected: that test FAILS. Restore the loop.
 
 ```bash
 npx vitest run src/stores/__tests__/remoteControl.spec.ts
-npm run prettier:write
-npm run lint:fix
+npm run format
+npm run lint
 git add astros_vue/src/stores/remoteControl.ts astros_vue/src/stores/__tests__/remoteControl.spec.ts
 git commit -m "feat(remote-store): add duplicatePage with deep button copy"
 ```
@@ -757,8 +757,8 @@ Expected: FAIL. Restore.
 
 ```bash
 npx vitest run src/stores/__tests__/remoteControl.spec.ts
-npm run prettier:write
-npm run lint:fix
+npm run format
+npm run lint
 git add astros_vue/src/stores/remoteControl.ts astros_vue/src/stores/__tests__/remoteControl.spec.ts
 git commit -m "feat(remote-store): add deletePage with single-page guard and selectedIdx clamp"
 ```
@@ -892,8 +892,8 @@ Expected: FAIL. Restore.
 
 ```bash
 npx vitest run src/stores/__tests__/remoteControl.spec.ts
-npm run prettier:write
-npm run lint:fix
+npm run format
+npm run lint
 git add astros_vue/src/stores/remoteControl.ts astros_vue/src/stores/__tests__/remoteControl.spec.ts
 git commit -m "feat(remote-store): add renamePage with trim + empty-string no-op"
 ```
@@ -1030,8 +1030,8 @@ Expected: FAIL. Restore.
 - [ ] **Step 7: Commit**
 
 ```bash
-npm run prettier:write
-npm run lint:fix
+npm run format
+npm run lint
 git add astros_vue/src/stores/remoteControl.ts astros_vue/src/stores/__tests__/remoteControl.spec.ts
 git commit -m "feat(remote-store): drop all-empty save filter; clear isDirty on save success"
 ```
