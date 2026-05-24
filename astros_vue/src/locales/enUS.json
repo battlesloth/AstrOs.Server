@@ -604,6 +604,9 @@
       "duplicate": "Duplicate",
       "delete": "Delete",
       "renameInput": "Page name"
+    },
+    "preview": {
+      "bezel_label": "Live preview"
     }
   }
 }
