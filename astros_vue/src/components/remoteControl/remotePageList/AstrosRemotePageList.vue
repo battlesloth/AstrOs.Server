@@ -118,6 +118,7 @@ function dotClass(type: PageButton['type']): string {
         v-for="(page, idx) in pages"
         :key="page.id"
         role="option"
+        tabindex="0"
         :aria-selected="idx === selectedIdx ? 'true' : 'false'"
         :class="[
           'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5',
@@ -127,6 +128,8 @@ function dotClass(type: PageButton['type']): string {
         ]"
         data-testid="page-list-row"
         @click="emit('select', idx)"
+        @keydown.enter.prevent="emit('select', idx)"
+        @keydown.space.prevent="emit('select', idx)"
       >
         <div
           class="grid flex-shrink-0 grid-cols-3 gap-px"
