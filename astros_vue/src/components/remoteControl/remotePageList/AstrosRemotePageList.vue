@@ -113,6 +113,7 @@ function dotClass(type: PageButton['type']): string {
     <ul
       role="listbox"
       class="flex-1 overflow-y-auto p-1"
+      :aria-label="t('remote_control_config.pageList.header')"
     >
       <li
         v-for="(page, idx) in pages"
