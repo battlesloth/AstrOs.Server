@@ -10,15 +10,14 @@ defineProps<{
   selectedIdx: number;
 }>();
 
-// No emits. The embedded AstrosMobileRemote will fire press/panic from
-// internal button clicks; we attach empty handlers to satisfy Vue's event
-// binding and explicitly NOT re-emit (Decision 1: live preview is read-only,
-// avoids the "I clicked a button in the editor and the droid moved" surprise).
+// The embedded AstrosMobileRemote fires press/panic from internal button
+// clicks; this wrapper explicitly does NOT re-emit, so a button click in
+// the editor preview can't surprise the user by moving the droid.
 function noopPress() {
-  /* read-only preview — see Decision 1 in the design spec */
+  /* intentionally no-op — preview is read-only */
 }
 function noopPanic() {
-  /* read-only preview — see Decision 1 in the design spec */
+  /* intentionally no-op — preview is read-only */
 }
 </script>
 

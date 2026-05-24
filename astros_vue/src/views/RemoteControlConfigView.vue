@@ -39,8 +39,7 @@ onMounted(async () => {
 
   // ANY of the three loads failing disables editing — partial state would let
   // the user save a config that references scripts/playlists they couldn't
-  // see in the editor dropdowns. The legacy view only gated on the remote
-  // result and was vulnerable to that partial-load case.
+  // see in the editor dropdowns.
   if (!scriptsResult.success || !playlistsResult.success || !remoteResult.success) {
     loadFailed.value = true;
     error(t('remote_control_config.view.load_error'));
@@ -55,7 +54,6 @@ async function saveConfig() {
   // The store catches its own errors and resolves with {success: false, error}
   // rather than rejecting — a bare `await` here would never throw and every
   // failed PUT would render as a success toast. Inspect the flag.
-  // (The store already logs the raw error on its side; no need to re-log.)
   const result = await remoteControlStore.saveRemoteControl();
   if (result.success) {
     success(t('remote_control_config.view.save_success'));
@@ -83,34 +81,34 @@ function onRenamePage(payload: { idx: number; name: string }) {
 // Delete-confirm modal state. The page list emits delete(idx); we capture
 // idx here, open the modal, and wait for user confirmation before calling
 // store.deletePage. Cancel resets pendingDeleteIdx without mutation.
-const pendingDeleteIdx = ref<number | null>(null);
-// Snapshot the name at request time so a concurrent mutation to
+// Snapshot {idx, name} at request time so a concurrent mutation to
 // remoteControlPages (between modal open and confirm) can't drift the
 // rendered message away from what the user clicked to delete. Without this,
 // a TOCTOU race during e.g. a future websocket-driven sync could surface a
-// `Delete ""?` empty-string fallback.
-const pendingDeleteName = ref('');
+// `Delete ""?` empty-string fallback. Bundled into one ref so idx and name
+// always change together — eliminates the "open with idx set but name blank"
+// intermediate.
+const pendingDelete = ref<{ idx: number; name: string } | null>(null);
 
 function onDeleteRequest(idx: number) {
-  pendingDeleteIdx.value = idx;
-  pendingDeleteName.value = remoteControlPages.value[idx]?.name ?? '';
+  const name = remoteControlPages.value[idx]?.name;
+  if (name === undefined) return; // out-of-range idx — no modal
+  pendingDelete.value = { idx, name };
 }
 
 function onDeleteConfirm() {
-  if (pendingDeleteIdx.value === null) return;
-  remoteControlStore.deletePage(pendingDeleteIdx.value);
-  pendingDeleteIdx.value = null;
-  pendingDeleteName.value = '';
+  if (pendingDelete.value === null) return;
+  remoteControlStore.deletePage(pendingDelete.value.idx);
+  pendingDelete.value = null;
 }
 
 function onDeleteCancel() {
-  pendingDeleteIdx.value = null;
-  pendingDeleteName.value = '';
+  pendingDelete.value = null;
 }
 
 function onButtonChange(key: ButtonKey, value: PageButton) {
-  // setButton atomically writes the slot AND flips isDirty — that's the §4
-  // contract added during 2a's PR review. No view-level dirty-tracking needed.
+  // setButton atomically writes the slot AND flips isDirty, so no view-level
+  // dirty-tracking is needed.
   remoteControlStore.setButton(selectedIdx.value, key, value);
 }
 
@@ -209,10 +207,10 @@ const pageCount = computed(() => remoteControlPages.value.length);
                 v-for="(key, i) in BUTTON_KEYS"
                 :key="key"
                 :button-number="i + 1"
-                :value="currentPage[key as ButtonKey]"
+                :value="currentPage[key]"
                 :scripts="scripts"
                 :playlists="playlists"
-                @change="(value) => onButtonChange(key as ButtonKey, value)"
+                @change="(value) => onButtonChange(key, value)"
               />
             </div>
           </main>
@@ -231,10 +229,10 @@ const pageCount = computed(() => remoteControlPages.value.length);
       </div>
 
       <AstrosConfirmModal
-        v-if="pendingDeleteIdx !== null"
+        v-if="pendingDelete !== null"
         title="remote_control_config.deleteModal.title"
         message="remote_control_config.deleteModal.message"
-        :message-params="{ name: pendingDeleteName }"
+        :message-params="{ name: pendingDelete.name }"
         :on-confirm="onDeleteConfirm"
         :on-close="onDeleteCancel"
       />

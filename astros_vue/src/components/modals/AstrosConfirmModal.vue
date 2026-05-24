@@ -13,7 +13,10 @@ const props = withDefaults(
     // misses, vue-i18n logs `[intlify] Not found ...`, and console fills with
     // noise on every open. Providing messageParams lets the modal call
     // $t(message, messageParams) so message stays a real key.
-    messageParams?: Record<string, unknown>;
+    // Param values are constrained to string | number to match vue-i18n's
+    // NamedValue contract — `unknown` would let callers pass an object that
+    // stringifies to "[object Object]" in the modal body.
+    messageParams?: Record<string, string | number>;
   }>(),
   {
     title: 'modals.confirm.title',
