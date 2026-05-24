@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { storeToRefs } from 'pinia';
 import { AstrosLayout } from '@/components';
@@ -8,20 +8,59 @@ import AstrosRemotePageList from '@/components/remoteControl/remotePageList/Astr
 import AstrosRemoteLivePreview from '@/components/remoteControl/remoteLivePreview/AstrosRemoteLivePreview.vue';
 import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import { useRemoteControlStore } from '@/stores/remoteControl';
+import { useScriptsStore } from '@/stores/scripts';
+import { usePlaylistsStore } from '@/stores/playlists';
+import { useToast } from '@/composables/useToast';
 import { BUTTON_KEYS, type ButtonKey } from '@/models/remoteControl/remoteControlPage';
 
 const { t } = useI18n();
 
 const remoteControlStore = useRemoteControlStore();
+const scriptStore = useScriptsStore();
+const playlistStore = usePlaylistsStore();
+const { success, error } = useToast();
+
 const { remoteControlPages, selectedIdx, isDirty } = storeToRefs(remoteControlStore);
 
-// loadFailed flips true if the remote-config GET fails on mount; gates the
-// Save button to prevent overwriting unloaded data. Set by the onMounted
-// block wired in Task 3 (the load_error / save_success / save_error locale
-// keys are also unreferenced until that task).
+// Flipped true if the remote-config GET fails on mount; gates the Save
+// button to prevent overwriting unloaded data.
 const loadFailed = ref(false);
 const scripts = ref<{ id: string; name: string }[]>([]);
 const playlists = ref<{ id: string; name: string }[]>([]);
+
+onMounted(async () => {
+  const [scriptsResult, playlistsResult, remoteResult] = await Promise.all([
+    scriptStore.loadScripts(),
+    playlistStore.loadData(),
+    remoteControlStore.loadRemoteControl(),
+  ]);
+
+  // ANY of the three loads failing disables editing — partial state would let
+  // the user save a config that references scripts/playlists they couldn't
+  // see in the editor dropdowns. The legacy view only gated on the remote
+  // result and was vulnerable to that partial-load case.
+  if (!scriptsResult.success || !playlistsResult.success || !remoteResult.success) {
+    loadFailed.value = true;
+    error(t('remote_control_config.view.load_error'));
+    return;
+  }
+
+  scripts.value = scriptStore.scripts.map((s) => ({ id: s.id, name: s.scriptName }));
+  playlists.value = playlistStore.playlists.map((p) => ({ id: p.id, name: p.playlistName }));
+});
+
+async function saveConfig() {
+  // The store catches its own errors and resolves with {success: false, error}
+  // rather than rejecting — a bare `await` here would never throw and every
+  // failed PUT would render as a success toast. Inspect the flag.
+  const result = await remoteControlStore.saveRemoteControl();
+  if (result.success) {
+    success(t('remote_control_config.view.save_success'));
+  } else {
+    console.error('Error saving remote control configuration:', result.error);
+    error(t('remote_control_config.view.save_error'));
+  }
+}
 
 const currentPage = computed(() => remoteControlPages.value[selectedIdx.value] ?? null);
 
@@ -68,11 +107,7 @@ const pageCount = computed(() => remoteControlPages.value.length);
             data-testid="save-config"
             class="btn btn-primary w-24"
             :disabled="loadFailed || !isDirty"
-            @click="
-              () => {
-                /* wired in Task 3 */
-              }
-            "
+            @click="saveConfig"
           >
             {{ t('remote_control_config.view.save') }}
           </AstrosWriteButton>
