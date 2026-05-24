@@ -320,6 +320,25 @@ describe('AstrosRemotePageList — inline rename', () => {
     expect(wrapper.emitted('rename')![0]).toEqual([{ idx: 1, name: 'Concerts' }]);
   });
 
+  it('does NOT emit select when Space is pressed inside the rename input', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .get('[data-testid="page-list-rename-input"]');
+
+    await input.trigger('keydown.space');
+
+    expect(wrapper.emitted('select')).toBeUndefined();
+  });
+
   it('emits rename on blur (commits the edit)', async () => {
     const wrapper = mount(AstrosRemotePageList, {
       attachTo: document.body,
