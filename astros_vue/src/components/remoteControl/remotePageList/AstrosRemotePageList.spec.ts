@@ -501,6 +501,70 @@ describe('AstrosRemotePageList — inline rename', () => {
     expect(wrapper.emitted('rename')![1]).toEqual([{ idx: 2, name: 'Renamed Row 2' }]);
   });
 
+  it('parent splicing a new page at idx 0 mid-rename: rename still commits to the correct page', async () => {
+    // The rename state is keyed by page.id (not position) so the user's
+    // edit follows the page across reorder. Without id-keying, a stale
+    // renamingIdx would re-bind the input to whatever page now occupies
+    // the old position, silently committing the user's edit to the wrong
+    // page on blur.
+    const pageB = mkPage('b', 'Performance');
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: [mkPage('a', 'A'), pageB, mkPage('c', 'C')], selectedIdx: 1 },
+    });
+
+    // Start renaming page B (currently at idx 1).
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input.setValue('Performance Edited');
+
+    // Parent splices a new page at idx 0. Page B is now at idx 2.
+    await wrapper.setProps({
+      pages: [mkPage('new', 'New Page'), mkPage('a', 'A'), pageB, mkPage('c', 'C')],
+      selectedIdx: 2,
+    });
+
+    // The rename input should still be on page B (now at idx 2).
+    const newRows = wrapper.findAll('[data-testid="page-list-row"]');
+    expect(newRows[2]!.find('[data-testid="page-list-rename-input"]').exists()).toBe(true);
+    expect(newRows[1]!.find('[data-testid="page-list-rename-input"]').exists()).toBe(false);
+
+    // Blur the input. Emit should reflect page B's NEW idx (2).
+    await newRows[2]!.get('[data-testid="page-list-rename-input"]').trigger('blur');
+    expect(wrapper.emitted('rename')).toHaveLength(1);
+    expect(wrapper.emitted('rename')![0]).toEqual([{ idx: 2, name: 'Performance Edited' }]);
+  });
+
+  it('parent removing the page being renamed mid-rename: no emit, no error', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input.setValue('Stale Edit');
+
+    // Parent removes the page being renamed (page 'b').
+    await wrapper.setProps({ pages: [PAGES_3[0]!, PAGES_3[2]!], selectedIdx: 0 });
+
+    // No rename input survives (the gone page no longer matches renamingId).
+    expect(wrapper.find('[data-testid="page-list-rename-input"]').exists()).toBe(false);
+    // No emit — consumer doesn't need a rename event for a page that's gone.
+    expect(wrapper.emitted('rename')).toBeUndefined();
+  });
+
   it('focuses the rename input on mount (so Enter/Esc work without an extra click)', async () => {
     const wrapper = mount(AstrosRemotePageList, {
       attachTo: document.body,

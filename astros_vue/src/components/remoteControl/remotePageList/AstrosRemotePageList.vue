@@ -7,7 +7,7 @@ import { assertNever } from '@/utils/assertNever';
 
 const { t } = useI18n();
 
-defineProps<{
+const props = defineProps<{
   pages: readonly RemoteControlPage[];
   selectedIdx: number;
 }>();
@@ -20,15 +20,21 @@ const emit = defineEmits<{
   rename: [payload: { idx: number; name: string }];
 }>();
 
-const renamingIdx = ref<number | null>(null);
-// renameDraft only carries meaning when renamingIdx !== null; the two refs
+// Rename state is keyed by page.id (stable across reorder/insert/delete),
+// not by position. The forIdx-style guard fixed cross-row pencil hand-off
+// in one tick, but parent-driven mutation of `pages` (Phase 5 reorder, an
+// async insert, a realtime sync) re-renders v-for with shifted indices —
+// an idx-based binding would re-attach the rename input to whatever page
+// now sits at the stale index. The emit shape stays {idx, name} per spec;
+// the idx is resolved at commit time from the captured page id.
+const renamingId = ref<string | null>(null);
+// renameDraft only carries meaning when renamingId !== null; the two refs
 // form a 2-state machine (idle | renaming).
 const renameDraft = ref('');
 // Captured via function ref on the rename input. Only one input is ever
-// mounted at a time (v-if=renamingIdx===idx), so this callback fires once
-// with the element on mount and once with null on unmount. Scoped to this
-// component instance — unlike document.querySelector which would clash if
-// two AstrosRemotePageLists were ever mounted on the same view.
+// mounted at a time (v-if=renamingId===page.id), so this callback fires
+// once with the element on mount and once with null on unmount. Scoped to
+// this component instance.
 let renameInputEl: HTMLInputElement | null = null;
 function captureRenameInput(el: unknown) {
   // Vue's function-ref signature is broader than Element (also accepts a
@@ -37,29 +43,32 @@ function captureRenameInput(el: unknown) {
   renameInputEl = el as HTMLInputElement | null;
 }
 
-function startRename(idx: number, current: string) {
-  renamingIdx.value = idx;
+function startRename(id: string, current: string) {
+  renamingId.value = id;
   renameDraft.value = current;
   nextTick(() => renameInputEl?.focus());
 }
 
-function commitRename(forIdx: number) {
-  // `forIdx` is the row this commit was bound to at handler-attach time. If
-  // the user has already switched rename to a different row (e.g., clicked
-  // another row's pencil), this blur/Enter is stale — the focus moved on
-  // and the active draft now belongs to a different row. Drop it.
-  if (renamingIdx.value !== forIdx) return;
+function commitRename(forId: string) {
+  // `forId` is the page id this commit was bound to at handler-attach time.
+  // If the user has already switched rename to a different row (e.g.,
+  // clicked another row's pencil), this blur/Enter is stale — drop it.
+  if (renamingId.value !== forId) return;
   const trimmed = renameDraft.value.trim();
   // Exit rename mode FIRST so the blur handler that fires as a side-effect
   // of Enter (which removes the input from the DOM) doesn't re-enter this
   // function and double-emit.
-  renamingIdx.value = null;
+  renamingId.value = null;
   if (trimmed.length === 0) return;
-  emit('rename', { idx: forIdx, name: trimmed });
+  // Resolve idx at commit time so the emit reflects the page's CURRENT
+  // position, not its position when rename started. Survives reorder.
+  const idx = props.pages.findIndex((p) => p.id === forId);
+  if (idx === -1) return; // page was removed mid-rename; no emit for a gone page
+  emit('rename', { idx, name: trimmed });
 }
 
 function cancelRename() {
-  renamingIdx.value = null;
+  renamingId.value = null;
 }
 
 function dotClass(type: PageButton['type']): string {
@@ -126,7 +135,7 @@ function dotClass(type: PageButton['type']): string {
           />
         </div>
         <input
-          v-if="renamingIdx === idx"
+          v-if="renamingId === page.id"
           :ref="captureRenameInput"
           v-model="renameDraft"
           type="text"
@@ -134,9 +143,9 @@ function dotClass(type: PageButton['type']): string {
           :aria-label="t('remote_control_config.pageList.renameInput')"
           data-testid="page-list-rename-input"
           @click.stop
-          @keydown.enter.prevent="commitRename(idx)"
+          @keydown.enter.prevent="commitRename(page.id)"
           @keydown.escape="cancelRename"
-          @blur="commitRename(idx)"
+          @blur="commitRename(page.id)"
         />
         <span
           v-else
@@ -156,7 +165,7 @@ function dotClass(type: PageButton['type']): string {
             :aria-label="t('remote_control_config.pageList.rename')"
             :title="t('remote_control_config.pageList.rename')"
             data-testid="page-list-rename"
-            @click.stop="startRename(idx, page.name)"
+            @click.stop="startRename(page.id, page.name)"
           >
             <v-icon
               name="md-edit"
