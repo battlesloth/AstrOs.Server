@@ -17,7 +17,7 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
 - [x] **Phase 1 — Page id/name data model**: Add `id` + `name` to RemoteControlPage and
       M5Page, migrate existing data on load/save, hold M5Stack-compatible JSON shape. —
       shipped 2026-05-21 via PR #90 (merge `9b52df5`), M5 bench-verified before merge.
-- [ ] **Phase 2 — Direction B editor port**: Rebuild RemoteControlConfig view as a 3-pane
+- [x] **Phase 2 — Direction B editor port**: Rebuild RemoteControlConfig view as a 3-pane
       layout (page list + 3×3 grid + live preview), inline button editor, inline page CRUD.
       Design: [`specs/2026-05-21-phase2-editor-design.md`](./specs/2026-05-21-phase2-editor-design.md).
       Split into 4 PRs:
@@ -40,8 +40,20 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
         parent-driven reorder during rename — divergence from the per-task snippets in the
         plan, addressed pre-merge. Focus capture via Vue function-ref (`captureRenameInput`),
         not a `ref=""` string or `document.querySelector`.
-  - [ ] **2d** — `AstrosRemoteLivePreview` + `RemoteControlConfigView` assembly + router
-        swap + delete-confirm modal + i18n sweep + manual QA + old code deletion.
+  - [x] **2d** — `AstrosRemoteLivePreview` + `RemoteControlConfigView` assembly + router
+        swap + delete-confirm modal + i18n sweep + manual QA + old code deletion. — ready
+        for PR (push pending). 7 commits on feature/phase2d-config-view: live-preview
+        component (mutation-tested no-emit contract), view scaffold (3-pane), data
+        loading with partial-failure OR-gate (improves on legacy single-gate), page list
+        wiring, delete-confirm modal, card change wiring, view tests (23 vitest cases
+        including mutation tests for save-disable cascade / delete-cancel no-op /
+        setButton selectedIdx snapshot). Pre-push toolkit dispatch caught: vue-i18n
+        intlify warning from double-`$t()` (fixed by adding `messageParams` to
+        AstrosConfirmModal — backward compatible with ModulesView usage), TOCTOU on
+        pendingDeleteName (snapshot at request time), duplicate console.error in
+        saveConfig (removed; store already logs). Deferred to followups: sticky
+        loadFailed banner with Retry (silent-failure C2), useToast dedupe/queue (H4),
+        playlistStore partial-failure cleanup (C1 — pre-existing in a different store).
 - [x] **Phase 3 — Shared `AstrosMobileRemote` component**: Build the handheld UI in Vue;
       consume it from Phase 2's preview rail in compact mode. — shipped 2026-05-21 via
       PR #92 (merge `547a7af`). Three pre-push toolkit rounds; 39 PR-added tests;
