@@ -41,16 +41,19 @@ function startRename(idx: number, current: string) {
   });
 }
 
-function commitRename() {
-  if (renamingIdx.value === null) return;
+function commitRename(forIdx: number) {
+  // `forIdx` is the row this commit was bound to at handler-attach time. If
+  // the user has already switched rename to a different row (e.g., clicked
+  // another row's pencil), this blur/Enter is stale — the focus moved on
+  // and the active draft now belongs to a different row. Drop it.
+  if (renamingIdx.value !== forIdx) return;
   const trimmed = renameDraft.value.trim();
   // Exit rename mode FIRST so the blur handler that fires as a side-effect
   // of Enter (which removes the input from the DOM) doesn't re-enter this
   // function and double-emit.
-  const idx = renamingIdx.value;
   renamingIdx.value = null;
   if (trimmed.length === 0) return;
-  emit('rename', { idx, name: trimmed });
+  emit('rename', { idx: forIdx, name: trimmed });
 }
 
 function cancelRename() {
@@ -128,9 +131,9 @@ function dotClass(type: PageButton['type']): string {
           :aria-label="t('remote_control_config.pageList.renameInput')"
           data-testid="page-list-rename-input"
           @click.stop
-          @keydown.enter.prevent="commitRename"
+          @keydown.enter.prevent="commitRename(idx)"
           @keydown.escape="cancelRename"
-          @blur="commitRename"
+          @blur="commitRename(idx)"
         />
         <span
           v-else

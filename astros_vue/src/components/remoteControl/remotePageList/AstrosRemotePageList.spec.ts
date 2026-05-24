@@ -366,6 +366,111 @@ describe('AstrosRemotePageList — inline rename', () => {
     wrapper.unmount();
   });
 
+  it('Enter followed by blur (input-unmount cascade) emits rename exactly once', async () => {
+    // The Enter handler calls commitRename, which clears renamingIdx and
+    // unmounts the input via v-if. The input's blur fires as a side effect.
+    // Pins the same-row no-double-emit contract.
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input.setValue('Concerts');
+    await input.trigger('keydown.enter');
+    // Browser fires blur naturally when the input is removed; replicate.
+    await input.trigger('blur');
+
+    expect(wrapper.emitted('rename')).toHaveLength(1);
+    expect(wrapper.emitted('rename')![0]).toEqual([{ idx: 1, name: 'Concerts' }]);
+    wrapper.unmount();
+  });
+
+  it('clicking pencil on another row while editing row A does NOT emit a phantom rename for row B', async () => {
+    // The cross-row hand-off used to leak: startRename(B) overwrote
+    // renameDraft and then blur from A's unmounting input committed with
+    // B's draft for B's idx. The forIdx parameter on commitRename guards
+    // against this — the stale blur returns early because renamingIdx is
+    // now B, not A.
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input0 = wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input0.setValue('Edited Row 0');
+    // User clicks pencil on row 2 WITHOUT blurring first (e.g., via keyboard
+    // shortcut, or because the new pencil receives the click first in some
+    // browsers). startRename(2) runs; then the v-if unmount fires blur.
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[2]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    // Simulate the blur from the now-detached row 0 input.
+    await input0.trigger('blur');
+
+    // Row 2 must NOT have emitted a phantom rename with its own name.
+    const renameEvents = wrapper.emitted('rename') ?? [];
+    const row2Emits = renameEvents.filter((e) => (e[0] as { idx: number }).idx === 2);
+    expect(row2Emits).toHaveLength(0);
+    // Row 0's draft was overwritten by startRename(2), so its edit is gone —
+    // that's a known UX tradeoff (the user clicked away before blurring).
+    // Row 2 should be in rename mode now, with its own name pre-filled.
+    const row2 = wrapper.findAll('[data-testid="page-list-row"]')[2]!;
+    expect(row2.find('[data-testid="page-list-rename-input"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('blur on row A then opening rename on row B commits row A cleanly', async () => {
+    // The "happy path" hand-off: user clicks somewhere else (or tabs out),
+    // blur commits row A, then they open rename on row B. Each row's rename
+    // is independent.
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input0 = wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input0.setValue('Renamed Row 0');
+    await input0.trigger('blur');
+
+    expect(wrapper.emitted('rename')).toHaveLength(1);
+    expect(wrapper.emitted('rename')![0]).toEqual([{ idx: 0, name: 'Renamed Row 0' }]);
+
+    // Now open rename on row 2 — independent.
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[2]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input2 = wrapper
+      .findAll('[data-testid="page-list-row"]')[2]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input2.setValue('Renamed Row 2');
+    await input2.trigger('blur');
+
+    expect(wrapper.emitted('rename')).toHaveLength(2);
+    expect(wrapper.emitted('rename')![1]).toEqual([{ idx: 2, name: 'Renamed Row 2' }]);
+    wrapper.unmount();
+  });
+
   it('focuses the rename input on mount (so Enter/Esc work without an extra click)', async () => {
     const wrapper = mount(AstrosRemotePageList, {
       attachTo: document.body,
