@@ -55,9 +55,10 @@ astros_vue/src/components/remoteControl/
 No `types.ts` — this component takes the existing `RemoteControlPage[]` and emits primitives + `{idx, name}`. No new domain types are warranted.
 
 **Modified files:**
-- `astros_vue/src/main.ts` — register additional `oh-vue-icons` (MdEdit, MdContentcopy, MdDelete, MdAdd)
+- `astros_vue/src/main.ts` — register `IoCreate` (rename icon) in the app icon set
+- `astros_vue/.storybook/preview.ts` — register the same icon(s) for Storybook
 - `astros_vue/src/components/remoteControl/index.ts` — re-export `AstrosRemotePageList`
-- `astros_vue/src/locales/enUS.json` — add `remote_control_config.pageList.*` keys (Pages, Add page, Rename, Duplicate, Delete, drag handle aria-label)
+- `astros_vue/src/locales/enUS.json` — add `remote_control_config.pageList.*` keys (header, add, rename, duplicate, delete, rename input)
 
 **Not modified:**
 - `useRemoteControlStore` — already complete; this component does not touch it.
