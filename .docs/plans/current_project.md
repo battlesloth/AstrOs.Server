@@ -32,7 +32,14 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
         component tests with mutation-guards on every defensive branch; `makeNoneButton()`
         factory + `assertNever` helper extracted post-review; focus capture/restore added
         for a11y; `@floating-ui/vue` added for popover anchoring.
-  - [ ] **2c** — `AstrosRemotePageList`. Storybook gate; no app integration.
+  - [x] **2c** — `AstrosRemotePageList`. Storybook gate; no app integration. — shipped
+        2026-05-24 via PR #96 (merge `58008c5`). Per-row mini 3×3 preview, always-visible
+        rename/duplicate/delete icons (rename via inline input — Enter/blur commits trimmed
+        value, Esc cancels, empty no-op), sticky header with Add, delete disabled at
+        `pages.length === 1`. Rename state keyed by `page.id` (not `idx`) to survive
+        parent-driven reorder during rename — divergence from the per-task snippets in the
+        plan, addressed pre-merge. Focus capture via Vue function-ref (`captureRenameInput`),
+        not a `ref=""` string or `document.querySelector`.
   - [ ] **2d** — `AstrosRemoteLivePreview` + `RemoteControlConfigView` assembly + router
         swap + delete-confirm modal + i18n sweep + manual QA + old code deletion.
 - [x] **Phase 3 — Shared `AstrosMobileRemote` component**: Build the handheld UI in Vue;
