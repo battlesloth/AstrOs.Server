@@ -459,9 +459,16 @@ describe('AstrosRemotePageList — inline rename', () => {
     expect(row2Emits).toHaveLength(0);
     // Row 0's draft was overwritten by startRename(2), so its edit is gone —
     // that's a known UX tradeoff (the user clicked away before blurring).
-    // Row 2 should be in rename mode now, with its own name pre-filled.
-    const row2 = wrapper.findAll('[data-testid="page-list-row"]')[2]!;
-    expect(row2.find('[data-testid="page-list-rename-input"]').exists()).toBe(true);
+    // Row 2 should be in rename mode now; row 0 should NOT (catches a
+    // regression that mounted inputs on multiple rows simultaneously).
+    const allRows = wrapper.findAll('[data-testid="page-list-row"]');
+    await flushPromises();
+    expect(allRows[0]!.find('[data-testid="page-list-rename-input"]').exists()).toBe(false);
+    expect(allRows[2]!.find('[data-testid="page-list-rename-input"]').exists()).toBe(true);
+    // Focus moved to row 2's input — the whole point of the function-ref
+    // migration was to keep focus working across cross-row hand-off.
+    const row2Input = allRows[2]!.get('[data-testid="page-list-rename-input"]').element;
+    expect(document.activeElement).toBe(row2Input);
   });
 
   it('blur on row A then opening rename on row B commits row A cleanly', async () => {
