@@ -7,6 +7,7 @@ import AstrosRemoteButtonCard from '@/components/remoteControl/remoteButtonCard/
 import AstrosRemotePageList from '@/components/remoteControl/remotePageList/AstrosRemotePageList.vue';
 import AstrosRemoteLivePreview from '@/components/remoteControl/remoteLivePreview/AstrosRemoteLivePreview.vue';
 import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
+import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
 import { useRemoteControlStore } from '@/stores/remoteControl';
 import { useScriptsStore } from '@/stores/scripts';
 import { usePlaylistsStore } from '@/stores/playlists';
@@ -78,6 +79,39 @@ function onRenamePage(payload: { idx: number; name: string }) {
   remoteControlStore.renamePage(payload.idx, payload.name);
 }
 
+// Delete-confirm modal state. The page list emits delete(idx); we capture
+// idx here, open the modal, and wait for user confirmation before calling
+// store.deletePage. Cancel resets pendingDeleteIdx without mutation.
+const pendingDeleteIdx = ref<number | null>(null);
+
+const pendingDeleteName = computed(() => {
+  if (pendingDeleteIdx.value === null) return '';
+  return remoteControlPages.value[pendingDeleteIdx.value]?.name ?? '';
+});
+
+// AstrosConfirmModal expects an i18n key for `message` and calls $t() on it.
+// vue-i18n returns the lookup key unchanged when no entry matches, so passing
+// a pre-interpolated string here renders as-is. This keeps the shared modal
+// contract untouched while still letting us include the page name.
+const pendingDeleteMessage = computed(() => {
+  if (pendingDeleteIdx.value === null) return '';
+  return t('remote_control_config.deleteModal.message', { name: pendingDeleteName.value });
+});
+
+function onDeleteRequest(idx: number) {
+  pendingDeleteIdx.value = idx;
+}
+
+function onDeleteConfirm() {
+  if (pendingDeleteIdx.value === null) return;
+  remoteControlStore.deletePage(pendingDeleteIdx.value);
+  pendingDeleteIdx.value = null;
+}
+
+function onDeleteCancel() {
+  pendingDeleteIdx.value = null;
+}
+
 const currentPage = computed(() => remoteControlPages.value[selectedIdx.value] ?? null);
 
 // Total assigned (non-none) buttons across all pages — shown in the header
@@ -142,11 +176,7 @@ const pageCount = computed(() => remoteControlPages.value.length);
               @select="onSelectPage"
               @add="onAddPage"
               @duplicate="onDuplicatePage"
-              @delete="
-                () => {
-                  /* wired in Task 5 */
-                }
-              "
+              @delete="onDeleteRequest"
               @rename="onRenamePage"
             />
           </aside>
@@ -189,6 +219,14 @@ const pageCount = computed(() => remoteControlPages.value.length);
           </aside>
         </div>
       </div>
+
+      <AstrosConfirmModal
+        v-if="pendingDeleteIdx !== null"
+        title="remote_control_config.deleteModal.title"
+        :message="pendingDeleteMessage"
+        :on-confirm="onDeleteConfirm"
+        :on-close="onDeleteCancel"
+      />
     </template>
   </AstrosLayout>
 </template>

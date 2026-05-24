@@ -617,6 +617,10 @@
       "load_error": "Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.",
       "save_success": "Remote control configuration saved successfully.",
       "save_error": "Failed to save remote control configuration."
+    },
+    "deleteModal": {
+      "title": "Delete page",
+      "message": "Delete \"{name}\"? Buttons on this page will be lost."
     }
   }
 }
