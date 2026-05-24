@@ -37,16 +37,22 @@ const renameDraft = ref('');
 // this component instance.
 let renameInputEl: HTMLInputElement | null = null;
 function captureRenameInput(el: unknown) {
-  // Vue's function-ref signature is broader than Element (also accepts a
-  // ComponentPublicInstance for child components). We only attach this ref
-  // to an <input>, so the runtime value is always HTMLInputElement | null.
-  renameInputEl = el as HTMLInputElement | null;
+  // Vue's function-ref signature accepts Element | ComponentPublicInstance |
+  // null. We only attach this ref to an <input>, but a future refactor that
+  // moved the ref onto a child component would silently produce a non-Element.
+  // instanceof narrows correctly and degrades to null on misuse, so .focus()
+  // becomes a visible no-op rather than a thrown TypeError.
+  renameInputEl = el instanceof HTMLInputElement ? el : null;
 }
 
 function startRename(id: string, current: string) {
   renamingId.value = id;
   renameDraft.value = current;
-  nextTick(() => renameInputEl?.focus());
+  nextTick(() => {
+    // Skip focus if the element was detached between capture and tick
+    // (e.g., the parent unmounted the component or removed the page).
+    if (renameInputEl?.isConnected) renameInputEl.focus();
+  });
 }
 
 function commitRename(forId: string) {

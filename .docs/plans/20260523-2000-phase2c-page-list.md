@@ -2,6 +2,19 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` (inline, single-component scope) or `superpowers:subagent-driven-development`. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Post-implementation deltas** (added after the plan was executed): the
+> shipped code diverges from the per-task snippets in this plan in two
+> places — both addressed PR-review findings, not bugs in the original
+> design. (1) Rename state is keyed by `page.id` (not `idx`) to survive
+> parent-driven reorder/insert/delete during a rename; the emit shape
+> `{idx, name}` per spec §4 is preserved by resolving idx at commit time.
+> (2) The focus capture uses a Vue function ref via `captureRenameInput`
+> (not `document.querySelector` or a string `ref="renameInputRef"`), to
+> avoid the singleton-component assumption and to keep the ref scoped to
+> this component instance. Per-task code snippets below show the
+> pre-refactor shape; the AstrosRemotePageList.vue file in HEAD is the
+> source of truth.
+
 **Goal:** Build the `AstrosRemotePageList` left-rail component (page rows with mini 3×3 previews, inline rename, always-visible action icons, sticky header with Add), verified in Storybook. No app integration — Phase 2d wires it.
 
 **Architecture:** Single new component under `components/remoteControl/remotePageList/` per the camelCase folder convention. Props are the page array + selected index; emits are semantic verbs (select / rename / duplicate / delete / add). All state ownership stays in the parent — this component is presentational + inline-rename-local-state only. The consumer (Phase 2d's `RemoteControlConfigView`) wires emits to `store.selectPage / renamePage / duplicatePage / deletePage / addPage`, and gates `delete` behind a DaisyUI confirm modal (Decision 2).
@@ -298,7 +311,6 @@ Add to `astros_vue/src/locales/enUS.json` under the existing `remote_control_con
   "rename": "Rename",
   "duplicate": "Duplicate",
   "delete": "Delete",
-  "dragHandle": "Drag to reorder",
   "renameInput": "Page name"
 }
 ```
@@ -1326,7 +1338,7 @@ gh pr create --base develop --title "feat(remote): Phase 2c — AstrosRemotePage
 - Delete icon disabled when `pages.length === 1`
 - Sticky header with Add button
 - Emits: `select(idx)`, `add()`, `duplicate(idx)`, `delete(idx)`, `rename({idx, name})`
-- ~24 behavioral tests with mutation-test guards on every defensive branch
+- ~32 behavioral tests with mutation-test guards on every defensive branch
 
 No app integration — Phase 2d wires this into the new `RemoteControlConfigView` alongside the Card+Editor from Phase 2b.
 
