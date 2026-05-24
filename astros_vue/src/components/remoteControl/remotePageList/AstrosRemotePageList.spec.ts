@@ -1,11 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
+import { describe, it, expect, afterEach } from 'vitest';
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import AstrosRemotePageList from './AstrosRemotePageList.vue';
 import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
 import { BUTTON_KEYS } from '@/models/remoteControl/remoteControlPage';
 import { makeNoneButton, type PageButton } from '@/models/remoteControl/pageButton';
 import enUS from '@/locales/enUS.json';
+
+// Unmount every wrapper after each test. Several tests use
+// attachTo: document.body for focus/keydown assertions; without auto-unmount
+// those DOM trees would accumulate across the test worker and cause cross-test
+// pollution (silent-failure agent reproduced 4 separate flaky failures in 10
+// runs of the suite before this was added).
+enableAutoUnmount(afterEach);
 
 function mkScriptBtn(): PageButton {
   return { id: 's1', name: 'Wave', type: 'script' };
@@ -292,7 +299,6 @@ describe('AstrosRemotePageList — inline rename', () => {
     const row = wrapper.findAll('[data-testid="page-list-row"]')[1]!;
     expect(row.find('[data-testid="page-list-rename-input"]').exists()).toBe(true);
     expect(row.find('[data-testid="page-list-name"]').exists()).toBe(false);
-    wrapper.unmount();
   });
 
   it('emits rename({idx, name}) on Enter with the trimmed input value', async () => {
@@ -312,7 +318,6 @@ describe('AstrosRemotePageList — inline rename', () => {
     await input.trigger('keydown.enter');
 
     expect(wrapper.emitted('rename')![0]).toEqual([{ idx: 1, name: 'Concerts' }]);
-    wrapper.unmount();
   });
 
   it('emits rename on blur (commits the edit)', async () => {
@@ -332,7 +337,6 @@ describe('AstrosRemotePageList — inline rename', () => {
     await input.trigger('blur');
 
     expect(wrapper.emitted('rename')![0]).toEqual([{ idx: 0, name: 'Quick Stuff' }]);
-    wrapper.unmount();
   });
 
   it('Esc cancels rename and does NOT emit', async () => {
@@ -355,7 +359,6 @@ describe('AstrosRemotePageList — inline rename', () => {
     const row = wrapper.findAll('[data-testid="page-list-row"]')[1]!;
     expect(row.find('[data-testid="page-list-rename-input"]').exists()).toBe(false);
     expect(row.find('[data-testid="page-list-name"]').exists()).toBe(true);
-    wrapper.unmount();
   });
 
   it('empty input on Enter exits rename mode WITHOUT emitting', async () => {
@@ -375,7 +378,6 @@ describe('AstrosRemotePageList — inline rename', () => {
     await input.trigger('keydown.enter');
 
     expect(wrapper.emitted('rename')).toBeUndefined();
-    wrapper.unmount();
   });
 
   it('whitespace-only input on Enter exits rename mode WITHOUT emitting', async () => {
@@ -395,7 +397,6 @@ describe('AstrosRemotePageList — inline rename', () => {
     await input.trigger('keydown.enter');
 
     expect(wrapper.emitted('rename')).toBeUndefined();
-    wrapper.unmount();
   });
 
   it('Enter followed by blur (input-unmount cascade) emits rename exactly once', async () => {
@@ -421,7 +422,6 @@ describe('AstrosRemotePageList — inline rename', () => {
 
     expect(wrapper.emitted('rename')).toHaveLength(1);
     expect(wrapper.emitted('rename')![0]).toEqual([{ idx: 1, name: 'Concerts' }]);
-    wrapper.unmount();
   });
 
   it('clicking pencil on another row while editing row A does NOT emit a phantom rename for row B', async () => {
@@ -462,7 +462,6 @@ describe('AstrosRemotePageList — inline rename', () => {
     // Row 2 should be in rename mode now, with its own name pre-filled.
     const row2 = wrapper.findAll('[data-testid="page-list-row"]')[2]!;
     expect(row2.find('[data-testid="page-list-rename-input"]').exists()).toBe(true);
-    wrapper.unmount();
   });
 
   it('blur on row A then opening rename on row B commits row A cleanly', async () => {
@@ -500,7 +499,6 @@ describe('AstrosRemotePageList — inline rename', () => {
 
     expect(wrapper.emitted('rename')).toHaveLength(2);
     expect(wrapper.emitted('rename')![1]).toEqual([{ idx: 2, name: 'Renamed Row 2' }]);
-    wrapper.unmount();
   });
 
   it('focuses the rename input on mount (so Enter/Esc work without an extra click)', async () => {
@@ -519,6 +517,5 @@ describe('AstrosRemotePageList — inline rename', () => {
       .get('[data-testid="page-list-rename-input"]').element;
 
     expect(document.activeElement).toBe(input);
-    wrapper.unmount();
   });
 });
