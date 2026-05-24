@@ -607,6 +607,16 @@
     },
     "preview": {
       "bezel_label": "Live preview"
+    },
+    "view": {
+      "title": "Remote Control Configuration",
+      "save": "Save",
+      "unsaved": "Unsaved",
+      "page_count": "{count} page | {count} pages",
+      "action_count": "{count} action | {count} actions",
+      "load_error": "Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.",
+      "save_success": "Remote control configuration saved successfully.",
+      "save_error": "Failed to save remote control configuration."
     }
   }
 }
