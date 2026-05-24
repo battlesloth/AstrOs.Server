@@ -62,6 +62,22 @@ async function saveConfig() {
   }
 }
 
+function onSelectPage(idx: number) {
+  remoteControlStore.selectPage(idx);
+}
+
+function onAddPage() {
+  remoteControlStore.addPage();
+}
+
+function onDuplicatePage(idx: number) {
+  remoteControlStore.duplicatePage(idx);
+}
+
+function onRenamePage(payload: { idx: number; name: string }) {
+  remoteControlStore.renamePage(payload.idx, payload.name);
+}
+
 const currentPage = computed(() => remoteControlPages.value[selectedIdx.value] ?? null);
 
 // Total assigned (non-none) buttons across all pages — shown in the header
@@ -123,31 +139,15 @@ const pageCount = computed(() => remoteControlPages.value.length);
             <AstrosRemotePageList
               :pages="remoteControlPages"
               :selected-idx="selectedIdx"
-              @select="
-                () => {
-                  /* wired in Task 4 */
-                }
-              "
-              @add="
-                () => {
-                  /* wired in Task 4 */
-                }
-              "
-              @duplicate="
-                () => {
-                  /* wired in Task 4 */
-                }
-              "
+              @select="onSelectPage"
+              @add="onAddPage"
+              @duplicate="onDuplicatePage"
               @delete="
                 () => {
                   /* wired in Task 5 */
                 }
               "
-              @rename="
-                () => {
-                  /* wired in Task 4 */
-                }
-              "
+              @rename="onRenamePage"
             />
           </aside>
 
