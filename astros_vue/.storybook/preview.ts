@@ -19,7 +19,7 @@ import {
   IoChevronDown,
   IoAdd,
   IoHelpCircleOutline,
-  IoPencilOutline,
+  IoCreate,
 } from 'oh-vue-icons/icons';
 import { MdDescription, MdDraghandle, MdFolder } from 'oh-vue-icons/icons/md';
 
@@ -42,7 +42,7 @@ setup((app) => {
     IoChevronDown,
     IoAdd,
     IoHelpCircleOutline,
-    IoPencilOutline,
+    IoCreate,
     MdDescription,
     MdDraghandle,
     MdFolder,

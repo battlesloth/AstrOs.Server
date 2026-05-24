@@ -178,7 +178,7 @@ function dotClass(type: PageButton['type']): string {
             @click.stop="startRename(page.id, page.name)"
           >
             <v-icon
-              name="io-pencil-outline"
+              name="io-create"
               scale="0.7"
             />
           </button>
