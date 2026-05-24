@@ -596,6 +596,14 @@
       "search_placeholder": "Search…",
       "none_row": "None",
       "empty_state": "No matches"
+    },
+    "pageList": {
+      "header": "Pages",
+      "add": "Add page",
+      "rename": "Rename",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "renameInput": "Page name"
     }
   }
 }
