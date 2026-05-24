@@ -25,20 +25,26 @@ const emit = defineEmits<{
 }>();
 
 const renamingIdx = ref<number | null>(null);
+// renameDraft only carries meaning when renamingIdx !== null; the two refs
+// form a 2-state machine (idle | renaming).
 const renameDraft = ref('');
+// Captured via function ref on the rename input. Only one input is ever
+// mounted at a time (v-if=renamingIdx===idx), so this callback fires once
+// with the element on mount and once with null on unmount. Scoped to this
+// component instance — unlike document.querySelector which would clash if
+// two AstrosRemotePageLists were ever mounted on the same view.
+let renameInputEl: HTMLInputElement | null = null;
+function captureRenameInput(el: unknown) {
+  // Vue's function-ref signature is broader than Element (also accepts a
+  // ComponentPublicInstance for child components). We only attach this ref
+  // to an <input>, so the runtime value is always HTMLInputElement | null.
+  renameInputEl = el as HTMLInputElement | null;
+}
 
 function startRename(idx: number, current: string) {
   renamingIdx.value = idx;
   renameDraft.value = current;
-  nextTick(() => {
-    // Querying the DOM directly because `ref` inside v-for becomes an array
-    // and we only ever have one rename input mounted at a time anyway. Cheaper
-    // than maintaining a function-ref + per-iteration capture.
-    const input = document.querySelector<HTMLInputElement>(
-      '[data-testid="page-list-rename-input"]',
-    );
-    input?.focus();
-  });
+  nextTick(() => renameInputEl?.focus());
 }
 
 function commitRename(forIdx: number) {
@@ -125,6 +131,7 @@ function dotClass(type: PageButton['type']): string {
         </div>
         <input
           v-if="renamingIdx === idx"
+          :ref="captureRenameInput"
           v-model="renameDraft"
           type="text"
           class="input input-bordered input-xs min-w-0 flex-1 text-xs"
