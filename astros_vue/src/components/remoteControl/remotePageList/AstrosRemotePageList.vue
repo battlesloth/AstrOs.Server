@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import {
-  BUTTON_KEYS,
-  type ButtonKey,
-  type RemoteControlPage,
-} from '@/models/remoteControl/remoteControlPage';
+import { BUTTON_KEYS, type RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import { assertNever } from '@/utils/assertNever';
 
@@ -124,8 +120,8 @@ function dotClass(type: PageButton['type']): string {
           <span
             v-for="key in BUTTON_KEYS"
             :key="key"
-            :class="['block h-1.5 w-1.5 rounded-sm', dotClass(page[key as ButtonKey].type)]"
-            :data-type="page[key as ButtonKey].type"
+            :class="['block h-1.5 w-1.5 rounded-sm', dotClass(page[key].type)]"
+            :data-type="page[key].type"
             data-testid="page-list-dot"
           />
         </div>

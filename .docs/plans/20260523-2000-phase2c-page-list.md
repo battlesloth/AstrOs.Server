@@ -36,7 +36,7 @@ astros_vue/src/components/remoteControl/
 └── remotePageList/
     ├── AstrosRemotePageList.vue          — sticky header + scrollable row list + per-row actions
     ├── AstrosRemotePageList.spec.ts      — behavioral tests
-    └── AstrosRemotePageList.stories.ts   — 5 stories (1 page, 3 pages, 30 pages, long names, rename mode)
+    └── AstrosRemotePageList.stories.ts   — 4 stories (1 page, 3 pages, 30 pages, long names)
 ```
 
 No `types.ts` — this component takes the existing `RemoteControlPage[]` and emits primitives + `{idx, name}`. No new domain types are warranted.

@@ -603,7 +603,6 @@
       "rename": "Rename",
       "duplicate": "Duplicate",
       "delete": "Delete",
-      "dragHandle": "Drag to reorder",
       "renameInput": "Page name"
     }
   }

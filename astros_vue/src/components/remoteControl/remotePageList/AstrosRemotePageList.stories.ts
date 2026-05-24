@@ -24,8 +24,8 @@ function mkPage(
   };
 }
 
-// Wrap each story in a narrow rail container so the layout reads how it
-// would when embedded in the Phase 2d 3-pane editor (left rail ~220px).
+// Narrow rail container so each story shows the component at the width
+// it will render at in its host editor (left rail ~220px).
 const railWrapper = `
   <div style="
     width: 220px;
