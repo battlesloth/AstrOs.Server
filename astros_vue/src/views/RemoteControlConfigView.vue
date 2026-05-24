@@ -55,11 +55,11 @@ async function saveConfig() {
   // The store catches its own errors and resolves with {success: false, error}
   // rather than rejecting — a bare `await` here would never throw and every
   // failed PUT would render as a success toast. Inspect the flag.
+  // (The store already logs the raw error on its side; no need to re-log.)
   const result = await remoteControlStore.saveRemoteControl();
   if (result.success) {
     success(t('remote_control_config.view.save_success'));
   } else {
-    console.error('Error saving remote control configuration:', result.error);
     error(t('remote_control_config.view.save_error'));
   }
 }
@@ -84,33 +84,28 @@ function onRenamePage(payload: { idx: number; name: string }) {
 // idx here, open the modal, and wait for user confirmation before calling
 // store.deletePage. Cancel resets pendingDeleteIdx without mutation.
 const pendingDeleteIdx = ref<number | null>(null);
-
-const pendingDeleteName = computed(() => {
-  if (pendingDeleteIdx.value === null) return '';
-  return remoteControlPages.value[pendingDeleteIdx.value]?.name ?? '';
-});
-
-// AstrosConfirmModal expects an i18n key for `message` and calls $t() on it.
-// vue-i18n returns the lookup key unchanged when no entry matches, so passing
-// a pre-interpolated string here renders as-is. This keeps the shared modal
-// contract untouched while still letting us include the page name.
-const pendingDeleteMessage = computed(() => {
-  if (pendingDeleteIdx.value === null) return '';
-  return t('remote_control_config.deleteModal.message', { name: pendingDeleteName.value });
-});
+// Snapshot the name at request time so a concurrent mutation to
+// remoteControlPages (between modal open and confirm) can't drift the
+// rendered message away from what the user clicked to delete. Without this,
+// a TOCTOU race during e.g. a future websocket-driven sync could surface a
+// `Delete ""?` empty-string fallback.
+const pendingDeleteName = ref('');
 
 function onDeleteRequest(idx: number) {
   pendingDeleteIdx.value = idx;
+  pendingDeleteName.value = remoteControlPages.value[idx]?.name ?? '';
 }
 
 function onDeleteConfirm() {
   if (pendingDeleteIdx.value === null) return;
   remoteControlStore.deletePage(pendingDeleteIdx.value);
   pendingDeleteIdx.value = null;
+  pendingDeleteName.value = '';
 }
 
 function onDeleteCancel() {
   pendingDeleteIdx.value = null;
+  pendingDeleteName.value = '';
 }
 
 function onButtonChange(key: ButtonKey, value: PageButton) {
@@ -119,7 +114,19 @@ function onButtonChange(key: ButtonKey, value: PageButton) {
   remoteControlStore.setButton(selectedIdx.value, key, value);
 }
 
-const currentPage = computed(() => remoteControlPages.value[selectedIdx.value] ?? null);
+const currentPage = computed(() => {
+  const page = remoteControlPages.value[selectedIdx.value];
+  if (page === undefined && remoteControlPages.value.length > 0) {
+    // Reaching this branch with non-empty pages means selectedIdx fell out of
+    // range without the store's selectPage/deletePage clamping catching it —
+    // a store-invariant violation. Surface in DevTools so a real bug doesn't
+    // hide behind the silent v-if="currentPage" template gate.
+    console.warn(
+      `[RemoteControlConfigView] currentPage: selectedIdx ${selectedIdx.value} out of range (pages: ${remoteControlPages.value.length})`,
+    );
+  }
+  return page ?? null;
+});
 
 // Total assigned (non-none) buttons across all pages — shown in the header
 // as "N actions". Drives the "is the user actually configuring anything"
@@ -226,7 +233,8 @@ const pageCount = computed(() => remoteControlPages.value.length);
       <AstrosConfirmModal
         v-if="pendingDeleteIdx !== null"
         title="remote_control_config.deleteModal.title"
-        :message="pendingDeleteMessage"
+        message="remote_control_config.deleteModal.message"
+        :message-params="{ name: pendingDeleteName }"
         :on-confirm="onDeleteConfirm"
         :on-close="onDeleteCancel"
       />

@@ -71,6 +71,7 @@ function mountView() {
         // Preserve the slot so the inner content renders.
         AstrosLayout: { template: '<div><slot name="main" /></div>' },
         AstrosWriteButton: {
+          name: 'AstrosWriteButton',
           props: ['disabled'],
           template:
             '<button :disabled="disabled" data-testid="save-config" @click="$emit(\'click\')"><slot /></button>',
@@ -94,9 +95,12 @@ function mountView() {
         },
         AstrosConfirmModal: {
           name: 'AstrosConfirmModal',
-          props: ['title', 'message', 'onConfirm', 'onClose'],
+          props: ['title', 'message', 'messageParams', 'onConfirm', 'onClose'],
+          // Expose message + messageParams.name as separate data attrs so the
+          // test can verify both the i18n key (real modal will $t() it) and
+          // the interpolated value (real modal threads it through to $t).
           template:
-            '<div data-testid="confirm-modal" :data-message="message"><button data-testid="modal-confirm" @click="onConfirm" /><button data-testid="modal-close" @click="onClose" /></div>',
+            '<div data-testid="confirm-modal" :data-message="message" :data-name="(messageParams && messageParams.name) || \'\'"><button data-testid="modal-confirm" @click="onConfirm" /><button data-testid="modal-close" @click="onClose" /></div>',
         },
       },
     },
@@ -188,17 +192,25 @@ describe('RemoteControlConfigView — page list wiring', () => {
     expect(spy).toHaveBeenCalled();
   });
 
-  it('forwards duplicate emit to store.duplicatePage', async () => {
+  it('forwards duplicate emit to store.duplicatePage and the page actually duplicates', async () => {
     const wrapper = mountView();
     await flushPromises();
 
     const store = useRemoteControlStore();
+    // Seed a second page so the duplicate idx is in range — without this, the
+    // store's out-of-range guard would silently no-op and the spy assertion
+    // alone would pass without exercising the real behavior.
+    store.addPage();
+    await flushPromises();
+    const lenBefore = store.remoteControlPages.length;
     const spy = vi.spyOn(store, 'duplicatePage');
 
     const pageList = wrapper.findComponent({ name: 'AstrosRemotePageList' });
-    await pageList.vm.$emit('duplicate', 2);
+    await pageList.vm.$emit('duplicate', 0);
+    await flushPromises();
 
-    expect(spy).toHaveBeenCalledWith(2);
+    expect(spy).toHaveBeenCalledWith(0);
+    expect(store.remoteControlPages.length).toBe(lenBefore + 1);
   });
 
   it('forwards rename emit to store.renamePage', async () => {
@@ -232,7 +244,7 @@ describe('RemoteControlConfigView — delete-confirm modal lifecycle', () => {
     expect(wrapper.find('[data-testid="confirm-modal"]').exists()).toBe(true);
   });
 
-  it('interpolates the page name into the modal message', async () => {
+  it('passes the deleteModal i18n key and the page name into the modal', async () => {
     const wrapper = mountView();
     await flushPromises();
 
@@ -240,9 +252,35 @@ describe('RemoteControlConfigView — delete-confirm modal lifecycle', () => {
     await pageList.vm.$emit('delete', 0);
 
     const modal = wrapper.get('[data-testid="confirm-modal"]');
-    // The stub forwards `:message` to a data attribute. The pre-resolved
-    // message should include "Page 1" (the seeded default page's name).
-    expect(modal.attributes('data-message')).toContain('Page 1');
+    // The view passes a real i18n key + params (so the modal can call
+    // $t(message, messageParams) without polluting console with intlify
+    // "Not found" warnings).
+    expect(modal.attributes('data-message')).toBe('remote_control_config.deleteModal.message');
+    // Page name "Page 1" comes from the seeded default page.
+    expect(modal.attributes('data-name')).toBe('Page 1');
+  });
+
+  it('snapshots the page name at request time (no TOCTOU race with concurrent mutations)', async () => {
+    // If the page array mutates between open-modal and confirm-click, the
+    // rendered name should still be the page's name AT THE TIME of open.
+    const wrapper = mountView();
+    await flushPromises();
+
+    const store = useRemoteControlStore();
+    store.addPage(); // adds page 1
+    store.renamePage(1, 'Performance');
+    await flushPromises();
+
+    const pageList = wrapper.findComponent({ name: 'AstrosRemotePageList' });
+    await pageList.vm.$emit('delete', 1);
+
+    // Simulate a concurrent rename of the same page AFTER the modal opens
+    // (e.g., a future websocket-driven sync would do this).
+    store.renamePage(1, 'Renamed-after-modal-open');
+    await flushPromises();
+
+    const modal = wrapper.get('[data-testid="confirm-modal"]');
+    expect(modal.attributes('data-name')).toBe('Performance');
   });
 
   it('confirm calls store.deletePage with the captured idx and closes the modal', async () => {
@@ -319,6 +357,166 @@ describe('RemoteControlConfigView — button card wiring', () => {
     await cards[0]!.vm.$emit('change', newValue);
 
     expect(spy).toHaveBeenCalledWith(1, 'button1', newValue);
+  });
+});
+
+describe('RemoteControlConfigView — header pluralization', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('renders singular "page" / "action" at counts of 1', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    // The seeded fixture is 1 page, 0 actions. Mutate to 1 page, 1 action.
+    const store = useRemoteControlStore();
+    store.setButton(0, 'button1', { id: 's1', name: 'Wave', type: 'script' });
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('1 page · 1 action');
+  });
+
+  it('renders plural "pages" / "actions" at counts ≠ 1', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    // Mutate to 2 pages, 0 actions.
+    const store = useRemoteControlStore();
+    store.addPage();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('2 pages · 0 actions');
+  });
+});
+
+describe('RemoteControlConfigView — save failure', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('shows the error toast and leaves isDirty=true when the PUT fails', async () => {
+    // Swap the put impl BEFORE mount so the in-mount load isn't affected and
+    // only saveConfig sees the rejection.
+    const apiServiceModule = await import('@/api/apiService');
+    const mockedPut = apiServiceModule.default.put as ReturnType<typeof vi.fn>;
+    const originalImpl = mockedPut.getMockImplementation();
+    mockedPut.mockImplementation(() => Promise.reject(new Error('network')));
+
+    try {
+      const wrapper = mountView();
+      await flushPromises();
+
+      // Mark dirty so Save is enabled.
+      const store = useRemoteControlStore();
+      store.isDirty = true;
+      await flushPromises();
+
+      const saveBtn = wrapper.get('[data-testid="save-config"]');
+      await saveBtn.trigger('click');
+      await flushPromises();
+
+      // isDirty must stay true so the user can retry.
+      expect(store.isDirty).toBe(true);
+      // Save button is still enabled (loadFailed is false, isDirty is true).
+      expect(saveBtn.attributes('disabled')).toBeUndefined();
+    } finally {
+      if (originalImpl) {
+        mockedPut.mockImplementation(originalImpl);
+      } else {
+        mockedPut.mockReset();
+        mockedPut.mockResolvedValue({ data: 'ok' });
+      }
+    }
+  });
+
+  it('clears isDirty on a successful save (no error path leak)', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    const store = useRemoteControlStore();
+    store.isDirty = true;
+    await flushPromises();
+
+    const saveBtn = wrapper.get('[data-testid="save-config"]');
+    await saveBtn.trigger('click');
+    await flushPromises();
+
+    expect(store.isDirty).toBe(false);
+  });
+});
+
+describe('RemoteControlConfigView — partial load failure', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  async function mountWithFailingEndpoint(failingUrlMatch: string) {
+    const apiServiceModule = await import('@/api/apiService');
+    const mockedGet = apiServiceModule.default.get as ReturnType<typeof vi.fn>;
+    const originalImpl = mockedGet.getMockImplementation();
+    mockedGet.mockImplementation((url: string) => {
+      if (url.includes(failingUrlMatch)) return Promise.reject(new Error('network'));
+      // The remote-config endpoint expects a JSON-parseable string body; the
+      // other endpoints expect an array. Match both shapes.
+      if (url.includes('remoteConfig')) {
+        return Promise.resolve(
+          JSON.stringify([
+            {
+              id: 'page-1',
+              name: 'Page 1',
+              button1: { id: '0', name: 'Button 1', type: 'none' },
+              button2: { id: '0', name: 'Button 2', type: 'none' },
+              button3: { id: '0', name: 'Button 3', type: 'none' },
+              button4: { id: '0', name: 'Button 4', type: 'none' },
+              button5: { id: '0', name: 'Button 5', type: 'none' },
+              button6: { id: '0', name: 'Button 6', type: 'none' },
+              button7: { id: '0', name: 'Button 7', type: 'none' },
+              button8: { id: '0', name: 'Button 8', type: 'none' },
+              button9: { id: '0', name: 'Button 9', type: 'none' },
+            },
+          ]),
+        );
+      }
+      return Promise.resolve([]);
+    });
+    return { mockedGet, originalImpl };
+  }
+
+  it('disables Save when scripts load fails (even if remote-config + playlists succeed)', async () => {
+    // Scripts endpoint is the only one that includes "scripts/all" and NOT
+    // "all-names" — using "scripts/all" as the URL match would also catch the
+    // playlists-store's secondary scripts/all-names GET. Match the more
+    // specific path.
+    const { mockedGet, originalImpl } = await mountWithFailingEndpoint('api/scripts/all');
+
+    try {
+      const wrapper = mountView();
+      await flushPromises();
+      const store = useRemoteControlStore();
+      store.isDirty = true;
+      await flushPromises();
+
+      expect(wrapper.get('[data-testid="save-config"]').attributes('disabled')).toBeDefined();
+    } finally {
+      if (originalImpl) mockedGet.mockImplementation(originalImpl);
+    }
+  });
+
+  it('disables Save when playlists load fails (even if scripts + remote-config succeed)', async () => {
+    const { mockedGet, originalImpl } = await mountWithFailingEndpoint('playlists/all');
+
+    try {
+      const wrapper = mountView();
+      await flushPromises();
+      const store = useRemoteControlStore();
+      store.isDirty = true;
+      await flushPromises();
+
+      expect(wrapper.get('[data-testid="save-config"]').attributes('disabled')).toBeDefined();
+    } finally {
+      if (originalImpl) mockedGet.mockImplementation(originalImpl);
+    }
   });
 });
 
