@@ -178,7 +178,7 @@ function dotClass(type: PageButton['type']): string {
             @click.stop="startRename(page.id, page.name)"
           >
             <v-icon
-              name="md-edit"
+              name="io-pencil-outline"
               scale="0.7"
             />
           </button>
@@ -191,7 +191,7 @@ function dotClass(type: PageButton['type']): string {
             @click.stop="emit('duplicate', idx)"
           >
             <v-icon
-              name="md-contentcopy"
+              name="io-copy"
               scale="0.7"
             />
           </button>
@@ -205,7 +205,7 @@ function dotClass(type: PageButton['type']): string {
             @click.stop="emit('delete', idx)"
           >
             <v-icon
-              name="md-delete"
+              name="io-trash-bin"
               scale="0.7"
             />
           </button>

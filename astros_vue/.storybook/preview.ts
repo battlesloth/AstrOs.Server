@@ -19,16 +19,9 @@ import {
   IoChevronDown,
   IoAdd,
   IoHelpCircleOutline,
+  IoPencilOutline,
 } from 'oh-vue-icons/icons';
-import {
-  MdAdd,
-  MdContentcopy,
-  MdDelete,
-  MdDescription,
-  MdDraghandle,
-  MdEdit,
-  MdFolder,
-} from 'oh-vue-icons/icons/md';
+import { MdDescription, MdDraghandle, MdFolder } from 'oh-vue-icons/icons/md';
 
 initialize();
 
@@ -49,12 +42,9 @@ setup((app) => {
     IoChevronDown,
     IoAdd,
     IoHelpCircleOutline,
-    MdAdd,
-    MdContentcopy,
-    MdDelete,
+    IoPencilOutline,
     MdDescription,
     MdDraghandle,
-    MdEdit,
     MdFolder,
   );
 
