@@ -170,6 +170,26 @@ describe('AstrosRemotePageList — mini 3x3 preview', () => {
     expect(dots[6]!.attributes('data-type')).toBe('playlist');
     expect(dots.length).toBe(BUTTON_KEYS.length);
   });
+
+  it('applies the correct background class per dot type', () => {
+    // data-type is bound directly from page[key].type; the visual color
+    // comes from dotClass(). Asserting on the class catches a regression
+    // that swapped script and playlist cases in the dotClass switch
+    // (which would pass the data-type assertions above).
+    const mixed: RemoteControlPage = {
+      ...mkPage('mixed', 'Mixed'),
+      button1: mkScriptBtn(),
+      button5: mkPlaylistBtn(),
+    };
+    const wrapper = mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: [mixed], selectedIdx: 0 },
+    });
+    const dots = wrapper.findAll('[data-testid="page-list-dot"]');
+    expect(dots[0]!.classes()).toContain('bg-primary'); // script
+    expect(dots[4]!.classes()).toContain('bg-orange-500'); // playlist
+    expect(dots[1]!.classes()).toContain('bg-base-300'); // none
+  });
 });
 
 describe('AstrosRemotePageList — action icons', () => {
@@ -212,18 +232,25 @@ describe('AstrosRemotePageList — action icons', () => {
     expect(wrapper.emitted('delete')![0]).toEqual([2]);
   });
 
-  it('action click does NOT also emit select (stopPropagation guard)', async () => {
-    const wrapper = mount(AstrosRemotePageList, {
-      global: { plugins: [i18n], stubs: { 'v-icon': true } },
-      props: { pages: PAGES_3, selectedIdx: 0 },
-    });
-    await wrapper
-      .findAll('[data-testid="page-list-row"]')[2]!
-      .find('[data-testid="page-list-duplicate"]')
-      .trigger('click');
+  it.each([
+    ['duplicate', 'page-list-duplicate'],
+    ['rename', 'page-list-rename'],
+    ['delete', 'page-list-delete'],
+  ])(
+    'clicking %s on a non-selected row does NOT emit select (stopPropagation guard)',
+    async (_label, testid) => {
+      const wrapper = mount(AstrosRemotePageList, {
+        global: { plugins: [i18n], stubs: { 'v-icon': true } },
+        props: { pages: PAGES_3, selectedIdx: 0 },
+      });
+      await wrapper
+        .findAll('[data-testid="page-list-row"]')[2]!
+        .find(`[data-testid="${testid}"]`)
+        .trigger('click');
 
-    expect(wrapper.emitted('select')).toBeUndefined();
-  });
+      expect(wrapper.emitted('select')).toBeUndefined();
+    },
+  );
 
   it('disables the delete button when pages.length === 1', () => {
     const wrapper = mount(AstrosRemotePageList, {
@@ -234,7 +261,11 @@ describe('AstrosRemotePageList — action icons', () => {
     expect(del.attributes('disabled')).toBeDefined();
   });
 
-  it('does NOT emit delete when the delete button is disabled (length === 1)', async () => {
+  it('does NOT emit delete OR select when the delete button is disabled (length === 1)', async () => {
+    // Disabled `<button>` doesn't fire click in modern browsers, so the
+    // row's @click="emit('select', idx)" also doesn't bubble. Pin both
+    // halves — a future migration to a non-button (e.g. a styled div with
+    // aria-disabled) would bubble and silently re-select the only row.
     const wrapper = mount(AstrosRemotePageList, {
       global: { plugins: [i18n], stubs: { 'v-icon': true } },
       props: { pages: [mkPage('only', 'Only Page')], selectedIdx: 0 },
@@ -242,6 +273,7 @@ describe('AstrosRemotePageList — action icons', () => {
     await wrapper.get('[data-testid="page-list-delete"]').trigger('click');
 
     expect(wrapper.emitted('delete')).toBeUndefined();
+    expect(wrapper.emitted('select')).toBeUndefined();
   });
 });
 
