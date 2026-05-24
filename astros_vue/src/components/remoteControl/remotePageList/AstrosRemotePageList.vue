@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nextTick, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   BUTTON_KEYS,
@@ -20,7 +21,41 @@ const emit = defineEmits<{
   add: [];
   duplicate: [idx: number];
   delete: [idx: number];
+  rename: [payload: { idx: number; name: string }];
 }>();
+
+const renamingIdx = ref<number | null>(null);
+const renameDraft = ref('');
+
+function startRename(idx: number, current: string) {
+  renamingIdx.value = idx;
+  renameDraft.value = current;
+  nextTick(() => {
+    // Querying the DOM directly because `ref` inside v-for becomes an array
+    // and we only ever have one rename input mounted at a time anyway. Cheaper
+    // than maintaining a function-ref + per-iteration capture.
+    const input = document.querySelector<HTMLInputElement>(
+      '[data-testid="page-list-rename-input"]',
+    );
+    input?.focus();
+  });
+}
+
+function commitRename() {
+  if (renamingIdx.value === null) return;
+  const trimmed = renameDraft.value.trim();
+  // Exit rename mode FIRST so the blur handler that fires as a side-effect
+  // of Enter (which removes the input from the DOM) doesn't re-enter this
+  // function and double-emit.
+  const idx = renamingIdx.value;
+  renamingIdx.value = null;
+  if (trimmed.length === 0) return;
+  emit('rename', { idx, name: trimmed });
+}
+
+function cancelRename() {
+  renamingIdx.value = null;
+}
 
 function dotClass(type: PageButton['type']): string {
   switch (type) {
@@ -85,7 +120,20 @@ function dotClass(type: PageButton['type']): string {
             data-testid="page-list-dot"
           />
         </div>
+        <input
+          v-if="renamingIdx === idx"
+          v-model="renameDraft"
+          type="text"
+          class="input input-bordered input-xs min-w-0 flex-1 text-xs"
+          :aria-label="t('remote_control_config.pageList.renameInput')"
+          data-testid="page-list-rename-input"
+          @click.stop
+          @keydown.enter.prevent="commitRename"
+          @keydown.escape="cancelRename"
+          @blur="commitRename"
+        />
         <span
+          v-else
           :class="[
             'min-w-0 flex-1 truncate text-xs',
             idx === selectedIdx ? 'font-semibold' : 'font-medium',
@@ -102,7 +150,7 @@ function dotClass(type: PageButton['type']): string {
             :aria-label="t('remote_control_config.pageList.rename')"
             :title="t('remote_control_config.pageList.rename')"
             data-testid="page-list-rename"
-            @click.stop
+            @click.stop="startRename(idx, page.name)"
           >
             <v-icon
               name="md-edit"

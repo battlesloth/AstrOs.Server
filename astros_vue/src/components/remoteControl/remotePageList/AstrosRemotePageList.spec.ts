@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { mount, flushPromises } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import AstrosRemotePageList from './AstrosRemotePageList.vue';
 import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
@@ -242,5 +242,146 @@ describe('AstrosRemotePageList — action icons', () => {
     await wrapper.get('[data-testid="page-list-delete"]').trigger('click');
 
     expect(wrapper.emitted('delete')).toBeUndefined();
+  });
+});
+
+describe('AstrosRemotePageList — inline rename', () => {
+  it('renders the rename input when the pencil is clicked, hides the name span', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+
+    const row = wrapper.findAll('[data-testid="page-list-row"]')[1]!;
+    expect(row.find('[data-testid="page-list-rename-input"]').exists()).toBe(true);
+    expect(row.find('[data-testid="page-list-name"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('emits rename({idx, name}) on Enter with the trimmed input value', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input.setValue('  Concerts  ');
+    await input.trigger('keydown.enter');
+
+    expect(wrapper.emitted('rename')![0]).toEqual([{ idx: 1, name: 'Concerts' }]);
+    wrapper.unmount();
+  });
+
+  it('emits rename on blur (commits the edit)', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input.setValue('Quick Stuff');
+    await input.trigger('blur');
+
+    expect(wrapper.emitted('rename')![0]).toEqual([{ idx: 0, name: 'Quick Stuff' }]);
+    wrapper.unmount();
+  });
+
+  it('Esc cancels rename and does NOT emit', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input.setValue('Should Not Save');
+    await input.trigger('keydown.escape');
+
+    expect(wrapper.emitted('rename')).toBeUndefined();
+    const row = wrapper.findAll('[data-testid="page-list-row"]')[1]!;
+    expect(row.find('[data-testid="page-list-rename-input"]').exists()).toBe(false);
+    expect(row.find('[data-testid="page-list-name"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('empty input on Enter exits rename mode WITHOUT emitting', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input.setValue('');
+    await input.trigger('keydown.enter');
+
+    expect(wrapper.emitted('rename')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('whitespace-only input on Enter exits rename mode WITHOUT emitting', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[0]!
+      .get('[data-testid="page-list-rename-input"]');
+    await input.setValue('   ');
+    await input.trigger('keydown.enter');
+
+    expect(wrapper.emitted('rename')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('focuses the rename input on mount (so Enter/Esc work without an extra click)', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .find('[data-testid="page-list-rename"]')
+      .trigger('click');
+    await flushPromises();
+    const input = wrapper
+      .findAll('[data-testid="page-list-row"]')[1]!
+      .get('[data-testid="page-list-rename-input"]').element;
+
+    expect(document.activeElement).toBe(input);
+    wrapper.unmount();
   });
 });
