@@ -129,8 +129,8 @@ function dotClass(type: PageButton['type']): string {
         ]"
         data-testid="page-list-row"
         @click="emit('select', idx)"
-        @keydown.enter.prevent="emit('select', idx)"
-        @keydown.space.prevent="emit('select', idx)"
+        @keydown.enter.self.prevent="emit('select', idx)"
+        @keydown.space.self.prevent="emit('select', idx)"
       >
         <div
           class="grid flex-shrink-0 grid-cols-3 gap-px"
