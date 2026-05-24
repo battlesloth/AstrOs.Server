@@ -13,6 +13,7 @@ import { useScriptsStore } from '@/stores/scripts';
 import { usePlaylistsStore } from '@/stores/playlists';
 import { useToast } from '@/composables/useToast';
 import { BUTTON_KEYS, type ButtonKey } from '@/models/remoteControl/remoteControlPage';
+import type { PageButton } from '@/models/remoteControl/pageButton';
 
 const { t } = useI18n();
 
@@ -112,6 +113,12 @@ function onDeleteCancel() {
   pendingDeleteIdx.value = null;
 }
 
+function onButtonChange(key: ButtonKey, value: PageButton) {
+  // setButton atomically writes the slot AND flips isDirty — that's the §4
+  // contract added during 2a's PR review. No view-level dirty-tracking needed.
+  remoteControlStore.setButton(selectedIdx.value, key, value);
+}
+
 const currentPage = computed(() => remoteControlPages.value[selectedIdx.value] ?? null);
 
 // Total assigned (non-none) buttons across all pages — shown in the header
@@ -198,11 +205,7 @@ const pageCount = computed(() => remoteControlPages.value.length);
                 :value="currentPage[key as ButtonKey]"
                 :scripts="scripts"
                 :playlists="playlists"
-                @change="
-                  () => {
-                    /* wired in Task 6 */
-                  }
-                "
+                @change="(value) => onButtonChange(key as ButtonKey, value)"
               />
             </div>
           </main>
