@@ -132,7 +132,8 @@
 ### 15. Load failure
 
 1. With config in a non-JSON-parseable state on the server (or simulate by killing the API at fetch time), reload `/remote`.
-2. **Expected:** Error toast about load failure; Save button is disabled even when isDirty is true; editing is otherwise locked.
+2. **Expected:** Error toast about load failure. The 3-pane editor body is replaced by an error-state banner (`role="alert"`). The page list, button grid, and live preview are NOT rendered. Save button stays disabled regardless of `isDirty`.
+3. **Expected:** No way to mutate the store from the UI — `addPage` / `renamePage` / `setButton` calls are impossible because their UI affordances aren't in the DOM.
 
 ### 16. Live preview — read-only
 

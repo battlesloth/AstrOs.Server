@@ -553,6 +553,27 @@ describe('RemoteControlConfigView — partial load failure', () => {
       if (originalImpl) mockedApiGet.mockImplementation(originalImpl);
     }
   });
+
+  it('replaces the editor surface with an error-state banner when ANY load fails', async () => {
+    // Save-disable on its own doesn't prevent unsavable mutations — the page
+    // list / cards / preview were previously still interactive, so addPage /
+    // renamePage / setButton calls would flip isDirty=true against a partial
+    // state with no way to persist. The error-state banner replaces the
+    // 3-pane body so the children aren't in the DOM and can't be mutated.
+    const { originalImpl } = mountWithFailingEndpoint('remoteConfig');
+
+    try {
+      const wrapper = mountView();
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="load-error-state"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="pane-page-list"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="pane-grid"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="pane-preview"]').exists()).toBe(false);
+    } finally {
+      if (originalImpl) mockedApiGet.mockImplementation(originalImpl);
+    }
+  });
 });
 
 describe('RemoteControlConfigView — load failure', () => {

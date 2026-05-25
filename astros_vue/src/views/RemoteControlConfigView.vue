@@ -181,8 +181,26 @@ const pageCount = computed(() => remoteControlPages.value.length);
           </AstrosWriteButton>
         </div>
 
-        <!-- 3-pane body -->
-        <div class="flex flex-1 overflow-hidden">
+        <!-- Load-error banner: replaces the editor body entirely so the user
+             can't make unsavable mutations against a half-loaded state. -->
+        <div
+          v-if="loadFailed"
+          class="flex flex-1 items-center justify-center p-8"
+          role="alert"
+          data-testid="load-error-state"
+        >
+          <div class="alert alert-error max-w-xl">
+            <span>{{ t('remote_control_config.view.load_error') }}</span>
+          </div>
+        </div>
+
+        <!-- 3-pane body — only mounted when loads succeeded; otherwise the
+             page list, cards, and preview are not in the DOM and can't fire
+             store mutations. -->
+        <div
+          v-else
+          class="flex flex-1 overflow-hidden"
+        >
           <!-- Left: page list -->
           <aside
             class="flex flex-col w-[220px] border-r border-base-300"
