@@ -42,18 +42,23 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
         not a `ref=""` string or `document.querySelector`.
   - [x] **2d** — `AstrosRemoteLivePreview` + `RemoteControlConfigView` assembly + router
         swap + delete-confirm modal + i18n sweep + manual QA + old code deletion. — ready
-        for PR (push pending). 7 commits on feature/phase2d-config-view: live-preview
-        component (mutation-tested no-emit contract), view scaffold (3-pane), data
-        loading with partial-failure OR-gate (improves on legacy single-gate), page list
-        wiring, delete-confirm modal, card change wiring, view tests (23 vitest cases
-        including mutation tests for save-disable cascade / delete-cancel no-op /
-        setButton selectedIdx snapshot). Pre-push toolkit dispatch caught: vue-i18n
-        intlify warning from double-`$t()` (fixed by adding `messageParams` to
-        AstrosConfirmModal — backward compatible with ModulesView usage), TOCTOU on
-        pendingDeleteName (snapshot at request time), duplicate console.error in
-        saveConfig (removed; store already logs). Deferred to followups: sticky
-        loadFailed banner with Retry (silent-failure C2), useToast dedupe/queue (H4),
-        playlistStore partial-failure cleanup (C1 — pre-existing in a different store).
+        for PR (push pending). 14 commits on feature/phase2d-config-view across the 11
+        plan tasks + 3 review-round fix commits (2 rounds of pre-push toolkit dispatch).
+        Final state: live-preview component (mutation-tested no-emit contract), 3-pane
+        view, data loading with partial-failure OR-gate (improves on legacy single-gate),
+        page list + card + delete-confirm wiring, 27 view-level vitest cases (incl.
+        mutation tests for save-disable cascade / delete-cancel no-op / setButton
+        selectedIdx snapshot, TOCTOU snapshot, save-failure + partial-load + pluralization
+        coverage, all toast contracts pinned), 3 added AstrosConfirmModal tests for the
+        new `messageParams` branch. Pre-push toolkit caught and fixed: vue-i18n intlify
+        warning from double-`$t()` (added `messageParams` to AstrosConfirmModal —
+        backward compatible), TOCTOU on pendingDeleteName (snapshot {idx,name} at request
+        time as one atomic ref), `Record<string, unknown>` too loose on the new prop
+        (tightened to `string | number`), invariant-warn on out-of-range delete idx
+        matches the existing console.warn pattern, hoisted toast spies so tests can
+        assert error() / success() were called. Deferred to followups: sticky loadFailed
+        banner with Retry (UX), useToast dedupe/queue (project-wide, pre-existing),
+        playlistStore partial-failure cleanup (pre-existing in a different store).
 - [x] **Phase 3 — Shared `AstrosMobileRemote` component**: Build the handheld UI in Vue;
       consume it from Phase 2's preview rail in compact mode. — shipped 2026-05-21 via
       PR #92 (merge `547a7af`). Three pre-push toolkit rounds; 39 PR-added tests;
