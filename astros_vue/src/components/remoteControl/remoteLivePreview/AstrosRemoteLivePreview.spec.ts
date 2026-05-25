@@ -65,6 +65,15 @@ describe('AstrosRemoteLivePreview — bezel + mobile remote embedding', () => {
     expect(remote.props('connected')).toBe(true);
   });
 
+  it('passes navigable=false so the preview cannot drift off selectedIdx', () => {
+    // The embedded remote's pagination + swipe handlers would otherwise let
+    // a user navigate the preview independently of the editor's page list,
+    // making the right rail show a different page from the selected row.
+    const wrapper = mountPreview({ pages: PAGES_3, selectedIdx: 0 });
+    const remote = wrapper.findComponent({ name: 'AstrosMobileRemote' });
+    expect(remote.props('navigable')).toBe(false);
+  });
+
   it('reseats the embedded remote when selectedIdx prop changes', async () => {
     const wrapper = mountPreview({ pages: PAGES_3, selectedIdx: 0 });
     await wrapper.setProps({ selectedIdx: 2 });

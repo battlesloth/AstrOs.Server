@@ -142,6 +142,9 @@
 3. **Expected:** The preview shows its own internal "Sent: …" toast (the mobile-remote component fires it), but NO toast appears in the main view header AND no actual script/playlist runs on the droid (no backend POST to `/scripts/run` etc.).
 4. Press and hold the preview's STOP ALL button.
 5. **Expected:** The preview shows its arming animation; on release-after-600ms it shows its own "STOP ALL — sending…" toast — but NO websocket PANIC is sent and no actual hardware halt happens. (Verify with backend logs or a network inspector.)
+6. **Expected:** The preview has NO pagination row (no `‹` / `›` arrows, no page dots) — the right rail is locked to whatever the page list shows.
+7. With multiple pages, swipe left/right on the preview's 3×3 grid.
+8. **Expected:** Nothing happens. The preview cannot navigate independently; selecting a page is only possible via the left-rail page list.
 
 ### 17. Pluralization
 

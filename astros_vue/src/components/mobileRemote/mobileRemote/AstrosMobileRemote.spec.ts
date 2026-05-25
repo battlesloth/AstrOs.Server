@@ -56,6 +56,7 @@ function render(props: {
   initialIdx?: number;
   compact?: boolean;
   connected?: boolean;
+  navigable?: boolean;
 }) {
   return mount(AstrosMobileRemote, {
     props,
@@ -286,5 +287,62 @@ describe('AstrosMobileRemote', () => {
     await flushPromises();
     expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Greetings');
     expect(wrapper.find('.astros-mobile-remote__page-pagination').text()).toBe('1 / 3');
+  });
+
+  describe('navigable=false (locked to initialIdx)', () => {
+    // The editor live-preview embeds this component with navigable=false so
+    // the right rail can't drift away from the page the user selected in the
+    // page list. Without this lock, prev/next/dots/swipe would all mutate an
+    // internal idx independently of initialIdx and the preview would show a
+    // different page from the selected row.
+    const threePages = [
+      pageWith('p1', 'Greetings', scriptButton('a', 'A')),
+      pageWith('p2', 'Performance', scriptButton('b', 'B')),
+      pageWith('p3', 'Idle', scriptButton('c', 'C')),
+    ];
+
+    it('hides the pagination row entirely', () => {
+      const wrapper = render({ pages: threePages, navigable: false });
+      expect(wrapper.find('.astros-mobile-remote__pagination').exists()).toBe(false);
+    });
+
+    it('still renders the pagination row when navigable defaults to true', () => {
+      // Mutation guard: confirm the v-if isn't accidentally always-false.
+      const wrapper = render({ pages: threePages });
+      expect(wrapper.find('.astros-mobile-remote__pagination').exists()).toBe(true);
+    });
+
+    it('ignores a swipe gesture that would otherwise advance the page', async () => {
+      const wrapper = render({ pages: threePages, initialIdx: 0, navigable: false });
+      await flushPromises();
+      expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Greetings');
+
+      const grid = wrapper.find('.astros-mobile-remote__grid');
+      // Simulate a left-swipe: touchstart at x=200, touchend at x=100 (delta
+      // -100, beyond the 60px threshold), vertical drift 0.
+      await grid.trigger('touchstart', {
+        touches: [{ clientX: 200, clientY: 50 }],
+      });
+      await grid.trigger('touchend', {
+        changedTouches: [{ clientX: 100, clientY: 50 }],
+      });
+      await flushPromises();
+
+      // initialIdx is still 0; the swipe was absorbed.
+      expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Greetings');
+    });
+
+    it('still re-seats when initialIdx prop changes (parent retains control)', async () => {
+      // The lock is one-way: the parent CAN drive the index via initialIdx,
+      // but the component itself can't mutate it. This is what lets the
+      // editor's page list selection keep flowing into the preview.
+      const wrapper = render({ pages: threePages, initialIdx: 0, navigable: false });
+      await flushPromises();
+      expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Greetings');
+
+      await wrapper.setProps({ initialIdx: 2 });
+      await flushPromises();
+      expect(wrapper.find('.astros-mobile-remote__page-name').text()).toBe('Idle');
+    });
   });
 });

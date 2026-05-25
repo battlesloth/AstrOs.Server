@@ -30,6 +30,7 @@ function noopPanic() {}
         :initial-idx="selectedIdx"
         :compact="true"
         :connected="true"
+        :navigable="false"
         @press="noopPress"
         @panic="noopPanic"
       />
