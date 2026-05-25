@@ -85,3 +85,45 @@ describe('AstrosConfirmModal — lock-aware primary action', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('AstrosConfirmModal — message rendering branches', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('renders $t(message) directly when messageParams is undefined (legacy callers)', () => {
+    // modals.confirm.title resolves to "Confirm" in enUS.json — verify the
+    // no-params branch resolves the i18n key without interpolation.
+    const wrapper = mountModal({ message: 'modals.confirm.title' });
+    // Body has the resolved message. Title (h2) also says "Confirm" (same
+    // key) — assert the resolved text appears in the body specifically.
+    const body = wrapper.find('.modal-body');
+    expect(body.text()).toContain('Confirm');
+  });
+
+  it('interpolates messageParams into the i18n key when provided', () => {
+    // Use a real locale key with a {name} placeholder so we're testing the
+    // actual vue-i18n path, not a lookup-miss fallback.
+    const wrapper = mountModal({
+      message: 'remote_control_config.deleteModal.message',
+      messageParams: { name: 'Performance' },
+    });
+    expect(wrapper.text()).toContain('Performance');
+    expect(wrapper.text()).toContain('Delete');
+    // The placeholder itself must NOT survive into the rendered text — that
+    // would indicate the params weren't threaded through to $t.
+    expect(wrapper.text()).not.toContain('{name}');
+  });
+
+  it('renders interpolated message reactively when params update', async () => {
+    const wrapper = mountModal({
+      message: 'remote_control_config.deleteModal.message',
+      messageParams: { name: 'Before' },
+    });
+    expect(wrapper.text()).toContain('Before');
+
+    await wrapper.setProps({ messageParams: { name: 'After' } });
+    expect(wrapper.text()).toContain('After');
+    expect(wrapper.text()).not.toContain('Before');
+  });
+});

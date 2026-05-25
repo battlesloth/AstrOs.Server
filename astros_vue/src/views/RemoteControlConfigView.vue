@@ -14,6 +14,7 @@ import { usePlaylistsStore } from '@/stores/playlists';
 import { useToast } from '@/composables/useToast';
 import { BUTTON_KEYS, type ButtonKey } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton } from '@/models/remoteControl/pageButton';
+import type { EditorListItem } from '@/components/remoteControl/remoteButtonEditor/types';
 
 const { t } = useI18n();
 
@@ -27,8 +28,8 @@ const { remoteControlPages, selectedIdx, isDirty } = storeToRefs(remoteControlSt
 // Flipped true if the remote-config GET fails on mount; gates the Save
 // button to prevent overwriting unloaded data.
 const loadFailed = ref(false);
-const scripts = ref<{ id: string; name: string }[]>([]);
-const playlists = ref<{ id: string; name: string }[]>([]);
+const scripts = ref<EditorListItem[]>([]);
+const playlists = ref<EditorListItem[]>([]);
 
 onMounted(async () => {
   const [scriptsResult, playlistsResult, remoteResult] = await Promise.all([
@@ -82,17 +83,23 @@ function onRenamePage(payload: { idx: number; name: string }) {
 // idx here, open the modal, and wait for user confirmation before calling
 // store.deletePage. Cancel resets pendingDeleteIdx without mutation.
 // Snapshot {idx, name} at request time so a concurrent mutation to
-// remoteControlPages (between modal open and confirm) can't drift the
-// rendered message away from what the user clicked to delete. Without this,
-// a TOCTOU race during e.g. a future websocket-driven sync could surface a
-// `Delete ""?` empty-string fallback. Bundled into one ref so idx and name
-// always change together — eliminates the "open with idx set but name blank"
-// intermediate.
+// remoteControlPages between modal-open and confirm can't drift the rendered
+// message. A TOCTOU race during a future websocket-driven sync would
+// otherwise show the wrong name in the dialog.
 const pendingDelete = ref<{ idx: number; name: string } | null>(null);
 
 function onDeleteRequest(idx: number) {
   const name = remoteControlPages.value[idx]?.name;
-  if (name === undefined) return; // out-of-range idx — no modal
+  if (name === undefined) {
+    // Reaching here means the page list emitted delete with an idx outside
+    // [0, pages.length) — only possible if its v-for iterates a stale array.
+    // Surface in DevTools instead of silently dropping the click, matching
+    // the store-invariant warning style at remoteControl.ts:124+.
+    console.warn(
+      `[RemoteControlConfigView] onDeleteRequest: idx ${idx} out of range (pages: ${remoteControlPages.value.length})`,
+    );
+    return;
+  }
   pendingDelete.value = { idx, name };
 }
 

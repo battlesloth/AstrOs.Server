@@ -40,8 +40,15 @@ vi.mock('@/api/apiService', () => ({
   },
 }));
 
+// Hoisted toast spies — re-bound per test in beforeEach so each test can
+// inspect what success/error were called with. Without this, a regression
+// that DELETES the error(...) call from a failure branch would still
+// pass tests that only assert isDirty/disabled — the toast contract has
+// to be pinned too.
+const toastSuccess = vi.fn();
+const toastError = vi.fn();
 vi.mock('@/composables/useToast', () => ({
-  useToast: () => ({ success: vi.fn(), error: vi.fn() }),
+  useToast: () => ({ success: toastSuccess, error: toastError }),
 }));
 
 import RemoteControlConfigView from '@/views/RemoteControlConfigView.vue';
@@ -107,9 +114,15 @@ function mountView() {
   });
 }
 
+function resetMocks() {
+  setActivePinia(createPinia());
+  toastSuccess.mockClear();
+  toastError.mockClear();
+}
+
 describe('RemoteControlConfigView — header counts + dirty signal', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    resetMocks();
   });
 
   it('renders the header title', async () => {
@@ -163,7 +176,7 @@ describe('RemoteControlConfigView — header counts + dirty signal', () => {
 
 describe('RemoteControlConfigView — page list wiring', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    resetMocks();
   });
 
   it('forwards select emit to store.selectPage', async () => {
@@ -229,7 +242,7 @@ describe('RemoteControlConfigView — page list wiring', () => {
 
 describe('RemoteControlConfigView — delete-confirm modal lifecycle', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    resetMocks();
   });
 
   it('opens the modal on delete emit (modal not visible before)', async () => {
@@ -324,7 +337,7 @@ describe('RemoteControlConfigView — delete-confirm modal lifecycle', () => {
 
 describe('RemoteControlConfigView — button card wiring', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    resetMocks();
   });
 
   it('forwards card change to store.setButton with the current selectedIdx and the iteration key', async () => {
@@ -362,7 +375,7 @@ describe('RemoteControlConfigView — button card wiring', () => {
 
 describe('RemoteControlConfigView — header pluralization', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    resetMocks();
   });
 
   it('renders singular "page" / "action" at counts of 1', async () => {
@@ -392,7 +405,7 @@ describe('RemoteControlConfigView — header pluralization', () => {
 
 describe('RemoteControlConfigView — save failure', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    resetMocks();
   });
 
   it('shows the error toast and leaves isDirty=true when the PUT fails', async () => {
@@ -420,6 +433,11 @@ describe('RemoteControlConfigView — save failure', () => {
       expect(store.isDirty).toBe(true);
       // Save button is still enabled (loadFailed is false, isDirty is true).
       expect(saveBtn.attributes('disabled')).toBeUndefined();
+      // Error toast must fire — the user needs to know the save didn't land.
+      // Without this assertion, a regression that deletes the error() call
+      // in saveConfig would pass on isDirty alone.
+      expect(toastError).toHaveBeenCalledWith('Failed to save remote control configuration.');
+      expect(toastSuccess).not.toHaveBeenCalled();
     } finally {
       if (originalImpl) {
         mockedPut.mockImplementation(originalImpl);
@@ -430,7 +448,7 @@ describe('RemoteControlConfigView — save failure', () => {
     }
   });
 
-  it('clears isDirty on a successful save (no error path leak)', async () => {
+  it('clears isDirty on a successful save and fires the success toast', async () => {
     const wrapper = mountView();
     await flushPromises();
 
@@ -443,12 +461,14 @@ describe('RemoteControlConfigView — save failure', () => {
     await flushPromises();
 
     expect(store.isDirty).toBe(false);
+    expect(toastSuccess).toHaveBeenCalledWith('Remote control configuration saved successfully.');
+    expect(toastError).not.toHaveBeenCalled();
   });
 });
 
 describe('RemoteControlConfigView — partial load failure', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    resetMocks();
   });
 
   async function mountWithFailingEndpoint(failingUrlMatch: string) {
@@ -483,7 +503,7 @@ describe('RemoteControlConfigView — partial load failure', () => {
     return { mockedGet, originalImpl };
   }
 
-  it('disables Save when scripts load fails (even if remote-config + playlists succeed)', async () => {
+  it('disables Save and fires load-error toast when scripts load fails', async () => {
     // Scripts endpoint is the only one that includes "scripts/all" and NOT
     // "all-names" — using "scripts/all" as the URL match would also catch the
     // playlists-store's secondary scripts/all-names GET. Match the more
@@ -498,12 +518,15 @@ describe('RemoteControlConfigView — partial load failure', () => {
       await flushPromises();
 
       expect(wrapper.get('[data-testid="save-config"]').attributes('disabled')).toBeDefined();
+      expect(toastError).toHaveBeenCalledWith(
+        'Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.',
+      );
     } finally {
       if (originalImpl) mockedGet.mockImplementation(originalImpl);
     }
   });
 
-  it('disables Save when playlists load fails (even if scripts + remote-config succeed)', async () => {
+  it('disables Save and fires load-error toast when playlists load fails', async () => {
     const { mockedGet, originalImpl } = await mountWithFailingEndpoint('playlists/all');
 
     try {
@@ -514,6 +537,9 @@ describe('RemoteControlConfigView — partial load failure', () => {
       await flushPromises();
 
       expect(wrapper.get('[data-testid="save-config"]').attributes('disabled')).toBeDefined();
+      expect(toastError).toHaveBeenCalledWith(
+        'Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.',
+      );
     } finally {
       if (originalImpl) mockedGet.mockImplementation(originalImpl);
     }
@@ -522,7 +548,7 @@ describe('RemoteControlConfigView — partial load failure', () => {
 
 describe('RemoteControlConfigView — load failure', () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    resetMocks();
   });
 
   it('disables Save when remote-config load fails', async () => {
@@ -548,6 +574,9 @@ describe('RemoteControlConfigView — load failure', () => {
 
       const saveBtn = wrapper.get('[data-testid="save-config"]');
       expect(saveBtn.attributes('disabled')).toBeDefined();
+      expect(toastError).toHaveBeenCalledWith(
+        'Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.',
+      );
     } finally {
       // Restore for any subsequent tests that import this file.
       if (originalImpl) mockedGet.mockImplementation(originalImpl);

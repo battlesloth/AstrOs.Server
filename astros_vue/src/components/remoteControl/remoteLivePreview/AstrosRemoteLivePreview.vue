@@ -13,12 +13,8 @@ defineProps<{
 // The embedded AstrosMobileRemote fires press/panic from internal button
 // clicks; this wrapper explicitly does NOT re-emit, so a button click in
 // the editor preview can't surprise the user by moving the droid.
-function noopPress() {
-  /* intentionally no-op — preview is read-only */
-}
-function noopPanic() {
-  /* intentionally no-op — preview is read-only */
-}
+function noopPress() {}
+function noopPanic() {}
 </script>
 
 <template>
@@ -42,8 +38,8 @@ function noopPanic() {
 
 <style scoped>
 /* MiniPhone bezel — presentational chrome around the embedded remote.
- * Width matches the design spec's "~280px" right-rail target; height clamps
- * to a phone-ish aspect so the bezel doesn't stretch on tall viewports. */
+ * Fixed-width rail with a clamped phone-aspect inner frame so the bezel
+ * doesn't stretch on tall viewports. */
 .astros-remote-live-preview {
   display: flex;
   flex-shrink: 0;
