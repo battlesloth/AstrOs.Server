@@ -80,6 +80,7 @@ export function migratePage(page: Partial<RemoteControlPage>, idx: number): Remo
 export const useRemoteControlStore = defineStore('remoteControl', () => {
   const remoteControlPages = ref<RemoteControlPage[]>([]);
   const isLoading = ref(false);
+  const isSaving = ref(false);
   const isDirty = ref(false);
   const selectedIdx = ref(0);
 
@@ -238,21 +239,35 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
   }
 
   async function saveRemoteControl() {
+    // Capture the wire payload at save-start so we can compare it to the
+    // current state when the PUT resolves. Without this, a user who edits
+    // between clicking Save and the PUT resolving would see isDirty cleared
+    // unconditionally — even though their post-edit changes weren't in the
+    // payload that hit the server. Net effect: silent loss of "unsaved
+    // changes" signal across the network window.
     const payload = JSON.stringify(remoteControlPages.value);
-
+    isSaving.value = true;
     try {
       await apiService.put(REMOTE_CONFIG, { config: payload });
-      isDirty.value = false;
+      // Only clear isDirty if the user's current state still matches what
+      // we actually sent. Any mid-flight mutation leaves isDirty=true so
+      // the Unsaved badge stays visible and the user can click Save again.
+      if (JSON.stringify(remoteControlPages.value) === payload) {
+        isDirty.value = false;
+      }
       return { success: true };
     } catch (error) {
       console.error('Failed to save remote control configuration:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      isSaving.value = false;
     }
   }
 
   return {
     remoteControlPages,
     isLoading,
+    isSaving,
     isDirty,
     selectedIdx,
     loadRemoteControl,

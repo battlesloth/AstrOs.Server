@@ -121,6 +121,17 @@
 4. Reload the browser.
 5. **Expected:** The 2 configured buttons are still there.
 
+### 13a. Save in flight — duplicate-click + mid-flight edit guards
+
+1. Configure a button to make the editor dirty. Open browser DevTools → Network → enable throttling (e.g., "Slow 3G") so the PUT to `/remoteConfig` is visibly in-flight for a few seconds.
+2. Click Save.
+3. **Expected (while PUT is in flight):** Save button is visibly disabled. Clicking it again does nothing — no duplicate PUT in the network panel.
+4. **While the PUT is still in flight**, configure a different button. The Unsaved badge stays visible (because the new edit is post-payload).
+5. Let the PUT resolve.
+6. **Expected:** Success toast fires for the SAVE that completed. But the Unsaved badge **stays visible** because the mid-flight edit is unsaved. The Save button becomes enabled again so the user can persist the new edit.
+7. Click Save again.
+8. **Expected:** A second PUT goes out with the post-edit payload; Unsaved badge clears.
+
 ### 14. Save failure (simulated)
 
 1. Stop the backend API.

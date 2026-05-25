@@ -551,6 +551,55 @@ describe('RemoteControlConfigView — save failure', () => {
     }
   });
 
+  it('disables Save while a PUT is in flight (prevents duplicate clicks during the network window)', async () => {
+    // Hold the PUT open so we can observe the in-flight state without
+    // racing against test cleanup.
+    let resolvePut: (value: unknown) => void = () => {};
+    const originalImpl = mockedApiPut.getMockImplementation();
+    mockedApiPut.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePut = resolve;
+        }),
+    );
+
+    try {
+      const wrapper = mountView();
+      await flushPromises();
+
+      const store = useRemoteControlStore();
+      store.isDirty = true;
+      await flushPromises();
+
+      const saveBtn = wrapper.get('[data-testid="save-config"]');
+      expect(saveBtn.attributes('disabled')).toBeUndefined();
+
+      // Click → in flight.
+      await saveBtn.trigger('click');
+      await flushPromises();
+
+      // PUT hasn't resolved yet; isSaving=true should keep Save disabled
+      // even though isDirty is still true.
+      expect(store.isSaving).toBe(true);
+      expect(saveBtn.attributes('disabled')).toBeDefined();
+
+      resolvePut(undefined);
+      await flushPromises();
+
+      // After resolve: isSaving=false, isDirty=false → Save disabled by the
+      // !isDirty branch instead.
+      expect(store.isSaving).toBe(false);
+      expect(store.isDirty).toBe(false);
+    } finally {
+      if (originalImpl) {
+        mockedApiPut.mockImplementation(originalImpl);
+      } else {
+        mockedApiPut.mockReset();
+        mockedApiPut.mockResolvedValue({ data: 'ok' });
+      }
+    }
+  });
+
   it('clears isDirty on a successful save and fires the success toast', async () => {
     const wrapper = mountView();
     await flushPromises();

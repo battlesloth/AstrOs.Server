@@ -23,7 +23,7 @@ const scriptStore = useScriptsStore();
 const playlistStore = usePlaylistsStore();
 const { success, error } = useToast();
 
-const { remoteControlPages, selectedIdx, isDirty } = storeToRefs(remoteControlStore);
+const { remoteControlPages, selectedIdx, isDirty, isSaving } = storeToRefs(remoteControlStore);
 
 // Three mount states gate the template:
 //   isInitialLoading=true   → loading panel (initial; until Promise.all resolves)
@@ -189,7 +189,7 @@ const pageCount = computed(() => remoteControlPages.value.length);
           <AstrosWriteButton
             data-testid="save-config"
             class="btn btn-primary w-24"
-            :disabled="isInitialLoading || loadFailed || !isDirty"
+            :disabled="isInitialLoading || loadFailed || isSaving || !isDirty"
             @click="saveConfig"
           >
             {{ t('remote_control_config.view.save') }}
