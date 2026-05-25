@@ -92,13 +92,11 @@ describe('AstrosConfirmModal — message rendering branches', () => {
   });
 
   it('renders $t(message) directly when messageParams is undefined (legacy callers)', () => {
-    // modals.confirm.title resolves to "Confirm" in enUS.json — verify the
-    // no-params branch resolves the i18n key without interpolation.
     const wrapper = mountModal({ message: 'modals.confirm.title' });
-    // Body has the resolved message. Title (h2) also says "Confirm" (same
-    // key) — assert the resolved text appears in the body specifically.
+    // Title (h2) and body both render the same key here; scope to the body
+    // node so we're specifically pinning the no-params branch's output.
     const body = wrapper.find('.modal-body');
-    expect(body.text()).toContain('Confirm');
+    expect(body.text()).toBe(enUS.modals.confirm.title);
   });
 
   it('interpolates messageParams into the i18n key when provided', () => {

@@ -82,10 +82,9 @@ function onRenamePage(payload: { idx: number; name: string }) {
 // Delete-confirm modal state. The page list emits delete(idx); we capture
 // idx here, open the modal, and wait for user confirmation before calling
 // store.deletePage. Cancel resets pendingDeleteIdx without mutation.
-// Snapshot {idx, name} at request time so a concurrent mutation to
-// remoteControlPages between modal-open and confirm can't drift the rendered
-// message. A TOCTOU race during a future websocket-driven sync would
-// otherwise show the wrong name in the dialog.
+// Captures both idx and name atomically — if a future websocket-driven sync
+// renames or removes the page between modal-open and confirm, the dialog
+// still shows the name the user clicked to delete.
 const pendingDelete = ref<{ idx: number; name: string } | null>(null);
 
 function onDeleteRequest(idx: number) {

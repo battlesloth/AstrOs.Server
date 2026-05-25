@@ -46,7 +46,7 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
         plan tasks + 3 review-round fix commits (2 rounds of pre-push toolkit dispatch).
         Final state: live-preview component (mutation-tested no-emit contract), 3-pane
         view, data loading with partial-failure OR-gate (improves on legacy single-gate),
-        page list + card + delete-confirm wiring, 27 view-level vitest cases (incl.
+        page list + card + delete-confirm wiring, 23 view-level vitest cases (incl.
         mutation tests for save-disable cascade / delete-cancel no-op / setButton
         selectedIdx snapshot, TOCTOU snapshot, save-failure + partial-load + pluralization
         coverage, all toast contracts pinned), 3 added AstrosConfirmModal tests for the

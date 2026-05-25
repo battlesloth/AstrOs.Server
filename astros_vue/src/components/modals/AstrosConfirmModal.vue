@@ -10,12 +10,9 @@ const props = withDefaults(
     // Optional interpolation params for `message`. Without this, callers that
     // needed interpolation had to pre-resolve via t(key, params) and pass the
     // resolved string as message — but then the modal's $t(message) lookup
-    // misses, vue-i18n logs `[intlify] Not found ...`, and console fills with
-    // noise on every open. Providing messageParams lets the modal call
-    // $t(message, messageParams) so message stays a real key.
-    // Param values are constrained to string | number to match vue-i18n's
-    // NamedValue contract — `unknown` would let callers pass an object that
-    // stringifies to "[object Object]" in the modal body.
+    // misses and vue-i18n logs `[intlify] Not found ...` on every open.
+    // Providing messageParams lets the modal call $t(message, messageParams)
+    // so message stays a real key.
     messageParams?: Record<string, string | number>;
   }>(),
   {

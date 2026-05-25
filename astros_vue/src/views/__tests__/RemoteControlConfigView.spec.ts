@@ -45,14 +45,21 @@ vi.mock('@/api/apiService', () => ({
 // that DELETES the error(...) call from a failure branch would still
 // pass tests that only assert isDirty/disabled — the toast contract has
 // to be pinned too.
-const toastSuccess = vi.fn();
-const toastError = vi.fn();
+// Typed signature mirrors `useToast()`'s `(msg: string) => void` so a
+// typo'd `toHaveBeenCalledWith(123)` fails at type-check instead of
+// runtime.
+const toastSuccess = vi.fn<(msg: string) => void>();
+const toastError = vi.fn<(msg: string) => void>();
 vi.mock('@/composables/useToast', () => ({
   useToast: () => ({ success: toastSuccess, error: toastError }),
 }));
 
 import RemoteControlConfigView from '@/views/RemoteControlConfigView.vue';
 import { useRemoteControlStore } from '@/stores/remoteControl';
+import apiService from '@/api/apiService';
+
+const mockedApiGet = apiService.get as ReturnType<typeof vi.fn>;
+const mockedApiPut = apiService.put as ReturnType<typeof vi.fn>;
 
 function createTestI18n() {
   return createI18n({
@@ -118,6 +125,12 @@ function resetMocks() {
   setActivePinia(createPinia());
   toastSuccess.mockClear();
   toastError.mockClear();
+  // apiService get/put are swapped via mockImplementation in failure-path
+  // tests; those use try/finally to restore the original impl. Clearing
+  // call counts here keeps a forgotten restore from leaking call history
+  // into a sibling test's assertions.
+  mockedApiGet.mockClear();
+  mockedApiPut.mockClear();
 }
 
 describe('RemoteControlConfigView — header counts + dirty signal', () => {
@@ -411,10 +424,8 @@ describe('RemoteControlConfigView — save failure', () => {
   it('shows the error toast and leaves isDirty=true when the PUT fails', async () => {
     // Swap the put impl BEFORE mount so the in-mount load isn't affected and
     // only saveConfig sees the rejection.
-    const apiServiceModule = await import('@/api/apiService');
-    const mockedPut = apiServiceModule.default.put as ReturnType<typeof vi.fn>;
-    const originalImpl = mockedPut.getMockImplementation();
-    mockedPut.mockImplementation(() => Promise.reject(new Error('network')));
+    const originalImpl = mockedApiPut.getMockImplementation();
+    mockedApiPut.mockImplementation(() => Promise.reject(new Error('network')));
 
     try {
       const wrapper = mountView();
@@ -440,10 +451,10 @@ describe('RemoteControlConfigView — save failure', () => {
       expect(toastSuccess).not.toHaveBeenCalled();
     } finally {
       if (originalImpl) {
-        mockedPut.mockImplementation(originalImpl);
+        mockedApiPut.mockImplementation(originalImpl);
       } else {
-        mockedPut.mockReset();
-        mockedPut.mockResolvedValue({ data: 'ok' });
+        mockedApiPut.mockReset();
+        mockedApiPut.mockResolvedValue({ data: 'ok' });
       }
     }
   });
@@ -471,11 +482,9 @@ describe('RemoteControlConfigView — partial load failure', () => {
     resetMocks();
   });
 
-  async function mountWithFailingEndpoint(failingUrlMatch: string) {
-    const apiServiceModule = await import('@/api/apiService');
-    const mockedGet = apiServiceModule.default.get as ReturnType<typeof vi.fn>;
-    const originalImpl = mockedGet.getMockImplementation();
-    mockedGet.mockImplementation((url: string) => {
+  function mountWithFailingEndpoint(failingUrlMatch: string) {
+    const originalImpl = mockedApiGet.getMockImplementation();
+    mockedApiGet.mockImplementation((url: string) => {
       if (url.includes(failingUrlMatch)) return Promise.reject(new Error('network'));
       // The remote-config endpoint expects a JSON-parseable string body; the
       // other endpoints expect an array. Match both shapes.
@@ -500,7 +509,7 @@ describe('RemoteControlConfigView — partial load failure', () => {
       }
       return Promise.resolve([]);
     });
-    return { mockedGet, originalImpl };
+    return { originalImpl };
   }
 
   it('disables Save and fires load-error toast when scripts load fails', async () => {
@@ -508,7 +517,7 @@ describe('RemoteControlConfigView — partial load failure', () => {
     // "all-names" — using "scripts/all" as the URL match would also catch the
     // playlists-store's secondary scripts/all-names GET. Match the more
     // specific path.
-    const { mockedGet, originalImpl } = await mountWithFailingEndpoint('api/scripts/all');
+    const { originalImpl } = mountWithFailingEndpoint('api/scripts/all');
 
     try {
       const wrapper = mountView();
@@ -522,12 +531,12 @@ describe('RemoteControlConfigView — partial load failure', () => {
         'Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.',
       );
     } finally {
-      if (originalImpl) mockedGet.mockImplementation(originalImpl);
+      if (originalImpl) mockedApiGet.mockImplementation(originalImpl);
     }
   });
 
   it('disables Save and fires load-error toast when playlists load fails', async () => {
-    const { mockedGet, originalImpl } = await mountWithFailingEndpoint('playlists/all');
+    const { originalImpl } = mountWithFailingEndpoint('playlists/all');
 
     try {
       const wrapper = mountView();
@@ -541,7 +550,7 @@ describe('RemoteControlConfigView — partial load failure', () => {
         'Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.',
       );
     } finally {
-      if (originalImpl) mockedGet.mockImplementation(originalImpl);
+      if (originalImpl) mockedApiGet.mockImplementation(originalImpl);
     }
   });
 });
@@ -556,10 +565,8 @@ describe('RemoteControlConfigView — load failure', () => {
     // but Promise.all fires three GETs in parallel and the order is not
     // guaranteed, so the once-impl might match a script/playlist URL instead
     // of remoteConfig and leak the rejection to the wrong call.
-    const apiServiceModule = await import('@/api/apiService');
-    const mockedGet = apiServiceModule.default.get as ReturnType<typeof vi.fn>;
-    const originalImpl = mockedGet.getMockImplementation();
-    mockedGet.mockImplementation((url: string) => {
+    const originalImpl = mockedApiGet.getMockImplementation();
+    mockedApiGet.mockImplementation((url: string) => {
       if (url.includes('remoteConfig')) return Promise.reject(new Error('network'));
       return Promise.resolve([]);
     });
@@ -579,7 +586,37 @@ describe('RemoteControlConfigView — load failure', () => {
       );
     } finally {
       // Restore for any subsequent tests that import this file.
-      if (originalImpl) mockedGet.mockImplementation(originalImpl);
+      if (originalImpl) mockedApiGet.mockImplementation(originalImpl);
+    }
+  });
+});
+
+describe('RemoteControlConfigView — invariant warnings', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it('console.warns and does NOT open the modal when delete is emitted with an out-of-range idx', async () => {
+    // The AstrosRemotePageList contract never emits an out-of-range idx in
+    // practice (it iterates the pages array), but the view-level guard at
+    // onDeleteRequest is defensive against a stale-array race. Pin it: a
+    // future refactor that removes the guard should break this test.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const wrapper = mountView();
+      await flushPromises();
+
+      const pageList = wrapper.findComponent({ name: 'AstrosRemotePageList' });
+      await pageList.vm.$emit('delete', 99);
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="confirm-modal"]').exists()).toBe(false);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('onDeleteRequest: idx 99 out of range'),
+      );
+    } finally {
+      warnSpy.mockRestore();
     }
   });
 });
