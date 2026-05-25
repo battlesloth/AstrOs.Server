@@ -1,0 +1,75 @@
+<script setup lang="ts">
+import { useI18n } from 'vue-i18n';
+import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
+import AstrosMobileRemote from '@/components/mobileRemote/mobileRemote/AstrosMobileRemote.vue';
+
+const { t } = useI18n();
+
+defineProps<{
+  pages: readonly RemoteControlPage[];
+  selectedIdx: number;
+}>();
+
+// The embedded AstrosMobileRemote fires press/panic from internal button
+// clicks; this wrapper explicitly does NOT re-emit, so a button click in
+// the editor preview can't surprise the user by moving the droid.
+function noopPress() {}
+function noopPanic() {}
+</script>
+
+<template>
+  <div
+    class="astros-remote-live-preview"
+    role="region"
+    :aria-label="t('remote_control_config.preview.bezel_label')"
+    data-testid="preview-bezel"
+  >
+    <div class="astros-remote-live-preview__bezel">
+      <AstrosMobileRemote
+        :pages="pages as RemoteControlPage[]"
+        :initial-idx="selectedIdx"
+        :compact="true"
+        :connected="true"
+        :navigable="false"
+        @press="noopPress"
+        @panic="noopPanic"
+      />
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* MiniPhone bezel — presentational chrome around the embedded remote.
+ * Fixed-width rail with a clamped phone-aspect inner frame so the bezel
+ * doesn't stretch on tall viewports. */
+.astros-remote-live-preview {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  justify-content: center;
+  width: 280px;
+  padding: 16px 12px;
+}
+
+.astros-remote-live-preview__bezel {
+  position: relative;
+  display: flex;
+  width: 224px;
+  height: 440px;
+  overflow: hidden;
+  background: #1a1f29;
+  border: 6px solid #0e1726;
+  border-radius: 28px;
+  box-shadow:
+    0 4px 14px rgba(14, 23, 38, 0.35),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.04);
+}
+
+/* Tiny inset so the embedded mobile remote's white background reads as a
+ * phone screen behind the bezel rather than bleeding to the bezel edge.
+ * NOTE: this :deep selector couples to AstrosMobileRemote's root BEM class —
+ * if that class renames, this rule silently stops applying (visual-only). */
+.astros-remote-live-preview__bezel :deep(.astros-mobile-remote) {
+  border-radius: 18px;
+}
+</style>

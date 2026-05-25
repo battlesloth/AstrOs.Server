@@ -333,6 +333,114 @@ describe('remoteControl store', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('save failed');
     });
+
+    it('sets isSaving=true while the PUT is in flight and back to false on success', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      // Hold the PUT open so we can observe the mid-flight state.
+      let resolvePut: (value: unknown) => void = () => {};
+      apiPut.mockReturnValue(
+        new Promise((resolve) => {
+          resolvePut = resolve;
+        }),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+
+      const savePromise = store.saveRemoteControl();
+      // The PUT hasn't resolved yet — isSaving must be true.
+      expect(store.isSaving).toBe(true);
+
+      resolvePut(undefined);
+      await savePromise;
+
+      expect(store.isSaving).toBe(false);
+    });
+
+    it('clears isSaving back to false even when the PUT rejects', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      apiPut.mockRejectedValue(new Error('save failed'));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+
+      await store.saveRemoteControl();
+
+      expect(store.isSaving).toBe(false);
+      errSpy.mockRestore();
+    });
+
+    it('does NOT clear isDirty when the user mutates pages between save-start and PUT resolve', async () => {
+      // In-flight race: the saved payload reflects the state at click time,
+      // but a mid-flight mutation makes the user's current state diverge
+      // from what hit the server. Clearing isDirty unconditionally would
+      // hide the post-edit changes — the Unsaved badge must stay visible.
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      let resolvePut: (value: unknown) => void = () => {};
+      apiPut.mockReturnValue(
+        new Promise((resolve) => {
+          resolvePut = resolve;
+        }),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage(); // isDirty=true
+      expect(store.isDirty).toBe(true);
+
+      const savePromise = store.saveRemoteControl();
+      // Mid-flight: mutate something the saved payload did NOT include.
+      store.remoteControlPages[0]!.button1 = {
+        id: 'script-mid-flight',
+        name: 'Mid-flight edit',
+        type: 'script',
+      };
+
+      resolvePut(undefined);
+      await savePromise;
+
+      // Save succeeded for the snapshot we sent, but the user's CURRENT
+      // state has additional unsaved changes. isDirty must stay true.
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('sends the pre-mutation snapshot — mid-flight edits do NOT leak into the wire payload', async () => {
+      // Companion to the previous test. The first assertion was on the
+      // dirty flag; this one pins the wire shape so we know the mid-flight
+      // edit ISN'T silently smuggled into the server's view of the world.
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      let resolvePut: (value: unknown) => void = () => {};
+      apiPut.mockReturnValue(
+        new Promise((resolve) => {
+          resolvePut = resolve;
+        }),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.remoteControlPages[0]!.button1 = {
+        id: 'pre-save',
+        name: 'Pre-save value',
+        type: 'script',
+      };
+
+      const savePromise = store.saveRemoteControl();
+      // Mutate AFTER the save started. apiPut.mock.calls captures the
+      // arguments at call time, so the snapshot we sent is fixed already —
+      // this mutation must not affect what's already on the wire.
+      store.remoteControlPages[0]!.button1 = {
+        id: 'post-save',
+        name: 'Post-save edit',
+        type: 'script',
+      };
+
+      resolvePut(undefined);
+      await savePromise;
+
+      const sent = apiPut.mock.calls[0]![1] as { config: string };
+      const parsed = JSON.parse(sent.config) as RemoteControlPage[];
+      expect(parsed[0]!.button1.id).toBe('pre-save');
+      expect(parsed[0]!.button1.name).toBe('Pre-save value');
+    });
   });
 
   describe('isDirty flag', () => {

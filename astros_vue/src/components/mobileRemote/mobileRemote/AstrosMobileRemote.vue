@@ -32,6 +32,15 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  // When false, the embedded remote is locked to `initialIdx`: pagination
+  // arrows + dots are hidden, swipe gestures on the grid are ignored. Used
+  // by the editor's live preview (Decision 1) so the right rail can't drift
+  // away from the page the user selected in the page list. Defaults to true
+  // so the standalone mobile route (Phase 4) keeps its full UX.
+  navigable: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits<{
@@ -159,14 +168,17 @@ function handlePress(button: PageButton) {
 }
 
 function goPrev() {
+  if (!props.navigable) return;
   if (currentIdx.value > 0) idx.value = currentIdx.value - 1;
 }
 
 function goNext() {
+  if (!props.navigable) return;
   if (currentIdx.value < totalPages.value - 1) idx.value = currentIdx.value + 1;
 }
 
 function selectPage(target: number) {
+  if (!props.navigable) return;
   if (target >= 0 && target < totalPages.value) idx.value = target;
 }
 
@@ -175,6 +187,8 @@ function selectPage(target: number) {
 // preventDefault that suppresses synthesized clicks on swipe). Direction
 // convention matches iOS Photos / Twitter / Instagram: the content moves
 // opposite the finger, so swipe LEFT → next page, swipe RIGHT → previous.
+// The goPrev/goNext callbacks short-circuit when navigable is false, so
+// swipes are absorbed without changing the displayed page.
 const swipe = useSwipeGesture({
   horizontalThresholdPx: 60,
   verticalMaxPx: 40,
@@ -307,8 +321,12 @@ const stopAllLabel = computed(() => {
       </button>
     </div>
 
-    <!-- Pagination row -->
-    <div class="astros-mobile-remote__pagination">
+    <!-- Pagination row — hidden when navigable=false (e.g., the editor's
+         live preview, which locks the index to selectedIdx). -->
+    <div
+      v-if="navigable"
+      class="astros-mobile-remote__pagination"
+    >
       <button
         type="button"
         class="astros-mobile-remote__page-nav"

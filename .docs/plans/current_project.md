@@ -17,7 +17,7 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
 - [x] **Phase 1 — Page id/name data model**: Add `id` + `name` to RemoteControlPage and
       M5Page, migrate existing data on load/save, hold M5Stack-compatible JSON shape. —
       shipped 2026-05-21 via PR #90 (merge `9b52df5`), M5 bench-verified before merge.
-- [ ] **Phase 2 — Direction B editor port**: Rebuild RemoteControlConfig view as a 3-pane
+- [x] **Phase 2 — Direction B editor port**: Rebuild RemoteControlConfig view as a 3-pane
       layout (page list + 3×3 grid + live preview), inline button editor, inline page CRUD.
       Design: [`specs/2026-05-21-phase2-editor-design.md`](./specs/2026-05-21-phase2-editor-design.md).
       Split into 4 PRs:
@@ -32,9 +32,33 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
         component tests with mutation-guards on every defensive branch; `makeNoneButton()`
         factory + `assertNever` helper extracted post-review; focus capture/restore added
         for a11y; `@floating-ui/vue` added for popover anchoring.
-  - [ ] **2c** — `AstrosRemotePageList`. Storybook gate; no app integration.
-  - [ ] **2d** — `AstrosRemoteLivePreview` + `RemoteControlConfigView` assembly + router
-        swap + delete-confirm modal + i18n sweep + manual QA + old code deletion.
+  - [x] **2c** — `AstrosRemotePageList`. Storybook gate; no app integration. — shipped
+        2026-05-24 via PR #96 (merge `58008c5`). Per-row mini 3×3 preview, always-visible
+        rename/duplicate/delete icons (rename via inline input — Enter/blur commits trimmed
+        value, Esc cancels, empty no-op), sticky header with Add, delete disabled at
+        `pages.length === 1`. Rename state keyed by `page.id` (not `idx`) to survive
+        parent-driven reorder during rename — divergence from the per-task snippets in the
+        plan, addressed pre-merge. Focus capture via Vue function-ref (`captureRenameInput`),
+        not a `ref=""` string or `document.querySelector`.
+  - [x] **2d** — `AstrosRemoteLivePreview` + `RemoteControlConfigView` assembly + router
+        swap + delete-confirm modal + i18n sweep + manual QA + old code deletion. — ready
+        for PR (push pending). 14 commits on feature/phase2d-config-view across the 11
+        plan tasks + 3 review-round fix commits (2 rounds of pre-push toolkit dispatch).
+        Final state: live-preview component (mutation-tested no-emit contract), 3-pane
+        view, data loading with partial-failure OR-gate (improves on legacy single-gate),
+        page list + card + delete-confirm wiring, 23 view-level vitest cases (incl.
+        mutation tests for save-disable cascade / delete-cancel no-op / setButton
+        selectedIdx snapshot, TOCTOU snapshot, save-failure + partial-load + pluralization
+        coverage, all toast contracts pinned), 3 added AstrosConfirmModal tests for the
+        new `messageParams` branch. Pre-push toolkit caught and fixed: vue-i18n intlify
+        warning from double-`$t()` (added `messageParams` to AstrosConfirmModal —
+        backward compatible), TOCTOU on pendingDeleteName (snapshot {idx,name} at request
+        time as one atomic ref), `Record<string, unknown>` too loose on the new prop
+        (tightened to `string | number`), invariant-warn on out-of-range delete idx
+        matches the existing console.warn pattern, hoisted toast spies so tests can
+        assert error() / success() were called. Deferred to followups: sticky loadFailed
+        banner with Retry (UX), useToast dedupe/queue (project-wide, pre-existing),
+        playlistStore partial-failure cleanup (pre-existing in a different store).
 - [x] **Phase 3 — Shared `AstrosMobileRemote` component**: Build the handheld UI in Vue;
       consume it from Phase 2's preview rail in compact mode. — shipped 2026-05-21 via
       PR #92 (merge `547a7af`). Three pre-push toolkit rounds; 39 PR-added tests;

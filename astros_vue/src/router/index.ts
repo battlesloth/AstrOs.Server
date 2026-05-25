@@ -44,7 +44,7 @@ const router = createRouter({
     {
       path: '/remote',
       name: 'remote',
-      component: () => import('../views/RemoteView.vue'),
+      component: () => import('../views/RemoteControlConfigView.vue'),
     },
     {
       path: '/modules',

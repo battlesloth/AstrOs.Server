@@ -433,24 +433,6 @@
       "down": "{location} disconnected"
     }
   },
-  "remote_view": {
-    "title": "Remote Control",
-    "save": "Save",
-    "page": "Page",
-    "backward": "Previous page",
-    "forward": "Next page",
-    "save_success": "Remote control configuration saved successfully.",
-    "save_error": "Failed to save remote control configuration.",
-    "load_error": "Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.",
-    "script_select": "Script selection",
-    "tab_scripts": "Script",
-    "tab_playlists": "Playlist",
-    "search_placeholder": "Search...",
-    "type_script": "SCR",
-    "type_playlist": "PL",
-    "button_label": "Button {number}",
-    "button_select": "Button assignment"
-  },
   "mobile_remote": {
     "region_label": "Mobile remote",
     "connected_label": "Connected",
@@ -604,6 +586,24 @@
       "duplicate": "Duplicate",
       "delete": "Delete",
       "renameInput": "Page name"
+    },
+    "preview": {
+      "bezel_label": "Live preview"
+    },
+    "view": {
+      "title": "Remote Control Configuration",
+      "save": "Save",
+      "unsaved": "Unsaved",
+      "loading": "Loading remote control configuration…",
+      "page_count": "{count} page | {count} pages",
+      "action_count": "{count} action | {count} actions",
+      "load_error": "Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.",
+      "save_success": "Remote control configuration saved successfully.",
+      "save_error": "Failed to save remote control configuration."
+    },
+    "deleteModal": {
+      "title": "Delete page",
+      "message": "Delete \"{name}\"? Buttons on this page will be lost."
     }
   }
 }
