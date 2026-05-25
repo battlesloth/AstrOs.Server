@@ -48,8 +48,10 @@ vi.mock('@/api/apiService', () => ({
 // Typed signature mirrors `useToast()`'s `(msg: string) => void` so a
 // typo'd `toHaveBeenCalledWith(123)` fails at type-check instead of
 // runtime.
-const toastSuccess = vi.fn<(msg: string) => void>();
-const toastError = vi.fn<(msg: string) => void>();
+const { toastSuccess, toastError } = vi.hoisted(() => ({
+  toastSuccess: vi.fn<(msg: string) => void>(),
+  toastError: vi.fn<(msg: string) => void>(),
+}));
 vi.mock('@/composables/useToast', () => ({
   useToast: () => ({ success: toastSuccess, error: toastError }),
 }));
