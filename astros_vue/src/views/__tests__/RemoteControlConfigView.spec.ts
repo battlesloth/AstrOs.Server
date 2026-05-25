@@ -135,6 +135,96 @@ function resetMocks() {
   mockedApiPut.mockClear();
 }
 
+// Module-scoped failure-path helper — used by the initial-loading-state
+// suite (testing the loading→error transition) AND the partial-load suite
+// (testing each individual endpoint failure). Defined at module scope so
+// both consumers can share it.
+function mountWithFailingEndpoint(failingUrlMatch: string) {
+  const originalImpl = mockedApiGet.getMockImplementation();
+  mockedApiGet.mockImplementation((url: string) => {
+    if (url.includes(failingUrlMatch)) return Promise.reject(new Error('network'));
+    // The remote-config endpoint expects a JSON-parseable string body; the
+    // other endpoints expect an array. Match both shapes.
+    if (url.includes('remoteConfig')) {
+      return Promise.resolve(
+        JSON.stringify([
+          {
+            id: 'page-1',
+            name: 'Page 1',
+            button1: { id: '0', name: 'Button 1', type: 'none' },
+            button2: { id: '0', name: 'Button 2', type: 'none' },
+            button3: { id: '0', name: 'Button 3', type: 'none' },
+            button4: { id: '0', name: 'Button 4', type: 'none' },
+            button5: { id: '0', name: 'Button 5', type: 'none' },
+            button6: { id: '0', name: 'Button 6', type: 'none' },
+            button7: { id: '0', name: 'Button 7', type: 'none' },
+            button8: { id: '0', name: 'Button 8', type: 'none' },
+            button9: { id: '0', name: 'Button 9', type: 'none' },
+          },
+        ]),
+      );
+    }
+    return Promise.resolve([]);
+  });
+  return { originalImpl };
+}
+
+describe('RemoteControlConfigView — initial loading state', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it('renders the loading panel and NOT the editor body before Promise.all resolves', () => {
+    // Mount but do NOT await flushPromises — the loads are still in flight.
+    const wrapper = mountView();
+
+    expect(wrapper.find('[data-testid="initial-loading-state"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="pane-page-list"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="pane-grid"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="pane-preview"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="load-error-state"]').exists()).toBe(false);
+  });
+
+  it('Save is disabled during the initial-loading window (even if isDirty somehow flips)', async () => {
+    const wrapper = mountView();
+    // Don't flush yet. Manually flip isDirty (mimicking a hypothetical
+    // mutation pathway during the load window) — Save must STILL be
+    // disabled because isInitialLoading=true is the dominant gate.
+    const store = useRemoteControlStore();
+    store.isDirty = true;
+
+    const saveBtn = wrapper.get('[data-testid="save-config"]');
+    expect(saveBtn.attributes('disabled')).toBeDefined();
+  });
+
+  it('transitions from loading → editor after all three loads succeed', async () => {
+    const wrapper = mountView();
+    expect(wrapper.find('[data-testid="initial-loading-state"]').exists()).toBe(true);
+
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="initial-loading-state"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="pane-page-list"]').exists()).toBe(true);
+  });
+
+  it('transitions from loading → error banner if any load fails', async () => {
+    const { originalImpl } = mountWithFailingEndpoint('remoteConfig');
+
+    try {
+      const wrapper = mountView();
+      expect(wrapper.find('[data-testid="initial-loading-state"]').exists()).toBe(true);
+
+      await flushPromises();
+
+      expect(wrapper.find('[data-testid="initial-loading-state"]').exists()).toBe(false);
+      expect(wrapper.find('[data-testid="load-error-state"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="pane-page-list"]').exists()).toBe(false);
+    } finally {
+      if (originalImpl) mockedApiGet.mockImplementation(originalImpl);
+    }
+  });
+});
+
 describe('RemoteControlConfigView — header counts + dirty signal', () => {
   beforeEach(() => {
     resetMocks();
@@ -483,36 +573,6 @@ describe('RemoteControlConfigView — partial load failure', () => {
   beforeEach(() => {
     resetMocks();
   });
-
-  function mountWithFailingEndpoint(failingUrlMatch: string) {
-    const originalImpl = mockedApiGet.getMockImplementation();
-    mockedApiGet.mockImplementation((url: string) => {
-      if (url.includes(failingUrlMatch)) return Promise.reject(new Error('network'));
-      // The remote-config endpoint expects a JSON-parseable string body; the
-      // other endpoints expect an array. Match both shapes.
-      if (url.includes('remoteConfig')) {
-        return Promise.resolve(
-          JSON.stringify([
-            {
-              id: 'page-1',
-              name: 'Page 1',
-              button1: { id: '0', name: 'Button 1', type: 'none' },
-              button2: { id: '0', name: 'Button 2', type: 'none' },
-              button3: { id: '0', name: 'Button 3', type: 'none' },
-              button4: { id: '0', name: 'Button 4', type: 'none' },
-              button5: { id: '0', name: 'Button 5', type: 'none' },
-              button6: { id: '0', name: 'Button 6', type: 'none' },
-              button7: { id: '0', name: 'Button 7', type: 'none' },
-              button8: { id: '0', name: 'Button 8', type: 'none' },
-              button9: { id: '0', name: 'Button 9', type: 'none' },
-            },
-          ]),
-        );
-      }
-      return Promise.resolve([]);
-    });
-    return { originalImpl };
-  }
 
   it('disables Save and fires load-error toast when scripts load fails', async () => {
     // Scripts endpoint is the only one that includes "scripts/all" and NOT

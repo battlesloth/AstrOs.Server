@@ -17,7 +17,8 @@
 ### 1. First load — no prior config
 
 1. Open a fresh browser session at `/remote` (clear stored config server-side first, if needed)
-2. **Expected:** A single page named "Page 1" renders in the left rail; all 9 button cards show "Configure →" (empty state); right rail shows the bezel with the embedded compact remote, also empty.
+2. **Expected (load window):** A centered "Loading remote control configuration…" panel with a spinner. The 3-pane editor (page list, button grid, live preview) is NOT yet in the DOM. Save button is disabled.
+3. **Expected (after loads resolve):** A single page named "Page 1" renders in the left rail; all 9 button cards show "Configure →" (empty state); right rail shows the bezel with the embedded compact remote, also empty.
 3. **Expected:** Header shows "1 page · 0 actions". Unsaved badge IS visible (fresh-seed dirty flag from store).
 4. **Expected:** Save button is enabled.
 5. Click Save.

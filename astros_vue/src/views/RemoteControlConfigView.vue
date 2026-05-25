@@ -25,30 +25,45 @@ const { success, error } = useToast();
 
 const { remoteControlPages, selectedIdx, isDirty } = storeToRefs(remoteControlStore);
 
-// Flipped true if the remote-config GET fails on mount; gates the Save
-// button to prevent overwriting unloaded data.
+// Three mount states gate the template:
+//   isInitialLoading=true   → loading panel (initial; until Promise.all resolves)
+//   loadFailed=true         → error banner (any of three loads failed)
+//   neither                 → 3-pane editor
+// Both flags start in their "block editing" position so a user can never
+// interact with empty/stale Pinia state during the initial-load window —
+// e.g., clicking Add against a still-empty pages array, only to have the
+// successful load later REPLACE the array (silently dropping the interim
+// add) or the failed load surface a banner that hides the lost mutation.
+const isInitialLoading = ref(true);
 const loadFailed = ref(false);
 const scripts = ref<EditorListItem[]>([]);
 const playlists = ref<EditorListItem[]>([]);
 
 onMounted(async () => {
-  const [scriptsResult, playlistsResult, remoteResult] = await Promise.all([
-    scriptStore.loadScripts(),
-    playlistStore.loadData(),
-    remoteControlStore.loadRemoteControl(),
-  ]);
+  try {
+    const [scriptsResult, playlistsResult, remoteResult] = await Promise.all([
+      scriptStore.loadScripts(),
+      playlistStore.loadData(),
+      remoteControlStore.loadRemoteControl(),
+    ]);
 
-  // ANY of the three loads failing disables editing — partial state would let
-  // the user save a config that references scripts/playlists they couldn't
-  // see in the editor dropdowns.
-  if (!scriptsResult.success || !playlistsResult.success || !remoteResult.success) {
-    loadFailed.value = true;
-    error(t('remote_control_config.view.load_error'));
-    return;
+    // ANY of the three loads failing disables editing — partial state would
+    // let the user save a config that references scripts/playlists they
+    // couldn't see in the editor dropdowns.
+    if (!scriptsResult.success || !playlistsResult.success || !remoteResult.success) {
+      loadFailed.value = true;
+      error(t('remote_control_config.view.load_error'));
+      return;
+    }
+
+    scripts.value = scriptStore.scripts.map((s) => ({ id: s.id, name: s.scriptName }));
+    playlists.value = playlistStore.playlists.map((p) => ({ id: p.id, name: p.playlistName }));
+  } finally {
+    // Regardless of success or failure, the load window is closed — clear
+    // the initial-loading state so the template moves to either the editor
+    // or the error banner.
+    isInitialLoading.value = false;
   }
-
-  scripts.value = scriptStore.scripts.map((s) => ({ id: s.id, name: s.scriptName }));
-  playlists.value = playlistStore.playlists.map((p) => ({ id: p.id, name: p.playlistName }));
 });
 
 async function saveConfig() {
@@ -174,17 +189,37 @@ const pageCount = computed(() => remoteControlPages.value.length);
           <AstrosWriteButton
             data-testid="save-config"
             class="btn btn-primary w-24"
-            :disabled="loadFailed || !isDirty"
+            :disabled="isInitialLoading || loadFailed || !isDirty"
             @click="saveConfig"
           >
             {{ t('remote_control_config.view.save') }}
           </AstrosWriteButton>
         </div>
 
+        <!-- Initial-loading panel: blocks editor mount until all three
+             loads resolve, so a user can't mutate empty/stale Pinia state
+             during the load window (e.g., click Add against [] only to have
+             the successful load replace the array). -->
+        <div
+          v-if="isInitialLoading"
+          class="flex flex-1 items-center justify-center p-8"
+          role="status"
+          aria-live="polite"
+          data-testid="initial-loading-state"
+        >
+          <div class="flex items-center gap-3">
+            <span
+              class="loading loading-spinner loading-md"
+              aria-hidden="true"
+            ></span>
+            <span>{{ t('remote_control_config.view.loading') }}</span>
+          </div>
+        </div>
+
         <!-- Load-error banner: replaces the editor body entirely so the user
              can't make unsavable mutations against a half-loaded state. -->
         <div
-          v-if="loadFailed"
+          v-else-if="loadFailed"
           class="flex flex-1 items-center justify-center p-8"
           role="alert"
           data-testid="load-error-state"

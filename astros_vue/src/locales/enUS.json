@@ -594,6 +594,7 @@
       "title": "Remote Control Configuration",
       "save": "Save",
       "unsaved": "Unsaved",
+      "loading": "Loading remote control configuration…",
       "page_count": "{count} page | {count} pages",
       "action_count": "{count} action | {count} actions",
       "load_error": "Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.",
