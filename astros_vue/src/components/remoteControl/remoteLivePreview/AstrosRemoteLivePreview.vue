@@ -20,6 +20,7 @@ function noopPanic() {}
 <template>
   <div
     class="astros-remote-live-preview"
+    role="region"
     :aria-label="t('remote_control_config.preview.bezel_label')"
     data-testid="preview-bezel"
   >
