@@ -547,7 +547,7 @@ describe('createFlashProgressThrottle', () => {
 describe('DEFAULT_STREAMER_CONFIG (production wiring)', () => {
   it('pins the four production-tuned values against silent regression to TRANSPORT_DEFAULTS', () => {
     expect(DEFAULT_STREAMER_CONFIG).toEqual({
-      windowSize: 1,
+      windowSize: 2,
       ackTimeoutMs: 5_000,
       maxRetriesPerChunk: 3,
       transferTimeoutMs: 600_000,
