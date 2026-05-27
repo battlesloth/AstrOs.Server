@@ -1724,7 +1724,7 @@ describe('FlashJobOrchestrator', () => {
       );
     }
 
-    it('happy path: streamer succeeds → FW_DEPLOY_BEGIN sent → controllers transition to Sending → FW_PROGRESS drives Sending→Verifying→Rebooting → FW_DEPLOY_DONE all OK transitions to VersionConfirmed', async () => {
+    it('happy path: streamer succeeds → FW_DEPLOY_BEGIN sent → controllers transition to Sending → FW_PROGRESS drives Sending→Verifying→Flashing→Rebooting → FW_DEPLOY_DONE all OK transitions to VersionConfirmed', async () => {
       const fx = setupHappyPath({ clock: fakeClock });
       const armed = await startAndArmDeploy(fx);
 
@@ -1751,11 +1751,11 @@ describe('FlashJobOrchestrator', () => {
         'controller-b',
       ]);
 
-      // Drive each controller through Sending→Verifying→Rebooting via
+      // Drive each controller through Sending→Verifying→Flashing→Rebooting via
       // FW_PROGRESS. Each stage transition forces an emit (force=true);
       // mid-stage progress would throttle (covered in a separate test).
       for (const controllerId of armed.targets) {
-        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
           fx.bus.deliverDeployEvent(armed.transferId, {
             kind: 'progress',
             payload: {
@@ -1770,9 +1770,9 @@ describe('FlashJobOrchestrator', () => {
         }
       }
 
-      // 4 baseline emits + 2 controllers * 2 stage transitions = 8 emits.
+      // 4 baseline emits + 2 controllers * 3 stage transitions = 10 emits.
       const updatesPreDone = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate);
-      expect(updatesPreDone).toHaveLength(8);
+      expect(updatesPreDone).toHaveLength(10);
 
       // Deliver FW_DEPLOY_DONE with all OK outcomes.
       fx.bus.deliverDeployEvent(armed.transferId, {
@@ -1850,11 +1850,11 @@ describe('FlashJobOrchestrator', () => {
       const fx = setupHappyPath({ clock: fakeClock });
       const armed = await startAndArmDeploy(fx);
 
-      // Drive each controller through Sending→Verifying→Rebooting via
+      // Drive each controller through Sending→Verifying→Flashing→Rebooting via
       // FW_PROGRESS so the terminal transition (Rebooting→VersionConfirmed
       // for OK; any-non-terminal→Failed for FAILED) is FSM-legal.
       for (const controllerId of armed.targets) {
-        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
           fx.bus.deliverDeployEvent(armed.transferId, {
             kind: 'progress',
             payload: {
@@ -2047,7 +2047,7 @@ describe('FlashJobOrchestrator', () => {
       // Advance controllers to Rebooting so the Rebooting→VersionConfirmed
       // terminal transition is FSM-legal.
       for (const controllerId of armed.targets) {
-        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
           fx.bus.deliverDeployEvent(armed.transferId, {
             kind: 'progress',
             payload: {
@@ -2179,10 +2179,10 @@ describe('FlashJobOrchestrator', () => {
       fx.streamerControls.resolve(makeTransferResult(run.spec));
       const result = await startPromise;
 
-      // Drive each controller through Sending→Verifying→Rebooting so the
+      // Drive each controller through Sending→Verifying→Flashing→Rebooting so the
       // FW_DEPLOY_DONE Rebooting→VersionConfirmed transition is FSM-legal.
       for (const controllerId of result.targets) {
-        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
           fx.bus.deliverDeployEvent(result.transferId, {
             kind: 'progress',
             payload: {
@@ -2250,7 +2250,7 @@ describe('FlashJobOrchestrator', () => {
       // Walk both controllers to Rebooting so the OK controller's terminal
       // transition is legal; the FAILED outcome is legal from any non-terminal.
       for (const controllerId of result.targets) {
-        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
           fx.bus.deliverDeployEvent(result.transferId, {
             kind: 'progress',
             payload: {
@@ -2379,7 +2379,7 @@ describe('FlashJobOrchestrator', () => {
       const result = await startPromise;
       // Drive controllers terminal to arm the (5s) timer.
       for (const controllerId of result.targets) {
-        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
           fx.bus.deliverDeployEvent(result.transferId, {
             kind: 'progress',
             payload: {
@@ -3230,12 +3230,12 @@ describe('FlashJobOrchestrator', () => {
       const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
 
       try {
-        // Drive controllers through Verifying → Rebooting so the
+        // Drive controllers through Verifying → Flashing → Rebooting so the
         // FW_DEPLOY_DONE results are accepted by the FSM as terminal
         // transitions. Without the pre-progress, the OK outcome would
         // trip the LEGAL_NEXT_STAGES guard.
         for (const controllerId of armed.targets) {
-          for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+          for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
             fx.bus.deliverDeployEvent(armed.transferId, {
               kind: 'progress',
               payload: {
@@ -3500,7 +3500,7 @@ describe('FlashJobOrchestrator', () => {
 
       // Walk both controllers to Rebooting then deliver FW_DEPLOY_DONE all OK.
       for (const controllerId of armed.targets) {
-        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
           fx.bus.deliverDeployEvent(armed.transferId, {
             kind: 'progress',
             payload: {
@@ -3663,7 +3663,7 @@ describe('FlashJobOrchestrator', () => {
       const armed = await startPromise;
 
       for (const controllerId of armed.targets) {
-        for (const stage of [FwStage.Verifying, FwStage.Rebooting]) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
           fx.bus.deliverDeployEvent(armed.transferId, {
             kind: 'progress',
             payload: {

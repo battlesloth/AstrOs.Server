@@ -211,9 +211,9 @@ export interface ScriptDeployControllerOpts {
   // Required when outcome === 'FAILED'. Validated at scriptDeploy() call time.
   error?: string;
   // FW_PROGRESS stages to emit for this controller before FW_DEPLOY_DONE.
-  // Default [Sending, Verifying, Rebooting]. Terminal stages (VersionConfirmed
-  // / Failed) come from FW_DEPLOY_DONE, not a final FW_PROGRESS, so they
-  // should NOT appear here.
+  // Default [Sending, Verifying, Flashing, Rebooting]. Terminal stages
+  // (VersionConfirmed / Failed) come from FW_DEPLOY_DONE, not a final
+  // FW_PROGRESS, so they should NOT appear here.
   stages?: FwStage[];
 }
 
@@ -563,7 +563,12 @@ export class StubMaster {
         outcome: c.outcome,
         finalVersion: c.finalVersion ?? '',
         error: c.error ?? '',
-        stages: c.stages ?? [FwStage.Sending, FwStage.Verifying, FwStage.Rebooting],
+        stages: c.stages ?? [
+          FwStage.Sending,
+          FwStage.Verifying,
+          FwStage.Flashing,
+          FwStage.Rebooting,
+        ],
       };
     });
     this.scriptDeployCfg = { controllers };

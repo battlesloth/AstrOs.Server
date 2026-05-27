@@ -1178,6 +1178,7 @@ export class FlashJobOrchestrator {
           | FwStage.UploadingToMaster
           | FwStage.Sending
           | FwStage.Verifying
+          | FwStage.Flashing
           | FwStage.Rebooting,
         {
           bytesSent: payload.bytesSent,

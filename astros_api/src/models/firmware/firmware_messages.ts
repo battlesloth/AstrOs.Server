@@ -22,6 +22,7 @@ export enum FwStage {
   UploadingToMaster = 'UPLOADING_TO_MASTER',
   Sending = 'SENDING',
   Verifying = 'VERIFYING',
+  Flashing = 'FLASHING',
   Rebooting = 'REBOOTING',
   VersionConfirmed = 'VERSION_CONFIRMED',
   Failed = 'FAILED',
