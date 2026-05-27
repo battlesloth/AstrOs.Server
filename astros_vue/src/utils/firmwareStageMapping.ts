@@ -20,6 +20,8 @@ export function mapServerStageToUiStage(stage: ServerFwStage): FirmwareStage | n
       return 'transfer';
     case 'VERIFYING':
       return 'verify';
+    case 'FLASHING':
+      return 'flash';
     case 'REBOOTING':
       return 'reboot';
     case 'QUEUED':
@@ -54,6 +56,7 @@ export function controllerStatePillKind(state: ControllerFlashState): FirmwareSt
     case 'UPLOADING_TO_MASTER':
     case 'SENDING':
     case 'VERIFYING':
+    case 'FLASHING':
     case 'REBOOTING':
       return 'updating';
     case 'VERSION_CONFIRMED':

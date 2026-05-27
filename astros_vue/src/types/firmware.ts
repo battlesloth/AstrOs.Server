@@ -226,6 +226,7 @@ export type ServerFwStage =
   | 'UPLOADING_TO_MASTER'
   | 'SENDING'
   | 'VERIFYING'
+  | 'FLASHING'
   | 'REBOOTING'
   | 'VERSION_CONFIRMED'
   | 'FAILED';
@@ -261,7 +262,7 @@ export type SlotId = Exclude<`${Location}`, `${Location.UNKNOWN}`>;
 export type ControllerFlashState =
   | {
       controllerId: string;
-      stage: 'QUEUED' | 'UPLOADING_TO_MASTER' | 'SENDING' | 'VERIFYING' | 'REBOOTING';
+      stage: 'QUEUED' | 'UPLOADING_TO_MASTER' | 'SENDING' | 'VERIFYING' | 'FLASHING' | 'REBOOTING';
       bytesSent?: number;
       totalBytes?: number;
     }
@@ -276,7 +277,7 @@ export type ControllerFlashState =
 export type ControllerFlashStateBySlot =
   | {
       controllerId: SlotId;
-      stage: 'QUEUED' | 'UPLOADING_TO_MASTER' | 'SENDING' | 'VERIFYING' | 'REBOOTING';
+      stage: 'QUEUED' | 'UPLOADING_TO_MASTER' | 'SENDING' | 'VERIFYING' | 'FLASHING' | 'REBOOTING';
       bytesSent?: number;
       totalBytes?: number;
     }
