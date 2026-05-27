@@ -1,6 +1,6 @@
 import type { FirmwarePhase, FirmwareStage } from '@/types/firmware';
 
-export const FIRMWARE_STAGES = ['download', 'transfer', 'flash', 'verify', 'reboot'] as const;
+export const FIRMWARE_STAGES = ['download', 'transfer', 'verify', 'flash', 'reboot'] as const;
 
 export type StageRowState = 'idle' | 'done' | 'current' | 'failed';
 
