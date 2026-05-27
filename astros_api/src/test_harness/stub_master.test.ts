@@ -481,9 +481,9 @@ describe('StubMaster (PTY-backed)', () => {
         }
 
         // Frame 8: FW_DEPLOY_DONE with both controller outcomes
-        const f6 = requireFrame(frames, 8);
-        expect(f6.type).toBe(SerialMessageType.FW_DEPLOY_DONE);
-        const done = handler.handleFwDeployDone(f6.data);
+        const doneFrame = requireFrame(frames, 8);
+        expect(doneFrame.type).toBe(SerialMessageType.FW_DEPLOY_DONE);
+        const done = handler.handleFwDeployDone(doneFrame.data);
         expect(done.type).toBe(SerialWorkerResponseType.FW_DEPLOY_DONE);
         if (done.type === SerialWorkerResponseType.FW_DEPLOY_DONE) {
           expect(done.payload.transferId).toBe(XFER);
