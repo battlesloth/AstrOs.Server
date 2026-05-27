@@ -2134,6 +2134,102 @@ describe('FlashJobOrchestrator', () => {
       // No deploy subscriber attached (we threw before subscribe).
       expect(fx.bus.deploySubscribers.size).toBe(0);
     });
+
+    it('M4 deploy: Sending → Verifying → Flashing → Failed(flash_not_implemented) — single controller walks FSM cleanly and emits in order', async () => {
+      // M4 firmware writes to flash locally and reports failure rather than
+      // transitioning to Rebooting. The sequence stops at Flashing because the
+      // M4 OtaWriter placeholder returns flash_not_implemented instead of
+      // calling esp_ota_end/esp_restart. Flashing→Failed is a legal FSM edge
+      // (flash_job_state_machine.ts line 29), so no protocol_violation fires.
+      const fx = setupHappyPath({
+        clock: fakeClock,
+        controllers: [{ id: 'pad1', variant: 'lolin_d32_pro' }],
+      });
+      const armed = await startAndArmDeploy(fx);
+
+      // Post-arm: controller-pad1 is at Sending (startAndArmDeploy transitions
+      // UploadingToMaster→Sending for all targets after streamer success).
+      expect(fx.orchestrator.getCurrentJob()?.controllers[0].stage).toBe(FwStage.Sending);
+
+      // Drive Sending→Verifying→Flashing via FW_PROGRESS (M4 stops here —
+      // no Rebooting stage because the OtaWriter never calls esp_ota_end).
+      for (const stage of [FwStage.Verifying, FwStage.Flashing]) {
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'progress',
+          payload: {
+            transferId: armed.transferId,
+            controllerId: 'pad1',
+            stage,
+            bytesSent: 0,
+            totalBytes: 0,
+            detail: '',
+          },
+        });
+      }
+
+      // Verify intermediate state: controller reached Flashing before done.
+      expect(fx.orchestrator.getCurrentJob()?.controllers[0].stage).toBe(FwStage.Flashing);
+
+      // FW_DEPLOY_DONE with FAILED outcome — M4 placeholder reports
+      // flash_not_implemented instead of a successful reboot handshake.
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [
+            {
+              controllerId: 'pad1',
+              outcome: 'FAILED',
+              finalVersion: '',
+              error: 'flash_not_implemented',
+            },
+          ],
+        },
+      });
+
+      // Terminal state: controller is Failed with the placeholder error.
+      const job = fx.orchestrator.getCurrentJob();
+      expect(job).not.toBeNull();
+      const controllers = job?.controllers ?? [];
+      expect(controllers).toHaveLength(1);
+      const controller = controllers[0];
+      expect(controller.stage).toBe(FwStage.Failed);
+      if (controller.stage === FwStage.Failed) {
+        expect(controller.error).toBe('flash_not_implemented');
+      }
+
+      // flashControllerResult emitted for the terminal transition (bypasses throttle).
+      const results = controllerResults(fx.emitWs);
+      expect(results).toHaveLength(1);
+      expect(results[0].jobId).toBe(armed.jobId);
+      expect(results[0].controller.stage).toBe(FwStage.Failed);
+      if (results[0].controller.stage === FwStage.Failed) {
+        expect(results[0].controller.error).toBe('flash_not_implemented');
+      }
+
+      // WS event stage sequence: UploadingToMaster → Sending emits from arm;
+      // then Verifying + Flashing from FW_PROGRESS; then Failed from done.
+      const updates = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate);
+      const updateStages = updates.map((f) => (f as { data: ControllerFlashState }).data.stage);
+      // Verify the sequence is exactly UploadingToMaster → Sending → Verifying → Flashing (in order).
+      expect(updateStages).toEqual([
+        FwStage.UploadingToMaster,
+        FwStage.Sending,
+        FwStage.Verifying,
+        FwStage.Flashing,
+      ]);
+      // Terminal Failed arrived via flashControllerResult, not flashControllerUpdate.
+      const resultStages = results.map((r) => r.controller.stage);
+      expect(resultStages[resultStages.length - 1]).toBe(FwStage.Failed);
+
+      // job-level: mixed-terminal (just Failed) counts as 'done' —
+      // flashJobDone fires, flashJobFailed does NOT (no protocol violation).
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(1);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+
+      // Deploy subscriber disposed after done.
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+    });
   });
 
   describe('reboot timer + heartbeat', () => {
