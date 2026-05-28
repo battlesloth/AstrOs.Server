@@ -7,14 +7,17 @@ import {
 import type { ControllerFlashState, ServerFwStage } from '@/types/firmware';
 
 function state(stage: ServerFwStage): ControllerFlashState {
-  // The discriminated union requires finalVersion on VERSION_CONFIRMED
-  // and error on FAILED. Provide test placeholders so the helper can
-  // build a valid state for any stage.
+  // The discriminated union requires finalVersion on VERSION_CONFIRMED,
+  // error on FAILED, and pendingDetail on FINALIZING. Provide test
+  // placeholders so the helper can build a valid state for any stage.
   if (stage === 'VERSION_CONFIRMED') {
     return { controllerId: 'body', stage, finalVersion: 'v1.0.0-test' };
   }
   if (stage === 'FAILED') {
     return { controllerId: 'body', stage, error: 'test:error' };
+  }
+  if (stage === 'FINALIZING') {
+    return { controllerId: 'body', stage, pendingDetail: 'awaiting_post_reboot_version' };
   }
   return { controllerId: 'body', stage };
 }
