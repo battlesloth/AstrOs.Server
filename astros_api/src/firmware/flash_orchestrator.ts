@@ -494,8 +494,8 @@ export class FlashJobOrchestrator {
   private readonly throttleWindowMs: number;
   // Phase C: timeout for resolving FwStage.Finalizing rows after
   // FW_DEPLOY_DONE arrives with PENDING. Armed in handleDeployDone,
-  // cleared by notifyMasterHeartbeat or by its own callback. Disposed
-  // alongside rebootTimer in releaseLock.
+  // cleared by notifyMasterHeartbeat or by its own callback. Disposal
+  // in releaseLock is added in T7 (see plan).
   private readonly finalizeTimeoutMs: number;
 
   private currentJob: FlashJobState | null = null;

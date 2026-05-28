@@ -2356,6 +2356,28 @@ describe('FlashJobOrchestrator', () => {
       // finalizeTimer is armed (one outstanding fake-timer).
       expect(vi.getTimerCount()).toBe(1);
 
+      // Mutation-resistance (per CLAUDE.md feedback_mutation_test_defensive_features):
+      // flashControllerResult is SUPPRESSED for the PENDING→Finalizing transition
+      // (the Finalizing stage is non-terminal; the final transition emit comes
+      // from completePendingResolution). The padawan's OK→VersionConfirmed
+      // transition is terminal and DOES emit. Reverting the suppression guard
+      // at flash_orchestrator.ts ~line 1286 should make this test fail.
+      const resultFrames = emittedFrames(fx.emitWs, TransmissionType.flashControllerResult);
+      const masterResult = resultFrames.find(
+        (f) =>
+          (f.data as { controller: ControllerFlashState }).controller.controllerId === 'master-esp',
+      );
+      expect(masterResult).toBeUndefined();
+      const padawanResult = resultFrames.find(
+        (f) =>
+          (f.data as { controller: ControllerFlashState }).controller.controllerId ===
+          'padawan-esp',
+      );
+      expect(padawanResult).toBeDefined();
+      expect((padawanResult!.data as { controller: ControllerFlashState }).controller.stage).toBe(
+        FwStage.VersionConfirmed,
+      );
+
       // Drain the timer so afterEach's useRealTimers() doesn't complain about
       // leaked timers firing against restored clock state.
       advance(1_001);
