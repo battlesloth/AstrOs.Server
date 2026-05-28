@@ -654,7 +654,7 @@ describe('Serial Message Handler Tests', () => {
     expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
   });
 
-  it('accepts PENDING outcome with empty finalVersion and non-empty error', () => {
+  it('handle FW_DEPLOY_DONE accepts PENDING outcome with empty finalVersion and non-empty error', () => {
     // Firmware-side contract: master self-flash success row reports PENDING
     // with finalVersion="" and error="awaiting_post_reboot_version" per
     // AstrOs.ESP OtaForwarder::handleLocalFlashResult.
@@ -680,7 +680,7 @@ describe('Serial Message Handler Tests', () => {
     expect(result.payload.results[1].outcome).toBe('OK');
   });
 
-  it('rejects PENDING result with non-empty finalVersion (firmware contract violation)', () => {
+  it('handle FW_DEPLOY_DONE rejects PENDING result with non-empty finalVersion (firmware contract violation)', () => {
     // Cross-field invariant: PENDING rows are emitted BEFORE the master
     // reboots, so finalVersion must be empty. A non-empty finalVersion
     // here means either a firmware regression or a corrupt frame; reject

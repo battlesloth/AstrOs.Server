@@ -116,7 +116,7 @@ export interface FwDeployDoneResult {
   controllerId: string;
   outcome: 'OK' | 'FAILED' | 'PENDING';
   finalVersion: string;
-  error: string; // empty string when outcome === 'OK'; populated for FAILED; firmware marker for PENDING
+  error: string; // empty string when outcome === 'OK'; populated for FAILED; firmware sentinel for PENDING (e.g. "awaiting_post_reboot_version")
 }
 
 export interface FwDeployDone {

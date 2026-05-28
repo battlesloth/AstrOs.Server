@@ -240,6 +240,8 @@ interface AutoAckUploadCfg {
 
 interface ScriptDeployControllerCfg {
   id: string;
+  // TODO T5: extend to 'OK' | 'FAILED' | 'PENDING' when orchestrator PENDING
+  // branch is added and integration tests need to emit PENDING master rows.
   outcome: 'OK' | 'FAILED';
   finalVersion: string;
   error: string;
