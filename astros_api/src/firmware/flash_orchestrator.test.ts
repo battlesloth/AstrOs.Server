@@ -7,6 +7,7 @@ import {
   FlashOrchestratorError,
   resolveFlashSource,
   type FlashJobFailedData,
+  type FlashJobOrchestratorOpts,
   type FlashOrchestratorWsMessage,
 } from './flash_orchestrator.js';
 import type { Clock, FlashRequest, Streamer } from '../models/firmware/flash_orchestrator.js';
@@ -709,6 +710,10 @@ describe('FlashJobOrchestrator', () => {
     releases?: ReleaseInfo[];
     controllersStoreError?: Error;
     clock?: Clock;
+    // Phase C: forwarded verbatim to FlashJobOrchestrator config so tests
+    // can exercise custom timeouts (e.g. finalizeTimeoutMs for the
+    // PENDING/Finalizing tests) without constructing the orchestrator inline.
+    config?: FlashJobOrchestratorOpts['config'];
   }
 
   function setupHappyPath(opts: SetupOpts = {}) {
@@ -755,6 +760,7 @@ describe('FlashJobOrchestrator', () => {
       emitWs,
       streamerFactory,
       clock: opts.clock ?? realClock,
+      config: opts.config,
     });
 
     return {
@@ -2229,6 +2235,212 @@ describe('FlashJobOrchestrator', () => {
 
       // Deploy subscriber disposed after done.
       expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+    });
+  });
+
+  describe('Phase C: PENDING / Finalizing resolution', () => {
+    // Same fake-timer pattern used by deploy-phase observer and reboot-timer
+    // blocks: vi.useFakeTimers + a counter-backed Clock so setTimeout callbacks
+    // fire deterministically via vi.advanceTimersByTime.
+    let nowMs = 0;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      nowMs = 0;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function advance(ms: number): void {
+      nowMs += ms;
+      vi.advanceTimersByTime(ms);
+    }
+
+    const fakeClock: Clock = {
+      now: () => nowMs,
+      setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms),
+      clearTimeout: (t) => globalThis.clearTimeout(t),
+    };
+
+    // Drives the orchestrator to the deploy-armed point (same as
+    // startAndArmDeploy in the deploy-phase block but scoped locally).
+    async function armDeploy(fx: ReturnType<typeof setupHappyPath>): Promise<{
+      jobId: string;
+      transferId: string;
+      targets: string[];
+    }> {
+      const startPromise = fx.orchestrator.start(fx.request);
+      await vi.waitFor(() => expect(fx.streamerControls.runs.length).toBe(1));
+      const run = fx.streamerControls.runs[0];
+      run.observer.onTransferBegun?.({ transferId: run.spec.transferId, status: 'OK' });
+      fx.streamerControls.resolve(makeTransferResult(run.spec));
+      return startPromise;
+    }
+
+    it('transitions master PENDING row to Finalizing without emitting flashJobDone', async () => {
+      // Two controllers: master (id 'master-esp') and padawan (id 'padawan-esp').
+      // FW_DEPLOY_DONE arrives with master=PENDING and padawan=OK. The deploy
+      // must hold open: master row → Finalizing, padawan row → VersionConfirmed,
+      // no flashJobDone emitted, endedAt undefined, and finalizeTimer armed.
+      const fx = setupHappyPath({
+        clock: fakeClock,
+        controllers: [
+          { id: 'master-esp', variant: 'lolin_d32_pro' },
+          { id: 'padawan-esp', variant: 'lolin_d32_pro' },
+        ],
+        config: { finalizeTimeoutMs: 1_000 },
+      });
+      const armed = await armDeploy(fx);
+
+      // Drive both controllers to Rebooting via FW_PROGRESS so the terminal
+      // transitions in FW_DEPLOY_DONE are FSM-legal.
+      // Rebooting→VersionConfirmed (padawan OK) and Rebooting→Finalizing
+      // (master PENDING) are both legal FSM edges.
+      for (const controllerId of ['master-esp', 'padawan-esp']) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [
+            {
+              controllerId: 'master-esp',
+              outcome: 'PENDING',
+              finalVersion: '',
+              error: 'awaiting_post_reboot_version',
+            },
+            {
+              controllerId: 'padawan-esp',
+              outcome: 'OK',
+              finalVersion: '1.4.0',
+              error: '',
+            },
+          ],
+        },
+      });
+
+      const job = fx.orchestrator.getCurrentJob();
+      expect(job).not.toBeNull();
+      const masterRow = job!.controllers.find((c) => c.controllerId === 'master-esp')!;
+      expect(masterRow.stage).toBe(FwStage.Finalizing);
+      if (masterRow.stage === FwStage.Finalizing) {
+        expect(masterRow.pendingDetail).toBe('awaiting_post_reboot_version');
+      }
+      const padawanRow = job!.controllers.find((c) => c.controllerId === 'padawan-esp')!;
+      expect(padawanRow.stage).toBe(FwStage.VersionConfirmed);
+
+      // Crucial: no flashJobDone yet. The deploy holds open in Finalizing.
+      const doneEmits = emittedFrames(fx.emitWs, TransmissionType.flashJobDone);
+      expect(doneEmits).toHaveLength(0);
+
+      // endedAt is undefined while Finalizing — a late-joining WS client
+      // should still receive the snapshot.
+      expect(job!.endedAt).toBeUndefined();
+
+      // finalizeTimer is armed (one outstanding fake-timer).
+      expect(vi.getTimerCount()).toBe(1);
+
+      // Drain the timer so afterEach's useRealTimers() doesn't complain about
+      // leaked timers firing against restored clock state.
+      advance(1_001);
+    });
+
+    it('finalizeTimer fires (no heartbeat): transitions Finalizing rows to Failed(post_reboot_timeout), emits flashJobDone, releases lock', async () => {
+      const fx = setupHappyPath({
+        clock: fakeClock,
+        controllers: [
+          { id: 'master-esp', variant: 'lolin_d32_pro' },
+          { id: 'padawan-esp', variant: 'lolin_d32_pro' },
+        ],
+        config: { finalizeTimeoutMs: 1_000 },
+      });
+      const armed = await armDeploy(fx);
+
+      // Drive both controllers to Rebooting so terminal transitions are FSM-legal.
+      for (const controllerId of ['master-esp', 'padawan-esp']) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [
+            {
+              controllerId: 'master-esp',
+              outcome: 'PENDING',
+              finalVersion: '',
+              error: 'awaiting_post_reboot_version',
+            },
+            {
+              controllerId: 'padawan-esp',
+              outcome: 'OK',
+              finalVersion: '1.4.0',
+              error: '',
+            },
+          ],
+        },
+      });
+
+      // Pre-fire: no flashJobDone, lock held, timer armed.
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(0);
+      expect(fx.jobLock.isLocked()).toBe(true);
+      expect(vi.getTimerCount()).toBe(1);
+
+      // Fire the timer.
+      advance(1_001);
+
+      // Timer transitions master row to Failed(post_reboot_timeout).
+      const resultFrames = emittedFrames(fx.emitWs, TransmissionType.flashControllerResult);
+      const masterResult = resultFrames.find(
+        (f) =>
+          (f.data as { controller: ControllerFlashState }).controller.controllerId === 'master-esp',
+      );
+      expect(masterResult).toBeDefined();
+      const masterController = (masterResult!.data as { controller: ControllerFlashState })
+        .controller;
+      expect(masterController.stage).toBe(FwStage.Failed);
+      if (masterController.stage === FwStage.Failed) {
+        expect(masterController.error).toBe('post_reboot_timeout');
+      }
+
+      // flashJobDone emitted after timeout resolution.
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(1);
+
+      // Lock released.
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+
+      // No leaked timers.
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 

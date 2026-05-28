@@ -1231,7 +1231,7 @@ export class FlashJobOrchestrator {
     // orchestrator can't know whether the OK entries reflect real outcomes
     // or are a master bug, so reject the lot rather than apply some).
     for (const r of results) {
-      if (r.outcome !== 'OK' && r.outcome !== 'FAILED') {
+      if (r.outcome !== 'OK' && r.outcome !== 'FAILED' && r.outcome !== 'PENDING') {
         this.failDeployPhase(
           'protocol_violation',
           `invalid outcome for controllerId=${r.controllerId}: ${String(r.outcome)}`,
@@ -1239,9 +1239,10 @@ export class FlashJobOrchestrator {
         return;
       }
     }
-    // Apply terminal transitions. Unknown controllerIds drop with a log per
-    // FMI §6 (master might mistakenly include a phantom id; rejecting the
-    // whole job over it would be brittle when the rest is sound).
+    // Apply per-result transitions (OK→VersionConfirmed, PENDING→Finalizing,
+    // FAILED→Failed). Unknown controllerIds drop with a log per FMI §6
+    // (master might mistakenly include a phantom id; rejecting the whole job
+    // over it would be brittle when the rest is sound).
     let updated = this.currentJob.controllers;
     for (const r of results) {
       const target = updated.find((c) => c.controllerId === r.controllerId);
@@ -1256,6 +1257,10 @@ export class FlashJobOrchestrator {
         if (r.outcome === 'OK') {
           next = transitionControllerState(target, FwStage.VersionConfirmed, {
             finalVersion: r.finalVersion,
+          });
+        } else if (r.outcome === 'PENDING') {
+          next = transitionControllerState(target, FwStage.Finalizing, {
+            pendingDetail: r.error,
           });
         } else {
           next = transitionControllerState(target, FwStage.Failed, {
@@ -1272,10 +1277,18 @@ export class FlashJobOrchestrator {
         return;
       }
       updated = updated.map((c) => (c.controllerId === r.controllerId ? next : c));
-      this.safeEmitWs({
-        type: TransmissionType.flashControllerResult,
-        data: { jobId: this.currentJob.jobId, controller: next },
-      });
+      // Emit flashControllerResult only for terminal transitions (OK →
+      // VersionConfirmed, FAILED → Failed). PENDING → Finalizing is
+      // non-terminal; the result arrives later via completePendingResolution
+      // (either heartbeat-confirmed or timed_out). Emitting a Finalizing frame
+      // here would produce a misleading intermediate-terminal frame that
+      // contradicts the contract pinned by the Phase C tests.
+      if (next.stage !== FwStage.Finalizing) {
+        this.safeEmitWs({
+          type: TransmissionType.flashControllerResult,
+          data: { jobId: this.currentJob.jobId, controller: next },
+        });
+      }
     }
     this.currentJob = { ...this.currentJob, controllers: updated };
     // Done is terminal for the deploy phase — drop the subscriber so a
@@ -1297,19 +1310,34 @@ export class FlashJobOrchestrator {
       this.deployUnsubscriber = null;
     }
 
-    // If every controller reached a terminal stage (any mix of
-    // VersionConfirmed and Failed), the job is "done" per c.6a's
-    // `deriveJobLifecycle`. Per-controller failures are local — the
-    // job-wide event is `flashJobDone` even when some controllers failed
-    // (the master still rebooted; we still want to release the lock when
-    // its post-reboot heartbeat arrives). `flashJobFailed` is reserved for
-    // job-wide aborts (set via `abortReason`), distinct from per-controller
-    // `Failed`. Mid-flight stages (Sending/Verifying/Rebooting still
-    // present in `controllers[]`) keep us in `'in_flight'` and the
-    // subscriber would have already been disposed above; in that case we
-    // never armed the timer, which matches the FMI §2 state matrix.
+    // Phase C: if any Finalizing rows exist, deriveJobLifecycle returns
+    // 'in_flight' because Finalizing is non-terminal. Hold the deploy open:
+    // do NOT emit flashJobDone yet. Arm finalizeTimer as the safety fallback;
+    // on fire it transitions Finalizing rows to Failed("post_reboot_timeout").
+    // The primary resolution path is notifyMasterHeartbeat (T6).
+    //
+    // For the no-Finalizing case: if every controller reached a terminal stage
+    // (any mix of VersionConfirmed and Failed), the job is "done" per c.6a's
+    // `deriveJobLifecycle`. Per-controller failures are local — the job-wide
+    // event is `flashJobDone` even when some controllers failed (the master
+    // still rebooted; we still want to release the lock when its post-reboot
+    // heartbeat arrives). `flashJobFailed` is reserved for job-wide aborts
+    // (set via `abortReason`), distinct from per-controller `Failed`.
+    // Mid-flight stages (Sending/Verifying/Rebooting still present in
+    // `controllers[]`) keep us in `'in_flight'` — unusual on FW_DEPLOY_DONE
+    // arrival but possible; subscriber already disposed above.
     const lifecycle = deriveJobLifecycle(this.currentJob);
-    if (lifecycle !== 'done') return;
+    if (lifecycle !== 'done') {
+      const hasFinalizing = this.currentJob.controllers.some((c) => c.stage === FwStage.Finalizing);
+      if (hasFinalizing) {
+        this.finalizeTimer = this.clock.setTimeout(() => {
+          this.finalizeTimer = null;
+          this.completePendingResolution('timed_out');
+        }, this.finalizeTimeoutMs);
+      }
+      // Otherwise still in_flight — nothing further to do.
+      return;
+    }
 
     const jobId = this.currentJob.jobId;
     const endedAt = new Date(this.clock.now()).toISOString();
@@ -1333,6 +1361,67 @@ export class FlashJobOrchestrator {
       this.rebootTimer = null;
       this.releaseLock(jobId);
     }, this.rebootTimeoutMs);
+  }
+
+  // Phase C: single resolution path for Finalizing rows. Called from
+  // notifyMasterHeartbeat (heartbeat-confirmed, version supplied) or from the
+  // finalizeTimer's fire callback (timeout, version absent). Mutates every
+  // Finalizing row to its terminal equivalent, emits flashControllerResult per
+  // mutated row, emits the job-wide flashJobDone, and releases the lock
+  // immediately — no rebootTimer grace period because the resolution signal
+  // (heartbeat or timeout) already settles the master's post-reboot state.
+  //
+  // Overloads enforce at compile time that 'confirmed' always carries a version
+  // string and 'timed_out' never needs one — eliminating the runtime throw path
+  // that would brick the orchestrator if called incorrectly from T6.
+  private completePendingResolution(outcome: 'confirmed', version: string): void;
+  private completePendingResolution(outcome: 'timed_out'): void;
+  private completePendingResolution(outcome: 'confirmed' | 'timed_out', version?: string): void {
+    if (this.currentJob === null) return;
+    const jobId = this.currentJob.jobId;
+
+    // Defuse the fallback timer. The timed_out path nulls finalizeTimer before
+    // calling this method (timer callback does `this.finalizeTimer = null`
+    // before the call), but the heartbeat-confirmed path (T6) calls this while
+    // the timer is still armed. Clear it here so the timer doesn't fire against
+    // a null/new currentJob after releaseLock clears the field.
+    if (this.finalizeTimer !== null) {
+      this.clock.clearTimeout(this.finalizeTimer);
+      this.finalizeTimer = null;
+    }
+
+    const updated: ControllerFlashState[] = [];
+    for (const c of this.currentJob.controllers) {
+      if (c.stage !== FwStage.Finalizing) {
+        updated.push(c);
+        continue;
+      }
+      let next: ControllerFlashState;
+      if (outcome === 'confirmed') {
+        next = transitionControllerState(c, FwStage.VersionConfirmed, {
+          finalVersion: version as string,
+        });
+      } else {
+        next = transitionControllerState(c, FwStage.Failed, {
+          error: 'post_reboot_timeout',
+        });
+      }
+      updated.push(next);
+      this.safeEmitWs({
+        type: TransmissionType.flashControllerResult,
+        data: { jobId, controller: next },
+      });
+    }
+    this.currentJob = { ...this.currentJob, controllers: updated };
+
+    const endedAt = new Date(this.clock.now()).toISOString();
+    this.currentJob = { ...this.currentJob, endedAt };
+    this.phase = 'done';
+    this.safeEmitWs({
+      type: TransmissionType.flashJobDone,
+      data: { jobId, endedAt },
+    });
+    this.releaseLock(jobId);
   }
 
   // Mid-deploy failure entry — `handleDeployEvent` calls this when FW_PROGRESS
