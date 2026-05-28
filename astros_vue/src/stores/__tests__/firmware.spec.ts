@@ -2393,4 +2393,77 @@ describe('firmware store', () => {
       expect(store.downloadPercent).toBeNull();
     });
   });
+
+  describe('Phase C: FINALIZING controller state', () => {
+    it('translates a wire FINALIZING row into a BySlot FINALIZING row with pendingDetail preserved', () => {
+      // Regression pin: buildControllerStatesMap must carry pendingDetail
+      // through the wire→BySlot re-keying. A spread-only implementation
+      // happens to work today, but the explicit case below makes the contract
+      // visible and catches future shape drift if the discriminated union
+      // changes. This test pins both slot-keying and field preservation.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      const job: FlashJobState = {
+        jobId: 'job-finalizing',
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: [
+          {
+            controllerId: BODY_MAC,
+            stage: 'FINALIZING',
+            pendingDetail: 'awaiting_post_reboot_version',
+          },
+        ],
+        startedAt: '2026-05-28T15:00:00Z',
+      };
+      store.applyJobStarted(job);
+
+      const state = store.controllerStates.get('body');
+      expect(state).toBeDefined();
+      expect(state!.stage).toBe('FINALIZING');
+      if (state!.stage === 'FINALIZING') {
+        expect(state!.pendingDetail).toBe('awaiting_post_reboot_version');
+      }
+    });
+
+    it('applyJobFailed records null stage in FailedControllerSummary when the controller was FINALIZING at failure time', () => {
+      // FINALIZING has no UI stage row (mapServerStageToUiStage returns null
+      // for it). applyControllerUpdate skips the currentStage update when the
+      // mapped UI stage is null, so currentStage stays null if the controller
+      // never passed through a UI-visible stage before the job failed.
+      // collectFailedControllers uses currentStage.value at call time, so the
+      // resulting FailedControllerSummary.stage is null — consistent with how
+      // all other null-mapping stages behave. This test is a regression pin.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      store.applyJobStarted({
+        jobId: 'job-finalizing-fail',
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: [
+          {
+            controllerId: BODY_MAC,
+            stage: 'FINALIZING',
+            pendingDetail: 'awaiting_post_reboot_version',
+          },
+        ],
+        startedAt: '2026-05-28T15:00:00Z',
+      });
+
+      // Confirm applyControllerUpdate for FINALIZING does not advance currentStage
+      // (mapServerStageToUiStage returns null for FINALIZING).
+      expect(store.currentStage).toBeNull();
+
+      store.applyJobFailed({
+        jobId: 'job-finalizing-fail',
+        endedAt: '2026-05-28T15:01:00Z',
+        reason: 'aborted',
+        abortReason: 'operator_cancel',
+      });
+
+      const summary = store.failedControllers.find((c) => c.id === 'body');
+      expect(summary).toBeDefined();
+      expect(summary!.stage).toBeNull();
+    });
+  });
 });

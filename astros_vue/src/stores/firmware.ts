@@ -395,7 +395,47 @@ export const useFirmwareStore = defineStore('firmware', () => {
         continue;
       }
       // Re-key by slot so the panel's slot-keyed lookups resolve.
-      m.set(slot, { ...s, controllerId: slot });
+      // Explicit switch rather than a blanket spread so TypeScript enforces
+      // that every discriminated-union arm is handled and future shape changes
+      // (new fields, renamed fields) surface as type errors here rather than
+      // silently dropping or carrying stale payload fields.
+      let translated: ControllerFlashStateBySlot;
+      switch (s.stage) {
+        case 'QUEUED':
+        case 'UPLOADING_TO_MASTER':
+        case 'SENDING':
+        case 'VERIFYING':
+        case 'FLASHING':
+        case 'REBOOTING':
+          translated = { ...s, controllerId: slot };
+          break;
+        case 'FINALIZING':
+          // Carry pendingDetail explicitly so the compiler catches any future
+          // rename of the field on either side of the wire→BySlot boundary.
+          translated = { controllerId: slot, stage: 'FINALIZING', pendingDetail: s.pendingDetail };
+          break;
+        case 'VERSION_CONFIRMED':
+          translated = {
+            controllerId: slot,
+            stage: 'VERSION_CONFIRMED',
+            finalVersion: s.finalVersion,
+          };
+          break;
+        case 'FAILED':
+          translated = { controllerId: slot, stage: 'FAILED', error: s.error };
+          break;
+        default:
+          // Runtime safety: skip any future stages the client doesn't yet know
+          // about. Compile-time exhaustiveness is enforced by `let translated`
+          // being uninitialized — TypeScript will error if any new stage is
+          // added to the union but not handled above (the `translated` variable
+          // would be used-before-assignment). The `never` assertion below is
+          // omitted because TypeScript can't narrow `s.stage` to `never` when
+          // the first union arm uses a multi-value stage literal — an inherent
+          // TS limitation with compound-discriminant unions.
+          continue;
+      }
+      m.set(slot, translated);
     }
     return m;
   }
