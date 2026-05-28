@@ -96,6 +96,7 @@ export type FirmwareStatusPillKind =
   | 'idle'
   | 'queued'
   | 'updating'
+  | 'finalizing'
   | 'done'
   | 'failed'
   | 'upToDate'
@@ -179,6 +180,11 @@ export const FLASH_ERROR_REASONS = [
   'subscriber_attach_failed',
   'protocol_violation',
   'streamer_unknown_error',
+  // Phase C: server-emitted when a Finalizing row's 90s safety timer
+  // fires before the master's post-reboot heartbeat arrives. The
+  // operator's per-row error renders the firmware_view.flash_errors.
+  // post_reboot_timeout copy (T13).
+  'post_reboot_timeout',
   // Streamer-emitted reasons (mirror of TransferErrorCode in
   // astros_api/src/models/firmware/chunk_streamer.ts). The orchestrator
   // routes these onto `flashJobFailed` so the same envelope/locale path
@@ -228,6 +234,7 @@ export type ServerFwStage =
   | 'VERIFYING'
   | 'FLASHING'
   | 'REBOOTING'
+  | 'FINALIZING'
   | 'VERSION_CONFIRMED'
   | 'FAILED';
 
@@ -266,6 +273,7 @@ export type ControllerFlashState =
       bytesSent?: number;
       totalBytes?: number;
     }
+  | { controllerId: string; stage: 'FINALIZING'; pendingDetail: string }
   | { controllerId: string; stage: 'VERSION_CONFIRMED'; finalVersion: string }
   | { controllerId: string; stage: 'FAILED'; error: string };
 
@@ -281,6 +289,7 @@ export type ControllerFlashStateBySlot =
       bytesSent?: number;
       totalBytes?: number;
     }
+  | { controllerId: SlotId; stage: 'FINALIZING'; pendingDetail: string }
   | { controllerId: SlotId; stage: 'VERSION_CONFIRMED'; finalVersion: string }
   | { controllerId: SlotId; stage: 'FAILED'; error: string };
 
