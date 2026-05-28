@@ -315,6 +315,10 @@ export function createFlashProgressThrottle(opts: {
 
 const DEFAULT_REBOOT_TIMEOUT_MS = 15_000;
 const DEFAULT_THROTTLE_WINDOW_MS = 250;
+// Phase C: covers worst-case master reboot (~5s) + SD remount (~3s) +
+// first poll cycle (~2s) + ~10× safety margin. Per the Phase C firmware
+// design Section 6 cross-repo coordination.
+const DEFAULT_FINALIZE_TIMEOUT_MS = 90_000;
 
 // Discriminated union of every shape the orchestrator broadcasts. Each
 // `safeEmitWs` call site now structurally matches one arm, so a new event
@@ -430,7 +434,7 @@ export interface FlashJobOrchestratorOpts {
   // doesn't need to know about the streamer factory.
   streamerFactory?: (opts: { bus: SerialBus }) => Streamer;
   clock?: Clock;
-  config?: { rebootTimeoutMs?: number; throttleWindowMs?: number };
+  config?: { rebootTimeoutMs?: number; throttleWindowMs?: number; finalizeTimeoutMs?: number };
 }
 
 // Default real-clock + real-streamer factories. Exported test-helper-style so
@@ -488,6 +492,11 @@ export class FlashJobOrchestrator {
   // `throttleWindowMs` feeds the per-job `flashProgressThrottle` window.
   private readonly rebootTimeoutMs: number;
   private readonly throttleWindowMs: number;
+  // Phase C: timeout for resolving FwStage.Finalizing rows after
+  // FW_DEPLOY_DONE arrives with PENDING. Armed in handleDeployDone,
+  // cleared by notifyMasterHeartbeat or by its own callback. Disposed
+  // alongside rebootTimer in releaseLock.
+  private readonly finalizeTimeoutMs: number;
 
   private currentJob: FlashJobState | null = null;
   // Deploy-phase resources owned beyond the synchronous span of `start()`.
@@ -510,6 +519,11 @@ export class FlashJobOrchestrator {
   // null-ness as the first-fire-wins guard so a heartbeat racing the timer
   // doesn't double-release the lock.
   private rebootTimer: NodeJS.Timeout | null = null;
+  // Phase C: armed when FW_DEPLOY_DONE arrives with any PENDING
+  // (Finalizing) rows. Fire callback transitions Finalizing rows to
+  // Failed("post_reboot_timeout") and completes the job. First-fire-wins
+  // shared with notifyMasterHeartbeat via the null check at both sites.
+  private finalizeTimer: NodeJS.Timeout | null = null;
   // AbortController whose signal threads through `streamer.run`'s `opts.signal`.
   // Created at upload-phase entry, fired by `cancel()` during the upload
   // phase to reject the in-flight `streamer.run()` with TransferError 'aborted'
@@ -560,6 +574,7 @@ export class FlashJobOrchestrator {
     this.clock = opts.clock ?? defaultClock;
     this.rebootTimeoutMs = opts.config?.rebootTimeoutMs ?? DEFAULT_REBOOT_TIMEOUT_MS;
     this.throttleWindowMs = opts.config?.throttleWindowMs ?? DEFAULT_THROTTLE_WINDOW_MS;
+    this.finalizeTimeoutMs = opts.config?.finalizeTimeoutMs ?? DEFAULT_FINALIZE_TIMEOUT_MS;
   }
 
   /**
