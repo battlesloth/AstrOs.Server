@@ -494,8 +494,9 @@ export class FlashJobOrchestrator {
   private readonly throttleWindowMs: number;
   // Phase C: timeout for resolving FwStage.Finalizing rows after
   // FW_DEPLOY_DONE arrives with PENDING. Armed in handleDeployDone,
-  // cleared by notifyMasterHeartbeat or by its own callback. Disposal
-  // in releaseLock is added in T7 (see plan).
+  // cleared by notifyMasterHeartbeat or by its own callback. Disposed
+  // alongside rebootTimer in releaseLock (covers cancel-during-Finalizing
+  // and other teardown paths).
   private readonly finalizeTimeoutMs: number;
 
   private currentJob: FlashJobState | null = null;
@@ -1112,6 +1113,23 @@ export class FlashJobOrchestrator {
         );
       }
       this.rebootTimer = null;
+    }
+    if (this.finalizeTimer !== null) {
+      // Phase C T7: covers cancel-during-Finalizing and any other teardown
+      // path that releases the lock with a still-armed finalizeTimer. Same
+      // idempotent pattern as rebootTimer above. A throw here would
+      // propagate up through failJob and out of whichever entry point
+      // called it — cancel() (HTTP handler) or the finalizeTimer callback
+      // — crashing the request or leaving the job in an inconsistent state.
+      try {
+        this.clock.clearTimeout(this.finalizeTimer);
+      } catch (err) {
+        logger.error(
+          err,
+          `flash orchestrator: clock.clearTimeout threw during releaseLock (finalizeTimer) for job=${jobId}`,
+        );
+      }
+      this.finalizeTimer = null;
     }
     // Disposer calls run in their own try/catch so a misbehaving
     // subscriber or throttle can't propagate up through `failJob` into

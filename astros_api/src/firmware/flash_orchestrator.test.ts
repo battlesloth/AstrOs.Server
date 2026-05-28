@@ -2721,6 +2721,105 @@ describe('FlashJobOrchestrator', () => {
 
       vi.restoreAllMocks();
     });
+
+    // -------------------------------------------------------------------------
+    // T7: cancel-during-Finalizing
+    // -------------------------------------------------------------------------
+
+    it('cancel during Finalizing fails the row and releases the lock', async () => {
+      // Two controllers: master (PENDING → Finalizing) and padawan (OK →
+      // VersionConfirmed). Operator cancels while the finalizeTimer is armed.
+      // Expected:
+      //   - cancel() returns { jobId } (not null)
+      //   - flashJobFailed emitted with reason='aborted', abortReason='operator_cancel'
+      //   - currentJob cleared (lock released)
+      //   - vi.getTimerCount() === 0 immediately after cancel — load-bearing
+      //     mutation guard proving finalizeTimer was disposed by releaseLock.
+      //     Without the dispose, the 60s timer remains armed and
+      //     vi.getTimerCount() returns 1 here, failing the test.
+      const fx = setupHappyPath({
+        clock: fakeClock,
+        controllers: [
+          { id: 'master-esp', variant: 'lolin_d32_pro' },
+          { id: 'padawan-esp', variant: 'lolin_d32_pro' },
+        ],
+        config: { finalizeTimeoutMs: 60_000 }, // long enough that the timer doesn't fire naturally
+      });
+      const armed = await armDeploy(fx);
+
+      // Drive both controllers to Rebooting so FSM transitions are legal.
+      for (const controllerId of ['master-esp', 'padawan-esp']) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+
+      // Deliver FW_DEPLOY_DONE with master=PENDING (→ Finalizing) and
+      // padawan=OK (→ VersionConfirmed). The job now holds open with the
+      // 60s finalizeTimer armed.
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [
+            {
+              controllerId: 'master-esp',
+              outcome: 'PENDING',
+              finalVersion: '',
+              error: 'awaiting_post_reboot_version',
+            },
+            {
+              controllerId: 'padawan-esp',
+              outcome: 'OK',
+              finalVersion: '1.4.0',
+              error: '',
+            },
+          ],
+        },
+      });
+
+      // Sanity: master is Finalizing, timer is armed.
+      expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
+      expect(vi.getTimerCount()).toBe(1);
+
+      // Operator cancels mid-Finalizing.
+      const result = await fx.orchestrator.cancel('operator_cancel');
+      expect(result).not.toBeNull();
+
+      // flashJobFailed emitted with reason='aborted', abortReason='operator_cancel'.
+      const failedEmits = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failedEmits).toHaveLength(1);
+      expect((failedEmits[0].data as { reason: string }).reason).toBe('aborted');
+      expect((failedEmits[0].data as { abortReason: string }).abortReason).toBe('operator_cancel');
+
+      // Lock released.
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+
+      // Mutation-resistance: vi.getTimerCount() must be 0 immediately after
+      // cancel. If releaseLock doesn't dispose finalizeTimer, the 60s timer
+      // is still armed here and this assertion fails.
+      const timersAfterCancel = vi.getTimerCount();
+      expect(timersAfterCancel).toBe(0);
+
+      // Belt-and-suspenders: advance the fake clock past the original 60s
+      // timeout — no further emits should fire. Without the dispose the timer
+      // would fire, call completePendingResolution against null currentJob
+      // (short-circuit), and the call count would still match — so the
+      // vi.getTimerCount() above is the real load-bearing assertion.
+      const emitsBeforeAdvance = fx.emitWs.mock.calls.length;
+      advance(120_000);
+      expect(fx.emitWs.mock.calls.length).toBe(emitsBeforeAdvance);
+    });
   });
 
   describe('reboot timer + heartbeat', () => {
