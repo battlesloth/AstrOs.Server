@@ -34,8 +34,19 @@ When extending either enum, **append** — never reorder existing entries. Both 
 Master emits these in `FW_PROGRESS.stage` (table A). Server forwards them to the UI via `flashControllerUpdate`. Both sides must agree on the spelling.
 
 ```
-QUEUED | UPLOADING_TO_MASTER | SENDING | VERIFYING | REBOOTING | VERSION_CONFIRMED | FAILED
+QUEUED | UPLOADING_TO_MASTER | SENDING | VERIFYING | FLASHING | REBOOTING | VERSION_CONFIRMED | FAILED
 ```
+
+**Stage definitions:**
+
+- **QUEUED** — Job enqueued by server, awaiting master dispatch.
+- **UPLOADING_TO_MASTER** — Master receiving chunks from server over serial.
+- **SENDING** — Master pushing image to padawan via ESP-NOW.
+- **VERIFYING** — Padawan has written all chunks; awaiting `esp_ota_end` hash verification.
+- **FLASHING** — Padawan has completed verification and is in the pre-flash delay window. PR set 2: padawan calls `esp_ota_set_boot_partition`. M4: padawan reports `FLASH_NOT_IMPLEMENTED` placeholder via the new `OTA_FLASH_RESULT` message (firmware-side wire format, separate from this serial protocol).
+- **REBOOTING** — Padawan rebooting; master polling for version heartbeat.
+- **VERSION_CONFIRMED** — Padawan heartbeat received with new version; flash successful.
+- **FAILED** — Transfer, write, hash, or reboot failure.
 
 ## A. Server ↔ Master (serial)
 

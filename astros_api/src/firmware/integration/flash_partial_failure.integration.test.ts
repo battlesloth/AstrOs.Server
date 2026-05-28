@@ -87,7 +87,7 @@ describe('integration: per-controller deploy mixed OK/FAILED', () => {
       //    distributed). scriptDeploy carries mixed outcomes: master
       //    OK with finalVersion, padawan FAILED with error. The stub
       //    emits FW_PROGRESS frames per controller through the default
-      //    Sending → Verifying → Rebooting stage progression, then ONE
+      //    Sending → Verifying → Flashing → Rebooting stage progression, then ONE
       //    FW_DEPLOY_DONE whose results[] array has both entries.
       harness.stub.autoAckUpload({});
       harness.stub.scriptDeploy({
@@ -156,8 +156,8 @@ describe('integration: per-controller deploy mixed OK/FAILED', () => {
       //      * padawan → Failed (error=PADAWAN_ERROR)
       //
       //    Note: scriptDeploy's per-stage FW_PROGRESS frames generate
-      //    `flashControllerUpdate` events (Sending/Verifying/Rebooting
-      //    × 2 controllers = 6 events on the WS bus); the terminal
+      //    `flashControllerUpdate` events (Sending/Verifying/Flashing/Rebooting
+      //    × 2 controllers = 8 events on the WS bus); the terminal
       //    transitions are the separate `flashControllerResult` stream.
       type ControllerResult = {
         type: number;

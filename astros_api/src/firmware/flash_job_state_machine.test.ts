@@ -27,7 +27,12 @@ function queued(
 }
 
 function withStage(
-  stage: FwStage.UploadingToMaster | FwStage.Sending | FwStage.Verifying | FwStage.Rebooting,
+  stage:
+    | FwStage.UploadingToMaster
+    | FwStage.Sending
+    | FwStage.Verifying
+    | FwStage.Flashing
+    | FwStage.Rebooting,
   overrides: Partial<{ bytesSent: number; totalBytes: number; detail: string }> = {},
 ): ControllerFlashState {
   return {
@@ -88,6 +93,7 @@ describe('isControllerStageTerminal', () => {
     [FwStage.UploadingToMaster, false],
     [FwStage.Sending, false],
     [FwStage.Verifying, false],
+    [FwStage.Flashing, false],
     [FwStage.Rebooting, false],
   ])('%s → %s', (stage, expected) => {
     expect(isControllerStageTerminal(stage)).toBe(expected);
@@ -103,6 +109,8 @@ describe('transitionControllerState — happy path', () => {
     expect(state.stage).toBe(FwStage.Sending);
     state = transitionControllerState(state, FwStage.Verifying);
     expect(state.stage).toBe(FwStage.Verifying);
+    state = transitionControllerState(state, FwStage.Flashing);
+    expect(state.stage).toBe(FwStage.Flashing);
     state = transitionControllerState(state, FwStage.Rebooting);
     expect(state.stage).toBe(FwStage.Rebooting);
     state = transitionControllerState(state, FwStage.VersionConfirmed, {
@@ -126,6 +134,7 @@ describe('transitionControllerState — happy path', () => {
     FwStage.UploadingToMaster,
     FwStage.Sending,
     FwStage.Verifying,
+    FwStage.Flashing,
     FwStage.Rebooting,
   ] as const)('Failed is reachable from %s', (fromStage) => {
     const start: ControllerFlashState =
@@ -236,6 +245,7 @@ describe('transitionControllerState — same-stage progress updates', () => {
     FwStage.UploadingToMaster,
     FwStage.Sending,
     FwStage.Verifying,
+    FwStage.Flashing,
     FwStage.Rebooting,
   ] as const)(
     'FW_PROGRESS during %s updates byte counts without forcing a stage transition',
@@ -301,6 +311,47 @@ describe('transitionControllerState — payload merging on legal in-flight trans
     expect(next.bytesSent).toBe(1024);
     expect(next.totalBytes).toBe(1024);
     expect(next.detail).toBe('verifying hash');
+  });
+});
+
+describe('transitionControllerState — Flashing transitions', () => {
+  it('Verifying → Flashing is legal', () => {
+    const before = withStage(FwStage.Verifying);
+    const after = transitionControllerState(before, FwStage.Flashing);
+    expect(after.stage).toBe(FwStage.Flashing);
+  });
+
+  it('Flashing → Rebooting is legal', () => {
+    const flashing = transitionControllerState(withStage(FwStage.Verifying), FwStage.Flashing);
+    const after = transitionControllerState(flashing, FwStage.Rebooting);
+    expect(after.stage).toBe(FwStage.Rebooting);
+  });
+
+  it('Flashing → Failed is legal', () => {
+    const flashing = transitionControllerState(withStage(FwStage.Verifying), FwStage.Flashing);
+    const after = transitionControllerState(flashing, FwStage.Failed, {
+      error: 'flash_not_implemented',
+    });
+    expect(after.stage).toBe(FwStage.Failed);
+  });
+
+  it('Flashing → Flashing (self-edge) is legal', () => {
+    const flashing = transitionControllerState(withStage(FwStage.Verifying), FwStage.Flashing);
+    const after = transitionControllerState(flashing, FwStage.Flashing);
+    expect(after.stage).toBe(FwStage.Flashing);
+  });
+
+  it('Sending → Flashing is illegal (must go through Verifying)', () => {
+    expect(() => transitionControllerState(withStage(FwStage.Sending), FwStage.Flashing)).toThrow(
+      /illegal/i,
+    );
+  });
+
+  it('Flashing → VersionConfirmed is illegal (must go through Rebooting)', () => {
+    const flashing = transitionControllerState(withStage(FwStage.Verifying), FwStage.Flashing);
+    expect(() =>
+      transitionControllerState(flashing, FwStage.VersionConfirmed, { finalVersion: 'v1' }),
+    ).toThrow(/illegal/i);
   });
 });
 

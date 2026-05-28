@@ -442,19 +442,22 @@ const defaultClock: Clock = {
   clearTimeout: (t) => globalThis.clearTimeout(t),
 };
 
-// Production streamer config. The AstrOs master is processing-bound
-// (astrosRxTask shares CPU with poll / heartbeat / I2C, landing ~1
-// chunk/sec). Stop-and-wait (`windowSize: 1`) avoids the OUT_OF_ORDER
-// NAK cascades a larger window triggers under that bottleneck.
+// Production streamer config. windowSize=2 lets the second chunk start
+// transmitting while the master is still processing the first, which is
+// necessary on this Pi↔master link: bench-measured cycle is ~485 ms with
+// windowSize=2 vs ~1550 ms with windowSize=1, a 3× throughput win at
+// ~8.4 KB/s. The fixed ~1 s per-chunk wire pause the Linux ftdi_sio
+// driver imposes on each USB-OUT batch is hidden by the overlap.
+// windowSize=1 was originally chosen because the master was thought to
+// be CPU-bound; current instrumentation shows ~52 ms of master CPU per
+// chunk (9× headroom vs the 480 ms wire fill), so the OUT_OF_ORDER NAK
+// cascades that justified stop-and-wait don't materialize at this size.
 // `ackTimeoutMs: 5_000` is ~5× the observed ~1 s round-trip; the
 // 3-retry × 5 s = 15 s per-chunk budget plus the 10-min whole-transfer
-// watchdog (a 1.2 MB image is 294 chunks ≈ 295 s steady state, so 5 min
-// was tight) gives ~2× headroom. If the master gets fast enough for the
-// wire to be the bottleneck, bump `windowSize` and recompute
-// `ackTimeoutMs`; the streamer's sliding-window machinery is exercised
-// against `TRANSPORT_DEFAULTS.windowSize=16` in its own tests.
+// watchdog gives ~2× headroom. The streamer's sliding-window machinery
+// is exercised against `TRANSPORT_DEFAULTS.windowSize=16` in its own tests.
 export const DEFAULT_STREAMER_CONFIG = {
-  windowSize: 1,
+  windowSize: 2,
   ackTimeoutMs: 5_000,
   maxRetriesPerChunk: 3,
   transferTimeoutMs: 600_000,
@@ -1175,6 +1178,7 @@ export class FlashJobOrchestrator {
           | FwStage.UploadingToMaster
           | FwStage.Sending
           | FwStage.Verifying
+          | FwStage.Flashing
           | FwStage.Rebooting,
         {
           bytesSent: payload.bytesSent,

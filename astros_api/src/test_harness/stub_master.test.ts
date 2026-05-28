@@ -431,8 +431,8 @@ describe('StubMaster (PTY-backed)', () => {
         const generator = new MessageGenerator();
         const XFER = 'xfer-1';
 
-        // 3 stages × 2 controllers + 1 FW_DEPLOY_DONE = 7 frames
-        const framesPromise = collectFrames(serverPort, 7);
+        // 4 stages × 2 controllers + 1 FW_DEPLOY_DONE = 9 frames
+        const framesPromise = collectFrames(serverPort, 9);
 
         const deployData: FwDeployBegin = {
           transferId: XFER,
@@ -445,10 +445,15 @@ describe('StubMaster (PTY-backed)', () => {
         const frames = await framesPromise;
         const handler = new MessageHandler();
 
-        const defaultStages = [FwStage.Sending, FwStage.Verifying, FwStage.Rebooting];
+        const defaultStages = [
+          FwStage.Sending,
+          FwStage.Verifying,
+          FwStage.Flashing,
+          FwStage.Rebooting,
+        ];
 
-        // Frames 0-2: FW_PROGRESS for ctrl-A (Sending, Verifying, Rebooting)
-        for (let i = 0; i < 3; i++) {
+        // Frames 0-3: FW_PROGRESS for ctrl-A (Sending, Verifying, Flashing, Rebooting)
+        for (let i = 0; i < 4; i++) {
           const f = requireFrame(frames, i);
           expect(f.type).toBe(SerialMessageType.FW_PROGRESS);
           const prog = handler.handleFwProgress(f.data);
@@ -462,9 +467,9 @@ describe('StubMaster (PTY-backed)', () => {
           }
         }
 
-        // Frames 3-5: FW_PROGRESS for ctrl-B (Sending, Verifying, Rebooting)
-        for (let i = 0; i < 3; i++) {
-          const f = requireFrame(frames, i + 3);
+        // Frames 4-7: FW_PROGRESS for ctrl-B (Sending, Verifying, Flashing, Rebooting)
+        for (let i = 0; i < 4; i++) {
+          const f = requireFrame(frames, i + 4);
           expect(f.type).toBe(SerialMessageType.FW_PROGRESS);
           const prog = handler.handleFwProgress(f.data);
           expect(prog.type).toBe(SerialWorkerResponseType.FW_PROGRESS);
@@ -475,10 +480,10 @@ describe('StubMaster (PTY-backed)', () => {
           }
         }
 
-        // Frame 6: FW_DEPLOY_DONE with both controller outcomes
-        const f6 = requireFrame(frames, 6);
-        expect(f6.type).toBe(SerialMessageType.FW_DEPLOY_DONE);
-        const done = handler.handleFwDeployDone(f6.data);
+        // Frame 8: FW_DEPLOY_DONE with both controller outcomes
+        const doneFrame = requireFrame(frames, 8);
+        expect(doneFrame.type).toBe(SerialMessageType.FW_DEPLOY_DONE);
+        const done = handler.handleFwDeployDone(doneFrame.data);
         expect(done.type).toBe(SerialWorkerResponseType.FW_DEPLOY_DONE);
         if (done.type === SerialWorkerResponseType.FW_DEPLOY_DONE) {
           expect(done.payload.transferId).toBe(XFER);

@@ -18,6 +18,7 @@ export type ControllerFlashState =
   | (BaseControllerFlashState & { stage: FwStage.UploadingToMaster })
   | (BaseControllerFlashState & { stage: FwStage.Sending })
   | (BaseControllerFlashState & { stage: FwStage.Verifying })
+  | (BaseControllerFlashState & { stage: FwStage.Flashing })
   | (BaseControllerFlashState & { stage: FwStage.Rebooting })
   | (BaseControllerFlashState & { stage: FwStage.VersionConfirmed; finalVersion: string })
   | (BaseControllerFlashState & { stage: FwStage.Failed; error: string });

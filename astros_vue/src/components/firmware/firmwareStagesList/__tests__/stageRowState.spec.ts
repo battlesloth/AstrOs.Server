@@ -31,11 +31,13 @@ describe('stageRowState', () => {
   });
 
   it("marks earlier stages 'done', the matching stage 'current', later stages 'idle' when flashing", () => {
+    // verify is at index 2, flash is at index 3 in the lifecycle order:
+    // download → transfer → verify → flash → reboot
     expect(rowsForPhase({ phase: 'flashing', currentStage: 'flash' })).toEqual([
       'done',
       'done',
+      'done',
       'current',
-      'idle',
       'idle',
     ]);
   });

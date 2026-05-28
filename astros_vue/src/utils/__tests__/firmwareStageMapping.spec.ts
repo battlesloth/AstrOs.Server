@@ -36,6 +36,10 @@ describe('mapServerStageToUiStage', () => {
     expect(mapServerStageToUiStage('REBOOTING')).toBe('reboot');
   });
 
+  it("maps 'FLASHING' to UI stage 'flash'", () => {
+    expect(mapServerStageToUiStage('FLASHING')).toBe('flash');
+  });
+
   it('returns null for QUEUED, VERSION_CONFIRMED, FAILED (no specific UI stage row)', () => {
     expect(mapServerStageToUiStage('QUEUED')).toBeNull();
     expect(mapServerStageToUiStage('VERSION_CONFIRMED')).toBeNull();
@@ -73,6 +77,7 @@ describe('controllerStatePillKind', () => {
     expect(controllerStatePillKind(state('UPLOADING_TO_MASTER'))).toBe('updating');
     expect(controllerStatePillKind(state('SENDING'))).toBe('updating');
     expect(controllerStatePillKind(state('VERIFYING'))).toBe('updating');
+    expect(controllerStatePillKind(state('FLASHING'))).toBe('updating');
     expect(controllerStatePillKind(state('REBOOTING'))).toBe('updating');
   });
 

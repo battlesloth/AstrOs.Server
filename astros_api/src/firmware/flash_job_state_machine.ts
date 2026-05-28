@@ -25,7 +25,8 @@ const LEGAL_NEXT_STAGES: ReadonlyMap<FwStage, ReadonlySet<FwStage>> = new Map<
     new Set([FwStage.UploadingToMaster, FwStage.Sending, FwStage.Failed]),
   ],
   [FwStage.Sending, new Set([FwStage.Sending, FwStage.Verifying, FwStage.Failed])],
-  [FwStage.Verifying, new Set([FwStage.Verifying, FwStage.Rebooting, FwStage.Failed])],
+  [FwStage.Verifying, new Set([FwStage.Verifying, FwStage.Flashing, FwStage.Failed])],
+  [FwStage.Flashing, new Set([FwStage.Flashing, FwStage.Rebooting, FwStage.Failed])],
   [FwStage.Rebooting, new Set([FwStage.Rebooting, FwStage.VersionConfirmed, FwStage.Failed])],
   [FwStage.VersionConfirmed, EMPTY_STAGE_SET],
   [FwStage.Failed, EMPTY_STAGE_SET],
@@ -54,6 +55,7 @@ type NonTerminalStage =
   | FwStage.UploadingToMaster
   | FwStage.Sending
   | FwStage.Verifying
+  | FwStage.Flashing
   | FwStage.Rebooting;
 
 // Overloaded so the type system enforces stage-specific payloads at the
