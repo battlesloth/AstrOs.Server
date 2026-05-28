@@ -129,6 +129,33 @@ describe('controllerStageLabelKey', () => {
   });
 });
 
+describe('Phase C: FINALIZING mapping', () => {
+  it('maps server FINALIZING to null UI stage row', () => {
+    // No global stage row for Finalizing — the per-controller pill
+    // carries the affordance. The global stage indicator stays at
+    // whatever the prior stage was.
+    expect(mapServerStageToUiStage('FINALIZING')).toBeNull();
+  });
+
+  it('maps Finalizing controller state to the "finalizing" pill kind', () => {
+    const state: ControllerFlashState = {
+      controllerId: '00:00:00:00:00:00',
+      stage: 'FINALIZING',
+      pendingDetail: 'awaiting_post_reboot_version',
+    };
+    expect(controllerStatePillKind(state)).toBe('finalizing');
+  });
+
+  it('returns null stage label key for FINALIZING', () => {
+    const state: ControllerFlashState = {
+      controllerId: '00:00:00:00:00:00',
+      stage: 'FINALIZING',
+      pendingDetail: 'awaiting_post_reboot_version',
+    };
+    expect(controllerStageLabelKey(state)).toBeNull();
+  });
+});
+
 describe('FlashErrorReason i18n key contract', () => {
   // Every FlashErrorReason in the union must have a corresponding
   // firmware_view.flash_errors.<reason> key in enUS.json. Without this
