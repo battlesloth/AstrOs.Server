@@ -355,6 +355,130 @@ describe('transitionControllerState — Flashing transitions', () => {
   });
 });
 
+describe('Finalizing transitions', () => {
+  it('allows Sending → Finalizing with pendingDetail', () => {
+    const sending: ControllerFlashState = {
+      controllerId: 'c1',
+      stage: FwStage.Sending,
+      bytesSent: 100,
+      totalBytes: 1000,
+      detail: '',
+    };
+    const next = transitionControllerState(sending, FwStage.Finalizing, {
+      pendingDetail: 'awaiting_post_reboot_version',
+    });
+    expect(next.stage).toBe(FwStage.Finalizing);
+    if (next.stage !== FwStage.Finalizing) return;
+    expect(next.pendingDetail).toBe('awaiting_post_reboot_version');
+    expect(next.bytesSent).toBe(100); // carried forward
+  });
+
+  it('allows Rebooting → Finalizing (most common production path)', () => {
+    const rebooting: ControllerFlashState = {
+      controllerId: 'c1',
+      stage: FwStage.Rebooting,
+      bytesSent: 1000,
+      totalBytes: 1000,
+      detail: '',
+    };
+    const next = transitionControllerState(rebooting, FwStage.Finalizing, {
+      pendingDetail: 'awaiting_post_reboot_version',
+    });
+    expect(next.stage).toBe(FwStage.Finalizing);
+  });
+
+  it('allows Queued → Finalizing (master with no FW_PROGRESS pre-DEPLOY_DONE)', () => {
+    // Phase C master self-flash doesn't go through wire OTA, so OtaWriter
+    // doesn't emit per-stage FW_PROGRESS for the master row. The master
+    // row stays Queued until FW_DEPLOY_DONE arrives with PENDING.
+    const queued: ControllerFlashState = {
+      controllerId: '00:00:00:00:00:00',
+      stage: FwStage.Queued,
+      bytesSent: 0,
+      totalBytes: 1000,
+      detail: '',
+    };
+    const next = transitionControllerState(queued, FwStage.Finalizing, {
+      pendingDetail: 'awaiting_post_reboot_version',
+    });
+    expect(next.stage).toBe(FwStage.Finalizing);
+  });
+
+  it('allows Finalizing → VersionConfirmed (heartbeat resolution)', () => {
+    const finalizing: ControllerFlashState = {
+      controllerId: 'c1',
+      stage: FwStage.Finalizing,
+      bytesSent: 1000,
+      totalBytes: 1000,
+      detail: '',
+      pendingDetail: 'awaiting_post_reboot_version',
+    };
+    const next = transitionControllerState(finalizing, FwStage.VersionConfirmed, {
+      finalVersion: '1.4.0',
+    });
+    expect(next.stage).toBe(FwStage.VersionConfirmed);
+    if (next.stage !== FwStage.VersionConfirmed) return;
+    expect(next.finalVersion).toBe('1.4.0');
+  });
+
+  it('allows Finalizing → Failed (90s timeout resolution)', () => {
+    const finalizing: ControllerFlashState = {
+      controllerId: 'c1',
+      stage: FwStage.Finalizing,
+      bytesSent: 1000,
+      totalBytes: 1000,
+      detail: '',
+      pendingDetail: 'awaiting_post_reboot_version',
+    };
+    const next = transitionControllerState(finalizing, FwStage.Failed, {
+      error: 'post_reboot_timeout',
+    });
+    expect(next.stage).toBe(FwStage.Failed);
+  });
+
+  it('rejects VersionConfirmed → Finalizing (terminal cannot regress)', () => {
+    const vc: ControllerFlashState = {
+      controllerId: 'c1',
+      stage: FwStage.VersionConfirmed,
+      bytesSent: 1000,
+      totalBytes: 1000,
+      detail: '',
+      finalVersion: '1.4.0',
+    };
+    expect(() =>
+      transitionControllerState(vc, FwStage.Finalizing, {
+        pendingDetail: 'should-not-allow',
+      }),
+    ).toThrow(/illegal flash-job transition/);
+  });
+
+  it('throws when transitioning to Finalizing without pendingDetail', () => {
+    const sending: ControllerFlashState = {
+      controllerId: 'c1',
+      stage: FwStage.Sending,
+      bytesSent: 100,
+      totalBytes: 1000,
+      detail: '',
+    };
+    // Cast through `unknown` to bypass TS overload — runtime check is the
+    // defense-in-depth guard for callers that bypass typing (matches the
+    // pattern used by the existing finalVersion/error required-payload tests).
+    expect(() =>
+      transitionControllerState(
+        sending,
+        FwStage.Finalizing,
+        undefined as unknown as {
+          pendingDetail: string;
+        },
+      ),
+    ).toThrow(/requires pendingDetail/);
+  });
+
+  it('does not mark Finalizing as terminal', () => {
+    expect(isControllerStageTerminal(FwStage.Finalizing)).toBe(false);
+  });
+});
+
 describe('deriveJobLifecycle', () => {
   it("returns 'failed' when abortReason is set, regardless of controller states", () => {
     expect(
