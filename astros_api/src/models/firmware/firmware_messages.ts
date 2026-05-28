@@ -24,6 +24,7 @@ export enum FwStage {
   Verifying = 'VERIFYING',
   Flashing = 'FLASHING',
   Rebooting = 'REBOOTING',
+  Finalizing = 'FINALIZING',
   VersionConfirmed = 'VERSION_CONFIRMED',
   Failed = 'FAILED',
 }
