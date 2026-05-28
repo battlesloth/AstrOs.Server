@@ -654,6 +654,49 @@ describe('Serial Message Handler Tests', () => {
     expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
   });
 
+  it('accepts PENDING outcome with empty finalVersion and non-empty error', () => {
+    // Firmware-side contract: master self-flash success row reports PENDING
+    // with finalVersion="" and error="awaiting_post_reboot_version" per
+    // AstrOs.ESP OtaForwarder::handleLocalFlashResult.
+    const transferId = 'xfer-1';
+    const masterRow = ['00:00:00:00:00:00', 'PENDING', '', 'awaiting_post_reboot_version'].join(
+      MessageHelper.US,
+    );
+    const padawanRow = ['11:22:33:44:55:66', 'OK', '1.4.0', ''].join(MessageHelper.US);
+    const msg = `${transferId}${MessageHelper.US}${masterRow}${MessageHelper.RS}${padawanRow}`;
+
+    const handler = new MessageHandler();
+    const result = handler.handleFwDeployDone(msg);
+
+    expect(result.type).toBe(SerialWorkerResponseType.FW_DEPLOY_DONE);
+    if (result.type !== SerialWorkerResponseType.FW_DEPLOY_DONE) return;
+    expect(result.payload.results).toHaveLength(2);
+    expect(result.payload.results[0]).toEqual({
+      controllerId: '00:00:00:00:00:00',
+      outcome: 'PENDING',
+      finalVersion: '',
+      error: 'awaiting_post_reboot_version',
+    });
+    expect(result.payload.results[1].outcome).toBe('OK');
+  });
+
+  it('rejects PENDING result with non-empty finalVersion (firmware contract violation)', () => {
+    // Cross-field invariant: PENDING rows are emitted BEFORE the master
+    // reboots, so finalVersion must be empty. A non-empty finalVersion
+    // here means either a firmware regression or a corrupt frame; reject
+    // the whole DEPLOY_DONE rather than apply a contradictory state.
+    const transferId = 'xfer-1';
+    const badRow = ['00:00:00:00:00:00', 'PENDING', '1.4.0', 'awaiting_post_reboot_version'].join(
+      MessageHelper.US,
+    );
+    const msg = `${transferId}${MessageHelper.US}${badRow}`;
+
+    const handler = new MessageHandler();
+    const result = handler.handleFwDeployDone(msg);
+
+    expect(result.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
   it('handle FW_BACKPRESSURE parses pause/resume + reason', () => {
     const handler = new MessageHandler();
     const payload = `xfer-1${US}PAUSE${US}sd_writing`;

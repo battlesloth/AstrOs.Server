@@ -150,12 +150,14 @@ export interface FwProgressArgs {
 
 export interface FwDeployDoneResultArg {
   controllerId: string;
+  // TODO T5: extend to 'OK' | 'FAILED' | 'PENDING' when orchestrator PENDING
+  // branch is added and integration tests need to emit PENDING master rows.
   outcome: 'OK' | 'FAILED';
-  // Cross-field invariant from protocol.md (also enforced by the server's
-  // handler at handleFwDeployDone): if outcome === 'OK' then error MUST
-  // be ''. The fake does not police this — callers are expected to honor
-  // the invariant; emitting OK + non-empty error will produce an UNKNOWN
-  // response on the server side.
+  // Cross-field invariants from protocol.md (also enforced by the server's
+  // handler at handleFwDeployDone): if outcome === 'OK' then error MUST be '';
+  // if outcome === 'PENDING' then finalVersion MUST be ''. The fake does not
+  // police these — callers are expected to honor them; violations produce an
+  // UNKNOWN response on the server side.
   finalVersion: string;
   error: string;
 }
@@ -205,6 +207,8 @@ export interface ScriptDeployControllerOpts {
   // Controller MAC — must match what the orchestrator sent in
   // FW_DEPLOY_BEGIN.order so progress frames are attributed correctly.
   id: string;
+  // TODO T5: extend to 'OK' | 'FAILED' | 'PENDING' when orchestrator PENDING
+  // branch is added and integration tests need to emit PENDING master rows.
   outcome: 'OK' | 'FAILED';
   // Required when outcome === 'OK'. Validated at scriptDeploy() call time.
   finalVersion?: string;

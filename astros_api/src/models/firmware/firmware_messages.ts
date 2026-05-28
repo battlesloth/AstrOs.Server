@@ -114,9 +114,9 @@ export interface FwProgress {
 
 export interface FwDeployDoneResult {
   controllerId: string;
-  outcome: 'OK' | 'FAILED';
+  outcome: 'OK' | 'FAILED' | 'PENDING';
   finalVersion: string;
-  error: string; // empty string when outcome === 'OK'
+  error: string; // empty string when outcome === 'OK'; populated for FAILED; firmware marker for PENDING
 }
 
 export interface FwDeployDone {

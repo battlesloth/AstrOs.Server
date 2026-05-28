@@ -355,24 +355,33 @@ export class MessageHandler {
       }
 
       const outcome = fields[1];
-      if (outcome !== 'OK' && outcome !== 'FAILED') {
+      if (outcome !== 'OK' && outcome !== 'FAILED' && outcome !== 'PENDING') {
         logger.error(`FW_DEPLOY_DONE has unknown outcome: ${outcome}`);
         return { type: SerialWorkerResponseType.UNKNOWN };
       }
 
+      const finalVersion = fields[2];
       const error = fields[3];
-      // Cross-field invariant from protocol.md: an OK outcome must have an
-      // empty error. Accepting OK + non-empty error would produce contradictory
-      // downstream state (e.g., a green pill with an error tooltip).
+
+      // Cross-field invariants — each outcome enforces its own contract.
+      //   OK: error must be empty (success leaves no error).
+      //   PENDING: master self-flash success row; emitted BEFORE master
+      //            reboots so finalVersion must be empty. A populated value
+      //            indicates a firmware regression — reject the frame.
+      //   FAILED: error populated; no finalVersion constraint here.
       if (outcome === 'OK' && error !== '') {
         logger.error(`FW_DEPLOY_DONE OK result has non-empty error: ${error}`);
+        return { type: SerialWorkerResponseType.UNKNOWN };
+      }
+      if (outcome === 'PENDING' && finalVersion !== '') {
+        logger.error(`FW_DEPLOY_DONE PENDING result has non-empty finalVersion: ${finalVersion}`);
         return { type: SerialWorkerResponseType.UNKNOWN };
       }
 
       results.push({
         controllerId: fields[0],
         outcome,
-        finalVersion: fields[2],
+        finalVersion,
         error,
       });
     }
