@@ -1023,27 +1023,36 @@ export class FlashJobOrchestrator {
 
   /**
    * Post-deploy heartbeat from the master (carries its now-running version).
-   * Called by `api_server`'s POLL handler when a POLL_ACK arrives carrying a
-   * version that matches the in-flight job's deployed target. The version
-   * argument is intentionally unused at this layer: api_server is responsible
-   * for the version-vs-expected match (see spec §"Data flow" step 13). The
-   * orchestrator's job is to clear the reboot timer + release the lock.
+   * Two resolution paths:
    *
-   * No-op when the reboot timer isn't armed: out-of-protocol heartbeats
-   * (mid-upload, mid-deploy, never-started) all leave `rebootTimer === null`,
-   * and a second heartbeat after the first one fired hits the same null check
-   * — first-fire-wins, no double release.
+   *   1. Phase C — Finalizing path: if `finalizeTimer` is armed, the deploy
+   *      is holding open on a Finalizing master row. The heartbeat proves
+   *      the master booted into the expected version. Clear the timer,
+   *      mutate every Finalizing row to VersionConfirmed via
+   *      `completePendingResolution`, emit flashJobDone, release lock.
+   *
+   *   2. Pre-Phase-C path: if `rebootTimer` is armed (lifecycle === 'done'
+   *      with no Finalizing rows — padawan-only or master-FAILED deploys),
+   *      clear it and release the lock without mutating any rows. This
+   *      preserves the existing 15s post-deploy grace-period semantics.
+   *
+   * Outside both windows the call is a no-op (out-of-protocol heartbeats:
+   * pre-job, mid-upload, mid-deploy, post-release).
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  notifyMasterHeartbeat(_version: string): void {
-    // First-fire-wins guard. `rebootTimer` is only non-null between
-    // `flashJobDone` emit and the lock-release (whichever path wins).
-    // Outside that window — including pre-job, mid-upload, mid-deploy,
-    // and post-release — the heartbeat is a no-op.
+  notifyMasterHeartbeat(version: string): void {
+    if (this.finalizeTimer !== null) {
+      if (this.currentJob === null) {
+        throw new Error(
+          'flash orchestrator invariant: finalizeTimer is set but currentJob is null',
+        );
+      }
+      this.clock.clearTimeout(this.finalizeTimer);
+      this.finalizeTimer = null;
+      this.completePendingResolution('confirmed', version);
+      return;
+    }
+
     if (this.rebootTimer === null) return;
-    // Invariant: `rebootTimer` is armed only inside `handleDeployDone`,
-    // which only runs while `currentJob !== null`. A violation indicates
-    // a bug somewhere upstream — surface it loudly rather than masking.
     if (this.currentJob === null) {
       throw new Error('flash orchestrator invariant: rebootTimer is set but currentJob is null');
     }
@@ -1380,11 +1389,14 @@ export class FlashJobOrchestrator {
     if (this.currentJob === null) return;
     const jobId = this.currentJob.jobId;
 
-    // Defuse the fallback timer. The timed_out path nulls finalizeTimer before
-    // calling this method (timer callback does `this.finalizeTimer = null`
-    // before the call), but the heartbeat-confirmed path (T6) calls this while
-    // the timer is still armed. Clear it here so the timer doesn't fire against
-    // a null/new currentJob after releaseLock clears the field.
+    // Defuse the fallback timer BEFORE mutating any controllers. This guard
+    // is the only place finalizeTimer gets cleared on the heartbeat-confirmed
+    // path: notifyMasterHeartbeat clears it first (preventing the OS callback
+    // from re-entering), but if this method were ever called from a future
+    // code path that doesn't pre-clear, this guard is the safety net.
+    // The timed_out path also reaches here with finalizeTimer already null
+    // (the timer callback sets it to null before calling), so this is a no-op
+    // on that path — but harmless.
     if (this.finalizeTimer !== null) {
       this.clock.clearTimeout(this.finalizeTimer);
       this.finalizeTimer = null;
@@ -1397,14 +1409,29 @@ export class FlashJobOrchestrator {
         continue;
       }
       let next: ControllerFlashState;
-      if (outcome === 'confirmed') {
-        next = transitionControllerState(c, FwStage.VersionConfirmed, {
-          finalVersion: version as string,
-        });
-      } else {
-        next = transitionControllerState(c, FwStage.Failed, {
-          error: 'post_reboot_timeout',
-        });
+      try {
+        if (outcome === 'confirmed') {
+          next = transitionControllerState(c, FwStage.VersionConfirmed, {
+            finalVersion: version as string,
+          });
+        } else {
+          next = transitionControllerState(c, FwStage.Failed, {
+            error: 'post_reboot_timeout',
+          });
+        }
+      } catch (err) {
+        // Defensive: Finalizing→VersionConfirmed and Finalizing→Failed are
+        // both legal per LEGAL_NEXT_STAGES (state machine T3), so this catch
+        // is structurally unreachable today. It exists because completePendingResolution
+        // is reachable from the public notifyMasterHeartbeat surface (T6); a
+        // future FSM edit that accidentally restricted the legal-next set
+        // would otherwise propagate an uncaught throw out of a public method
+        // or out of the async finalizeTimer callback, crashing the worker.
+        // finalizeTimer is already null here (cleared by the guard above).
+        // Mirrors the established pattern at handleDeployDone (~lines 1270-1278).
+        const detail = err instanceof Error ? err.message : String(err);
+        this.failJob(this.currentJob!.jobId, 'protocol_violation', detail);
+        return;
       }
       updated.push(next);
       this.safeEmitWs({
