@@ -68,4 +68,47 @@ describe('decideLateJoinSnapshot', () => {
     };
     expect(decideLateJoinSnapshot(job).kind).toBe('none');
   });
+
+  it('returns flashJobStarted snapshot while a Finalizing row exists', () => {
+    // Phase C: during the PENDING-resolution window (after FW_DEPLOY_DONE,
+    // before notifyMasterHeartbeat or finalize timeout), the deploy is
+    // in-flight and endedAt is undefined. A late-joining WS client should
+    // receive the snapshot with Finalizing rows so its UI shows the
+    // "Finalizing…" pill rather than nothing.
+    const job: FlashJobState = {
+      jobId: 'job-1',
+      source: {
+        kind: 'github',
+        version: '1.4.0',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 1000,
+        displayName: 'astros-esp 1.4.0 (lolin_d32_pro)',
+      },
+      controllers: [
+        {
+          controllerId: '00:00:00:00:00:00',
+          stage: FwStage.Finalizing,
+          bytesSent: 1000,
+          totalBytes: 1000,
+          detail: '',
+          pendingDetail: 'awaiting_post_reboot_version',
+        },
+        {
+          controllerId: '11:22:33:44:55:66',
+          stage: FwStage.VersionConfirmed,
+          bytesSent: 1000,
+          totalBytes: 1000,
+          detail: '',
+          finalVersion: '1.4.0',
+        },
+      ],
+      startedAt: '2026-05-28T15:00:00Z',
+      // endedAt deliberately undefined — Finalizing keeps the deploy open
+    };
+    const snapshot = decideLateJoinSnapshot(job);
+    expect(snapshot.kind).toBe('flashJobStarted');
+    if (snapshot.kind === 'flashJobStarted') {
+      expect(snapshot.data).toBe(job);
+    }
+  });
 });
