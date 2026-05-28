@@ -94,6 +94,7 @@
         "idle": "Idle",
         "queued": "Queued",
         "updating": "Updating",
+        "finalizing": "Finalizing…",
         "done": "Done",
         "failed": "Failed",
         "up_to_date": "Up to date",
@@ -192,7 +193,8 @@
       "bus_send_failed": "The server couldn't send to the master over the serial bus. Restart the server, then try again.",
       "aborted": "Flash cancelled. The controllers were not updated.",
       "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
-      "network_error": "Couldn't reach the server. Check your network connection and try again."
+      "network_error": "Couldn't reach the server. Check your network connection and try again.",
+      "post_reboot_timeout": "Master controller did not report a matching firmware version within 90 seconds. The flash may have failed; verify the controller and retry."
     },
     "lock_active": "A firmware update is in progress — write actions are disabled until it completes.",
     "lock_banner": "Firmware update in progress — write actions are disabled across the app.",
