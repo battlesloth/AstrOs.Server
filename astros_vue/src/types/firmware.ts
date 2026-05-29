@@ -183,7 +183,7 @@ export const FLASH_ERROR_REASONS = [
   // Phase C: server-emitted when a Finalizing row's 90s safety timer
   // fires before the master's post-reboot heartbeat arrives. The
   // operator's per-row error renders the firmware_view.flash_errors.
-  // post_reboot_timeout copy (T13).
+  // post_reboot_timeout copy.
   'post_reboot_timeout',
   // Streamer-emitted reasons (mirror of TransferErrorCode in
   // astros_api/src/models/firmware/chunk_streamer.ts). The orchestrator

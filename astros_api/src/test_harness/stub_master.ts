@@ -150,8 +150,9 @@ export interface FwProgressArgs {
 
 export interface FwDeployDoneResultArg {
   controllerId: string;
-  // TODO T5: extend to 'OK' | 'FAILED' | 'PENDING' when orchestrator PENDING
-  // branch is added and integration tests need to emit PENDING master rows.
+  // TODO: extend to 'OK' | 'FAILED' | 'PENDING' when integration tests need
+  // stub_master to emit PENDING master rows. The orchestrator handles PENDING
+  // (Phase C), but unit tests cover that path via direct bus injection.
   outcome: 'OK' | 'FAILED';
   // Cross-field invariants from protocol.md (also enforced by the server's
   // handler at handleFwDeployDone): if outcome === 'OK' then error MUST be '';
@@ -207,8 +208,9 @@ export interface ScriptDeployControllerOpts {
   // Controller MAC — must match what the orchestrator sent in
   // FW_DEPLOY_BEGIN.order so progress frames are attributed correctly.
   id: string;
-  // TODO T5: extend to 'OK' | 'FAILED' | 'PENDING' when orchestrator PENDING
-  // branch is added and integration tests need to emit PENDING master rows.
+  // TODO: extend to 'OK' | 'FAILED' | 'PENDING' when integration tests need
+  // stub_master to emit PENDING master rows. The orchestrator handles PENDING
+  // (Phase C), but unit tests cover that path via direct bus injection.
   outcome: 'OK' | 'FAILED';
   // Required when outcome === 'OK'. Validated at scriptDeploy() call time.
   finalVersion?: string;
@@ -240,8 +242,9 @@ interface AutoAckUploadCfg {
 
 interface ScriptDeployControllerCfg {
   id: string;
-  // TODO T5: extend to 'OK' | 'FAILED' | 'PENDING' when orchestrator PENDING
-  // branch is added and integration tests need to emit PENDING master rows.
+  // TODO: extend to 'OK' | 'FAILED' | 'PENDING' when integration tests need
+  // stub_master to emit PENDING master rows. The orchestrator handles PENDING
+  // (Phase C), but unit tests cover that path via direct bus injection.
   outcome: 'OK' | 'FAILED';
   finalVersion: string;
   error: string;

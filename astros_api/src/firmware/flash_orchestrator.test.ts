@@ -2478,7 +2478,7 @@ describe('FlashJobOrchestrator', () => {
     });
 
     // -------------------------------------------------------------------------
-    // T6: heartbeat-resolution path
+    // Heartbeat-resolution path
     // -------------------------------------------------------------------------
 
     it('resolves Finalizing → VersionConfirmed when master heartbeat arrives', async () => {
@@ -2724,7 +2724,7 @@ describe('FlashJobOrchestrator', () => {
     });
 
     // -------------------------------------------------------------------------
-    // T7: cancel-during-Finalizing
+    // Cancel-during-Finalizing
     // -------------------------------------------------------------------------
 
     it('cancel during Finalizing fails the row and releases the lock', async () => {

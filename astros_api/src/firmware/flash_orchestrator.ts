@@ -600,10 +600,15 @@ export class FlashJobOrchestrator {
    * way the prior all-sync catch did, but emit on the WS surface only —
    * by the time they fire, HTTP has already responded 200.
    *
-   * After all controllers reach a terminal stage, `handleDeployDone`
-   * emits `flashJobDone` and arms the reboot-timer fallback; lock release
-   * happens via `notifyMasterHeartbeat` (primary, post-deploy POLL_ACK)
-   * or the timer (fallback for master malfunction).
+   * After all controllers reach a terminal stage with no Finalizing rows,
+   * `handleDeployDone` emits `flashJobDone` and arms `rebootTimer` (15s
+   * fallback); lock release happens via `notifyMasterHeartbeat` (primary,
+   * post-deploy POLL_ACK) or the timer (fallback for master malfunction).
+   * When Finalizing rows are present (Phase C: master self-flash success),
+   * `handleDeployDone` arms `finalizeTimer` (90s) instead; `flashJobDone`
+   * fires from `completePendingResolution` after the master's heartbeat
+   * arrives (mutating Finalizing → VersionConfirmed) or the timer fires
+   * (mutating Finalizing → Failed("post_reboot_timeout")).
    *
    * `this.runInProgress` exposes the background promise as a test seam.
    * Production code MUST NOT await it.
@@ -1115,7 +1120,7 @@ export class FlashJobOrchestrator {
       this.rebootTimer = null;
     }
     if (this.finalizeTimer !== null) {
-      // Phase C T7: covers cancel-during-Finalizing and any other teardown
+      // Phase C: covers cancel-during-Finalizing and any other teardown
       // path that releases the lock with a still-armed finalizeTimer. Same
       // idempotent pattern as rebootTimer above. A throw here would
       // propagate up through failJob and out of whichever entry point
@@ -1341,7 +1346,7 @@ export class FlashJobOrchestrator {
     // 'in_flight' because Finalizing is non-terminal. Hold the deploy open:
     // do NOT emit flashJobDone yet. Arm finalizeTimer as the safety fallback;
     // on fire it transitions Finalizing rows to Failed("post_reboot_timeout").
-    // The primary resolution path is notifyMasterHeartbeat (T6).
+    // The primary resolution path is notifyMasterHeartbeat.
     //
     // For the no-Finalizing case: if every controller reached a terminal stage
     // (any mix of VersionConfirmed and Failed), the job is "done" per c.6a's
@@ -1400,7 +1405,7 @@ export class FlashJobOrchestrator {
   //
   // Overloads enforce at compile time that 'confirmed' always carries a version
   // string and 'timed_out' never needs one — eliminating the runtime throw path
-  // that would brick the orchestrator if called incorrectly from T6.
+  // that would brick the orchestrator if called incorrectly from notifyMasterHeartbeat.
   private completePendingResolution(outcome: 'confirmed', version: string): void;
   private completePendingResolution(outcome: 'timed_out'): void;
   private completePendingResolution(outcome: 'confirmed' | 'timed_out', version?: string): void {
@@ -1439,14 +1444,14 @@ export class FlashJobOrchestrator {
         }
       } catch (err) {
         // Defensive: Finalizing→VersionConfirmed and Finalizing→Failed are
-        // both legal per LEGAL_NEXT_STAGES (state machine T3), so this catch
-        // is structurally unreachable today. It exists because completePendingResolution
-        // is reachable from the public notifyMasterHeartbeat surface (T6); a
-        // future FSM edit that accidentally restricted the legal-next set
-        // would otherwise propagate an uncaught throw out of a public method
-        // or out of the async finalizeTimer callback, crashing the worker.
+        // both legal per LEGAL_NEXT_STAGES (state machine), so this catch
+        // is structurally unreachable today. It exists because a future FSM
+        // edit that accidentally restricted the legal-next set would otherwise
+        // propagate an uncaught throw out of a public method or out of the
+        // async finalizeTimer callback, crashing the worker.
         // finalizeTimer is already null here (cleared by the guard above).
-        // Mirrors the established pattern at handleDeployDone (~lines 1270-1278).
+        // Mirrors the established try/catch pattern in handleDeployDone's
+        // per-result transition loop.
         const detail = err instanceof Error ? err.message : String(err);
         this.failJob(jobId, 'protocol_violation', detail);
         return;
