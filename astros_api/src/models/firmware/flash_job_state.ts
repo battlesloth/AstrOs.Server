@@ -20,6 +20,7 @@ export type ControllerFlashState =
   | (BaseControllerFlashState & { stage: FwStage.Verifying })
   | (BaseControllerFlashState & { stage: FwStage.Flashing })
   | (BaseControllerFlashState & { stage: FwStage.Rebooting })
+  | (BaseControllerFlashState & { stage: FwStage.Finalizing; pendingDetail: string })
   | (BaseControllerFlashState & { stage: FwStage.VersionConfirmed; finalVersion: string })
   | (BaseControllerFlashState & { stage: FwStage.Failed; error: string });
 

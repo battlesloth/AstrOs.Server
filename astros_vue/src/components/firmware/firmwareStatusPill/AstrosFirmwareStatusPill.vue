@@ -11,6 +11,7 @@ const KIND_LABEL_KEY: Record<FirmwareStatusPillKind, string> = {
   idle: 'firmware_view.controllers.pill.idle',
   queued: 'firmware_view.controllers.pill.queued',
   updating: 'firmware_view.controllers.pill.updating',
+  finalizing: 'firmware_view.controllers.pill.finalizing',
   done: 'firmware_view.controllers.pill.done',
   failed: 'firmware_view.controllers.pill.failed',
   upToDate: 'firmware_view.controllers.pill.up_to_date',
@@ -22,6 +23,7 @@ const KIND_MODIFIER: Record<FirmwareStatusPillKind, string> = {
   idle: 'idle',
   queued: 'queued',
   updating: 'updating',
+  finalizing: 'finalizing',
   done: 'done',
   failed: 'failed',
   upToDate: 'up-to-date',
@@ -65,6 +67,11 @@ const modifierClass = computed(() => `astros-firmware-status-pill--${KIND_MODIFI
 .astros-firmware-status-pill--updating {
   background: #fff3dc;
   color: #7d5a14;
+}
+
+.astros-firmware-status-pill--finalizing {
+  background: #ece9f7;
+  color: #4a3a8a;
 }
 
 .astros-firmware-status-pill--done,

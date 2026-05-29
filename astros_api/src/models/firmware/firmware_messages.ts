@@ -13,8 +13,11 @@
 export const FW_SERIAL_SLIDING_WINDOW = 16;
 
 // ---------------------------------------------------------------------------
-// Stage enum (shared with .docs/protocol.md "Stage enum"). Master emits these
-// in FW_PROGRESS.stage; server forwards them to the UI.
+// Stage enum (shared with .docs/protocol.md "Stage enum"). The master emits
+// these in FW_PROGRESS.stage and the server forwards them to the UI — EXCEPT
+// Finalizing, which is a server-internal stage never sent over the wire. The
+// server synthesizes Finalizing from a PENDING FW_DEPLOY_DONE row while it
+// holds the deploy open for the master's post-reboot heartbeat.
 // ---------------------------------------------------------------------------
 
 export enum FwStage {
@@ -24,6 +27,7 @@ export enum FwStage {
   Verifying = 'VERIFYING',
   Flashing = 'FLASHING',
   Rebooting = 'REBOOTING',
+  Finalizing = 'FINALIZING',
   VersionConfirmed = 'VERSION_CONFIRMED',
   Failed = 'FAILED',
 }
@@ -112,11 +116,18 @@ export interface FwProgress {
   detail: string;
 }
 
+// Single source of truth for the FW_DEPLOY_DONE per-controller outcome codes.
+// The runtime checks in MessageHandler and FlashJobOrchestrator derive their
+// lookup set from this same tuple, so adding a new outcome here automatically
+// extends both the type and the validators (mirrors FW_CHUNK_NAK_REASONS).
+export const FW_DEPLOY_OUTCOMES = ['OK', 'FAILED', 'PENDING'] as const;
+export type FwDeployOutcome = (typeof FW_DEPLOY_OUTCOMES)[number];
+
 export interface FwDeployDoneResult {
   controllerId: string;
-  outcome: 'OK' | 'FAILED';
+  outcome: FwDeployOutcome;
   finalVersion: string;
-  error: string; // empty string when outcome === 'OK'
+  error: string; // empty string when outcome === 'OK'; populated for FAILED; firmware sentinel for PENDING (e.g. "awaiting_post_reboot_version")
 }
 
 export interface FwDeployDone {

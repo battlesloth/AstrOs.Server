@@ -7,14 +7,17 @@ import {
 import type { ControllerFlashState, ServerFwStage } from '@/types/firmware';
 
 function state(stage: ServerFwStage): ControllerFlashState {
-  // The discriminated union requires finalVersion on VERSION_CONFIRMED
-  // and error on FAILED. Provide test placeholders so the helper can
-  // build a valid state for any stage.
+  // The discriminated union requires finalVersion on VERSION_CONFIRMED,
+  // error on FAILED, and pendingDetail on FINALIZING. Provide test
+  // placeholders so the helper can build a valid state for any stage.
   if (stage === 'VERSION_CONFIRMED') {
     return { controllerId: 'body', stage, finalVersion: 'v1.0.0-test' };
   }
   if (stage === 'FAILED') {
     return { controllerId: 'body', stage, error: 'test:error' };
+  }
+  if (stage === 'FINALIZING') {
+    return { controllerId: 'body', stage, pendingDetail: 'awaiting_post_reboot_version' };
   }
   return { controllerId: 'body', stage };
 }
@@ -126,6 +129,33 @@ describe('controllerStageLabelKey', () => {
     expect(controllerStageLabelKey(state('QUEUED'))).toBeNull();
     expect(controllerStageLabelKey(state('VERSION_CONFIRMED'))).toBeNull();
     expect(controllerStageLabelKey(state('FAILED'))).toBeNull();
+  });
+});
+
+describe('Phase C: FINALIZING mapping', () => {
+  it('maps server FINALIZING to null UI stage row', () => {
+    // No global stage row for Finalizing — the per-controller pill
+    // carries the affordance. The global stage indicator stays at
+    // whatever the prior stage was.
+    expect(mapServerStageToUiStage('FINALIZING')).toBeNull();
+  });
+
+  it('maps Finalizing controller state to the "finalizing" pill kind', () => {
+    const state: ControllerFlashState = {
+      controllerId: '00:00:00:00:00:00',
+      stage: 'FINALIZING',
+      pendingDetail: 'awaiting_post_reboot_version',
+    };
+    expect(controllerStatePillKind(state)).toBe('finalizing');
+  });
+
+  it('returns null stage label key for FINALIZING', () => {
+    const state: ControllerFlashState = {
+      controllerId: '00:00:00:00:00:00',
+      stage: 'FINALIZING',
+      pendingDetail: 'awaiting_post_reboot_version',
+    };
+    expect(controllerStageLabelKey(state)).toBeNull();
   });
 });
 

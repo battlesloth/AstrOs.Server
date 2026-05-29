@@ -987,7 +987,7 @@ export class ApiServer {
 
       this.updateClients(update);
     } catch (error) {
-      logger.error(`Error handling poll response: ${error}`);
+      logger.error(error, 'Error handling poll response');
     }
   }
 

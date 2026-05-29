@@ -19,21 +19,42 @@ const LEGAL_NEXT_STAGES: ReadonlyMap<FwStage, ReadonlySet<FwStage>> = new Map<
   FwStage,
   ReadonlySet<FwStage>
 >([
-  [FwStage.Queued, new Set([FwStage.Queued, FwStage.UploadingToMaster, FwStage.Failed])],
+  [
+    FwStage.Queued,
+    new Set([FwStage.Queued, FwStage.UploadingToMaster, FwStage.Finalizing, FwStage.Failed]),
+  ],
   [
     FwStage.UploadingToMaster,
-    new Set([FwStage.UploadingToMaster, FwStage.Sending, FwStage.Failed]),
+    new Set([FwStage.UploadingToMaster, FwStage.Sending, FwStage.Finalizing, FwStage.Failed]),
   ],
-  [FwStage.Sending, new Set([FwStage.Sending, FwStage.Verifying, FwStage.Failed])],
-  [FwStage.Verifying, new Set([FwStage.Verifying, FwStage.Flashing, FwStage.Failed])],
-  [FwStage.Flashing, new Set([FwStage.Flashing, FwStage.Rebooting, FwStage.Failed])],
-  [FwStage.Rebooting, new Set([FwStage.Rebooting, FwStage.VersionConfirmed, FwStage.Failed])],
+  [
+    FwStage.Sending,
+    new Set([FwStage.Sending, FwStage.Verifying, FwStage.Finalizing, FwStage.Failed]),
+  ],
+  [
+    FwStage.Verifying,
+    new Set([FwStage.Verifying, FwStage.Flashing, FwStage.Finalizing, FwStage.Failed]),
+  ],
+  [
+    FwStage.Flashing,
+    new Set([FwStage.Flashing, FwStage.Rebooting, FwStage.Finalizing, FwStage.Failed]),
+  ],
+  [
+    FwStage.Rebooting,
+    new Set([FwStage.Rebooting, FwStage.VersionConfirmed, FwStage.Finalizing, FwStage.Failed]),
+  ],
+  [FwStage.Finalizing, new Set([FwStage.Finalizing, FwStage.VersionConfirmed, FwStage.Failed])],
   [FwStage.VersionConfirmed, EMPTY_STAGE_SET],
   [FwStage.Failed, EMPTY_STAGE_SET],
 ]);
 
+// A stage is terminal exactly when it has no legal next stages. Derived from
+// LEGAL_NEXT_STAGES (the EMPTY_STAGE_SET entries) rather than hardcoding the
+// terminal stages, so adding/removing a terminal stage only requires editing
+// the transition graph above — one source of truth. An unmapped stage (none
+// today) is treated as non-terminal.
 export function isControllerStageTerminal(stage: FwStage): boolean {
-  return stage === FwStage.VersionConfirmed || stage === FwStage.Failed;
+  return LEGAL_NEXT_STAGES.get(stage)?.size === 0;
 }
 
 interface InFlightTransitionPayload {
@@ -48,6 +69,10 @@ interface VersionConfirmedPayload {
 
 interface FailedPayload {
   error: string;
+}
+
+interface FinalizingPayload {
+  pendingDetail: string;
 }
 
 type NonTerminalStage =
@@ -82,13 +107,21 @@ export function transitionControllerState(
 ): ControllerFlashState;
 export function transitionControllerState(
   current: ControllerFlashState,
+  toStage: FwStage.Finalizing,
+  payload: FinalizingPayload,
+): ControllerFlashState;
+export function transitionControllerState(
+  current: ControllerFlashState,
   toStage: NonTerminalStage,
   payload?: InFlightTransitionPayload,
 ): ControllerFlashState;
 export function transitionControllerState(
   current: ControllerFlashState,
   toStage: FwStage,
-  payload?: InFlightTransitionPayload & Partial<VersionConfirmedPayload> & Partial<FailedPayload>,
+  payload?: InFlightTransitionPayload &
+    Partial<VersionConfirmedPayload> &
+    Partial<FailedPayload> &
+    Partial<FinalizingPayload>,
 ): ControllerFlashState {
   if (!LEGAL_NEXT_STAGES.get(current.stage)?.has(toStage)) {
     throw new Error(
@@ -119,6 +152,15 @@ export function transitionControllerState(
       );
     }
     return { ...base, stage: FwStage.Failed, error: payload.error };
+  }
+
+  if (toStage === FwStage.Finalizing) {
+    if (typeof payload?.pendingDetail !== 'string') {
+      throw new Error(
+        `flash-job transition to ${FwStage.Finalizing} requires pendingDetail in payload (controllerId=${current.controllerId})`,
+      );
+    }
+    return { ...base, stage: FwStage.Finalizing, pendingDetail: payload.pendingDetail };
   }
 
   return { ...base, stage: toStage };

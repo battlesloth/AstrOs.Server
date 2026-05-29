@@ -9,8 +9,9 @@ import type {
 /**
  * Project a server-side stage onto a UI stage row. Returns null for stages
  * that have no corresponding row (QUEUED — handled via the per-controller
- * pill; VERSION_CONFIRMED — terminal success; FAILED — terminal failure
- * surfaced via the row's `!` glyph).
+ * pill; FINALIZING — post-reboot pending resolution, per-controller pill
+ * carries the affordance; VERSION_CONFIRMED — terminal success; FAILED —
+ * terminal failure surfaced via the row's `!` glyph).
  */
 export function mapServerStageToUiStage(stage: ServerFwStage): FirmwareStage | null {
   switch (stage) {
@@ -25,8 +26,12 @@ export function mapServerStageToUiStage(stage: ServerFwStage): FirmwareStage | n
     case 'REBOOTING':
       return 'reboot';
     case 'QUEUED':
+    case 'FINALIZING':
     case 'VERSION_CONFIRMED':
     case 'FAILED':
+      // FINALIZING is post-reboot; the per-controller pill renders the
+      // "Finalizing…" affordance. No global stage row advances during
+      // this window.
       return null;
     default: {
       // Forward-compat: a future server-side `ServerFwStage` value would
@@ -59,6 +64,8 @@ export function controllerStatePillKind(state: ControllerFlashState): FirmwareSt
     case 'FLASHING':
     case 'REBOOTING':
       return 'updating';
+    case 'FINALIZING':
+      return 'finalizing';
     case 'VERSION_CONFIRMED':
       return 'done';
     case 'FAILED':

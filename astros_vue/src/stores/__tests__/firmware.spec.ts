@@ -2393,4 +2393,161 @@ describe('firmware store', () => {
       expect(store.downloadPercent).toBeNull();
     });
   });
+
+  describe('Phase C: FINALIZING controller state', () => {
+    it('translates a wire FINALIZING row into a BySlot FINALIZING row with pendingDetail preserved', () => {
+      // Regression pin: buildControllerStatesMap must carry pendingDetail
+      // through the wire→BySlot re-keying. A spread-only implementation
+      // happens to work today, but the explicit case below makes the contract
+      // visible and catches future shape drift if the discriminated union
+      // changes. This test pins both slot-keying and field preservation.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      const job: FlashJobState = {
+        jobId: 'job-finalizing',
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: [
+          {
+            controllerId: BODY_MAC,
+            stage: 'FINALIZING',
+            pendingDetail: 'awaiting_post_reboot_version',
+          },
+        ],
+        startedAt: '2026-05-28T15:00:00Z',
+      };
+      store.applyJobStarted(job);
+
+      const state = store.controllerStates.get('body');
+      expect(state).toBeDefined();
+      expect(state!.stage).toBe('FINALIZING');
+      if (state!.stage === 'FINALIZING') {
+        expect(state!.pendingDetail).toBe('awaiting_post_reboot_version');
+      }
+    });
+
+    it('applyJobFailed records null stage in FailedControllerSummary when the controller was FINALIZING at failure time', () => {
+      // FINALIZING has no UI stage row (mapServerStageToUiStage returns null
+      // for it). applyControllerUpdate skips the currentStage update when the
+      // mapped UI stage is null, so currentStage stays null if the controller
+      // never passed through a UI-visible stage before the job failed.
+      // collectFailedControllers uses currentStage.value at call time, so the
+      // resulting FailedControllerSummary.stage is null — consistent with how
+      // all other null-mapping stages behave. This test is a regression pin.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      store.applyJobStarted({
+        jobId: 'job-finalizing-fail',
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: [
+          {
+            controllerId: BODY_MAC,
+            stage: 'FINALIZING',
+            pendingDetail: 'awaiting_post_reboot_version',
+          },
+        ],
+        startedAt: '2026-05-28T15:00:00Z',
+      });
+
+      // Confirm applyControllerUpdate for FINALIZING does not advance currentStage
+      // (mapServerStageToUiStage returns null for FINALIZING).
+      expect(store.currentStage).toBeNull();
+
+      store.applyJobFailed({
+        jobId: 'job-finalizing-fail',
+        endedAt: '2026-05-28T15:01:00Z',
+        reason: 'aborted',
+        abortReason: 'operator_cancel',
+      });
+
+      const summary = store.failedControllers.find((c) => c.id === 'body');
+      expect(summary).toBeDefined();
+      expect(summary!.stage).toBeNull();
+    });
+
+    it('surfaces post_reboot_timeout in flashError when a failed controller carries that reason', () => {
+      // Regression pin: completePendingResolution('timed_out') emits flashJobDone
+      // (not flashJobFailed) with per-controller FAILED rows carrying
+      // error='post_reboot_timeout'. Without this fix, applyJobDone never called
+      // setFlashError so the banner copy at firmware_view.flash_errors.post_reboot_timeout
+      // was unreachable. The fix scans failed controllers' error strings for
+      // KNOWN_FLASH_ERROR_REASONS matches and surfaces the first as flashError.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      // Simulate a Finalizing job snapshot (master body in FINALIZING stage).
+      store.applyJobStarted({
+        jobId: 'job-timeout',
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: [
+          {
+            controllerId: BODY_MAC,
+            stage: 'FINALIZING',
+            pendingDetail: 'awaiting_post_reboot_version',
+          },
+        ],
+        startedAt: '2026-05-28T15:00:00Z',
+      });
+
+      // Simulate the completePendingResolution('timed_out') sequence:
+      // server emits flashControllerResult (body FAILED with post_reboot_timeout)
+      // followed by flashJobDone.
+      store.applyControllerResult({
+        jobId: 'job-timeout',
+        controller: {
+          controllerId: BODY_MAC,
+          stage: 'FAILED',
+          error: 'post_reboot_timeout',
+        },
+      });
+      store.applyJobDone({
+        jobId: 'job-timeout',
+        endedAt: '2026-05-28T15:01:30Z',
+      });
+
+      expect(store.phase).toBe('failed');
+      expect(store.flashError).not.toBeNull();
+      expect(store.flashError!.reason).toBe('post_reboot_timeout');
+    });
+
+    it('applyControllerResult mutates FINALIZING → VERSION_CONFIRMED on heartbeat resolution', () => {
+      // Regression pin: when notifyMasterHeartbeat triggers completePendingResolution,
+      // the server emits flashControllerResult with stage VERSION_CONFIRMED for
+      // the previously-Finalizing controller. The UI must reflect this mutation
+      // so the row renders the confirmed state before flashJobDone arrives.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      store.applyJobStarted({
+        jobId: 'job-heartbeat',
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: [
+          {
+            controllerId: BODY_MAC,
+            stage: 'FINALIZING',
+            pendingDetail: 'awaiting_post_reboot_version',
+          },
+        ],
+        startedAt: '2026-05-28T15:00:00Z',
+      });
+
+      // Heartbeat arrives → master moves to VERSION_CONFIRMED.
+      store.applyControllerResult({
+        jobId: 'job-heartbeat',
+        controller: {
+          controllerId: BODY_MAC,
+          stage: 'VERSION_CONFIRMED',
+          finalVersion: '1.4.0',
+        },
+      });
+
+      const state = store.controllerStates.get('body');
+      expect(state).toBeDefined();
+      expect(state!.stage).toBe('VERSION_CONFIRMED');
+      if (state!.stage === 'VERSION_CONFIRMED') {
+        expect(state!.finalVersion).toBe('1.4.0');
+      }
+    });
+  });
 });
