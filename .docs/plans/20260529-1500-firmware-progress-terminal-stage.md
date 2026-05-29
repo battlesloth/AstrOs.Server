@@ -79,9 +79,43 @@ throw that caused this bug.
   (Important); added a `scriptDeploy` guard rejecting terminal stages in custom
   `stages` (Minor hardening). Committed. (User pushes via VS Code → PR into develop.)
 
+## Pre-push review (5-agent) — addressed
+
+- Removed an accidentally-committed vitest cache (`src/node_modules/.vite/.../results.json`)
+  and hardened `.gitignore` with un-anchored `node_modules/` + `.vite/`.
+- Extracted `previewTerminalState` into `flash_job_state_machine.ts` (next to
+  `transitionControllerState`) with a `never`-exhaustive switch — the union, not a
+  hand-maintained branch, now drives terminal-preview correctness.
+- Added durable server-side logging in `emitTerminalProgressPreview` (records
+  controllerId/stage/detail; `warn` on empty detail) so a transient WS preview a
+  disconnected operator missed is still diagnosable.
+- Reworded the stale `flashProgressThrottle` header comment (it conflated the
+  preview update channel with the authoritative `flashControllerResult` channel).
+- Added tests: preview-disagrees-with-DONE (VERSION_CONFIRMED preview then DONE
+  FAILED → resolves Failed), FAILED-preview-then-DONE completes (flashJobDone),
+  out-of-order terminal preview; made the integration test's VERSION_CONFIRMED
+  preview a load-bearing assertion.
+
+## Follow-up — REQUIRED, separate PR (needs a failure-mode inventory)
+
+- **Deploy-phase watchdog (pre-existing gap, widened slightly here).** During the
+  deploy phase (after `FW_DEPLOY_BEGIN`, before `FW_DEPLOY_DONE`) there is NO
+  timeout, and the serial-port `close`/`error` handlers (`api_server.ts:641-647`)
+  only log — they don't abort the active job. So a master that disconnects/crashes
+  mid-deploy holds the `JobLock` forever with no operator signal (next flash →
+  `job_already_running`). This affects `develop` already (e.g. a stall at
+  `Rebooting`); this fix removes one accidental self-heal (the old bogus
+  `protocol_violation` on a valid `VERSION_CONFIRMED` happened to release the
+  lock). Do NOT restore that — instead add a deploy-phase watchdog + serial-close →
+  `failDeployPhase('deploy_timeout')`, with a failure-mode inventory covering its
+  interaction with `rebootTimer`/`finalizeTimer`/`cancel`/`abort`/`releaseLock`.
+  The durable logging added here is a partial mitigation (diagnosable, not auto-released).
+
 ## Out of scope (logged for the UI redesign phase)
 
-- Vue store must accept `stage=VersionConfirmed` arriving via `flashControllerUpdate`
-  (today it only arrived via `flashControllerResult`).
+- Vue store must accept `stage=VersionConfirmed`/`Failed` arriving via
+  `flashControllerUpdate` (today those stages only arrived via
+  `flashControllerResult`) — the server now emits a contract shape the current
+  client may mishandle; update the wire→state mapper with the redesign.
 - `UPLOADING_TO_MASTER` is currently emitted for padawans too; new UI makes
   "Download" master-only — revisit the emit or map it store-side then.

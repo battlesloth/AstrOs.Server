@@ -155,12 +155,15 @@ describe('integration: per-controller deploy mixed OK/FAILED', () => {
       //      * master  → VersionConfirmed (finalVersion=POST_FLASH_FW)
       //      * padawan → Failed (error=PADAWAN_ERROR)
       //
-      //    Note: scriptDeploy's per-stage FW_PROGRESS frames generate
-      //    `flashControllerUpdate` events — 4 in-flight stages
-      //    (Sending/Verifying/Flashing/Rebooting) × 2 controllers = 8, plus a
-      //    terminal VERSION_CONFIRMED preview for the OK master (per
-      //    protocol.md §A the master reports it before FW_DEPLOY_DONE) = 9
-      //    update events. Those previews are non-authoritative; the binding
+      //    Note: terminal stages also appear on the `flashControllerUpdate`
+      //    stream now — for the OK master, scriptDeploy emits a FW_PROGRESS
+      //    VERSION_CONFIRMED that the server forwards as a non-authoritative
+      //    preview (per protocol.md §A). We don't pin the TOTAL update count
+      //    (the real 250ms throttle coalesces in-flight bytesSent updates), but
+      //    we DO pin that exactly one VERSION_CONFIRMED preview reaches the
+      //    update stream for the master and none for the FAILED padawan (step
+      //    8b) — a load-bearing guard against the stub silently dropping the
+      //    preview or the orchestrator failing to forward it. The binding
       //    terminal transitions arrive on the separate `flashControllerResult`
       //    stream asserted below.
       type ControllerResult = {
@@ -195,6 +198,23 @@ describe('integration: per-controller deploy mixed OK/FAILED', () => {
       expect(padawanResult).toBeDefined();
       expect(padawanResult?.data.controller.stage).toBe(FwStage.Failed);
       expect(padawanResult?.data.controller.error).toBe(PADAWAN_ERROR);
+
+      // 8b. The OK master's FW_PROGRESS VERSION_CONFIRMED is forwarded as a
+      //     non-authoritative preview on the `flashControllerUpdate` stream
+      //     (force-emitted, so this is timing-stable). Exactly one, for the
+      //     master; none for the FAILED padawan. This is the end-to-end guard
+      //     that the terminal-progress path the original bug broke now works
+      //     through the real worker→orchestrator pipeline.
+      // flashControllerUpdate carries the ControllerFlashState directly as
+      // `data` (data.stage / data.controllerId), unlike flashControllerResult
+      // which wraps it as data.controller.
+      const versionConfirmedUpdates = (
+        harness.receivedWsMessages.filter(
+          (m) => (m as { type?: unknown }).type === TransmissionType.flashControllerUpdate,
+        ) as Array<{ type: number; data: { controllerId: string; stage: FwStage } }>
+      ).filter((u) => u.data.stage === FwStage.VersionConfirmed);
+      expect(versionConfirmedUpdates).toHaveLength(1);
+      expect(versionConfirmedUpdates[0]?.data.controllerId).toBe(MASTER_SENTINEL_MAC);
 
       // 9. NO flashJobFailed should have been emitted. This is the
       //    second-most-load-bearing pin: a regression where mixed

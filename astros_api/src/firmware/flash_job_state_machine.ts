@@ -166,6 +166,38 @@ export function transitionControllerState(
   return { ...base, stage: toStage };
 }
 
+// Builds an emit-only terminal ControllerFlashState for a UI *preview* of a
+// terminal status the master reported via FW_PROGRESS (VERSION_CONFIRMED /
+// FAILED — see protocol.md §A). Unlike `transitionControllerState`, this does
+// NO FSM-legality check: a preview is not a transition, so it must not gate on
+// the controller's current stage and must never throw out of the serial-event
+// dispatcher. It still produces a fully-formed variant (`finalVersion` / `error`
+// sourced from the wire `detail`). The `never` switch forces a compile error if
+// a future terminal stage is added without a preview shape here — so the union,
+// not a hand-maintained branch in the orchestrator, drives correctness.
+export function previewTerminalState(
+  current: ControllerFlashState,
+  stage: FwStage.VersionConfirmed | FwStage.Failed,
+  detail: string,
+): ControllerFlashState {
+  const base = {
+    controllerId: current.controllerId,
+    bytesSent: current.bytesSent,
+    totalBytes: current.totalBytes,
+    detail,
+  };
+  switch (stage) {
+    case FwStage.VersionConfirmed:
+      return { ...base, stage: FwStage.VersionConfirmed, finalVersion: detail };
+    case FwStage.Failed:
+      return { ...base, stage: FwStage.Failed, error: detail };
+    default: {
+      const _exhaustive: never = stage;
+      return _exhaustive;
+    }
+  }
+}
+
 export function deriveJobLifecycle(state: FlashJobState): JobLifecycle {
   if (state.abortReason !== undefined) return 'failed';
   // Empty controllers array is degenerate — the orchestrator shouldn't

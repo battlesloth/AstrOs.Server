@@ -36,6 +36,7 @@ import {
 import {
   deriveJobLifecycle,
   isControllerStageTerminal,
+  previewTerminalState,
   transitionControllerState,
 } from './flash_job_state_machine.js';
 import type {
@@ -208,9 +209,13 @@ class FlashSourceLookupError extends Error {
 // Mid-stage progress (e.g., bytesSent advancing during UploadingToMaster)
 // can fire at hundreds of Hz when the streamer is in the inner ack loop.
 // The orchestrator coalesces those into ≤4 emits/sec per controller by
-// passing `force=false`. Stage-boundary transitions (Queued→…→
-// VersionConfirmed/Failed) pass `force=true` so no terminal/transition
-// state is dropped.
+// passing `force=false`. In-flight stage-boundary transitions (Queued→…→
+// Rebooting) pass `force=true` so no transition is dropped. Terminal
+// VERSION_CONFIRMED/FAILED arriving via FW_PROGRESS are also forced through
+// here as one-shot, non-authoritative UI previews (see
+// `emitTerminalProgressPreview`). The AUTHORITATIVE terminal results (from
+// FW_DEPLOY_DONE) are emitted as `flashControllerResult` and bypass this
+// throttle entirely — see `handleDeployDone` / `failNonTerminalControllers`.
 //
 // Semantics (per controllerId):
 //   * Leading edge: first submit fires immediately and stamps
@@ -1278,33 +1283,40 @@ export class FlashJobOrchestrator {
   // Forwards a terminal FW_PROGRESS stage (VERSION_CONFIRMED / FAILED) to the UI
   // as a one-shot `flashControllerUpdate`, WITHOUT mutating the FSM — see the
   // call site in `handleDeployProgress` for why this is emit-only. The preview
-  // state is built directly rather than via `transitionControllerState` because
-  // this is NOT a state transition: it must not be subject to the FSM
-  // legality/required-field checks, and must never throw out of the serial-event
-  // dispatcher. The new version (VERSION_CONFIRMED) or failure reason (FAILED)
-  // rides in `payload.detail`.
+  // state is built via `previewTerminalState` (NOT `transitionControllerState`)
+  // because this is NOT a state transition: it must not be subject to the FSM
+  // legality check, and must never throw out of the serial-event dispatcher. The
+  // new version (VERSION_CONFIRMED) or failure reason (FAILED) rides in
+  // `payload.detail`.
   private emitTerminalProgressPreview(target: ControllerFlashState, payload: FwProgress): void {
     if (this.throttle === null) return;
-    const base = {
-      controllerId: target.controllerId,
-      bytesSent: payload.bytesSent,
-      totalBytes: payload.totalBytes,
-      detail: payload.detail,
-    };
-    let preview: ControllerFlashState;
-    if (payload.stage === FwStage.VersionConfirmed) {
-      preview = { ...base, stage: FwStage.VersionConfirmed, finalVersion: payload.detail };
-    } else if (payload.stage === FwStage.Failed) {
-      preview = { ...base, stage: FwStage.Failed, error: payload.detail };
-    } else {
-      // Only VERSION_CONFIRMED and FAILED are terminal stages the master emits
-      // via FW_PROGRESS (protocol.md §A). A future terminal stage reaching here
-      // would need an explicit preview shape — log + skip rather than mis-render.
-      logger.info(
+    if (payload.stage !== FwStage.VersionConfirmed && payload.stage !== FwStage.Failed) {
+      // `isControllerStageTerminal` admitted this stage, but only
+      // VERSION_CONFIRMED and FAILED have a preview shape (protocol.md §A). A
+      // future terminal stage reaching here is code/protocol drift — surface
+      // loudly (not info) and skip rather than mis-render. (`previewTerminalState`
+      // would also fail to compile if such a stage were wired through it.)
+      logger.warn(
         `flash orchestrator: unhandled terminal FW_PROGRESS stage=${String(payload.stage)} for controllerId=${target.controllerId}; not forwarding preview`,
       );
       return;
     }
+    // Durable server-side record of the master's real-time per-controller signal
+    // (the WS preview is transient — a reconnecting/closed operator UI would miss
+    // it). Mirrors the Finalizing marker log in `handleDeployDone`. An empty
+    // `detail` is malformed (VERSION_CONFIRMED should carry the version, FAILED
+    // the reason) — still forward for live feedback (FW_DEPLOY_DONE corrects it
+    // ~30ms later) but flag it so a blank confirmation/failure is diagnosable.
+    if (payload.detail.trim() === '') {
+      logger.warn(
+        `flash orchestrator: terminal FW_PROGRESS stage=${payload.stage} controllerId=${target.controllerId} has empty detail (expected version/error)`,
+      );
+    } else {
+      logger.info(
+        `flash orchestrator: forwarding terminal FW_PROGRESS preview stage=${payload.stage} controllerId=${target.controllerId} detail=${payload.detail}`,
+      );
+    }
+    const preview = previewTerminalState(target, payload.stage, payload.detail);
     // force=true: a confirmation/failure must not be coalesced away or dropped
     // by the throttle window.
     this.throttle.submit(target.controllerId, preview, true);
