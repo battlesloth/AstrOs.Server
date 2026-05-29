@@ -335,6 +335,12 @@ const DEFAULT_THROTTLE_WINDOW_MS = 250;
 // first poll cycle (~2s) + ~10× safety margin. Per the Phase C firmware
 // design Section 6 cross-repo coordination.
 const DEFAULT_FINALIZE_TIMEOUT_MS = 90_000;
+// Deploy-phase inactivity watchdog: max silence (no FW_PROGRESS/FW_DEPLOY_DONE)
+// between FW_DEPLOY_BEGIN and FW_DEPLOY_DONE before the job is failed with
+// 'deploy_timeout'. Must exceed the longest quiet gap in a healthy deploy —
+// chiefly the master's own self-flash write (no FW_PROGRESS emitted during it).
+// Matches the finalizeTimer magnitude; configurable per-job.
+const DEFAULT_DEPLOY_STALL_TIMEOUT_MS = 90_000;
 
 // Discriminated union of every shape the orchestrator broadcasts. Each
 // `safeEmitWs` call site now structurally matches one arm, so a new event
@@ -419,6 +425,7 @@ export type FlashOrchestratorErrorReason =
   | 'controllers_lookup_failed'
   | 'subscriber_attach_failed'
   | 'protocol_violation'
+  | 'deploy_timeout'
   | 'streamer_unknown_error'
   | TransferErrorCode;
 
@@ -450,7 +457,12 @@ export interface FlashJobOrchestratorOpts {
   // doesn't need to know about the streamer factory.
   streamerFactory?: (opts: { bus: SerialBus }) => Streamer;
   clock?: Clock;
-  config?: { rebootTimeoutMs?: number; throttleWindowMs?: number; finalizeTimeoutMs?: number };
+  config?: {
+    rebootTimeoutMs?: number;
+    throttleWindowMs?: number;
+    finalizeTimeoutMs?: number;
+    deployStallTimeoutMs?: number;
+  };
 }
 
 // Default real-clock + real-streamer factories. Exported test-helper-style so
@@ -514,6 +526,7 @@ export class FlashJobOrchestrator {
   // alongside rebootTimer in releaseLock (covers cancel-during-Finalizing
   // and other teardown paths).
   private readonly finalizeTimeoutMs: number;
+  private readonly deployStallTimeoutMs: number;
 
   private currentJob: FlashJobState | null = null;
   // Deploy-phase resources owned beyond the synchronous span of `start()`.
@@ -541,6 +554,12 @@ export class FlashJobOrchestrator {
   // Failed("post_reboot_timeout") and completes the job. First-fire-wins
   // shared with notifyMasterHeartbeat via the null check at both sites.
   private finalizeTimer: NodeJS.Timeout | null = null;
+  // Deploy-phase inactivity watchdog timer. Armed when the deploy subscriber
+  // attaches; reset on each FW_PROGRESS; disarmed on FW_DEPLOY_DONE (hand-off
+  // to finalize/reboot timers) and in releaseLock. null outside the
+  // FW_DEPLOY_BEGIN→FW_DEPLOY_DONE window. First-fire-wins via the field's
+  // null-ness in onDeployStall.
+  private deployStallTimer: NodeJS.Timeout | null = null;
   // AbortController whose signal threads through `streamer.run`'s `opts.signal`.
   // Created at upload-phase entry, fired by `cancel()` during the upload
   // phase to reject the in-flight `streamer.run()` with TransferError 'aborted'
@@ -592,6 +611,8 @@ export class FlashJobOrchestrator {
     this.rebootTimeoutMs = opts.config?.rebootTimeoutMs ?? DEFAULT_REBOOT_TIMEOUT_MS;
     this.throttleWindowMs = opts.config?.throttleWindowMs ?? DEFAULT_THROTTLE_WINDOW_MS;
     this.finalizeTimeoutMs = opts.config?.finalizeTimeoutMs ?? DEFAULT_FINALIZE_TIMEOUT_MS;
+    this.deployStallTimeoutMs =
+      opts.config?.deployStallTimeoutMs ?? DEFAULT_DEPLOY_STALL_TIMEOUT_MS;
   }
 
   /**
