@@ -27,12 +27,17 @@ import type {
   FlashSource,
 } from '../models/firmware/flash_job_state.js';
 import {
+  FW_DEPLOY_OUTCOMES,
   FwStage,
   type FwDeployBegin,
   type FwDeployDoneResult,
   type FwProgress,
 } from '../models/firmware/firmware_messages.js';
-import { deriveJobLifecycle, transitionControllerState } from './flash_job_state_machine.js';
+import {
+  deriveJobLifecycle,
+  isControllerStageTerminal,
+  transitionControllerState,
+} from './flash_job_state_machine.js';
 import type {
   SerialBus,
   StreamObserver,
@@ -52,6 +57,12 @@ import {
 import { ChunkStreamer } from './chunk_streamer.js';
 import { MessageGenerator } from '../serial/message_generator.js';
 import { SerialMessageType } from '../serial/serial_message.js';
+
+// Runtime validation set for FW_DEPLOY_DONE outcomes — derived from the same
+// const tuple that defines FwDeployOutcome, so a new outcome can't drift
+// between the type and this defense-in-depth re-check (the parser validates
+// too, but tests and any future non-parser caller inject results directly).
+const FW_DEPLOY_OUTCOME_SET: ReadonlySet<string> = new Set(FW_DEPLOY_OUTCOMES);
 
 // Result of resolving a `FlashRequest`. `source` is the operator-facing
 // shape (carried into `flashJobStarted` and the HTTP response); `path` is
@@ -1263,7 +1274,7 @@ export class FlashJobOrchestrator {
     // orchestrator can't know whether the OK entries reflect real outcomes
     // or are a master bug, so reject the lot rather than apply some).
     for (const r of results) {
-      if (r.outcome !== 'OK' && r.outcome !== 'FAILED' && r.outcome !== 'PENDING') {
+      if (!FW_DEPLOY_OUTCOME_SET.has(r.outcome)) {
         this.failDeployPhase(
           'protocol_violation',
           `invalid outcome for controllerId=${r.controllerId}: ${String(r.outcome)}`,
@@ -1294,10 +1305,21 @@ export class FlashJobOrchestrator {
           next = transitionControllerState(target, FwStage.Finalizing, {
             pendingDetail: r.error,
           });
-        } else {
+        } else if (r.outcome === 'FAILED') {
           next = transitionControllerState(target, FwStage.Failed, {
             error: r.error,
           });
+        } else {
+          // Exhaustiveness guard: every FwDeployOutcome must be handled above.
+          // If a new outcome is added to FW_DEPLOY_OUTCOMES, this assignment
+          // fails to compile — forcing an explicit decision rather than
+          // silently degrading the new outcome to FAILED via a catch-all else.
+          const _exhaustive: never = r.outcome;
+          this.failDeployPhase(
+            'protocol_violation',
+            `unhandled FW_DEPLOY_DONE outcome: ${String(_exhaustive)}`,
+          );
+          return;
         }
       } catch (err) {
         // Illegal transition (e.g., terminal arriving when the controller
@@ -1320,6 +1342,15 @@ export class FlashJobOrchestrator {
           type: TransmissionType.flashControllerResult,
           data: { jobId: this.currentJob.jobId, controller: next },
         });
+      } else {
+        // PENDING → Finalizing is non-terminal, so the result frame is
+        // suppressed (above). Log the firmware's pending marker server-side
+        // so a bench operator can see WHY the row is being held open while it
+        // awaits the post-reboot heartbeat. This is the sole reader of
+        // pendingDetail — keep it so the field isn't dead metadata.
+        logger.info(
+          `flash orchestrator: controllerId=${r.controllerId} entered Finalizing for job=${this.currentJob.jobId}; awaiting post-reboot heartbeat (firmware marker: ${next.pendingDetail})`,
+        );
       }
     }
     this.currentJob = { ...this.currentJob, controllers: updated };
@@ -1364,6 +1395,19 @@ export class FlashJobOrchestrator {
       if (hasFinalizing) {
         this.finalizeTimer = this.clock.setTimeout(() => {
           this.finalizeTimer = null;
+          // The master never reported a matching post-reboot version within the
+          // finalize window — the single most likely real-world bench failure
+          // this feature exists to handle. Log loudly (jobId + which rows)
+          // before resolving so a silent/wedged master is diagnosable;
+          // completePendingResolution then marks the Finalizing rows
+          // Failed("post_reboot_timeout") and releases the lock.
+          const finalizingIds =
+            this.currentJob?.controllers
+              .filter((c) => c.stage === FwStage.Finalizing)
+              .map((c) => c.controllerId) ?? [];
+          logger.error(
+            `flash orchestrator: finalizeTimer expired after ${this.finalizeTimeoutMs}ms for job=${this.currentJob?.jobId ?? '<none>'}; master post-reboot heartbeat never confirmed. Marking Finalizing rows post_reboot_timeout: [${finalizingIds.join(', ')}]`,
+          );
           this.completePendingResolution('timed_out');
         }, this.finalizeTimeoutMs);
       }
@@ -1428,6 +1472,17 @@ export class FlashJobOrchestrator {
     const updated: ControllerFlashState[] = [];
     for (const c of this.currentJob.controllers) {
       if (c.stage !== FwStage.Finalizing) {
+        // Phase C edge: on the timed_out path a row that is neither Finalizing
+        // nor terminal (e.g. a padawan still Sending because the master's
+        // FW_DEPLOY_DONE omitted its result) is carried through unchanged and
+        // the job is about to be released. Surface it so a bench failure is
+        // diagnosable rather than silently abandoned — the Vue store otherwise
+        // normalizes such a row to VERSION_CONFIRMED on job-done, masking it.
+        if (outcome === 'timed_out' && !isControllerStageTerminal(c.stage)) {
+          logger.error(
+            `flash orchestrator: job=${jobId} resolving on timeout with controllerId=${c.controllerId} still non-terminal (stage=${c.stage}); no per-controller result was ever reported for it`,
+          );
+        }
         updated.push(c);
         continue;
       }

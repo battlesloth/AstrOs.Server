@@ -2477,6 +2477,76 @@ describe('FlashJobOrchestrator', () => {
       expect(vi.getTimerCount()).toBe(0);
     });
 
+    it('late master heartbeat after finalizeTimer fired is a no-op (no duplicate frames, no throw)', async () => {
+      // Third ordering for the Finalizing race (the other two are covered: this
+      // block's "heartbeat before timer" and "timer with no heartbeat"). Here
+      // the timer fires FIRST — resolving the job to post_reboot_timeout and
+      // releasing the lock — THEN a stray master POLL_ACK arrives. It must fall
+      // through both guards in notifyMasterHeartbeat (finalizeTimer === null,
+      // then rebootTimer === null) to a silent return: no second flashJobDone,
+      // no duplicate flashControllerResult, no throw. The timer-null guards are
+      // what enforce the no-op here (currentJob is never consulted on this
+      // path) — this test pins that a stray post-timeout heartbeat can't
+      // re-emit terminal frames or throw. Mirrors the pre-Phase-C reboot path's
+      // "subsequent heartbeat is a no-op" test.
+      const fx = setupHappyPath({
+        clock: fakeClock,
+        controllers: [{ id: 'master-esp', variant: 'lolin_d32_pro' }],
+        config: { finalizeTimeoutMs: 1_000 },
+      });
+      const armed = await armDeploy(fx);
+
+      // Drive master to Rebooting then deliver PENDING so it enters Finalizing.
+      for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'progress',
+          payload: {
+            transferId: armed.transferId,
+            controllerId: 'master-esp',
+            stage,
+            bytesSent: 0,
+            totalBytes: 0,
+            detail: '',
+          },
+        });
+      }
+
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [
+            {
+              controllerId: 'master-esp',
+              outcome: 'PENDING',
+              finalVersion: '',
+              error: 'awaiting_post_reboot_version',
+            },
+          ],
+        },
+      });
+
+      // Fire the finalize timer (no heartbeat) → master row Failed,
+      // flashJobDone, lock released.
+      advance(1_001);
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(1);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashControllerResult)).toHaveLength(1);
+
+      // Stray late heartbeat arrives AFTER the timeout already resolved the job.
+      const emitsBeforeHeartbeat = fx.emitWs.mock.calls.length;
+      expect(() => fx.orchestrator.notifyMasterHeartbeat('1.4.0')).not.toThrow();
+
+      // No new frames of any kind, job still released, no leaked timers.
+      expect(fx.emitWs.mock.calls.length).toBe(emitsBeforeHeartbeat);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(1);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashControllerResult)).toHaveLength(1);
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
     // -------------------------------------------------------------------------
     // Heartbeat-resolution path
     // -------------------------------------------------------------------------
@@ -2575,12 +2645,16 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('first-fire-wins: heartbeat racing the timer fires only once (mutation guard)', async () => {
-      // This test catches a regression where notifyMasterHeartbeat doesn't
-      // clear finalizeTimer before completing — a late timer-fire would
-      // then attempt to mutate an already-terminal controller and either
-      // throw or emit duplicate flashJobDone. Per CLAUDE.md mutation-test
-      // discipline: a reviewer should be able to revert the timer-clear
-      // line in notifyMasterHeartbeat and watch this test fail.
+      // This test catches a regression where the finalizeTimer isn't cleared
+      // before completion — a late timer-fire would then attempt to mutate an
+      // already-terminal controller and either throw or emit a duplicate
+      // flashJobDone. Note the timer is cleared in TWO places by design:
+      // notifyMasterHeartbeat clears it first (prevents the OS callback from
+      // re-entering), and completePendingResolution's guard clears it again as
+      // a safety net for any future caller that doesn't pre-clear. They are
+      // intentionally redundant, so per CLAUDE.md mutation-test discipline you
+      // must revert BOTH clear sites for this test to fail — reverting either
+      // one alone leaves the other to clear the timer and the test stays green.
       const fx = setupHappyPath({
         clock: fakeClock,
         controllers: [{ id: 'master-esp', variant: 'lolin_d32_pro' }],

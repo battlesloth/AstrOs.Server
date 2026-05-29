@@ -48,8 +48,13 @@ const LEGAL_NEXT_STAGES: ReadonlyMap<FwStage, ReadonlySet<FwStage>> = new Map<
   [FwStage.Failed, EMPTY_STAGE_SET],
 ]);
 
+// A stage is terminal exactly when it has no legal next stages. Derived from
+// LEGAL_NEXT_STAGES (the EMPTY_STAGE_SET entries) rather than hardcoding the
+// terminal stages, so adding/removing a terminal stage only requires editing
+// the transition graph above — one source of truth. An unmapped stage (none
+// today) is treated as non-terminal.
 export function isControllerStageTerminal(stage: FwStage): boolean {
-  return stage === FwStage.VersionConfirmed || stage === FwStage.Failed;
+  return LEGAL_NEXT_STAGES.get(stage)?.size === 0;
 }
 
 interface InFlightTransitionPayload {

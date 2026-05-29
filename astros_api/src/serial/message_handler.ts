@@ -22,12 +22,14 @@ import type { ControlModule } from 'src/models/index.js';
 import {
   FW_BACKPRESSURE_ACTIONS,
   FW_CHUNK_NAK_REASONS,
+  FW_DEPLOY_OUTCOMES,
   FW_SERIAL_SLIDING_WINDOW,
   FW_TRANSFER_END_STATUSES,
   FwStage,
   type FwBackpressureAction,
   type FwChunkNakReason,
   type FwDeployDoneResult,
+  type FwDeployOutcome,
   type FwTransferEndStatus,
 } from 'src/models/firmware/firmware_messages.js';
 
@@ -42,6 +44,7 @@ const FW_TRANSFER_END_STATUS_SET: ReadonlySet<FwTransferEndStatus> = new Set(
 const FW_BACKPRESSURE_ACTION_SET: ReadonlySet<FwBackpressureAction> = new Set(
   FW_BACKPRESSURE_ACTIONS,
 );
+const FW_DEPLOY_OUTCOME_SET: ReadonlySet<FwDeployOutcome> = new Set(FW_DEPLOY_OUTCOMES);
 const FW_STAGE_VALUES: ReadonlySet<FwStage> = new Set(Object.values(FwStage));
 
 //|--type--|--validation--|---msg Id---|---------------payload-------------|
@@ -354,8 +357,8 @@ export class MessageHandler {
         return { type: SerialWorkerResponseType.UNKNOWN };
       }
 
-      const outcome = fields[1];
-      if (outcome !== 'OK' && outcome !== 'FAILED' && outcome !== 'PENDING') {
+      const outcome = fields[1] as FwDeployOutcome;
+      if (!FW_DEPLOY_OUTCOME_SET.has(outcome)) {
         logger.error(`FW_DEPLOY_DONE has unknown outcome: ${outcome}`);
         return { type: SerialWorkerResponseType.UNKNOWN };
       }
@@ -368,7 +371,10 @@ export class MessageHandler {
       //   PENDING: master self-flash success row; emitted BEFORE master
       //            reboots so finalVersion must be empty. A populated value
       //            indicates a firmware regression — reject the frame.
-      //   FAILED: error populated; no finalVersion constraint here.
+      //   FAILED: error is expected to be populated by firmware, but is NOT
+      //           validated here — an empty FAILED error is accepted as a
+      //           degenerate-but-non-contradictory state (no finalVersion
+      //           constraint either).
       if (outcome === 'OK' && error !== '') {
         logger.error(`FW_DEPLOY_DONE OK result has non-empty error: ${error}`);
         return { type: SerialWorkerResponseType.UNKNOWN };
