@@ -2659,6 +2659,39 @@ describe('FlashJobOrchestrator', () => {
       advance(5_001);
       expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
     });
+
+    it('deploy stall: cancel() during the deploy phase disarms the watchdog (no later deploy_timeout)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      await startAndArmDeploy(fx);
+
+      // Mid-deploy (pre-DONE), the stall timer is the only armed timer.
+      expect(vi.getTimerCount()).toBe(1);
+
+      await fx.orchestrator.cancel('user');
+      const failedAfterCancel = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed).length;
+
+      // Load-bearing: cancel → releaseLock must have cleared the stall timer.
+      // (Without clearDeployStallTimer() in releaseLock this is 1, and the test fails.)
+      expect(vi.getTimerCount()).toBe(0);
+
+      advance(5_001);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(
+        failedAfterCancel,
+      );
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    });
+
+    it('deploy stall: a stray clock advance after the watchdog fired is a no-op (no second failure)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      const armed = await startAndArmDeploy(fx);
+
+      advance(5_001); // fire deploy_timeout → job released
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(1);
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+
+      advance(5_001); // a second advance must not produce another failure
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(1);
+    });
   });
 
   describe('Phase C: PENDING / Finalizing resolution', () => {
