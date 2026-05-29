@@ -10,6 +10,8 @@
 
 **Spec:** `.docs/plans/specs/2026-05-29-firmware-deploy-watchdog-design.md`
 
+> **STATUS: COMPLETE (2026-05-29).** All tasks implemented via subagent-driven development (Tasks 2 & 4 folded into one commit to avoid a leaky intermediate timer state). Commits `5ddc064`→`5889aa4`. Verified: API 848 tests + Vue 598 tests pass, tsc + lint clean. Pre-push 5-agent review passed (no Critical/Important); findings addressed in `5889aa4` (POLL_ACK-doesn't-reset regression test + doc-drift fixes + softened banner copy). Deferred follow-ups: (1) thread `deployStallTimeoutMs`/`rebootTimeoutMs` from an env var in `ApiServer.bootstrap` so the timeout is operator-tunable without a recompile; (2) de-duplicate the 4-way `flashOrchestratorConfig` shape into one exported type. Ready to push → PR into `develop`.
+
 ---
 
 ## Failure-Mode Inventory (timer-lifecycle / concurrency / crash-recovery)
