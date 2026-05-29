@@ -609,6 +609,26 @@ export const useFirmwareStore = defineStore('firmware', () => {
     if (failed.length > 0) {
       failedControllers.value = failed;
       phase.value = 'failed';
+      // completePendingResolution('timed_out') emits flashJobDone (not
+      // flashJobFailed) with per-controller FAILED rows carrying a recognized
+      // server-side error reason (e.g. 'post_reboot_timeout'). Without this
+      // scan, flashError stays null and the specific banner copy is unreachable.
+      // Scan the normalized controllerStates for the first FAILED entry whose
+      // error is in KNOWN_FLASH_ERROR_REASONS and surface it. The applyJobDone
+      // normalizer has already resolved controllerStates before this block runs,
+      // so the Map is the authoritative post-normalize view.
+      if (flashError.value === null) {
+        for (const state of controllerStates.value.values()) {
+          if (
+            state.stage === 'FAILED' &&
+            typeof state.error === 'string' &&
+            KNOWN_FLASH_ERROR_REASONS.has(state.error as FlashErrorReason)
+          ) {
+            setFlashError({ reason: state.error as FlashErrorReason });
+            break;
+          }
+        }
+      }
     } else {
       phase.value = 'done';
     }

@@ -2465,5 +2465,89 @@ describe('firmware store', () => {
       expect(summary).toBeDefined();
       expect(summary!.stage).toBeNull();
     });
+
+    it('surfaces post_reboot_timeout in flashError when a failed controller carries that reason', () => {
+      // Regression pin: completePendingResolution('timed_out') emits flashJobDone
+      // (not flashJobFailed) with per-controller FAILED rows carrying
+      // error='post_reboot_timeout'. Without this fix, applyJobDone never called
+      // setFlashError so the banner copy at firmware_view.flash_errors.post_reboot_timeout
+      // was unreachable. The fix scans failed controllers' error strings for
+      // KNOWN_FLASH_ERROR_REASONS matches and surfaces the first as flashError.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      // Simulate a Finalizing job snapshot (master body in FINALIZING stage).
+      store.applyJobStarted({
+        jobId: 'job-timeout',
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: [
+          {
+            controllerId: BODY_MAC,
+            stage: 'FINALIZING',
+            pendingDetail: 'awaiting_post_reboot_version',
+          },
+        ],
+        startedAt: '2026-05-28T15:00:00Z',
+      });
+
+      // Simulate the completePendingResolution('timed_out') sequence:
+      // server emits flashControllerResult (body FAILED with post_reboot_timeout)
+      // followed by flashJobDone.
+      store.applyControllerResult({
+        jobId: 'job-timeout',
+        controller: {
+          controllerId: BODY_MAC,
+          stage: 'FAILED',
+          error: 'post_reboot_timeout',
+        },
+      });
+      store.applyJobDone({
+        jobId: 'job-timeout',
+        endedAt: '2026-05-28T15:01:30Z',
+      });
+
+      expect(store.phase).toBe('failed');
+      expect(store.flashError).not.toBeNull();
+      expect(store.flashError!.reason).toBe('post_reboot_timeout');
+    });
+
+    it('applyControllerResult mutates FINALIZING → VERSION_CONFIRMED on heartbeat resolution', () => {
+      // Regression pin: when notifyMasterHeartbeat triggers completePendingResolution,
+      // the server emits flashControllerResult with stage VERSION_CONFIRMED for
+      // the previously-Finalizing controller. The UI must reflect this mutation
+      // so the row renders the confirmed state before flashJobDone arrives.
+      const store = useFirmwareStore();
+      seedSampleFleet();
+
+      store.applyJobStarted({
+        jobId: 'job-heartbeat',
+        source: { kind: 'github', version: '1.4.0' },
+        controllers: [
+          {
+            controllerId: BODY_MAC,
+            stage: 'FINALIZING',
+            pendingDetail: 'awaiting_post_reboot_version',
+          },
+        ],
+        startedAt: '2026-05-28T15:00:00Z',
+      });
+
+      // Heartbeat arrives → master moves to VERSION_CONFIRMED.
+      store.applyControllerResult({
+        jobId: 'job-heartbeat',
+        controller: {
+          controllerId: BODY_MAC,
+          stage: 'VERSION_CONFIRMED',
+          finalVersion: '1.4.0',
+        },
+      });
+
+      const state = store.controllerStates.get('body');
+      expect(state).toBeDefined();
+      expect(state!.stage).toBe('VERSION_CONFIRMED');
+      if (state!.stage === 'VERSION_CONFIRMED') {
+        expect(state!.finalVersion).toBe('1.4.0');
+      }
+    });
   });
 });

@@ -67,6 +67,17 @@ function failed(error = 'simulated'): ControllerFlashState {
   };
 }
 
+function finalizing(pendingDetail = 'awaiting_post_reboot_version'): ControllerFlashState {
+  return {
+    stage: FwStage.Finalizing,
+    controllerId: C_ID,
+    bytesSent: 1000,
+    totalBytes: 1000,
+    detail: '',
+    pendingDetail,
+  };
+}
+
 const SOURCE: FlashSource = {
   kind: 'github',
   version: '1.4.0',
@@ -518,5 +529,12 @@ describe('deriveJobLifecycle', () => {
     expect(deriveJobLifecycle(jobStateWith([versionConfirmed(), withStage(FwStage.Sending)]))).toBe(
       'in_flight',
     );
+  });
+
+  it("returns 'in_flight' when a controller is in Finalizing (Phase C invariant)", () => {
+    // Load-bearing for handleDeployDone's hasFinalizing branch: if Finalizing
+    // ever got reclassified as terminal, the orchestrator would skip the
+    // finalizeTimer arming and emit flashJobDone immediately on PENDING.
+    expect(deriveJobLifecycle(jobStateWith([finalizing(), versionConfirmed()]))).toBe('in_flight');
   });
 });

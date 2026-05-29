@@ -1448,7 +1448,7 @@ export class FlashJobOrchestrator {
         // finalizeTimer is already null here (cleared by the guard above).
         // Mirrors the established pattern at handleDeployDone (~lines 1270-1278).
         const detail = err instanceof Error ? err.message : String(err);
-        this.failJob(this.currentJob!.jobId, 'protocol_violation', detail);
+        this.failJob(jobId, 'protocol_violation', detail);
         return;
       }
       updated.push(next);
