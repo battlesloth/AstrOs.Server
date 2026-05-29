@@ -28,15 +28,19 @@ export interface BootIntegrationHarnessOpts {
    */
   firmwareReleaseFetcher?: typeof fetch;
   /**
-   * Override the FlashJobOrchestrator's reboot-timeout / throttle-window to
-   * keep timer-fallback tests fast. Default reboot timeout is 15000ms;
-   * tests exercising the timer fallback set this to a small value (e.g.
-   * 1000ms) so a wrong-version-heartbeat or no-heartbeat scenario doesn't
-   * burn 15 seconds of wall-clock.
+   * Override the FlashJobOrchestrator's reboot-timeout / throttle-window /
+   * deploy-stall-timeout to keep timer-fallback tests fast. Default reboot
+   * timeout is 15000ms; tests exercising the timer fallback set this to a
+   * small value (e.g. 1000ms) so a wrong-version-heartbeat or no-heartbeat
+   * scenario doesn't burn 15 seconds of wall-clock. Default deploy-stall
+   * timeout is 90000ms; tests exercising the deploy watchdog set this to a
+   * small value (e.g. 3000ms) so total silence in the deploy phase fires
+   * quickly without burning wall-clock.
    */
   flashOrchestratorConfig?: {
     rebootTimeoutMs?: number;
     throttleWindowMs?: number;
+    deployStallTimeoutMs?: number;
   };
 }
 
