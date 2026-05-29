@@ -37,6 +37,7 @@ import {
   type FwChunkNakReason,
   type FwTransferEndStatus,
 } from '../models/firmware/firmware_messages.js';
+import { isControllerStageTerminal } from '../firmware/flash_job_state_machine.js';
 
 // ---------------------------------------------------------------------------
 // Construction options
@@ -216,10 +217,13 @@ export interface ScriptDeployControllerOpts {
   finalVersion?: string;
   // Required when outcome === 'FAILED'. Validated at scriptDeploy() call time.
   error?: string;
-  // FW_PROGRESS stages to emit for this controller before FW_DEPLOY_DONE.
-  // Default [Sending, Verifying, Flashing, Rebooting]. Terminal stages
-  // (VersionConfirmed / Failed) come from FW_DEPLOY_DONE, not a final
-  // FW_PROGRESS, so they should NOT appear here.
+  // In-flight FW_PROGRESS stages to emit for this controller before
+  // FW_DEPLOY_DONE. Default [Sending, Verifying, Flashing, Rebooting]. List
+  // ONLY in-flight stages here: for an OK outcome the stub additionally emits a
+  // FW_PROGRESS VERSION_CONFIRMED frame (new version in `detail`) automatically
+  // — per protocol.md §A the master reports it in real time (it saw the new
+  // version in the padawan heartbeat) BEFORE the batch FW_DEPLOY_DONE. The
+  // authoritative terminal transition still comes from FW_DEPLOY_DONE.
   stages?: FwStage[];
 }
 
@@ -567,6 +571,16 @@ export class StubMaster {
           `StubMaster.scriptDeploy: controller '${c.id}' has outcome 'FAILED' but error is missing`,
         );
       }
+      // `stages` is the IN-FLIGHT progression only — the stub auto-emits the
+      // terminal FW_PROGRESS VERSION_CONFIRMED for OK controllers. Listing a
+      // terminal stage here would double-emit it; reject so the contract is
+      // mechanical, not comment-only (the divergence that hid the original bug).
+      const terminalInStages = c.stages?.find((s) => isControllerStageTerminal(s));
+      if (terminalInStages !== undefined) {
+        throw new Error(
+          `StubMaster.scriptDeploy: controller '${c.id}' lists terminal stage '${terminalInStages}' in 'stages'; list in-flight stages only (terminal progress is emitted automatically)`,
+        );
+      }
       return {
         id: c.id,
         outcome: c.outcome,
@@ -798,6 +812,22 @@ export class StubMaster {
               // writeFwProgress directly.
               bytesSent: 0,
               totalBytes: 0,
+            });
+          }
+          // protocol.md §A: for an OK controller the master emits a terminal
+          // FW_PROGRESS VERSION_CONFIRMED (new version in `detail`) once it sees
+          // the new version in the padawan heartbeat, BEFORE the batch
+          // FW_DEPLOY_DONE. Model that real sequence so integration tests
+          // exercise the terminal-progress path the server forwards as a UI
+          // preview (the authoritative transition still rides FW_DEPLOY_DONE).
+          if (ctrl.outcome === 'OK') {
+            this.writeFwProgress({
+              transferId,
+              controllerId: ctrl.id,
+              stage: FwStage.VersionConfirmed,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: ctrl.finalVersion,
             });
           }
         }
