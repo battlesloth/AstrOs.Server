@@ -526,6 +526,7 @@ export class FlashJobOrchestrator {
   // alongside rebootTimer in releaseLock (covers cancel-during-Finalizing
   // and other teardown paths).
   private readonly finalizeTimeoutMs: number;
+  // Inactivity watchdog window for the deploy phase (FW_DEPLOY_BEGIN→DONE).
   private readonly deployStallTimeoutMs: number;
 
   private currentJob: FlashJobState | null = null;
@@ -871,6 +872,8 @@ export class FlashJobOrchestrator {
             this.deployUnsubscriber = this.bus.subscribeDeployEvents(transferId, (event) =>
               this.handleDeployEvent(event),
             );
+            // Arm the inactivity watchdog now that we're waiting on the master.
+            this.kickDeployStallTimer();
           } catch (err) {
             const detail = err instanceof Error ? err.message : String(err);
             throw new FlashOrchestratorError('subscriber_attach_failed', detail);
@@ -1173,6 +1176,7 @@ export class FlashJobOrchestrator {
       }
       this.finalizeTimer = null;
     }
+    this.clearDeployStallTimer();
     // Disposer calls run in their own try/catch so a misbehaving
     // subscriber or throttle can't propagate up through `failJob` into
     // the background-IIFE `.catch` belt. Without this guard, a throw
@@ -1343,8 +1347,51 @@ export class FlashJobOrchestrator {
     this.throttle.submit(target.controllerId, preview, true);
   }
 
+  // Arm or reset the deploy-phase inactivity watchdog. Called at subscriber
+  // attach (initial arm) and on each FW_PROGRESS (reset). Guarded on
+  // phase==='deploy' so a stray late event can't re-arm it after hand-off.
+  private kickDeployStallTimer(): void {
+    this.clearDeployStallTimer();
+    if (this.phase !== 'deploy') return;
+    this.deployStallTimer = this.clock.setTimeout(
+      () => this.onDeployStall(),
+      this.deployStallTimeoutMs,
+    );
+  }
+
+  // Disarm the watchdog. Idempotent. Wrapped like releaseLock's other timer
+  // clears: a throw from a custom clock must not propagate out of the
+  // serial-event dispatcher into the worker.
+  private clearDeployStallTimer(): void {
+    if (this.deployStallTimer === null) return;
+    try {
+      this.clock.clearTimeout(this.deployStallTimer);
+    } catch (err) {
+      logger.error(err, `flash orchestrator: clock.clearTimeout threw clearing deployStallTimer`);
+    }
+    this.deployStallTimer = null;
+  }
+
+  // Watchdog fired: the master sent no FW_PROGRESS/FW_DEPLOY_DONE for
+  // deployStallTimeoutMs. Null the field first (so releaseLock's clear is a
+  // no-op), then guard first-fire-wins before failing the deploy phase.
+  private onDeployStall(): void {
+    this.deployStallTimer = null;
+    if (this.currentJob === null || this.phase !== 'deploy') return;
+    const jobId = this.currentJob.jobId;
+    logger.error(
+      `flash orchestrator: deploy stalled — no FW_PROGRESS/FW_DEPLOY_DONE for ${this.deployStallTimeoutMs}ms on job=${jobId}; failing (deploy_timeout)`,
+    );
+    this.failDeployPhase('deploy_timeout', `no deploy progress for ${this.deployStallTimeoutMs}ms`);
+  }
+
   private handleDeployDone(results: FwDeployDoneResult[]): void {
     if (this.currentJob === null) return;
+    // FW_DEPLOY_DONE ends the deploy-phase wait — disarm the inactivity
+    // watchdog. The post-reboot finalizeTimer/rebootTimer (armed below) govern
+    // from here. (Runs before validation: a malformed DONE still ends the wait,
+    // and failDeployPhase→releaseLock would clear it again, idempotently.)
+    this.clearDeployStallTimer();
     if (results.length === 0) {
       // Empty results array = master sent "done" with no per-controller
       // outcomes. Per FMI §1's hostile-input guard, treat as protocol

@@ -2566,6 +2566,61 @@ describe('FlashJobOrchestrator', () => {
       // Deploy subscriber disposed after done.
       expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
     });
+
+    it('deploy stall: no deploy events for deployStallTimeoutMs → deploy_timeout, controllers Failed, lock released, subscriber disposed', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      const armed = await startAndArmDeploy(fx);
+
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+      advance(5_001);
+
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({ jobId: armed.jobId, reason: 'deploy_timeout' });
+
+      const results = controllerResults(fx.emitWs);
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      expect(results.every((r) => r.controller.stage === FwStage.Failed)).toBe(true);
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+    });
+
+    it('deploy stall: FW_DEPLOY_DONE disarms the watchdog (post-DONE finalize/reboot timers govern, no deploy_timeout)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      const armed = await startAndArmDeploy(fx);
+
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: armed.targets.map((id) => ({
+            controllerId: id,
+            outcome: 'OK' as const,
+            finalVersion: '1.4.0',
+            error: '',
+          })),
+        },
+      });
+
+      advance(5_001);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+    });
   });
 
   describe('Phase C: PENDING / Finalizing resolution', () => {
@@ -2683,7 +2738,8 @@ describe('FlashJobOrchestrator', () => {
       // should still receive the snapshot.
       expect(job!.endedAt).toBeUndefined();
 
-      // finalizeTimer is armed (one outstanding fake-timer).
+      // Only the finalizeTimer is armed post-DONE — the stall watchdog is
+      // disarmed by clearDeployStallTimer() at the top of handleDeployDone.
       expect(vi.getTimerCount()).toBe(1);
 
       // Mutation-resistance (per CLAUDE.md feedback_mutation_test_defensive_features):
@@ -2762,7 +2818,8 @@ describe('FlashJobOrchestrator', () => {
         },
       });
 
-      // Pre-fire: no flashJobDone, lock held, timer armed.
+      // Pre-fire: no flashJobDone, lock held, one timer armed (finalizeTimer).
+      // The stall watchdog was disarmed at FW_DEPLOY_DONE.
       expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(0);
       expect(fx.jobLock.isLocked()).toBe(true);
       expect(vi.getTimerCount()).toBe(1);
@@ -3181,7 +3238,8 @@ describe('FlashJobOrchestrator', () => {
         },
       });
 
-      // Sanity: master is Finalizing, timer is armed.
+      // Sanity: master is Finalizing; only finalizeTimer is armed post-DONE.
+      // The stall watchdog was disarmed at FW_DEPLOY_DONE.
       expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
       expect(vi.getTimerCount()).toBe(1);
 
@@ -3305,7 +3363,8 @@ describe('FlashJobOrchestrator', () => {
       // endedAt is an ISO timestamp derived from clock.now() at deploy-done.
       expect(doneData.endedAt).toBe(new Date(1_000_000).toISOString());
 
-      // Reboot timer is armed (one outstanding fake-timer).
+      // Only the reboot timer is armed post-DONE — the stall watchdog is
+      // disarmed at FW_DEPLOY_DONE; releaseLock clears the reboot timer on exit.
       expect(vi.getTimerCount()).toBe(1);
 
       // Lock still held (release is gated on heartbeat-or-timer).
@@ -3364,8 +3423,8 @@ describe('FlashJobOrchestrator', () => {
       // flashJobFailed does NOT (job-wide abort is a separate event).
       expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(1);
       expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
-      // Reboot timer armed even with a partial failure — the master still
-      // rebooted; we still want to release the lock when its heartbeat lands.
+      // Only the reboot timer is armed post-DONE (stall watchdog disarmed at
+      // FW_DEPLOY_DONE). The master still rebooted; release via heartbeat or timer.
       expect(vi.getTimerCount()).toBe(1);
       expect(fx.jobLock.isLocked()).toBe(true);
     });
@@ -3373,6 +3432,8 @@ describe('FlashJobOrchestrator', () => {
     it('heartbeat called pre-timer: clears the timer, releases the lock, emits lockStateChanged; no leaked timers', async () => {
       const fx = setupHappyPath({ clock: fakeClock });
       const armed = await startAndCompleteDeploy(fx);
+      // Only the reboot timer is armed post-DONE (stall watchdog disarmed at
+      // FW_DEPLOY_DONE; cleared by releaseLock → notifyMasterHeartbeat path).
       expect(vi.getTimerCount()).toBe(1);
 
       const lockEventsBefore = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged).length;
@@ -3404,6 +3465,7 @@ describe('FlashJobOrchestrator', () => {
     it('reboot timer fires (no heartbeat): releases the lock, emits lockStateChanged; subsequent heartbeat is a no-op', async () => {
       const fx = setupHappyPath({ clock: fakeClock });
       await startAndCompleteDeploy(fx);
+      // Only the reboot timer is armed post-DONE (stall watchdog disarmed at FW_DEPLOY_DONE).
       expect(vi.getTimerCount()).toBe(1);
       const lockEventsBefore = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged).length;
 
@@ -3484,6 +3546,7 @@ describe('FlashJobOrchestrator', () => {
           })),
         },
       });
+      // Only the reboot timer is armed post-DONE (stall watchdog disarmed at FW_DEPLOY_DONE).
       expect(vi.getTimerCount()).toBe(1);
 
       // Advance just under the configured timeout — must NOT have released yet.
@@ -3568,9 +3631,9 @@ describe('FlashJobOrchestrator', () => {
       const armed = await startPromise;
 
       // We're now post-FW_DEPLOY_BEGIN, mid-deploy. Subscribers armed; no
-      // reboot timer yet.
+      // reboot timer yet — only the deploy stall timer (Task 2).
       expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
-      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.getTimerCount()).toBe(1);
 
       const allEventsBefore = fx.emitWs.mock.calls.length;
       fx.orchestrator.notifyMasterHeartbeat('1.4.0');
@@ -4608,7 +4671,7 @@ describe('FlashJobOrchestrator', () => {
       });
 
       // We're now in the post-flashJobDone, pre-release window. Lock still
-      // held; reboot timer armed; phase === 'done'.
+      // held; only the reboot timer is armed (stall watchdog disarmed at FW_DEPLOY_DONE).
       expect(fx.jobLock.isLocked()).toBe(true);
       expect(vi.getTimerCount()).toBe(1);
       const failedBefore = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed).length;
