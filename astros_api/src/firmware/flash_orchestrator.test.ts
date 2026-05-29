@@ -29,10 +29,18 @@ import type { FwDeployEvent } from '../models/firmware/flash_orchestrator.js';
 import { JobLock } from '../job_lock/job_lock.js';
 import { logger } from '../logger.js';
 import { TransmissionType } from '../models/enums.js';
-// T6: imported as a namespace so the protocol_violation test can vi.spyOn
+// Imported as a namespace so the protocol_violation test can vi.spyOn
 // transitionControllerState and inject a throw to exercise the defensive
-// catch in completePendingResolution.
+// catch in completePendingResolution. The vi.mock with importActual
+// passthrough at the bottom of the import block ensures the spy reliably
+// intercepts the orchestrator's named import under Vitest's ESM module
+// interop (without it, vi.spyOn would replace the namespace property but
+// the orchestrator's compiled binding might not update).
 import * as flashJobStateMachine from './flash_job_state_machine.js';
+
+vi.mock('./flash_job_state_machine.js', async (importActual) => ({
+  ...(await importActual<typeof import('./flash_job_state_machine.js')>()),
+}));
 
 // --- Fixture builders -------------------------------------------------------
 // Each builder fills only the fields `resolveFlashSource` actually reads. The
@@ -2635,17 +2643,16 @@ describe('FlashJobOrchestrator', () => {
     });
 
     it('completePendingResolution wraps transitionControllerState errors as protocol_violation', async () => {
-      // T5-deferred review finding (Important #1): defensive try/catch in
-      // completePendingResolution surfaces a hypothetical FSM throw as
-      // protocol_violation via failJob, matching the established handleDeployDone
-      // catch pattern.
+      // Defensive try/catch in completePendingResolution surfaces a hypothetical
+      // FSM throw as protocol_violation via failJob, matching the established
+      // handleDeployDone catch pattern.
       //
       // The FSM transitions Finalizing→VersionConfirmed and Finalizing→Failed
       // are both legal today, so a throw is structurally unreachable. This
       // test injects an FSM throw via vi.spyOn to prove the catch fires.
-      // vi.mock('./flash_job_state_machine.js') at the top of this file
-      // (with importActual passthrough) enables the spy to intercept the
-      // orchestrator's internal call.
+      // The top-of-file vi.mock with importActual passthrough ensures the spy
+      // reliably intercepts the orchestrator's named import under Vitest's ESM
+      // module interop.
       const fx = setupHappyPath({
         clock: fakeClock,
         controllers: [{ id: 'master-esp', variant: 'lolin_d32_pro' }],
@@ -2691,12 +2698,6 @@ describe('FlashJobOrchestrator', () => {
       // Inject the FSM throw AFTER handleDeployDone has already called it for
       // the PENDING→Finalizing transition. This mock targets only the next call
       // (the confirmed→VersionConfirmed call inside completePendingResolution).
-      // vi.spyOn on the namespace intercepts the call if Vitest's module
-      // interop shares the binding between this file and the orchestrator.
-      // If it doesn't intercept (ESM live-binding isolation), the spy is a
-      // no-op and the expect(failedEmits).toHaveLength(1) assertion below
-      // would fail, revealing the spy isn't effective — at which point a
-      // top-level vi.mock would be required.
       vi.spyOn(flashJobStateMachine, 'transitionControllerState').mockImplementationOnce(() => {
         throw new Error('illegal flash-job transition (simulated)');
       });
