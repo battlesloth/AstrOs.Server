@@ -185,6 +185,10 @@ export const FLASH_ERROR_REASONS = [
   // operator's per-row error renders the firmware_view.flash_errors.
   // post_reboot_timeout copy.
   'post_reboot_timeout',
+  // server-emitted when the deploy-phase inactivity watchdog fires
+  // (no FW_PROGRESS from master for 90 s during SENDING/VERIFYING/
+  // REBOOTING). Renders firmware_view.flash_errors.deploy_timeout copy.
+  'deploy_timeout',
   // Streamer-emitted reasons (mirror of TransferErrorCode in
   // astros_api/src/models/firmware/chunk_streamer.ts). The orchestrator
   // routes these onto `flashJobFailed` so the same envelope/locale path
