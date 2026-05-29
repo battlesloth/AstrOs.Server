@@ -38,8 +38,180 @@
     "playlists": "Playlists",
     "remote": "Remote",
     "modules": "Modules",
+    "firmware": "Firmware",
     "utility": "Utility",
     "logout": "Logout"
+  },
+  "firmware_view": {
+    "title": "Firmware",
+    "subtitle": {
+      "select": "Push firmware to your ESP fleet. The master receives the file then forwards to padawans over ESP-NOW.",
+      "flashing": "Update in progress — keep all controllers powered until reboot completes",
+      "done": "Update complete — all selected controllers are running the target firmware",
+      "failed": "Update finished with errors — review the failure below"
+    },
+    "source": {
+      "toggle_aria": "Firmware source",
+      "toggle_github": "GitHub",
+      "toggle_upload": "Upload",
+      "eyebrow_release": "SELECTED RELEASE",
+      "eyebrow_file": "SELECTED FILE",
+      "no_release_selected": "No release selected",
+      "no_file_selected": "No file selected",
+      "uploading": "Uploading…",
+      "browse_files": "Browse files…",
+      "remove": "Remove",
+      "tag_pill_latest": "Latest",
+      "tag_pill_prerelease": "Pre-release",
+      "release_option_latest_suffix": "(latest)",
+      "release_option_prerelease_suffix": "(pre-release)",
+      "label_select_release": "Select release",
+      "label_upload_file": "Upload firmware file",
+      "releases_load_error": "Failed to load releases.",
+      "releases_stale_warning": "Showing cached releases — couldn't reach GitHub since {since}.",
+      "releases_loading": "Loading releases…"
+    },
+    "topology": {
+      "eyebrow_title": "UPDATE TOPOLOGY",
+      "role_master": "MASTER",
+      "role_padawan": "PADAWAN",
+      "figure_aria_label": "Firmware update topology — master receives the file then forwards to padawan controllers over ESP-NOW",
+      "node_title": "{label} ({role})"
+    },
+    "controllers": {
+      "eyebrow_title": "CONTROLLERS",
+      "select_all": "Select all",
+      "clear": "Clear",
+      "master_pill": "Master",
+      "downgrade_pill": "DOWNGRADE",
+      "up_to_date_suffix": "· up to date",
+      "status_dot_aria": "{label} is {status}",
+      "status_up": "online",
+      "status_down": "offline",
+      "status_needs_synced": "needs sync",
+      "row_select_aria": "Select {label} for firmware update",
+      "pill": {
+        "idle": "Idle",
+        "queued": "Queued",
+        "updating": "Updating",
+        "finalizing": "Finalizing…",
+        "done": "Done",
+        "failed": "Failed",
+        "up_to_date": "Up to date",
+        "offline": "Offline",
+        "downgrade": "Downgrade"
+      },
+      "action_bar": {
+        "no_source": "Pick a source",
+        "no_selection": "Pick at least one controller",
+        "push_summary": "Will push {target} to {count} controller(s)",
+        "downgrade_blocked": "⛔ Downgrade blocked",
+        "flash_button": "Flash firmware"
+      },
+      "allow_downgrade": {
+        "toggle_label": "Allow downgrades",
+        "toggle_help": "Lets you select controllers running newer firmware than the chosen target. Resets when you reload the page."
+      },
+      "result_bar": {
+        "all_updated": "✓ All {count} controller(s) updated",
+        "failed_summary": "⚠ {label} failed during {stage}",
+        "failed_summary_multi": "⚠ {labels} failed during the flash",
+        "done": "Done"
+      },
+      "flash_error_banner": {
+        "title": "Flash failed to start",
+        "retry": "Try again",
+        "dismiss": "Dismiss"
+      }
+    },
+    "stages": {
+      "eyebrow_title": "STAGES",
+      "in_progress": "IN PROGRESS",
+      "download": {
+        "label": "Download",
+        "hint": "Master receives file"
+      },
+      "transfer": {
+        "label": "Transfer",
+        "hint": "Forward to padawans"
+      },
+      "flash": {
+        "label": "Flash",
+        "hint": "Write firmware"
+      },
+      "verify": {
+        "label": "Verify",
+        "hint": "Checksum"
+      },
+      "reboot": {
+        "label": "Reboot",
+        "hint": "Restart"
+      }
+    },
+    "confirm_modal": {
+      "title": "Confirm firmware update",
+      "source_label": "Source",
+      "controllers_label": "Targets",
+      "power_warning": "Do not cut power to any selected controller until the update completes — interrupting a flash can leave a controller in a bricked state.",
+      "downgrade_ack": "I understand this will install OLDER firmware on {count} controller(s).",
+      "cancel": "Cancel",
+      "confirm": "Push firmware",
+      "delta_separator": "→"
+    },
+    "flash_errors": {
+      "invalid_body": "The request was malformed. This is a bug — please report it.",
+      "job_already_running": "Another flash job is already running. Wait for it to finish or cancel it before starting a new one.",
+      "job_already_running_with_id": "Flash job {jobId} is already running. Wait for it to finish or cancel it before starting a new one.",
+      "no_controllers": "No controllers were selected. Pick at least one before flashing.",
+      "controllers_unknown": "Some selected controllers haven't reported their firmware variant yet — wait a poll cycle and try again.",
+      "invalid_firmware": "The selected file isn't a valid AstrOs firmware binary. Check the project name and version match an AstrOs build.",
+      "upload_io_failed": "Couldn't stage the uploaded firmware on the server. Try again or check the server's disk space.",
+      "upload_persist_failed": "The server couldn't save the uploaded firmware. Check the server logs and try again.",
+      "payload_too_large": "The selected firmware file is larger than the server's 50 MB limit. Pick a smaller binary — check it isn't a combined app+partitions+spiffs image.",
+      "variant_mismatch": "The selected release doesn't include a firmware variant for one or more of the selected controllers.",
+      "variant_unknown": "One of the selected controllers reports a variant the server doesn't recognize.",
+      "release_not_found": "The selected release could not be found on GitHub. Try refreshing the release list.",
+      "asset_not_found": "The selected release exists but is missing a firmware asset for the selected controllers.",
+      "no_upload": "Upload mode is selected but no firmware file has been uploaded yet.",
+      "release_lookup_failed": "Couldn't reach GitHub to fetch the release. Check the server's internet connection and try again.",
+      "source_resolution_failed": "Couldn't fetch the firmware binary from its source. Try again or pick a different release.",
+      "controllers_lookup_failed": "The server couldn't look up the selected controllers. Try again.",
+      "subscriber_attach_failed": "The server couldn't subscribe to deploy events. Try again or restart the server.",
+      "protocol_violation": "Unexpected message format from the server. Try again or restart the master controller.",
+      "streamer_unknown_error": "The firmware streamer failed with an unknown error. Try again.",
+      "source_read_failed": "The server couldn't read the staged firmware file from disk. Re-upload or re-fetch the binary and try again.",
+      "source_size_mismatch": "The firmware file's actual size doesn't match its declared size. Re-upload or re-fetch the binary and try again.",
+      "source_sha_mismatch": "The firmware file's bytes don't match its cached hash — the cache is stale. Re-fetch (GitHub releases) or re-upload (local upload) the binary and try again; retrying without re-caching won't help.",
+      "begin_timeout": "The master controller didn't acknowledge the transfer start. Check that the master is powered on and connected, then try again.",
+      "begin_rejected": "The master controller rejected the firmware transfer. Check that the master has free SD card space, then try again.",
+      "chunk_retry_exhausted": "Lost contact with the master controller during transfer (too many failed retries). Check the USB cable and the master's power, then try again.",
+      "flash_full": "The master controller's SD card is full. Free space (delete older scripts or run FORMAT SD), then try again.",
+      "transfer_timeout": "The firmware transfer didn't complete in time. Power-cycle the master controller, then try again.",
+      "end_timeout": "The master controller didn't acknowledge transfer completion. Check the master, then try again.",
+      "hash_mismatch": "The firmware that arrived at the master doesn't match the source binary (corrupted in transit). Try the flash again — if it persists, re-upload the binary.",
+      "master_io_error": "Serial I/O error talking to the master controller. Check the USB cable and the master's power, then try again.",
+      "bus_send_failed": "The server couldn't send to the master over the serial bus. Restart the server, then try again.",
+      "aborted": "Flash cancelled. The controllers were not updated.",
+      "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
+      "network_error": "Couldn't reach the server. Check your network connection and try again.",
+      "post_reboot_timeout": "Master controller did not report a matching firmware version within 90 seconds. The flash may have failed; verify the controller and retry."
+    },
+    "lock_active": "A firmware update is in progress — write actions are disabled until it completes.",
+    "lock_banner": "Firmware update in progress — write actions are disabled across the app.",
+    "lock_banner_cta": "View progress",
+    "lock_conflict": {
+      "title": "Firmware update in progress",
+      "body": "Another operator started a firmware update at {since}. Wait for it to finish before starting a new one."
+    },
+    "current_job_load_failed": "Could not confirm current firmware state. A flash may be in flight — refresh to retry.",
+    "flash_stream_suspended": "Live updates paused — reconnecting to the server. Progress shown may be stale.",
+    "mid_flash_error": {
+      "title_warning": "Flash warning:",
+      "title_failed": "Flash failed:",
+      "title_done_warning": "Flash completed with a warning:",
+      "abort_reason": "Abort reason: {reason}",
+      "dismiss": "Dismiss"
+    }
   },
   "placeholder": {
     "username": "username",
@@ -263,22 +435,22 @@
       "down": "{location} disconnected"
     }
   },
-  "remote_view": {
-    "title": "Remote Control",
-    "save": "Save",
-    "page": "Page",
-    "backward": "Previous page",
-    "forward": "Next page",
-    "save_success": "Remote control configuration saved successfully.",
-    "save_error": "Failed to save remote control configuration.",
-    "script_select": "Script selection",
-    "tab_scripts": "Script",
-    "tab_playlists": "Playlist",
-    "search_placeholder": "Search...",
-    "type_script": "SCR",
-    "type_playlist": "PL",
-    "button_label": "Button {number}",
-    "button_select": "Button assignment"
+  "mobile_remote": {
+    "region_label": "Mobile remote",
+    "connected_label": "Connected",
+    "chip_script": "Script",
+    "chip_playlist": "List",
+    "press_toast": "Sent: {name}",
+    "panic_toast": "STOP ALL — sending…",
+    "stop_all_idle": "Stop All",
+    "stop_all_arming": "Hold…",
+    "stop_all_active": "STOPPED",
+    "stop_all_caption": "Hold to halt every running action",
+    "empty_slot_aria": "Empty slot {number}",
+    "prev_page_aria": "Previous page",
+    "next_page_aria": "Next page",
+    "dot_aria": "Go to page {number}",
+    "no_pages": "No remote pages configured"
   },
   "utility_view": {
     "title": "Utility",
@@ -390,6 +562,50 @@
       "MIGRATION_FAILED_RESTORED": "A schema migration failed but the database was successfully rolled back to the previous version. Investigate the failed migration before redeploying.",
       "MIGRATION_FAILED_RESTORE_FAILED": "A schema migration failed and the automatic restore also failed. Manual recovery is required.",
       "UNKNOWN": "The database is currently unavailable for writes."
+    }
+  },
+  "remote_control_config": {
+    "card": {
+      "configure": "Configure →",
+      "edit": "Edit",
+      "clear": "Clear",
+      "type_script": "SCRIPT",
+      "type_playlist": "PLAYLIST"
+    },
+    "editor": {
+      "header": "BTN {n} · EDITING",
+      "close": "Close",
+      "tab_script": "Scripts",
+      "tab_playlist": "Playlists",
+      "search_placeholder": "Search…",
+      "none_row": "None",
+      "empty_state": "No matches"
+    },
+    "pageList": {
+      "header": "Pages",
+      "add": "Add page",
+      "rename": "Rename",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "renameInput": "Page name"
+    },
+    "preview": {
+      "bezel_label": "Live preview"
+    },
+    "view": {
+      "title": "Remote Control Configuration",
+      "save": "Save",
+      "unsaved": "Unsaved",
+      "loading": "Loading remote control configuration…",
+      "page_count": "{count} page | {count} pages",
+      "action_count": "{count} action | {count} actions",
+      "load_error": "Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.",
+      "save_success": "Remote control configuration saved successfully.",
+      "save_error": "Failed to save remote control configuration."
+    },
+    "deleteModal": {
+      "title": "Delete page",
+      "message": "Delete \"{name}\"? Buttons on this page will be lost."
     }
   }
 }

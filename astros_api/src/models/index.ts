@@ -41,9 +41,9 @@ export type { BaseResponse } from './networking/base_response.js';
 export type { ControllersResponse } from './networking/controllers_response.js';
 export type { StatusResponse } from './networking/status_response.js';
 export type { ScriptResponse } from './networking/script_response.js';
-export { M5Page, PageButton } from './remotes/M5Page.js';
-export type { M5ScriptList } from './remotes/M5ScriptList.js';
-export type { M5Button } from './remotes/M5Button.js';
+export { RemotePage, PageButton } from './remotes/RemotePage.js';
+export type { RemoteScriptList } from './remotes/RemoteScriptList.js';
+export type { RemoteButton } from './remotes/RemoteButton.js';
 export type { DeploymentStatus } from './scripts/deployment_status.js';
 export { Constants } from './constants.js';
 export {

@@ -74,6 +74,27 @@
       "options": {
         "cwd": "${workspaceFolder}/astros_api"
       }
+    },
+    {
+      "label": "virtual com port",
+      "type": "shell",
+      "command": "socat -d -d pty,raw,echo=0 pty,raw,echo=0",
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*socat.*$",
+          "endsPattern": "^.*PTY is (/dev/pts/\\d+).*$"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "label": "virtual com port"
+      }
     }
   ]
 }

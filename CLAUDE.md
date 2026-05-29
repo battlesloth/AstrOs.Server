@@ -70,7 +70,25 @@ The system manages **Locations** (physical positions on the droid) that contain 
 
 ## Pre-commit
 
-Always run lint and prettier before making a commit to ensure consistent formatting.
+Before each implementation commit, run in order:
+
+1. `npm run prettier:write` and `npm run lint:fix` (formatting + lint).
+2. `npm run build` (type-check) and the test suite (`npx vitest run` for single-run mode).
+3. Invoke `superpowers:requesting-code-review` on the diff against the prior commit (or `origin/<branch>` for a batch of unpushed work). Mechanical checks confirm the code compiles and tests pass; code review catches what tests can't see — comment-vs-code drift, naming-vs-protocol mismatches, missing capabilities, broken test-name format strings, and similar issues that have repeatedly come back as PR feedback when this step is skipped. Address **Critical** and **Important** issues before committing; note **Minor** for later.
+
+**When dispatching the reviewer (step 3):**
+
+- Include the OTHER side of any interface boundary the diff touches (consumer of an enum, worker that receives an envelope, test that pins the contract). The reviewer can't catch contract mismatches it never sees.
+- Frame the prompt as "find anything wrong" rather than "verify X works." Pre-framed questions return confirmation of your framing, not the bugs outside it.
+- Explicitly request: dead-metadata sweep (declared fields with no read sites), doc-vs-code drift (spec/plan claims that don't match runtime behavior), and contract checks against consumers outside the diff.
+
+**When fixing review findings (partial-fix sweep):**
+
+- The cited line is rarely the only place the bug lives. Before marking a finding "fixed," sweep the related sites for the same drift: file/header docstrings, PR description, README, type-doc claims, sibling tests, test-skip lists. On the firmware-OTA harness branch, "macOS portability" came back across four review rounds because each fix patched the cited code site but left a stale claim somewhere else (header, test skip, PR description).
+- Treat doc/header text as code. If feedback says "header claims X but code does Y," fix whichever side is wrong AND verify the other isn't making sibling claims that just slipped past.
+- A reviewer flagging the same conceptual issue twice is a signal of an incomplete sweep, not a flaky reviewer. Re-grep the symbol/claim across the module before replying "fixed" the second time.
+
+**Carve-outs that may skip step 3:** plan-only commits (no source changes), trivial typo / comment-only fixes, and check-off-only updates to a plan file. Everything else — including any change to a `.ts` / `.tsx` / test file with logic — requires the review.
 
 ## Branching & PRs
 
@@ -81,7 +99,37 @@ All implementation work goes on a feature branch that merges into `develop` via 
 - Plan files commit to the feature branch too — the "commit the plan first" rule in the Planning section still applies.
 - Open the PR with `gh pr create --base develop` when the work is ready.
 
-**Exception — doc-only changes:** Edits limited to `CLAUDE.md`, `README.md`, or `.docs/` (with no code or config impact) may be committed directly to `develop`. PR overhead isn't justified for pure meta edits.
+**Exception — doc-only changes:** A "doc-only" branch is one whose entire diff is limited to `CLAUDE.md`, `README.md`, `.docs/`, or other prose files — with no `.ts`/`.tsx`/`.vue`/`.css`/`.json` config or asset changes. A plan file committed alongside implementation work does NOT make a branch doc-only. Doc-only branches may be committed directly to `develop` and skip the pre-push toolkit; PR overhead isn't justified for pure meta edits.
+
+## Pre-push branch review
+
+Before pushing a feature branch, run a comprehensive multi-agent review on the full diff vs `develop`:
+
+```
+/pr-review-toolkit:review-pr
+```
+
+**When required:** every PR that touches code, config, or assets — regardless of size, commit count, or which directories it touches. The per-commit reviewer sees one diff at a time; the pre-push run reframes the work as a whole-branch surface, which is where cross-commit drift, missing-test sweeps, and stale-comment regressions surface.
+
+**Carve-out — skip only when the branch is documentation-only** (see definition under "Branching & PRs / Exception — doc-only changes" above).
+
+**What it does.** Dispatches 5 specialized agents in parallel against the full branch diff vs `develop`:
+
+- `code-reviewer`: bug patterns, project-convention adherence
+- `pr-test-analyzer`: coverage gaps, vacuous assertions, mutation sensitivity
+- `silent-failure-hunter`: swallowed errors, listener leaks, partial-failure cascades
+- `type-design-analyzer`: encapsulation, invariant expression
+- `comment-analyzer`: comment-vs-code drift, stale references after refactors
+
+**Prompt the agents with hazard categories, not "review this fix."** The per-commit reviewer is framed around the change; the pre-push review must be framed around what could be wrong on the full surface. Categories that have repeatedly shown up in PR feedback on this codebase:
+
+- **Concurrency**: TOCTOU windows, stream chunk boundaries, fixed sleeps masquerading as deterministic waits, missing line buffering on stream parsers, timing-baseline bugs (client-side `Date.now()` when server-side timestamps are in the payload).
+- **Operability**: `process.exit` in library code, `close()` calls that hang on unclosed clients, `process.env` mutations across concurrent boots, listener leaks after promise resolves.
+- **Resource lifecycle**: PTY cleanup, port allocation (especially "find then bind later" schemes), worker teardown, file-descriptor leaks, env restore vs explicit-config plumbing.
+
+**Address findings.** Critical and Important items must be fixed before push. Minor items may be deferred to a follow-up commit but not silently dropped.
+
+**Why this exists.** Per-commit reviews see narrow diffs and are framed by the specific change; cross-commit drift, architectural patterns, and stale comments-after-refactor only become visible at the full-branch level. Running this skill before push catches in ~10 minutes what would otherwise come back as multiple rounds of PR feedback churn.
 
 ## Planning (MANDATORY)
 
@@ -112,6 +160,10 @@ For larger features or work that spans multiple layers:
 5. As each task is completed, update the plan file to check off the box (`- [x]`) and commit the update. This makes the plan the single source of truth for progress.
 6. If a session is interrupted, the next session should read the plan file to determine what has been done and what remains.
 
+### Multi-phase projects — `current_project.md`
+
+When a feature spans 3+ independently shippable phases (typical signal: the Scope guard below recommends splitting), create `.docs/plans/current_project.md` from the template at [`.docs/templates/current_project.md`](./.docs/templates/current_project.md). This file is the top-level checklist linking to each phase's individual plan file. Update the checkbox + add the archive link when each phase ships. Move the file to `.docs/completed_plans/YYYY/MM/DD/` when the whole project ships. Single-project at a time: if another multi-phase project starts, finish or rename the existing tracker first.
+
 ### Scope guard — break up large work
 
 During planning, evaluate the total scope. If a feature involves **more than ~8 discrete tasks**, or spans **3+ layers** (migration + API + shared types + store + UI + tests + QA), it is probably too large for a single plan. In that case:
@@ -120,6 +172,10 @@ During planning, evaluate the total scope. If a feature involves **more than ~8 
 - **Propose separate plan files** for each phase (e.g., `20260330-study-crud-phase1-api.md`, `20260330-study-crud-phase2-ui.md`).
 - Each phase should be independently shippable and testable.
 - Get user approval on the phasing before proceeding.
+
+### Failure-mode inventory — for high-stakes modules
+
+For modules involving filesystem state, concurrency, network I/O, crash-recovery, or cross-process state, fill out a **failure-mode inventory** as part of the plan before writing implementation code. Template at [`.docs/templates/failure-mode-inventory.md`](./.docs/templates/failure-mode-inventory.md). The c.4 firmware cache hit ~10 PR-feedback rounds catching real bugs (Windows rename, hung downloads, mismatched-bytes hit, unbounded garbage) that the inventory's error-coverage and crash-recovery sections would have surfaced upfront. Skip for simple CRUD endpoints or pure-compute modules.
 
 ## QA Test Plans
 
@@ -144,7 +200,7 @@ Use the following skills and subagents as part of the development workflow:
 - **Feature Dev** (`feature-dev:feature-dev`): Use for guided feature development with codebase understanding and architecture focus.
 - **Debugging** (`superpowers:systematic-debugging`): Use systematic debugging for any bug, test failure, or unexpected behavior before proposing fixes.
 - **Verification** (`superpowers:verification-before-completion`): Always verify before claiming work is done or creating a PR. Run tests and confirm output — evidence before assertions.
-- **Code Review** (`superpowers:requesting-code-review`): Request a code review after completing significant features or before merging.
+- **Code Review** (`superpowers:requesting-code-review`): Run **before every implementation commit** (between tests-passing and `git commit`) — same workflow slot as prettier / lint. Mechanical checks miss comment-vs-code drift, missing capabilities, protocol-shape mismatches, and broken test-name format strings; the reviewer subagent catches them. See the Pre-commit section for the carve-outs that may skip it.
 - **Parallel Agents** (`superpowers:dispatching-parallel-agents`): Use parallel agents for independent tasks that can be worked on without shared state or sequential dependencies.
 
 ## Internationalization (i18n)

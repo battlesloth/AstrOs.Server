@@ -79,17 +79,30 @@ export enum ControllerStatus {
   down,
 }
 
+// Wire-format numeric IDs. Hand-mirrored by the Vue client's
+// `WebsocketMessageType` enum — adding or reordering values here without
+// updating the client mirror silently breaks every WS message. Explicit
+// `= N` annotations make mid-block insertions visible in diffs rather
+// than silently renumbering downstream values; the runtime contract is
+// pinned by the wire-numeric test in useWebsocket.spec.ts.
 export enum TransmissionType {
-  script,
-  sync,
-  status,
-  controllers,
-  run,
-  panic,
-  directCommand,
-  formatSD,
-  servoTest,
-  systemStatus,
+  script = 0,
+  sync = 1,
+  status = 2,
+  controllers = 3,
+  run = 4,
+  panic = 5,
+  directCommand = 6,
+  formatSD = 7,
+  servoTest = 8,
+  systemStatus = 9,
+  lockStateChanged = 10,
+  flashJobActive = 11,
+  flashJobStarted = 12,
+  flashControllerUpdate = 13,
+  flashControllerResult = 14,
+  flashJobDone = 15,
+  flashJobFailed = 16,
 }
 
 export enum TransmissionStatus {

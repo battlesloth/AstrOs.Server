@@ -3,6 +3,7 @@ import './preview.css';
 import type { ThemeConfig } from 'storybook-addon-data-theme-switcher';
 import i18n from '../src/i18n.ts';
 import { initialize, mswLoader } from 'msw-storybook-addon';
+import { createRouter, createMemoryHistory } from 'vue-router';
 import { OhVueIcon, addIcons } from 'oh-vue-icons';
 import {
   IoCloudUpload,
@@ -18,7 +19,9 @@ import {
   IoChevronDown,
   IoAdd,
   IoHelpCircleOutline,
+  IoCreate,
 } from 'oh-vue-icons/icons';
+import { MdDescription, MdDraghandle, MdFolder } from 'oh-vue-icons/icons/md';
 
 initialize();
 
@@ -39,9 +42,27 @@ setup((app) => {
     IoChevronDown,
     IoAdd,
     IoHelpCircleOutline,
+    IoCreate,
+    MdDescription,
+    MdDraghandle,
+    MdFolder,
   );
 
   app.component('v-icon', OhVueIcon);
+
+  // In-memory router so components that call useRoute() or render
+  // <RouterLink> (AstrosLockStateBanner, AstrosLayout) work in Storybook
+  // without the full app router. Routes are a wildcard catch-all because
+  // stories don't exercise navigation — they just need the router plugin
+  // installed so useRoute() returns a valid RouteLocationNormalized and
+  // <RouterLink> renders as <a href>.
+  const storybookRouter = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
+    ],
+  });
+  app.use(storybookRouter);
 });
 
 export const initialGlobals = {

@@ -1,5 +1,6 @@
 // Re-export all components from subdirectories
 export * from './common';
+export * from './firmware';
 export * from './login';
 export * from './modals';
 export * from './modules';

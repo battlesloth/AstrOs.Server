@@ -44,7 +44,7 @@ const router = createRouter({
     {
       path: '/remote',
       name: 'remote',
-      component: () => import('../views/RemoteView.vue'),
+      component: () => import('../views/RemoteControlConfigView.vue'),
     },
     {
       path: '/modules',
@@ -55,6 +55,11 @@ const router = createRouter({
       path: '/modules/:skipControllers',
       name: 'modules-skip-controllers',
       component: () => import('../views/ModulesView.vue'),
+    },
+    {
+      path: '/firmware',
+      name: 'firmware',
+      component: () => import('../views/FirmwareView.vue'),
     },
     {
       path: '/utility',

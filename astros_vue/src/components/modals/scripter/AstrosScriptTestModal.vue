@@ -6,6 +6,7 @@ import { useScriptsStore } from '@/stores/scripts';
 import { useScripterStore } from '@/stores/scripter';
 import { useLocationStore } from '@/stores/location';
 import { useI18n } from 'vue-i18n';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 
 const { t } = useI18n();
 
@@ -209,14 +210,14 @@ const closeModal = () => {
       </div>
 
       <div class="modal-action justify-center mt-5">
-        <button
+        <AstrosWriteButton
           class="btn btn-primary w-24 text-lg"
           data-testid="run-button"
           :disabled="!canRun"
           @click="runClicked"
         >
           {{ $t('run') }}
-        </button>
+        </AstrosWriteButton>
         <button
           class="btn w-24 text-lg"
           data-testid="cancel-button"

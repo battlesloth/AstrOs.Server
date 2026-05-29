@@ -9,6 +9,12 @@ import { ScriptUpload } from 'src/models/scripts/script_upload.js';
 import { ScriptRun } from 'src/models/scripts/script_run.js';
 import { ServoTest } from 'src/models/servo_test.js';
 import { MaestroModule } from 'src/models/index.js';
+import type {
+  FwTransferBegin,
+  FwChunk,
+  FwTransferEnd,
+  FwDeployBegin,
+} from 'src/models/firmware/firmware_messages.js';
 
 export enum EspModuleType {
   NONE = 0,
@@ -52,6 +58,18 @@ export class MessageGenerator {
         break;
       case SerialMessageType.SERVO_TEST:
         result = this.generateServoTestCommand(header, data);
+        break;
+      case SerialMessageType.FW_TRANSFER_BEGIN:
+        result = this.generateFwTransferBegin(header, data);
+        break;
+      case SerialMessageType.FW_CHUNK:
+        result = this.generateFwChunk(header, data);
+        break;
+      case SerialMessageType.FW_TRANSFER_END:
+        result = this.generateFwTransferEnd(header, data);
+        break;
+      case SerialMessageType.FW_DEPLOY_BEGIN:
+        result = this.generateFwDeployBegin(header, data);
         break;
       default:
         logger.error(`Unknown message type: ${type}`);
@@ -314,6 +332,50 @@ export class MessageGenerator {
     return new MessageGeneratorResponse(`${header}${MessageHelper.MessageEOL}`, [
       '00:00:00:00:00:00',
     ]);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Firmware OTA outgoing messages — see .docs/protocol.md § A.
+  // ---------------------------------------------------------------------------
+
+  generateFwTransferBegin(header: string, data: FwTransferBegin): MessageGeneratorResponse {
+    const payload = [
+      data.transferId,
+      String(data.totalSize),
+      data.sha256Hex,
+      String(data.chunkSize),
+      data.targets.join(this.RS),
+    ].join(this.US);
+
+    const msg = `${header}${this.GS}${payload}${MessageHelper.MessageEOL}`;
+    return new MessageGeneratorResponse(msg, [...data.targets], data.transferId);
+  }
+
+  generateFwChunk(header: string, data: FwChunk): MessageGeneratorResponse {
+    const payload = [
+      data.transferId,
+      String(data.seq),
+      String(data.payloadLen),
+      data.base64Bytes,
+      data.crc16Hex,
+    ].join(this.US);
+
+    const msg = `${header}${this.GS}${payload}${MessageHelper.MessageEOL}`;
+    return new MessageGeneratorResponse(msg, [], data.transferId);
+  }
+
+  generateFwTransferEnd(header: string, data: FwTransferEnd): MessageGeneratorResponse {
+    const payload = [data.transferId, String(data.totalChunks), data.finalSha256Hex].join(this.US);
+
+    const msg = `${header}${this.GS}${payload}${MessageHelper.MessageEOL}`;
+    return new MessageGeneratorResponse(msg, [], data.transferId);
+  }
+
+  generateFwDeployBegin(header: string, data: FwDeployBegin): MessageGeneratorResponse {
+    const payload = [data.transferId, data.order.join(this.RS)].join(this.US);
+
+    const msg = `${header}${this.GS}${payload}${MessageHelper.MessageEOL}`;
+    return new MessageGeneratorResponse(msg, [...data.order], data.transferId);
   }
 
   generateFormatSD(header: string, data: any) {

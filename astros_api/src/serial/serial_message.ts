@@ -1,5 +1,21 @@
 export enum SerialMessageType {
-  // for internal use
+  // Internal-use IPC envelopes (negative values). Not part of the wire
+  // protocol — never sent to or received from a controller. Used only as
+  // the `type` field on `worker.postMessage` payloads between the main
+  // thread and the serial worker.
+  //
+  // SERIAL_MSG_RECEIVED: parent → worker. "I read these bytes from the
+  // port; please parse them." The worker routes via msgService.handleMessage
+  // and posts back a typed ISerialWorkerResponse.
+  //
+  // RAW_WIRE: parent → worker. "Send these pre-formed wire bytes verbatim."
+  // The worker echoes them back as { type: SEND_SERIAL_MESSAGE, data }
+  // so the parent's existing handler writes them to the port. This path
+  // bypasses msgService.generateMessage's tracker/timeout machinery —
+  // intentional, because the firmware streamer (c.6b) has its own
+  // sliding-window retry budget and would conflict with msgService firing
+  // parallel timeouts per FW_CHUNK.
+  RAW_WIRE = -2,
   SERIAL_MSG_RECEIVED = -1,
 
   // needs to match ESP enums
@@ -26,6 +42,22 @@ export enum SerialMessageType {
   FORMAT_SD_NAK,
   SERVO_TEST, // from web server
   SERVO_TEST_ACK,
+
+  // Firmware OTA wire protocol; see .docs/protocol.md § A. Reserved range
+  // 30-40. Numeric values are explicit so a future insertion above this
+  // block does not silently shift them. AstrOs.ESP must hold the same
+  // numbers — both copies of .docs/protocol.md are the source of truth.
+  FW_TRANSFER_BEGIN = 30, // from web server
+  FW_TRANSFER_BEGIN_ACK = 31,
+  FW_CHUNK = 32, // from web server
+  FW_CHUNK_ACK = 33,
+  FW_CHUNK_NAK = 34,
+  FW_TRANSFER_END = 35, // from web server
+  FW_TRANSFER_END_ACK = 36,
+  FW_DEPLOY_BEGIN = 37, // from web server
+  FW_PROGRESS = 38,
+  FW_DEPLOY_DONE = 39,
+  FW_BACKPRESSURE = 40,
 }
 
 export class SerialMsgConst {
@@ -51,6 +83,18 @@ export class SerialMsgConst {
   static readonly FORMAT_SD_NAK = 'FORMAT_SD_NAK';
   static readonly SERVO_TEST = 'SERVO_TEST';
   static readonly SERVO_TEST_ACK = 'SERVO_TEST_ACK';
+
+  static readonly FW_TRANSFER_BEGIN = 'FW_TRANSFER_BEGIN';
+  static readonly FW_TRANSFER_BEGIN_ACK = 'FW_TRANSFER_BEGIN_ACK';
+  static readonly FW_CHUNK = 'FW_CHUNK';
+  static readonly FW_CHUNK_ACK = 'FW_CHUNK_ACK';
+  static readonly FW_CHUNK_NAK = 'FW_CHUNK_NAK';
+  static readonly FW_TRANSFER_END = 'FW_TRANSFER_END';
+  static readonly FW_TRANSFER_END_ACK = 'FW_TRANSFER_END_ACK';
+  static readonly FW_DEPLOY_BEGIN = 'FW_DEPLOY_BEGIN';
+  static readonly FW_PROGRESS = 'FW_PROGRESS';
+  static readonly FW_DEPLOY_DONE = 'FW_DEPLOY_DONE';
+  static readonly FW_BACKPRESSURE = 'FW_BACKPRESSURE';
 }
 
 export interface SerialMsgValidationResult {

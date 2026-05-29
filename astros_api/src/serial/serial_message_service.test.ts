@@ -131,6 +131,159 @@ describe('SerialMessageService', () => {
       // Tracker should be removed (all controllers ACK'd)
       expect(service.messageTracker.has(msgId)).toBe(false);
     });
+
+    // ── FW_* response routing ────────────────────────────────
+    // Regression coverage for the bug where the handleMessage switch had no
+    // FW_* cases — inbound firmware response frames validated successfully but
+    // fell through, causing the worker to postMessage `{ type: UNKNOWN }` and
+    // the orchestrator to time out at begin_timeout. See
+    // fix(api/serial): route FW_* responses through serial_message_service.
+
+    it('routes FW_TRANSFER_BEGIN_ACK to handleFwTransferBeginAck', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      const msg = buildMessage(
+        SerialMessageType.FW_TRANSFER_BEGIN_ACK,
+        'msg-fw-begin',
+        `xfer-1${US}OK`,
+      );
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.FW_TRANSFER_BEGIN_ACK);
+      if (result.type === SerialWorkerResponseType.FW_TRANSFER_BEGIN_ACK) {
+        expect(result.payload.transferId).toBe('xfer-1');
+        expect(result.payload.status).toBe('OK');
+      }
+    });
+
+    it('routes FW_CHUNK_ACK to handleFwChunkAck', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      const msg = buildMessage(
+        SerialMessageType.FW_CHUNK_ACK,
+        'msg-fw-chunk-ack',
+        `xfer-1${US}5${US}6${US}10`,
+      );
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.FW_CHUNK_ACK);
+      if (result.type === SerialWorkerResponseType.FW_CHUNK_ACK) {
+        expect(result.payload.transferId).toBe('xfer-1');
+        expect(result.payload.highestContiguousSeq).toBe(5);
+        expect(result.payload.nextExpectedSeq).toBe(6);
+        expect(result.payload.windowRemaining).toBe(10);
+      }
+    });
+
+    it('routes FW_CHUNK_NAK to handleFwChunkNak', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      const msg = buildMessage(
+        SerialMessageType.FW_CHUNK_NAK,
+        'msg-fw-chunk-nak',
+        `xfer-1${US}3${US}4${US}CRC`,
+      );
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.FW_CHUNK_NAK);
+      if (result.type === SerialWorkerResponseType.FW_CHUNK_NAK) {
+        expect(result.payload.transferId).toBe('xfer-1');
+        expect(result.payload.lastGoodSeq).toBe(3);
+        expect(result.payload.nextExpectedSeq).toBe(4);
+        expect(result.payload.reasonCode).toBe('CRC');
+      }
+    });
+
+    it('routes FW_TRANSFER_END_ACK to handleFwTransferEndAck', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      const sha = 'a'.repeat(64);
+      const msg = buildMessage(
+        SerialMessageType.FW_TRANSFER_END_ACK,
+        'msg-fw-end',
+        `xfer-1${US}OK${US}${sha}`,
+      );
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.FW_TRANSFER_END_ACK);
+      if (result.type === SerialWorkerResponseType.FW_TRANSFER_END_ACK) {
+        expect(result.payload.transferId).toBe('xfer-1');
+        expect(result.payload.status).toBe('OK');
+        expect(result.payload.computedSha256Hex).toBe(sha);
+      }
+    });
+
+    it('routes FW_PROGRESS to handleFwProgress', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      const msg = buildMessage(
+        SerialMessageType.FW_PROGRESS,
+        'msg-fw-progress',
+        `xfer-1${US}ctrl-1${US}SENDING${US}1024${US}4096${US}detail-text`,
+      );
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.FW_PROGRESS);
+      if (result.type === SerialWorkerResponseType.FW_PROGRESS) {
+        expect(result.payload.transferId).toBe('xfer-1');
+        expect(result.payload.controllerId).toBe('ctrl-1');
+        expect(result.payload.stage).toBe('SENDING');
+        expect(result.payload.bytesSent).toBe(1024);
+        expect(result.payload.totalBytes).toBe(4096);
+        expect(result.payload.detail).toBe('detail-text');
+      }
+    });
+
+    it('routes FW_DEPLOY_DONE to handleFwDeployDone', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      // Wire format: transferId<US>result_1<RS>result_2<RS>...
+      // where each result is controllerId<US>outcome<US>finalVersion<US>error.
+      // The single-controller case below has no RS — the result list is just
+      // result_1 — so the bytes coincidentally read as a flat structure, but
+      // the protocol is hierarchical (see message_handler.ts:handleFwDeployDone).
+      const msg = buildMessage(
+        SerialMessageType.FW_DEPLOY_DONE,
+        'msg-fw-deploy-done',
+        `xfer-1${US}ctrl-1${US}OK${US}1.5.0${US}`,
+      );
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.FW_DEPLOY_DONE);
+      if (result.type === SerialWorkerResponseType.FW_DEPLOY_DONE) {
+        expect(result.payload.transferId).toBe('xfer-1');
+        expect(result.payload.results).toHaveLength(1);
+        expect(result.payload.results[0].controllerId).toBe('ctrl-1');
+        expect(result.payload.results[0].outcome).toBe('OK');
+        expect(result.payload.results[0].finalVersion).toBe('1.5.0');
+        expect(result.payload.results[0].error).toBe('');
+      }
+    });
+
+    it('routes FW_BACKPRESSURE to handleFwBackpressure', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      const msg = buildMessage(
+        SerialMessageType.FW_BACKPRESSURE,
+        'msg-fw-bp',
+        `xfer-1${US}PAUSE${US}sd_busy`,
+      );
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.FW_BACKPRESSURE);
+      if (result.type === SerialWorkerResponseType.FW_BACKPRESSURE) {
+        expect(result.payload.transferId).toBe('xfer-1');
+        expect(result.payload.action).toBe('PAUSE');
+        expect(result.payload.reason).toBe('sd_busy');
+      }
+    });
   });
 
   // ── Tracker lifecycle ────────────────────────────────────────

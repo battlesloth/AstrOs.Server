@@ -5,7 +5,7 @@ import { logger } from 'src/logger.js';
 import { TrackType } from 'src/models/playlists/trackType.js';
 import { v4 as uuid } from 'uuid';
 import { PlaylistType } from 'src/models/playlists/playlistType.js';
-import { generateShortId } from 'src/utility.js';
+import { generateShortId } from 'src/utility/short_id.js';
 import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
 
 export class PlaylistRepository {

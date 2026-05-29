@@ -2,7 +2,8 @@
 import router from '@/router';
 import apiService from '@/api/apiService';
 import { ref, watch } from 'vue';
-import SystemStatusBanner from '@/components/common/SystemStatusBanner.vue';
+import AstrosSystemStatusBanner from '@/components/common/systemStatusBanner/AstrosSystemStatusBanner.vue';
+import AstrosLockStateBanner from '@/components/common/lockStateBanner/AstrosLockStateBanner.vue';
 
 const props = defineProps({
   isSidebarOpen: {
@@ -45,7 +46,8 @@ function logout() {
       aria-controls="sidebar-menu"
     />
     <div class="drawer-content">
-      <SystemStatusBanner />
+      <AstrosSystemStatusBanner />
+      <AstrosLockStateBanner />
       <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-none pl-2 flex items-center">
           <label
@@ -100,6 +102,9 @@ function logout() {
             </li>
             <li>
               <router-link to="/modules">{{ $t('nav.modules') }}</router-link>
+            </li>
+            <li>
+              <router-link to="/firmware">{{ $t('nav.firmware') }}</router-link>
             </li>
             <li>
               <router-link to="/utility">{{ $t('nav.utility') }}</router-link>

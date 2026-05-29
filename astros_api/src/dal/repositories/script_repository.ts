@@ -29,7 +29,8 @@ import {
   readUartChannel,
 } from './module_repositories/uart_repository.js';
 import { getI2cModules, readI2cChannel } from './module_repositories/i2c_repository.js';
-import { calculateLengthDS, generateShortId, updateScriptDuration } from 'src/utility.js';
+import { generateShortId } from 'src/utility/short_id.js';
+import { calculateLengthDS, updateScriptDuration } from 'src/scripting/script_duration.js';
 
 export class ScriptRepository {
   constructor(private readonly db: Kysely<Database>) {}

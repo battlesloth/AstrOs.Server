@@ -46,3 +46,32 @@
   background-color: #f49446 !important;
   color: black !important;
 }
+
+/* Tokens scoped to .firmware-view so the rest of the app keeps the existing palette; values from .docs/design_handoff_firmware_update/. */
+.firmware-view {
+  --fw-ink: #0e1726;
+  --fw-ink-soft: #4b5b73;
+  --fw-border: #d6e0e6;
+  --fw-border-strong: #9bb1bd;
+  --fw-success: #3aa676;
+  --fw-warn: #e5a93a;
+  --fw-danger: #cf4242;
+
+  --fw-state-idle-bg: #e6edf2;
+  --fw-state-idle-fg: #4b5b73;
+  --fw-state-idle-dot: #9bb1bd;
+  --fw-state-queued-bg: #e8eef7;
+  --fw-state-queued-fg: #3a4a6b;
+  --fw-state-queued-dot: #7d92b8;
+  --fw-state-updating-bg: #fff3dc;
+  --fw-state-updating-fg: #7d5a14;
+  --fw-state-updating-dot: #e5a93a;
+  --fw-state-done-bg: #dcf2e6;
+  --fw-state-done-fg: #1f6e44;
+  --fw-state-done-dot: #3aa676;
+  --fw-state-failed-bg: #fbe0e0;
+  --fw-state-failed-fg: #9a2828;
+  --fw-state-failed-dot: #cf4242;
+
+  font-family: 'Inter', system-ui, sans-serif;
+}
