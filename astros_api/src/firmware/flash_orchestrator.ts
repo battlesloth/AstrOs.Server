@@ -1217,6 +1217,21 @@ export class FlashJobOrchestrator {
       this.failDeployPhase('protocol_violation', `invalid stage: ${String(payload.stage)}`);
       return;
     }
+    // VERSION_CONFIRMED / FAILED also arrive via FW_PROGRESS: per protocol.md §A
+    // the master reports per-controller terminal status in real time (e.g. "saw
+    // the new version in the padawan heartbeat") BEFORE the batch FW_DEPLOY_DONE.
+    // These are informational UI signals — forward them so the operator sees
+    // per-controller confirmation/failure live, but do NOT run the FSM terminal
+    // transition here. The authoritative transition (carrying finalVersion /
+    // error) lands in `handleDeployDone` when FW_DEPLOY_DONE arrives. Routing a
+    // terminal stage through `transitionControllerState` would throw — it needs
+    // finalVersion / error the progress frame doesn't carry — which previously
+    // failed the whole job and disposed the deploy subscriber, dropping the very
+    // FW_DEPLOY_DONE that carries the real outcome.
+    if (isControllerStageTerminal(payload.stage)) {
+      this.emitTerminalProgressPreview(target, payload);
+      return;
+    }
     // Same-stage progress (bytesSent advance) and stage transitions both
     // route through `transitionControllerState`, which permits the
     // self-edge in the LEGAL_NEXT_STAGES map for non-terminal stages.
@@ -1225,10 +1240,10 @@ export class FlashJobOrchestrator {
     const stageChanged = target.stage !== payload.stage;
     let next: ControllerFlashState;
     try {
-      // Terminal stages arrive via FW_DEPLOY_DONE; `handleDeployProgress` only
-      // sees in-flight stages. The narrow union below excludes terminal
-      // stages so transitionControllerState's overload picks the in-flight
-      // payload (bytesSent / totalBytes / detail).
+      // Terminal stages are handled above (forwarded as UI previews), so by here
+      // payload.stage is an in-flight stage. The narrow union below matches
+      // transitionControllerState's in-flight overload (bytesSent / totalBytes /
+      // detail).
       next = transitionControllerState(
         target,
         payload.stage as
@@ -1258,6 +1273,41 @@ export class FlashJobOrchestrator {
     if (this.throttle !== null) {
       this.throttle.submit(next.controllerId, next, stageChanged);
     }
+  }
+
+  // Forwards a terminal FW_PROGRESS stage (VERSION_CONFIRMED / FAILED) to the UI
+  // as a one-shot `flashControllerUpdate`, WITHOUT mutating the FSM — see the
+  // call site in `handleDeployProgress` for why this is emit-only. The preview
+  // state is built directly rather than via `transitionControllerState` because
+  // this is NOT a state transition: it must not be subject to the FSM
+  // legality/required-field checks, and must never throw out of the serial-event
+  // dispatcher. The new version (VERSION_CONFIRMED) or failure reason (FAILED)
+  // rides in `payload.detail`.
+  private emitTerminalProgressPreview(target: ControllerFlashState, payload: FwProgress): void {
+    if (this.throttle === null) return;
+    const base = {
+      controllerId: target.controllerId,
+      bytesSent: payload.bytesSent,
+      totalBytes: payload.totalBytes,
+      detail: payload.detail,
+    };
+    let preview: ControllerFlashState;
+    if (payload.stage === FwStage.VersionConfirmed) {
+      preview = { ...base, stage: FwStage.VersionConfirmed, finalVersion: payload.detail };
+    } else if (payload.stage === FwStage.Failed) {
+      preview = { ...base, stage: FwStage.Failed, error: payload.detail };
+    } else {
+      // Only VERSION_CONFIRMED and FAILED are terminal stages the master emits
+      // via FW_PROGRESS (protocol.md §A). A future terminal stage reaching here
+      // would need an explicit preview shape — log + skip rather than mis-render.
+      logger.info(
+        `flash orchestrator: unhandled terminal FW_PROGRESS stage=${String(payload.stage)} for controllerId=${target.controllerId}; not forwarding preview`,
+      );
+      return;
+    }
+    // force=true: a confirmation/failure must not be coalesced away or dropped
+    // by the throttle window.
+    this.throttle.submit(target.controllerId, preview, true);
   }
 
   private handleDeployDone(results: FwDeployDoneResult[]): void {

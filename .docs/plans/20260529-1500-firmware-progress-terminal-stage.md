@@ -56,7 +56,7 @@ throw that caused this bug.
 
 ## Tasks
 
-- [ ] **Failing test first (TDD red).** In `flash_orchestrator.test.ts`: drive a
+- [x] **Failing test first (TDD red).** In `flash_orchestrator.test.ts`: drive a
   controller to `Rebooting` via FW_PROGRESS, then deliver `FW_PROGRESS
   VERSION_CONFIRMED` (detail=version). Assert: NO `flashJobFailed`; a
   `flashControllerUpdate` with `stage=VersionConfirmed` + `finalVersion`=detail is
@@ -64,19 +64,20 @@ throw that caused this bug.
   then a subsequent `FW_DEPLOY_DONE OK` drives the authoritative transition and
   emits `flashControllerResult` + `flashJobDone`. Add a sibling test for
   `FW_PROGRESS FAILED` (detail=error). Confirm both FAIL against current code.
-- [ ] **Implement** the terminal-stage forwarding branch in `handleDeployProgress`
-  (`flash_orchestrator.ts`). Make the tests pass.
-- [ ] **Mutation check** (per defensive-feature rule): revert the new branch and
-  confirm the new tests fail (no vacuous assertions), then restore.
-- [ ] **Align the harness + comments to protocol:** update `stub_master.ts` to
-  emit `FW_PROGRESS VERSION_CONFIRMED` before `FW_DEPLOY_DONE` (per
-  `protocol.md:136`); correct the misleading comments at
-  `flash_orchestrator.ts:1233` and `stub_master.ts:221`. Re-confirm the existing
-  happy-path test still passes (now exercising the real firmware sequence).
-- [ ] **Pre-commit:** `prettier:write`, `lint:fix`, `build`, `vitest run`;
-  `superpowers:requesting-code-review` on the diff (include the consumer side:
-  protocol.md, message_handler, the Vue store's wire→state mapper note).
-  Address Critical/Important. Then commit. (User pushes via VS Code → PR into develop.)
+- [x] **Implement** the terminal-stage forwarding branch in `handleDeployProgress`
+  (`flash_orchestrator.ts`). Make the tests pass. (Added `emitTerminalProgressPreview`.)
+- [x] **Mutation check** (per defensive-feature rule): RED run confirmed all 3
+  tests fail without the fix (false `flashJobFailed` / disposed subscriber).
+- [x] **Align the harness + comments to protocol:** `stub_master.ts` now
+  auto-emits `FW_PROGRESS VERSION_CONFIRMED` (detail=finalVersion) for OK
+  controllers before `FW_DEPLOY_DONE` (per `protocol.md:136`); corrected the
+  comments at `flash_orchestrator.ts` (in-flight overload) and `stub_master.ts`
+  (`stages` doc). Full suite green incl. integration (838 tests).
+- [x] **Pre-commit:** prettier + lint (0 errors) + build (clean tsc) + full
+  `vitest run` (838 pass incl. integration). Code review done: fixed stale
+  `flashControllerUpdate` count comment in `flash_partial_failure.integration.test.ts`
+  (Important); added a `scriptDeploy` guard rejecting terminal stages in custom
+  `stages` (Minor hardening). Committed. (User pushes via VS Code → PR into develop.)
 
 ## Out of scope (logged for the UI redesign phase)
 

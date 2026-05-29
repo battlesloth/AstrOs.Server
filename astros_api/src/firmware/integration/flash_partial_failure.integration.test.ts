@@ -156,9 +156,13 @@ describe('integration: per-controller deploy mixed OK/FAILED', () => {
       //      * padawan → Failed (error=PADAWAN_ERROR)
       //
       //    Note: scriptDeploy's per-stage FW_PROGRESS frames generate
-      //    `flashControllerUpdate` events (Sending/Verifying/Flashing/Rebooting
-      //    × 2 controllers = 8 events on the WS bus); the terminal
-      //    transitions are the separate `flashControllerResult` stream.
+      //    `flashControllerUpdate` events — 4 in-flight stages
+      //    (Sending/Verifying/Flashing/Rebooting) × 2 controllers = 8, plus a
+      //    terminal VERSION_CONFIRMED preview for the OK master (per
+      //    protocol.md §A the master reports it before FW_DEPLOY_DONE) = 9
+      //    update events. Those previews are non-authoritative; the binding
+      //    terminal transitions arrive on the separate `flashControllerResult`
+      //    stream asserted below.
       type ControllerResult = {
         type: number;
         data: {
