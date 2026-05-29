@@ -536,7 +536,7 @@ export class FlashJobOrchestrator {
   // asynchronously through `handleDeployEvent`. Both fields are disposed on
   // every exit path: FW_DEPLOY_DONE drops the subscriber inline; the
   // canonical `releaseLock` helper disposes both idempotently for the
-  // protocol_violation, reboot-timeout, heartbeat, and cancel paths.
+  // protocol_violation, deploy_timeout, reboot-timeout, heartbeat, and cancel paths.
   // A leaked subscriber would route a stale prior job's deploy events into
   // the next job; a leaked throttle would carry per-controller flush timers
   // across jobs.
@@ -634,7 +634,7 @@ export class FlashJobOrchestrator {
    * try/catch maps them to typed `FlashOrchestratorError` and the
    * controller's catch block maps THAT to the right HTTP status code.
    * Background errors (streamer rejection, deploy-begin bus_send_failed,
-   * subscriber_attach_failed) route through `failJob` exactly the same
+   * subscriber_attach_failed, deploy-phase inactivity timeout `deploy_timeout`) route through `failJob` exactly the same
    * way the prior all-sync catch did, but emit on the WS surface only —
    * by the time they fire, HTTP has already responded 200.
    *
@@ -1661,10 +1661,11 @@ export class FlashJobOrchestrator {
     this.releaseLock(jobId);
   }
 
-  // Mid-deploy failure entry — `handleDeployEvent` calls this when FW_PROGRESS
-  // / FW_DEPLOY_DONE wire validation trips `protocol_violation`. The deploy
-  // subscriber fires asynchronously off a serial event so it can't throw out
-  // of an orchestrator try/catch; this wrapper delegates to `failJob`.
+  // Mid-deploy failure entry. Callers: handleDeployProgress / handleDeployDone on
+  // a `protocol_violation` (FW_PROGRESS / FW_DEPLOY_DONE wire-validation failure),
+  // and onDeployStall on a `deploy_timeout` (the inactivity watchdog fired).
+  // Reached either off an async serial event or off the watchdog timer callback —
+  // both run outside an orchestrator try/catch — so this wrapper delegates to failJob.
   private failDeployPhase(reason: FlashOrchestratorErrorReason, detail: string): void {
     if (this.currentJob === null) return;
     this.failJob(this.currentJob.jobId, reason, detail);
@@ -1688,7 +1689,7 @@ export class FlashJobOrchestrator {
   //   3. Emit `flashJobFailed { jobId, reason, detail, endedAt }` (with
   //      `abortReason` mixed in when the bucket-B path supplied one).
   //   4. `releaseLock(jobId)` for canonical teardown — disposes
-  //      subscriber, throttle, reboot timer, AbortController, clears
+  //      subscriber, throttle, reboot/finalize/deploy-stall timers, AbortController, clears
   //      `currentJob`, releases the lock, broadcasts `lockStateChanged`.
   //
   // Idempotent against `currentJob === null`: pre-streamer failures still

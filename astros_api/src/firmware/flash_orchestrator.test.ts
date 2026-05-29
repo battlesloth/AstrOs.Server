@@ -2656,8 +2656,25 @@ describe('FlashJobOrchestrator', () => {
         },
       });
 
+      // Stall timer was cleared at DONE — only the post-DONE reboot timer remains.
+      expect(vi.getTimerCount()).toBe(1);
+
       advance(5_001);
       expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+    });
+
+    it('deploy stall: a master POLL_ACK heartbeat does NOT reset the watchdog (heartbeats are not deploy events)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      await startAndArmDeploy(fx);
+
+      // A heartbeat mid-deploy must NOT kick the stall timer (only FW_PROGRESS does).
+      advance(4_000);
+      fx.orchestrator.notifyMasterHeartbeat('1.4.0');
+      advance(1_001); // 5_001 total since arm, with NO deploy event in between
+
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({ reason: 'deploy_timeout' });
     });
 
     it('deploy stall: cancel() during the deploy phase disarms the watchdog (no later deploy_timeout)', async () => {
