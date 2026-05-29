@@ -1226,6 +1226,8 @@ export class FlashJobOrchestrator {
   private handleDeployEvent(event: FwDeployEvent): void {
     if (this.currentJob === null) return;
     if (event.kind === 'progress') {
+      // Master is alive — reset the inactivity watchdog before processing.
+      this.kickDeployStallTimer();
       this.handleDeployProgress(event.payload);
       return;
     }

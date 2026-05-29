@@ -2586,6 +2586,44 @@ describe('FlashJobOrchestrator', () => {
       expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
     });
 
+    it('deploy stall: FW_PROGRESS resets the watchdog (no false timeout while the master keeps reporting)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      const armed = await startAndArmDeploy(fx);
+
+      advance(4_000);
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.Verifying,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: '',
+        },
+      });
+      advance(4_000); // 8s total elapsed, only 4s since the last event
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.Flashing,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: '',
+        },
+      });
+
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+
+      advance(5_001); // now go silent past the window
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({ reason: 'deploy_timeout' });
+    });
+
     it('deploy stall: FW_DEPLOY_DONE disarms the watchdog (post-DONE finalize/reboot timers govern, no deploy_timeout)', async () => {
       const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
       const armed = await startAndArmDeploy(fx);
