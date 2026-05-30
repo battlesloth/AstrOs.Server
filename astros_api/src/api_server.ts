@@ -145,6 +145,7 @@ export interface ApiServerOptions {
   flashOrchestratorConfig?: {
     rebootTimeoutMs?: number;
     throttleWindowMs?: number;
+    deployStallTimeoutMs?: number;
   };
   configOverrides?: ConfigOverrides;
 }
@@ -184,6 +185,7 @@ export class ApiServer {
   private readonly flashOrchestratorConfig?: {
     rebootTimeoutMs?: number;
     throttleWindowMs?: number;
+    deployStallTimeoutMs?: number;
   };
   private readonly configOverrides?: ConfigOverrides;
 

@@ -335,6 +335,12 @@ const DEFAULT_THROTTLE_WINDOW_MS = 250;
 // first poll cycle (~2s) + ~10× safety margin. Per the Phase C firmware
 // design Section 6 cross-repo coordination.
 const DEFAULT_FINALIZE_TIMEOUT_MS = 90_000;
+// Deploy-phase inactivity watchdog: max silence (no FW_PROGRESS/FW_DEPLOY_DONE)
+// between FW_DEPLOY_BEGIN and FW_DEPLOY_DONE before failing with 'deploy_timeout'.
+// Must exceed the longest quiet gap in the deploy phase; per .docs/protocol.md the
+// master's self-flash/commit+reboot happens after FW_DEPLOY_DONE and is covered by the
+// post-DONE finalize/reboot timers (not this watchdog).
+const DEFAULT_DEPLOY_STALL_TIMEOUT_MS = 90_000;
 
 // Discriminated union of every shape the orchestrator broadcasts. Each
 // `safeEmitWs` call site now structurally matches one arm, so a new event
@@ -419,6 +425,7 @@ export type FlashOrchestratorErrorReason =
   | 'controllers_lookup_failed'
   | 'subscriber_attach_failed'
   | 'protocol_violation'
+  | 'deploy_timeout'
   | 'streamer_unknown_error'
   | TransferErrorCode;
 
@@ -450,7 +457,12 @@ export interface FlashJobOrchestratorOpts {
   // doesn't need to know about the streamer factory.
   streamerFactory?: (opts: { bus: SerialBus }) => Streamer;
   clock?: Clock;
-  config?: { rebootTimeoutMs?: number; throttleWindowMs?: number; finalizeTimeoutMs?: number };
+  config?: {
+    rebootTimeoutMs?: number;
+    throttleWindowMs?: number;
+    finalizeTimeoutMs?: number;
+    deployStallTimeoutMs?: number;
+  };
 }
 
 // Default real-clock + real-streamer factories. Exported test-helper-style so
@@ -514,6 +526,8 @@ export class FlashJobOrchestrator {
   // alongside rebootTimer in releaseLock (covers cancel-during-Finalizing
   // and other teardown paths).
   private readonly finalizeTimeoutMs: number;
+  // Inactivity watchdog window for the deploy phase (FW_DEPLOY_BEGIN→DONE).
+  private readonly deployStallTimeoutMs: number;
 
   private currentJob: FlashJobState | null = null;
   // Deploy-phase resources owned beyond the synchronous span of `start()`.
@@ -522,7 +536,7 @@ export class FlashJobOrchestrator {
   // asynchronously through `handleDeployEvent`. Both fields are disposed on
   // every exit path: FW_DEPLOY_DONE drops the subscriber inline; the
   // canonical `releaseLock` helper disposes both idempotently for the
-  // protocol_violation, reboot-timeout, heartbeat, and cancel paths.
+  // protocol_violation, deploy_timeout, reboot-timeout, heartbeat, and cancel paths.
   // A leaked subscriber would route a stale prior job's deploy events into
   // the next job; a leaked throttle would carry per-controller flush timers
   // across jobs.
@@ -541,6 +555,12 @@ export class FlashJobOrchestrator {
   // Failed("post_reboot_timeout") and completes the job. First-fire-wins
   // shared with notifyMasterHeartbeat via the null check at both sites.
   private finalizeTimer: NodeJS.Timeout | null = null;
+  // Deploy-phase inactivity watchdog timer. Armed when the deploy subscriber
+  // attaches; reset on each FW_PROGRESS; disarmed on FW_DEPLOY_DONE (hand-off
+  // to finalize/reboot timers) and in releaseLock. null outside the
+  // FW_DEPLOY_BEGIN→FW_DEPLOY_DONE window. First-fire-wins via the field's
+  // null-ness in onDeployStall.
+  private deployStallTimer: NodeJS.Timeout | null = null;
   // AbortController whose signal threads through `streamer.run`'s `opts.signal`.
   // Created at upload-phase entry, fired by `cancel()` during the upload
   // phase to reject the in-flight `streamer.run()` with TransferError 'aborted'
@@ -592,6 +612,8 @@ export class FlashJobOrchestrator {
     this.rebootTimeoutMs = opts.config?.rebootTimeoutMs ?? DEFAULT_REBOOT_TIMEOUT_MS;
     this.throttleWindowMs = opts.config?.throttleWindowMs ?? DEFAULT_THROTTLE_WINDOW_MS;
     this.finalizeTimeoutMs = opts.config?.finalizeTimeoutMs ?? DEFAULT_FINALIZE_TIMEOUT_MS;
+    this.deployStallTimeoutMs =
+      opts.config?.deployStallTimeoutMs ?? DEFAULT_DEPLOY_STALL_TIMEOUT_MS;
   }
 
   /**
@@ -612,7 +634,7 @@ export class FlashJobOrchestrator {
    * try/catch maps them to typed `FlashOrchestratorError` and the
    * controller's catch block maps THAT to the right HTTP status code.
    * Background errors (streamer rejection, deploy-begin bus_send_failed,
-   * subscriber_attach_failed) route through `failJob` exactly the same
+   * subscriber_attach_failed, deploy-phase inactivity timeout `deploy_timeout`) route through `failJob` exactly the same
    * way the prior all-sync catch did, but emit on the WS surface only —
    * by the time they fire, HTTP has already responded 200.
    *
@@ -850,6 +872,8 @@ export class FlashJobOrchestrator {
             this.deployUnsubscriber = this.bus.subscribeDeployEvents(transferId, (event) =>
               this.handleDeployEvent(event),
             );
+            // Arm the inactivity watchdog now that we're waiting on the master.
+            this.kickDeployStallTimer();
           } catch (err) {
             const detail = err instanceof Error ? err.message : String(err);
             throw new FlashOrchestratorError('subscriber_attach_failed', detail);
@@ -1152,6 +1176,7 @@ export class FlashJobOrchestrator {
       }
       this.finalizeTimer = null;
     }
+    this.clearDeployStallTimer();
     // Disposer calls run in their own try/catch so a misbehaving
     // subscriber or throttle can't propagate up through `failJob` into
     // the background-IIFE `.catch` belt. Without this guard, a throw
@@ -1201,6 +1226,8 @@ export class FlashJobOrchestrator {
   private handleDeployEvent(event: FwDeployEvent): void {
     if (this.currentJob === null) return;
     if (event.kind === 'progress') {
+      // Master is alive — reset the inactivity watchdog before processing.
+      this.kickDeployStallTimer();
       this.handleDeployProgress(event.payload);
       return;
     }
@@ -1322,8 +1349,51 @@ export class FlashJobOrchestrator {
     this.throttle.submit(target.controllerId, preview, true);
   }
 
+  // Arm or reset the deploy-phase inactivity watchdog. Called at subscriber
+  // attach (initial arm) and on each FW_PROGRESS (reset). Guarded on
+  // phase==='deploy' so a stray late event can't re-arm it after hand-off.
+  private kickDeployStallTimer(): void {
+    this.clearDeployStallTimer();
+    if (this.phase !== 'deploy') return;
+    this.deployStallTimer = this.clock.setTimeout(
+      () => this.onDeployStall(),
+      this.deployStallTimeoutMs,
+    );
+  }
+
+  // Disarm the watchdog. Idempotent. Wrapped like releaseLock's other timer
+  // clears: a throw from a custom clock must not propagate out of the
+  // serial-event dispatcher into the worker.
+  private clearDeployStallTimer(): void {
+    if (this.deployStallTimer === null) return;
+    try {
+      this.clock.clearTimeout(this.deployStallTimer);
+    } catch (err) {
+      logger.error(err, `flash orchestrator: clock.clearTimeout threw clearing deployStallTimer`);
+    }
+    this.deployStallTimer = null;
+  }
+
+  // Watchdog fired: the master sent no FW_PROGRESS/FW_DEPLOY_DONE for
+  // deployStallTimeoutMs. Null the field first (so releaseLock's clear is a
+  // no-op), then guard first-fire-wins before failing the deploy phase.
+  private onDeployStall(): void {
+    this.deployStallTimer = null;
+    if (this.currentJob === null || this.phase !== 'deploy') return;
+    const jobId = this.currentJob.jobId;
+    logger.error(
+      `flash orchestrator: deploy stalled — no FW_PROGRESS/FW_DEPLOY_DONE for ${this.deployStallTimeoutMs}ms on job=${jobId}; failing (deploy_timeout)`,
+    );
+    this.failDeployPhase('deploy_timeout', `no deploy progress for ${this.deployStallTimeoutMs}ms`);
+  }
+
   private handleDeployDone(results: FwDeployDoneResult[]): void {
     if (this.currentJob === null) return;
+    // FW_DEPLOY_DONE ends the deploy-phase wait — disarm the inactivity
+    // watchdog. The post-reboot finalizeTimer/rebootTimer (armed below) govern
+    // from here. (Runs before validation: a malformed DONE still ends the wait,
+    // and failDeployPhase→releaseLock would clear it again, idempotently.)
+    this.clearDeployStallTimer();
     if (results.length === 0) {
       // Empty results array = master sent "done" with no per-controller
       // outcomes. Per FMI §1's hostile-input guard, treat as protocol
@@ -1591,10 +1661,11 @@ export class FlashJobOrchestrator {
     this.releaseLock(jobId);
   }
 
-  // Mid-deploy failure entry — `handleDeployEvent` calls this when FW_PROGRESS
-  // / FW_DEPLOY_DONE wire validation trips `protocol_violation`. The deploy
-  // subscriber fires asynchronously off a serial event so it can't throw out
-  // of an orchestrator try/catch; this wrapper delegates to `failJob`.
+  // Mid-deploy failure entry. Callers: handleDeployProgress / handleDeployDone on
+  // a `protocol_violation` (FW_PROGRESS / FW_DEPLOY_DONE wire-validation failure),
+  // and onDeployStall on a `deploy_timeout` (the inactivity watchdog fired).
+  // Reached either off an async serial event or off the watchdog timer callback —
+  // both run outside an orchestrator try/catch — so this wrapper delegates to failJob.
   private failDeployPhase(reason: FlashOrchestratorErrorReason, detail: string): void {
     if (this.currentJob === null) return;
     this.failJob(this.currentJob.jobId, reason, detail);
@@ -1618,7 +1689,7 @@ export class FlashJobOrchestrator {
   //   3. Emit `flashJobFailed { jobId, reason, detail, endedAt }` (with
   //      `abortReason` mixed in when the bucket-B path supplied one).
   //   4. `releaseLock(jobId)` for canonical teardown — disposes
-  //      subscriber, throttle, reboot timer, AbortController, clears
+  //      subscriber, throttle, reboot/finalize/deploy-stall timers, AbortController, clears
   //      `currentJob`, releases the lock, broadcasts `lockStateChanged`.
   //
   // Idempotent against `currentJob === null`: pre-streamer failures still

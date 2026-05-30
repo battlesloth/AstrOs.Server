@@ -194,7 +194,8 @@
       "aborted": "Flash cancelled. The controllers were not updated.",
       "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
       "network_error": "Couldn't reach the server. Check your network connection and try again.",
-      "post_reboot_timeout": "Master controller did not report a matching firmware version within 90 seconds. The flash may have failed; verify the controller and retry."
+      "post_reboot_timeout": "Master controller did not report a matching firmware version within 90 seconds. The flash may have failed; verify the controller and retry.",
+      "deploy_timeout": "The master controller stopped responding during the update (no deploy progress for an extended period). The flash was aborted; check the master's power and USB connection, then try again."
     },
     "lock_active": "A firmware update is in progress — write actions are disabled until it completes.",
     "lock_banner": "Firmware update in progress — write actions are disabled across the app.",
