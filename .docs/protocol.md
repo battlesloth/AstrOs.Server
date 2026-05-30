@@ -48,6 +48,8 @@ QUEUED | UPLOADING_TO_MASTER | SENDING | VERIFYING | FLASHING | REBOOTING | VERS
 - **VERSION_CONFIRMED** — Padawan heartbeat received with new version; flash successful.
 - **FAILED** — Transfer, write, hash, or reboot failure.
 
+These stages apply to the **master's own self-flash too**. After deploying to the padawans, the master reports `VERIFYING → FLASHING → REBOOTING` for its *own* row via `FW_PROGRESS`, using the sentinel controllerId `00:00:00:00:00:00` (the same id its `POLL_ACK` heartbeat uses), then emits `FW_DEPLOY_DONE` with `master=PENDING` and reboots. The server forwards these per-stage updates to the UI exactly like a padawan's, so the master column animates through verify/flash/reboot rather than jumping straight to done. The master cannot confirm its *own* new version before rebooting, so the terminal resolution still comes from the `PENDING → Finalizing → post-reboot-heartbeat` path below.
+
 > **FINALIZING** is a **server-internal** stage and is intentionally absent from
 > the wire enum above — the master never emits it in `FW_PROGRESS.stage`. The
 > server synthesizes it from a `PENDING` `FW_DEPLOY_DONE` row (master self-flash)
@@ -102,10 +104,12 @@ FW_PROGRESS:          transfer-id<US>controller-id<US>stage<US>bytes-sent<US>tot
 FW_DEPLOY_DONE:       transfer-id<US>per-controller-result-list
                       result = controllerId<US>OK|FAILED|PENDING<US>finalVersion<US>errorOrEmpty (RS-separated)
                       PENDING is emitted ONLY for the master self-flash success
-                      row (AstrOs.ESP Phase C). The master writes its inactive
-                      partition, emits FW_DEPLOY_DONE with master=PENDING,
-                      then reboots. finalVersion MUST be empty on PENDING
-                      rows; errorOrEmpty carries a firmware-domain marker
+                      row (AstrOs.ESP Phase C). As it self-flashes (after the
+                      padawans) the master reports its OWN VERIFYING → FLASHING
+                      → REBOOTING via FW_PROGRESS under the sentinel controllerId
+                      00:00:00:00:00:00, then emits FW_DEPLOY_DONE with
+                      master=PENDING and reboots. finalVersion MUST be empty on
+                      PENDING rows; errorOrEmpty carries a firmware-domain marker
                       ("awaiting_post_reboot_version"). The server holds the
                       deploy open in Finalizing until either the master's
                       post-reboot POLL_ACK arrives with a matching version
@@ -132,13 +136,16 @@ Server                                Master
   |--FW_DEPLOY_BEGIN order=core,dome,master->|
   |<-FW_PROGRESS core SENDING...----------|
   |<-FW_PROGRESS core VERIFYING-----------|
+  |<-FW_PROGRESS core FLASHING------------|
   |<-FW_PROGRESS core REBOOTING-----------|
   |<-FW_PROGRESS core VERSION_CONFIRMED---|     (master saw new version in heartbeat)
   |<-FW_PROGRESS dome ...same sequence----|
+  |<-FW_PROGRESS master VERIFYING---------|     (master self-flash; controllerId=00:00:00:00:00:00)
+  |<-FW_PROGRESS master FLASHING----------|
   |<-FW_PROGRESS master REBOOTING---------|     (master flashes self last)
-  |<-FW_DEPLOY_DONE all=OK----------------|     (sent BEFORE master commits + reboots)
+  |<-FW_DEPLOY_DONE core=OK dome=OK master=PENDING->|  (sent BEFORE master commits + reboots)
   |<-(silence ~8s while master reboots)---|
-  |<-(POLL_ACK heartbeat: master version=target)
+  |<-(POLL_ACK heartbeat: master version=target)->|  server resolves master PENDING → VersionConfirmed
                                                 Server holds the JobLock until this heartbeat.
 ```
 

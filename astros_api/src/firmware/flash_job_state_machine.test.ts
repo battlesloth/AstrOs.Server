@@ -398,10 +398,13 @@ describe('Finalizing transitions', () => {
     expect(next.stage).toBe(FwStage.Finalizing);
   });
 
-  it('allows Queued → Finalizing (master with no FW_PROGRESS pre-DEPLOY_DONE)', () => {
-    // Phase C master self-flash doesn't go through wire OTA, so OtaWriter
-    // doesn't emit per-stage FW_PROGRESS for the master row. The master
-    // row stays Queued until FW_DEPLOY_DONE arrives with PENDING.
+  it('allows Queued → Finalizing (master that sends no per-stage FW_PROGRESS pre-DEPLOY_DONE)', () => {
+    // Robustness path: the FSM must accept a master row jumping straight from
+    // Queued to Finalizing on a PENDING FW_DEPLOY_DONE. The updated Phase C
+    // firmware reports the master's own VERIFYING → FLASHING → REBOOTING via
+    // FW_PROGRESS first (so the common path is Rebooting → Finalizing, pinned
+    // by the test just above) — but a master that skips per-stage progress and
+    // goes straight to PENDING must still resolve cleanly rather than throw.
     const queued: ControllerFlashState = {
       controllerId: '00:00:00:00:00:00',
       stage: FwStage.Queued,

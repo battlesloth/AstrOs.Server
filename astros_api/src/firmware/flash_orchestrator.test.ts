@@ -1829,6 +1829,55 @@ describe('FlashJobOrchestrator', () => {
       expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
     });
 
+    it('forwards the master self-flash per-stage FW_PROGRESS (sentinel controllerId) to the UI', async () => {
+      // Phase C contract (protocol.md §A): once AstrOs.ESP reports the master's
+      // OWN Verifying → Flashing → Rebooting via FW_PROGRESS under the sentinel
+      // controllerId 00:00:00:00:00:00, the orchestrator's role-agnostic
+      // per-controller handler must forward each as a flashControllerUpdate —
+      // the same path a padawan takes — so the master column animates through
+      // verify/flash/reboot instead of jumping straight to VersionConfirmed.
+      const MASTER = '00:00:00:00:00:00';
+      const fx = setupHappyPath({
+        clock: fakeClock,
+        controllers: [
+          { id: MASTER, variant: 'lolin_d32_pro' },
+          { id: 'controller-b', variant: 'lolin_d32_pro' },
+        ],
+      });
+      const armed = await startAndArmDeploy(fx);
+
+      // The master is at Sending after FW_DEPLOY_BEGIN; drive its own self-flash
+      // stages. Each stage change forces an emit (force=true).
+      for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'progress',
+          payload: {
+            transferId: armed.transferId,
+            controllerId: MASTER,
+            stage,
+            bytesSent: 0,
+            totalBytes: 0,
+            detail: '',
+          },
+        });
+      }
+
+      const masterStages = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate)
+        .map((f) => (f as { data: ControllerFlashState }).data)
+        .filter((c) => c.controllerId === MASTER)
+        .map((c) => c.stage);
+
+      // The last three master-row updates are the self-flash stages, in order.
+      // Pinning the ordered slice (not arrayContaining) asserts the sequence the
+      // firmware emits — Verifying → Flashing → Rebooting — and that Rebooting is
+      // last (the row the UI holds through the post-reboot Finalizing window).
+      expect(masterStages.slice(-3)).toEqual([
+        FwStage.Verifying,
+        FwStage.Flashing,
+        FwStage.Rebooting,
+      ]);
+    });
+
     // --- Terminal FW_PROGRESS stages (protocol.md §A: master emits
     // VERSION_CONFIRMED / FAILED in FW_PROGRESS.stage in real time, then the
     // authoritative FW_DEPLOY_DONE). These are informational UI signals; the
