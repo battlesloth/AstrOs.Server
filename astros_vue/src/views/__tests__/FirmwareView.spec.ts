@@ -63,7 +63,7 @@ function mountFirmwareView() {
         AstrosLayout: { template: '<div><slot name="main" /></div>' },
         AstrosFirmwareSourceStrip: { template: '<div data-test="source-strip" />' },
         AstrosFirmwareTopology: { template: '<div data-test="topology" />' },
-        AstrosFirmwareStagesList: { template: '<div data-test="stages-list" />' },
+        AstrosFirmwareStagesBoard: { template: '<div data-test="stages-board" />' },
         AstrosFirmwareControllersPanel: { template: '<div data-test="controllers-panel" />' },
         AstrosFirmwareConfirmModal: { template: '<div data-test="confirm-modal" />' },
       },
@@ -544,5 +544,45 @@ describe('FirmwareView fast-paint on cold load', () => {
     expect(pendingReleases).toHaveBeenCalled();
     expect(firmwareStore.phase).toBe('select');
     expect(wrapper.find('[data-test="source-strip"]').exists()).toBe(true);
+  });
+});
+
+describe('FirmwareView stages-board gating', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    mockWsIsConnected.value = true;
+    mockWsHasEverConnected.value = true;
+  });
+
+  it('renders the stages board during flashing phase', async () => {
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('flashing');
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="stages-board"]').exists()).toBe(true);
+  });
+
+  it('hides the stages board during select phase', async () => {
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('select');
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="stages-board"]').exists()).toBe(false);
+  });
+
+  it('hides the stages board during a lock conflict even when phase is flashing', async () => {
+    const lockStore = useJobLockStore();
+    lockStore.locked = true; // isOwnJob is false (currentJob null) → lockConflict
+    const firmwareStore = useFirmwareStore();
+    firmwareStore.setPhase('flashing');
+
+    const wrapper = mountFirmwareView();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-test="stages-board"]').exists()).toBe(false);
   });
 });

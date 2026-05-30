@@ -8,7 +8,6 @@ import type {
 import { mapServerStageToUiStage } from '@/utils/firmwareStageMapping';
 
 // ---- Shared stage order + single-track row state machine ----
-// (moved verbatim from the deleted firmwareStagesList/stageRowState.ts)
 export const FIRMWARE_STAGES = ['download', 'transfer', 'verify', 'flash', 'reboot'] as const;
 
 export type StageRowState = 'idle' | 'done' | 'current' | 'failed';

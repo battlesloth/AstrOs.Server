@@ -5,7 +5,7 @@ export { default as AstrosFirmwareStatusPill } from './firmwareStatusPill/Astros
 export { default as AstrosFirmwareVersionDelta } from './firmwareVersionDelta/AstrosFirmwareVersionDelta.vue';
 export { default as AstrosFirmwareControllerRow } from './firmwareControllerRow/AstrosFirmwareControllerRow.vue';
 export { default as AstrosFirmwareControllersPanel } from './firmwareControllersPanel/AstrosFirmwareControllersPanel.vue';
-export { default as AstrosFirmwareStagesList } from './firmwareStagesList/AstrosFirmwareStagesList.vue';
+export { default as AstrosFirmwareStagesBoard } from './firmwareStagesBoard/AstrosFirmwareStagesBoard.vue';
 export { default as AstrosFirmwareConfirmModal } from './firmwareConfirmModal/AstrosFirmwareConfirmModal.vue';
 export type { AstrosFirmwareButtonKind } from './firmwareButton/types';
 export type { TopologyController, TopologyFleet, TopologyPhase } from './firmwareTopology/types';
@@ -15,6 +15,7 @@ export type {
   ControllersPanelPhase,
   ControllersPanelProps,
 } from './firmwareControllersPanel/types';
+export type { StageColumnModel } from '@/utils/firmwareStageBoard';
 export type {
   FirmwareControllerView,
   FirmwarePhase,
