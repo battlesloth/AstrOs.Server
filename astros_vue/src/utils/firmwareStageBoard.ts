@@ -71,7 +71,9 @@ export interface StageBoardRow {
   labelKey: StageRowLabelKey;
   /** i18n key path for the row hint. */
   hintKey: StageRowHintKey;
-  /** Integer 0..100 for byte-bearing rows (download[master]/transfer); null otherwise. */
+  /** Integer 0..100 for the one byte-bearing row per role (master Download /
+   *  padawan Receive); null on every other row (incl. the master's broadcast
+   *  Transfer step, which has no single progress value). */
   percent: number | null;
 }
 
@@ -92,13 +94,15 @@ export interface ControllerStageColumnOptions {
   failedStage?: FirmwareStage | null;
 }
 
-// Stages whose progress is byte-driven: the master Download (file lands on the
-// master) and the Transfer/Receive (master → padawans). Verify/Flash/Reboot
-// are not byte-progress stages, so they never show a percent.
-const BYTE_BEARING_STAGES: ReadonlySet<FirmwareStage> = new Set<FirmwareStage>([
-  'download',
-  'transfer',
-]);
+// Which row shows a byte-progress percentage, by role. The master shows it
+// only while it receives the file (Download); a padawan shows it only while it
+// receives from the master (the 'transfer' stage = "Receive"). The master's
+// 'transfer' step is a fan-out broadcast to the padawans with no single
+// progress value, so it shows no percent (matches the mockup). Verify / Flash /
+// Reboot are never byte-driven.
+function isByteBearing(stage: FirmwareStage, isMaster: boolean): boolean {
+  return isMaster ? stage === 'download' : stage === 'transfer';
+}
 
 function clampPercent(
   bytesSent: number | undefined,
@@ -147,7 +151,10 @@ function deriveProgress(
  * Role rules applied on top of the row state machine:
  *  - Padawan Download row → 'na' ("Master only"); padawans never download.
  *  - Step-2 label = "Transfer" (master) / "Receive" (padawan); same stage id.
- *  - Percent attaches only to byte-bearing rows: live % while current, 100% when done.
+ *  - Percent attaches to the one byte-bearing row per role (master Download,
+ *    padawan Receive): live % while current, 100% when done. The master's
+ *    broadcast Transfer shows no percent; a padawan Receive suppresses the
+ *    stale full-bar carried over from the upload phase (starts at 0).
  */
 export function controllerStageColumn(
   controller: Pick<FirmwareControllerView, 'id' | 'label' | 'glyph' | 'isMaster'>,
@@ -185,9 +192,19 @@ export function controllerStageColumn(
           : `firmware_view.stages.${stage}.hint`;
 
     let percent: number | null = null;
-    if (BYTE_BEARING_STAGES.has(stage)) {
+    if (isByteBearing(stage, isMaster)) {
       if (rowState === 'current') {
-        percent = bytes !== null ? clampPercent(bytes.bytesSent, bytes.totalBytes) : null;
+        const raw = bytes !== null ? clampPercent(bytes.bytesSent, bytes.totalBytes) : null;
+        // A padawan Receive that's still in progress but reads a full bar is
+        // the upload byte-count carried into the send phase (the orchestrator
+        // re-emits the prior stage's bytes on the transition), NOT real receive
+        // progress — start at 0 until a genuine deploy-progress event arrives.
+        // Accepted tradeoff: if a receive genuinely peaks at 100% while still
+        // 'current' (the final byte update lands a frame before the VERIFYING
+        // transition), this shows 0 for that one frame. It self-heals on the
+        // next event — the row flips to 'done' and shows 100%; no correctness
+        // impact, only a possible 1-frame blip at the very end of transfer.
+        percent = !isMaster && raw === 100 ? 0 : raw;
       } else if (rowState === 'done') {
         percent = 100;
       }

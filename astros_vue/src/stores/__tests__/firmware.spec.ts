@@ -2317,21 +2317,29 @@ describe('firmware store', () => {
       }
     });
 
-    it('projects a participating controller using its own live stage and percent', () => {
+    it('projects each controller using its own live stage; only the padawan Receive carries a percent', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.setPhase('select');
       store.applyJobStarted({
         jobId: 'job-1',
         source: { kind: 'github', version: 'v1.4.2' },
-        controllers: [{ controllerId: BODY_MAC, stage: 'SENDING', bytesSent: 30, totalBytes: 100 }],
+        controllers: [
+          { controllerId: BODY_MAC, stage: 'SENDING', bytesSent: 30, totalBytes: 100 },
+          { controllerId: CORE_MAC, stage: 'SENDING', bytesSent: 54, totalBytes: 100 },
+        ],
         startedAt: '2026-05-29T00:00:00Z',
       });
       const body = store.stageBoard.find((c) => c.id === 'body');
       expect(body?.role).toBe('master');
-      const transfer = body?.rows.find((r) => r.stage === 'transfer');
-      expect(transfer?.state).toBe('current');
-      expect(transfer?.percent).toBe(30);
+      const bodyTransfer = body?.rows.find((r) => r.stage === 'transfer');
+      expect(bodyTransfer?.state).toBe('current');
+      // Master Transfer is a broadcast — no single percent.
+      expect(bodyTransfer?.percent).toBeNull();
+      const core = store.stageBoard.find((c) => c.id === 'core');
+      const coreReceive = core?.rows.find((r) => r.stage === 'transfer');
+      expect(coreReceive?.state).toBe('current');
+      expect(coreReceive?.percent).toBe(54);
     });
 
     it('threads failedControllers[].stage into the failed column', () => {

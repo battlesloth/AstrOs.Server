@@ -116,7 +116,8 @@ describe('controllerStageColumn — master', () => {
     expect(byStage(col, 'download').state).toBe('done');
     expect(byStage(col, 'download').percent).toBe(100);
     expect(byStage(col, 'transfer').state).toBe('current');
-    expect(byStage(col, 'transfer').percent).toBe(10);
+    // The master's Transfer is a broadcast to the padawans — no single percent.
+    expect(byStage(col, 'transfer').percent).toBeNull();
   });
 
   it('surfaces Reboot as current (not idle) during FINALIZING', () => {
@@ -149,6 +150,23 @@ describe('controllerStageColumn — padawan', () => {
     expect(receive.percent).toBe(54);
     expect(receive.labelKey).toBe('firmware_view.stages.receive.label');
     expect(receive.hintKey).toBe('firmware_view.stages.receive.hint');
+  });
+
+  it('starts Receive at 0 when the byte count is the stale full bar carried from upload', () => {
+    // On the upload→send transition the orchestrator re-emits the upload byte
+    // count (== totalBytes) before real deploy progress arrives. A Receive
+    // that's still 'current' but reads a full bar is that stale value, so it
+    // shows 0, not 100.
+    const state: ControllerFlashStateBySlot = {
+      controllerId: 'core',
+      stage: 'SENDING',
+      bytesSent: 100,
+      totalBytes: 100,
+    };
+    const col = controllerStageColumn(padawan, state);
+    const receive = byStage(col, 'transfer');
+    expect(receive.state).toBe('current');
+    expect(receive.percent).toBe(0);
   });
 
   it('marks all real steps done on VERSION_CONFIRMED but keeps Download na', () => {

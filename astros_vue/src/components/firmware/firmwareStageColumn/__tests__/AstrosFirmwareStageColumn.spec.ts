@@ -93,7 +93,7 @@ describe('AstrosFirmwareStageColumn', () => {
     expect(doneRow.find('.astros-firmware-stage-column__progress--done').text()).toBe('100%');
   });
 
-  it('renders the master Transfer label and MASTER role', () => {
+  it('renders the master Transfer label and MASTER role with no percent (broadcast step)', () => {
     const wrapper = mountColFor(master, {
       controllerId: 'body',
       stage: 'SENDING',
@@ -102,6 +102,11 @@ describe('AstrosFirmwareStageColumn', () => {
     });
     expect(wrapper.text()).toContain('MASTER');
     expect(wrapper.text()).toContain('Transfer');
+    // The master's current Transfer row is a broadcast — generic in-progress
+    // badge, never a numeric percent.
+    const current = wrapper.find('.astros-firmware-stage-column__row--current');
+    expect(current.exists()).toBe(true);
+    expect(current.text()).not.toMatch(/\d+%/);
   });
 
   it('renders the failed (!) glyph on the failed row', () => {
