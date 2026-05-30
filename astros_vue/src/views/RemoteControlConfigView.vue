@@ -150,8 +150,9 @@ const currentPage = computed(() => {
 
 // Editor modal state — view-owned singleton (matches ScripterView's modal
 // pattern). A card's edit request sets editingButtonKey; the modal renders only
-// while it's set. The modal edits the CURRENTLY selected page's slot;
-// selectedIdx can't change while the modal is open (it overlays the page list).
+// while it's set. The modal edits the CURRENTLY selected page's slot; the
+// backdrop overlays the page list so a pointer can't change selectedIdx while
+// it's open (there's no focus trap, matching the app's other modals).
 const editingButtonKey = ref<ButtonKey | null>(null);
 
 const editingButtonValue = computed<PageButton | null>(() => {

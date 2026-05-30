@@ -581,7 +581,6 @@
     },
     "editor": {
       "title": "Configure Button {n}",
-      "close": "Close",
       "tab_script": "Scripts",
       "tab_playlist": "Playlists",
       "search_placeholder": "Search…",

@@ -520,9 +520,11 @@ describe('RemoteControlConfigView — editor modal wiring', () => {
     const newValue = { id: 's1', name: 'Wave', type: 'script' as const };
     await modal.vm.$emit('change', newValue);
     await flushPromises();
+    await wrapper.vm.$nextTick();
 
     expect(spy).toHaveBeenCalledWith(0, 'button5', newValue);
-    // Selecting a value closes the modal.
+    // Selecting a value closes the modal (the v-if drops after the
+    // editingButtonKey=null reactivity flush).
     expect(wrapper.find('[data-testid="editor-modal"]').exists()).toBe(false);
   });
 
@@ -541,6 +543,7 @@ describe('RemoteControlConfigView — editor modal wiring', () => {
     const modal = wrapper.findComponent({ name: 'AstrosRemoteButtonEditorModal' });
     await modal.vm.$emit('close');
     await flushPromises();
+    await wrapper.vm.$nextTick();
 
     expect(wrapper.find('[data-testid="editor-modal"]').exists()).toBe(false);
     expect(spy).not.toHaveBeenCalled();
