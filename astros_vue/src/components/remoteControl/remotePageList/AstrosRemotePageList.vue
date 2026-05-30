@@ -82,7 +82,7 @@ function dotClass(type: PageButton['type']): string {
     case 'script':
       return 'bg-primary';
     case 'playlist':
-      return 'bg-orange-500';
+      return 'bg-r2-complement';
     case 'none':
       return 'bg-base-300';
     default:
@@ -94,14 +94,14 @@ function dotClass(type: PageButton['type']): string {
 <template>
   <div class="astros-remote-page-list flex h-full w-full flex-col">
     <header
-      class="sticky top-0 z-10 flex items-center justify-between border-b border-base-300 bg-base-200 px-3 py-2"
+      class="sticky top-0 z-10 flex items-center justify-between bg-primary px-3 py-2"
     >
-      <span class="text-[11px] font-bold uppercase tracking-[0.1em] text-base-content/60">
+      <span class="text-[13px] font-bold uppercase tracking-[0.1em] text-white">
         {{ t('remote_control_config.pageList.header') }}
       </span>
       <button
         type="button"
-        class="btn btn-ghost btn-xs btn-square text-primary"
+        class="btn btn-ghost btn-sm btn-square text-xl leading-none text-white"
         :aria-label="t('remote_control_config.pageList.add')"
         :title="t('remote_control_config.pageList.add')"
         data-testid="page-list-add"
@@ -128,9 +128,7 @@ function dotClass(type: PageButton['type']): string {
         :aria-selected="idx === selectedIdx ? 'true' : 'false'"
         :class="[
           'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5',
-          idx === selectedIdx
-            ? 'border border-primary/30 bg-primary/10'
-            : 'border border-transparent hover:bg-base-200',
+          idx === selectedIdx ? 'bg-r2-xlight' : 'hover:bg-base-200',
         ]"
         data-testid="page-list-row"
         @click="emit('select', idx)"
@@ -144,7 +142,7 @@ function dotClass(type: PageButton['type']): string {
           <span
             v-for="key in BUTTON_KEYS"
             :key="key"
-            :class="['block h-1.5 w-1.5 rounded-sm', dotClass(page[key].type)]"
+            :class="['block h-2 w-2 rounded-sm', dotClass(page[key].type)]"
             :data-type="page[key].type"
             data-testid="page-list-dot"
           />
@@ -154,7 +152,7 @@ function dotClass(type: PageButton['type']): string {
           :ref="captureRenameInput"
           v-model="renameDraft"
           type="text"
-          class="input input-bordered input-xs min-w-0 flex-1 text-xs"
+          class="input input-bordered input-sm min-w-0 flex-1 text-sm"
           :aria-label="t('remote_control_config.pageList.renameInput')"
           data-testid="page-list-rename-input"
           @click.stop
@@ -165,7 +163,7 @@ function dotClass(type: PageButton['type']): string {
         <span
           v-else
           :class="[
-            'min-w-0 flex-1 truncate text-xs',
+            'min-w-0 flex-1 truncate text-sm',
             idx === selectedIdx ? 'font-semibold' : 'font-medium',
           ]"
           :title="page.name"
@@ -176,7 +174,7 @@ function dotClass(type: PageButton['type']): string {
         <div class="flex flex-shrink-0 items-center gap-px">
           <button
             type="button"
-            class="btn btn-ghost btn-xs btn-square text-base-content/60"
+            class="btn btn-ghost btn-sm btn-square text-base-content/60"
             :aria-label="t('remote_control_config.pageList.rename')"
             :title="t('remote_control_config.pageList.rename')"
             data-testid="page-list-rename"
@@ -184,12 +182,12 @@ function dotClass(type: PageButton['type']): string {
           >
             <v-icon
               name="io-create"
-              scale="0.7"
+              scale="0.9"
             />
           </button>
           <button
             type="button"
-            class="btn btn-ghost btn-xs btn-square text-base-content/60"
+            class="btn btn-ghost btn-sm btn-square text-base-content/60"
             :aria-label="t('remote_control_config.pageList.duplicate')"
             :title="t('remote_control_config.pageList.duplicate')"
             data-testid="page-list-duplicate"
@@ -197,12 +195,12 @@ function dotClass(type: PageButton['type']): string {
           >
             <v-icon
               name="io-copy"
-              scale="0.7"
+              scale="0.9"
             />
           </button>
           <button
             type="button"
-            class="btn btn-ghost btn-xs btn-square text-base-content/60"
+            class="btn btn-ghost btn-sm btn-square text-base-content/60"
             :aria-label="t('remote_control_config.pageList.delete')"
             :title="t('remote_control_config.pageList.delete')"
             :disabled="pages.length <= 1"
@@ -211,7 +209,7 @@ function dotClass(type: PageButton['type']): string {
           >
             <v-icon
               name="io-trash-bin"
-              scale="0.7"
+              scale="0.9"
             />
           </button>
         </div>

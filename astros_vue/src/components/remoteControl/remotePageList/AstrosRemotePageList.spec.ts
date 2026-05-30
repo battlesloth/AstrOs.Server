@@ -194,7 +194,7 @@ describe('AstrosRemotePageList — mini 3x3 preview', () => {
     });
     const dots = wrapper.findAll('[data-testid="page-list-dot"]');
     expect(dots[0]!.classes()).toContain('bg-primary'); // script
-    expect(dots[4]!.classes()).toContain('bg-orange-500'); // playlist
+    expect(dots[4]!.classes()).toContain('bg-r2-complement'); // playlist
     expect(dots[1]!.classes()).toContain('bg-base-300'); // none
   });
 });
