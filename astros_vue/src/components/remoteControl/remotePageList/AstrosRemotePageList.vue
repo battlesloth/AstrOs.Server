@@ -93,9 +93,7 @@ function dotClass(type: PageButton['type']): string {
 
 <template>
   <div class="astros-remote-page-list flex h-full w-full flex-col">
-    <header
-      class="sticky top-0 z-10 flex items-center justify-between bg-primary px-3 py-2"
-    >
+    <header class="sticky top-0 z-10 flex items-center justify-between bg-primary px-3 py-2">
       <span class="text-[13px] font-bold uppercase tracking-[0.1em] text-white">
         {{ t('remote_control_config.pageList.header') }}
       </span>
