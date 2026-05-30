@@ -49,4 +49,16 @@ describe('AstrosFirmwareStageColumn', () => {
     expect(wrapper.text()).toContain('NOT IN UPDATE');
     expect(wrapper.find('.astros-firmware-stage-column--idle').exists()).toBe(true);
   });
+
+  it('does NOT apply the dimmed --idle modifier to a participating column', () => {
+    // Guards the inverse of the not-in-update case: a controller with a live
+    // state must render at full opacity (no --idle), even when it's a padawan.
+    const wrapper = mountCol({
+      controllerId: 'core',
+      stage: 'SENDING',
+      bytesSent: 54,
+      totalBytes: 100,
+    });
+    expect(wrapper.find('.astros-firmware-stage-column--idle').exists()).toBe(false);
+  });
 });

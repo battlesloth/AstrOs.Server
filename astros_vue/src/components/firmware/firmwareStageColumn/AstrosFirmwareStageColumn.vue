@@ -14,8 +14,13 @@ const roleLabel = computed(() => {
       return t('firmware_view.topology.role_padawan');
     case 'idle':
       return t('firmware_view.stages.not_in_update');
+    default: {
+      // Compile-time exhaustiveness: a new StageColumnRole without a case
+      // here fails type-check rather than silently rendering a blank role.
+      const _exhaustive: never = props.column.role;
+      return _exhaustive;
+    }
   }
-  return '';
 });
 </script>
 
