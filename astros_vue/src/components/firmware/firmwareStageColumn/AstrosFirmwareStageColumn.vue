@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { assertNever } from '@/utils/assertNever';
 import type { StageColumnModel } from '@/utils/firmwareStageBoard';
 
 const props = defineProps<{ column: StageColumnModel }>();
@@ -18,7 +19,7 @@ const roleLabel = computed(() => {
       // Compile-time exhaustiveness: a new StageColumnRole without a case
       // here fails type-check rather than silently rendering a blank role.
       const _exhaustive: never = props.column.role;
-      return _exhaustive;
+      return assertNever(_exhaustive);
     }
   }
 });
