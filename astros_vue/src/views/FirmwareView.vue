@@ -33,7 +33,6 @@ const {
   sourceMode,
   uploadedFilename,
   progressByControllerId,
-  downloadPercent,
   isOwnJob,
   currentJobLoadFailed,
   flashError,
@@ -310,7 +309,6 @@ onMounted(async () => {
                 :phase="phase"
                 :current-stage="currentStage"
                 :failed-stage="failedStage"
-                :download-percent="downloadPercent"
               />
             </div>
 
