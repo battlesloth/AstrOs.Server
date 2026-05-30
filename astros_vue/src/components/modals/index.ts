@@ -4,3 +4,4 @@ export { default as AstrosInterruptModal } from './AstrosInterruptModal.vue';
 export { default as AstrosHtmlModal } from './AstrosHtmlModal.vue';
 export * from './modules';
 export * from './scripter';
+export * from './remoteControl';

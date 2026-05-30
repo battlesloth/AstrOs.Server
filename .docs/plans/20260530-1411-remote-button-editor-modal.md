@@ -29,25 +29,30 @@ modal-open">` form modals in `components/modals/{domain}/`).
 
 ## Tasks
 
-- [ ] Create `components/modals/remoteControl/AstrosRemoteButtonEditorModal.vue`
+- [x] Create `components/modals/remoteControl/AstrosRemoteButtonEditorModal.vue`
       (dialog shell wrapping `AstrosRemoteButtonEditor`; forwards `change`,
-      emits `close` on backdrop/×/Escape). Export from the modals barrel.
-- [ ] Modal spec: renders editor content; forwards `change` on item-select;
-      `close` on backdrop click, on editor `×`, and on Escape. (Mutation-check
-      the close paths.)
-- [ ] Strip `AstrosRemoteButtonCard.vue`: remove floating-ui / Teleport /
-      click-outside / editor import / open-close-handleChange; emit `edit`;
-      keep `change` for Clear. Update card spec (drop the popover-host block;
-      add `edit`-emit + `change(none)`-on-Clear coverage).
-- [ ] Wire `RemoteControlConfigView.vue`: `editingButtonKey` state, render the
-      modal singleton, `onEditRequested(key)` / `onEditorChange(v)` (→
-      `setButton(selectedIdx, editingButtonKey, v)` + close) / close. Update
-      view spec (card `edit` opens modal; modal `change` → `setButton`; close
-      clears state).
-- [ ] Remove `@floating-ui/vue` from `package.json` + lockfile; confirm no
-      remaining imports.
-- [ ] Pre-commit gate: `lint`, `build` (vue-tsc + vite build), affected specs
-      (modal / card / view / editor) green. Commit.
+      emits `close` on backdrop/×/Escape). Exported from the modals barrel
+      (`remoteControl/index.ts` re-exported by `modals/index.ts`).
+- [x] Modal spec (5 cases): renders editor in the dialog shell; forwards
+      `change` on item-select; `close` on backdrop click, editor `×`, and Escape.
+- [x] Stripped `AstrosRemoteButtonCard.vue` to presentational: removed
+      floating-ui / Teleport / click-outside / editor import / open-close
+      plumbing AND the `buttonNumber`/`scripts`/`playlists` props; emits `edit`
+      + `change` (Clear). Card spec slimmed; stories fixed.
+- [x] Wired `RemoteControlConfigView.vue`: `editingButtonKey` +
+      `editingButtonValue`/`editingButtonNumber` computeds, singleton modal
+      `v-if`, `onEditRequested`/`onEditorChange`(→`setButton`+close)/
+      `onEditorClose`. View spec gained editor-modal-wiring tests + stub.
+- [x] Removed `@floating-ui/vue` (package.json + lockfile); zero `src/` imports.
+- [x] Gate: lint clean, `vue-tsc`+`vite build` clean, full suite 613 pass.
+      Pre-commit review: no Critical/Important.
+
+## Review note (recorded decision)
+
+The old popover captured + restored keyboard focus to the trigger on close; the
+modal does not. This is **intentional** — it matches every other modal in the
+app (`AstrosServoEventModal` et al.), which was the goal of this refactor. Flag
+for the pending a11y pass; not a regression vs. the app's convention.
 
 ## Notes
 

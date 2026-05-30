@@ -64,8 +64,8 @@ const rootRef = ref<HTMLDivElement | null>(null);
 
 // Focus the editor root on open so the @keydown.escape on the wrapper div
 // actually fires when the user presses Escape. Without an explicit focus,
-// focus stays on the Edit/Configure button that opened the popover and
-// the editor's keydown handler never sees the event.
+// focus stays on whatever triggered the open (the card's Edit/Configure
+// button) and the editor's keydown handler never sees the event.
 onMounted(() => {
   nextTick(() => rootRef.value?.focus());
 });
