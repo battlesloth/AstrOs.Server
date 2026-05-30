@@ -186,7 +186,10 @@ export const migration_0: Migration = {
 
     const remoteConfig = <NewRemoteConfig>{
       type: 'remoteConfig',
-      value: '{}',
+      // Empty pages array — the remote-config consumers (editor GET + M5 sync)
+      // expect a JSON array. Seeding '{}' (an object) here historically forced
+      // both to normalize on read; '[]' is correct at the source.
+      value: '[]',
     };
 
     await db.insertInto('remote_config').values(remoteConfig).execute();

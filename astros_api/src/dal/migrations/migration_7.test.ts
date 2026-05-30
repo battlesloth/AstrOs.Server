@@ -79,8 +79,9 @@ describe('migration_7: rename remote_config.type astrOsScreen → remoteConfig',
   }
 
   // Mutate the seeded remoteConfig row back to astrOsScreen to simulate an
-  // existing v6 install (whose original migration_0 seeded with the old key).
-  async function simulateLegacySeed(value = '{}'): Promise<void> {
+  // existing v6 install (whose original migration_0 seeded with the old
+  // `astrOsScreen` key). Callers pass the legacy `value` explicitly.
+  async function simulateLegacySeed(value: string): Promise<void> {
     await db
       .updateTable('remote_config')
       .set({ type: 'astrOsScreen', value })

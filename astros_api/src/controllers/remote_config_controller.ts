@@ -36,9 +36,10 @@ export async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any,
 
     const val = JSON.parse(scripts?.value || '[]') as Array<RemotePage>;
 
-    // Defensive: migration_0 seeds the row with value '{}' (an object, not
-    // an array) on fresh installs. Until a user saves their first config,
-    // val is the parsed object and val.forEach below would throw.
+    // Defensive: existing installs can hold value '{}' — an object, not an
+    // array (the pre-fix migration_0 seed; fresh installs now seed '[]').
+    // Until such a row is overwritten by a save, val is the parsed object and
+    // val.forEach below would throw, so treat any non-array as empty.
     if (!Array.isArray(val) || val.length === 0) {
       res.status(200);
       res.json({ pages: [] } as RemoteScriptList);
@@ -72,14 +73,44 @@ export async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any,
   }
 }
 
-async function getRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function getRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new RemoteConfigRepository(db);
 
-    const scripts = await repo.getConfig('remoteConfig');
+    const stored = (await repo.getConfig('remoteConfig'))?.value;
+
+    // The editor store JSON.parses this response and hard-fails unless the
+    // result is a pages array, so normalize anything that is not an array to
+    // the empty-array string '[]'. The column is free-form JSON; existing
+    // installs can still hold the legacy '{}' object seed (fresh installs now
+    // seed '[]'). This applies the same non-array→empty intent as
+    // syncRemoteConfig, but unlike that path — which lets a JSON.parse failure
+    // reach the outer catch and 500 — the editor must not hard-fail on a
+    // corrupt value (a thrown load collapses the whole 3-pane view to an error
+    // banner), so it degrades to '[]'.
+    let value = '[]';
+    if (stored) {
+      try {
+        if (Array.isArray(JSON.parse(stored))) {
+          value = stored;
+        }
+        // A parsed-but-non-array value (e.g. the legacy '{}' object seed) is a
+        // known-benign state — normalize silently to '[]'.
+      } catch (error) {
+        // A non-JSON value is unreachable by any legitimate write (every save
+        // is JSON.stringify of a pages array), so it signals real corruption
+        // or external tampering. Leave a breadcrumb before serving '[]': the
+        // user's first Save would otherwise overwrite the bad row with the
+        // empty default and erase the evidence permanently.
+        logger.warn(
+          { err: error, type: 'remoteConfig' },
+          'Corrupt remote_config value; serving empty array',
+        );
+      }
+    }
 
     res.status(200);
-    res.json(scripts?.value || { value: '[]' });
+    res.json(value);
   } catch (error) {
     logger.error(error);
 

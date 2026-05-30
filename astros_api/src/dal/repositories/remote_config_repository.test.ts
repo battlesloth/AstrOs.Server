@@ -44,4 +44,16 @@ describe('RemoteConfigRepository', () => {
 
     expect(result).toBeUndefined();
   });
+
+  it('seeds the remoteConfig row with an empty-array string on a fresh install', async () => {
+    // migration_0 seeds value '[]' (a pages array), not the legacy '{}' object.
+    // The editor's load path expects an array, so seeding '[]' keeps a fresh
+    // install correct at the source rather than relying solely on the
+    // read-time normalization in getRemoteConfig.
+    const repo = new RemoteConfigRepository(db);
+
+    const result = await repo.getConfig('remoteConfig');
+
+    expect(result?.value).toBe('[]');
+  });
 });

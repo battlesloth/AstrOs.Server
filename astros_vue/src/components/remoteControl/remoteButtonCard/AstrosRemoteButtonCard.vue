@@ -27,9 +27,12 @@ const isAssigned = computed(() => props.value.type !== 'none');
 const typeChipClasses = computed(() => {
   switch (props.value.type) {
     case 'playlist':
-      return 'bg-orange-500/15 text-orange-700 border border-orange-500/40';
+      // Matches the mobile-remote playlist chip: --mr-complement (#f49446) bg +
+      // black text. `bg-r2-complement` forces that exact pair via styles.css.
+      return 'bg-r2-complement';
     case 'script':
-      return 'bg-primary/15 text-primary border border-primary/40';
+      // Matches the mobile-remote filled button: --mr-primary (#2a5a97) + white.
+      return 'bg-primary text-white';
     case 'none':
       return '';
     default:
@@ -119,11 +122,11 @@ onScopeDispose(() => {
 <template>
   <div
     ref="cardRef"
-    class="astros-remote-button-card flex min-h-32 flex-col gap-2 rounded-xl border-2 p-3 transition-colors"
+    class="astros-remote-button-card flex min-h-32 flex-col gap-2 rounded-xl p-3 transition-colors"
     :class="
       isAssigned
-        ? 'border-primary bg-primary/5'
-        : 'border-base-300 bg-base-100 hover:border-base-content/30'
+        ? 'bg-r2-xlight'
+        : 'border-2 border-base-300 bg-base-100 hover:border-base-content/30'
     "
   >
     <div
@@ -146,7 +149,7 @@ onScopeDispose(() => {
       <div class="flex gap-2">
         <button
           type="button"
-          class="btn btn-sm btn-outline flex-1"
+          class="btn btn-sm btn-primary flex-1"
           data-testid="card-edit"
           @click="openEditor"
         >
@@ -154,7 +157,7 @@ onScopeDispose(() => {
         </button>
         <button
           type="button"
-          class="btn btn-sm btn-ghost flex-1"
+          class="btn btn-sm btn-primary flex-1"
           data-testid="card-clear"
           @click="clearAssignment"
         >

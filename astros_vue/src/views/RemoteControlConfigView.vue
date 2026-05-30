@@ -238,7 +238,7 @@ const pageCount = computed(() => remoteControlPages.value.length);
         >
           <!-- Left: page list -->
           <aside
-            class="flex flex-col w-[220px] border-r border-base-300"
+            class="flex flex-col w-[260px] border-r border-base-300"
             data-testid="pane-page-list"
           >
             <AstrosRemotePageList
@@ -254,13 +254,13 @@ const pageCount = computed(() => remoteControlPages.value.length);
 
           <!-- Center: 3x3 grid (capped at 540px wide) -->
           <main
-            class="flex-1 overflow-auto p-6"
+            class="flex-1 min-w-0 overflow-auto p-6"
             data-testid="pane-grid"
           >
             <div
               v-if="currentPage"
               class="grid grid-cols-3 gap-4 mx-auto"
-              style="max-width: 540px"
+              style="min-width: 500px; max-width: 540px"
             >
               <AstrosRemoteButtonCard
                 v-for="(key, i) in BUTTON_KEYS"
