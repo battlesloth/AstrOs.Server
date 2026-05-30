@@ -2,6 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **STATUS: ✅ COMPLETE** — all 7 tasks shipped on branch `feature/firmware-stages-board` (off `develop`). Full suite 611 tests green, `vue-tsc` + `vite build` clean. Per-commit + pre-push 5-agent review applied; Important + consistency findings fixed.
+>
+> **Deferred follow-up (your call):** a controller that fails *before any stage maps* (`FAILED` with a null stage — e.g. fails while `QUEUED`) renders its board column as all-idle (looks "not started"). This is **equivalent to the old single-track list's behavior** and the failure is still surfaced via the topology highlight + the controllers-panel result bar, so it's not a regression. A column-level failure treatment (e.g. a `failed` flag on `StageColumnModel`) would close the gap but is a UX enhancement beyond the design mockup. Current behavior is pinned by a test so any future change is deliberate.
+
 **Goal:** Replace the single shared firmware-update STAGES list with a per-controller STAGES board (one column per fleet controller: Body/MASTER, Core/PADAWAN, Dome/NOT IN UPDATE), each column showing that controller's own progression and percent.
 
 **Architecture:** The per-controller data already lives in the store (`controllerStates`, keyed by slot, each with its own server stage + `bytesSent`/`totalBytes`). We add a pure derivation helper (`controllerStageColumn`) that turns one controller's state into a 5-row column model, project it in the store as `stageBoard`, and render it with two thin layout components (`AstrosFirmwareStagesBoard` → `AstrosFirmwareStageColumn`). The old `AstrosFirmwareStagesList` (single global track) and the orphaned `downloadPercent` projection are deleted. Source strip, topology, and controllers panel are untouched.
