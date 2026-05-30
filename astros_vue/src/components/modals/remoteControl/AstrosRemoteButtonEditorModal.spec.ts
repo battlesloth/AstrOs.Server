@@ -33,6 +33,8 @@ describe('AstrosRemoteButtonEditorModal', () => {
     expect(wrapper.find('.modal-box').exists()).toBe(true);
     expect(wrapper.find('.modal-backdrop').exists()).toBe(true);
     expect(wrapper.find('[data-testid="editor-search"]').exists()).toBe(true);
+    // Title is supplied by the modal shell (button number is 1-based).
+    expect(wrapper.text()).toContain('Configure Button 3');
     wrapper.unmount();
   });
 
@@ -48,9 +50,9 @@ describe('AstrosRemoteButtonEditorModal', () => {
     wrapper.unmount();
   });
 
-  it('emits close when the editor × button is clicked', async () => {
+  it('emits close when the footer Close button is clicked', async () => {
     const wrapper = mountModal();
-    await wrapper.get('[data-testid="editor-close"]').trigger('click');
+    await wrapper.get('[data-testid="editor-modal-close"]').trigger('click');
 
     expect(wrapper.emitted('close')).toHaveLength(1);
     wrapper.unmount();

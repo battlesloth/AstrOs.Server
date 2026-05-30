@@ -39,7 +39,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -52,7 +51,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkPlaylistButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -65,7 +63,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -80,7 +77,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -95,7 +91,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -112,7 +107,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -130,7 +124,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: [...PLAYLISTS, { id: 'p3', name: 'Wave Routine' }],
@@ -152,7 +145,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkScriptButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -166,7 +158,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -183,7 +174,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -203,7 +193,6 @@ describe('AstrosRemoteButtonEditor', () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkScriptButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -214,27 +203,11 @@ describe('AstrosRemoteButtonEditor', () => {
     expect(wrapper.emitted('change')![0]![0]).toEqual({ id: '0', name: 'None', type: 'none' });
   });
 
-  it('emits close when × button is clicked', async () => {
-    const wrapper = mount(AstrosRemoteButtonEditor, {
-      global: { plugins: [i18n] },
-      props: {
-        buttonNumber: 5,
-        currentValue: mkNoneButton(),
-        scripts: SCRIPTS,
-        playlists: PLAYLISTS,
-      },
-    });
-    await wrapper.get('[data-testid="editor-close"]').trigger('click');
-
-    expect(wrapper.emitted('close')).toHaveLength(1);
-  });
-
   it('emits close on Escape keydown from the editor root', async () => {
     const wrapper = mount(AstrosRemoteButtonEditor, {
       attachTo: document.body,
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -256,7 +229,6 @@ describe('AstrosRemoteButtonEditor', () => {
       attachTo: document.body,
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,
@@ -278,7 +250,6 @@ describe('AstrosRemoteButtonEditor', () => {
       attachTo: document.body,
       global: { plugins: [i18n] },
       props: {
-        buttonNumber: 5,
         currentValue: mkNoneButton(),
         scripts: SCRIPTS,
         playlists: PLAYLISTS,

@@ -3,12 +3,12 @@ import AstrosRemoteButtonEditor from '@/components/remoteControl/remoteButtonEdi
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import type { EditorListItem } from '@/components/remoteControl/remoteButtonEditor/types';
 
-// View-owned singleton modal wrapper around the button editor. The editor
-// stays presentation-agnostic content; this shell supplies the app's standard
-// <dialog class="modal modal-open"> chrome (matches components/modals/scripter/).
-// `change` is forwarded verbatim from the editor (selecting an item is the
-// immediate action — there's no separate Save); `close` fires from the
-// backdrop click, the editor's × button, or Escape.
+// View-owned singleton modal wrapper around the button editor. Supplies the
+// app's standard modal chrome — title + modal-action footer Close button,
+// matching components/modals/scripter/ — around the editor content. `change`
+// is forwarded verbatim from the editor (selecting an item is the immediate
+// action — there's no separate Save); `close` fires from the footer button,
+// the backdrop click, or the editor's Escape handler.
 defineProps<{
   buttonNumber: number;
   currentValue: PageButton;
@@ -24,22 +24,36 @@ const emit = defineEmits<{
 
 <template>
   <dialog class="modal modal-open">
-    <div class="modal-box">
+    <div class="modal-box w-100 max-w-md">
+      <h1 class="text-2xl font-bold mb-4">
+        {{ $t('remote_control_config.editor.title', { n: buttonNumber }) }}
+      </h1>
+
       <AstrosRemoteButtonEditor
-        :button-number="buttonNumber"
         :current-value="currentValue"
         :scripts="scripts"
         :playlists="playlists"
         @change="(value) => emit('change', value)"
         @close="emit('close')"
       />
+
+      <div class="modal-action justify-center mt-5">
+        <button
+          type="button"
+          class="btn w-24 text-lg"
+          data-testid="editor-modal-close"
+          @click="emit('close')"
+        >
+          {{ $t('close') }}
+        </button>
+      </div>
     </div>
     <form
       method="dialog"
       class="modal-backdrop"
       @click="emit('close')"
     >
-      <button>{{ $t('remote_control_config.editor.close') }}</button>
+      <button>{{ $t('close') }}</button>
     </form>
   </dialog>
 </template>

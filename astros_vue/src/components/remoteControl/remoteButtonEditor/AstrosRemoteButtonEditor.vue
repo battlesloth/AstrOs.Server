@@ -8,7 +8,6 @@ import type { EditorTab, EditorListItem } from './types';
 const { t } = useI18n();
 
 const props = defineProps<{
-  buttonNumber: number;
   currentValue: PageButton;
   scripts: readonly EditorListItem[];
   playlists: readonly EditorListItem[];
@@ -74,38 +73,19 @@ onMounted(() => {
 <template>
   <div
     ref="rootRef"
-    class="astros-remote-button-editor flex flex-col gap-2"
+    class="astros-remote-button-editor flex flex-col gap-4"
     tabindex="-1"
     @keydown.escape="emit('close')"
   >
-    <header class="flex items-center justify-between">
-      <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-base-content/60">
-        {{ t('remote_control_config.editor.header', { n: buttonNumber }) }}
-      </span>
-      <button
-        type="button"
-        class="btn btn-ghost btn-xs btn-square"
-        :aria-label="t('remote_control_config.editor.close')"
-        data-testid="editor-close"
-        @click="emit('close')"
-      >
-        ×
-      </button>
-    </header>
-
     <div
       role="tablist"
-      class="flex gap-1"
+      class="join w-full"
     >
       <button
         type="button"
         role="tab"
-        class="flex-1 rounded-md py-1 text-xs font-semibold capitalize"
-        :class="
-          tab === 'script'
-            ? 'bg-primary/10 text-primary'
-            : 'bg-transparent text-base-content/60 hover:bg-base-200'
-        "
+        class="join-item btn flex-1"
+        :class="tab === 'script' ? 'btn-primary' : 'btn-ghost'"
         :aria-selected="tab === 'script'"
         data-testid="editor-tab-script"
         @click="tab = 'script'"
@@ -115,12 +95,8 @@ onMounted(() => {
       <button
         type="button"
         role="tab"
-        class="flex-1 rounded-md py-1 text-xs font-semibold capitalize"
-        :class="
-          tab === 'playlist'
-            ? 'bg-primary/10 text-primary'
-            : 'bg-transparent text-base-content/60 hover:bg-base-200'
-        "
+        class="join-item btn flex-1"
+        :class="tab === 'playlist' ? 'btn-primary' : 'btn-ghost'"
         :aria-selected="tab === 'playlist'"
         data-testid="editor-tab-playlist"
         @click="tab = 'playlist'"
@@ -132,18 +108,18 @@ onMounted(() => {
     <input
       v-model="query"
       type="text"
-      class="input input-sm input-bordered w-full text-xs"
+      class="input input-bordered w-full text-lg"
       :placeholder="t('remote_control_config.editor.search_placeholder')"
       data-testid="editor-search"
     />
 
     <ul
-      class="flex max-h-56 min-h-24 flex-col gap-px overflow-y-auto rounded-md border border-base-300 p-1 text-xs"
+      class="flex h-64 flex-col gap-1 overflow-y-auto rounded-lg border border-base-300 p-2 text-lg"
     >
       <li>
         <button
           type="button"
-          class="flex w-full items-center rounded px-2 py-1 text-left italic text-base-content/60 hover:bg-base-200"
+          class="flex w-full items-center rounded-md px-3 py-2 text-left italic text-base-content/60 hover:bg-base-200"
           data-testid="editor-none"
           @click="selectNone"
         >
@@ -156,7 +132,7 @@ onMounted(() => {
       >
         <button
           type="button"
-          class="flex w-full items-center rounded px-2 py-1 text-left hover:bg-base-200"
+          class="flex w-full items-center rounded-md px-3 py-2 text-left hover:bg-base-200"
           :data-testid="`editor-item-${item.id}`"
           @click="selectItem(item)"
         >
@@ -165,7 +141,7 @@ onMounted(() => {
       </li>
       <li
         v-if="items.length === 0"
-        class="px-2 py-3 text-center text-[11px] text-base-content/50"
+        class="px-3 py-4 text-center text-base text-base-content/50"
         data-testid="editor-empty"
       >
         {{ t('remote_control_config.editor.empty_state') }}
