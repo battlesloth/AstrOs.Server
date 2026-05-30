@@ -2314,7 +2314,6 @@ describe('firmware store', () => {
       seedSampleFleet();
       for (const col of store.stageBoard) {
         expect(col.role).toBe('idle');
-        expect(col.participating).toBe(false);
       }
     });
 
@@ -2330,7 +2329,6 @@ describe('firmware store', () => {
       });
       const body = store.stageBoard.find((c) => c.id === 'body');
       expect(body?.role).toBe('master');
-      expect(body?.participating).toBe(true);
       const transfer = body?.rows.find((r) => r.stage === 'transfer');
       expect(transfer?.state).toBe('current');
       expect(transfer?.percent).toBe(30);

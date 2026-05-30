@@ -7,7 +7,7 @@ import type {
 } from '@/types/firmware';
 import { mapServerStageToUiStage } from '@/utils/firmwareStageMapping';
 
-// ---- Shared stage order + single-track row state machine ----
+// ---- Shared stage order + row state machine ----
 export const FIRMWARE_STAGES = ['download', 'transfer', 'verify', 'flash', 'reboot'] as const;
 
 export type StageRowState = 'idle' | 'done' | 'current' | 'failed';
@@ -50,16 +50,27 @@ export type StageBoardRowState = StageRowState | 'na';
 // 'idle' role = controller is not part of the current job ("NOT IN UPDATE").
 export type StageColumnRole = 'master' | 'padawan' | 'idle';
 
+// i18n key paths the column rows resolve. Typed (not bare string) so a typo
+// in the controllerStageColumn branches fails type-check, matching the
+// FirmwareStageLabelKey pattern in @/types/firmware.
+type StageRowLabelKey =
+  | `firmware_view.stages.${FirmwareStage}.label`
+  | 'firmware_view.stages.receive.label';
+type StageRowHintKey =
+  | `firmware_view.stages.${FirmwareStage}.hint`
+  | 'firmware_view.stages.receive.hint'
+  | 'firmware_view.stages.master_only';
+
 export interface StageBoardRow {
   stage: FirmwareStage;
   state: StageBoardRowState;
-  /** 1-based badge number; the column component shows it for non-terminal rows
-   *  (idle / current / na) and swaps in a glyph for done/failed. */
+  /** 1-based badge number; the column component shows it for idle / current
+   *  rows and swaps in a glyph for done (✓), failed (!), and na (—). */
   index: number;
   /** i18n key path for the row label; resolved by the column component. */
-  labelKey: string;
+  labelKey: StageRowLabelKey;
   /** i18n key path for the row hint. */
-  hintKey: string;
+  hintKey: StageRowHintKey;
   /** Integer 0..100 for byte-bearing rows (download[master]/transfer); null otherwise. */
   percent: number | null;
 }
@@ -70,7 +81,6 @@ export interface StageColumnModel {
   glyph: string;
   isMaster: boolean;
   role: StageColumnRole;
-  participating: boolean;
   rows: StageBoardRow[];
 }
 
@@ -78,8 +88,7 @@ export interface ControllerStageColumnOptions {
   /** The UI stage the job was on when this controller failed, sourced from
    *  the store's `failedControllers` summary. Used only when the controller's
    *  state is FAILED — drives which row renders the failure glyph. The wire
-   *  FAILED state carries no stage, so this is the global-stage approximation
-   *  (same one the old single-track list used). */
+   *  FAILED state carries no stage, so this is the global-stage approximation. */
   failedStage?: FirmwareStage | null;
 }
 
@@ -159,14 +168,14 @@ export function controllerStageColumn(
     });
     if (stage === 'download' && !isMaster) rowState = 'na';
 
-    const labelKey =
+    const labelKey: StageRowLabelKey =
       stage === 'transfer'
         ? isMaster
           ? 'firmware_view.stages.transfer.label'
           : 'firmware_view.stages.receive.label'
         : `firmware_view.stages.${stage}.label`;
 
-    const hintKey =
+    const hintKey: StageRowHintKey =
       stage === 'download' && !isMaster
         ? 'firmware_view.stages.master_only'
         : stage === 'transfer'
@@ -193,7 +202,6 @@ export function controllerStageColumn(
     glyph: controller.glyph,
     isMaster,
     role: state === undefined ? 'idle' : isMaster ? 'master' : 'padawan',
-    participating: state !== undefined,
     rows,
   };
 }

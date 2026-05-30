@@ -15,11 +15,28 @@ const padawan: Pick<FirmwareControllerView, 'id' | 'label' | 'glyph' | 'isMaster
   glyph: 'C',
   isMaster: false,
 };
+const master: Pick<FirmwareControllerView, 'id' | 'label' | 'glyph' | 'isMaster'> = {
+  id: 'body',
+  label: 'Body',
+  glyph: 'B',
+  isMaster: true,
+};
 
 function mountCol(state: ControllerFlashStateBySlot | undefined, opts = {}) {
   return mount(AstrosFirmwareStageColumn, {
     global: { plugins: [i18n()] },
     props: { column: controllerStageColumn(padawan, state, opts) },
+  });
+}
+
+function mountColFor(
+  controller: Pick<FirmwareControllerView, 'id' | 'label' | 'glyph' | 'isMaster'>,
+  state: ControllerFlashStateBySlot | undefined,
+  opts = {},
+) {
+  return mount(AstrosFirmwareStageColumn, {
+    global: { plugins: [i18n()] },
+    props: { column: controllerStageColumn(controller, state, opts) },
   });
 }
 
@@ -60,5 +77,41 @@ describe('AstrosFirmwareStageColumn', () => {
       totalBytes: 100,
     });
     expect(wrapper.find('.astros-firmware-stage-column--idle').exists()).toBe(false);
+  });
+
+  it('renders 100% with a ✓ glyph on a completed (done) byte-bearing row', () => {
+    // Master in SENDING → Download is done; the done-progress branch renders 100%.
+    const wrapper = mountColFor(master, {
+      controllerId: 'body',
+      stage: 'SENDING',
+      bytesSent: 10,
+      totalBytes: 100,
+    });
+    const doneRow = wrapper.find('.astros-firmware-stage-column__row--done');
+    expect(doneRow.exists()).toBe(true);
+    expect(doneRow.find('.astros-firmware-stage-column__bullet--done').text()).toBe('✓');
+    expect(doneRow.find('.astros-firmware-stage-column__progress--done').text()).toBe('100%');
+  });
+
+  it('renders the master Transfer label and MASTER role', () => {
+    const wrapper = mountColFor(master, {
+      controllerId: 'body',
+      stage: 'SENDING',
+      bytesSent: 0,
+      totalBytes: 100,
+    });
+    expect(wrapper.text()).toContain('MASTER');
+    expect(wrapper.text()).toContain('Transfer');
+  });
+
+  it('renders the failed (!) glyph on the failed row', () => {
+    const wrapper = mountColFor(
+      master,
+      { controllerId: 'body', stage: 'FAILED', error: 'hash_mismatch' },
+      { failedStage: 'verify' },
+    );
+    const failedRow = wrapper.find('.astros-firmware-stage-column__row--failed');
+    expect(failedRow.exists()).toBe(true);
+    expect(failedRow.find('.astros-firmware-stage-column__bullet--failed').text()).toBe('!');
   });
 });

@@ -72,10 +72,9 @@ function byStage(col: StageColumnModel, stage: string) {
 }
 
 describe('controllerStageColumn — not in update', () => {
-  it('renders role idle / not-participating when state is undefined', () => {
+  it('renders role idle when state is undefined', () => {
     const col = controllerStageColumn(padawan, undefined);
     expect(col.role).toBe('idle');
-    expect(col.participating).toBe(false);
   });
 
   it('still marks padawan Download as na when not in update', () => {
@@ -180,11 +179,39 @@ describe('controllerStageColumn — failed', () => {
 });
 
 describe('controllerStageColumn — queued', () => {
-  it('renders all rows idle but still participating once queued', () => {
+  it('renders all rows idle with master role once queued', () => {
     const state: ControllerFlashStateBySlot = { controllerId: 'body', stage: 'QUEUED' };
     const col = controllerStageColumn(master, state);
     expect(col.role).toBe('master');
-    expect(col.participating).toBe(true);
+    expect(col.rows.map((r) => r.state)).toEqual(['idle', 'idle', 'idle', 'idle', 'idle']);
+  });
+});
+
+describe('controllerStageColumn — clamp', () => {
+  it('clamps a stale byte-count overflow to 100 on the current Download row', () => {
+    const state: ControllerFlashStateBySlot = {
+      controllerId: 'body',
+      stage: 'UPLOADING_TO_MASTER',
+      bytesSent: 1_200_000,
+      totalBytes: 1_000_000,
+    };
+    const col = controllerStageColumn(master, state);
+    expect(byStage(col, 'download').percent).toBe(100);
+  });
+});
+
+describe('controllerStageColumn — failed (null stage)', () => {
+  it('renders an all-idle column when FAILED with no attributable stage (current approximation)', () => {
+    const state: ControllerFlashStateBySlot = {
+      controllerId: 'body',
+      stage: 'FAILED',
+      error: 'aborted',
+    };
+    const col = controllerStageColumn(master, state, { failedStage: null });
+    // Wire FAILED carries no stage; with failedStage null the rows can't
+    // attribute the failure, so every row falls back to idle. Pinned so a
+    // future column-level failure treatment is a deliberate, test-visible change.
+    expect(col.role).toBe('master');
     expect(col.rows.map((r) => r.state)).toEqual(['idle', 'idle', 'idle', 'idle', 'idle']);
   });
 });
