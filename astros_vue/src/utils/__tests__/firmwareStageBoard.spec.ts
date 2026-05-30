@@ -178,7 +178,30 @@ describe('controllerStageColumn — padawan', () => {
     const col = controllerStageColumn(padawan, state);
     expect(byStage(col, 'download').state).toBe('na');
     expect(byStage(col, 'transfer').state).toBe('done');
+    // A completed Receive shows 100% (the done branch, mirroring master Download).
+    expect(byStage(col, 'transfer').percent).toBe(100);
     expect(byStage(col, 'reboot').state).toBe('done');
+  });
+
+  it('never carries a percent on na / idle / failed byte-bearing rows', () => {
+    // Locks the percent gating: percent attaches ONLY to a byte-bearing row in
+    // 'current' or 'done'. A mutation dropping the rowState checks would surface
+    // a number on these rows.
+    const notInUpdate = controllerStageColumn(padawan, undefined);
+    expect(byStage(notInUpdate, 'download').state).toBe('na');
+    expect(byStage(notInUpdate, 'download').percent).toBeNull();
+
+    const queued = controllerStageColumn(padawan, { controllerId: 'core', stage: 'QUEUED' });
+    expect(byStage(queued, 'transfer').state).toBe('idle');
+    expect(byStage(queued, 'transfer').percent).toBeNull();
+
+    const failed = controllerStageColumn(
+      padawan,
+      { controllerId: 'core', stage: 'FAILED', error: 'hash_mismatch' },
+      { failedStage: 'transfer' },
+    );
+    expect(byStage(failed, 'transfer').state).toBe('failed');
+    expect(byStage(failed, 'transfer').percent).toBeNull();
   });
 });
 

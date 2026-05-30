@@ -90,7 +90,13 @@ export interface ControllerStageColumnOptions {
   /** The UI stage the job was on when this controller failed, sourced from
    *  the store's `failedControllers` summary. Used only when the controller's
    *  state is FAILED — drives which row renders the failure glyph. The wire
-   *  FAILED state carries no stage, so this is the global-stage approximation. */
+   *  FAILED state carries no stage, so this is the global-stage approximation:
+   *  every failed controller shares the global `currentStage` captured at
+   *  collection time. Caveat: once the master emits its own per-stage progress
+   *  (AstrOs.ESP Phase C self-flash), that advances the global stage to
+   *  `reboot`, so a padawan that failed earlier may render its glyph on a later
+   *  row than where it actually failed. A per-controller stage snapshot in the
+   *  store's `collectFailedControllers` would tighten this — tracked follow-up. */
   failedStage?: FirmwareStage | null;
 }
 
