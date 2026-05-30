@@ -336,10 +336,10 @@ const DEFAULT_THROTTLE_WINDOW_MS = 250;
 // design Section 6 cross-repo coordination.
 const DEFAULT_FINALIZE_TIMEOUT_MS = 90_000;
 // Deploy-phase inactivity watchdog: max silence (no FW_PROGRESS/FW_DEPLOY_DONE)
-// between FW_DEPLOY_BEGIN and FW_DEPLOY_DONE before the job is failed with
-// 'deploy_timeout'. Must exceed the longest quiet gap in a healthy deploy —
-// chiefly the master's own self-flash write (no FW_PROGRESS emitted during it).
-// Matches the finalizeTimer magnitude; configurable per-job.
+// between FW_DEPLOY_BEGIN and FW_DEPLOY_DONE before failing with 'deploy_timeout'.
+// Must exceed the longest quiet gap in the deploy phase; per .docs/protocol.md the
+// master's self-flash/commit+reboot happens after FW_DEPLOY_DONE and is covered by the
+// post-DONE finalize/reboot timers (not this watchdog).
 const DEFAULT_DEPLOY_STALL_TIMEOUT_MS = 90_000;
 
 // Discriminated union of every shape the orchestrator broadcasts. Each
