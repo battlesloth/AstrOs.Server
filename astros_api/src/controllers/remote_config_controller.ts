@@ -72,14 +72,30 @@ export async function syncRemoteConfig(db: Kysely<Database>, req: any, res: any,
   }
 }
 
-async function getRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function getRemoteConfig(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new RemoteConfigRepository(db);
 
-    const scripts = await repo.getConfig('remoteConfig');
+    const stored = (await repo.getConfig('remoteConfig'))?.value;
+
+    // The editor store JSON.parses this response and hard-fails unless the
+    // result is a pages array. The column is free-form JSON and migration_0
+    // seeds it with '{}' (an object) on fresh installs, so normalize anything
+    // that is not an array to the empty-array string '[]'. Mirrors the same
+    // defensive guard in syncRemoteConfig.
+    let value = '[]';
+    if (stored) {
+      try {
+        if (Array.isArray(JSON.parse(stored))) {
+          value = stored;
+        }
+      } catch {
+        // Corrupt JSON in the column — fall through to '[]'.
+      }
+    }
 
     res.status(200);
-    res.json(scripts?.value || { value: '[]' });
+    res.json(value);
   } catch (error) {
     logger.error(error);
 
