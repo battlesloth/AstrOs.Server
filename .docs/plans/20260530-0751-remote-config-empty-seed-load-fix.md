@@ -50,14 +50,20 @@ Once the backend sends `'[]'`, the store's existing fresh-seed path seeds one
 
 ## Tasks
 
-- [ ] Write failing `getRemoteConfig` tests in `remote_config_controller.test.ts`:
+- [x] Write failing `getRemoteConfig` tests in `remote_config_controller.test.ts`:
       `'{}'` seed → `'[]'`; saved array string → passthrough unchanged; no row →
-      `'[]'`; corrupt non-JSON value → `'[]'`. Run red.
-- [ ] Normalize `getRemoteConfig` in `remote_config_controller.ts`. Run green.
-- [ ] Change `migration_0` seed `value: '{}'` → `'[]'`.
-- [ ] Pre-commit: `prettier:write`, `lint:fix`, `build`, full `vitest run`, then
-      `superpowers:requesting-code-review` on the diff. Address Critical/Important.
-- [ ] Commit. (Push via VS Code.)
+      `'[]'`; corrupt non-JSON value → `'[]'`; non-array object → `'[]'`; fresh
+      `'[]'` seed passthrough. Watched 4 fail (RED). Plus a repo test pinning the
+      new seed value (RED: `'{}'` → expected `'[]'`).
+- [x] Normalize `getRemoteConfig` in `remote_config_controller.ts`. All green.
+- [x] Change `migration_0` seed `value: '{}'` → `'[]'`. Decoupled the two
+      seed-dependent controller tests via explicit `saveConfig('{}')` so the
+      `'{}'` defense stays covered after the flip.
+- [x] Pre-commit: `prettier:write`, `lint:fix` (0 errors), `build` (clean), full
+      `vitest run` (67 files / 856 tests pass), then `requesting-code-review` on
+      the diff (no Critical/Important; 2 Minor deferred — `migration_7` comment
+      nuance, optional `logger.warn`).
+- [x] Commit (`eba28cd`). Push via VS Code after pre-push review.
 
 ## Out of scope / notes
 
