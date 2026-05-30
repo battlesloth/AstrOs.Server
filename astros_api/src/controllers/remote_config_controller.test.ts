@@ -1,10 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import { Kysely } from 'kysely';
 import { Database } from '../dal/types.js';
 import { createKyselyConnection, migrateToLatest } from '../dal/database.js';
 import { RemoteConfigRepository } from '../dal/repositories/remote_config_repository.js';
 import { syncRemoteConfig, getRemoteConfig } from './remote_config_controller.js';
 import { RemotePage, PageButton } from '../models/remotes/RemotePage.js';
+// Import via the same specifier the controller uses ('src/logger.js'), not the
+// relative '../logger.js'. vitest dedupes modules by resolved specifier, so a
+// mismatch would spy on a different logger instance than the controller calls.
+import { logger } from 'src/logger.js';
 
 function mockRes() {
   const res: any = {};
@@ -117,13 +121,19 @@ describe('remote_config_controller / syncRemoteConfig', () => {
 
 describe('remote_config_controller / getRemoteConfig', () => {
   let db: Kysely<Database>;
+  // Spy on the corruption breadcrumb so tests can assert it fires only on a
+  // genuine parse failure (never on the benign non-array seed), and so the
+  // real pino warn doesn't emit through the transport during the run.
+  let warnSpy: MockInstance;
 
   beforeEach(async () => {
     db = createKyselyConnection().db;
     await migrateToLatest(db);
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation((() => undefined) as never);
   });
 
   afterEach(async () => {
+    warnSpy.mockRestore();
     await db.destroy();
   });
 
@@ -143,6 +153,11 @@ describe('remote_config_controller / getRemoteConfig', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith('[]');
+    // The real contract the store enforces: the response must JSON.parse to an
+    // array, not merely equal a particular string.
+    expect(Array.isArray(JSON.parse(res.json.mock.calls[0][0]))).toBe(true);
+    // A parsed-but-non-array value is a known-benign state — no corruption log.
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('returns "[]" for the fresh-install seed', async () => {
@@ -173,6 +188,8 @@ describe('remote_config_controller / getRemoteConfig', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(stored);
+    // Pin the real contract: a saved config round-trips as a parseable array.
+    expect(Array.isArray(JSON.parse(res.json.mock.calls[0][0]))).toBe(true);
   });
 
   it('falls back to "[]" when no remote_config row exists', async () => {
@@ -190,7 +207,11 @@ describe('remote_config_controller / getRemoteConfig', () => {
     expect(res.json).toHaveBeenCalledWith('[]');
   });
 
-  it('falls back to "[]" when the stored value is not valid JSON', async () => {
+  it('falls back to "[]" and logs a breadcrumb when the stored value is not valid JSON', async () => {
+    // A non-JSON value is unreachable by any legitimate write, so it signals
+    // real corruption — the GET must still serve '[]' (so the editor opens) AND
+    // leave a server-side breadcrumb, since the user's first Save would
+    // otherwise overwrite the bad row and erase the evidence.
     const repo = new RemoteConfigRepository(db);
     await repo.saveConfig('remoteConfig', 'not-json{');
 
@@ -201,6 +222,7 @@ describe('remote_config_controller / getRemoteConfig', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith('[]');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to "[]" when the stored value parses to a non-array object', async () => {

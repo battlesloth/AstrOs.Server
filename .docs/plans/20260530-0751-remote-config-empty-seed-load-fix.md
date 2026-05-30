@@ -65,6 +65,37 @@ Once the backend sends `'[]'`, the store's existing fresh-seed path seeds one
       nuance, optional `logger.warn`).
 - [x] Commit (`eba28cd`). Push via VS Code after pre-push review.
 
+## Pre-push review (`/pr-review-toolkit:review-pr`, 5 agents)
+
+No Critical/Important *code* defects in the committed fix. Addressed in a
+follow-up commit:
+
+- **Doc-drift from the seed flip** (3 agents): `syncRemoteConfig`'s comment and
+  the `getRemoteConfig` comment both still claimed "migration_0 seeds '{}' on
+  fresh installs" — reworded to "existing installs can hold '{}'; fresh installs
+  now seed '[]'." Dropped the overstated "mirrors syncRemoteConfig" claim (they
+  diverge on corrupt JSON: GET → 200 `'[]'`, sync → 500).
+- **Silent corruption swallow** (silent-failure HIGH): the corrupt-JSON `catch`
+  was empty. A non-JSON value is unreachable by any legitimate write, so it
+  signals real corruption — and the frontend's first-save-overwrites path would
+  erase it permanently with no trace. Added a `logger.warn` breadcrumb on the
+  parse-failure branch ONLY (the benign non-array seed stays silent — no log
+  noise). Mutation-checked: dropping the warn fails the new breadcrumb test.
+- **Dead metadata**: removed the unused `= '{}'` default on
+  `migration_7.test.ts` `simulateLegacySeed` (all callers pass explicit values).
+- **Contract test** (test-analyzer top pick): added `Array.isArray(JSON.parse(...))`
+  assertions on the normalize + passthrough paths so the tests pin the real
+  store contract, not just a literal string.
+
+Deferred (noted, not dropped):
+
+- `getRemoteConfig`'s 500-catch path and `saveRemoteConfig` are untested —
+  **pre-existing** gaps the sibling shares, out of scope for a load-bug fix.
+- Typed choke-point refactor (`repo.getPages(): RemotePage[]`) to collapse the
+  duplicated, slightly-divergent array guards in both controllers into one
+  tested function — type-analyzer flagged as a follow-up, not a blocker. Would
+  also resolve the corrupt-JSON 200-vs-500 divergence.
+
 ## Out of scope / notes
 
 - No `migration_8` to rewrite existing `'{}'` rows — the read-time normalization
