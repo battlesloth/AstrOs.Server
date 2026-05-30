@@ -127,13 +127,19 @@
     "stages": {
       "eyebrow_title": "STAGES",
       "in_progress": "IN PROGRESS",
+      "not_in_update": "NOT IN UPDATE",
+      "master_only": "Master only",
       "download": {
         "label": "Download",
         "hint": "Master receives file"
       },
       "transfer": {
         "label": "Transfer",
-        "hint": "Forward to padawans"
+        "hint": "Master → padawans"
+      },
+      "receive": {
+        "label": "Receive",
+        "hint": "Master → padawans"
       },
       "flash": {
         "label": "Flash",
@@ -141,7 +147,7 @@
       },
       "verify": {
         "label": "Verify",
-        "hint": "Checksum"
+        "hint": "Checksum binary"
       },
       "reboot": {
         "label": "Reboot",
