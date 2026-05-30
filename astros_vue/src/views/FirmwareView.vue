@@ -6,7 +6,7 @@ import {
   AstrosLayout,
   AstrosFirmwareSourceStrip,
   AstrosFirmwareTopology,
-  AstrosFirmwareStagesList,
+  AstrosFirmwareStagesBoard,
   AstrosFirmwareControllersPanel,
   AstrosFirmwareConfirmModal,
 } from '@/components';
@@ -33,7 +33,7 @@ const {
   sourceMode,
   uploadedFilename,
   progressByControllerId,
-  downloadPercent,
+  stageBoard,
   isOwnJob,
   currentJobLoadFailed,
   flashError,
@@ -305,13 +305,6 @@ onMounted(async () => {
                 :current-stage="currentStage"
                 :failed-controller-ids="failedControllerIds"
               />
-              <AstrosFirmwareStagesList
-                v-if="phase === 'flashing' || phase === 'done' || phase === 'failed'"
-                :phase="phase"
-                :current-stage="currentStage"
-                :failed-stage="failedStage"
-                :download-percent="downloadPercent"
-              />
             </div>
 
             <AstrosFirmwareControllersPanel
@@ -325,6 +318,10 @@ onMounted(async () => {
               @done="onResultBarDone"
             />
           </div>
+          <AstrosFirmwareStagesBoard
+            v-if="(phase === 'flashing' || phase === 'done' || phase === 'failed') && !lockConflict"
+            :columns="stageBoard"
+          />
         </div>
       </div>
     </template>
