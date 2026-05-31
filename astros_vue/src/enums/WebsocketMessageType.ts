@@ -19,4 +19,5 @@ export enum WebsocketMessageType {
   FLASH_CONTROLLER_RESULT = 14,
   FLASH_JOB_DONE = 15,
   FLASH_JOB_FAILED = 16,
+  PANIC_STATE = 17,
 }

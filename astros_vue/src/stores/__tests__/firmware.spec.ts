@@ -2299,11 +2299,50 @@ describe('firmware store', () => {
     });
   });
 
-  describe('downloadPercent', () => {
+  describe('stageBoard', () => {
     const BODY_MAC = '00:00:00:00:00:00';
     const CORE_MAC = 'aa:bb:cc:dd:ee:01';
 
-    function startUploadingJob(): ReturnType<typeof useFirmwareStore> {
+    it('returns one column per fleet controller', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      expect(store.stageBoard.map((c) => c.id)).toEqual(['body', 'core', 'dome']);
+    });
+
+    it('marks controllers without a live state as not-in-update (role idle)', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      for (const col of store.stageBoard) {
+        expect(col.role).toBe('idle');
+      }
+    });
+
+    it('projects each controller using its own live stage; only the padawan Receive carries a percent', () => {
+      const store = useFirmwareStore();
+      seedSampleFleet();
+      store.setPhase('select');
+      store.applyJobStarted({
+        jobId: 'job-1',
+        source: { kind: 'github', version: 'v1.4.2' },
+        controllers: [
+          { controllerId: BODY_MAC, stage: 'SENDING', bytesSent: 30, totalBytes: 100 },
+          { controllerId: CORE_MAC, stage: 'SENDING', bytesSent: 54, totalBytes: 100 },
+        ],
+        startedAt: '2026-05-29T00:00:00Z',
+      });
+      const body = store.stageBoard.find((c) => c.id === 'body');
+      expect(body?.role).toBe('master');
+      const bodyTransfer = body?.rows.find((r) => r.stage === 'transfer');
+      expect(bodyTransfer?.state).toBe('current');
+      // Master Transfer is a broadcast — no single percent.
+      expect(bodyTransfer?.percent).toBeNull();
+      const core = store.stageBoard.find((c) => c.id === 'core');
+      const coreReceive = core?.rows.find((r) => r.stage === 'transfer');
+      expect(coreReceive?.state).toBe('current');
+      expect(coreReceive?.percent).toBe(54);
+    });
+
+    it('threads failedControllers[].stage into the failed column', () => {
       const store = useFirmwareStore();
       seedSampleFleet();
       store.setPhase('select');
@@ -2314,83 +2353,23 @@ describe('firmware store', () => {
           { controllerId: BODY_MAC, stage: 'QUEUED' },
           { controllerId: CORE_MAC, stage: 'QUEUED' },
         ],
-        startedAt: '2026-05-12T08:00:00Z',
+        startedAt: '2026-05-29T00:00:00Z',
       });
-      return store;
-    }
-
-    it('is null before any controller enters UPLOADING_TO_MASTER', () => {
-      const store = startUploadingJob();
-      // Still in QUEUED — no percent to report yet.
-      expect(store.downloadPercent).toBeNull();
-    });
-
-    it('reports the integer percent computed from bytesSent / totalBytes', () => {
-      const store = startUploadingJob();
+      // Core reaches VERIFYING (sets the shared currentStage), then FAILS.
+      store.applyControllerUpdate({ controllerId: CORE_MAC, stage: 'VERIFYING' });
       store.applyControllerUpdate({
-        controllerId: BODY_MAC,
-        stage: 'UPLOADING_TO_MASTER',
-        bytesSent: 250_000,
-        totalBytes: 1_000_000,
+        controllerId: CORE_MAC,
+        stage: 'FAILED',
+        error: 'hash_mismatch',
       });
-      expect(store.downloadPercent).toBe(25);
-    });
+      store.applyJobDone({ jobId: 'job-1', endedAt: '2026-05-29T00:05:00Z' });
 
-    it('rounds to nearest integer (no fractional percents)', () => {
-      const store = startUploadingJob();
-      store.applyControllerUpdate({
-        controllerId: BODY_MAC,
-        stage: 'UPLOADING_TO_MASTER',
-        bytesSent: 333_333,
-        totalBytes: 1_000_000,
-      });
-      // 33.3333… rounds down to 33.
-      expect(store.downloadPercent).toBe(33);
-    });
-
-    it('clamps a stale-byte-count overflow to 100 rather than emitting > 100', () => {
-      const store = startUploadingJob();
-      store.applyControllerUpdate({
-        controllerId: BODY_MAC,
-        stage: 'UPLOADING_TO_MASTER',
-        bytesSent: 1_200_000,
-        totalBytes: 1_000_000,
-      });
-      expect(store.downloadPercent).toBe(100);
-    });
-
-    it('is null when totalBytes is missing or non-positive', () => {
-      const store = startUploadingJob();
-      store.applyControllerUpdate({
-        controllerId: BODY_MAC,
-        stage: 'UPLOADING_TO_MASTER',
-        bytesSent: 100,
-        // totalBytes intentionally omitted.
-      });
-      expect(store.downloadPercent).toBeNull();
-
-      store.applyControllerUpdate({
-        controllerId: BODY_MAC,
-        stage: 'UPLOADING_TO_MASTER',
-        bytesSent: 100,
-        totalBytes: 0,
-      });
-      expect(store.downloadPercent).toBeNull();
-    });
-
-    it('is null once controllers have moved past UPLOADING_TO_MASTER', () => {
-      const store = startUploadingJob();
-      store.applyControllerUpdate({
-        controllerId: BODY_MAC,
-        stage: 'UPLOADING_TO_MASTER',
-        bytesSent: 500_000,
-        totalBytes: 1_000_000,
-      });
-      expect(store.downloadPercent).toBe(50);
-      store.applyControllerUpdate({ controllerId: BODY_MAC, stage: 'SENDING' });
-      store.applyControllerUpdate({ controllerId: CORE_MAC, stage: 'SENDING' });
-      // No controllers in UPLOADING_TO_MASTER anymore — percent gone.
-      expect(store.downloadPercent).toBeNull();
+      expect(store.failedControllers.map((f) => f.id)).toContain('core');
+      const core = store.stageBoard.find((c) => c.id === 'core');
+      // The failed row is sourced from failedControllers[].stage (= 'verify',
+      // the UI stage current when the failure landed). A mutation that dropped
+      // failedStage from the stageBoard computed would render this row 'idle'.
+      expect(core?.rows.find((r) => r.stage === 'verify')?.state).toBe('failed');
     });
   });
 

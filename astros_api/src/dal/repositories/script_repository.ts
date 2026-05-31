@@ -251,6 +251,27 @@ export class ScriptRepository {
     return result;
   }
 
+  /**
+   * Map of script id → recorded duration (deciseconds) for every script.
+   * Used by the playlist converter to give a Script track its real runtime —
+   * playlist track rows carry no usable duration for scripts (no editor
+   * control), so the queue would otherwise treat scripts as instantaneous.
+   * Intentionally unfiltered (no `enabled = 1`) so a still-referenced script's
+   * duration resolves even if the script was soft-disabled.
+   */
+  async getScriptDurationsDS(): Promise<Map<string, number>> {
+    const rows = await this.db
+      .selectFrom('scripts')
+      .select(['id', 'duration_ds'])
+      .execute()
+      .catch((err) => {
+        logger.error('ScriptRepository.getScriptDurationsDS', err);
+        throw err;
+      });
+
+    return new Map(rows.map((r) => [r.id, r.duration_ds]));
+  }
+
   //#endregion
   //#region Script Delete
 

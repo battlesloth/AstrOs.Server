@@ -9,6 +9,8 @@ import {
   controllerStatePillKind,
   mapServerStageToUiStage,
 } from '@/utils/firmwareStageMapping';
+import { controllerStageColumn } from '@/utils/firmwareStageBoard';
+import type { StageColumnModel } from '@/utils/firmwareStageBoard';
 import { useControllerStore } from '@/stores/controller';
 import { ControllerStatus, Location } from '@/enums';
 import type {
@@ -993,22 +995,19 @@ export const useFirmwareStore = defineStore('firmware', () => {
     return out;
   });
 
-  // Integer percentage 0..100 for the serial-upload step. All controllers
-  // share bytesSent during upload (single binary to the master — see
-  // flash_orchestrator.ts onTransferBegun), so picking any one in
-  // UPLOADING_TO_MASTER is sufficient. null falls through to the UI's
-  // generic in-progress label.
-  const downloadPercent = computed<number | null>(() => {
-    for (const state of controllerStates.value.values()) {
-      if (state.stage !== 'UPLOADING_TO_MASTER') continue;
-      const total = state.totalBytes;
-      const sent = state.bytesSent;
-      if (typeof total !== 'number' || total <= 0) return null;
-      if (typeof sent !== 'number') return null;
-      // Clamp so a stale bytesSent overflow can't render as "117%".
-      return Math.round(Math.max(0, Math.min(1, sent / total)) * 100);
-    }
-    return null;
+  // Per-controller STAGES board projection. One column per fleet controller;
+  // controllers absent from `controllerStates` render as "NOT IN UPDATE".
+  // Failure rows are sourced from `failedControllers` (the wire FAILED state
+  // carries no stage). Mirrors the `progressByControllerId` projection pattern.
+  const stageBoard = computed<StageColumnModel[]>(() => {
+    const failedStageById = new Map<SlotId, FirmwareStage | null>(
+      failedControllers.value.map((f) => [f.id, f.stage]),
+    );
+    return controllers.value.map((c) =>
+      controllerStageColumn(c, controllerStates.value.get(c.id), {
+        failedStage: failedStageById.get(c.id) ?? null,
+      }),
+    );
   });
 
   return {
@@ -1038,7 +1037,7 @@ export const useFirmwareStore = defineStore('firmware', () => {
     canFlash,
     isOwnJob,
     progressByControllerId,
-    downloadPercent,
+    stageBoard,
     toggle,
     selectAll,
     clear,

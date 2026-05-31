@@ -20,10 +20,18 @@ function getTrackDuration(track: PlaylistTrack): number {
   return dsToMs(track.durationDS);
 }
 
-function convertScriptTrack(track: PlaylistTrack): QueueTrack {
+function convertScriptTrack(
+  track: PlaylistTrack,
+  scriptDurations: Map<string, number>,
+): QueueTrack {
+  // A playlist Script track's own durationDS is meaningless — the editor
+  // exposes no duration control for script tracks, so it stays 0 (or stale).
+  // Use the referenced script's recorded duration instead; otherwise the queue
+  // would treat the script as instantaneous and run the next track over it.
+  // Unknown scriptId → 0 (script deleted/missing); the queue still advances.
   return {
     id: track.trackId,
-    duration: getTrackDuration(track),
+    duration: dsToMs(scriptDurations.get(track.trackId) ?? 0),
     isWait: false,
   };
 }
@@ -51,6 +59,7 @@ async function flattenPlaylistTrack(
   track: PlaylistTrack,
   playlistRepo: PlaylistRepository,
   visited: Set<string>,
+  scriptDurations: Map<string, number>,
 ): Promise<QueueTrack[]> {
   if (visited.has(track.trackId)) {
     throw new PlaylistCycleError(track.trackId, {
@@ -74,13 +83,18 @@ async function flattenPlaylistTrack(
     for (const subTrack of nestedPlaylist.tracks) {
       switch (subTrack.trackType) {
         case TrackType.Script:
-          subTracks.push(convertScriptTrack(subTrack));
+          subTracks.push(convertScriptTrack(subTrack, scriptDurations));
           break;
         case TrackType.Wait:
           subTracks.push(convertWaitTrack(subTrack));
           break;
         case TrackType.Playlist: {
-          const deepTracks = await flattenPlaylistTrack(subTrack, playlistRepo, visited);
+          const deepTracks = await flattenPlaylistTrack(
+            subTrack,
+            playlistRepo,
+            visited,
+            scriptDurations,
+          );
           subTracks.push(...deepTracks);
           break;
         }
@@ -95,6 +109,7 @@ async function flattenPlaylistTrack(
 export async function convertPlaylistToQueueItem(
   playlist: Playlist,
   playlistRepo: PlaylistRepository,
+  scriptDurations: Map<string, number>,
   locations: Array<ControllerLocation>,
 ): Promise<AnimationQueuePlaylist> {
   const tracks: Array<QueueTrack | QueueTrack[]> = [];
@@ -105,14 +120,19 @@ export async function convertPlaylistToQueueItem(
   for (const track of playlist.tracks) {
     switch (track.trackType) {
       case TrackType.Script:
-        tracks.push(convertScriptTrack(track));
+        tracks.push(convertScriptTrack(track, scriptDurations));
         break;
       case TrackType.Wait:
         tracks.push(convertWaitTrack(track));
         break;
       case TrackType.Playlist: {
         try {
-          const subTracks = await flattenPlaylistTrack(track, playlistRepo, visited);
+          const subTracks = await flattenPlaylistTrack(
+            track,
+            playlistRepo,
+            visited,
+            scriptDurations,
+          );
           if (subTracks.length > 0) {
             tracks.push(subTracks);
           }

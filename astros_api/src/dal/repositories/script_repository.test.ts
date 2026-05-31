@@ -935,4 +935,103 @@ describe('Script Repository', () => {
     expect(after?.tracks[0].id).toBe(waitTrackId);
     expect(after?.tracks[0].trackType).toBe(TrackType.Wait);
   });
+
+  describe('script_deployments FK contract', () => {
+    // Regression: handleScriptDeployResponse stored the location NAME in
+    // script_deployments.location_id, which is a FK to locations.id (a UUID).
+    // Once migration_6 added that FK, uploading a script threw
+    // "FOREIGN KEY constraint failed". These pin the contract: a deployment row
+    // must be keyed by the location id, never the name.
+    async function seedScript(): Promise<string> {
+      const scriptId = uuid();
+      const scriptRepo = new ScriptRepository(db);
+      await scriptRepo.upsertScript({
+        id: scriptId,
+        scriptName: 'Deploy Test',
+        description: '',
+        lastSaved: new Date(),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [],
+      });
+      return scriptId;
+    }
+
+    it('records a deployment keyed by the location id and round-trips the date', async () => {
+      const scriptRepo = new ScriptRepository(db);
+      const scriptId = await seedScript();
+
+      const deployedAt = new Date('2026-05-31T12:00:00.000Z');
+      await scriptRepo.updateScriptControllerUploaded(scriptId, locationId, deployedAt);
+
+      const roundTrip = await scriptRepo.getLastScriptUploadedDate(scriptId, locationId);
+      expect(roundTrip.getTime()).toBe(deployedAt.getTime());
+    });
+
+    it('upserts last_deployed on repeat deployment (single row per script+location)', async () => {
+      const scriptRepo = new ScriptRepository(db);
+      const scriptId = await seedScript();
+
+      const first = new Date('2026-05-31T12:00:00.000Z');
+      const second = new Date('2026-05-31T13:30:00.000Z');
+      await scriptRepo.updateScriptControllerUploaded(scriptId, locationId, first);
+      await scriptRepo.updateScriptControllerUploaded(scriptId, locationId, second);
+
+      const roundTrip = await scriptRepo.getLastScriptUploadedDate(scriptId, locationId);
+      expect(roundTrip.getTime()).toBe(second.getTime());
+
+      const rows = await db
+        .selectFrom('script_deployments')
+        .selectAll()
+        .where('script_id', '=', scriptId)
+        .execute();
+      expect(rows.length).toBe(1);
+    });
+
+    it('rejects a deployment whose location_id is a location NAME, not an id (the original bug)', async () => {
+      const scriptRepo = new ScriptRepository(db);
+      const scriptId = await seedScript();
+
+      // 'dome' is what getLocationNameByMac returns; it is a locations.name, not
+      // a locations.id, so the FK on script_deployments.location_id rejects it.
+      await expect(
+        scriptRepo.updateScriptControllerUploaded(scriptId, 'dome', new Date()),
+      ).rejects.toThrow(/FOREIGN KEY constraint failed/);
+    });
+  });
+
+  describe('getScriptDurationsDS', () => {
+    it('returns a map of script id → recorded duration_ds for every script', async () => {
+      const scriptRepo = new ScriptRepository(db);
+      const a = uuid();
+      const b = uuid();
+      await db
+        .insertInto('scripts')
+        .values([
+          {
+            id: a,
+            name: 'A',
+            description: '',
+            last_modified: Date.now(),
+            enabled: 1,
+            duration_ds: 8,
+          },
+          {
+            id: b,
+            name: 'B',
+            description: '',
+            last_modified: Date.now(),
+            enabled: 1,
+            duration_ds: 50,
+          },
+        ])
+        .execute();
+
+      const durations = await scriptRepo.getScriptDurationsDS();
+
+      expect(durations.get(a)).toBe(8);
+      expect(durations.get(b)).toBe(50);
+    });
+  });
 });

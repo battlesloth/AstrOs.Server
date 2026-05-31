@@ -94,14 +94,14 @@ function mountView() {
         },
         AstrosRemoteButtonCard: {
           name: 'AstrosRemoteButtonCard',
-          props: ['buttonNumber', 'value', 'scripts', 'playlists'],
-          emits: ['change'],
-          template: '<div data-testid="card-stub" :data-button="buttonNumber" />',
+          props: ['value'],
+          emits: ['change', 'edit'],
+          template: '<div data-testid="card-stub" />',
         },
         AstrosRemotePageList: {
           name: 'AstrosRemotePageList',
           props: ['pages', 'selectedIdx'],
-          emits: ['select', 'add', 'duplicate', 'delete', 'rename'],
+          emits: ['select', 'add', 'duplicate', 'delete', 'rename', 'reorder'],
           template: '<div data-testid="page-list-stub" />',
         },
         AstrosRemoteLivePreview: {
@@ -117,6 +117,12 @@ function mountView() {
           // the interpolated value (real modal threads it through to $t).
           template:
             '<div data-testid="confirm-modal" :data-message="message" :data-name="(messageParams && messageParams.name) || \'\'"><button data-testid="modal-confirm" @click="onConfirm" /><button data-testid="modal-close" @click="onClose" /></div>',
+        },
+        AstrosRemoteButtonEditorModal: {
+          name: 'AstrosRemoteButtonEditorModal',
+          props: ['buttonNumber', 'currentValue', 'scripts', 'playlists'],
+          emits: ['change', 'close'],
+          template: '<div data-testid="editor-modal" :data-button="buttonNumber" />',
         },
       },
     },
@@ -343,6 +349,27 @@ describe('RemoteControlConfigView — page list wiring', () => {
 
     expect(spy).toHaveBeenCalledWith(0, 'Renamed');
   });
+
+  it('forwards reorder emit to store.reorderPages and the order actually changes', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    const store = useRemoteControlStore();
+    // Seed a second page so the reorder indices are in range — without this,
+    // the store's out-of-range guard would silently no-op and the spy
+    // assertion alone would pass without exercising the real behavior.
+    store.addPage();
+    await flushPromises();
+    const namesBefore = store.remoteControlPages.map((p) => p.name);
+    const spy = vi.spyOn(store, 'reorderPages');
+
+    const pageList = wrapper.findComponent({ name: 'AstrosRemotePageList' });
+    await pageList.vm.$emit('reorder', { fromIdx: 0, toIdx: 1 });
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledWith(0, 1);
+    expect(store.remoteControlPages.map((p) => p.name)).toEqual([namesBefore[1], namesBefore[0]]);
+  });
 });
 
 describe('RemoteControlConfigView — delete-confirm modal lifecycle', () => {
@@ -475,6 +502,72 @@ describe('RemoteControlConfigView — button card wiring', () => {
     await cards[0]!.vm.$emit('change', newValue);
 
     expect(spy).toHaveBeenCalledWith(1, 'button1', newValue);
+  });
+});
+
+describe('RemoteControlConfigView — editor modal wiring', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it('opens the editor modal for the clicked card (modal absent before)', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="editor-modal"]').exists()).toBe(false);
+
+    const cards = wrapper.findAllComponents({ name: 'AstrosRemoteButtonCard' });
+    await cards[4]!.vm.$emit('edit'); // BUTTON 5 (index 4)
+    await flushPromises();
+
+    const modal = wrapper.find('[data-testid="editor-modal"]');
+    expect(modal.exists()).toBe(true);
+    // 1-based button number derived from the slot key (button5).
+    expect(modal.attributes('data-button')).toBe('5');
+  });
+
+  it('forwards the modal change to store.setButton for the editing slot, then closes', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    const store = useRemoteControlStore();
+    const spy = vi.spyOn(store, 'setButton');
+
+    const cards = wrapper.findAllComponents({ name: 'AstrosRemoteButtonCard' });
+    await cards[4]!.vm.$emit('edit');
+    await flushPromises();
+
+    const modal = wrapper.findComponent({ name: 'AstrosRemoteButtonEditorModal' });
+    const newValue = { id: 's1', name: 'Wave', type: 'script' as const };
+    await modal.vm.$emit('change', newValue);
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+
+    expect(spy).toHaveBeenCalledWith(0, 'button5', newValue);
+    // Selecting a value closes the modal (the v-if drops after the
+    // editingButtonKey=null reactivity flush).
+    expect(wrapper.find('[data-testid="editor-modal"]').exists()).toBe(false);
+  });
+
+  it('close emit dismisses the modal WITHOUT calling setButton', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    const store = useRemoteControlStore();
+    const spy = vi.spyOn(store, 'setButton');
+
+    const cards = wrapper.findAllComponents({ name: 'AstrosRemoteButtonCard' });
+    await cards[0]!.vm.$emit('edit');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="editor-modal"]').exists()).toBe(true);
+
+    const modal = wrapper.findComponent({ name: 'AstrosRemoteButtonEditorModal' });
+    await modal.vm.$emit('close');
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-testid="editor-modal"]').exists()).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
   });
 });
 

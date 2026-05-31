@@ -1,23 +1,21 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onScopeDispose, ref } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue';
 import { makeNoneButton, type PageButton } from '@/models/remoteControl/pageButton';
 import { assertNever } from '@/utils/assertNever';
-import type { EditorListItem } from '../remoteButtonEditor/types';
-import AstrosRemoteButtonEditor from '../remoteButtonEditor/AstrosRemoteButtonEditor.vue';
 
 const { t } = useI18n();
 
 const props = defineProps<{
-  buttonNumber: number;
   value: PageButton;
-  scripts: readonly EditorListItem[];
-  playlists: readonly EditorListItem[];
 }>();
 
+// The editor is now a view-owned modal (AstrosRemoteButtonEditorModal); this
+// card is presentational. `edit` asks the view to open the editor for this
+// slot; `change` is the direct Clear action (no modal needed).
 const emit = defineEmits<{
   change: [value: PageButton];
+  edit: [];
 }>();
 
 const isAssigned = computed(() => props.value.type !== 'none');
@@ -27,9 +25,12 @@ const isAssigned = computed(() => props.value.type !== 'none');
 const typeChipClasses = computed(() => {
   switch (props.value.type) {
     case 'playlist':
-      return 'bg-orange-500/15 text-orange-700 border border-orange-500/40';
+      // Matches the mobile-remote playlist chip: --mr-complement (#f49446) bg +
+      // black text. `bg-r2-complement` forces that exact pair via styles.css.
+      return 'bg-r2-complement';
     case 'script':
-      return 'bg-primary/15 text-primary border border-primary/40';
+      // Matches the mobile-remote filled button: --mr-primary (#2a5a97) + white.
+      return 'bg-primary text-white';
     case 'none':
       return '';
     default:
@@ -50,80 +51,18 @@ const typeChipLabel = computed(() => {
   }
 });
 
-const popoverOpen = ref(false);
-const cardRef = ref<HTMLElement | null>(null);
-const popoverRef = ref<HTMLElement | null>(null);
-// Captured on openEditor so closeEditor can restore keyboard focus to the
-// element that opened the popover. Without this, every popover dismissal
-// dumps focus to <body> and a keyboard user has to Tab back to where they
-// were.
-let triggerEl: HTMLElement | null = null;
-
-const { floatingStyles } = useFloating(cardRef, popoverRef, {
-  placement: 'bottom',
-  middleware: [offset(8), flip(), shift({ padding: 8 })],
-  whileElementsMounted: autoUpdate,
-});
-
-function openEditor() {
-  triggerEl = document.activeElement as HTMLElement | null;
-  popoverOpen.value = true;
-}
-
-function closeEditor(options: { restoreFocus?: boolean } = {}) {
-  popoverOpen.value = false;
-
-  const restoreFocus = options.restoreFocus !== false;
-  const target = restoreFocus ? triggerEl : null;
-  triggerEl = null;
-
-  // Restore focus AFTER the popover unmounts so the trigger button can
-  // re-receive focus cleanly. nextTick lets Vue flush the v-if removal.
-  nextTick(() => target?.focus());
-}
-
-function handleChange(value: PageButton) {
-  emit('change', value);
-  closeEditor();
-}
-
 function clearAssignment() {
   emit('change', makeNoneButton());
 }
-
-function handleClickOutside(e: MouseEvent) {
-  if (!popoverOpen.value) return;
-  // composedPath walks through Shadow DOM boundaries too, so a future
-  // shadow-hosted child of the popover wouldn't get treated as "outside."
-  const path = e.composedPath();
-  if (cardRef.value && path.includes(cardRef.value)) return;
-  if (popoverRef.value && path.includes(popoverRef.value)) return;
-  closeEditor({ restoreFocus: false });
-}
-
-onMounted(() => {
-  // Capture phase so the outside-click fires before any child popover handler
-  // can call stopPropagation and swallow the close.
-  document.addEventListener('click', handleClickOutside, true);
-});
-
-// onScopeDispose (not onBeforeUnmount) so the listener is also torn down on
-// non-standard teardown paths (parent throws mid-render, Suspense cancels a
-// pending mount after onMounted already fired). Same pattern used by the
-// useHoldGesture composable.
-onScopeDispose(() => {
-  document.removeEventListener('click', handleClickOutside, true);
-});
 </script>
 
 <template>
   <div
-    ref="cardRef"
-    class="astros-remote-button-card flex min-h-32 flex-col gap-2 rounded-xl border-2 p-3 transition-colors"
+    class="astros-remote-button-card flex min-h-32 flex-col gap-2 rounded-xl p-3 transition-colors"
     :class="
       isAssigned
-        ? 'border-primary bg-primary/5'
-        : 'border-base-300 bg-base-100 hover:border-base-content/30'
+        ? 'bg-r2-xlight'
+        : 'border-2 border-base-300 bg-base-100 hover:border-base-content/30'
     "
   >
     <div
@@ -146,15 +85,15 @@ onScopeDispose(() => {
       <div class="flex gap-2">
         <button
           type="button"
-          class="btn btn-sm btn-outline flex-1"
+          class="btn btn-sm btn-primary flex-1"
           data-testid="card-edit"
-          @click="openEditor"
+          @click="emit('edit')"
         >
           {{ t('remote_control_config.card.edit') }}
         </button>
         <button
           type="button"
-          class="btn btn-sm btn-ghost flex-1"
+          class="btn btn-sm btn-primary flex-1"
           data-testid="card-clear"
           @click="clearAssignment"
         >
@@ -167,28 +106,10 @@ onScopeDispose(() => {
         type="button"
         class="btn btn-sm btn-ghost mt-auto w-full justify-center text-base-content/60"
         data-testid="card-configure"
-        @click="openEditor"
+        @click="emit('edit')"
       >
         {{ t('remote_control_config.card.configure') }}
       </button>
     </template>
   </div>
-
-  <Teleport to="body">
-    <div
-      v-if="popoverOpen"
-      ref="popoverRef"
-      :style="floatingStyles"
-      class="z-50 w-64 rounded-xl border-2 border-primary bg-base-100 p-3 shadow-xl"
-    >
-      <AstrosRemoteButtonEditor
-        :button-number="buttonNumber"
-        :current-value="value"
-        :scripts="scripts"
-        :playlists="playlists"
-        @change="handleChange"
-        @close="closeEditor"
-      />
-    </div>
-  </Teleport>
 </template>

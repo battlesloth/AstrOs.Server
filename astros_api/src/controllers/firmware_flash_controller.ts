@@ -9,7 +9,7 @@ import type { FlashRequest } from '../models/firmware/flash_orchestrator.js';
 
 const route = '/firmware/flash';
 
-type HttpStatus = 400 | 409 | 500 | 502;
+type HttpStatus = 400 | 409 | 500 | 502 | 504;
 
 // Exhaustive map from every FlashOrchestratorErrorReason to its HTTP
 // status. The Record type makes this exhaustive at compile time —
@@ -38,6 +38,10 @@ const REASON_HTTP_STATUS: Record<FlashOrchestratorErrorReason, HttpStatus> = {
   controllers_lookup_failed: 500,
   subscriber_attach_failed: 500,
   protocol_violation: 500,
+  // Background watchdog timeout — never returned from the synchronous start()
+  // HTTP call (it fires later, surfaced via the flashJobFailed WS event); this
+  // entry exists for Record exhaustiveness. 504 = upstream (master) timed out.
+  deploy_timeout: 504,
   streamer_unknown_error: 500,
 
   source_read_failed: 500,

@@ -5,6 +5,7 @@ import {
   mapServerStageToUiStage,
 } from '../firmwareStageMapping';
 import type { ControllerFlashState, ServerFwStage } from '@/types/firmware';
+import { KNOWN_FLASH_ERROR_REASONS } from '@/types/firmware';
 
 function state(stage: ServerFwStage): ControllerFlashState {
   // The discriminated union requires finalVersion on VERSION_CONFIRMED,
@@ -172,5 +173,9 @@ describe('FlashErrorReason i18n key contract', () => {
     for (const reason of FLASH_ERROR_REASONS) {
       expect(enUS.firmware_view.flash_errors).toHaveProperty(reason);
     }
+  });
+
+  it("recognizes 'deploy_timeout' as a known flash error reason", () => {
+    expect(KNOWN_FLASH_ERROR_REASONS.has('deploy_timeout')).toBe(true);
   });
 });

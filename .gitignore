@@ -17,6 +17,9 @@
 /astros_client/node_modules
 /astros_api/node_modules
 /astros_common/node_modules
+# un-anchored so nested copies (e.g. a stray src/node_modules vitest cache) are caught at any depth
+node_modules/
+.vite/
 
 # profiling files
 chrome-profiler-events*.json
@@ -66,3 +69,4 @@ testem.log
 
 .tmp
 
+.claude/scheduled_tasks.lock

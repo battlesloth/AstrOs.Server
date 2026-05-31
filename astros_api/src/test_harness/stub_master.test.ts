@@ -431,8 +431,10 @@ describe('StubMaster (PTY-backed)', () => {
         const generator = new MessageGenerator();
         const XFER = 'xfer-1';
 
-        // 4 stages × 2 controllers + 1 FW_DEPLOY_DONE = 9 frames
-        const framesPromise = collectFrames(serverPort, 9);
+        // ctrl-A (OK): 4 in-flight stages + 1 terminal VERSION_CONFIRMED progress
+        // ctrl-B (FAILED): 4 in-flight stages (no terminal progress for FAILED)
+        // + 1 FW_DEPLOY_DONE = 10 frames
+        const framesPromise = collectFrames(serverPort, 10);
 
         const deployData: FwDeployBegin = {
           transferId: XFER,
@@ -467,9 +469,23 @@ describe('StubMaster (PTY-backed)', () => {
           }
         }
 
-        // Frames 4-7: FW_PROGRESS for ctrl-B (Sending, Verifying, Flashing, Rebooting)
+        // Frame 4: terminal FW_PROGRESS VERSION_CONFIRMED for ctrl-A (OK), with
+        // the new version in `detail` — per protocol.md §A the master emits this
+        // before the batch FW_DEPLOY_DONE.
+        const confirmFrame = requireFrame(frames, 4);
+        expect(confirmFrame.type).toBe(SerialMessageType.FW_PROGRESS);
+        const confirm = handler.handleFwProgress(confirmFrame.data);
+        expect(confirm.type).toBe(SerialWorkerResponseType.FW_PROGRESS);
+        if (confirm.type === SerialWorkerResponseType.FW_PROGRESS) {
+          expect(confirm.payload.controllerId).toBe('ctrl-A');
+          expect(confirm.payload.stage).toBe(FwStage.VersionConfirmed);
+          expect(confirm.payload.detail).toBe('1.5.0');
+        }
+
+        // Frames 5-8: FW_PROGRESS for ctrl-B (Sending, Verifying, Flashing,
+        // Rebooting). ctrl-B is FAILED, so it gets no terminal progress frame.
         for (let i = 0; i < 4; i++) {
-          const f = requireFrame(frames, i + 4);
+          const f = requireFrame(frames, i + 5);
           expect(f.type).toBe(SerialMessageType.FW_PROGRESS);
           const prog = handler.handleFwProgress(f.data);
           expect(prog.type).toBe(SerialWorkerResponseType.FW_PROGRESS);
@@ -480,8 +496,8 @@ describe('StubMaster (PTY-backed)', () => {
           }
         }
 
-        // Frame 8: FW_DEPLOY_DONE with both controller outcomes
-        const doneFrame = requireFrame(frames, 8);
+        // Frame 9: FW_DEPLOY_DONE with both controller outcomes
+        const doneFrame = requireFrame(frames, 9);
         expect(doneFrame.type).toBe(SerialMessageType.FW_DEPLOY_DONE);
         const done = handler.handleFwDeployDone(doneFrame.data);
         expect(done.type).toBe(SerialWorkerResponseType.FW_DEPLOY_DONE);

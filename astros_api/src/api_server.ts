@@ -65,6 +65,7 @@ import { ApiKeyValidator } from './guard/api_key_validator.js';
 import { JobLock } from './job_lock/job_lock.js';
 import { rejectIfLocked } from './guard/ws_lock_guard.js';
 import { buildLockStateResponse } from './models/networking/lock_responses.js';
+import { buildPanicStateResponse } from './models/networking/panic_responses.js';
 import { SerialMessageType } from './serial/serial_message.js';
 import {
   ConfigSyncResponse,
@@ -145,6 +146,7 @@ export interface ApiServerOptions {
   flashOrchestratorConfig?: {
     rebootTimeoutMs?: number;
     throttleWindowMs?: number;
+    deployStallTimeoutMs?: number;
   };
   configOverrides?: ConfigOverrides;
 }
@@ -184,6 +186,7 @@ export class ApiServer {
   private readonly flashOrchestratorConfig?: {
     rebootTimeoutMs?: number;
     throttleWindowMs?: number;
+    deployStallTimeoutMs?: number;
   };
   private readonly configOverrides?: ConfigOverrides;
 
@@ -299,6 +302,13 @@ export class ApiServer {
     logger.info('Setting up animation queue');
     this.animationQueue = new AnimationQueue((scriptId, locations) => {
       this.dispatchScriptFromQueue(scriptId, locations);
+    });
+
+    // Broadcast panic-state transitions to all WS clients (mirrors the
+    // jobLock.subscribe wiring). The on-connect snapshot + GET /panicState
+    // cover cold-load; this keeps live clients in sync.
+    this.animationQueue.subscribe((state) => {
+      this.updateClients(buildPanicStateResponse(state));
     });
 
     logger.info('Setting up routes');
@@ -578,6 +588,14 @@ export class ApiServer {
       res.json({ message: 'success' });
     });
 
+    // Hydrate endpoint so a client learns the current panic state on
+    // load/refresh before the WS on-connect snapshot arrives. Unauthenticated,
+    // mirroring the sibling state-read GETs (/system/status, /firmware/lock-state)
+    // — a non-sensitive boolean, and the on-mount fetch may run pre-login.
+    this.router.get('/panicState', (req: any, res: any) => {
+      res.status(200).json(this.animationQueue.getPanicState());
+    });
+
     // API key secured routes
     this.router.get(
       '/remotecontrol',
@@ -707,6 +725,14 @@ export class ApiServer {
           conn.send(JSON.stringify(buildLockStateResponse(this.jobLock.getState())));
         } catch (err) {
           logger.error(`websocket initial lockState send error: ${err}`);
+        }
+
+        // Late-join panic snapshot: a client connecting while the queue is
+        // panicked learns it immediately rather than at the next transition.
+        try {
+          conn.send(JSON.stringify(buildPanicStateResponse(this.animationQueue.getPanicState())));
+        } catch (err) {
+          logger.error(`websocket initial panicState send error: ${err}`);
         }
 
         // Late-join flash-job snapshot — only emitted when a job is in flight.
@@ -1017,32 +1043,39 @@ export class ApiServer {
       const locationRepo = new LocationsRepository(this.db);
       const scriptRepo = new ScriptRepository(this.db);
 
-      const locId = await locationRepo.getLocationNameByMac(val.controller.address);
+      // script_deployments.location_id is a FK to locations.id (a UUID), so the
+      // DB write/read below must use the location id. The WS
+      // ScriptResponse.locationId, by contrast, is the Location enum value
+      // ('body'|'core'|'dome') the frontend keys deploymentStatus by — i.e. the
+      // location *name*. Resolve both; using the name for the FK column throws
+      // "FOREIGN KEY constraint failed".
+      const locationId = await locationRepo.getLocationIdByControllerByMac(val.controller.address);
+      const locationName = await locationRepo.getLocationNameByMac(val.controller.address);
 
       if (val.success) {
         const now = new Date();
 
-        await scriptRepo.updateScriptControllerUploaded(val.scriptId, locId, now);
+        await scriptRepo.updateScriptControllerUploaded(val.scriptId, locationId, now);
 
         const update: ScriptResponse = {
           type: TransmissionType.script,
           success: true,
           message: '',
           scriptId: val.scriptId,
-          locationId: locId,
+          locationId: locationName,
           status: TransmissionStatus.success,
           date: now,
         };
 
         this.updateClients(update);
       } else {
-        const deployDate = await scriptRepo.getLastScriptUploadedDate(val.scriptId, locId);
+        const deployDate = await scriptRepo.getLastScriptUploadedDate(val.scriptId, locationId);
         const update: ScriptResponse = {
           type: TransmissionType.script,
           success: true,
           message: '',
           scriptId: val.scriptId,
-          locationId: locId,
+          locationId: locationName,
           status: TransmissionStatus.failed,
           date: deployDate,
         };
@@ -1139,6 +1172,7 @@ export class ApiServer {
 
     const playlistRepo = new PlaylistRepository(this.db);
     const locationsRepo = new LocationsRepository(this.db);
+    const scriptRepo = new ScriptRepository(this.db);
 
     try {
       const playlist = await playlistRepo.getPlaylist(id);
@@ -1150,7 +1184,16 @@ export class ApiServer {
       }
 
       const locations = await locationsRepo.loadLocations();
-      const queueItem = await convertPlaylistToQueueItem(playlist, playlistRepo, locations);
+      // Script tracks store duration_ds = 0 (no editor control), so feed the
+      // converter the scripts' recorded durations — otherwise the queue treats
+      // each script as instantaneous and a following Wait runs concurrently.
+      const scriptDurations = await scriptRepo.getScriptDurationsDS();
+      const queueItem = await convertPlaylistToQueueItem(
+        playlist,
+        playlistRepo,
+        scriptDurations,
+        locations,
+      );
       this.animationQueue.addToQueue(queueItem);
 
       res.status(200);

@@ -41,11 +41,28 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  // When false the component renders without its own top bar (wordmark +
+  // connection chip). The standalone mobile shell (MobileRemoteView) provides a
+  // shared top bar with a connection/navigation toggle button instead, so the
+  // embedded grid must not draw a second one. Defaults true so the editor's
+  // live preview and Storybook keep the full chrome.
+  showTopBar: {
+    type: Boolean,
+    default: true,
+  },
+  // When true the server animation queue is panic-stopped, so the Stop-All
+  // control morphs into a hold-to-confirm "Clear Panic" button (distinct color,
+  // emits `clearPanic`). Fed from the panicState store by the parent.
+  inPanicStop: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits<{
   press: [event: AstrosMobileRemotePressEvent];
   panic: [];
+  clearPanic: [];
 }>();
 
 const { t } = useI18n();
@@ -118,12 +135,17 @@ const panic = useHoldGesture({
   holdMs: 600,
   cooldownMs: 2200,
   onFire: () => {
-    showToast(t('mobile_remote.panic_toast'), 1800);
     // Fire-and-forget by design: the toast says "sending…" because this
     // emit does not wait for delivery. Parents that need a "sent vs failed"
     // visual must gate on their own delivery confirmation (prop or wrapper),
-    // not on this emit firing.
-    emit('panic');
+    // not on this emit firing. When panicked, the same hold gesture clears.
+    if (props.inPanicStop) {
+      showToast(t('mobile_remote.clear_toast'), 1800);
+      emit('clearPanic');
+    } else {
+      showToast(t('mobile_remote.panic_toast'), 1800);
+      emit('panic');
+    }
   },
 });
 
@@ -219,6 +241,11 @@ onBeforeUnmount(() => {
 });
 
 const stopAllLabel = computed(() => {
+  if (props.inPanicStop) {
+    if (panic.state.value === 'active') return t('mobile_remote.clear_active');
+    if (panic.state.value === 'arming') return t('mobile_remote.clear_arming');
+    return t('mobile_remote.clear_idle');
+  }
   if (panic.state.value === 'active') return t('mobile_remote.stop_all_active');
   if (panic.state.value === 'arming') return t('mobile_remote.stop_all_arming');
   return t('mobile_remote.stop_all_idle');
@@ -233,7 +260,10 @@ const stopAllLabel = computed(() => {
     :aria-label="$t('mobile_remote.region_label')"
   >
     <!-- Top bar -->
-    <div class="astros-mobile-remote__top-bar">
+    <div
+      v-if="showTopBar"
+      class="astros-mobile-remote__top-bar"
+    >
       <span
         class="astros-mobile-remote__wordmark font-starwars"
         :aria-label="$t('astros')"
@@ -377,6 +407,7 @@ const stopAllLabel = computed(() => {
         :class="{
           'astros-mobile-remote__panic--arming': panic.state.value === 'arming',
           'astros-mobile-remote__panic--active': panic.state.value === 'active',
+          'astros-mobile-remote__panic--clear': inPanicStop,
         }"
         :aria-pressed="panic.state.value === 'active'"
         @mousedown="handlePanicDown"
@@ -402,7 +433,7 @@ const stopAllLabel = computed(() => {
         </span>
       </button>
       <div class="astros-mobile-remote__panic-caption">
-        {{ $t('mobile_remote.stop_all_caption') }}
+        {{ inPanicStop ? $t('mobile_remote.clear_caption') : $t('mobile_remote.stop_all_caption') }}
       </div>
     </div>
   </div>
@@ -780,6 +811,22 @@ const stopAllLabel = computed(() => {
 .astros-mobile-remote__panic--active {
   background: var(--mr-panic-active);
   transform: translateY(1px);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Clear-Panic mode: recolor away from danger red to the primary so it reads as
+   "recover / re-enable", not "stop". The plain --clear rule wins over the base
+   red by source order (same single-class specificity). When the button is ALSO
+   mid-hold (--active), the dedicated two-class rule below
+   (.__panic--clear.__panic--active) wins on specificity and supplies hover-blue. */
+.astros-mobile-remote__panic--clear {
+  background: var(--mr-primary, #2a5a97);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.2),
+    0 6px 16px rgba(42, 90, 151, 0.35);
+}
+.astros-mobile-remote__panic--clear.astros-mobile-remote__panic--active {
+  background: var(--mr-primary-hover, #2f445c);
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 

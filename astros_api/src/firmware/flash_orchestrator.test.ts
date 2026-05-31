@@ -1829,6 +1829,373 @@ describe('FlashJobOrchestrator', () => {
       expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
     });
 
+    it('forwards the master self-flash per-stage FW_PROGRESS (sentinel controllerId) to the UI', async () => {
+      // Phase C contract (protocol.md §A): once AstrOs.ESP reports the master's
+      // OWN Verifying → Flashing → Rebooting via FW_PROGRESS under the sentinel
+      // controllerId 00:00:00:00:00:00, the orchestrator's role-agnostic
+      // per-controller handler must forward each as a flashControllerUpdate —
+      // the same path a padawan takes — so the master column animates through
+      // verify/flash/reboot instead of jumping straight to VersionConfirmed.
+      const MASTER = '00:00:00:00:00:00';
+      const fx = setupHappyPath({
+        clock: fakeClock,
+        controllers: [
+          { id: MASTER, variant: 'lolin_d32_pro' },
+          { id: 'controller-b', variant: 'lolin_d32_pro' },
+        ],
+      });
+      const armed = await startAndArmDeploy(fx);
+
+      // The master is at Sending after FW_DEPLOY_BEGIN; drive its own self-flash
+      // stages. Each stage change forces an emit (force=true).
+      for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'progress',
+          payload: {
+            transferId: armed.transferId,
+            controllerId: MASTER,
+            stage,
+            bytesSent: 0,
+            totalBytes: 0,
+            detail: '',
+          },
+        });
+      }
+
+      const masterStages = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate)
+        .map((f) => (f as { data: ControllerFlashState }).data)
+        .filter((c) => c.controllerId === MASTER)
+        .map((c) => c.stage);
+
+      // The last three master-row updates are the self-flash stages, in order.
+      // Pinning the ordered slice (not arrayContaining) asserts the sequence the
+      // firmware emits — Verifying → Flashing → Rebooting — and that Rebooting is
+      // last (the row the UI holds through the post-reboot Finalizing window).
+      expect(masterStages.slice(-3)).toEqual([
+        FwStage.Verifying,
+        FwStage.Flashing,
+        FwStage.Rebooting,
+      ]);
+    });
+
+    // --- Terminal FW_PROGRESS stages (protocol.md §A: master emits
+    // VERSION_CONFIRMED / FAILED in FW_PROGRESS.stage in real time, then the
+    // authoritative FW_DEPLOY_DONE). These are informational UI signals; the
+    // server must forward them WITHOUT running the FSM terminal transition
+    // (which needs finalVersion/error the progress frame doesn't carry) — doing
+    // so previously threw and failed the whole job, disposing the deploy
+    // subscriber so the later FW_DEPLOY_DONE was silently dropped. ---
+
+    it('FW_PROGRESS VERSION_CONFIRMED: forwards a flashControllerUpdate (finalVersion from detail) without failing the job or transitioning the FSM; subscriber stays armed', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+
+      // Drive controller-a to Rebooting (the legal predecessor of confirmation).
+      for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'progress',
+          payload: {
+            transferId: armed.transferId,
+            controllerId: 'controller-a',
+            stage,
+            bytesSent: 0,
+            totalBytes: 0,
+            detail: '',
+          },
+        });
+      }
+      const updatesBefore = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate).length;
+
+      // Master saw the new version in the padawan heartbeat (version in `detail`).
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.VersionConfirmed,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: '1.4.0',
+        },
+      });
+
+      // Not a job-wide failure.
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+
+      // A flashControllerUpdate carrying the terminal stage + version was forwarded.
+      const updates = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate);
+      expect(updates).toHaveLength(updatesBefore + 1);
+      const last = (updates[updates.length - 1] as { data: ControllerFlashState }).data;
+      expect(last.controllerId).toBe('controller-a');
+      expect(last.stage).toBe(FwStage.VersionConfirmed);
+      if (last.stage === FwStage.VersionConfirmed) {
+        expect(last.finalVersion).toBe('1.4.0');
+      }
+
+      // FSM NOT mutated to terminal — FW_DEPLOY_DONE stays authoritative, so the
+      // internal stage stays Rebooting and the subscriber stays armed.
+      const rowA = fx.orchestrator
+        .getCurrentJob()
+        ?.controllers.find((c) => c.controllerId === 'controller-a');
+      expect(rowA?.stage).toBe(FwStage.Rebooting);
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+      expect(fx.jobLock.isLocked()).toBe(true);
+    });
+
+    it('FW_PROGRESS VERSION_CONFIRMED then FW_DEPLOY_DONE: progress is non-authoritative; DONE still drives the terminal result and completes the job', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+
+      // Real-firmware sequence: per-controller FW_PROGRESS VERSION_CONFIRMED...
+      for (const controllerId of armed.targets) {
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'progress',
+          payload: {
+            transferId: armed.transferId,
+            controllerId,
+            stage: FwStage.VersionConfirmed,
+            bytesSent: 0,
+            totalBytes: 0,
+            detail: '1.4.0',
+          },
+        });
+      }
+      // ...then the authoritative FW_DEPLOY_DONE.
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: armed.targets.map((id) => ({
+            controllerId: id,
+            outcome: 'OK' as const,
+            finalVersion: '1.4.0',
+            error: '',
+          })),
+        },
+      });
+
+      // No false protocol_violation; DONE produced the authoritative results.
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+      const results = controllerResults(fx.emitWs);
+      expect(results).toHaveLength(2);
+      expect(results.every((r) => r.controller.stage === FwStage.VersionConfirmed)).toBe(true);
+      expect(
+        fx.orchestrator
+          .getCurrentJob()
+          ?.controllers.every((c) => c.stage === FwStage.VersionConfirmed),
+      ).toBe(true);
+      // Done is terminal — subscriber disposed.
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+    });
+
+    it('FW_PROGRESS FAILED: forwards a flashControllerUpdate (error from detail) without failing the job; subscriber stays armed', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+
+      for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+        fx.bus.deliverDeployEvent(armed.transferId, {
+          kind: 'progress',
+          payload: {
+            transferId: armed.transferId,
+            controllerId: 'controller-a',
+            stage,
+            bytesSent: 0,
+            totalBytes: 0,
+            detail: '',
+          },
+        });
+      }
+      const updatesBefore = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate).length;
+
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.Failed,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: 'reboot_timeout',
+        },
+      });
+
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+      const updates = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate);
+      expect(updates).toHaveLength(updatesBefore + 1);
+      const last = (updates[updates.length - 1] as { data: ControllerFlashState }).data;
+      expect(last.stage).toBe(FwStage.Failed);
+      if (last.stage === FwStage.Failed) {
+        expect(last.error).toBe('reboot_timeout');
+      }
+      const rowA = fx.orchestrator
+        .getCurrentJob()
+        ?.controllers.find((c) => c.controllerId === 'controller-a');
+      expect(rowA?.stage).toBe(FwStage.Rebooting);
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+    });
+
+    it('preview disagrees with DONE: VERSION_CONFIRMED progress then FW_DEPLOY_DONE FAILED → authoritative result is Failed (not stuck-confirmed)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+
+      // Drive BOTH controllers to Rebooting so each DONE transition is FSM-legal.
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+      // Optimistic preview: master reported VERSION_CONFIRMED via FW_PROGRESS...
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.VersionConfirmed,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: '1.4.0',
+        },
+      });
+      // ...but the authoritative FW_DEPLOY_DONE then reports FAILED for it. Since
+      // the preview did NOT mutate the FSM (row stayed Rebooting), DONE's
+      // Rebooting→Failed transition is legal and wins — the controller must
+      // resolve to Failed, not remain stuck on the optimistic confirmation.
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [
+            { controllerId: 'controller-a', outcome: 'FAILED', finalVersion: '', error: 'crc' },
+            { controllerId: 'controller-b', outcome: 'OK', finalVersion: '1.4.0', error: '' },
+          ],
+        },
+      });
+
+      const results = controllerResults(fx.emitWs);
+      const rA = results.find((r) => r.controller.controllerId === 'controller-a');
+      expect(rA?.controller.stage).toBe(FwStage.Failed);
+      if (rA?.controller.stage === FwStage.Failed) {
+        expect(rA.controller.error).toBe('crc');
+      }
+      expect(
+        fx.orchestrator.getCurrentJob()?.controllers.find((c) => c.controllerId === 'controller-a')
+          ?.stage,
+      ).toBe(FwStage.Failed);
+    });
+
+    it('FW_PROGRESS FAILED then FW_DEPLOY_DONE FAILED: subscriber disposed and job completes (flashJobDone, per-controller FAILED is local)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+      // controller-a fails via FW_PROGRESS preview first...
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.Failed,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: 'reboot_timeout',
+        },
+      });
+      // ...then the authoritative DONE (a OK, b OK; a also reported FAILED here
+      // to exercise the failed→done completion path).
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: [
+            {
+              controllerId: 'controller-a',
+              outcome: 'FAILED',
+              finalVersion: '',
+              error: 'reboot_timeout',
+            },
+            { controllerId: 'controller-b', outcome: 'OK', finalVersion: '1.4.0', error: '' },
+          ],
+        },
+      });
+
+      // A per-controller FAILED is local — the job still completes (flashJobDone),
+      // not flashJobFailed (which is reserved for job-wide aborts).
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(1);
+      // Done is terminal — subscriber disposed.
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+    });
+
+    it('out-of-order terminal FW_PROGRESS: VERSION_CONFIRMED while Sending is forwarded as a preview (no ordering guard), FSM stays Sending, no failure', async () => {
+      const fx = setupHappyPath({ clock: fakeClock });
+      const armed = await startAndArmDeploy(fx);
+      // Controller-a is at Sending (just armed) — NOT Rebooting. A terminal
+      // preview is a non-authoritative master report, deliberately NOT gated on
+      // stage order, so it must forward without tripping protocol_violation.
+      const updatesBefore = emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate).length;
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.VersionConfirmed,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: '1.4.0',
+        },
+      });
+
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashControllerUpdate)).toHaveLength(
+        updatesBefore + 1,
+      );
+      expect(
+        fx.orchestrator.getCurrentJob()?.controllers.find((c) => c.controllerId === 'controller-a')
+          ?.stage,
+      ).toBe(FwStage.Sending);
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+    });
+
     it('mid-stage FW_PROGRESS within window: throttled (no immediate emit), flushes when window elapses', async () => {
       const fx = setupHappyPath({ clock: fakeClock });
       const armed = await startAndArmDeploy(fx);
@@ -2248,6 +2615,149 @@ describe('FlashJobOrchestrator', () => {
       // Deploy subscriber disposed after done.
       expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
     });
+
+    it('deploy stall: no deploy events for deployStallTimeoutMs → deploy_timeout, controllers Failed, lock released, subscriber disposed', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      const armed = await startAndArmDeploy(fx);
+
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+      advance(5_001);
+
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({ jobId: armed.jobId, reason: 'deploy_timeout' });
+
+      const results = controllerResults(fx.emitWs);
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      expect(results.every((r) => r.controller.stage === FwStage.Failed)).toBe(true);
+      expect(fx.jobLock.isLocked()).toBe(false);
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+    });
+
+    it('deploy stall: FW_PROGRESS resets the watchdog (no false timeout while the master keeps reporting)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      const armed = await startAndArmDeploy(fx);
+
+      advance(4_000);
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.Verifying,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: '',
+        },
+      });
+      advance(4_000); // 8s total elapsed, only 4s since the last event
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'progress',
+        payload: {
+          transferId: armed.transferId,
+          controllerId: 'controller-a',
+          stage: FwStage.Flashing,
+          bytesSent: 0,
+          totalBytes: 0,
+          detail: '',
+        },
+      });
+
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
+
+      advance(5_001); // now go silent past the window
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({ reason: 'deploy_timeout' });
+    });
+
+    it('deploy stall: FW_DEPLOY_DONE disarms the watchdog (post-DONE finalize/reboot timers govern, no deploy_timeout)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      const armed = await startAndArmDeploy(fx);
+
+      for (const controllerId of armed.targets) {
+        for (const stage of [FwStage.Verifying, FwStage.Flashing, FwStage.Rebooting]) {
+          fx.bus.deliverDeployEvent(armed.transferId, {
+            kind: 'progress',
+            payload: {
+              transferId: armed.transferId,
+              controllerId,
+              stage,
+              bytesSent: 0,
+              totalBytes: 0,
+              detail: '',
+            },
+          });
+        }
+      }
+      fx.bus.deliverDeployEvent(armed.transferId, {
+        kind: 'done',
+        payload: {
+          transferId: armed.transferId,
+          results: armed.targets.map((id) => ({
+            controllerId: id,
+            outcome: 'OK' as const,
+            finalVersion: '1.4.0',
+            error: '',
+          })),
+        },
+      });
+
+      // Stall timer was cleared at DONE — only the post-DONE reboot timer remains.
+      expect(vi.getTimerCount()).toBe(1);
+
+      advance(5_001);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
+    });
+
+    it('deploy stall: a master POLL_ACK heartbeat does NOT reset the watchdog (heartbeats are not deploy events)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      await startAndArmDeploy(fx);
+
+      // A heartbeat mid-deploy must NOT kick the stall timer (only FW_PROGRESS does).
+      advance(4_000);
+      fx.orchestrator.notifyMasterHeartbeat('1.4.0');
+      advance(1_001); // 5_001 total since arm, with NO deploy event in between
+
+      const failed = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed);
+      expect(failed).toHaveLength(1);
+      expect(failed[0].data).toMatchObject({ reason: 'deploy_timeout' });
+    });
+
+    it('deploy stall: cancel() during the deploy phase disarms the watchdog (no later deploy_timeout)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      await startAndArmDeploy(fx);
+
+      // Mid-deploy (pre-DONE), the stall timer is the only armed timer.
+      expect(vi.getTimerCount()).toBe(1);
+
+      await fx.orchestrator.cancel('user');
+      const failedAfterCancel = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed).length;
+
+      // Load-bearing: cancel → releaseLock must have cleared the stall timer.
+      // (Without clearDeployStallTimer() in releaseLock this is 1, and the test fails.)
+      expect(vi.getTimerCount()).toBe(0);
+
+      advance(5_001);
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(
+        failedAfterCancel,
+      );
+      expect(fx.orchestrator.getCurrentJob()).toBeNull();
+    });
+
+    it('deploy stall: a stray clock advance after the watchdog fired is a no-op (no second failure)', async () => {
+      const fx = setupHappyPath({ clock: fakeClock, config: { deployStallTimeoutMs: 5_000 } });
+      const armed = await startAndArmDeploy(fx);
+
+      advance(5_001); // fire deploy_timeout → job released
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(1);
+      expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(false);
+
+      advance(5_001); // a second advance must not produce another failure
+      expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(1);
+    });
   });
 
   describe('Phase C: PENDING / Finalizing resolution', () => {
@@ -2365,7 +2875,8 @@ describe('FlashJobOrchestrator', () => {
       // should still receive the snapshot.
       expect(job!.endedAt).toBeUndefined();
 
-      // finalizeTimer is armed (one outstanding fake-timer).
+      // Only the finalizeTimer is armed post-DONE — the stall watchdog is
+      // disarmed by clearDeployStallTimer() at the top of handleDeployDone.
       expect(vi.getTimerCount()).toBe(1);
 
       // Mutation-resistance (per CLAUDE.md feedback_mutation_test_defensive_features):
@@ -2444,7 +2955,8 @@ describe('FlashJobOrchestrator', () => {
         },
       });
 
-      // Pre-fire: no flashJobDone, lock held, timer armed.
+      // Pre-fire: no flashJobDone, lock held, one timer armed (finalizeTimer).
+      // The stall watchdog was disarmed at FW_DEPLOY_DONE.
       expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(0);
       expect(fx.jobLock.isLocked()).toBe(true);
       expect(vi.getTimerCount()).toBe(1);
@@ -2863,7 +3375,8 @@ describe('FlashJobOrchestrator', () => {
         },
       });
 
-      // Sanity: master is Finalizing, timer is armed.
+      // Sanity: master is Finalizing; only finalizeTimer is armed post-DONE.
+      // The stall watchdog was disarmed at FW_DEPLOY_DONE.
       expect(fx.orchestrator.getCurrentJob()).not.toBeNull();
       expect(vi.getTimerCount()).toBe(1);
 
@@ -2987,7 +3500,8 @@ describe('FlashJobOrchestrator', () => {
       // endedAt is an ISO timestamp derived from clock.now() at deploy-done.
       expect(doneData.endedAt).toBe(new Date(1_000_000).toISOString());
 
-      // Reboot timer is armed (one outstanding fake-timer).
+      // Only the reboot timer is armed post-DONE — the stall watchdog is
+      // disarmed at FW_DEPLOY_DONE; releaseLock clears the reboot timer on exit.
       expect(vi.getTimerCount()).toBe(1);
 
       // Lock still held (release is gated on heartbeat-or-timer).
@@ -3046,8 +3560,8 @@ describe('FlashJobOrchestrator', () => {
       // flashJobFailed does NOT (job-wide abort is a separate event).
       expect(emittedFrames(fx.emitWs, TransmissionType.flashJobDone)).toHaveLength(1);
       expect(emittedFrames(fx.emitWs, TransmissionType.flashJobFailed)).toHaveLength(0);
-      // Reboot timer armed even with a partial failure — the master still
-      // rebooted; we still want to release the lock when its heartbeat lands.
+      // Only the reboot timer is armed post-DONE (stall watchdog disarmed at
+      // FW_DEPLOY_DONE). The master still rebooted; release via heartbeat or timer.
       expect(vi.getTimerCount()).toBe(1);
       expect(fx.jobLock.isLocked()).toBe(true);
     });
@@ -3055,6 +3569,8 @@ describe('FlashJobOrchestrator', () => {
     it('heartbeat called pre-timer: clears the timer, releases the lock, emits lockStateChanged; no leaked timers', async () => {
       const fx = setupHappyPath({ clock: fakeClock });
       const armed = await startAndCompleteDeploy(fx);
+      // Only the reboot timer is armed post-DONE (stall watchdog disarmed at
+      // FW_DEPLOY_DONE; cleared by releaseLock → notifyMasterHeartbeat path).
       expect(vi.getTimerCount()).toBe(1);
 
       const lockEventsBefore = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged).length;
@@ -3086,6 +3602,7 @@ describe('FlashJobOrchestrator', () => {
     it('reboot timer fires (no heartbeat): releases the lock, emits lockStateChanged; subsequent heartbeat is a no-op', async () => {
       const fx = setupHappyPath({ clock: fakeClock });
       await startAndCompleteDeploy(fx);
+      // Only the reboot timer is armed post-DONE (stall watchdog disarmed at FW_DEPLOY_DONE).
       expect(vi.getTimerCount()).toBe(1);
       const lockEventsBefore = emittedFrames(fx.emitWs, TransmissionType.lockStateChanged).length;
 
@@ -3166,6 +3683,7 @@ describe('FlashJobOrchestrator', () => {
           })),
         },
       });
+      // Only the reboot timer is armed post-DONE (stall watchdog disarmed at FW_DEPLOY_DONE).
       expect(vi.getTimerCount()).toBe(1);
 
       // Advance just under the configured timeout — must NOT have released yet.
@@ -3250,9 +3768,9 @@ describe('FlashJobOrchestrator', () => {
       const armed = await startPromise;
 
       // We're now post-FW_DEPLOY_BEGIN, mid-deploy. Subscribers armed; no
-      // reboot timer yet.
+      // reboot timer yet — only the deploy stall timer (Task 2).
       expect(fx.bus.deploySubscribers.has(armed.transferId)).toBe(true);
-      expect(vi.getTimerCount()).toBe(0);
+      expect(vi.getTimerCount()).toBe(1);
 
       const allEventsBefore = fx.emitWs.mock.calls.length;
       fx.orchestrator.notifyMasterHeartbeat('1.4.0');
@@ -4290,7 +4808,7 @@ describe('FlashJobOrchestrator', () => {
       });
 
       // We're now in the post-flashJobDone, pre-release window. Lock still
-      // held; reboot timer armed; phase === 'done'.
+      // held; only the reboot timer is armed (stall watchdog disarmed at FW_DEPLOY_DONE).
       expect(fx.jobLock.isLocked()).toBe(true);
       expect(vi.getTimerCount()).toBe(1);
       const failedBefore = emittedFrames(fx.emitWs, TransmissionType.flashJobFailed).length;

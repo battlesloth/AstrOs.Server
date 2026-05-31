@@ -8,6 +8,7 @@ import AstrosRemotePageList from '@/components/remoteControl/remotePageList/Astr
 import AstrosRemoteLivePreview from '@/components/remoteControl/remoteLivePreview/AstrosRemoteLivePreview.vue';
 import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import AstrosConfirmModal from '@/components/modals/AstrosConfirmModal.vue';
+import AstrosRemoteButtonEditorModal from '@/components/modals/remoteControl/AstrosRemoteButtonEditorModal.vue';
 import { useRemoteControlStore } from '@/stores/remoteControl';
 import { useScriptsStore } from '@/stores/scripts';
 import { usePlaylistsStore } from '@/stores/playlists';
@@ -94,6 +95,10 @@ function onRenamePage(payload: { idx: number; name: string }) {
   remoteControlStore.renamePage(payload.idx, payload.name);
 }
 
+function onReorderPage(payload: { fromIdx: number; toIdx: number }) {
+  remoteControlStore.reorderPages(payload.fromIdx, payload.toIdx);
+}
+
 // Delete-confirm modal state. The page list emits delete(idx); we capture
 // idx here, open the modal, and wait for user confirmation before calling
 // store.deletePage. Cancel resets pendingDeleteIdx without mutation.
@@ -146,6 +151,39 @@ const currentPage = computed(() => {
   }
   return page ?? null;
 });
+
+// Editor modal state — view-owned singleton (matches ScripterView's modal
+// pattern). A card's edit request sets editingButtonKey; the modal renders only
+// while it's set. The modal edits the CURRENTLY selected page's slot; the
+// backdrop overlays the page list so a pointer can't change selectedIdx while
+// it's open (there's no focus trap, matching the app's other modals).
+const editingButtonKey = ref<ButtonKey | null>(null);
+
+const editingButtonValue = computed<PageButton | null>(() => {
+  const page = currentPage.value;
+  if (page === null || editingButtonKey.value === null) return null;
+  return page[editingButtonKey.value];
+});
+
+const editingButtonNumber = computed(() =>
+  editingButtonKey.value === null ? 0 : BUTTON_KEYS.indexOf(editingButtonKey.value) + 1,
+);
+
+function onEditRequested(key: ButtonKey) {
+  editingButtonKey.value = key;
+}
+
+function onEditorChange(value: PageButton) {
+  // editingButtonKey is non-null whenever the modal is mounted (it gates the
+  // v-if), but guard anyway so a stray emit can't write to a null slot.
+  if (editingButtonKey.value === null) return;
+  remoteControlStore.setButton(selectedIdx.value, editingButtonKey.value, value);
+  editingButtonKey.value = null;
+}
+
+function onEditorClose() {
+  editingButtonKey.value = null;
+}
 
 // Total assigned (non-none) buttons across all pages — shown in the header
 // as "N actions". Drives the "is the user actually configuring anything"
@@ -238,7 +276,7 @@ const pageCount = computed(() => remoteControlPages.value.length);
         >
           <!-- Left: page list -->
           <aside
-            class="flex flex-col w-[220px] border-r border-base-300"
+            class="flex flex-col w-[260px] border-r border-base-300"
             data-testid="pane-page-list"
           >
             <AstrosRemotePageList
@@ -249,26 +287,25 @@ const pageCount = computed(() => remoteControlPages.value.length);
               @duplicate="onDuplicatePage"
               @delete="onDeleteRequest"
               @rename="onRenamePage"
+              @reorder="onReorderPage"
             />
           </aside>
 
           <!-- Center: 3x3 grid (capped at 540px wide) -->
           <main
-            class="flex-1 overflow-auto p-6"
+            class="flex-1 min-w-0 overflow-auto p-6"
             data-testid="pane-grid"
           >
             <div
               v-if="currentPage"
               class="grid grid-cols-3 gap-4 mx-auto"
-              style="max-width: 540px"
+              style="min-width: 500px; max-width: 540px"
             >
               <AstrosRemoteButtonCard
-                v-for="(key, i) in BUTTON_KEYS"
+                v-for="key in BUTTON_KEYS"
                 :key="key"
-                :button-number="i + 1"
                 :value="currentPage[key]"
-                :scripts="scripts"
-                :playlists="playlists"
+                @edit="() => onEditRequested(key)"
                 @change="(value) => onButtonChange(key, value)"
               />
             </div>
@@ -294,6 +331,16 @@ const pageCount = computed(() => remoteControlPages.value.length);
         :message-params="{ name: pendingDelete.name }"
         :on-confirm="onDeleteConfirm"
         :on-close="onDeleteCancel"
+      />
+
+      <AstrosRemoteButtonEditorModal
+        v-if="editingButtonValue !== null"
+        :button-number="editingButtonNumber"
+        :current-value="editingButtonValue"
+        :scripts="scripts"
+        :playlists="playlists"
+        @change="onEditorChange"
+        @close="onEditorClose"
       />
     </template>
   </AstrosLayout>

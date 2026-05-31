@@ -127,13 +127,19 @@
     "stages": {
       "eyebrow_title": "STAGES",
       "in_progress": "IN PROGRESS",
+      "not_in_update": "NOT IN UPDATE",
+      "master_only": "Master only",
       "download": {
         "label": "Download",
         "hint": "Master receives file"
       },
       "transfer": {
         "label": "Transfer",
-        "hint": "Forward to padawans"
+        "hint": "Master → padawans"
+      },
+      "receive": {
+        "label": "Receive",
+        "hint": "Master → padawans"
       },
       "flash": {
         "label": "Flash",
@@ -141,7 +147,7 @@
       },
       "verify": {
         "label": "Verify",
-        "hint": "Checksum"
+        "hint": "Checksum binary"
       },
       "reboot": {
         "label": "Reboot",
@@ -194,7 +200,8 @@
       "aborted": "Flash cancelled. The controllers were not updated.",
       "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
       "network_error": "Couldn't reach the server. Check your network connection and try again.",
-      "post_reboot_timeout": "Master controller did not report a matching firmware version within 90 seconds. The flash may have failed; verify the controller and retry."
+      "post_reboot_timeout": "Master controller did not report a matching firmware version within 90 seconds. The flash may have failed; verify the controller and retry.",
+      "deploy_timeout": "The master controller stopped responding during the update (no deploy progress for an extended period). The flash was aborted; check the master's power and USB connection, then try again."
     },
     "lock_active": "A firmware update is in progress — write actions are disabled until it completes.",
     "lock_banner": "Firmware update in progress — write actions are disabled across the app.",
@@ -428,12 +435,28 @@
   },
   "statusPage": {
     "base_alt": "Astromech base",
+    "panicked_hint": "The droid is in panic stop — control is disabled until cleared.",
+    "clear_panic": "Clear Panic Stop",
+    "clear_panic_failed": "Couldn't clear panic — try again.",
     "alt": {
       "up": "{location} connected",
       "needsSynced": "{location} needs sync",
       "firmwareIncompatible": "{location} firmware out of date",
       "down": "{location} disconnected"
     }
+  },
+  "mobile": {
+    "connected": "Connected",
+    "offline": "Offline",
+    "remote": "Remote",
+    "status_heading": "Droid Status",
+    "command_failed": "Couldn't send \"{name}\" — check the connection.",
+    "panic_failed": "Stop All failed to send — check the connection.",
+    "clear_failed": "Couldn't clear panic — try again.",
+    "config_load_failed": "Couldn't load the remote layout.",
+    "toggle_to_status_connected_aria": "Connected to server. Tap to view droid status.",
+    "toggle_to_status_offline_aria": "Disconnected from server. Tap to view droid status.",
+    "toggle_to_remote_aria": "Tap to return to the remote."
   },
   "mobile_remote": {
     "region_label": "Mobile remote",
@@ -446,6 +469,11 @@
     "stop_all_arming": "Hold…",
     "stop_all_active": "STOPPED",
     "stop_all_caption": "Hold to halt every running action",
+    "clear_toast": "Clearing panic…",
+    "clear_idle": "Clear Panic",
+    "clear_arming": "Hold to clear…",
+    "clear_active": "CLEARING",
+    "clear_caption": "Hold to re-enable control",
     "empty_slot_aria": "Empty slot {number}",
     "prev_page_aria": "Previous page",
     "next_page_aria": "Next page",
@@ -573,8 +601,7 @@
       "type_playlist": "PLAYLIST"
     },
     "editor": {
-      "header": "BTN {n} · EDITING",
-      "close": "Close",
+      "title": "Configure Button {n}",
       "tab_script": "Scripts",
       "tab_playlist": "Playlists",
       "search_placeholder": "Search…",
@@ -587,7 +614,13 @@
       "rename": "Rename",
       "duplicate": "Duplicate",
       "delete": "Delete",
-      "renameInput": "Page name"
+      "renameInput": "Page name",
+      "grab": "Reorder {name}",
+      "grabInstructions": "Press Space or Enter to grab, then use the arrow keys to move and Space to drop, or Escape to cancel.",
+      "grabbed": "Grabbed {name}, position {position} of {total}. Use arrow keys to move, Space to drop, Escape to cancel.",
+      "moved": "Moved {name} to position {position} of {total}.",
+      "dropped": "Dropped {name} at position {position} of {total}.",
+      "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}."
     },
     "preview": {
       "bezel_label": "Live preview"

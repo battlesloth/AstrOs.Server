@@ -559,4 +559,49 @@ describe('Animation Queue Tests', () => {
       expect(queue.activePlaylist).toBeNull();
     });
   });
+
+  describe('panic state observability', () => {
+    it('getPanicState reflects panicStop / clearPanicStop', () => {
+      const queue = new AnimationQueue(vi.fn());
+      expect(queue.getPanicState()).toEqual({ inPanicStop: false });
+      queue.panicStop();
+      expect(queue.getPanicState()).toEqual({ inPanicStop: true });
+      queue.clearPanicStop();
+      expect(queue.getPanicState()).toEqual({ inPanicStop: false });
+    });
+
+    it('notifies subscribers on panicStop and clearPanicStop', () => {
+      const queue = new AnimationQueue(vi.fn());
+      const seen: boolean[] = [];
+      queue.subscribe((s) => seen.push(s.inPanicStop));
+      queue.panicStop();
+      queue.clearPanicStop();
+      expect(seen).toEqual([true, false]);
+    });
+
+    it('unsubscribe stops notifications', () => {
+      const queue = new AnimationQueue(vi.fn());
+      const seen: boolean[] = [];
+      const off = queue.subscribe((s) => seen.push(s.inPanicStop));
+      off();
+      queue.panicStop();
+      expect(seen).toEqual([]);
+    });
+
+    it('a throwing subscriber does not stop other subscribers or block the state change', () => {
+      // The per-listener try/catch in notifyPanic is load-bearing: if it were
+      // moved outside the loop, one bad WS-broadcast subscriber would silently
+      // drop panic notifications to every other client. Reverting that guard
+      // makes this fail (mutation-test the defensive feature).
+      const queue = new AnimationQueue(vi.fn());
+      const seen: boolean[] = [];
+      queue.subscribe(() => {
+        throw new Error('boom');
+      });
+      queue.subscribe((s) => seen.push(s.inPanicStop));
+      queue.panicStop();
+      expect(seen).toEqual([true]); // second listener still ran
+      expect(queue.getPanicState()).toEqual({ inPanicStop: true }); // state still set
+    });
+  });
 });
