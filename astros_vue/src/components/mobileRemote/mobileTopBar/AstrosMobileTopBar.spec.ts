@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
 import AstrosMobileTopBar from './AstrosMobileTopBar.vue';
+import type { MobileScreen } from './types';
 import enUS from '@/locales/enUS.json';
 
 const i18n = createI18n({ legacy: false, locale: 'en-US', messages: { 'en-US': enUS } });
 
-function render(props: { connected: boolean; screen: 'remote' | 'status' }) {
+function render(props: { connected: boolean; screen: MobileScreen }) {
   return mount(AstrosMobileTopBar, { props, global: { plugins: [i18n] } });
 }
 

@@ -447,6 +447,9 @@
     "offline": "Offline",
     "remote": "Remote",
     "status_heading": "Droid Status",
+    "command_failed": "Couldn't send \"{name}\" — check the connection.",
+    "panic_failed": "Stop All failed to send — check the connection.",
+    "config_load_failed": "Couldn't load the remote layout.",
     "location": {
       "dome": "Dome",
       "core": "Core",

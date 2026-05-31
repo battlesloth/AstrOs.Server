@@ -10,6 +10,19 @@ vi.mock('@/api/apiService', () => ({
 const pushMock = vi.fn();
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: pushMock }) }));
 
+const toastErrorMock = vi.fn();
+vi.mock('@/composables/useToast', () => ({
+  useToast: () => ({
+    error: toastErrorMock,
+    success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    addToast: vi.fn(),
+    removeToast: vi.fn(),
+    toasts: { value: [] },
+  }),
+}));
+
 import apiService from '@/api/apiService';
 import MobileRemoteView from '../MobileRemoteView.vue';
 import AstrosMobileRemote from '@/components/mobileRemote/mobileRemote/AstrosMobileRemote.vue';
@@ -39,6 +52,7 @@ describe('MobileRemoteView', () => {
     apiPost.mockReset();
     apiClearToken.mockReset();
     pushMock.mockReset();
+    toastErrorMock.mockReset();
     // loadRemoteControl parses this as the (empty) saved config → seeds a page.
     apiGet.mockResolvedValue('[]');
     apiPost.mockResolvedValue(undefined);
@@ -86,6 +100,34 @@ describe('MobileRemoteView', () => {
     wrapper.findComponent(AstrosMobileTopBar).vm.$emit('toggle');
     await flushPromises();
     expect(wrapper.findComponent(AstrosMobileRemote).exists()).toBe(true);
+  });
+
+  it('shows an error toast when a command fails', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    apiGet.mockRejectedValueOnce(new Error('server down')); // the run call fails
+    wrapper
+      .findComponent(AstrosMobileRemote)
+      .vm.$emit('press', { id: 's-1', name: 'Wave', type: 'script' });
+    await flushPromises();
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an error toast when panic stop fails', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    apiPost.mockRejectedValueOnce(new Error('server down'));
+    wrapper.findComponent(AstrosMobileRemote).vm.$emit('panic');
+    await flushPromises();
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an error toast when the remote config fails to load', async () => {
+    apiGet.mockReset();
+    apiGet.mockRejectedValue(new Error('config load failed'));
+    mountView();
+    await flushPromises();
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
   });
 
   it('logs out from the status screen', async () => {

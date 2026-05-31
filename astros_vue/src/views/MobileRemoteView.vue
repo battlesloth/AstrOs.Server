@@ -2,7 +2,9 @@
 import { ref, onMounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import apiService from '@/api/apiService';
+import { useToast } from '@/composables/useToast';
 import { useWebsocket } from '@/composables/useWebsocket';
 import { useRemoteCommands } from '@/composables/useRemoteCommands';
 import { useControllerStore } from '@/stores/controller';
@@ -11,8 +13,11 @@ import AstrosMobileTopBar from '@/components/mobileRemote/mobileTopBar/AstrosMob
 import AstrosMobileRemote from '@/components/mobileRemote/mobileRemote/AstrosMobileRemote.vue';
 import AstrosMobileStatus from '@/components/mobileRemote/mobileStatus/AstrosMobileStatus.vue';
 import type { AstrosMobileRemotePressEvent } from '@/components/mobileRemote/mobileRemote/types';
+import type { MobileScreen } from '@/components/mobileRemote/mobileTopBar/types';
 
 const router = useRouter();
+const toast = useToast();
+const { t } = useI18n();
 const commands = useRemoteCommands();
 
 const { wsIsConnected } = useWebsocket();
@@ -21,28 +26,42 @@ const { domeStatus, coreStatus, bodyStatus } = storeToRefs(useControllerStore())
 const remoteStore = useRemoteControlStore();
 const { remoteControlPages } = storeToRefs(remoteStore);
 
-const screen = ref<'remote' | 'status'>('remote');
+const screen = ref<MobileScreen>('remote');
 
-onMounted(() => {
-  // Store swallows its own errors and seeds a default page on failure, so the
-  // remote always has something to render.
-  remoteStore.loadRemoteControl();
+onMounted(async () => {
+  // loadRemoteControl logs its own errors and never throws. On success with an
+  // empty saved config it seeds one default page; on a real failure it leaves
+  // pages empty (the grid shows its "no pages" state). Surface the failure so
+  // an empty remote reads as "load failed", not "unconfigured".
+  const result = await remoteStore.loadRemoteControl();
+  if (!result.success) {
+    toast.error(t('mobile.config_load_failed'));
+  }
 });
 
 function toggleScreen() {
   screen.value = screen.value === 'remote' ? 'status' : 'remote';
 }
 
-function onPress(button: AstrosMobileRemotePressEvent) {
-  if (button.type === 'script') {
-    commands.runScript(button.id);
-  } else {
-    commands.runPlaylist(button.id);
+// The remote grid shows an optimistic "sent" toast on press, so a swallowed
+// command failure would falsely tell the operator the droid got the command.
+// Surface failures as an error toast.
+async function onPress(button: AstrosMobileRemotePressEvent) {
+  const result =
+    button.type === 'script'
+      ? await commands.runScript(button.id)
+      : await commands.runPlaylist(button.id);
+  if (!result.success) {
+    toast.error(t('mobile.command_failed', { name: button.name }));
   }
 }
 
-function onPanic() {
-  commands.panicStop();
+async function onPanic() {
+  const result = await commands.panicStop();
+  if (!result.success) {
+    // Longer-lived: this is the emergency stop — a failed stop must not be missed.
+    toast.error(t('mobile.panic_failed'), 6000);
+  }
 }
 
 function onLogout() {

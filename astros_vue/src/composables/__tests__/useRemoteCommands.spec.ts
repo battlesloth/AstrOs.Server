@@ -51,4 +51,20 @@ describe('useRemoteCommands', () => {
     const result = await panicStop();
     expect(result.success).toBe(false);
   });
+
+  it('runScript returns a failure result (with an error) when the request throws', async () => {
+    apiGet.mockRejectedValueOnce(new Error('boom'));
+    const { runScript } = useRemoteCommands();
+    const result = await runScript('s-1');
+    expect(result.success).toBe(false);
+    // Discriminated union: a failure always carries a reason string.
+    if (!result.success) expect(typeof result.error).toBe('string');
+  });
+
+  it('runPlaylist returns a failure result when the request throws', async () => {
+    apiGet.mockRejectedValueOnce(new Error('boom'));
+    const { runPlaylist } = useRemoteCommands();
+    const result = await runPlaylist('p-1');
+    expect(result.success).toBe(false);
+  });
 });

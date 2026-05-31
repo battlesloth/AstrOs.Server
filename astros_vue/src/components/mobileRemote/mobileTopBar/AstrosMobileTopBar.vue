@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-
-type MobileScreen = 'remote' | 'status';
+import type { MobileScreen } from './types';
 
 const props = defineProps<{
   // Server/WebSocket reachability. Drives the button color (green/red), not
