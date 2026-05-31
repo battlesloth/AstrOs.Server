@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue';
+import { ref, shallowRef, type Ref } from 'vue';
 import { Container, FederatedPointerEvent, type ContainerChild } from 'pixi.js';
 import { PixiChannelEvent } from '@/pixiComponents/pixiChannelEvent';
 import type { ScriptEvent } from '@/models';
@@ -14,9 +14,17 @@ export function useEventBoxes(
   rowHeight: number,
   onEditEvent: (event: ScriptEvent) => void,
 ) {
-  const channelEventBoxes = ref<Map<string, PixiChannelEvent[]>>(new Map());
+  // shallowRef (not ref): these hold PixiChannelEvent instances. A deep
+  // reactive proxy from ref() wraps every property access, so a box read back
+  // out of the map (e.g. in rebuildEventBox) is a Vue Proxy, not the raw
+  // object in the Pixi scene graph. rebuild() then mutates the proxy's
+  // children, and PixiJS's render-group dirty-tracking — which keys on the raw
+  // object's identity — never picks up the change, so an edited event vanishes
+  // until an unrelated transform (zoom) forces a full re-render. Keeping these
+  // shallow stores the raw instances. See AstrosPixiView.vue's shallowRef note.
+  const channelEventBoxes = shallowRef<Map<string, PixiChannelEvent[]>>(new Map());
   const isDraggingEventBox = ref(false);
-  const draggedEventBox = ref<PixiChannelEvent | null>(null);
+  const draggedEventBox = shallowRef<PixiChannelEvent | null>(null);
   const eventBoxDragStartX = ref(0);
   const eventBoxStartTime = ref(0);
   const hasEventBoxDragged = ref(false);
