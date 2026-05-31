@@ -218,6 +218,37 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     isDirty.value = true;
   }
 
+  function reorderPages(fromIdx: number, toIdx: number) {
+    if (!Number.isInteger(fromIdx) || !Number.isInteger(toIdx)) {
+      // NaN/fractional from a stale drag index or a miswired keyboard handler.
+      console.warn(
+        `[remoteControl] reorderPages: fromIdx ${fromIdx} / toIdx ${toIdx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    const lastIdx = remoteControlPages.value.length - 1;
+    if (fromIdx < 0 || fromIdx > lastIdx || toIdx < 0 || toIdx > lastIdx) {
+      console.warn(
+        `[remoteControl] reorderPages: fromIdx ${fromIdx} / toIdx ${toIdx} out of range (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    // A drag that lands back on its start slot is not an edit — bail before
+    // flipping isDirty so the Save button stays disabled.
+    if (fromIdx === toIdx) return;
+    // Capture the selected page by id, not slot: the move may shift its index
+    // (it might BE the page moving, or a page may cross it). Re-find after the
+    // splice so selection tracks content, mirroring renamePage's id discipline.
+    const selectedId = remoteControlPages.value[selectedIdx.value]?.id ?? null;
+    const [page] = remoteControlPages.value.splice(fromIdx, 1);
+    remoteControlPages.value.splice(toIdx, 0, page!);
+    if (selectedId !== null) {
+      const i = remoteControlPages.value.findIndex((p) => p.id === selectedId);
+      if (i !== -1) selectedIdx.value = i;
+    }
+    isDirty.value = true;
+  }
+
   function setButton(pageIdx: number, buttonKey: ButtonKey, value: PageButton) {
     // Wrap the slot write + isDirty flip so consumers have a single, safe entry
     // point for updating a page's button configuration.
@@ -277,6 +308,7 @@ export const useRemoteControlStore = defineStore('remoteControl', () => {
     duplicatePage,
     deletePage,
     renamePage,
+    reorderPages,
     setButton,
   };
 });

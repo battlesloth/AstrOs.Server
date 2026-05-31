@@ -129,15 +129,15 @@ grid; Save → reload → order persists; touch (device or emulation).
 
 ## Build sequence
 
-- [ ] 1. Branch `feature/phase5-page-drag-reorder` off `develop`; commit this plan to `.docs/plans/`.
-- [ ] 2. `npm install vue-draggable-plus`.
-- [ ] 3. Add i18n keys.
-- [ ] 4. TDD `reorderPages` store action (14 cases) → implement → green.
-- [ ] 5. TDD component keyboard machine + emit contract + handle tests.
-- [ ] 6. Implement component: emit, `VueDraggable` wiring + `localPages` sync, grip handle,
+- [x] 1. Branch `feature/phase5-page-drag-reorder` off `develop`; commit this plan to `.docs/plans/`.
+- [x] 2. `npm install vue-draggable-plus`.
+- [x] 3. Add i18n keys.
+- [x] 4. TDD `reorderPages` store action (14 cases) → implement → green.
+- [x] 5. TDD component keyboard machine + emit contract + handle tests.
+- [x] 6. Implement component: emit, `VueDraggable` wiring + `localPages` sync, grip handle,
       keyboard machine, live region → green.
-- [ ] 7. View: `onReorderPage` + `@reorder`; update view spec stub + forwarding test → green.
-- [ ] 8. Pre-commit gate (prettier/lint/build/vitest) + code review; commit.
+- [x] 7. View: `onReorderPage` + `@reorder`; update view spec stub + forwarding test → green.
+- [x] 8. Pre-commit gate (prettier/lint/build/vitest) + code review; commit.
 - [ ] 9. QA plan file + manual QA.
 - [ ] 10. Pre-push toolkit review; address; push + PR `--base develop`.
 
