@@ -593,7 +593,13 @@
       "rename": "Rename",
       "duplicate": "Duplicate",
       "delete": "Delete",
-      "renameInput": "Page name"
+      "renameInput": "Page name",
+      "grab": "Reorder {name}",
+      "grabInstructions": "Press Space or Enter to grab, then use the arrow keys to move and Space to drop, or Escape to cancel.",
+      "grabbed": "Grabbed {name}, position {position} of {total}. Use arrow keys to move, Space to drop, Escape to cancel.",
+      "moved": "Moved {name} to position {position} of {total}.",
+      "dropped": "Dropped {name} at position {position} of {total}.",
+      "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}."
     },
     "preview": {
       "bezel_label": "Live preview"

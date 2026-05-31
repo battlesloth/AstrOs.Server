@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue';
+import { nextTick, ref, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { VueDraggable, type SortableEvent } from 'vue-draggable-plus';
 import { BUTTON_KEYS, type RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import { assertNever } from '@/utils/assertNever';
@@ -18,7 +19,23 @@ const emit = defineEmits<{
   duplicate: [idx: number];
   delete: [idx: number];
   rename: [payload: { idx: number; name: string }];
+  reorder: [payload: { fromIdx: number; toIdx: number }];
 }>();
+
+// vue-draggable-plus needs a writable model it can splice during a pointer
+// drag. The store is authoritative, so we keep a local copy synced from the
+// `pages` prop and never let the library's mutation be the source of truth —
+// on drop we reset it and emit `reorder`, then the new order flows back here.
+// deep:true because the store reorders IN PLACE (splice keeps the same array
+// reference), so a shallow watch would never see a keyboard/pointer move.
+const localPages = ref<RemoteControlPage[]>([]);
+watch(
+  () => props.pages,
+  (pages) => {
+    localPages.value = [...pages];
+  },
+  { immediate: true, deep: true },
+);
 
 // Rename state is keyed by page.id (stable across reorder/insert/delete),
 // not by position. The forIdx-style guard fixed cross-row pencil hand-off
@@ -77,6 +94,109 @@ function cancelRename() {
   renamingId.value = null;
 }
 
+// --- Keyboard reorder (grab handle) --------------------------------------
+// A 2-state machine keyed by page id (like rename): idle | grabbed. The
+// grabbed page is tracked by id, not slot, so a multi-step move re-resolves
+// the current index after each store-applied reorder. grabOriginIdx is the
+// slot at grab time, used to undo on Escape.
+const grabbedId = ref<string | null>(null);
+const grabOriginIdx = ref(-1);
+// aria-live announcement. Cleared then re-set on the next tick so identical
+// consecutive messages (e.g. a boundary bump) are re-announced — screen
+// readers ignore an aria-live update whose text didn't change. A side effect:
+// arrow presses faster than a tick coalesce to the LAST message, which is the
+// desired behavior (the final resting position is what the user needs).
+const liveMessage = ref('');
+// One shared visually-hidden instructions element; every handle points its
+// aria-describedby at it.
+const helpId = useId();
+
+// Starting an inline rename cancels any active keyboard grab so the grabbed
+// ring doesn't linger on a row the user has moved on from. Arrow/Escape are
+// already no-ops while renaming; this clears the stale visual state too.
+watch(renamingId, (id) => {
+  if (id !== null && grabbedId.value !== null) {
+    grabbedId.value = null;
+    grabOriginIdx.value = -1;
+  }
+});
+
+function announce(
+  key: 'grabbed' | 'moved' | 'dropped' | 'cancelled',
+  name: string,
+  position: number,
+) {
+  liveMessage.value = '';
+  void nextTick(() => {
+    liveMessage.value = t(`remote_control_config.pageList.${key}`, {
+      name,
+      position,
+      total: props.pages.length,
+    });
+  });
+}
+
+function onHandleGrabToggle(idx: number) {
+  if (renamingId.value !== null) return; // no keyboard reorder mid-rename
+  if (grabbedId.value === null) {
+    const page = props.pages[idx];
+    if (!page) return;
+    grabbedId.value = page.id;
+    grabOriginIdx.value = idx;
+    announce('grabbed', page.name, idx + 1);
+  } else {
+    // Drop where it currently sits — resolve by id, not the pressed handle.
+    const i = props.pages.findIndex((p) => p.id === grabbedId.value);
+    if (i !== -1) announce('dropped', props.pages[i]!.name, i + 1);
+    grabbedId.value = null;
+    grabOriginIdx.value = -1;
+  }
+}
+
+function onHandleMove(direction: 1 | -1) {
+  if (renamingId.value !== null || grabbedId.value === null) return;
+  const currentIdx = props.pages.findIndex((p) => p.id === grabbedId.value);
+  if (currentIdx === -1) {
+    // Grabbed page vanished from under us (parent removed it) — end the grab.
+    grabbedId.value = null;
+    grabOriginIdx.value = -1;
+    return;
+  }
+  const targetIdx = currentIdx + direction;
+  if (targetIdx < 0 || targetIdx >= props.pages.length) return; // at a boundary
+  // Read the name BEFORE emitting: `reorder` is handled synchronously and the
+  // store splices the same array backing `props.pages`, so after the emit
+  // `props.pages[currentIdx]` is the page that shifted into the vacated slot.
+  const movedName = props.pages[currentIdx]!.name;
+  emit('reorder', { fromIdx: currentIdx, toIdx: targetIdx });
+  announce('moved', movedName, targetIdx + 1);
+}
+
+function onHandleCancel() {
+  if (renamingId.value !== null || grabbedId.value === null) return;
+  const currentIdx = props.pages.findIndex((p) => p.id === grabbedId.value);
+  if (currentIdx !== -1) {
+    const name = props.pages[currentIdx]!.name;
+    if (currentIdx !== grabOriginIdx.value) {
+      emit('reorder', { fromIdx: currentIdx, toIdx: grabOriginIdx.value });
+    }
+    announce('cancelled', name, grabOriginIdx.value + 1);
+  }
+  grabbedId.value = null;
+  grabOriginIdx.value = -1;
+}
+
+function onDragEnd(evt: SortableEvent) {
+  const { oldIndex, newIndex } = evt;
+  // Undo SortableJS's in-place reorder of localPages and defer to the store:
+  // the move is emitted, applied by the parent, and the authoritative order
+  // flows back via the `pages` prop. Resetting first means a store that
+  // REJECTS the move (guard fail) still leaves the list visually correct.
+  localPages.value = [...props.pages];
+  if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return;
+  emit('reorder', { fromIdx: oldIndex, toIdx: newIndex });
+}
+
 function dotClass(type: PageButton['type']): string {
   switch (type) {
     case 'script':
@@ -108,18 +228,24 @@ function dotClass(type: PageButton['type']): string {
         +
       </button>
     </header>
-    <ul
+    <VueDraggable
+      v-model="localPages"
+      tag="ul"
       role="listbox"
       class="flex-1 overflow-y-auto p-1"
       :aria-label="t('remote_control_config.pageList.header')"
+      handle="[data-drag-handle]"
+      :animation="150"
+      :force-fallback="true"
+      @end="onDragEnd"
     >
       <li
-        v-for="(page, idx) in pages"
+        v-for="(page, idx) in localPages"
         :key="page.id"
         role="option"
         :tabindex="
           idx === selectedIdx ||
-          (selectedIdx < 0 || selectedIdx >= pages.length ? idx === 0 : false)
+          (selectedIdx < 0 || selectedIdx >= localPages.length ? idx === 0 : false)
             ? 0
             : -1
         "
@@ -127,12 +253,35 @@ function dotClass(type: PageButton['type']): string {
         :class="[
           'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5',
           idx === selectedIdx ? 'bg-r2-xlight' : 'hover:bg-base-200',
+          grabbedId === page.id ? 'ring-2 ring-primary' : '',
         ]"
         data-testid="page-list-row"
         @click="emit('select', idx)"
         @keydown.enter.self.prevent="emit('select', idx)"
         @keydown.space.self.prevent="emit('select', idx)"
       >
+        <button
+          type="button"
+          data-drag-handle
+          data-testid="page-list-drag-handle"
+          class="btn btn-ghost btn-sm btn-square flex-shrink-0 cursor-grab text-base-content/40"
+          :class="{ 'pointer-events-none opacity-40': renamingId === page.id }"
+          :disabled="renamingId === page.id"
+          :aria-label="t('remote_control_config.pageList.grab', { name: page.name })"
+          :aria-describedby="helpId"
+          @click.stop
+          @keydown.space.prevent.stop="onHandleGrabToggle(idx)"
+          @keydown.enter.prevent.stop="onHandleGrabToggle(idx)"
+          @keydown.up.prevent.stop="onHandleMove(-1)"
+          @keydown.down.prevent.stop="onHandleMove(1)"
+          @keydown.esc.prevent.stop="onHandleCancel()"
+        >
+          <v-icon
+            name="md-draghandle"
+            scale="0.9"
+            aria-hidden="true"
+          />
+        </button>
         <div
           class="grid flex-shrink-0 grid-cols-3 gap-px"
           aria-hidden="true"
@@ -212,6 +361,27 @@ function dotClass(type: PageButton['type']): string {
           </button>
         </div>
       </li>
-    </ul>
+    </VueDraggable>
+    <!-- Visually-hidden keyboard-reorder instructions, referenced by every
+         handle's aria-describedby. -->
+    <span
+      :id="helpId"
+      class="sr-only"
+    >
+      {{ t('remote_control_config.pageList.grabInstructions') }}
+    </span>
+    <!-- Live region announcing grab / move / drop / cancel to screen readers.
+         role="status" + aria-live="polite" matches every other live region in
+         the app; reorder feedback isn't urgent enough to interrupt (assertive),
+         and role="status" already implies polite. -->
+    <div
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-testid="page-list-live"
+    >
+      {{ liveMessage }}
+    </div>
   </div>
 </template>

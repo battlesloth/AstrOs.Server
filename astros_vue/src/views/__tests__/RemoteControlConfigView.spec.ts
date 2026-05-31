@@ -101,7 +101,7 @@ function mountView() {
         AstrosRemotePageList: {
           name: 'AstrosRemotePageList',
           props: ['pages', 'selectedIdx'],
-          emits: ['select', 'add', 'duplicate', 'delete', 'rename'],
+          emits: ['select', 'add', 'duplicate', 'delete', 'rename', 'reorder'],
           template: '<div data-testid="page-list-stub" />',
         },
         AstrosRemoteLivePreview: {
@@ -348,6 +348,27 @@ describe('RemoteControlConfigView — page list wiring', () => {
     await pageList.vm.$emit('rename', { idx: 0, name: 'Renamed' });
 
     expect(spy).toHaveBeenCalledWith(0, 'Renamed');
+  });
+
+  it('forwards reorder emit to store.reorderPages and the order actually changes', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    const store = useRemoteControlStore();
+    // Seed a second page so the reorder indices are in range — without this,
+    // the store's out-of-range guard would silently no-op and the spy
+    // assertion alone would pass without exercising the real behavior.
+    store.addPage();
+    await flushPromises();
+    const namesBefore = store.remoteControlPages.map((p) => p.name);
+    const spy = vi.spyOn(store, 'reorderPages');
+
+    const pageList = wrapper.findComponent({ name: 'AstrosRemotePageList' });
+    await pageList.vm.$emit('reorder', { fromIdx: 0, toIdx: 1 });
+    await flushPromises();
+
+    expect(spy).toHaveBeenCalledWith(0, 1);
+    expect(store.remoteControlPages.map((p) => p.name)).toEqual([namesBefore[1], namesBefore[0]]);
   });
 });
 

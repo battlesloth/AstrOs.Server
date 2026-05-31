@@ -1039,4 +1039,156 @@ describe('remoteControl store', () => {
       expect(store.isDirty).toBe(false);
     });
   });
+
+  describe('reorderPages', () => {
+    async function loadNamed(...names: string[]) {
+      apiGet.mockResolvedValue(JSON.stringify(names.map((name) => ({ ...legacyPage(), name }))));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      return store;
+    }
+
+    it('moves a page from a low index to a high index', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(0, 2);
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['B', 'C', 'A']);
+    });
+
+    it('moves a page from a high index to a low index', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(2, 0);
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['C', 'A', 'B']);
+    });
+
+    it('keeps the moved page selected when the SELECTED page is the one moved', async () => {
+      // The selected page follows its content across the move, not its slot.
+      const store = await loadNamed('A', 'B', 'C');
+      store.selectPage(0); // A selected
+
+      store.reorderPages(0, 2); // A travels to the end
+
+      expect(store.selectedIdx).toBe(2);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('A');
+    });
+
+    it('shifts selectedIdx toward 0 when a page above the selection is moved below it', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+      store.selectPage(1); // B selected at idx 1
+
+      store.reorderPages(0, 2); // A (above B) moves below B → [B, C, A]
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['B', 'C', 'A']);
+      expect(store.selectedIdx).toBe(0);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('B');
+    });
+
+    it('shifts selectedIdx upward when a page below the selection is moved above it', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+      store.selectPage(1); // B selected at idx 1
+
+      store.reorderPages(2, 0); // C (below B) moves above B → [C, A, B]
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['C', 'A', 'B']);
+      expect(store.selectedIdx).toBe(2);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('B');
+    });
+
+    it('leaves selectedIdx unchanged when a reorder happens entirely below the selection', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+      store.selectPage(0); // A selected at idx 0
+
+      store.reorderPages(1, 2); // swap B and C, both below A → [A, C, B]
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'C', 'B']);
+      expect(store.selectedIdx).toBe(0);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('A');
+    });
+
+    it('flips isDirty to true on a real move', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+      expect(store.isDirty).toBe(false);
+
+      store.reorderPages(0, 1);
+
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('warns and no-ops on NaN fromIdx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(NaN, 1);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on NaN toIdx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(0, NaN);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on fractional idx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(0.5, 2);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on negative idx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(-1, 1);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on out-of-range idx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(0, 99);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('no-ops when fromIdx === toIdx (order unchanged)', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(1, 1);
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+    });
+
+    it('does NOT flip isDirty when fromIdx === toIdx', async () => {
+      // A drag that ends where it started is not an edit — the Save button
+      // must stay disabled.
+      const store = await loadNamed('A', 'B', 'C');
+      expect(store.isDirty).toBe(false);
+
+      store.reorderPages(1, 1);
+
+      expect(store.isDirty).toBe(false);
+    });
+  });
 });

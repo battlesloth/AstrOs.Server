@@ -95,6 +95,10 @@ function onRenamePage(payload: { idx: number; name: string }) {
   remoteControlStore.renamePage(payload.idx, payload.name);
 }
 
+function onReorderPage(payload: { fromIdx: number; toIdx: number }) {
+  remoteControlStore.reorderPages(payload.fromIdx, payload.toIdx);
+}
+
 // Delete-confirm modal state. The page list emits delete(idx); we capture
 // idx here, open the modal, and wait for user confirmation before calling
 // store.deletePage. Cancel resets pendingDeleteIdx without mutation.
@@ -283,6 +287,7 @@ const pageCount = computed(() => remoteControlPages.value.length);
               @duplicate="onDuplicatePage"
               @delete="onDeleteRequest"
               @rename="onRenamePage"
+              @reorder="onReorderPage"
             />
           </aside>
 

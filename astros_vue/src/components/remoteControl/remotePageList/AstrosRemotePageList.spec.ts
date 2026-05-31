@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { ref } from 'vue';
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
+import { VueDraggable } from 'vue-draggable-plus';
 import AstrosRemotePageList from './AstrosRemotePageList.vue';
 import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
 import { BUTTON_KEYS } from '@/models/remoteControl/remoteControlPage';
@@ -607,5 +609,313 @@ describe('AstrosRemotePageList — inline rename', () => {
       .get('[data-testid="page-list-rename-input"]').element;
 
     expect(document.activeElement).toBe(input);
+  });
+});
+
+describe('AstrosRemotePageList — drag handle + keyboard reorder', () => {
+  // Pointer drag (vue-draggable-plus / SortableJS) is real DOM-drag and is
+  // covered by the manual QA plan (project UI-drag TDD exception). These tests
+  // pin the KEYBOARD reorder state machine and the `reorder` emit contract —
+  // pure component logic the store relies on.
+  function mountList(pages = PAGES_3, selectedIdx = 0) {
+    return mount(AstrosRemotePageList, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages, selectedIdx },
+    });
+  }
+  const handles = (w: ReturnType<typeof mountList>) =>
+    w.findAll('[data-testid="page-list-drag-handle"]');
+  const rows = (w: ReturnType<typeof mountList>) => w.findAll('[data-testid="page-list-row"]');
+
+  const SPACE = { key: ' ' };
+  const ENTER = { key: 'Enter' };
+  const DOWN = { key: 'ArrowDown' };
+  const UP = { key: 'ArrowUp' };
+  const ESC = { key: 'Escape' };
+
+  it('renders a drag handle on every row', () => {
+    const wrapper = mountList();
+    expect(handles(wrapper)).toHaveLength(3);
+  });
+
+  it('grab then ArrowDown emits reorder {fromIdx:0, toIdx:1}', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // grab A (idx 0)
+    await handles(wrapper)[0]!.trigger('keydown', DOWN);
+
+    expect(wrapper.emitted('reorder')).toHaveLength(1);
+    expect(wrapper.emitted('reorder')![0]).toEqual([{ fromIdx: 0, toIdx: 1 }]);
+  });
+
+  it('grab then ArrowUp emits reorder {fromIdx:1, toIdx:0}', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[1]!.trigger('keydown', SPACE); // grab B (idx 1)
+    await handles(wrapper)[1]!.trigger('keydown', UP);
+
+    expect(wrapper.emitted('reorder')).toHaveLength(1);
+    expect(wrapper.emitted('reorder')![0]).toEqual([{ fromIdx: 1, toIdx: 0 }]);
+  });
+
+  it('does NOT emit when ArrowUp is pressed on the grabbed top row (boundary)', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // grab A (idx 0)
+    await handles(wrapper)[0]!.trigger('keydown', UP); // already at top
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+  });
+
+  it('does NOT emit when ArrowDown is pressed on the grabbed bottom row (boundary)', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[2]!.trigger('keydown', SPACE); // grab C (idx 2)
+    await handles(wrapper)[2]!.trigger('keydown', DOWN); // already at bottom
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+  });
+
+  it('does NOT emit on arrow keys when no row is grabbed', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[0]!.trigger('keydown', DOWN);
+    await handles(wrapper)[1]!.trigger('keydown', UP);
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+  });
+
+  it('two ArrowDowns emit reorder twice, tracking the grabbed page across the moves', async () => {
+    // The store is authoritative: each move emits, the parent applies it, and
+    // the new order flows back through `pages`. Simulate that with setProps so
+    // the second move computes from the page's NEW index — exactly the runtime
+    // path, not a snapshot of the original order.
+    const wrapper = mountList();
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // grab A (idx 0)
+    await handles(wrapper)[0]!.trigger('keydown', DOWN); // {0,1}
+
+    await wrapper.setProps({ pages: [PAGES_3[1]!, PAGES_3[0]!, PAGES_3[2]!] }); // [B,A,C]; A now idx 1
+    await handles(wrapper)[1]!.trigger('keydown', DOWN); // {1,2}
+
+    expect(wrapper.emitted('reorder')).toHaveLength(2);
+    expect(wrapper.emitted('reorder')![0]).toEqual([{ fromIdx: 0, toIdx: 1 }]);
+    expect(wrapper.emitted('reorder')![1]).toEqual([{ fromIdx: 1, toIdx: 2 }]);
+  });
+
+  it('keeps focus on the grabbed page handle after it moves (keyboard focus-follow)', async () => {
+    // The most load-bearing keyboard-reorder behavior: when the grabbed page
+    // changes position, the keyed <li> DOM node (and the focused handle inside
+    // it) is MOVED, not recreated, so the NEXT arrow keypress still lands on
+    // the right handle. A regression that broke :key="page.id" or pulled the
+    // handle out of the row would silently strand focus.
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    const grabbedHandle = handles(wrapper)[0]!.element as HTMLElement;
+    grabbedHandle.focus();
+    expect(document.activeElement).toBe(grabbedHandle);
+
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // grab A
+    await handles(wrapper)[0]!.trigger('keydown', DOWN); // emit {0,1}
+    // Parent applies the move; A now sits at index 1.
+    await wrapper.setProps({ pages: [PAGES_3[1]!, PAGES_3[0]!, PAGES_3[2]!] });
+
+    // The SAME handle element now sits at index 1 and is still focused.
+    expect(handles(wrapper)[1]!.element).toBe(grabbedHandle);
+    expect(document.activeElement).toBe(grabbedHandle);
+  });
+
+  it('Esc with no prior move emits nothing and ends the grab', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[1]!.trigger('keydown', SPACE); // grab B
+    await handles(wrapper)[1]!.trigger('keydown', ESC);
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+    // grab ended → no row carries the grabbed ring
+    expect(rows(wrapper).some((r) => r.classes().includes('ring-2'))).toBe(false);
+  });
+
+  it('Esc after a move emits reorder back to the original index', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // grab A at origin 0
+    await handles(wrapper)[0]!.trigger('keydown', DOWN); // {0,1}
+
+    await wrapper.setProps({ pages: [PAGES_3[1]!, PAGES_3[0]!, PAGES_3[2]!] }); // [B,A,C]; A now idx 1
+    await handles(wrapper)[1]!.trigger('keydown', ESC); // cancel → back to origin 0
+    await flushPromises();
+
+    expect(wrapper.emitted('reorder')).toHaveLength(2);
+    expect(wrapper.emitted('reorder')![1]).toEqual([{ fromIdx: 1, toIdx: 0 }]);
+    // Announce names the page and its RESTORED (origin) position, not the
+    // position it was dragged to.
+    const live = wrapper.get('[data-testid="page-list-live"]');
+    expect(live.text()).toContain('cancelled');
+    expect(live.text()).toContain('Quick Actions');
+    expect(live.text()).toContain('position 1 of 3');
+  });
+
+  it('marks the grabbed row with a ring and clears it on drop (Space)', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // grab
+    expect(rows(wrapper)[0]!.classes()).toContain('ring-2');
+
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // drop
+    await flushPromises();
+    expect(rows(wrapper)[0]!.classes()).not.toContain('ring-2');
+    // Drop announces the page at its resting position.
+    const live = wrapper.get('[data-testid="page-list-live"]');
+    expect(live.text()).toContain('Dropped');
+    expect(live.text()).toContain('Quick Actions');
+    expect(live.text()).toContain('position 1 of 3');
+  });
+
+  it('Enter grabs and a second Enter drops (clears the ring)', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[1]!.trigger('keydown', ENTER); // grab
+    expect(rows(wrapper)[1]!.classes()).toContain('ring-2');
+
+    await handles(wrapper)[1]!.trigger('keydown', ENTER); // drop
+    expect(rows(wrapper)[1]!.classes()).not.toContain('ring-2');
+  });
+
+  it('pressing a grab key on the handle does NOT emit select (no row-select bubble)', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[2]!.trigger('keydown', SPACE);
+    await handles(wrapper)[0]!.trigger('keydown', ENTER);
+
+    expect(wrapper.emitted('select')).toBeUndefined();
+  });
+
+  it('disables the drag handle on the row being renamed', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await rows(wrapper)[1]!.find('[data-testid="page-list-rename"]').trigger('click');
+
+    expect(handles(wrapper)[1]!.attributes('disabled')).toBeDefined();
+  });
+
+  it('does NOT grab/reorder via keyboard while any row is being renamed', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    // Begin renaming row 1; row 0's handle is still enabled.
+    await rows(wrapper)[1]!.find('[data-testid="page-list-rename"]').trigger('click');
+    await handles(wrapper)[0]!.trigger('keydown', SPACE);
+    await handles(wrapper)[0]!.trigger('keydown', DOWN);
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+  });
+
+  it('announces the grabbed page in an aria-live region', async () => {
+    const wrapper = mountList();
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // grab "Quick Actions"
+    await flushPromises();
+
+    const live = wrapper.get('[data-testid="page-list-live"]');
+    expect(live.text()).toContain('Quick Actions');
+  });
+
+  it('announces the GRABBED page on move, even after the parent applies the reorder synchronously', async () => {
+    // Runtime path: emitting `reorder` synchronously runs the store splice on
+    // the same array backing `pages` BEFORE the announce fires. A naive read of
+    // pages[currentIdx] after the emit would name the page that shifted INTO
+    // the vacated slot. This harness reproduces that synchronous round-trip
+    // (the stub-parent mountList() can't — its props never change on emit).
+    const Harness = {
+      components: { AstrosRemotePageList },
+      setup() {
+        const pages = ref<RemoteControlPage[]>([...PAGES_3]);
+        function onReorder({ fromIdx, toIdx }: { fromIdx: number; toIdx: number }) {
+          const [p] = pages.value.splice(fromIdx, 1);
+          pages.value.splice(toIdx, 0, p!);
+        }
+        return { pages, onReorder };
+      },
+      template: '<AstrosRemotePageList :pages="pages" :selected-idx="0" @reorder="onReorder" />',
+    };
+    const wrapper = mount(Harness, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+    });
+    const handle = () => wrapper.findAll('[data-testid="page-list-drag-handle"]')[0]!;
+    await handle().trigger('keydown', SPACE); // grab "Quick Actions"
+    await handle().trigger('keydown', DOWN); // move; parent splices synchronously
+    await flushPromises();
+
+    const live = wrapper.get('[data-testid="page-list-live"]');
+    expect(live.text()).toContain('Quick Actions'); // the grabbed page…
+    expect(live.text()).not.toContain('Performance'); // …NOT the one that shifted in
+    expect(live.text()).toContain('position 2 of 3'); // the new 1-based position
+  });
+
+  it('clears the grabbed ring when an inline rename starts on another row', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // grab row 0 → ring
+    expect(rows(wrapper)[0]!.classes()).toContain('ring-2');
+
+    await rows(wrapper)[1]!.find('[data-testid="page-list-rename"]').trigger('click');
+
+    expect(rows(wrapper).some((r) => r.classes().includes('ring-2'))).toBe(false);
+  });
+
+  it('ends the grab silently when the grabbed page is removed mid-grab', async () => {
+    // Parent removes the grabbed page (e.g. a concurrent delete/sync). An arrow
+    // press must not emit a reorder against the vanished id, and no row may
+    // keep the grabbed ring.
+    const wrapper = mountList();
+    await handles(wrapper)[1]!.trigger('keydown', SPACE); // grab B (id 'b')
+    expect(rows(wrapper)[1]!.classes()).toContain('ring-2');
+
+    await wrapper.setProps({ pages: [PAGES_3[0]!, PAGES_3[2]!] }); // B removed → [A, C]
+    await handles(wrapper)[0]!.trigger('keydown', DOWN); // arrow while grabbed page is gone
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+    expect(rows(wrapper).some((r) => r.classes().includes('ring-2'))).toBe(false);
+  });
+
+  // The pointer-drag DOM mechanics (SortableJS) are manual-QA only, but the
+  // `onDragEnd` handler the library calls is pure component JS and is exercised
+  // here by emitting from the VueDraggable child directly.
+  const draggable = (w: ReturnType<typeof mountList>) => w.findComponent(VueDraggable);
+
+  it('@end emits reorder with the SortableJS old/new indices', async () => {
+    const wrapper = mountList();
+    await draggable(wrapper).vm.$emit('end', { oldIndex: 0, newIndex: 2 });
+
+    expect(wrapper.emitted('reorder')![0]).toEqual([{ fromIdx: 0, toIdx: 2 }]);
+  });
+
+  it('@end with oldIndex === newIndex does NOT emit (no-op drop)', async () => {
+    const wrapper = mountList();
+    await draggable(wrapper).vm.$emit('end', { oldIndex: 1, newIndex: 1 });
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+  });
+
+  it('@end with missing indices does NOT emit (defensive against a malformed event)', async () => {
+    const wrapper = mountList();
+    await draggable(wrapper).vm.$emit('end', {});
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+  });
+
+  it('@end resets the visual order from props when the move is not applied (store-rejected)', async () => {
+    // SortableJS splices the v-model in place during the drag; if the parent
+    // never applies the reorder (store guard fails), @end must snap the list
+    // back to the authoritative prop order.
+    const wrapper = mountList();
+    // Simulate the library's in-place splice of the v-model.
+    await draggable(wrapper).vm.$emit('update:modelValue', [PAGES_3[1]!, PAGES_3[2]!, PAGES_3[0]!]);
+    // @end fires, but props.pages is unchanged (parent didn't apply the move).
+    await draggable(wrapper).vm.$emit('end', { oldIndex: 0, newIndex: 2 });
+    await wrapper.vm.$nextTick();
+
+    const names = wrapper.findAll('[data-testid="page-list-name"]').map((n) => n.text());
+    expect(names).toEqual(['Quick Actions', 'Performance', 'Songs']);
   });
 });
