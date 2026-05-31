@@ -65,6 +65,7 @@ import { ApiKeyValidator } from './guard/api_key_validator.js';
 import { JobLock } from './job_lock/job_lock.js';
 import { rejectIfLocked } from './guard/ws_lock_guard.js';
 import { buildLockStateResponse } from './models/networking/lock_responses.js';
+import { buildPanicStateResponse } from './models/networking/panic_responses.js';
 import { SerialMessageType } from './serial/serial_message.js';
 import {
   ConfigSyncResponse,
@@ -301,6 +302,13 @@ export class ApiServer {
     logger.info('Setting up animation queue');
     this.animationQueue = new AnimationQueue((scriptId, locations) => {
       this.dispatchScriptFromQueue(scriptId, locations);
+    });
+
+    // Broadcast panic-state transitions to all WS clients (mirrors the
+    // jobLock.subscribe wiring). The on-connect snapshot + GET /panicState
+    // cover cold-load; this keeps live clients in sync.
+    this.animationQueue.subscribe((state) => {
+      this.updateClients(buildPanicStateResponse(state));
     });
 
     logger.info('Setting up routes');
@@ -580,6 +588,12 @@ export class ApiServer {
       res.json({ message: 'success' });
     });
 
+    // Hydrate endpoint so a client learns the current panic state on
+    // load/refresh before the WS on-connect snapshot arrives.
+    this.router.get('/panicState', this.authHandler, (req: any, res: any) => {
+      res.status(200).json(this.animationQueue.getPanicState());
+    });
+
     // API key secured routes
     this.router.get(
       '/remotecontrol',
@@ -709,6 +723,14 @@ export class ApiServer {
           conn.send(JSON.stringify(buildLockStateResponse(this.jobLock.getState())));
         } catch (err) {
           logger.error(`websocket initial lockState send error: ${err}`);
+        }
+
+        // Late-join panic snapshot: a client connecting while the queue is
+        // panicked learns it immediately rather than at the next transition.
+        try {
+          conn.send(JSON.stringify(buildPanicStateResponse(this.animationQueue.getPanicState())));
+        } catch (err) {
+          logger.error(`websocket initial panicState send error: ${err}`);
         }
 
         // Late-join flash-job snapshot — only emitted when a job is in flight.
