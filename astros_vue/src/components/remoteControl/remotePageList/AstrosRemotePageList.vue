@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { VueDraggable } from 'vue-draggable-plus';
+import { VueDraggable, type SortableEvent } from 'vue-draggable-plus';
 import { BUTTON_KEYS, type RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
 import type { PageButton } from '@/models/remoteControl/pageButton';
 import { assertNever } from '@/utils/assertNever';
@@ -111,6 +111,16 @@ const liveMessage = ref('');
 // aria-describedby at it.
 const helpId = useId();
 
+// Starting an inline rename cancels any active keyboard grab so the grabbed
+// ring doesn't linger on a row the user has moved on from. Arrow/Escape are
+// already no-ops while renaming; this clears the stale visual state too.
+watch(renamingId, (id) => {
+  if (id !== null && grabbedId.value !== null) {
+    grabbedId.value = null;
+    grabOriginIdx.value = -1;
+  }
+});
+
 function announce(
   key: 'grabbed' | 'moved' | 'dropped' | 'cancelled',
   name: string,
@@ -154,8 +164,12 @@ function onHandleMove(direction: 1 | -1) {
   }
   const targetIdx = currentIdx + direction;
   if (targetIdx < 0 || targetIdx >= props.pages.length) return; // at a boundary
+  // Read the name BEFORE emitting: `reorder` is handled synchronously and the
+  // store splices the same array backing `props.pages`, so after the emit
+  // `props.pages[currentIdx]` is the page that shifted into the vacated slot.
+  const movedName = props.pages[currentIdx]!.name;
   emit('reorder', { fromIdx: currentIdx, toIdx: targetIdx });
-  announce('moved', props.pages[currentIdx]!.name, targetIdx + 1);
+  announce('moved', movedName, targetIdx + 1);
 }
 
 function onHandleCancel() {
@@ -172,7 +186,7 @@ function onHandleCancel() {
   grabOriginIdx.value = -1;
 }
 
-function onDragEnd(evt: { oldIndex?: number; newIndex?: number }) {
+function onDragEnd(evt: SortableEvent) {
   const { oldIndex, newIndex } = evt;
   // Undo SortableJS's in-place reorder of localPages and defer to the store:
   // the move is emitted, applied by the parent, and the authoritative order

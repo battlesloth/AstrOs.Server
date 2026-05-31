@@ -65,10 +65,11 @@ plan confirms they hold end-to-end in a browser with a real screen reader.
 2. Press **Space** (or Enter).
 3. **Expected:** A "grabbed" visual ring appears on A's row. A screen reader announces
    "Grabbed A, position 1 of 4. Use arrow keys to move, Space to drop, Escape to cancel."
-4. Press **ArrowDown** twice.
-5. **Expected:** A moves down two positions (`B, C, A, D` → after 2 downs from row 1:
-   `B, C, A, D`). Focus stays on A's handle (the next arrow keeps working without
-   re-focusing). Each move is announced ("Moved A to position N of 4.").
+4. Press **ArrowDown** twice. (Starting order `A, B, C, D`.)
+5. **Expected:** A moves down two positions: `A, B, C, D` → after one down `B, A, C, D` →
+   after the second `B, C, A, D` (A now at position 3). Focus stays on A's handle (the next
+   arrow keeps working without re-focusing). Each move is announced ("Moved A to position N
+   of 4." — naming **A**, the grabbed page, not the page it passed).
 6. Press **Space** (or Enter) to drop.
 7. **Expected:** The ring clears; a "Dropped A at position 3 of 4." announcement fires.
    Unsaved badge is visible.

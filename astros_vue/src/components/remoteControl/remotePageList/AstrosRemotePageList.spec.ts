@@ -1,6 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { ref } from 'vue';
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
+import { VueDraggable } from 'vue-draggable-plus';
 import AstrosRemotePageList from './AstrosRemotePageList.vue';
 import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
 import { BUTTON_KEYS } from '@/models/remoteControl/remoteControlPage';
@@ -800,5 +802,91 @@ describe('AstrosRemotePageList — drag handle + keyboard reorder', () => {
 
     const live = wrapper.get('[data-testid="page-list-live"]');
     expect(live.text()).toContain('Quick Actions');
+  });
+
+  it('announces the GRABBED page on move, even after the parent applies the reorder synchronously', async () => {
+    // Runtime path: emitting `reorder` synchronously runs the store splice on
+    // the same array backing `pages` BEFORE the announce fires. A naive read of
+    // pages[currentIdx] after the emit would name the page that shifted INTO
+    // the vacated slot. This harness reproduces that synchronous round-trip
+    // (the stub-parent mountList() can't — its props never change on emit).
+    const Harness = {
+      components: { AstrosRemotePageList },
+      setup() {
+        const pages = ref<RemoteControlPage[]>([...PAGES_3]);
+        function onReorder({ fromIdx, toIdx }: { fromIdx: number; toIdx: number }) {
+          const [p] = pages.value.splice(fromIdx, 1);
+          pages.value.splice(toIdx, 0, p!);
+        }
+        return { pages, onReorder };
+      },
+      template: '<AstrosRemotePageList :pages="pages" :selected-idx="0" @reorder="onReorder" />',
+    };
+    const wrapper = mount(Harness, {
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+    });
+    const handle = () => wrapper.findAll('[data-testid="page-list-drag-handle"]')[0]!;
+    await handle().trigger('keydown', SPACE); // grab "Quick Actions"
+    await handle().trigger('keydown', DOWN); // move; parent splices synchronously
+    await flushPromises();
+
+    const live = wrapper.get('[data-testid="page-list-live"]');
+    expect(live.text()).toContain('Quick Actions'); // the grabbed page…
+    expect(live.text()).not.toContain('Performance'); // …NOT the one that shifted in
+  });
+
+  it('clears the grabbed ring when an inline rename starts on another row', async () => {
+    const wrapper = mount(AstrosRemotePageList, {
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { 'v-icon': true } },
+      props: { pages: PAGES_3, selectedIdx: 0 },
+    });
+    await handles(wrapper)[0]!.trigger('keydown', SPACE); // grab row 0 → ring
+    expect(rows(wrapper)[0]!.classes()).toContain('ring-2');
+
+    await rows(wrapper)[1]!.find('[data-testid="page-list-rename"]').trigger('click');
+
+    expect(rows(wrapper).some((r) => r.classes().includes('ring-2'))).toBe(false);
+  });
+
+  // The pointer-drag DOM mechanics (SortableJS) are manual-QA only, but the
+  // `onDragEnd` handler the library calls is pure component JS and is exercised
+  // here by emitting from the VueDraggable child directly.
+  const draggable = (w: ReturnType<typeof mountList>) => w.findComponent(VueDraggable);
+
+  it('@end emits reorder with the SortableJS old/new indices', async () => {
+    const wrapper = mountList();
+    await draggable(wrapper).vm.$emit('end', { oldIndex: 0, newIndex: 2 });
+
+    expect(wrapper.emitted('reorder')![0]).toEqual([{ fromIdx: 0, toIdx: 2 }]);
+  });
+
+  it('@end with oldIndex === newIndex does NOT emit (no-op drop)', async () => {
+    const wrapper = mountList();
+    await draggable(wrapper).vm.$emit('end', { oldIndex: 1, newIndex: 1 });
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+  });
+
+  it('@end with missing indices does NOT emit (defensive against a malformed event)', async () => {
+    const wrapper = mountList();
+    await draggable(wrapper).vm.$emit('end', {});
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
+  });
+
+  it('@end resets the visual order from props when the move is not applied (store-rejected)', async () => {
+    // SortableJS splices the v-model in place during the drag; if the parent
+    // never applies the reorder (store guard fails), @end must snap the list
+    // back to the authoritative prop order.
+    const wrapper = mountList();
+    // Simulate the library's in-place splice of the v-model.
+    await draggable(wrapper).vm.$emit('update:modelValue', [PAGES_3[1]!, PAGES_3[2]!, PAGES_3[0]!]);
+    // @end fires, but props.pages is unchanged (parent didn't apply the move).
+    await draggable(wrapper).vm.$emit('end', { oldIndex: 0, newIndex: 2 });
+    await wrapper.vm.$nextTick();
+
+    const names = wrapper.findAll('[data-testid="page-list-name"]').map((n) => n.text());
+    expect(names).toEqual(['Quick Actions', 'Performance', 'Songs']);
   });
 });

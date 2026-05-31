@@ -81,14 +81,17 @@ function reorderPages(fromIdx: number, toIdx: number) {
   renaming row → `pointer-events-none` + inert. Space/Enter/Arrow/Esc keydowns use
   `.prevent.stop` so they don't reach the row's existing `@keydown.enter/space.self`
   select handlers.
-- **Keyboard grab machine** (`grabIdx`/`grabbedId` refs, `onHandleKey(evt, idx)`):
+- **Keyboard grab machine** (`grabbedId`/`grabOriginIdx` refs; discrete handlers
+  `onHandleGrabToggle(idx)` / `onHandleMove(±1)` / `onHandleCancel()` bound to `@keydown.*`):
   idle + Space/Enter → grab (record idx + page id, announce); grabbed + ↑/↓ → emit
   `reorder` toward `currentIdx∓1` (re-find current pos by `grabbedId` since indices shift),
   announce; grabbed + Space/Enter → drop (clear state, announce); grabbed + Esc → emit
   `reorder` back to the original idx if moved, clear, announce. Guard: `if (renamingId.value
-  !== null) return;` at the top (no grab while renaming).
-- **Announcements:** `liveMessage` ref bound to a `sr-only` `role="status" aria-live="assertive"
-  aria-atomic` region; `announceReorder` clears then sets on `nextTick` so repeats (e.g.
+  !== null) return;` at the top (no grab while renaming); a `watch(renamingId)` also clears a
+  lingering grab when a rename starts.
+- **Announcements:** `liveMessage` ref bound to a `sr-only` `role="status" aria-live="polite"
+  aria-atomic` region (polite matches the app's other live regions; reorder feedback isn't
+  urgent enough to interrupt); `announce` clears then sets on `nextTick` so repeats (e.g.
   boundary bumps) re-announce. Handle carries `aria-label` (grab) + `aria-describedby` →
   visually-hidden instructions. Grabbed row gets a visual `ring-2 ring-primary`.
 - **Emit:** add `reorder: [payload: { fromIdx: number; toIdx: number }]` to `defineEmits`.
