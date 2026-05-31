@@ -29,7 +29,7 @@ import AstrosMobileRemote from '@/components/mobileRemote/mobileRemote/AstrosMob
 import AstrosMobileStatus from '@/components/mobileRemote/mobileStatus/AstrosMobileStatus.vue';
 import AstrosMobileTopBar from '@/components/mobileRemote/mobileTopBar/AstrosMobileTopBar.vue';
 import enUS from '@/locales/enUS.json';
-import { SCRIPTS_RUN, PLAYLISTS_RUN, PANIC_STOP } from '@/api/endpoints';
+import { SCRIPTS_RUN, PLAYLISTS_RUN, PANIC_STOP, PANIC_CLEAR } from '@/api/endpoints';
 
 const apiGet = apiService.get as ReturnType<typeof vi.fn>;
 const apiPost = apiService.post as ReturnType<typeof vi.fn>;
@@ -84,6 +84,23 @@ describe('MobileRemoteView', () => {
     wrapper.findComponent(AstrosMobileRemote).vm.$emit('panic');
     await flushPromises();
     expect(apiPost).toHaveBeenCalledWith(PANIC_STOP, {});
+  });
+
+  it('sends panic clear on the clear-panic event', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    wrapper.findComponent(AstrosMobileRemote).vm.$emit('clearPanic');
+    await flushPromises();
+    expect(apiPost).toHaveBeenCalledWith(PANIC_CLEAR, {});
+  });
+
+  it('shows an error toast when panic clear fails', async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    apiPost.mockRejectedValueOnce(new Error('server down'));
+    wrapper.findComponent(AstrosMobileRemote).vm.$emit('clearPanic');
+    await flushPromises();
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
   });
 
   it('toggles between the remote and status screens', async () => {
