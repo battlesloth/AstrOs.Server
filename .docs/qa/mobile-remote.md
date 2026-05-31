@@ -21,7 +21,7 @@ Live remote served to mobile clients with command sending. Desktop unchanged.
 9. Tap again → returns to the **Remote** screen.
 
 ## Status screen
-10. Status screen shows the droid image with dome/core/body coloring that matches the desktop Status view, plus a legend (Dome/Core/Body + Online / Needs sync / Firmware out of date / Offline) and a **Logout** button.
+10. Status screen shows the droid image (dome/core/body coloring matching the desktop Status view) and a **Logout** button. On short screens the droid scales down so the **Logout** button stays visible below it — no scrolling.
 
 11b. **Command failure feedback:** with the server unreachable, tap a button → an **error toast** appears (the optimistic "sent" toast is corrected by a failure toast); Stop All failure shows a longer error toast; a failed config load on entry shows a "Couldn't load the remote layout" toast.
 

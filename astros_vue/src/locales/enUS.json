@@ -450,20 +450,9 @@
     "command_failed": "Couldn't send \"{name}\" — check the connection.",
     "panic_failed": "Stop All failed to send — check the connection.",
     "config_load_failed": "Couldn't load the remote layout.",
-    "location": {
-      "dome": "Dome",
-      "core": "Core",
-      "body": "Body"
-    },
     "toggle_to_status_connected_aria": "Connected to server. Tap to view droid status.",
     "toggle_to_status_offline_aria": "Disconnected from server. Tap to view droid status.",
-    "toggle_to_remote_aria": "Tap to return to the remote.",
-    "location_status": {
-      "up": "Online",
-      "needsSynced": "Needs sync",
-      "firmwareIncompatible": "Firmware out of date",
-      "down": "Offline"
-    }
+    "toggle_to_remote_aria": "Tap to return to the remote."
   },
   "mobile_remote": {
     "region_label": "Mobile remote",
