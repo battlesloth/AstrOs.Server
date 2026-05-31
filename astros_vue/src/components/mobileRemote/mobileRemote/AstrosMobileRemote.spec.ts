@@ -58,6 +58,7 @@ function render(props: {
   connected?: boolean;
   navigable?: boolean;
   showTopBar?: boolean;
+  inPanicStop?: boolean;
 }) {
   return mount(AstrosMobileRemote, {
     props,
@@ -85,6 +86,34 @@ describe('AstrosMobileRemote', () => {
       showTopBar: false,
     });
     expect(wrapper.find('.astros-mobile-remote__top-bar').exists()).toBe(false);
+  });
+
+  it('morphs to Clear Panic and emits clearPanic on hold when inPanicStop', async () => {
+    const wrapper = render({
+      pages: [pageWith('p1', 'Greetings', scriptButton('script-wave', 'Wave Hello'))],
+      inPanicStop: true,
+    });
+    expect(wrapper.find('.astros-mobile-remote__panic').text()).toContain('Clear Panic');
+
+    await wrapper.find('.astros-mobile-remote__panic').trigger('mousedown');
+    vi.advanceTimersByTime(600);
+    await flushPromises();
+
+    expect(wrapper.emitted('clearPanic')).toHaveLength(1);
+    expect(wrapper.emitted('panic')).toBeUndefined();
+  });
+
+  it('emits panic (not clearPanic) on hold when not panicked', async () => {
+    const wrapper = render({
+      pages: [pageWith('p1', 'Greetings', scriptButton('script-wave', 'Wave Hello'))],
+    });
+
+    await wrapper.find('.astros-mobile-remote__panic').trigger('mousedown');
+    vi.advanceTimersByTime(600);
+    await flushPromises();
+
+    expect(wrapper.emitted('panic')).toHaveLength(1);
+    expect(wrapper.emitted('clearPanic')).toBeUndefined();
   });
 
   it('suppresses button presses while the panic gesture is in the active lockout', async () => {
