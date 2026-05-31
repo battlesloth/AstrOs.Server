@@ -38,8 +38,6 @@ const locations = [
     role="region"
     :aria-label="$t('mobile.status_heading')"
   >
-    <h2 class="astros-mobile-status__heading">{{ $t('mobile.status_heading') }}</h2>
-
     <div class="astros-mobile-status__droid">
       <AstrosStatus
         :body-status="bodyStatus"
@@ -88,13 +86,6 @@ const locations = [
   background: var(--mr-base-200, #f2f7fa);
   color: var(--mr-ink, #0e1726);
   font-family: 'Inter', system-ui, sans-serif;
-}
-
-.astros-mobile-status__heading {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
 }
 
 .astros-mobile-status__droid {
