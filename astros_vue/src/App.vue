@@ -5,10 +5,12 @@ import { useWebsocket } from './composables/useWebsocket';
 import AstrosToastContainer from './components/common/AstrosToastContainer.vue';
 import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useJobLockStore } from '@/stores/jobLock';
+import { usePanicStateStore } from '@/stores/panicState';
 
 const { wsConnect, wsDisconnect } = useWebsocket();
 const systemStatusStore = useSystemStatusStore();
 const jobLockStore = useJobLockStore();
+const panicStateStore = usePanicStateStore();
 
 onMounted(() => {
   // Belt-and-braces: WebSocket pushes initial state on connect, but until the
@@ -20,6 +22,7 @@ onMounted(() => {
   // state).
   systemStatusStore.fetchStatus();
   jobLockStore.fetchLockState();
+  panicStateStore.fetchPanicState();
   wsConnect();
 });
 

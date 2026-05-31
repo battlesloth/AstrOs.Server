@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { useWebsocket } from '../useWebsocket';
 import { useFirmwareStore } from '@/stores/firmware';
 import { useControllerStore } from '@/stores/controller';
+import { usePanicStateStore } from '@/stores/panicState';
 import { WebsocketMessageType, Location } from '@/enums';
 
 // Capture warn calls so individual tests can assert against them, while
@@ -641,5 +642,24 @@ describe('WebsocketMessageType wire-numeric pinning (cross-process contract)', (
     expect(WebsocketMessageType.FLASH_CONTROLLER_RESULT).toBe(14);
     expect(WebsocketMessageType.FLASH_JOB_DONE).toBe(15);
     expect(WebsocketMessageType.FLASH_JOB_FAILED).toBe(16);
+    expect(WebsocketMessageType.PANIC_STATE).toBe(17);
+  });
+});
+
+describe('useWebsocket handleMessage — panic state dispatcher', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('updates the panicState store from a PANIC_STATE frame', () => {
+    const { handleMessage } = useWebsocket();
+    const panic = usePanicStateStore();
+    expect(panic.inPanicStop).toBe(false);
+
+    handleMessage(JSON.stringify({ type: WebsocketMessageType.PANIC_STATE, inPanicStop: true }));
+    expect(panic.inPanicStop).toBe(true);
+
+    handleMessage(JSON.stringify({ type: WebsocketMessageType.PANIC_STATE, inPanicStop: false }));
+    expect(panic.inPanicStop).toBe(false);
   });
 });

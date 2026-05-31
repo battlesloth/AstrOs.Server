@@ -2,6 +2,7 @@ import { PlaylistType } from 'src/models/playlists/playlistType.js';
 import { ControllerLocation } from 'src/models/control_module/controller_location.js';
 import { AnimationQueuePlaylist, QueueTrack } from './queue_item/animation_queue_item.js';
 import { logger } from 'src/logger.js';
+import type { PanicState } from 'src/models/networking/panic_responses.js';
 
 export class AnimationQueue {
   inPanicStop = false;
@@ -11,6 +12,7 @@ export class AnimationQueue {
 
   private currentTimeout: ReturnType<typeof setTimeout> | null = null;
   private playlistReplaced = false;
+  private panicListeners = new Set<(state: PanicState) => void>();
 
   dispatchCallback: (id: string, locations: Array<ControllerLocation>) => void;
 
@@ -91,10 +93,37 @@ export class AnimationQueue {
     this.currentTrack = null;
     this.playlistReplaced = false;
     this.clearQueue();
+    this.notifyPanic();
   }
 
   clearPanicStop() {
     this.inPanicStop = false;
+    this.notifyPanic();
+  }
+
+  getPanicState(): PanicState {
+    return { inPanicStop: this.inPanicStop };
+  }
+
+  // Observable panic state — api_server subscribes to broadcast the change to
+  // WebSocket clients (and reads getPanicState() for the on-connect snapshot
+  // and the GET hydrate endpoint). Mirrors JobLock.subscribe.
+  subscribe(listener: (state: PanicState) => void): () => void {
+    this.panicListeners.add(listener);
+    return () => {
+      this.panicListeners.delete(listener);
+    };
+  }
+
+  private notifyPanic(): void {
+    const state = this.getPanicState();
+    for (const fn of this.panicListeners) {
+      try {
+        fn(state);
+      } catch (error) {
+        logger.error('Error in panic listener:', error);
+      }
+    }
   }
 
   startPlayingActivePlaylist() {

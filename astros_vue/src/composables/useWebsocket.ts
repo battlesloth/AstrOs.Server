@@ -4,6 +4,7 @@ import type {
   LocationStatus,
   ControllerSync,
   LockStateChanged,
+  PanicStateChanged,
   ScriptStatus,
   SystemStatusWsMessage,
 } from '@/models';
@@ -13,6 +14,7 @@ import { useScriptsStore } from '@/stores/scripts';
 import { useScripterStore } from '@/stores/scripter';
 import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useJobLockStore } from '@/stores/jobLock';
+import { usePanicStateStore } from '@/stores/panicState';
 import { useFirmwareStore } from '@/stores/firmware';
 import type { ControllerFlashState, FlashJobFailedData, FlashJobState } from '@/types/firmware';
 
@@ -122,6 +124,9 @@ export function useWebsocket() {
         break;
       case WebsocketMessageType.LOCK_STATE_CHANGED:
         handleLockStateChanged(parsedMessage);
+        break;
+      case WebsocketMessageType.PANIC_STATE:
+        handlePanicStateMessage(parsedMessage);
         break;
       case WebsocketMessageType.FLASH_JOB_STARTED:
         handleFlashJobStarted(parsedMessage);
@@ -251,6 +256,15 @@ export function useWebsocket() {
       });
     } catch (error) {
       console.error('Error handling system status message:', error);
+    }
+  }
+
+  function handlePanicStateMessage(message: BaseWsMessage) {
+    try {
+      const data = message as unknown as PanicStateChanged;
+      usePanicStateStore().setState({ inPanicStop: data.inPanicStop });
+    } catch (error) {
+      console.error('Error handling panic state message:', error);
     }
   }
 

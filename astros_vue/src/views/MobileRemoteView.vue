@@ -9,6 +9,7 @@ import { useWebsocket } from '@/composables/useWebsocket';
 import { useRemoteCommands } from '@/composables/useRemoteCommands';
 import { useControllerStore } from '@/stores/controller';
 import { useRemoteControlStore } from '@/stores/remoteControl';
+import { usePanicStateStore } from '@/stores/panicState';
 import AstrosMobileTopBar from '@/components/mobileRemote/mobileTopBar/AstrosMobileTopBar.vue';
 import AstrosMobileRemote from '@/components/mobileRemote/mobileRemote/AstrosMobileRemote.vue';
 import AstrosMobileStatus from '@/components/mobileRemote/mobileStatus/AstrosMobileStatus.vue';
@@ -25,6 +26,8 @@ const { domeStatus, coreStatus, bodyStatus } = storeToRefs(useControllerStore())
 
 const remoteStore = useRemoteControlStore();
 const { remoteControlPages } = storeToRefs(remoteStore);
+
+const { inPanicStop } = storeToRefs(usePanicStateStore());
 
 const screen = ref<MobileScreen>('remote');
 
@@ -64,6 +67,13 @@ async function onPanic() {
   }
 }
 
+async function onClearPanic() {
+  const result = await commands.panicClear();
+  if (!result.success) {
+    toast.error(t('mobile.clear_failed'));
+  }
+}
+
 function onLogout() {
   apiService.clearToken();
   router.push('/auth');
@@ -83,8 +93,10 @@ function onLogout() {
         v-if="screen === 'remote'"
         :pages="remoteControlPages"
         :show-top-bar="false"
+        :in-panic-stop="inPanicStop"
         @press="onPress"
         @panic="onPanic"
+        @clear-panic="onClearPanic"
       />
       <AstrosMobileStatus
         v-else
