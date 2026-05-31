@@ -559,4 +559,33 @@ describe('Animation Queue Tests', () => {
       expect(queue.activePlaylist).toBeNull();
     });
   });
+
+  describe('panic state observability', () => {
+    it('getPanicState reflects panicStop / clearPanicStop', () => {
+      const queue = new AnimationQueue(() => {});
+      expect(queue.getPanicState()).toEqual({ inPanicStop: false });
+      queue.panicStop();
+      expect(queue.getPanicState()).toEqual({ inPanicStop: true });
+      queue.clearPanicStop();
+      expect(queue.getPanicState()).toEqual({ inPanicStop: false });
+    });
+
+    it('notifies subscribers on panicStop and clearPanicStop', () => {
+      const queue = new AnimationQueue(() => {});
+      const seen: boolean[] = [];
+      queue.subscribe((s) => seen.push(s.inPanicStop));
+      queue.panicStop();
+      queue.clearPanicStop();
+      expect(seen).toEqual([true, false]);
+    });
+
+    it('unsubscribe stops notifications', () => {
+      const queue = new AnimationQueue(() => {});
+      const seen: boolean[] = [];
+      const off = queue.subscribe((s) => seen.push(s.inPanicStop));
+      off();
+      queue.panicStop();
+      expect(seen).toEqual([]);
+    });
+  });
 });
