@@ -2,7 +2,7 @@
 
 **Feature:** Direction B 3-pane editor (Phase 2d capstone)
 **Routes covered:** `/remote`
-**Last updated:** 2026-05-24
+**Last updated:** 2026-05-31
 
 ## Preconditions
 
@@ -77,9 +77,9 @@
 ### 8. Configuring buttons — script
 
 1. On a fresh empty card, click "Configure →".
-2. **Expected:** A popover opens anchored to the card; the editor is in the Script tab; the result list contains all available scripts plus a "None" row at top.
+2. **Expected:** A modal dialog opens, titled "Configure Button N"; the editor is in the Script tab; the result list contains all available scripts plus a "None" row at top.
 3. Click any script name.
-4. **Expected:** Popover closes; the card transitions to the assigned state (tinted blue background, BUTTON N label at top, script name middle, SCRIPT chip below); right-rail preview shows the same slot filled; the row's mini 3×3 preview in the page list also shows the corresponding dot in blue.
+4. **Expected:** Modal closes; the card transitions to the assigned state (tinted blue background, BUTTON N label at top, script name middle, SCRIPT chip below); right-rail preview shows the same slot filled; the row's mini 3×3 preview in the page list also shows the corresponding dot in blue.
 5. **Expected:** Unsaved badge visible; "actions" header count incremented by 1.
 
 ### 9. Configuring buttons — playlist
@@ -97,7 +97,7 @@
 ### 11. Editing an assigned button
 
 1. On an assigned card, click Edit.
-2. **Expected:** Popover opens with the editor in the tab matching the current assignment; the current selection is highlighted in the list (if the editor highlights selections).
+2. **Expected:** The modal opens with the editor in the tab matching the current assignment; the current selection is highlighted in the list (if the editor highlights selections).
 3. Pick a different item.
 4. **Expected:** Card reflects the new assignment.
 
@@ -105,13 +105,13 @@
 
 1. Open the editor on a card.
 2. Press Escape.
-3. **Expected:** Popover closes; card returns to its prior state.
+3. **Expected:** Modal closes; card returns to its prior state, with no change to the button.
 4. Open the editor again.
-5. Click outside the popover (on the page list, the preview, the header, the document).
-6. **Expected:** Popover closes.
+5. Click the modal backdrop (the dimmed area outside the modal box; it overlays the whole page, including the page list).
+6. **Expected:** Modal closes; the button is unchanged.
 7. Open the editor.
-8. Click the × close button inside the editor.
-9. **Expected:** Popover closes.
+8. Click the **Close** button in the modal footer.
+9. **Expected:** Modal closes; the button is unchanged.
 
 ### 13. Save success
 
