@@ -1019,32 +1019,39 @@ export class ApiServer {
       const locationRepo = new LocationsRepository(this.db);
       const scriptRepo = new ScriptRepository(this.db);
 
-      const locId = await locationRepo.getLocationNameByMac(val.controller.address);
+      // script_deployments.location_id is a FK to locations.id (a UUID), so the
+      // DB write/read below must use the location id. The WS
+      // ScriptResponse.locationId, by contrast, is the Location enum value
+      // ('body'|'core'|'dome') the frontend keys deploymentStatus by — i.e. the
+      // location *name*. Resolve both; using the name for the FK column throws
+      // "FOREIGN KEY constraint failed".
+      const locationId = await locationRepo.getLocationIdByControllerByMac(val.controller.address);
+      const locationName = await locationRepo.getLocationNameByMac(val.controller.address);
 
       if (val.success) {
         const now = new Date();
 
-        await scriptRepo.updateScriptControllerUploaded(val.scriptId, locId, now);
+        await scriptRepo.updateScriptControllerUploaded(val.scriptId, locationId, now);
 
         const update: ScriptResponse = {
           type: TransmissionType.script,
           success: true,
           message: '',
           scriptId: val.scriptId,
-          locationId: locId,
+          locationId: locationName,
           status: TransmissionStatus.success,
           date: now,
         };
 
         this.updateClients(update);
       } else {
-        const deployDate = await scriptRepo.getLastScriptUploadedDate(val.scriptId, locId);
+        const deployDate = await scriptRepo.getLastScriptUploadedDate(val.scriptId, locationId);
         const update: ScriptResponse = {
           type: TransmissionType.script,
           success: true,
           message: '',
           scriptId: val.scriptId,
-          locationId: locId,
+          locationId: locationName,
           status: TransmissionStatus.failed,
           date: deployDate,
         };
@@ -1141,6 +1148,7 @@ export class ApiServer {
 
     const playlistRepo = new PlaylistRepository(this.db);
     const locationsRepo = new LocationsRepository(this.db);
+    const scriptRepo = new ScriptRepository(this.db);
 
     try {
       const playlist = await playlistRepo.getPlaylist(id);
@@ -1152,7 +1160,16 @@ export class ApiServer {
       }
 
       const locations = await locationsRepo.loadLocations();
-      const queueItem = await convertPlaylistToQueueItem(playlist, playlistRepo, locations);
+      // Script tracks store duration_ds = 0 (no editor control), so feed the
+      // converter the scripts' recorded durations — otherwise the queue treats
+      // each script as instantaneous and a following Wait runs concurrently.
+      const scriptDurations = await scriptRepo.getScriptDurationsDS();
+      const queueItem = await convertPlaylistToQueueItem(
+        playlist,
+        playlistRepo,
+        scriptDurations,
+        locations,
+      );
       this.animationQueue.addToQueue(queueItem);
 
       res.status(200);

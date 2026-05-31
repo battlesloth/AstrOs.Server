@@ -33,6 +33,11 @@ function makeTrack(overrides: Partial<PlaylistTrack>): PlaylistTrack {
   };
 }
 
+// Script-duration lookup the converter now consumes (scriptId → durationDS).
+function durations(entries: Array<[string, number]> = []): Map<string, number> {
+  return new Map(entries);
+}
+
 function makeMockRepo(
   playlists: Map<string, Playlist> = new Map(),
   callLimit = 1000,
@@ -54,27 +59,52 @@ function makeMockRepo(
 }
 
 describe('Playlist Converter', () => {
-  it('should convert script tracks with durationDS to ms', async () => {
+  it('should source script-track duration from the referenced script, ignoring the track durationDS', async () => {
     const playlist: Playlist = {
       id: 'p1',
       playlistName: 'Test',
       description: '',
       playlistType: PlaylistType.Sequential,
       tracks: [
-        makeTrack({ idx: 0, durationDS: 50, trackId: 'script-1' }),
-        makeTrack({ idx: 1, durationDS: 30, trackId: 'script-2' }),
+        // durationDS is a decoy: playlist Script tracks store 0 (or stale)
+        // values, so the converter must use the script's recorded duration.
+        makeTrack({ idx: 0, durationDS: 999, trackId: 'script-1' }),
+        makeTrack({ idx: 1, durationDS: 999, trackId: 'script-2' }),
       ],
       settings: makeSettings(),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
+    const result = await convertPlaylistToQueueItem(
+      playlist,
+      makeMockRepo(),
+      durations([
+        ['script-1', 50],
+        ['script-2', 30],
+      ]),
+      [],
+    );
 
     expect(result.tracks).toHaveLength(2);
     expect(result.tracks[0]).toEqual({ id: 'script-1', duration: 5000, isWait: false });
     expect(result.tracks[1]).toEqual({ id: 'script-2', duration: 3000, isWait: false });
   });
 
-  it('should convert wait tracks with isWait=true', async () => {
+  it('should default script-track duration to 0 when the script is unknown', async () => {
+    const playlist: Playlist = {
+      id: 'p1',
+      playlistName: 'Test',
+      description: '',
+      playlistType: PlaylistType.Sequential,
+      tracks: [makeTrack({ idx: 0, durationDS: 999, trackId: 'ghost-script' })],
+      settings: makeSettings(),
+    };
+
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
+
+    expect(result.tracks[0]).toEqual({ id: 'ghost-script', duration: 0, isWait: false });
+  });
+
+  it('should convert wait tracks with isWait=true using the track durationDS', async () => {
     const playlist: Playlist = {
       id: 'p1',
       playlistName: 'Test',
@@ -84,13 +114,13 @@ describe('Playlist Converter', () => {
       settings: makeSettings(),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
 
     expect(result.tracks).toHaveLength(1);
     expect(result.tracks[0]).toEqual({ id: 'wait-1', duration: 2000, isWait: true });
   });
 
-  it('should randomize duration when randomWait is true', async () => {
+  it('should randomize wait duration when randomWait is true', async () => {
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValueOnce(0.5);
 
     const playlist: Playlist = {
@@ -111,7 +141,7 @@ describe('Playlist Converter', () => {
       settings: makeSettings(),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
 
     // min=1000ms, max=5000ms, random=0.5 → 1000 + floor(0.5 * 4001) = 1000 + 2000 = 3000
     expect(result.tracks[0]).toEqual({ id: 'wait-1', duration: 3000, isWait: true });
@@ -119,15 +149,15 @@ describe('Playlist Converter', () => {
     randomSpy.mockRestore();
   });
 
-  it('should resolve nested playlist tracks into QueueTrack[]', async () => {
+  it('should resolve nested playlist tracks into QueueTrack[] using script durations', async () => {
     const nestedPlaylist: Playlist = {
       id: 'nested-p',
       playlistName: 'Nested',
       description: '',
       playlistType: PlaylistType.Sequential,
       tracks: [
-        makeTrack({ idx: 0, trackId: 'sub-script-1', durationDS: 15 }),
-        makeTrack({ idx: 1, trackId: 'sub-script-2', durationDS: 25 }),
+        makeTrack({ idx: 0, trackId: 'sub-script-1', durationDS: 999 }),
+        makeTrack({ idx: 1, trackId: 'sub-script-2', durationDS: 999 }),
       ],
       settings: makeSettings(),
     };
@@ -140,13 +170,22 @@ describe('Playlist Converter', () => {
       description: '',
       playlistType: PlaylistType.Sequential,
       tracks: [
-        makeTrack({ idx: 0, trackId: 'script-1', durationDS: 10 }),
+        makeTrack({ idx: 0, trackId: 'script-1', durationDS: 999 }),
         makeTrack({ idx: 1, trackType: TrackType.Playlist, trackId: 'nested-p', durationDS: 0 }),
       ],
       settings: makeSettings(),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, repo, []);
+    const result = await convertPlaylistToQueueItem(
+      playlist,
+      repo,
+      durations([
+        ['script-1', 10],
+        ['sub-script-1', 15],
+        ['sub-script-2', 25],
+      ]),
+      [],
+    );
 
     expect(result.tracks).toHaveLength(2);
     // First track: regular script
@@ -169,8 +208,8 @@ describe('Playlist Converter', () => {
       description: '',
       playlistType: PlaylistType.Sequential,
       tracks: [
-        makeTrack({ idx: 0, trackId: 'e', durationDS: 10 }),
-        makeTrack({ idx: 1, trackId: 'f', durationDS: 10 }),
+        makeTrack({ idx: 0, trackId: 'e', durationDS: 999 }),
+        makeTrack({ idx: 1, trackId: 'f', durationDS: 999 }),
       ],
       settings: makeSettings(),
     };
@@ -181,10 +220,10 @@ describe('Playlist Converter', () => {
       description: '',
       playlistType: PlaylistType.Sequential,
       tracks: [
-        makeTrack({ idx: 0, trackId: 'b', durationDS: 10 }),
-        makeTrack({ idx: 1, trackId: 'c', durationDS: 10 }),
+        makeTrack({ idx: 0, trackId: 'b', durationDS: 999 }),
+        makeTrack({ idx: 1, trackId: 'c', durationDS: 999 }),
         makeTrack({ idx: 2, trackType: TrackType.Playlist, trackId: 'deep-p', durationDS: 0 }),
-        makeTrack({ idx: 3, trackId: 'g', durationDS: 10 }),
+        makeTrack({ idx: 3, trackId: 'g', durationDS: 999 }),
       ],
       settings: makeSettings(),
     };
@@ -202,14 +241,22 @@ describe('Playlist Converter', () => {
       description: '',
       playlistType: PlaylistType.Sequential,
       tracks: [
-        makeTrack({ idx: 0, trackId: 'a', durationDS: 10 }),
+        makeTrack({ idx: 0, trackId: 'a', durationDS: 999 }),
         makeTrack({ idx: 1, trackType: TrackType.Playlist, trackId: 'mid-p', durationDS: 0 }),
-        makeTrack({ idx: 2, trackId: 'h', durationDS: 10 }),
+        makeTrack({ idx: 2, trackId: 'h', durationDS: 999 }),
       ],
       settings: makeSettings(),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, repo, []);
+    const result = await convertPlaylistToQueueItem(
+      playlist,
+      repo,
+      durations([
+        ['a', 10],
+        ['h', 10],
+      ]),
+      [],
+    );
 
     expect(result.tracks).toHaveLength(3);
     // track 0: script 'a'
@@ -234,7 +281,7 @@ describe('Playlist Converter', () => {
       settings: makeSettings(),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, repo, []);
+    const result = await convertPlaylistToQueueItem(playlist, repo, durations(), []);
 
     expect(result.tracks).toHaveLength(0);
   });
@@ -249,7 +296,7 @@ describe('Playlist Converter', () => {
       settings: makeSettings({ repeat: true, repeatCount: 3 }),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
     expect(result.repeatsLeft).toBe(3);
   });
 
@@ -263,7 +310,7 @@ describe('Playlist Converter', () => {
       settings: makeSettings({ repeat: true, repeatCount: 0 }),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
     expect(result.repeatsLeft).toBe(-1);
   });
 
@@ -277,7 +324,7 @@ describe('Playlist Converter', () => {
       settings: makeSettings({ repeat: false }),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
     expect(result.repeatsLeft).toBe(0);
   });
 
@@ -291,7 +338,7 @@ describe('Playlist Converter', () => {
       settings: makeSettings({ randomDelay: true, delayMin: 10, delayMax: 50 }),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
     expect(result.shuffleWaitMin).toBe(1000);
     expect(result.shuffleWaitMax).toBe(5000);
   });
@@ -306,7 +353,7 @@ describe('Playlist Converter', () => {
       settings: makeSettings(),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
     expect(result.playlistType).toBe(PlaylistType.ShuffleWithDelayAndRepeat);
   });
 
@@ -320,7 +367,7 @@ describe('Playlist Converter', () => {
       settings: makeSettings(),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), []);
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
     expect(result.tracksRemaining).toEqual([]);
   });
 
@@ -344,9 +391,9 @@ describe('Playlist Converter', () => {
 
       const repo = makeMockRepo(new Map([['p1', selfReferencing]]));
 
-      await expect(convertPlaylistToQueueItem(selfReferencing, repo, [])).rejects.toThrow(
-        PlaylistCycleError,
-      );
+      await expect(
+        convertPlaylistToQueueItem(selfReferencing, repo, durations(), []),
+      ).rejects.toThrow(PlaylistCycleError);
     });
 
     it('should throw PlaylistCycleError on transitive cycle A → B → A', async () => {
@@ -388,7 +435,7 @@ describe('Playlist Converter', () => {
         ]),
       );
 
-      await expect(convertPlaylistToQueueItem(playlistA, repo, [])).rejects.toThrow(
+      await expect(convertPlaylistToQueueItem(playlistA, repo, durations(), [])).rejects.toThrow(
         PlaylistCycleError,
       );
     });
@@ -427,7 +474,7 @@ describe('Playlist Converter', () => {
 
       const repo = makeMockRepo(new Map([['shared', sharedSub]]));
 
-      const result = await convertPlaylistToQueueItem(parent, repo, []);
+      const result = await convertPlaylistToQueueItem(parent, repo, durations(), []);
 
       // Both sibling references to 'shared' should flatten successfully
       expect(result.tracks).toHaveLength(2);
