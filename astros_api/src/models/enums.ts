@@ -103,6 +103,7 @@ export enum TransmissionType {
   flashControllerResult = 14,
   flashJobDone = 15,
   flashJobFailed = 16,
+  panicState = 17,
 }
 
 export enum TransmissionStatus {
