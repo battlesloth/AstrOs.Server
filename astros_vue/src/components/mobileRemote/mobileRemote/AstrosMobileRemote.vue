@@ -815,8 +815,10 @@ const stopAllLabel = computed(() => {
 }
 
 /* Clear-Panic mode: recolor away from danger red to the primary so it reads as
-   "recover / re-enable", not "stop". Wins over the base red (later source
-   order) and over --active (two-class specificity) when both are present. */
+   "recover / re-enable", not "stop". The plain --clear rule wins over the base
+   red by source order (same single-class specificity). When the button is ALSO
+   mid-hold (--active), the dedicated two-class rule below
+   (.__panic--clear.__panic--active) wins on specificity and supplies hover-blue. */
 .astros-mobile-remote__panic--clear {
   background: var(--mr-primary, #2a5a97);
   box-shadow:

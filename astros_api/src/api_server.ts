@@ -589,8 +589,10 @@ export class ApiServer {
     });
 
     // Hydrate endpoint so a client learns the current panic state on
-    // load/refresh before the WS on-connect snapshot arrives.
-    this.router.get('/panicState', this.authHandler, (req: any, res: any) => {
+    // load/refresh before the WS on-connect snapshot arrives. Unauthenticated,
+    // mirroring the sibling state-read GETs (/system/status, /firmware/lock-state)
+    // — a non-sensitive boolean, and the on-mount fetch may run pre-login.
+    this.router.get('/panicState', (req: any, res: any) => {
       res.status(200).json(this.animationQueue.getPanicState());
     });
 

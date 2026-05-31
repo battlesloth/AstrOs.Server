@@ -587,5 +587,21 @@ describe('Animation Queue Tests', () => {
       queue.panicStop();
       expect(seen).toEqual([]);
     });
+
+    it('a throwing subscriber does not stop other subscribers or block the state change', () => {
+      // The per-listener try/catch in notifyPanic is load-bearing: if it were
+      // moved outside the loop, one bad WS-broadcast subscriber would silently
+      // drop panic notifications to every other client. Reverting that guard
+      // makes this fail (mutation-test the defensive feature).
+      const queue = new AnimationQueue(() => {});
+      const seen: boolean[] = [];
+      queue.subscribe(() => {
+        throw new Error('boom');
+      });
+      queue.subscribe((s) => seen.push(s.inPanicStop));
+      queue.panicStop();
+      expect(seen).toEqual([true]); // second listener still ran
+      expect(queue.getPanicState()).toEqual({ inPanicStop: true }); // state still set
+    });
   });
 });

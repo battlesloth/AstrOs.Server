@@ -4,6 +4,7 @@ import type {
   LocationStatus,
   ControllerSync,
   LockStateChanged,
+  PanicStateChanged,
   ScriptStatus,
   SystemStatusWsMessage,
 } from '@/models';
@@ -260,7 +261,7 @@ export function useWebsocket() {
 
   function handlePanicStateMessage(message: BaseWsMessage) {
     try {
-      const data = message as unknown as { inPanicStop: boolean };
+      const data = message as unknown as PanicStateChanged;
       usePanicStateStore().setState({ inPanicStop: data.inPanicStop });
     } catch (error) {
       console.error('Error handling panic state message:', error);

@@ -12,7 +12,7 @@ Clients can clear a server panic-stop and always know the current panic state (o
 2. Hold the **Clear Panic** button (~600ms) → API logs the clear; the button morphs back to red **Stop All**.
 
 ## Real-time cross-client sync
-3. With the desktop on the Status page, trigger panic from mobile → within a moment the desktop shows the **"panic stop"** hint + a **Clear Panic Stop** button under the droid (no refresh).
+3. With the desktop on the Status page, trigger panic from mobile → within a moment the desktop shows the panic-stop hint ("The droid is in panic stop — control is disabled until cleared.") + a **Clear Panic Stop** button under the droid (no refresh).
 4. Click **Clear Panic Stop** on desktop → the mobile button morphs back to **Stop All** live (no refresh).
 5. Open a second mobile/desktop client while panicked → it shows the panicked state immediately (WS on-connect snapshot).
 

@@ -642,6 +642,7 @@ describe('WebsocketMessageType wire-numeric pinning (cross-process contract)', (
     expect(WebsocketMessageType.FLASH_CONTROLLER_RESULT).toBe(14);
     expect(WebsocketMessageType.FLASH_JOB_DONE).toBe(15);
     expect(WebsocketMessageType.FLASH_JOB_FAILED).toBe(16);
+    expect(WebsocketMessageType.PANIC_STATE).toBe(17);
   });
 });
 
