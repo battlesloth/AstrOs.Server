@@ -8,17 +8,17 @@ Serve the live remote on mobile and have it send commands. Desktop unchanged. On
 
 ## Tasks
 
-- [ ] `utils/isMobileClient.ts` (+ spec) — pure `isMobileClient()` = mobile-UA OR `innerWidth < 768`. TDD.
-- [ ] `api/endpoints.ts` — add `PANIC_STOP = 'api/panicStop'`.
-- [ ] `composables/useRemoteCommands.ts` (+ spec) — `runScript`/`runPlaylist` (delegate to existing stores), `panicStop()` → `apiService.post(PANIC_STOP)`. TDD.
-- [ ] `router/index.ts` — add `/mobile` route (no `AstrosLayout`); `beforeEach` redirect: mobile + path∉{/mobile,/auth} → `/mobile`; desktop + `/mobile` → `/`. Test the redirect logic.
-- [ ] `AstrosMobileRemote.vue` — add `showTopBar` prop (default true); wrap internal top bar in `v-if`. Add spec case.
-- [ ] `components/mobileRemote/mobileTopBar/AstrosMobileTopBar.vue` (+ stories, spec) — wordmark + color-coded toggle button; props `connected`, `screen`; emits `toggle`. frontend-design.
-- [ ] `components/mobileRemote/mobileStatus/AstrosMobileStatus.vue` (+ stories) — mobile-styled panel reusing `AstrosStatus`; logout button (emits `logout`). frontend-design.
-- [ ] `views/MobileRemoteView.vue` (+ spec) — shell: screen state, load pages, read `wsIsConnected` + controller statuses, wire `@press`/`@panic`/`@logout`. frontend-design.
-- [ ] `locales/enUS.json` — `mobile.*` keys.
-- [ ] QA plan `.docs/qa/mobile-remote.md`.
-- [ ] Verify: `npm run test:unit`, `npm run build`; manual e2e per design doc. Pre-push `/pr-review-toolkit:review-pr`.
+- [x] `utils/isMobileClient.ts` (+ spec) — pure `isMobileClient()` = mobile-UA OR `innerWidth < 768`. TDD.
+- [x] `api/endpoints.ts` — add `PANIC_STOP = 'api/panicStop'`.
+- [x] `composables/useRemoteCommands.ts` (+ spec) — `runScript`/`runPlaylist` (delegate to existing stores), `panicStop()` → `apiService.post(PANIC_STOP)`. TDD.
+- [x] `router/index.ts` — add `/mobile` route (no `AstrosLayout`); `beforeEach` redirect: mobile + path∉{/mobile,/auth} → `/mobile`; desktop + `/mobile` → `/`. Test the redirect logic.
+- [x] `AstrosMobileRemote.vue` — add `showTopBar` prop (default true); wrap internal top bar in `v-if`. Add spec case.
+- [x] `components/mobileRemote/mobileTopBar/AstrosMobileTopBar.vue` (+ stories, spec) — wordmark + color-coded toggle button; props `connected`, `screen`; emits `toggle`. frontend-design.
+- [x] `components/mobileRemote/mobileStatus/AstrosMobileStatus.vue` (+ stories) — mobile-styled panel reusing `AstrosStatus`; logout button (emits `logout`). frontend-design.
+- [x] `views/MobileRemoteView.vue` (+ spec) — shell: screen state, load pages, read `wsIsConnected` + controller statuses, wire `@press`/`@panic`/`@logout`. frontend-design.
+- [x] `locales/enUS.json` — `mobile.*` keys.
+- [x] QA plan `.docs/qa/mobile-remote.md`.
+- [x] Verify: `npm run test:unit`, `npm run build`; manual e2e per design doc. Pre-push `/pr-review-toolkit:review-pr`.
 
 ## Notes
 - Reuse: `useScriptsStore().runScript`, `usePlaylistsStore().runPlaylist`, `useWebsocket().wsIsConnected`, `AstrosStatus`, `useControllerStore()` statuses, `useRemoteControlStore().loadRemoteControl()`, logout pattern from `AstrosLayout.vue:32`.

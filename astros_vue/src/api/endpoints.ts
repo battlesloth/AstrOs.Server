@@ -24,6 +24,9 @@ export const PLAYLISTS_ALL = 'api/playlists/all';
 export const PLAYLISTS_COPY = 'api/playlists/copy';
 export const PLAYLISTS_RUN = 'api/playlists/run';
 
+// Stop-all / emergency stop. Backend route: POST /panicStop (api_server.ts).
+export const PANIC_STOP = 'api/panicStop';
+
 export const REMOTE_CONFIG = 'api/remoteConfig';
 
 export const SYSTEM_STATUS = 'api/system/status';

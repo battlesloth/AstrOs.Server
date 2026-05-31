@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import StatusView from '../views/StatusView.vue';
 import api from '@/api/apiService';
 import { CHECK_SESSION } from '@/api/endpoints';
+import { mobileRouteRedirect } from './mobileRouteRedirect';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -47,6 +48,13 @@ const router = createRouter({
       component: () => import('../views/RemoteControlConfigView.vue'),
     },
     {
+      // Chrome-less full-screen live remote for mobile clients. The guard
+      // routes mobile browsers here and confines them to it (Remote + Status).
+      path: '/mobile',
+      name: 'mobile',
+      component: () => import('../views/MobileRemoteView.vue'),
+    },
+    {
       path: '/modules',
       name: 'modules',
       component: () => import('../views/ModulesView.vue'),
@@ -85,7 +93,9 @@ router.beforeEach(async (to, from, next) => {
 
     // Skip the API round-trip if we recently verified the session
     if (Date.now() - lastSessionCheckAt < SESSION_CHECK_TTL_MS) {
-      next();
+      const dest = mobileRouteRedirect(to);
+      if (dest) next(dest);
+      else next();
       return;
     }
 
@@ -95,7 +105,9 @@ router.beforeEach(async (to, from, next) => {
       console.log('Session check response:', response);
       if (response.isAuthenticated) {
         lastSessionCheckAt = Date.now();
-        next();
+        const dest = mobileRouteRedirect(to);
+        if (dest) next(dest);
+        else next();
       } else {
         lastSessionCheckAt = 0;
         next('/auth');
