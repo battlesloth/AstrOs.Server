@@ -14,16 +14,16 @@ const SAMPLE_PLAYLISTS = [
   { id: 'p3', name: 'Quick Demo' },
 ];
 
-// Wrap each story in a popover-shaped container so it reads how it would
-// when anchored over a button card.
-const popoverWrapper = `
+// Wrap each story in a modal-box-shaped container so it reads how it appears
+// inside AstrosRemoteButtonEditorModal (the editor renders in the app's
+// standard modal-box now, not an anchored popover).
+const modalBoxWrapper = `
   <div style="
-    width: 260px;
-    border: 2px solid #2a5a97;
-    border-radius: 14px;
-    padding: 12px;
+    width: 320px;
+    border-radius: 16px;
+    padding: 24px;
     background: #fff;
-    box-shadow: 0 6px 24px rgba(42,90,151,0.18);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
   ">
     <AstrosRemoteButtonEditor
       v-bind="args"
@@ -39,7 +39,7 @@ const meta: Meta<typeof AstrosRemoteButtonEditor> = {
   render: (args) => ({
     components: { AstrosRemoteButtonEditor },
     setup: () => ({ args }),
-    template: popoverWrapper,
+    template: modalBoxWrapper,
   }),
 };
 export default meta;
@@ -52,7 +52,6 @@ const PLAYLIST_ASSIGNED: PageButton = { id: 'p1', name: 'Morning Routine', type:
 
 export const EmptyButtonOpensOnScripts: Story = {
   args: {
-    buttonNumber: 5,
     currentValue: NONE,
     scripts: SAMPLE_SCRIPTS,
     playlists: SAMPLE_PLAYLISTS,
@@ -61,7 +60,6 @@ export const EmptyButtonOpensOnScripts: Story = {
 
 export const AssignedScriptOpensOnScripts: Story = {
   args: {
-    buttonNumber: 5,
     currentValue: SCRIPT_ASSIGNED,
     scripts: SAMPLE_SCRIPTS,
     playlists: SAMPLE_PLAYLISTS,
@@ -70,7 +68,6 @@ export const AssignedScriptOpensOnScripts: Story = {
 
 export const AssignedPlaylistOpensOnPlaylists: Story = {
   args: {
-    buttonNumber: 5,
     currentValue: PLAYLIST_ASSIGNED,
     scripts: SAMPLE_SCRIPTS,
     playlists: SAMPLE_PLAYLISTS,
@@ -79,7 +76,6 @@ export const AssignedPlaylistOpensOnPlaylists: Story = {
 
 export const EmptyScriptList: Story = {
   args: {
-    buttonNumber: 5,
     currentValue: NONE,
     scripts: [],
     playlists: SAMPLE_PLAYLISTS,
@@ -88,7 +84,6 @@ export const EmptyScriptList: Story = {
 
 export const LongName: Story = {
   args: {
-    buttonNumber: 5,
     currentValue: NONE,
     scripts: [
       { id: 's-long', name: 'This Is A Really Long Script Name That Should Truncate' },

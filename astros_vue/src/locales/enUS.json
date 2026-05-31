@@ -580,8 +580,7 @@
       "type_playlist": "PLAYLIST"
     },
     "editor": {
-      "header": "BTN {n} · EDITING",
-      "close": "Close",
+      "title": "Configure Button {n}",
       "tab_script": "Scripts",
       "tab_playlist": "Playlists",
       "search_placeholder": "Search…",
