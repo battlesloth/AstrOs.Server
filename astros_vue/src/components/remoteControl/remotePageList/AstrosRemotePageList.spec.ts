@@ -739,9 +739,16 @@ describe('AstrosRemotePageList — drag handle + keyboard reorder', () => {
 
     await wrapper.setProps({ pages: [PAGES_3[1]!, PAGES_3[0]!, PAGES_3[2]!] }); // [B,A,C]; A now idx 1
     await handles(wrapper)[1]!.trigger('keydown', ESC); // cancel → back to origin 0
+    await flushPromises();
 
     expect(wrapper.emitted('reorder')).toHaveLength(2);
     expect(wrapper.emitted('reorder')![1]).toEqual([{ fromIdx: 1, toIdx: 0 }]);
+    // Announce names the page and its RESTORED (origin) position, not the
+    // position it was dragged to.
+    const live = wrapper.get('[data-testid="page-list-live"]');
+    expect(live.text()).toContain('cancelled');
+    expect(live.text()).toContain('Quick Actions');
+    expect(live.text()).toContain('position 1 of 3');
   });
 
   it('marks the grabbed row with a ring and clears it on drop (Space)', async () => {
@@ -750,7 +757,13 @@ describe('AstrosRemotePageList — drag handle + keyboard reorder', () => {
     expect(rows(wrapper)[0]!.classes()).toContain('ring-2');
 
     await handles(wrapper)[0]!.trigger('keydown', SPACE); // drop
+    await flushPromises();
     expect(rows(wrapper)[0]!.classes()).not.toContain('ring-2');
+    // Drop announces the page at its resting position.
+    const live = wrapper.get('[data-testid="page-list-live"]');
+    expect(live.text()).toContain('Dropped');
+    expect(live.text()).toContain('Quick Actions');
+    expect(live.text()).toContain('position 1 of 3');
   });
 
   it('Enter grabs and a second Enter drops (clears the ring)', async () => {
@@ -833,6 +846,7 @@ describe('AstrosRemotePageList — drag handle + keyboard reorder', () => {
     const live = wrapper.get('[data-testid="page-list-live"]');
     expect(live.text()).toContain('Quick Actions'); // the grabbed page…
     expect(live.text()).not.toContain('Performance'); // …NOT the one that shifted in
+    expect(live.text()).toContain('position 2 of 3'); // the new 1-based position
   });
 
   it('clears the grabbed ring when an inline rename starts on another row', async () => {
@@ -846,6 +860,21 @@ describe('AstrosRemotePageList — drag handle + keyboard reorder', () => {
 
     await rows(wrapper)[1]!.find('[data-testid="page-list-rename"]').trigger('click');
 
+    expect(rows(wrapper).some((r) => r.classes().includes('ring-2'))).toBe(false);
+  });
+
+  it('ends the grab silently when the grabbed page is removed mid-grab', async () => {
+    // Parent removes the grabbed page (e.g. a concurrent delete/sync). An arrow
+    // press must not emit a reorder against the vanished id, and no row may
+    // keep the grabbed ring.
+    const wrapper = mountList();
+    await handles(wrapper)[1]!.trigger('keydown', SPACE); // grab B (id 'b')
+    expect(rows(wrapper)[1]!.classes()).toContain('ring-2');
+
+    await wrapper.setProps({ pages: [PAGES_3[0]!, PAGES_3[2]!] }); // B removed → [A, C]
+    await handles(wrapper)[0]!.trigger('keydown', DOWN); // arrow while grabbed page is gone
+
+    expect(wrapper.emitted('reorder')).toBeUndefined();
     expect(rows(wrapper).some((r) => r.classes().includes('ring-2'))).toBe(false);
   });
 
