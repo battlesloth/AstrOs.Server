@@ -120,6 +120,8 @@ describe('MobileRemoteView', () => {
     wrapper.findComponent(AstrosMobileRemote).vm.$emit('panic');
     await flushPromises();
     expect(toastErrorMock).toHaveBeenCalledTimes(1);
+    // The e-stop failure toast is intentionally longer-lived than the default.
+    expect(toastErrorMock).toHaveBeenCalledWith(expect.any(String), 6000);
   });
 
   it('shows an error toast when the remote config fails to load', async () => {

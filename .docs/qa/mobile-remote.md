@@ -36,5 +36,5 @@ Live remote served to mobile clients with command sending. Desktop unchanged.
 
 ## Edge cases
 - No saved config (fresh DB): Remote screen shows a default page / "no pages" empty state, no crash.
-- Disconnected server: button red; pressing a button still attempts the call (fire-and-forget) — no UI lockup.
+- Disconnected server: button red; pressing a button still attempts the call and surfaces an error toast on failure (see 11b) — no UI lockup.
 - Rotate device / resize while on `/mobile`: layout stays full-screen and usable (uses `dvh`).
