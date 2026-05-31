@@ -138,7 +138,8 @@ grid; Save → reload → order persists; touch (device or emulation).
       keyboard machine, live region → green.
 - [x] 7. View: `onReorderPage` + `@reorder`; update view spec stub + forwarding test → green.
 - [x] 8. Pre-commit gate (prettier/lint/build/vitest) + code review; commit.
-- [ ] 9. QA plan file + manual QA.
+- [x] 9a. QA plan file `.docs/qa/remote-page-reorder.md` written + committed.
+- [ ] 9b. Manual QA (pointer drag / touch / screen-reader) — Jeff's hands-on review pass.
 - [ ] 10. Pre-push toolkit review; address; push + PR `--base develop`.
 
 ## Out of scope
