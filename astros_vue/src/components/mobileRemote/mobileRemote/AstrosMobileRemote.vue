@@ -41,6 +41,15 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  // When false the component renders without its own top bar (wordmark +
+  // connection chip). The standalone mobile shell (MobileRemoteView) provides a
+  // shared top bar with a connection/navigation toggle button instead, so the
+  // embedded grid must not draw a second one. Defaults true so the editor's
+  // live preview and Storybook keep the full chrome.
+  showTopBar: {
+    type: Boolean,
+    default: true,
+  },
 });
 
 const emit = defineEmits<{
@@ -233,7 +242,10 @@ const stopAllLabel = computed(() => {
     :aria-label="$t('mobile_remote.region_label')"
   >
     <!-- Top bar -->
-    <div class="astros-mobile-remote__top-bar">
+    <div
+      v-if="showTopBar"
+      class="astros-mobile-remote__top-bar"
+    >
       <span
         class="astros-mobile-remote__wordmark font-starwars"
         :aria-label="$t('astros')"

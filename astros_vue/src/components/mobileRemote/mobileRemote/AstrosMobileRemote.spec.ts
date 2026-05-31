@@ -57,6 +57,7 @@ function render(props: {
   compact?: boolean;
   connected?: boolean;
   navigable?: boolean;
+  showTopBar?: boolean;
 }) {
   return mount(AstrosMobileRemote, {
     props,
@@ -71,6 +72,21 @@ function render(props: {
 }
 
 describe('AstrosMobileRemote', () => {
+  it('renders its own top bar by default', () => {
+    const wrapper = render({
+      pages: [pageWith('p1', 'Greetings', scriptButton('script-wave', 'Wave Hello'))],
+    });
+    expect(wrapper.find('.astros-mobile-remote__top-bar').exists()).toBe(true);
+  });
+
+  it('suppresses its top bar when showTopBar is false (shell provides one)', () => {
+    const wrapper = render({
+      pages: [pageWith('p1', 'Greetings', scriptButton('script-wave', 'Wave Hello'))],
+      showTopBar: false,
+    });
+    expect(wrapper.find('.astros-mobile-remote__top-bar').exists()).toBe(false);
+  });
+
   it('suppresses button presses while the panic gesture is in the active lockout', async () => {
     // Safety contract: once STOP ALL fires, normal button presses must NOT
     // emit during the 2.2s cooldown. A regression that flips the guard

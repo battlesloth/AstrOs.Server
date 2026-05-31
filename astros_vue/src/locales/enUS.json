@@ -442,6 +442,18 @@
       "down": "{location} disconnected"
     }
   },
+  "mobile": {
+    "connected": "Connected",
+    "offline": "Offline",
+    "remote": "Remote",
+    "status_heading": "Droid Status",
+    "command_failed": "Couldn't send \"{name}\" — check the connection.",
+    "panic_failed": "Stop All failed to send — check the connection.",
+    "config_load_failed": "Couldn't load the remote layout.",
+    "toggle_to_status_connected_aria": "Connected to server. Tap to view droid status.",
+    "toggle_to_status_offline_aria": "Disconnected from server. Tap to view droid status.",
+    "toggle_to_remote_aria": "Tap to return to the remote."
+  },
   "mobile_remote": {
     "region_label": "Mobile remote",
     "connected_label": "Connected",
