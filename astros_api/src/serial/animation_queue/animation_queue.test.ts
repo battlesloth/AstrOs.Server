@@ -562,7 +562,7 @@ describe('Animation Queue Tests', () => {
 
   describe('panic state observability', () => {
     it('getPanicState reflects panicStop / clearPanicStop', () => {
-      const queue = new AnimationQueue(() => {});
+      const queue = new AnimationQueue(vi.fn());
       expect(queue.getPanicState()).toEqual({ inPanicStop: false });
       queue.panicStop();
       expect(queue.getPanicState()).toEqual({ inPanicStop: true });
@@ -571,7 +571,7 @@ describe('Animation Queue Tests', () => {
     });
 
     it('notifies subscribers on panicStop and clearPanicStop', () => {
-      const queue = new AnimationQueue(() => {});
+      const queue = new AnimationQueue(vi.fn());
       const seen: boolean[] = [];
       queue.subscribe((s) => seen.push(s.inPanicStop));
       queue.panicStop();
@@ -580,7 +580,7 @@ describe('Animation Queue Tests', () => {
     });
 
     it('unsubscribe stops notifications', () => {
-      const queue = new AnimationQueue(() => {});
+      const queue = new AnimationQueue(vi.fn());
       const seen: boolean[] = [];
       const off = queue.subscribe((s) => seen.push(s.inPanicStop));
       off();
@@ -593,7 +593,7 @@ describe('Animation Queue Tests', () => {
       // moved outside the loop, one bad WS-broadcast subscriber would silently
       // drop panic notifications to every other client. Reverting that guard
       // makes this fail (mutation-test the defensive feature).
-      const queue = new AnimationQueue(() => {});
+      const queue = new AnimationQueue(vi.fn());
       const seen: boolean[] = [];
       queue.subscribe(() => {
         throw new Error('boom');
