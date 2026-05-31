@@ -1148,6 +1148,7 @@ export class ApiServer {
 
     const playlistRepo = new PlaylistRepository(this.db);
     const locationsRepo = new LocationsRepository(this.db);
+    const scriptRepo = new ScriptRepository(this.db);
 
     try {
       const playlist = await playlistRepo.getPlaylist(id);
@@ -1159,7 +1160,16 @@ export class ApiServer {
       }
 
       const locations = await locationsRepo.loadLocations();
-      const queueItem = await convertPlaylistToQueueItem(playlist, playlistRepo, locations);
+      // Script tracks store duration_ds = 0 (no editor control), so feed the
+      // converter the scripts' recorded durations — otherwise the queue treats
+      // each script as instantaneous and a following Wait runs concurrently.
+      const scriptDurations = await scriptRepo.getScriptDurationsDS();
+      const queueItem = await convertPlaylistToQueueItem(
+        playlist,
+        playlistRepo,
+        scriptDurations,
+        locations,
+      );
       this.animationQueue.addToQueue(queueItem);
 
       res.status(200);

@@ -12,10 +12,10 @@ Resolve the referenced script's recorded duration when building the queue and us
 
 ## Tasks
 
-- [ ] `ScriptRepository.getScriptDurationsDS(): Promise<Map<string, number>>` — single `SELECT id, duration_ds FROM scripts`. Test-first.
-- [ ] Thread `scriptDurations: Map<string, number>` through `convertPlaylistToQueueItem` → `convertScriptTrack` / `flattenPlaylistTrack`. Script tracks use `dsToMs(scriptDurations.get(trackId) ?? 0)`; Wait tracks unchanged. Test-first: rewrite existing converter script-duration tests to the new contract; add missing-script→0 and nested-script cases.
-- [ ] Wire `runPlaylist` (api_server.ts) to build the map via the repo and pass it to the converter.
-- [ ] Verify: full API build + tests; pre-push/pre-commit review; commit on `feature/regression_testing`.
+- [x] `ScriptRepository.getScriptDurationsDS(): Promise<Map<string, number>>` — single `SELECT id, duration_ds FROM scripts`. Test-first.
+- [x] Thread `scriptDurations: Map<string, number>` through `convertPlaylistToQueueItem` → `convertScriptTrack` / `flattenPlaylistTrack`. Script tracks use `dsToMs(scriptDurations.get(trackId) ?? 0)`; Wait tracks unchanged. Test-first: rewrite existing converter script-duration tests to the new contract; add missing-script→0 and nested-script cases.
+- [x] Wire `runPlaylist` (api_server.ts) to build the map via the repo and pass it to the converter.
+- [x] Verify: full API build + tests (tsc 0, 861 tests pass); pre-commit review; commit on `feature/regression_testing`.
 
 ## Notes
 

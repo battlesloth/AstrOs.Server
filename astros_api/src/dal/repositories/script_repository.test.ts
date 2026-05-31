@@ -1000,4 +1000,38 @@ describe('Script Repository', () => {
       ).rejects.toThrow(/FOREIGN KEY constraint failed/);
     });
   });
+
+  describe('getScriptDurationsDS', () => {
+    it('returns a map of script id → recorded duration_ds for every script', async () => {
+      const scriptRepo = new ScriptRepository(db);
+      const a = uuid();
+      const b = uuid();
+      await db
+        .insertInto('scripts')
+        .values([
+          {
+            id: a,
+            name: 'A',
+            description: '',
+            last_modified: Date.now(),
+            enabled: 1,
+            duration_ds: 8,
+          },
+          {
+            id: b,
+            name: 'B',
+            description: '',
+            last_modified: Date.now(),
+            enabled: 1,
+            duration_ds: 50,
+          },
+        ])
+        .execute();
+
+      const durations = await scriptRepo.getScriptDurationsDS();
+
+      expect(durations.get(a)).toBe(8);
+      expect(durations.get(b)).toBe(50);
+    });
+  });
 });
