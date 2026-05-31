@@ -143,7 +143,8 @@ grid; Save → reload → order persists; touch (device or emulation).
 - [x] 8. Pre-commit gate (prettier/lint/build/vitest) + code review; commit.
 - [x] 9a. QA plan file `.docs/qa/remote-page-reorder.md` written + committed.
 - [ ] 9b. Manual QA (pointer drag / touch / screen-reader) — Jeff's hands-on review pass.
-- [ ] 10. Pre-push toolkit review; address; push + PR `--base develop`.
+- [x] 10a. Pre-push 5-agent toolkit review run + findings addressed.
+- [ ] 10b. Push (VS Code) + open PR `--base develop`. ← Jeff
 
 ## Out of scope
 
