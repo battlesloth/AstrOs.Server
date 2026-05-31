@@ -435,6 +435,9 @@
   },
   "statusPage": {
     "base_alt": "Astromech base",
+    "panicked_hint": "The droid is in panic stop — control is disabled until cleared.",
+    "clear_panic": "Clear Panic Stop",
+    "clear_panic_failed": "Couldn't clear panic — try again.",
     "alt": {
       "up": "{location} connected",
       "needsSynced": "{location} needs sync",
