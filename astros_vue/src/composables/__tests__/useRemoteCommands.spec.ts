@@ -10,7 +10,7 @@ vi.mock('@/api/apiService', () => ({
 
 import apiService from '@/api/apiService';
 import { useRemoteCommands } from '../useRemoteCommands';
-import { SCRIPTS_RUN, PLAYLISTS_RUN, PANIC_STOP } from '@/api/endpoints';
+import { SCRIPTS_RUN, PLAYLISTS_RUN, PANIC_STOP, PANIC_CLEAR } from '@/api/endpoints';
 
 const apiGet = apiService.get as ReturnType<typeof vi.fn>;
 const apiPost = apiService.post as ReturnType<typeof vi.fn>;
@@ -49,6 +49,20 @@ describe('useRemoteCommands', () => {
     apiPost.mockRejectedValueOnce(new Error('boom'));
     const { panicStop } = useRemoteCommands();
     const result = await panicStop();
+    expect(result.success).toBe(false);
+  });
+
+  it('panicClear POSTs the clear endpoint', async () => {
+    const { panicClear } = useRemoteCommands();
+    const result = await panicClear();
+    expect(apiPost).toHaveBeenCalledWith(PANIC_CLEAR, {});
+    expect(result).toEqual({ success: true });
+  });
+
+  it('panicClear returns failure when the request throws', async () => {
+    apiPost.mockRejectedValueOnce(new Error('boom'));
+    const { panicClear } = useRemoteCommands();
+    const result = await panicClear();
     expect(result.success).toBe(false);
   });
 

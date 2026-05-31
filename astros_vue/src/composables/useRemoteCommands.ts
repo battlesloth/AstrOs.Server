@@ -1,5 +1,5 @@
 import apiService from '@/api/apiService';
-import { PANIC_STOP } from '@/api/endpoints';
+import { PANIC_STOP, PANIC_CLEAR } from '@/api/endpoints';
 import { useScriptsStore } from '@/stores/scripts';
 import { usePlaylistsStore } from '@/stores/playlists';
 
@@ -44,5 +44,15 @@ export function useRemoteCommands() {
     }
   }
 
-  return { runScript, runPlaylist, panicStop };
+  async function panicClear(): Promise<CommandResult> {
+    try {
+      await apiService.post(PANIC_CLEAR, {});
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to clear panic stop:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  return { runScript, runPlaylist, panicStop, panicClear };
 }
