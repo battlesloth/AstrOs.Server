@@ -184,12 +184,19 @@ export class ScriptRepository {
         });
 
       for (const dep of deployments) {
+        // Key by the location name ('body'|'core'|'dome'), not the location_id
+        // UUID: the WS update path and every frontend consumer look up
+        // deploymentStatus by the Location enum name. Skip orphaned rows whose
+        // location no longer exists (no name to key by).
+        if (!dep.location_name) {
+          continue;
+        }
         const status: DeploymentStatus = {
           date: new Date(dep.last_deployed),
           value: UploadStatus.uploaded,
-          locationName: dep.location_name || '',
+          locationName: dep.location_name,
         };
-        scr.deploymentStatus[dep.location_id] = status;
+        scr.deploymentStatus[dep.location_name] = status;
       }
     }
 
@@ -238,12 +245,17 @@ export class ScriptRepository {
       });
 
     for (const dep of deployments) {
+      // Key by the location name ('body'|'core'|'dome'), not the location_id
+      // UUID — see getScripts() above. Skip orphaned rows with no location.
+      if (!dep.location_name) {
+        continue;
+      }
       const status: DeploymentStatus = {
         date: new Date(dep.last_deployed),
         value: UploadStatus.uploaded,
-        locationName: dep.location_name || '',
+        locationName: dep.location_name,
       };
-      result.deploymentStatus[dep.location_id] = status;
+      result.deploymentStatus[dep.location_name] = status;
     }
 
     result.scriptChannels = await this.readScriptChannels(id);

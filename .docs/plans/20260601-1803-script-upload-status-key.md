@@ -35,10 +35,10 @@ frontend can't render it under any key anyway).
 
 ## Tasks
 
-- [ ] Add failing repository tests: a deployed script's `deploymentStatus` from
+- [x] Add failing repository tests: a deployed script's `deploymentStatus` from
       `getScripts()` and `getScript()` is keyed by the location name, not the id
       (assert both the name-key is present and the id-key is absent). Confirm red.
-- [ ] Apply the key fix to both methods (lines 192 and 246). Confirm green.
-- [ ] Run full API suite, lint (both projects), prettier, build.
-- [ ] Code review the diff; address Critical/Important.
-- [ ] Update QA plan note if one exists for the scripts page.
+- [x] Apply the key fix to both methods (lines 192 and 246). Confirm green.
+- [x] Run full API suite (868 pass), lint (0 errors), prettier, build (tsc clean).
+- [x] Code review the diff; address Critical/Important. (None found; ready to commit.)
+- [x] Update QA plan note if one exists for the scripts page. (No scripts QA plan exists — no-op.)

@@ -22,6 +22,7 @@ import {
   HcrCommand,
   HumanCyborgRelationsCmd,
   HcrCommandCategory,
+  UploadStatus,
 } from '../../models/index.js';
 import type { MaestroModule } from '../../models/index.js';
 import { upsertGpioModule } from './module_repositories/gpio_repository.js';
@@ -1032,6 +1033,71 @@ describe('Script Repository', () => {
 
       expect(durations.get(a)).toBe(8);
       expect(durations.get(b)).toBe(50);
+    });
+  });
+
+  describe('deploymentStatus keying (read path)', () => {
+    // Regression: getScripts()/getScript() keyed deploymentStatus by the
+    // location id (UUID FK), but the WebSocket update path (ScriptResponse) and
+    // every frontend consumer key it by the location NAME ('body'|'core'|'dome').
+    // On page refresh the UUID-keyed entries never matched the name lookup, so
+    // every status badge reverted to "Not uploaded". The read path must key the
+    // returned deploymentStatus by the location name, never the id.
+    async function seedDeployedScript(
+      locName: string,
+    ): Promise<{ scriptId: string; locId: string; deployedAt: Date }> {
+      // The body/core/dome locations are seeded by migration_0 with a UNIQUE
+      // name; resolve the seeded id rather than inserting a duplicate.
+      const { id: locId } = await db
+        .selectFrom('locations')
+        .select('id')
+        .where('name', '=', locName)
+        .executeTakeFirstOrThrow();
+
+      const scriptId = uuid();
+      const scriptRepo = new ScriptRepository(db);
+      await scriptRepo.upsertScript({
+        id: scriptId,
+        scriptName: 'Deployed Script',
+        description: '',
+        lastSaved: new Date(),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [],
+      });
+
+      const deployedAt = new Date('2026-05-31T12:00:00.000Z');
+      await scriptRepo.updateScriptControllerUploaded(scriptId, locId, deployedAt);
+
+      return { scriptId, locId, deployedAt };
+    }
+
+    it('getScripts keys deploymentStatus by location name, not the id', async () => {
+      const { scriptId, locId, deployedAt } = await seedDeployedScript('dome');
+      const scriptRepo = new ScriptRepository(db);
+
+      const script = (await scriptRepo.getScripts()).find((s) => s.id === scriptId);
+
+      expect(script).toBeDefined();
+      // Keyed by the location name the frontend looks up by...
+      expect(script?.deploymentStatus['dome']).toBeDefined();
+      expect(script?.deploymentStatus['dome'].value).toBe(UploadStatus.uploaded);
+      expect(script?.deploymentStatus['dome'].date.getTime()).toBe(deployedAt.getTime());
+      // ...and NOT by the location id UUID (the original bug).
+      expect(script?.deploymentStatus[locId]).toBeUndefined();
+    });
+
+    it('getScript keys deploymentStatus by location name, not the id', async () => {
+      const { scriptId, locId, deployedAt } = await seedDeployedScript('body');
+      const scriptRepo = new ScriptRepository(db);
+
+      const script = await scriptRepo.getScript(scriptId);
+
+      expect(script.deploymentStatus['body']).toBeDefined();
+      expect(script.deploymentStatus['body'].value).toBe(UploadStatus.uploaded);
+      expect(script.deploymentStatus['body'].date.getTime()).toBe(deployedAt.getTime());
+      expect(script.deploymentStatus[locId]).toBeUndefined();
     });
   });
 });
