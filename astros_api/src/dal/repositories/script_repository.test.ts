@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Kysely } from 'kysely';
 import { Database } from '../types.js';
 import { createKyselyConnection, migrateToLatest } from '../database.js';
 import { ScriptRepository } from './script_repository.js';
+import { logger } from 'src/logger.js';
 import {
   Script,
   ScriptChannel,
@@ -36,10 +37,13 @@ import { v4 as uuid } from 'uuid';
 
 describe('Script Repository', () => {
   let db: Kysely<Database>;
+  let raw: ReturnType<typeof createKyselyConnection>['raw'];
   let locationId: string;
 
   beforeEach(async () => {
-    db = createKyselyConnection().db;
+    const conn = createKyselyConnection();
+    db = conn.db;
+    raw = conn.raw;
 
     await migrateToLatest(db);
 
@@ -1098,6 +1102,32 @@ describe('Script Repository', () => {
       expect(script.deploymentStatus['body'].value).toBe(UploadStatus.uploaded);
       expect(script.deploymentStatus['body'].date.getTime()).toBe(deployedAt.getTime());
       expect(script.deploymentStatus[locId]).toBeUndefined();
+    });
+
+    it('skips (and logs) a deployment row whose location was removed', async () => {
+      const { scriptId } = await seedDeployedScript('dome');
+      const scriptRepo = new ScriptRepository(db);
+
+      // The FK cascade (migration_6) normally prevents an orphaned deployment;
+      // manufacture one by deleting the location with foreign keys disabled, so
+      // the left join yields a null location_name on read.
+      raw.pragma('foreign_keys = OFF');
+      await db.deleteFrom('locations').where('name', '=', 'dome').execute();
+      raw.pragma('foreign_keys = ON');
+
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        const fromList = (await scriptRepo.getScripts()).find((s) => s.id === scriptId);
+        expect(fromList?.deploymentStatus).toEqual({});
+
+        const single = await scriptRepo.getScript(scriptId);
+        expect(single.deploymentStatus).toEqual({});
+
+        // The skip is observable, not silent.
+        expect(warnSpy).toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 });

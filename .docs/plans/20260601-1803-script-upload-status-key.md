@@ -38,7 +38,11 @@ frontend can't render it under any key anyway).
 - [x] Add failing repository tests: a deployed script's `deploymentStatus` from
       `getScripts()` and `getScript()` is keyed by the location name, not the id
       (assert both the name-key is present and the id-key is absent). Confirm red.
-- [x] Apply the key fix to both methods (lines 192 and 246). Confirm green.
-- [x] Run full API suite (868 pass), lint (0 errors), prettier, build (tsc clean).
-- [x] Code review the diff; address Critical/Important. (None found; ready to commit.)
+- [x] Apply the key fix to both methods (`getScripts()`/`getScript()`). Confirm green.
+- [x] Run full API suite, lint (0 errors), prettier, build (tsc clean).
+- [x] Code review the diff; address Critical/Important. (None blocking.)
 - [x] Update QA plan note if one exists for the scripts page. (No scripts QA plan exists — no-op.)
+- [x] Pre-push multi-agent review; address the one Important finding (observable
+      skip: `logger.warn` on the orphaned-deployment branch) + a regression test
+      for it. Type-key tightening + dead `locationName` removal deferred to a
+      follow-up.

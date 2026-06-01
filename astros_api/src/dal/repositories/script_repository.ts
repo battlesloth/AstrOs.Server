@@ -187,8 +187,13 @@ export class ScriptRepository {
         // Key by the location name ('body'|'core'|'dome'), not the location_id
         // UUID: the WS update path and every frontend consumer look up
         // deploymentStatus by the Location enum name. Skip orphaned rows whose
-        // location no longer exists (no name to key by).
+        // location no longer exists (no name to key by) — unreachable while the
+        // FK cascade holds, so log rather than fail the whole list.
         if (!dep.location_name) {
+          logger.warn(
+            `ScriptRepository.getScripts: skipping deployment for script ${scr.id} — ` +
+              `location_id ${dep.location_id} has no matching location (orphaned FK?)`,
+          );
           continue;
         }
         const status: DeploymentStatus = {
@@ -248,6 +253,10 @@ export class ScriptRepository {
       // Key by the location name ('body'|'core'|'dome'), not the location_id
       // UUID — see getScripts() above. Skip orphaned rows with no location.
       if (!dep.location_name) {
+        logger.warn(
+          `ScriptRepository.getScript: skipping deployment for script ${id} — ` +
+            `location_id ${dep.location_id} has no matching location (orphaned FK?)`,
+        );
         continue;
       }
       const status: DeploymentStatus = {
