@@ -30,9 +30,12 @@ Follow-up to the script upload-status key fix (pre-push review findings):
 
 ## Tasks
 
-- [ ] Add `LocationName` + `isLocationName` to constants.ts; export from index.ts.
-- [ ] Tighten `Script.deploymentStatus`; remove `DeploymentStatus.locationName`.
-- [ ] Update repository: guard with `isLocationName`, drop `locationName` writes.
-- [ ] Update tests (Object.keys assertion); confirm still mutation-sensitive.
-- [ ] prettier, lint (0 errors), build (tsc clean), full suite green.
-- [ ] Code review; address Critical/Important.
+- [x] Add `LocationName` + `isLocationName` to constants.ts; export from index.ts.
+- [x] Tighten `Script.deploymentStatus`; remove `DeploymentStatus.locationName`.
+- [x] Update repository: guard with `isLocationName`, drop `locationName` writes.
+- [x] Update tests (Object.keys assertion); confirm still mutation-sensitive.
+      (Verified: reintroducing the UUID key now fails `tsc` with TS7053 — the bug
+      is a compile error, not just a test failure.)
+- [x] prettier, lint (0 errors), build (tsc clean), full suite green (869).
+- [x] Code review; address Critical/Important. (None; 2 cosmetic Minors fixed —
+      warn wording for unknown-name case + dropped unused `locId` return.)

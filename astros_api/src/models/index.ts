@@ -45,7 +45,8 @@ export { RemotePage, PageButton } from './remotes/RemotePage.js';
 export type { RemoteScriptList } from './remotes/RemoteScriptList.js';
 export type { RemoteButton } from './remotes/RemoteButton.js';
 export type { DeploymentStatus } from './scripts/deployment_status.js';
-export { Constants } from './constants.js';
+export { Constants, isLocationName } from './constants.js';
+export type { LocationName } from './constants.js';
 export {
   ScriptChannelType,
   ModuleType,

@@ -1049,7 +1049,7 @@ describe('Script Repository', () => {
     // returned deploymentStatus by the location name, never the id.
     async function seedDeployedScript(
       locName: string,
-    ): Promise<{ scriptId: string; locId: string; deployedAt: Date }> {
+    ): Promise<{ scriptId: string; deployedAt: Date }> {
       // The body/core/dome locations are seeded by migration_0 with a UNIQUE
       // name; resolve the seeded id rather than inserting a duplicate.
       const { id: locId } = await db
@@ -1074,34 +1074,34 @@ describe('Script Repository', () => {
       const deployedAt = new Date('2026-05-31T12:00:00.000Z');
       await scriptRepo.updateScriptControllerUploaded(scriptId, locId, deployedAt);
 
-      return { scriptId, locId, deployedAt };
+      return { scriptId, deployedAt };
     }
 
     it('getScripts keys deploymentStatus by location name, not the id', async () => {
-      const { scriptId, locId, deployedAt } = await seedDeployedScript('dome');
+      const { scriptId, deployedAt } = await seedDeployedScript('dome');
       const scriptRepo = new ScriptRepository(db);
 
       const script = (await scriptRepo.getScripts()).find((s) => s.id === scriptId);
 
       expect(script).toBeDefined();
-      // Keyed by the location name the frontend looks up by...
-      expect(script?.deploymentStatus['dome']).toBeDefined();
-      expect(script?.deploymentStatus['dome'].value).toBe(UploadStatus.uploaded);
-      expect(script?.deploymentStatus['dome'].date.getTime()).toBe(deployedAt.getTime());
-      // ...and NOT by the location id UUID (the original bug).
-      expect(script?.deploymentStatus[locId]).toBeUndefined();
+      // 'dome' is the SOLE key — keyed by the location name the frontend looks up
+      // by, never the location id UUID (the original bug).
+      expect(Object.keys(script?.deploymentStatus ?? {})).toEqual(['dome']);
+      const status = script?.deploymentStatus['dome'];
+      expect(status?.value).toBe(UploadStatus.uploaded);
+      expect(status?.date.getTime()).toBe(deployedAt.getTime());
     });
 
     it('getScript keys deploymentStatus by location name, not the id', async () => {
-      const { scriptId, locId, deployedAt } = await seedDeployedScript('body');
+      const { scriptId, deployedAt } = await seedDeployedScript('body');
       const scriptRepo = new ScriptRepository(db);
 
       const script = await scriptRepo.getScript(scriptId);
 
-      expect(script.deploymentStatus['body']).toBeDefined();
-      expect(script.deploymentStatus['body'].value).toBe(UploadStatus.uploaded);
-      expect(script.deploymentStatus['body'].date.getTime()).toBe(deployedAt.getTime());
-      expect(script.deploymentStatus[locId]).toBeUndefined();
+      expect(Object.keys(script.deploymentStatus)).toEqual(['body']);
+      const status = script.deploymentStatus['body'];
+      expect(status?.value).toBe(UploadStatus.uploaded);
+      expect(status?.date.getTime()).toBe(deployedAt.getTime());
     });
 
     it('skips (and logs) a deployment row whose location was removed', async () => {
