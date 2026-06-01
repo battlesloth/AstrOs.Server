@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Kysely } from 'kysely';
 import { Database } from '../types.js';
 import { createKyselyConnection, migrateToLatest } from '../database.js';
 import { ScriptRepository } from './script_repository.js';
+import { logger } from 'src/logger.js';
 import {
   Script,
   ScriptChannel,
@@ -22,6 +23,7 @@ import {
   HcrCommand,
   HumanCyborgRelationsCmd,
   HcrCommandCategory,
+  UploadStatus,
 } from '../../models/index.js';
 import type { MaestroModule } from '../../models/index.js';
 import { upsertGpioModule } from './module_repositories/gpio_repository.js';
@@ -35,10 +37,13 @@ import { v4 as uuid } from 'uuid';
 
 describe('Script Repository', () => {
   let db: Kysely<Database>;
+  let raw: ReturnType<typeof createKyselyConnection>['raw'];
   let locationId: string;
 
   beforeEach(async () => {
-    db = createKyselyConnection().db;
+    const conn = createKyselyConnection();
+    db = conn.db;
+    raw = conn.raw;
 
     await migrateToLatest(db);
 
@@ -1032,6 +1037,97 @@ describe('Script Repository', () => {
 
       expect(durations.get(a)).toBe(8);
       expect(durations.get(b)).toBe(50);
+    });
+  });
+
+  describe('deploymentStatus keying (read path)', () => {
+    // Regression: getScripts()/getScript() keyed deploymentStatus by the
+    // location id (UUID FK), but the WebSocket update path (ScriptResponse) and
+    // every frontend consumer key it by the location NAME ('body'|'core'|'dome').
+    // On page refresh the UUID-keyed entries never matched the name lookup, so
+    // every status badge reverted to "Not uploaded". The read path must key the
+    // returned deploymentStatus by the location name, never the id.
+    async function seedDeployedScript(
+      locName: string,
+    ): Promise<{ scriptId: string; deployedAt: Date }> {
+      // The body/core/dome locations are seeded by migration_0 with a UNIQUE
+      // name; resolve the seeded id rather than inserting a duplicate.
+      const { id: locId } = await db
+        .selectFrom('locations')
+        .select('id')
+        .where('name', '=', locName)
+        .executeTakeFirstOrThrow();
+
+      const scriptId = uuid();
+      const scriptRepo = new ScriptRepository(db);
+      await scriptRepo.upsertScript({
+        id: scriptId,
+        scriptName: 'Deployed Script',
+        description: '',
+        lastSaved: new Date(),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [],
+      });
+
+      const deployedAt = new Date('2026-05-31T12:00:00.000Z');
+      await scriptRepo.updateScriptControllerUploaded(scriptId, locId, deployedAt);
+
+      return { scriptId, deployedAt };
+    }
+
+    it('getScripts keys deploymentStatus by location name, not the id', async () => {
+      const { scriptId, deployedAt } = await seedDeployedScript('dome');
+      const scriptRepo = new ScriptRepository(db);
+
+      const script = (await scriptRepo.getScripts()).find((s) => s.id === scriptId);
+
+      expect(script).toBeDefined();
+      // 'dome' is the SOLE key — keyed by the location name the frontend looks up
+      // by, never the location id UUID (the original bug).
+      expect(Object.keys(script?.deploymentStatus ?? {})).toEqual(['dome']);
+      const status = script?.deploymentStatus['dome'];
+      expect(status?.value).toBe(UploadStatus.uploaded);
+      expect(status?.date.getTime()).toBe(deployedAt.getTime());
+    });
+
+    it('getScript keys deploymentStatus by location name, not the id', async () => {
+      const { scriptId, deployedAt } = await seedDeployedScript('body');
+      const scriptRepo = new ScriptRepository(db);
+
+      const script = await scriptRepo.getScript(scriptId);
+
+      expect(Object.keys(script.deploymentStatus)).toEqual(['body']);
+      const status = script.deploymentStatus['body'];
+      expect(status?.value).toBe(UploadStatus.uploaded);
+      expect(status?.date.getTime()).toBe(deployedAt.getTime());
+    });
+
+    it('skips (and logs) a deployment row whose location was removed', async () => {
+      const { scriptId } = await seedDeployedScript('dome');
+      const scriptRepo = new ScriptRepository(db);
+
+      // The FK cascade (migration_6) normally prevents an orphaned deployment;
+      // manufacture one by deleting the location with foreign keys disabled, so
+      // the left join yields a null location_name on read.
+      raw.pragma('foreign_keys = OFF');
+      await db.deleteFrom('locations').where('name', '=', 'dome').execute();
+      raw.pragma('foreign_keys = ON');
+
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        const fromList = (await scriptRepo.getScripts()).find((s) => s.id === scriptId);
+        expect(fromList?.deploymentStatus).toEqual({});
+
+        const single = await scriptRepo.getScript(scriptId);
+        expect(single.deploymentStatus).toEqual({});
+
+        // The skip is observable, not silent.
+        expect(warnSpy).toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 });
