@@ -44,4 +44,29 @@ describe('UserRepository', () => {
 
     await expect(repo.getByUsername('nonexistent')).rejects.toThrow();
   });
+
+  describe('updatePassword', () => {
+    it('should persist the new hash and salt so the new password validates', async () => {
+      await seedUser('testuser', 'oldpassword');
+      const repo = new UserRepository(db);
+
+      const updated = new User('testuser');
+      updated.setPassword('newpassword123');
+      await repo.updatePassword(updated);
+
+      const result = await repo.getByUsername('testuser');
+      expect(result.hash).toBe(updated.hash);
+      expect(result.salt).toBe(updated.salt);
+      expect(result.validatePassword('newpassword123')).toBe(true);
+      expect(result.validatePassword('oldpassword')).toBe(false);
+    });
+
+    it('should throw when no user matches the username', async () => {
+      const repo = new UserRepository(db);
+      const ghost = new User('nonexistent');
+      ghost.setPassword('whatever123');
+
+      await expect(repo.updatePassword(ghost)).rejects.toThrow();
+    });
+  });
 });

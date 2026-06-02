@@ -7,6 +7,7 @@ interface FieldPasswordProps {
   modelValue: string;
   onEnter: () => void;
   validatePassword: boolean;
+  revealable: boolean;
 }
 
 const meta = {
@@ -20,7 +21,7 @@ const meta = {
       return { props, password };
     },
     template:
-      '<AstrosFieldPassword v-model="password" :validate-password="props.validatePassword" />',
+      '<AstrosFieldPassword v-model="password" :validate-password="props.validatePassword" :revealable="props.revealable" />',
   }),
   parameters: {
     layout: 'centered',
@@ -28,6 +29,7 @@ const meta = {
   args: {
     onEnter: fn(),
     validatePassword: false,
+    revealable: false,
   },
   argTypes: {
     modelValue: {
@@ -37,6 +39,10 @@ const meta = {
     validatePassword: {
       control: 'boolean',
       description: 'Whether to enable password validation',
+    },
+    revealable: {
+      control: 'boolean',
+      description: 'Whether to show a show/hide (eye) toggle',
     },
   },
   tags: ['autodocs'],
@@ -98,6 +104,22 @@ export const Interactive: Story = {
       description: {
         story:
           'Try entering different passwords to test validation. Press Enter to see the enter event in the Actions panel.',
+      },
+    },
+  },
+};
+
+export const Revealable: Story = {
+  args: {
+    modelValue: 'secret123',
+    validatePassword: false,
+    revealable: true,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Opt-in show/hide (eye) toggle. Click the eye icon to un-obfuscate the value; click again to re-mask it.',
       },
     },
   },

@@ -70,3 +70,4 @@ testem.log
 .tmp
 
 .claude/scheduled_tasks.lock
+.pr_summary/
