@@ -133,7 +133,6 @@ describe('ControllerWatchdog', () => {
       controllerLocation: 'dome',
       up: false,
       synced: false,
-      firmwareVersion: '',
       firmwareCompatible: false,
     });
   });
