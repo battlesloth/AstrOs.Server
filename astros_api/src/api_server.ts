@@ -54,6 +54,7 @@ import {
   ScriptResponse,
   TransmissionStatus,
   ModuleSubType,
+  isLocationName,
 } from './models/index.js';
 import { ControllerRepository } from './dal/repositories/controller_repository.js';
 import { createConfigSync } from './models/config/config_sync.js';
@@ -102,6 +103,11 @@ import { FirmwareUploadStore } from './firmware/firmware_upload_store.js';
 import { GitHubReleaseService } from './firmware/github_release_service.js';
 import { decidePostDeployHeartbeat } from './firmware/post_deploy_heartbeat.js';
 import { decideLateJoinSnapshot } from './firmware/late_join_snapshot.js';
+import {
+  ControllerWatchdog,
+  buildDownStatus,
+  STATUS_SWEEP_INTERVAL_MS,
+} from 'src/serial/controller_watchdog.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -213,6 +219,9 @@ export class ApiServer {
   // POLL_ACK-fed variant cache keyed by controller MAC. Entries never expire;
   // operator recovers stale state via syncControllers (re-poll).
   private readonly controllerVariantCache = new Map<string, string>();
+
+  private readonly controllerWatchdog = new ControllerWatchdog();
+  private statusSweepTimer: NodeJS.Timeout | null = null;
 
   // Test-only: lets the harness poll-wait for a POLL_ACK to populate the cache
   // instead of sleeping an arbitrary duration before flashing.
@@ -658,10 +667,24 @@ export class ApiServer {
 
       this.serialPort.on('error', (err: any) => {
         logger.error(`Serial port error: ${err}`);
+        try {
+          for (const id of this.controllerWatchdog.markAllDown()) {
+            this.updateClients(buildDownStatus(id));
+          }
+        } catch (e) {
+          logger.error({ err: e }, 'markAllDown broadcast (serial error) failed');
+        }
       });
 
       this.serialPort.on('close', () => {
         logger.warn('Serial port closed');
+        try {
+          for (const id of this.controllerWatchdog.markAllDown()) {
+            this.updateClients(buildDownStatus(id));
+          }
+        } catch (e) {
+          logger.error({ err: e }, 'markAllDown broadcast (serial close) failed');
+        }
       });
 
       this.serialParser = this.serialPort
@@ -672,6 +695,22 @@ export class ApiServer {
             data: data.toString(),
           });
         });
+
+      // Staleness watchdog: a controller silent past the timeout flips to DOWN.
+      // Suppressed during an OTA flash — the master reboots and polls pause past
+      // the timeout, and the firmware-stages board owns status then.
+      this.statusSweepTimer = setInterval(() => {
+        try {
+          if (this.flashOrchestrator?.getCurrentJob()) {
+            return;
+          }
+          for (const id of this.controllerWatchdog.sweep(Date.now())) {
+            this.updateClients(buildDownStatus(id));
+          }
+        } catch (err) {
+          logger.error({ err }, 'status sweep failed');
+      }, STATUS_SWEEP_INTERVAL_MS);
+      this.statusSweepTimer?.unref();
     } catch (err) {
       logger.error(`Failed to open serial port: ${err}`);
     }
@@ -1010,6 +1049,21 @@ export class ApiServer {
         firmwareVersion,
         firmwareCompatible,
       };
+
+      if (isLocationName(location.locationName)) {
+        this.controllerWatchdog.recordAck(
+          {
+            controllerId: controller.id,
+            controllerAddress: val.controller.address,
+            controllerLocation: location.locationName,
+          },
+          Date.now(),
+        );
+      } else {
+        logger.error(
+          `handlePollResponse: unexpected location name '${location.locationName}' for controller ${controller.id}; skipping watchdog tracking`,
+        );
+      }
 
       this.updateClients(update);
     } catch (error) {
@@ -1393,6 +1447,13 @@ export class ApiServer {
         logger.error(`shutdown ${label} failed: ${msg}`);
       }
     };
+
+    await safeClose('statusSweepTimer.clear', () => {
+      if (this.statusSweepTimer) {
+        clearInterval(this.statusSweepTimer);
+        this.statusSweepTimer = null;
+      }
+    });
 
     await safeClose('animationQueue.panicStop', () => this.animationQueue?.panicStop());
 
