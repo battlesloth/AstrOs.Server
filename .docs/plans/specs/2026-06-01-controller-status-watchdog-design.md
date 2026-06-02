@@ -96,8 +96,8 @@ class ControllerWatchdog {
 
   // Serial close/error: return all seen-but-not-already-down controllers; add
   // them to `down` (so a later sweep won't re-emit). They stay down until a
-  // fresh recordAck clears the flag.
-  markAllDown(now: number): ControllerIdentity[];
+  // fresh recordAck clears the flag. (No `now` — it flags, it doesn't stamp time.)
+  markAllDown(): ControllerIdentity[];
 }
 ```
 
