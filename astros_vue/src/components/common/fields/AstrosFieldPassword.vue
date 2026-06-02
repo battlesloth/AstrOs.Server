@@ -1,6 +1,14 @@
 <script lang="ts" setup>
+import { ref } from 'vue';
+
 const props = defineProps({
   validatePassword: {
+    type: Boolean,
+    default: false,
+  },
+  // Opt-in show/hide toggle (eye icon). Default off preserves the original
+  // always-masked behavior for existing callers (e.g. the login form).
+  revealable: {
     type: Boolean,
     default: false,
   },
@@ -32,6 +40,9 @@ const password = defineModel<string>({
 defineEmits<{
   (event: 'enter'): void;
 }>();
+
+// Local per-field reveal state; resets to masked whenever the field remounts.
+const revealed = ref(false);
 </script>
 
 <template>
@@ -45,7 +56,7 @@ defineEmits<{
         v-if="!props.validatePassword"
         :id="props.inputId || undefined"
         v-model="password"
-        type="password"
+        :type="revealed ? 'text' : 'password'"
         required
         :placeholder="props.placeholder || $t('placeholder.password')"
         :title="props.placeholder || $t('placeholder.password')"
@@ -56,7 +67,7 @@ defineEmits<{
         v-if="props.validatePassword"
         :id="props.inputId || undefined"
         v-model="password"
-        type="password"
+        :type="revealed ? 'text' : 'password'"
         required
         :placeholder="props.placeholder || $t('placeholder.password')"
         minlength="8"
@@ -65,6 +76,19 @@ defineEmits<{
         @keydown.enter="$emit('enter')"
         :aria-label="props.ariaLabel || 'password'"
       />
+      <button
+        v-if="props.revealable"
+        type="button"
+        class="opacity-50 hover:opacity-100 cursor-pointer"
+        :aria-label="revealed ? $t('hide_password') : $t('show_password')"
+        :aria-pressed="revealed"
+        @click="revealed = !revealed"
+      >
+        <v-icon
+          :name="revealed ? 'io-eye-off-outline' : 'io-eye-outline'"
+          aria-hidden="true"
+        />
+      </button>
     </label>
     <p
       class="validator-hint hidden"

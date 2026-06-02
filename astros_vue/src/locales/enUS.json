@@ -15,6 +15,8 @@
   "download": "Download",
   "change": "Change",
   "accept": "Accept",
+  "show_password": "Show password",
+  "hide_password": "Hide password",
   "copy": "Copy",
   "upload": "Upload",
   "play": "Play",

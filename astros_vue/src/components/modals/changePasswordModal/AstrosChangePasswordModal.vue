@@ -84,6 +84,7 @@ function onAccept() {
         <AstrosFieldPassword
           v-model="oldPassword"
           input-id="change-password-current"
+          revealable
           :aria-label="$t('utility_view.current_password')"
           :placeholder="$t('utility_view.current_password')"
           @enter="onAccept"
@@ -100,6 +101,7 @@ function onAccept() {
         <AstrosFieldPassword
           v-model="newPassword"
           input-id="change-password-new"
+          revealable
           :aria-label="$t('utility_view.new_password')"
           :placeholder="$t('utility_view.new_password')"
           @enter="onAccept"
@@ -117,6 +119,7 @@ function onAccept() {
         <AstrosFieldPassword
           v-model="confirmPassword"
           input-id="change-password-confirm"
+          revealable
           :aria-label="$t('utility_view.confirm_password')"
           :placeholder="$t('utility_view.confirm_password')"
           @enter="onAccept"

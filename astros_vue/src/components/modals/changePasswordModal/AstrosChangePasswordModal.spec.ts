@@ -58,6 +58,28 @@ describe('AstrosChangePasswordModal', () => {
     wrapper.unmount();
   });
 
+  it('toggles a single field between masked and revealed via its show/hide button', async () => {
+    const wrapper = mountModal();
+    // All three fields start masked, each with its own "Show password" toggle.
+    expect(wrapper.find('#change-password-new').attributes('type')).toBe('password');
+    const showToggles = wrapper.findAll('[aria-label="Show password"]');
+    expect(showToggles).toHaveLength(3);
+
+    // Reveal only the new-password field (index 1: current, new, confirm).
+    await showToggles[1]!.trigger('click');
+    expect(wrapper.find('#change-password-new').attributes('type')).toBe('text');
+    // The other two stay masked — reveal is per-field.
+    expect(wrapper.find('#change-password-current').attributes('type')).toBe('password');
+    expect(wrapper.find('#change-password-confirm').attributes('type')).toBe('password');
+
+    // The toggle now offers to hide; clicking it re-masks the field.
+    const hideToggles = wrapper.findAll('[aria-label="Hide password"]');
+    expect(hideToggles).toHaveLength(1);
+    await hideToggles[0]!.trigger('click');
+    expect(wrapper.find('#change-password-new').attributes('type')).toBe('password');
+    wrapper.unmount();
+  });
+
   it('emits cancel when the Cancel button is clicked', async () => {
     const wrapper = mountModal();
     await wrapper.get('[data-testid="change-password-cancel"]').trigger('click');
