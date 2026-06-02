@@ -708,7 +708,7 @@ export class ApiServer {
             this.updateClients(buildDownStatus(id));
           }
         } catch (err) {
-          logger.error(`status sweep failed: ${err}`);
+          logger.error({ err }, 'status sweep failed');
         }
       }, STATUS_SWEEP_INTERVAL_MS);
       this.statusSweepTimer.unref();
