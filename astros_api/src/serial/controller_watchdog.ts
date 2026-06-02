@@ -1,4 +1,4 @@
-import { StatusResponse, TransmissionType, type LocationName } from 'src/models/index.js';
+import { TransmissionType, type LocationName, type StatusResponse } from 'src/models/index.js';
 
 /** How long a controller may be silent (no POLL_ACK) before it is marked DOWN. */
 export const STATUS_STALE_TIMEOUT_MS = 10_000;
