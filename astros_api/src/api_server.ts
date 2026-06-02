@@ -709,9 +709,8 @@ export class ApiServer {
           }
         } catch (err) {
           logger.error({ err }, 'status sweep failed');
-        }
       }, STATUS_SWEEP_INTERVAL_MS);
-      this.statusSweepTimer.unref();
+      this.statusSweepTimer?.unref();
     } catch (err) {
       logger.error(`Failed to open serial port: ${err}`);
     }
