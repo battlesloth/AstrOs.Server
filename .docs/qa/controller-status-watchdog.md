@@ -20,7 +20,7 @@ the Status page with the WebSocket connected.
    reflects reality.
    - 4b. With a padawan ALREADY offline when the flash starts: confirm it does
      NOT flip to DOWN mid-flash (sweep suppressed for all controllers during a
-     job), and DOES flip to DOWN within ~10 s AFTER the flash completes.
+     job), and DOES flip to DOWN within ~2 s (next sweep) AFTER the flash completes.
 5. **Edge-trigger (no spam).** With a controller offline, watch the network/WS
    frames. Expected: a single `status{up:false}` per controller per outage, not
    one every 2 s.
