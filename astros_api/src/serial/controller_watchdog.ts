@@ -53,6 +53,7 @@ export class ControllerWatchdog {
   /**
    * Serial close/error fast-path: return every seen controller not already
    * flagged, marking them DOWN. They stay down until a fresh recordAck.
+   * Subsequent calls without an intervening recordAck return [] (idempotent).
    */
   markAllDown(): ControllerIdentity[] {
     const newlyDown: ControllerIdentity[] = [];

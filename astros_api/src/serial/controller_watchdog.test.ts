@@ -14,7 +14,7 @@ const dome: ControllerIdentity = {
 };
 const body: ControllerIdentity = {
   controllerId: 'id-body',
-  controllerAddress: '00:00:00:00:00:00',
+  controllerAddress: 'AA:BB:CC:DD:EE:02',
   controllerLocation: 'body',
 };
 
@@ -29,6 +29,13 @@ describe('ControllerWatchdog', () => {
     const wd = new ControllerWatchdog();
     wd.recordAck(dome, 1000);
     expect(wd.sweep(1000 + STATUS_STALE_TIMEOUT_MS + 1)).toEqual([dome]);
+  });
+
+  it('respects a custom staleTimeoutMs passed to the constructor', () => {
+    const wd = new ControllerWatchdog(500);
+    wd.recordAck(dome, 0);
+    expect(wd.sweep(500)).toEqual([]); // exactly at the custom threshold, not over
+    expect(wd.sweep(501)).toEqual([dome]); // over it
   });
 
   it('emits a DOWN only once per outage (edge-triggered)', () => {
