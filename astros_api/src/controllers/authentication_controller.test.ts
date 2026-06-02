@@ -174,4 +174,21 @@ describe('Authentication - changePassword', () => {
     const user = await new UserRepository(db).getByUsername('admin');
     expect(user.validatePassword(CURRENT_PASSWORD)).toBe(true);
   });
+
+  it('should return 500 when a database query throws (after input validation passes)', async () => {
+    // Force the repository lookup to throw to exercise the catch/500 branch.
+    // The new password is valid-length so it clears the 400 guard and reaches
+    // getByUsername.
+    const brokenDb = {
+      selectFrom: () => {
+        throw new Error('db down');
+      },
+    } as unknown as Kysely<Database>;
+    const req: any = { body: { oldPassword: CURRENT_PASSWORD, newPassword: 'newpassword123' } };
+    const res = mockRes();
+
+    await changePassword(brokenDb, req, res, vi.fn());
+
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
 });

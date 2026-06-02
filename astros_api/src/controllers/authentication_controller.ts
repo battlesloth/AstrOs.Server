@@ -11,8 +11,11 @@ const route = '/login';
 const reauthRoute = '/reauth';
 const changePasswordRoute = '/changePassword';
 
-// The system is single-user; the login flow and auth strategy both operate on
-// this fixed account, so password changes target it too.
+// The system ships a single seeded account ('admin', from migration_0). The JWT
+// proves the caller is authenticated but not which user, so password changes
+// target the seeded admin by name. (The login auth strategy looks users up by
+// the posted username; it isn't hardcoded to 'admin'.) If multi-user is ever
+// added, derive this from the JWT 'name' claim instead.
 const ADMIN_USERNAME = 'admin';
 
 // Minimum length for a new password. Length only — no complexity rule by design.
@@ -119,11 +122,11 @@ export async function changePassword(db: Kysely<Database>, req: any, res: any, n
     res.status(200);
     res.json({ message: 'success' });
   } catch (error) {
-    // Intentionally collapses every unexpected failure (a missing/corrupt admin
-    // row from getByUsername/updatePassword, a transient DB fault) into a
-    // generic 500. The full error is logged for the operator; the client maps
-    // any non-403 to a generic "check logs" message.
-    logger.error(error);
+    // Intentionally collapses every unexpected failure (a missing admin row
+    // from getByUsername/updatePassword, a transient DB fault) into a generic
+    // 500. The full error is logged for the operator; the client maps any
+    // non-403 to a generic "check logs" message.
+    logger.error('changePassword failed', error);
 
     res.status(500);
     res.json({

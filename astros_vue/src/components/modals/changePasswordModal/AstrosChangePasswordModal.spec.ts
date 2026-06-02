@@ -47,6 +47,14 @@ describe('AstrosChangePasswordModal', () => {
     expect(wrapper.find('#change-password-new').exists()).toBe(true);
     expect(wrapper.find('#change-password-confirm').exists()).toBe(true);
     expect(wrapper.find('label[for="change-password-current"]').exists()).toBe(true);
+
+    // Each field must have a distinct accessible name; otherwise a screen
+    // reader announces all three as "password".
+    const ariaLabels = wrapper
+      .findAll('input[type="password"]')
+      .map((input) => input.attributes('aria-label'));
+    expect(ariaLabels).toHaveLength(3);
+    expect(new Set(ariaLabels).size).toBe(3);
     wrapper.unmount();
   });
 
@@ -88,6 +96,18 @@ describe('AstrosChangePasswordModal', () => {
     wrapper.unmount();
   });
 
+  it('rejects a new password of exactly 7 characters (lower boundary)', async () => {
+    const wrapper = mountModal();
+    await fill(wrapper, { current: 'oldpw', next: '1234567', confirm: '1234567' });
+    await wrapper.get('[data-testid="change-password-accept"]').trigger('click');
+
+    expect(wrapper.emitted('accept')).toBeUndefined();
+    expect(wrapper.get('[data-testid="change-password-error"]').text()).toBe(
+      enUS.utility_view.password_too_short,
+    );
+    wrapper.unmount();
+  });
+
   it('shows a mismatch error and does not emit accept when confirmation differs', async () => {
     const wrapper = mountModal();
     await fill(wrapper, { current: 'oldpw', next: 'newpassword', confirm: 'different1' });
@@ -119,6 +139,19 @@ describe('AstrosChangePasswordModal', () => {
     await wrapper.get('[data-testid="change-password-accept"]').trigger('click');
 
     expect(wrapper.emitted('accept')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('submits via the Enter key when inputs are valid', async () => {
+    const wrapper = mountModal();
+    await fill(wrapper, { current: 'oldpw', next: 'newpassword', confirm: 'newpassword' });
+    await wrapper.find('#change-password-new').trigger('keydown.enter');
+
+    expect(wrapper.emitted('accept')).toHaveLength(1);
+    expect(wrapper.emitted('accept')![0]![0]).toEqual({
+      oldPassword: 'oldpw',
+      newPassword: 'newpassword',
+    });
     wrapper.unmount();
   });
 
