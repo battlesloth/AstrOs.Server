@@ -519,7 +519,7 @@ export class ApiServer {
   }
 
   private setRoutes(): void {
-    registerAuthRoutes(this.router);
+    registerAuthRoutes(this.router, this.authHandler, this.db);
     registerSystemStatusRoutes(this.router, this.systemStatus);
     // Firmware routes whose dependencies are available before setupSerialPort()
     // belong here so they stay registered when serial is skipped (test envs,

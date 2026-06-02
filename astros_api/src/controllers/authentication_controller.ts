@@ -1,15 +1,29 @@
 import passport from 'passport';
 import jsonwebtoken from 'jsonwebtoken';
+import { Kysely } from 'kysely';
 import { logger } from 'src/logger.js';
 import { User } from 'src/models/users.js';
+import { Database } from 'src/dal/types.js';
+import { UserRepository } from 'src/dal/repositories/user_repository.js';
 import { Router } from 'express';
 
 const route = '/login';
 const reauthRoute = '/reauth';
+const changePasswordRoute = '/changePassword';
 
-export function registerAuthRoutes(router: Router) {
+// The system is single-user; the login flow and auth strategy both operate on
+// this fixed account, so password changes target it too.
+const ADMIN_USERNAME = 'admin';
+
+// Minimum length for a new password. Length only — no complexity rule by design.
+const MIN_PASSWORD_LENGTH = 8;
+
+export function registerAuthRoutes(router: Router, auth: any, db: Kysely<Database>) {
   router.post(route, login);
   router.post(reauthRoute, reauth);
+  router.post(changePasswordRoute, auth, (req: any, res: any, next: any) =>
+    changePassword(db, req, res, next),
+  );
 }
 
 async function login(req: any, res: any, next: any) {
@@ -62,6 +76,44 @@ async function reauth(req: any, res: any, next: any) {
         message: 'token not valid',
       });
     }
+  } catch (error) {
+    logger.error(error);
+
+    res.status(500);
+    res.json({
+      message: 'Internal server error',
+    });
+  }
+}
+
+export async function changePassword(db: Kysely<Database>, req: any, res: any, next: any) {
+  try {
+    const newPassword: unknown = req.body?.newPassword;
+
+    if (typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LENGTH) {
+      res.status(400);
+      res.json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+      return;
+    }
+
+    // Coerce a non-string old password to '' so it fails validation as a
+    // 401 (wrong password) rather than throwing inside pbkdf2Sync.
+    const oldPassword = typeof req.body?.oldPassword === 'string' ? req.body.oldPassword : '';
+
+    const repository = new UserRepository(db);
+    const user = await repository.getByUsername(ADMIN_USERNAME);
+
+    if (!user.validatePassword(oldPassword)) {
+      res.status(401);
+      res.json({ message: 'Current password is incorrect' });
+      return;
+    }
+
+    user.setPassword(newPassword);
+    await repository.updatePassword(user);
+
+    res.status(200);
+    res.json({ message: 'success' });
   } catch (error) {
     logger.error(error);
 
