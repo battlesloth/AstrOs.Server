@@ -492,7 +492,7 @@
     "format_queued": "Format queued!",
     "format_error": "Error requesting format. Check logs.",
     "download_error": "Error downloading logs. Check logs.",
-    "change_password": "Change Password",
+    "change_password": "Password",
     "change_password_modal_title": "Change Password",
     "current_password": "Current Password",
     "new_password": "New Password",

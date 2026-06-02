@@ -15,7 +15,7 @@ current/new/confirm fields, Cancel/Accept). Changes the single `admin` account p
 
 1. **Open the modal**
    - Navigate to the Utility page.
-   - **Expected:** a "Change Password" row appears alongside API Key / Format SD Card /
+   - **Expected:** a "Password" row appears alongside API Key / Format SD Card /
      Log Files, with a primary "Change" button.
    - Click "Change".
    - **Expected:** a modal opens titled "Change Password" with three labeled password
