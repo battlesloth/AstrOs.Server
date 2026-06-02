@@ -2,7 +2,10 @@
 import { ref, onMounted } from 'vue';
 import { AstrosLayout } from '@/components';
 import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
+import AstrosChangePasswordModal from '@/components/modals/changePasswordModal/AstrosChangePasswordModal.vue';
+import type { ChangePasswordPayload } from '@/components/modals/changePasswordModal/types';
 import apiService from '@/api/apiService';
+import { CHANGE_PASSWORD } from '@/api/endpoints';
 import type { ControllerModule } from '@/models';
 import { useI18n } from 'vue-i18n';
 
@@ -17,6 +20,11 @@ const showFormatModal = ref(false);
 const selectedControllers = ref<SelectedControllerModule[]>([]);
 const showAlert = ref(false);
 const alertMessage = ref('');
+const showChangePasswordModal = ref(false);
+// i18n key for a server-reported change-password error, passed to the modal.
+const changePasswordError = ref('');
+// Guards against a double submit (Enter + click) firing two POSTs.
+const changingPassword = ref(false);
 
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
@@ -121,6 +129,41 @@ const confirmFormat = async () => {
 const closeAlert = () => {
   showAlert.value = false;
 };
+
+// Change password modal
+const openChangePasswordModal = () => {
+  changePasswordError.value = '';
+  showChangePasswordModal.value = true;
+};
+
+const closeChangePasswordModal = () => {
+  showChangePasswordModal.value = false;
+};
+
+const changePassword = async (payload: ChangePasswordPayload) => {
+  if (changingPassword.value) return;
+  changingPassword.value = true;
+  // Clear any prior server error before retrying.
+  changePasswordError.value = '';
+
+  try {
+    await apiService.post(CHANGE_PASSWORD, payload);
+    showChangePasswordModal.value = false;
+    showAlert.value = true;
+    alertMessage.value = t('utility_view.change_password_success');
+  } catch (error) {
+    console.error('Error changing password:', error);
+    // 403 = wrong current password (kept distinct from the 401 the global
+    // interceptor uses for session expiry). Anything else is a generic failure.
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    changePasswordError.value =
+      status === 403
+        ? 'utility_view.current_password_incorrect'
+        : 'utility_view.change_password_error';
+  } finally {
+    changingPassword.value = false;
+  }
+};
 </script>
 
 <template>
@@ -143,7 +186,6 @@ const closeAlert = () => {
               <div class="float-right">
                 <AstrosWriteButton
                   class="btn btn-primary w-35 px-5 py-0.75"
-                  aria-label="$t('generate')"
                   @click="generateApiKey"
                 >
                   {{ $t('generate') }}
@@ -160,7 +202,6 @@ const closeAlert = () => {
               <div class="float-right">
                 <AstrosWriteButton
                   class="btn btn-primary w-35 px-5 py-0.75"
-                  aria-label="$t('format')"
                   @click="openFormatModal"
                 >
                   {{ $t('format') }}
@@ -177,11 +218,26 @@ const closeAlert = () => {
               <div class="float-right">
                 <button
                   class="btn btn-primary w-35 px-5 py-0.75"
-                  aria-label="$t('download')"
                   @click="downloadLogs"
                 >
                   {{ $t('download') }}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
+          <div class="text-2xl w-45">{{ $t('utility_view.change_password') }}</div>
+          <div class="grow">
+            <div class="flex flex-row flex-nowrap">
+              <div class="grow"></div>
+              <div class="float-right">
+                <AstrosWriteButton
+                  class="btn btn-primary w-35 px-5 py-0.75"
+                  @click="openChangePasswordModal"
+                >
+                  {{ $t('change') }}
+                </AstrosWriteButton>
               </div>
             </div>
           </div>
@@ -236,6 +292,15 @@ const closeAlert = () => {
           <button>{{ $t('close') }}</button>
         </form>
       </dialog>
+
+      <!-- Change Password Modal -->
+      <AstrosChangePasswordModal
+        v-if="showChangePasswordModal"
+        :error-message="changePasswordError"
+        @cancel="closeChangePasswordModal"
+        @accept="changePassword"
+        @dirty="changePasswordError = ''"
+      />
 
       <!-- Alert Modal -->
       <dialog

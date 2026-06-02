@@ -15,24 +15,25 @@ buttons. Changes the single `admin` account's password.
 
 ## Tasks
 
-- [ ] **Backend repo + endpoint (TDD):** add `UserRepository.updatePassword(user)`;
+- [x] **Backend repo + endpoint (TDD):** add `UserRepository.updatePassword(user)`;
       add authenticated `POST /api/changePassword` in `authentication_controller.ts`
-      (wrong old → 401, new < 8 → 400, success persists fresh hash); thread `auth`+`db`
-      into `registerAuthRoutes` and update the `api_server.ts` call site. Tests:
-      repo update + endpoint behaviors (in-memory DB).
-- [ ] **`AstrosFieldPassword` enhancement:** optional backward-compatible `placeholder`
-      + `ariaLabel` props (default to current values) so three fields have distinct
-      accessible names.
-- [ ] **`AstrosChangePasswordModal` component (+ stories, types, spec):** three labeled
+      (wrong old → 403, new < 8 / non-string → 400, success persists fresh hash); thread
+      `auth`+`db` into `registerAuthRoutes` and update the `api_server.ts` call site.
+      Tests: repo update + endpoint behaviors (in-memory DB). 403 (not 401) so the
+      frontend's global 401-logout interceptor doesn't sign the user out mid-change.
+- [x] **`AstrosFieldPassword` enhancement:** optional backward-compatible `placeholder`,
+      `ariaLabel`, `inputId` props (default to current values) so three fields have
+      distinct accessible names and label associations.
+- [x] **`AstrosChangePasswordModal` component (+ stories, types, spec):** three labeled
       password fields, client validation (old non-empty, new ≥ 8, confirm === new),
       inline `role="alert"` errors, `errorMessage` prop for server errors, emits
-      `cancel` / `accept({ oldPassword, newPassword })`. Frontend test: validation +
-      emits + error display.
-- [ ] **`UtilityView.vue` wiring + endpoint const + i18n:** add `CHANGE_PASSWORD` to
+      `cancel` / `accept({ oldPassword, newPassword })` / `dirty`. Frontend test:
+      validation + emits + error display.
+- [x] **`UtilityView.vue` wiring + endpoint const + i18n:** add `CHANGE_PASSWORD` to
       `endpoints.ts`; add the Change Password row + modal toggle + POST handler
       (success → close + Alert "Password updated"; failure → error into modal); add
       `utility_view.*` i18n keys to `enUS.json`.
-- [ ] **QA plan:** add `.docs/qa/change-password.md`.
+- [x] **QA plan:** add `.docs/qa/change-password.md`.
 
 ## Verification
 

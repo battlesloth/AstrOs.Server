@@ -4,6 +4,24 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Optional overrides so multiple password fields on one form (e.g. current /
+  // new / confirm) can have distinct placeholders and accessible names.
+  // Empty defaults preserve the original single-field behavior.
+  placeholder: {
+    type: String,
+    default: '',
+  },
+  ariaLabel: {
+    type: String,
+    default: '',
+  },
+  // Forwarded to the inner <input> so an external <label for="..."> can be
+  // associated with it (the wrapping label here is daisyUI styling, not a
+  // form label). Omitted attribute when empty.
+  inputId: {
+    type: String,
+    default: '',
+  },
 });
 
 const password = defineModel<string>({
@@ -25,25 +43,27 @@ defineEmits<{
       />
       <input
         v-if="!props.validatePassword"
+        :id="props.inputId || undefined"
         v-model="password"
         type="password"
         required
-        :placeholder="$t('placeholder.password')"
-        :title="$t('placeholder.password')"
+        :placeholder="props.placeholder || $t('placeholder.password')"
+        :title="props.placeholder || $t('placeholder.password')"
         @keydown.enter="$emit('enter')"
-        aria-label="password"
+        :aria-label="props.ariaLabel || 'password'"
       />
       <input
         v-if="props.validatePassword"
+        :id="props.inputId || undefined"
         v-model="password"
         type="password"
         required
-        :placeholder="$t('placeholder.password')"
+        :placeholder="props.placeholder || $t('placeholder.password')"
         minlength="8"
         pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}"
-        :title="$t('placeholder.password')"
+        :title="props.placeholder || $t('placeholder.password')"
         @keydown.enter="$emit('enter')"
-        aria-label="password"
+        :aria-label="props.ariaLabel || 'password'"
       />
     </label>
     <p
