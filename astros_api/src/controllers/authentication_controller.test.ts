@@ -94,13 +94,15 @@ describe('Authentication - changePassword', () => {
     expect(user.validatePassword(CURRENT_PASSWORD)).toBe(false);
   });
 
-  it('should return 401 when the current password is wrong', async () => {
+  it('should return 403 when the current password is wrong', async () => {
+    // 403 (not 401) so the frontend's global 401-logout interceptor does not
+    // sign the user out mid-change.
     const req: any = { body: { oldPassword: 'wrongpassword', newPassword: 'newpassword123' } };
     const res = mockRes();
 
     await changePassword(db, req, res, vi.fn());
 
-    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.status).toHaveBeenCalledWith(403);
 
     // Password must remain unchanged after a failed attempt.
     const user = await new UserRepository(db).getByUsername('admin');
@@ -161,13 +163,13 @@ describe('Authentication - changePassword', () => {
     expect(res.status).toHaveBeenCalledWith(400);
   });
 
-  it('should return 401 when the old password is not a string', async () => {
+  it('should return 403 when the old password is not a string', async () => {
     const req: any = { body: { oldPassword: 42, newPassword: 'newpassword123' } };
     const res = mockRes();
 
     await changePassword(db, req, res, vi.fn());
 
-    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.status).toHaveBeenCalledWith(403);
 
     const user = await new UserRepository(db).getByUsername('admin');
     expect(user.validatePassword(CURRENT_PASSWORD)).toBe(true);

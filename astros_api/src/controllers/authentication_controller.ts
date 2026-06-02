@@ -97,14 +97,18 @@ export async function changePassword(db: Kysely<Database>, req: any, res: any, n
     }
 
     // Coerce a non-string old password to '' so it fails validation as a
-    // 401 (wrong password) rather than throwing inside pbkdf2Sync.
+    // wrong-password 403 rather than throwing inside pbkdf2Sync.
     const oldPassword = typeof req.body?.oldPassword === 'string' ? req.body.oldPassword : '';
 
     const repository = new UserRepository(db);
     const user = await repository.getByUsername(ADMIN_USERNAME);
 
     if (!user.validatePassword(oldPassword)) {
-      res.status(401);
+      // 403, not 401: the caller IS authenticated (valid JWT) but supplied the
+      // wrong current password. The frontend's global 401 interceptor clears the
+      // session and redirects to login, so a 401 here would log the user out
+      // mid-change instead of surfacing the error in the modal.
+      res.status(403);
       res.json({ message: 'Current password is incorrect' });
       return;
     }
