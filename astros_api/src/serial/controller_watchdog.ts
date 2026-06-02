@@ -1,4 +1,4 @@
-import { StatusResponse, TransmissionType } from 'src/models/index.js';
+import { StatusResponse, TransmissionType, type LocationName } from 'src/models/index.js';
 
 /** How long a controller may be silent (no POLL_ACK) before it is marked DOWN. */
 export const STATUS_STALE_TIMEOUT_MS = 10_000;
@@ -9,7 +9,7 @@ export const STATUS_SWEEP_INTERVAL_MS = 2_000;
 export interface ControllerIdentity {
   controllerId: string;
   controllerAddress: string;
-  controllerLocation: string; // body | core | dome — the key the frontend reads
+  controllerLocation: LocationName; // body | core | dome — the key the frontend reads
 }
 
 /**
@@ -79,7 +79,6 @@ export function buildDownStatus(id: ControllerIdentity): StatusResponse {
     controllerLocation: id.controllerLocation,
     up: false,
     synced: false,
-    firmwareVersion: '',
     firmwareCompatible: false,
   };
 }

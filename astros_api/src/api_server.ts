@@ -54,6 +54,7 @@ import {
   ScriptResponse,
   TransmissionStatus,
   ModuleSubType,
+  isLocationName,
 } from './models/index.js';
 import { ControllerRepository } from './dal/repositories/controller_repository.js';
 import { createConfigSync } from './models/config/config_sync.js';
@@ -666,15 +667,23 @@ export class ApiServer {
 
       this.serialPort.on('error', (err: any) => {
         logger.error(`Serial port error: ${err}`);
-        for (const id of this.controllerWatchdog.markAllDown()) {
-          this.updateClients(buildDownStatus(id));
+        try {
+          for (const id of this.controllerWatchdog.markAllDown()) {
+            this.updateClients(buildDownStatus(id));
+          }
+        } catch (e) {
+          logger.error(`markAllDown broadcast (serial error) failed: ${e}`);
         }
       });
 
       this.serialPort.on('close', () => {
         logger.warn('Serial port closed');
-        for (const id of this.controllerWatchdog.markAllDown()) {
-          this.updateClients(buildDownStatus(id));
+        try {
+          for (const id of this.controllerWatchdog.markAllDown()) {
+            this.updateClients(buildDownStatus(id));
+          }
+        } catch (e) {
+          logger.error(`markAllDown broadcast (serial close) failed: ${e}`);
         }
       });
 
@@ -691,11 +700,15 @@ export class ApiServer {
       // Suppressed during an OTA flash — the master reboots and polls pause past
       // the timeout, and the firmware-stages board owns status then.
       this.statusSweepTimer = setInterval(() => {
-        if (this.flashOrchestrator?.getCurrentJob()) {
-          return;
-        }
-        for (const id of this.controllerWatchdog.sweep(Date.now())) {
-          this.updateClients(buildDownStatus(id));
+        try {
+          if (this.flashOrchestrator?.getCurrentJob()) {
+            return;
+          }
+          for (const id of this.controllerWatchdog.sweep(Date.now())) {
+            this.updateClients(buildDownStatus(id));
+          }
+        } catch (err) {
+          logger.error(`status sweep failed: ${err}`);
         }
       }, STATUS_SWEEP_INTERVAL_MS);
       this.statusSweepTimer.unref();
@@ -1038,14 +1051,20 @@ export class ApiServer {
         firmwareCompatible,
       };
 
-      this.controllerWatchdog.recordAck(
-        {
-          controllerId: controller.id,
-          controllerAddress: val.controller.address,
-          controllerLocation: location.locationName,
-        },
-        Date.now(),
-      );
+      if (isLocationName(location.locationName)) {
+        this.controllerWatchdog.recordAck(
+          {
+            controllerId: controller.id,
+            controllerAddress: val.controller.address,
+            controllerLocation: location.locationName,
+          },
+          Date.now(),
+        );
+      } else {
+        logger.error(
+          `handlePollResponse: unexpected location name '${location.locationName}' for controller ${controller.id}; skipping watchdog tracking`,
+        );
+      }
 
       this.updateClients(update);
     } catch (error) {

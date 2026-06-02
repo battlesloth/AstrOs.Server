@@ -79,6 +79,14 @@ describe('ControllerWatchdog', () => {
     expect(wd.markAllDown()).toEqual([]); // already down
   });
 
+  it('markAllDown re-arms after a recovering ack (close → reconnect → close)', () => {
+    const wd = new ControllerWatchdog();
+    wd.recordAck(dome, 0);
+    expect(wd.markAllDown()).toEqual([dome]);
+    wd.recordAck(dome, 100); // reconnected
+    expect(wd.markAllDown()).toEqual([dome]); // can be flagged again
+  });
+
   it('a sweep after markAllDown does not re-emit', () => {
     const wd = new ControllerWatchdog();
     wd.recordAck(dome, 0);
@@ -96,7 +104,6 @@ describe('ControllerWatchdog', () => {
       controllerLocation: 'dome',
       up: false,
       synced: false,
-      firmwareVersion: '',
       firmwareCompatible: false,
     });
   });

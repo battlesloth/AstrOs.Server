@@ -117,17 +117,19 @@ the frontend's default `DOWN` covers cold-start, with no spurious up→down chur
   instance, and `clearInterval`'d in the existing shutdown path. Created inside
   the serial-setup block that already no-ops under `NODE_ENV=test`.
 - **Fast-path:** the `'close'` and `'error'` handlers (`:659-665`) additionally
-  `for (const id of this.watchdog.markAllDown(Date.now())) this.updateClients(buildDownStatus(id))`.
+  `for (const id of this.watchdog.markAllDown()) this.updateClients(buildDownStatus(id))`.
 
 ### The DOWN message — `buildDownStatus(id): StatusResponse`
 
-Identical shape to the live path, `up:false`, fields the frontend ignores when
-`!up` set to inert defaults:
+Identical shape to the live path, `up:false`. The inert `synced`/`firmwareCompatible`
+fields are ignored when `!up`. `firmwareVersion` is omitted so the UI keeps showing
+a dash (its `?? '—'` fallback) rather than a blank, which would clobber the
+last-known version during an outage.
 
 ```ts
 { type: TransmissionType.status, success: true, message: '',
   controllerId, controllerAddress, controllerLocation,
-  up: false, synced: false, firmwareVersion: '', firmwareCompatible: false }
+  up: false, synced: false, firmwareCompatible: false }
 ```
 
 ### Recovery — free
