@@ -17,6 +17,8 @@ import {
   IoAdd,
   IoHelpCircleOutline,
   IoCreate,
+  IoEyeOutline,
+  IoEyeOffOutline,
 } from 'oh-vue-icons/icons';
 import { MdDescription, MdDraghandle, MdFolder } from 'oh-vue-icons/icons/md';
 import App from './App.vue';
@@ -39,6 +41,8 @@ addIcons(
   IoAdd,
   IoHelpCircleOutline,
   IoCreate,
+  IoEyeOutline,
+  IoEyeOffOutline,
   MdDescription,
   MdDraghandle,
   MdFolder,
