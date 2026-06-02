@@ -229,7 +229,6 @@ export function buildDownStatus(id: ControllerIdentity): StatusResponse {
     controllerLocation: id.controllerLocation,
     up: false,
     synced: false,
-    firmwareVersion: '',
     firmwareCompatible: false,
   };
 }
