@@ -119,6 +119,10 @@ export async function changePassword(db: Kysely<Database>, req: any, res: any, n
     res.status(200);
     res.json({ message: 'success' });
   } catch (error) {
+    // Intentionally collapses every unexpected failure (a missing/corrupt admin
+    // row from getByUsername/updatePassword, a transient DB fault) into a
+    // generic 500. The full error is logged for the operator; the client maps
+    // any non-403 to a generic "check logs" message.
     logger.error(error);
 
     res.status(500);

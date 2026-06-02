@@ -234,6 +234,7 @@ const changePassword = async (payload: ChangePasswordPayload) => {
               <div class="float-right">
                 <AstrosWriteButton
                   class="btn btn-primary w-35 px-5 py-0.75"
+                  data-testid="change-password-open"
                   @click="openChangePasswordModal"
                 >
                   {{ $t('change') }}

@@ -5,8 +5,9 @@ import { AstrosFieldPassword } from '@/components/common';
 import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
 import type { ChangePasswordPayload } from './types';
 
-// Length only — no complexity rule by design. Mirrors the server-side guard
-// in authentication_controller.ts (MIN_PASSWORD_LENGTH).
+// Length only — no complexity rule by design. Must stay in sync with
+// MIN_PASSWORD_LENGTH in authentication_controller.ts; there is no shared
+// constant across the api / vue packages.
 const MIN_PASSWORD_LENGTH = 8;
 
 const props = withDefaults(
