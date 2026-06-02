@@ -683,7 +683,7 @@ export class ApiServer {
             this.updateClients(buildDownStatus(id));
           }
         } catch (e) {
-          logger.error(`markAllDown broadcast (serial close) failed: ${e}`);
+          logger.error({ err: e }, 'markAllDown broadcast (serial close) failed');
         }
       });
 
