@@ -1,20 +1,19 @@
 services:
   astros:
-    platform: linux/arm64/v8
-    image: 'dirtknap/astros-server:latest'
+    image: 'ghcr.io/battlesloth/astros-server:latest'
     restart: unless-stopped
     ports:
       - 80:80
       - 5000:5000
       - 3000:3000
+    environment:
+      - CORS_ORIGIN=http://localhost
     volumes:
       - /home/astros/.config/astrosserver:/root/.config/astrosserver
-    environment:
-      - CORS_ORIGIN=http://<ip_address>:5173
     networks:
       - astronet
     devices:
-      - '/dev/ttyAMA0:/dev/ttyS0'
+      - 'dev/ttyAMA0:/dev/ttyS0'
 
 networks:
   astronet:
