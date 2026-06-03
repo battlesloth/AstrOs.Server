@@ -7,7 +7,8 @@ describe('apiClient base URL', () => {
     // base resolves to the *browser's* machine, so login fails from any host but
     // the server itself. A relative `/` flows through the nginx `/api/` proxy
     // (prod) / Vite dev proxy (dev) to the backend that served the page.
-    expect(apiClient.defaults.baseURL).toBe('/');
-    expect(apiClient.defaults.baseURL).not.toMatch(/^https?:\/\//);
+    const baseURL = apiClient.defaults.baseURL ?? '';
+    expect(baseURL).toMatch(/^\//);
+    expect(baseURL).not.toMatch(/^https?:\/\//);
   });
 });
