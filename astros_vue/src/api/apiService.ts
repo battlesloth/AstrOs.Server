@@ -5,7 +5,13 @@ import router from '@/router';
 // after Pinia is created — keeps this module dependency-free of stores and
 // avoids the circular-dep trap (apiService → store → apiService).
 export const apiClient = axios.create({
-  baseURL: import.meta.env.BACKEND_API || 'http://localhost:3000',
+  // Same-origin relative base so requests flow through the nginx `/api/` proxy
+  // in prod (or the Vite dev proxy in dev) and reach the backend on whichever
+  // host served the page — not the browser's own `localhost`. Use `/` (not '')
+  // so `api/...` endpoints anchor at root regardless of the current route.
+  // VITE_BACKEND_API is an optional build-time override (must be baked into the
+  // bundle at `npm run build` — a runtime container env var is not visible here).
+  baseURL: import.meta.env.VITE_BACKEND_API || '/',
   headers: {
     'Content-Type': 'application/json',
   },
