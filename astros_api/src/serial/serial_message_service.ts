@@ -1,18 +1,17 @@
 import { v4 } from 'uuid';
-import { logger } from '../logger.js';
+import { logger } from 'src/logger.js';
 import { MessageGenerator } from './message_generator.js';
 import { MessageHandler } from './message_handler.js';
 import { SerialMessageType } from './serial_message.js';
-import {
+import { SerialWorkerResponseType } from './serial_worker_response.js';
+import type {
   ConfigSyncResponse,
   ISerialWorkerResponse,
   RegistrationResponse,
   ScriptDeployResponse,
-  SerialWorkerResponseType,
 } from './serial_worker_response.js';
 import { SerialMessageTracker } from './serial_message_tracker.js';
 import { MessageHelper } from './message_helper.js';
-import { ControlModule } from '../models/index.js';
 
 export class SerialMessageService {
   messageHandler: MessageHandler = new MessageHandler();
@@ -89,6 +88,27 @@ export class SerialMessageService {
           validationResult.type,
           validationResult.data,
         );
+        break;
+      case SerialMessageType.FW_TRANSFER_BEGIN_ACK:
+        result = this.messageHandler.handleFwTransferBeginAck(validationResult.data);
+        break;
+      case SerialMessageType.FW_CHUNK_ACK:
+        result = this.messageHandler.handleFwChunkAck(validationResult.data);
+        break;
+      case SerialMessageType.FW_CHUNK_NAK:
+        result = this.messageHandler.handleFwChunkNak(validationResult.data);
+        break;
+      case SerialMessageType.FW_TRANSFER_END_ACK:
+        result = this.messageHandler.handleFwTransferEndAck(validationResult.data);
+        break;
+      case SerialMessageType.FW_PROGRESS:
+        result = this.messageHandler.handleFwProgress(validationResult.data);
+        break;
+      case SerialMessageType.FW_DEPLOY_DONE:
+        result = this.messageHandler.handleFwDeployDone(validationResult.data);
+        break;
+      case SerialMessageType.FW_BACKPRESSURE:
+        result = this.messageHandler.handleFwBackpressure(validationResult.data);
         break;
     }
 
@@ -180,19 +200,30 @@ export class SerialMessageService {
 
     switch (tracker.type) {
       case SerialMessageType.REGISTRATION_SYNC:
-        result.push(new RegistrationResponse(false));
+        result.push({
+          type: SerialWorkerResponseType.REGISTRATION_SYNC,
+          success: false,
+          registrations: [],
+        } as RegistrationResponse);
         break;
       case SerialMessageType.DEPLOY_CONFIG:
         for (const controller of failed) {
-          const csr = new ConfigSyncResponse(false);
-          csr.controller = new ControlModule('', '', controller);
+          const csr = {
+            type: SerialWorkerResponseType.CONFIG_SYNC,
+            success: false,
+            controller: { id: '', name: '', address: controller },
+          } as ConfigSyncResponse;
           result.push(csr);
         }
         break;
       case SerialMessageType.DEPLOY_SCRIPT:
         for (const controller of failed) {
-          const sdr = new ScriptDeployResponse(false, tracker.metaData);
-          sdr.controller = new ControlModule('', '', controller);
+          const sdr = {
+            type: SerialWorkerResponseType.SCRIPT_DEPLOY,
+            success: false,
+            scriptId: tracker.metaData,
+            controller: { id: '', name: '', address: controller },
+          } as ScriptDeployResponse;
           result.push(sdr);
         }
         break;

@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue';
+import { ref, shallowRef, type Ref } from 'vue';
 import { Container, FederatedPointerEvent, type ContainerChild } from 'pixi.js';
 import { PixiChannelEvent } from '@/pixiComponents/pixiChannelEvent';
 import type { ScriptEvent } from '@/models';
@@ -14,9 +14,17 @@ export function useEventBoxes(
   rowHeight: number,
   onEditEvent: (event: ScriptEvent) => void,
 ) {
-  const channelEventBoxes = ref<Map<string, PixiChannelEvent[]>>(new Map());
+  // shallowRef (not ref): these hold PixiChannelEvent instances. A deep
+  // reactive proxy from ref() wraps every property access, so a box read back
+  // out of the map (e.g. in rebuildEventBox) is a Vue Proxy, not the raw
+  // object in the Pixi scene graph. rebuild() then mutates the proxy's
+  // children, and PixiJS's render-group dirty-tracking — which keys on the raw
+  // object's identity — never picks up the change, so an edited event vanishes
+  // until an unrelated transform (zoom) forces a full re-render. Keeping these
+  // shallow stores the raw instances. See AstrosPixiView.vue's shallowRef note.
+  const channelEventBoxes = shallowRef<Map<string, PixiChannelEvent[]>>(new Map());
   const isDraggingEventBox = ref(false);
-  const draggedEventBox = ref<PixiChannelEvent | null>(null);
+  const draggedEventBox = shallowRef<PixiChannelEvent | null>(null);
   const eventBoxDragStartX = ref(0);
   const eventBoxStartTime = ref(0);
   const hasEventBoxDragged = ref(false);
@@ -95,7 +103,29 @@ export function useEventBoxes(
       if (removedBox.parent) {
         removedBox.parent.removeChild(removedBox as unknown as ContainerChild);
       }
+      // Destroy so any pending Assets.load callbacks short-circuit and
+      // pointer listeners are cleaned up.
+      removedBox.destroy({ children: true });
     }
+  }
+
+  /**
+   * Removes and destroys every event box for a channel. Called when the
+   * channel itself is being removed — ensures all PixiChannelEvent instances
+   * for that channel have their listeners cleaned up and their in-flight
+   * Assets.load callbacks short-circuited.
+   */
+  function removeAllEventBoxesForChannel(channelId: string) {
+    const eventBoxes = channelEventBoxes.value.get(channelId);
+    if (!eventBoxes) return;
+
+    for (const box of eventBoxes) {
+      if (box.parent) {
+        box.parent.removeChild(box as unknown as ContainerChild);
+      }
+      box.destroy({ children: true });
+    }
+    channelEventBoxes.value.delete(channelId);
   }
 
   /**
@@ -191,6 +221,7 @@ export function useEventBoxes(
     // Methods
     addEventBox,
     removeEventBox,
+    removeAllEventBoxesForChannel,
     rebuildEventBox,
     updateEventBoxPositions,
     updateAllEventBoxPositions,

@@ -1,5 +1,5 @@
-import { ModuleSubType } from '../../../../enums.js';
-import { UartChannel } from '../../uart_channel.js';
+import { ModuleSubType } from 'src/models/enums.js';
+import { UartChannel } from 'src/models/control_module/uart/uart_channel.js';
 
 export class KangarooX2Channel extends UartChannel {
   ch1Name: string;

@@ -1,22 +1,16 @@
+import { LocationName } from '../constants.js';
 import { DeploymentStatus } from './deployment_status.js';
 import { ScriptChannel } from './script_channel.js';
 
-export class Script {
+export interface Script {
   id: string;
   scriptName: string;
   description: string;
   lastSaved: Date;
-
-  deploymentStatus: Record<string, DeploymentStatus>;
-
+  durationDS: number;
+  playlistCount: number;
+  // Keyed by location name ('body'|'core'|'dome'); the WS update path and every
+  // frontend consumer look it up by that name. A UUID key is now a type error.
+  deploymentStatus: Partial<Record<LocationName, DeploymentStatus>>;
   scriptChannels: Array<ScriptChannel>;
-
-  constructor(id: string, scriptName: string, description: string, lastSaved: Date) {
-    this.id = id;
-    this.scriptName = scriptName;
-    this.description = description;
-    this.lastSaved = lastSaved;
-    this.deploymentStatus = {};
-    this.scriptChannels = new Array<ScriptChannel>();
-  }
 }

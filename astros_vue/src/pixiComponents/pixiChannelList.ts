@@ -1,4 +1,4 @@
-import { Container, TextStyle, Text, Graphics, FillGradient } from 'pixi.js';
+import { Container, TextStyle, Text, Graphics } from 'pixi.js';
 import type { PixiChannelData } from './pixiChannelData';
 
 export interface PixiChannelListOptions {
@@ -67,15 +67,11 @@ export class PixiChannelList extends Container {
       this.options.emitAddChannel();
     });
 
-    const fill = new FillGradient(0, 0, 1, 1);
-    fill.addColorStop(0, this.buttonTextColor);
-    fill.addColorStop(1, this.buttonTextColor);
-
     const style = new TextStyle({
       fontFamily: 'Arial',
       fontSize: 20,
       fontWeight: 'bold',
-      fill: fill,
+      fill: this.buttonTextColor,
     });
 
     const buttonText = new Text({
@@ -95,7 +91,7 @@ export class PixiChannelList extends Container {
     buttonText.y = buttonHeight / 2 - 8;
 
     buttonContainer.addChild(buttonText);
-    buttonContainer.zIndex = 10; // Ensure it's on top
+    buttonContainer.zIndex = 10;
     this.addChild(buttonContainer);
   }
 
@@ -111,6 +107,9 @@ export class PixiChannelList extends Container {
     if (row && this.channelListScrollableContainer) {
       this.channelListScrollableContainer.removeChild(row);
       this.channels.delete(channelId);
+      // Destroy after detaching so listeners and sprite children are cleaned
+      // up — prevents leaked pointer handlers and stale Assets.load callbacks.
+      row.destroy({ children: true });
     }
   }
 

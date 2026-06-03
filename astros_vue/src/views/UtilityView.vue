@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { AstrosLayout } from '@/components';
+import AstrosWriteButton from '@/components/common/AstrosWriteButton.vue';
+import AstrosChangePasswordModal from '@/components/modals/changePasswordModal/AstrosChangePasswordModal.vue';
+import type { ChangePasswordPayload } from '@/components/modals/changePasswordModal/types';
 import apiService from '@/api/apiService';
+import { CHANGE_PASSWORD } from '@/api/endpoints';
 import type { ControllerModule } from '@/models';
+import { useI18n } from 'vue-i18n';
 
 interface SelectedControllerModule extends ControllerModule {
   selected: boolean;
@@ -15,8 +20,15 @@ const showFormatModal = ref(false);
 const selectedControllers = ref<SelectedControllerModule[]>([]);
 const showAlert = ref(false);
 const alertMessage = ref('');
+const showChangePasswordModal = ref(false);
+// i18n key for a server-reported change-password error, passed to the modal.
+const changePasswordError = ref('');
+// Guards against a double submit (Enter + click) firing two POSTs.
+const changingPassword = ref(false);
 
 const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+
+const { t } = useI18n();
 
 // Load data on mount
 onMounted(async () => {
@@ -67,10 +79,11 @@ const downloadLogs = async () => {
     document.body.appendChild(link);
     link.click();
     link.remove();
+    window.URL.revokeObjectURL(url);
   } catch (error) {
     console.error('Error downloading logs:', error);
     showAlert.value = true;
-    alertMessage.value = 'Error downloading logs. Check logs.';
+    alertMessage.value = t('utility_view.download_error');
   }
 };
 
@@ -97,24 +110,59 @@ const confirmFormat = async () => {
 
   if (controllersToFormat.length === 0) {
     showAlert.value = true;
-    alertMessage.value = 'Please select at least one controller to format.';
+    alertMessage.value = t('utility_view.select_controller_error');
     return;
   }
 
   try {
     await apiService.post('/api/settings/formatSD', { controllers: controllersToFormat });
     showAlert.value = true;
-    alertMessage.value = 'Format queued!';
+    alertMessage.value = t('utility_view.format_queued');
     closeFormatModal();
   } catch (error) {
     console.error('Error requesting format:', error);
     showAlert.value = true;
-    alertMessage.value = 'Error requesting format. Check logs.';
+    alertMessage.value = t('utility_view.format_error');
   }
 };
 
 const closeAlert = () => {
   showAlert.value = false;
+};
+
+// Change password modal
+const openChangePasswordModal = () => {
+  changePasswordError.value = '';
+  showChangePasswordModal.value = true;
+};
+
+const closeChangePasswordModal = () => {
+  showChangePasswordModal.value = false;
+};
+
+const changePassword = async (payload: ChangePasswordPayload) => {
+  if (changingPassword.value) return;
+  changingPassword.value = true;
+  // Clear any prior server error before retrying.
+  changePasswordError.value = '';
+
+  try {
+    await apiService.post(CHANGE_PASSWORD, payload);
+    showChangePasswordModal.value = false;
+    showAlert.value = true;
+    alertMessage.value = t('utility_view.change_password_success');
+  } catch (error) {
+    console.error('Error changing password:', error);
+    // 403 = wrong current password (kept distinct from the 401 the global
+    // interceptor uses for session expiry). Anything else is a generic failure.
+    const status = (error as { response?: { status?: number } })?.response?.status;
+    changePasswordError.value =
+      status === 403
+        ? 'utility_view.current_password_incorrect'
+        : 'utility_view.change_password_error';
+  } finally {
+    changingPassword.value = false;
+  }
 };
 </script>
 
@@ -128,7 +176,7 @@ const closeAlert = () => {
       </div>
       <div class="max-w-3xl mx-auto">
         <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
-          <div class="text-2xl w-45">API Key</div>
+          <div class="text-2xl w-45">{{ $t('utility_view.api_key') }}</div>
           <div class="grow">
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
@@ -136,34 +184,34 @@ const closeAlert = () => {
                 {{ apiKey }}
               </div>
               <div class="float-right">
-                <button
+                <AstrosWriteButton
                   class="btn btn-primary w-35 px-5 py-0.75"
                   @click="generateApiKey"
                 >
-                  Generate
-                </button>
+                  {{ $t('generate') }}
+                </AstrosWriteButton>
               </div>
             </div>
           </div>
         </div>
         <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
-          <div class="text-2xl w-45">Format SD Card</div>
+          <div class="text-2xl w-45">{{ $t('utility_view.format_sd') }}</div>
           <div class="grow">
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
               <div class="float-right">
-                <button
+                <AstrosWriteButton
                   class="btn btn-primary w-35 px-5 py-0.75"
                   @click="openFormatModal"
                 >
-                  Format
-                </button>
+                  {{ $t('format') }}
+                </AstrosWriteButton>
               </div>
             </div>
           </div>
         </div>
         <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
-          <div class="text-2xl w-45">Log Files</div>
+          <div class="text-2xl w-45">{{ $t('utility_view.log_files') }}</div>
           <div class="grow">
             <div class="flex flex-row flex-nowrap">
               <div class="grow"></div>
@@ -172,8 +220,25 @@ const closeAlert = () => {
                   class="btn btn-primary w-35 px-5 py-0.75"
                   @click="downloadLogs"
                 >
-                  Download
+                  {{ $t('download') }}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex flex-row flex-wrap border-b-2 border-black m-5 p-2">
+          <div class="text-2xl w-45">{{ $t('utility_view.change_password') }}</div>
+          <div class="grow">
+            <div class="flex flex-row flex-nowrap">
+              <div class="grow"></div>
+              <div class="float-right">
+                <AstrosWriteButton
+                  class="btn btn-primary w-35 px-5 py-0.75"
+                  data-testid="change-password-open"
+                  @click="openChangePasswordModal"
+                >
+                  {{ $t('change') }}
+                </AstrosWriteButton>
               </div>
             </div>
           </div>
@@ -186,7 +251,7 @@ const closeAlert = () => {
         class="modal modal-open"
       >
         <div class="modal-box">
-          <h3 class="font-bold text-lg mb-4">Format Module SD Card</h3>
+          <h3 class="font-bold text-lg mb-4">{{ $t('utility_view.format_modal_title') }}</h3>
           <div class="py-5">
             <div class="max-h-96 overflow-y-auto">
               <div
@@ -206,17 +271,17 @@ const closeAlert = () => {
             </div>
           </div>
           <div class="modal-action">
-            <button
+            <AstrosWriteButton
               class="btn btn-primary"
               @click="confirmFormat"
             >
-              OK
-            </button>
+              {{ $t('ok') }}
+            </AstrosWriteButton>
             <button
               class="btn"
               @click="closeFormatModal"
             >
-              Close
+              {{ $t('close') }}
             </button>
           </div>
         </div>
@@ -225,9 +290,18 @@ const closeAlert = () => {
           class="modal-backdrop"
           @click="closeFormatModal"
         >
-          <button>Close</button>
+          <button>{{ $t('close') }}</button>
         </form>
       </dialog>
+
+      <!-- Change Password Modal -->
+      <AstrosChangePasswordModal
+        v-if="showChangePasswordModal"
+        :error-message="changePasswordError"
+        @cancel="closeChangePasswordModal"
+        @accept="changePassword"
+        @dirty="changePasswordError = ''"
+      />
 
       <!-- Alert Modal -->
       <dialog
@@ -235,14 +309,14 @@ const closeAlert = () => {
         class="modal modal-open"
       >
         <div class="modal-box">
-          <h3 class="font-bold text-lg">Alert</h3>
+          <h3 class="font-bold text-lg">{{ $t('modals.alert.title') }}</h3>
           <p class="py-4">{{ alertMessage }}</p>
           <div class="modal-action">
             <button
               class="btn"
               @click="closeAlert"
             >
-              Close
+              {{ $t('close') }}
             </button>
           </div>
         </div>
@@ -251,7 +325,7 @@ const closeAlert = () => {
           class="modal-backdrop"
           @click="closeAlert"
         >
-          <button>Close</button>
+          <button>{{ $t('close') }}</button>
         </form>
       </dialog>
     </template>

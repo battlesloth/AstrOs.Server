@@ -1,5 +1,7 @@
-import process from 'node:process'
-import { defineConfig, devices } from '@playwright/test'
+import process from 'node:process';
+import { defineConfig, devices } from '@playwright/test';
+
+const reuseExistingServers = process.env.PW_REUSE_SERVER === '1';
 
 /**
  * Read environment variables from file.
@@ -99,12 +101,12 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-      command: 'npm run-script start:server',
+      command: 'NODE_ENV=test npm run-script start:server',
       url: 'http://127.0.0.1:3000',
       timeout: 120 * 1000, // 2 minutes timeout
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: reuseExistingServers,
       ignoreHTTPSErrors: true,
-      stdout: 'pipe'
+      stdout: 'pipe',
     },
     /**
      * Use the dev server by default for faster feedback loop.
@@ -112,9 +114,11 @@ export default defineConfig({
      * Playwright will re-use the local server if there is already a dev-server running.
      */
     {
-      command: process.env.CI ? 'npm run preview' : 'npm run dev',
-      port: process.env.CI ? 4173 : 5173,
-      reuseExistingServer: !process.env.CI,
+      command: process.env.CI
+        ? 'npm run preview -- --host localhost --port 4173 --strictPort'
+        : 'npm run dev -- --host localhost --port 5173 --strictPort',
+      url: process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173',
+      reuseExistingServer: reuseExistingServers,
     },
   ],
-})
+});

@@ -50,13 +50,39 @@
       "userDataDir": "${workspaceRoot}/.vscode/edge"
     },
     {
-      "name": "vue_browser",
+      "name": "smoke (cli)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/astros_smoke_test",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run-script",
+        "smoke",
+        "--",
+        "${input:smokeScenario}"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "smoke web",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/astros_smoke_test",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run-script",
+        "web:dev"
+      ],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "smoke browser",
       "type": "msedge",
       "request": "launch",
-      "url": "http://localhost:5173",
-      "webRoot": "${workspaceFolder}/astros_vue",
-      "userDataDir": "${workspaceRoot}/.vscode/edge"
-    },
+      "url": "http://localhost:5174",
+      "webRoot": "${workspaceFolder}/astros_smoke_test/src/web/ui",
+      "userDataDir": "${workspaceRoot}/.vscode/edge-smoke"
+    }
   ],
   "compounds": [
     {
@@ -71,8 +97,32 @@
       "name": "server/vue",
       "configurations": [
         "nodejs",
-        "vue",
-        "vue_browser"
+        "vue"
+      ]
+    },
+    {
+      "name": "smoke web + browser",
+      "configurations": [
+        "smoke web",
+        "smoke browser"
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "smokeScenario",
+      "type": "pickString",
+      "description": "Smoke test scenario (destructive ones need --confirm via terminal)",
+      "default": "list",
+      "options": [
+        "list",
+        "sync-only",
+        "format-and-sync",
+        "config-only",
+        "full-happy-path",
+        "direct-command-sweep",
+        "servo-test-sweep",
+        "panic-drill"
       ]
     }
   ]

@@ -77,7 +77,7 @@ const closeModal = () => {
 <template>
   <dialog class="modal modal-open">
     <div class="modal-box max-w-md">
-      <h3 class="text-lg font-bold mb-4">Serial Event</h3>
+      <h3 class="text-lg font-bold mb-4">{{ $t('modals.uart_event.title') }}</h3>
 
       <div class="space-y-4">
         <div v-if="mode !== ModalMode.TEST">
@@ -85,7 +85,7 @@ const closeModal = () => {
             for="time"
             class="label"
           >
-            <span class="label-text">Event Time (seconds)</span>
+            <span class="label-text">{{ $t('modals.uart_event.event_time') }}</span>
           </label>
           <input
             id="time"
@@ -102,7 +102,7 @@ const closeModal = () => {
             for="value"
             class="label"
           >
-            <span class="label-text">Serial Command</span>
+            <span class="label-text">{{ $t('modals.uart_event.serial_command') }}</span>
           </label>
           <input
             id="value"
@@ -126,20 +126,20 @@ const closeModal = () => {
           class="btn btn-primary"
           @click="saveEvent"
         >
-          {{ mode !== ModalMode.TEST ? $t('Save') : $t('Test') }}
+          {{ mode !== ModalMode.TEST ? $t('save') : $t('test') }}
         </button>
         <button
           v-if="mode === ModalMode.EDIT"
           class="btn btn-error"
           @click="removeEvent"
         >
-          {{ $t('Remove') }}
+          {{ $t('remove') }}
         </button>
         <button
           class="btn"
           @click="closeModal"
         >
-          {{ $t('Close') }}
+          {{ $t('close') }}
         </button>
       </div>
     </div>
@@ -148,7 +148,7 @@ const closeModal = () => {
       class="modal-backdrop"
       @click="closeModal"
     >
-      <button>{{ $t('Close') }}</button>
+      <button>{{ $t('close') }}</button>
     </form>
   </dialog>
 </template>

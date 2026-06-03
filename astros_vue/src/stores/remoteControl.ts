@@ -1,68 +1,314 @@
 import apiService from '@/api/apiService';
 import { REMOTE_CONFIG } from '@/api/endpoints';
 import type { RemoteControlPage } from '@/models';
+import { BUTTON_KEYS, type ButtonKey } from '@/models/remoteControl/remoteControlPage';
+import type { PageButton, PageButtonType } from '@/models/remoteControl/pageButton';
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
+
+function defaultButton(name: string): PageButton {
+  return { id: '0', name, type: 'none' };
+}
+
+function defaultPageName(idx: number): string {
+  return `Page ${idx + 1}`;
+}
+
+export function createDefaultPage(idx: number): RemoteControlPage {
+  return {
+    id: crypto.randomUUID(),
+    name: defaultPageName(idx),
+    button1: defaultButton('Button 1'),
+    button2: defaultButton('Button 2'),
+    button3: defaultButton('Button 3'),
+    button4: defaultButton('Button 4'),
+    button5: defaultButton('Button 5'),
+    button6: defaultButton('Button 6'),
+    button7: defaultButton('Button 7'),
+    button8: defaultButton('Button 8'),
+    button9: defaultButton('Button 9'),
+  };
+}
+
+function isPageButtonType(type: unknown): type is PageButtonType {
+  return type === 'none' || type === 'script' || type === 'playlist';
+}
+
+function migrateButton(
+  btn: Pick<PageButton, 'id' | 'name'> & { type?: PageButtonType },
+): PageButton {
+  if (isPageButtonType(btn.type)) return btn as PageButton;
+  const type: PageButtonType = btn.id === '0' ? 'none' : 'script';
+  return { ...btn, type };
+}
+
+function isPageButtonShape(raw: unknown): raw is Pick<PageButton, 'id' | 'name'> {
+  // `Partial<RemoteControlPage>` is a TypeScript fiction here — the value comes
+  // from JSON.parse of stored config and could be anything. Validate per-slot
+  // before letting it reach migrateButton, which spreads `{...btn, type}` — a
+  // string slot would otherwise produce `{0:'a',1:'b',..., type:'script'}` and
+  // a no-`name` slot would surface `undefined` to remote consumers — dropped
+  // by JSON.stringify on the wire, breaking the {name, command} sync contract.
+  if (typeof raw !== 'object' || raw === null) return false;
+  const candidate = raw as Partial<PageButton>;
+  return typeof candidate.id === 'string' && typeof candidate.name === 'string';
+}
+
+export function migratePage(page: Partial<RemoteControlPage>, idx: number): RemoteControlPage {
+  const migrated = {
+    id: typeof page.id === 'string' ? page.id : crypto.randomUUID(),
+    name: typeof page.name === 'string' ? page.name : defaultPageName(idx),
+  } as RemoteControlPage;
+  for (const key of BUTTON_KEYS) {
+    const raw = page[key];
+    if (isPageButtonShape(raw)) {
+      migrated[key] = migrateButton(raw);
+    } else {
+      // Surface the substitution so a user-reported "my Page N slot reset
+      // itself" complaint has a DevTools breadcrumb. The user-facing behavior
+      // stays silent-degrade (no toast); this is for diagnosis only.
+      console.warn(
+        `[remoteControl] migratePage: page ${idx + 1} slot "${key}" had malformed shape; replaced with default. raw:`,
+        raw,
+      );
+      migrated[key] = defaultButton('None');
+    }
+  }
+  return migrated;
+}
 
 export const useRemoteControlStore = defineStore('remoteControl', () => {
   const remoteControlPages = ref<RemoteControlPage[]>([]);
   const isLoading = ref(false);
+  const isSaving = ref(false);
+  const isDirty = ref(false);
+  const selectedIdx = ref(0);
 
   async function loadRemoteControl() {
     isLoading.value = true;
     try {
       const response = (await apiService.get(REMOTE_CONFIG)) as string;
 
-      const result = JSON.parse(response) as RemoteControlPage[];
+      const result = JSON.parse(response) as Partial<RemoteControlPage>[];
 
       if (!Array.isArray(result)) {
+        isLoading.value = false;
         throw new Error('No remote control configuration found');
       }
 
-      if (result.length > 0) {
-        remoteControlPages.value = [...result];
-      } else {
-        remoteControlPages.value = [
-          {
-            button1: { id: '0', name: 'Button 1' },
-            button2: { id: '0', name: 'Button 2' },
-            button3: { id: '0', name: 'Button 3' },
-            button4: { id: '0', name: 'Button 4' },
-            button5: { id: '0', name: 'Button 5' },
-            button6: { id: '0', name: 'Button 6' },
-            button7: { id: '0', name: 'Button 7' },
-            button8: { id: '0', name: 'Button 8' },
-            button9: { id: '0', name: 'Button 9' },
-          },
-        ];
-      }
+      const isFreshSeed = result.length === 0;
+      remoteControlPages.value = isFreshSeed
+        ? [createDefaultPage(0)]
+        : result.map((page, idx) => migratePage(page, idx));
+      // When we seed a default page because the server had nothing stored, the
+      // seeded page is NOT yet persisted — flag it dirty so the Save button
+      // lights up and the user explicitly opts in. Before the all-empty save
+      // filter was removed, this case was protected by the filter dropping the
+      // seeded default on save; without that filter, clicking Save without
+      // dirtying first would have silently written a random-UUID page the user
+      // never authored.
+      isDirty.value = isFreshSeed;
+      selectedIdx.value = 0;
+      isLoading.value = false;
       return { success: true, data: result };
     } catch (error) {
       console.error('Failed to load remote control configuration:', error);
+      isLoading.value = false;
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
 
+  function selectPage(idx: number) {
+    if (!Number.isInteger(idx)) {
+      // NaN, fractional, or Infinity — typically a UI bug computing idx from
+      // a stale/missing ref.
+      console.warn(
+        `[remoteControl] selectPage: idx ${idx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      // Clamp to 0 so the store stays in a valid state (otherwise selectedIdx
+      // becomes NaN and pages[selectedIdx] is always undefined for the rest of
+      // the session).
+      selectedIdx.value = 0;
+      return;
+    }
+    if (remoteControlPages.value.length === 0) {
+      selectedIdx.value = 0;
+      return;
+    }
+    const lastIdx = remoteControlPages.value.length - 1;
+    selectedIdx.value = Math.min(Math.max(idx, 0), lastIdx);
+  }
+
+  function addPage() {
+    const newIdx = remoteControlPages.value.length;
+    remoteControlPages.value.push(createDefaultPage(newIdx));
+    selectedIdx.value = newIdx;
+    isDirty.value = true;
+  }
+
+  function renamePage(idx: number, name: string): boolean {
+    if (!Number.isInteger(idx)) {
+      console.warn(
+        `[remoteControl] renamePage: idx ${idx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      return false;
+    }
+    const target = remoteControlPages.value[idx];
+    if (!target) {
+      console.warn(
+        `[remoteControl] renamePage: idx ${idx} out of range (pages: ${remoteControlPages.value.length})`,
+      );
+      return false;
+    }
+    const trimmed = name.trim();
+    if (trimmed.length === 0) return false;
+    target.name = trimmed;
+    isDirty.value = true;
+    return true;
+  }
+
+  function deletePage(idx: number) {
+    if (remoteControlPages.value.length <= 1) return;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= remoteControlPages.value.length) {
+      // The Number.isInteger check covers NaN and fractional idx — both slip
+      // past the comparison-based guard (NaN comparisons all return false,
+      // fractional idx truncates inside splice and would silently delete the
+      // wrong page).
+      console.warn(
+        `[remoteControl] deletePage: idx ${idx} out of range (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    remoteControlPages.value.splice(idx, 1);
+    if (selectedIdx.value > idx) {
+      selectedIdx.value -= 1;
+    } else if (selectedIdx.value === idx) {
+      // The selected page itself was deleted — move back to the previous
+      // sibling so the user's mental position is preserved. Stays at 0 when
+      // there's nothing further back.
+      selectedIdx.value = Math.max(idx - 1, 0);
+    }
+    isDirty.value = true;
+  }
+
+  function duplicatePage(idx: number) {
+    if (!Number.isInteger(idx)) {
+      console.warn(
+        `[remoteControl] duplicatePage: idx ${idx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    const src = remoteControlPages.value[idx];
+    if (!src) {
+      console.warn(
+        `[remoteControl] duplicatePage: idx ${idx} out of range (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    const copy: RemoteControlPage = {
+      ...src,
+      id: crypto.randomUUID(),
+      name: `${src.name} (copy)`,
+    };
+    for (const key of BUTTON_KEYS) {
+      copy[key] = { ...src[key] };
+    }
+    remoteControlPages.value.splice(idx + 1, 0, copy);
+    selectedIdx.value = idx + 1;
+    isDirty.value = true;
+  }
+
+  function reorderPages(fromIdx: number, toIdx: number) {
+    if (!Number.isInteger(fromIdx) || !Number.isInteger(toIdx)) {
+      // NaN/fractional from a stale drag index or a miswired keyboard handler.
+      console.warn(
+        `[remoteControl] reorderPages: fromIdx ${fromIdx} / toIdx ${toIdx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    const lastIdx = remoteControlPages.value.length - 1;
+    if (fromIdx < 0 || fromIdx > lastIdx || toIdx < 0 || toIdx > lastIdx) {
+      console.warn(
+        `[remoteControl] reorderPages: fromIdx ${fromIdx} / toIdx ${toIdx} out of range (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    // A drag that lands back on its start slot is not an edit — bail before
+    // flipping isDirty so the Save button stays disabled.
+    if (fromIdx === toIdx) return;
+    // Capture the selected page by id, not slot: the move may shift its index
+    // (it might BE the page moving, or a page may cross it). Re-find after the
+    // splice so selection tracks content, mirroring renamePage's id discipline.
+    const selectedId = remoteControlPages.value[selectedIdx.value]?.id ?? null;
+    const [page] = remoteControlPages.value.splice(fromIdx, 1);
+    remoteControlPages.value.splice(toIdx, 0, page!);
+    if (selectedId !== null) {
+      const i = remoteControlPages.value.findIndex((p) => p.id === selectedId);
+      if (i !== -1) selectedIdx.value = i;
+    }
+    isDirty.value = true;
+  }
+
+  function setButton(pageIdx: number, buttonKey: ButtonKey, value: PageButton) {
+    // Wrap the slot write + isDirty flip so consumers have a single, safe entry
+    // point for updating a page's button configuration.
+    if (!Number.isInteger(pageIdx)) {
+      console.warn(
+        `[remoteControl] setButton: pageIdx ${pageIdx} is not a valid integer (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    const page = remoteControlPages.value[pageIdx];
+    if (!page) {
+      console.warn(
+        `[remoteControl] setButton: pageIdx ${pageIdx} out of range (pages: ${remoteControlPages.value.length})`,
+      );
+      return;
+    }
+    page[buttonKey] = value;
+    isDirty.value = true;
+  }
+
   async function saveRemoteControl() {
-    const contentPages = remoteControlPages.value.filter((page) => {
-      return Object.values(page).some((button) => button.id !== '0');
-    });
-
-    const payload = JSON.stringify(contentPages);
-
+    // Capture the wire payload at save-start so we can compare it to the
+    // current state when the PUT resolves. Without this, a user who edits
+    // between clicking Save and the PUT resolving would see isDirty cleared
+    // unconditionally — even though their post-edit changes weren't in the
+    // payload that hit the server. Net effect: silent loss of "unsaved
+    // changes" signal across the network window.
+    const payload = JSON.stringify(remoteControlPages.value);
+    isSaving.value = true;
     try {
       await apiService.put(REMOTE_CONFIG, { config: payload });
+      // Only clear isDirty if the user's current state still matches what
+      // we actually sent. Any mid-flight mutation leaves isDirty=true so
+      // the Unsaved badge stays visible and the user can click Save again.
+      if (JSON.stringify(remoteControlPages.value) === payload) {
+        isDirty.value = false;
+      }
       return { success: true };
     } catch (error) {
       console.error('Failed to save remote control configuration:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
+    } finally {
+      isSaving.value = false;
     }
   }
 
   return {
     remoteControlPages,
     isLoading,
+    isSaving,
+    isDirty,
+    selectedIdx,
     loadRemoteControl,
     saveRemoteControl,
+    selectPage,
+    addPage,
+    duplicatePage,
+    deletePage,
+    renamePage,
+    reorderPages,
+    setButton,
   };
 });

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { AstrosFieldUsername, AstrosFieldPassword } from '@/components/common';
+import { AstrosFieldPassword } from '@/components/common';
 
 const props = defineProps({
   background: {
@@ -12,8 +12,8 @@ const props = defineProps({
   },
 });
 
-const credentials = defineModel<{ email: string; password: string }>({
-  default: () => ({ email: '', password: '' }),
+const credentials = defineModel<{ password: string }>({
+  default: () => ({ password: '' }),
   type: Object,
 });
 
@@ -50,10 +50,6 @@ defineEmits<{
               <span class="text-2xl">s</span>
             </div>
           </div>
-          <AstrosFieldUsername
-            class="w-full mb-4"
-            v-model="credentials.email"
-          />
           <AstrosFieldPassword
             class="w-full mb-4"
             v-model="credentials.password"

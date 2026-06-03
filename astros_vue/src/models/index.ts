@@ -4,3 +4,4 @@ export * from './remoteControl';
 export * from './scripter';
 export * from './scripts';
 export * from './websocket';
+export * from './playlists';

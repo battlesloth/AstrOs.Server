@@ -11,6 +11,7 @@ const props = defineProps<{
     deploymentStatus: Partial<Record<Location, DeploymentStatus>>;
   };
   locations: Location[];
+  playlistCount: number;
 }>();
 
 defineEmits<{
@@ -81,33 +82,51 @@ function getUploadStatus(location: Location): { class: string; text: string } {
       </div>
     </td>
 
+    <!-- Playlist Count -->
+    <td class="text-center">
+      <span
+        v-if="props.playlistCount > 0"
+        class="badge badge-info"
+        >{{ props.playlistCount }}</span
+      >
+      <span
+        v-else
+        class="opacity-40"
+        >0</span
+      >
+    </td>
+
     <!-- Action Buttons -->
     <td class="pr-2 pl-2">
       <div class="flex flex-row justify-end">
         <button
           class="btn btn-ghost btn-xs"
-          title="Copy"
+          :title="$t('copy')"
+          :aria-label="$t('copy')"
           @click="$emit('copy', props.script.id)"
         >
           <v-icon name="io-copy" />
         </button>
         <button
           class="btn btn-ghost btn-xs"
-          title="Upload"
+          :title="$t('upload')"
+          :aria-label="$t('upload')"
           @click="$emit('upload', props.script.id)"
         >
           <v-icon name="io-cloud-upload" />
         </button>
         <button
           class="btn btn-ghost btn-xs"
-          title="Run"
+          :title="$t('run')"
+          :aria-label="$t('run')"
           @click="$emit('run', props.script.id)"
         >
           <v-icon name="io-play" />
         </button>
         <button
           class="btn btn-ghost btn-xs"
-          title="Delete"
+          :title="$t('delete')"
+          :aria-label="$t('delete')"
           @click="$emit('delete', props.script.id, props.script.scriptName)"
         >
           <v-icon name="io-trash-bin" />

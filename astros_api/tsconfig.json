@@ -37,11 +37,16 @@
       "jest"
     ]
   },
+  // When adding a new src/-resident pattern here, mirror it in
+  // src/test_harness/global_setup.ts:newestCompiledMtime — the vitest
+  // globalSetup walker filters this list by hand to decide whether dist/
+  // is stale before integration tests run.
   "exclude": [
     "./vitest.config.ts",
     "./vitest.config.js",
     "./webpack.config.js",
     "dist",
+    "coverage",
     "**/*.test.ts",
     "**/*.spec.ts"
   ]

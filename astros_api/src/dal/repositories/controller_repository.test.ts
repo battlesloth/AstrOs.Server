@@ -1,0 +1,348 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Kysely } from 'kysely';
+import { Database } from '../types.js';
+import { createKyselyConnection, migrateToLatest } from '../database.js';
+import { ControllerRepository } from './controller_repository.js';
+
+describe('ControllerRepository', () => {
+  let db: Kysely<Database>;
+
+  beforeEach(async () => {
+    db = createKyselyConnection().db;
+    await migrateToLatest(db);
+  });
+
+  afterEach(async () => {
+    await db.destroy();
+  });
+
+  describe('insertController', () => {
+    it('should insert a controller and return its id', async () => {
+      const repo = new ControllerRepository(db);
+
+      const controller = { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' };
+      const id = await repo.insertController(controller);
+
+      expect(id).toBeTruthy();
+      expect(id).not.toBe('');
+
+      const result = await repo.getControllerById(id);
+      expect(result.name).toBe('dome');
+      expect(result.address).toBe('AA:BB:CC:DD:EE:01');
+    });
+  });
+
+  describe('getControllers', () => {
+    it('should return all controllers including seed data', async () => {
+      const repo = new ControllerRepository(db);
+
+      // Migration seeds a 'master' controller
+      const before = await repo.getControllers();
+      const seedCount = before.length;
+
+      await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
+      await repo.insertController({ id: '', name: 'body', address: 'AA:BB:CC:DD:EE:02' });
+
+      const controllers = await repo.getControllers();
+
+      expect(controllers).toHaveLength(seedCount + 2);
+      expect(controllers.map((c) => c.name)).toContain('dome');
+      expect(controllers.map((c) => c.name)).toContain('body');
+    });
+  });
+
+  describe('getControllerByAddress', () => {
+    it('should find controller by MAC address', async () => {
+      const repo = new ControllerRepository(db);
+
+      await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
+
+      const result = await repo.getControllerByAddress('AA:BB:CC:DD:EE:01');
+      expect(result.name).toBe('dome');
+    });
+
+    it('should throw when address not found', async () => {
+      const repo = new ControllerRepository(db);
+
+      await expect(repo.getControllerByAddress('FF:FF:FF:FF:FF:FF')).rejects.toThrow();
+    });
+  });
+
+  describe('updateController', () => {
+    it('should update controller name and address', async () => {
+      const repo = new ControllerRepository(db);
+
+      const id = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
+
+      const updated = await repo.updateController({
+        id,
+        name: 'dome-v2',
+        address: 'AA:BB:CC:DD:EE:FF',
+      });
+      expect(updated).toBe(true);
+
+      const result = await repo.getControllerById(id);
+      expect(result.name).toBe('dome-v2');
+      expect(result.address).toBe('AA:BB:CC:DD:EE:FF');
+    });
+  });
+
+  describe('insertControllers (bulk with deduplication)', () => {
+    it('should insert new controllers', async () => {
+      const repo = new ControllerRepository(db);
+
+      const before = await repo.getControllers();
+      const seedCount = before.length;
+
+      const controllers = [
+        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
+        { id: '', name: 'body', address: 'AA:BB:CC:DD:EE:02' },
+      ];
+
+      const result = await repo.insertControllers(controllers);
+      expect(result).toBe(true);
+
+      const all = await repo.getControllers();
+      expect(all).toHaveLength(seedCount + 2);
+    });
+
+    it('should preserve ID when re-inserting with same address', async () => {
+      const repo = new ControllerRepository(db);
+
+      // Insert initial controller
+      const originalId = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
+
+      // Bulk insert with same address but different name (simulating re-registration)
+      await repo.insertControllers([
+        { id: '', name: 'dome-renamed', address: 'AA:BB:CC:DD:EE:01' },
+      ]);
+
+      const result = await repo.getControllerByAddress('AA:BB:CC:DD:EE:01');
+      expect(result.id).toBe(originalId);
+      expect(result.name).toBe('dome-renamed');
+    });
+
+    it('should preserve ID when re-inserting with same name', async () => {
+      const repo = new ControllerRepository(db);
+
+      const originalId = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
+
+      // Bulk insert with same name but different address (controller got new MAC)
+      await repo.insertControllers([{ id: '', name: 'dome', address: 'FF:FF:FF:FF:FF:FF' }]);
+
+      const result = await repo.getControllerByAddress('FF:FF:FF:FF:FF:FF');
+      expect(result.id).toBe(originalId);
+      expect(result.name).toBe('dome');
+    });
+
+    it('should remove stale controllers when address or name conflicts', async () => {
+      const repo = new ControllerRepository(db);
+
+      const before = await repo.getControllers();
+      const seedCount = before.length;
+
+      await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
+      await repo.insertController({ id: '', name: 'body', address: 'AA:BB:CC:DD:EE:02' });
+
+      // Insert new controller that takes dome's address — should replace dome
+      await repo.insertControllers([{ id: '', name: 'new-dome', address: 'AA:BB:CC:DD:EE:01' }]);
+
+      const all = await repo.getControllers();
+      expect(all).toHaveLength(seedCount + 2);
+      expect(all.map((c) => c.name)).toContain('new-dome');
+      expect(all.map((c) => c.name)).toContain('body');
+      expect(all.map((c) => c.name)).not.toContain('dome');
+    });
+
+    it('returns true when re-registering with identical name and address (no-op UPDATE)', async () => {
+      // Regression: the keeper-UPDATE return value should not depend on
+      // SQLite's change-count semantics for no-op updates. Success means
+      // "the controller is in the DB with these values," not "the UPDATE
+      // statement reported a row change."
+      const repo = new ControllerRepository(db);
+
+      await repo.insertController({ id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' });
+
+      // Re-register with exactly the same name and address — UPDATE is a no-op.
+      const result = await repo.insertControllers([
+        { id: '', name: 'dome', address: 'AA:BB:CC:DD:EE:01' },
+      ]);
+
+      expect(result).toBe(true);
+
+      const found = await repo.getControllerByAddress('AA:BB:CC:DD:EE:01');
+      expect(found.name).toBe('dome');
+    });
+
+    it('handles two existing matches without UNIQUE collision (one by address, one by name)', async () => {
+      // Regression: if matches include row A (matches by name) and row B
+      // (matches by address), updating A's name+address would conflict with
+      // B's UNIQUE values before B is deleted. Fix: drop duplicates first.
+      const repo = new ControllerRepository(db);
+
+      await repo.insertController({ id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0A' });
+      await repo.insertController({ id: '', name: 'beta', address: 'AA:BB:CC:DD:EE:0B' });
+
+      // name=alpha matches first row; address=...0B matches second row.
+      await repo.insertControllers([{ id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0B' }]);
+
+      const all = await repo.getControllers();
+      const alpha = all.find((c) => c.name === 'alpha');
+      expect(alpha).toBeDefined();
+      expect(alpha?.address).toBe('AA:BB:CC:DD:EE:0B');
+      // beta should be gone — its address was taken
+      expect(all.find((c) => c.name === 'beta')).toBeUndefined();
+    });
+
+    it('re-points controller_locations from duplicates to keeper before deleting them', async () => {
+      // Regression: under migration_6's RESTRICT FK on
+      // controller_locations.controller_id, deleting a duplicate controller
+      // that still has controller_locations rows would be rejected. Re-point
+      // the dependent rows to the keeper first.
+      // Insert directly so we control the ids (the keeper is selected by
+      // lex order on id; UUID-generated ids are non-deterministic).
+      await db
+        .insertInto('controllers')
+        .values({
+          id: 'ctl-a',
+          name: 'alpha',
+          description: '',
+          address: 'AA:BB:CC:DD:EE:0A',
+        })
+        .execute();
+      await db
+        .insertInto('controllers')
+        .values({
+          id: 'ctl-b',
+          name: 'beta',
+          description: '',
+          address: 'AA:BB:CC:DD:EE:0B',
+        })
+        .execute();
+
+      await db
+        .insertInto('locations')
+        .values({ id: 'loc-A', name: 'A-loc', description: '', config_fingerprint: '' })
+        .execute();
+      await db
+        .insertInto('locations')
+        .values({ id: 'loc-B', name: 'B-loc', description: '', config_fingerprint: '' })
+        .execute();
+
+      await db
+        .insertInto('controller_locations')
+        .values({ location_id: 'loc-A', controller_id: 'ctl-a' })
+        .execute();
+      await db
+        .insertInto('controller_locations')
+        .values({ location_id: 'loc-B', controller_id: 'ctl-b' })
+        .execute();
+
+      // Two-match merge: name=alpha hits ctl-a, address=...0B hits ctl-b.
+      const repo = new ControllerRepository(db);
+      await repo.insertControllers([{ id: '', name: 'alpha', address: 'AA:BB:CC:DD:EE:0B' }]);
+
+      // The keeper is ctl-a (lex-first id). Both controller_locations rows
+      // must now point at it.
+      const links = await db
+        .selectFrom('controller_locations')
+        .selectAll()
+        .where('location_id', 'in', ['loc-A', 'loc-B'])
+        .execute();
+      expect(links).toHaveLength(2);
+      links.forEach((l) => expect(l.controller_id).toBe('ctl-a'));
+
+      // The duplicate is gone; the keeper has the merged values.
+      const all = await repo.getControllers();
+      expect(all.find((c) => c.name === 'beta')).toBeUndefined();
+      const keeper = all.find((c) => c.id === 'ctl-a');
+      expect(keeper?.address).toBe('AA:BB:CC:DD:EE:0B');
+    });
+
+    it('preserves controller_locations FK rows when re-registering an existing controller', async () => {
+      // Regression: this is the invariant migration_6's RESTRICT FK will enforce.
+      // The controller_locations row must survive insertControllers without being
+      // deleted-then-reinserted, otherwise a future RESTRICT FK would block the delete.
+      const repo = new ControllerRepository(db);
+
+      const originalId = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
+
+      await db
+        .insertInto('locations')
+        .values({ id: 'loc-1', name: 'Dome Location', description: '', config_fingerprint: '' })
+        .execute();
+
+      await db
+        .insertInto('controller_locations')
+        .values({ location_id: 'loc-1', controller_id: originalId })
+        .execute();
+
+      // Re-register the same controller via the bulk path (typical serial-worker behavior).
+      await repo.insertControllers([
+        { id: '', name: 'dome-renamed', address: 'AA:BB:CC:DD:EE:01' },
+      ]);
+
+      // The controller_locations row must still exist with the same controller_id.
+      const link = await db
+        .selectFrom('controller_locations')
+        .selectAll()
+        .where('location_id', '=', 'loc-1')
+        .executeTakeFirstOrThrow();
+      expect(link.controller_id).toBe(originalId);
+
+      // And the controller itself is still queryable via that location.
+      const found = await repo.getControllerByLocationId('loc-1');
+      expect(found.id).toBe(originalId);
+      expect(found.name).toBe('dome-renamed');
+    });
+  });
+
+  describe('getControllerByLocationId', () => {
+    it('should find controller via location join', async () => {
+      const repo = new ControllerRepository(db);
+
+      const controllerId = await repo.insertController({
+        id: '',
+        name: 'dome',
+        address: 'AA:BB:CC:DD:EE:01',
+      });
+
+      // Seed location and controller_locations relationship
+      await db
+        .insertInto('locations')
+        .values({ id: 'loc-1', name: 'Dome Location', description: '', config_fingerprint: '' })
+        .execute();
+
+      await db
+        .insertInto('controller_locations')
+        .values({ location_id: 'loc-1', controller_id: controllerId })
+        .execute();
+
+      const result = await repo.getControllerByLocationId('loc-1');
+      expect(result.name).toBe('dome');
+      expect(result.id).toBe(controllerId);
+    });
+
+    it('should throw when location has no controller', async () => {
+      const repo = new ControllerRepository(db);
+
+      await expect(repo.getControllerByLocationId('nonexistent')).rejects.toThrow();
+    });
+  });
+});

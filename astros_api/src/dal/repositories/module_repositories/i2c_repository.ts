@@ -1,7 +1,7 @@
 import { Kysely, Transaction } from 'kysely';
-import { Database, I2CModule as I2CModuleRow } from '../../types.js';
-import { logger } from '../../../logger.js';
-import { I2cModule, I2cChannel } from '../../../models/index.js';
+import { Database, I2CModule as I2CModuleRow } from 'src/dal/types.js';
+import { logger } from 'src/logger.js';
+import { I2cModule, I2cChannel } from 'src/models/index.js';
 
 //#region I2C Modules
 

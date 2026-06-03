@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Application, Container, Graphics } from 'pixi.js';
-import { onUnmounted, ref, watch } from 'vue';
+import { onUnmounted, ref, shallowRef, watch } from 'vue';
 
 // Import composables
 import { useZoomState, ZOOM_LEVELS } from '@/composables/useZoomState';
@@ -57,7 +57,11 @@ import type { ScriptEvent } from '@/models';
 // APPLICATION REFS
 // ============================================================================
 
-const app = ref<Application | null>(null);
+// Pixi objects must use shallowRef. Deep reactive proxies (from ref()) wrap
+// every nested property access through Vue's Proxy machinery, which breaks
+// PixiJS internal identity checks like `texture === Texture.WHITE` at render
+// time and causes `createPattern` to be called with a raw Uint8Array fallback.
+const app = shallowRef<Application | null>(null);
 const pixiContainer = ref<HTMLDivElement | null>(null);
 const channels = ref<Channel[]>([]);
 
@@ -65,20 +69,20 @@ const channels = ref<Channel[]>([]);
 // PIXI CONTAINERS & GRAPHICS REFS
 // ============================================================================
 
-const mainContainer = ref<Container | null>(null);
-const scrollableContentContainer = ref<Container | null>(null);
-const uiLayer = ref<Container | null>(null);
-const channelListContainer = ref<PixiChannelList | null>(null);
-const timeline = ref<PixiTimeline | null>(null);
-const channelRowContainers = ref(new Map<string, PixiChannelEventRow>());
+const mainContainer = shallowRef<Container | null>(null);
+const scrollableContentContainer = shallowRef<Container | null>(null);
+const uiLayer = shallowRef<Container | null>(null);
+const channelListContainer = shallowRef<PixiChannelList | null>(null);
+const timeline = shallowRef<PixiTimeline | null>(null);
+const channelRowContainers = shallowRef(new Map<string, PixiChannelEventRow>());
 
 // Scrollbar graphics
-const horizontalScrollBar = ref<PixiScrollBar | null>(null);
-const verticalScrollBar = ref<PixiScrollBar | null>(null);
+const horizontalScrollBar = shallowRef<PixiScrollBar | null>(null);
+const verticalScrollBar = shallowRef<PixiScrollBar | null>(null);
 
 // UI buttons
-const plusButton = ref<Container | null>(null);
-const minusButton = ref<Container | null>(null);
+const plusButton = shallowRef<Container | null>(null);
+const minusButton = shallowRef<Container | null>(null);
 
 // ============================================================================
 // Exposed Methods
@@ -86,12 +90,14 @@ const minusButton = ref<Container | null>(null);
 
 const initializePixi = async (scriptChannels: Channel[]) => {
   await init();
+  if (isDestroyed) return;
   for (const channel of scriptChannels) {
     addChannel(channel);
   }
 };
 
 const addChannel = (channel: Channel) => {
+  if (isDestroyed) return;
   console.log('adding channel', channel);
   doAddChannel(channel);
   if (channel.events.length > 0) {
@@ -110,6 +116,7 @@ const swapChannel = (chA: Channel, chB: Channel) => {
 };
 
 const addEvent = (event: ScriptEvent, scriptChannelType: ScriptChannelType) => {
+  if (isDestroyed) return;
   doAddEvent(event, scriptChannelType);
 };
 
@@ -212,6 +219,7 @@ const {
   hasEventBoxDragged,
   addEventBox,
   removeEventBox,
+  removeAllEventBoxesForChannel,
   rebuildEventBox,
   updateEventBoxPositions,
   updateAllEventBoxPositions,
@@ -223,6 +231,11 @@ const {
 
 // Other
 let resizeObserver: ResizeObserver | null = null;
+
+// Tracks whether the component has been unmounted. Set in onUnmounted and
+// checked after every await in init() / initializePixi() to prevent adding
+// children to destroyed containers if the user navigates away mid-load.
+let isDestroyed = false;
 
 // ============================================================================
 // WATCHERS
@@ -288,6 +301,7 @@ async function init() {
   app.value = new Application();
 
   await loadAssets();
+  if (isDestroyed) return;
 
   await app.value.init({
     width: pixiContainer.value.clientWidth || 800,
@@ -296,6 +310,7 @@ async function init() {
     antialias: true,
     resolution: window.devicePixelRatio || 1,
   });
+  if (isDestroyed || !pixiContainer.value) return;
 
   pixiContainer.value.appendChild(app.value.canvas);
 
@@ -383,6 +398,10 @@ async function init() {
 }
 
 onUnmounted(() => {
+  // Flip the destroy flag first so any in-flight awaits or pending
+  // Assets.load callbacks short-circuit before touching torn-down state.
+  isDestroyed = true;
+
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
@@ -394,10 +413,23 @@ onUnmounted(() => {
     pixiContainer.value.removeEventListener('wheel', handleWheel);
   }
 
+  // Explicitly destroy any tracked PixiChannelData / PixiChannelEvent
+  // containers before the Pixi app tears down. This ensures our custom
+  // destroy methods run (clearing listeners) even if Pixi's cascading
+  // destroy path changes in a future release.
+  for (const rowContainer of channelRowContainers.value.values()) {
+    rowContainer.destroy({ children: true });
+  }
+  channelRowContainers.value.clear();
+
+  // Do NOT pass texture/textureSource — the SVG icons (swapIcon, deleteIcon,
+  // etc.) are owned by PixiJS's Assets cache and must be released through
+  // `Assets.unload*()`, not destroyed via the app cascade. The cache also
+  // intentionally outlives this Application instance so revisits to the
+  // scripter don't re-decode every SVG. `children: true` still tears down
+  // every Container/Graphics/Sprite we created.
   app.value?.destroy(true, {
     children: true,
-    texture: true,
-    textureSource: true,
     context: true,
   });
   app.value = null;
@@ -409,7 +441,6 @@ onUnmounted(() => {
   horizontalScrollBar.value = null;
   timeline.value = null;
   verticalScrollBar.value = null;
-  channelRowContainers.value.clear();
 });
 
 function addAppStageListeners() {
@@ -597,7 +628,6 @@ function createChannelRowContainer(
 
   scrollableContentContainer.value.addChild(eventRow as unknown as Container);
 
-  // @ts-expect-error - Vue ref unwrapping causes type incompatibility with nested Ref types
   channelRowContainers.value.set(channelId, eventRow);
 
   // Update positions of any existing event boxes for this channel
@@ -646,13 +676,20 @@ function doRemoveChannel(chId: string) {
 
   channels.value.splice(channelIndex, 1);
 
+  // Destroy all PixiChannelEvent instances for this channel before tearing
+  // down the row container. This short-circuits any in-flight Assets.load
+  // callbacks on the events and removes their pointer listeners.
+  removeAllEventBoxesForChannel(chId);
+
   // Remove the corresponding row container under the timeline
   const rowContainer = channelRowContainers.value.get(chId);
   if (rowContainer && scrollableContentContainer.value) {
     scrollableContentContainer.value.removeChild(rowContainer as unknown as Container);
     channelRowContainers.value.delete(chId);
+    rowContainer.destroy({ children: true });
   }
 
+  // Destroys the PixiChannelData inside the list as a side effect.
   channelListContainer.value?.removeChannelRow(chId);
 
   // Update remaining row indices to match their position in the channels array

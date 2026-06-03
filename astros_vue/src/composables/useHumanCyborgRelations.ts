@@ -87,7 +87,7 @@ export function useHumanCyborgRelations() {
       case HumanCyborgRelationsCmd.MILD_SAD:
         return 'Mild Sad';
       case HumanCyborgRelationsCmd.EXTREME_SAD:
-        return 'Extreme ';
+        return 'Extreme Sad';
       case HumanCyborgRelationsCmd.MILD_ANGRY:
         return 'Mild Angry';
       case HumanCyborgRelationsCmd.EXTREME_ANGRY:
@@ -101,7 +101,7 @@ export function useHumanCyborgRelations() {
       case HumanCyborgRelationsCmd.ENABLE_MUSE:
         return 'Enable Muse';
       case HumanCyborgRelationsCmd.DISABLE_MUSE:
-        return 'DDisable Muse';
+        return 'Disable Muse';
       case HumanCyborgRelationsCmd.TOGGLE_MUSE:
         return 'Toggle Muse';
       case HumanCyborgRelationsCmd.TRIGGER_MUSING:

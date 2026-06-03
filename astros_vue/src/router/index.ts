@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import StatusView from '../views/StatusView.vue';
 import api from '@/api/apiService';
 import { CHECK_SESSION } from '@/api/endpoints';
+import { mobileRouteRedirect } from './mobileRouteRedirect';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -32,9 +33,26 @@ const router = createRouter({
       component: () => import('../views/ScripterView.vue'),
     },
     {
+      path: '/playlists',
+      name: 'playlists',
+      component: () => import('../views/PlaylistsView.vue'),
+    },
+    {
+      path: '/playlist/:id',
+      name: 'playlist',
+      component: () => import('../views/PlaylistEditorView.vue'),
+    },
+    {
       path: '/remote',
       name: 'remote',
-      component: () => import('../views/RemoteView.vue'),
+      component: () => import('../views/RemoteControlConfigView.vue'),
+    },
+    {
+      // Chrome-less full-screen live remote for mobile clients. The guard
+      // routes mobile browsers here and confines them to it (Remote + Status).
+      path: '/mobile',
+      name: 'mobile',
+      component: () => import('../views/MobileRemoteView.vue'),
     },
     {
       path: '/modules',
@@ -47,6 +65,11 @@ const router = createRouter({
       component: () => import('../views/ModulesView.vue'),
     },
     {
+      path: '/firmware',
+      name: 'firmware',
+      component: () => import('../views/FirmwareView.vue'),
+    },
+    {
       path: '/utility',
       name: 'utility',
       component: () => import('../views/UtilityView.vue'),
@@ -54,13 +77,25 @@ const router = createRouter({
   ],
 });
 
+const SESSION_CHECK_TTL_MS = 60_000;
+let lastSessionCheckAt = 0;
+
 router.beforeEach(async (to, from, next) => {
   if (!to.meta.public && to.path !== '/auth') {
     // Check if we have a token first
     const token = api.getToken();
     if (!token) {
       console.log('No token found, redirecting to auth');
+      lastSessionCheckAt = 0;
       next('/auth');
+      return;
+    }
+
+    // Skip the API round-trip if we recently verified the session
+    if (Date.now() - lastSessionCheckAt < SESSION_CHECK_TTL_MS) {
+      const dest = mobileRouteRedirect(to);
+      if (dest) next(dest);
+      else next();
       return;
     }
 
@@ -69,12 +104,17 @@ router.beforeEach(async (to, from, next) => {
       const response = await api.get(CHECK_SESSION);
       console.log('Session check response:', response);
       if (response.isAuthenticated) {
-        next();
+        lastSessionCheckAt = Date.now();
+        const dest = mobileRouteRedirect(to);
+        if (dest) next(dest);
+        else next();
       } else {
+        lastSessionCheckAt = 0;
         next('/auth');
       }
     } catch (error) {
       console.error('Session check failed:', error);
+      lastSessionCheckAt = 0;
       next('/auth');
     }
   } else {

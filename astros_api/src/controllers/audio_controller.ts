@@ -1,54 +1,64 @@
-import { AudioFileRepository } from '../dal/repositories/audio_file_repository.js';
-import { unlink } from 'fs';
+import { AudioFileRepository } from 'src/dal/repositories/audio_file_repository.js';
+import { unlink } from 'fs/promises';
 import appdata from 'appdata-path';
-import { logger } from '../logger.js';
-import { db } from '../dal/database.js';
+import path from 'path';
+import { logger } from 'src/logger.js';
+import { Kysely } from 'kysely';
+import { Database } from 'src/dal/types.js';
+import { Router } from 'express';
 
-export class AudioController {
-  public static getAll = '/audio/all';
-  public static deleteRoute = '/audio/delete';
+const getAll = '/audio/all';
+const deleteRoute = '/audio/delete';
 
-  public static async getAllAudioFiles(req: any, res: any, next: any) {
-    try {
-      const repo = new AudioFileRepository(db);
+export function registerAudioRoutes(router: Router, auth: any, db: Kysely<Database>) {
+  router.get(getAll, auth, (req: any, res: any, next: any) => getAllAudioFiles(db, req, res, next));
+  router.delete(deleteRoute, auth, (req: any, res: any, next: any) =>
+    deleteAudioFile(db, req, res, next),
+  );
+}
 
-      const files = await repo.getAudioFiles();
+export async function getAllAudioFiles(db: Kysely<Database>, req: any, res: any, next: any) {
+  try {
+    const repo = new AudioFileRepository(db);
 
-      res.status(200);
-      res.json(files);
-    } catch (error) {
-      logger.error(error);
+    const files = await repo.getAudioFiles();
 
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
-    }
+    res.status(200);
+    res.json(files);
+  } catch (error) {
+    logger.error(error);
+
+    res.status(500);
+    res.json({
+      message: 'Internal server error',
+    });
   }
+}
 
-  public static async deleteAudioFile(req: any, res: any, next: any) {
-    try {
-      const repo = new AudioFileRepository(db);
+export async function deleteAudioFile(db: Kysely<Database>, req: any, res: any, next: any) {
+  try {
+    const repo = new AudioFileRepository(db);
 
-      const result = await repo.deleteFile(req.query.id);
+    const result = await repo.deleteFile(req.query.id);
 
-      if (result) {
-        await unlink(`${appdata('astrosserver')}/files/${req.query.id}`, (err) => {
-          if (err) {
-            console.error(err);
-          }
-        });
+    if (result) {
+      const storageDir = `${appdata('astrosserver')}/files`;
+      const filePath = path.resolve(storageDir, req.query.id);
+      if (!filePath.startsWith(path.resolve(storageDir))) {
+        logger.error(`Path traversal attempt blocked: ${req.query.id}`);
+      } else {
+        await unlink(filePath);
       }
-
-      res.status(200);
-      res.json({ success: true });
-    } catch (error) {
-      logger.error(error);
-
-      res.status(500);
-      res.json({
-        message: 'Internal server error',
-      });
     }
+
+    res.status(200);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error(error);
+
+    res.status(500);
+    res.json({
+      message: 'Internal server error',
+    });
   }
 }

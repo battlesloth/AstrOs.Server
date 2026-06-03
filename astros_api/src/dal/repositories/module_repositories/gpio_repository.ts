@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
-import { Database } from '../../types.js';
-import { logger } from '../../../logger.js';
-import { GpioModule, GpioChannel } from '../../../models/index.js';
+import { Database } from 'src/dal/types.js';
+import { logger } from 'src/logger.js';
+import { GpioModule, GpioChannel } from 'src/models/index.js';
 
 export async function getAllActiveGpioChannels(db: Kysely<Database>): Promise<GpioChannel[]> {
   const gpioData = await db

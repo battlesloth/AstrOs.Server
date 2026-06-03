@@ -1,4 +1,4 @@
-import { ModuleSubType, ModuleType } from '../enums.js';
+import { ModuleSubType, ModuleType } from 'src/models/enums.js';
 import { GpioChannel } from './gpio/gpio_channel.js';
 import { I2cChannel } from './i2c/i2c_channel.js';
 import { PwmChannel } from './i2c/sub_modules/pca9685/pwm_channel.js';

@@ -1,0 +1,1194 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { createPinia, setActivePinia } from 'pinia';
+
+vi.mock('@/api/apiService', () => ({
+  default: {
+    get: vi.fn(),
+    put: vi.fn(),
+  },
+}));
+
+import apiService from '@/api/apiService';
+import { useRemoteControlStore, migratePage, createDefaultPage } from '../remoteControl';
+import { BUTTON_KEYS } from '@/models/remoteControl/remoteControlPage';
+import type { RemoteControlPage } from '@/models/remoteControl/remoteControlPage';
+
+const apiGet = apiService.get as ReturnType<typeof vi.fn>;
+const apiPut = apiService.put as ReturnType<typeof vi.fn>;
+
+// Loose stand-in for a UUID — we only care that crypto.randomUUID() ran,
+// not that the value matches RFC 4122. Asserting a real UUID shape would
+// couple the test to crypto.randomUUID's format and add nothing.
+const UUID_LIKE = /^[0-9a-f-]{8,}$/i;
+
+function legacyPage(): Record<string, { id: string; name: string }> {
+  // No id, no name, no `type` on the buttons — the "stored before Phase 1" shape.
+  return {
+    button1: { id: '0', name: 'None' },
+    button2: { id: '0', name: 'None' },
+    button3: { id: '0', name: 'None' },
+    button4: { id: '0', name: 'None' },
+    button5: { id: '0', name: 'None' },
+    button6: { id: '0', name: 'None' },
+    button7: { id: '0', name: 'None' },
+    button8: { id: '0', name: 'None' },
+    button9: { id: '0', name: 'None' },
+  };
+}
+
+describe('remoteControl store', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    apiGet.mockReset();
+    apiPut.mockReset();
+  });
+
+  describe('migratePage', () => {
+    it('backfills a UUID-shaped id when missing', () => {
+      const migrated = migratePage(legacyPage() as Partial<RemoteControlPage>, 0);
+      expect(migrated.id).toMatch(UUID_LIKE);
+    });
+
+    it('backfills name as "Page N" when missing (1-indexed)', () => {
+      expect(migratePage(legacyPage() as Partial<RemoteControlPage>, 0).name).toBe('Page 1');
+      expect(migratePage(legacyPage() as Partial<RemoteControlPage>, 2).name).toBe('Page 3');
+    });
+
+    it('preserves an existing id (no overwrite)', () => {
+      const input = {
+        ...legacyPage(),
+        id: 'existing-id-12345',
+      } as unknown as Partial<RemoteControlPage>;
+      expect(migratePage(input, 0).id).toBe('existing-id-12345');
+    });
+
+    it('preserves an existing name (no overwrite)', () => {
+      const input = {
+        ...legacyPage(),
+        name: 'My Custom Page',
+      } as unknown as Partial<RemoteControlPage>;
+      expect(migratePage(input, 0).name).toBe('My Custom Page');
+    });
+
+    it('runs migrateButton on each of the 9 button slots (adds `type` field)', () => {
+      const migrated = migratePage(legacyPage() as Partial<RemoteControlPage>, 0);
+      for (const key of BUTTON_KEYS) {
+        expect(migrated[key].type).toBe('none');
+      }
+    });
+
+    it('replaces malformed button slots with default buttons', () => {
+      // Manually-edited or corrupt stored payloads might have button slots that
+      // are not the expected { id, name } shape. Migration is the boundary
+      // enforcement point — anything not matching the shape becomes a default
+      // button rather than getting spread (a string spread would produce
+      // {0:'a',1:'b',...}, and a no-`name` slot would surface `undefined` to
+      // remote consumers on sync — dropped by JSON.stringify on the wire,
+      // breaking the {name, command} contract).
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const malformed = {
+        ...legacyPage(),
+        button2: {} as unknown as { id: string; name: string },
+        button3: 'oops' as unknown as { id: string; name: string },
+        button4: { name: 'NoIdField' } as unknown as { id: string; name: string },
+        button5: { id: 'script-x' } as unknown as { id: string; name: string },
+      };
+      const migrated = migratePage(malformed as Partial<RemoteControlPage>, 0);
+      expect(migrated.button2).toEqual({ id: '0', name: 'None', type: 'none' });
+      expect(migrated.button3).toEqual({ id: '0', name: 'None', type: 'none' });
+      expect(migrated.button4).toEqual({ id: '0', name: 'None', type: 'none' });
+      expect(migrated.button5).toEqual({ id: '0', name: 'None', type: 'none' });
+      expect(migrated.button1.id).toBe('0');
+      expect(migrated.button1.type).toBe('none');
+      expect(warnSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('BUTTON_KEYS contract', () => {
+    // Pinning the literal here protects against silent mutation: if production
+    // code shrinks BUTTON_KEYS to 8 entries, the migration loop would still
+    // run, the assertions in other tests (which themselves iterate BUTTON_KEYS)
+    // would pass on a mutated set, and the bug would slip through. This is the
+    // anchor.
+    it('contains exactly button1..button9 in order', () => {
+      expect([...BUTTON_KEYS]).toEqual([
+        'button1',
+        'button2',
+        'button3',
+        'button4',
+        'button5',
+        'button6',
+        'button7',
+        'button8',
+        'button9',
+      ]);
+    });
+  });
+
+  describe('createDefaultPage', () => {
+    it('produces a page with id, name, and 9 buttons', () => {
+      const page = createDefaultPage(0);
+      expect(page.id).toMatch(UUID_LIKE);
+      expect(page.name).toBe('Page 1');
+      for (const key of BUTTON_KEYS) {
+        expect(page[key].id).toBe('0');
+        expect(page[key].type).toBe('none');
+      }
+    });
+
+    it('names by 1-indexed position', () => {
+      expect(createDefaultPage(4).name).toBe('Page 5');
+    });
+  });
+
+  describe('loadRemoteControl', () => {
+    it('seeds one default page when the stored config is empty', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      const store = useRemoteControlStore();
+
+      await store.loadRemoteControl();
+
+      expect(store.remoteControlPages).toHaveLength(1);
+      expect(store.remoteControlPages[0]!.id).toMatch(UUID_LIKE);
+      expect(store.remoteControlPages[0]!.name).toBe('Page 1');
+    });
+
+    it('migrates legacy stored pages so each has an id and name', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+
+      await store.loadRemoteControl();
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      expect(store.remoteControlPages[0]!.id).toMatch(UUID_LIKE);
+      expect(store.remoteControlPages[0]!.name).toBe('Page 1');
+      expect(store.remoteControlPages[1]!.id).toMatch(UUID_LIKE);
+      expect(store.remoteControlPages[1]!.name).toBe('Page 2');
+    });
+
+    it('keeps existing id/name when the stored config already has them', async () => {
+      const stored = [
+        { ...legacyPage(), id: 'persistent-id-A', name: 'Quick Actions' },
+        { ...legacyPage(), id: 'persistent-id-B', name: 'Songs' },
+      ];
+      apiGet.mockResolvedValue(JSON.stringify(stored));
+      const store = useRemoteControlStore();
+
+      await store.loadRemoteControl();
+
+      expect(store.remoteControlPages[0]!.id).toBe('persistent-id-A');
+      expect(store.remoteControlPages[0]!.name).toBe('Quick Actions');
+      expect(store.remoteControlPages[1]!.id).toBe('persistent-id-B');
+      expect(store.remoteControlPages[1]!.name).toBe('Songs');
+    });
+
+    it('assigns distinct ids to each migrated page', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+
+      await store.loadRemoteControl();
+
+      const ids = store.remoteControlPages.map((p) => p.id);
+      expect(new Set(ids).size).toBe(3);
+    });
+
+    it('replaces existing pages when loading over a populated store', async () => {
+      // Pin the "load REPLACES" contract — the refactored isDirty tests
+      // implicitly rely on this (they addPage then re-load), but it should
+      // be tested in isolation so a load-merges-instead-of-replaces
+      // regression surfaces here rather than as a confused dirty-flag
+      // failure elsewhere.
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.remoteControlPages).toHaveLength(2);
+
+      apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'X' }]));
+      await store.loadRemoteControl();
+
+      expect(store.remoteControlPages).toHaveLength(1);
+      expect(store.remoteControlPages[0]!.name).toBe('X');
+    });
+
+    it('returns {success:false} and leaves pages untouched when the stored config is not an array', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify({ corrupt: true }));
+      const store = useRemoteControlStore();
+
+      const result = await store.loadRemoteControl();
+
+      expect(result.success).toBe(false);
+      expect(store.remoteControlPages).toEqual([]);
+    });
+
+    it('returns {success:false, error} when the API rejects', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockRejectedValue(new Error('network down'));
+      const store = useRemoteControlStore();
+
+      const result = await store.loadRemoteControl();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('network down');
+    });
+  });
+
+  describe('saveRemoteControl', () => {
+    it('serializes a page that has at least one non-default button to the wire payload', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      apiPut.mockResolvedValue(undefined);
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.remoteControlPages[0]!.button1 = {
+        id: 'script-id-7',
+        name: 'Wave',
+        type: 'script',
+      };
+
+      await store.saveRemoteControl();
+
+      expect(apiPut).toHaveBeenCalledTimes(1);
+      const sent = apiPut.mock.calls[0]![1] as { config: string };
+      const parsed = JSON.parse(sent.config) as RemoteControlPage[];
+      expect(parsed).toHaveLength(1);
+    });
+
+    it('serializes id and name through saveRemoteControl so they round-trip through storage', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      apiPut.mockResolvedValue(undefined);
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      const seededId = store.remoteControlPages[0]!.id;
+      store.remoteControlPages[0]!.name = 'Quick Actions';
+      store.remoteControlPages[0]!.button1 = { id: 'script-1', name: 'Wave', type: 'script' };
+
+      await store.saveRemoteControl();
+
+      const sent = apiPut.mock.calls[0]![1] as { config: string };
+      const parsed = JSON.parse(sent.config) as RemoteControlPage[];
+      expect(parsed[0]!.id).toBe(seededId);
+      expect(parsed[0]!.name).toBe('Quick Actions');
+    });
+
+    it('persists every page including ones where all 9 buttons are id="0"', async () => {
+      // Anti-regression for the old "drop pages where all 9 buttons have
+      // id=0" save filter. Empty pages now persist; users delete pages
+      // explicitly via the UI.
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      apiPut.mockResolvedValue(undefined);
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      expect(store.remoteControlPages).toHaveLength(1);
+      expect(store.remoteControlPages[0]!.id).toMatch(UUID_LIKE);
+      expect(store.remoteControlPages[0]!.name).toBe('Page 1');
+
+      await store.saveRemoteControl();
+
+      const sent = apiPut.mock.calls[0]![1] as { config: string };
+      const parsed = JSON.parse(sent.config) as RemoteControlPage[];
+      expect(parsed).toHaveLength(1);
+      expect(parsed[0]!.id).toBe(store.remoteControlPages[0]!.id);
+      expect(parsed[0]!.name).toBe('Page 1');
+    });
+
+    it('clears isDirty to false on save success', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      apiPut.mockResolvedValue(undefined);
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+      expect(store.isDirty).toBe(true);
+
+      await store.saveRemoteControl();
+
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('does NOT clear isDirty when save fails', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      apiPut.mockRejectedValue(new Error('save failed'));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+
+      await store.saveRemoteControl();
+
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('returns {success:false, error} when the API rejects', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      apiPut.mockRejectedValue(new Error('save failed'));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.remoteControlPages[0]!.button1 = { id: 'script-1', name: 'Wave', type: 'script' };
+
+      const result = await store.saveRemoteControl();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('save failed');
+    });
+
+    it('sets isSaving=true while the PUT is in flight and back to false on success', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      // Hold the PUT open so we can observe the mid-flight state.
+      let resolvePut: (value: unknown) => void = () => {};
+      apiPut.mockReturnValue(
+        new Promise((resolve) => {
+          resolvePut = resolve;
+        }),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+
+      const savePromise = store.saveRemoteControl();
+      // The PUT hasn't resolved yet — isSaving must be true.
+      expect(store.isSaving).toBe(true);
+
+      resolvePut(undefined);
+      await savePromise;
+
+      expect(store.isSaving).toBe(false);
+    });
+
+    it('clears isSaving back to false even when the PUT rejects', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      apiPut.mockRejectedValue(new Error('save failed'));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+
+      await store.saveRemoteControl();
+
+      expect(store.isSaving).toBe(false);
+      errSpy.mockRestore();
+    });
+
+    it('does NOT clear isDirty when the user mutates pages between save-start and PUT resolve', async () => {
+      // In-flight race: the saved payload reflects the state at click time,
+      // but a mid-flight mutation makes the user's current state diverge
+      // from what hit the server. Clearing isDirty unconditionally would
+      // hide the post-edit changes — the Unsaved badge must stay visible.
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      let resolvePut: (value: unknown) => void = () => {};
+      apiPut.mockReturnValue(
+        new Promise((resolve) => {
+          resolvePut = resolve;
+        }),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage(); // isDirty=true
+      expect(store.isDirty).toBe(true);
+
+      const savePromise = store.saveRemoteControl();
+      // Mid-flight: mutate something the saved payload did NOT include.
+      store.remoteControlPages[0]!.button1 = {
+        id: 'script-mid-flight',
+        name: 'Mid-flight edit',
+        type: 'script',
+      };
+
+      resolvePut(undefined);
+      await savePromise;
+
+      // Save succeeded for the snapshot we sent, but the user's CURRENT
+      // state has additional unsaved changes. isDirty must stay true.
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('sends the pre-mutation snapshot — mid-flight edits do NOT leak into the wire payload', async () => {
+      // Companion to the previous test. The first assertion was on the
+      // dirty flag; this one pins the wire shape so we know the mid-flight
+      // edit ISN'T silently smuggled into the server's view of the world.
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      let resolvePut: (value: unknown) => void = () => {};
+      apiPut.mockReturnValue(
+        new Promise((resolve) => {
+          resolvePut = resolve;
+        }),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.remoteControlPages[0]!.button1 = {
+        id: 'pre-save',
+        name: 'Pre-save value',
+        type: 'script',
+      };
+
+      const savePromise = store.saveRemoteControl();
+      // Mutate AFTER the save started. apiPut.mock.calls captures the
+      // arguments at call time, so the snapshot we sent is fixed already —
+      // this mutation must not affect what's already on the wire.
+      store.remoteControlPages[0]!.button1 = {
+        id: 'post-save',
+        name: 'Post-save edit',
+        type: 'script',
+      };
+
+      resolvePut(undefined);
+      await savePromise;
+
+      const sent = apiPut.mock.calls[0]![1] as { config: string };
+      const parsed = JSON.parse(sent.config) as RemoteControlPage[];
+      expect(parsed[0]!.button1.id).toBe('pre-save');
+      expect(parsed[0]!.button1.name).toBe('Pre-save value');
+    });
+  });
+
+  describe('isDirty flag', () => {
+    it('starts false on a fresh store', () => {
+      const store = useRemoteControlStore();
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('stays false after a successful load of stored pages', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('flips true after a successful load of empty stored config (seeded default needs opt-in to persist)', async () => {
+      // Empty stored config triggers the seed-default-page path. The seeded
+      // page is NOT yet on the server; setting isDirty=true makes the Save
+      // button enable so the user explicitly opts in to persisting the
+      // freshly-minted default. Without this, clicking Save on a fresh
+      // install would silently write a random-UUID page the user never
+      // authored.
+      apiGet.mockResolvedValue(JSON.stringify([]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('clears to false when a successful load of stored pages follows a dirty state', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+      expect(store.isDirty).toBe(true);
+
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      await store.loadRemoteControl();
+
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('does NOT clear isDirty when load fails (network)', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.addPage();
+      expect(store.isDirty).toBe(true);
+
+      apiGet.mockRejectedValue(new Error('network down'));
+      await store.loadRemoteControl();
+
+      expect(store.isDirty).toBe(true);
+    });
+  });
+
+  describe('selectedIdx + selectPage', () => {
+    it('starts at 0', () => {
+      const store = useRemoteControlStore();
+      expect(store.selectedIdx).toBe(0);
+    });
+
+    it('selectPage(2) sets selectedIdx to 2 when 3 pages exist', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.selectPage(2);
+
+      expect(store.selectedIdx).toBe(2);
+    });
+
+    it('clamps selectPage(99) to last index when out of range high', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.selectPage(99);
+
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('clamps selectPage(-3) to 0 when negative', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      // Move off the post-load default of 0 so a no-op mutation of
+      // selectPage (which would leave selectedIdx unchanged) doesn't
+      // pass this test by accident.
+      store.selectPage(1);
+      expect(store.selectedIdx).toBe(1);
+
+      store.selectPage(-3);
+
+      expect(store.selectedIdx).toBe(0);
+    });
+
+    it('clamps NaN idx to 0 (avoids selectedIdx = NaN unreachable state)', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      store.selectPage(NaN);
+
+      expect(store.selectedIdx).toBe(0);
+    });
+
+    it('does NOT set isDirty', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.selectPage(1);
+
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('loadRemoteControl resets selectedIdx to 0', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      await store.loadRemoteControl();
+
+      expect(store.selectedIdx).toBe(0);
+    });
+  });
+
+  describe('addPage', () => {
+    it('appends a default page with auto-numbered name', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.addPage();
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      expect(store.remoteControlPages[1]!.name).toBe('Page 2');
+      expect(store.remoteControlPages[1]!.id).toMatch(UUID_LIKE);
+    });
+
+    it('selects the newly added page', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.addPage();
+
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('flips isDirty to true', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(false);
+
+      store.addPage();
+
+      expect(store.isDirty).toBe(true);
+    });
+  });
+
+  describe('duplicatePage', () => {
+    it('splices a copy right after the source index with a fresh id', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      const srcId = store.remoteControlPages[0]!.id;
+
+      store.duplicatePage(0);
+
+      expect(store.remoteControlPages).toHaveLength(3);
+      expect(store.remoteControlPages[1]!.id).not.toBe(srcId);
+      expect(store.remoteControlPages[1]!.id).toMatch(UUID_LIKE);
+    });
+
+    it('names the copy "<src> (copy)"', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'Performance' }]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(0);
+
+      expect(store.remoteControlPages[1]!.name).toBe('Performance (copy)');
+    });
+
+    it('deep-copies button slots (mutating source button in place does not affect copy)', async () => {
+      // Slot reassignment (`page.button1 = {...}`) would always isolate the copy
+      // even without a deep copy — it just rebinds the source's slot reference.
+      // The real shared-reference hazard is in-place property mutation, which
+      // is what a Pinia consumer would do via `page.button1.name = '...'` or
+      // `page.button1.id = '...'`. This test pokes that path.
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.remoteControlPages[0]!.button1 = { id: 's1', name: 'Wave', type: 'script' };
+
+      store.duplicatePage(0);
+      store.remoteControlPages[0]!.button1.name = 'Bow';
+      store.remoteControlPages[0]!.button1.id = 's2';
+
+      expect(store.remoteControlPages[1]!.button1).toEqual({
+        id: 's1',
+        name: 'Wave',
+        type: 'script',
+      });
+    });
+
+    it('selects the copy', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(0);
+
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('flips isDirty to true', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(0);
+
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('inserts the copy at idx+1 and selects it when duplicating a non-zero index', async () => {
+      // Pins the `splice(idx + 1, 0, copy)` and `selectedIdx = idx + 1`
+      // math. The previous coverage only exercised idx=0, where a mutation
+      // to a constant `1` would still pass.
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(1);
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'B (copy)', 'C']);
+      expect(store.selectedIdx).toBe(2);
+    });
+
+    it('moves selection to the copy even when a higher page was previously selected', async () => {
+      // The selectedIdx-above-target case: when the user is on page C (idx=2)
+      // and duplicates page A (idx=0), the implementation jumps selection to
+      // the copy at idx=1. Discoverability of the new page wins over
+      // preserving the user's prior selection.
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      store.duplicatePage(0);
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'A (copy)', 'B', 'C']);
+      expect(store.selectedIdx).toBe(1);
+      // The page formerly at idx 2 (C) is now at idx 3 — selection didn't
+      // "follow" the user's prior page; it jumped to the copy.
+      expect(store.remoteControlPages[3]!.name).toBe('C');
+    });
+
+    it('warns and no-ops on out-of-range index (negative or beyond end)', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.duplicatePage(-1);
+      store.duplicatePage(99);
+
+      expect(store.remoteControlPages).toHaveLength(1);
+      expect(store.isDirty).toBe(false);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('deletePage', () => {
+    it('removes the page at the given index', async () => {
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(1);
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'C']);
+    });
+
+    it('no-ops when only one page remains', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(0);
+
+      expect(store.remoteControlPages).toHaveLength(1);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('moves selectedIdx back when deleting the currently-selected mid-list page', async () => {
+      // Contract: when the user deletes the page they're viewing, selection
+      // moves to the PREVIOUS sibling — the user's mental position is
+      // preserved rather than jumping forward to whichever page took the
+      // deleted slot. Cf. most file managers / tab strips.
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(1);
+
+      store.deletePage(1);
+
+      expect(store.selectedIdx).toBe(0);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('A');
+    });
+
+    it('moves selectedIdx back to previous page when deleting the currently-selected last page', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      store.deletePage(2);
+
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('keeps selectedIdx at 0 when deleting the first (selected) page', async () => {
+      // Edge of the "move back" rule: there is no page further back, so
+      // selection stays at 0 (the page that USED to be at idx 1 is now at 0).
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+          { ...legacyPage(), name: 'C' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(0);
+
+      store.deletePage(0);
+
+      expect(store.selectedIdx).toBe(0);
+      expect(store.remoteControlPages[0]!.name).toBe('B');
+    });
+
+    it('warns and no-ops on NaN idx (would otherwise become splice(0,1) and delete page[0])', async () => {
+      // splice(NaN, 1) is silently treated as splice(0, 1) per ECMA's
+      // ToInteger spec. The comparison-based guard (idx < 0 || idx >= length)
+      // misses NaN because all NaN comparisons return false. The
+      // Number.isInteger check is what closes the gap.
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(NaN);
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      expect(store.remoteControlPages[0]!.name).toBe('A');
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('warns and no-ops on fractional idx (would otherwise truncate inside splice)', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(
+        JSON.stringify([
+          { ...legacyPage(), name: 'A' },
+          { ...legacyPage(), name: 'B' },
+        ]),
+      );
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(0.7);
+
+      expect(store.remoteControlPages).toHaveLength(2);
+    });
+
+    it('warns on out-of-range deletePage idx (programming-error breadcrumb)', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(-1);
+      store.deletePage(99);
+
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('shifts selectedIdx down when deleting a page below the current selection', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(2);
+
+      store.deletePage(0);
+
+      // Was idx 2, now at idx 1 because the page below it was removed.
+      expect(store.selectedIdx).toBe(1);
+    });
+
+    it('keeps selectedIdx unchanged when deleting a page above the current selection', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      store.selectPage(0);
+
+      store.deletePage(2);
+
+      expect(store.selectedIdx).toBe(0);
+    });
+
+    it('flips isDirty to true', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(0);
+
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('no-ops on out-of-range idx without changing pages or isDirty', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.deletePage(-1);
+      store.deletePage(99);
+
+      expect(store.remoteControlPages).toHaveLength(2);
+      expect(store.isDirty).toBe(false);
+    });
+  });
+
+  describe('renamePage', () => {
+    it('updates the name at the given index and returns true', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      const applied = store.renamePage(0, 'Quick Actions');
+
+      expect(applied).toBe(true);
+      expect(store.remoteControlPages[0]!.name).toBe('Quick Actions');
+    });
+
+    it('trims surrounding whitespace before saving', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.renamePage(0, '   Performance   ');
+
+      expect(store.remoteControlPages[0]!.name).toBe('Performance');
+    });
+
+    it('returns false and no-ops on empty string', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'Original' }]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      const applied = store.renamePage(0, '');
+
+      expect(applied).toBe(false);
+      expect(store.remoteControlPages[0]!.name).toBe('Original');
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('returns false and no-ops on whitespace-only string', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([{ ...legacyPage(), name: 'Original' }]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      const applied = store.renamePage(0, '   \t  ');
+
+      expect(applied).toBe(false);
+      expect(store.remoteControlPages[0]!.name).toBe('Original');
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('returns false, warns, and no-ops on out-of-range idx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      const high = store.renamePage(99, 'NewName');
+      const low = store.renamePage(-1, 'NewName');
+
+      expect(high).toBe(false);
+      expect(low).toBe(false);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(store.remoteControlPages[0]!.name).toBe('Page 1');
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('flips isDirty to true on a valid rename', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.renamePage(0, 'New');
+
+      expect(store.isDirty).toBe(true);
+    });
+  });
+
+  describe('setButton', () => {
+    it('writes the button value to the given slot on the given page', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage(), legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.setButton(1, 'button3', { id: 'script-7', name: 'Wave', type: 'script' });
+
+      expect(store.remoteControlPages[1]!.button3).toEqual({
+        id: 'script-7',
+        name: 'Wave',
+        type: 'script',
+      });
+      expect(store.remoteControlPages[0]!.button3.id).toBe('0');
+    });
+
+    it('flips isDirty to true on a successful write', async () => {
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      expect(store.isDirty).toBe(false);
+
+      store.setButton(0, 'button1', { id: 's1', name: 'Wave', type: 'script' });
+
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('warns and no-ops on out-of-range slotIdx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      const originalButton = { ...store.remoteControlPages[0]!.button1 };
+
+      store.setButton(99, 'button1', { id: 's1', name: 'Wave', type: 'script' });
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages[0]!.button1).toEqual(originalButton);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on NaN slotIdx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      apiGet.mockResolvedValue(JSON.stringify([legacyPage()]));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+
+      store.setButton(NaN, 'button1', { id: 's1', name: 'Wave', type: 'script' });
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages[0]!.button1.id).toBe('0');
+      expect(store.isDirty).toBe(false);
+    });
+  });
+
+  describe('reorderPages', () => {
+    async function loadNamed(...names: string[]) {
+      apiGet.mockResolvedValue(JSON.stringify(names.map((name) => ({ ...legacyPage(), name }))));
+      const store = useRemoteControlStore();
+      await store.loadRemoteControl();
+      return store;
+    }
+
+    it('moves a page from a low index to a high index', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(0, 2);
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['B', 'C', 'A']);
+    });
+
+    it('moves a page from a high index to a low index', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(2, 0);
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['C', 'A', 'B']);
+    });
+
+    it('keeps the moved page selected when the SELECTED page is the one moved', async () => {
+      // The selected page follows its content across the move, not its slot.
+      const store = await loadNamed('A', 'B', 'C');
+      store.selectPage(0); // A selected
+
+      store.reorderPages(0, 2); // A travels to the end
+
+      expect(store.selectedIdx).toBe(2);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('A');
+    });
+
+    it('shifts selectedIdx toward 0 when a page above the selection is moved below it', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+      store.selectPage(1); // B selected at idx 1
+
+      store.reorderPages(0, 2); // A (above B) moves below B → [B, C, A]
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['B', 'C', 'A']);
+      expect(store.selectedIdx).toBe(0);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('B');
+    });
+
+    it('shifts selectedIdx upward when a page below the selection is moved above it', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+      store.selectPage(1); // B selected at idx 1
+
+      store.reorderPages(2, 0); // C (below B) moves above B → [C, A, B]
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['C', 'A', 'B']);
+      expect(store.selectedIdx).toBe(2);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('B');
+    });
+
+    it('leaves selectedIdx unchanged when a reorder happens entirely below the selection', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+      store.selectPage(0); // A selected at idx 0
+
+      store.reorderPages(1, 2); // swap B and C, both below A → [A, C, B]
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'C', 'B']);
+      expect(store.selectedIdx).toBe(0);
+      expect(store.remoteControlPages[store.selectedIdx]!.name).toBe('A');
+    });
+
+    it('flips isDirty to true on a real move', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+      expect(store.isDirty).toBe(false);
+
+      store.reorderPages(0, 1);
+
+      expect(store.isDirty).toBe(true);
+    });
+
+    it('warns and no-ops on NaN fromIdx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(NaN, 1);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on NaN toIdx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(0, NaN);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on fractional idx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(0.5, 2);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on negative idx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(-1, 1);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('warns and no-ops on out-of-range idx', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(0, 99);
+
+      expect(warnSpy).toHaveBeenCalled();
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+      expect(store.isDirty).toBe(false);
+    });
+
+    it('no-ops when fromIdx === toIdx (order unchanged)', async () => {
+      const store = await loadNamed('A', 'B', 'C');
+
+      store.reorderPages(1, 1);
+
+      expect(store.remoteControlPages.map((p) => p.name)).toEqual(['A', 'B', 'C']);
+    });
+
+    it('does NOT flip isDirty when fromIdx === toIdx', async () => {
+      // A drag that ends where it started is not an edit — the Save button
+      // must stay disabled.
+      const store = await loadNamed('A', 'B', 'C');
+      expect(store.isDirty).toBe(false);
+
+      store.reorderPages(1, 1);
+
+      expect(store.isDirty).toBe(false);
+    });
+  });
+});

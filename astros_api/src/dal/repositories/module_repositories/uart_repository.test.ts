@@ -1,19 +1,16 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
+import { Kysely } from 'kysely';
 import { Database } from '../../types.js';
-import { migrateToLatest } from '../../database.js';
+import { createKyselyConnection, migrateToLatest } from '../../database.js';
 import {
   Constants,
   UartModule,
   ModuleSubType,
   ModuleType,
-  KangarooX2,
-  MaestroModule,
-  MaestroBoard,
   MaestroChannel,
 } from '../../../models/index.js';
+import type { KangarooX2, MaestroModule, MaestroBoard } from '../../../models/index.js';
 import { getUartModules, upsertUartModules } from './uart_repository.js';
 import { v4 as uuid } from 'uuid';
 
@@ -22,13 +19,7 @@ describe('UartRepository', () => {
   const location = Constants.BODY;
 
   beforeEach(async () => {
-    const dialect = new SqliteDialect({
-      database: new SQLite(':memory:'),
-    });
-
-    db = new Kysely<Database>({
-      dialect,
-    });
+    db = createKyselyConnection().db;
 
     await migrateToLatest(db);
   });
@@ -161,7 +152,7 @@ describe('UartRepository', () => {
       9600,
     );
 
-    const subModule = new KangarooX2(subModuleId, 'channel 1', 'channel 2');
+    const subModule: KangarooX2 = { id: subModuleId, ch1Name: 'channel 1', ch2Name: 'channel 2' };
 
     module.subModule = subModule;
 
@@ -182,7 +173,6 @@ describe('UartRepository', () => {
     expect(modules[0].moduleType).toBe(ModuleType.uart);
     expect(modules[0].moduleSubType).toBe(ModuleSubType.kangaroo);
     expect(modules[0].subModule).toBeDefined();
-    expect(modules[0].subModule).toBeInstanceOf(KangarooX2);
     expect(savedSubmodule.ch1Name).toBe('channel 1');
     expect(savedSubmodule.ch2Name).toBe('channel 2');
 
@@ -208,7 +198,6 @@ describe('UartRepository', () => {
     expect(updatedModules[0].moduleType).toBe(ModuleType.uart);
     expect(updatedModules[0].moduleSubType).toBe(ModuleSubType.kangaroo);
     expect(updatedModules[0].subModule).toBeDefined();
-    expect(updatedModules[0].subModule).toBeInstanceOf(KangarooX2);
     expect(updatedSubmodule.ch1Name).toBe('new channel 1');
     expect(updatedSubmodule.ch2Name).toBe('new channel 2');
   });
@@ -236,8 +225,15 @@ describe('UartRepository', () => {
       9600,
     );
 
-    const maestroModule = new MaestroModule();
-    const board = new MaestroBoard(boardId, modId, 0, 'Board 1', 3);
+    const maestroModule: MaestroModule = { boards: [] };
+    const board: MaestroBoard = {
+      id: boardId,
+      parentId: modId,
+      boardId: 0,
+      name: 'Board 1',
+      channelCount: 3,
+      channels: [],
+    };
 
     // Create channels with various invalid position values
     // Channel 1: undefined values (simulating disabled channel cleared by user)
@@ -295,8 +291,6 @@ describe('UartRepository', () => {
 
     expect(modules.length).toBe(1);
     expect(modules[0].subModule).toBeDefined();
-    expect(modules[0].subModule).toBeInstanceOf(MaestroModule);
-
     const savedMaestro = modules[0].subModule as MaestroModule;
     expect(savedMaestro.boards.length).toBe(1);
     expect(savedMaestro.boards[0].channels.length).toBe(3);

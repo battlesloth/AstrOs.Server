@@ -12,10 +12,19 @@ import {
   IoTrashBin,
   IoPlay,
   IoSearch,
+  IoChevronUp,
+  IoChevronDown,
+  IoAdd,
+  IoHelpCircleOutline,
+  IoCreate,
+  IoEyeOutline,
+  IoEyeOffOutline,
 } from 'oh-vue-icons/icons';
+import { MdDescription, MdDraghandle, MdFolder } from 'oh-vue-icons/icons/md';
 import App from './App.vue';
 import router from './router';
 import i18n from './i18n';
+import { installReadOnlyInterceptor } from '@/api/readOnlyInterceptor';
 
 addIcons(
   IoCloudUpload,
@@ -27,6 +36,16 @@ addIcons(
   IoWarning,
   IoCheckmarkCircle,
   IoSearch,
+  IoChevronUp,
+  IoChevronDown,
+  IoAdd,
+  IoHelpCircleOutline,
+  IoCreate,
+  IoEyeOutline,
+  IoEyeOffOutline,
+  MdDescription,
+  MdDraghandle,
+  MdFolder,
 );
 
 const app = createApp(App);
@@ -35,5 +54,11 @@ app.use(i18n);
 app.component('v-icon', OhVueIcon);
 app.use(createPinia());
 app.use(router);
+
+// Install the 503 read-only-mode response interceptor *after* Pinia is
+// active. This keeps apiService.ts free of any store import and breaks
+// what would otherwise be a circular module dependency
+// (apiService → store → apiService).
+installReadOnlyInterceptor();
 
 app.mount('#app');

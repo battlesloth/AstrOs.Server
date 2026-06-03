@@ -1,23 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Kysely } from 'kysely';
 import { Database } from '../types.js';
-import { migrateToLatest } from '../database.js';
+import { createKyselyConnection, migrateToLatest } from '../database.js';
 import { ScriptRepository } from './script_repository.js';
+import { logger } from 'src/logger.js';
 import {
   Script,
   ScriptChannel,
   ScriptEvent,
   GpioModule,
   GpioChannel,
-  MaestroModule,
   MaestroChannel,
   ScriptChannelType,
   ModuleChannelTypes,
   ModuleType,
   ModuleSubType,
   MaestroEvent,
-  MaestroBoard,
   GpioEvent,
   UartModule,
   UartChannel,
@@ -25,24 +23,27 @@ import {
   HcrCommand,
   HumanCyborgRelationsCmd,
   HcrCommandCategory,
+  UploadStatus,
 } from '../../models/index.js';
+import type { MaestroModule } from '../../models/index.js';
 import { upsertGpioModule } from './module_repositories/gpio_repository.js';
 import { upsertUartModules } from './module_repositories/uart_repository.js';
+import { PlaylistRepository } from './playlist_repository.js';
+import { Playlist } from '../../models/playlists/playlist.js';
+import { TrackType } from '../../models/playlists/trackType.js';
+import { PlaylistType } from '../../models/playlists/playlistType.js';
 
 import { v4 as uuid } from 'uuid';
 
 describe('Script Repository', () => {
   let db: Kysely<Database>;
+  let raw: ReturnType<typeof createKyselyConnection>['raw'];
   let locationId: string;
 
   beforeEach(async () => {
-    const dialect = new SqliteDialect({
-      database: new SQLite(':memory:'),
-    });
-
-    db = new Kysely<Database>({
-      dialect,
-    });
+    const conn = createKyselyConnection();
+    db = conn.db;
+    raw = conn.raw;
 
     await migrateToLatest(db);
 
@@ -66,7 +67,16 @@ describe('Script Repository', () => {
   it('should save script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()));
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: 'Test Description',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
     const repo = new ScriptRepository(db);
 
@@ -84,7 +94,16 @@ describe('Script Repository', () => {
   it('should update script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()));
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: 'Test Description',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
     const repo = new ScriptRepository(db);
 
@@ -115,7 +134,16 @@ describe('Script Repository', () => {
   it('should delete script', async () => {
     const scriptId = uuid();
 
-    const script = new Script(scriptId, 'Test Script', 'Test Description', new Date(Date.now()));
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: 'Test Description',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
     const repo = new ScriptRepository(db);
 
@@ -136,6 +164,70 @@ describe('Script Repository', () => {
     expect(updatedScripts.length).toBe(0);
   });
 
+  it('should copy script', async () => {
+    const scriptId = uuid();
+    const channelId = uuid();
+
+    // Create a GPIO channel in the database
+    const gpioModule = new GpioModule(locationId);
+    const gpioChannel = new GpioChannel(channelId, locationId, 0, true, 'Test GPIO Channel', false);
+    gpioModule.channels.push(gpioChannel);
+    await upsertGpioModule(db, gpioModule);
+
+    // Create a script with a GPIO channel
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Original Script',
+      description: 'Original Description',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
+
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GPIO,
+      parentModuleId: locationId,
+      moduleChannelId: channelId,
+      moduleChannelType: ModuleChannelTypes.GpioChannel,
+      moduleChannel: gpioChannel,
+      maxDuration: 0,
+      events: {},
+    };
+
+    script.scriptChannels.push(scriptChannel);
+
+    const repo = new ScriptRepository(db);
+
+    await repo.upsertScript(script);
+    const copyResult = await repo.copyScript(scriptId);
+
+    const allScripts = await repo.getScripts();
+
+    expect(allScripts.length).toBe(2);
+
+    const originalScript = allScripts.find((s) => s.id === scriptId);
+    expect(originalScript).toBeDefined();
+    expect(originalScript?.scriptName).toBe('Original Script');
+    expect(originalScript?.description).toBe('Original Description');
+
+    const copiedScript = allScripts.find((s) => s.id === copyResult.id);
+    expect(copiedScript).toBeDefined();
+    expect(copiedScript?.id).toMatch(/^s[0-9]{7}[A-Za-z]{3}$/);
+    expect(copiedScript?.scriptName).toBe('Original Script (Copy)');
+    expect(copiedScript?.description).toBe('Original Description');
+
+    // Verify channels of copy
+    const fullCopy = await repo.getScript(copyResult.id);
+    expect(fullCopy.scriptChannels.length).toBe(1);
+    expect(fullCopy.scriptChannels[0].channelType).toBe(ScriptChannelType.GPIO);
+    expect(fullCopy.scriptChannels[0].moduleChannelType).toBe(ModuleChannelTypes.GpioChannel);
+    expect(fullCopy.scriptChannels[0].moduleChannel.channelName).toBe('Test GPIO Channel');
+  });
+
   it('should save and retrieve script with GPIO channel', async () => {
     const scriptId = uuid();
     const channelId = uuid();
@@ -147,23 +239,28 @@ describe('Script Repository', () => {
     await upsertGpioModule(db, gpioModule);
 
     // Create a script with a GPIO channel
-    const script = new Script(
-      scriptId,
-      'GPIO Test Script',
-      'Script with GPIO channel',
-      new Date(Date.now()),
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'GPIO Test Script',
+      description: 'Script with GPIO channel',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.GPIO,
-      locationId,
-      channelId,
-      ModuleChannelTypes.GpioChannel,
-      gpioChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GPIO,
+      parentModuleId: locationId,
+      moduleChannelId: channelId,
+      moduleChannelType: ModuleChannelTypes.GpioChannel,
+      moduleChannel: gpioChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     script.scriptChannels.push(scriptChannel);
 
@@ -185,9 +282,16 @@ describe('Script Repository', () => {
     const maestroChannelId = uuid();
 
     // Create a Maestro module and channel in the database
-    const maestroModule = new MaestroModule();
+    const maestroModule: MaestroModule = { boards: [] };
 
-    maestroModule.boards.push(new MaestroBoard(maestroModuleId, locationId, 0, 'Test Board', 24));
+    maestroModule.boards.push({
+      id: maestroModuleId,
+      parentId: locationId,
+      boardId: 0,
+      name: 'Test Board',
+      channelCount: 24,
+      channels: [],
+    });
 
     const maestroChannel = new MaestroChannel(
       maestroChannelId,
@@ -221,23 +325,28 @@ describe('Script Repository', () => {
     });
 
     // Create a script with a Maestro channel
-    const script = new Script(
-      scriptId,
-      'Maestro Test Script',
-      'Script with Maestro channel',
-      new Date(Date.now()),
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Maestro Test Script',
+      description: 'Script with Maestro channel',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.SERVO,
-      maestroModuleId,
-      maestroChannelId,
-      ModuleChannelTypes.MaestroChannel,
-      maestroChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.SERVO,
+      parentModuleId: maestroModuleId,
+      moduleChannelId: maestroChannelId,
+      moduleChannelType: ModuleChannelTypes.MaestroChannel,
+      moduleChannel: maestroChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     script.scriptChannels.push(scriptChannel);
 
@@ -265,32 +374,37 @@ describe('Script Repository', () => {
     await upsertGpioModule(db, gpioModule);
 
     // Create a script with a channel and event
-    const script = new Script(
-      scriptId,
-      'Event Test Script',
-      'Script with events',
-      new Date(Date.now()),
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Event Test Script',
+      description: 'Script with events',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.GPIO,
-      locationId,
-      channelId,
-      ModuleChannelTypes.GpioChannel,
-      gpioChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GPIO,
+      parentModuleId: locationId,
+      moduleChannelId: channelId,
+      moduleChannelType: ModuleChannelTypes.GpioChannel,
+      moduleChannel: gpioChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
-    const scriptEvent = new ScriptEvent(
-      eventId,
-      scriptChannel.id,
-      ModuleType.gpio,
-      ModuleSubType.genericGpio,
-      5.5,
-      new GpioEvent(true),
-    );
+    const scriptEvent: ScriptEvent = {
+      id: eventId,
+      scriptChannel: scriptChannel.id,
+      moduleType: ModuleType.gpio,
+      moduleSubType: ModuleSubType.genericGpio,
+      time: 5.5,
+      event: { setHigh: true } as GpioEvent,
+    };
 
     scriptChannel.events[eventId] = scriptEvent;
     script.scriptChannels.push(scriptChannel);
@@ -318,9 +432,16 @@ describe('Script Repository', () => {
     const eventId = uuid();
 
     // Create Maestro module and channel
-    const maestroModule = new MaestroModule();
+    const maestroModule: MaestroModule = { boards: [] };
 
-    maestroModule.boards.push(new MaestroBoard(maestroModuleId, locationId, 0, 'Test Board', 24));
+    maestroModule.boards.push({
+      id: maestroModuleId,
+      parentId: locationId,
+      boardId: 0,
+      name: 'Test Board',
+      channelCount: 24,
+      channels: [],
+    });
 
     const maestroChannel = new MaestroChannel(
       maestroChannelId,
@@ -353,33 +474,44 @@ describe('Script Repository', () => {
     });
 
     // Create script with Maestro event
-    const script = new Script(
-      scriptId,
-      'Maestro Event Test',
-      'Test Maestro event channel update',
-      new Date(Date.now()),
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Maestro Event Test',
+      description: 'Test Maestro event channel update',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.SERVO,
-      maestroModuleId,
-      maestroChannelId,
-      ModuleChannelTypes.MaestroChannel,
-      maestroChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.SERVO,
+      parentModuleId: maestroModuleId,
+      moduleChannelId: maestroChannelId,
+      moduleChannelType: ModuleChannelTypes.MaestroChannel,
+      moduleChannel: maestroChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
-    const maestroEvent = new MaestroEvent(0, true, 1500, 0, 0); // Channel is 0 initially
-    const scriptEvent = new ScriptEvent(
-      eventId,
-      scriptChannel.id,
-      ModuleType.uart,
-      ModuleSubType.maestro,
-      2.0,
-      maestroEvent,
-    );
+    const maestroEvent = {
+      channel: 0,
+      isServo: true,
+      position: 1500,
+      speed: 0,
+      acceleration: 0,
+    } as MaestroEvent; // Channel is 0 initially
+    const scriptEvent: ScriptEvent = {
+      id: eventId,
+      scriptChannel: scriptChannel.id,
+      moduleType: ModuleType.uart,
+      moduleSubType: ModuleSubType.maestro,
+      time: 2.0,
+      event: maestroEvent,
+    };
 
     scriptChannel.events[eventId] = scriptEvent;
     script.scriptChannels.push(scriptChannel);
@@ -425,23 +557,28 @@ describe('Script Repository', () => {
     });
 
     // Create a script with an HCR channel
-    const script = new Script(
-      scriptId,
-      'HCR Test Script',
-      'Script with HCR channel',
-      new Date(Date.now()),
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'HCR Test Script',
+      description: 'Script with HCR channel',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.GENERIC_UART,
-      hcrModuleId,
-      hcrModuleId,
-      ModuleChannelTypes.UartChannel,
-      uartChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GENERIC_UART,
+      parentModuleId: hcrModuleId,
+      moduleChannelId: hcrModuleId,
+      moduleChannelType: ModuleChannelTypes.UartChannel,
+      moduleChannel: uartChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     script.scriptChannels.push(scriptChannel);
 
@@ -488,45 +625,56 @@ describe('Script Repository', () => {
     });
 
     // Create a script with an HCR channel and event
-    const script = new Script(
-      scriptId,
-      'HCR Event Test Script',
-      'Script with HCR events',
-      new Date(Date.now()),
-    );
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'HCR Event Test Script',
+      description: 'Script with HCR events',
+      lastSaved: new Date(Date.now()),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
-    const scriptChannel = new ScriptChannel(
-      uuid(),
-      scriptId,
-      ScriptChannelType.GENERIC_UART,
-      hcrModuleId,
-      hcrModuleId,
-      ModuleChannelTypes.UartChannel,
-      uartChannel,
-      0,
-    );
+    const scriptChannel: ScriptChannel = {
+      id: uuid(),
+      scriptId: scriptId,
+      channelType: ScriptChannelType.GENERIC_UART,
+      parentModuleId: hcrModuleId,
+      moduleChannelId: hcrModuleId,
+      moduleChannelType: ModuleChannelTypes.UartChannel,
+      moduleChannel: uartChannel,
+      maxDuration: 0,
+      events: {},
+    };
 
     // Create HCR commands
     const hcrCommands = [
-      new HcrCommand(uuid(), HcrCommandCategory.stimuli, HumanCyborgRelationsCmd.mildHappy, 0, 0),
-      new HcrCommand(
-        uuid(),
-        HcrCommandCategory.volume,
-        HumanCyborgRelationsCmd.vocalizerVolume,
-        75,
-        0,
-      ),
+      {
+        id: uuid(),
+        category: HcrCommandCategory.stimuli,
+        command: HumanCyborgRelationsCmd.mildHappy,
+        valueA: 0,
+        valueB: 0,
+      } as HcrCommand,
+      {
+        id: uuid(),
+        category: HcrCommandCategory.volume,
+        command: HumanCyborgRelationsCmd.vocalizerVolume,
+        valueA: 75,
+        valueB: 0,
+      } as HcrCommand,
     ];
 
-    const hcrEvent = new HumanCyborgRelationsEvent(hcrCommands);
-    const scriptEvent = new ScriptEvent(
-      eventId,
-      scriptChannel.id,
-      ModuleType.uart,
-      ModuleSubType.humanCyborgRelationsSerial,
-      3.5,
-      hcrEvent,
-    );
+    const hcrEvent = { commands: hcrCommands } as HumanCyborgRelationsEvent;
+    const scriptEvent: ScriptEvent = {
+      id: eventId,
+      scriptChannel: scriptChannel.id,
+      moduleType: ModuleType.uart,
+      moduleSubType: ModuleSubType.humanCyborgRelationsSerial,
+      time: 3.5,
+      event: hcrEvent,
+    };
 
     scriptChannel.events[eventId] = scriptEvent;
     script.scriptChannels.push(scriptChannel);
@@ -554,5 +702,432 @@ describe('Script Repository', () => {
     expect(savedHcrEvent.commands[1].category).toBe(HcrCommandCategory.volume);
     expect(savedHcrEvent.commands[1].command).toBe(HumanCyborgRelationsCmd.vocalizerVolume);
     expect(savedHcrEvent.commands[1].valueA).toBe(75);
+  });
+
+  it('should remove playlist tracks referencing deleted script', async () => {
+    const scriptId = uuid();
+    const playlistId = uuid();
+
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: 'Description',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
+    const scriptRepo = new ScriptRepository(db);
+    await scriptRepo.upsertScript(script);
+
+    const playlist: Playlist = {
+      id: playlistId,
+      playlistName: 'Test Playlist',
+      description: '',
+      playlistType: PlaylistType.Sequential,
+      settings: { randomDelay: false, delayMin: 0, delayMax: 0, repeat: false, repeatCount: 0 },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId,
+          trackName: 'Test Script',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+      ],
+    };
+
+    const playlistRepo = new PlaylistRepository(db);
+    await playlistRepo.upsertPlaylist(playlist);
+
+    // Verify track exists
+    const before = await playlistRepo.getPlaylist(playlistId);
+    expect(before).toBeDefined();
+    expect(before?.tracks.length).toBe(1);
+
+    await scriptRepo.deleteScript(scriptId);
+
+    // Playlist track should be removed
+    const after = await playlistRepo.getPlaylist(playlistId);
+    expect(after).toBeDefined();
+    expect(after?.tracks.length).toBe(0);
+  });
+
+  it('should only remove playlist tracks for the deleted script', async () => {
+    const scriptId1 = uuid();
+    const scriptId2 = uuid();
+    const playlistId = uuid();
+
+    const scriptRepo = new ScriptRepository(db);
+    await scriptRepo.upsertScript({
+      id: scriptId1,
+      scriptName: 'Script 1',
+      description: '',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    });
+    await scriptRepo.upsertScript({
+      id: scriptId2,
+      scriptName: 'Script 2',
+      description: '',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    });
+
+    const playlist: Playlist = {
+      id: playlistId,
+      playlistName: 'Test Playlist',
+      description: '',
+      playlistType: PlaylistType.Sequential,
+      settings: { randomDelay: false, delayMin: 0, delayMax: 0, repeat: false, repeatCount: 0 },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId1,
+          trackName: 'Script 1',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+        {
+          id: uuid(),
+          idx: 1,
+          playlistId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId2,
+          trackName: 'Script 2',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+      ],
+    };
+
+    const playlistRepo = new PlaylistRepository(db);
+    await playlistRepo.upsertPlaylist(playlist);
+
+    await scriptRepo.deleteScript(scriptId1);
+
+    const after = await playlistRepo.getPlaylist(playlistId);
+    expect(after).toBeDefined();
+    expect(after?.tracks.length).toBe(1);
+    expect(after?.tracks[0].trackId).toBe(scriptId2);
+  });
+
+  it('should remove tracks from multiple playlists when script is deleted', async () => {
+    const scriptId = uuid();
+    const playlistId1 = uuid();
+    const playlistId2 = uuid();
+
+    const scriptRepo = new ScriptRepository(db);
+    await scriptRepo.upsertScript({
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: '',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    });
+
+    const makePlaylist = (plId: string, name: string): Playlist => ({
+      id: plId,
+      playlistName: name,
+      description: '',
+      playlistType: PlaylistType.Sequential,
+      settings: { randomDelay: false, delayMin: 0, delayMax: 0, repeat: false, repeatCount: 0 },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId: plId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId,
+          trackName: 'Test Script',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+      ],
+    });
+
+    const playlistRepo = new PlaylistRepository(db);
+    await playlistRepo.upsertPlaylist(makePlaylist(playlistId1, 'Playlist 1'));
+    await playlistRepo.upsertPlaylist(makePlaylist(playlistId2, 'Playlist 2'));
+
+    await scriptRepo.deleteScript(scriptId);
+
+    const after1 = await playlistRepo.getPlaylist(playlistId1);
+    const after2 = await playlistRepo.getPlaylist(playlistId2);
+    expect(after1).toBeDefined();
+    expect(after2).toBeDefined();
+    expect(after1?.tracks.length).toBe(0);
+    expect(after2?.tracks.length).toBe(0);
+  });
+
+  it('should not remove non-Script track types when script is deleted', async () => {
+    const scriptId = uuid();
+    const playlistId = uuid();
+    const waitTrackId = uuid();
+
+    const scriptRepo = new ScriptRepository(db);
+    await scriptRepo.upsertScript({
+      id: scriptId,
+      scriptName: 'Test Script',
+      description: '',
+      lastSaved: new Date(),
+      durationDS: 0,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    });
+
+    const playlist: Playlist = {
+      id: playlistId,
+      playlistName: 'Test Playlist',
+      description: '',
+      playlistType: PlaylistType.Shuffle,
+      settings: { randomDelay: false, delayMin: 0, delayMax: 0, repeat: false, repeatCount: 0 },
+      tracks: [
+        {
+          id: uuid(),
+          idx: 0,
+          playlistId,
+          durationDS: 100,
+          trackType: TrackType.Script,
+          trackId: scriptId,
+          trackName: 'Test Script',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+        {
+          id: waitTrackId,
+          idx: 1,
+          playlistId,
+          durationDS: 50,
+          trackType: TrackType.Wait,
+          trackId: '',
+          trackName: 'Wait',
+          randomWait: false,
+          durationMaxDS: 0,
+        },
+      ],
+    };
+
+    const playlistRepo = new PlaylistRepository(db);
+    await playlistRepo.upsertPlaylist(playlist);
+
+    await scriptRepo.deleteScript(scriptId);
+
+    const after = await playlistRepo.getPlaylist(playlistId);
+    expect(after).toBeDefined();
+    expect(after?.tracks.length).toBe(1);
+    expect(after?.tracks[0].id).toBe(waitTrackId);
+    expect(after?.tracks[0].trackType).toBe(TrackType.Wait);
+  });
+
+  describe('script_deployments FK contract', () => {
+    // Regression: handleScriptDeployResponse stored the location NAME in
+    // script_deployments.location_id, which is a FK to locations.id (a UUID).
+    // Once migration_6 added that FK, uploading a script threw
+    // "FOREIGN KEY constraint failed". These pin the contract: a deployment row
+    // must be keyed by the location id, never the name.
+    async function seedScript(): Promise<string> {
+      const scriptId = uuid();
+      const scriptRepo = new ScriptRepository(db);
+      await scriptRepo.upsertScript({
+        id: scriptId,
+        scriptName: 'Deploy Test',
+        description: '',
+        lastSaved: new Date(),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [],
+      });
+      return scriptId;
+    }
+
+    it('records a deployment keyed by the location id and round-trips the date', async () => {
+      const scriptRepo = new ScriptRepository(db);
+      const scriptId = await seedScript();
+
+      const deployedAt = new Date('2026-05-31T12:00:00.000Z');
+      await scriptRepo.updateScriptControllerUploaded(scriptId, locationId, deployedAt);
+
+      const roundTrip = await scriptRepo.getLastScriptUploadedDate(scriptId, locationId);
+      expect(roundTrip.getTime()).toBe(deployedAt.getTime());
+    });
+
+    it('upserts last_deployed on repeat deployment (single row per script+location)', async () => {
+      const scriptRepo = new ScriptRepository(db);
+      const scriptId = await seedScript();
+
+      const first = new Date('2026-05-31T12:00:00.000Z');
+      const second = new Date('2026-05-31T13:30:00.000Z');
+      await scriptRepo.updateScriptControllerUploaded(scriptId, locationId, first);
+      await scriptRepo.updateScriptControllerUploaded(scriptId, locationId, second);
+
+      const roundTrip = await scriptRepo.getLastScriptUploadedDate(scriptId, locationId);
+      expect(roundTrip.getTime()).toBe(second.getTime());
+
+      const rows = await db
+        .selectFrom('script_deployments')
+        .selectAll()
+        .where('script_id', '=', scriptId)
+        .execute();
+      expect(rows.length).toBe(1);
+    });
+
+    it('rejects a deployment whose location_id is a location NAME, not an id (the original bug)', async () => {
+      const scriptRepo = new ScriptRepository(db);
+      const scriptId = await seedScript();
+
+      // 'dome' is what getLocationNameByMac returns; it is a locations.name, not
+      // a locations.id, so the FK on script_deployments.location_id rejects it.
+      await expect(
+        scriptRepo.updateScriptControllerUploaded(scriptId, 'dome', new Date()),
+      ).rejects.toThrow(/FOREIGN KEY constraint failed/);
+    });
+  });
+
+  describe('getScriptDurationsDS', () => {
+    it('returns a map of script id → recorded duration_ds for every script', async () => {
+      const scriptRepo = new ScriptRepository(db);
+      const a = uuid();
+      const b = uuid();
+      await db
+        .insertInto('scripts')
+        .values([
+          {
+            id: a,
+            name: 'A',
+            description: '',
+            last_modified: Date.now(),
+            enabled: 1,
+            duration_ds: 8,
+          },
+          {
+            id: b,
+            name: 'B',
+            description: '',
+            last_modified: Date.now(),
+            enabled: 1,
+            duration_ds: 50,
+          },
+        ])
+        .execute();
+
+      const durations = await scriptRepo.getScriptDurationsDS();
+
+      expect(durations.get(a)).toBe(8);
+      expect(durations.get(b)).toBe(50);
+    });
+  });
+
+  describe('deploymentStatus keying (read path)', () => {
+    // Regression: getScripts()/getScript() keyed deploymentStatus by the
+    // location id (UUID FK), but the WebSocket update path (ScriptResponse) and
+    // every frontend consumer key it by the location NAME ('body'|'core'|'dome').
+    // On page refresh the UUID-keyed entries never matched the name lookup, so
+    // every status badge reverted to "Not uploaded". The read path must key the
+    // returned deploymentStatus by the location name, never the id.
+    async function seedDeployedScript(
+      locName: string,
+    ): Promise<{ scriptId: string; deployedAt: Date }> {
+      // The body/core/dome locations are seeded by migration_0 with a UNIQUE
+      // name; resolve the seeded id rather than inserting a duplicate.
+      const { id: locId } = await db
+        .selectFrom('locations')
+        .select('id')
+        .where('name', '=', locName)
+        .executeTakeFirstOrThrow();
+
+      const scriptId = uuid();
+      const scriptRepo = new ScriptRepository(db);
+      await scriptRepo.upsertScript({
+        id: scriptId,
+        scriptName: 'Deployed Script',
+        description: '',
+        lastSaved: new Date(),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [],
+      });
+
+      const deployedAt = new Date('2026-05-31T12:00:00.000Z');
+      await scriptRepo.updateScriptControllerUploaded(scriptId, locId, deployedAt);
+
+      return { scriptId, deployedAt };
+    }
+
+    it('getScripts keys deploymentStatus by location name, not the id', async () => {
+      const { scriptId, deployedAt } = await seedDeployedScript('dome');
+      const scriptRepo = new ScriptRepository(db);
+
+      const script = (await scriptRepo.getScripts()).find((s) => s.id === scriptId);
+
+      expect(script).toBeDefined();
+      // 'dome' is the SOLE key — keyed by the location name the frontend looks up
+      // by, never the location id UUID (the original bug).
+      expect(Object.keys(script?.deploymentStatus ?? {})).toEqual(['dome']);
+      const status = script?.deploymentStatus['dome'];
+      expect(status?.value).toBe(UploadStatus.uploaded);
+      expect(status?.date.getTime()).toBe(deployedAt.getTime());
+    });
+
+    it('getScript keys deploymentStatus by location name, not the id', async () => {
+      const { scriptId, deployedAt } = await seedDeployedScript('body');
+      const scriptRepo = new ScriptRepository(db);
+
+      const script = await scriptRepo.getScript(scriptId);
+
+      expect(Object.keys(script.deploymentStatus)).toEqual(['body']);
+      const status = script.deploymentStatus['body'];
+      expect(status?.value).toBe(UploadStatus.uploaded);
+      expect(status?.date.getTime()).toBe(deployedAt.getTime());
+    });
+
+    it('skips (and logs) a deployment row whose location was removed', async () => {
+      const { scriptId } = await seedDeployedScript('dome');
+      const scriptRepo = new ScriptRepository(db);
+
+      // The FK cascade (migration_6) normally prevents an orphaned deployment;
+      // manufacture one by deleting the location with foreign keys disabled, so
+      // the left join yields a null location_name on read.
+      raw.pragma('foreign_keys = OFF');
+      await db.deleteFrom('locations').where('name', '=', 'dome').execute();
+      raw.pragma('foreign_keys = ON');
+
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        const fromList = (await scriptRepo.getScripts()).find((s) => s.id === scriptId);
+        expect(fromList?.deploymentStatus).toEqual({});
+
+        const single = await scriptRepo.getScript(scriptId);
+        expect(single.deploymentStatus).toEqual({});
+
+        // The skip is observable, not silent.
+        expect(warnSpy).toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { HumanCyborgRelationsCmd } from '../../../enums.js';
+import { HumanCyborgRelationsCmd } from 'src/models/enums.js';
 
 export class HumanCyborgRelationsModule {
   static getCommandString(cmd: HumanCyborgRelationsCmd): string {

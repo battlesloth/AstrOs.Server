@@ -1,8 +1,17 @@
 import axios from 'axios';
 import router from '@/router';
 
-const apiClient = axios.create({
-  baseURL: import.meta.env.BACKEND_API || 'http://localhost:3000',
+// Exported so app-level wiring (main.ts) can attach additional interceptors
+// after Pinia is created — keeps this module dependency-free of stores and
+// avoids the circular-dep trap (apiService → store → apiService).
+export const apiClient = axios.create({
+  // Same-origin relative base so requests flow through the nginx `/api/` proxy
+  // in prod (or the Vite dev proxy in dev) and reach the backend on whichever
+  // host served the page — not the browser's own `localhost`. Use `/` (not '')
+  // so `api/...` endpoints anchor at root regardless of the current route.
+  // VITE_BACKEND_API is an optional build-time override (must be baked into the
+  // bundle at `npm run build` — a runtime container env var is not visible here).
+  baseURL: import.meta.env.VITE_BACKEND_API || '/',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -22,7 +31,10 @@ apiClient.interceptors.request.use(
   },
 );
 
-// Add response interceptor to handle 401 errors
+// Add response interceptor to handle 401 errors. The 503 read-only handler
+// lives in `@/api/readOnlyInterceptor` and is installed from main.ts after
+// Pinia is created — installing it here would require importing the store,
+// which itself imports apiService, creating a circular module dependency.
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

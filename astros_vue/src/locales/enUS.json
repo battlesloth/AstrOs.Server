@@ -2,7 +2,29 @@
   "astros": "AstrOs",
   "save": "Save",
   "close": "Close",
+  "remove": "Remove",
   "test": "Test",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "confirm": "Confirm",
+  "add": "Add",
+  "ok": "OK",
+  "run": "Run",
+  "generate": "Generate",
+  "format": "Format",
+  "download": "Download",
+  "change": "Change",
+  "accept": "Accept",
+  "show_password": "Show password",
+  "hide_password": "Hide password",
+  "copy": "Copy",
+  "upload": "Upload",
+  "play": "Play",
+  "none": "None",
+  "name": "Name",
+  "description": "Description",
+  "actions": "Actions",
+  "status": "Status",
   "error": {
     "invalid_email": "Enter valid email address",
     "invalid_password": "Password must be at least 8 characters long and include a number, a lowercase letter, and an uppercase letter",
@@ -17,10 +39,190 @@
   "nav": {
     "status": "Status",
     "scripts": "Scripts",
+    "playlists": "Playlists",
     "remote": "Remote",
     "modules": "Modules",
+    "firmware": "Firmware",
     "utility": "Utility",
     "logout": "Logout"
+  },
+  "firmware_view": {
+    "title": "Firmware",
+    "subtitle": {
+      "select": "Push firmware to your ESP fleet. The master receives the file then forwards to padawans over ESP-NOW.",
+      "flashing": "Update in progress — keep all controllers powered until reboot completes",
+      "done": "Update complete — all selected controllers are running the target firmware",
+      "failed": "Update finished with errors — review the failure below"
+    },
+    "source": {
+      "toggle_aria": "Firmware source",
+      "toggle_github": "GitHub",
+      "toggle_upload": "Upload",
+      "eyebrow_release": "SELECTED RELEASE",
+      "eyebrow_file": "SELECTED FILE",
+      "no_release_selected": "No release selected",
+      "no_file_selected": "No file selected",
+      "uploading": "Uploading…",
+      "browse_files": "Browse files…",
+      "remove": "Remove",
+      "tag_pill_latest": "Latest",
+      "tag_pill_prerelease": "Pre-release",
+      "release_option_latest_suffix": "(latest)",
+      "release_option_prerelease_suffix": "(pre-release)",
+      "label_select_release": "Select release",
+      "label_upload_file": "Upload firmware file",
+      "releases_load_error": "Failed to load releases.",
+      "releases_stale_warning": "Showing cached releases — couldn't reach GitHub since {since}.",
+      "releases_loading": "Loading releases…"
+    },
+    "topology": {
+      "eyebrow_title": "UPDATE TOPOLOGY",
+      "role_master": "MASTER",
+      "role_padawan": "PADAWAN",
+      "figure_aria_label": "Firmware update topology — master receives the file then forwards to padawan controllers over ESP-NOW",
+      "node_title": "{label} ({role})"
+    },
+    "controllers": {
+      "eyebrow_title": "CONTROLLERS",
+      "select_all": "Select all",
+      "clear": "Clear",
+      "master_pill": "Master",
+      "downgrade_pill": "DOWNGRADE",
+      "up_to_date_suffix": "· up to date",
+      "status_dot_aria": "{label} is {status}",
+      "status_up": "online",
+      "status_down": "offline",
+      "status_needs_synced": "needs sync",
+      "row_select_aria": "Select {label} for firmware update",
+      "pill": {
+        "idle": "Idle",
+        "queued": "Queued",
+        "updating": "Updating",
+        "finalizing": "Finalizing…",
+        "done": "Done",
+        "failed": "Failed",
+        "up_to_date": "Up to date",
+        "offline": "Offline",
+        "downgrade": "Downgrade"
+      },
+      "action_bar": {
+        "no_source": "Pick a source",
+        "no_selection": "Pick at least one controller",
+        "push_summary": "Will push {target} to {count} controller(s)",
+        "downgrade_blocked": "⛔ Downgrade blocked",
+        "flash_button": "Flash firmware"
+      },
+      "allow_downgrade": {
+        "toggle_label": "Allow downgrades",
+        "toggle_help": "Lets you select controllers running newer firmware than the chosen target. Resets when you reload the page."
+      },
+      "result_bar": {
+        "all_updated": "✓ All {count} controller(s) updated",
+        "failed_summary": "⚠ {label} failed during {stage}",
+        "failed_summary_multi": "⚠ {labels} failed during the flash",
+        "done": "Done"
+      },
+      "flash_error_banner": {
+        "title": "Flash failed to start",
+        "retry": "Try again",
+        "dismiss": "Dismiss"
+      }
+    },
+    "stages": {
+      "eyebrow_title": "STAGES",
+      "in_progress": "IN PROGRESS",
+      "not_in_update": "NOT IN UPDATE",
+      "master_only": "Master only",
+      "download": {
+        "label": "Download",
+        "hint": "Master receives file"
+      },
+      "transfer": {
+        "label": "Transfer",
+        "hint": "Master → padawans"
+      },
+      "receive": {
+        "label": "Receive",
+        "hint": "Master → padawans"
+      },
+      "flash": {
+        "label": "Flash",
+        "hint": "Write firmware"
+      },
+      "verify": {
+        "label": "Verify",
+        "hint": "Checksum binary"
+      },
+      "reboot": {
+        "label": "Reboot",
+        "hint": "Restart"
+      }
+    },
+    "confirm_modal": {
+      "title": "Confirm firmware update",
+      "source_label": "Source",
+      "controllers_label": "Targets",
+      "power_warning": "Do not cut power to any selected controller until the update completes — interrupting a flash can leave a controller in a bricked state.",
+      "downgrade_ack": "I understand this will install OLDER firmware on {count} controller(s).",
+      "cancel": "Cancel",
+      "confirm": "Push firmware",
+      "delta_separator": "→"
+    },
+    "flash_errors": {
+      "invalid_body": "The request was malformed. This is a bug — please report it.",
+      "job_already_running": "Another flash job is already running. Wait for it to finish or cancel it before starting a new one.",
+      "job_already_running_with_id": "Flash job {jobId} is already running. Wait for it to finish or cancel it before starting a new one.",
+      "no_controllers": "No controllers were selected. Pick at least one before flashing.",
+      "controllers_unknown": "Some selected controllers haven't reported their firmware variant yet — wait a poll cycle and try again.",
+      "invalid_firmware": "The selected file isn't a valid AstrOs firmware binary. Check the project name and version match an AstrOs build.",
+      "upload_io_failed": "Couldn't stage the uploaded firmware on the server. Try again or check the server's disk space.",
+      "upload_persist_failed": "The server couldn't save the uploaded firmware. Check the server logs and try again.",
+      "payload_too_large": "The selected firmware file is larger than the server's 50 MB limit. Pick a smaller binary — check it isn't a combined app+partitions+spiffs image.",
+      "variant_mismatch": "The selected release doesn't include a firmware variant for one or more of the selected controllers.",
+      "variant_unknown": "One of the selected controllers reports a variant the server doesn't recognize.",
+      "release_not_found": "The selected release could not be found on GitHub. Try refreshing the release list.",
+      "asset_not_found": "The selected release exists but is missing a firmware asset for the selected controllers.",
+      "no_upload": "Upload mode is selected but no firmware file has been uploaded yet.",
+      "release_lookup_failed": "Couldn't reach GitHub to fetch the release. Check the server's internet connection and try again.",
+      "source_resolution_failed": "Couldn't fetch the firmware binary from its source. Try again or pick a different release.",
+      "controllers_lookup_failed": "The server couldn't look up the selected controllers. Try again.",
+      "subscriber_attach_failed": "The server couldn't subscribe to deploy events. Try again or restart the server.",
+      "protocol_violation": "Unexpected message format from the server. Try again or restart the master controller.",
+      "streamer_unknown_error": "The firmware streamer failed with an unknown error. Try again.",
+      "source_read_failed": "The server couldn't read the staged firmware file from disk. Re-upload or re-fetch the binary and try again.",
+      "source_size_mismatch": "The firmware file's actual size doesn't match its declared size. Re-upload or re-fetch the binary and try again.",
+      "source_sha_mismatch": "The firmware file's bytes don't match its cached hash — the cache is stale. Re-fetch (GitHub releases) or re-upload (local upload) the binary and try again; retrying without re-caching won't help.",
+      "begin_timeout": "The master controller didn't acknowledge the transfer start. Check that the master is powered on and connected, then try again.",
+      "begin_rejected": "The master controller rejected the firmware transfer. Check that the master has free SD card space, then try again.",
+      "chunk_retry_exhausted": "Lost contact with the master controller during transfer (too many failed retries). Check the USB cable and the master's power, then try again.",
+      "flash_full": "The master controller's SD card is full. Free space (delete older scripts or run FORMAT SD), then try again.",
+      "transfer_timeout": "The firmware transfer didn't complete in time. Power-cycle the master controller, then try again.",
+      "end_timeout": "The master controller didn't acknowledge transfer completion. Check the master, then try again.",
+      "hash_mismatch": "The firmware that arrived at the master doesn't match the source binary (corrupted in transit). Try the flash again — if it persists, re-upload the binary.",
+      "master_io_error": "Serial I/O error talking to the master controller. Check the USB cable and the master's power, then try again.",
+      "bus_send_failed": "The server couldn't send to the master over the serial bus. Restart the server, then try again.",
+      "aborted": "Flash cancelled. The controllers were not updated.",
+      "internal_server_error": "The server hit an unexpected error. Check the server logs and try again.",
+      "network_error": "Couldn't reach the server. Check your network connection and try again.",
+      "post_reboot_timeout": "Master controller did not report a matching firmware version within 90 seconds. The flash may have failed; verify the controller and retry.",
+      "deploy_timeout": "The master controller stopped responding during the update (no deploy progress for an extended period). The flash was aborted; check the master's power and USB connection, then try again."
+    },
+    "lock_active": "A firmware update is in progress — write actions are disabled until it completes.",
+    "lock_banner": "Firmware update in progress — write actions are disabled across the app.",
+    "lock_banner_cta": "View progress",
+    "lock_conflict": {
+      "title": "Firmware update in progress",
+      "body": "Another operator started a firmware update at {since}. Wait for it to finish before starting a new one."
+    },
+    "current_job_load_failed": "Could not confirm current firmware state. A flash may be in flight — refresh to retry.",
+    "flash_stream_suspended": "Live updates paused — reconnecting to the server. Progress shown may be stale.",
+    "mid_flash_error": {
+      "title_warning": "Flash warning:",
+      "title_failed": "Flash failed:",
+      "title_done_warning": "Flash completed with a warning:",
+      "abort_reason": "Abort reason: {reason}",
+      "dismiss": "Dismiss"
+    }
   },
   "placeholder": {
     "username": "username",
@@ -54,7 +256,7 @@
     "confirm": {
       "title": "Confirm",
       "confirm": "Confirm",
-      "close": "Close"
+      "close": "Cancel"
     },
     "loading": {
       "title": "Loading",
@@ -71,12 +273,91 @@
       "enable_test": "Enable",
       "disable_test": "Disable",
       "close": "Close"
+    },
+    "add_channel": {
+      "title": "Select Channel",
+      "any_channel_type": "Any Channel Type",
+      "audio_channels": "Audio Channels",
+      "gpio_channels": "GPIO Channels",
+      "i2c_channels": "I2C Channels",
+      "kangaroo_channels": "KangarooX2 Channels",
+      "serial_channels": "Serial Channels",
+      "servo_channels": "Servo Channels",
+      "any_controller": "Any Controller",
+      "select_channel": "Select Channel",
+      "controller": "Controller",
+      "channel_type": "Channel Type"
+    },
+    "uart_event": {
+      "title": "Serial Event",
+      "event_time": "Event Time (seconds)",
+      "serial_command": "Serial Command"
+    },
+    "i2c_event": {
+      "title": "I2C Event",
+      "event_time": "Event Time (seconds)",
+      "i2c_message": "I2C Message"
+    },
+    "gpio_event": {
+      "title": "GPIO Event",
+      "event_time": "Event Time (seconds)",
+      "state": "State",
+      "low": "Low",
+      "high": "High"
+    },
+    "servo_event": {
+      "title": "Servo Event",
+      "event_time": "Event Time (seconds)",
+      "position": "Position (0 to 100%, -1 for Home)",
+      "speed": "Speed (0 to 255, 0 is unlimited)",
+      "acceleration": "Accel. (0 to 255, 0 is unlimited)"
+    },
+    "kangaroo_event": {
+      "title": "Kangaroo Event",
+      "event_time": "Event Time (seconds)",
+      "speed": "Speed",
+      "position": "Position",
+      "start": "Start",
+      "home": "Home"
+    },
+    "hcr_event": {
+      "title": "Human Cyborg Relations Event",
+      "event_time": "Event Time (seconds)",
+      "command_category": "Command Category",
+      "command": "Command",
+      "value_a": "Value A",
+      "value_b": "Value B",
+      "stimuli": "Stimuli",
+      "muse": "Muse",
+      "sd_wav": "SD Wav",
+      "stop": "Stop",
+      "volume": "Volume",
+      "override": "Override"
+    },
+    "channel_swap": {
+      "title": "Swap Channel",
+      "no_channels": "No eligible channels available to swap.",
+      "select_channel": "Select a Channel"
+    },
+    "script_test": {
+      "title": "Script Test",
+      "uploading": "Uploading script...",
+      "upload_complete": "Upload Complete.",
+      "not_assigned": "Not Assigned",
+      "success": "Success",
+      "failed": "Failed",
+      "uploading_status": "Uploading",
+      "body": "Body",
+      "core": "Core",
+      "dome": "Dome"
     }
   },
   "esp": {
     "serial_modules": "Serial Modules",
     "i2c_modules": "I2C Modules",
-    "gpio_config": "GPIO Configuration"
+    "gpio_config": "GPIO Configuration",
+    "add_serial_module": "Add serial module",
+    "add_i2c_module": "Add I2C module"
   },
   "gpio": {
     "channel": "Channel",
@@ -143,17 +424,237 @@
     "core": "Core Module",
     "master": "Master Controller",
     "sync_successful": "Controllers sync queued!",
-    "sync_failed": "Controllers sync failed."
+    "sync_failed": "Controllers sync failed.",
+    "controller_select": "Controller Select"
   },
-  "remote_view": {
-    "title": "Remote Control",
-    "save": "Save"
+  "modules": {
+    "firmware": {
+      "unknown": "unknown",
+      "tooltip": {
+        "ok": "Firmware {version}",
+        "incompatible": "Firmware {version} (minimum {minimum} required)",
+        "disconnected": "Module not connected"
+      }
+    }
+  },
+  "statusPage": {
+    "base_alt": "Astromech base",
+    "panicked_hint": "The droid is in panic stop — control is disabled until cleared.",
+    "clear_panic": "Clear Panic Stop",
+    "clear_panic_failed": "Couldn't clear panic — try again.",
+    "alt": {
+      "up": "{location} connected",
+      "needsSynced": "{location} needs sync",
+      "firmwareIncompatible": "{location} firmware out of date",
+      "down": "{location} disconnected"
+    }
+  },
+  "mobile": {
+    "connected": "Connected",
+    "offline": "Offline",
+    "remote": "Remote",
+    "status_heading": "Droid Status",
+    "command_failed": "Couldn't send \"{name}\" — check the connection.",
+    "panic_failed": "Stop All failed to send — check the connection.",
+    "clear_failed": "Couldn't clear panic — try again.",
+    "config_load_failed": "Couldn't load the remote layout.",
+    "toggle_to_status_connected_aria": "Connected to server. Tap to view droid status.",
+    "toggle_to_status_offline_aria": "Disconnected from server. Tap to view droid status.",
+    "toggle_to_remote_aria": "Tap to return to the remote."
+  },
+  "mobile_remote": {
+    "region_label": "Mobile remote",
+    "connected_label": "Connected",
+    "chip_script": "Script",
+    "chip_playlist": "List",
+    "press_toast": "Sent: {name}",
+    "panic_toast": "STOP ALL — sending…",
+    "stop_all_idle": "Stop All",
+    "stop_all_arming": "Hold…",
+    "stop_all_active": "STOPPED",
+    "stop_all_caption": "Hold to halt every running action",
+    "clear_toast": "Clearing panic…",
+    "clear_idle": "Clear Panic",
+    "clear_arming": "Hold to clear…",
+    "clear_active": "CLEARING",
+    "clear_caption": "Hold to re-enable control",
+    "empty_slot_aria": "Empty slot {number}",
+    "prev_page_aria": "Previous page",
+    "next_page_aria": "Next page",
+    "dot_aria": "Go to page {number}",
+    "no_pages": "No remote pages configured"
   },
   "utility_view": {
-    "title": "Utility"
+    "title": "Utility",
+    "api_key": "API Key",
+    "format_sd": "Format SD Card",
+    "log_files": "Log Files",
+    "format_modal_title": "Format Module SD Card",
+    "select_controller_error": "Please select at least one controller to format.",
+    "format_queued": "Format queued!",
+    "format_error": "Error requesting format. Check logs.",
+    "download_error": "Error downloading logs. Check logs.",
+    "change_password": "Password",
+    "change_password_modal_title": "Change Password",
+    "current_password": "Current Password",
+    "new_password": "New Password",
+    "confirm_password": "Confirm New Password",
+    "password_hint": "At least 8 characters.",
+    "current_password_required": "Please enter your current password.",
+    "password_too_short": "New password must be at least 8 characters.",
+    "password_mismatch": "New password and confirmation do not match.",
+    "current_password_incorrect": "Current password is incorrect.",
+    "change_password_success": "Password updated.",
+    "change_password_error": "Error changing password. Check logs."
   },
   "scripts_view": {
     "title": "Scripts",
-    "new": "New"
+    "new": "New",
+    "script_name": "Script Name",
+    "playlists": "Playlists",
+    "delete_title": "Delete Script",
+    "delete_confirm": "Are you sure you want to delete script \"{name}\"?",
+    "delete_confirm_with_playlists": "Are you sure you want to delete script \"{name}\"? This script is used in {count} playlist. | Are you sure you want to delete script \"{name}\"? This script is used in {count} playlists.",
+    "delete_success": "Script deleted successfully",
+    "delete_error": "Failed to delete script",
+    "run_success": "Script run queued!",
+    "run_error": "Error requesting upload. Check logs.",
+    "copy_success": "Script copied successfully!",
+    "copy_error": "Error copying script. Check logs.",
+    "upload_success": "Script upload started!",
+    "upload_error": "Error requesting upload. Check logs."
+  },
+  "playlists_view": {
+    "title": "Playlists",
+    "new": "New",
+    "playlist_name": "Playlist Name",
+    "delete_title": "Delete Playlist",
+    "delete_confirm": "Are you sure you want to delete playlist \"{name}\"?",
+    "delete_success": "Playlist deleted successfully",
+    "delete_error": "Failed to delete playlist",
+    "run_success": "Playlist run queued!",
+    "run_error": "Error starting playlist. Check logs.",
+    "copy_success": "Playlist copied successfully!",
+    "copy_error": "Error copying playlist. Check logs."
+  },
+  "scripter_view": {
+    "script_name": "Script Name",
+    "save_success": "Script saved successfully.",
+    "save_error": "Failed to save script",
+    "unsaved_changes": "You have unsaved changes. Discard them?"
+  },
+  "playlist_settings": {
+    "random_delay": "Random Delay",
+    "delay": "Delay",
+    "min_delay": "Min Delay",
+    "max_delay": "Max Delay",
+    "repeat_none": "Repeat - None",
+    "repeat_count": "Repeat - Count",
+    "repeat_infinite": "Repeat - Infinite",
+    "count": "Count"
+  },
+  "playlist_editor_view": {
+    "title": "Playlist Editor",
+    "save": "Save",
+    "remove": "Remove",
+    "track_name": "Track Name",
+    "description": "Description",
+    "track_duration": "Track Duration (seconds)",
+    "track_duration_max": "Max Duration (seconds)",
+    "random_wait": "Random",
+    "min": "Min",
+    "max": "Max",
+    "add_track": "Add Track",
+    "no_tracks": "No tracks added yet.",
+    "save_success": "Playlist saved successfully.",
+    "save_error": "Error saving playlist.",
+    "cycle_error": "Cannot save: track \"{trackName}\" at position {position} creates an infinite loop. Remove or replace this track and try again.",
+    "track_types": {
+      "script": "Script",
+      "playlist": "Playlist",
+      "wait": "Wait"
+    },
+    "sequential": "Sequential",
+    "sequentialinterruptible": "Sequential, Interruptible",
+    "sequentialrepeatable": "Sequential, Repeatable",
+    "shuffle": "Shuffle",
+    "shufflewithrepeat": "Shuffle with Repeat",
+    "shufflewithdelay": "Shuffle with Delay",
+    "shufflewithdelayandrepeat": "Shuffle with Delay and Repeat",
+    "help_title": "Playlist Editor Help",
+    "help_body": "Here's a breakdown of the different playlist types you can choose from:",
+    "help_sequential": "Plays tracks in the order they were added. Once the end of the playlist is reached, it stops. If another playlist or a script is sent to the server while a sequential playlist is playing, it will wait until the current playlist finishes before starting.",
+    "help_sequentialinterruptible": "Similar to Sequential. If a new playlist or script is sent to the server, it will interrupt the current playlist and start the new script or playlist as soon as the current track finishes.",
+    "help_sequentialrepeatable": "Plays tracks in the order they were added. Once the end of the playlist is reached, it starts over from the beginning. This type is always interruptible.",
+    "help_shuffle": "Plays tracks in a random order. Each track is played once until all tracks have been played, then it stops. This type is always interruptible.",
+    "help_shufflewithrepeat": "Similar to Shuffle, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible.",
+    "help_shufflewithdelay": "Similar to Shuffle, but after each track is played, it waits for a specified delay before playing the next track. This type is always interruptible.",
+    "help_shufflewithdelayandrepeat": "Similar to Shuffle With Delay, but once all tracks have been played, it reshuffles and starts again. This type is always interruptible.",
+    "sequential_nested_confirm_title": "Remove Nested Playlists",
+    "sequential_nested_warning": "Sequential playlists cannot contain nested playlists. {count} track will be removed. | Sequential playlists cannot contain nested playlists. {count} tracks will be removed."
+  },
+  "systemStatus": {
+    "readOnly": {
+      "title": "Read-only mode",
+      "disabled": "This action is disabled while the system is in read-only mode.",
+      "requestBlocked": "The server is in read-only mode. Your change was not saved."
+    },
+    "reasonCode": {
+      "STARTUP_OPEN_FAILED": "The database could not be opened at startup. The server is running on a temporary in-memory database with no data.",
+      "BACKUP_FAILED": "A pre-migration backup could not be written. The schema upgrade was skipped.",
+      "MIGRATION_FAILED_NO_BACKUP": "A schema migration failed and there was no prior backup to restore from. The database may be in a partially-migrated state.",
+      "MIGRATION_FAILED_RESTORED": "A schema migration failed but the database was successfully rolled back to the previous version. Investigate the failed migration before redeploying.",
+      "MIGRATION_FAILED_RESTORE_FAILED": "A schema migration failed and the automatic restore also failed. Manual recovery is required.",
+      "UNKNOWN": "The database is currently unavailable for writes."
+    }
+  },
+  "remote_control_config": {
+    "card": {
+      "configure": "Configure →",
+      "edit": "Edit",
+      "clear": "Clear",
+      "type_script": "SCRIPT",
+      "type_playlist": "PLAYLIST"
+    },
+    "editor": {
+      "title": "Configure Button {n}",
+      "tab_script": "Scripts",
+      "tab_playlist": "Playlists",
+      "search_placeholder": "Search…",
+      "none_row": "None",
+      "empty_state": "No matches"
+    },
+    "pageList": {
+      "header": "Pages",
+      "add": "Add page",
+      "rename": "Rename",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "renameInput": "Page name",
+      "grab": "Reorder {name}",
+      "grabInstructions": "Press Space or Enter to grab, then use the arrow keys to move and Space to drop, or Escape to cancel.",
+      "grabbed": "Grabbed {name}, position {position} of {total}. Use arrow keys to move, Space to drop, Escape to cancel.",
+      "moved": "Moved {name} to position {position} of {total}.",
+      "dropped": "Dropped {name} at position {position} of {total}.",
+      "cancelled": "Reorder cancelled. {name} returned to position {position} of {total}."
+    },
+    "preview": {
+      "bezel_label": "Live preview"
+    },
+    "view": {
+      "title": "Remote Control Configuration",
+      "save": "Save",
+      "unsaved": "Unsaved",
+      "loading": "Loading remote control configuration…",
+      "page_count": "{count} page | {count} pages",
+      "action_count": "{count} action | {count} actions",
+      "load_error": "Failed to load remote control configuration. Editing is disabled to avoid overwriting saved data.",
+      "save_success": "Remote control configuration saved successfully.",
+      "save_error": "Failed to save remote control configuration."
+    },
+    "deleteModal": {
+      "title": "Delete page",
+      "message": "Delete \"{name}\"? Buttons on this page will be lost."
+    }
   }
 }

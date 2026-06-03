@@ -21,12 +21,20 @@ WORKDIR /usr/src/app
 
 COPY ./astros_api/package*.json ./
 
-RUN npm ci --python=/usr/bin/python3 && npm install typescript -g
+RUN npm ci --python=/usr/bin/python3
 
 COPY ./astros_api/ .
-RUN tsc
+RUN npx tsc && npx tsc-alias
 
-COPY ./container_files/.env ./dist
+ARG JWT_KEY
+RUN printf '%s\n' \
+  "JWT_KEY=${JWT_KEY}" \
+  "DATABASE_PATH=%AppData%" \
+  "API_PORT=3000" \
+  "WEBSOCKET_PORT=5000" \
+  "SERIAL_PORT=/dev/ttyS0" \
+  "BAUD_RATE=115200" \
+  > ./dist/.env
 
 # Install production dependencies for API
 FROM build-api as build-api-prod

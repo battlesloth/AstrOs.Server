@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import SQLite from 'better-sqlite3';
-import { Kysely, SqliteDialect } from 'kysely';
-import { migrateToLatest } from '../../database.js';
+import { Kysely } from 'kysely';
+import { createKyselyConnection, migrateToLatest } from '../../database.js';
 import { Database } from '../../types.js';
 import { getGpioModule, upsertGpioModule } from './gpio_repository.js';
 import { Constants } from '../../../models/index.js';
@@ -12,13 +11,7 @@ describe('GpioRepository', () => {
   const location = Constants.BODY;
 
   beforeEach(async () => {
-    const dialect = new SqliteDialect({
-      database: new SQLite(':memory:'),
-    });
-
-    db = new Kysely<Database>({
-      dialect,
-    });
+    db = createKyselyConnection().db;
 
     await migrateToLatest(db);
   });

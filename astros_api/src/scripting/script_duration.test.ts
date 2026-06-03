@@ -1,0 +1,89 @@
+import { describe, expect, it } from 'vitest';
+import {
+  Script,
+  ScriptChannel,
+  ScriptChannelType,
+  ScriptEvent,
+  UartChannel,
+  ModuleSubType,
+  ModuleType,
+  ModuleChannelTypes,
+  GenericSerialEvent,
+} from '../models/index.js';
+import { calculateLengthDS } from './script_duration.js';
+import { v4 as uuid } from 'uuid';
+
+describe('calculateLengthDS', () => {
+  it('returns the max event time across all channels', () => {
+    const scriptId = 'testScriptTimes';
+
+    const evt1Time = 5; // 0.5 seconds
+    const evt2Time = 12; // 1.2 seconds
+    const evt3Time = 24; // 2.4 seconds
+    const evt4Time = 362; // 36.2 seconds
+
+    const script: Script = {
+      id: scriptId,
+      scriptName: 'test',
+      description: 'test',
+      lastSaved: new Date(),
+      durationDS: 362,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
+    const scriptCh1 = generateSerialScriptChannel(scriptId);
+    const sevt1 = generateCoreScriptSerialEventByDecSec(evt1Time, scriptCh1.id);
+    const sevt2 = generateCoreScriptSerialEventByDecSec(evt2Time, scriptCh1.id);
+    const scriptCh2 = generateSerialScriptChannel(scriptId);
+    const sevt3 = generateCoreScriptSerialEventByDecSec(evt3Time, scriptCh2.id);
+    const sevt4 = generateCoreScriptSerialEventByDecSec(evt4Time, scriptCh2.id);
+
+    scriptCh1.events[uuid()] = sevt1;
+    scriptCh1.events[uuid()] = sevt2;
+    scriptCh2.events[uuid()] = sevt3;
+    scriptCh2.events[uuid()] = sevt4;
+
+    script.scriptChannels.push(scriptCh1);
+    script.scriptChannels.push(scriptCh2);
+
+    const lengthDS = calculateLengthDS(script);
+
+    expect(lengthDS).toBe(evt4Time);
+  });
+});
+
+function generateSerialScriptChannel(scriptId: string): ScriptChannel {
+  const moduleId = uuid();
+
+  const uartChannel = new UartChannel(uuid(), moduleId, '', ModuleSubType.genericSerial, true);
+
+  const scriptCh: ScriptChannel = {
+    id: uuid(),
+    scriptId,
+    channelType: ScriptChannelType.GENERIC_UART,
+    parentModuleId: moduleId,
+    moduleChannelId: uartChannel.id,
+    moduleChannelType: ModuleChannelTypes.UartChannel,
+    moduleChannel: uartChannel,
+    maxDuration: 3000,
+    events: {},
+  };
+
+  return scriptCh;
+}
+
+function generateCoreScriptSerialEventByDecSec(tenthOfSeconds: number, chId: string): ScriptEvent {
+  const evt = { value: `test ${tenthOfSeconds}` } as GenericSerialEvent;
+
+  const sevt: ScriptEvent = {
+    id: uuid(),
+    scriptChannel: chId,
+    moduleType: ModuleType.uart,
+    moduleSubType: ModuleSubType.genericSerial,
+    time: tenthOfSeconds,
+    event: evt,
+  };
+
+  return sevt;
+}

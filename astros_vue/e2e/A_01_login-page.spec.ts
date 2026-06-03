@@ -14,7 +14,7 @@ test.describe('Login Page', () => {
 
     await authenticateUser(page);
 
-    expect(page.url()).toBe('http://localhost:5173/');
+    await expect(page).toHaveURL('/');
     await expect(page).toHaveTitle('AstrOs');
     await expect(page.locator('[data-v-app]')).toBeVisible();
   });

@@ -1,4 +1,4 @@
-import { ModuleSubType, ModuleType } from '../enums.js';
+import { ModuleSubType, ModuleType } from 'src/models/enums.js';
 import { GpioModule } from './gpio/gpio_module.js';
 import { I2cModule } from './i2c/i2c_module.js';
 import { UartModule } from './uart/uart_module.js';

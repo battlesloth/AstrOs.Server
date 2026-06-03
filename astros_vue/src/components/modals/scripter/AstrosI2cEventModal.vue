@@ -77,7 +77,7 @@ const closeModal = () => {
 <template>
   <dialog class="modal modal-open">
     <div class="modal-box w-100 max-w-md">
-      <h1 class="text-2xl font-bold mb-4">I2C Event</h1>
+      <h1 class="text-2xl font-bold mb-4">{{ $t('modals.i2c_event.title') }}</h1>
 
       <div class="py-4 flex flex-row">
         <div class="grow"></div>
@@ -89,7 +89,7 @@ const closeModal = () => {
             <label
               for="time"
               class="block w-full mb-0.5 text-lg"
-              >Event Time (seconds)</label
+              >{{ $t('modals.i2c_event.event_time') }}</label
             >
             <input
               id="time"
@@ -105,7 +105,7 @@ const closeModal = () => {
             <label
               for="value"
               class="block w-full mb-0.5 text-lg"
-              >I2C Message</label
+              >{{ $t('modals.i2c_event.i2c_message') }}</label
             >
             <input
               id="value"
@@ -132,7 +132,7 @@ const closeModal = () => {
           data-testid="save-button"
           @click="addEvent"
         >
-          {{ mode !== ModalMode.TEST ? $t('Save') : $t('Test') }}
+          {{ mode !== ModalMode.TEST ? $t('save') : $t('test') }}
         </button>
         <button
           v-if="showRemoveButton"
@@ -140,14 +140,14 @@ const closeModal = () => {
           data-testid="remove-button"
           @click="removeEvent"
         >
-          {{ $t('Remove') }}
+          {{ $t('remove') }}
         </button>
         <button
           class="btn w-24 text-lg"
           data-testid="close-button"
           @click="closeModal"
         >
-          {{ $t('Close') }}
+          {{ $t('close') }}
         </button>
       </div>
     </div>
@@ -156,7 +156,7 @@ const closeModal = () => {
       class="modal-backdrop"
       @click="closeModal"
     >
-      <button>{{ $t('Close') }}</button>
+      <button>{{ $t('close') }}</button>
     </form>
   </dialog>
 </template>

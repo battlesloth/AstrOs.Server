@@ -1,7 +1,7 @@
 import { Kysely } from 'kysely';
-import { logger } from '../../logger.js';
-import { User } from '../../models/users.js';
-import { Database } from '../types.js';
+import { logger } from 'src/logger.js';
+import { User } from 'src/models/users.js';
+import { Database } from 'src/dal/types.js';
 
 export class UserRepository {
   constructor(private readonly db: Kysely<Database>) {}
@@ -18,5 +18,24 @@ export class UserRepository {
       });
 
     return new User(user.user, user.hash, user.salt);
+  }
+
+  async updatePassword(user: User) {
+    try {
+      const result = await this.db
+        .updateTable('users')
+        .set({ hash: user.hash, salt: user.salt })
+        .where('user', '=', user.name)
+        .executeTakeFirst();
+
+      // A Kysely UPDATE resolves successfully even when no row matches, which
+      // would silently no-op. Surface a missing user instead of reporting success.
+      if (!result || Number(result.numUpdatedRows) === 0) {
+        throw new Error(`No user found to update password for: ${user.name}`);
+      }
+    } catch (err) {
+      logger.error('UserRepository.updatePassword', err);
+      throw err;
+    }
   }
 }

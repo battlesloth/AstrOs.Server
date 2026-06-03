@@ -12,10 +12,11 @@ import {
   ModuleClassType,
   MaestroEvent,
   MaestroChannel,
-} from '../../models/index.js';
-import { logger } from '../../logger.js';
+  isLocationName,
+} from 'src/models/index.js';
+import { logger } from 'src/logger.js';
 import { Guid } from 'guid-typescript';
-import { Database, ScriptsTable } from '../types.js';
+import { Database } from 'src/dal/types.js';
 import { Kysely, Transaction } from 'kysely';
 import {
   getAllActiveGpioChannels,
@@ -29,15 +30,19 @@ import {
   readUartChannel,
 } from './module_repositories/uart_repository.js';
 import { getI2cModules, readI2cChannel } from './module_repositories/i2c_repository.js';
+import { generateShortId } from 'src/utility/short_id.js';
+import { calculateLengthDS, updateScriptDuration } from 'src/scripting/script_duration.js';
 
 export class ScriptRepository {
-  private characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-
   constructor(private readonly db: Kysely<Database>) {}
 
   //#region Script Create
 
   async upsertScript(script: Script): Promise<boolean> {
+    // always calculate duration on save to ensure it is up
+    // to date with any changes to events or channels
+    script.durationDS = calculateLengthDS(script);
+
     await this.db.transaction().execute(async (tx) => {
       await tx
         .insertInto('scripts')
@@ -47,6 +52,7 @@ export class ScriptRepository {
           description: script.description,
           last_modified: new Date(script.lastSaved).getTime(),
           enabled: 1,
+          duration_ds: script.durationDS,
         })
         .onConflict((c) =>
           c.columns(['id']).doUpdateSet((eb) => ({
@@ -54,6 +60,7 @@ export class ScriptRepository {
             description: eb.ref('excluded.description'),
             last_modified: Date.now(),
             enabled: 1,
+            duration_ds: eb.ref('excluded.duration_ds'),
           })),
         )
         .execute()
@@ -78,12 +85,10 @@ export class ScriptRepository {
   //#region Script Copy
 
   async copyScript(id: string): Promise<Script> {
-    let result = Script.prototype;
-
     const script = await this.getScript(id);
 
-    script.id = this.generateScriptId(5);
-    script.scriptName = script.scriptName + ' - copy';
+    script.id = generateShortId('s');
+    script.scriptName = script.scriptName + ' (Copy)';
     for (const ch of script.scriptChannels) {
       ch.id = Guid.create().toString();
 
@@ -100,17 +105,23 @@ export class ScriptRepository {
     script.deploymentStatus = {};
     script.lastSaved = new Date();
 
+    updateScriptDuration(script);
+
     await this.upsertScript(script).catch((err: any) => {
       logger.error(`Exception saving copy script for ${id} => ${err}`);
       throw err;
     });
 
-    result = new Script(
-      script.id,
-      script.scriptName,
-      script.description,
-      new Date(script.lastSaved),
-    );
+    const result: Script = {
+      id: script.id,
+      scriptName: script.scriptName,
+      description: script.description,
+      lastSaved: new Date(script.lastSaved),
+      durationDS: script.durationDS,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
 
     return result;
   }
@@ -120,9 +131,23 @@ export class ScriptRepository {
 
   async getScripts(): Promise<Array<Script>> {
     const scripts = await this.db
+      .with('playlist_counts', (qb) =>
+        qb
+          .selectFrom('playlist_tracks')
+          .innerJoin('playlists', 'playlists.id', 'playlist_tracks.playlist_id')
+          .select([
+            'playlist_tracks.track_id',
+            (eb) => eb.fn.count<number>('playlists.id').distinct().as('playlist_count'),
+          ])
+          .where('playlist_tracks.track_type', '=', 'Script')
+          .where('playlists.enabled', '=', 1)
+          .groupBy('playlist_tracks.track_id'),
+      )
       .selectFrom('scripts')
-      .selectAll()
-      .where('enabled', '=', 1)
+      .leftJoin('playlist_counts', 'playlist_counts.track_id', 'scripts.id')
+      .selectAll('scripts')
+      .select('playlist_counts.playlist_count')
+      .where('scripts.enabled', '=', 1)
       .execute()
       .catch((err) => {
         logger.error('ScriptRepository.getScripts', err);
@@ -133,8 +158,17 @@ export class ScriptRepository {
       throw 'error';
     }
 
-    const result = scripts.map((scr: ScriptsTable) => {
-      return new Script(scr.id, scr.name, scr.description, new Date(scr.last_modified));
+    const result = scripts.map((scr) => {
+      return {
+        id: scr.id,
+        scriptName: scr.name,
+        description: scr.description,
+        lastSaved: new Date(scr.last_modified),
+        durationDS: scr.duration_ds,
+        playlistCount: scr.playlist_count ?? 0,
+        deploymentStatus: {},
+        scriptChannels: [],
+      } as Script;
     });
 
     for (const scr of result) {
@@ -151,12 +185,23 @@ export class ScriptRepository {
         });
 
       for (const dep of deployments) {
-        const status = new DeploymentStatus(
-          new Date(dep.last_deployed),
-          UploadStatus.uploaded,
-          dep.location_name || '',
-        );
-        scr.deploymentStatus[dep.location_id] = status;
+        // Key by the location name ('body'|'core'|'dome'), not the location_id
+        // UUID: the WS update path and every frontend consumer look up
+        // deploymentStatus by that name. The guard narrows location_name to a
+        // LocationName and skips orphaned rows (no/unknown location) —
+        // unreachable while the FK cascade holds, so log rather than fail the list.
+        if (!isLocationName(dep.location_name)) {
+          logger.warn(
+            `ScriptRepository.getScripts: skipping deployment for script ${scr.id} — ` +
+              `location_id ${dep.location_id} has no recognized location name (orphaned FK?)`,
+          );
+          continue;
+        }
+        const status: DeploymentStatus = {
+          date: new Date(dep.last_deployed),
+          value: UploadStatus.uploaded,
+        };
+        scr.deploymentStatus[dep.location_name] = status;
       }
     }
 
@@ -179,12 +224,18 @@ export class ScriptRepository {
         throw err;
       });
 
-    const result = new Script(
-      script.id,
-      script.name,
-      script.description,
-      new Date(script.last_modified),
-    );
+    const result: Script = {
+      id: script.id,
+      scriptName: script.name,
+      description: script.description,
+      lastSaved: new Date(script.last_modified),
+      durationDS: script.duration_ds,
+      playlistCount: 0,
+      deploymentStatus: {},
+      scriptChannels: [],
+    };
+
+    updateScriptDuration(result);
 
     const deployments = await this.db
       .selectFrom('script_deployments')
@@ -199,12 +250,20 @@ export class ScriptRepository {
       });
 
     for (const dep of deployments) {
-      const status = new DeploymentStatus(
-        new Date(dep.last_deployed),
-        UploadStatus.uploaded,
-        dep.location_name || '',
-      );
-      result.deploymentStatus[dep.location_id] = status;
+      // Key by the location name ('body'|'core'|'dome'), not the location_id
+      // UUID — see getScripts() above. Skip orphaned/unknown-location rows.
+      if (!isLocationName(dep.location_name)) {
+        logger.warn(
+          `ScriptRepository.getScript: skipping deployment for script ${id} — ` +
+            `location_id ${dep.location_id} has no recognized location name (orphaned FK?)`,
+        );
+        continue;
+      }
+      const status: DeploymentStatus = {
+        date: new Date(dep.last_deployed),
+        value: UploadStatus.uploaded,
+      };
+      result.deploymentStatus[dep.location_name] = status;
     }
 
     result.scriptChannels = await this.readScriptChannels(id);
@@ -212,19 +271,52 @@ export class ScriptRepository {
     return result;
   }
 
+  /**
+   * Map of script id → recorded duration (deciseconds) for every script.
+   * Used by the playlist converter to give a Script track its real runtime —
+   * playlist track rows carry no usable duration for scripts (no editor
+   * control), so the queue would otherwise treat scripts as instantaneous.
+   * Intentionally unfiltered (no `enabled = 1`) so a still-referenced script's
+   * duration resolves even if the script was soft-disabled.
+   */
+  async getScriptDurationsDS(): Promise<Map<string, number>> {
+    const rows = await this.db
+      .selectFrom('scripts')
+      .select(['id', 'duration_ds'])
+      .execute()
+      .catch((err) => {
+        logger.error('ScriptRepository.getScriptDurationsDS', err);
+        throw err;
+      });
+
+    return new Map(rows.map((r) => [r.id, r.duration_ds]));
+  }
+
   //#endregion
   //#region Script Delete
 
   async deleteScript(id: string): Promise<boolean> {
-    this.db
-      .updateTable('scripts')
-      .set('enabled', 0)
-      .where('id', '=', id)
-      .executeTakeFirstOrThrow()
-      .catch((err) => {
-        logger.error('ScriptRepository.deleteScript', err);
-        throw err;
-      });
+    await this.db.transaction().execute(async (tx) => {
+      await tx
+        .updateTable('scripts')
+        .set('enabled', 0)
+        .where('id', '=', id)
+        .executeTakeFirstOrThrow()
+        .catch((err) => {
+          logger.error('ScriptRepository.deleteScript', err);
+          throw err;
+        });
+
+      await tx
+        .deleteFrom('playlist_tracks')
+        .where('track_type', '=', 'Script')
+        .where('track_id', '=', id)
+        .execute()
+        .catch((err) => {
+          logger.error('ScriptRepository.deleteScript.playlistTracks', err);
+          throw err;
+        });
+    });
 
     return true;
   }
@@ -285,16 +377,17 @@ export class ScriptRepository {
       });
 
     for (const ch of channels) {
-      const channel = new ScriptChannel(
-        ch.id,
-        ch.script_id,
-        ch.channel_type,
-        ch.parent_module_id,
-        ch.module_channel_id,
-        ch.module_channel_type,
-        new BaseChannel('', '', '', ModuleType.none, ModuleSubType.none, false),
-        0,
-      );
+      const channel: ScriptChannel = {
+        id: ch.id,
+        scriptId: ch.script_id,
+        channelType: ch.channel_type,
+        parentModuleId: ch.parent_module_id,
+        moduleChannelId: ch.module_channel_id,
+        moduleChannelType: ch.module_channel_type,
+        moduleChannel: new BaseChannel('', '', '', ModuleType.none, ModuleSubType.none, false),
+        maxDuration: 0,
+        events: {},
+      };
 
       await this.configScriptChannel(channel);
 
@@ -408,14 +501,14 @@ export class ScriptRepository {
 
       const scriptEventType = moduleSubTypeToScriptEventTypes(subtype, evt.data);
 
-      const event = new ScriptEvent(
-        evt.id,
-        evt.script_channel_id,
-        evt.module_type,
-        subtype,
-        evt.time / 10, // stored as integer scaled storage to 0.1s
-        scriptEventType,
-      );
+      const event: ScriptEvent = {
+        id: evt.id,
+        scriptChannel: evt.script_channel_id,
+        moduleType: evt.module_type,
+        moduleSubType: subtype,
+        time: evt.time / 10, // stored as integer scaled storage to 0.1s
+        event: scriptEventType,
+      };
 
       result[event.id] = event;
     }
@@ -533,15 +626,6 @@ export class ScriptRepository {
       });
 
     return locations.map((loc) => loc.id);
-  }
-
-  private generateScriptId(length: number): string {
-    let result = `s${Math.floor(Date.now() / 1000)}`;
-    const charactersLength = this.characters.length;
-    for (let i = 0; i < length; i++) {
-      result += this.characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
   }
 
   //#endregion

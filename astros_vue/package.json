@@ -1,6 +1,6 @@
 {
   "name": "astros_vue",
-  "version": "0.0.0",
+  "version": "1.0.0-dev.11",
   "private": true,
   "type": "module",
   "engines": {
@@ -21,6 +21,7 @@
     "start:server": "cd ../astros_api &&  npm run-script start"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
     "@headlessui/vue": "^1.7.23",
     "axios": "^1.13.2",
     "oh-vue-icons": "^1.0.0-rc3",
@@ -28,6 +29,7 @@
     "pixi.js": "^8.14.3",
     "uuid": "^13.0.0",
     "vue": "^3.5.25",
+    "vue-draggable-plus": "^0.6.1",
     "vue-i18n": "^11.2.2",
     "vue-router": "^4.6.3"
   },

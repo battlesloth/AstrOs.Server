@@ -1,7 +1,3 @@
-export class GenericSerialEvent {
+export interface GenericSerialEvent {
   value: string;
-
-  constructor(value: string) {
-    this.value = value;
-  }
 }

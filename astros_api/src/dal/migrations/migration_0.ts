@@ -6,10 +6,10 @@ import {
   NewLocation,
   NewRemoteConfig,
   NewUser,
-} from '../types.js';
+} from 'src/dal/types.js';
 import { v4 as uuid } from 'uuid';
 import * as crypto from 'crypto';
-import { Constants } from '../../models/index.js';
+import { Constants } from 'src/models/index.js';
 
 export const migration_0: Migration = {
   up: async (db: Kysely<any>): Promise<void> => {
@@ -185,8 +185,11 @@ export const migration_0: Migration = {
     await db.insertInto('users').values(adminUser).execute();
 
     const remoteConfig = <NewRemoteConfig>{
-      type: 'astrOsScreen',
-      value: '{}',
+      type: 'remoteConfig',
+      // Empty pages array — the remote-config consumers (editor GET + M5 sync)
+      // expect a JSON array. Seeding '{}' (an object) here historically forced
+      // both to normalize on read; '[]' is correct at the source.
+      value: '[]',
     };
 
     await db.insertInto('remote_config').values(remoteConfig).execute();

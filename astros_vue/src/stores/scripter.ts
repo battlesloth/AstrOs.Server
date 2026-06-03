@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useScriptResources } from '@/composables/useScriptResources';
 import { useLocationStore } from './location';
 import apiService from '@/api/apiService';
@@ -17,13 +17,38 @@ import { v4 as uuid } from 'uuid';
 import { moduleChannelTypeFromSubType } from '@/models';
 import { useEventConverter } from '@/composables/useEventConverter';
 import type { ChannelTestValue } from '@/models/scripter/channelTestValue';
+import { generateShortId } from '@/utils/shortId';
 
 export const useScripterStore = defineStore('scripter', () => {
   const isLoading = ref(false);
   const isSaving = ref(false);
   const script = ref<Script | null>(null);
+  const savedSnapshot = ref<string>('');
 
   const locationsStore = useLocationStore();
+
+  function editableSnapshot(s: Script): string {
+    return JSON.stringify({
+      id: s.id,
+      scriptName: s.scriptName,
+      description: s.description,
+      lastSaved: s.lastSaved,
+      scriptChannels: s.scriptChannels,
+    });
+  }
+
+  function takeSnapshot() {
+    if (!script.value) {
+      savedSnapshot.value = '';
+      return;
+    }
+    savedSnapshot.value = editableSnapshot(script.value);
+  }
+
+  const isDirty = computed(() => {
+    if (!script.value || !savedSnapshot.value) return false;
+    return editableSnapshot(script.value) !== savedSnapshot.value;
+  });
 
   const { convertEventsForChannelType } = useEventConverter();
 
@@ -48,8 +73,8 @@ export const useScripterStore = defineStore('scripter', () => {
 
       loadResources(locationsStore.getLocationCollection());
 
-      script.value = {
-        id: generateScriptId(5),
+      const newScript: Script = {
+        id: generateShortId('s'),
         scriptName: 'New Script',
         description: '',
         lastSaved: new Date('1970-01-01T00:00:00Z'),
@@ -60,9 +85,13 @@ export const useScripterStore = defineStore('scripter', () => {
           [Location.UNKNOWN]: { date: undefined, value: UploadStatus.NOT_UPLOADED },
         },
         scriptChannels: [],
+        durationDS: 0,
+        playlistCount: 0,
       };
 
-      applyScript(script.value);
+      script.value = newScript;
+      applyScript(newScript);
+      takeSnapshot();
       return { success: true };
     } catch (error) {
       console.error('Failed to create new script:', error);
@@ -89,12 +118,11 @@ export const useScripterStore = defineStore('scripter', () => {
         throw new Error('Script not found');
       }
 
-      script.value = response as Script;
+      const loadedScript = response as Script;
 
-      console.log('loaded script channels:', script.value.scriptChannels);
-
-      applyScript(script.value);
-
+      script.value = loadedScript;
+      applyScript(loadedScript);
+      takeSnapshot();
       return { success: true };
     } catch (error) {
       console.error('Failed to load scripter data:', error);
@@ -115,6 +143,7 @@ export const useScripterStore = defineStore('scripter', () => {
         throw new Error('Failed to save script');
       }
 
+      takeSnapshot();
       return { success: true };
     } catch (error) {
       console.error('Failed to save script:', error);
@@ -357,16 +386,6 @@ export const useScripterStore = defineStore('scripter', () => {
     };
   }
 
-  function generateScriptId(length: number): string {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = `s${Math.floor(Date.now() / 1000)}`;
-    const charactersLength = characters.length;
-    for (let i = 0; i < length; i++) {
-      result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-    return result;
-  }
-
   function updateScriptStatus(status: ScriptStatus) {
     if (script.value) {
       // Update the script's deployment status based on the incoming status
@@ -383,6 +402,7 @@ export const useScripterStore = defineStore('scripter', () => {
   return {
     isLoading,
     isSaving,
+    isDirty,
     script,
     createNewScript,
     loadScripterData,

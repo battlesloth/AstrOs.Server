@@ -1,6 +1,6 @@
-import { logger } from '../../logger.js';
+import { logger } from 'src/logger.js';
 import { Kysely } from 'kysely';
-import { Database } from '../types.js';
+import { Database } from 'src/dal/types.js';
 
 export class RemoteConfigRepository {
   constructor(private readonly db: Kysely<Database>) {}

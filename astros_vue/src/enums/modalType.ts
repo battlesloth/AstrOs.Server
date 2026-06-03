@@ -4,6 +4,7 @@ export enum ModalType {
   ERROR = 'errorModal',
   CONFIRM = 'confirmModal',
   INTERRUPT = 'interruptModal',
+  HELP = 'helpModal',
 
   // modules view
   LOADING = 'loadingModal',

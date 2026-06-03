@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { ScriptChannelType } from '@/enums/scripts/scriptChannelType';
 import type { LocationDetails, ChannelDetails, AddChannelModalResponse } from '@/models';
 import { useScripterStore } from '@/stores/scripter';
+import { useI18n } from 'vue-i18n';
 
 interface ScriptChannelTypeOption {
   id: ScriptChannelType;
@@ -10,6 +11,7 @@ interface ScriptChannelTypeOption {
 }
 
 const scripterStore = useScripterStore();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   (e: 'addChannel', response: AddChannelModalResponse): void;
@@ -26,13 +28,13 @@ const selectedChannels = ref<string[]>([]);
 
 // Channel type options
 const channelTypes: ScriptChannelTypeOption[] = [
-  { id: ScriptChannelType.NONE, name: 'Any Channel Type' },
-  { id: ScriptChannelType.AUDIO, name: 'Audio Channels' },
-  { id: ScriptChannelType.GPIO, name: 'GPIO Channels' },
-  { id: ScriptChannelType.GENERIC_I2C, name: 'I2C Channels' },
-  { id: ScriptChannelType.KANGAROO, name: 'KangarooX2 Channels' },
-  { id: ScriptChannelType.GENERIC_UART, name: 'Serial Channels' },
-  { id: ScriptChannelType.SERVO, name: 'Servo Channels' },
+  { id: ScriptChannelType.NONE, name: t('modals.add_channel.any_channel_type') },
+  { id: ScriptChannelType.AUDIO, name: t('modals.add_channel.audio_channels') },
+  { id: ScriptChannelType.GPIO, name: t('modals.add_channel.gpio_channels') },
+  { id: ScriptChannelType.GENERIC_I2C, name: t('modals.add_channel.i2c_channels') },
+  { id: ScriptChannelType.KANGAROO, name: t('modals.add_channel.kangaroo_channels') },
+  { id: ScriptChannelType.GENERIC_UART, name: t('modals.add_channel.serial_channels') },
+  { id: ScriptChannelType.SERVO, name: t('modals.add_channel.servo_channels') },
 ];
 
 // Computed controllers with "Any Controller" option
@@ -117,12 +119,12 @@ onMounted(() => {
 <template>
   <dialog class="modal modal-open">
     <div class="modal-box w-100 max-w-md">
-      <h1 class="text-2xl font-bold mb-4">Select Channel</h1>
+      <h1 class="text-2xl font-bold mb-4">{{ $t('modals.add_channel.title') }}</h1>
       <div class="py-4">
         <select
           id="controller-select"
           v-model="selectedController"
-          title="Controller"
+          :aria-label="$t('modals.add_channel.controller')"
           class="select select-bordered w-full text-2xl mb-5"
         >
           <option
@@ -137,7 +139,7 @@ onMounted(() => {
         <select
           id="module-select"
           v-model="selectedChannelType"
-          title="Channel Type"
+          :aria-label="$t('modals.add_channel.channel_type')"
           class="select select-bordered w-full text-2xl mb-5"
         >
           <option
@@ -152,7 +154,7 @@ onMounted(() => {
         <select
           id="channel-select"
           v-model="selectedChannels"
-          title="Channel"
+          :aria-label="$t('modals.add_channel.select_channel')"
           multiple
           class="select select-bordered w-full text-2xl mb-5 min-h-50"
         >
@@ -160,7 +162,7 @@ onMounted(() => {
             value="-1"
             disabled
           >
-            Select Channel
+            {{ $t('modals.add_channel.select_channel') }}
           </option>
           <option
             v-for="ch in filteredChannels"
@@ -186,14 +188,14 @@ onMounted(() => {
           data-testid="add-channel-button"
           @click="addChannel"
         >
-          Add
+          {{ $t('add') }}
         </button>
         <button
           class="btn w-24 text-lg"
           data-testid="close-button"
           @click="closeModal"
         >
-          Close
+          {{ $t('close') }}
         </button>
       </div>
     </div>
@@ -202,7 +204,7 @@ onMounted(() => {
       class="modal-backdrop"
       @click="closeModal"
     >
-      <button>Close</button>
+      <button>{{ $t('close') }}</button>
     </form>
   </dialog>
 </template>

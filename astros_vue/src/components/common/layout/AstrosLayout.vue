@@ -2,6 +2,8 @@
 import router from '@/router';
 import apiService from '@/api/apiService';
 import { ref, watch } from 'vue';
+import AstrosSystemStatusBanner from '@/components/common/systemStatusBanner/AstrosSystemStatusBanner.vue';
+import AstrosLockStateBanner from '@/components/common/lockStateBanner/AstrosLockStateBanner.vue';
 
 const props = defineProps({
   isSidebarOpen: {
@@ -44,6 +46,8 @@ function logout() {
       aria-controls="sidebar-menu"
     />
     <div class="drawer-content">
+      <AstrosSystemStatusBanner />
+      <AstrosLockStateBanner />
       <div class="navbar bg-base-100 shadow-sm">
         <div class="flex-none pl-2 flex items-center">
           <label
@@ -91,10 +95,16 @@ function logout() {
               <router-link to="/scripts">{{ $t('nav.scripts') }}</router-link>
             </li>
             <li>
+              <router-link to="/playlists">{{ $t('nav.playlists') }}</router-link>
+            </li>
+            <li>
               <router-link to="/remote">{{ $t('nav.remote') }}</router-link>
             </li>
             <li>
               <router-link to="/modules">{{ $t('nav.modules') }}</router-link>
+            </li>
+            <li>
+              <router-link to="/firmware">{{ $t('nav.firmware') }}</router-link>
             </li>
             <li>
               <router-link to="/utility">{{ $t('nav.utility') }}</router-link>
