@@ -1,6 +1,6 @@
 {
   "name": "astros_vue",
-  "version": "1.0.0-dev.10",
+  "version": "1.0.0-dev.11",
   "private": true,
   "type": "module",
   "engines": {
