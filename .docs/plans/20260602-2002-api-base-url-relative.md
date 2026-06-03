@@ -34,12 +34,19 @@ Out of scope: WebSocket (already correct — uses `window.location.hostname:5000
 
 ## Tasks
 
-- [ ] Change `apiService.ts` baseURL to `import.meta.env.VITE_BACKEND_API || '/'`
+- [x] Change `apiService.ts` baseURL to `import.meta.env.VITE_BACKEND_API || '/'`
       (relative; `/` anchors at root regardless of current route since endpoints
       have no leading slash).
-- [ ] Add a `/api` dev proxy to `astros_vue/vite.config.ts` pointing at
+- [x] Add a `/api` dev proxy to `astros_vue/vite.config.ts` pointing at
       `http://localhost:3000`.
-- [ ] Add a test asserting `apiClient.defaults.baseURL` is relative (`/`) so a
+- [x] Add a test asserting `apiClient.defaults.baseURL` is relative (`/`) so a
       regression back to an absolute localhost URL fails the suite.
-- [ ] prettier:write + lint (vue) + build/type-check + vitest run, all green.
-- [ ] Code review on the diff, then commit.
+- [x] prettier:write + lint (vue) + build/type-check + vitest run, all green.
+- [x] Code review on the diff, then commit.
+
+## Deferred (noted in code review, out of scope for this fix)
+
+- `UtilityView.vue` uses raw leading-slash API path literals (`/api/settings`,
+  `/api/settings/controllers`, `/api/settings/logs`, ...) instead of `endpoints.ts`
+  constants. Pre-existing, resolves correctly under the relative base. Promoting
+  them to constants is a separate file-wide consistency cleanup.
