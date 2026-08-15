@@ -88,18 +88,18 @@ Before each implementation commit, run in order:
 - Treat doc/header text as code. If feedback says "header claims X but code does Y," fix whichever side is wrong AND verify the other isn't making sibling claims that just slipped past.
 - A reviewer flagging the same conceptual issue twice is a signal of an incomplete sweep, not a flaky reviewer. Re-grep the symbol/claim across the module before replying "fixed" the second time.
 
-**Carve-outs that may skip step 3:** plan-only commits (no source changes), trivial typo / comment-only fixes, and check-off-only updates to a plan file. Everything else — including any change to a `.ts` / `.tsx` / test file with logic — requires the review.
+**Carve-outs that may skip step 3:** task-file-only commits (no source changes), trivial typo / comment-only fixes, and check-off-only updates to a task file or `PLAN.md`. Everything else — including any change to a `.ts` / `.tsx` / test file with logic — requires the review.
 
 ## Branching & PRs
 
 All implementation work goes on a feature branch that merges into `develop` via pull request. Never commit directly to `develop` or `main`. `develop` is the integration branch for contributor work; `main` is production.
 
-- Branch naming: `feature/<slug>` (e.g., `feature/database-path-env`).
-- Branch off the latest `origin/develop` at the start of each task.
-- Plan files commit to the feature branch too — the "commit the plan first" rule in the Planning section still applies.
-- Open the PR with `gh pr create --base develop` when the work is ready.
+- Branch naming carries the task ID: `feature/T-NNN-<slug>` (e.g., `feature/T-014-poll-nak-handling`).
+- Branch off the latest `origin/develop` at the start of each task. One task per branch — never let a branch accumulate multiple tasks.
+- Task files commit to the feature branch too — the "commit the task file first" rule in the Workflow section still applies.
+- Open the PR with `gh pr create --base develop` when the work is ready. PR title: `T-NNN: <task title>`; body carries the verification evidence.
 
-**Exception — doc-only changes:** A "doc-only" branch is one whose entire diff is limited to `CLAUDE.md`, `README.md`, `.docs/`, or other prose files — with no `.ts`/`.tsx`/`.vue`/`.css`/`.json` config or asset changes. A plan file committed alongside implementation work does NOT make a branch doc-only. Doc-only branches may be committed directly to `develop` and skip the pre-push toolkit; PR overhead isn't justified for pure meta edits.
+**Exception — doc-only changes:** A "doc-only" branch is one whose entire diff is limited to `CLAUDE.md`, `README.md`, `PLAN.md`, `.docs/`, or other prose files — with no `.ts`/`.tsx`/`.vue`/`.css`/`.json` config or asset changes. A task file committed alongside implementation work does NOT make a branch doc-only. Doc-only branches may be committed directly to `develop` and skip the pre-push toolkit; PR overhead isn't justified for pure meta edits.
 
 ## Pre-push branch review
 
@@ -131,51 +131,35 @@ Before pushing a feature branch, run a comprehensive multi-agent review on the f
 
 **Why this exists.** Per-commit reviews see narrow diffs and are framed by the specific change; cross-commit drift, architectural patterns, and stale comments-after-refactor only become visible at the full-branch level. Running this skill before push catches in ~10 minutes what would otherwise come back as multiple rounds of PR feedback churn.
 
-## Planning (MANDATORY)
+## Workflow (MANDATORY)
 
-**NEVER write implementation code without a written, committed plan.** This is a hard rule, with the exceptions below.
+**NEVER write implementation code without a committed task file.** Quick-tier fixes are the only exception. Rationale and templates: [`.docs/agentic-workflow.md`](./.docs/agentic-workflow.md).
 
-### Quick feedback mode
+### Session ritual
 
-No plan is required for small, minimally invasive changes made while reviewing a completed feature. Examples: CSS tweaks, wording/copy changes, spacing fixes, color adjustments, typo corrections. Just make the change directly. If a "quick" change starts growing in scope, stop and write a plan.
+- **Open:** read `PLAN.md` (repo root) and state current status — active project, in-progress task, what's next — before touching code.
+- **Close:** update the `PLAN.md` Status block; append a Log entry (dated header + short sub-bullets) for any completed task. Quick fixes stay out of the Log. A session that ends without this is not finished.
+- `PLAN.md` is authoritative over agent memory: when they disagree, `PLAN.md` wins.
 
-### Light plan mode
+### Three tiers
 
-For medium-sized changes that are straightforward but span more than a trivial tweak — e.g., adding a new API endpoint with a store and view, or a self-contained bug fix touching 2-3 files — use a light plan:
+- **Quick** — small, minimally invasive fixes during bench testing or feature review (CSS, copy, spacing, typos). No artifact; fix directly on the active branch. If it grows, stop and promote to a task.
+- **Task** — anything else that passes the five sizing rules as one unit. One file: `.docs/tasks/T-NNN-<slug>.md` from [`.docs/templates/task.md`](./.docs/templates/task.md).
+- **Project** — work that fails the sizing rules. Run a seam-discovery session (`superpowers:brainstorming`) to split it into task files + a `PLAN.md` section before implementing anything.
 
-1. Write a brief plan (a short description + a checklist of 3-5 tasks) and save to `.docs/plans/` with the same naming convention.
-2. **Commit the plan file before writing implementation code.**
-3. Check off tasks as completed and commit updates.
+### Task rules
 
-Light plans skip the brainstorming skill and don't require a scope guard evaluation. If the plan grows beyond ~5 tasks or starts spanning many layers, escalate to a full plan.
-
-### Full plan workflow
-
-For larger features or work that spans multiple layers:
-
-1. Brainstorm the feature with the user (using `superpowers:brainstorming`).
-2. Write the plan using `superpowers:writing-plans` and save to `.docs/plans/` with a timestamped filename including time (e.g., `20260327-1500-feature-name.md` using `YYYYMMDD-HHmm` format).
-3. The plan must include a checklist of discrete tasks with checkboxes (`- [ ]`). Each task should be small enough to complete and commit independently.
-4. **Commit the plan file to the repo before writing any implementation code.** This ensures the plan survives crashes, context loss, or session restarts.
-5. As each task is completed, update the plan file to check off the box (`- [x]`) and commit the update. This makes the plan the single source of truth for progress.
-6. If a session is interrupted, the next session should read the plan file to determine what has been done and what remains.
-
-### Multi-phase projects — `current_project.md`
-
-When a feature spans 3+ independently shippable phases (typical signal: the Scope guard below recommends splitting), create `.docs/plans/current_project.md` from the template at [`.docs/templates/current_project.md`](./.docs/templates/current_project.md). This file is the top-level checklist linking to each phase's individual plan file. Update the checkbox + add the archive link when each phase ships. Move the file to `.docs/completed_plans/YYYY/MM/DD/` when the whole project ships. Single-project at a time: if another multi-phase project starts, finish or rename the existing tracker first.
-
-### Scope guard — break up large work
-
-During planning, evaluate the total scope. If a feature involves **more than ~8 discrete tasks**, or spans **3+ layers** (migration + API + shared types + store + UI + tests + QA), it is probably too large for a single plan. In that case:
-
-- **Warn the user** that the work should be broken into phases.
-- **Propose separate plan files** for each phase (e.g., `20260330-study-crud-phase1-api.md`, `20260330-study-crud-phase2-ui.md`).
-- Each phase should be independently shippable and testable.
-- Get user approval on the phasing before proceeding.
+- The task file's Context / Contract / Task / Acceptance criteria / Out of scope / Verification sections are written and **committed before implementation code**. The Implementation checklist is added when work starts; check off + commit as work proceeds.
+- **Sizing rules** (all must hold, else split): one session with headroom; zero unmade architectural decisions; independently verifiable; pinned interfaces; a diff small enough that it will actually be read.
+- Treat the **Contract** section as immutable. If it seems wrong, stop and raise it — do not adapt it silently. If a needed contract doesn't exist, designing it is its own task.
+- Respect **Out of scope**. Adjacent improvements go in a note or the `PLAN.md` Backlog, not the diff.
+- Never make an architectural decision mid-task. If one surfaces, stop, state the options, and wait.
+- A task is done only when its **Verification** section runs green — never claim completion without running it. Done also includes updating the owning feature's QA plan in `.docs/qa/`, moving the task file to `.docs/tasks/completed/`, and flipping the `PLAN.md` checkbox.
+- If the diff is ballooning past what the task implies, stop and propose a split.
 
 ### Failure-mode inventory — for high-stakes modules
 
-For modules involving filesystem state, concurrency, network I/O, crash-recovery, or cross-process state, fill out a **failure-mode inventory** as part of the plan before writing implementation code. Template at [`.docs/templates/failure-mode-inventory.md`](./.docs/templates/failure-mode-inventory.md). The c.4 firmware cache hit ~10 PR-feedback rounds catching real bugs (Windows rename, hung downloads, mismatched-bytes hit, unbounded garbage) that the inventory's error-coverage and crash-recovery sections would have surfaced upfront. Skip for simple CRUD endpoints or pure-compute modules.
+For modules involving filesystem state, concurrency, network I/O, crash-recovery, or cross-process state, fill out a **failure-mode inventory** in the task file before writing implementation code. Template at [`.docs/templates/failure-mode-inventory.md`](./.docs/templates/failure-mode-inventory.md). The c.4 firmware cache hit ~10 PR-feedback rounds catching real bugs (Windows rename, hung downloads, mismatched-bytes hit, unbounded garbage) that the inventory's error-coverage and crash-recovery sections would have surfaced upfront. Skip for simple CRUD endpoints or pure-compute modules.
 
 ## QA Test Plans
 
@@ -186,14 +170,14 @@ For each feature, create a manual QA test plan in `.docs/qa/` with a descriptive
 - **Expected results**: what should happen after each step or group of steps
 - **Edge cases / negative tests**: invalid inputs, error states, boundary conditions
 
-QA plans should be committed alongside the feature work they cover.
+QA plans should be committed alongside the feature work they cover. Completing a task includes updating the owning feature's QA plan (or creating it if the feature is new) — the feature plans are the living regression suite; there is no per-task QA intermediate.
 
 ## Skills & Subagents
 
 Use the following skills and subagents as part of the development workflow:
 
-- **Brainstorming** (`superpowers:brainstorming`): Always brainstorm before building new features. Explore intent, requirements, and design before writing code.
-- **Write Plan** (`superpowers:writing-plans`): Write a plan before any multi-step implementation. Save plans to `.docs/plans/`.
+- **Brainstorming** (`superpowers:brainstorming`): Always brainstorm before building new features — this is also the vehicle for seam-discovery sessions that decompose project-tier work into tasks.
+- **Write Plan** (`superpowers:writing-plans`): Use when authoring project-tier task sets. The output lands as task files in `.docs/tasks/` (template: `.docs/templates/task.md`), not standalone plan documents.
 - **Execute Plan** (`superpowers:executing-plans`): Use to execute written implementation plans with review checkpoints.
 - **TDD** (`superpowers:test-driven-development`): Write tests before implementation code for features and bug fixes. **Exceptions**: serial/hardware integration code, PixiJS rendering code, and UI layout work where the feedback loop is inherently manual — for these, write tests after implementation where feasible, or rely on manual QA.
 - **Frontend Design** (`frontend-design:frontend-design`): Use for all Vue component and page work to produce polished, production-grade UI.
