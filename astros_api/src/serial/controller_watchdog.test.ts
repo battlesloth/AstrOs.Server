@@ -94,6 +94,57 @@ describe('ControllerWatchdog', () => {
     expect(wd.sweep(STATUS_STALE_TIMEOUT_MS + 1)).toEqual([]);
   });
 
+  it('recordNak returns true on the up→down transition', () => {
+    const wd = new ControllerWatchdog();
+    wd.recordAck(dome, 0);
+    expect(wd.recordNak(dome)).toBe(true);
+  });
+
+  it('recordNak returns false for a controller already down (edge-triggered)', () => {
+    const wd = new ControllerWatchdog();
+    wd.recordAck(dome, 0);
+    expect(wd.recordNak(dome)).toBe(true);
+    expect(wd.recordNak(dome)).toBe(false);
+    expect(wd.recordNak(dome)).toBe(false);
+  });
+
+  it('recordNak flags a controller that never acked this session', () => {
+    const wd = new ControllerWatchdog();
+    expect(wd.recordNak(dome)).toBe(true);
+    expect(wd.recordNak(dome)).toBe(false);
+  });
+
+  it('a recovering ack after a NAK re-arms the NAK edge trigger', () => {
+    const wd = new ControllerWatchdog();
+    wd.recordAck(dome, 0);
+    expect(wd.recordNak(dome)).toBe(true);
+    wd.recordAck(dome, 100); // padawan came back
+    expect(wd.recordNak(dome)).toBe(true); // went down again
+  });
+
+  it('a sweep after recordNak does not re-emit the same controller', () => {
+    const wd = new ControllerWatchdog();
+    wd.recordAck(dome, 0);
+    wd.recordNak(dome);
+    expect(wd.sweep(STATUS_STALE_TIMEOUT_MS + 1)).toEqual([]);
+  });
+
+  it('markAllDown after recordNak does not re-emit the NAKed controller', () => {
+    const wd = new ControllerWatchdog();
+    wd.recordAck(dome, 0);
+    wd.recordAck(body, 0);
+    wd.recordNak(dome);
+    expect(wd.markAllDown()).toEqual([body]);
+  });
+
+  it('recordNak on one controller does not affect a sibling', () => {
+    const wd = new ControllerWatchdog();
+    wd.recordAck(dome, 0);
+    wd.recordAck(body, 0);
+    wd.recordNak(dome);
+    expect(wd.recordNak(body)).toBe(true);
+  });
+
   it('buildDownStatus produces a DOWN StatusResponse the UI renders as down', () => {
     expect(buildDownStatus(dome)).toEqual({
       type: TransmissionType.status,

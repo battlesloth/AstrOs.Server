@@ -71,6 +71,7 @@ import { SerialMessageType } from './serial/serial_message.js';
 import {
   ConfigSyncResponse,
   ISerialWorkerResponse,
+  PollNakResponse,
   PollResponse,
   RegistrationResponse,
   SerialWorkerResponseType,
@@ -932,6 +933,13 @@ export class ApiServer {
       case SerialWorkerResponseType.POLL:
         this.handlePollResponse(msg);
         break;
+      case SerialWorkerResponseType.POLL_NAK:
+        this.handlePollNak(msg as PollNakResponse);
+        break;
+      case SerialWorkerResponseType.NO_OP:
+        // Valid frame the worker parsed but the server takes no action on
+        // (e.g. FORMAT_SD_ACK). Already debug-logged worker-side.
+        break;
       case SerialWorkerResponseType.CONFIG_SYNC:
         this.handleConfigSync(msg);
         break;
@@ -1069,6 +1077,60 @@ export class ApiServer {
       this.updateClients(update);
     } catch (error) {
       logger.error(error, 'Error handling poll response');
+    }
+  }
+
+  // Master reported a padawan unreachable (POLL_NAK). Broadcast DOWN once per
+  // outage: recordNak is edge-triggered, and a later POLL_ACK re-arms it. The
+  // 10s watchdog stale sweep stays as the backstop for a silent master.
+  async handlePollNak(msg: PollNakResponse) {
+    try {
+      // Suppressed during an OTA flash for the same reason as the stale
+      // sweep: controllers reboot mid-flash and the firmware-stages board
+      // owns status then. The NAK repeats every poll cycle, so the DOWN
+      // re-asserts within ~2s of the lock releasing.
+      if (this.flashOrchestrator?.getCurrentJob()) {
+        return;
+      }
+
+      const controllerRepo = new ControllerRepository(this.db);
+      const locationRepo = new LocationsRepository(this.db);
+
+      const controller = await controllerRepo.getControllerByAddress(msg.controller.address);
+      if (controller === null) {
+        // Not an error: the master can NAK a padawan this server never
+        // registered. The frame repeats every poll cycle — keep it quiet.
+        logger.debug(
+          `handlePollNak: no controller for address ${msg.controller.address} (master calls it '${msg.controller.name}')`,
+        );
+        return;
+      }
+
+      const location = await locationRepo.getLocationByController(controller.id);
+      if (location === null || !isLocationName(location.locationName)) {
+        logger.debug(
+          `handlePollNak: no valid location for controller ${controller.id}; skipping DOWN broadcast`,
+        );
+        return;
+      }
+
+      // Re-check after the awaits: a flash job registered mid-lookup would
+      // otherwise consume the edge trigger and broadcast during the flash.
+      if (this.flashOrchestrator?.getCurrentJob()) {
+        return;
+      }
+
+      const identity = {
+        controllerId: controller.id,
+        controllerAddress: msg.controller.address,
+        controllerLocation: location.locationName,
+      };
+
+      if (this.controllerWatchdog.recordNak(identity)) {
+        this.updateClients(buildDownStatus(identity));
+      }
+    } catch (error) {
+      logger.error(error, 'Error handling poll nak');
     }
   }
 

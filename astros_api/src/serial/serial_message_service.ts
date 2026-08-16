@@ -7,6 +7,7 @@ import { SerialWorkerResponseType } from './serial_worker_response.js';
 import type {
   ConfigSyncResponse,
   ISerialWorkerResponse,
+  NoOpSerialResponse,
   RegistrationResponse,
   ScriptDeployResponse,
 } from './serial_worker_response.js';
@@ -61,13 +62,22 @@ export class SerialMessageService {
       return result;
     }
 
-    if (validationResult.type !== SerialMessageType.POLL_ACK) {
+    // POLL_ACK/POLL_NAK are unsolicited and repeat every poll cycle —
+    // exempt from the per-message debug log and the tracker update below.
+    const isPollMessage =
+      validationResult.type === SerialMessageType.POLL_ACK ||
+      validationResult.type === SerialMessageType.POLL_NAK;
+
+    if (!isPollMessage) {
       logger.debug(`Received message: ${msg}`);
     }
 
     switch (validationResult.type) {
       case SerialMessageType.POLL_ACK:
         result = this.messageHandler.handlePollAck(validationResult.data);
+        break;
+      case SerialMessageType.POLL_NAK:
+        result = this.messageHandler.handlePollNak(validationResult.data);
         break;
       case SerialMessageType.REGISTRATION_SYNC_ACK:
         result = this.messageHandler.handleRegistraionSyncAck(validationResult.data);
@@ -110,9 +120,15 @@ export class SerialMessageService {
       case SerialMessageType.FW_BACKPRESSURE:
         result = this.messageHandler.handleFwBackpressure(validationResult.data);
         break;
+      default:
+        // Valid frame, no server-side action (e.g. FORMAT_SD_ACK). NO_OP keeps
+        // the main thread silent; UNKNOWN stays reserved for invalid frames.
+        logger.debug(`Unhandled serial message type: ${SerialMessageType[validationResult.type]}`);
+        result = { type: SerialWorkerResponseType.NO_OP } satisfies NoOpSerialResponse;
+        break;
     }
 
-    if (validationResult.type !== SerialMessageType.POLL_ACK) {
+    if (!isPollMessage) {
       this.updateTracker(validationResult.id, result);
     }
 

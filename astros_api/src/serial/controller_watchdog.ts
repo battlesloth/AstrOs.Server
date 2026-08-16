@@ -33,6 +33,19 @@ export class ControllerWatchdog {
   }
 
   /**
+   * The master reported this controller unreachable (POLL_NAK). Returns true
+   * only on the up→down transition so the caller broadcasts one DOWN per
+   * outage, not one per poll cycle. recordAck re-arms the trigger.
+   */
+  recordNak(id: ControllerIdentity): boolean {
+    if (this.down.has(id.controllerId)) {
+      return false;
+    }
+    this.down.add(id.controllerId);
+    return true;
+  }
+
+  /**
    * Periodic check: return controllers silent longer than the timeout that are
    * not already flagged, marking them DOWN. Caller broadcasts each as up:false.
    */

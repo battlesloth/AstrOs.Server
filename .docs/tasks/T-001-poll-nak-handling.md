@@ -71,6 +71,8 @@ Backlog origin: `PLAN.md` Backlog item 1 (seeded 2026-08-14).
 - [ ] Other valid-but-unhandled types (e.g. `FORMAT_SD_ACK`) hit the default case: debug
       log with the type name, `NO_OP` response, main thread silent.
 - [ ] Genuinely invalid frames still return UNKNOWN and still log an error.
+- [ ] A NAK arriving while a flash job is current produces no DOWN broadcast
+      (mirrors the stale-sweep suppression; QA watchdog case 4).
 - [ ] Watchdog edge-trigger test survives the mutation check: reverting the
       `recordNak` dedup (always returning `true`) makes a test fail.
 
@@ -117,9 +119,14 @@ in-memory and rebuilt from live POLL traffic after restart.
   sweep interval both dispatch there); no locking needed. NAK-before-first-ACK: the
   controller is not in `lastSeen`; `recordNak` still flags `down` and broadcasts using
   the DB-derived identity — sweep never re-flags (already down), `recordAck` recovers.
-- NAK during an active flash: padawans reboot during OTA, master NAKs them, DOWN
-  broadcasts fire. Accepted — the 10s sweep already produces the same UI behavior
-  today; no new flapping mode is introduced.
+- NAK during an active flash: padawans reboot during OTA and the master NAKs
+  them. **Corrected during implementation** — the original "accepted, sweep does
+  the same" claim was wrong: the stale sweep is *suppressed* while a flash job
+  is current (QA controller-status-watchdog case 4), so an unguarded NAK
+  broadcast would introduce a new flapping mode. `handlePollNak` now carries the
+  same `flashOrchestrator?.getCurrentJob()` guard as the sweep; pinned by the
+  NAK-during-flash integration test. The DOWN re-asserts within one poll cycle
+  after lock release.
 - Envelope ordering: POLL_ACK and POLL_NAK for the same controller can interleave;
   last-writer-wins on the `down` flag is the intended semantic.
 
@@ -132,8 +139,10 @@ in-memory and rebuilt from live POLL traffic after restart.
 - POLL_NAK payload crosses the serial trust boundary: field-count and empty-MAC
   validation before any DB lookup; the MAC is used only as a query parameter (Kysely
   binds it), never for path/SQL interpolation.
-- Payload fields are logged verbatim at debug only — no error-level log flooding from a
-  misbehaving master.
+- Well-formed payloads that hit a handled state (unknown MAC, missing location) log at
+  debug only — no error-level flooding from a repeating NAK. Malformed payloads DO log
+  at error (per the acceptance criteria: invalid frames keep the error log); a master
+  emitting garbage every poll cycle is a wiring/firmware fault that should be loud.
 
 **§7 Resource lifecycle** — no new resources (no timers, listeners, handles). `down`
 set entries are cleared by `recordAck` or discarded with the process.
@@ -142,13 +151,20 @@ set entries are cleared by `recordAck` or discarded with the process.
 
 ## Implementation checklist
 
-- [ ] Watchdog `recordNak` tests (TDD) + implementation, incl. mutation check
-- [ ] `serial_worker_response.ts`: `POLL_NAK`, `NO_OP`, `PollNakResponse`
-- [ ] `handlePollNak` parser tests (TDD) + implementation in `message_handler.ts`
-- [ ] Dispatch tests (POLL_NAK routing, tracker/debug exemption, default→NO_OP) +
+- [x] Watchdog `recordNak` tests (TDD) + implementation, incl. mutation check
+      (mutation: always-true `recordNak` → 2 tests fail)
+- [x] `serial_worker_response.ts`: `POLL_NAK`, `NO_OP`, `PollNakResponse`
+      (appended to the enum — numeric values cross postMessage to the dist/
+      worker, which can lag src/ in tsx-dev/stale-build windows)
+- [x] `handlePollNak` parser tests (TDD) + implementation in `message_handler.ts`
+- [x] Dispatch tests (POLL_NAK routing, tracker/debug exemption, default→NO_OP) +
       implementation in `serial_message_service.ts`
-- [ ] `api_server.ts`: `handlePollNak` + `NO_OP` case
-- [ ] QA plan: update controller-status coverage in `.docs/qa/`
-- [ ] prettier + lint (both sub-projects), build, full vitest run
+- [x] `api_server.ts`: `handlePollNak` + `NO_OP` case + flash-suppression guard
+      (added mid-task after QA case 4 disproved the inventory's "accepted" claim)
+- [x] Integration tests: `src/serial/integration/poll_nak_down.integration.test.ts`
+      (full PTY→worker→WS path; NAK-during-flash suppression); harness additions:
+      `stub.writePollNak`, `harness.databasePath`
+- [x] QA plan: `controller-status-watchdog.md` cases 1/1b/4/4b/5 + negative edges
+- [x] prettier + lint (both sub-projects), build, full vitest run (909 passed)
 - [ ] Pre-commit code review; pre-push `/pr-review-toolkit:review-pr`
 - [ ] Move task file to `.docs/tasks/completed/`, flip `PLAN.md`
