@@ -7,7 +7,7 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 Active:  none — between projects
 Now:     —
 Next:    promote a Backlog item to T-001, or start the next project with a seam-discovery session
-Blocked: none known (firmware-side OTA master-flash fix lives in AstrOs.ESP; status last confirmed 2026-05-29)
+Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
 Last:    2026-08-14 — agentic workflow bootstrap; Remote Redesign tracker closed out
 
 ## Standalone tasks
