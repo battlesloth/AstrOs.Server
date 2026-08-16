@@ -4,15 +4,15 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-001 — POLL_NAK offline-padawan handling
-Now:     implementing on `feature/T-001-poll-nak-handling` (task file committed 2026-08-16)
-Next:    T-001 PR into develop; then promote the next Backlog item
+Active:  none — T-001 implementation complete, awaiting push + PR + bench sign-off
+Now:     `feature/T-001-poll-nak-handling` ready to push (Jeff pushes via VS Code); then PR into develop
+Next:    open the T-001 PR; bench-verify the ~2–6s DOWN latency post-merge; then promote the next Backlog item
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-08-14 — agentic workflow bootstrap; Remote Redesign tracker closed out
+Last:    2026-08-16 — T-001 implemented + reviewed (see Log)
 
 ## Standalone tasks
 
-- [ ] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`)
+- [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; bench sign-off pending post-merge)
 
 ## Backlog (unscheduled candidates)
 
@@ -44,6 +44,12 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 
 ## Log
 
+- 2026-08-16 T-001 — POLL_NAK offline-padawan handling
+  - worker now parses POLL_NAK (`mac{US}name`, pinned to ESP `getPollNak`); main thread broadcasts DOWN once per outage via edge-triggered `ControllerWatchdog.recordNak`; UI shows an offline padawan in ~2–6s vs the 10s sweep (which stays as backstop)
+  - suppressed while a flash job is current (mirrors the sweep; guard re-checked after async lookups), pinned by a PTY-level flash integration test
+  - valid-but-unhandled serial types now return NO_OP instead of round-tripping UNKNOWN; `*_NAK` types warn with payload
+  - review fallout: new nullable `findControllerByAddress`/`findLocationByController` (the OrThrow originals error-flooded on unknown-MAC NAKs — caught by new spy-based unit tests); enum values pinned by test; firmware-verified timing corrections (4s poll cycle, master suspends polling during OTA)
+  - Backlog seeded: SCRIPT_RUN envelope gap, RUN_COMMAND/FORMAT_SD/DEPLOY_CONFIG NAK handling, repo NoResultError sweep, ESP stale poll-nak comment
 - 2026-08-14 workflow bootstrap
   - adopted the task-file workflow (`.docs/agentic-workflow.md`); `PLAN.md` is now the authoritative status view — agent memory is a cache
   - closed out the Remote Redesign tracker: Phases 4 (PR #108) and 5 (PR #106) had shipped unrecorded; Phase 2d shipped via PR #97
