@@ -69,6 +69,50 @@ export class LocationsRepository {
     return result;
   }
 
+  // Nullable variant of getLocationByController: a controller with no
+  // location link is a normal state during droid setup (POLL_NAK handling
+  // hits it while the board is offline) — no throw, no log on miss.
+  public async findLocationByController(id: string): Promise<ControllerLocation | null> {
+    const data = await this.db
+      .selectFrom('locations')
+      .leftJoin('controller_locations as cl', 'cl.location_id', 'locations.id')
+      .leftJoin('controllers as c', 'c.id', 'cl.controller_id')
+      .select([
+        'locations.id as loc_id',
+        'locations.name as loc_name',
+        'locations.description as loc_desc',
+        'locations.config_fingerprint as loc_fingerprint',
+        'c.id as ctrl_id',
+        'c.name as ctrl_name',
+        'c.address as ctrl_address',
+      ])
+      .where('c.id', '=', id)
+      .executeTakeFirst()
+      .catch((err) => {
+        logger.error('LocationsRepository.findLocationByController', err);
+        throw err;
+      });
+
+    if (data === undefined) {
+      return null;
+    }
+
+    const location = createControllerLocation(
+      data.loc_id,
+      data.loc_name,
+      data.loc_desc,
+      data.loc_fingerprint,
+    );
+
+    location.controller = {
+      id: data.ctrl_id ?? '',
+      name: data.ctrl_name ?? '',
+      address: data.ctrl_address ?? '',
+    };
+
+    return location;
+  }
+
   public async getLocationByController(id: string): Promise<ControllerLocation> {
     const data = await this.db
       .selectFrom('locations')

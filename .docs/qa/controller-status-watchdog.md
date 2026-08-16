@@ -7,10 +7,12 @@ the Status page with the WebSocket connected.
 ## Test cases
 
 1. **Padawan offline → DOWN (fast path via POLL_NAK).** Power off / disconnect
-   a single padawan (master stays up). Expected: within ~2 s (the next poll
-   cycle, when the master reports POLL_NAK) that location's badge turns grey
-   (DOWN); the others stay green. The ~10 s stale sweep remains the backstop
-   and is what applies when the master itself goes silent (case 2).
+   a single padawan (master stays up). Expected: within a few seconds (~2–6 s:
+   the master polls padawans every 4 s — its 2 s timer alternates poll and
+   expire ticks — and the NAK follows 2 s after a missed poll) that location's
+   badge turns grey (DOWN); the others stay green. Well before the ~10 s stale
+   sweep, which remains the backstop and is what applies when the master
+   itself goes silent (case 2).
    - 1b. **Log noise.** While the padawan is offline, the server log must NOT
      fill with `Invalid message received: {"type":0}` — the POLL_NAK frames
      are parsed and handled, not discarded.
@@ -24,15 +26,18 @@ the Status page with the WebSocket connected.
    though the master reboots and goes silent > 10 s. After the flash, status
    reflects reality. Both DOWN paths are suppressed while a job is current:
    the stale sweep AND POLL_NAK handling.
-   - 4b. Padawan going offline AROUND flash start: power it off less than one
-     poll cycle (~2 s) before starting the flash, so its first POLL_NAK lands
-     while the job is current. Confirm the badge does NOT flip mid-flash (both
-     paths suppressed during a job) and DOES flip to DOWN within ~2 s AFTER the
-     lock releases (next POLL_NAK or sweep). A padawan that went grey well
-     before the flash simply stays grey throughout — no new flip to observe.
+   - 4b. Padawan going offline AROUND flash start: power it off shortly before
+     or during the flash. The master suspends polling during its own OTA, so
+     the in-flash NAK lands either in the narrow pre-transfer window or (more
+     reliably) after the master's post-flash reboot, before the heartbeat
+     releases the lock. Confirm the badge does NOT flip mid-flash (both paths
+     suppressed during a job) and DOES flip to DOWN within ~2 s AFTER the lock
+     releases (first un-suppressed sweep; the resumed ~4 s NAK cycle also
+     re-asserts it). A padawan that went grey well before the flash simply
+     stays grey throughout — no new flip to observe.
 5. **Edge-trigger (no spam).** With a controller offline, watch the network/WS
-   frames. Expected: a single `status{up:false}` per controller per outage, not
-   one every 2 s — even though the master repeats POLL_NAK every poll cycle.
+   frames. Expected: a single `status{up:false}` per controller per outage —
+   even though the master repeats POLL_NAK every ~4 s poll cycle.
 6. **Clean shutdown.** Stop the server (SIGINT). Expected: no errors about a
    timer firing after teardown; process exits promptly (timer is unref'd).
 

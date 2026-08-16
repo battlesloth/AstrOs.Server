@@ -150,6 +150,24 @@ export class ControllerRepository {
     return { id: data.id, name: data.name, address: data.address };
   }
 
+  // Nullable variant of getControllerByAddress. An unknown address is a
+  // normal state for POLL_NAK handling (the master can NAK a peer this server
+  // never registered, every poll cycle) — so no throw and no log on miss,
+  // unlike the OrThrow variant whose catch error-logs each lookup failure.
+  public async findControllerByAddress(address: string): Promise<ControlModule | null> {
+    const data = await this.db
+      .selectFrom('controllers')
+      .selectAll()
+      .where('address', '=', address)
+      .executeTakeFirst()
+      .catch((err) => {
+        logger.error('ControllerRepository.findControllerByAddress', err);
+        throw err;
+      });
+
+    return data === undefined ? null : { id: data.id, name: data.name, address: data.address };
+  }
+
   public async getControllerByAddress(address: string): Promise<ControlModule> {
     const data = await this.db
       .selectFrom('controllers')

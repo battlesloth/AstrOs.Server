@@ -30,9 +30,11 @@ export enum SerialWorkerResponseType {
   FW_BACKPRESSURE,
 
   // Appended after the FW block, never inserted: these numeric values cross
-  // the postMessage boundary to the compiled dist/ worker, which can lag src/
-  // under tsx dev runs or a stale build — renumbering would silently remap
-  // every response type in that mismatch window.
+  // the postMessage boundary, and in integration runs the main thread
+  // executes src/ (vitest transform) while the Worker loads compiled dist/ —
+  // which can lag src/ if global_setup.ts's mtime-based rebuild check is
+  // fooled. Renumbering would silently remap every response type in that
+  // window. Values are pinned by test.
   POLL_NAK,
   NO_OP,
 }
@@ -88,9 +90,10 @@ export interface ScriptRunResponse extends ISerialWorkerResponse {
 // c.6 can accept either family.
 // ---------------------------------------------------------------------------
 
-// Marker response returned by every FW_* handler when the wire payload fails
-// validation. No `payload` field — callers MUST discriminate against this
-// case before reading payload from the success-shape sibling.
+// Marker response returned by frame handlers (the FW_* family and
+// handlePollNak) when the wire payload fails validation. No `payload` field —
+// callers MUST discriminate against this case before reading payload from the
+// success-shape sibling.
 export interface UnknownSerialResponse {
   type: SerialWorkerResponseType.UNKNOWN;
 }

@@ -5,12 +5,17 @@
 // controller, feeds ControllerWatchdog.recordNak, and broadcasts a DOWN
 // StatusResponse over WS.
 //
-// Each frame is written only after the previous frame's broadcast has been
-// awaited, so ordering is deterministic. The repeat-NAK dedup (no second DOWN
-// while already down) is deliberately NOT asserted here: a back-to-back
-// NAK+ACK write would race the two un-awaited async handlers on the main
-// thread, making the assertion flaky either way. The dedup is pinned by the
-// ControllerWatchdog unit tests instead.
+// Every broadcast-producing frame is written only after the previous frame's
+// broadcast has been awaited; the two silent frames (the unknown-MAC NAK and
+// the repeat NAK) are covered by count/absence assertions placed after later
+// awaited fences on the same FIFO pipeline — correct code emits nothing for
+// them, so no ordering can flake a pass, while buggy code's extra message
+// lands before the end-of-test count. The dedup COMPUTATION (recordNak's
+// edge trigger) is pinned by the ControllerWatchdog unit tests; what this
+// file pins is that the broadcast is actually gated on it end-to-end. A
+// back-to-back NAK+ACK interleave is still deliberately not asserted — that
+// ordering could race the un-awaited async handlers if the DB driver ever
+// gained a real async hop.
 
 import { describe, it, expect, afterEach } from 'vitest';
 import {
@@ -96,6 +101,11 @@ describe('integration: POLL_NAK marks a padawan DOWN', () => {
       );
       expect(down.up).toBe(false);
 
+      // 2b. Repeat NAK while already down: must NOT broadcast again. Silent
+      //     by design, so no fence here — the count assertion at the end
+      //     (exactly 2 DOWNs total) catches a duplicate wherever it lands.
+      harness.stub.writePollNak({ mac: PADAWAN_MAC, name: PADAWAN_NAME, msgId: 'na' });
+
       // 3. Recovery ACK → up:true broadcast (and re-arms the NAK trigger).
       snapshot = harness.receivedWsMessages.length;
       harness.stub.writePollAck({ mac: PADAWAN_MAC });
@@ -106,9 +116,15 @@ describe('integration: POLL_NAK marks a padawan DOWN', () => {
       harness.stub.writePollNak({ mac: PADAWAN_MAC, name: PADAWAN_NAME, msgId: 'na' });
       await harness.waitForWsMessage<StatusMsg>(statusFor(PADAWAN_MAC, false), 5000, snapshot);
 
-      // 5. The unknown-MAC NAK produced no status at any point. Its handler
-      //    ran before every awaited fence above (FIFO serial → worker → WS),
-      //    so by now its broadcast would have arrived if the bug existed.
+      // 5. End-of-test counts, all fenced by step 4's awaited DOWN:
+      //    - exactly 2 DOWNs for the padawan (steps 2 and 4) — the repeat NAK
+      //      in 2b must not have added a third;
+      //    - the unknown-MAC NAK produced no status at any point (its handler
+      //      ran before every awaited fence above; the vacuity risk of this
+      //      assertion alone — a throw swallowed by the catch also emits
+      //      nothing — is covered by the spy-based unit tests in
+      //      api_server.poll_nak.test.ts).
+      expect(harness.receivedWsMessages.filter(statusFor(PADAWAN_MAC, false))).toHaveLength(2);
       const ghostStatuses = harness.receivedWsMessages.filter(
         (m) => (m as Partial<StatusMsg>).controllerAddress === UNSEEDED_MAC,
       );
@@ -160,8 +176,11 @@ describe('integration: POLL_NAK marks a padawan DOWN', () => {
       });
       expect(flashRes.status).toBe(200);
 
-      // NAK the padawan while the job is current (job registration precedes
-      // the 200; the transfer keeps the job current for seconds after this).
+      // NAK the padawan while the job is current. Job registration precedes
+      // the 200, and the job STAYS current until the heartbeat-gated lock
+      // release — which this test itself triggers later — so the NAK below
+      // is processed strictly inside the suppression window regardless of
+      // how fast the 4KB transfer completes.
       harness.stub.writePollNak({ mac: PADAWAN_MAC, name: PADAWAN_NAME, msgId: 'na' });
 
       // Ride out the flash: done event, then heartbeat-driven lock release.

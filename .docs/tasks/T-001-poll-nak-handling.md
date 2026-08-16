@@ -20,8 +20,12 @@ parser (`AstrOsSerialMsgHandler.cpp` NAK path comment: "the server's poll-nak pa
 name-only, see message_handler.ts") that was never built.
 
 Same fall-through affects the other valid-but-unhandled types (`DEPLOY_CONFIG_NAK`,
-`RUN_COMMAND_ACK/NAK`, `FORMAT_SD_ACK/NAK`, `SERVO_TEST_ACK`); they get a debug-logging
-default case only.
+`RUN_COMMAND_ACK/NAK`, `FORMAT_SD_ACK/NAK`); they get a logging default case only —
+warn (with payload) for NAK-suffixed types since those are controllers actively
+reporting failure, debug for ACKs. (`SERVO_TEST_ACK` is NOT in this set: it has no
+`ValidationMap` entry, so such a frame fails validation upstream and never reaches
+the dispatch switch — and per `project_servo_test_no_ack` the firmware never sends
+it anyway.)
 
 Backlog origin: `PLAN.md` Backlog item 1 (seeded 2026-08-14).
 
@@ -30,6 +34,13 @@ Backlog origin: `PLAN.md` Backlog item 1 (seeded 2026-08-14).
 - **POLL_NAK wire payload:** `mac{US}name` — exactly 2 unit-separated fields, header
   msgId `"na"` (unsolicited). Source of truth:
   `AstrOs.ESP/lib_native/AstrOsMessaging/src/AstrOsSerialMessageService.cpp::getPollNak`.
+  Parser strictness decision (raised in code review): the parser rejects field counts
+  other than 2 rather than pre-emptively tolerating growth. This matches the actual
+  house convention — `handlePollAck` accepts a *closed* range [3,5] that was widened
+  release-by-release as firmware shipped new fields (and explicitly rejects 6) — so
+  when the NAK payload grows, the firmware PR widens this range too, same as ACK's
+  history. Accepted failure mode of that convention: new-firmware/old-server logs
+  `Invalid poll nak` until the server updates.
 - **`SerialMessageType` enum values** must continue to match the ESP enums; no
   renumbering, no insertions above the FW block.
 - **`StatusResponse` WS shape** is unchanged; the DOWN broadcast reuses
@@ -52,34 +63,42 @@ Backlog origin: `PLAN.md` Backlog item 1 (seeded 2026-08-14).
    `handlePollAck`'s error path.
 4. `SerialMessageService.handleMessage`: add the `POLL_NAK` case; exempt POLL_NAK from
    the per-message debug log and the tracker update exactly like POLL_ACK; add a
-   `default:` case that logs the type name (`SerialMessageType[type]`) at debug and
-   returns `NO_OP`.
-5. `api_server.ts`: `POLL_NAK` case → new `handlePollNak(msg)`: look up controller by
-   address + location (mirroring `handlePollResponse`), call `recordNak`, broadcast
-   `buildDownStatus(identity)` only when newly down. Unknown MAC / no location → debug
-   log, no broadcast. Add an explicit no-op `NO_OP` case to `handleSerialWorkerMessage`.
+   `default:` case returning `NO_OP` that logs the type name — at warn with payload
+   for `*_NAK` types (active failure reports), at debug otherwise.
+5. `api_server.ts`: `POLL_NAK` case → new `handlePollNak(msg)`: look up controller +
+   location via new nullable repo variants (`findControllerByAddress` /
+   `findLocationByController` — the `get*` originals `executeTakeFirstOrThrow` and
+   error-log inside the repo on every miss, which would re-create the log flood;
+   discovered by the spy-based unit tests), call `recordNak`, broadcast
+   `buildDownStatus(identity)` only when newly down. Unknown MAC → debug once per
+   address; registered-but-no-location → warn once, re-armed when
+   `handlePollResponse` sees the location. Add an explicit no-op `NO_OP` case to
+   `handleSerialWorkerMessage`.
 
 ## Acceptance criteria
 
-- [ ] A POLL_NAK frame no longer produces `Invalid message received`; it routes to
+- [x] A POLL_NAK frame no longer produces `Invalid message received`; it routes to
       `handlePollNak` and skips tracker + per-message debug log.
-- [ ] First NAK for a known, up controller → exactly one DOWN `StatusResponse`
+- [x] First NAK for a known, up controller → exactly one DOWN `StatusResponse`
       broadcast; repeated NAKs for the same controller → zero additional broadcasts.
-- [ ] POLL_ACK after a NAK clears the down flag; a subsequent NAK broadcasts DOWN again.
-- [ ] NAK for a MAC not in the DB (or controller without a location) → debug log only,
-      no broadcast, no thrown error.
-- [ ] Other valid-but-unhandled types (e.g. `FORMAT_SD_ACK`) hit the default case: debug
-      log with the type name, `NO_OP` response, main thread silent.
-- [ ] Genuinely invalid frames still return UNKNOWN and still log an error.
-- [ ] A NAK arriving while a flash job is current produces no DOWN broadcast
+- [x] POLL_ACK after a NAK clears the down flag; a subsequent NAK broadcasts DOWN again.
+- [x] NAK for a MAC not in the DB → no broadcast, no error-level log (debug once per
+      address). Registered controller without a location → no broadcast, one warn.
+- [x] Other valid-but-unhandled types hit the default case (`NO_OP`, main thread
+      silent): ACKs (e.g. `FORMAT_SD_ACK`) log the type name at debug; NAKs (e.g.
+      `FORMAT_SD_NAK`) warn with the payload — a controller reporting failure must
+      stay visible above debug.
+- [x] Genuinely invalid frames still return UNKNOWN and still log an error.
+- [x] A NAK arriving while a flash job is current produces no DOWN broadcast
       (mirrors the stale-sweep suppression; QA watchdog case 4).
-- [ ] Watchdog edge-trigger test survives the mutation check: reverting the
+- [x] Watchdog edge-trigger test survives the mutation check: reverting the
       `recordNak` dedup (always returning `true`) makes a test fail.
 
 ## Out of scope
 
-- Business handling for `DEPLOY_CONFIG_NAK`, `RUN_COMMAND_ACK/NAK`, `FORMAT_SD_ACK/NAK`,
-  `SERVO_TEST_ACK` beyond the debug default (each would be its own task if ever needed).
+- Business handling for `DEPLOY_CONFIG_NAK`, `RUN_COMMAND_ACK/NAK`, `FORMAT_SD_ACK/NAK`
+  beyond the logging default (each would be its own task if ever needed — see the
+  PLAN.md Backlog notes added at task close).
 - The dual-pino log-corruption issue (PLAN.md Backlog item 3).
 - Watchdog sweep timing/semantics changes.
 - Firmware changes (AstrOs.ESP is untouched).
@@ -93,8 +112,8 @@ Backlog origin: `PLAN.md` Backlog item 1 (seeded 2026-08-14).
 - Mutation check: temporarily make `recordNak` always return `true` → at least one test
   fails; restore.
 - [ ] Bench (human-gated, post-merge): power off one padawan → its location shows DOWN
-      within one poll cycle (~2s, vs ~10s today); log shows no `Invalid message
-      received: {"type":0}` spam.
+      within ~2–6s (master polls every 4s, NAK follows 2s after the missed poll; vs
+      ~10s sweep today); log shows no `Invalid message received: {"type":0}` spam.
 
 ## Failure-mode inventory
 
@@ -105,10 +124,16 @@ to `.docs/templates/failure-mode-inventory.md`.
 
 | Call | Error / condition | Response |
 |------|-------------------|----------|
-| `getControllerByAddress(mac)` | returns null (unknown MAC) | debug log, drop NAK — watchdog sweep remains backstop |
-| `getControllerByAddress(mac)` | throws (DB error) | caught by `handlePollNak` try/catch, error log, no crash (mirror `handlePollResponse`) |
-| `getLocationByController(id)` | returns null | debug log, drop NAK |
+| `findControllerByAddress(mac)` | returns null (unknown MAC) | debug once per address, drop NAK — watchdog sweep remains backstop |
+| `findControllerByAddress(mac)` | throws (real DB error) | caught by `handlePollNak` try/catch, error log with MAC, no crash |
+| `findLocationByController(id)` | returns null (no location link) | warn once per controller (config gap), drop NAK; re-armed on ACK |
 | WS broadcast | client gone mid-send | existing `updateClients` path already tolerates closed sockets |
+
+Inventory correction (found by the unit tests): the original rows assumed the
+`get*ByAddress`/`get*ByController` repo methods return null on a miss — they
+`executeTakeFirstOrThrow` (Kysely `NoResultError`) and error-log inside the repo,
+so the planned "debug log, drop" behavior required new nullable `find*` variants.
+Same `NoResultError` pattern as PLAN.md Backlog item 2 (settings 500).
 
 **§2 Crash-recovery state matrix** — N/A: no filesystem writes; watchdog state is
 in-memory and rebuilt from live POLL traffic after restart.
@@ -125,8 +150,10 @@ in-memory and rebuilt from live POLL traffic after restart.
   is current (QA controller-status-watchdog case 4), so an unguarded NAK
   broadcast would introduce a new flapping mode. `handlePollNak` now carries the
   same `flashOrchestrator?.getCurrentJob()` guard as the sweep; pinned by the
-  NAK-during-flash integration test. The DOWN re-asserts within one poll cycle
-  after lock release.
+  NAK-during-flash integration test. After lock release the DOWN re-asserts via
+  the first un-suppressed sweep (≤2s) or the next NAK (~4s master poll cycle,
+  once its polling resumes post-OTA — the master suspends polling during its
+  own flash).
 - Envelope ordering: POLL_ACK and POLL_NAK for the same controller can interleave;
   last-writer-wins on the `down` flag is the intended semantic.
 
@@ -154,8 +181,9 @@ set entries are cleared by `recordAck` or discarded with the process.
 - [x] Watchdog `recordNak` tests (TDD) + implementation, incl. mutation check
       (mutation: always-true `recordNak` → 2 tests fail)
 - [x] `serial_worker_response.ts`: `POLL_NAK`, `NO_OP`, `PollNakResponse`
-      (appended to the enum — numeric values cross postMessage to the dist/
-      worker, which can lag src/ in tsx-dev/stale-build windows)
+      (appended to the enum — in integration runs the main thread executes src/
+      while the Worker loads compiled dist/, which can lag if the mtime rebuild
+      check is fooled; values pinned by `serial_worker_response.test.ts`)
 - [x] `handlePollNak` parser tests (TDD) + implementation in `message_handler.ts`
 - [x] Dispatch tests (POLL_NAK routing, tracker/debug exemption, default→NO_OP) +
       implementation in `serial_message_service.ts`
@@ -166,5 +194,15 @@ set entries are cleared by `recordAck` or discarded with the process.
       `stub.writePollNak`, `harness.databasePath`
 - [x] QA plan: `controller-status-watchdog.md` cases 1/1b/4/4b/5 + negative edges
 - [x] prettier + lint (both sub-projects), build, full vitest run (909 passed)
-- [ ] Pre-commit code review; pre-push `/pr-review-toolkit:review-pr`
+- [x] Pre-commit code review (1 Important fixed: flash-guard TOCTOU re-check) and
+      pre-push `/pr-review-toolkit:review-pr` (5 agents). Findings addressed: NAK
+      types warn in the dispatch default; nullable `find*` repo variants (the unit
+      tests exposed that `get*OrThrow` misses threw and error-flooded); spy-based
+      cross-platform unit tests for `handlePollNak`; enum value-pin test;
+      once-per-condition log dedup; firmware-verified timing corrections (4s poll
+      cycle, 2–6s first DOWN, master suspends polling during OTA). Push-back
+      recorded in Contract: parser stays strict-2-field per the ACK parser's
+      closed-range history. Deferred to Backlog: SCRIPT_RUN envelope gap,
+      RUN_COMMAND/FORMAT_SD/DEPLOY_CONFIG business handling, repo NoResultError
+      sweep, ESP stale-comment fix.
 - [ ] Move task file to `.docs/tasks/completed/`, flip `PLAN.md`

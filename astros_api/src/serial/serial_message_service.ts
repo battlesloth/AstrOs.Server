@@ -120,12 +120,24 @@ export class SerialMessageService {
       case SerialMessageType.FW_BACKPRESSURE:
         result = this.messageHandler.handleFwBackpressure(validationResult.data);
         break;
-      default:
-        // Valid frame, no server-side action (e.g. FORMAT_SD_ACK). NO_OP keeps
-        // the main thread silent; UNKNOWN stays reserved for invalid frames.
-        logger.debug(`Unhandled serial message type: ${SerialMessageType[validationResult.type]}`);
+      default: {
+        // Valid frame, no server-side action. NO_OP keeps the main thread
+        // silent; UNKNOWN stays reserved for frames that fail validation
+        // (header or payload). NAK-suffixed types are a controller actively
+        // reporting a failed operation (e.g. FORMAT_SD_NAK after a wipe
+        // attempt) — one-shot responses to user actions, so warn with the
+        // payload rather than burying them at debug like the chatty ACKs.
+        const typeName = SerialMessageType[validationResult.type];
+        if (typeName.endsWith('_NAK')) {
+          logger.warn(
+            `Unhandled ${typeName} — controller reported failure: ${validationResult.data}`,
+          );
+        } else {
+          logger.debug(`Unhandled serial message type: ${typeName}`);
+        }
         result = { type: SerialWorkerResponseType.NO_OP } satisfies NoOpSerialResponse;
         break;
+      }
     }
 
     if (!isPollMessage) {

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from 'src/logger.js';
 import { SerialMessageService } from './serial_message_service.js';
 import { SerialMessageTracker } from './serial_message_tracker.js';
 import { SerialMessageType } from './serial_message.js';
@@ -155,6 +156,27 @@ describe('SerialMessageService', () => {
       const result = service.handleMessage(msg);
 
       expect(result.type).toBe(SerialWorkerResponseType.NO_OP);
+    });
+
+    it('should warn with the payload for an unhandled NAK type (FORMAT_SD_NAK)', () => {
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        const service = new SerialMessageService(vi.fn());
+
+        // A NAK is a controller actively reporting failure (here: a failed SD
+        // wipe) — it must stay visible above debug even without a handler.
+        const msg = buildMessage(SerialMessageType.FORMAT_SD_NAK, 'msg-1', 'sd-mount-error');
+
+        const result = service.handleMessage(msg);
+
+        expect(result.type).toBe(SerialWorkerResponseType.NO_OP);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        const logged = String(warnSpy.mock.calls[0][0]);
+        expect(logged).toContain('FORMAT_SD_NAK');
+        expect(logged).toContain('sd-mount-error');
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
 
     it('should handle DEPLOY_CONFIG_ACK and update tracker', () => {
