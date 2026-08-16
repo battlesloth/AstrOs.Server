@@ -4,21 +4,21 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  none — between projects
-Now:     —
-Next:    promote a Backlog item to T-001, or start the next project with a seam-discovery session
+Active:  T-001 — POLL_NAK offline-padawan handling
+Now:     implementing on `feature/T-001-poll-nak-handling` (task file committed 2026-08-16)
+Next:    T-001 PR into develop; then promote the next Backlog item
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
 Last:    2026-08-14 — agentic workflow bootstrap; Remote Redesign tracker closed out
 
 ## Standalone tasks
 
-(none open)
+- [ ] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`)
 
 ## Backlog (unscheduled candidates)
 
 From the 2026-08-06 bench log review (`.tmp/astros.2026-08-06.1.log` analysis):
 
-- POLL_NAK (and other valid-but-unhandled serial types) fall through `handleMessage` and flood the log as `Invalid message received: {"type":0}` — the offline-padawan signal is being discarded
+- ~~POLL_NAK fall-through~~ → promoted to T-001 (2026-08-16)
 - `GET /api/settings?key=apikey` returns 500 via Kysely `NoResultError` when the setting was never saved — missing settings should be a handled state
 - Dual pino writers (main thread + serial worker both instantiate `logger.ts`) corrupt the shared log file: NUL holes, interleaved records, lost crash reasons; worker exit also logged as a bare number (`api_server.ts:620`)
 - `GET /api/firmware/releases` hard-depends on GitHub DNS; consider caching last-known releases for offline bench use
