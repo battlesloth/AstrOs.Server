@@ -4,11 +4,11 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  none — T-001 implementation complete, awaiting push + PR + bench sign-off
-Now:     `feature/T-001-poll-nak-handling` ready to push (Jeff pushes via VS Code); then PR into develop
-Next:    open the T-001 PR; bench-verify the ~2–6s DOWN latency post-merge; then promote the next Backlog item
+Active:  none — T-001 in review (PR #121 into develop)
+Now:     PR #121 review findings addressed (CI lint fix; Copilot: bounded NAK dedup set, doc sync) — awaiting push (Jeff pushes via VS Code)
+Next:    merge PR #121; bench-verify the ~2–6s DOWN latency post-merge; then promote the next Backlog item
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-08-16 — T-001 implemented + reviewed (see Log)
+Last:    2026-08-23 — PR #121 review round addressed (see Log)
 
 ## Standalone tasks
 
@@ -44,6 +44,11 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 
 ## Log
 
+- 2026-08-23 PR #121 review round (T-001 branch)
+  - CI lint fix: `no-empty-function` on the poll_nak test's spy stub (`() => {}` → `() => undefined`); root cause was mechanical checks not re-run after the last review-fix edit
+  - Copilot finding: `pollNakNoticed` grew unbounded (parser accepts any opaque address string) — now capped at 256 with FIFO eviction, pinned by a fail-without-fix unit test
+  - declined Copilot's parser-level MAC validation: contract is pinned strict-2-field, and parser rejection error-logs per frame (reintroduces the T-001 flood)
+  - doc sync: checked off the T-001 close-out item; refreshed the Status block
 - 2026-08-16 T-001 — POLL_NAK offline-padawan handling
   - worker now parses POLL_NAK (`mac{US}name`, pinned to ESP `getPollNak`); main thread broadcasts DOWN once per outage via edge-triggered `ControllerWatchdog.recordNak`; UI shows an offline padawan in ~2–6s vs the 10s sweep (which stays as backstop)
   - suppressed while a flash job is current (mirrors the sweep; guard re-checked after async lookups), pinned by a PTY-level flash integration test

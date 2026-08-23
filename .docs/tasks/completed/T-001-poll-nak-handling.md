@@ -205,4 +205,10 @@ set entries are cleared by `recordAck` or discarded with the process.
       closed-range history. Deferred to Backlog: SCRIPT_RUN envelope gap,
       RUN_COMMAND/FORMAT_SD/DEPLOY_CONFIG business handling, repo NoResultError
       sweep, ESP stale-comment fix.
-- [ ] Move task file to `.docs/tasks/completed/`, flip `PLAN.md`
+- [x] Move task file to `.docs/tasks/completed/`, flip `PLAN.md`
+- [x] PR #121 Copilot review (2026-08-23): bounded `pollNakNoticed` at 256
+      entries with FIFO eviction — the parser treats the address as an opaque
+      string, so a noisy peer could mint unlimited novel `addr:` keys.
+      Declined the suggested parser-level MAC validation: the parse contract
+      is pinned strict-2-field (see push-back above), and parser rejection
+      error-logs per frame, which reintroduces the log flood T-001 removes.

@@ -98,7 +98,30 @@ describe('ApiServer.handlePollNak', () => {
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
-  it('registered controller without a location: no broadcast, one warn per process', async () => {
+  it('unknown-address dedup set is bounded at 256 with FIFO eviction', async () => {
+    // The parser treats the address as an opaque string, so a corrupt or
+    // noisy peer can mint unlimited novel addresses; the dedup set must not
+    // grow with them (PR #121 review finding).
+    const debugSpy = vi.spyOn(logger, 'debug');
+    const noticed = (server as unknown as { pollNakNoticed: Set<string> }).pollNakNoticed;
+
+    for (let i = 0; i < 300; i++) {
+      await server.handlePollNak(nak(`noise-${i}`, 'ghost'));
+    }
+    expect(debugSpy).toHaveBeenCalledTimes(300); // each new address logs once
+    expect(noticed.size).toBe(256);
+
+    // Oldest entry was evicted, so its address logs again on replay...
+    await server.handlePollNak(nak('noise-0', 'ghost'));
+    expect(debugSpy).toHaveBeenCalledTimes(301);
+    expect(noticed.size).toBe(256);
+
+    // ...while a resident entry stays deduplicated.
+    await server.handlePollNak(nak('noise-299', 'ghost'));
+    expect(debugSpy).toHaveBeenCalledTimes(301);
+  });
+
+  it('registered controller without a location: no broadcast, one warn while noticed', async () => {
     await server.handlePollNak(nak(NO_LOCATION_MAC, 'orphan'));
     await server.handlePollNak(nak(NO_LOCATION_MAC, 'orphan'));
 

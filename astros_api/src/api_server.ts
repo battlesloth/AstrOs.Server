@@ -229,7 +229,24 @@ export class ApiServer {
   // symptom. Keys: `addr:<mac>` (unknown controller, debug once) and
   // `loc:<controllerId>` (registered but no location — a server-side config
   // gap worth one warn; cleared when handlePollResponse sees the location).
+  // Bounded: the NAK parser treats the address as an opaque string, so a
+  // corrupt or noisy peer can mint unlimited novel `addr:` keys on a server
+  // that runs for months. Capped with FIFO eviction (Sets iterate in
+  // insertion order); an evicted condition costs one repeat log line.
+  private static readonly POLL_NAK_NOTICED_MAX = 256;
   private readonly pollNakNoticed = new Set<string>();
+
+  // Returns true when the caller should log: key is newly seen (or was
+  // evicted). Evicts the oldest entry once the set is at capacity.
+  private notePollNakOnce(key: string): boolean {
+    if (this.pollNakNoticed.has(key)) return false;
+    if (this.pollNakNoticed.size >= ApiServer.POLL_NAK_NOTICED_MAX) {
+      const oldest = this.pollNakNoticed.values().next().value;
+      if (oldest !== undefined) this.pollNakNoticed.delete(oldest);
+    }
+    this.pollNakNoticed.add(key);
+    return true;
+  }
   private statusSweepTimer: NodeJS.Timeout | null = null;
 
   // Test-only: lets the harness poll-wait for a POLL_ACK to populate the cache
@@ -1114,9 +1131,8 @@ export class ApiServer {
       const controller = await controllerRepo.findControllerByAddress(msg.controller.address);
       if (controller === null) {
         // Not an error: the master can NAK a padawan this server never
-        // registered. Logged once per address per process (see pollNakNoticed).
-        if (!this.pollNakNoticed.has(`addr:${msg.controller.address}`)) {
-          this.pollNakNoticed.add(`addr:${msg.controller.address}`);
+        // registered. Logged once per address (bounded dedup — see pollNakNoticed).
+        if (this.notePollNakOnce(`addr:${msg.controller.address}`)) {
           logger.debug(
             `handlePollNak: no controller for address ${msg.controller.address} (master calls it '${msg.controller.name}')`,
           );
@@ -1131,8 +1147,7 @@ export class ApiServer {
         // ACK path's error logs never fire and the UI can never show DOWN.
         // One warn per outage-ish window; handlePollResponse clears the key
         // once the location resolves.
-        if (!this.pollNakNoticed.has(`loc:${controller.id}`)) {
-          this.pollNakNoticed.add(`loc:${controller.id}`);
+        if (this.notePollNakOnce(`loc:${controller.id}`)) {
           logger.warn(
             `handlePollNak: controller ${controller.name} (${controller.id}) has no valid location — cannot broadcast DOWN for ${msg.controller.address}`,
           );
