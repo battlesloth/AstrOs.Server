@@ -61,7 +61,7 @@ describe('ApiServer.handlePollNak', () => {
     // Spies attach after boot so bootstrap noise cannot pollute assertions.
     updateClientsSpy = vi
       .spyOn(server as unknown as { updateClients: (msg: unknown) => void }, 'updateClients')
-      .mockImplementation(() => {});
+      .mockImplementation(() => undefined);
     errorSpy = vi.spyOn(logger, 'error');
     warnSpy = vi.spyOn(logger, 'warn');
   });
