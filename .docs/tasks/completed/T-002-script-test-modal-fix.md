@@ -160,4 +160,4 @@ dropped `locationName` field was never read by the frontend; orphan-row skip unr
 - [x] QA plan `.docs/qa/scripter-script-test.md`
 - [x] Review fixes (gate reset, assignment guard, empty-list no-op) with RED-first tests; mutation checks (c) reset removed / (d) guards removed
 - [x] prettier:write, lint, build, full `npx vitest run`; `superpowers:requesting-code-review`; commit
-- [ ] `/pr-review-toolkit:review-pr` on the branch diff vs develop; PLAN.md Log + Status; move task file to completed
+- [x] `/pr-review-toolkit:review-pr` on the branch diff vs develop; PLAN.md Log + Status; move task file to completed

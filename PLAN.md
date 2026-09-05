@@ -4,15 +4,15 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (branch `feature/T-002-script-test-modal-fix`, off develop). T-001 (POLL_NAK) is in review on PR #121 from its own branch.
-Now:     T-002 task file committed; implementing TDD (component spec + store spec first)
-Next:    T-002 pre-push review → Jeff pushes → PR into develop; then merge PR #121 and bench-verify its DOWN latency
+Active:  none — T-002 done on `feature/T-002-script-test-modal-fix` (awaiting push + PR); T-001 (POLL_NAK) in review on PR #121 from its own branch
+Now:     T-002 ready: 5 commits, pre-push review addressed — Jeff pushes via VS Code, then PR into develop (PLAN.md Backlog will conflict with PR #121's; both append to the same region)
+Next:    open the T-002 PR; merge PR #121; bench-verify T-002 (QA cases 1–2, 5) and T-001's DOWN latency post-merge; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action)
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-04 — T-002 opened from the scripter Test-button bench failure (diagnosis in the task file)
+Last:    2026-09-05 — T-002 implemented and reviewed (see Log)
 
 ## Standalone tasks
 
-- [ ] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`)
+- [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; bench sign-off pending post-merge)
 
 ## Backlog (unscheduled candidates)
 
@@ -54,6 +54,11 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 
 ## Log
 
+- 2026-09-05 T-002 — ScriptTestModal setup crash + stale-status Run gate
+  - root cause: the modal's `immediate: true` watcher called `setCaption` before its `const` declaration (TDZ); the throw escaped setup and left AstrosLayout's vnode tree half-mounted, so every later update cascaded into renderer errors. Latent since ddf65eee (2026-02-07); exposed when PR #113 (2026-06-01) keyed `deploymentStatus` by location name and the watcher's early return stopped masking it — last good upload was 2026-05-31
+  - fixes: helpers hoisted above the watcher; `scripterStore.markUploading` resets assigned locations to UPLOADING before the upload request (stale entries could complete the run on the first ack); every run starts gated and the watcher tracks only assigned locations (pre-commit review found the immediate watcher flipping the gate refs at setup)
+  - 10 component + 6 store tests, all RED-first with recorded mutation checks; new QA plan `.docs/qa/scripter-script-test.md`
+  - pre-push review (5 agents; 4 re-run after a rate-limit cutoff): all "push"; Backlog seeded with the adjacent defects (sum-based Run gate on FAILED, WS status enum coincidence, dead upload catch, no run id on acks, zero-assigned non-terminal state, per-location state refactor, `DeployableLocation` alias, spec files excluded from lint, WS scriptId gate untested)
 - 2026-08-14 workflow bootstrap
   - adopted the task-file workflow (`.docs/agentic-workflow.md`); `PLAN.md` is now the authoritative status view — agent memory is a cache
   - closed out the Remote Redesign tracker: Phases 4 (PR #108) and 5 (PR #106) had shipped unrecorded; Phase 2d shipped via PR #97
