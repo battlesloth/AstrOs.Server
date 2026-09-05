@@ -407,7 +407,11 @@ export const useScripterStore = defineStore('scripter', () => {
   // ScriptsView.setUploadingStatus (which only flips entries that already
   // exist), this creates a missing entry so the modal can track the location.
   function markUploading(locations: Location[]) {
-    if (!script.value || locations.length === 0) return;
+    if (!script.value) {
+      console.warn('markUploading: no script loaded');
+      return;
+    }
+    if (locations.length === 0) return;
     const next = { ...script.value.deploymentStatus };
     for (const location of locations) {
       next[location] = {

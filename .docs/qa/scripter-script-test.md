@@ -48,6 +48,10 @@ WebSocket connected and the console open.
   again while a previous run's ack is still in flight, that ack can flip its
   location to "Success" early in the new run. Known gap (Backlog, from the T-002
   review); avoid back-to-back Test clicks when reading results.
+- **Upload request rejected** (serial port unavailable → 503 without a reason
+  code, a 500, or offline): the modal stays at "Uploading script..." with Run
+  disabled and only a console error is logged; use Cancel. Known gap (Backlog,
+  from the T-002 review).
 - **No assigned locations** (degenerate — the setup wizard requires a Body
   controller): the modal stays at "Uploading script..." with Run disabled; use
   Cancel.

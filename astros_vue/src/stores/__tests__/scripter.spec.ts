@@ -86,11 +86,14 @@ describe('scripter store markUploading', () => {
     expect(store.script?.deploymentStatus).toBe(before);
   });
 
-  it('is a no-op when no script is loaded', () => {
+  it('warns and does nothing when no script is loaded', () => {
     const store = useScripterStore();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     expect(() => store.markUploading([Location.BODY])).not.toThrow();
+
     expect(store.script).toBeNull();
+    expect(warn).toHaveBeenCalledWith('markUploading: no script loaded');
   });
 
   it('does not dirty a freshly saved script', async () => {

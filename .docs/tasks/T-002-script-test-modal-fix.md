@@ -129,6 +129,8 @@ dropped `locationName` field was never read by the frontend; orphan-row skip unr
   (from the pre-commit review).
 - Acks carry no run id, so a late ack from a cancelled run can flip a location early
   in the next run — needs a protocol-shaped change; Backlog (from the review).
+- `runClicked` ignores `runScript`'s result, and the API's deploy-response failure
+  branch can drop the WS message for an unmapped MAC — Backlog (pre-push review).
 
 ## Verification
 
