@@ -39,13 +39,15 @@ const locationsStore = useLocationStore();
 const scriptStore = useScriptsStore();
 const scripterStore = useScripterStore();
 
-// A location counts as assigned when it has a controller to upload to. The
-// watcher below only tracks assigned locations: a new script seeds an entry for
-// every Location, and a controller may have been removed after an earlier
+// A location counts as assigned when it has a controller to upload to. Snapshotted
+// once per run on purpose: the run tracks exactly the locations it uploads to, and
+// a location assigned mid-run was not uploaded to, so it must not be waited on.
+// The watcher below only tracks assigned locations: a new script seeds an entry
+// for every Location, and a controller may have been removed after an earlier
 // upload, so an entry alone must never override the "Not Assigned" caption.
-const bodyAssigned = computed(() => !!locationsStore.bodyLocation?.controller.address);
-const coreAssigned = computed(() => !!locationsStore.coreLocation?.controller.address);
-const domeAssigned = computed(() => !!locationsStore.domeLocation?.controller.address);
+const bodyAssigned = !!locationsStore.bodyLocation?.controller.address;
+const coreAssigned = !!locationsStore.coreLocation?.controller.address;
+const domeAssigned = !!locationsStore.domeLocation?.controller.address;
 
 const canRun = computed(() => {
   return !uploadInProgress.value && !runDisabled.value;
@@ -71,7 +73,8 @@ const convertUploadStatusToTransmission = (
 const setInitialUploadStatus = (hasBody: boolean, hasCore: boolean, hasDome: boolean) => {
   // Start every run gated. The immediate watcher may already have run against
   // the pre-reset map during setup and, when all three locations are assigned
-  // and each carries an entry, flipped these three; nothing else resets them.
+  // and each carries a non-UPLOADING entry, flipped these three; nothing else
+  // resets them.
   status.value = t('modals.script_test.uploading');
   uploadInProgress.value = true;
   runDisabled.value = true;
@@ -123,21 +126,21 @@ watch(
 
     // Update Body status
     const bodyStatus = deploymentStatus[Location.BODY];
-    if (bodyStatus && bodyAssigned.value) {
+    if (bodyStatus && bodyAssigned) {
       bodyUpload.value = convertUploadStatusToTransmission(bodyStatus.value);
       setCaption(bodyCaption.value, bodyUpload.value);
     }
 
     // Update Core status
     const coreStatus = deploymentStatus[Location.CORE];
-    if (coreStatus && coreAssigned.value) {
+    if (coreStatus && coreAssigned) {
       coreUpload.value = convertUploadStatusToTransmission(coreStatus.value);
       setCaption(coreCaption.value, coreUpload.value);
     }
 
     // Update Dome status
     const domeStatus = deploymentStatus[Location.DOME];
-    if (domeStatus && domeAssigned.value) {
+    if (domeStatus && domeAssigned) {
       domeUpload.value = convertUploadStatusToTransmission(domeStatus.value);
       setCaption(domeCaption.value, domeUpload.value);
     }
@@ -162,22 +165,19 @@ watch(
 );
 
 onMounted(async () => {
-  const hasBody = bodyAssigned.value;
-  const hasCore = coreAssigned.value;
-  const hasDome = domeAssigned.value;
-
-  setInitialUploadStatus(hasBody, hasCore, hasDome);
+  setInitialUploadStatus(bodyAssigned, coreAssigned, domeAssigned);
 
   if (props.scriptId) {
     // Reset the assigned locations to UPLOADING BEFORE the upload request goes
     // out. The watcher re-reads every assigned location on each change, so this
     // guarantees no ack from this run is read against a stale entry from an
     // earlier upload. (Acks carry no run id: a late ack from a cancelled
-    // previous run is indistinguishable — see the QA plan's edge cases.)
+    // previous run is indistinguishable — see .docs/qa/scripter-script-test.md,
+    // Negative / edge.)
     const assigned: Location[] = [];
-    if (hasBody) assigned.push(Location.BODY);
-    if (hasCore) assigned.push(Location.CORE);
-    if (hasDome) assigned.push(Location.DOME);
+    if (bodyAssigned) assigned.push(Location.BODY);
+    if (coreAssigned) assigned.push(Location.CORE);
+    if (domeAssigned) assigned.push(Location.DOME);
     scripterStore.markUploading(assigned);
 
     try {

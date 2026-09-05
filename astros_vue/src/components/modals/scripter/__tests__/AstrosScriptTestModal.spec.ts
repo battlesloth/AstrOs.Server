@@ -21,6 +21,7 @@ import { TransmissionStatus } from '@/enums/transmissionStatus';
 import { SCRIPTS_UPLOAD } from '@/api/endpoints';
 import { WebsocketMessageType } from '@/enums/WebsocketMessageType';
 import type { ControllerLocation, Script, ScriptStatus } from '@/models';
+import type { GpioModule } from '@/models/controllers/modules/gpio/gpioModule';
 
 const apiGet = apiService.get as ReturnType<typeof vi.fn>;
 
@@ -57,9 +58,11 @@ function makeLocation(name: Location, address: string): ControllerLocation {
     description: '',
     configFingerprint: '',
     controller: { id: `${name}-controller`, name: `${name} controller`, address, fingerprint: '' },
+    // The modal reads only controller.address; the module trees are never touched.
+    gpioModule: undefined as unknown as GpioModule,
     i2cModules: [],
     uartModules: [],
-  } as unknown as ControllerLocation;
+  };
 }
 
 // What the HTTP payload carries for a script that was uploaded on an earlier occasion.
@@ -80,6 +83,8 @@ function newScriptMap(): Script['deploymentStatus'] {
 // Simulate the WS ScriptStatus message the server sends when a controller acks
 // an upload. On the wire `status` carries the API's TransmissionStatus number
 // (pinned contract, see T-002), so mirror that rather than an UploadStatus.
+// `date` is a Date here; on the wire it is an ISO string, which nothing in the
+// modal reads.
 function ack(
   store: ReturnType<typeof useScripterStore>,
   location: Location,
@@ -266,6 +271,8 @@ describe('AstrosScriptTestModal', () => {
     expect(wrapper.text()).toContain('Body: Failed');
   });
 
+  it.todo('keeps Run disabled when an assigned location fails (Backlog: sum-based completion check)');
+
   it('reports Failed and requests no upload when no scriptId is given', async () => {
     scripterStore.script = makeScript({});
 
@@ -276,6 +283,28 @@ describe('AstrosScriptTestModal', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Failed');
+    expect(wrapper.text()).not.toContain('Uploading script...');
     expect(apiGet).not.toHaveBeenCalled();
+  });
+
+  it('starts gated again on a second Test of the same script', async () => {
+    scripterStore.script = makeScript({});
+
+    const first = mountModal();
+    await flushPromises();
+    ack(scripterStore, Location.BODY);
+    ack(scripterStore, Location.CORE);
+    await flushPromises();
+    expect(first.get('[data-testid="run-button"]').attributes('disabled')).toBeUndefined();
+    first.unmount();
+
+    const second = mountModal();
+    await flushPromises();
+
+    expect(second.text()).toContain('Uploading script...');
+    expect(second.text()).toContain('Body: Uploading');
+    expect(second.text()).toContain('Core: Uploading');
+    expect(second.get('[data-testid="run-button"]').attributes('disabled')).toBeDefined();
+    expect(apiGet).toHaveBeenCalledTimes(2);
   });
 });

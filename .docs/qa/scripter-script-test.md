@@ -52,11 +52,11 @@ WebSocket connected and the console open.
   code, a 500, or offline): the modal stays at "Uploading script..." with Run
   disabled and only a console error is logged; use Cancel. Known gap (Backlog,
   from the T-002 review).
-- **No assigned locations** (degenerate — the setup wizard requires a Body
-  controller): the modal stays at "Uploading script..." with Run disabled; use
-  Cancel.
+- **No assigned locations** (degenerate — migration_0 seeds Body → master, but the
+  assignment can be cleared through the locations API): the modal stays at
+  "Uploading script..." with Run disabled; use Cancel. Known gap (Backlog).
 - **Console noise (expected, Backlog):** `[intlify] Not found 'Saving script...'`,
   the `<Suspense>` single-root warning on route load, and
-  `Script status update skipped: <id> not found in store` (logged when the
+  `Script status update skipped: script <id> not found in store` (logged when the
   scripter was opened by direct navigation, so the scripts-list store is empty)
   are known and harmless.

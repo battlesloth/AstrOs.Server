@@ -86,6 +86,18 @@ describe('scripter store markUploading', () => {
     expect(store.script?.deploymentStatus).toBe(before);
   });
 
+  it('replaces the map object so shallow watchers fire', () => {
+    const store = useScripterStore();
+    store.script = makeScript({
+      [Location.BODY]: { value: UploadStatus.UPLOADED, date: PRIOR_DEPLOY_DATE },
+    });
+    const before = store.script?.deploymentStatus;
+
+    store.markUploading([Location.BODY]);
+
+    expect(store.script?.deploymentStatus).not.toBe(before);
+  });
+
   it('warns and does nothing when no script is loaded', () => {
     const store = useScripterStore();
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
