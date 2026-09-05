@@ -4,9 +4,9 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  none — T-002 done on `feature/T-002-script-test-modal-fix` (awaiting push + PR); T-001 (POLL_NAK) in review on PR #121 from its own branch
-Now:     T-002 ready: 5 commits, pre-push review addressed — Jeff pushes via VS Code, then PR into develop (PLAN.md Backlog will conflict with PR #121's; both append to the same region)
-Next:    open the T-002 PR; merge PR #121; bench-verify T-002 (QA cases 1–2, 5) and T-001's DOWN latency post-merge; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action)
+Active:  none — T-002 in review (PR #122 into develop); T-001 (POLL_NAK) in review on PR #121 from its own branch
+Now:     PR #122 open (5 commits, pre-push review addressed) — awaiting review/merge (PLAN.md Backlog will conflict with PR #121's; both append to the same region)
+Next:    merge PR #121 and PR #122; bench-verify T-002 (QA cases 1–2, 5) and T-001's DOWN latency post-merge; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action)
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
 Last:    2026-09-05 — T-002 implemented and reviewed (see Log)
 
