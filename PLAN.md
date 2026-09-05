@@ -4,15 +4,15 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  none — between projects
-Now:     —
-Next:    promote a Backlog item to T-001, or start the next project with a seam-discovery session
+Active:  T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (branch `feature/T-002-script-test-modal-fix`, off develop). T-001 (POLL_NAK) is in review on PR #121 from its own branch.
+Now:     T-002 task file committed; implementing TDD (component spec + store spec first)
+Next:    T-002 pre-push review → Jeff pushes → PR into develop; then merge PR #121 and bench-verify its DOWN latency
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-08-14 — agentic workflow bootstrap; Remote Redesign tracker closed out
+Last:    2026-09-04 — T-002 opened from the scripter Test-button bench failure (diagnosis in the task file)
 
 ## Standalone tasks
 
-(none open)
+- [ ] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`)
 
 ## Backlog (unscheduled candidates)
 
@@ -23,6 +23,13 @@ From the 2026-08-06 bench log review (`.tmp/astros.2026-08-06.1.log` analysis):
 - Dual pino writers (main thread + serial worker both instantiate `logger.ts`) corrupt the shared log file: NUL holes, interleaved records, lost crash reasons; worker exit also logged as a bare number (`api_server.ts:620`)
 - `GET /api/firmware/releases` hard-depends on GitHub DNS; consider caching last-known releases for offline bench use
 - 16:32 crash-restart loop (5 boots in 7 s) had no logged cause — crash paths only reach stderr/`docker logs`, never the log file
+
+From the T-002 diagnosis (2026-09-04, scripter Test button):
+
+- `AstrosScriptTestModal` completion check is sum-based (`>= SUCCESS * 3`); `TransmissionStatus.FAILED = 3` outranks `SUCCESS = 2`, so a failed upload ack also enables Run
+- WS `ScriptStatus.status` carries the API `TransmissionStatus` number but is stored into `DeploymentStatus.value` typed `UploadStatus`; works only because both enums put success at 2 — give the WS payload its own type or map it on receipt
+- `ScripterView.vue` passes literal strings to `$t()` (`'Saving script...'`, `'Loading...'`, `'Initializing...'`) — intlify warns on every open; move to `scripter_view.*` keys
+- `App.vue` `<Suspense>` logs "slots expect a single root node" on every route load (dynamic component is undefined before the router resolves) — cosmetic
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
