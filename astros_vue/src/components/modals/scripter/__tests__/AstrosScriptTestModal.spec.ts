@@ -271,7 +271,9 @@ describe('AstrosScriptTestModal', () => {
     expect(wrapper.text()).toContain('Body: Failed');
   });
 
-  it.todo('keeps Run disabled when an assigned location fails (Backlog: sum-based completion check)');
+  it.todo(
+    'keeps Run disabled when an assigned location fails (Backlog: sum-based completion check)',
+  );
 
   it('reports Failed and requests no upload when no scriptId is given', async () => {
     scripterStore.script = makeScript({});
