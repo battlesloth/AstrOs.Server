@@ -49,7 +49,7 @@ dropped `locationName` field was never read by the frontend; orphan-row skip unr
   both stores — unchanged.
 - **`Script.deploymentStatus: Partial<Record<Location, DeploymentStatus>>`** keyed by
   location name (PR #113) — unchanged on both sides.
-- **`DeploymentStatus { date?: Date; value: UploadStatus }`**, `UploadStatus`
+- **`DeploymentStatus { date?: Date | undefined; value: UploadStatus }`**, `UploadStatus`
   (`NOT_UPLOADED=0, UPLOADING=1, UPLOADED=2`) and `TransmissionStatus`
   (`UNKNOWN=0, SENDING=1, SUCCESS=2, FAILED=3`) numeric values — unchanged. (The WS path
   stores API `TransmissionStatus` numbers into `value`; that coincidence is not touched.)
@@ -75,25 +75,40 @@ dropped `locationName` field was never read by the frontend; orphan-row skip unr
 3. `AstrosScriptTestModal.vue` `onMounted`: call `scripterStore.markUploading(assigned)`
    for exactly the locations that have a controller address, **before**
    `scriptStore.uploadScript(...)`, so no ack can precede the reset.
-4. Tests (TDD, failing first): component spec
+4. `AstrosScriptTestModal.vue` (added from the pre-commit review): start every run
+   gated — `setInitialUploadStatus` also resets `status` / `uploadInProgress` /
+   `runDisabled`, because the immediate watcher can flip them against the pre-reset
+   map during setup when all three locations are assigned and each carries an
+   entry. The watcher only tracks *assigned* locations (`bodyAssigned` /
+   `coreAssigned` / `domeAssigned` computeds), so an entry for an unassigned
+   location never overrides "Not Assigned" — every new script has one for every
+   Location, since `createNewScript` seeds four entries. `markUploading([])` is a
+   no-op.
+5. Tests (TDD, failing first): component spec
    `src/components/modals/scripter/__tests__/AstrosScriptTestModal.spec.ts` and store spec
    `src/stores/__tests__/scripter.spec.ts` — see Verification.
-5. QA plan: create `.docs/qa/scripter-script-test.md` (feature has no plan yet).
+6. QA plan: create `.docs/qa/scripter-script-test.md` (feature has no plan yet).
 
 ## Acceptance criteria
 
-- [ ] Modal mounts without throwing when the loaded script already has deployment entries
+- [x] Modal mounts without throwing when the loaded script already has deployment entries
       (regression test; fails on the pre-fix declaration order).
-- [ ] With body+core assigned and prior UPLOADED entries for both, after the body ack Run
+- [x] With body+core assigned and prior UPLOADED entries for both, after the body ack Run
       is still disabled and the core caption still reads "uploading"; after the core ack Run
       is enabled (regression test; fails with the `markUploading` call removed).
-- [ ] An unassigned location (no controller) shows "Not assigned" and does not block
+- [x] An unassigned location (no controller) shows "Not assigned" and does not block
       completion (existing behavior preserved, pinned by test).
-- [ ] Assigned locations are marked UPLOADING in the scripter store at the moment the upload
+- [x] Assigned locations are marked UPLOADING in the scripter store at the moment the upload
       request is issued (test asserts store state from inside the mocked upload call).
-- [ ] `markUploading`: no-op without a script; preserves an existing `date`; leaves
+- [x] `markUploading`: no-op without a script; preserves an existing `date`; leaves
       `isDirty` false (store tests).
-- [ ] `npm run lint` clean, `npm run build` (type-check) clean, full `npx vitest run` green.
+- [x] New-script map (NOT_UPLOADED entry for every Location) with body+core assigned:
+      the modal starts gated ("Uploading script...", Run disabled, "Dome: Not Assigned");
+      likewise for a script previously uploaded to all three locations with dome
+      unassigned (regression tests; both fail without the assignment guard).
+- [x] With all three locations assigned, Run stays disabled until the third ack
+      (regression test; fails without the gate reset).
+- [x] `npm run lint` clean, `npm run build` (type-check) clean, full `npx vitest run` green.
 - [ ] Bench (human-gated): open Servo Test → Test → modal shows Body/Core "Uploading…",
       each flips on its own ack, Run enables only after both; no console errors.
 
@@ -109,6 +124,11 @@ dropped `locationName` field was never read by the frontend; orphan-row skip unr
   its own `setUploadingStatus` flow.
 - Any API change or change to PR #113's keying.
 - App.vue `<Suspense>` single-root warning on every route load — cosmetic; Backlog.
+- `scriptsStore.uploadScript` never throws (returns `{ success: false }`), so the
+  modal's `catch` is dead and an HTTP failure leaves "Uploading" forever — Backlog
+  (from the pre-commit review).
+- Acks carry no run id, so a late ack from a cancelled run can flip a location early
+  in the next run — needs a protocol-shaped change; Backlog (from the review).
 
 ## Verification
 
@@ -117,9 +137,21 @@ dropped `locationName` field was never read by the frontend; orphan-row skip unr
   `npm run build` — type-check clean.
 - Mutation checks (recorded in the PR body): (a) revert the declaration order → mount test
   fails with the ReferenceError; (b) remove the `markUploading` call → stale-status test
-  fails (Run enabled after the first ack).
+  fails (Run enabled after the first ack); (c) remove the gate reset in
+  `setInitialUploadStatus` → "waits for all three acks when dome is assigned too" fails;
+  (d) remove the `&& xAssigned.value` guards → both "starts gated" tests fail; store:
+  `markUploading([])` identity test fails without the empty-list early return.
 - Bench (human-gated, post-merge): see last acceptance criterion.
 
 ## Implementation checklist
 
-<!-- Added when work STARTS. -->
+- [x] RED: component spec — mount with prior deployment entries fails with the ReferenceError
+- [x] GREEN: move `setInitialUploadStatus` / `setCaption` above the watcher
+- [x] RED: component spec — Run stays disabled after the first ack (stale entries) + reset-before-upload + Not Assigned
+- [x] RED: store spec — `markUploading` (sets UPLOADING, preserves date, no-op without script, `isDirty` stays false)
+- [x] GREEN: `markUploading` in `stores/scripter.ts`; modal calls it before `uploadScript`
+- [x] Mutation checks (a) order reverted → mount test fails; (b) `markUploading` call removed → stale-status test fails
+- [x] QA plan `.docs/qa/scripter-script-test.md`
+- [x] Review fixes (gate reset, assignment guard, empty-list no-op) with RED-first tests; mutation checks (c) reset removed / (d) guards removed
+- [ ] prettier:write, lint, build, full `npx vitest run`; `superpowers:requesting-code-review`; commit
+- [ ] `/pr-review-toolkit:review-pr` on the branch diff vs develop; PLAN.md Log + Status; move task file to completed

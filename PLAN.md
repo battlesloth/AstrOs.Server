@@ -30,6 +30,9 @@ From the T-002 diagnosis (2026-09-04, scripter Test button):
 - WS `ScriptStatus.status` carries the API `TransmissionStatus` number but is stored into `DeploymentStatus.value` typed `UploadStatus`; works only because both enums put success at 2 — give the WS payload its own type or map it on receipt
 - `ScripterView.vue` passes literal strings to `$t()` (`'Saving script...'`, `'Loading...'`, `'Initializing...'`) — intlify warns on every open; move to `scripter_view.*` keys
 - `App.vue` `<Suspense>` logs "slots expect a single root node" on every route load (dynamic component is undefined before the router resolves) — cosmetic
+- `AstrosScriptTestModal`: `scriptsStore.uploadScript` never throws (returns `{ success: false }`), so the modal's `catch` is dead and an HTTP failure leaves "Uploading" forever with Run disabled — check `result.success` and drive the FAILED branch
+- `astros_vue/eslint.config.ts` globally ignores `**/*.spec.*`, so "lint clean" never covers spec files and the vitest-plugin block in the same config is dead — either lint specs or drop the dead block
+- Script upload acks carry no run id; a late ack from a cancelled Test run can flip a location early in the next run — needs an upload id threaded through `SCRIPT_UPLOAD` / `ScriptResponse` (protocol-shaped; its own task)
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 

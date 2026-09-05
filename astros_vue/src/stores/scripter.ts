@@ -399,6 +399,25 @@ export const useScripterStore = defineStore('scripter', () => {
     }
   }
 
+  // Reset the per-run upload record before an upload starts. The test modal
+  // derives its captions and the Run gate from deploymentStatus, and a script
+  // that was uploaded on an earlier occasion arrives from the API with UPLOADED
+  // entries; without this reset, the first ack for one location would let the
+  // modal read those stale entries as this run's successes. Unlike
+  // ScriptsView.setUploadingStatus (which only flips entries that already
+  // exist), this creates a missing entry so the modal can track the location.
+  function markUploading(locations: Location[]) {
+    if (!script.value || locations.length === 0) return;
+    const next = { ...script.value.deploymentStatus };
+    for (const location of locations) {
+      next[location] = {
+        value: UploadStatus.UPLOADING,
+        date: script.value.deploymentStatus[location]?.date,
+      };
+    }
+    script.value.deploymentStatus = next;
+  }
+
   return {
     isLoading,
     isSaving,
@@ -420,5 +439,6 @@ export const useScripterStore = defineStore('scripter', () => {
     getResourceIdByChannelId,
     getChannelTestValue,
     updateScriptStatus,
+    markUploading,
   };
 });
