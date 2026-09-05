@@ -144,7 +144,7 @@ dropped `locationName` field was never read by the frontend; orphan-row skip unr
   fails with the ReferenceError; (b) remove the `markUploading` call → stale-status test
   fails (Run enabled after the first ack); (c) remove the gate reset in
   `setInitialUploadStatus` → "waits for all three acks when dome is assigned too" fails;
-  (d) remove the `&& xAssigned.value` guards → both "starts gated" tests fail; store:
+  (d) remove the `&& xAssigned` guards → both "starts gated" tests fail; store:
   `markUploading([])` identity test fails without the empty-list early return; the
   spread pin (`not.toBe(before)`) fails if the map is mutated in place.
 - Bench (human-gated, post-merge): see last acceptance criterion.
