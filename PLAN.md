@@ -5,7 +5,7 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  none — patch release in flight (PR #124 develop → main; CI running at open)
-Now:     merge PR #124 once CI is green; then open the main → release PR — it conflicts on the version lines: keep release's `1.0.0` so `release-build.yml` bumps to `1.0.1` (taking main's `1.0.0-dev.12` would re-strip to `1.0.0` and overwrite that published image tag)
+Now:     land `chore/bump-1.0.1-dev` (develop → `1.0.1-dev.0`) via PR into develop BEFORE merging PR #124, so dev-build tags the merge `astros-server-dev:1.0.1-dev.1`; then open the main → release PR — its version-line conflict resolves to `1.0.1` whichever side is kept (strip `-dev.1`, or increment release's `1.0.0`). Post-release rule: bump develop's base to the next patch (`1.0.2-dev.0`) so the dev line always carries the NEXT version
 Next:    bench-verify T-001's ~2–6s DOWN latency and T-002 (QA cases 1–2, 5) on the released build; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action)
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
 Last:    2026-09-06 — T-001 merged (PR #121) and #123 add-channel modal fix merged into develop; release PR #124 opened
