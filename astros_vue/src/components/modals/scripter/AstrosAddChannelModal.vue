@@ -156,7 +156,8 @@ onMounted(() => {
           v-model="selectedChannels"
           :aria-label="$t('modals.add_channel.select_channel')"
           multiple
-          class="select select-bordered w-full text-2xl mb-5 min-h-50"
+          size="10"
+          class="select select-bordered block! h-50! w-full text-2xl mb-5"
         >
           <option
             value="-1"

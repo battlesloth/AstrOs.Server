@@ -72,7 +72,10 @@ The system manages **Locations** (physical positions on the droid) that contain 
 
 Before each implementation commit, run in order:
 
-1. `npm run prettier:write` and `npm run lint:fix` (formatting + lint).
+1. Formatting + lint, in **every** sub-project the diff touches — the script names differ:
+   - `astros_api/`: `npm run prettier:write && npm run lint:fix` (CI checks with `npm run prettier:check`; the build also lints via `prebuild`).
+   - `astros_vue/`: `npm run format && npm run lint` (CI checks with `npx prettier --check --experimental-cli "src/**"`). There is **no** `prettier:write` script in `astros_vue`, and `npm run build` there does not lint.
+   Re-run after the last edit and read the check output. An empty `git diff` after `npm run <script> --silent | tail` is not evidence — it hides a "missing script" error (this is how PR #122's CI prettier check failed).
 2. `npm run build` (type-check) and the test suite (`npx vitest run` for single-run mode).
 3. Invoke `superpowers:requesting-code-review` on the diff against the prior commit (or `origin/<branch>` for a batch of unpushed work). Mechanical checks confirm the code compiles and tests pass; code review catches what tests can't see — comment-vs-code drift, naming-vs-protocol mismatches, missing capabilities, broken test-name format strings, and similar issues that have repeatedly come back as PR feedback when this step is skipped. Address **Critical** and **Important** issues before committing; note **Minor** for later.
 
