@@ -4,11 +4,11 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  none — T-001 in review (PR #121 into develop; branch synced with develop after PR #122 landed)
-Now:     PR #121 review findings addressed and develop merged in (PLAN.md conflict resolved) — awaiting push (Jeff pushes via VS Code)
-Next:    merge PR #121; bench-verify T-001's ~2–6s DOWN latency and T-002 (QA cases 1–2, 5) post-merge; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action)
+Active:  none — patch release in flight (PR #124 develop → main; CI running at open)
+Now:     merge PR #124 once CI is green; then open the main → release PR — it conflicts on the version lines: keep release's `1.0.0` so `release-build.yml` bumps to `1.0.1` (taking main's `1.0.0-dev.12` would re-strip to `1.0.0` and overwrite that published image tag)
+Next:    bench-verify T-001's ~2–6s DOWN latency and T-002 (QA cases 1–2, 5) on the released build; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action)
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-05 — T-002 merged (PR #122); T-001 branch synced with develop
+Last:    2026-09-06 — T-001 merged (PR #121) and #123 add-channel modal fix merged into develop; release PR #124 opened
 
 ## Standalone tasks
 
@@ -48,6 +48,10 @@ From the T-002 diagnosis (2026-09-04, scripter Test button):
 - `AstrosScriptTestModal` with zero assigned locations never reaches a terminal state (completion lives only in the watcher and `markUploading([])` is a no-op) — extract `checkComplete()` and call it from `setInitialUploadStatus`, or decide "nothing to upload" in the modal before requesting
 - `AstrosScriptTestModal` state model: nine parallel refs kept consistent by three writers — replace with a per-location discriminated union (`unassigned | sending | success | failed`) and derive `canRun`/captions; makes the T-002 invariants impossible to violate and retires the sum-based completion bug and the `Caption` wrapper
 - `useWebsocket.handleScriptMessage`'s `scriptId` gate (an ack for another script must not touch the scripter store) has no dispatch test
+
+From the 2026-09-06 release prep (PR #124):
+
+- `deployment/docker-compose.yml` `devices` entry reads `'dev/ttyAMA0:/dev/ttyS0'` — leading slash dropped in 5919d972 ("update deploy"); Docker expects an absolute host device path, so a Pi deployed from this file likely fails to start. Verify on the bench and fix (quick-tier, but needs its own branch — not doc-only)
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
