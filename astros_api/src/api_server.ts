@@ -71,6 +71,7 @@ import { SerialMessageType } from './serial/serial_message.js';
 import {
   ConfigSyncResponse,
   ISerialWorkerResponse,
+  PollNakResponse,
   PollResponse,
   RegistrationResponse,
   SerialWorkerResponseType,
@@ -221,6 +222,31 @@ export class ApiServer {
   private readonly controllerVariantCache = new Map<string, string>();
 
   private readonly controllerWatchdog = new ControllerWatchdog();
+
+  // Once-per-condition log dedup for handlePollNak's non-broadcast exits.
+  // POLL_NAK repeats every ~4s master poll cycle for as long as a padawan is
+  // unreachable, so per-frame logging floods the file — the original T-001
+  // symptom. Keys: `addr:<mac>` (unknown controller, debug once) and
+  // `loc:<controllerId>` (registered but no location — a server-side config
+  // gap worth one warn; cleared when handlePollResponse sees the location).
+  // Bounded: the NAK parser treats the address as an opaque string, so a
+  // corrupt or noisy peer can mint unlimited novel `addr:` keys on a server
+  // that runs for months. Capped with FIFO eviction (Sets iterate in
+  // insertion order); an evicted condition costs one repeat log line.
+  private static readonly POLL_NAK_NOTICED_MAX = 256;
+  private readonly pollNakNoticed = new Set<string>();
+
+  // Returns true when the caller should log: key is newly seen (or was
+  // evicted). Evicts the oldest entry once the set is at capacity.
+  private notePollNakOnce(key: string): boolean {
+    if (this.pollNakNoticed.has(key)) return false;
+    if (this.pollNakNoticed.size >= ApiServer.POLL_NAK_NOTICED_MAX) {
+      const oldest = this.pollNakNoticed.values().next().value;
+      if (oldest !== undefined) this.pollNakNoticed.delete(oldest);
+    }
+    this.pollNakNoticed.add(key);
+    return true;
+  }
   private statusSweepTimer: NodeJS.Timeout | null = null;
 
   // Test-only: lets the harness poll-wait for a POLL_ACK to populate the cache
@@ -932,6 +958,13 @@ export class ApiServer {
       case SerialWorkerResponseType.POLL:
         this.handlePollResponse(msg);
         break;
+      case SerialWorkerResponseType.POLL_NAK:
+        this.handlePollNak(msg as PollNakResponse);
+        break;
+      case SerialWorkerResponseType.NO_OP:
+        // Valid frame the worker parsed but the server takes no action on
+        // (e.g. FORMAT_SD_ACK). Already debug-logged worker-side.
+        break;
       case SerialWorkerResponseType.CONFIG_SYNC:
         this.handleConfigSync(msg);
         break;
@@ -1031,6 +1064,8 @@ export class ApiServer {
         logger.error(`Location not found for controller: ${val.controller.name}`);
         return;
       }
+      // Location resolved — re-arm handlePollNak's one-shot no-location warn.
+      this.pollNakNoticed.delete(`loc:${controller.id}`);
 
       const firmwareVersion = val.controller.firmwareVersion;
       const firmwareCompatible = meetsMinimum(
@@ -1069,6 +1104,75 @@ export class ApiServer {
       this.updateClients(update);
     } catch (error) {
       logger.error(error, 'Error handling poll response');
+    }
+  }
+
+  // Master reported a padawan unreachable (POLL_NAK). Broadcast DOWN once per
+  // outage: recordNak is edge-triggered, and a later POLL_ACK re-arms it. The
+  // 10s watchdog stale sweep stays as the backstop for a silent master.
+  async handlePollNak(msg: PollNakResponse) {
+    try {
+      // Suppressed during an OTA flash for the same reason as the stale
+      // sweep: controllers reboot mid-flash and the firmware-stages board
+      // owns status then. Dropping the edge is safe — after the lock
+      // releases, the first un-suppressed sweep (≤2s) or the next NAK (the
+      // master re-NAKs unreachable padawans every ~4s poll cycle once its
+      // polling resumes post-OTA) re-asserts the DOWN.
+      if (this.flashOrchestrator?.getCurrentJob()) {
+        return;
+      }
+
+      const controllerRepo = new ControllerRepository(this.db);
+      const locationRepo = new LocationsRepository(this.db);
+
+      // find* variants, not get*ByAddress/get*ByController: the OrThrow
+      // originals treat a miss as an exception (with repo-level error logs),
+      // but for a repeating NAK both misses are ordinary handled states.
+      const controller = await controllerRepo.findControllerByAddress(msg.controller.address);
+      if (controller === null) {
+        // Not an error: the master can NAK a padawan this server never
+        // registered. Logged once per address (bounded dedup — see pollNakNoticed).
+        if (this.notePollNakOnce(`addr:${msg.controller.address}`)) {
+          logger.debug(
+            `handlePollNak: no controller for address ${msg.controller.address} (master calls it '${msg.controller.name}')`,
+          );
+        }
+        return;
+      }
+
+      const location = await locationRepo.findLocationByController(controller.id);
+      if (location === null || !isLocationName(location.locationName)) {
+        // Registered controller with no (valid) location is a server-side
+        // config gap: while the board is offline only NAKs arrive, so the
+        // ACK path's error logs never fire and the UI can never show DOWN.
+        // One warn per outage-ish window; handlePollResponse clears the key
+        // once the location resolves.
+        if (this.notePollNakOnce(`loc:${controller.id}`)) {
+          logger.warn(
+            `handlePollNak: controller ${controller.name} (${controller.id}) has no valid location — cannot broadcast DOWN for ${msg.controller.address}`,
+          );
+        }
+        return;
+      }
+      this.pollNakNoticed.delete(`loc:${controller.id}`);
+
+      // Re-check after the awaits: a flash job registered mid-lookup would
+      // otherwise consume the edge trigger and broadcast during the flash.
+      if (this.flashOrchestrator?.getCurrentJob()) {
+        return;
+      }
+
+      const identity = {
+        controllerId: controller.id,
+        controllerAddress: msg.controller.address,
+        controllerLocation: location.locationName,
+      };
+
+      if (this.controllerWatchdog.recordNak(identity)) {
+        this.updateClients(buildDownStatus(identity));
+      }
+    } catch (error) {
+      logger.error(error, `Error handling poll nak for ${msg.controller.address}`);
     }
   }
 

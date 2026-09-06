@@ -4,6 +4,7 @@ import { MessageHelper } from './message_helper.js';
 import { SerialWorkerResponseType } from './serial_worker_response.js';
 import type {
   ConfigSyncResponse,
+  PollNakResponse,
   FwBackpressureResponse,
   FwChunkAckResponse,
   FwChunkNakResponse,
@@ -119,6 +120,22 @@ export class MessageHandler {
     response.controller = module;
 
     return response;
+  }
+
+  public handlePollNak(msg: string): PollNakResponse | UnknownSerialResponse {
+    const parts = msg.split(MessageHelper.US);
+
+    // Wire contract: mac{US}name, exactly 2 fields — see AstrOs.ESP
+    // AstrOsSerialMessageService::getPollNak.
+    if (parts.length !== 2 || parts[0].length === 0) {
+      logger.error(`Invalid poll nak: ${msg}`);
+      return { type: SerialWorkerResponseType.UNKNOWN };
+    }
+
+    return {
+      type: SerialWorkerResponseType.POLL_NAK,
+      controller: { address: parts[0], name: parts[1] },
+    };
   }
 
   public handleRegistraionSyncAck(msg: string): RegistrationResponse {

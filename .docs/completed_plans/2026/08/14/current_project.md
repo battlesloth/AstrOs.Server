@@ -2,7 +2,7 @@
 
 **Started:** 2026-05-19
 **Owner:** Jeff Rector
-**Status:** active
+**Status:** complete — archived 2026-08-14 during agentic-workflow bootstrap. Phases 4 (PR #108) and 5 (PR #106) had shipped without the tracker being updated; checkboxes below corrected at archive time. Successor tracking: `PLAN.md` at repo root.
 
 ## Goal
 
@@ -50,7 +50,9 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
         mutation tests for save-disable cascade / delete-cancel no-op / setButton
         selectedIdx snapshot, TOCTOU snapshot, save-failure + partial-load + pluralization
         coverage, all toast contracts pinned), 3 added AstrosConfirmModal tests for the
-        new `messageParams` branch. Pre-push toolkit caught and fixed: vue-i18n intlify
+        new `messageParams` branch. Shipped via PR #97 (merge `e16c5cc`); the
+        "ready for PR (push pending)" wording above predates the merge. Pre-push
+        toolkit caught and fixed: vue-i18n intlify
         warning from double-`$t()` (added `messageParams` to AstrosConfirmModal —
         backward compatible), TOCTOU on pendingDeleteName (snapshot {idx,name} at request
         time as one atomic ref), `Record<string, unknown>` too loose on the new prop
@@ -63,11 +65,14 @@ fires the configured actions. M5Stack hardware remote continues to work in paral
       consume it from Phase 2's preview rail in compact mode. — shipped 2026-05-21 via
       PR #92 (merge `547a7af`). Three pre-push toolkit rounds; 39 PR-added tests;
       `useHoldGesture` + `useSwipeGesture` composables extracted for mutation-test coverage.
-- [ ] **Phase 4 — Mobile operator route**: New `/m` route, full-bleed phone layout, wires
+- [x] **Phase 4 — Mobile operator route**: New `/m` route, full-bleed phone layout, wires
       button presses to existing `/scripts/run` & `/playlists/run` endpoints, Stop All via
-      WebSocket PANIC, connection chip from WS state.
-- [ ] **Phase 5 — Page drag-reorder**: Install `vuedraggable` (or `vue-draggable-plus`),
-      wire row reorder, persist new order on save.
+      WebSocket PANIC, connection chip from WS state. — shipped via PR #108
+      (`feature/mobile-remote-view`, merge `9eba0b3`); checkbox corrected at archive time.
+- [x] **Phase 5 — Page drag-reorder**: Install `vuedraggable` (or `vue-draggable-plus`),
+      wire row reorder, persist new order on save. — shipped via PR #106
+      (`feature/phase5-page-drag-reorder`, merge `1f54dce`); checkbox corrected at
+      archive time.
 - [x] **Phase 6 — Backend M5 → Remote rename + DB key migration**: Rename `M5Page` /
       `M5Button` / `M5ScriptList` backend types to `RemotePage` / `RemoteButton` /
       `RemoteScriptList` (frontend already uses generic names). Migrate the

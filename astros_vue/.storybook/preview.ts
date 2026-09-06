@@ -58,9 +58,7 @@ setup((app) => {
   // <RouterLink> renders as <a href>.
   const storybookRouter = createRouter({
     history: createMemoryHistory(),
-    routes: [
-      { path: '/:pathMatch(.*)*', component: { template: '<div />' } },
-    ],
+    routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }],
   });
   app.use(storybookRouter);
 });

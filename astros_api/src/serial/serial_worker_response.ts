@@ -28,6 +28,15 @@ export enum SerialWorkerResponseType {
   FW_PROGRESS,
   FW_DEPLOY_DONE,
   FW_BACKPRESSURE,
+
+  // Appended after the FW block, never inserted: these numeric values cross
+  // the postMessage boundary, and in integration runs the main thread
+  // executes src/ (vitest transform) while the Worker loads compiled dist/ —
+  // which can lag src/ if global_setup.ts's mtime-based rebuild check is
+  // fooled. Renumbering would silently remap every response type in that
+  // window. Values are pinned by test.
+  POLL_NAK,
+  NO_OP,
 }
 
 export interface ISerialWorkerResponse extends Record<string, any> {
@@ -81,9 +90,10 @@ export interface ScriptRunResponse extends ISerialWorkerResponse {
 // c.6 can accept either family.
 // ---------------------------------------------------------------------------
 
-// Marker response returned by every FW_* handler when the wire payload fails
-// validation. No `payload` field — callers MUST discriminate against this
-// case before reading payload from the success-shape sibling.
+// Marker response returned by frame handlers (the FW_* family and
+// handlePollNak) when the wire payload fails validation. No `payload` field —
+// callers MUST discriminate against this case before reading payload from the
+// success-shape sibling.
 export interface UnknownSerialResponse {
   type: SerialWorkerResponseType.UNKNOWN;
 }
@@ -121,4 +131,18 @@ export interface FwDeployDoneResponse {
 export interface FwBackpressureResponse {
   type: SerialWorkerResponseType.FW_BACKPRESSURE;
   payload: FwBackpressure;
+}
+
+// Master reported a padawan unreachable. Carries only what the POLL_NAK wire
+// payload holds (mac{US}name — see AstrOs.ESP getPollNak); no ControlModule
+// because fingerprint/version/variant are meaningless for a silent peer.
+export interface PollNakResponse {
+  type: SerialWorkerResponseType.POLL_NAK;
+  controller: { address: string; name: string };
+}
+
+// Valid frame, deliberately no main-thread action (e.g. FORMAT_SD_ACK).
+// Distinct from UnknownSerialResponse, which marks an invalid frame.
+export interface NoOpSerialResponse {
+  type: SerialWorkerResponseType.NO_OP;
 }
