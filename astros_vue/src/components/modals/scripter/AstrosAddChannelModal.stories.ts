@@ -57,7 +57,11 @@ export const SelectedChannels: Story = {
     const canvas = within(canvasElement);
     const channelSelect = canvas.getByRole('listbox');
 
-    await userEvent.selectOptions(channelSelect, ['GPIO 0', 'GPIO 1', 'HCR 0']);
+    await userEvent.selectOptions(channelSelect, [
+      canvas.getByRole('option', { name: 'GPIO 0' }),
+      canvas.getByRole('option', { name: 'GPIO 1' }),
+      canvas.getByRole('option', { name: 'HCR 0' }),
+    ]);
 
     await expect(canvas.getByRole('option', { name: 'GPIO 0' })).toHaveProperty('selected', true);
     await expect(canvas.getByRole('option', { name: 'GPIO 1' })).toHaveProperty('selected', true);
