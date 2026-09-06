@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from 'src/logger.js';
 import { SerialMessageService } from './serial_message_service.js';
 import { SerialMessageTracker } from './serial_message_tracker.js';
 import { SerialMessageType } from './serial_message.js';
@@ -102,6 +103,80 @@ describe('SerialMessageService', () => {
       expect(result.type).toBe(SerialWorkerResponseType.POLL);
       // Tracker should not be created for POLL_ACK
       expect(service.messageTracker.size).toBe(0);
+    });
+
+    it('should route POLL_NAK to a PollNakResponse', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      // POLL_NAK payload: address{US}name; msgId is 'na' (unsolicited)
+      const msg = buildMessage(SerialMessageType.POLL_NAK, 'na', `AA:BB:CC:DD:EE:01${US}dome`);
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.POLL_NAK);
+      expect(result.controller).toEqual({ address: 'AA:BB:CC:DD:EE:01', name: 'dome' });
+    });
+
+    it('should handle POLL_NAK without updating tracker', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      // Seed a fully-acked tracker under the NAK frame's msgId: if POLL_NAK
+      // were routed through updateTracker, the all-true status would delete it.
+      const tracker = new SerialMessageTracker(
+        'na',
+        SerialMessageType.DEPLOY_CONFIG,
+        ['AA:BB:CC:DD:EE:01'],
+        null,
+      );
+      tracker.controllerStatus.set('AA:BB:CC:DD:EE:01', true);
+      service.messageTracker.set('na', tracker);
+
+      const msg = buildMessage(SerialMessageType.POLL_NAK, 'na', `AA:BB:CC:DD:EE:01${US}dome`);
+
+      service.handleMessage(msg);
+
+      expect(service.messageTracker.has('na')).toBe(true);
+    });
+
+    it('should return NO_OP for a valid but unhandled type (FORMAT_SD_ACK)', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      const msg = buildMessage(SerialMessageType.FORMAT_SD_ACK, 'msg-1', 'payload');
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.NO_OP);
+    });
+
+    it('should return NO_OP for a valid but unhandled type (RUN_COMMAND_NAK)', () => {
+      const service = new SerialMessageService(vi.fn());
+
+      const msg = buildMessage(SerialMessageType.RUN_COMMAND_NAK, 'msg-1', 'payload');
+
+      const result = service.handleMessage(msg);
+
+      expect(result.type).toBe(SerialWorkerResponseType.NO_OP);
+    });
+
+    it('should warn with the payload for an unhandled NAK type (FORMAT_SD_NAK)', () => {
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        const service = new SerialMessageService(vi.fn());
+
+        // A NAK is a controller actively reporting failure (here: a failed SD
+        // wipe) — it must stay visible above debug even without a handler.
+        const msg = buildMessage(SerialMessageType.FORMAT_SD_NAK, 'msg-1', 'sd-mount-error');
+
+        const result = service.handleMessage(msg);
+
+        expect(result.type).toBe(SerialWorkerResponseType.NO_OP);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        const logged = String(warnSpy.mock.calls[0][0]);
+        expect(logged).toContain('FORMAT_SD_NAK');
+        expect(logged).toContain('sd-mount-error');
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
 
     it('should handle DEPLOY_CONFIG_ACK and update tracker', () => {

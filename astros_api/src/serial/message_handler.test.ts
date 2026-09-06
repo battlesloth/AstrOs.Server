@@ -250,6 +250,49 @@ describe('Serial Message Handler Tests', () => {
     expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
   });
 
+  it('handlePollNak should parse mac and name from a 2-field payload', () => {
+    const messageHandler = new MessageHandler();
+
+    const message = createMessage(
+      SerialMessageType.POLL_NAK,
+      'na',
+      'AA:BB:CC:DD:EE:01' + US + 'dome',
+    );
+
+    const validation = messageHandler.validateMessage(message);
+
+    const response = messageHandler.handlePollNak(validation.data);
+
+    expect(response).toEqual({
+      type: SerialWorkerResponseType.POLL_NAK,
+      controller: { address: 'AA:BB:CC:DD:EE:01', name: 'dome' },
+    });
+  });
+
+  it('handlePollNak should reject a 1-field payload as UNKNOWN', () => {
+    const messageHandler = new MessageHandler();
+
+    const response = messageHandler.handlePollNak('AA:BB:CC:DD:EE:01');
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handlePollNak should reject a 3-field payload as UNKNOWN', () => {
+    const messageHandler = new MessageHandler();
+
+    const response = messageHandler.handlePollNak('AA:BB:CC:DD:EE:01' + US + 'dome' + US + 'extra');
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
+  it('handlePollNak should reject an empty mac as UNKNOWN', () => {
+    const messageHandler = new MessageHandler();
+
+    const response = messageHandler.handlePollNak('' + US + 'dome');
+
+    expect(response.type).toBe(SerialWorkerResponseType.UNKNOWN);
+  });
+
   it('handleRegistraionSyncAck should return valid response', () => {
     const messageHandler = new MessageHandler();
 

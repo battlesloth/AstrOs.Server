@@ -186,6 +186,12 @@ export interface PollAckArgs {
   msgId?: string;
 }
 
+export interface PollNakArgs {
+  mac: string;
+  name: string;
+  msgId?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Scripted-response API argument shapes
 // ---------------------------------------------------------------------------
@@ -507,6 +513,13 @@ export class StubMaster {
     // project_master_esp_sentinel_mac); we mirror that.
     const payload = [mac, mac, fingerprint, firmwareVersion, variant].join(MessageHelper.US);
     this.writeFrame(SerialMessageType.POLL_ACK, args?.msgId, payload);
+  }
+
+  writePollNak(args: PollNakArgs): void {
+    // 2-field POLL_NAK: mac, name — the master reporting a padawan that did
+    // not answer its ESP-NOW poll (AstrOs.ESP getPollNak).
+    const payload = [args.mac, args.name].join(MessageHelper.US);
+    this.writeFrame(SerialMessageType.POLL_NAK, args.msgId, payload);
   }
 
   // -------------------------------------------------------------------------
