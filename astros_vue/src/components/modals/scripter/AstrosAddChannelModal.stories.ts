@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
+import { createPinia, setActivePinia } from 'pinia';
 import { v4 as uuid } from 'uuid';
 import AstrosAddChannelModal from './AstrosAddChannelModal.vue';
 import { ScriptChannelType } from '@/enums';
 import type { LocationDetails, ChannelDetails } from '@/models';
+import { useScripterStore } from '@/stores/scripter';
 
 const bodyUuid = '1035b586-54ea-4e12-b08c-b47c20ec4d76';
 const coreUuid = '1a216e62-3224-4113-a3a5-24d486d83ca4';
@@ -25,12 +27,42 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const mockScripterStore = (addUnavailable = false) => {
+  setActivePinia(createPinia());
+  const store = useScripterStore();
+  store.getLocationDetailsList = generateControllers;
+  store.getChannelDetailsMap = () => generateChannels(addUnavailable);
+};
+
 export const Default: Story = {
   args: {},
+  beforeEach: () => {
+    mockScripterStore();
+  },
 };
 
 export const Unavailable: Story = {
   args: {},
+  beforeEach: () => {
+    mockScripterStore(true);
+  },
+};
+
+export const SelectedChannels: Story = {
+  args: {},
+  beforeEach: () => {
+    mockScripterStore();
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const channelSelect = canvas.getByRole('listbox');
+
+    await userEvent.selectOptions(channelSelect, ['GPIO 0', 'GPIO 1', 'HCR 0']);
+
+    await expect(canvas.getByRole('option', { name: 'GPIO 0' })).toHaveProperty('selected', true);
+    await expect(canvas.getByRole('option', { name: 'GPIO 1' })).toHaveProperty('selected', true);
+    await expect(canvas.getByRole('option', { name: 'HCR 0' })).toHaveProperty('selected', true);
+  },
 };
 
 function generateControllers(): LocationDetails[] {
