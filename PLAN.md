@@ -4,16 +4,16 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  none — patch release in flight (PR #124 develop → main; CI running at open)
-Now:     land `chore/bump-1.0.1-dev` (develop → `1.0.1-dev.0`) via PR into develop BEFORE merging PR #124, so dev-build tags the merge `astros-server-dev:1.0.1-dev.1`; then open the main → release PR — its version-line conflict resolves to `1.0.1` whichever side is kept (strip `-dev.1`, or increment release's `1.0.0`). Post-release rule: bump develop's base to the next patch (`1.0.2-dev.0`) so the dev line always carries the NEXT version
-Next:    bench-verify T-001's ~2–6s DOWN latency and T-002 (QA cases 1–2, 5) on the released build; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action)
+Active:  none — 1.0.1 released 2026-09-07; `chore/bump-1.0.2-dev` (develop → `1.0.2-dev.0`, main merged in) awaiting push + PR into develop
+Now:     land `chore/bump-1.0.2-dev`; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action; the `deployment/docker-compose.yml` device-path typo is a quick-fix candidate that shipped in 1.0.1)
+Next:    pick the promoted item's task file (T-003) off the latest origin/develop
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-06 — T-001 merged (PR #121) and #123 add-channel modal fix merged into develop; release PR #124 opened
+Last:    2026-09-07 — 1.0.1 released (PR #124 develop → main, PR #126 release-prep → release); T-001/T-002 bench-verified on the release build
 
 ## Standalone tasks
 
-- [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; bench sign-off pending post-merge)
-- [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05, bench sign-off pending)
+- [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
+- [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
 
 ## Backlog (unscheduled candidates)
 
@@ -66,6 +66,12 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 
 ## Log
 
+- 2026-09-07 release 1.0.1
+  - develop → main via PR #124 (T-001, T-002, #123, deployment compose defaults); main → release via prep-branch PR #126; `release-build.yml` stripped `1.0.1-dev.1` → `1.0.1`
+  - version-flow fix: develop was still `1.0.0-dev.10` after 1.0.0 shipped, so post-release dev images sorted before the release. PR #125 rebased the dev line to `1.0.1-dev.0`. New post-release rule: bump develop to `<next patch>-dev.0` on a chore branch (merge main in first; use the bot's compose regex `(astros-server[^:]*:)[0-9][^ ]*` — a looser one clobbers the `:latest` build tag). First applied as `chore/bump-1.0.2-dev`
+  - a plain main → release PR cannot merge: 5-file version-line conflict, and `release`'s strict status checks require the head to already contain `release`. Resolving in the GitHub web UI would commit to `main` and fire `dev-build.yml`. Use `release-prep-<ver>` = main + release merged in, conflicts kept to main's side (tree identical to main)
+  - `gh pr edit` fails on this repo (Projects-classic GraphQL error); `gh api --method PATCH .../pulls/<n> -F body=@file` works
+  - shipped unchanged: `deployment/docker-compose.yml` device path `dev/ttyAMA0` (Backlog)
 - 2026-09-05 T-002 — ScriptTestModal setup crash + stale-status Run gate
   - root cause: the modal's `immediate: true` watcher called `setCaption` before its `const` declaration (TDZ); the throw escaped setup and left AstrosLayout's vnode tree half-mounted, so every later update cascaded into renderer errors. Latent since ddf65eee (2026-02-07); exposed when PR #113 (2026-06-01) keyed `deploymentStatus` by location name and the watcher's early return stopped masking it — last good upload was 2026-05-31
   - fixes: helpers hoisted above the watcher; `scripterStore.markUploading` resets assigned locations to UPLOADING before the upload request (stale entries could complete the run on the first ack); every run starts gated and the watcher tracks only assigned locations (pre-commit review found the immediate watcher flipping the gate refs at setup)
