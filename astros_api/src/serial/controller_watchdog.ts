@@ -5,7 +5,10 @@ export const STATUS_STALE_TIMEOUT_MS = 10_000;
 /** How often the staleness sweep runs. */
 export const STATUS_SWEEP_INTERVAL_MS = 2_000;
 
-/** The identity a DOWN broadcast needs, captured from each POLL_ACK. */
+/**
+ * The identity a DOWN broadcast needs — captured from each POLL_ACK, or built
+ * from DB rows when a POLL_NAK names a controller that has not acked yet.
+ */
 export interface ControllerIdentity {
   controllerId: string;
   controllerAddress: string;
@@ -13,9 +16,10 @@ export interface ControllerIdentity {
 }
 
 /**
- * Tracks controller liveness from POLL_ACK timestamps and decides which
- * controllers have gone silent. Pure logic: the caller passes `now` and does the
- * broadcasting — no serial/DB/WS/Date.now() here, so it is fully unit-testable.
+ * Tracks controller liveness from POLL_ACK timestamps and from the master's
+ * POLL_NAK unreachable reports, deciding which controllers are down. Pure
+ * logic: the caller passes `now` and does the broadcasting — no
+ * serial/DB/WS/Date.now() here, so it is fully unit-testable.
  *
  * Edge-triggered: a controller emits one DOWN on the up->down transition (via the
  * `down` set), not once per sweep, preventing WS spam and UI flapping.
@@ -30,6 +34,19 @@ export class ControllerWatchdog {
   recordAck(id: ControllerIdentity, now: number): void {
     this.lastSeen.set(id.controllerId, { id, at: now });
     this.down.delete(id.controllerId);
+  }
+
+  /**
+   * The master reported this controller unreachable (POLL_NAK). Returns true
+   * only on the up→down transition so the caller broadcasts one DOWN per
+   * outage, not one per poll cycle. recordAck re-arms the trigger.
+   */
+  recordNak(id: ControllerIdentity): boolean {
+    if (this.down.has(id.controllerId)) {
+      return false;
+    }
+    this.down.add(id.controllerId);
+    return true;
   }
 
   /**

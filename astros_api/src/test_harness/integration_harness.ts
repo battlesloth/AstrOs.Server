@@ -86,6 +86,11 @@ export interface IntegrationHarness {
   authToken: string;
   wsClient: WebSocket;
   receivedWsMessages: readonly unknown[];
+  // Absolute path to the ApiServer's SQLite file (per-instance tmpdir). Tests
+  // that need pre-seeded rows (e.g. a registered controller linked to a
+  // location) open their own Kysely connection here and reuse the real
+  // repositories — ApiServer.db is intentionally private.
+  databasePath: string;
   // Errors emitted by the spawned serial Worker thread. Tests assert this is
   // empty so a Worker that fails to load (e.g. ERR_MODULE_NOT_FOUND) surfaces
   // as a test failure rather than a silent log line. Mutated in-place by the
@@ -485,6 +490,7 @@ export async function bootIntegrationHarness(
       authToken,
       wsClient,
       receivedWsMessages,
+      databasePath: configOverrides.databasePath,
       workerErrors,
       waitForWsMessage,
       populateUpload,
