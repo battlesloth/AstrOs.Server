@@ -206,4 +206,13 @@ per-run warning marker. No filesystem, network, or cross-process state.
 
 ## Implementation checklist
 
-<!-- Added when work STARTS, not at authoring time. -->
+- [x] Precondition: vitest 3.2.4 default fake timers fake `performance.now()`; `vi.setSystemTime` moves `Date` only (probe)
+- [ ] Task 4 RED/GREEN — pass builder drops empty nested arrays (`[[]]` no recursion, no error log)
+- [ ] Task 5 RED/GREEN — `repeatsLeft`: only `-1` infinite; malformed → one pass + one warning
+- [ ] Tasks 1–3 RED/GREEN — repeat-pass padding (0 ms loops, nested, Wait-only, 300 ms pass, ≥ 1 s unchanged, delay max(), finite repeats, clock jump, replacement, panic, once-per-run warning)
+- [ ] Task 6 RED/GREEN — converter warns on unknown script id
+- [ ] Mutation checks recorded
+- [ ] Task 9 — QA plan cases
+- [ ] Pre-commit: prettier + lint, build, full suite, code review
+- [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
+- [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry
