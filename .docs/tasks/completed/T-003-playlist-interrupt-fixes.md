@@ -1,6 +1,6 @@
 # T-003: Fix playlist repeat/interrupt bugs and cover every interrupt path
 
-<!-- File: .docs/tasks/T-003-playlist-interrupt-fixes.md. Branch: feature/T-003-playlist-interrupt-fixes.
+<!-- File: .docs/tasks/completed/T-003-playlist-interrupt-fixes.md. Branch: feature/T-003-playlist-interrupt-fixes.
      PR title: "T-003: Fix playlist repeat/interrupt bugs and cover every interrupt path". -->
 
 ## Context
@@ -196,25 +196,25 @@ Added after the pre-commit and pre-push reviews (2026-09-28):
 
 ## Acceptance criteria
 
-- [ ] A playlist's `tracks` (including nested arrays) are unchanged after playback; nested tracks
+- [x] A playlist's `tracks` (including nested arrays) are unchanged after playback; nested tracks
       replay on every repeat pass.
-- [ ] A nested-only playlist with infinite repeat cycles indefinitely without throwing and is
+- [x] A nested-only playlist with infinite repeat cycles indefinitely without throwing and is
       interruptible.
-- [ ] A replacement queued during a shuffle gap starts when the gap ends; no track from the
+- [x] A replacement queued during a shuffle gap starts when the gap ends; no track from the
       replaced playlist dispatches after the replacement arrives (outside of an in-progress
       nested track).
-- [ ] `ShuffleWithDelayAndRepeat` applies the gap before the first track of each repeat pass.
-- [ ] An interrupt during a nested track switches only after the nested track's last sub-track;
+- [x] `ShuffleWithDelayAndRepeat` applies the gap before the first track of each repeat pass.
+- [x] An interrupt during a nested track switches only after the nested track's last sub-track;
       those sub-tracks dispatch with the original playlist's locations.
-- [ ] `randomDelay: false` yields a fixed delay of `delayMin`.
-- [ ] The repeat dropdown shows "Repeat - None" for types that cannot repeat, and follows the
+- [x] `randomDelay: false` yields a fixed delay of `delayMin`.
+- [x] The repeat dropdown shows "Repeat - None" for types that cannot repeat, and follows the
       currently loaded playlist's settings; stored settings are untouched.
-- [ ] Interrupt matrix covers all 7 types (count + infinite rows for repeat types) and the
+- [x] Interrupt matrix covers all 7 types (count + infinite rows for repeat types) and the
       timing, interrupter-kind, and panic cases listed in Task 7.
-- [ ] Every fix has a test that fails with the fix reverted (mutation checks recorded).
-- [ ] All pre-existing queue and converter tests pass unmodified (except the nested-copy removal
+- [x] Every fix has a test that fails with the fix reverted (mutation checks recorded).
+- [x] All pre-existing queue and converter tests pass unmodified (except the nested-copy removal
       in Task 7).
-- [ ] `.docs/qa/playlist-playback.md` exists and covers the cases in Task 10.
+- [x] `.docs/qa/playlist-playback.md` exists and covers the cases in Task 10.
 
 ## Out of scope
 
@@ -311,4 +311,4 @@ on shared in-memory state (`activePlaylist`, `currentTrack`, `currentTimeout`,
 - [x] Pre-commit: api + vue format/lint, builds, full suites, code review (findings addressed)
 - [x] Tasks 11–13 (review fixes): `takeOverIfReplaced`; repeat mode derived from the model (swap test RED `'infinite'` vs `'none'` first; count-only-in-Count RED `'3'` vs `''`); new tests. Mutations now caught that the first suite missed: takeover never clears the flag → 4 tests; takeover step deleted → 1; `panicStop` skips `clearTimeout` → 4; boundary gap without the takeover → 1; locations not captured on a normal start → 2; Count branch forgets `repeat = true` → 1 (Vue); count always empty → 1 (Vue)
 - [x] Pre-push: `/pr-review-toolkit:review-pr` (5 agents) + a per-commit review of the fix batch; findings addressed (Tasks 11–13, doc/comment sweep, Backlog)
-- [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry
+- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (bench items in Verification stay open until post-merge upkeep)

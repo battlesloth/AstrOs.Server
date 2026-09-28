@@ -4,17 +4,17 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-003 — playlist repeat/interrupt bug fixes + interrupt coverage (`feature/T-003-playlist-interrupt-fixes`; develop merged in 2026-09-28 after T-004, pointers updated)
-Now:     T-003 implemented + pre-push reviewed (5 agents, findings addressed) → close out on the branch, Jeff pushes and opens the PR into develop
+Active:  T-003 — playlist repeat/interrupt fixes (`feature/T-003-playlist-interrupt-fixes`); implemented, pre-push reviewed, closed out on the branch — awaiting push + PR into develop
+Now:     Jeff pushes the T-003 branch and opens the PR into develop; bench cases 7–13 in `.docs/qa/playlist-playback.md` (log-verifiable, droid optional)
 Next:    T-005 — zero-duration playlist tracks re-dispatching `SCRIPT_RUN` every tick (promoted from the T-004 Backlog by Jeff 2026-09-28: "immediately after this task"); task file first, off develop once T-003 merges. Then the Backlog candidates (sum-based Run gate on FAILED, dead upload catch, compose device-path typo); T-004's ESP-side bench check whenever the droid is connected
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — T-004 merged (PR #128); log-level bench passed (QA cases 1–6)
+Last:    2026-09-28 — T-003 implemented + pre-push reviewed (on its branch); T-004 merged (PR #128), log-level bench passed
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
-- [ ] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/T-003-playlist-interrupt-fixes.md` — task file lives on its branch until it merges; branch `feature/T-003-playlist-interrupt-fixes`)
+- [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; bench verification pending)
 - [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench log-verified 2026-09-28 — ESP-side check pending hardware)
 
 ## Backlog (unscheduled candidates)
@@ -107,6 +107,12 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-09-28 T-003 — playlist repeat/interrupt bugs + interrupt coverage
+  - queue: nested tracks were consumed in place (repeat passes skipped them; a nested-only playlist on infinite repeat recursed into a stack overflow in a timer → API crash) — `beginTrack` copies; a nested playlist is one track for interrupts (sub-tracks finish first, with their own playlist's locations); every shuffle gap goes through `scheduleGap`, so a replacement during a gap takes over at its end instead of a track pre-picked from the replaced playlist; delay types wait their gap at the repeat boundary (a one-track loop replayed back-to-back)
+  - converter: Random Delay off → fixed `delayMin` (a stale `delayMax` kept it random); Vue: the repeat dropdown shows "None" for non-repeat types and follows the loaded playlist (it showed the previously opened playlist's mode)
+  - interrupt matrix over all seven types plus timing, interrupter-kind, panic, repeat and stale-settings tests; every fix mutation-checked. The reviews mattered: the first suite used only script/Sequential interrupters, so a takeover that never cleared the replacement flag (an infinite loop after an interrupt stopping after one pass) passed; panic tests recovered after the stale deadlines; a Vue assertion dropped on one reviewer's advice was the only thing seeing writes through the model
+  - Backlog seeded: pino drops error objects in ~89 log calls (high), queue failure handling and silent drops, help text vs behavior, `PlaylistType` traits table, T-005 scope (nested zero-duration tracks now loop at ~1000/s instead of crashing; empty nested arrays still recurse)
 
 - 2026-09-28 T-004 — script durations stored in deciseconds
   - root cause of the 2026-09-27 report ("45 s script repeats forever, interrupts never land"): `calculateLengthDS` returned the last event time in seconds into `scripts.duration_ds`, which every consumer reads as deciseconds → queue timed scripts 10× short → an infinite loop re-sent `SCRIPT_RUN` every 4.5 s against a 45 s run, filling the ESP's 30-slot queue so the interrupting script was dropped (`Queue is full`)
