@@ -7,7 +7,11 @@ import type { PanicState } from 'src/models/networking/panic_responses.js';
 export class AnimationQueue {
   inPanicStop = false;
   playlistQueue: AnimationQueuePlaylist[] = [];
+  // The playlist addToQueue routes against. After a replacement it is already the new
+  // item while the replaced playlist's current track, nested track, or gap
+  // finishes (see playlistReplaced).
   activePlaylist: AnimationQueuePlaylist | null = null;
+  // For a nested track, the sub-tracks still to play (not the one playing).
   currentTrack: QueueTrack | QueueTrack[] | null = null;
 
   // Locations of the playlist the current track came from, captured when the
@@ -15,6 +19,8 @@ export class AnimationQueue {
   // item while a nested track's remaining sub-tracks still play.
   private currentLocations: Array<ControllerLocation> = [];
   private currentTimeout: ReturnType<typeof setTimeout> | null = null;
+  // Set when an interruptible activePlaylist is replaced; consumed by
+  // takeOverIfReplaced at the end of the current track or gap.
   private playlistReplaced = false;
   private panicListeners = new Set<(state: PanicState) => void>();
 
@@ -51,9 +57,10 @@ export class AnimationQueue {
         this.activePlaylist !== null &&
         this.activePlaylist.playlistType !== PlaylistType.Sequential
       ) {
-        // if the current playlist is interruptible, we can replace the
-        // current playlist as there can only be one interruptible playlist
-        // in the queue at a time, and the new item will take its place
+        // if the current playlist is interruptible, the new item replaces it:
+        // it becomes activePlaylist now and takes over when the current track
+        // (a nested track counts as one) or gap ends. The replaced playlist
+        // never resumes.
         this.activePlaylist = item;
         this.playlistReplaced = true;
         return;
@@ -201,7 +208,9 @@ export class AnimationQueue {
   // Every inter-track gap goes through here. The timer lives in currentTimeout
   // so panicStop cancels it, and a replacement that arrived during the gap
   // takes over when it ends instead of `then` (e.g. a track picked from the
-  // replaced playlist before the gap started).
+  // replaced playlist before the gap started). Taking over also clears the
+  // flag, so the replacement's own first track end is not treated as another
+  // takeover (which would skip its gap).
   private scheduleGap(then: () => void) {
     const delay = this.getShuffleDelay();
     if (this.currentTimeout) {

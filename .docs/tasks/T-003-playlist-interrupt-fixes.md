@@ -39,19 +39,20 @@ Investigation (2026-09-27). Bugs 1–3 were reproduced with throwaway vitest pro
    tracks): dispatches at `0:b 1100:a 1200:a 2300:b` — no gap between passes, and the same track
    played back-to-back.
 4. **`randomDelay` is ignored.** The API never reads `settings.randomDelay`; the converter maps
-   `delayMin`/`delayMax` straight to `shuffleWaitMin`/`shuffleWaitMax`. The editor only ever
-   raises `delayMax` (never lowers it), so turning Random Delay off after using it leaves a stale
-   `delayMax` and the "fixed" delay stays random.
+   `delayMin`/`delayMax` straight to `shuffleWaitMin`/`shuffleWaitMax`. Nothing lowers
+   `delayMax` once Random Delay is off (its input is hidden, and raising `delayMin` only ever
+   raises it — e.g. Delay 10 s then Delay 2 s leaves 2–10 s whether or not Random Delay was ever
+   on), so the "fixed" delay stays random.
 5. **A disabled repeat dropdown shows a stale mode.** `AstrosPlaylistSettings` is not re-keyed on
    type change and nothing resets `settings.repeat`, so switching `SequentialRepeatable` +
    "Repeat - Infinite" → `Sequential` leaves a greyed-out dropdown reading "Repeat - Infinite"
-   (also after reload — `initRepeatMode()` rebuilds it from the stored JSON). The backend plays
+   (also after reload — the pre-fix `initRepeatMode()` rebuilt it from the stored JSON). The backend plays
    the playlist once, uninterruptibly. Likely source of the reporter's "sequential set to repeat".
 6. **Interrupts land between a nested playlist's sub-tracks.** In `playNextTrack` the replacement
    check (Step B in the pre-fix code) runs before the sub-track step (Step C; the fix swaps them,
    so the labels now read the other way), so an interruptible playlist is cut
-   mid-nested-playlist. The editor presents a nested playlist as one track, nested playlists are
-   always `Sequential` (uninterruptible), and the help text says interruption happens "as soon as
+   mid-nested-playlist. The editor presents a nested playlist as one track and only offers
+   `Sequential` (uninterruptible) playlists as nested tracks, and the help text says interruption happens "as soon as
    the current track finishes". Decision (Jeff, 2026-09-27): switch only after the whole nested
    track finishes.
 
@@ -59,7 +60,7 @@ Coverage today: interrupts are tested only for `SequentialInterruptible` (plus t
 queued-interruptible replacement rule). Nothing covers interrupting `SequentialRepeatable` or any
 shuffle type, repeat with nested tracks, gap interleavings, panic during a gap, non-repeat types
 ignoring `repeatsLeft`, or the converter's `repeatCount: -1` (the value the editor actually saves
-for Infinite — only the legacy `0` is tested).
+for Infinite — only `0` — every new playlist's default, which also means infinite when `repeat` is on — is tested).
 
 Reporter answers (2026-09-27): a **`Sequential, Repeatable`** playlist, **Infinite** repeat, whose
 one track is a script with a single event at **45 s**; the 45 s event keeps firing over and over
@@ -178,6 +179,21 @@ Docs:
     behavior per type, nested-track interrupts, shuffle gaps at the repeat boundary, fixed vs
     random delay, and the repeat dropdown display.
 
+Added after the pre-commit and pre-push reviews (2026-09-28):
+
+11. `animation_queue.ts`: `takeOverIfReplaced()` shared by the track-end and gap-end paths
+    (behavior-preserving). Comments corrected: `activePlaylist`/`currentTrack`/`playlistReplaced`
+    semantics, `addToQueue`'s replacement comment, `scheduleGap`, and `animation_queue_item.ts`
+    (comments only — the pinned shape is unchanged).
+12. Fix 6 hardening, display only: `AstrosPlaylistSettings` derives the repeat mode from the model
+    instead of copying it once at setup, so opening playlist B after A no longer shows A's mode
+    (confirmed by a component test that swaps `modelValue`); the count shows only in Count mode.
+13. Tests closing gaps the reviews found: repeatable and delay-type interrupters (a flag never
+    cleared, or a deleted takeover step, passed the first suite), a playlist run after an
+    interrupt, a delay-type replacement in the repeat-boundary gap, no pending timer after
+    `panicStop`, per-playlist locations on FIFO advance, no trailing gap, stale delay settings on
+    non-delay types, the Vue display for all seven types and swapped-in settings.
+
 ## Acceptance criteria
 
 - [ ] A playlist's `tracks` (including nested arrays) are unchanged after playback; nested tracks
@@ -191,8 +207,8 @@ Docs:
 - [ ] An interrupt during a nested track switches only after the nested track's last sub-track;
       those sub-tracks dispatch with the original playlist's locations.
 - [ ] `randomDelay: false` yields a fixed delay of `delayMin`.
-- [ ] The repeat dropdown shows "Repeat - None" for types that cannot repeat; stored settings are
-      untouched.
+- [ ] The repeat dropdown shows "Repeat - None" for types that cannot repeat, and follows the
+      currently loaded playlist's settings; stored settings are untouched.
 - [ ] Interrupt matrix covers all 7 types (count + infinite rows for repeat types) and the
       timing, interrupter-kind, and panic cases listed in Task 7.
 - [ ] Every fix has a test that fails with the fix reverted (mutation checks recorded).
@@ -208,7 +224,8 @@ Docs:
 - **Cutting silence short on interrupt** — starting a replacement immediately during a Wait track
   or shuffle gap instead of at its end. Behavior change → PLAN.md Backlog.
 - **Zero-duration tracks + infinite repeat** — scripts with no recorded duration (e.g. deleted →
-  0 ms) re-dispatch back-to-back every tick. → Backlog.
+  0 ms) re-dispatch back-to-back every tick. → **T-005** (promoted 2026-09-28; must also cover
+  zero-duration sub-tracks inside nested tracks and empty nested arrays — see PLAN.md).
 - **Process-level crash logging** (`uncaughtException`) — already tracked by the existing
   Backlog item about the unlogged 16:32 crash-restart loop; bug 1 is another instance.
 - **Clearing stale `settings.repeat` on type change / data migration** — fix 5 is display-only.
@@ -234,7 +251,7 @@ Vue (`astros_vue/`):
 - `npm run format && npm run lint`, then `npx prettier --check --experimental-cli "src/**"` —
   clean.
 - `npm run build` — green.
-- Mutation check: revert fix 6 → the spec's non-repeat-type case fails.
+- Mutation check: revert fix 6 → the spec's non-repeat-type case fails; revert the derived repeat mode (a `ref` copied at setup) → the swapped-settings case fails; drop `repeat = true` from the Count branch → the user-edit case fails.
 
 Bench (human-gated, from `.docs/qa/playlist-playback.md`):
 
@@ -274,8 +291,8 @@ on shared in-memory state (`activePlaylist`, `currentTrack`, `currentTimeout`,
 | Shuffle gap at the repeat boundary | `addToQueue(x)` | `x` at gap end; new pass never starts |
 | Replacement pending, first is interruptible | `addToQueue(y)` | `y` replaces it (latest wins) |
 | Replacement pending, first is `Sequential` | `addToQueue(y)` | `y` queues behind it |
-| Any playing state, gap, or replacement pending | `panicStop()` | timer cleared, flag reset, no dispatch |
-| After `panicStop` | timers advance | nothing fires |
+| Any playing state, gap, or replacement pending | `panicStop()` | timer cleared (`vi.getTimerCount() === 0`), flag reset, no dispatch |
+| After `panicStop` | timers advance | nothing fires; recovery before the old deadline shows no stale timer or flag |
 | After `clearPanicStop` | `addToQueue(x)` | `x` plays normally, no stale replacement |
 | Last track of the final pass | timer fires | queue advances / goes idle |
 | Nested-only, infinite repeat, pass ends | timer fires | next pass begins via timer (no recursion) |
@@ -292,5 +309,6 @@ on shared in-memory state (`activePlaylist`, `currentTrack`, `currentTimeout`,
 - [x] Mutation checks recorded (fixes 1–6): fix 1 revert → 4 tests fail (source untouched, nested replay, nested-only infinite RangeError, nested-only interruptible); fix 4 step order → 2, captured locations → 1; fix 2 gap ignores replacement → 1; fix 3 no boundary gap → 2, gap keyed on repeatable instead of delay → 7; fix 5 revert → 1, always-delayMin → 1 (existing random test); fix 6 each binding → its own test, always-empty count → 1. Review round: gap timer outside `currentTimeout` → panic-gap test, `panicStop` keeping `playlistReplaced` → panic-replacement test (both escaped the first version of the panic tests)
 - [x] Task 10 — extend `.docs/qa/playlist-playback.md`
 - [x] Pre-commit: api + vue format/lint, builds, full suites, code review (findings addressed)
-- [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
+- [x] Tasks 11–13 (review fixes): `takeOverIfReplaced`; repeat mode derived from the model (swap test RED `'infinite'` vs `'none'` first; count-only-in-Count RED `'3'` vs `''`); new tests. Mutations now caught that the first suite missed: takeover never clears the flag → 4 tests; takeover step deleted → 1; `panicStop` skips `clearTimeout` → 4; boundary gap without the takeover → 1; locations not captured on a normal start → 2; Count branch forgets `repeat = true` → 1 (Vue); count always empty → 1 (Vue)
+- [x] Pre-push: `/pr-review-toolkit:review-pr` (5 agents) + a per-commit review of the fix batch; findings addressed (Tasks 11–13, doc/comment sweep, Backlog)
 - [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry

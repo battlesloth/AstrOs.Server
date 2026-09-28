@@ -358,8 +358,8 @@ describe('Playlist Converter', () => {
   });
 
   it('should use a fixed delay of delayMin when randomDelay is false, ignoring a stale delayMax', async () => {
-    // The editor only ever raises delayMax, so turning Random Delay off after
-    // using it leaves the old maximum behind.
+    // Nothing lowers delayMax once Random Delay is off (its input is hidden and
+    // raising delayMin only ever raises it), so it can be stale.
     const playlist: Playlist = {
       id: 'p1',
       playlistName: 'Test',
