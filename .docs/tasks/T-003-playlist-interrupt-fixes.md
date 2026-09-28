@@ -64,7 +64,7 @@ Reporter answers (2026-09-27): a **`Sequential, Repeatable`** playlist, **Infini
 one track is a script with a single event at **45 s**; the 45 s event keeps firing over and over
 and a script sent mid-loop never interrupts it. None of bugs 1–6 applies (no nested playlist, no
 shuffle). Root cause is a units bug, owned by **T-004**
-(`.docs/tasks/T-004-script-duration-units.md`): `calculateLengthDS` stores the last event time in
+(`.docs/tasks/completed/T-004-script-duration-units.md`): `calculateLengthDS` stores the last event time in
 *seconds* in `scripts.duration_ds`, which every consumer reads as deciseconds, so the queue times
 the 45 s script as 4.5 s. The server re-sends `SCRIPT_RUN` ten times per real run, the ESP's
 30-slot script queue fills, and the interrupting script is dropped (`Queue is full`) or queued
@@ -72,7 +72,7 @@ behind ~22 min of backlog. (An earlier note here blamed track-boundary latency; 
 the column really held deciseconds.)
 
 This task stays as scoped: bugs 1–6 are real (bug 1 crashes the API) and independent of the
-report. T-004 lands first.
+report. T-004 landed first (PR #128, merged 2026-09-28).
 
 ## Contract (pinned — do not change)
 
@@ -93,7 +93,8 @@ report. T-004 lands first.
 - **`convertPlaylistToQueueItem(playlist, playlistRepo, scriptDurations, locations)`** signature
   and repeat mapping (`repeat: false` → 0; `repeatCount` 0 or -1 → -1; N → N).
 - **`runScript`** wraps a single script as `PlaylistType.Sequential`, `repeatsLeft: 0`
-  (`api_server.ts` ~1389).
+  (built by `convertScriptToQueueItem` in `playlist_converter.ts` since T-004; previously inline
+  in `api_server.ts` — location updated 2026-09-28, behavior unchanged).
 - **`PlaylistSettings` JSON as stored in the DB** — no migration, no write-side change. Fix 5 is
   display-only.
 - **Timing semantics not being changed**: an interrupt that arrives during a Wait track or a
@@ -172,7 +173,7 @@ Tests — each fix RED-first; after it goes green, revert the fix and confirm th
 
 Docs:
 
-10. Create `.docs/qa/playlist-playback.md` (or extend it, if T-004 created it first) covering interrupt
+10. Extend `.docs/qa/playlist-playback.md` (created by T-004) covering interrupt
     behavior per type, nested-track interrupts, shuffle gaps at the repeat boundary, fixed vs
     random delay, and the repeat dropdown display.
 
@@ -202,7 +203,7 @@ Docs:
 
 - **Uninterruptible repeat** (`Sequential` + repeat, or a new type) — withdrawn; the reporter
   uses `Sequential, Repeatable`, so it is not what the report needs.
-- **Script durations 10× too short** (the reporter's actual root cause) — T-004.
+- **Script durations 10× too short** (the reporter's actual root cause) — fixed by T-004 (PR #128).
 - **Cutting silence short on interrupt** — starting a replacement immediately during a Wait track
   or shuffle gap instead of at its end. Behavior change → PLAN.md Backlog.
 - **Zero-duration tracks + infinite repeat** — scripts with no recorded duration (e.g. deleted →
