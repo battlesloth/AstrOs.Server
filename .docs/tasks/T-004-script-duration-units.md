@@ -179,3 +179,16 @@ IPC, or concurrency beyond boot ordering.
 
 **Boot ordering:** `initializeDatabase` (migrations) is awaited before routes are configured and
 before `listen` (`api_server.ts` ~327 vs ~752), so no request can write a script mid-migration.
+
+## Implementation checklist
+
+- [ ] Task 4 RED/GREEN — `calculateLengthDS` test in seconds, rounding + no-events cases; Task 1 fix
+- [ ] Task 5 RED/GREEN — `migration_8.test.ts`; Task 2 migration + registry
+- [ ] Task 6 RED/GREEN — `getScript` legacy `-1` test; Task 3 reorder
+- [ ] Task 7 — end-to-end units test (`script_duration.integration.test.ts`)
+- [ ] Mutation checks recorded (Task 1, Task 2, Task 3 reverts)
+- [ ] Local DB dry run on a scratch copy (`Script A` → 44)
+- [ ] Task 8 — `.docs/qa/playlist-playback.md`
+- [ ] Pre-commit: prettier + lint, build, full suite, code review
+- [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
+- [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry
