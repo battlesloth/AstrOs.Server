@@ -4,17 +4,17 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-003 — playlist repeat/interrupt bug fixes + interrupt coverage (`feature/T-003-playlist-interrupt-fixes`; task file committed, branch needs develop merged in)
-Now:     merge develop into the T-003 branch and update two T-003 pointers — its Contract's `runScript` wrapper now lives in `convertScriptToQueueItem` (`playlist_converter.ts`, same behavior) and its Context link to T-004 moves to `.docs/tasks/completed/` — then implement T-003
-Next:    after T-003, promote the next Backlog item (candidates: sum-based Run gate on FAILED, dead upload catch, `deployment/docker-compose.yml` device-path typo); T-004's ESP-side bench check whenever the droid is connected
+Active:  T-003 — playlist repeat/interrupt fixes (`feature/T-003-playlist-interrupt-fixes`); implemented, pre-push reviewed, closed out on the branch — awaiting push + PR into develop
+Now:     Jeff pushes the T-003 branch and opens the PR into develop; bench cases 7–13 in `.docs/qa/playlist-playback.md` (log-verifiable, droid optional)
+Next:    T-005 — zero-duration playlist tracks re-dispatching `SCRIPT_RUN` every tick (promoted from the T-004 Backlog by Jeff 2026-09-28: "immediately after this task"); task file first, off develop once T-003 merges. Then the Backlog candidates (sum-based Run gate on FAILED, dead upload catch, compose device-path typo); T-004's ESP-side bench check whenever the droid is connected
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — T-004 merged (PR #128); log-level bench passed (QA cases 1–6)
+Last:    2026-09-28 — T-003 implemented + pre-push reviewed (on its branch); T-004 merged (PR #128), log-level bench passed
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
-- [ ] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/T-003-playlist-interrupt-fixes.md` — task file lives on its branch until it merges; branch `feature/T-003-playlist-interrupt-fixes`)
+- [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; bench verification pending)
 - [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench log-verified 2026-09-28 — ESP-side check pending hardware)
 
 ## Backlog (unscheduled candidates)
@@ -32,7 +32,7 @@ From the T-001 pre-push review (2026-08-16):
 - `SCRIPT_RUN` worker envelopes have no `handleSerialWorkerMessage` case — run-script ack/nak responses are produced and routed by the worker but silently vanish on the main thread; audit whether clients should see them, then consider an error-logging `default:` for that switch (safe only once SCRIPT_RUN has a case)
 - `RUN_COMMAND_ACK/NAK` and `DEPLOY_CONFIG_NAK`/`FORMAT_SD_NAK` have no business handling: acks still let the 5s tracker time out (misleading "Timeout for message" error), and `/settings/formatSD` replies success before the controller answers. T-001 raised the NAK default to warn-with-payload; real handling is its own task
 - Repo lookup NoResultError sweep: `get*ByAddress`/`get*ByController` repo methods `executeTakeFirstOrThrow`, so the `=== null` guards in `handlePollResponse`/`handleConfigSync` are dead code (misses throw into the catch instead). T-001 added nullable `find*` variants for its own path; sweep the remaining callers (same pattern as the settings-500 item above)
-- 16:32 crash-restart loop (5 boots in 7 s) had no logged cause — crash paths only reach stderr/`docker logs`, never the log file
+- 16:32 crash-restart loop (5 boots in 7 s) had no logged cause — crash paths only reach stderr/`docker logs`, never the log file (no `uncaughtException` handler; T-003's queue stack overflow inside a timer is another instance)
 
 From the T-002 diagnosis (2026-09-04, scripter Test button):
 
@@ -55,9 +55,32 @@ From the 2026-09-06 release prep (PR #124):
 
 - `deployment/docker-compose.yml` `devices` entry reads `'dev/ttyAMA0:/dev/ttyS0'` — leading slash dropped in 5919d972 ("update deploy"); Docker expects an absolute host device path, so a Pi deployed from this file likely fails to start. Verify on the bench and fix (quick-tier, but needs its own branch — not doc-only)
 
+From the T-003 planning (2026-09-27, playlist interrupt investigation):
+
+- Interrupt during a Wait track or shuffle gap waits for the silence to end before switching — consider starting the replacement immediately (behavior change; T-003 keeps switch-at-end)
+- `settings.repeat`/`repeatCount` survive a type change to a non-repeat type (settings JSON never reset); T-003 only fixes the display — decide whether the editor should clear them
+- `convertPlaylistToQueueItem` does not clamp `delayMax < delayMin` (editor prevents it; hand-edited/imported data would compute a negative delay range) — since T-003 fix 5 this only matters with Random Delay on; also validate finite/non-negative values (settings stored as `'{}'` — the migration_3 column default — give NaN bounds → `setTimeout(NaN)`), warning with the playlist id
+- Preemptive interrupt of a running script (server cancels the track timer + ESP aborts the current script; protocol change with AstrOs.ESP) — only if track-boundary switching still feels too slow once T-004's durations are correct
+- Uninterruptible repeat (`Sequential` + repeat) — dropped from T-003; the reporter uses `Sequential, Repeatable`, so no demand for it yet
+- "Repeat - Count" with no number plays forever: new playlists default `repeatCount: 0` (`stores/playlists.ts`), choosing Count keeps 0 (only negatives are bumped to 1, `AstrosPlaylistSettings.vue` `onRepeatModeChange`), the count box shows empty, and the converter maps 0 → -1 (infinite; mapping pinned by T-003's Contract) — so the UI reads Count while the backend loops forever. Own task (T-003 review, 2026-09-28)
+- Delay controls show stale values greyed out after switching from a delay type to a non-delay type (same class as T-003 fix 6, which covered only the repeat dropdown)
+
+From the T-003 pre-push review (2026-09-28):
+
+- **T-005 scope** (zero-duration tracks, next task): the floor/"all-zero pass" check must look inside nested tracks — since T-003 fix 1 a nested playlist of 0 ms sub-tracks on infinite repeat loops at ~1000 dispatches/s instead of crashing; empty nested arrays (`[[]]`) still recurse synchronously through `beginTrack([])` (the converter never emits them — strip them in the queue so the no-cycle invariant holds by construction); `handleRepeat` treats any non-0, non-positive `repeatsLeft` (e.g. `undefined` from malformed settings) as infinite — only `-1` should be. Natural time to make the queue's unpinned members private and add a private `playing` field (source of the in-flight track; replaces `currentLocations` + `playlistReplaced`)
+- **pino drops error objects codebase-wide** (high): pino ignores arguments after a message string without placeholders, so `logger.error('msg', error)` logs no error/stack/ids (~89 calls, incl. the queue's `addToQueue` catch, `api_server.ts` `runPlaylist`). Sweep to `logger.error({ err, …ids }, 'msg')`
+- Queue failure handling: `addToQueue`'s catch leaves the queue wedged (active playlist, no timer — later items never play; route still returns 200) — reset to idle and rethrow; the `dispatchTrack`/gap timer callbacks are unguarded (a throw is an uncaught exception → process exit, only stderr) — guard, log, reset to idle
+- Queue silent drops: a pending replacement superseded by a later arrival, and queued interruptibles dropped by `addToBackOfQueue`, are not logged; no queue state transitions are logged (so post-fix "dispatching <old sub-track>" lines after an interrupt look unexplained)
+- `dispatchScriptFromQueue` logs `${error}` only (no stack/script/locations); the serial worker `exit` handler never marks it unavailable, so after the worker dies every dispatch posts to a dead worker while the log still says "dispatching script"
+- Help text vs behavior (docs T-003 pinned): the three repeat types are documented as always repeating but "Repeat - None" plays once and Count N plays N+1 passes; an interrupt during a shuffle gap waits for the gap end (undocumented); `help_sequential` says queued items wait, but a queued interruptible is dropped when anything is queued after it; nested sub-tracks play back-to-back with no shuffle/delay (undocumented)
+- Settings display: a rejected entry stays on screen — 0 or a negative number in the repeat Count, a negative delay, or a Max below Min (clamped; e.g. Max shows 1.0 while 2.0 is stored)
+- The playlists store never clears `selectedPlaylist`, so the editor briefly renders the previously opened playlist while the next loads; its type watcher can read that A→B type change as a user edit (for a Sequential B with nested tracks it pops the remove-nested confirm, and Cancel writes A's type into B) — clear `selectedPlaylist` on load/unmount
+- `PlaylistType` traits table: `Record<PlaylistType, { shuffle; repeat; delay; interruptible }>` beside each enum (API + Vue) replacing `isRepeatableType`/`hasShuffleDelay`/`isShufflePlaylistType` and ~7 inline `Sequential` checks, so a new member is a compile error until its traits are decided (prerequisite if uninterruptible repeat returns); readonly nested track arrays with an `isNested` type guard so a bug-1 regression is a compile error
+- Queue phase union (`idle | playing | gap | panicked` with a pending replacement slot) — trigger: the "interrupt during a Wait/gap waits for the silence" item; split `AnimationQueuePlaylist` into a readonly spec + queue-private playback position (changes the pinned shape)
+
 From the T-004 planning (2026-09-27, script duration units):
 
-- Zero-duration tracks under infinite repeat (zero-event scripts → `duration_ds = 0`, or any 0 ms track) re-dispatch `SCRIPT_RUN` back-to-back every tick (~1000/s) — floor the track duration or refuse to repeat an all-zero pass; consider a server-side dispatch-rate floor as defense-in-depth. Same class: `scripts.duration_ds` keeps migration_2's `-1` default and `getScriptDurationsDS` has no negative guard (only `getScript` recomputes and warns), so a raw-SQL insert that omits the column reintroduces a −100 ms track (typed Kysely inserts already require it — `duration_ds` is not `Generated<>`); likewise an unknown script id in a playlist silently becomes a 0 ms track (`playlist_converter.ts` `?? 0`) — warn with playlist/track ids
+- ~~Zero-duration tracks~~ → promoted to T-005 (2026-09-28; scope notes in the T-003 pre-push block above). Original note: zero-duration tracks under infinite repeat (zero-event scripts → `duration_ds = 0`, or any 0 ms track) re-dispatch `SCRIPT_RUN` back-to-back every tick (~1000/s) — floor the track duration or refuse to repeat an all-zero pass; consider a server-side dispatch-rate floor as defense-in-depth. Same class: `scripts.duration_ds` keeps migration_2's `-1` default and `getScriptDurationsDS` has no negative guard (only `getScript` recomputes and warns), so a raw-SQL insert that omits the column reintroduces a −100 ms track (typed Kysely inserts already require it — `duration_ds` is not `Generated<>`); likewise an unknown script id in a playlist silently becomes a 0 ms track (`playlist_converter.ts` `?? 0`) — warn with playlist/track ids
 - Script duration ends at the last event's *start*; the event's own run time (servo travel, audio length) is not counted, so the next dispatch can overlap it
 - Event rows the **Vue** scripter saved before deb95a40 (2026-01-07) are stored unscaled (seconds in the deciseconds column) and no data migration converted them — those scripts play 10× compressed. Angular-scripter rows were already deciseconds (the API converter then did `time * 100`, ds → ms) and play correctly, so do **not** scale pre-2026-01-07 rows wholesale
 - ESP drops `SCRIPT_RUN` silently when its 30-slot queue is full (`Queue is full`); the server never learns (pairs with the `SCRIPT_RUN` envelope item above)
@@ -84,6 +107,12 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-09-28 T-003 — playlist repeat/interrupt bugs + interrupt coverage
+  - queue: nested tracks were consumed in place (repeat passes skipped them; a nested-only playlist on infinite repeat recursed into a stack overflow in a timer → API crash) — `beginTrack` copies; a nested playlist is one track for interrupts (sub-tracks finish first, with their own playlist's locations); every shuffle gap goes through `scheduleGap`, so a replacement during a gap takes over at its end instead of a track pre-picked from the replaced playlist; delay types wait their gap at the repeat boundary (a one-track loop replayed back-to-back)
+  - converter: Random Delay off → fixed `delayMin` (a stale `delayMax` kept it random); Vue: the repeat dropdown shows "None" for non-repeat types and follows the loaded playlist (it showed the previously opened playlist's mode)
+  - interrupt matrix over all seven types plus timing, interrupter-kind, panic, repeat and stale-settings tests; every fix mutation-checked. The reviews mattered: the first suite used only script/Sequential interrupters, so a takeover that never cleared the replacement flag (an infinite loop after an interrupt stopping after one pass) passed; panic tests recovered after the stale deadlines; a Vue assertion dropped on one reviewer's advice was the only thing seeing writes through the model
+  - Backlog seeded: pino drops error objects in ~89 log calls (high), queue failure handling and silent drops, help text vs behavior, `PlaylistType` traits table, T-005 scope (nested zero-duration tracks now loop at ~1000/s instead of crashing; empty nested arrays still recurse)
 
 - 2026-09-28 T-004 — script durations stored in deciseconds
   - root cause of the 2026-09-27 report ("45 s script repeats forever, interrupts never land"): `calculateLengthDS` returned the last event time in seconds into `scripts.duration_ds`, which every consumer reads as deciseconds → queue timed scripts 10× short → an infinite loop re-sent `SCRIPT_RUN` every 4.5 s against a 45 s run, filling the ESP's 30-slot queue so the interrupting script was dropped (`Queue is full`)

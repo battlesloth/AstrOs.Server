@@ -174,7 +174,10 @@ export async function convertPlaylistToQueueItem(
     tracks,
     repeatsLeft,
     shuffleWaitMin: dsToMs(settings.delayMin),
-    shuffleWaitMax: dsToMs(settings.delayMax),
+    // Random Delay off → a fixed delay of delayMin. delayMax can be stale:
+    // nothing lowers it once Random Delay is off (its input is hidden, and
+    // raising delayMin only ever raises it).
+    shuffleWaitMax: dsToMs(settings.randomDelay ? settings.delayMax : settings.delayMin),
     tracksRemaining: [],
   };
 }

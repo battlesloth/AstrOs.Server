@@ -12,18 +12,20 @@ export interface AnimationQueuePlaylist {
   playlistType: PlaylistType;
   locations: Array<ControllerLocation>;
 
-  // Script and wait tracks are single QueueTrack, Sequential
-  // playlist tracks are an array of QueueTrack ids played
-  // in order. Only the top level of playlist track is supported,
-  // so nested playlists are decomposed into a flat list of tracks.
+  // Script and wait tracks are single QueueTracks; a nested playlist track is
+  // an array of QueueTracks played in order (nested playlists are flattened
+  // into it). The queue treats a nested array as one track: no gap between its
+  // sub-tracks, and an interrupt waits for the last one. Never mutated — each
+  // pass replays from it.
   tracks: Array<QueueTrack | QueueTrack[]>;
 
-  repeatsLeft: number; // -1 for infinite
+  repeatsLeft: number; // -1 infinite, 0 no further passes, N more passes
+  // Milliseconds; read only by the delay types; equal when Random Delay is off.
   shuffleWaitMin: number;
   shuffleWaitMax: number;
 
-  // For shuffle, we need to track the remaining tracks in the current
-  // shuffle cycle. If the shuffle repeats, this will be reset to the
-  // full list of tracks once it is empty.
+  // Tracks not yet played this pass (every type): filled from `tracks` by
+  // addToQueue and refilled by handleRepeat (shuffled for shuffle types). A
+  // shallow copy — nested arrays are shared with `tracks`, so never mutate them.
   tracksRemaining: Array<QueueTrack | QueueTrack[]>;
 }
