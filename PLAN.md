@@ -4,9 +4,9 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-003 — playlist repeat/interrupt bug fixes + interrupt coverage (`feature/T-003-playlist-interrupt-fixes`); task file drafted, awaiting review + commit
-Now:     commit the approved T-003 task file; decide the follow-up for the reporter's actual symptom (interrupt waits for a 45 s script track — see Backlog "Interrupt latency")
-Next:    implement T-003 (TDD, mutation-check each fix); then promote the next Backlog item (candidates: sum-based Run gate on FAILED, dead upload catch, `deployment/docker-compose.yml` device-path typo)
+Active:  T-003 — playlist repeat/interrupt bug fixes + interrupt coverage (`feature/T-003-playlist-interrupt-fixes`); task file committed, implementation waits for T-004
+Now:     T-004 first (`feature/T-004-script-duration-units`) — the reporter's actual root cause (script durations stored in seconds, read as deciseconds)
+Next:    implement T-003 after T-004 merges (merge develop into the T-003 branch first); then promote the next Backlog item (candidates: sum-based Run gate on FAILED, dead upload catch, `deployment/docker-compose.yml` device-path typo)
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
 Last:    2026-09-07 — 1.0.1 released (PR #124 develop → main, PR #126 release-prep → release); develop bumped to `1.0.2-dev.0` (PR #127)
 
@@ -57,10 +57,9 @@ From the 2026-09-06 release prep (PR #124):
 From the T-003 planning (2026-09-27, playlist interrupt investigation):
 
 - Interrupt during a Wait track or shuffle gap waits for the silence to end before switching — consider starting the replacement immediately (behavior change; T-003 keeps switch-at-end)
-- Zero-duration tracks + infinite repeat: scripts with no recorded duration (deleted → 0 ms) re-dispatch `SCRIPT_RUN` back-to-back every tick — floor the track duration or refuse to repeat an all-zero pass
 - `settings.repeat`/`repeatCount` survive a type change to a non-repeat type (settings JSON never reset); T-003 only fixes the display — decide whether the editor should clear them
 - `convertPlaylistToQueueItem` does not clamp `delayMax < delayMin` (editor prevents it; hand-edited/imported data would compute a negative delay range)
-- Interrupt latency on long script tracks (the actual 2026-09-27 report): `Sequential, Repeatable` + Infinite + one script whose only event is at 45 s → a remote press waits up to 45 s (switch happens at track end; the ESP also queues `SCRIPT_RUN` behind a running script, only `PANIC_STOP` clears it). Server-only mitigation = the Wait/gap cut-short item above + modelling idle time as a Wait track; true preemption of a running script needs a protocol change with AstrOs.ESP
+- Preemptive interrupt of a running script (server cancels the track timer + ESP aborts the current script; protocol change with AstrOs.ESP) — only if track-boundary switching still feels too slow once T-004's durations are correct
 - Uninterruptible repeat (`Sequential` + repeat) — dropped from T-003; the reporter uses `Sequential, Repeatable`, so no demand for it yet
 
 Open local branches (pre-workflow threads, unmerged into `develop`):

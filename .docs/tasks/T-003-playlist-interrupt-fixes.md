@@ -61,19 +61,18 @@ ignoring `repeatsLeft`, or the converter's `repeatCount: -1` (the value the edit
 for Infinite — only the legacy `0` is tested).
 
 Reporter answers (2026-09-27): a **`Sequential, Repeatable`** playlist, **Infinite** repeat, whose
-one track is a script with a single event at **45 s**. None of bugs 1–6 applies (no nested
-playlist, no shuffle). Root cause of the report is the documented semantics, not a defect:
-
-- Script duration is recalculated on every save as the time of the last event
-  (`calculateLengthDS`, `script_repository.ts` `upsertScript`), so the track lasts 45 000 ms.
-- An interruptible playlist switches at the end of the current track. Probe (reporter's exact
-  shape, remote press at t = 10 s): `0s:S45  45s:X`, then idle — the interrupt works, 35 s late.
-- Firmware cannot shorten this: `AnimationController::queueScript` (AstrOs.ESP) queues a
-  `SCRIPT_RUN` behind the running script; only `PANIC_STOP` clears the ESP queue. An immediate
-  interrupt of a running script needs a protocol change (follow-up, not this task).
+one track is a script with a single event at **45 s**; the 45 s event keeps firing over and over
+and a script sent mid-loop never interrupts it. None of bugs 1–6 applies (no nested playlist, no
+shuffle). Root cause is a units bug, owned by **T-004**
+(`.docs/tasks/T-004-script-duration-units.md`): `calculateLengthDS` stores the last event time in
+*seconds* in `scripts.duration_ds`, which every consumer reads as deciseconds, so the queue times
+the 45 s script as 4.5 s. The server re-sends `SCRIPT_RUN` ten times per real run, the ESP's
+30-slot script queue fills, and the interrupting script is dropped (`Queue is full`) or queued
+behind ~22 min of backlog. (An earlier note here blamed track-boundary latency; that probe assumed
+the column really held deciseconds.)
 
 This task stays as scoped: bugs 1–6 are real (bug 1 crashes the API) and independent of the
-report.
+report. T-004 lands first.
 
 ## Contract (pinned — do not change)
 
@@ -173,7 +172,7 @@ Tests — each fix RED-first; after it goes green, revert the fix and confirm th
 
 Docs:
 
-10. Create `.docs/qa/playlist-playback.md` (no playlist QA plan exists) covering interrupt
+10. Create `.docs/qa/playlist-playback.md` (or extend it, if T-004 created it first) covering interrupt
     behavior per type, nested-track interrupts, shuffle gaps at the repeat boundary, fixed vs
     random delay, and the repeat dropdown display.
 
@@ -203,8 +202,7 @@ Docs:
 
 - **Uninterruptible repeat** (`Sequential` + repeat, or a new type) — withdrawn; the reporter
   uses `Sequential, Repeatable`, so it is not what the report needs.
-- **Interrupt latency on long script tracks** (the reporter's actual symptom) — a follow-up task;
-  see Context.
+- **Script durations 10× too short** (the reporter's actual root cause) — T-004.
 - **Cutting silence short on interrupt** — starting a replacement immediately during a Wait track
   or shuffle gap instead of at its end. Behavior change → PLAN.md Backlog.
 - **Zero-duration tracks + infinite repeat** — scripts with no recorded duration (e.g. deleted →
