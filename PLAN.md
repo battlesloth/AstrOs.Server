@@ -4,18 +4,18 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-004 — store script durations in deciseconds (`feature/T-004-script-duration-units`); implemented, pre-push reviewed, closed out on the branch — awaiting push + PR into develop
-Now:     Jeff pushes `feature/T-004-script-duration-units` and opens the PR into develop; bench-verify from `.docs/qa/playlist-playback.md` (cases 1–4 on a DB created under 1.0.1); 1.0.2 patch candidate
-Next:    T-003 (task file committed on `feature/T-003-playlist-interrupt-fixes`) — merge develop into that branch after T-004 lands, then implement; at that merge, update two T-003 pointers: its Contract's `runScript` wrapper (`api_server.ts` ~1389) now lives in `convertScriptToQueueItem` (`playlist_converter.ts`, same behavior), and its Context link to T-004 moves to `.docs/tasks/completed/`
+Active:  T-003 — playlist repeat/interrupt bug fixes + interrupt coverage (`feature/T-003-playlist-interrupt-fixes`; task file committed, branch needs develop merged in)
+Now:     merge develop into the T-003 branch and update two T-003 pointers — its Contract's `runScript` wrapper now lives in `convertScriptToQueueItem` (`playlist_converter.ts`, same behavior) and its Context link to T-004 moves to `.docs/tasks/completed/` — then implement T-003
+Next:    after T-003, promote the next Backlog item (candidates: sum-based Run gate on FAILED, dead upload catch, `deployment/docker-compose.yml` device-path typo); T-004's ESP-side bench check whenever the droid is connected
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — T-004 implemented + pre-push reviewed (4 commits on `feature/T-004-script-duration-units`)
+Last:    2026-09-28 — T-004 merged (PR #128); log-level bench passed (QA cases 1–6)
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
 - [ ] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/T-003-playlist-interrupt-fixes.md` — task file lives on its branch until it merges; branch `feature/T-003-playlist-interrupt-fixes`)
-- [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; bench verification pending)
+- [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench log-verified 2026-09-28 — ESP-side check pending hardware)
 
 ## Backlog (unscheduled candidates)
 
@@ -69,6 +69,8 @@ From the T-004 planning (2026-09-27, script duration units):
 - `initializeDatabase` doesn't detect a DB that is *ahead* of the code (applied migrations the build doesn't know): with nothing pending it returns early and Kysely's missing-migration check never runs, so a downgraded build boots silently — log an error or go read-only
 - `write_guard.ts` `BLOCKED_GET_PATHS` blocks `/scripts/run` and `/playlists/run` but not `GET /remotecontrol`, which calls the same `runScript`/`runPlaylist` — in read-only mode the remote can still dispatch
 - `database.integration.test.ts` failure-path tests assert only the `reasonCode`, not *why* the migration failed — a production migration missing from `buildProvider` makes them pass on "corrupted migrations" (T-004 hit exactly this); assert the logged cause or add a guard that `buildProvider` matches the production list
+- `upsertScript` insert path stores the client's `lastSaved` (`new Date(script.lastSaved).getTime()`) while the update path uses `Date.now()`; the scripter seeds new scripts with `1970-01-01`, so a script saved once shows `last_modified = 0` (seen on the T-004 bench) — use `Date.now()` on insert too
+- Dev DB script `T-004 QA` stored `duration_ds = 30` while all its events sit at 0 s (migration 8 made it 0) — some path wrote the script row without its events; find it (and note its 0 ms length makes it a flood risk under infinite repeat)
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
@@ -89,6 +91,7 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
   - end-to-end units test (45.0 s event → 45 000 ms for direct run and playlist) plus a save-path-vs-migration cross-check — the only test that catches a symmetric ×100 storage change; every fix mutation-checked
   - `database.integration.test.ts` mirrors the production migration list — adding a migration without bumping it made failure-path tests pass on "corrupted migrations"
   - review lesson: Kysely's SQLite adapter runs migrations **without** a transaction (`supportsTransactionalDdl = false`); the codebase's comments had claimed otherwise since the db-safety work, and a first "fix" repeated a reviewer's claim after reading only the matching line
+  - merged as PR #128. Log-level bench (no droid; dev DB created under develop): develop sent the 45 s script every 4.501 s (21 dispatches in 90 s → ~18 queued ahead of an interrupt on a real ESP); on T-004, migration 8 converted 45 → 450 with no re-save, the loop ran every 45.002 s, the interrupt replaced it at the next boundary, script + Wait 5 s → T+50.007 s, a 30 s re-save stored 300 (30.00 s cadence), a queued direct run waited 45.001 s. ESP-side (`Queue is full` absent, interrupt plays right after the event) pending the droid
   - T-003 (queue/interrupt bugs found while investigating) stays planned on its branch; Backlog gained branded time units, a boot-time duration consistency check, a DB-ahead-of-code check, the `/remotecontrol` read-only gap, and the Kysely `10_*` sort hazard
 
 - 2026-09-07 release 1.0.1
