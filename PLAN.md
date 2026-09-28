@@ -4,17 +4,17 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-003 — playlist repeat/interrupt fixes (`feature/T-003-playlist-interrupt-fixes`); implemented, pre-push reviewed, closed out on the branch — awaiting push + PR into develop
-Now:     Jeff pushes the T-003 branch and opens the PR into develop; bench cases 7–13 in `.docs/qa/playlist-playback.md` (log-verifiable, droid optional)
-Next:    T-005 — zero-duration playlist tracks re-dispatching `SCRIPT_RUN` every tick (promoted from the T-004 Backlog by Jeff 2026-09-28: "immediately after this task"); task file first, off develop once T-003 merges. Then the Backlog candidates (sum-based Run gate on FAILED, dead upload catch, compose device-path typo); T-004's ESP-side bench check whenever the droid is connected
+Active:  T-005 — pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`feature/T-005-zero-duration-repeat-passes`)
+Now:     implement T-005 (TDD, mutation-check each fix; failure-mode inventory in the task file)
+Next:    Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo); bench checks still open: T-004 ESP-side, T-003 cases 7–13
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — T-003 implemented + pre-push reviewed (on its branch); T-004 merged (PR #128), log-level bench passed
+Last:    2026-09-28 — T-003 merged (PR #129); T-004 merged (PR #128), log-level bench passed
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
-- [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; bench verification pending)
+- [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; merged 2026-09-28, PR #129; bench cases 7–13 pending)
 - [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench log-verified 2026-09-28 — ESP-side check pending hardware)
 
 ## Backlog (unscheduled candidates)
