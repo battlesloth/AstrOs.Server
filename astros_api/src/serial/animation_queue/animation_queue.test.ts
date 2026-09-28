@@ -2,9 +2,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnimationQueue } from './animation_queue.js';
 import { AnimationQueuePlaylist, QueueTrack } from './queue_item/animation_queue_item.js';
 import { PlaylistType } from '../../models/playlists/playlistType.js';
+import { ControllerLocation } from '../../models/control_module/controller_location.js';
 
 function makeTrack(id: string, duration: number, isWait = false): QueueTrack {
   return { id, duration, isWait };
+}
+
+// A directly run script: Sequential (uninterruptible), one track, no repeat.
+function makeScriptItem(
+  id: string,
+  duration: number,
+  locations: ControllerLocation[] = [],
+): AnimationQueuePlaylist {
+  return makePlaylist({
+    id: `script-${id}`,
+    playlistType: PlaylistType.Sequential,
+    locations,
+    tracks: [makeTrack(id, duration)],
+  });
+}
+
+function makeLocations(id: string): ControllerLocation[] {
+  return [{ id } as ControllerLocation];
+}
+
+function dispatchedIds(dispatch: ReturnType<typeof vi.fn>): string[] {
+  return dispatch.mock.calls.map((call) => call[0] as string);
 }
 
 function makePlaylist(
@@ -96,11 +119,7 @@ describe('Animation Queue Tests', () => {
 
       const playlist = makePlaylist({
         playlistType: PlaylistType.Sequential,
-        tracks: [
-          makeTrack('track1', 1000),
-          [...subTracks], // copy to avoid mutation issues
-          makeTrack('track3', 200),
-        ],
+        tracks: [makeTrack('track1', 1000), subTracks, makeTrack('track3', 200)],
       });
 
       queue.addToQueue(playlist);
@@ -122,6 +141,10 @@ describe('Animation Queue Tests', () => {
       vi.advanceTimersByTime(300);
       expect(dispatch).toHaveBeenCalledTimes(4);
       expect(dispatch).toHaveBeenCalledWith('track3', []);
+
+      // Playback must not consume the playlist's own nested array — a repeat
+      // pass replays from it.
+      expect(subTracks.map((t) => t.id)).toEqual(['sub1', 'sub2']);
     });
   });
 
@@ -602,6 +625,652 @@ describe('Animation Queue Tests', () => {
       queue.panicStop();
       expect(seen).toEqual([true]); // second listener still ran
       expect(queue.getPanicState()).toEqual({ inPanicStop: true }); // state still set
+    });
+  });
+
+  // ── Repeat with nested tracks ────────────────────────────────
+
+  describe('Repeat with nested tracks', () => {
+    it('replays nested tracks on every pass', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialRepeatable,
+          tracks: [makeTrack('s1', 100), [makeTrack('n1', 100), makeTrack('n2', 100)]],
+          repeatsLeft: 1,
+        }),
+      );
+      vi.advanceTimersByTime(1000);
+
+      expect(dispatchedIds(dispatch)).toEqual(['s1', 'n1', 'n2', 's1', 'n1', 'n2']);
+    });
+
+    it('keeps cycling a nested-only playlist on infinite repeat without throwing', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialRepeatable,
+          tracks: [[makeTrack('n1', 100), makeTrack('n2', 100)]],
+          repeatsLeft: -1,
+        }),
+      );
+
+      // Emptied nested arrays used to recurse synchronously into a stack
+      // overflow inside the timer callback, killing the API process.
+      expect(() => vi.advanceTimersByTime(1000)).not.toThrow();
+      // t = 0, 100, …, 1000 → 11 dispatches alternating n1, n2.
+      expect(dispatchedIds(dispatch)).toEqual([
+        'n1',
+        'n2',
+        'n1',
+        'n2',
+        'n1',
+        'n2',
+        'n1',
+        'n2',
+        'n1',
+        'n2',
+        'n1',
+      ]);
+    });
+  });
+
+  // ── Interrupt during a nested track ──────────────────────────
+
+  describe('Interrupt during a nested track', () => {
+    // A nested playlist is one track in the editor and is always Sequential,
+    // so a replacement waits for its last sub-track.
+    it('finishes the nested track first, dispatching its sub-tracks with the original locations', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      const locA = makeLocations('loc-A');
+      const locX = makeLocations('loc-X');
+
+      queue.addToQueue(
+        makePlaylist({
+          id: 'A',
+          playlistType: PlaylistType.SequentialInterruptible,
+          locations: locA,
+          tracks: [
+            [makeTrack('n1', 100), makeTrack('n2', 100), makeTrack('n3', 100)],
+            makeTrack('c', 100),
+          ],
+        }),
+      );
+      vi.advanceTimersByTime(50);
+      queue.addToQueue(makeScriptItem('X', 100, locX));
+      vi.advanceTimersByTime(1000);
+
+      expect(dispatch.mock.calls).toEqual([
+        ['n1', locA],
+        ['n2', locA],
+        ['n3', locA],
+        ['X', locX],
+      ]);
+    });
+
+    it('switches at the end of the last sub-track when interrupted during it', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialInterruptible,
+          tracks: [[makeTrack('n1', 100), makeTrack('n2', 100)], makeTrack('c', 100)],
+        }),
+      );
+      vi.advanceTimersByTime(150); // n2 playing
+      queue.addToQueue(makeScriptItem('X', 100));
+      vi.advanceTimersByTime(49);
+      expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2', 'X']);
+
+      vi.advanceTimersByTime(1000);
+      expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2', 'X']);
+    });
+  });
+
+  // ── Shuffle gaps ─────────────────────────────────────────────
+
+  describe('Shuffle gaps', () => {
+    // Math.random 0.99 keeps Fisher-Yates order (j === i) and, with
+    // shuffleWaitMin === shuffleWaitMax, the gap is exactly that value.
+    let randomSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    });
+    afterEach(() => {
+      randomSpy.mockRestore();
+    });
+
+    it('starts a replacement queued during a gap when the gap ends, never the pre-picked track', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.ShuffleWithDelay,
+          tracks: [makeTrack('a', 100), makeTrack('b', 100)],
+          shuffleWaitMin: 1000,
+          shuffleWaitMax: 1000,
+        }),
+      );
+      vi.advanceTimersByTime(500); // a ended at 100; in the gap until 1100
+      queue.addToQueue(makeScriptItem('X', 100));
+
+      vi.advanceTimersByTime(599);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+
+      vi.advanceTimersByTime(5000);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+    });
+
+    it('waits a gap before the first track of each repeat pass', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.ShuffleWithDelayAndRepeat,
+          tracks: [makeTrack('a', 100), makeTrack('b', 100)],
+          repeatsLeft: 1,
+          shuffleWaitMin: 1000,
+          shuffleWaitMax: 1000,
+        }),
+      );
+      // Pass 1: a at 0, gap, b at 1100 (ends 1200). Pass 2 must wait the gap too.
+      vi.advanceTimersByTime(2199);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'a']);
+      vi.advanceTimersByTime(1100);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'a', 'b']);
+
+      vi.advanceTimersByTime(5000);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'a', 'b']);
+    });
+
+    it('starts a replacement queued in the repeat-boundary gap when the gap ends; the next pass never starts', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.ShuffleWithDelayAndRepeat,
+          tracks: [makeTrack('a', 100)],
+          repeatsLeft: -1,
+          shuffleWaitMin: 1000,
+          shuffleWaitMax: 1000,
+        }),
+      );
+      vi.advanceTimersByTime(500); // a ended at 100; boundary gap until 1100
+      queue.addToQueue(makeScriptItem('X', 100));
+
+      vi.advanceTimersByTime(599);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+
+      vi.advanceTimersByTime(5000);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+    });
+  });
+
+  // ── Interrupt matrix ─────────────────────────────────────────
+
+  describe('Interrupt matrix', () => {
+    // 0.99 keeps shuffle order; min === max makes a delay type's gap exact.
+    let randomSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    });
+    afterEach(() => {
+      randomSpy.mockRestore();
+    });
+
+    it.each([
+      [PlaylistType.SequentialInterruptible, 'no repeat', 0],
+      [PlaylistType.SequentialRepeatable, 'count 2', 2],
+      [PlaylistType.SequentialRepeatable, 'infinite', -1],
+      [PlaylistType.Shuffle, 'no repeat', 0],
+      [PlaylistType.ShuffleWithRepeat, 'count 2', 2],
+      [PlaylistType.ShuffleWithRepeat, 'infinite', -1],
+      [PlaylistType.ShuffleWithDelay, 'no repeat', 0],
+      [PlaylistType.ShuffleWithDelayAndRepeat, 'count 2', 2],
+      [PlaylistType.ShuffleWithDelayAndRepeat, 'infinite', -1],
+    ] as const)(
+      '%s, %s: a script queued mid-track starts when the track ends and the playlist never returns',
+      (type, _label, repeatsLeft) => {
+        const dispatch = vi.fn();
+        const queue = new AnimationQueue(dispatch);
+
+        queue.addToQueue(
+          makePlaylist({
+            playlistType: type,
+            tracks: [makeTrack('a', 1000), makeTrack('b', 1000)],
+            repeatsLeft,
+            shuffleWaitMin: 1000,
+            shuffleWaitMax: 1000,
+          }),
+        );
+        vi.advanceTimersByTime(500);
+        queue.addToQueue(makeScriptItem('X', 300));
+
+        vi.advanceTimersByTime(499);
+        expect(dispatchedIds(dispatch)).toEqual(['a']);
+        vi.advanceTimersByTime(1);
+        expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+
+        vi.advanceTimersByTime(20000);
+        expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+        expect(queue.activePlaylist).toBeNull();
+      },
+    );
+
+    it('Sequential: a script queued mid-track waits for the whole playlist', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.Sequential,
+          tracks: [makeTrack('a', 1000), makeTrack('b', 1000)],
+        }),
+      );
+      vi.advanceTimersByTime(500);
+      queue.addToQueue(makeScriptItem('X', 300));
+
+      vi.advanceTimersByTime(1499);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'X']);
+    });
+  });
+
+  // ── Interrupt timing ─────────────────────────────────────────
+
+  describe('Interrupt timing', () => {
+    it('during a Wait track: switches when the wait ends', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialInterruptible,
+          tracks: [makeTrack('a', 100), makeTrack('wait', 1000, true), makeTrack('b', 100)],
+        }),
+      );
+      vi.advanceTimersByTime(500);
+      queue.addToQueue(makeScriptItem('X', 100));
+
+      vi.advanceTimersByTime(599);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+      vi.advanceTimersByTime(5000);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+    });
+
+    it('on the last track of the final pass: switches at that track end', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialRepeatable,
+          tracks: [makeTrack('a', 100), makeTrack('b', 100)],
+          repeatsLeft: 1,
+        }),
+      );
+      vi.advanceTimersByTime(350); // pass 2's b plays 300–400
+      queue.addToQueue(makeScriptItem('X', 100));
+
+      vi.advanceTimersByTime(49);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'a', 'b']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'a', 'b', 'X']);
+      vi.advanceTimersByTime(5000);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'a', 'b', 'X']);
+    });
+  });
+
+  // ── Interrupter kind ─────────────────────────────────────────
+
+  describe('Interrupter kind', () => {
+    function playInterruptible(queue: AnimationQueue) {
+      queue.addToQueue(
+        makePlaylist({
+          id: 'A',
+          playlistType: PlaylistType.SequentialInterruptible,
+          tracks: [makeTrack('a1', 1000), makeTrack('a2', 1000)],
+        }),
+      );
+    }
+
+    it('a Sequential playlist replaces an interruptible one and plays through', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      playInterruptible(queue);
+
+      vi.advanceTimersByTime(500);
+      queue.addToQueue(
+        makePlaylist({
+          id: 'P',
+          playlistType: PlaylistType.Sequential,
+          tracks: [makeTrack('p1', 100), makeTrack('p2', 100)],
+        }),
+      );
+      vi.advanceTimersByTime(5000);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a1', 'p1', 'p2']);
+    });
+
+    it('an interruptible replacement can itself be interrupted', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      playInterruptible(queue);
+
+      vi.advanceTimersByTime(500);
+      queue.addToQueue(
+        makePlaylist({
+          id: 'B',
+          playlistType: PlaylistType.SequentialInterruptible,
+          tracks: [makeTrack('b1', 1000), makeTrack('b2', 1000)],
+        }),
+      );
+      vi.advanceTimersByTime(1000); // b1 started at 1000
+      queue.addToQueue(makeScriptItem('X', 100));
+      vi.advanceTimersByTime(5000);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a1', 'b1', 'X']);
+    });
+
+    it('two arrivals in one track: a later item replaces a pending interruptible replacement', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      playInterruptible(queue);
+
+      vi.advanceTimersByTime(300);
+      queue.addToQueue(
+        makePlaylist({
+          id: 'B',
+          playlistType: PlaylistType.SequentialInterruptible,
+          tracks: [makeTrack('b1', 100)],
+        }),
+      );
+      vi.advanceTimersByTime(300);
+      queue.addToQueue(makeScriptItem('X', 100));
+      vi.advanceTimersByTime(5000);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a1', 'X']);
+    });
+
+    it('two arrivals in one track: a later item queues behind a pending Sequential replacement', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      playInterruptible(queue);
+
+      vi.advanceTimersByTime(300);
+      queue.addToQueue(makeScriptItem('X', 100));
+      vi.advanceTimersByTime(300);
+      queue.addToQueue(makeScriptItem('Y', 100));
+
+      vi.advanceTimersByTime(400); // a1 ends at 1000
+      expect(dispatchedIds(dispatch)).toEqual(['a1', 'X']);
+      vi.advanceTimersByTime(100);
+      expect(dispatchedIds(dispatch)).toEqual(['a1', 'X', 'Y']);
+      vi.advanceTimersByTime(5000);
+      expect(dispatchedIds(dispatch)).toEqual(['a1', 'X', 'Y']);
+    });
+  });
+
+  // ── Panic interleavings ──────────────────────────────────────
+
+  describe('Panic interleavings', () => {
+    let randomSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    });
+    afterEach(() => {
+      randomSpy.mockRestore();
+    });
+
+    // Recover *before* the interrupted playlist's pending deadline, with a
+    // delay-type item: a gap timer panicStop failed to cancel would dispatch
+    // the old playlist's pre-picked track, and a replacement flag panicStop
+    // failed to reset would skip the recovery item's gap (r2 at +2000, not
+    // +3000).
+    function expectCleanRecovery(
+      queue: AnimationQueue,
+      dispatch: ReturnType<typeof vi.fn>,
+      before: string[],
+    ) {
+      queue.panicStop();
+      vi.advanceTimersByTime(10);
+      expect(dispatchedIds(dispatch)).toEqual(before);
+
+      queue.clearPanicStop();
+      queue.addToQueue(
+        makePlaylist({
+          id: 'R',
+          playlistType: PlaylistType.ShuffleWithDelay,
+          tracks: [makeTrack('r1', 2000), makeTrack('r2', 100)],
+          shuffleWaitMin: 1000,
+          shuffleWaitMax: 1000,
+        }),
+      );
+      expect(dispatchedIds(dispatch)).toEqual([...before, 'r1']);
+      vi.advanceTimersByTime(2999);
+      expect(dispatchedIds(dispatch)).toEqual([...before, 'r1']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual([...before, 'r1', 'r2']);
+
+      vi.advanceTimersByTime(10000);
+      expect(dispatchedIds(dispatch)).toEqual([...before, 'r1', 'r2']);
+    }
+
+    it('during a shuffle gap', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.ShuffleWithDelay,
+          tracks: [makeTrack('a', 100), makeTrack('b', 100)],
+          shuffleWaitMin: 1000,
+          shuffleWaitMax: 1000,
+        }),
+      );
+      vi.advanceTimersByTime(500); // in the gap
+
+      expectCleanRecovery(queue, dispatch, ['a']);
+    });
+
+    it('during a Wait track', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialInterruptible,
+          tracks: [makeTrack('a', 100), makeTrack('wait', 1000, true), makeTrack('b', 100)],
+        }),
+      );
+      vi.advanceTimersByTime(500);
+
+      expectCleanRecovery(queue, dispatch, ['a']);
+    });
+
+    it('mid-nested track', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialInterruptible,
+          tracks: [[makeTrack('n1', 100), makeTrack('n2', 100), makeTrack('n3', 100)]],
+        }),
+      );
+      vi.advanceTimersByTime(50);
+
+      expectCleanRecovery(queue, dispatch, ['n1']);
+    });
+
+    it('with a replacement pending', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialInterruptible,
+          tracks: [makeTrack('a1', 1000), makeTrack('a2', 1000)],
+        }),
+      );
+      vi.advanceTimersByTime(300);
+      queue.addToQueue(
+        makePlaylist({
+          id: 'B',
+          playlistType: PlaylistType.SequentialInterruptible,
+          tracks: [makeTrack('b1', 100)],
+        }),
+      );
+      vi.advanceTimersByTime(300);
+
+      expectCleanRecovery(queue, dispatch, ['a1']);
+    });
+  });
+
+  // ── Repeat counts and non-repeat types ───────────────────────
+
+  describe('Repeat counts and non-repeat types', () => {
+    let randomSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+    });
+    afterEach(() => {
+      randomSpy.mockRestore();
+    });
+
+    it('repeatsLeft 2 plays three passes', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialRepeatable,
+          tracks: [makeTrack('a', 100)],
+          repeatsLeft: 2,
+        }),
+      );
+      vi.advanceTimersByTime(5000);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a', 'a']);
+      expect(queue.activePlaylist).toBeNull();
+    });
+
+    it('a nested-only playlist on infinite repeat is interruptible after its nested track', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialRepeatable,
+          tracks: [[makeTrack('n1', 100), makeTrack('n2', 100)]],
+          repeatsLeft: -1,
+        }),
+      );
+      vi.advanceTimersByTime(250); // pass 2's n1 plays 200–300
+      queue.addToQueue(makeScriptItem('X', 100));
+      vi.advanceTimersByTime(5000);
+
+      expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2', 'n1', 'n2', 'X']);
+    });
+
+    it.each([
+      PlaylistType.Sequential,
+      PlaylistType.SequentialInterruptible,
+      PlaylistType.Shuffle,
+      PlaylistType.ShuffleWithDelay,
+    ])('%s ignores repeatsLeft -1 and plays one pass', (type) => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: type,
+          tracks: [makeTrack('a', 100), makeTrack('b', 100)],
+          repeatsLeft: -1,
+          shuffleWaitMin: 1000,
+          shuffleWaitMax: 1000,
+        }),
+      );
+      vi.advanceTimersByTime(10000);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b']);
+      expect(queue.activePlaylist).toBeNull();
+    });
+
+    // The converter fills shuffleWaitMin/Max from the settings for every type,
+    // so stale delay settings reach the queue; only the delay types may wait.
+    it.each([
+      PlaylistType.Sequential,
+      PlaylistType.SequentialInterruptible,
+      PlaylistType.SequentialRepeatable,
+      PlaylistType.Shuffle,
+      PlaylistType.ShuffleWithRepeat,
+    ])('%s never waits between tracks, even with delay settings stored', (type) => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: type,
+          tracks: [makeTrack('a', 100), makeTrack('b', 100)],
+          shuffleWaitMin: 1000,
+          shuffleWaitMax: 1000,
+        }),
+      );
+      vi.advanceTimersByTime(100);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b']);
+    });
+
+    it.each([PlaylistType.SequentialRepeatable, PlaylistType.ShuffleWithRepeat])(
+      '%s starts the next pass immediately, even with delay settings stored',
+      (type) => {
+        const dispatch = vi.fn();
+        const queue = new AnimationQueue(dispatch);
+        queue.addToQueue(
+          makePlaylist({
+            playlistType: type,
+            tracks: [makeTrack('a', 100)],
+            repeatsLeft: 1,
+            shuffleWaitMin: 1000,
+            shuffleWaitMax: 1000,
+          }),
+        );
+        vi.advanceTimersByTime(100);
+
+        expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      },
+    );
+
+    it('an empty playlist on infinite repeat goes idle', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+
+      expect(() =>
+        queue.addToQueue(
+          makePlaylist({
+            playlistType: PlaylistType.SequentialRepeatable,
+            tracks: [],
+            repeatsLeft: -1,
+          }),
+        ),
+      ).not.toThrow();
+      vi.advanceTimersByTime(1000);
+
+      expect(dispatch).not.toHaveBeenCalled();
+      expect(queue.activePlaylist).toBeNull();
     });
   });
 });

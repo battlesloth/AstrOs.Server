@@ -343,6 +343,37 @@ describe('Playlist Converter', () => {
     expect(result.shuffleWaitMax).toBe(5000);
   });
 
+  it('should map repeat settings: repeatCount=-1 (what the editor saves for Infinite) → repeatsLeft=-1', async () => {
+    const playlist: Playlist = {
+      id: 'p1',
+      playlistName: 'Test',
+      description: '',
+      playlistType: PlaylistType.SequentialRepeatable,
+      tracks: [makeTrack({ idx: 0 })],
+      settings: makeSettings({ repeat: true, repeatCount: -1 }),
+    };
+
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
+    expect(result.repeatsLeft).toBe(-1);
+  });
+
+  it('should use a fixed delay of delayMin when randomDelay is false, ignoring a stale delayMax', async () => {
+    // The editor only ever raises delayMax, so turning Random Delay off after
+    // using it leaves the old maximum behind.
+    const playlist: Playlist = {
+      id: 'p1',
+      playlistName: 'Test',
+      description: '',
+      playlistType: PlaylistType.ShuffleWithDelay,
+      tracks: [makeTrack({ idx: 0 })],
+      settings: makeSettings({ randomDelay: false, delayMin: 10, delayMax: 50 }),
+    };
+
+    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
+    expect(result.shuffleWaitMin).toBe(1000);
+    expect(result.shuffleWaitMax).toBe(1000);
+  });
+
   it('should preserve playlistType from source', async () => {
     const playlist: Playlist = {
       id: 'p1',

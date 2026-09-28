@@ -32,6 +32,10 @@ function initRepeatMode(): 'none' | 'count' | 'infinite' {
 
 const repeatMode = ref<'none' | 'count' | 'infinite'>(initRepeatMode());
 
+// Display only: settings survive a type change, so a type that cannot repeat
+// would otherwise show a stale (greyed-out) mode it will never play.
+const displayedRepeatMode = computed(() => (repeatEnabled.value ? repeatMode.value : 'none'));
+
 function onRepeatModeChange(mode: 'none' | 'count' | 'infinite') {
   repeatMode.value = mode;
   if (mode === 'none') {
@@ -125,7 +129,7 @@ function setDelayMax(e: Event) {
     </div>
     <div class="flex flex-row flex-wrap items-center gap-2">
       <select
-        :value="repeatMode"
+        :value="displayedRepeatMode"
         @change="
           onRepeatModeChange(
             ($event.target as HTMLSelectElement).value as 'none' | 'count' | 'infinite',
@@ -143,7 +147,7 @@ function setDelayMax(e: Event) {
         placeholder="Count"
         min="1"
         step="1"
-        :value="modelValue.repeatCount > 0 ? modelValue.repeatCount : ''"
+        :value="repeatEnabled && modelValue.repeatCount > 0 ? modelValue.repeatCount : ''"
         @change="onRepeatCountChange"
         :disabled="!repeatEnabled || repeatMode !== 'count'"
         class="input input-bordered input-sm w-17"

@@ -48,7 +48,8 @@ Investigation (2026-09-27). Bugs 1–3 were reproduced with throwaway vitest pro
    (also after reload — `initRepeatMode()` rebuilds it from the stored JSON). The backend plays
    the playlist once, uninterruptibly. Likely source of the reporter's "sequential set to repeat".
 6. **Interrupts land between a nested playlist's sub-tracks.** In `playNextTrack` the replacement
-   check (Step B) runs before the sub-track step (Step C), so an interruptible playlist is cut
+   check (Step B in the pre-fix code) runs before the sub-track step (Step C; the fix swaps them,
+   so the labels now read the other way), so an interruptible playlist is cut
    mid-nested-playlist. The editor presents a nested playlist as one track, nested playlists are
    always `Sequential` (uninterruptible), and the help text says interruption happens "as soon as
    the current track finishes". Decision (Jeff, 2026-09-27): switch only after the whole nested
@@ -281,15 +282,15 @@ on shared in-memory state (`activePlaylist`, `currentTrack`, `currentTimeout`,
 
 ## Implementation checklist
 
-- [ ] Fix 1 RED/GREEN — `beginTrack` copies nested arrays (nested replay on repeat, source untouched, nested-only infinite loop no throw)
-- [ ] Fix 4 RED/GREEN — nested sub-tracks finish before a replacement; captured locations
-- [ ] Fix 2 RED/GREEN — `scheduleGap`; no stale pre-picked track after a replacement in a gap
-- [ ] Fix 3 RED/GREEN — gap before the first track of each repeat pass
-- [ ] Task 7 coverage — interrupt matrix (7 types, count + infinite rows), timing, interrupter kind, panic interleavings, repeat, non-repeat, empty
-- [ ] Fix 5 RED/GREEN — converter `randomDelay: false` → fixed delay; `repeatCount: -1` row
-- [ ] Fix 6 RED/GREEN — `AstrosPlaylistSettings.spec.ts`; repeat dropdown shows none for non-repeat types
-- [ ] Mutation checks recorded (fixes 1–6)
-- [ ] Task 10 — extend `.docs/qa/playlist-playback.md`
-- [ ] Pre-commit: api + vue format/lint, builds, full suites, code review
+- [x] Fix 1 RED/GREEN — `beginTrack` copies nested arrays (nested replay on repeat, source untouched, nested-only infinite loop no throw)
+- [x] Fix 4 RED/GREEN — nested sub-tracks finish before a replacement; captured locations
+- [x] Fix 2 RED/GREEN — `scheduleGap`; no stale pre-picked track after a replacement in a gap
+- [x] Fix 3 RED/GREEN — gap before the first track of each repeat pass
+- [x] Task 7 coverage — interrupt matrix (7 types, count + infinite rows), timing, interrupter kind, panic interleavings, repeat, non-repeat, empty
+- [x] Fix 5 RED/GREEN — converter `randomDelay: false` → fixed delay; `repeatCount: -1` row
+- [x] Fix 6 RED/GREEN — `AstrosPlaylistSettings.spec.ts`; repeat dropdown shows none for non-repeat types
+- [x] Mutation checks recorded (fixes 1–6): fix 1 revert → 4 tests fail (source untouched, nested replay, nested-only infinite RangeError, nested-only interruptible); fix 4 step order → 2, captured locations → 1; fix 2 gap ignores replacement → 1; fix 3 no boundary gap → 2, gap keyed on repeatable instead of delay → 7; fix 5 revert → 1, always-delayMin → 1 (existing random test); fix 6 each binding → its own test, always-empty count → 1. Review round: gap timer outside `currentTimeout` → panic-gap test, `panicStop` keeping `playlistReplaced` → panic-replacement test (both escaped the first version of the panic tests)
+- [x] Task 10 — extend `.docs/qa/playlist-playback.md`
+- [x] Pre-commit: api + vue format/lint, builds, full suites, code review (findings addressed)
 - [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
 - [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry

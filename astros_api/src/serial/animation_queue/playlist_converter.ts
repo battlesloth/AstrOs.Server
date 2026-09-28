@@ -174,7 +174,9 @@ export async function convertPlaylistToQueueItem(
     tracks,
     repeatsLeft,
     shuffleWaitMin: dsToMs(settings.delayMin),
-    shuffleWaitMax: dsToMs(settings.delayMax),
+    // Random Delay off → a fixed delay of delayMin; the editor never lowers a
+    // stale delayMax left over from when it was on.
+    shuffleWaitMax: dsToMs(settings.randomDelay ? settings.delayMax : settings.delayMin),
     tracksRemaining: [],
   };
 }

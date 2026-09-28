@@ -62,6 +62,8 @@ From the T-003 planning (2026-09-27, playlist interrupt investigation):
 - `convertPlaylistToQueueItem` does not clamp `delayMax < delayMin` (editor prevents it; hand-edited/imported data would compute a negative delay range)
 - Preemptive interrupt of a running script (server cancels the track timer + ESP aborts the current script; protocol change with AstrOs.ESP) — only if track-boundary switching still feels too slow once T-004's durations are correct
 - Uninterruptible repeat (`Sequential` + repeat) — dropped from T-003; the reporter uses `Sequential, Repeatable`, so no demand for it yet
+- "Repeat - Count" with no number plays forever: new playlists default `repeatCount: 0` (`stores/playlists.ts`), choosing Count keeps 0 (only negatives are bumped to 1, `AstrosPlaylistSettings.vue` `onRepeatModeChange`), the count box shows empty, and the converter maps 0 → -1 (infinite; mapping pinned by T-003's Contract) — so the UI reads Count while the backend loops forever. Own task (T-003 review, 2026-09-28)
+- Delay controls show stale values greyed out after switching from a delay type to a non-delay type (same class as T-003 fix 6, which covered only the repeat dropdown)
 
 From the T-004 planning (2026-09-27, script duration units):
 
