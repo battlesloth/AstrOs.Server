@@ -4,16 +4,18 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  none — 1.0.1 released 2026-09-07; `chore/bump-1.0.2-dev` (develop → `1.0.2-dev.0`, main merged in) awaiting push + PR into develop
-Now:     land `chore/bump-1.0.2-dev`; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action; the `deployment/docker-compose.yml` device-path typo is a quick-fix candidate that shipped in 1.0.1)
-Next:    pick the promoted item's task file (T-003) off the latest origin/develop
+Active:  T-004 — store script durations in deciseconds (`feature/T-004-script-duration-units`); root cause of the 2026-09-27 endless-loop report (durations saved in seconds, read as deciseconds → 10× re-dispatch floods the ESP script queue)
+Now:     implement T-004 (TDD, mutation-check each fix, migration 8 dry run on a copy of the local DB); 1.0.2 patch candidate
+Next:    T-003 (task file committed on `feature/T-003-playlist-interrupt-fixes`) — merge develop into that branch after T-004 lands, then implement
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-07 — 1.0.1 released (PR #124 develop → main, PR #126 release-prep → release); T-001/T-002 bench-verified on the release build
+Last:    2026-09-07 — 1.0.1 released (PR #124 develop → main, PR #126 release-prep → release); develop bumped to `1.0.2-dev.0` (PR #127)
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
+- [ ] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`)
+- [ ] T-004 — Store script durations in deciseconds (`.docs/tasks/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`)
 
 ## Backlog (unscheduled candidates)
 
@@ -52,6 +54,13 @@ From the T-002 diagnosis (2026-09-04, scripter Test button):
 From the 2026-09-06 release prep (PR #124):
 
 - `deployment/docker-compose.yml` `devices` entry reads `'dev/ttyAMA0:/dev/ttyS0'` — leading slash dropped in 5919d972 ("update deploy"); Docker expects an absolute host device path, so a Pi deployed from this file likely fails to start. Verify on the bench and fix (quick-tier, but needs its own branch — not doc-only)
+
+From the T-004 planning (2026-09-27, script duration units):
+
+- Zero-duration tracks under infinite repeat (zero-event scripts → `duration_ds = 0`, or any 0 ms track) re-dispatch `SCRIPT_RUN` back-to-back every tick (~1000/s) — floor the track duration or refuse to repeat an all-zero pass; consider a server-side dispatch-rate floor as defense-in-depth
+- Script duration ends at the last event's *start*; the event's own run time (servo travel, audio length) is not counted, so the next dispatch can overlap it
+- Event rows saved before deb95a40 (2026-01-07) are stored unscaled (seconds in the deciseconds column) and no data migration converted them — those scripts play 10× compressed; check whether any pre-1.0 DBs exist in the field before fixing
+- ESP drops `SCRIPT_RUN` silently when its 30-slot queue is full (`Queue is full`); the server never learns (pairs with the `SCRIPT_RUN` envelope item above)
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
