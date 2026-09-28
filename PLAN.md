@@ -4,16 +4,17 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  none — 1.0.1 released 2026-09-07; `chore/bump-1.0.2-dev` (develop → `1.0.2-dev.0`, main merged in) awaiting push + PR into develop
-Now:     land `chore/bump-1.0.2-dev`; then promote the next Backlog item (candidates: the sum-based Run gate on FAILED and the dead upload catch — both gate a hardware action; the `deployment/docker-compose.yml` device-path typo is a quick-fix candidate that shipped in 1.0.1)
-Next:    pick the promoted item's task file (T-003) off the latest origin/develop
+Active:  T-003 — playlist repeat/interrupt bug fixes + interrupt coverage (`feature/T-003-playlist-interrupt-fixes`); task file drafted, awaiting review + commit
+Now:     commit the approved T-003 task file; decide the follow-up for the reporter's actual symptom (interrupt waits for a 45 s script track — see Backlog "Interrupt latency")
+Next:    implement T-003 (TDD, mutation-check each fix); then promote the next Backlog item (candidates: sum-based Run gate on FAILED, dead upload catch, `deployment/docker-compose.yml` device-path typo)
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-07 — 1.0.1 released (PR #124 develop → main, PR #126 release-prep → release); T-001/T-002 bench-verified on the release build
+Last:    2026-09-07 — 1.0.1 released (PR #124 develop → main, PR #126 release-prep → release); develop bumped to `1.0.2-dev.0` (PR #127)
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
+- [ ] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`)
 
 ## Backlog (unscheduled candidates)
 
@@ -30,7 +31,7 @@ From the T-001 pre-push review (2026-08-16):
 - `SCRIPT_RUN` worker envelopes have no `handleSerialWorkerMessage` case — run-script ack/nak responses are produced and routed by the worker but silently vanish on the main thread; audit whether clients should see them, then consider an error-logging `default:` for that switch (safe only once SCRIPT_RUN has a case)
 - `RUN_COMMAND_ACK/NAK` and `DEPLOY_CONFIG_NAK`/`FORMAT_SD_NAK` have no business handling: acks still let the 5s tracker time out (misleading "Timeout for message" error), and `/settings/formatSD` replies success before the controller answers. T-001 raised the NAK default to warn-with-payload; real handling is its own task
 - Repo lookup NoResultError sweep: `get*ByAddress`/`get*ByController` repo methods `executeTakeFirstOrThrow`, so the `=== null` guards in `handlePollResponse`/`handleConfigSync` are dead code (misses throw into the catch instead). T-001 added nullable `find*` variants for its own path; sweep the remaining callers (same pattern as the settings-500 item above)
-- 16:32 crash-restart loop (5 boots in 7 s) had no logged cause — crash paths only reach stderr/`docker logs`, never the log file
+- 16:32 crash-restart loop (5 boots in 7 s) had no logged cause — crash paths only reach stderr/`docker logs`, never the log file (no `uncaughtException` handler; T-003's queue stack overflow inside a timer is another instance)
 
 From the T-002 diagnosis (2026-09-04, scripter Test button):
 
@@ -52,6 +53,15 @@ From the T-002 diagnosis (2026-09-04, scripter Test button):
 From the 2026-09-06 release prep (PR #124):
 
 - `deployment/docker-compose.yml` `devices` entry reads `'dev/ttyAMA0:/dev/ttyS0'` — leading slash dropped in 5919d972 ("update deploy"); Docker expects an absolute host device path, so a Pi deployed from this file likely fails to start. Verify on the bench and fix (quick-tier, but needs its own branch — not doc-only)
+
+From the T-003 planning (2026-09-27, playlist interrupt investigation):
+
+- Interrupt during a Wait track or shuffle gap waits for the silence to end before switching — consider starting the replacement immediately (behavior change; T-003 keeps switch-at-end)
+- Zero-duration tracks + infinite repeat: scripts with no recorded duration (deleted → 0 ms) re-dispatch `SCRIPT_RUN` back-to-back every tick — floor the track duration or refuse to repeat an all-zero pass
+- `settings.repeat`/`repeatCount` survive a type change to a non-repeat type (settings JSON never reset); T-003 only fixes the display — decide whether the editor should clear them
+- `convertPlaylistToQueueItem` does not clamp `delayMax < delayMin` (editor prevents it; hand-edited/imported data would compute a negative delay range)
+- Interrupt latency on long script tracks (the actual 2026-09-27 report): `Sequential, Repeatable` + Infinite + one script whose only event is at 45 s → a remote press waits up to 45 s (switch happens at track end; the ESP also queues `SCRIPT_RUN` behind a running script, only `PANIC_STOP` clears it). Server-only mitigation = the Wait/gap cut-short item above + modelling idle time as a Wait track; true preemption of a running script needs a protocol change with AstrOs.ESP
+- Uninterruptible repeat (`Sequential` + repeat) — dropped from T-003; the reporter uses `Sequential, Repeatable`, so no demand for it yet
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
