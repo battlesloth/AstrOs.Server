@@ -278,3 +278,18 @@ on shared in-memory state (`activePlaylist`, `currentTrack`, `currentTimeout`,
 | After `clearPanicStop` | `addToQueue(x)` | `x` plays normally, no stale replacement |
 | Last track of the final pass | timer fires | queue advances / goes idle |
 | Nested-only, infinite repeat, pass ends | timer fires | next pass begins via timer (no recursion) |
+
+## Implementation checklist
+
+- [ ] Fix 1 RED/GREEN — `beginTrack` copies nested arrays (nested replay on repeat, source untouched, nested-only infinite loop no throw)
+- [ ] Fix 4 RED/GREEN — nested sub-tracks finish before a replacement; captured locations
+- [ ] Fix 2 RED/GREEN — `scheduleGap`; no stale pre-picked track after a replacement in a gap
+- [ ] Fix 3 RED/GREEN — gap before the first track of each repeat pass
+- [ ] Task 7 coverage — interrupt matrix (7 types, count + infinite rows), timing, interrupter kind, panic interleavings, repeat, non-repeat, empty
+- [ ] Fix 5 RED/GREEN — converter `randomDelay: false` → fixed delay; `repeatCount: -1` row
+- [ ] Fix 6 RED/GREEN — `AstrosPlaylistSettings.spec.ts`; repeat dropdown shows none for non-repeat types
+- [ ] Mutation checks recorded (fixes 1–6)
+- [ ] Task 10 — extend `.docs/qa/playlist-playback.md`
+- [ ] Pre-commit: api + vue format/lint, builds, full suites, code review
+- [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
+- [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry

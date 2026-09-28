@@ -6,7 +6,7 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 Active:  T-003 — playlist repeat/interrupt bug fixes + interrupt coverage (`feature/T-003-playlist-interrupt-fixes`; develop merged in 2026-09-28 after T-004, pointers updated)
 Now:     implement T-003 (TDD, mutation-check each fix; failure-mode inventory in the task file)
-Next:    after T-003, promote the next Backlog item (candidates: sum-based Run gate on FAILED, dead upload catch, `deployment/docker-compose.yml` device-path typo); T-004's ESP-side bench check whenever the droid is connected
+Next:    T-005 — zero-duration playlist tracks re-dispatching `SCRIPT_RUN` every tick (promoted from the T-004 Backlog by Jeff 2026-09-28: "immediately after this task"); task file first, off develop once T-003 merges. Then the Backlog candidates (sum-based Run gate on FAILED, dead upload catch, compose device-path typo); T-004's ESP-side bench check whenever the droid is connected
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
 Last:    2026-09-28 — T-004 merged (PR #128); log-level bench passed (QA cases 1–6)
 
