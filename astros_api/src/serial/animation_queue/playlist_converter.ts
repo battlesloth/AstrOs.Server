@@ -6,6 +6,8 @@ import { ControllerLocation } from 'src/models/control_module/controller_locatio
 import { AnimationQueuePlaylist, QueueTrack } from './queue_item/animation_queue_item.js';
 import { logger } from 'src/logger.js';
 import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
+import { PlaylistType } from 'src/models/playlists/playlistType.js';
+import { Script } from 'src/models/scripts/script.js';
 
 function dsToMs(ds: number): number {
   return ds * 100;
@@ -173,6 +175,24 @@ export async function convertPlaylistToQueueItem(
     repeatsLeft,
     shuffleWaitMin: dsToMs(settings.delayMin),
     shuffleWaitMax: dsToMs(settings.delayMax),
+    tracksRemaining: [],
+  };
+}
+
+// A directly run script queues as a one-track playlist: Sequential, so it is
+// uninterruptible and anything run meanwhile waits behind it, and no repeat.
+export function convertScriptToQueueItem(
+  script: Script,
+  locations: Array<ControllerLocation>,
+): AnimationQueuePlaylist {
+  return {
+    id: `script-${script.id}`,
+    playlistType: PlaylistType.Sequential,
+    locations,
+    tracks: [{ id: script.id, duration: dsToMs(script.durationDS), isWait: false }],
+    repeatsLeft: 0,
+    shuffleWaitMin: 0,
+    shuffleWaitMax: 0,
     tracksRemaining: [],
   };
 }

@@ -20,6 +20,7 @@ import {
   migration_5,
   migration_6,
   migration_7,
+  migration_8,
 } from './migrations/index.js';
 
 // Mirrors the production provider so injected test migrations layer on top of
@@ -39,6 +40,7 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
         '5_fix_controller_locations_type': migration_5,
         '6_add_foreign_keys': migration_6,
         '7_rename_remote_config_key': migration_7,
+        '8_fix_script_duration_units': migration_8,
         ...extra,
       };
     }
@@ -96,15 +98,15 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   });
 
   it('takes a backup when there is a last-applied migration AND a pending migration', async () => {
-    // First run: migrate baseline to current production latest (v7).
+    // First run: migrate baseline to the current production latest.
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a new migration on top of the real production baseline (currently v7).
+    // Inject a new migration on top of the real production baseline.
     __setMigrationProviderForTest(
       buildProvider({
-        '8_safe_addition': {
+        '9_safe_addition': {
           async up(db) {
             await db.schema.createTable('safe_addition').addColumn('id', 'integer').execute();
           },
@@ -118,16 +120,16 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
 
-    // Backup file named after the previous last-applied migration (v7) should exist.
+    // Backup file named after the previous last-applied (production-latest) migration should exist.
     const backupFiles = fs
       .readdirSync(tmpDir)
       .filter((f) => f.startsWith('database.sqlite3.backup-'));
-    expect(backupFiles).toEqual(['database.sqlite3.backup-7_rename_remote_config_key']);
+    expect(backupFiles).toEqual(['database.sqlite3.backup-8_fix_script_duration_units']);
     expect(status.isReadOnly()).toBe(false);
   });
 
   it('failed migration triggers restore from backup AND enters read-only with MIGRATION_FAILED_RESTORED', async () => {
-    // Migrate baseline to current production latest (v7) first.
+    // Migrate baseline to the current production latest first.
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
@@ -143,7 +145,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // Inject a migration on top of the production baseline that throws.
     __setMigrationProviderForTest(
       buildProvider({
-        '8_will_fail': {
+        '9_will_fail': {
           async up() {
             throw new Error('intentional migration failure');
           },
@@ -157,7 +159,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     status = new SystemStatus();
     const db = await initializeDatabase(status, { dbPath });
 
-    // Restore brought the file back to v7, but a migration still failed —
+    // Restore brought the file back to the production latest, but a migration still failed —
     // the system enters read-only with MIGRATION_FAILED_RESTORED so operators
     // notice and investigate before redeploying. Writes against the rolled-
     // back schema while the migration is broken could compound the problem.
@@ -182,7 +184,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // Inject a pending migration on top of the production baseline so a backup attempt happens.
     __setMigrationProviderForTest(
       buildProvider({
-        '8_pending': {
+        '9_pending': {
           async up(db) {
             await db.schema.createTable('pending_table').addColumn('id', 'integer').execute();
           },
@@ -209,7 +211,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   });
 
   it('failed migration + failed restore → enters read-only', async () => {
-    // Migrate baseline to current production latest (v7)
+    // Migrate baseline to the current production latest
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
@@ -217,7 +219,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // Inject a migration on top of the production baseline that throws
     __setMigrationProviderForTest(
       buildProvider({
-        '8_will_fail': {
+        '9_will_fail': {
           async up() {
             throw new Error('intentional migration failure');
           },
@@ -264,14 +266,14 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // foreign_key_check must detect it, throw, and Phase 1's
     // restore-from-backup must revert to the pre-migration state.
 
-    // Bring DB to the current production latest (v7).
+    // Bring DB to the current production latest.
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
     __setMigrationProviderForTest(
       buildProvider({
-        '8_introduces_orphan': {
+        '9_introduces_orphan': {
           async up(db) {
             // Insert a script_channels row with a fabricated script_id —
             // valid SQL because FKs are off during the migration window.
@@ -292,7 +294,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     status = new SystemStatus();
     const db = await initializeDatabase(status, { dbPath });
 
-    // Restore brought us back to v7 AND the system enters read-only with
+    // Restore brought us back to the production latest AND the system enters read-only with
     // MIGRATION_FAILED_RESTORED so operators notice — the same end-state as
     // any other migration failure that successfully recovered.
     expect(status.isReadOnly()).toBe(true);
@@ -307,11 +309,11 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
       .execute();
     expect(survivors).toHaveLength(0);
 
-    // And the migration history shows v7 as the latest, not v8.
+    // And the migration history shows the production latest, not the injected migration.
     const result = await sql<{ name: string }>`
       SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
     `.execute(db);
-    expect(result.rows[0]?.name).toBe('7_rename_remote_config_key');
+    expect(result.rows[0]?.name).toBe('8_fix_script_duration_units');
   });
 
   it('initial open failure → enters read-only with STARTUP_OPEN_FAILED and returns a usable in-memory db', async () => {
