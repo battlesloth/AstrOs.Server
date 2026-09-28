@@ -16,6 +16,7 @@ Last:    2026-09-28 — T-003 merged (PR #129); T-004 merged (PR #128), log-leve
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; merged 2026-09-28, PR #129; bench cases 7–13 pending)
 - [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench log-verified 2026-09-28 — ESP-side check pending hardware)
+- [ ] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`)
 
 ## Backlog (unscheduled candidates)
 
