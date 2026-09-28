@@ -8,7 +8,8 @@
 User report (2026-09-27, via Jeff): a `Sequential, Repeatable` playlist on Infinite repeat whose
 one track is a script with a single event at 45 s "always keeps triggering the 45 s script; when
 another script is sent it never interrupts and keeps playing the 45 s event over and over".
-Found while planning T-003 (`.docs/tasks/T-003-playlist-interrupt-fixes.md`), whose six bugs do
+Found while planning T-003 (`.docs/tasks/T-003-playlist-interrupt-fixes.md`, on
+`feature/T-003-playlist-interrupt-fixes`), whose six bugs do
 not cover this case.
 
 Root cause — a units mismatch in the stored script length:
@@ -67,15 +68,17 @@ Related defect in the same path: `getScript` calls `updateScriptDuration(result)
    - `up`: `UPDATE scripts SET duration_ds = COALESCE((SELECT MAX(time) FROM script_events WHERE script_events.script_id = scripts.id), 0)`
      — recomputes every row from the DB event times (already deciseconds), including legacy
      `-1` rows. Log the affected-row count (migration_7 style).
-   - `down`: `UPDATE scripts SET duration_ds = duration_ds / 10.0` — restores the pre-fix
-     (seconds) values for rows the old code computed; legacy `-1` rows are not restored
-     (documented in the header comment).
+   - `down`: no-op (no data change). *Changed 2026-09-28 after the pre-push review, Jeff's
+     call:* the originally planned `duration_ds / 10.0` would restore the seconds values that
+     time scripts 10× short — pre-T-004 builds already read the column as deciseconds, so the
+     corrected values are right for them too.
    - Header comment explains the units bug and why the recompute reads `script_events` rather
      than model code (migrations must not depend on evolving model code).
    - `dal/database.integration.test.ts` mirrors the production migration list: add
-     migration 8 to its `buildProvider` baseline and renumber its injected test migrations
-     `8_*` → `9_*` (same bump migration 7 made), otherwise kysely reports "corrupted
-     migrations" and the failure-path tests pass for the wrong reason.
+     migration 8 to its `buildProvider` baseline — otherwise kysely reports "corrupted
+     migrations" and the failure-path tests pass for the wrong reason. Its injected test
+     migrations are renumbered `8_*` → `9_*` (same bump migration 7 made) for clarity; the
+     `8_*` names already sorted after `8_fix…`, so the renumber is not what fixes it.
 3. `astros_api/src/dal/repositories/script_repository.ts` `getScript`: call
    `updateScriptDuration(result)` after `result.scriptChannels = await this.readScriptChannels(id)`,
    not before.
@@ -89,15 +92,16 @@ Tests — each RED-first; after green, revert the fix and confirm the test fails
    `453`); no events → `0`.
 5. `migration_8.test.ts` (pattern of `migration_7.test.ts`, v7 → v8 providers): seeded rows with
    (a) an old seconds value (`4.4`) and events max `44` → `44`; (b) `-1` with events → max event
-   time; (c) no events → `0`; (d) `down` → `/ 10`; (e) re-running `up` on corrected data is a
+   time; (c) no events → `0`; (d) `down` leaves deciseconds; (e) re-running `up` on corrected data is a
    no-op (idempotent).
 6. `script_repository.test.ts`: a row inserted directly with `duration_ds = -1` plus events →
    `getScript(id).durationDS` equals the max event time in deciseconds (not `0`).
 7. New `astros_api/src/scripting/script_duration.integration.test.ts` — the end-to-end unit
    chain the bug slipped through: on an in-memory DB, save a script via `ScriptRepository` with
-   one event at `45.0` s; assert `getScript(id).durationDS * 100 === 45000` (the `runScript`
-   formula) and that `convertPlaylistToQueueItem` fed `getScriptDurationsDS()` yields a script
-   track with `duration === 45000`.
+   one event at `45.0` s; assert the direct-run queue item (see Task 9) and that
+   `convertPlaylistToQueueItem` fed `getScriptDurationsDS()` yields a script track with
+   `duration === 45000`; and that the stored `script_events.time` (450) agrees with
+   migration 8's recompute.
 
 Docs:
 
@@ -106,13 +110,27 @@ Docs:
    a mid-loop script plays after the current run, the loop stops, no `Queue is full` on the ESP;
    plus a Wait-after-script case (the Wait starts only after the script's last event).
 
+Added after the pre-push review (2026-09-28; Jeff approved the builder extraction):
+
+9. `playlist_converter.ts`: new `convertScriptToQueueItem(script, locations)` builds the
+   direct-run queue item (Sequential, no repeat, one track of `dsToMs(durationDS)`); `runScript`
+   calls it instead of building the item inline. Behavior-preserving — the `× 100` it replaces
+   is `dsToMs` — and it lets Task 7 exercise the real direct-run conversion.
+10. `getScript` logs a warning when it replaces an invalid stored duration (the playlist path,
+    `getScriptDurationsDS`, still returns the raw column).
+11. Comment corrections: Kysely runs SQLite migrations without a transaction
+    (`supportsTransactionalDdl = false`) — fix `database.ts` and the rationale in
+    `migration_6.ts`; unit/ordering notes on `updateScriptDuration`, `calculateLengthDS`, and
+    `getScriptDurationsDS`.
+
 ## Acceptance criteria
 
 - [ ] A script whose last event is at 45.0 s saves `duration_ds = 450` and is timed as 45 000 ms
       both as a playlist track and as a directly run script.
 - [ ] Migration 8 converts existing seconds values and legacy `-1` rows to deciseconds from
-      `script_events`; scripts with no events get `0`; `down` restores the seconds values.
-- [ ] `getScript` computes a missing/invalid duration from the script's loaded channels.
+      `script_events`; scripts with no events get `0`; `down` leaves the values in deciseconds.
+- [ ] `getScript` computes a missing/invalid duration from the script's loaded channels, and
+      logs a warning when it does.
 - [ ] Existing converter, queue, and repository tests pass unchanged (except the rewritten
       `calculateLengthDS` test in Task 4).
 - [ ] Each fix has a test that fails with the fix reverted (mutation checks recorded).
@@ -126,9 +144,11 @@ Docs:
   repeat → PLAN.md Backlog.
 - **Last event's own run time** (servo travel, audio length) is not included in the duration; the
   next dispatch lands when the last event *starts* → Backlog.
-- **Pre-2026-01-07 event rows** stored unscaled (deb95a40 changed the scaling without a data
-  migration). Such scripts already play 10× compressed on the ESP; migration 8's `MAX(time)`
-  stays consistent with how they play → Backlog.
+- **Vue-scripter event rows saved before deb95a40** (2026-01-07) are stored unscaled (deb95a40
+  changed the scaling without a data migration). Such scripts already play 10× compressed on the
+  ESP; migration 8's `MAX(time)` stays consistent with how they play → Backlog. Rows from the
+  older Angular scripter were already deciseconds (the API converter then did `time * 100`,
+  ds → ms) and play correctly.
 - **ESP queue-full drops are silent to the server** (the `RUN_SCRIPT` NAK path has no handling —
   see the existing Backlog item on `SCRIPT_RUN` envelopes).
 - **Preemptive interrupt** of a running script (protocol change with AstrOs.ESP).
@@ -165,7 +185,7 @@ IPC, or concurrency beyond boot ordering.
 
 | Call | Error / condition | Response |
 |---|---|---|
-| migration_8 `UPDATE … SELECT MAX` | SQLite error (locked/corrupt) | Kysely's batch transaction (one per `migrateToLatest` run) rolls back; `initializeDatabase` restores the pre-migration backup and boots read-only (`MIGRATION_FAILED_RESTORED`) — existing flow |
+| migration_8 `UPDATE … SELECT MAX` | SQLite error (locked/corrupt) | No Kysely transaction for SQLite (`supportsTransactionalDdl = false`); the single `UPDATE` is atomic under autocommit, so nothing is half-applied; `initializeDatabase` restores the pre-migration backup and boots read-only (`MIGRATION_FAILED_RESTORED`) — existing flow |
 | migration_8 `UPDATE` | script with no events | `COALESCE(…, 0)` → `0` (not NULL; column is NOT NULL) |
 | migration_8 `UPDATE` | orphan `script_events` rows (script deleted) | FK cascade (migration_6) removed them; correlated subquery only reads rows for existing scripts |
 | `calculateLengthDS` | arithmetic-derived float time (`(45.2 + 0.1) * 10 = 453.00000000000006`; scripter/DB values `i / 10` scale exactly) | `Math.round` → `453` |
@@ -176,10 +196,11 @@ IPC, or concurrency beyond boot ordering.
 | After step | `duration_ds` values | Migration recorded? | Next boot | Status |
 |---|---|---|---|---|
 | Backup created, before `up` | old (seconds / `-1`) | no | migration 8 runs | consistent ✓ |
-| Crash mid-`UPDATE` | old (txn rolled back) | no | migration 8 re-runs | consistent ✓ |
+| Crash mid-`UPDATE` | old (single statement is atomic) | no | migration 8 re-runs | consistent ✓ |
+| `UPDATE` committed, crash before Kysely records the migration | deciseconds | no | migration 8 re-runs; `up` is a recompute, so it lands on the same values | consistent ✓ (why `up` must never become a scale) |
 | `up` committed | deciseconds | yes | nothing to run | consistent ✓ |
 | Old backup restored by hand onto a new build | old | no (backup predates it) | migration 8 runs | consistent ✓ |
-| New DB run by an older build (downgrade without `migrateDown`) | deciseconds | yes | old code reads ×10 → tracks 10× **long** (interrupts late, never flood) | known risk, documented; `down` exists |
+| New DB run by an older build (downgrade) | deciseconds | yes (unknown to the old build; nothing pending, so it boots without checking) | old consumers read deciseconds → unedited scripts timed **correctly**; scripts saved on the old build go back to seconds (10× short, flood); after re-upgrading, migration 8 does not re-run, so those rows stay short until re-saved | known risk → Backlog (boot-time duration consistency check); `down` is a no-op because the corrected values are right for old builds |
 
 **Boot ordering:** `initializeDatabase` (migrations) is awaited before routes are configured and
 before `listen` (`api_server.ts` ~327 vs ~752), so no request can write a script mid-migration.
@@ -194,5 +215,6 @@ before `listen` (`api_server.ts` ~327 vs ~752), so no request can write a script
 - [x] Local DB dry run on a scratch copy (`Script A` → 44)
 - [x] Task 8 — `.docs/qa/playlist-playback.md`
 - [x] Pre-commit: prettier + lint, build, full suite, code review
-- [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
+- [x] Pre-push: `/pr-review-toolkit:review-pr` (5 agents); findings addressed (Tasks 9–11, `down` no-op, doc corrections, Backlog additions)
+- [x] Post-review mutation checks: `down` ÷10 → down test fails; builder without `dsToMs` / interruptible wrapper / dropped `locations` → direct-run test fails; getScript warn always-on → no-warn test fails, never → legacy test fails; 3-channel max layout catches first-event and first-channel-only; symmetric ×100 event storage → only the save-vs-migration test fails (24 round-trip tests pass it)
 - [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry

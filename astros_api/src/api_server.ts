@@ -118,9 +118,10 @@ import { SerialPort } from 'serialport';
 import { DelimiterParser } from '@serialport/parser-delimiter';
 import { registerPlaylistRoutes } from './controllers/playlist_controller.js';
 import { AnimationQueue } from './serial/animation_queue/animation_queue.js';
-import { AnimationQueuePlaylist } from './serial/animation_queue/queue_item/animation_queue_item.js';
-import { PlaylistType } from './models/playlists/playlistType.js';
-import { convertPlaylistToQueueItem } from './serial/animation_queue/playlist_converter.js';
+import {
+  convertPlaylistToQueueItem,
+  convertScriptToQueueItem,
+} from './serial/animation_queue/playlist_converter.js';
 import { PlaylistRepository } from './dal/repositories/playlist_repository.js';
 // Must use `src/*` alias (not relative path) — esbuild-based runtimes
 // (tsx/vitest) treat the two import paths as separate modules and break
@@ -1386,18 +1387,7 @@ export class ApiServer {
     const script = await scriptRepo.getScript(id);
     const locations = await locationsRepo.loadLocations();
 
-    const queueItem: AnimationQueuePlaylist = {
-      id: `script-${id}`,
-      playlistType: PlaylistType.Sequential,
-      locations,
-      tracks: [{ id: script.id, duration: script.durationDS * 100, isWait: false }],
-      repeatsLeft: 0,
-      shuffleWaitMin: 0,
-      shuffleWaitMax: 0,
-      tracksRemaining: [],
-    };
-
-    this.animationQueue.addToQueue(queueItem);
+    this.animationQueue.addToQueue(convertScriptToQueueItem(script, locations));
 
     res.status(200);
     res.json({ message: 'success' });

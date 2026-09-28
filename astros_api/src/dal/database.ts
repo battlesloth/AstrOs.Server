@@ -200,8 +200,11 @@ export async function initializeDatabase(
   try {
     // Toggle FKs OFF for the migrate window so rename-dance migrations can
     // drop/recreate referenced tables without RESTRICT/CASCADE side-effects.
-    // The pragma cannot be changed inside a transaction, so it must wrap
-    // migrateToLatest() — Kysely runs the whole pending batch in one transaction.
+    // Kysely's SQLite adapter runs migrations without a transaction
+    // (supportsTransactionalDdl is false): each statement autocommits, so a
+    // failed migration can leave partial writes and the backup restore below
+    // is the rollback. The pragma is set here, around migrateToLatest(), so it
+    // holds for the whole run (SQLite ignores it inside a transaction).
     // The finally guarantees FKs are re-enabled even if migrate throws.
     conn.raw.pragma('foreign_keys = OFF');
     try {

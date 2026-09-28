@@ -266,15 +266,27 @@ export class ScriptRepository {
 
     result.scriptChannels = await this.readScriptChannels(id);
 
-    // After the channels load: a legacy -1 duration is recomputed from the events.
+    // Must run after readScriptChannels — calculateLengthDS reads the events.
+    // Defensive: upsertScript always stores a valid value and migration_8
+    // corrects older rows, so a replacement here means a row was written some
+    // other way. getScriptDurationsDS returns the raw column, so log it.
+    const storedDurationDS = result.durationDS;
     updateScriptDuration(result);
+    if (result.durationDS !== storedDurationDS) {
+      logger.warn(
+        `ScriptRepository.getScript: script ${id} has invalid stored duration_ds ${storedDurationDS}; ` +
+          `recomputed ${result.durationDS} (not written back)`,
+      );
+    }
 
     return result;
   }
 
   /**
    * Map of script id → recorded duration (deciseconds) for every script.
-   * Used by the playlist converter to give a Script track its real runtime —
+   * Returns the raw column: unlike getScript, an invalid stored value is not
+   * recomputed. Used by the playlist converter to give a Script track its
+   * runtime (up to the start of its last event) —
    * playlist track rows carry no usable duration for scripts (no editor
    * control), so the queue would otherwise treat scripts as instantaneous.
    * Intentionally unfiltered (no `enabled = 1`) so a still-referenced script's

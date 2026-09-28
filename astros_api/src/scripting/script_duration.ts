@@ -2,7 +2,8 @@ import { Script } from '../models/index.js';
 
 /**
  * Updates the duration of a script if it is undefined, null, NaN, or less than 0.
- * Modifies the script object in place.
+ * Modifies the script object in place. Reads `script.scriptChannels`, so call it
+ * only after the channels and events are loaded — on an unloaded script it computes 0.
  * @param script The script to update
  */
 export function updateScriptDuration(script: Script): void {
@@ -19,7 +20,8 @@ export function updateScriptDuration(script: Script): void {
 /**
  * Calculates the length of a script in deciseconds from the latest event time across all channels.
  * Event times are in seconds (0.1 s precision); the result is deciseconds, the unit
- * `scripts.duration_ds` is stored in and every consumer reads it as.
+ * `scripts.duration_ds` is stored in and every consumer reads it as. The length ends
+ * at the start of the last event; that event's own run time is not included.
  * @param script The script to calculate the length for
  * @returns The length of the script in deciseconds
  */

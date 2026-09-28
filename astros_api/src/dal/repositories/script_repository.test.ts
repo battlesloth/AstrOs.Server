@@ -1088,9 +1088,45 @@ describe('Script Repository', () => {
       // A row never re-saved since migration_2 still holds the column default.
       await db.updateTable('scripts').set({ duration_ds: -1 }).where('id', '=', scriptId).execute();
 
-      const script = await repo.getScript(scriptId);
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        const script = await repo.getScript(scriptId);
 
-      expect(script.durationDS).toBe(450);
+        expect(script.durationDS).toBe(450);
+        // The repair is observable, not silent: getScriptDurationsDS (the
+        // playlist path) still returns the raw stored value.
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringMatching(new RegExp(`${scriptId}.*-1.*\\b450\\b`)),
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('does not warn for a valid stored duration', async () => {
+      const scriptId = uuid();
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript({
+        id: scriptId,
+        scriptName: 'Valid Duration',
+        description: '',
+        lastSaved: new Date(),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [],
+      });
+
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        await repo.getScript(scriptId);
+
+        expect(warnSpy).not.toHaveBeenCalledWith(
+          expect.stringContaining('invalid stored duration_ds'),
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
     });
   });
 

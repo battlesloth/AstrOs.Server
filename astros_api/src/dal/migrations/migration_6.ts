@@ -10,14 +10,15 @@ import { logger } from 'src/logger.js';
 //   5. ALTER TABLE <table>_new RENAME TO <table>
 //
 // CONTRACT: callers must run this migration with `PRAGMA foreign_keys = OFF`.
-// SQLite cannot toggle the pragma inside a transaction, so the toggle has to
-// happen at the call site, before invoking the migrator. The production
+// The toggle happens at the call site, before invoking the migrator, so it
+// holds for the whole run (SQLite ignores the pragma inside a transaction;
+// Kysely's SQLite adapter itself runs migrations without one). The production
 // startup wrapper (initializeDatabase in dal/database.ts) handles this for
 // both the file-backed and in-memory paths. Test code that constructs a
 // Kysely Migrator directly must toggle explicitly — see migration_6.test.ts.
 //
 // `down` throws — recovery is via Phase 1 backup-restore. See plan
-// `.docs/plans/20260410-0807-db-safety-phase2-schema-migrations.md`.
+// `.docs/completed_plans/2026/04/10/20260410-0807-db-safety-phase2-schema-migrations.md`.
 
 async function logOrphanDeletion(
   db: Kysely<Database>,

@@ -21,22 +21,26 @@ describe('calculateLengthDS', () => {
     const script = generateScript('testScriptTimes');
     const scriptCh1 = generateSerialScriptChannel(script.id);
     const scriptCh2 = generateSerialScriptChannel(script.id);
-    // Latest event first, so a "last event wins" implementation fails.
-    addEvent(scriptCh1, generateCoreScriptSerialEvent(36.2, scriptCh1.id));
+    const scriptCh3 = generateSerialScriptChannel(script.id);
+    // Latest event mid-way through the middle channel, so first/last-event and
+    // first/last-channel-only implementations all fail.
     addEvent(scriptCh1, generateCoreScriptSerialEvent(0.5, scriptCh1.id));
-    addEvent(scriptCh2, generateCoreScriptSerialEvent(2.4, scriptCh2.id));
     addEvent(scriptCh2, generateCoreScriptSerialEvent(1.2, scriptCh2.id));
-    script.scriptChannels.push(scriptCh1, scriptCh2);
+    addEvent(scriptCh2, generateCoreScriptSerialEvent(36.2, scriptCh2.id));
+    addEvent(scriptCh2, generateCoreScriptSerialEvent(2.4, scriptCh2.id));
+    addEvent(scriptCh3, generateCoreScriptSerialEvent(3.0, scriptCh3.id));
+    script.scriptChannels.push(scriptCh1, scriptCh2, scriptCh3);
 
     expect(calculateLengthDS(script)).toBe(362);
   });
 
-  // Arithmetic-derived times drift either side of a whole decisecond; the
-  // below-integer case separates rounding from floor/trunc.
+  // Arithmetic-derived times drift either side of a whole decisecond: the
+  // above-integer case separates rounding from ceil, the below-integer case
+  // from floor/trunc.
   it.each([
-    { seconds: 45.2 + 0.1, expected: 453 }, // x10 === 453.00000000000006
-    { seconds: 0.3 - 0.1, expected: 2 }, // x10 === 1.9999999999999998
-  ])('rounds $seconds s to $expected ds', ({ seconds, expected }) => {
+    { label: '45.2 + 0.1', seconds: 45.2 + 0.1, expected: 453 }, // x10 === 453.00000000000006
+    { label: '0.3 - 0.1', seconds: 0.3 - 0.1, expected: 2 }, // x10 === 1.9999999999999998
+  ])('rounds $label s to $expected ds', ({ seconds, expected }) => {
     const script = generateScript('testScriptRounding');
     const scriptCh = generateSerialScriptChannel(script.id);
     addEvent(scriptCh, generateCoreScriptSerialEvent(seconds, scriptCh.id));

@@ -98,12 +98,12 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   });
 
   it('takes a backup when there is a last-applied migration AND a pending migration', async () => {
-    // First run: migrate baseline to current production latest (v8).
+    // First run: migrate baseline to the current production latest.
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
-    // Inject a new migration on top of the real production baseline (currently v8).
+    // Inject a new migration on top of the real production baseline.
     __setMigrationProviderForTest(
       buildProvider({
         '9_safe_addition': {
@@ -120,7 +120,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
 
-    // Backup file named after the previous last-applied migration (v8) should exist.
+    // Backup file named after the previous last-applied (production-latest) migration should exist.
     const backupFiles = fs
       .readdirSync(tmpDir)
       .filter((f) => f.startsWith('database.sqlite3.backup-'));
@@ -129,7 +129,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   });
 
   it('failed migration triggers restore from backup AND enters read-only with MIGRATION_FAILED_RESTORED', async () => {
-    // Migrate baseline to current production latest (v8) first.
+    // Migrate baseline to the current production latest first.
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
@@ -159,7 +159,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     status = new SystemStatus();
     const db = await initializeDatabase(status, { dbPath });
 
-    // Restore brought the file back to v8, but a migration still failed —
+    // Restore brought the file back to the production latest, but a migration still failed —
     // the system enters read-only with MIGRATION_FAILED_RESTORED so operators
     // notice and investigate before redeploying. Writes against the rolled-
     // back schema while the migration is broken could compound the problem.
@@ -211,7 +211,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   });
 
   it('failed migration + failed restore → enters read-only', async () => {
-    // Migrate baseline to current production latest (v8)
+    // Migrate baseline to the current production latest
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
@@ -266,7 +266,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // foreign_key_check must detect it, throw, and Phase 1's
     // restore-from-backup must revert to the pre-migration state.
 
-    // Bring DB to the current production latest (v8).
+    // Bring DB to the current production latest.
     let status = new SystemStatus();
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
@@ -294,7 +294,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     status = new SystemStatus();
     const db = await initializeDatabase(status, { dbPath });
 
-    // Restore brought us back to v8 AND the system enters read-only with
+    // Restore brought us back to the production latest AND the system enters read-only with
     // MIGRATION_FAILED_RESTORED so operators notice — the same end-state as
     // any other migration failure that successfully recovered.
     expect(status.isReadOnly()).toBe(true);
@@ -309,7 +309,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
       .execute();
     expect(survivors).toHaveLength(0);
 
-    // And the migration history shows v8 as the latest, not v9.
+    // And the migration history shows the production latest, not the injected migration.
     const result = await sql<{ name: string }>`
       SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
     `.execute(db);

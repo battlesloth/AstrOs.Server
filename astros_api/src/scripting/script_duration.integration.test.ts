@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Kysely } from 'kysely';
 import { v4 as uuid } from 'uuid';
 import { Database } from '../dal/types.js';
+import { ControllerLocation } from '../models/control_module/controller_location.js';
+import { migration_8 } from '../dal/migrations/index.js';
 import { createKyselyConnection, migrateToLatest } from '../dal/database.js';
 import { ScriptRepository } from '../dal/repositories/script_repository.js';
 import { PlaylistRepository } from '../dal/repositories/playlist_repository.js';
@@ -19,11 +21,15 @@ import {
 import { Playlist } from '../models/playlists/playlist.js';
 import { PlaylistType } from '../models/playlists/playlistType.js';
 import { TrackType } from '../models/playlists/trackType.js';
-import { convertPlaylistToQueueItem } from '../serial/animation_queue/playlist_converter.js';
+import {
+  convertPlaylistToQueueItem,
+  convertScriptToQueueItem,
+} from '../serial/animation_queue/playlist_converter.js';
 
 // The unit chain a script length crosses before it times the animation queue:
-// scripter event time (seconds) → script_events.time (ds) → scripts.duration_ds
-// (ds) → queue track (ms). Each hop was unit-tested with numbers already in the
+// scripter event time (s) → calculateLengthDS → scripts.duration_ds (ds) →
+// queue track (ms). script_events.time (ds) is a parallel store and
+// migration_8's source. Each hop was unit-tested with numbers already in the
 // hop's unit, so a seconds value stored as deciseconds passed every test while
 // the queue timed scripts 10x short.
 describe('script duration units, save → queue', () => {
@@ -85,11 +91,23 @@ describe('script duration units, save → queue', () => {
     await db.destroy();
   });
 
-  it('a directly run script is timed at 45 000 ms', async () => {
+  it('a directly run script is queued as one 45 000 ms track', async () => {
     const script = await new ScriptRepository(db).getScript(scriptId);
+    // Non-empty so a builder that drops the locations (SCRIPT_RUN to no
+    // controllers) fails.
+    const locations = [{ id: 'loc-body' } as ControllerLocation];
 
-    // runScript builds its queue item with duration = durationDS * 100 ms.
-    expect(script.durationDS * 100).toBe(45000);
+    // runScript queues exactly this item: uninterruptible, no repeat.
+    expect(convertScriptToQueueItem(script, locations)).toEqual({
+      id: `script-${scriptId}`,
+      playlistType: PlaylistType.Sequential,
+      locations: [{ id: 'loc-body' }],
+      tracks: [{ id: scriptId, duration: 45000, isWait: false }],
+      repeatsLeft: 0,
+      shuffleWaitMin: 0,
+      shuffleWaitMax: 0,
+      tracksRemaining: [],
+    });
   });
 
   it('a playlist script track is timed at 45 000 ms', async () => {
@@ -124,5 +142,20 @@ describe('script duration units, save → queue', () => {
     );
 
     expect(item.tracks).toEqual([{ id: scriptId, duration: 45000, isWait: false }]);
+  });
+
+  it('stores event times in the unit migration_8 recomputes from', async () => {
+    const evt = await db
+      .selectFrom('script_events')
+      .select('time')
+      .where('script_id', '=', scriptId)
+      .executeTakeFirstOrThrow();
+    expect(evt.time).toBe(450);
+
+    // The save path and the migration's recompute must agree.
+    const repo = new ScriptRepository(db);
+    expect((await repo.getScriptDurationsDS()).get(scriptId)).toBe(450);
+    await migration_8.up(db);
+    expect((await repo.getScriptDurationsDS()).get(scriptId)).toBe(450);
   });
 });

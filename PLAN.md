@@ -5,8 +5,8 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  T-004 — store script durations in deciseconds (`feature/T-004-script-duration-units`); root cause of the 2026-09-27 endless-loop report (durations saved in seconds, read as deciseconds → 10× re-dispatch floods the ESP script queue)
-Now:     implement T-004 (TDD, mutation-check each fix, migration 8 dry run on a copy of the local DB); 1.0.2 patch candidate
-Next:    T-003 (task file committed on `feature/T-003-playlist-interrupt-fixes`) — merge develop into that branch after T-004 lands, then implement
+Now:     T-004 implemented and pre-push reviewed (5 agents, findings addressed) → Jeff pushes the branch and opens the PR into develop; 1.0.2 patch candidate
+Next:    T-003 (task file committed on `feature/T-003-playlist-interrupt-fixes`) — merge develop into that branch after T-004 lands, then implement; its Contract's `runScript` pointer (`api_server.ts` ~1389) now lives in `convertScriptToQueueItem` (`playlist_converter.ts`) — same behavior
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
 Last:    2026-09-07 — 1.0.1 released (PR #124 develop → main, PR #126 release-prep → release); develop bumped to `1.0.2-dev.0` (PR #127)
 
@@ -14,7 +14,7 @@ Last:    2026-09-07 — 1.0.1 released (PR #124 develop → main, PR #126 releas
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
-- [ ] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`)
+- [ ] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/T-003-playlist-interrupt-fixes.md` — task file lives on its branch until it merges; branch `feature/T-003-playlist-interrupt-fixes`)
 - [ ] T-004 — Store script durations in deciseconds (`.docs/tasks/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`)
 
 ## Backlog (unscheduled candidates)
@@ -57,14 +57,18 @@ From the 2026-09-06 release prep (PR #124):
 
 From the T-004 planning (2026-09-27, script duration units):
 
-- Zero-duration tracks under infinite repeat (zero-event scripts → `duration_ds = 0`, or any 0 ms track) re-dispatch `SCRIPT_RUN` back-to-back every tick (~1000/s) — floor the track duration or refuse to repeat an all-zero pass; consider a server-side dispatch-rate floor as defense-in-depth. Same class: `scripts.duration_ds` keeps migration_2's `-1` default and `getScriptDurationsDS` has no negative guard, so any future insert that omits the column reintroduces a −100 ms track
+- Zero-duration tracks under infinite repeat (zero-event scripts → `duration_ds = 0`, or any 0 ms track) re-dispatch `SCRIPT_RUN` back-to-back every tick (~1000/s) — floor the track duration or refuse to repeat an all-zero pass; consider a server-side dispatch-rate floor as defense-in-depth. Same class: `scripts.duration_ds` keeps migration_2's `-1` default and `getScriptDurationsDS` has no negative guard (only `getScript` recomputes and warns), so a raw-SQL insert that omits the column reintroduces a −100 ms track (typed Kysely inserts already require it — `duration_ds` is not `Generated<>`); likewise an unknown script id in a playlist silently becomes a 0 ms track (`playlist_converter.ts` `?? 0`) — warn with playlist/track ids
 - Script duration ends at the last event's *start*; the event's own run time (servo travel, audio length) is not counted, so the next dispatch can overlap it
-- Event rows saved before deb95a40 (2026-01-07) are stored unscaled (seconds in the deciseconds column) and no data migration converted them — those scripts play 10× compressed; check whether any pre-1.0 DBs exist in the field before fixing
+- Event rows the **Vue** scripter saved before deb95a40 (2026-01-07) are stored unscaled (seconds in the deciseconds column) and no data migration converted them — those scripts play 10× compressed. Angular-scripter rows were already deciseconds (the API converter then did `time * 100`, ds → ms) and play correctly, so do **not** scale pre-2026-01-07 rows wholesale
 - ESP drops `SCRIPT_RUN` silently when its 30-slot queue is full (`Queue is full`); the server never learns (pairs with the `SCRIPT_RUN` envelope item above)
-- Kysely sorts migration names with `localeCompare` (0.27.6 `migrator.js:470`), so a future `10_*` sorts before `2_*` and fails the ordered-migrations check — add a numeric `nameComparator` (or zero-pad) before migration 10
-- Units misnomers that seeded the T-004 bug: `script_converter.test.ts` helper `generateCoreScriptSerialEventByDecSec(tenthOfSeconds)` is fed seconds; Vue `PixiChannelEvent.deciseconds` (`pixiChannelEvent.ts`, `useEventBoxes.ts`) holds seconds — rename both
-- `runScript` builds its queue item inline in `api_server.ts` (`durationDS * 100`), so nothing tests it — extract a pure builder and pin the ms conversion
+- Kysely 0.27.6 orders migrations with a plain `Object.keys(...).sort()` (`migrator.js:457`, `#resolveMigrations` — it ignores `nameComparator`), so a future `10_*` sorts before `2_*` and fails the ordered-migrations check. A custom comparator will not help; options are a Kysely version whose resolver honors `nameComparator` (verify first) or a naming scheme that sorts as plain strings (renaming executed migrations also means rewriting `kysely_migration` rows). `database.integration.test.ts`'s `ORDER BY name DESC LIMIT 1` breaks the same way. Decide before migration 10
+- Units misnomers that seeded the T-004 bug: `script_converter.test.ts` helper `generateCoreScriptSerialEventByDecSec(tenthOfSeconds)` is fed seconds (and its line-188 comment says 34.2 s for a 33.8 s gap); Vue `PixiChannelEvent.deciseconds` (`pixiChannelEvent.ts`, `useEventBoxes.ts`) holds seconds — rename both
 - `copyScript` calls `updateScriptDuration` right before `upsertScript`, which recalculates unconditionally — dead call
+- Branded time units for the script-length chain (T-004 type review): a `units.ts` with `secondsToDs`/`dsToMs` as the only constructors replacing the inline scale sites (`saveScriptEvent` ×10, `readScriptEvents` ÷10, `calculateLengthDS`, `dsToMs`, `script_converter.ts` in-place `evt.time * 1000`), then brand `ScriptEvent.time: Seconds`, `duration_ds`/`durationDS: Deciseconds`, `QueueTrack.duration`/`shuffleWait*: Milliseconds`, plus a lint rule banning `as Seconds|Deciseconds|Milliseconds` outside `units.ts`. A strict-`tsc` sketch showed the original `calculateLengthDS` bug becomes a compile error. Meanwhile, one-line unit JSDoc on those fields
+- Boot-time duration consistency check: `duration_ds` is a cached copy of `MAX(script_events.time)`, and nothing re-derives it after migration 8 — a downgrade + re-save + re-upgrade (or any out-of-band write) leaves rows in seconds forever. Recompute or warn at boot on `duration_ds != COALESCE(MAX(time), 0)`, or have `getScriptDurationsDS` derive it from `script_events`
+- `initializeDatabase` doesn't detect a DB that is *ahead* of the code (applied migrations the build doesn't know): with nothing pending it returns early and Kysely's missing-migration check never runs, so a downgraded build boots silently — log an error or go read-only
+- `write_guard.ts` `BLOCKED_GET_PATHS` blocks `/scripts/run` and `/playlists/run` but not `GET /remotecontrol`, which calls the same `runScript`/`runPlaylist` — in read-only mode the remote can still dispatch
+- `database.integration.test.ts` failure-path tests assert only the `reasonCode`, not *why* the migration failed — a production migration missing from `buildProvider` makes them pass on "corrupted migrations" (T-004 hit exactly this); assert the logged cause or add a guard that `buildProvider` matches the production list
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 

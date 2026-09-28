@@ -174,7 +174,10 @@ describe('migration_8: recompute scripts.duration_ds in deciseconds', () => {
     expect(await durationOf('s-rerun')).toBe(450);
   });
 
-  it('down restores the pre-fix seconds values', async () => {
+  // Pre-T-004 builds already read duration_ds as deciseconds (only the old
+  // producer was wrong), so rolling back must leave the corrected values. A
+  // ÷10 down would restore the seconds values that time scripts 10x short.
+  it('down leaves durations in deciseconds', async () => {
     await migrateWith(v7Provider);
     await seedScript('s-down', 4.4, [10, 44]);
     await migrateWith(v8Provider);
@@ -190,6 +193,6 @@ describe('migration_8: recompute scripts.duration_ds in deciseconds', () => {
       ]),
     );
 
-    expect(await durationOf('s-down')).toBe(4.4);
+    expect(await durationOf('s-down')).toBe(44);
   });
 });

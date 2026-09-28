@@ -20,7 +20,8 @@ sends a script; the ESP logs `Queue is full` when it drops a `SCRIPT_RUN`.
    against that DB **without re-saving the script**. Expected: the log shows
    `migration "8_fix_script_duration_units" was executed successfully` and
    `migration_8: recomputed duration_ds (deciseconds) for N script(s)` (only
-   logged when at least one script exists); a backup
+   logged when at least one script exists; N counts every row, including
+   disabled scripts the UI hides); a backup
    `database.sqlite3.backup-7_rename_remote_config_key` exists beside the DB; the
    same query shows Forty-five at `450`. Run case 2 next, still without
    re-saving — existing users get the fix only through this migration.
@@ -50,8 +51,12 @@ sends a script; the ESP logs `Queue is full` when it drops a `SCRIPT_RUN`.
 - **Recovering a droid stuck in a pre-fix backlog** (ESP still replaying queued
   copies of a looped script after an upgrade): **Panic Stop**, then clear the
   panic. Expected: the ESP queue empties and the droid goes idle.
-- **Downgrade** (running a pre-T-004 build against a migrated DB): scripts are
-  timed 10× *long*, so interrupts arrive late but nothing floods. Known risk,
-  documented in T-004; do not deploy an older build on a migrated DB.
+- **Downgrade** (running a pre-T-004 build against a migrated DB): the old build
+  boots normally and times *unedited* scripts correctly (it already read
+  deciseconds). Any script **saved** on the old build goes back to seconds —
+  10× short, the flood this plan tests for — and after upgrading again,
+  migration 8 does not re-run, so that script stays wrong until it is re-saved
+  on the new build. Expected: re-save such scripts after re-upgrading (known
+  risk, T-004 / PLAN.md Backlog).
 - **Last event's own run time** is not counted: in case 4 the Wait starts when
   Forty-five's action *starts*, so a long action overlaps the Wait (Backlog).
