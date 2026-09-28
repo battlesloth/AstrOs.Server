@@ -1,6 +1,6 @@
 # T-004: Store script durations in deciseconds
 
-<!-- File: .docs/tasks/T-004-script-duration-units.md. Branch: feature/T-004-script-duration-units.
+<!-- File: .docs/tasks/completed/T-004-script-duration-units.md. Branch: feature/T-004-script-duration-units.
      PR title: "T-004: Store script durations in deciseconds". -->
 
 ## Context
@@ -125,16 +125,16 @@ Added after the pre-push review (2026-09-28; Jeff approved the builder extractio
 
 ## Acceptance criteria
 
-- [ ] A script whose last event is at 45.0 s saves `duration_ds = 450` and is timed as 45 000 ms
+- [x] A script whose last event is at 45.0 s saves `duration_ds = 450` and is timed as 45 000 ms
       both as a playlist track and as a directly run script.
-- [ ] Migration 8 converts existing seconds values and legacy `-1` rows to deciseconds from
+- [x] Migration 8 converts existing seconds values and legacy `-1` rows to deciseconds from
       `script_events`; scripts with no events get `0`; `down` leaves the values in deciseconds.
-- [ ] `getScript` computes a missing/invalid duration from the script's loaded channels, and
+- [x] `getScript` computes a missing/invalid duration from the script's loaded channels, and
       logs a warning when it does.
-- [ ] Existing converter, queue, and repository tests pass unchanged (except the rewritten
+- [x] Existing converter, queue, and repository tests pass unchanged (except the rewritten
       `calculateLengthDS` test in Task 4).
-- [ ] Each fix has a test that fails with the fix reverted (mutation checks recorded).
-- [ ] `.docs/qa/playlist-playback.md` exists with the cases in Task 8.
+- [x] Each fix has a test that fails with the fix reverted (mutation checks recorded).
+- [x] `.docs/qa/playlist-playback.md` exists with the cases in Task 8.
 
 ## Out of scope
 
@@ -217,4 +217,4 @@ before `listen` (`api_server.ts` ~327 vs ~752), so no request can write a script
 - [x] Pre-commit: prettier + lint, build, full suite, code review
 - [x] Pre-push: `/pr-review-toolkit:review-pr` (5 agents); findings addressed (Tasks 9–11, `down` no-op, doc corrections, Backlog additions)
 - [x] Post-review mutation checks: `down` ÷10 → down test fails; builder without `dsToMs` / interruptible wrapper / dropped `locations` → direct-run test fails; getScript warn always-on → no-warn test fails, never → legacy test fails; 3-channel max layout catches first-event and first-channel-only; symmetric ×100 event storage → only the save-vs-migration test fails (24 round-trip tests pass it)
-- [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry
+- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (bench items in Verification stay open until post-merge upkeep)

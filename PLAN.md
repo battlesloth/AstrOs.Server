@@ -4,18 +4,18 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-004 — store script durations in deciseconds (`feature/T-004-script-duration-units`); root cause of the 2026-09-27 endless-loop report (durations saved in seconds, read as deciseconds → 10× re-dispatch floods the ESP script queue)
-Now:     T-004 implemented and pre-push reviewed (5 agents, findings addressed) → Jeff pushes the branch and opens the PR into develop; 1.0.2 patch candidate
-Next:    T-003 (task file committed on `feature/T-003-playlist-interrupt-fixes`) — merge develop into that branch after T-004 lands, then implement; its Contract's `runScript` pointer (`api_server.ts` ~1389) now lives in `convertScriptToQueueItem` (`playlist_converter.ts`) — same behavior
+Active:  T-004 — store script durations in deciseconds (`feature/T-004-script-duration-units`); implemented, pre-push reviewed, closed out on the branch — awaiting push + PR into develop
+Now:     Jeff pushes `feature/T-004-script-duration-units` and opens the PR into develop; bench-verify from `.docs/qa/playlist-playback.md` (cases 1–4 on a DB created under 1.0.1); 1.0.2 patch candidate
+Next:    T-003 (task file committed on `feature/T-003-playlist-interrupt-fixes`) — merge develop into that branch after T-004 lands, then implement; at that merge, update two T-003 pointers: its Contract's `runScript` wrapper (`api_server.ts` ~1389) now lives in `convertScriptToQueueItem` (`playlist_converter.ts`, same behavior), and its Context link to T-004 moves to `.docs/tasks/completed/`
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-07 — 1.0.1 released (PR #124 develop → main, PR #126 release-prep → release); develop bumped to `1.0.2-dev.0` (PR #127)
+Last:    2026-09-28 — T-004 implemented + pre-push reviewed (4 commits on `feature/T-004-script-duration-units`)
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
 - [ ] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/T-003-playlist-interrupt-fixes.md` — task file lives on its branch until it merges; branch `feature/T-003-playlist-interrupt-fixes`)
-- [ ] T-004 — Store script durations in deciseconds (`.docs/tasks/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`)
+- [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; bench verification pending)
 
 ## Backlog (unscheduled candidates)
 
@@ -82,6 +82,14 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-09-28 T-004 — script durations stored in deciseconds
+  - root cause of the 2026-09-27 report ("45 s script repeats forever, interrupts never land"): `calculateLengthDS` returned the last event time in seconds into `scripts.duration_ds`, which every consumer reads as deciseconds → queue timed scripts 10× short → an infinite loop re-sent `SCRIPT_RUN` every 4.5 s against a 45 s run, filling the ESP's 30-slot queue so the interrupting script was dropped (`Queue is full`)
+  - fix at the producer (`Math.round(max seconds × 10)`); migration 8 recomputes stored values from `MAX(script_events.time)` (also fixes legacy `-1` rows); `down` is a no-op (Jeff's call — pre-T-004 builds already read deciseconds); `getScript` recomputes after channels load and warns; `convertScriptToQueueItem` extracted so the direct-run conversion is tested
+  - end-to-end units test (45.0 s event → 45 000 ms for direct run and playlist) plus a save-path-vs-migration cross-check — the only test that catches a symmetric ×100 storage change; every fix mutation-checked
+  - `database.integration.test.ts` mirrors the production migration list — adding a migration without bumping it made failure-path tests pass on "corrupted migrations"
+  - review lesson: Kysely's SQLite adapter runs migrations **without** a transaction (`supportsTransactionalDdl = false`); the codebase's comments had claimed otherwise since the db-safety work, and a first "fix" repeated a reviewer's claim after reading only the matching line
+  - T-003 (queue/interrupt bugs found while investigating) stays planned on its branch; Backlog gained branded time units, a boot-time duration consistency check, a DB-ahead-of-code check, the `/remotecontrol` read-only gap, and the Kysely `10_*` sort hazard
 
 - 2026-09-07 release 1.0.1
   - develop → main via PR #124 (T-001, T-002, #123, deployment compose defaults); main → release via prep-branch PR #126; `release-build.yml` stripped `1.0.1-dev.1` → `1.0.1`
