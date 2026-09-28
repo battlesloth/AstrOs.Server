@@ -57,10 +57,14 @@ From the 2026-09-06 release prep (PR #124):
 
 From the T-004 planning (2026-09-27, script duration units):
 
-- Zero-duration tracks under infinite repeat (zero-event scripts → `duration_ds = 0`, or any 0 ms track) re-dispatch `SCRIPT_RUN` back-to-back every tick (~1000/s) — floor the track duration or refuse to repeat an all-zero pass; consider a server-side dispatch-rate floor as defense-in-depth
+- Zero-duration tracks under infinite repeat (zero-event scripts → `duration_ds = 0`, or any 0 ms track) re-dispatch `SCRIPT_RUN` back-to-back every tick (~1000/s) — floor the track duration or refuse to repeat an all-zero pass; consider a server-side dispatch-rate floor as defense-in-depth. Same class: `scripts.duration_ds` keeps migration_2's `-1` default and `getScriptDurationsDS` has no negative guard, so any future insert that omits the column reintroduces a −100 ms track
 - Script duration ends at the last event's *start*; the event's own run time (servo travel, audio length) is not counted, so the next dispatch can overlap it
 - Event rows saved before deb95a40 (2026-01-07) are stored unscaled (seconds in the deciseconds column) and no data migration converted them — those scripts play 10× compressed; check whether any pre-1.0 DBs exist in the field before fixing
 - ESP drops `SCRIPT_RUN` silently when its 30-slot queue is full (`Queue is full`); the server never learns (pairs with the `SCRIPT_RUN` envelope item above)
+- Kysely sorts migration names with `localeCompare` (0.27.6 `migrator.js:470`), so a future `10_*` sorts before `2_*` and fails the ordered-migrations check — add a numeric `nameComparator` (or zero-pad) before migration 10
+- Units misnomers that seeded the T-004 bug: `script_converter.test.ts` helper `generateCoreScriptSerialEventByDecSec(tenthOfSeconds)` is fed seconds; Vue `PixiChannelEvent.deciseconds` (`pixiChannelEvent.ts`, `useEventBoxes.ts`) holds seconds — rename both
+- `runScript` builds its queue item inline in `api_server.ts` (`durationDS * 100`), so nothing tests it — extract a pure builder and pin the ms conversion
+- `copyScript` calls `updateScriptDuration` right before `upsertScript`, which recalculates unconditionally — dead call
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 

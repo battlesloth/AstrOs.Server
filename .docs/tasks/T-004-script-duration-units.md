@@ -72,6 +72,10 @@ Related defect in the same path: `getScript` calls `updateScriptDuration(result)
      (documented in the header comment).
    - Header comment explains the units bug and why the recompute reads `script_events` rather
      than model code (migrations must not depend on evolving model code).
+   - `dal/database.integration.test.ts` mirrors the production migration list: add
+     migration 8 to its `buildProvider` baseline and renumber its injected test migrations
+     `8_*` → `9_*` (same bump migration 7 made), otherwise kysely reports "corrupted
+     migrations" and the failure-path tests pass for the wrong reason.
 3. `astros_api/src/dal/repositories/script_repository.ts` `getScript`: call
    `updateScriptDuration(result)` after `result.scriptChannels = await this.readScriptChannels(id)`,
    not before.
@@ -161,7 +165,7 @@ IPC, or concurrency beyond boot ordering.
 
 | Call | Error / condition | Response |
 |---|---|---|
-| migration_8 `UPDATE … SELECT MAX` | SQLite error (locked/corrupt) | Kysely per-migration transaction rolls back; `initializeDatabase` restores the pre-migration backup (existing flow); boot fails loudly |
+| migration_8 `UPDATE … SELECT MAX` | SQLite error (locked/corrupt) | Kysely's batch transaction (one per `migrateToLatest` run) rolls back; `initializeDatabase` restores the pre-migration backup and boots read-only (`MIGRATION_FAILED_RESTORED`) — existing flow |
 | migration_8 `UPDATE` | script with no events | `COALESCE(…, 0)` → `0` (not NULL; column is NOT NULL) |
 | migration_8 `UPDATE` | orphan `script_events` rows (script deleted) | FK cascade (migration_6) removed them; correlated subquery only reads rows for existing scripts |
 | `calculateLengthDS` | arithmetic-derived float time (`(45.2 + 0.1) * 10 = 453.00000000000006`; scripter/DB values `i / 10` scale exactly) | `Math.round` → `453` |
@@ -182,13 +186,13 @@ before `listen` (`api_server.ts` ~327 vs ~752), so no request can write a script
 
 ## Implementation checklist
 
-- [ ] Task 4 RED/GREEN — `calculateLengthDS` test in seconds, rounding + no-events cases; Task 1 fix
-- [ ] Task 5 RED/GREEN — `migration_8.test.ts`; Task 2 migration + registry
-- [ ] Task 6 RED/GREEN — `getScript` legacy `-1` test; Task 3 reorder
-- [ ] Task 7 — end-to-end units test (`script_duration.integration.test.ts`)
-- [ ] Mutation checks recorded (Task 1, Task 2, Task 3 reverts)
-- [ ] Local DB dry run on a scratch copy (`Script A` → 44)
-- [ ] Task 8 — `.docs/qa/playlist-playback.md`
-- [ ] Pre-commit: prettier + lint, build, full suite, code review
+- [x] Task 4 RED/GREEN — `calculateLengthDS` test in seconds, rounding + no-events cases; Task 1 fix
+- [x] Task 5 RED/GREEN — `migration_8.test.ts`; Task 2 migration + registry
+- [x] Task 6 RED/GREEN — `getScript` legacy `-1` test; Task 3 reorder
+- [x] Task 7 — end-to-end units test (`script_duration.integration.test.ts`)
+- [x] Mutation checks recorded (Task 1, Task 2, Task 3 reverts)
+- [x] Local DB dry run on a scratch copy (`Script A` → 44)
+- [x] Task 8 — `.docs/qa/playlist-playback.md`
+- [x] Pre-commit: prettier + lint, build, full suite, code review
 - [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
 - [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry

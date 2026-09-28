@@ -14,44 +14,61 @@ import { calculateLengthDS } from './script_duration.js';
 import { v4 as uuid } from 'uuid';
 
 describe('calculateLengthDS', () => {
-  it('returns the max event time across all channels', () => {
-    const scriptId = 'testScriptTimes';
+  // ScriptEvent.time is in seconds (the scripter rounds to 0.1 s; the DB stores
+  // it x10). The result must be deciseconds — the unit every consumer of
+  // scripts.duration_ds assumes.
+  it('returns the latest event time across all channels, in deciseconds', () => {
+    const script = generateScript('testScriptTimes');
+    const scriptCh1 = generateSerialScriptChannel(script.id);
+    const scriptCh2 = generateSerialScriptChannel(script.id);
+    // Latest event first, so a "last event wins" implementation fails.
+    addEvent(scriptCh1, generateCoreScriptSerialEvent(36.2, scriptCh1.id));
+    addEvent(scriptCh1, generateCoreScriptSerialEvent(0.5, scriptCh1.id));
+    addEvent(scriptCh2, generateCoreScriptSerialEvent(2.4, scriptCh2.id));
+    addEvent(scriptCh2, generateCoreScriptSerialEvent(1.2, scriptCh2.id));
+    script.scriptChannels.push(scriptCh1, scriptCh2);
 
-    const evt1Time = 5; // 0.5 seconds
-    const evt2Time = 12; // 1.2 seconds
-    const evt3Time = 24; // 2.4 seconds
-    const evt4Time = 362; // 36.2 seconds
+    expect(calculateLengthDS(script)).toBe(362);
+  });
 
-    const script: Script = {
-      id: scriptId,
-      scriptName: 'test',
-      description: 'test',
-      lastSaved: new Date(),
-      durationDS: 362,
-      playlistCount: 0,
-      deploymentStatus: {},
-      scriptChannels: [],
-    };
-    const scriptCh1 = generateSerialScriptChannel(scriptId);
-    const sevt1 = generateCoreScriptSerialEventByDecSec(evt1Time, scriptCh1.id);
-    const sevt2 = generateCoreScriptSerialEventByDecSec(evt2Time, scriptCh1.id);
-    const scriptCh2 = generateSerialScriptChannel(scriptId);
-    const sevt3 = generateCoreScriptSerialEventByDecSec(evt3Time, scriptCh2.id);
-    const sevt4 = generateCoreScriptSerialEventByDecSec(evt4Time, scriptCh2.id);
+  // Arithmetic-derived times drift either side of a whole decisecond; the
+  // below-integer case separates rounding from floor/trunc.
+  it.each([
+    { seconds: 45.2 + 0.1, expected: 453 }, // x10 === 453.00000000000006
+    { seconds: 0.3 - 0.1, expected: 2 }, // x10 === 1.9999999999999998
+  ])('rounds $seconds s to $expected ds', ({ seconds, expected }) => {
+    const script = generateScript('testScriptRounding');
+    const scriptCh = generateSerialScriptChannel(script.id);
+    addEvent(scriptCh, generateCoreScriptSerialEvent(seconds, scriptCh.id));
+    script.scriptChannels.push(scriptCh);
 
-    scriptCh1.events[uuid()] = sevt1;
-    scriptCh1.events[uuid()] = sevt2;
-    scriptCh2.events[uuid()] = sevt3;
-    scriptCh2.events[uuid()] = sevt4;
+    expect(calculateLengthDS(script)).toBe(expected);
+  });
 
-    script.scriptChannels.push(scriptCh1);
-    script.scriptChannels.push(scriptCh2);
+  it('returns 0 for a script with no events', () => {
+    const script = generateScript('testScriptEmpty');
+    script.scriptChannels.push(generateSerialScriptChannel(script.id));
 
-    const lengthDS = calculateLengthDS(script);
-
-    expect(lengthDS).toBe(evt4Time);
+    expect(calculateLengthDS(script)).toBe(0);
   });
 });
+
+function generateScript(scriptId: string): Script {
+  return {
+    id: scriptId,
+    scriptName: 'test',
+    description: 'test',
+    lastSaved: new Date(),
+    durationDS: 0,
+    playlistCount: 0,
+    deploymentStatus: {},
+    scriptChannels: [],
+  };
+}
+
+function addEvent(scriptCh: ScriptChannel, evt: ScriptEvent): void {
+  scriptCh.events[uuid()] = evt;
+}
 
 function generateSerialScriptChannel(scriptId: string): ScriptChannel {
   const moduleId = uuid();
@@ -73,15 +90,15 @@ function generateSerialScriptChannel(scriptId: string): ScriptChannel {
   return scriptCh;
 }
 
-function generateCoreScriptSerialEventByDecSec(tenthOfSeconds: number, chId: string): ScriptEvent {
-  const evt = { value: `test ${tenthOfSeconds}` } as GenericSerialEvent;
+function generateCoreScriptSerialEvent(timeSeconds: number, chId: string): ScriptEvent {
+  const evt = { value: `test ${timeSeconds}` } as GenericSerialEvent;
 
   const sevt: ScriptEvent = {
     id: uuid(),
     scriptChannel: chId,
     moduleType: ModuleType.uart,
     moduleSubType: ModuleSubType.genericSerial,
-    time: tenthOfSeconds,
+    time: timeSeconds,
     event: evt,
   };
 

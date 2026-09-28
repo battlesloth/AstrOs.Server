@@ -1040,6 +1040,60 @@ describe('Script Repository', () => {
     });
   });
 
+  describe('getScript duration', () => {
+    it('recomputes a legacy -1 duration from the loaded channels', async () => {
+      const scriptId = uuid();
+      const channelId = uuid();
+      const eventId = uuid();
+
+      const gpioModule = new GpioModule(locationId);
+      const gpioChannel = new GpioChannel(channelId, locationId, 0, true, 'Test GPIO', false);
+      gpioModule.channels.push(gpioChannel);
+      await upsertGpioModule(db, gpioModule);
+
+      const scriptChannel: ScriptChannel = {
+        id: uuid(),
+        scriptId,
+        channelType: ScriptChannelType.GPIO,
+        parentModuleId: locationId,
+        moduleChannelId: channelId,
+        moduleChannelType: ModuleChannelTypes.GpioChannel,
+        moduleChannel: gpioChannel,
+        maxDuration: 0,
+        events: {
+          [eventId]: {
+            id: eventId,
+            scriptChannel: '',
+            moduleType: ModuleType.gpio,
+            moduleSubType: ModuleSubType.genericGpio,
+            time: 45,
+            event: { setHigh: true } as GpioEvent,
+          },
+        },
+      };
+      scriptChannel.events[eventId].scriptChannel = scriptChannel.id;
+
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript({
+        id: scriptId,
+        scriptName: 'Legacy Duration',
+        description: '',
+        lastSaved: new Date(),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [scriptChannel],
+      });
+
+      // A row never re-saved since migration_2 still holds the column default.
+      await db.updateTable('scripts').set({ duration_ds: -1 }).where('id', '=', scriptId).execute();
+
+      const script = await repo.getScript(scriptId);
+
+      expect(script.durationDS).toBe(450);
+    });
+  });
+
   describe('deploymentStatus keying (read path)', () => {
     // Regression: getScripts()/getScript() keyed deploymentStatus by the
     // location id (UUID FK), but the WebSocket update path (ScriptResponse) and

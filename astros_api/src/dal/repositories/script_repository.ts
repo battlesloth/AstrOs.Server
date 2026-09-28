@@ -235,8 +235,6 @@ export class ScriptRepository {
       scriptChannels: [],
     };
 
-    updateScriptDuration(result);
-
     const deployments = await this.db
       .selectFrom('script_deployments')
       .selectAll()
@@ -267,6 +265,9 @@ export class ScriptRepository {
     }
 
     result.scriptChannels = await this.readScriptChannels(id);
+
+    // After the channels load: a legacy -1 duration is recomputed from the events.
+    updateScriptDuration(result);
 
     return result;
   }
