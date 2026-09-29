@@ -217,4 +217,4 @@ before `listen` (`api_server.ts` ~327 vs ~752), so no request can write a script
 - [x] Pre-commit: prettier + lint, build, full suite, code review
 - [x] Pre-push: `/pr-review-toolkit:review-pr` (5 agents); findings addressed (Tasks 9–11, `down` no-op, doc corrections, Backlog additions)
 - [x] Post-review mutation checks: `down` ÷10 → down test fails; builder without `dsToMs` / interruptible wrapper / dropped `locations` → direct-run test fails; getScript warn always-on → no-warn test fails, never → legacy test fails; 3-channel max layout catches first-event and first-channel-only; symmetric ×100 event storage → only the save-vs-migration test fails (24 round-trip tests pass it)
-- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (bench items in Verification stay open until post-merge upkeep)
+- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (bench items in Verification stay open until post-merge upkeep — run 2026-09-28: log-level cases 1–6 passed; ESP-side check passed per Jeff)

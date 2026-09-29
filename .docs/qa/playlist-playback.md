@@ -45,9 +45,10 @@ sends a script; the ESP logs `Queue is full` when it drops a `SCRIPT_RUN`.
 
 ## Negative / edge
 
-- **Script with no events in an infinite loop** — its duration is 0 ms, so the
-  queue re-sends it every tick (known flood — T-005). Do not
-  run on hardware; if seen, **Panic Stop** clears the ESP queue.
+- **Script with no events in an infinite loop** — its duration is 0 ms. Since
+  T-005 the loop is padded to one pass per second (cases 14–18); before T-005
+  it re-sent the script every tick. If a flood is ever seen, **Panic Stop**
+  clears the ESP queue.
 - **Recovering a droid stuck in a pre-fix backlog** (ESP still replaying queued
   copies of a looped script after an upgrade): **Panic Stop**, then clear the
   panic. Expected: the ESP queue empties and the droid goes idle.
@@ -116,3 +117,31 @@ attached, also watch that the actions match. Case 13 is a UI check.
   run "Interrupt" ~2 s into the Wait) switches when the Wait ends, not immediately — by design
   (PLAN.md Backlog: "Interrupt during a Wait track or shuffle gap waits for the silence to
   end…").
+
+## Zero-length loops (T-005)
+
+**Preconditions:** as above, plus **"Instant"** — a script with a single event at **0.0 s**
+(its length is 0) — and **"Empty"** — a script with no events. The API log shows each
+`dispatching script <id> from animation queue` line with a timestamp, and one
+`Repeat pass shorter than the minimum; padding` warning per padded playlist run.
+
+14. **Zero-length script loop.** Sequential, Repeatable, **Repeat - Infinite**, one track
+    "Instant"; Run for ~10 s. Expected: dispatches ~1 s apart (≈10 lines, not thousands);
+    exactly **one** padding warning. Repeat with "Empty". Stop with Panic Stop or "Interrupt".
+15. **Zero-length nested loop.** Make a Sequential playlist "Instants" of Instant, Instant;
+    then Sequential, Repeatable, Infinite with one Playlist track "Instants". Expected: each
+    pass dispatches Instant twice back-to-back, passes ~1 s apart; the API stays up.
+16. **Short pass.** Sequential, Repeatable, Infinite, tracks: a script with one event at 0.3 s.
+    Expected: dispatches ~1 s apart (the 0.3 s pass is padded by ~0.7 s). Then a pass longer
+    than 1 s (e.g. "Short A", 3 s) keeps its own cadence (~3 s) with **no** padding warning.
+17. **0 s Wait-only loop.** Sequential, Repeatable, Infinite, one Wait track of 0.0 s. Expected:
+    no dispatches and no CPU spike (`top`/`docker stats` on the SBC stays flat); run "Interrupt"
+    — it is dispatched within ~1 s.
+18. **Interrupt during padding.** During case 14's loop, run "Interrupt" between two Instant
+    dispatches. Expected: "Interrupt" is dispatched when the current 1 s pass ends (≤ ~1 s),
+    and the loop does not resume.
+19. **Invalid delay.** Shuffle with Delay and Repeat, Infinite, one track "Instant", Delay set to
+    an absurd value (e.g. 9999999 s). Expected: one `Invalid playlist delay settings; using a
+    safe value` warning and **no** flood (no dispatch after the first, since the delay is
+    clamped to ~24.8 days). Running "Interrupt" during that gap waits for the gap to end (switch
+    at gap end, by design), so only Panic Stop ends it — not a bug.

@@ -3,7 +3,11 @@ import { PlaylistTrack } from 'src/models/playlists/playlistTrack.js';
 import { TrackType } from 'src/models/playlists/trackType.js';
 import { PlaylistRepository } from 'src/dal/repositories/playlist_repository.js';
 import { ControllerLocation } from 'src/models/control_module/controller_location.js';
-import { AnimationQueuePlaylist, QueueTrack } from './queue_item/animation_queue_item.js';
+import {
+  AnimationQueuePlaylist,
+  MAX_TIMER_MS,
+  QueueTrack,
+} from './queue_item/animation_queue_item.js';
 import { logger } from 'src/logger.js';
 import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
 import { PlaylistType } from 'src/models/playlists/playlistType.js';
@@ -12,6 +16,18 @@ import { Script } from 'src/models/scripts/script.js';
 function dsToMs(ds: number): number {
   return ds * 100;
 }
+
+// A delay a timer can honor: settings reach the converter unvalidated
+// (JSON.parse), so a missing (NaN) or negative delay means none, and one beyond
+// the timer maximum — Infinity included — is clamped to it (Node would fire it
+// after 1 ms).
+function safeDelayMs(ds: number): number {
+  const ms = dsToMs(ds);
+  if (Number.isNaN(ms) || ms < 0) return 0;
+  return Math.min(ms, MAX_TIMER_MS);
+}
+
+const DELAY_TYPES = [PlaylistType.ShuffleWithDelay, PlaylistType.ShuffleWithDelayAndRepeat];
 
 function getTrackDuration(track: PlaylistTrack): number {
   if (track.randomWait && track.durationMaxDS > track.durationDS) {
@@ -25,15 +41,23 @@ function getTrackDuration(track: PlaylistTrack): number {
 function convertScriptTrack(
   track: PlaylistTrack,
   scriptDurations: Map<string, number>,
+  unknownScripts: Map<string, string>,
 ): QueueTrack {
   // A playlist Script track's own durationDS is meaningless — the editor
   // exposes no duration control for script tracks, so it stays 0 (or stale).
   // Use the referenced script's recorded duration instead; otherwise the queue
   // would treat the script as instantaneous and run the next track over it.
-  // Unknown scriptId → 0 (script deleted/missing); the queue still advances.
+  // Unknown scriptId (no scripts row — deleting a script soft-disables it and
+  // removes its tracks, so this means imported or hand-edited data) → 0 ms;
+  // collected and warned once per conversion. The queue's minimum repeat pass
+  // keeps a loop of them from flooding.
+  const durationDS = scriptDurations.get(track.trackId);
+  if (durationDS === undefined) {
+    unknownScripts.set(track.trackId, track.trackName);
+  }
   return {
     id: track.trackId,
-    duration: dsToMs(scriptDurations.get(track.trackId) ?? 0),
+    duration: dsToMs(durationDS ?? 0),
     isWait: false,
   };
 }
@@ -62,6 +86,7 @@ async function flattenPlaylistTrack(
   playlistRepo: PlaylistRepository,
   visited: Set<string>,
   scriptDurations: Map<string, number>,
+  unknownScripts: Map<string, string>,
 ): Promise<QueueTrack[]> {
   if (visited.has(track.trackId)) {
     throw new PlaylistCycleError(track.trackId, {
@@ -85,7 +110,7 @@ async function flattenPlaylistTrack(
     for (const subTrack of nestedPlaylist.tracks) {
       switch (subTrack.trackType) {
         case TrackType.Script:
-          subTracks.push(convertScriptTrack(subTrack, scriptDurations));
+          subTracks.push(convertScriptTrack(subTrack, scriptDurations, unknownScripts));
           break;
         case TrackType.Wait:
           subTracks.push(convertWaitTrack(subTrack));
@@ -96,6 +121,7 @@ async function flattenPlaylistTrack(
             playlistRepo,
             visited,
             scriptDurations,
+            unknownScripts,
           );
           subTracks.push(...deepTracks);
           break;
@@ -118,11 +144,13 @@ export async function convertPlaylistToQueueItem(
   // Seed the visited set with the top-level playlist's own ID so that direct
   // self-reference (A → A) is caught on the first recursive call.
   const visited = new Set<string>([playlist.id]);
+  // id → track name (the only human-readable hint for a missing script).
+  const unknownScripts = new Map<string, string>();
 
   for (const track of playlist.tracks) {
     switch (track.trackType) {
       case TrackType.Script:
-        tracks.push(convertScriptTrack(track, scriptDurations));
+        tracks.push(convertScriptTrack(track, scriptDurations, unknownScripts));
         break;
       case TrackType.Wait:
         tracks.push(convertWaitTrack(track));
@@ -134,6 +162,7 @@ export async function convertPlaylistToQueueItem(
             playlistRepo,
             visited,
             scriptDurations,
+            unknownScripts,
           );
           if (subTracks.length > 0) {
             tracks.push(subTracks);
@@ -161,7 +190,40 @@ export async function convertPlaylistToQueueItem(
     }
   }
 
+  if (unknownScripts.size > 0) {
+    logger.warn(
+      {
+        playlistId: playlist.id,
+        unknownScripts: [...unknownScripts].map(([id, trackName]) => ({ id, trackName })),
+      },
+      'Playlist references unknown scripts; timing them as 0 ms',
+    );
+  }
+
   const { settings } = playlist;
+  // Random Delay off → a fixed delay of delayMin. delayMax can be stale:
+  // nothing lowers it once Random Delay is off (its input is hidden, and
+  // raising delayMin only ever raises it).
+  const delayMaxDS = settings.randomDelay ? settings.delayMax : settings.delayMin;
+  const shuffleWaitMin = safeDelayMs(settings.delayMin);
+  const shuffleWaitMax = safeDelayMs(delayMaxDS);
+  if (
+    DELAY_TYPES.includes(playlist.playlistType) &&
+    (shuffleWaitMin !== dsToMs(settings.delayMin) || shuffleWaitMax !== dsToMs(delayMaxDS))
+  ) {
+    // String(): pino drops undefined keys and writes NaN as null.
+    logger.warn(
+      {
+        playlistId: playlist.id,
+        randomDelay: String(settings.randomDelay),
+        delayMin: String(settings.delayMin),
+        delayMax: String(settings.delayMax),
+        shuffleWaitMin,
+        shuffleWaitMax,
+      },
+      'Invalid playlist delay settings; using a safe value',
+    );
+  }
   let repeatsLeft = 0;
   if (settings.repeat) {
     repeatsLeft = settings.repeatCount === 0 ? -1 : settings.repeatCount;
@@ -173,11 +235,8 @@ export async function convertPlaylistToQueueItem(
     locations,
     tracks,
     repeatsLeft,
-    shuffleWaitMin: dsToMs(settings.delayMin),
-    // Random Delay off → a fixed delay of delayMin. delayMax can be stale:
-    // nothing lowers it once Random Delay is off (its input is hidden, and
-    // raising delayMin only ever raises it).
-    shuffleWaitMax: dsToMs(settings.randomDelay ? settings.delayMax : settings.delayMin),
+    shuffleWaitMin,
+    shuffleWaitMax,
     tracksRemaining: [],
   };
 }
