@@ -4,19 +4,19 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  release 1.0.2 (T-003, T-004, T-005) — develop → main PR open
-Now:     merge develop → main (dev build `1.0.2-dev.1`), then `release-prep-1.0.2` → release
-Next:    bump develop to `1.0.3-dev.0` (chore PR); Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo)
+Active:  none — 1.0.2 released; develop bump to `1.0.3-dev.0` on `chore/bump-1.0.3-dev` (PR into develop)
+Now:     merge the `chore/bump-1.0.3-dev` PR
+Next:    Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo)
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — T-005 merged (PR #130) after the Copilot review round; T-003/T-004/T-005 bench passed; 1.0.2 release started
+Last:    2026-09-28 — released 1.0.2 (T-003, T-004, T-005): develop → main #131, main → release #132; `astros-server:1.0.2` pushed
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
-- [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; merged 2026-09-28, PR #129; bench log-verified 2026-09-28, cases 7–13)
-- [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench verified 2026-09-28 — log-level cases 1–6 plus the ESP-side check, passed per Jeff)
-- [x] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/completed/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`; merged 2026-09-28, PR #130; bench log-verified 2026-09-28, cases 14, 16–19 — 15 covered by case 9 and unit tests)
+- [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; merged 2026-09-28, PR #129; shipped in 1.0.2; bench log-verified 2026-09-28, cases 7–13)
+- [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; shipped in 1.0.2; bench verified 2026-09-28 — log-level cases 1–6 plus the ESP-side check, passed per Jeff)
+- [x] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/completed/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`; merged 2026-09-28, PR #130; shipped in 1.0.2; bench log-verified 2026-09-28, cases 14, 16–19 — 15 covered by case 9 and unit tests)
 
 ## Backlog (unscheduled candidates)
 
@@ -115,6 +115,11 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-09-28 release 1.0.2
+  - develop → main via PR #131 (T-003, T-004, T-005); `dev-build.yml` bumped main to `1.0.2-dev.1`; main → release via prep-branch PR #132 (the five version-line conflicts kept to main's side, tree identical to main); `release-build.yml` stripped `1.0.2-dev.1` → `1.0.2` and pushed `astros-server:1.0.2` / `:latest`
+  - first boot of 1.0.2 runs migration 8 (script duration units) after the pre-migration backup
+  - the 1.0.1 recipe held with no surprises now that the post-release bump (#127) happened on time; develop bumped to `1.0.3-dev.0` on `chore/bump-1.0.3-dev` (main fast-forwarded in first — #131's merge commit made develop an ancestor of main)
 
 - 2026-09-28 bench — T-003 + T-005, log-level (no droid), on the T-005 branch; runs driven through `/api/remotecontrol` for exact timing
   - T-005: a 0 s-event script on infinite repeat dispatched every +1.000 s with one padding warning (`passMs: 2`) — no flood; a 0.3 s pass padded to 1 s (`passMs: 301`); a 0 s Wait-only loop idle at 0.2 % API CPU (0.7 % idle baseline); a 9,999,999 s delay clamped to 2^31−1 ms with one warning — 1 dispatch in 27 s (it flooded at ~449/s before the fix); interrupts land at the end of the current track or padding
