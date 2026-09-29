@@ -127,6 +127,18 @@ Docs:
    and an interrupt during padding (switches within ~1 s). Update the existing "Script with no
    events in an infinite loop — known flood" edge case.
 
+Added after the pre-commit review (2026-09-28):
+
+10. `TIMER_SLACK_MS = 5`: real timers fire up to ~1 ms early against `performance.now()`, so a
+    pass meant to last exactly 1 s can measure 999.x ms — within the slack it is neither padded
+    nor warned (the Contract's "passes ≥ 1 s play exactly as today").
+11. A NaN shuffle delay (settings stored as `'{}'`) is treated as 0 at the repeat boundary —
+    `Math.max(NaN, padding)` switched the padding off, so such a loop flooded with no warning.
+12. The padding warning fires only when padding is positive and longer than the gap; delay
+    types keep going through the gap timer even with a 0 ms wait (as before T-005);
+    malformed `repeatsLeft` is logged as a string (pino drops `undefined`, writes `NaN` as
+    `null`).
+
 ## Acceptance criteria
 
 - [ ] No repeating playlist dispatches more than one pass per second, whatever its tracks.
@@ -137,7 +149,13 @@ Docs:
 - [ ] Empty nested arrays are skipped; `[[]]` cannot recurse or wedge the queue.
 - [ ] Only `-1` means infinite repeat.
 - [ ] Every fix has a test that fails with the fix reverted (mutation checks recorded).
-- [ ] All pre-existing queue and converter tests pass unmodified.
+- [ ] Pre-existing queue and converter tests pass. *Amended 2026-09-28 during implementation:* the
+      approved design changes the timing of repeat passes shorter than 1 s, so nine older test
+      definitions (ten cases) that repeated 100–300 ms passes were updated, keeping their
+      sequences and intent (cycle counts, reshuffle, nested replay, interrupt landing points,
+      stale delay settings ignored): most now use passes ≥ 1 s; "replays nested tracks on every
+      pass" keeps its 300 ms pass and advances longer; the stale-delay tests use a 1 s track with
+      a 500 ms stale gap. No expectation about passes ≥ 1 s changed.
 
 ## Out of scope
 
@@ -195,10 +213,10 @@ per-run warning marker. No filesystem, network, or cross-process state.
 |---|---|---|
 | Pass ends after < 1 s, non-delay repeat type | timer fires | padding timer for `1000 - elapsed`; next pass at its end |
 | Pass ends after < 1 s, delay type, gap G | timer fires | wait `max(G, 1000 - elapsed)` |
-| Pass ends after ≥ 1 s | timer fires | next pass immediately (non-delay) / after G (delay) — unchanged |
+| Pass ends after ≥ 1 s (within `TIMER_SLACK_MS` = 5 ms of it counts) | timer fires | next pass immediately (non-delay) / after G (delay) — unchanged, no warning |
+| Pass ends after < 1 s, delay type with an unset (NaN) delay | timer fires | padded (NaN gap treated as 0), one warning |
 | Padding pending | `addToQueue(x)` (interruptible active) | `x` at padding end; next pass never starts |
 | Padding pending | `panicStop()` | timer cleared, nothing fires; recovery normal |
-| Padding pending | `addToQueue(y)` (Sequential active) | `y` queued; plays after the loop ends (never, for infinite — unchanged routing) |
 | New playlist run starts (addToQueue / takeover / advance) | first padded pass | one warning for this run |
 | System clock jumps (NTP after boot) | pass boundary | no effect — elapsed uses `performance.now()` |
 | Pass built from `[[]]` | `addToQueue` / repeat | empty nested array dropped; idle if nothing left |
@@ -207,12 +225,12 @@ per-run warning marker. No filesystem, network, or cross-process state.
 ## Implementation checklist
 
 - [x] Precondition: vitest 3.2.4 default fake timers fake `performance.now()`; `vi.setSystemTime` moves `Date` only (probe)
-- [ ] Task 4 RED/GREEN — pass builder drops empty nested arrays (`[[]]` no recursion, no error log)
-- [ ] Task 5 RED/GREEN — `repeatsLeft`: only `-1` infinite; malformed → one pass + one warning
-- [ ] Tasks 1–3 RED/GREEN — repeat-pass padding (0 ms loops, nested, Wait-only, 300 ms pass, ≥ 1 s unchanged, delay max(), finite repeats, clock jump, replacement, panic, once-per-run warning)
-- [ ] Task 6 RED/GREEN — converter warns on unknown script id
-- [ ] Mutation checks recorded
-- [ ] Task 9 — QA plan cases
-- [ ] Pre-commit: prettier + lint, build, full suite, code review
+- [x] Task 4 RED/GREEN — pass builder drops empty nested arrays (`[[]]` no recursion, no error log)
+- [x] Task 5 RED/GREEN — `repeatsLeft`: only `-1` infinite; malformed → one pass + one warning
+- [x] Tasks 1–3 RED/GREEN — repeat-pass padding (0 ms loops, nested, Wait-only, 300 ms pass, ≥ 1 s unchanged, delay max(), finite repeats, clock jump, replacement, panic, once-per-run warning)
+- [x] Task 6 RED/GREEN — converter warns on unknown script id
+- [x] Mutation checks recorded (review additions: NaN guard removed → the NaN-delay test; slack removed → the within-5-ms test; warn when the gap is longer → the delay-type gap-wins case): no padding → 8 tests; `Date.now()` instead of `performance.now()` → the clock-jump test; padding without the takeover → 2 (incl. the repeatable-interrupter padding test); padding timer outside `currentTimeout` → 3 (incl. panic → no pending timer); warn every pass → 1; keep empty nested arrays → 1; malformed `repeatsLeft` accepted → 4 (an `if (false)` mutant failed `tsc` in vitest's globalSetup — used `Number.isNaN(0)`); converter never warns → 1
+- [x] Task 9 — QA plan cases
+- [x] Pre-commit: prettier + lint, build, full suite, code review (findings addressed)
 - [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
 - [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry

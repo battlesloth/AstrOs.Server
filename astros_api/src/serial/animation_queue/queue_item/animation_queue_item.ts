@@ -26,6 +26,7 @@ export interface AnimationQueuePlaylist {
 
   // Tracks not yet played this pass (every type): filled from `tracks` by
   // addToQueue and refilled by handleRepeat (shuffled for shuffle types). A
-  // shallow copy — nested arrays are shared with `tracks`, so never mutate them.
+  // filtered shallow copy (empty nested arrays dropped) — nested arrays are
+  // shared with `tracks`, so never mutate them.
   tracksRemaining: Array<QueueTrack | QueueTrack[]>;
 }

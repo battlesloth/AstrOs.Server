@@ -4,6 +4,15 @@ import { AnimationQueuePlaylist, QueueTrack } from './queue_item/animation_queue
 import { logger } from 'src/logger.js';
 import type { PanicState } from 'src/models/networking/panic_responses.js';
 
+// A repeat pass shorter than this is padded before the next pass, so a loop of
+// zero-length tracks (no events, events at 0 s, 0 s Waits) cannot re-send
+// SCRIPT_RUN every tick and flood the serial link and the ESP's script queue.
+const MIN_REPEAT_PASS_MS = 1000;
+// Timers can fire ~1 ms early against performance.now(), so a pass meant to
+// last exactly the minimum may measure 999.x ms; within this slack it counts
+// as long enough (no padding, no warning).
+const TIMER_SLACK_MS = 5;
+
 export class AnimationQueue {
   inPanicStop = false;
   playlistQueue: AnimationQueuePlaylist[] = [];
@@ -22,6 +31,11 @@ export class AnimationQueue {
   // Set when an interruptible activePlaylist is replaced; consumed by
   // takeOverIfReplaced at the end of the current track or gap.
   private playlistReplaced = false;
+  // performance.now() when the current pass began — monotonic, unlike
+  // Date.now(), which jumps when an SBC syncs its clock after boot.
+  private passStartedAt = 0;
+  // The playlist run already warned about padding (one warning per run).
+  private paddingWarnedFor: AnimationQueuePlaylist | null = null;
   private panicListeners = new Set<(state: PanicState) => void>();
 
   dispatchCallback: (id: string, locations: Array<ControllerLocation>) => void;
@@ -37,10 +51,7 @@ export class AnimationQueue {
     }
 
     try {
-      item.tracksRemaining = [...item.tracks];
-      if (this.isShufflePlaylistType(item.playlistType)) {
-        this.shuffleArray(item.tracksRemaining);
-      }
+      item.tracksRemaining = this.buildPass(item);
 
       // if the current playlist is sequential we can add the new item
       // to the end of the queue without worrying about needing to
@@ -145,6 +156,7 @@ export class AnimationQueue {
       return;
     }
 
+    this.passStartedAt = performance.now();
     const track = this.pickNextTrack();
     if (track === null) {
       this.advanceQueue();
@@ -183,7 +195,7 @@ export class AnimationQueue {
     const track = this.pickNextTrack();
     if (track !== null) {
       if (this.hasShuffleDelay()) {
-        this.scheduleGap(() => this.beginTrack(track));
+        this.scheduleGap(this.getShuffleDelay(), () => this.beginTrack(track));
       } else {
         this.beginTrack(track);
       }
@@ -191,10 +203,24 @@ export class AnimationQueue {
     }
 
     // Step E — tracks exhausted, check repeat. A delay type waits its gap
-    // before the first track of the new pass, as between any two tracks.
+    // before the first track of the new pass, as between any two tracks, and
+    // the next pass starts at least MIN_REPEAT_PASS_MS after this one started
+    // (gap and padding overlap — the longer wins; they never add).
     if (this.handleRepeat()) {
-      if (this.hasShuffleDelay()) {
-        this.scheduleGap(() => this.startPlayingActivePlaylist());
+      const shuffleGap = this.hasShuffleDelay() ? this.getShuffleDelay() : 0;
+      // An unset delay (settings stored as '{}') is NaN; it must not switch
+      // the padding off (Math.max(NaN, x) is NaN).
+      const gap = Number.isFinite(shuffleGap) ? shuffleGap : 0;
+      const passMs = performance.now() - this.passStartedAt;
+      const shortfall = MIN_REPEAT_PASS_MS - passMs;
+      const padding = shortfall > TIMER_SLACK_MS ? shortfall : 0;
+      if (padding > 0 && padding > gap) {
+        this.warnPadding(passMs);
+      }
+      const wait = Math.max(gap, padding);
+      // Delay types always go through the gap timer, as before T-005.
+      if (wait > 0 || this.hasShuffleDelay()) {
+        this.scheduleGap(wait, () => this.startPlayingActivePlaylist());
       } else {
         this.startPlayingActivePlaylist();
       }
@@ -205,14 +231,14 @@ export class AnimationQueue {
     this.advanceQueue();
   }
 
-  // Every inter-track gap goes through here. The timer lives in currentTimeout
+  // Every inter-track gap — and the repeat-pass padding — goes through here,
+  // with the caller's delay. The timer lives in currentTimeout
   // so panicStop cancels it, and a replacement that arrived during the gap
   // takes over when it ends instead of `then` (e.g. a track picked from the
   // replaced playlist before the gap started). Taking over also clears the
   // flag, so the replacement's own first track end is not treated as another
   // takeover (which would skip its gap).
-  private scheduleGap(then: () => void) {
-    const delay = this.getShuffleDelay();
+  private scheduleGap(delay: number, then: () => void) {
     if (this.currentTimeout) {
       clearTimeout(this.currentTimeout);
     }
@@ -222,6 +248,21 @@ export class AnimationQueue {
       }
       then();
     }, delay);
+  }
+
+  private warnPadding(passMs: number) {
+    if (this.activePlaylist === null || this.paddingWarnedFor === this.activePlaylist) {
+      return;
+    }
+    this.paddingWarnedFor = this.activePlaylist;
+    logger.warn(
+      {
+        playlistId: this.activePlaylist.id,
+        passMs: Math.round(passMs),
+        paddedToMs: MIN_REPEAT_PASS_MS,
+      },
+      'Repeat pass shorter than the minimum; padding',
+    );
   }
 
   // A replacement that arrived during the current track or gap takes over at
@@ -238,6 +279,8 @@ export class AnimationQueue {
   private beginTrack(track: QueueTrack | QueueTrack[]) {
     this.currentLocations = this.activePlaylist?.locations ?? [];
     if (Array.isArray(track)) {
+      // Defensive only: buildPass drops empty nested arrays, which would
+      // otherwise recurse here with no timer in between.
       if (track.length === 0) {
         this.playNextTrack();
         return;
@@ -303,14 +346,35 @@ export class AnimationQueue {
 
   private handleRepeat(): boolean {
     if (!this.activePlaylist || !this.isRepeatableType()) return false;
-    if (this.activePlaylist.repeatsLeft === 0) return false;
-    if (this.activePlaylist.repeatsLeft > 0) this.activePlaylist.repeatsLeft--;
-    // -1 means infinite, don't decrement
-    this.activePlaylist.tracksRemaining = [...this.activePlaylist.tracks];
-    if (this.isShufflePlaylistType(this.activePlaylist.playlistType)) {
-      this.shuffleArray(this.activePlaylist.tracksRemaining);
+    const { repeatsLeft } = this.activePlaylist;
+    if (repeatsLeft === 0) return false;
+    // -1 means infinite, don't decrement. Anything else that is not a
+    // positive whole count (settings reach the queue unvalidated) must not
+    // loop forever.
+    if (repeatsLeft !== -1) {
+      if (!Number.isInteger(repeatsLeft) || repeatsLeft < 0) {
+        // String(): pino drops undefined keys and writes NaN as null.
+        logger.warn(
+          { playlistId: this.activePlaylist.id, repeatsLeft: String(repeatsLeft) },
+          'Invalid repeatsLeft; not repeating',
+        );
+        return false;
+      }
+      this.activePlaylist.repeatsLeft--;
     }
+    this.activePlaylist.tracksRemaining = this.buildPass(this.activePlaylist);
     return true;
+  }
+
+  // The tracks one pass plays, in order: a copy of `tracks` (never mutated),
+  // shuffled for shuffle types. Empty nested arrays are dropped — beginTrack
+  // would recurse through them with no timer in between.
+  private buildPass(item: AnimationQueuePlaylist): Array<QueueTrack | QueueTrack[]> {
+    const pass = item.tracks.filter((track) => !Array.isArray(track) || track.length > 0);
+    if (this.isShufflePlaylistType(item.playlistType)) {
+      this.shuffleArray(pass);
+    }
+    return pass;
   }
 
   private shuffleArray<T>(array: T[]): void {

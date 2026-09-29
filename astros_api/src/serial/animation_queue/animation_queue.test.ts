@@ -237,7 +237,7 @@ describe('Animation Queue Tests', () => {
 
       const playlist = makePlaylist({
         playlistType: PlaylistType.SequentialRepeatable,
-        tracks: [makeTrack('track1', 100), makeTrack('track2', 100)],
+        tracks: [makeTrack('track1', 500), makeTrack('track2', 500)],
         repeatsLeft: 1,
       });
 
@@ -245,17 +245,17 @@ describe('Animation Queue Tests', () => {
 
       // Cycle 1: track1
       expect(dispatch).toHaveBeenCalledTimes(1);
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
       // Cycle 1: track2
       expect(dispatch).toHaveBeenCalledTimes(2);
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
 
       // Cycle 2: track1 (repeat)
       expect(dispatch).toHaveBeenCalledTimes(3);
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
       // Cycle 2: track2
       expect(dispatch).toHaveBeenCalledTimes(4);
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
 
       // No cycle 3 — repeatsLeft was 1
       expect(dispatch).toHaveBeenCalledTimes(4);
@@ -267,7 +267,7 @@ describe('Animation Queue Tests', () => {
 
       const playlist = makePlaylist({
         playlistType: PlaylistType.SequentialRepeatable,
-        tracks: [makeTrack('track1', 100)],
+        tracks: [makeTrack('track1', 1000)],
         repeatsLeft: -1,
       });
 
@@ -276,7 +276,7 @@ describe('Animation Queue Tests', () => {
       // Play at least 5 cycles
       for (let i = 0; i < 5; i++) {
         expect(dispatch).toHaveBeenCalledTimes(i + 1);
-        vi.advanceTimersByTime(100);
+        vi.advanceTimersByTime(1000);
       }
 
       expect(dispatch).toHaveBeenCalledTimes(6);
@@ -295,7 +295,7 @@ describe('Animation Queue Tests', () => {
 
       const playlist = makePlaylist({
         playlistType: PlaylistType.ShuffleWithRepeat,
-        tracks: [makeTrack('track1', 100), makeTrack('track2', 100)],
+        tracks: [makeTrack('track1', 500), makeTrack('track2', 500)],
         repeatsLeft: 1,
       });
 
@@ -304,18 +304,18 @@ describe('Animation Queue Tests', () => {
       // Cycle 1: shuffled to [track2, track1]
       expect(dispatch).toHaveBeenCalledTimes(1);
       expect(dispatch).toHaveBeenLastCalledWith('track2', []);
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
       expect(dispatch).toHaveBeenCalledTimes(2);
       expect(dispatch).toHaveBeenLastCalledWith('track1', []);
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
 
       // Cycle 2: reshuffled to [track1, track2]
       expect(dispatch).toHaveBeenCalledTimes(3);
       expect(dispatch).toHaveBeenLastCalledWith('track1', []);
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
       expect(dispatch).toHaveBeenCalledTimes(4);
       expect(dispatch).toHaveBeenLastCalledWith('track2', []);
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(500);
 
       // Done
       expect(dispatch).toHaveBeenCalledTimes(4);
@@ -673,7 +673,7 @@ describe('Animation Queue Tests', () => {
           repeatsLeft: 1,
         }),
       );
-      vi.advanceTimersByTime(1000);
+      vi.advanceTimersByTime(3000);
 
       expect(dispatchedIds(dispatch)).toEqual(['s1', 'n1', 'n2', 's1', 'n1', 'n2']);
     });
@@ -685,15 +685,16 @@ describe('Animation Queue Tests', () => {
       queue.addToQueue(
         makePlaylist({
           playlistType: PlaylistType.SequentialRepeatable,
-          tracks: [[makeTrack('n1', 100), makeTrack('n2', 100)]],
+          tracks: [[makeTrack('n1', 500), makeTrack('n2', 500)]],
           repeatsLeft: -1,
         }),
       );
 
-      // Emptied nested arrays used to recurse synchronously into a stack
-      // overflow inside the timer callback, killing the API process.
-      expect(() => vi.advanceTimersByTime(1000)).not.toThrow();
-      // t = 0, 100, …, 1000 → 11 dispatches alternating n1, n2.
+      // Emptied nested arrays used to recurse into a stack overflow inside the
+      // timer callback. buildPass and the repeat padding would now stop that
+      // too, so the dispatch list below is what pins T-003's copy-on-begin.
+      expect(() => vi.advanceTimersByTime(5000)).not.toThrow();
+      // t = 0, 500, …, 5000 → 11 dispatches alternating n1, n2 (1 s passes).
       expect(dispatchedIds(dispatch)).toEqual([
         'n1',
         'n2',
@@ -891,14 +892,14 @@ describe('Animation Queue Tests', () => {
         makePlaylist({
           id: 'B',
           playlistType: PlaylistType.SequentialRepeatable,
-          tracks: [makeTrack('b1', 100)],
+          tracks: [makeTrack('b1', 1000)],
           repeatsLeft: 1,
         }),
       );
 
       vi.advanceTimersByTime(500); // a1 ends at 1000 → b1
       expect(dispatchedIds(dispatch)).toEqual(['a1', 'b1']);
-      vi.advanceTimersByTime(100); // pass 2
+      vi.advanceTimersByTime(1000); // pass 2
       expect(dispatchedIds(dispatch)).toEqual(['a1', 'b1', 'b1']);
       vi.advanceTimersByTime(5000);
       expect(dispatchedIds(dispatch)).toEqual(['a1', 'b1', 'b1']);
@@ -1085,14 +1086,14 @@ describe('Animation Queue Tests', () => {
       queue.addToQueue(
         makePlaylist({
           playlistType: PlaylistType.SequentialRepeatable,
-          tracks: [makeTrack('a', 100), makeTrack('b', 100)],
+          tracks: [makeTrack('a', 500), makeTrack('b', 500)],
           repeatsLeft: 1,
         }),
       );
-      vi.advanceTimersByTime(350); // pass 2's b plays 300–400
+      vi.advanceTimersByTime(1750); // pass 2's b plays 1500–2000
       queue.addToQueue(makeScriptItem('X', 100));
 
-      vi.advanceTimersByTime(49);
+      vi.advanceTimersByTime(249);
       expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'a', 'b']);
       vi.advanceTimersByTime(1);
       expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'a', 'b', 'X']);
@@ -1337,11 +1338,11 @@ describe('Animation Queue Tests', () => {
       queue.addToQueue(
         makePlaylist({
           playlistType: PlaylistType.SequentialRepeatable,
-          tracks: [[makeTrack('n1', 100), makeTrack('n2', 100)]],
+          tracks: [[makeTrack('n1', 500), makeTrack('n2', 500)]],
           repeatsLeft: -1,
         }),
       );
-      vi.advanceTimersByTime(250); // pass 2's n1 plays 200–300
+      vi.advanceTimersByTime(1250); // pass 2's n1 plays 1000–1500
       queue.addToQueue(makeScriptItem('X', 100));
       vi.advanceTimersByTime(5000);
 
@@ -1403,13 +1404,13 @@ describe('Animation Queue Tests', () => {
         queue.addToQueue(
           makePlaylist({
             playlistType: type,
-            tracks: [makeTrack('a', 100)],
+            tracks: [makeTrack('a', 1000)],
             repeatsLeft: 1,
-            shuffleWaitMin: 1000,
-            shuffleWaitMax: 1000,
+            shuffleWaitMin: 500,
+            shuffleWaitMax: 500,
           }),
         );
-        vi.advanceTimersByTime(100);
+        vi.advanceTimersByTime(1000);
 
         expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
       },
@@ -1437,6 +1438,365 @@ describe('Animation Queue Tests', () => {
       } finally {
         errorSpy.mockRestore();
       }
+    });
+  });
+
+  // ── Empty nested tracks ──────────────────────────────────────
+
+  describe('Empty nested tracks', () => {
+    // beginTrack([]) calls playNextTrack synchronously; on infinite repeat an
+    // empty nested array recursed into a RangeError that addToQueue's catch
+    // swallowed, leaving the queue stuck with no timer.
+    it('a playlist of only an empty nested track goes idle without an error', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      const errorSpy = vi.spyOn(logger, 'error');
+      try {
+        queue.addToQueue(
+          makePlaylist({
+            playlistType: PlaylistType.SequentialRepeatable,
+            tracks: [[]],
+            repeatsLeft: -1,
+          }),
+        );
+
+        expect(errorSpy).not.toHaveBeenCalled();
+        expect(queue.activePlaylist).toBeNull();
+        expect(vi.getTimerCount()).toBe(0);
+        expect(dispatch).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('skips an empty nested track on every pass without changing the playlist', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      const tracks: Array<QueueTrack | QueueTrack[]> = [[], makeTrack('a', 1000)];
+      queue.addToQueue(
+        makePlaylist({
+          playlistType: PlaylistType.SequentialRepeatable,
+          tracks,
+          repeatsLeft: 1,
+        }),
+      );
+      vi.advanceTimersByTime(5000);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      expect(queue.activePlaylist).toBeNull();
+      expect(tracks).toHaveLength(2);
+      expect(tracks[0]).toEqual([]);
+    });
+  });
+
+  // ── Malformed repeatsLeft ────────────────────────────────────
+
+  describe('Malformed repeatsLeft', () => {
+    // Settings reach the converter unvalidated, so repeatsLeft can be anything;
+    // only -1 means infinite.
+    it.each([
+      ['undefined', undefined],
+      ['NaN', NaN],
+      ['-2', -2],
+      ['1.5', 1.5],
+    ])('repeatsLeft %s plays one pass and warns once', (_label, repeatsLeft) => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        queue.addToQueue(
+          makePlaylist({
+            playlistType: PlaylistType.SequentialRepeatable,
+            tracks: [makeTrack('a', 100)],
+            repeatsLeft: repeatsLeft as number,
+          }),
+        );
+        vi.advanceTimersByTime(5000);
+
+        expect(dispatchedIds(dispatch)).toEqual(['a']);
+        expect(queue.activePlaylist).toBeNull();
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ playlistId: 'playlist-1' }),
+          expect.any(String),
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it.each([
+      ['-1 (infinite)', -1, ['a', 'a', 'a', 'a']],
+      ['2', 2, ['a', 'a', 'a']],
+    ])('repeatsLeft %s repeats without a warning', (_label, repeatsLeft, expected) => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        queue.addToQueue(
+          makePlaylist({
+            playlistType: PlaylistType.SequentialRepeatable,
+            tracks: [makeTrack('a', 1000)],
+            repeatsLeft,
+          }),
+        );
+        vi.advanceTimersByTime(3000);
+
+        expect(dispatchedIds(dispatch)).toEqual(expected);
+        expect(warnSpy).not.toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
+  // ── Minimum repeat pass ──────────────────────────────────────
+
+  describe('Minimum repeat pass', () => {
+    // A repeat pass shorter than 1 s is padded before the next pass, so a loop
+    // of zero-length tracks cannot re-send SCRIPT_RUN every tick.
+    let randomSpy: ReturnType<typeof vi.spyOn>;
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99);
+      warnSpy = vi.spyOn(logger, 'warn');
+    });
+    afterEach(() => {
+      randomSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    function loop(tracks: Array<QueueTrack | QueueTrack[]>, overrides = {}) {
+      return makePlaylist({
+        playlistType: PlaylistType.SequentialRepeatable,
+        tracks,
+        repeatsLeft: -1,
+        ...overrides,
+      });
+    }
+
+    it('a 0 ms script on infinite repeat dispatches once per second', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 0)]));
+
+      vi.advanceTimersByTime(2500);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a', 'a']); // 0, 1000, 2000
+    });
+
+    it('a nested playlist of 0 ms sub-tracks plays each pass back-to-back, passes 1 s apart', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([[makeTrack('n1', 0), makeTrack('n2', 0)]]));
+
+      vi.advanceTimersByTime(999);
+      expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2', 'n1']);
+      // A 0 ms timer still takes >= 1 ms (Node semantics), so n2 follows at +1.
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2', 'n1', 'n2']);
+    });
+
+    it('a 0 s Wait-only loop is paced at one pass per second', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('wait', 0, true)]));
+
+      vi.advanceTimersByTime(2500);
+      // Unpaced, the loop would restart every ~1 ms and X would take over at
+      // once; paced, pass 3 began at 2000 and its padding ends at 3000.
+      queue.addToQueue(makeScriptItem('X', 100));
+      vi.advanceTimersByTime(499);
+      expect(dispatch).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['X']);
+    });
+
+    it('a 300 ms pass waits the remaining 700 ms', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 100), makeTrack('b', 100), makeTrack('c', 100)]));
+
+      vi.advanceTimersByTime(999);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'c']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'b', 'c', 'a']);
+    });
+
+    it('a pass of 1 s or more keeps its timing', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 1200)]));
+
+      vi.advanceTimersByTime(1199);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      // [label, gap, pass 2 starts at, padding warnings]
+      ['the gap is longer than the padding', 1000, 1100, 0],
+      ['the padding is longer than the gap', 200, 1000, 1],
+    ])(
+      'a delay type waits the longer of gap and padding when %s',
+      (_label, gap, pass2, warnings) => {
+        const dispatch = vi.fn();
+        const queue = new AnimationQueue(dispatch);
+        queue.addToQueue(
+          loop([makeTrack('a', 100)], {
+            playlistType: PlaylistType.ShuffleWithDelayAndRepeat,
+            shuffleWaitMin: gap,
+            shuffleWaitMax: gap,
+          }),
+        );
+
+        vi.advanceTimersByTime(pass2 - 1);
+        expect(dispatchedIds(dispatch)).toEqual(['a']);
+        vi.advanceTimersByTime(1);
+        expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+        // The gap alone paces the loop when it is longer — no padding warning.
+        expect(warnSpy).toHaveBeenCalledTimes(warnings);
+      },
+    );
+
+    it('a delay type with an unset (NaN) delay is still padded', () => {
+      // Settings stored as '{}' (the migration_3 column default) give NaN
+      // bounds; Math.max(NaN, padding) must not switch the padding off.
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        loop([makeTrack('a', 0)], {
+          playlistType: PlaylistType.ShuffleWithDelayAndRepeat,
+          shuffleWaitMin: NaN,
+          shuffleWaitMax: NaN,
+        }),
+      );
+
+      vi.advanceTimersByTime(2500);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a', 'a']); // 0, 1000, 2000
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
+
+    // Real timers can fire ~1 ms early against performance.now(), so a pass
+    // meant to last exactly 1 s may measure 999.x ms; a few ms of slack keeps
+    // it unpadded and unwarned.
+    it('a pass within a few ms of 1 s is not padded or warned', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 996)]));
+
+      vi.advanceTimersByTime(996);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('a pass more than a few ms short of 1 s is padded', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 994)]));
+
+      vi.advanceTimersByTime(999);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('finite repeats are padded too, then go idle', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 0)], { repeatsLeft: 2 }));
+
+      vi.advanceTimersByTime(1999);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a', 'a']);
+      vi.advanceTimersByTime(1); // the last 0 ms track ends (>= 1 ms)
+      expect(queue.activePlaylist).toBeNull();
+    });
+
+    it('a system clock jump mid-pass does not change the cadence', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 600)]));
+
+      // setSystemTime moves Date, not performance.now (e.g. NTP after boot).
+      vi.advanceTimersByTime(300);
+      vi.setSystemTime(Date.now() - 3_600_000);
+      vi.advanceTimersByTime(699);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1); // 1000
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+
+      vi.advanceTimersByTime(300);
+      vi.setSystemTime(Date.now() + 7_200_000);
+      vi.advanceTimersByTime(699);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      vi.advanceTimersByTime(1); // 2000
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a', 'a']);
+    });
+
+    it('a replacement queued during padding takes over when the padding ends', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 0)]));
+
+      vi.advanceTimersByTime(500);
+      // A repeatable replacement: if the padding timer started it without
+      // taking over (flag left set), its repeat pass would be lost.
+      queue.addToQueue(loop([makeTrack('r', 1000)], { id: 'R', repeatsLeft: 1 }));
+      vi.advanceTimersByTime(499);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1); // padding ends at 1000
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'r']);
+      vi.advanceTimersByTime(1000);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'r', 'r']);
+      vi.advanceTimersByTime(5000);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'r', 'r']);
+    });
+
+    it('panicStop during padding leaves no pending timer', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 0)]));
+
+      vi.advanceTimersByTime(500);
+      queue.panicStop();
+      expect(vi.getTimerCount()).toBe(0);
+      vi.advanceTimersByTime(5000);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+
+      queue.clearPanicStop();
+      queue.addToQueue(makeScriptItem('X', 100));
+      vi.advanceTimersByTime(5000);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+    });
+
+    it('warns once per playlist run, not once per pass', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 0)], { id: 'run-1', repeatsLeft: 2 }));
+      vi.advanceTimersByTime(5000); // two padded boundaries
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ playlistId: 'run-1' }),
+        expect.any(String),
+      );
+
+      queue.addToQueue(loop([makeTrack('a', 0)], { id: 'run-2', repeatsLeft: 1 }));
+      vi.advanceTimersByTime(5000);
+
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(warnSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ playlistId: 'run-2' }),
+        expect.any(String),
+      );
     });
   });
 });

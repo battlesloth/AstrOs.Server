@@ -6,6 +6,7 @@ import { PlaylistType } from '../../models/playlists/playlistType.js';
 import { TrackType } from '../../models/playlists/trackType.js';
 import { PlaylistRepository } from '../../dal/repositories/playlist_repository.js';
 import { PlaylistCycleError } from 'src/models/playlists/playlist_cycle_error.js';
+import { logger } from 'src/logger.js';
 
 function makeSettings(overrides: Partial<PlaylistSettings> = {}): PlaylistSettings {
   return {
@@ -102,6 +103,37 @@ describe('Playlist Converter', () => {
     const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
 
     expect(result.tracks[0]).toEqual({ id: 'ghost-script', duration: 0, isWait: false });
+  });
+
+  it('should warn, naming the playlist and track, when a script track references an unknown script', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn');
+    try {
+      const playlist: Playlist = {
+        id: 'p1',
+        playlistName: 'Test',
+        description: '',
+        playlistType: PlaylistType.Sequential,
+        tracks: [
+          makeTrack({ idx: 0, trackId: 'ghost-script', trackName: 'Ghost' }),
+          makeTrack({ idx: 1, trackId: 'script-1' }),
+        ],
+        settings: makeSettings(),
+      };
+
+      await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations([['script-1', 10]]), []);
+
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playlistId: 'playlist-id',
+          trackId: 'ghost-script',
+          trackName: 'Ghost',
+        }),
+        expect.any(String),
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('should convert wait tracks with isWait=true using the track durationDS', async () => {

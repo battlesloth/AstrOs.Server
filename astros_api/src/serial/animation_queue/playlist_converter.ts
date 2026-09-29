@@ -30,10 +30,18 @@ function convertScriptTrack(
   // exposes no duration control for script tracks, so it stays 0 (or stale).
   // Use the referenced script's recorded duration instead; otherwise the queue
   // would treat the script as instantaneous and run the next track over it.
-  // Unknown scriptId → 0 (script deleted/missing); the queue still advances.
+  // Unknown scriptId → 0 (script deleted/missing); the queue still advances,
+  // and the queue's minimum repeat pass keeps a loop of them from flooding.
+  const durationDS = scriptDurations.get(track.trackId);
+  if (durationDS === undefined) {
+    logger.warn(
+      { playlistId: track.playlistId, trackId: track.trackId, trackName: track.trackName },
+      'Script track references an unknown script; timing it as 0 ms',
+    );
+  }
   return {
     id: track.trackId,
-    duration: dsToMs(scriptDurations.get(track.trackId) ?? 0),
+    duration: dsToMs(durationDS ?? 0),
     isWait: false,
   };
 }
