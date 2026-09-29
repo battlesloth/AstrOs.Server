@@ -1,6 +1,10 @@
 import { PlaylistType } from 'src/models/playlists/playlistType.js';
 import { ControllerLocation } from 'src/models/control_module/controller_location.js';
-import { AnimationQueuePlaylist, QueueTrack } from './queue_item/animation_queue_item.js';
+import {
+  AnimationQueuePlaylist,
+  MAX_TIMER_MS,
+  QueueTrack,
+} from './queue_item/animation_queue_item.js';
 import { logger } from 'src/logger.js';
 import type { PanicState } from 'src/models/networking/panic_responses.js';
 
@@ -21,7 +25,7 @@ export class AnimationQueue {
   // finishes (see playlistReplaced).
   activePlaylist: AnimationQueuePlaylist | null = null;
   // For a nested track, the sub-tracks still to play (not the one playing).
-  currentTrack: QueueTrack | QueueTrack[] | null = null;
+  private currentTrack: QueueTrack | QueueTrack[] | null = null;
 
   // Locations of the playlist the current track came from, captured when the
   // track begins: after a replacement, activePlaylist already points at the new
@@ -35,6 +39,8 @@ export class AnimationQueue {
   // Date.now(), which jumps when an SBC syncs its clock after boot.
   private passStartedAt = 0;
   // The playlist run already warned about padding (one warning per run).
+  // Keyed on the object: the converter builds a fresh item per run, so
+  // re-running the same playlist (same id) warns again.
   private paddingWarnedFor: AnimationQueuePlaylist | null = null;
   private panicListeners = new Set<(state: PanicState) => void>();
 
@@ -84,24 +90,24 @@ export class AnimationQueue {
     }
   }
 
-  addToBackOfQueue(item: AnimationQueuePlaylist) {
+  private addToBackOfQueue(item: AnimationQueuePlaylist) {
     if (this.queueHasInterruptible()) {
       this.removeInterruptibleFromQueue();
     }
     this.playlistQueue.push(item);
   }
 
-  queueHasInterruptible() {
+  private queueHasInterruptible() {
     return this.playlistQueue.some((item) => item.playlistType !== PlaylistType.Sequential);
   }
 
-  removeInterruptibleFromQueue() {
+  private removeInterruptibleFromQueue() {
     this.playlistQueue = this.playlistQueue.filter(
       (item) => item.playlistType === PlaylistType.Sequential,
     );
   }
 
-  clearQueue() {
+  private clearQueue() {
     this.playlistQueue = [];
   }
 
@@ -114,6 +120,7 @@ export class AnimationQueue {
     this.activePlaylist = null;
     this.currentTrack = null;
     this.playlistReplaced = false;
+    this.paddingWarnedFor = null;
     this.clearQueue();
     this.notifyPanic();
   }
@@ -148,7 +155,7 @@ export class AnimationQueue {
     }
   }
 
-  startPlayingActivePlaylist() {
+  private startPlayingActivePlaylist() {
     if (this.inPanicStop) {
       return;
     }
@@ -166,7 +173,7 @@ export class AnimationQueue {
     this.beginTrack(track);
   }
 
-  playNextTrack() {
+  private playNextTrack() {
     // Step A — panic guard
     if (this.inPanicStop) {
       return;
@@ -204,13 +211,10 @@ export class AnimationQueue {
 
     // Step E — tracks exhausted, check repeat. A delay type waits its gap
     // before the first track of the new pass, as between any two tracks, and
-    // the next pass starts at least MIN_REPEAT_PASS_MS after this one started
-    // (gap and padding overlap — the longer wins; they never add).
+    // the next pass starts at least MIN_REPEAT_PASS_MS (less TIMER_SLACK_MS)
+    // after this one started (gap and padding overlap — the longer wins).
     if (this.handleRepeat()) {
-      const shuffleGap = this.hasShuffleDelay() ? this.getShuffleDelay() : 0;
-      // An unset delay (settings stored as '{}') is NaN; it must not switch
-      // the padding off (Math.max(NaN, x) is NaN).
-      const gap = Number.isFinite(shuffleGap) ? shuffleGap : 0;
+      const gap = this.hasShuffleDelay() ? this.getShuffleDelay() : 0;
       const passMs = performance.now() - this.passStartedAt;
       const shortfall = MIN_REPEAT_PASS_MS - passMs;
       const padding = shortfall > TIMER_SLACK_MS ? shortfall : 0;
@@ -218,7 +222,8 @@ export class AnimationQueue {
         this.warnPadding(passMs);
       }
       const wait = Math.max(gap, padding);
-      // Delay types always go through the gap timer, as before T-005.
+      // Delay types keep the gap timer even for a 0 ms wait, so their timing
+      // is unchanged (a 0 ms gap still fires >= 1 ms later).
       if (wait > 0 || this.hasShuffleDelay()) {
         this.scheduleGap(wait, () => this.startPlayingActivePlaylist());
       } else {
@@ -299,7 +304,7 @@ export class AnimationQueue {
     }
   }
 
-  dispatchTrack(track: QueueTrack) {
+  private dispatchTrack(track: QueueTrack) {
     if (!track.isWait && this.activePlaylist) {
       this.dispatchCallback(track.id, this.currentLocations);
     }
@@ -367,8 +372,9 @@ export class AnimationQueue {
   }
 
   // The tracks one pass plays, in order: a copy of `tracks` (never mutated),
-  // shuffled for shuffle types. Empty nested arrays are dropped — beginTrack
-  // would recurse through them with no timer in between.
+  // shuffled for shuffle types. Empty nested arrays are dropped: beginTrack
+  // would recurse through them with no timer in between, and a playlist of
+  // only empty nested tracks must go idle rather than loop on padding.
   private buildPass(item: AnimationQueuePlaylist): Array<QueueTrack | QueueTrack[]> {
     const pass = item.tracks.filter((track) => !Array.isArray(track) || track.length > 0);
     if (this.isShufflePlaylistType(item.playlistType)) {
@@ -391,9 +397,15 @@ export class AnimationQueue {
     );
   }
 
+  // Defense in depth (the converter already normalizes delays): a NaN or
+  // negative delay means none — Math.max(NaN, padding) would otherwise switch
+  // the repeat padding off — and one beyond the timer maximum is clamped.
   private getShuffleDelay(): number {
     if (!this.activePlaylist) return 0;
     const { shuffleWaitMin, shuffleWaitMax } = this.activePlaylist;
-    return shuffleWaitMin + Math.floor(Math.random() * (shuffleWaitMax - shuffleWaitMin + 1));
+    const delay =
+      shuffleWaitMin + Math.floor(Math.random() * (shuffleWaitMax - shuffleWaitMin + 1));
+    if (Number.isNaN(delay) || delay < 0) return 0;
+    return Math.min(delay, MAX_TIMER_MS);
   }
 }

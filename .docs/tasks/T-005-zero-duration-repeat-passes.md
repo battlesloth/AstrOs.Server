@@ -28,7 +28,8 @@ dispatch.
   crashes the process. Only the converter's `subTracks.length > 0` guard keeps it unreachable
   today.
 - **Malformed `repeatsLeft`.** `handleRepeat` treats any value that is neither `0` nor positive —
-  `undefined`, `NaN`, `-2`, fractions — as infinite (settings reach the converter via
+  `undefined`, `NaN`, `-2` — as infinite (a fraction counts down 1.5 → 0.5 → −0.5 and then loops
+  forever too) (settings reach the converter via
   `JSON.parse(...) as PlaylistSettings` without validation; `repeatCount: undefined` →
   `repeatsLeft: undefined` → loops forever).
 
@@ -65,6 +66,8 @@ API — `astros_api/src/serial/animation_queue/animation_queue.ts`:
    succeeds: `elapsed = now - passStart`; `wait = max(delayTypeGap, MIN_REPEAT_PASS_MS - elapsed)`
    where `delayTypeGap` is the shuffle delay for delay types and 0 otherwise. If `wait > 0`, start
    the next pass through the gap helper; otherwise start it immediately (today's path).
+   *(Amended by Tasks 10–13: 5 ms slack, NaN-safe gap — now via delay normalization — delay types
+   keep the gap timer.)*
 2. **Gap helper takes an explicit delay.** `scheduleGap(delayMs, then)` — callers pass
    `this.getShuffleDelay()` for shuffle gaps, `wait` for the repeat boundary. The timer stays in
    `currentTimeout` and a pending replacement still takes over when it ends
@@ -85,6 +88,8 @@ API — `astros_api/src/serial/animation_queue/playlist_converter.ts`:
 6. A script track whose `trackId` is not in `scriptDurations` keeps the 0 ms fallback but logs
    `logger.warn({ playlistId: track.playlistId, trackId, trackName }, 'Script track references an
    unknown script; timing it as 0 ms')`.
+   *(Superseded by Task 14: one warning per conversion, naming the run playlist and the unknown
+   scripts.)*
 
 Tests — each RED-first; after green, revert the fix and confirm the test fails (record in the
 task file and PR body). Confirm first that the queue tests' fake timers fake `performance.now()`
@@ -117,7 +122,7 @@ task file and PR body). Confirm first that the queue tests' fake timers fake `pe
      `-1` still infinite; `2` still three passes;
    - `item.tracks` unchanged after playback (including the dropped empty nested array).
 8. `playlist_converter.test.ts`: an unknown script id → 0 ms track and one warning naming the
-   playlist and track.
+   playlist and track. *(Superseded by Task 14.)*
 
 Docs:
 
@@ -132,20 +137,41 @@ Added after the pre-commit review (2026-09-28):
 10. `TIMER_SLACK_MS = 5`: real timers fire up to ~1 ms early against `performance.now()`, so a
     pass meant to last exactly 1 s can measure 999.x ms — within the slack it is neither padded
     nor warned (the Contract's "passes ≥ 1 s play exactly as today").
-11. A NaN shuffle delay (settings stored as `'{}'`) is treated as 0 at the repeat boundary —
-    `Math.max(NaN, padding)` switched the padding off, so such a loop flooded with no warning.
+11. A NaN shuffle delay (stored settings with repeat on but no `delayMin` — e.g. a legacy `'{}'`
+    row later saved with repeat; a bare `'{}'` never repeats) is treated as 0 at the repeat boundary —
+    `Math.max(NaN, padding)` switched the padding off, so such a loop flooded with no warning. *(Superseded by Task 13: the guard moved into delay normalization.)*
 12. The padding warning fires only when padding is positive and longer than the gap; delay
     types keep going through the gap timer even with a 0 ms wait (as before T-005);
     malformed `repeatsLeft` is logged as a string (pino drops `undefined`, writes `NaN` as
     `null`).
 
+Added after the pre-push review (2026-09-28):
+
+13. Delays: the converter makes each delay finite, non-negative, and ≤ `MAX_TIMER_MS`
+    (2^31−1 ms; Node fires a longer timer after 1 ms, so `max(gap, padding)` picked the "huge"
+    gap and the loop flooded) with one warning per run for delay types; the queue's
+    `getShuffleDelay` clamps the same way as defense in depth (replacing Step E's NaN guard).
+14. Unknown scripts: one warning per conversion naming the run playlist and the unique unknown
+    ids (was one per track, naming the nested playlist that owned it).
+15. The queue's unpinned members (`startPlayingActivePlaylist`, `playNextTrack`,
+    `dispatchTrack`, `addToBackOfQueue`, `queueHasInterruptible`, `removeInterruptibleFromQueue`,
+    `clearQueue`, `currentTrack`) are private — no callers outside the class; this closes the
+    only way around the one-timer and pass-floor invariants. `panicStop` also resets the
+    per-run warning marker.
+16. Tests closing gaps the reviews found: first-pass start recorded (a test starting away from
+    t = 0), same-id re-run warns again (object identity, incl. takeover), empty nested arrays
+    dropped on repeat passes, reshuffle pinned, padding for all three repeatable types, stale
+    delay on a non-delay type, `repeatsLeft` logged as a string.
+
 ## Acceptance criteria
 
-- [ ] No repeating playlist dispatches more than one pass per second, whatever its tracks.
+- [ ] No repeating playlist starts passes more than once per ~second (1000 ms less the 5 ms slack),
+      whatever its tracks or delay settings (a single pass of many instant tracks still bursts —
+      Out of scope).
 - [ ] Single passes, passes ≥ 1 s, direct runs, and delay-type gaps keep their timing.
 - [ ] Padding is cancelled by `panicStop` and taken over by a replacement at its end.
-- [ ] One padding warning per playlist run; one warning per malformed `repeatsLeft`; one per
-      unknown script id.
+- [ ] One padding warning per padded playlist run; one warning per malformed `repeatsLeft`; one
+      warning per run listing its unknown script ids; one per run for invalid delay settings.
 - [ ] Empty nested arrays are skipped; `[[]]` cannot recurse or wedge the queue.
 - [ ] Only `-1` means infinite repeat.
 - [ ] Every fix has a test that fails with the fix reverted (mutation checks recorded).
@@ -160,14 +186,15 @@ Added after the pre-commit review (2026-09-28):
 ## Out of scope
 
 - A warning in the playlist editor for loops shorter than 1 s → Backlog.
-- A **single** pass of more than ~30 instant scripts (one burst can still overflow the ESP's
-  30-slot queue) → Backlog.
+- A **single** pass of many instant scripts: padding caps passes, not dispatches, so under repeat
+  such a pass bursts every second, and at ≥ ~1000 tracks it is neither padded nor warned
+  (reachable via repeated nested playlists) → PLAN.md Backlog.
 - Cutting silence short on interrupt (Wait / gap / padding) — existing Backlog item.
 - The pino logging sweep beyond the lines this task touches — existing Backlog item (high).
 - Queue failure handling (`addToQueue`'s catch leaving the queue wedged; unguarded timer
   callbacks) — existing Backlog item.
-- Making the queue's unpinned members private / a `playing` field refactor — Backlog (may ride
-  along only if the diff stays small; otherwise its own task).
+- A `playing` field refactor — Backlog (folded into the queue phase-union item). The queue's
+  unpinned members were made private in this task (Task 15).
 - The "Repeat - Count with no number plays forever" UI/converter mapping — its own task
   (T-003's Contract pinned the 0 → -1 mapping).
 
@@ -175,7 +202,8 @@ Added after the pre-commit review (2026-09-28):
 
 API (`astros_api/`):
 
-- `npx vitest run src/serial/animation_queue/` — green, including every new case in Tasks 7–8.
+- `npx vitest run src/serial/animation_queue/` — green, including every new case in Tasks 7–8 and
+  13–16.
 - `npx vitest run` — full suite green.
 - `npm run prettier:write && npm run lint:fix`, then `npm run prettier:check` — clean.
 - `npm run build` — green.
@@ -201,20 +229,21 @@ per-run warning marker. No filesystem, network, or cross-process state.
 
 - At most one pending timer; it is always `currentTimeout` (padding included), so `panicStop`
   cancels it.
-- A repeat pass starts at least `MIN_REPEAT_PASS_MS` after the previous pass started (measured on
-  a monotonic clock).
+- A repeat pass starts at least `MIN_REPEAT_PASS_MS − TIMER_SLACK_MS` (995 ms) after the previous
+  pass started (measured on a monotonic clock).
 - No synchronous `beginTrack ↔ playNextTrack` cycle: empty nested arrays never reach
   `beginTrack`.
 - `item.tracks` is never mutated.
 
-**Event × state matrix** (→ expected; each row pinned by a Task 7 test):
+**Event × state matrix** (→ expected; each row pinned by a Task 7/16 test):
 
 | State when event fires | Event | Expected |
 |---|---|---|
 | Pass ends after < 1 s, non-delay repeat type | timer fires | padding timer for `1000 - elapsed`; next pass at its end |
 | Pass ends after < 1 s, delay type, gap G | timer fires | wait `max(G, 1000 - elapsed)` |
 | Pass ends after ≥ 1 s (within `TIMER_SLACK_MS` = 5 ms of it counts) | timer fires | next pass immediately (non-delay) / after G (delay) — unchanged, no warning |
-| Pass ends after < 1 s, delay type with an unset (NaN) delay | timer fires | padded (NaN gap treated as 0), one warning |
+| Pass ends after < 1 s, delay type with an unset (NaN) delay | timer fires | padded (the delay normalizes to 0); two warnings per run — invalid delay settings, padding |
+| Delay type with a delay beyond the timer maximum | pass boundary | gap clamped to `MAX_TIMER_MS` (not truncated to 1 ms), one invalid-delay warning — no flood |
 | Padding pending | `addToQueue(x)` (interruptible active) | `x` at padding end; next pass never starts |
 | Padding pending | `panicStop()` | timer cleared, nothing fires; recovery normal |
 | New playlist run starts (addToQueue / takeover / advance) | first padded pass | one warning for this run |
@@ -229,8 +258,8 @@ per-run warning marker. No filesystem, network, or cross-process state.
 - [x] Task 5 RED/GREEN — `repeatsLeft`: only `-1` infinite; malformed → one pass + one warning
 - [x] Tasks 1–3 RED/GREEN — repeat-pass padding (0 ms loops, nested, Wait-only, 300 ms pass, ≥ 1 s unchanged, delay max(), finite repeats, clock jump, replacement, panic, once-per-run warning)
 - [x] Task 6 RED/GREEN — converter warns on unknown script id
-- [x] Mutation checks recorded (review additions: NaN guard removed → the NaN-delay test; slack removed → the within-5-ms test; warn when the gap is longer → the delay-type gap-wins case): no padding → 8 tests; `Date.now()` instead of `performance.now()` → the clock-jump test; padding without the takeover → 2 (incl. the repeatable-interrupter padding test); padding timer outside `currentTimeout` → 3 (incl. panic → no pending timer); warn every pass → 1; keep empty nested arrays → 1; malformed `repeatsLeft` accepted → 4 (an `if (false)` mutant failed `tsc` in vitest's globalSetup — used `Number.isNaN(0)`); converter never warns → 1
+- [x] Mutation checks recorded (pre-push additions: first pass start never recorded → the 0 ms loops and the 10 s-offset test; warn keyed on id → the same-id takeover test; repeat pass not built by `buildPass` → reshuffle + empty-nested-on-repeat; stale delay on non-delay types → 3; timer-max clamp removed → the huge-delay test. Pre-commit additions: NaN guard removed → the NaN-delay test; slack removed → the within-5-ms test; warn when the gap is longer → the delay-type gap-wins case): no padding → 8 tests; `Date.now()` instead of `performance.now()` → the clock-jump test; padding without the takeover → 2 (incl. the repeatable-interrupter padding test); padding timer outside `currentTimeout` → 3 (incl. panic → no pending timer); warn every pass → 1; keep empty nested arrays → 1; malformed `repeatsLeft` accepted → 4 (an `if (false)` mutant failed `tsc` in vitest's globalSetup — used `Number.isNaN(0)`); converter never warns → 1
 - [x] Task 9 — QA plan cases
 - [x] Pre-commit: prettier + lint, build, full suite, code review (findings addressed)
-- [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
+- [x] Pre-push: `/pr-review-toolkit:review-pr` (5 agents); findings addressed (Tasks 13–16, comment/doc sweep, PLAN.md Backlog)
 - [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry

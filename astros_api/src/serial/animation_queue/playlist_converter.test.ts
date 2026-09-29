@@ -105,35 +105,145 @@ describe('Playlist Converter', () => {
     expect(result.tracks[0]).toEqual({ id: 'ghost-script', duration: 0, isWait: false });
   });
 
-  it('should warn, naming the playlist and track, when a script track references an unknown script', async () => {
+  it('should warn once per conversion, naming the run playlist and each unknown script', async () => {
     const warnSpy = vi.spyOn(logger, 'warn');
     try {
+      // 'ghost-script' appears twice (top level and nested — deduped),
+      // 'ghost-nested' only inside the nested playlist (so the nested path must
+      // collect too), and a known script has a recorded length of 0 (not unknown).
+      const nested: Playlist = {
+        id: 'nested-1',
+        playlistName: 'Nested',
+        description: '',
+        playlistType: PlaylistType.Sequential,
+        tracks: [
+          makeTrack({
+            playlistId: 'nested-1',
+            idx: 0,
+            trackId: 'ghost-script',
+            trackName: 'Ghost',
+          }),
+          makeTrack({ playlistId: 'nested-1', idx: 1, trackId: 'ghost-nested', trackName: 'Deep' }),
+        ],
+        settings: makeSettings(),
+      };
       const playlist: Playlist = {
         id: 'p1',
         playlistName: 'Test',
         description: '',
-        playlistType: PlaylistType.Sequential,
+        playlistType: PlaylistType.SequentialRepeatable,
         tracks: [
-          makeTrack({ idx: 0, trackId: 'ghost-script', trackName: 'Ghost' }),
-          makeTrack({ idx: 1, trackId: 'script-1' }),
+          makeTrack({ playlistId: 'p1', idx: 0, trackId: 'ghost-script', trackName: 'Ghost' }),
+          makeTrack({ playlistId: 'p1', idx: 1, trackId: 'zero-length' }),
+          makeTrack({
+            playlistId: 'p1',
+            idx: 2,
+            trackType: TrackType.Playlist,
+            trackId: 'nested-1',
+            trackName: 'Nested',
+          }),
         ],
         settings: makeSettings(),
       };
 
-      await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations([['script-1', 10]]), []);
+      await convertPlaylistToQueueItem(
+        playlist,
+        makeMockRepo(new Map([['nested-1', nested]])),
+        durations([['zero-length', 0]]),
+        [],
+      );
 
       expect(warnSpy).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          playlistId: 'playlist-id',
-          trackId: 'ghost-script',
-          trackName: 'Ghost',
-        }),
-        expect.any(String),
+        {
+          playlistId: 'p1',
+          unknownScripts: [
+            { id: 'ghost-script', trackName: 'Ghost' },
+            { id: 'ghost-nested', trackName: 'Deep' },
+          ],
+        },
+        'Playlist references unknown scripts; timing them as 0 ms',
       );
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  describe('delay settings', () => {
+    function delayPlaylist(
+      playlistType: PlaylistType,
+      settings: Partial<PlaylistSettings>,
+    ): Playlist {
+      return {
+        id: 'p1',
+        playlistName: 'Test',
+        description: '',
+        playlistType,
+        tracks: [makeTrack({ idx: 0 })],
+        settings: makeSettings(settings),
+      };
+    }
+
+    it.each([
+      // [label, settings, expected min, expected max]
+      ['missing delays', { delayMin: undefined, delayMax: undefined }, 0, 0],
+      ['a negative delay', { delayMin: -10, delayMax: -10 }, 0, 0],
+      [
+        'a delay beyond the timer maximum',
+        { delayMin: 30_000_000, delayMax: 30_000_000 },
+        2 ** 31 - 1,
+        2 ** 31 - 1,
+      ],
+      ['an infinite delay', { delayMin: Infinity, delayMax: Infinity }, 2 ** 31 - 1, 2 ** 31 - 1],
+      [
+        'only an invalid random maximum',
+        { randomDelay: true, delayMin: 10, delayMax: 30_000_000 },
+        1000,
+        2 ** 31 - 1,
+      ],
+    ])('normalizes %s for a delay type and warns once', async (_label, settings, min, max) => {
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        const result = await convertPlaylistToQueueItem(
+          delayPlaylist(
+            PlaylistType.ShuffleWithDelayAndRepeat,
+            settings as Partial<PlaylistSettings>,
+          ),
+          makeMockRepo(),
+          durations([['script-1', 10]]),
+          [],
+        );
+
+        expect(result.shuffleWaitMin).toBe(min);
+        expect(result.shuffleWaitMax).toBe(max);
+        expect(warnSpy).toHaveBeenCalledTimes(1);
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ playlistId: 'p1' }),
+          'Invalid playlist delay settings; using a safe value',
+        );
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('does not warn about unused delay settings on a non-delay type', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn');
+      try {
+        await convertPlaylistToQueueItem(
+          delayPlaylist(PlaylistType.SequentialRepeatable, {
+            delayMin: undefined,
+            delayMax: undefined,
+          } as Partial<PlaylistSettings>),
+          makeMockRepo(),
+          durations([['script-1', 10]]),
+          [],
+        );
+
+        expect(warnSpy).not.toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
   });
 
   it('should convert wait tracks with isWait=true using the track durationDS', async () => {
@@ -370,9 +480,20 @@ describe('Playlist Converter', () => {
       settings: makeSettings({ randomDelay: true, delayMin: 10, delayMax: 50 }),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
-    expect(result.shuffleWaitMin).toBe(1000);
-    expect(result.shuffleWaitMax).toBe(5000);
+    const warnSpy = vi.spyOn(logger, 'warn');
+    try {
+      const result = await convertPlaylistToQueueItem(
+        playlist,
+        makeMockRepo(),
+        durations([['script-1', 10]]),
+        [],
+      );
+      expect(result.shuffleWaitMin).toBe(1000);
+      expect(result.shuffleWaitMax).toBe(5000);
+      expect(warnSpy).not.toHaveBeenCalled(); // valid delays: no false positive
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('should map repeat settings: repeatCount=-1 (what the editor saves for Infinite) → repeatsLeft=-1', async () => {
@@ -401,9 +522,21 @@ describe('Playlist Converter', () => {
       settings: makeSettings({ randomDelay: false, delayMin: 10, delayMax: 50 }),
     };
 
-    const result = await convertPlaylistToQueueItem(playlist, makeMockRepo(), durations(), []);
-    expect(result.shuffleWaitMin).toBe(1000);
-    expect(result.shuffleWaitMax).toBe(1000);
+    const warnSpy = vi.spyOn(logger, 'warn');
+    try {
+      const result = await convertPlaylistToQueueItem(
+        playlist,
+        makeMockRepo(),
+        durations([['script-1', 10]]),
+        [],
+      );
+      expect(result.shuffleWaitMin).toBe(1000);
+      expect(result.shuffleWaitMax).toBe(1000);
+      // A stale (unused) delayMax is not an invalid setting: no warning.
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('should preserve playlistType from source', async () => {

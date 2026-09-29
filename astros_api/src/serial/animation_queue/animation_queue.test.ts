@@ -287,38 +287,31 @@ describe('Animation Queue Tests', () => {
       const queue = new AnimationQueue(dispatch);
 
       const randomSpy = vi.spyOn(Math, 'random');
-      // Fisher-Yates for 2 items: 1 random call per shuffle
-      // Cycle 1 shuffle: i=1, random=0.0 → j=0, swap → [track2, track1]
-      randomSpy.mockReturnValueOnce(0.0);
-      // Cycle 2 shuffle: i=1, random=0.99 → j=1, no swap → [track1, track2]
-      randomSpy.mockReturnValueOnce(0.99);
+      // Fisher-Yates for 3 items: 2 random calls per shuffle (i=2: j=floor(r*3), i=1: j=floor(r*2))
+      // Pass 1: 0.0 → swap [0]↔[2], 0.99 → no swap → [track3, track2, track1]
+      randomSpy.mockReturnValueOnce(0.0).mockReturnValueOnce(0.99);
+      // Pass 2: 0.5 → swap [1]↔[2], 0.0 → swap [0]↔[1] → [track3, track1, track2]
+      // (differs from both the unshuffled order and pass 1, so a pass that is
+      // not reshuffled fails)
+      randomSpy.mockReturnValueOnce(0.5).mockReturnValueOnce(0.0);
 
       const playlist = makePlaylist({
         playlistType: PlaylistType.ShuffleWithRepeat,
-        tracks: [makeTrack('track1', 500), makeTrack('track2', 500)],
+        tracks: [makeTrack('track1', 400), makeTrack('track2', 400), makeTrack('track3', 400)],
         repeatsLeft: 1,
       });
 
       queue.addToQueue(playlist);
+      vi.advanceTimersByTime(5000); // 1.2 s passes — no padding
 
-      // Cycle 1: shuffled to [track2, track1]
-      expect(dispatch).toHaveBeenCalledTimes(1);
-      expect(dispatch).toHaveBeenLastCalledWith('track2', []);
-      vi.advanceTimersByTime(500);
-      expect(dispatch).toHaveBeenCalledTimes(2);
-      expect(dispatch).toHaveBeenLastCalledWith('track1', []);
-      vi.advanceTimersByTime(500);
-
-      // Cycle 2: reshuffled to [track1, track2]
-      expect(dispatch).toHaveBeenCalledTimes(3);
-      expect(dispatch).toHaveBeenLastCalledWith('track1', []);
-      vi.advanceTimersByTime(500);
-      expect(dispatch).toHaveBeenCalledTimes(4);
-      expect(dispatch).toHaveBeenLastCalledWith('track2', []);
-      vi.advanceTimersByTime(500);
-
-      // Done
-      expect(dispatch).toHaveBeenCalledTimes(4);
+      expect(dispatchedIds(dispatch)).toEqual([
+        'track3',
+        'track2',
+        'track1',
+        'track3',
+        'track1',
+        'track2',
+      ]);
 
       randomSpy.mockRestore();
     });
@@ -1373,7 +1366,7 @@ describe('Animation Queue Tests', () => {
     });
 
     // The converter fills shuffleWaitMin/Max from the settings for every type,
-    // so stale delay settings reach the queue; only the delay types may wait.
+    // so stale delay settings reach the queue; only the delay types wait their stored delay.
     it.each([
       PlaylistType.Sequential,
       PlaylistType.SequentialInterruptible,
@@ -1397,7 +1390,7 @@ describe('Animation Queue Tests', () => {
     });
 
     it.each([PlaylistType.SequentialRepeatable, PlaylistType.ShuffleWithRepeat])(
-      '%s starts the next pass immediately, even with delay settings stored',
+      '%s starts the next 1 s pass immediately, even with delay settings stored',
       (type) => {
         const dispatch = vi.fn();
         const queue = new AnimationQueue(dispatch);
@@ -1499,7 +1492,7 @@ describe('Animation Queue Tests', () => {
       ['NaN', NaN],
       ['-2', -2],
       ['1.5', 1.5],
-    ])('repeatsLeft %s plays one pass and warns once', (_label, repeatsLeft) => {
+    ])('repeatsLeft %s plays one pass and warns once', (label, repeatsLeft) => {
       const dispatch = vi.fn();
       const queue = new AnimationQueue(dispatch);
       const warnSpy = vi.spyOn(logger, 'warn');
@@ -1516,9 +1509,10 @@ describe('Animation Queue Tests', () => {
         expect(dispatchedIds(dispatch)).toEqual(['a']);
         expect(queue.activePlaylist).toBeNull();
         expect(warnSpy).toHaveBeenCalledTimes(1);
+        // Logged as a string: pino drops undefined keys and writes NaN as null.
         expect(warnSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ playlistId: 'playlist-1' }),
-          expect.any(String),
+          expect.objectContaining({ playlistId: 'playlist-1', repeatsLeft: label }),
+          'Invalid repeatsLeft; not repeating',
         );
       } finally {
         warnSpy.mockRestore();
@@ -1575,14 +1569,23 @@ describe('Animation Queue Tests', () => {
       });
     }
 
-    it('a 0 ms script on infinite repeat dispatches once per second', () => {
+    it.each([
+      PlaylistType.SequentialRepeatable,
+      PlaylistType.ShuffleWithRepeat,
+      PlaylistType.ShuffleWithDelayAndRepeat,
+    ])('%s: a 0 ms script on infinite repeat dispatches once per second', (type) => {
       const dispatch = vi.fn();
       const queue = new AnimationQueue(dispatch);
-      queue.addToQueue(loop([makeTrack('a', 0)]));
+      queue.addToQueue(loop([makeTrack('a', 0)], { playlistType: type }));
 
-      vi.advanceTimersByTime(2500);
-
-      expect(dispatchedIds(dispatch)).toEqual(['a', 'a', 'a']); // 0, 1000, 2000
+      vi.advanceTimersByTime(999);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      vi.advanceTimersByTime(999);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a', 'a']);
     });
 
     it('a nested playlist of 0 ms sub-tracks plays each pass back-to-back, passes 1 s apart', () => {
@@ -1594,7 +1597,8 @@ describe('Animation Queue Tests', () => {
       expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2']);
       vi.advanceTimersByTime(1);
       expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2', 'n1']);
-      // A 0 ms timer still takes >= 1 ms (Node semantics), so n2 follows at +1.
+      // A 0 ms timer set inside a timer callback fires >= 1 ms later (fake
+      // timers, like Node), so pass 2's n2 follows at +1.
       vi.advanceTimersByTime(1);
       expect(dispatchedIds(dispatch)).toEqual(['n1', 'n2', 'n1', 'n2']);
     });
@@ -1617,6 +1621,9 @@ describe('Animation Queue Tests', () => {
     it('a 300 ms pass waits the remaining 700 ms', () => {
       const dispatch = vi.fn();
       const queue = new AnimationQueue(dispatch);
+      // Start away from t = 0 (passStartedAt's initial value), so a first pass
+      // whose start is never recorded would go unpadded and fail.
+      vi.advanceTimersByTime(10_000);
       queue.addToQueue(loop([makeTrack('a', 100), makeTrack('b', 100), makeTrack('c', 100)]));
 
       vi.advanceTimersByTime(999);
@@ -1664,8 +1671,9 @@ describe('Animation Queue Tests', () => {
     );
 
     it('a delay type with an unset (NaN) delay is still padded', () => {
-      // Settings stored as '{}' (the migration_3 column default) give NaN
-      // bounds; Math.max(NaN, padding) must not switch the padding off.
+      // Stored settings with repeat on but no delayMin (e.g. a legacy '{}' row
+      // later saved with repeat) give NaN bounds; Math.max(NaN, padding) must
+      // not switch the padding off.
       const dispatch = vi.fn();
       const queue = new AnimationQueue(dispatch);
       queue.addToQueue(
@@ -1705,6 +1713,24 @@ describe('Animation Queue Tests', () => {
       vi.advanceTimersByTime(1);
       expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
       expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('a delay beyond the timer maximum is clamped, not truncated to 1 ms', () => {
+      // Node cuts a delay over 2^31-1 ms to 1 ms; max(gap, padding) would then
+      // pick that "huge" gap over the padding and the loop would flood.
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        loop([makeTrack('a', 0)], {
+          playlistType: PlaylistType.ShuffleWithDelayAndRepeat,
+          shuffleWaitMin: 3e9,
+          shuffleWaitMax: 3e9,
+        }),
+      );
+
+      vi.advanceTimersByTime(3000);
+
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
     });
 
     it('finite repeats are padded too, then go idle', () => {
@@ -1775,6 +1801,50 @@ describe('Animation Queue Tests', () => {
       queue.addToQueue(makeScriptItem('X', 100));
       vi.advanceTimersByTime(5000);
       expect(dispatchedIds(dispatch)).toEqual(['a', 'X']);
+    });
+
+    it('drops empty nested tracks on repeat passes too', () => {
+      // Visible only for a delay type: a kept [] on pass 2 would add a gap.
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        loop([[], makeTrack('a', 100)], {
+          playlistType: PlaylistType.ShuffleWithDelayAndRepeat,
+          repeatsLeft: 1,
+          shuffleWaitMin: 1000,
+          shuffleWaitMax: 1000,
+        }),
+      );
+
+      vi.advanceTimersByTime(1099);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+    });
+
+    it('a non-delay type ignores a stale delay longer than the padding', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 100)], { shuffleWaitMin: 5000, shuffleWaitMax: 5000 }));
+
+      vi.advanceTimersByTime(999);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1); // padding, not the stale 5 s gap
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+    });
+
+    it('warns again for a fresh run of the same playlist, including one that takes over', () => {
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(loop([makeTrack('a', 0)], { id: 'same' }));
+      vi.advanceTimersByTime(500);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      // Re-running the same playlist builds a new item with the same id.
+      queue.addToQueue(loop([makeTrack('b', 0)], { id: 'same' }));
+      vi.advanceTimersByTime(1500); // takes over at 1000; its first boundary pads
+
+      expect(warnSpy).toHaveBeenCalledTimes(2);
     });
 
     it('warns once per playlist run, not once per pass', () => {

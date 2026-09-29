@@ -123,7 +123,7 @@ attached, also watch that the actions match. Case 13 is a UI check.
 **Preconditions:** as above, plus **"Instant"** — a script with a single event at **0.0 s**
 (its length is 0) — and **"Empty"** — a script with no events. The API log shows each
 `dispatching script <id> from animation queue` line with a timestamp, and one
-`Repeat pass shorter than the minimum; padding` warning per playlist run.
+`Repeat pass shorter than the minimum; padding` warning per padded playlist run.
 
 14. **Zero-length script loop.** Sequential, Repeatable, **Repeat - Infinite**, one track
     "Instant"; Run for ~10 s. Expected: dispatches ~1 s apart (≈10 lines, not thousands);
@@ -140,3 +140,8 @@ attached, also watch that the actions match. Case 13 is a UI check.
 18. **Interrupt during padding.** During case 14's loop, run "Interrupt" between two Instant
     dispatches. Expected: "Interrupt" is dispatched when the current 1 s pass ends (≤ ~1 s),
     and the loop does not resume.
+19. **Invalid delay.** Shuffle with Delay and Repeat, Infinite, one track "Instant", Delay set to
+    an absurd value (e.g. 9999999 s). Expected: one `Invalid playlist delay settings; using a
+    safe value` warning and **no** flood (no dispatch after the first, since the delay is
+    clamped to ~24.8 days). Running "Interrupt" during that gap waits for the gap to end (switch
+    at gap end, by design), so only Panic Stop ends it — not a bug.
