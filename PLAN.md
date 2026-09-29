@@ -4,11 +4,11 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-005 — pad repeat passes shorter than 1 s (`feature/T-005-zero-duration-repeat-passes`); PR #130 open, bench log-verified
-Now:     merge PR #130 into develop
-Next:    Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo)
+Active:  release 1.0.2 (T-003, T-004, T-005) — develop → main PR open
+Now:     merge develop → main (dev build `1.0.2-dev.1`), then `release-prep-1.0.2` → release
+Next:    bump develop to `1.0.3-dev.0` (chore PR); Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo)
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — bench (log-level) passed for T-003 cases 7–13 and T-005 cases 14, 16–19; T-004 ESP-side check passed; PR #130 review (Copilot) addressed
+Last:    2026-09-28 — T-005 merged (PR #130) after the Copilot review round; T-003/T-004/T-005 bench passed; 1.0.2 release started
 
 ## Standalone tasks
 
@@ -16,7 +16,7 @@ Last:    2026-09-28 — bench (log-level) passed for T-003 cases 7–13 and T-00
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; merged 2026-09-28, PR #129; bench log-verified 2026-09-28, cases 7–13)
 - [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench verified 2026-09-28 — log-level cases 1–6 plus the ESP-side check, passed per Jeff)
-- [x] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/completed/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`; PR #130; bench log-verified 2026-09-28, cases 14, 16–19 — 15 covered by case 9 and unit tests)
+- [x] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/completed/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`; merged 2026-09-28, PR #130; bench log-verified 2026-09-28, cases 14, 16–19 — 15 covered by case 9 and unit tests)
 
 ## Backlog (unscheduled candidates)
 
