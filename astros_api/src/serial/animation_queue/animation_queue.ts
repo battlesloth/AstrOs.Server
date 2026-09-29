@@ -17,6 +17,11 @@ const MIN_REPEAT_PASS_MS = 1000;
 // as long enough (no padding, no warning).
 const TIMER_SLACK_MS = 5;
 
+function clampDelayMs(ms: number): number {
+  if (Number.isNaN(ms) || ms < 0) return 0;
+  return Math.min(ms, MAX_TIMER_MS);
+}
+
 export class AnimationQueue {
   inPanicStop = false;
   playlistQueue: AnimationQueuePlaylist[] = [];
@@ -397,15 +402,16 @@ export class AnimationQueue {
     );
   }
 
-  // Defense in depth (the converter already normalizes delays): a NaN or
-  // negative delay means none — Math.max(NaN, padding) would otherwise switch
-  // the repeat padding off — and one beyond the timer maximum is clamped.
+  // Defense in depth (the converter already normalizes delays): each bound is
+  // clamped before the random range is computed (Infinity - Infinity is NaN) —
+  // a NaN or negative bound counts as 0, one beyond the timer maximum, Infinity
+  // included, as the maximum — and so is the result, which a fractional bound
+  // can push past the maximum. A NaN delay would reach Math.max(NaN, padding)
+  // and switch the repeat padding off.
   private getShuffleDelay(): number {
     if (!this.activePlaylist) return 0;
-    const { shuffleWaitMin, shuffleWaitMax } = this.activePlaylist;
-    const delay =
-      shuffleWaitMin + Math.floor(Math.random() * (shuffleWaitMax - shuffleWaitMin + 1));
-    if (Number.isNaN(delay) || delay < 0) return 0;
-    return Math.min(delay, MAX_TIMER_MS);
+    const min = clampDelayMs(this.activePlaylist.shuffleWaitMin);
+    const max = clampDelayMs(this.activePlaylist.shuffleWaitMax);
+    return clampDelayMs(min + Math.floor(Math.random() * (max - min + 1)));
   }
 }

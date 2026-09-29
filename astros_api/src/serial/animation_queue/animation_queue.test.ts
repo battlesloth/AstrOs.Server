@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnimationQueue } from './animation_queue.js';
-import { AnimationQueuePlaylist, QueueTrack } from './queue_item/animation_queue_item.js';
+import {
+  AnimationQueuePlaylist,
+  MAX_TIMER_MS,
+  QueueTrack,
+} from './queue_item/animation_queue_item.js';
 import { PlaylistType } from '../../models/playlists/playlistType.js';
 import { ControllerLocation } from '../../models/control_module/controller_location.js';
 // Same module instance the queue logs through (src/* alias, not a relative path).
@@ -1728,9 +1732,39 @@ describe('Animation Queue Tests', () => {
         }),
       );
 
+      // Check early too, so a flood fails here rather than after millions of
+      // padded passes.
       vi.advanceTimersByTime(3000);
-
       expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(MAX_TIMER_MS - 1 - 3000);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('an infinite delay is clamped to the timer maximum, not zeroed', () => {
+      // Infinity - Infinity is NaN, so the random range must be computed from
+      // bounds that are already clamped.
+      const dispatch = vi.fn();
+      const queue = new AnimationQueue(dispatch);
+      queue.addToQueue(
+        loop([makeTrack('a', 0)], {
+          playlistType: PlaylistType.ShuffleWithDelayAndRepeat,
+          shuffleWaitMin: Infinity,
+          shuffleWaitMax: Infinity,
+        }),
+      );
+
+      // Check early too, so a flood fails here rather than after millions of
+      // padded passes.
+      vi.advanceTimersByTime(3000);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(MAX_TIMER_MS - 1 - 3000);
+      expect(dispatchedIds(dispatch)).toEqual(['a']);
+      vi.advanceTimersByTime(1);
+      expect(dispatchedIds(dispatch)).toEqual(['a', 'a']);
+      expect(warnSpy).not.toHaveBeenCalled();
     });
 
     it('finite repeats are padded too, then go idle', () => {

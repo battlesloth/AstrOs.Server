@@ -18,8 +18,9 @@ function dsToMs(ds: number): number {
 }
 
 // A delay a timer can honor: settings reach the converter unvalidated
-// (JSON.parse), so a missing, negative, or non-finite delay means none, and one
-// beyond the timer maximum is clamped (Node would fire it after 1 ms).
+// (JSON.parse), so a missing (NaN) or negative delay means none, and one beyond
+// the timer maximum — Infinity included — is clamped to it (Node would fire it
+// after 1 ms).
 function safeDelayMs(ds: number): number {
   const ms = dsToMs(ds);
   if (Number.isNaN(ms) || ms < 0) return 0;
