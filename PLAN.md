@@ -4,11 +4,11 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-005 — pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`feature/T-005-zero-duration-repeat-passes`)
-Now:     T-005 implemented + pre-push reviewed (5 agents, findings addressed) → close out on the branch, Jeff pushes develop + the T-005 branch, PR into develop
+Active:  T-005 — pad repeat passes shorter than 1 s (`feature/T-005-zero-duration-repeat-passes`); implemented, pre-push reviewed, closed out on the branch — awaiting push + PR into develop
+Now:     Jeff pushes develop (`5a3f6cd5`) and the T-005 branch; PR into develop; bench cases 14–19 in `.docs/qa/playlist-playback.md` (log-verifiable)
 Next:    Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo); bench checks still open: T-004 ESP-side, T-003 cases 7–13
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — T-003 merged (PR #129); T-004 merged (PR #128), log-level bench passed
+Last:    2026-09-28 — T-005 implemented + pre-push reviewed (on its branch); T-003 merged (PR #129); T-004 merged (PR #128)
 
 ## Standalone tasks
 
@@ -16,7 +16,7 @@ Last:    2026-09-28 — T-003 merged (PR #129); T-004 merged (PR #128), log-leve
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; merged 2026-09-28, PR #129; bench cases 7–13 pending)
 - [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench log-verified 2026-09-28 — ESP-side check pending hardware)
-- [ ] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`)
+- [x] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/completed/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`; bench verification pending)
 
 ## Backlog (unscheduled candidates)
 
@@ -115,6 +115,12 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-09-28 T-005 — repeat passes shorter than 1 s are padded
+  - a repeating playlist whose pass takes ~0 ms (zero-event scripts, events at 0 s, 0 s Waits, nested 0 ms sub-tracks) re-sent `SCRIPT_RUN` every tick — one 0 ms script on infinite repeat dispatched 2502 times in 2.5 s. The next pass now starts ≥ 1 s (less 5 ms slack) after the previous one started: measured with `performance.now()` (NTP jumps `Date`), `max(gap, padding)`, through T-003's `scheduleGap` (panic cancels it, a replacement takes over at its end), one warning per run
+  - `buildPass` drops empty nested arrays (they recursed synchronously and wedged the queue); only `-1` means infinite repeat (undefined/NaN/-2/1.5 looped forever); delays are made finite, non-negative and ≤ Node's timer max (a huge delay was truncated to 1 ms and flooded); unknown scripts warned once per run; the queue's unpinned members are private
+  - reviews mattered again: every padding test started at t = 0 (= `passStartedAt`'s initial value), so an unrecorded first pass passed; the warning was keyed on object identity but tested with different ids; the old reshuffle test never pinned the reshuffle; a NaN delay and a beyond-timer-max delay each switched the padding off. Nine older tests with sub-1 s repeat passes were updated (design change, amendment recorded)
+  - Backlog: a single pass of many instant tracks still bursts (padding caps passes, not dispatches — ~925/s unwarned at ≥ ~1000 tracks), editor warnings (sub-1 s loops, delay/Wait maxima), repository-level settings parsing, negative `duration_ds`
 
 - 2026-09-28 T-003 — playlist repeat/interrupt bugs + interrupt coverage
   - queue: nested tracks were consumed in place (repeat passes skipped them; a nested-only playlist on infinite repeat recursed into a stack overflow in a timer → API crash) — `beginTrack` copies; a nested playlist is one track for interrupts (sub-tracks finish first, with their own playlist's locations); every shuffle gap goes through `scheduleGap`, so a replacement during a gap takes over at its end instead of a track pre-picked from the replaced playlist; delay types wait their gap at the repeat boundary (a one-track loop replayed back-to-back)

@@ -1,6 +1,6 @@
 # T-005: Pad repeat passes shorter than 1 s so zero-duration loops cannot flood
 
-<!-- File: .docs/tasks/T-005-zero-duration-repeat-passes.md. Branch: feature/T-005-zero-duration-repeat-passes
+<!-- File: .docs/tasks/completed/T-005-zero-duration-repeat-passes.md. Branch: feature/T-005-zero-duration-repeat-passes
      (off develop AFTER T-003 merges — same queue loop). PR title: "T-005: Pad repeat passes shorter than 1 s". -->
 
 ## Context
@@ -165,17 +165,17 @@ Added after the pre-push review (2026-09-28):
 
 ## Acceptance criteria
 
-- [ ] No repeating playlist starts passes more than once per ~second (1000 ms less the 5 ms slack),
+- [x] No repeating playlist starts passes more than once per ~second (1000 ms less the 5 ms slack),
       whatever its tracks or delay settings (a single pass of many instant tracks still bursts —
       Out of scope).
-- [ ] Single passes, passes ≥ 1 s, direct runs, and delay-type gaps keep their timing.
-- [ ] Padding is cancelled by `panicStop` and taken over by a replacement at its end.
-- [ ] One padding warning per padded playlist run; one warning per malformed `repeatsLeft`; one
+- [x] Single passes, passes ≥ 1 s, direct runs, and delay-type gaps keep their timing.
+- [x] Padding is cancelled by `panicStop` and taken over by a replacement at its end.
+- [x] One padding warning per padded playlist run; one warning per malformed `repeatsLeft`; one
       warning per run listing its unknown script ids; one per run for invalid delay settings.
-- [ ] Empty nested arrays are skipped; `[[]]` cannot recurse or wedge the queue.
-- [ ] Only `-1` means infinite repeat.
-- [ ] Every fix has a test that fails with the fix reverted (mutation checks recorded).
-- [ ] Pre-existing queue and converter tests pass. *Amended 2026-09-28 during implementation:* the
+- [x] Empty nested arrays are skipped; `[[]]` cannot recurse or wedge the queue.
+- [x] Only `-1` means infinite repeat.
+- [x] Every fix has a test that fails with the fix reverted (mutation checks recorded).
+- [x] Pre-existing queue and converter tests pass. *Amended 2026-09-28 during implementation:* the
       approved design changes the timing of repeat passes shorter than 1 s, so nine older test
       definitions (ten cases) that repeated 100–300 ms passes were updated, keeping their
       sequences and intent (cycle counts, reshuffle, nested replay, interrupt landing points,
@@ -262,4 +262,4 @@ per-run warning marker. No filesystem, network, or cross-process state.
 - [x] Task 9 — QA plan cases
 - [x] Pre-commit: prettier + lint, build, full suite, code review (findings addressed)
 - [x] Pre-push: `/pr-review-toolkit:review-pr` (5 agents); findings addressed (Tasks 13–16, comment/doc sweep, PLAN.md Backlog)
-- [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry
+- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (bench cases 14–19 stay open until post-merge upkeep)
