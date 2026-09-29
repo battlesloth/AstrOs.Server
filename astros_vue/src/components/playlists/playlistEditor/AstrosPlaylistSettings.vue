@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import type { PlaylistSettings } from '@/models/playlists/playlistSettings';
 import { PlaylistType } from '@/enums/playlists/playlistType';
 
@@ -25,15 +25,18 @@ const repeatEnabled = computed(() =>
   ].includes(props.playlistType),
 );
 
-function initRepeatMode(): 'none' | 'count' | 'infinite' {
+// Derived from the model, not copied at setup: the editor swaps in another
+// playlist's settings without remounting this component.
+const repeatMode = computed<'none' | 'count' | 'infinite'>(() => {
   if (!modelValue.value.repeat) return 'none';
   return modelValue.value.repeatCount === -1 ? 'infinite' : 'count';
-}
+});
 
-const repeatMode = ref<'none' | 'count' | 'infinite'>(initRepeatMode());
+// Display only: settings survive a type change, so a type that cannot repeat
+// would otherwise show a stale (greyed-out) mode it will never play.
+const displayedRepeatMode = computed(() => (repeatEnabled.value ? repeatMode.value : 'none'));
 
 function onRepeatModeChange(mode: 'none' | 'count' | 'infinite') {
-  repeatMode.value = mode;
   if (mode === 'none') {
     modelValue.value.repeat = false;
   } else if (mode === 'infinite') {
@@ -125,7 +128,7 @@ function setDelayMax(e: Event) {
     </div>
     <div class="flex flex-row flex-wrap items-center gap-2">
       <select
-        :value="repeatMode"
+        :value="displayedRepeatMode"
         @change="
           onRepeatModeChange(
             ($event.target as HTMLSelectElement).value as 'none' | 'count' | 'infinite',
@@ -143,9 +146,13 @@ function setDelayMax(e: Event) {
         placeholder="Count"
         min="1"
         step="1"
-        :value="modelValue.repeatCount > 0 ? modelValue.repeatCount : ''"
+        :value="
+          displayedRepeatMode === 'count' && modelValue.repeatCount > 0
+            ? modelValue.repeatCount
+            : ''
+        "
         @change="onRepeatCountChange"
-        :disabled="!repeatEnabled || repeatMode !== 'count'"
+        :disabled="displayedRepeatMode !== 'count'"
         class="input input-bordered input-sm w-17"
       />
     </div>
