@@ -311,4 +311,4 @@ on shared in-memory state (`activePlaylist`, `currentTrack`, `currentTimeout`,
 - [x] Pre-commit: api + vue format/lint, builds, full suites, code review (findings addressed)
 - [x] Tasks 11–13 (review fixes): `takeOverIfReplaced`; repeat mode derived from the model (swap test RED `'infinite'` vs `'none'` first; count-only-in-Count RED `'3'` vs `''`); new tests. Mutations now caught that the first suite missed: takeover never clears the flag → 4 tests; takeover step deleted → 1; `panicStop` skips `clearTimeout` → 4; boundary gap without the takeover → 1; locations not captured on a normal start → 2; Count branch forgets `repeat = true` → 1 (Vue); count always empty → 1 (Vue)
 - [x] Pre-push: `/pr-review-toolkit:review-pr` (5 agents) + a per-commit review of the fix batch; findings addressed (Tasks 11–13, doc/comment sweep, Backlog)
-- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (bench items in Verification stay open until post-merge upkeep)
+- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (bench items in Verification stay open until post-merge upkeep — run 2026-09-28: cases 7–13 log-verified, passed)

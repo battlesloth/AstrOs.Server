@@ -262,5 +262,5 @@ per-run warning marker. No filesystem, network, or cross-process state.
 - [x] Task 9 — QA plan cases
 - [x] Pre-commit: prettier + lint, build, full suite, code review (findings addressed)
 - [x] Pre-push: `/pr-review-toolkit:review-pr` (5 agents); findings addressed (Tasks 13–16, comment/doc sweep, PLAN.md Backlog)
-- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (bench cases 14–19 stay open until post-merge upkeep)
+- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (bench cases 14–19 stay open until post-merge upkeep — run 2026-09-28: cases 14, 16–19 log-verified, passed; 15 covered by case 9 and unit tests)
 - [x] PR #130 review (Copilot): `getShuffleDelay` clamps each bound before computing the random range — `Infinity - Infinity` was `NaN`, so infinite bounds gave a 0 ms gap instead of the timer maximum (`clampDelayMs`); `safeDelayMs` comment corrected (Infinity is clamped, not zeroed). The two timer-max tests now pin the gap to exactly `MAX_TIMER_MS` and check at 3 s first so a flood fails fast. Mutation checks: bounds not clamped first → the infinite-delay test; clamp to `MAX_TIMER_MS - 1` → both timer-max tests; no timer-max clamp → both

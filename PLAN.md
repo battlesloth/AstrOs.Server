@@ -6,16 +6,16 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 Active:  T-005 — pad repeat passes shorter than 1 s (`feature/T-005-zero-duration-repeat-passes`); PR #130 open, bench log-verified
 Now:     merge PR #130 into develop
-Next:    Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo); bench checks still open: T-004 ESP-side, T-003 cases 7–13
+Next:    Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo)
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — bench (log-level) passed for T-003 cases 7–13 and T-005 cases 14, 16–19; T-005 PR #130 open
+Last:    2026-09-28 — bench (log-level) passed for T-003 cases 7–13 and T-005 cases 14, 16–19; T-004 ESP-side check passed; PR #130 review (Copilot) addressed
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; merged 2026-09-28, PR #129; bench log-verified 2026-09-28, cases 7–13)
-- [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench log-verified 2026-09-28 — ESP-side check pending hardware)
+- [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench verified 2026-09-28 — log-level cases 1–6 plus the ESP-side check, passed per Jeff)
 - [x] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/completed/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`; PR #130; bench log-verified 2026-09-28, cases 14, 16–19 — 15 covered by case 9 and unit tests)
 
 ## Backlog (unscheduled candidates)
@@ -139,7 +139,7 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
   - end-to-end units test (45.0 s event → 45 000 ms for direct run and playlist) plus a save-path-vs-migration cross-check — the only test that catches a symmetric ×100 storage change; every fix mutation-checked
   - `database.integration.test.ts` mirrors the production migration list — adding a migration without bumping it made failure-path tests pass on "corrupted migrations"
   - review lesson: Kysely's SQLite adapter runs migrations **without** a transaction (`supportsTransactionalDdl = false`); the codebase's comments had claimed otherwise since the db-safety work, and a first "fix" repeated a reviewer's claim after reading only the matching line
-  - merged as PR #128. Log-level bench (no droid; dev DB created under develop): develop sent the 45 s script every 4.501 s (21 dispatches in 90 s → ~18 queued ahead of an interrupt on a real ESP); on T-004, migration 8 converted 45 → 450 with no re-save, the loop ran every 45.002 s, the interrupt replaced it at the next boundary, script + Wait 5 s → T+50.007 s, a 30 s re-save stored 300 (30.00 s cadence), a queued direct run waited 45.001 s. ESP-side (`Queue is full` absent, interrupt plays right after the event) pending the droid
+  - merged as PR #128. Log-level bench (no droid; dev DB created under develop): develop sent the 45 s script every 4.501 s (21 dispatches in 90 s → ~18 queued ahead of an interrupt on a real ESP); on T-004, migration 8 converted 45 → 450 with no re-save, the loop ran every 45.002 s, the interrupt replaced it at the next boundary, script + Wait 5 s → T+50.007 s, a 30 s re-save stored 300 (30.00 s cadence), a queued direct run waited 45.001 s. ESP-side (`Queue is full` absent, interrupt plays right after the event) passed per Jeff (2026-09-28)
   - T-003 (queue/interrupt bugs found while investigating) stays planned on its branch; Backlog gained branded time units, a boot-time duration consistency check, a DB-ahead-of-code check, the `/remotecontrol` read-only gap, and the Kysely `10_*` sort hazard
 
 - 2026-09-07 release 1.0.1
