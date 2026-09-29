@@ -4,19 +4,19 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  T-005 — pad repeat passes shorter than 1 s (`feature/T-005-zero-duration-repeat-passes`); implemented, pre-push reviewed, closed out on the branch — awaiting push + PR into develop
-Now:     Jeff pushes develop (`5a3f6cd5`) and the T-005 branch; PR into develop; bench cases 14–19 in `.docs/qa/playlist-playback.md` (log-verifiable)
+Active:  T-005 — pad repeat passes shorter than 1 s (`feature/T-005-zero-duration-repeat-passes`); PR #130 open, bench log-verified
+Now:     merge PR #130 into develop
 Next:    Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo); bench checks still open: T-004 ESP-side, T-003 cases 7–13
 Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — T-005 implemented + pre-push reviewed (on its branch); T-003 merged (PR #129); T-004 merged (PR #128)
+Last:    2026-09-28 — bench (log-level) passed for T-003 cases 7–13 and T-005 cases 14, 16–19; T-005 PR #130 open
 
 ## Standalone tasks
 
 - [x] T-001 — Handle POLL_NAK as the offline-padawan signal (`.docs/tasks/completed/T-001-poll-nak-handling.md`, branch `feature/T-001-poll-nak-handling`; shipped in 1.0.1, bench-verified 2026-09-07)
 - [x] T-002 — Fix ScriptTestModal setup crash and stale-status Run enable (`.docs/tasks/completed/T-002-script-test-modal-fix.md`, branch `feature/T-002-script-test-modal-fix`; merged 2026-09-05; shipped in 1.0.1, bench-verified 2026-09-07)
-- [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; merged 2026-09-28, PR #129; bench cases 7–13 pending)
+- [x] T-003 — Fix playlist repeat/interrupt bugs and cover every interrupt path (`.docs/tasks/completed/T-003-playlist-interrupt-fixes.md`, branch `feature/T-003-playlist-interrupt-fixes`; merged 2026-09-28, PR #129; bench log-verified 2026-09-28, cases 7–13)
 - [x] T-004 — Store script durations in deciseconds (`.docs/tasks/completed/T-004-script-duration-units.md`, branch `feature/T-004-script-duration-units`; merged 2026-09-28, PR #128; bench log-verified 2026-09-28 — ESP-side check pending hardware)
-- [x] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/completed/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`; bench verification pending)
+- [x] T-005 — Pad repeat passes shorter than 1 s so zero-duration loops cannot flood (`.docs/tasks/completed/T-005-zero-duration-repeat-passes.md`, branch `feature/T-005-zero-duration-repeat-passes`; PR #130; bench log-verified 2026-09-28, cases 14, 16–19 — 15 covered by case 9 and unit tests)
 
 ## Backlog (unscheduled candidates)
 
@@ -115,6 +115,11 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-09-28 bench — T-003 + T-005, log-level (no droid), on the T-005 branch; runs driven through `/api/remotecontrol` for exact timing
+  - T-005: a 0 s-event script on infinite repeat dispatched every +1.000 s with one padding warning (`passMs: 2`) — no flood; a 0.3 s pass padded to 1 s (`passMs: 301`); a 0 s Wait-only loop idle at 0.2 % API CPU (0.7 % idle baseline); a 9,999,999 s delay clamped to 2^31−1 ms with one warning — 1 dispatch in 27 s (it flooded at ~449/s before the fix); interrupts land at the end of the current track or padding
+  - T-003: a nested-only infinite loop ran 10 passes with the API up (it crashed on pass 2 before) and an interrupt waited for the nested playlist to finish; Sequential waits for the whole playlist; an interrupt during a shuffle gap took over at the gap end without the pre-picked track; the 8 s cadence held across a repeat boundary; Random Delay off gave a fixed 2 s gap (+5.000 s) despite a stale 15 s max; the repeat dropdown shows None for Sequential and follows the loaded playlist (UI)
+  - dev DB bench items (Point three + 4 playlists) created through the repositories; backup `.data/database.sqlite3.pre-T005-bench`
 
 - 2026-09-28 T-005 — repeat passes shorter than 1 s are padded
   - a repeating playlist whose pass takes ~0 ms (zero-event scripts, events at 0 s, 0 s Waits, nested 0 ms sub-tracks) re-sent `SCRIPT_RUN` every tick — one 0 ms script on infinite repeat dispatched 2502 times in 2.5 s. The next pass now starts ≥ 1 s (less 5 ms slack) after the previous one started: measured with `performance.now()` (NTP jumps `Date`), `max(gap, padding)`, through T-003's `scheduleGap` (panic cancels it, a replacement takes over at its end), one warning per run
