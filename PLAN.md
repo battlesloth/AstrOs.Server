@@ -4,11 +4,32 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  none — 1.0.2 released; develop bump to `1.0.3-dev.0` on `chore/bump-1.0.3-dev` (PR into develop)
-Now:     merge the `chore/bump-1.0.3-dev` PR
-Next:    Backlog candidates (pino logging sweep — high; "Repeat - Count with no number plays forever"; sum-based Run gate on FAILED; dead upload catch; compose device-path typo)
-Blocked: none (the firmware-side OTA master-flash fix shipped in AstrOs.ESP rel_1.2 — stack overflow fixed in its PR #47)
-Last:    2026-09-28 — released 1.0.2 (T-003, T-004, T-005): develop → main #131, main → release #132; `astros-server:1.0.2` pushed
+Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
+Now:     — (T-006 next)
+Next:    T-006 → T-007 → T-008 in order (T-006 must merge before `migration_9` exists anywhere); AstrOs.ESP T-007/T-008 can run in parallel; Phase B (scripter) is decomposed when Phase A is done
+Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
+Last:    2026-10-22 — random span events design approved (`.docs/specs/20261022-0748-random-span-events-design.md`); develop at `1.0.3-dev.0` (#133 merged)
+
+## Random span events
+
+Spec: `.docs/specs/20261022-0748-random-span-events-design.md` · wire format: `.docs/protocol.md` § C (both repos) · firmware: AstrOs.ESP `PLAN.md` § Random span events (its T-007 parsers, T-008 math + span table, T-009 runtime)
+
+Phase A — database guard + span data and conversion
+
+- [ ] T-006 — Refuse a database written by a newer server (`.docs/tasks/T-006-refuse-newer-database.md`) — merges before T-007
+- [ ] T-007 — Persist random span events (`.docs/tasks/T-007-persist-random-span-events.md`)
+- [ ] T-008 — Convert random spans to ESP commands 6 and 7 (`.docs/tasks/T-008-convert-random-spans.md`)
+
+Phase B — scripter (decompose at phase start; contracts already pinned by T-007):
+- shared overlap/clamp, validation and hint-line helpers (TDD)
+- the Single / Random switch in the servo and GPIO dialogs
+- the span bar on the Pixi timeline (mockup option A), with click-to-edit
+- body drag and edge resize, both stopping at the boundary
+- GPIO ↔ Maestro-digital channel swap for spans (replaces T-007's throw)
+
+Phase C — release:
+- raise `MINIMUM_FIRMWARE_VERSION` to the AstrOs.ESP release carrying its T-009 (planned v1.3.0)
+- end-to-end bench QA (`.docs/qa/random-span-events.md`)
 
 ## Standalone tasks
 
@@ -102,6 +123,13 @@ From the T-004 planning (2026-09-27, script duration units):
 - `database.integration.test.ts` failure-path tests assert only the `reasonCode`, not *why* the migration failed — a production migration missing from `buildProvider` makes them pass on "corrupted migrations" (T-004 hit exactly this); assert the logged cause or add a guard that `buildProvider` matches the production list
 - `upsertScript` insert path stores the client's `lastSaved` (`new Date(script.lastSaved).getTime()`) while the update path uses `Date.now()`; the scripter seeds new scripts with `1970-01-01`, so a script saved once shows `last_modified = 0` (seen on the T-004 bench) — use `Date.now()` on insert too
 - Dev DB script `T-004 QA` stored `duration_ds = 30` while all its events sit at 0 s (migration 8 made it 0) — some path wrote the script row without its events; find it (its 0 ms length no longer floods under repeat — T-005 pads it to 1 s)
+
+From the random span events design (2026-10-22):
+
+- **Converter throw → empty upload**:
+  - What happens: any throw inside `ScriptConverter.convertScript` (missing GPIO channel, missing UART/I2C module, Maestro channel < 0) returns an empty map. `uploadScript` only logs it, and `createScriptUpload` sends `''` to every controller, overwriting their stored scripts. The route returns 200, so the UI shows success.
+  - Fix: fail the upload visibly, or skip only the bad event (T-008 does the latter for random spans only).
+- **`.docs/protocol.md` copies have drifted between repos.** The OTA sections differ: master self-flash `FW_PROGRESS` rows on the Server side, `OTA_FLASH_RESULT` on the ESP side. § C was added identically to both on 2026-10-22, but the rest needs reconciling to one text.
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
