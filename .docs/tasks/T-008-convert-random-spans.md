@@ -20,8 +20,14 @@ T-007 gave events an `endTime` and added the random payload types. This task mak
   - For a digital Maestro span (`isServo: false`), the six fields after `maxGapMs` are each `0`.
 - **`CommandType` gains `maestroRandom = 6` and `gpioRandom = 7`, appended.** Existing values are unchanged.
 - **Point-event output is byte-identical to today.** No existing expected string in `script_converter.test.ts` changes.
+- **Integer milliseconds** (amended 2026-10-22, after the AstrOs.ESP T-007 review). Seconds × 1000 is not exact in floating point: a 2.01 s gap becomes `2009.9999999999998`, and a 16.1 → 16.2 s span becomes `99.99999999999818`. The firmware rejects any non-integer field (§ C), so the time-derived values are rounded **once**, before validation and before emission:
+  - `spanMs = Math.round(endMs − startMs)`
+  - `minGapMs` and `maxGapMs` are `Math.round`ed
+
+  Validation and the wire string both see the rounded values. No other field is rounded: positions, moves, speed and acceleration must already be integers.
 - **The validation ranges match `.docs/protocol.md` § C:**
   - all spans:
+    - every field that is sent is an integer (after the rounding above)
     - `spanMs ≥ minGapMs`
     - `maxGapMs ≥ minGapMs`
     - `minGapMs ≥ 20`
@@ -31,7 +37,6 @@ T-007 gave events an `endTime` and added the random payload types. This task mak
     - `1 ≤ minMove ≤ (maxPos − minPos) / 2`
     - `maxMove` is null, or `minMove ≤ maxMove ≤ maxPos − minPos`
     - speed and acceleration are each `0–255`
-    - every field is an integer
 
 ## Task
 
@@ -56,9 +61,9 @@ export function randomSpanProblems(
 - **`addBufferEvents`:** `maxDuration` becomes the max over every bucketed event of `endTime ?? time` (ms), not the max bucket key. The rest is unchanged. A location whose span ends last gets its end buffer at the span's end.
 - **`convertScriptEvents`:** an event with `endTime !== null` goes to `convertRandomSpanEvent(evt, timeToSend): string` before the `moduleType` switch.
 - **`convertRandomSpanEvent`:**
-  - It computes `spanMs = evt.endTime - evt.time` (both already ms).
+  - It computes `spanMs = Math.round(evt.endTime - evt.time)` (both already ms), and builds a copy of the payload with `minGapMs` and `maxGapMs` `Math.round`ed (Contract: integer milliseconds).
   - It looks up the GPIO channel (for `genericGpio`) or the UART values (for `maestro`).
-  - It calls `randomSpanProblems`.
+  - It calls `randomSpanProblems` with the rounded `spanMs` and the rounded payload copy. The serializer receives the same values.
   - On a valid span it returns:
     - `randomGpioAsString(evt: RandomGpioEvent, gpioChannel: number, spanMs: number, next: number): string`, or
     - `randomMaestroAsString(evt: RandomMaestroEvent, uart: IUartValues, spanMs: number, next: number): string`
@@ -83,6 +88,7 @@ Write these first.
 - `minPos equal to maxPos is rejected`
 - `speed 256 is rejected`
 - `a non-integer minPos is rejected`
+- `a non-integer gap is rejected for gpio spans too` (the integer rule covers all spans; the converter rounds before calling, so this is the validator's own guard)
 - `digital maestro (isServo false) ignores the servo fields`
 
 **`astros_api/src/scripting/script_converter.test.ts`:**
@@ -93,6 +99,11 @@ Write these first.
 - `maestro random span`: a core Maestro servo channel with a span 0→14.0 s, `{ minGapMs: 400, maxGapMs: 2000, minPos: 20, maxPos: 100, minMove: 15, maxMove: 60, speed: 0, acceleration: 0 }`.
   - Core → `6|14000|<idx>|<ch>|14000|400|2000|20|100|15|60|0|0;0|0|0`
 - `null maxMove is sent as 0`
+- **Review focus:** `a 2.01 s gap is sent as 2010`: a core GPIO span 0→10.0 s with `minGapMs: 2.01 * 1000` (that is `2009.9999999999998`) and `maxGapMs: 3000`.
+  - Core contains `7|10000|<gpioCh>|10000|2010|3000`, and no `.` appears anywhere in the string.
+- **Review focus:** `a 16.1 → 16.2 s span with a 100 ms min gap is valid`: a core GPIO span 16.1→16.2 s with gaps 100/100.
+  - Floating point gives `99.99999999999818` for the raw span, which would wrongly fail `spanMs ≥ minGapMs` before rounding.
+  - Core → `0|16100|0;7|100|<gpioCh>|100|100|100;0|0|0`, and `logger.warn` is not called.
 - `digital maestro span zeroes the servo fields`
 - `a span's end extends every location's end buffer`: dome has a point at 5.0 s, and core has a span 0→20.0 s.
   - The dome string ends with a buffer at 20000: `...|15000|...;0|0|0`.

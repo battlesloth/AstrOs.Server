@@ -22,7 +22,7 @@ Phase A — database guard + span data and conversion
 
 Phase B — scripter (decompose at phase start; contracts already pinned by T-007):
 - shared overlap/clamp, validation and hint-line helpers (TDD)
-- the Single / Random switch in the servo and GPIO dialogs
+- the Single / Random switch in the servo and GPIO dialogs. Gaps are entered in seconds and stored as integer ms (`Math.round(s × 1000)`); a blank max move is stored as `null`, never `0`
 - the span bar on the Pixi timeline (mockup option A), with click-to-edit
 - body drag and edge resize, both stopping at the boundary
 - GPIO ↔ Maestro-digital channel swap for spans (replaces T-007's throw)
