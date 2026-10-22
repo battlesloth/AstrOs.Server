@@ -28,6 +28,7 @@ T-007 gave events an `endTime` and added the random payload types. This task mak
 - **The validation ranges match `.docs/protocol.md` § C:**
   - all spans:
     - every field that is sent is an integer (after the rounding above)
+    - every index that is sent is ≥ 0: the Maestro payload's `channel`, the UART `idx`, and the GPIO channel number (amended 2026-10-22, matching the firmware's T-007 rejects). A Maestro `channel` still at its `-1` UI placeholder, never overwritten on save, would otherwise reach the controller and be silently dropped there.
     - `spanMs ≥ minGapMs`
     - `maxGapMs ≥ minGapMs`
     - `minGapMs ≥ 20`
@@ -88,6 +89,7 @@ Write these first.
 - `minPos equal to maxPos is rejected`
 - `speed 256 is rejected`
 - `a non-integer minPos is rejected`
+- `a negative maestro channel is rejected` (`channel: -1`)
 - `a non-integer gap is rejected for gpio spans too` (the integer rule covers all spans; the converter rounds before calling, so this is the validator's own guard)
 - `digital maestro (isServo false) ignores the servo fields`
 
@@ -112,6 +114,7 @@ Write these first.
   - `logger.warn` was called once with the event id.
 - **Review focus:** `an invalid span still extends the script to its end time`. The same fixture's end buffer is at 9000.
 - **Review focus:** `a span whose gpio channel mapping is missing is skipped, not thrown`. The other locations still convert.
+- **Review focus:** `a maestro span whose channel is still -1 is skipped`. Its slot becomes `0|<delta>|0`, `logger.warn` names the event id, and point events on the same location keep their deltas. The existing point-event path throws for `channel < 0`; the span path must skip, not throw.
 
 ## Acceptance criteria
 
