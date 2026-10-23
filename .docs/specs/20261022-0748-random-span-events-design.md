@@ -95,7 +95,7 @@ Today this means hand-placing dozens of point events, and they play the same way
    - the estimated travel time for this move
 
    This way the servo arrives before it is redirected, so the physical move matches the commanded one. Without it, a slow speed plus short gaps would cut moves short of `m`.
-   - The travel estimate scales the firmware's existing worst-case model (`WorstCaseTravelMs(speed, acceleration)` in `AstrOsServoUtils.hpp`, which models a full-range move) by this move's distance in µs as a share of the full range.
+   - The travel estimate runs the firmware's Maestro speed/acceleration model, the one behind `WorstCaseTravelMs(speed, acceleration)` in `AstrOsServoUtils.hpp`, at this move's distance in µs (`MoveTravelMs`). It is not a linear share of the full-range time: with acceleration, a short move that never reaches the speed cap takes time that grows with √distance. (Amended 2026-10-22, from AstrOs.ESP T-008's review; the linear share underestimated a 200 µs move at accel 5 by about 4×.)
    - Speed `0` (unlimited) is already modelled there as the fastest cap, so it still gets a small travel floor.
    - GPIO gaps are never stretched.
 
