@@ -5,10 +5,10 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
-Now:     — (unblocked: AstrOs.ESP T-007 + T-008 merged 2026-10-22/23, PRs #62/#63; server T-006 is next)
-Next:    agreed order (2026-10-22): ESP T-007 + T-008 → server T-006 → T-007 → T-008 (T-006 must merge before `migration_9` exists anywhere) → ESP T-009 bench (spans inserted by SQL) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
+Now:     T-006 done on `feature/T-006-refuse-newer-database` (pre-push review addressed, bench cases 9–14 passed) — awaiting push + PR to develop
+Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 (PR) → T-007 → T-008 (T-006 must merge before `migration_9` exists anywhere) → ESP T-009 bench (spans inserted by SQL) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
 Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
-Last:    2026-10-22 — random span events design approved (`.docs/specs/20261022-0748-random-span-events-design.md`); develop at `1.0.3-dev.0` (#133 merged)
+Last:    2026-10-23 — T-006 implemented and reviewed (incompatible-database refusal); develop at `1.0.3-dev.0` (#133 merged)
 
 ## Random span events
 
@@ -16,7 +16,7 @@ Spec: `.docs/specs/20261022-0748-random-span-events-design.md` · wire format: `
 
 Phase A — database guard + span data and conversion
 
-- [ ] T-006 — Refuse a database written by a newer server (`.docs/tasks/T-006-refuse-newer-database.md`) — merges before T-007
+- [x] T-006 — Refuse a database written by a newer server (`.docs/tasks/completed/T-006-refuse-newer-database.md`, branch `feature/T-006-refuse-newer-database`; bench-verified 2026-10-23, cases 9–14) — merges before T-007
 - [ ] T-007 — Persist random span events (`.docs/tasks/T-007-persist-random-span-events.md`)
 - [ ] T-008 — Convert random spans to ESP commands 6 and 7 (`.docs/tasks/T-008-convert-random-spans.md`)
 
@@ -155,6 +155,12 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-10-23 T-006 — refuse a database written by a newer server
+  - a build that finds applied migrations its provider doesn't know enters `DB_NEWER_THAN_SERVER` before the pending check: no backup, migrate or prune, and the connection is `query_only`. Every `/api` route but `GET /system/status` answers 503, serial setup is skipped, WS client messages are dropped (one warning per connection), and the Vue app replaces the router view with a notice page (focus on its heading, no toasts)
+  - the branch-switch RED showed the old behavior: a newer-and-pending DB was backed up, failed Kysely's corrupted-migrations check and was restored over (`MIGRATION_FAILED_RESTORED`); the `query_only` RED showed an INSERT going straight through the incompatible connection
+  - reviews mattered: the App test set the flag before mount on a plain object, so a lost-reactivity regression passed (fixing it exposed earlier tests' Apps still mounted — `enableAutoUnmount`); the boot byte-identical test couldn't fail until it sent an authenticated write; the banner allowlist and locale keys are now checked by `vue-tsc`
+  - bench (dev machine): cases 9–14 on copies of `.data` (newer-only) and the stale `~/.config` DB at `7_` (branch switch); `start:tsx` needs `.env` exported first (Backlog). Backlog also gained four pre-existing gaps the review found, notably serial-originated writes bypassing the HTTP guard in the plain read-only modes
 
 - 2026-09-28 release 1.0.2
   - develop → main via PR #131 (T-003, T-004, T-005); `dev-build.yml` bumped main to `1.0.2-dev.1`; main → release via prep-branch PR #132 (the five version-line conflicts kept to main's side, tree identical to main); `release-build.yml` stripped `1.0.2-dev.1` → `1.0.2` and pushed `astros-server:1.0.2` / `:latest`
