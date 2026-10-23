@@ -131,6 +131,11 @@ From the random span events design (2026-10-22):
   - Fix: fail the upload visibly, or skip only the bad event (T-008 does the latter for random spans only).
 - **`.docs/protocol.md` copies have drifted between repos.** The OTA sections differ: master self-flash `FW_PROGRESS` rows on the Server side, `OTA_FLASH_RESULT` on the ESP side. § C was added identically to both on 2026-10-22, but the rest needs reconciling to one text.
 
+From the T-006 implementation (2026-10-23):
+
+- **`npm run start:tsx` never reads `astros_api/.env`.** Under `tsx`, both dotenv calls (`api_server.ts` constructor and `dal/database.ts`) resolve to `src/.env`, which doesn't exist. Only `postbuild` copies `.env` to `dist/`. The dev boot dies on `JWT_KEY is required`, and `DATABASE_PATH` / `SERIAL_PORT` silently fall back to defaults. Workaround: `set -a && . ./.env && set +a` first (now in `.docs/qa/system-readonly-mode.md`).
+- **Router guard turns a 503 `check-session` into `/auth`.** While the database is incompatible (or during any 503 with a `reasonCode`), every navigation is rewritten to `/auth`, so after recovery a user with a valid token lands on the login page. The cost is small, since recovery means reinstalling. Possible fix: the guard skips the redirect on a 503 that carries `reasonCode`.
+
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
 - `debug/serial-rx-frame-diag` — temp serial-RX + deploy-route diagnostics

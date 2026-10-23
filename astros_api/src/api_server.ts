@@ -170,7 +170,8 @@ export interface ConfigOverrides {
   readonly firmwareCachePath?: string;
   // Explicit override for the implicit `NODE_ENV=test` skip. The harness sets
   // this `false` so vitest's default NODE_ENV doesn't suppress the serial path
-  // it's trying to exercise.
+  // it's trying to exercise. An incompatible database skips serial setup
+  // even when this is `false`.
   readonly skipSerialSetup?: boolean;
 }
 
@@ -352,10 +353,13 @@ export class ApiServer {
 
     // configOverrides.skipSerialSetup wins over NODE_ENV — vitest defaults
     // NODE_ENV=test, which would otherwise hide the serial path from the
-    // integration harness that is specifically exercising it.
+    // integration harness that is specifically exercising it. An incompatible
+    // database (DB_NEWER_THAN_SERVER) wins over both.
     const skipSerialSetup =
       this.configOverrides?.skipSerialSetup ?? process.env.NODE_ENV?.toLocaleLowerCase() === 'test';
-    if (skipSerialSetup) {
+    if (this.systemStatus.isDbIncompatible()) {
+      logger.warn('Skipping serial port setup: database is from a newer server version');
+    } else if (skipSerialSetup) {
       logger.warn(
         `Skipping serial port setup (configOverrides.skipSerialSetup=${String(this.configOverrides?.skipSerialSetup)}, NODE_ENV=${process.env.NODE_ENV ?? '<unset>'})`,
       );
@@ -918,6 +922,11 @@ export class ApiServer {
   }
 
   handleWebsocketMessage(msg: string, conn: WebSocket): void {
+    if (this.systemStatus.isDbIncompatible()) {
+      logger.warn('Dropping websocket message: database is from a newer server version');
+      return;
+    }
+
     try {
       const parsed = JSON.parse(msg) as IWebSocketMessage;
 

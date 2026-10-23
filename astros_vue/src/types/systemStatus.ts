@@ -7,7 +7,8 @@ export type ReadOnlyReasonCode =
   | 'BACKUP_FAILED'
   | 'MIGRATION_FAILED_NO_BACKUP'
   | 'MIGRATION_FAILED_RESTORED'
-  | 'MIGRATION_FAILED_RESTORE_FAILED';
+  | 'MIGRATION_FAILED_RESTORE_FAILED'
+  | 'DB_NEWER_THAN_SERVER';
 
 export interface SystemStatusPayload {
   readOnly: boolean;

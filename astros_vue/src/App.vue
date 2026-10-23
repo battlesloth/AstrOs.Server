@@ -3,6 +3,7 @@ import { onMounted, onUnmounted } from 'vue';
 import { RouterView } from 'vue-router';
 import { useWebsocket } from './composables/useWebsocket';
 import AstrosToastContainer from './components/common/AstrosToastContainer.vue';
+import AstrosIncompatibleDatabaseNotice from './components/common/incompatibleDatabase/AstrosIncompatibleDatabaseNotice.vue';
 import { useSystemStatusStore } from '@/stores/systemStatus';
 import { useJobLockStore } from '@/stores/jobLock';
 import { usePanicStateStore } from '@/stores/panicState';
@@ -31,7 +32,11 @@ onUnmounted(() => {
 });
 </script>
 <template>
-  <router-view v-slot="{ Component }">
+  <AstrosIncompatibleDatabaseNotice v-if="systemStatusStore.dbIncompatible" />
+  <router-view
+    v-else
+    v-slot="{ Component }"
+  >
     <suspense timeout="0">
       <template #default>
         <component

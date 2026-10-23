@@ -16,6 +16,7 @@ const KNOWN_CODES: readonly ReadOnlyReasonCode[] = [
   'MIGRATION_FAILED_NO_BACKUP',
   'MIGRATION_FAILED_RESTORED',
   'MIGRATION_FAILED_RESTORE_FAILED',
+  'DB_NEWER_THAN_SERVER',
 ];
 
 const reasonMessage = computed(() => {

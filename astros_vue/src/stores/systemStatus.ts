@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import apiService from '@/api/apiService';
 import { SYSTEM_STATUS } from '@/api/endpoints';
@@ -8,6 +8,9 @@ export const useSystemStatusStore = defineStore('systemStatus', () => {
   const readOnly = ref(false);
   const reasonCode = ref<ReadOnlyReasonCode | null>(null);
   const enteredAt = ref<string | null>(null);
+  // The database belongs to a newer server: App.vue swaps the whole UI for a
+  // notice, since every API route but /system/status answers 503.
+  const dbIncompatible = computed(() => reasonCode.value === 'DB_NEWER_THAN_SERVER');
 
   function setStatus(state: SystemStatusPayload) {
     readOnly.value = state.readOnly;
@@ -37,6 +40,7 @@ export const useSystemStatusStore = defineStore('systemStatus', () => {
     readOnly,
     reasonCode,
     enteredAt,
+    dbIncompatible,
     setStatus,
     fetchStatus,
   };

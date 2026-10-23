@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -314,6 +315,86 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
       SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
     `.execute(db);
     expect(result.rows[0]?.name).toBe('8_fix_script_duration_units');
+  });
+
+  describe('a database written by a newer server', () => {
+    function sha256(file: string): string {
+      return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+    }
+
+    // Migrates a fresh file DB to this build's latest, then records a
+    // migration this build has never heard of — what a newer server leaves.
+    async function seedNewerDatabase(): Promise<void> {
+      await initializeDatabase(new SystemStatus(), { dbPath });
+      await closeDatabaseForTest();
+
+      const sqlite = new SQLite(dbPath);
+      sqlite
+        .prepare('INSERT INTO kysely_migration (name, timestamp) VALUES (?, ?)')
+        .run('99_future', '2026-10-22T00:00:00.000Z');
+      sqlite.close();
+    }
+
+    it('a database with an unknown applied migration enters DB_NEWER_THAN_SERVER and is left untouched', async () => {
+      await seedNewerDatabase();
+      const hashBefore = sha256(dbPath);
+      const filesBefore = fs.readdirSync(tmpDir).sort();
+
+      const status = new SystemStatus();
+      await initializeDatabase(status, { dbPath });
+      await closeDatabaseForTest();
+
+      expect(status.getState().reasonCode).toBe('DB_NEWER_THAN_SERVER');
+      expect(sha256(dbPath)).toBe(hashBefore);
+      // Exact listing: catches a backup file and any journal/WAL left behind.
+      expect(fs.readdirSync(tmpDir).sort()).toEqual(filesBefore);
+    });
+
+    it('a newer database with a pending migration is incompatible and nothing is applied', async () => {
+      // Branch switch: the DB has a sibling branch's migration AND this build
+      // has one the DB lacks. The unknown check must win before any backup.
+      await seedNewerDatabase();
+      const hashBefore = sha256(dbPath);
+      const filesBefore = fs.readdirSync(tmpDir).sort();
+
+      __setMigrationProviderForTest(
+        buildProvider({
+          '9_pending': {
+            async up(db) {
+              await db.schema.createTable('pending_table').addColumn('id', 'integer').execute();
+            },
+            async down() {
+              return;
+            },
+          },
+        }),
+      );
+
+      const status = new SystemStatus();
+      await initializeDatabase(status, { dbPath });
+      await closeDatabaseForTest();
+
+      expect(status.getState().reasonCode).toBe('DB_NEWER_THAN_SERVER');
+      expect(sha256(dbPath)).toBe(hashBefore);
+      expect(fs.readdirSync(tmpDir).sort()).toEqual(filesBefore);
+    });
+
+    it('a fresh database is not flagged', async () => {
+      const status = new SystemStatus();
+      await initializeDatabase(status, { dbPath });
+
+      expect(status.getState().readOnly).toBe(false);
+    });
+
+    it("a database at exactly this build's migrations is not flagged", async () => {
+      await initializeDatabase(new SystemStatus(), { dbPath });
+      await closeDatabaseForTest();
+
+      const status = new SystemStatus();
+      await initializeDatabase(status, { dbPath });
+
+      expect(status.getState().readOnly).toBe(false);
+    });
   });
 
   it('initial open failure → enters read-only with STARTUP_OPEN_FAILED and returns a usable in-memory db', async () => {

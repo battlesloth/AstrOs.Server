@@ -29,6 +29,7 @@ import { SystemStatus } from '../system_status.js';
 import {
   checkPendingMigrations,
   createBackup,
+  findUnknownAppliedMigrations,
   getLastAppliedMigrationName,
   pruneOldBackups,
   restoreBackup,
@@ -171,6 +172,17 @@ export async function initializeDatabase(
   let lastApplied: string | null;
   try {
     conn = openConnection(dbFile);
+    // Checked before pending: a newer database must get no backup, migrate or
+    // prune, even when this build also has migrations the database lacks.
+    // enterReadOnly is first-wins, so nothing may enter read-only before this.
+    const unknown = await findUnknownAppliedMigrations(conn.db, activeMigrationProvider);
+    if (unknown.length > 0) {
+      systemStatus.enterReadOnly(
+        'DB_NEWER_THAN_SERVER',
+        `database has migrations this build does not know: ${unknown.join(', ')}`,
+      );
+      return conn.db;
+    }
     pending = await checkPendingMigrations(conn.db, activeMigrationProvider);
     lastApplied = await getLastAppliedMigrationName(conn.db, activeMigrationProvider);
   } catch (err) {

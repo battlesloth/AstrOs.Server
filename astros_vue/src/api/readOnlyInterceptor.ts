@@ -16,7 +16,8 @@ function readOnlyReasonCodeFrom(error: AxiosError): ReadOnlyReasonCode | null {
 }
 
 // Installs an axios response interceptor that detects the API's read-only
-// 503s, mirrors the state into the systemStatus store, and surfaces a toast.
+// 503s, mirrors the state into the systemStatus store, and surfaces a toast
+// (except for DB_NEWER_THAN_SERVER, which App.vue's notice page covers).
 //
 // MUST be called from main.ts AFTER `app.use(createPinia())`. Calling
 // useSystemStatusStore() before Pinia is active throws.
@@ -35,10 +36,15 @@ export function installReadOnlyInterceptor(): void {
           console.warn('Could not update systemStatus store from 503:', storeErr);
         }
 
-        try {
-          useToast().warning(i18n.global.t('systemStatus.readOnly.requestBlocked'));
-        } catch (toastErr) {
-          console.warn('Could not surface read-only toast:', toastErr);
+        // An incompatible database 503s every call, including the on-mount
+        // fetches. App.vue's notice page already explains it, so a toast saying
+        // "your change was not saved" would only mislead.
+        if (reasonCode !== 'DB_NEWER_THAN_SERVER') {
+          try {
+            useToast().warning(i18n.global.t('systemStatus.readOnly.requestBlocked'));
+          } catch (toastErr) {
+            console.warn('Could not surface read-only toast:', toastErr);
+          }
         }
       }
 

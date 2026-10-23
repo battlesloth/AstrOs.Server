@@ -72,6 +72,28 @@ describe('systemStatus store', () => {
     });
   });
 
+  describe('dbIncompatible', () => {
+    it('dbIncompatible is true only for DB_NEWER_THAN_SERVER', () => {
+      const store = useSystemStatusStore();
+      expect(store.dbIncompatible).toBe(false);
+
+      store.setStatus({ readOnly: true, reasonCode: 'MIGRATION_FAILED_RESTORED' });
+      expect(store.dbIncompatible).toBe(false);
+
+      store.setStatus({ readOnly: true, reasonCode: 'DB_NEWER_THAN_SERVER' });
+      expect(store.dbIncompatible).toBe(true);
+    });
+
+    it('dbIncompatible is false when readOnly is false', () => {
+      const store = useSystemStatusStore();
+      store.setStatus({ readOnly: true, reasonCode: 'DB_NEWER_THAN_SERVER' });
+
+      store.setStatus({ readOnly: false, reasonCode: 'DB_NEWER_THAN_SERVER' });
+
+      expect(store.dbIncompatible).toBe(false);
+    });
+  });
+
   describe('fetchStatus', () => {
     it('updates state from a successful GET response', async () => {
       apiGet.mockResolvedValueOnce({

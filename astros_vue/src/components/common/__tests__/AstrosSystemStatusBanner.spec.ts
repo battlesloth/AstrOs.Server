@@ -57,6 +57,17 @@ describe('AstrosSystemStatusBanner', () => {
     expect(wrapper.text()).toContain('Investigate the failed migration before redeploying');
   });
 
+  it('renders the newer-server message for DB_NEWER_THAN_SERVER, not the UNKNOWN fallback', async () => {
+    const store = useSystemStatusStore();
+    store.setStatus({ readOnly: true, reasonCode: 'DB_NEWER_THAN_SERVER' });
+
+    const wrapper = mountBanner();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.text()).toContain(enUS.systemStatus.reasonCode.DB_NEWER_THAN_SERVER);
+    expect(wrapper.text()).not.toContain('currently unavailable for writes');
+  });
+
   it('falls back to UNKNOWN message when reasonCode is null', async () => {
     const store = useSystemStatusStore();
     // Force a state where readOnly is true but no reasonCode is set.

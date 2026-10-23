@@ -51,8 +51,12 @@ function isAllowed(
 }
 
 /**
- * Gates write-class HTTP requests. Two distinct rejection modes share one
- * "is this a write?" definition (BLOCKED_WRITE_METHODS + BLOCKED_GET_PATHS):
+ * Gates HTTP requests. An incompatible database blocks everything except
+ * GET /system/status (503, DB_NEWER_THAN_SERVER) — this build must not read
+ * a database written by a newer server, let alone write it.
+ *
+ * Otherwise two rejection modes share one "is this a write?" definition
+ * (BLOCKED_WRITE_METHODS + BLOCKED_GET_PATHS):
  *
  *   - 503 when the server is in read-only mode (DB recovery, etc.).
  *   - 423 when a flash job is active (per .docs/protocol.md hard-lock spec).
@@ -72,6 +76,18 @@ export function writeGuard(systemStatus: SystemStatus, jobLock: JobLock): Reques
     // through with a single pair of property accesses.
     if (!readOnly && !locked) {
       next();
+      return;
+    }
+
+    if (systemStatus.isDbIncompatible()) {
+      if (req.method === 'GET' && req.path === '/system/status') {
+        next();
+        return;
+      }
+      res.status(503).json({
+        message: 'Database is from a newer server version',
+        reasonCode: 'DB_NEWER_THAN_SERVER',
+      });
       return;
     }
 

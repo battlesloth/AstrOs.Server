@@ -162,15 +162,25 @@ Write these first.
 
 ## Implementation checklist
 
-- [ ] RED/GREEN — `findUnknownAppliedMigrations` (`backup.test.ts`, 4 cases)
-- [ ] RED/GREEN — `initializeDatabase` enters `DB_NEWER_THAN_SERVER` before the pending check; file byte-identical, no backup (`database.integration.test.ts`, 3 cases)
-- [ ] RED/GREEN — `isDbIncompatible()` + write guard 503 for every `/api` route but `GET /system/status` (`write_guard.test.ts`, 3 cases)
-- [ ] `api_server.ts` — skip `setupSerialPort()` with the one-time log line; drop WS client messages; startup DB-write audit recorded
-- [ ] RED/GREEN — Vue `dbIncompatible` computed (`systemStatus.spec.ts`, 2 cases)
-- [ ] RED/GREEN — `App.vue` renders `AstrosIncompatibleDatabaseNotice` instead of the router view (`App.spec.ts`, 2 cases); component + story; pinned `enUS.json` copy
-- [ ] Mutation checks recorded
-- [ ] QA plan: `.docs/qa/system-readonly-mode.md` § Incompatible (newer) database
-- [ ] Pre-commit: prettier + lint (both sub-projects), build, full suites, code review (findings addressed)
-- [ ] Bench verification (dev machine, Verification § Bench)
+- [x] RED/GREEN — `findUnknownAppliedMigrations` (`backup.test.ts`, the 4 pinned cases + numeric-prefix sort order)
+- [x] RED/GREEN — `initializeDatabase` enters `DB_NEWER_THAN_SERVER` before the pending check; file byte-identical, no backup (`database.integration.test.ts`, the 3 pinned cases + newer-and-pending, the §5 branch-switch row). The newer-and-pending RED showed today's behavior: backup taken, Kysely's "corrupted migrations" throw, restore, `MIGRATION_FAILED_RESTORED`
+- [x] RED/GREEN — `isDbIncompatible()` (`system_status.test.ts`) + write guard 503 for every `/api` route but `GET /system/status` (`write_guard.test.ts`, the 3 pinned cases + `POST /system/status` blocked)
+- [x] `api_server.ts` — skip `setupSerialPort()` with the one-time log line; drop WS client messages. Pinned by the new boot-level `api_server.incompatible_db.integration.test.ts` (real `ApiServer` on a newer DB file with `skipSerialSetup: false`: skip line once, 503s, WS push, WS drop, file byte-identical through boot and shutdown)
+  - Startup DB-write audit (all steps after `initializeDatabase`): `setAuthStrategy` registers a closure; `ApiKeyValidator` is a lazy closure; `FirmwareCache` / `FirmwareUploadStore` constructors do no DB I/O; `AnimationQueue` has no timers and nothing can enqueue; every `register*Routes` only registers handlers; the WS on-connect snapshots are status, lock and panic only; middleware mounted before the guard never touches the DB; `shutdown()` only destroys the connection. No seeding or settings defaults exist at startup. The boot-level byte-identical test was green even before the serial skip landed.
+- [x] RED/GREEN — Vue `dbIncompatible` computed (`systemStatus.spec.ts`, 2 cases)
+- [x] RED/GREEN — `App.vue` renders `AstrosIncompatibleDatabaseNotice` instead of the router view (`App.spec.ts`, the 2 pinned cases, flipping the reactive store after mount as production does, + recovery back to the router view); component + story; pinned `enUS.json` copy
+- [x] Mutation checks recorded: unknown names sorted with plain `.sort()` → the sort-order test; detection after the no-pending early return → the unknown-applied test; detection only when nothing is pending → newer-and-pending (the only test that kills it); `isDbIncompatible` returns `readOnly` → its unit test + 5 guard tests; `/system/status` passthrough for any method → the POST test; passthrough removed → guard + boot test; incompatible guard branch removed → 2 guard tests; serial skip removed → boot skip-line test; WS drop removed → boot WS test; store `dbIncompatible = readOnly` → store test; `v-else` removed → App test; `role="alert"` removed → App test; toast suppressed for every code / never → interceptor tests; `App.vue` snapshots the store (`{ ...useSystemStatusStore() }`, loses reactivity) → App flip test; banner allowlist entry removed → banner test
+- [x] QA plan: `.docs/qa/system-readonly-mode.md` § Incompatible (newer) database (cases 9–14)
+- [x] Pre-commit: prettier + lint (both sub-projects), build, full suites (API 76 files / 1033 tests, Vue 52 / 759 + 1 todo), code review (findings addressed). No Critical. Important: the App test set `dbIncompatible` before mount on a plain object, so a lost-reactivity regression passed; it now flips a reactive mock after mount, with `enableAutoUnmount` (earlier tests' Apps stayed mounted and re-rendered on the shared state). Minors fixed: banner spec case, boot-test DB backstop, `skipSerialSetup` / interceptor-header comments, first-wins ordering note, shared applied-names query, QA DB source / login flash / recovery-lands-on-login / story title / branch-switch case 14. Router 503 → `/auth` noted in the PLAN.md Backlog
+- [x] Bench verification (dev machine, 2026-10-23, copy of `.data/database.sqlite3` + `99_future`; UI driven by headless Chromium): cases 9–14 pass. Boot log has the reason line and the skip line once; the notice shows logged out, after hard reload, on a `/scripts` deep link and logged in, with one `h1`, the message in `role="alert"`, no nav, no focusable controls, no toasts, also at 375 px; the 3 curls 503 with the pinned body, status 200; checksum `OK` and only `database.sqlite3` after a graceful shutdown; recovery swapped to the login page 1.3 s after the healthy server's WS came up; branch switch (stale `~/.config` DB at `7_` + `99_future`) refused with no backup and checksum `OK`. `npm run start:tsx` needed `.env` exported first (pre-existing; see PLAN.md Backlog)
 - [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
 - [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry
+
+### Additions beyond the task text
+
+The Contract is unchanged. These widen the diff and were decided during implementation:
+
+- `astros_vue/src/api/readOnlyInterceptor.ts` skips its "Your change was not saved" toast for `DB_NEWER_THAN_SERVER`, while still mirroring the code into the store. Approved by Jeff (2026-10-23): App.vue's on-mount fetches and the router's `check-session` all 503 in this mode, which would toast 2–3 times on every load of the notice page. The five existing codes toast as before. New `readOnlyInterceptor.spec.ts`.
+- `AstrosSystemStatusBanner.vue` `KNOWN_CODES` gained `DB_NEWER_THAN_SERVER` (+ a story and a spec case). Without it the pinned `systemStatus.reasonCode.DB_NEWER_THAN_SERVER` key has no reader, and the banner would show the UNKNOWN fallback.
+- `backup.ts`: the three `kysely_migration` readers share one private `getAppliedMigrationNames` (pre-commit review; behavior unchanged).
+- Extra tests beyond the pinned list, noted in the checklist above.

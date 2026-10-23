@@ -114,6 +114,60 @@ describe('writeGuard', () => {
     });
   });
 
+  describe('when the database is from a newer server', () => {
+    function incompatible(): SystemStatus {
+      const s = new SystemStatus();
+      s.enterReadOnly('DB_NEWER_THAN_SERVER');
+      return s;
+    }
+
+    it('DB_NEWER_THAN_SERVER blocks GET /scripts, POST /login and POST /panicStop with 503 and the reason code', () => {
+      const status = incompatible();
+      for (const [m, p] of [
+        ['GET', '/scripts'],
+        ['POST', '/login'],
+        ['POST', '/panicStop'],
+      ]) {
+        const { res, next } = call(m, p, status);
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(503);
+        expect(res.json).toHaveBeenCalledWith({
+          message: 'Database is from a newer server version',
+          reasonCode: 'DB_NEWER_THAN_SERVER',
+        });
+      }
+    });
+
+    it('DB_NEWER_THAN_SERVER lets GET /system/status through', () => {
+      const { res, next } = call('GET', '/system/status', incompatible());
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('DB_NEWER_THAN_SERVER blocks non-GET requests to /system/status', () => {
+      const { res, next } = call('POST', '/system/status', incompatible());
+      expect(next).not.toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({
+        message: 'Database is from a newer server version',
+        reasonCode: 'DB_NEWER_THAN_SERVER',
+      });
+    });
+  });
+
+  it('MIGRATION_FAILED_RESTORED still lets GET /scripts and POST /login through', () => {
+    const status = new SystemStatus();
+    status.enterReadOnly('MIGRATION_FAILED_RESTORED');
+    for (const [m, p] of [
+      ['GET', '/scripts'],
+      ['POST', '/login'],
+    ]) {
+      const { res, next } = call(m, p, status);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.status).not.toHaveBeenCalled();
+    }
+  });
+
   describe('when a flash job is active', () => {
     function activeFlash(): { status: SystemStatus; lock: JobLock } {
       const status = new SystemStatus();
