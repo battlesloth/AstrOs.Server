@@ -4,6 +4,7 @@ import { useWebsocket } from '../useWebsocket';
 import { useFirmwareStore } from '@/stores/firmware';
 import { useControllerStore } from '@/stores/controller';
 import { usePanicStateStore } from '@/stores/panicState';
+import { useSystemStatusStore } from '@/stores/systemStatus';
 import { WebsocketMessageType, Location } from '@/enums';
 
 // Capture warn calls so individual tests can assert against them, while
@@ -643,6 +644,32 @@ describe('WebsocketMessageType wire-numeric pinning (cross-process contract)', (
     expect(WebsocketMessageType.FLASH_JOB_DONE).toBe(15);
     expect(WebsocketMessageType.FLASH_JOB_FAILED).toBe(16);
     expect(WebsocketMessageType.PANIC_STATE).toBe(17);
+  });
+});
+
+describe('useWebsocket handleMessage — system status dispatcher', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  // The on-connect push is the only automatic path into and out of the
+  // incompatible-database notice: App.vue fetches status once, on mount.
+  it('drives dbIncompatible from SYSTEM_STATUS frames, both ways', () => {
+    const { handleMessage } = useWebsocket();
+    const status = useSystemStatusStore();
+
+    handleMessage(
+      JSON.stringify({
+        type: WebsocketMessageType.SYSTEM_STATUS,
+        data: { readOnly: true, reasonCode: 'DB_NEWER_THAN_SERVER' },
+      }),
+    );
+    expect(status.dbIncompatible).toBe(true);
+
+    handleMessage(
+      JSON.stringify({ type: WebsocketMessageType.SYSTEM_STATUS, data: { readOnly: false } }),
+    );
+    expect(status.dbIncompatible).toBe(false);
   });
 });
 

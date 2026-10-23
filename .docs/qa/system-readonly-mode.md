@@ -12,7 +12,7 @@ Tests for the Phase 3 Vue UI when the AstrOs.Server enters read-only mode (Phase
 
 ## Forcing read-only mode
 
-Three reliable ways to put the server into read-only mode for testing. Pick whichever matches the scenario:
+Four ways to put the server into read-only mode for testing. Pick whichever matches the scenario. (`DB_NEWER_THAN_SERVER` is not a substitute for cases 1–8: it replaces the UI and blocks login and panic. See § Incompatible (newer) database.)
 
 1. **`STARTUP_OPEN_FAILED`** — point `DATABASE_PATH` at a directory:
    ```bash
@@ -128,7 +128,7 @@ The UI shows a single notice page in place of the app.
 
 ### Preconditions
 
-- Work on a **copy** of the active dev database, never the real one. That is the file `DATABASE_PATH` in `astros_api/.env` names (`.data/database.sqlite3` at the repo root on the dev machine). It must be at this build's latest migration: the last name `SELECT name FROM kysely_migration` prints should be the last one in `dal/database.ts`'s provider. An older copy stages the branch-switch case below instead.
+- Work on a **copy** of the active dev database, never the real one. That is `database.sqlite3` in the directory `DATABASE_PATH` names in `astros_api/.env` (`../.data`, i.e. `.data/database.sqlite3` at the repo root on the dev machine). It must be at this build's latest migration: the last name `SELECT name FROM kysely_migration` prints should be the last one in `dal/database.ts`'s provider. An older copy stages the branch-switch case below instead.
   ```bash
   mkdir -p /tmp/astros-newer-db
   cp .data/database.sqlite3 /tmp/astros-newer-db/
@@ -153,8 +153,8 @@ The UI shows a single notice page in place of the app.
 
 ### 10. The notice page replaces the app
 
-1. Open `http://localhost:5173`. Try it once logged in and once logged out.
-2. **Pass:** one card over the R2 schematic, reading "Incompatible database", the message, and "Install the newer version of AstrOs Server, or restore a database backup made by this version." There is no login form, navigation, read-only banner or toast. Logged out, the login form may flash for a fraction of a second first: the notice appears once `GET /api/system/status` answers.
+1. Open `http://localhost:5173`. Try it once logged out and once with a saved session. Login itself 503s now, so for the saved session sign in against a healthy server first, then restart it on the copy.
+2. **Pass:** one card over the R2 schematic, reading "Incompatible database", the message, and "Install the newer version of AstrOs Server, or restore a database backup made by this version." There is no login form, navigation, read-only banner or toast. Keyboard focus is on the heading (a screen reader announces the message). Logged out, the login form may flash for a fraction of a second first: the notice appears once `GET /api/system/status` answers.
 3. Hard refresh (`Ctrl+Shift+R`), then deep-link to `http://localhost:5173/scripts`.
 4. **Pass:** both still show only the notice.
 5. **Fail:** the login page or app layout stays on screen, the read-only banner shows, a "Your change was not saved" toast appears, or any raw i18n key path is visible.
@@ -181,7 +181,7 @@ curl -s -i localhost:3000/api/system/status
 ### 13. Recovery
 
 1. With the notice page still open, stop the API and start it against a database without `99_future`. Use a fresh copy of the dev database, or the dev database itself: drop the `DATABASE_PATH=…` prefix so the value sourced from `.env` applies.
-2. **Pass:** within about 3 s (the WebSocket retry interval) the notice is replaced by the login page. This happens even with a saved session: while the database was incompatible, the router turned every navigation into `/auth`, so you sign in again.
+2. **Pass:** within about 3 s (the WebSocket retry interval) the notice is replaced by the login page. This happens even with a saved session: while the database was incompatible, the router turned every navigation into `/auth`. The token is kept, so you can sign in or go straight to `/`.
 3. **Fail:** the notice persists after the reconnect.
 
 ### 14. Branch switch: unknown and pending migrations

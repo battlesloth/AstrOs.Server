@@ -28,18 +28,23 @@ export function installReadOnlyInterceptor(): void {
       const reasonCode = readOnlyReasonCodeFrom(error);
       if (reasonCode !== null) {
         // Sync local state with the server's view of itself — the WebSocket
-        // push would catch up eventually, but updating here makes the banner
-        // and disabled-button bindings flip immediately.
+        // push would catch up eventually, but updating here makes the banner,
+        // the disabled-button bindings and App.vue's incompatible-database
+        // notice flip immediately.
+        let mirrored = false;
         try {
           useSystemStatusStore().setStatus({ readOnly: true, reasonCode });
+          mirrored = true;
         } catch (storeErr) {
           console.warn('Could not update systemStatus store from 503:', storeErr);
         }
 
-        // An incompatible database 503s every call, including the on-mount
-        // fetches. App.vue's notice page already explains it, so a toast saying
-        // "your change was not saved" would only mislead.
-        if (reasonCode !== 'DB_NEWER_THAN_SERVER') {
+        // An incompatible database 503s every call but GET /system/status,
+        // including App.vue's lock-state and panic-state fetches and the
+        // router's check-session. The notice page explains it, so a toast
+        // saying "your change was not saved" would only mislead — unless the
+        // store update failed and no notice will show.
+        if (reasonCode !== 'DB_NEWER_THAN_SERVER' || !mirrored) {
           try {
             useToast().warning(i18n.global.t('systemStatus.readOnly.requestBlocked'));
           } catch (toastErr) {

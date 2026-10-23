@@ -1,8 +1,20 @@
 <!--
-  Replaces the whole UI when the server reports DB_NEWER_THAN_SERVER. Every
-  API route but /system/status answers 503 then, so there is nothing to
-  navigate to: no login, no links, no controls.
+  Replaces the router view when the server reports DB_NEWER_THAN_SERVER.
+  Every API route but GET /system/status answers 503 then, so there is
+  nothing to navigate to: no login, no links, no controls.
 -->
+<script setup lang="ts">
+import { onMounted, ref } from 'vue';
+
+const heading = ref<HTMLHeadingElement | null>(null);
+
+// The notice always replaces content after the first paint (the status fetch,
+// a 503 or the WS push), so focus would otherwise stay on the old page.
+onMounted(() => {
+  heading.value?.focus();
+});
+</script>
+
 <template>
   <main class="relative flex min-h-dvh w-full items-center justify-center bg-base-200 p-4">
     <img
@@ -26,7 +38,11 @@
         <span class="text-xl">s</span>
       </div>
 
-      <h1 class="mb-3 text-2xl font-semibold text-base-content">
+      <h1
+        ref="heading"
+        tabindex="-1"
+        class="mb-3 text-2xl font-semibold text-base-content focus:outline-none"
+      >
         {{ $t('systemStatus.incompatibleDatabase.title') }}
       </h1>
       <p

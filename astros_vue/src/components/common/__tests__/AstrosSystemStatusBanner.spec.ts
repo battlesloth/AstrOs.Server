@@ -5,6 +5,7 @@ import { createI18n } from 'vue-i18n';
 import enUS from '@/locales/enUS.json';
 import AstrosSystemStatusBanner from '@/components/common/systemStatusBanner/AstrosSystemStatusBanner.vue';
 import { useSystemStatusStore } from '@/stores/systemStatus';
+import type { ReadOnlyReasonCode } from '@/types/systemStatus';
 
 function createTestI18n() {
   return createI18n({
@@ -66,6 +67,13 @@ describe('AstrosSystemStatusBanner', () => {
 
     expect(wrapper.text()).toContain(enUS.systemStatus.reasonCode.DB_NEWER_THAN_SERVER);
     expect(wrapper.text()).not.toContain('currently unavailable for writes');
+  });
+
+  it('has a localized message for every reason code', () => {
+    // The annotation is the real check: a code without a locale key fails
+    // vue-tsc (npm run build type-checks specs).
+    const messages: Record<ReadOnlyReasonCode | 'UNKNOWN', string> = enUS.systemStatus.reasonCode;
+    expect(Object.values(messages).every((m) => m.length > 0)).toBe(true);
   });
 
   it('falls back to UNKNOWN message when reasonCode is null', async () => {

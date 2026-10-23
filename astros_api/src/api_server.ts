@@ -251,6 +251,10 @@ export class ApiServer {
   }
   private statusSweepTimer: NodeJS.Timeout | null = null;
 
+  // Connections already warned about while the database is incompatible.
+  // Weak, so closed sockets drop out without a cleanup listener.
+  private readonly wsDropNoticed = new WeakSet<WebSocket>();
+
   // Test-only: lets the harness poll-wait for a POLL_ACK to populate the cache
   // instead of sleeping an arbitrary duration before flashing.
   public getVariantForControllerForTest(mac: string): string | undefined {
@@ -923,7 +927,11 @@ export class ApiServer {
 
   handleWebsocketMessage(msg: string, conn: WebSocket): void {
     if (this.systemStatus.isDbIncompatible()) {
-      logger.warn('Dropping websocket message: database is from a newer server version');
+      // Once per connection: a slider client would otherwise flood the log.
+      if (!this.wsDropNoticed.has(conn)) {
+        this.wsDropNoticed.add(conn);
+        logger.warn('Dropping websocket messages: database is from a newer server version');
+      }
       return;
     }
 

@@ -135,6 +135,26 @@ describe('backup module', () => {
       await db.destroy();
     });
 
+    it('flags a sibling branch migration that shares a known number', async () => {
+      // The real branch switch: both branches added their own `2_*`. Detection
+      // must compare names, not numeric prefixes.
+      const { db } = connectionWithApplied(['0_initial', '2_second', '2_sibling_branch']);
+
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual(['2_sibling_branch']);
+
+      await db.destroy();
+    });
+
+    it('returns [] when the migration table exists but is empty', async () => {
+      // Kysely creates the table before running 0_initial, so a failed first
+      // migration leaves it empty.
+      const { db } = connectionWithApplied([]);
+
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual([]);
+
+      await db.destroy();
+    });
+
     it('ignores pending (known, unapplied) migrations', async () => {
       const { db } = connectionWithApplied(['0_initial']);
 

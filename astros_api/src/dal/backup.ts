@@ -59,7 +59,8 @@ export async function checkPendingMigrations(
 }
 
 // Applied migrations this build's provider doesn't know: the database was
-// written by a newer server (or a sibling branch). Read-only.
+// written by a newer server (or a sibling branch). Performs no writes; names
+// come back in compareMigrationNames order.
 export async function findUnknownAppliedMigrations(
   db: Kysely<Database>,
   provider: MigrationProvider,

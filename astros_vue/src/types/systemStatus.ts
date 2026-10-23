@@ -2,6 +2,9 @@
 // WebSocket dispatcher. Lives in `types/` so neither the store nor the api
 // service has to import from each other to share these shapes.
 
+// Mirrors astros_api/src/system_status.ts. Each code also needs a
+// systemStatus.reasonCode.* locale key and an entry in
+// AstrosSystemStatusBanner.vue's KNOWN_CODES (both checked by vue-tsc).
 export type ReadOnlyReasonCode =
   | 'STARTUP_OPEN_FAILED'
   | 'BACKUP_FAILED'

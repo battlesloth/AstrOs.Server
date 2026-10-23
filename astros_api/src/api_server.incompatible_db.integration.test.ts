@@ -8,11 +8,17 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import SQLite from 'better-sqlite3';
+import jsonwebtoken from 'jsonwebtoken';
 import { WebSocket } from 'ws';
 import { ApiServer } from './api_server.js';
 import { closeDatabaseForTest, initializeDatabase } from './dal/database.js';
+import { JobLock } from './job_lock/job_lock.js';
 import { logger } from './logger.js';
+import { TransmissionType } from './models/index.js';
 import { SystemStatus } from './system_status.js';
+
+const JWT_KEY = 'integration-test-key';
+const WS_DROP_LINE = 'Dropping websocket messages: database is from a newer server version';
 
 function sha256(file: string): string {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -53,7 +59,7 @@ describe('ApiServer on a database written by a newer server', { timeout: 15_000 
       configOverrides: {
         apiPort: 0,
         websocketPort: 0,
-        jwtKey: 'integration-test-key',
+        jwtKey: JWT_KEY,
         databasePath: dbPath,
         // Serial setup is requested; only the incompatible database may skip
         // it. The port path does not exist, so a regression cannot open a
@@ -75,18 +81,24 @@ describe('ApiServer on a database written by a newer server', { timeout: 15_000 
     );
     expect(skipLines).toHaveLength(1);
     expect(info).not.toHaveBeenCalledWith('Starting up serial port services');
+    // src/background_tasks/serial_worker.js exists, so a regression would
+    // really start a Worker.
+    expect((server as unknown as { serialWorker?: unknown }).serialWorker).toBeUndefined();
   });
 
-  it('answers only GET /api/system/status and pushes the reason code over WS', async () => {
+  it('answers GET /api/system/status, 503s other routes, and sends the code on WS connect', async () => {
     server = await boot();
     const base = `http://127.0.0.1:${server.getBoundApiPort()}/api`;
 
-    const statusRes = await fetch(`${base}/system/status`);
-    expect(statusRes.status).toBe(200);
-    expect(await statusRes.json()).toMatchObject({
-      readOnly: true,
-      reasonCode: 'DB_NEWER_THAN_SERVER',
-    });
+    // req.path excludes the query string, so a cache-buster still passes.
+    for (const route of ['/system/status', '/system/status?t=1']) {
+      const statusRes = await fetch(`${base}${route}`);
+      expect(statusRes.status).toBe(200);
+      expect(await statusRes.json()).toMatchObject({
+        readOnly: true,
+        reasonCode: 'DB_NEWER_THAN_SERVER',
+      });
+    }
 
     for (const [method, route] of [
       ['GET', '/scripts'],
@@ -106,40 +118,70 @@ describe('ApiServer on a database written by a newer server', { timeout: 15_000 
         client.once('message', (data) => resolve(data.toString()));
         client.once('error', reject);
       });
-      expect(JSON.parse(first).data).toMatchObject({
-        readOnly: true,
-        reasonCode: 'DB_NEWER_THAN_SERVER',
-      });
+      const frame = JSON.parse(first);
+      expect(frame.type).toBe(TransmissionType.systemStatus);
+      expect(frame.data).toMatchObject({ readOnly: true, reasonCode: 'DB_NEWER_THAN_SERVER' });
     } finally {
       client.close();
     }
   });
 
-  it('drops WS client messages without answering', async () => {
+  it('drops WS client messages without answering, warning once per connection', async () => {
     server = await boot();
+    // Held lock: a SERVO_TEST that is NOT dropped gets two lock frames back.
+    const jobLock = (server as unknown as { jobLock: JobLock }).jobLock;
+    jobLock.acquire('test');
     const warn = vi.spyOn(logger, 'warn');
     const conn = { send: vi.fn() };
+    const servoTest = JSON.stringify({ msgType: 'SERVO_TEST', data: {} });
 
-    server.handleWebsocketMessage(
-      JSON.stringify({ msgType: 'SERVO_TEST', data: {} }),
-      conn as unknown as WebSocket,
-    );
+    try {
+      server.handleWebsocketMessage(servoTest, conn as unknown as WebSocket);
+      server.handleWebsocketMessage(servoTest, conn as unknown as WebSocket);
+    } finally {
+      jobLock.release('test');
+    }
 
-    expect(warn).toHaveBeenCalledWith(
-      'Dropping websocket message: database is from a newer server version',
-    );
-    // Reaching the SERVO_TEST handler would log this (no serial worker).
-    expect(warn).not.toHaveBeenCalledWith(
-      'Serial services unavailable; serial port setup was skipped or failed',
-    );
     expect(conn.send).not.toHaveBeenCalled();
+    const dropLines = warn.mock.calls.filter(([msg]) => msg === WS_DROP_LINE);
+    expect(dropLines).toHaveLength(1);
   });
 
-  it('leaves the database file byte-identical through boot and shutdown', async () => {
+  it('routes a real WS client frame into the drop', async () => {
+    server = await boot();
+    const warn = vi.spyOn(logger, 'warn');
+    const client = new WebSocket(`ws://127.0.0.1:${server.getBoundWebsocketPort()}`);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        client.once('open', () => resolve());
+        client.once('error', reject);
+      });
+      client.send(JSON.stringify({ msgType: 'SERVO_TEST', data: {} }));
+
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(WS_DROP_LINE));
+    } finally {
+      client.close();
+    }
+  });
+
+  it('leaves the database file byte-identical through boot, a refused write, and shutdown', async () => {
     const hashBefore = sha256(dbPath);
     const filesBefore = fs.readdirSync(tmpDir).sort();
 
     server = await boot();
+    // An authenticated write that changes the admin row if it gets through.
+    const token = jsonwebtoken.sign(
+      { name: 'integration-test', exp: Math.floor(Date.now() / 1000) + 3600 },
+      JWT_KEY,
+    );
+    const res = await fetch(`http://127.0.0.1:${server.getBoundApiPort()}/api/changePassword`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPassword: 'password', newPassword: 'a-new-password' }),
+    });
+    expect(res.status).toBe(503);
+    await res.json();
+
     await server.shutdown();
     server = undefined;
 

@@ -84,6 +84,18 @@ describe('systemStatus store', () => {
       expect(store.dbIncompatible).toBe(true);
     });
 
+    it.each([
+      'STARTUP_OPEN_FAILED',
+      'BACKUP_FAILED',
+      'MIGRATION_FAILED_NO_BACKUP',
+      'MIGRATION_FAILED_RESTORED',
+      'MIGRATION_FAILED_RESTORE_FAILED',
+    ] as const)('dbIncompatible is false for %s', (reasonCode) => {
+      const store = useSystemStatusStore();
+      store.setStatus({ readOnly: true, reasonCode });
+      expect(store.dbIncompatible).toBe(false);
+    });
+
     it('dbIncompatible is false when readOnly is false', () => {
       const store = useSystemStatusStore();
       store.setStatus({ readOnly: true, reasonCode: 'DB_NEWER_THAN_SERVER' });

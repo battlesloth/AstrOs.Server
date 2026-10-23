@@ -53,6 +53,10 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
 // timeout leaves only ~3.4s of headroom; under full-suite contention that
 // margin disappears and these tests flake on CI. 15s is well above the
 // observed worst case while still failing fast if a real hang regresses in.
+function sha256(file: string): string {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
 describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   let tmpDir: string;
   let dbPath: string;
@@ -318,10 +322,6 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   });
 
   describe('a database written by a newer server', () => {
-    function sha256(file: string): string {
-      return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-    }
-
     // Migrates a fresh file DB to this build's latest, then records a
     // migration this build has never heard of — what a newer server leaves.
     async function seedNewerDatabase(): Promise<void> {
@@ -395,6 +395,37 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
 
       expect(status.getState().readOnly).toBe(false);
     });
+
+    it('the incompatible connection refuses writes', async () => {
+      // Defense in depth behind the HTTP guard, the serial skip and the WS
+      // drop: SQLite itself rejects a write that reaches the connection.
+      await seedNewerDatabase();
+      const hashBefore = sha256(dbPath);
+
+      const db = await initializeDatabase(new SystemStatus(), { dbPath });
+      await expect(
+        sql`INSERT INTO kysely_migration (name, timestamp) VALUES ('100_sneaky', 'x')`.execute(db),
+      ).rejects.toThrow(/readonly/i);
+      await closeDatabaseForTest();
+
+      expect(sha256(dbPath)).toBe(hashBefore);
+    });
+  });
+
+  it('a file that opens but fails inspection → STARTUP_OPEN_FAILED, left untouched', async () => {
+    // Not a SQLite file: the open and pragma succeed, the first query (the
+    // unknown-migration check) throws. Must degrade, not crash or migrate.
+    fs.writeFileSync(dbPath, Buffer.alloc(4096, 'x'));
+    const hashBefore = sha256(dbPath);
+
+    const status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+
+    expect(status.getState().reasonCode).toBe('STARTUP_OPEN_FAILED');
+    const probe = await sql<{ one: number }>`SELECT 1 AS one`.execute(db);
+    expect(probe.rows).toEqual([{ one: 1 }]);
+    expect(sha256(dbPath)).toBe(hashBefore);
+    expect(fs.readdirSync(tmpDir)).toEqual(['database.sqlite3']);
   });
 
   it('initial open failure → enters read-only with STARTUP_OPEN_FAILED and returns a usable in-memory db', async () => {

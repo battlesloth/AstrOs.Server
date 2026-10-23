@@ -1,9 +1,10 @@
 import { RequestHandler } from 'express';
 import { JobLock } from '../job_lock/job_lock.js';
-import { SystemStatus } from '../system_status.js';
+import { ReadOnlyReasonCode, SystemStatus } from '../system_status.js';
 
 const BLOCKED_WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+// Not consulted when the database is incompatible: that blocks these too.
 const ALLOWED_IN_READONLY: Array<{ method: string; path: string }> = [
   { method: 'POST', path: '/login' },
   { method: 'POST', path: '/reauth' },
@@ -58,13 +59,15 @@ function isAllowed(
  * Otherwise two rejection modes share one "is this a write?" definition
  * (BLOCKED_WRITE_METHODS + BLOCKED_GET_PATHS):
  *
- *   - 503 when the server is in read-only mode (DB recovery, etc.).
+ *   - 503 when the server is in read-only mode (any other reason code).
  *   - 423 when a flash job is active (per .docs/protocol.md hard-lock spec).
  *
  * Hot path (no gates active) skips the write-class detection entirely and
- * calls next() directly. When at least one gate is active we then check
- * whether the request is write-class and apply the relevant gate(s).
- * Read-only is checked first; a request must clear BOTH gates to proceed.
+ * calls next() directly. isDbIncompatible() implies isReadOnly(), so the hot
+ * path never skips the incompatible check. When at least one gate is active
+ * we then check whether the request is write-class and apply the relevant
+ * gate(s). Read-only is checked first; a request must clear BOTH gates to
+ * proceed.
  */
 export function writeGuard(systemStatus: SystemStatus, jobLock: JobLock): RequestHandler {
   return (req, res, next) => {
@@ -86,7 +89,7 @@ export function writeGuard(systemStatus: SystemStatus, jobLock: JobLock): Reques
       }
       res.status(503).json({
         message: 'Database is from a newer server version',
-        reasonCode: 'DB_NEWER_THAN_SERVER',
+        reasonCode: 'DB_NEWER_THAN_SERVER' satisfies ReadOnlyReasonCode,
       });
       return;
     }

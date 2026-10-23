@@ -8,9 +8,11 @@ export const useSystemStatusStore = defineStore('systemStatus', () => {
   const readOnly = ref(false);
   const reasonCode = ref<ReadOnlyReasonCode | null>(null);
   const enteredAt = ref<string | null>(null);
-  // The database belongs to a newer server: App.vue swaps the whole UI for a
-  // notice, since every API route but /system/status answers 503.
-  const dbIncompatible = computed(() => reasonCode.value === 'DB_NEWER_THAN_SERVER');
+  // The database belongs to a newer server: App.vue replaces the router view
+  // with a notice, since every API route but GET /system/status answers 503.
+  const dbIncompatible = computed(
+    () => readOnly.value && reasonCode.value === 'DB_NEWER_THAN_SERVER',
+  );
 
   function setStatus(state: SystemStatusPayload) {
     readOnly.value = state.readOnly;
@@ -29,9 +31,9 @@ export const useSystemStatusStore = defineStore('systemStatus', () => {
       setStatus(response);
     } catch (error) {
       // Leave state unchanged. The /api/system/status endpoint is unauthenticated
-      // and on a healthy system always responds; a network error here is
-      // transient and another fetch (or the WebSocket push on connect) will
-      // bring us back up to date.
+      // and answers in every mode, including DB_NEWER_THAN_SERVER; a network
+      // error here is transient and the WebSocket push on (re)connect brings
+      // us back up to date. Nothing re-fetches.
       console.warn('systemStatus.fetchStatus failed', error);
     }
   }

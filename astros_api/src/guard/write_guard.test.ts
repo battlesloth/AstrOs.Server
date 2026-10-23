@@ -153,11 +153,58 @@ describe('writeGuard', () => {
         reasonCode: 'DB_NEWER_THAN_SERVER',
       });
     });
+
+    it('DB_NEWER_THAN_SERVER blocks every read-only allowlisted POST and a serial-write GET', () => {
+      const status = incompatible();
+      for (const [m, p] of [
+        ['POST', '/login'],
+        ['POST', '/reauth'],
+        ['POST', '/panicStop'],
+        ['POST', '/panicClear'],
+        ['GET', '/scripts/run'],
+      ]) {
+        const { res, next } = call(m, p, status);
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(503);
+      }
+    });
+
+    it('DB_NEWER_THAN_SERVER fails closed on HEAD and a trailing slash for /system/status', () => {
+      // Express routes HEAD to the GET handler, but the passthrough is an
+      // exact GET match: nothing in the app sends either form.
+      for (const [m, p] of [
+        ['HEAD', '/system/status'],
+        ['GET', '/system/status/'],
+      ]) {
+        const { res, next } = call(m, p, incompatible());
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(503);
+      }
+    });
   });
 
   it('MIGRATION_FAILED_RESTORED still lets GET /scripts and POST /login through', () => {
     const status = new SystemStatus();
     status.enterReadOnly('MIGRATION_FAILED_RESTORED');
+    for (const [m, p] of [
+      ['GET', '/scripts'],
+      ['POST', '/login'],
+    ]) {
+      const { res, next } = call(m, p, status);
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(res.status).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each([
+    'STARTUP_OPEN_FAILED',
+    'BACKUP_FAILED',
+    'MIGRATION_FAILED_NO_BACKUP',
+    'MIGRATION_FAILED_RESTORED',
+    'MIGRATION_FAILED_RESTORE_FAILED',
+  ] as const)('%s keeps plain read-only behavior: GET /scripts and POST /login pass', (code) => {
+    const status = new SystemStatus();
+    status.enterReadOnly(code);
     for (const [m, p] of [
       ['GET', '/scripts'],
       ['POST', '/login'],

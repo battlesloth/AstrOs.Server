@@ -45,13 +45,22 @@ describe('SystemStatus', () => {
   it('isDbIncompatible is true only for DB_NEWER_THAN_SERVER', () => {
     expect(new SystemStatus().isDbIncompatible()).toBe(false);
 
-    const otherCode = new SystemStatus();
-    otherCode.enterReadOnly('MIGRATION_FAILED_RESTORED');
-    expect(otherCode.isDbIncompatible()).toBe(false);
-
     const newer = new SystemStatus();
     newer.enterReadOnly('DB_NEWER_THAN_SERVER');
     expect(newer.isDbIncompatible()).toBe(true);
+    expect(newer.isReadOnly()).toBe(true);
+  });
+
+  it.each([
+    'STARTUP_OPEN_FAILED',
+    'BACKUP_FAILED',
+    'MIGRATION_FAILED_NO_BACKUP',
+    'MIGRATION_FAILED_RESTORED',
+    'MIGRATION_FAILED_RESTORE_FAILED',
+  ] as const)('isDbIncompatible is false for %s', (code) => {
+    const status = new SystemStatus();
+    status.enterReadOnly(code);
+    expect(status.isDbIncompatible()).toBe(false);
   });
 
   it('notifies subscribers on enterReadOnly', () => {
