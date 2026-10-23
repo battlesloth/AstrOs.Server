@@ -159,3 +159,18 @@ Write these first.
 
 - **§6 Hostile input.** Migration names come from the DB file. They are only compared and logged, never executed or interpolated into SQL.
 - **§7 Resource lifecycle.** The DB connection stays open in incompatible mode (as it is in read-only mode). No serial worker, port or animation dispatch starts. A container restart with the right build clears the state.
+
+## Implementation checklist
+
+- [ ] RED/GREEN — `findUnknownAppliedMigrations` (`backup.test.ts`, 4 cases)
+- [ ] RED/GREEN — `initializeDatabase` enters `DB_NEWER_THAN_SERVER` before the pending check; file byte-identical, no backup (`database.integration.test.ts`, 3 cases)
+- [ ] RED/GREEN — `isDbIncompatible()` + write guard 503 for every `/api` route but `GET /system/status` (`write_guard.test.ts`, 3 cases)
+- [ ] `api_server.ts` — skip `setupSerialPort()` with the one-time log line; drop WS client messages; startup DB-write audit recorded
+- [ ] RED/GREEN — Vue `dbIncompatible` computed (`systemStatus.spec.ts`, 2 cases)
+- [ ] RED/GREEN — `App.vue` renders `AstrosIncompatibleDatabaseNotice` instead of the router view (`App.spec.ts`, 2 cases); component + story; pinned `enUS.json` copy
+- [ ] Mutation checks recorded
+- [ ] QA plan: `.docs/qa/system-readonly-mode.md` § Incompatible (newer) database
+- [ ] Pre-commit: prettier + lint (both sub-projects), build, full suites, code review (findings addressed)
+- [ ] Bench verification (dev machine, Verification § Bench)
+- [ ] Pre-push: `/pr-review-toolkit:review-pr`; findings addressed
+- [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry
