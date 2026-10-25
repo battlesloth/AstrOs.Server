@@ -148,16 +148,19 @@ The UI shows a single notice page in place of the app.
 ### 9. Startup refuses the database
 
 1. Start the API as above and watch its log.
-2. **Pass:** the log has `Entering read-only mode (DB_NEWER_THAN_SERVER): database has migrations this build does not know: 99_future`, and `Skipping serial port setup: database is from a newer server version` appears exactly once.
+2. **Pass:** the log has `Entering read-only mode (DB_NEWER_THAN_SERVER): database has migrations this build does not know: 99_future`, and `Skipping serial port setup: database version is newer than this server supports` appears exactly once.
 3. **Fail:** any `Created pre-migration backup`, `migration "…" was executed`, or `Starting up serial port services` line.
 
 ### 10. The notice page replaces the app
 
-1. Open `http://localhost:5173`. Try it once logged out and once with a saved session. Login itself 503s now, so for the saved session sign in against a healthy server first, then restart it on the copy.
-2. **Pass:** one card over the R2 schematic, reading "Incompatible database", the message, and "Install the newer version of AstrOs Server, or restore a database backup made by this version." There is no login form, navigation, read-only banner or toast. Keyboard focus is on the heading (a screen reader announces the message). Logged out, the login form may flash for a fraction of a second first: the notice appears once `GET /api/system/status` answers.
-3. Hard refresh (`Ctrl+Shift+R`), then deep-link to `http://localhost:5173/scripts`.
-4. **Pass:** both still show only the notice.
-5. **Fail:** the login page or app layout stays on screen, the read-only banner shows, a "Your change was not saved" toast appears, or any raw i18n key path is visible.
+1. Before starting the API on the copy, sign in against a healthy server and leave a tab open on the app (login itself 503s once the database is incompatible). Then restart the API on the copy.
+2. **Pass:** the open tab switches to the notice by itself within about 3 s: the WebSocket reconnects and the server pushes the reason code on connect.
+3. **Pass:** one card over the R2 schematic, reading "Incompatible database", the message ("…The database version is newer than this server supports…"), and "Update AstrOs Server, or restore a database backup made by this version." There is no login form, navigation, read-only banner or toast. Keyboard focus is on the heading (`document.activeElement` is the `h1`; a screen reader announces the message), and Tab reaches nothing on the page.
+4. Hard refresh (`Ctrl+Shift+R`), then deep-link to `http://localhost:5173/scripts`.
+5. **Pass:** both still show only the notice.
+6. Open a private window on `http://localhost:5173` (no saved session).
+7. **Pass:** the notice. The login form may flash for a fraction of a second first: the notice appears once `GET /api/system/status` answers.
+8. **Fail:** the login page or app layout stays on screen, the read-only banner shows, a "Your change was not saved" toast appears, or any raw i18n key path is visible.
 
 ### 11. Every API route except status answers 503
 
@@ -168,7 +171,7 @@ curl -s -i -X POST localhost:3000/api/panicStop
 curl -s -i localhost:3000/api/system/status
 ```
 
-**Pass:** the first three return `503` with `{"message":"Database is from a newer server version","reasonCode":"DB_NEWER_THAN_SERVER"}`. The status call returns `200` with `{"readOnly":true,"reasonCode":"DB_NEWER_THAN_SERVER","enteredAt":"…"}`.
+**Pass:** the first three return `503` with `{"message":"Database version is newer than this server supports","reasonCode":"DB_NEWER_THAN_SERVER"}`. The status call returns `200` with `{"readOnly":true,"reasonCode":"DB_NEWER_THAN_SERVER","enteredAt":"…"}`.
 **Fail:** any other status, or login / panic getting through (those are allowed only in plain read-only mode).
 
 ### 12. The database file is untouched

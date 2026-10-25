@@ -362,7 +362,9 @@ export class ApiServer {
     const skipSerialSetup =
       this.configOverrides?.skipSerialSetup ?? process.env.NODE_ENV?.toLocaleLowerCase() === 'test';
     if (this.systemStatus.isDbIncompatible()) {
-      logger.warn('Skipping serial port setup: database is from a newer server version');
+      logger.warn(
+        'Skipping serial port setup: database version is newer than this server supports',
+      );
     } else if (skipSerialSetup) {
       logger.warn(
         `Skipping serial port setup (configOverrides.skipSerialSetup=${String(this.configOverrides?.skipSerialSetup)}, NODE_ENV=${process.env.NODE_ENV ?? '<unset>'})`,
@@ -930,7 +932,9 @@ export class ApiServer {
       // Once per connection: a slider client would otherwise flood the log.
       if (!this.wsDropNoticed.has(conn)) {
         this.wsDropNoticed.add(conn);
-        logger.warn('Dropping websocket messages: database is from a newer server version');
+        logger.warn(
+          'Dropping websocket messages: database version is newer than this server supports',
+        );
       }
       return;
     }

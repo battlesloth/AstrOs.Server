@@ -88,7 +88,7 @@ export function writeGuard(systemStatus: SystemStatus, jobLock: JobLock): Reques
         return;
       }
       res.status(503).json({
-        message: 'Database is from a newer server version',
+        message: 'Database version is newer than this server supports',
         reasonCode: 'DB_NEWER_THAN_SERVER' satisfies ReadOnlyReasonCode,
       });
       return;

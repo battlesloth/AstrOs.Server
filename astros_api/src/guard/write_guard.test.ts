@@ -132,7 +132,7 @@ describe('writeGuard', () => {
         expect(next).not.toHaveBeenCalled();
         expect(res.status).toHaveBeenCalledWith(503);
         expect(res.json).toHaveBeenCalledWith({
-          message: 'Database is from a newer server version',
+          message: 'Database version is newer than this server supports',
           reasonCode: 'DB_NEWER_THAN_SERVER',
         });
       }
@@ -149,7 +149,7 @@ describe('writeGuard', () => {
       expect(next).not.toHaveBeenCalled();
       expect(res.status).toHaveBeenCalledWith(503);
       expect(res.json).toHaveBeenCalledWith({
-        message: 'Database is from a newer server version',
+        message: 'Database version is newer than this server supports',
         reasonCode: 'DB_NEWER_THAN_SERVER',
       });
     });

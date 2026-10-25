@@ -18,7 +18,8 @@ import { TransmissionType } from './models/index.js';
 import { SystemStatus } from './system_status.js';
 
 const JWT_KEY = 'integration-test-key';
-const WS_DROP_LINE = 'Dropping websocket messages: database is from a newer server version';
+const WS_DROP_LINE =
+  'Dropping websocket messages: database version is newer than this server supports';
 
 function sha256(file: string): string {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
@@ -77,7 +78,8 @@ describe('ApiServer on a database written by a newer server', { timeout: 15_000 
     server = await boot();
 
     const skipLines = warn.mock.calls.filter(
-      ([msg]) => msg === 'Skipping serial port setup: database is from a newer server version',
+      ([msg]) =>
+        msg === 'Skipping serial port setup: database version is newer than this server supports',
     );
     expect(skipLines).toHaveLength(1);
     expect(info).not.toHaveBeenCalledWith('Starting up serial port services');
@@ -107,7 +109,7 @@ describe('ApiServer on a database written by a newer server', { timeout: 15_000 
       const res = await fetch(`${base}${route}`, { method });
       expect(res.status).toBe(503);
       expect(await res.json()).toEqual({
-        message: 'Database is from a newer server version',
+        message: 'Database version is newer than this server supports',
         reasonCode: 'DB_NEWER_THAN_SERVER',
       });
     }
