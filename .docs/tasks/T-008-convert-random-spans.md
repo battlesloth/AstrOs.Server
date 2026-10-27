@@ -60,7 +60,7 @@ export function randomSpanProblems(
 
 - **`mapEventsByControllerAndTime`:** after `evt.time *= 1000`, also scale `evt.endTime` when it's non-null. Bucketing is still by start time.
 - **`addBufferEvents`:** `maxDuration` becomes the max over every bucketed event of `endTime ?? time` (ms), not the max bucket key. The rest is unchanged. A location whose span ends last gets its end buffer at the span's end.
-- **`convertScriptEvents`:** an event with `endTime !== null` goes to `convertRandomSpanEvent(evt, timeToSend): string` before the `moduleType` switch.
+- **`convertScriptEvents`:** an event with `endTime !== null` goes to `convertRandomSpanEvent(evt, timeToSend): string` before the `moduleType` switch. (Note 2026-10-27, T-007 type review: `getScript` always returns `null` or a number, but API test fixtures are not type-checked, so one that omits `endTime` would take the span path with `undefined`; prefer `!= null` here and in `mapEventsByControllerAndTime`.)
 - **`convertRandomSpanEvent`:**
   - It computes `spanMs = Math.round(evt.endTime - evt.time)` (both already ms), and builds a copy of the payload with `minGapMs` and `maxGapMs` `Math.round`ed (Contract: integer milliseconds).
   - It looks up the GPIO channel (for `genericGpio`) or the UART values (for `maestro`).

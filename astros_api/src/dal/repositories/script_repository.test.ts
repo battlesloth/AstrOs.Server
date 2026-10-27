@@ -1390,6 +1390,84 @@ describe('Script Repository', () => {
       expect(saved.event).toEqual(payload);
     });
 
+    // Arithmetic-derived end times drift either side of a whole decisecond:
+    // the above-integer case separates rounding from ceil, the below-integer
+    // case from floor/trunc.
+    it.each([
+      { label: '45.2 + 0.1', endTime: 45.2 + 0.1, ds: 453 }, // x10 === 453.00000000000006
+      { label: '0.7 + 0.1', endTime: 0.7 + 0.1, ds: 8 }, // x10 === 7.999999999999999
+    ])('stores endTime $label s as $ds ds', async ({ endTime, ds }) => {
+      const channel = await seedGpioChannel();
+      const scriptId = uuid();
+      const scriptChannel = gpioScriptChannel(scriptId, channel);
+      const evt: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptChannel.id,
+        moduleType: ModuleType.gpio,
+        moduleSubType: ModuleSubType.genericGpio,
+        time: 0,
+        endTime,
+        event: { minGapMs: 50, maxGapMs: 400 },
+      };
+
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, evt));
+
+      expect((await storedRow(evt.id)).end_time).toBe(ds);
+      const saved = (await repo.getScript(scriptId)).scriptChannels[0].events[evt.id];
+      expect(saved.endTime).toBe(ds / 10);
+    });
+
+    function gpioSpan(scriptChannel: ScriptChannel, time: number, endTime: number): ScriptEvent {
+      return {
+        id: uuid(),
+        scriptChannel: scriptChannel.id,
+        moduleType: ModuleType.gpio,
+        moduleSubType: ModuleSubType.genericGpio,
+        time,
+        endTime,
+        event: { minGapMs: 50, maxGapMs: 400 },
+      };
+    }
+
+    // The playlist queue reads getScriptDurationsDS; runScript reads getScript.
+    it("a span script's stored duration counts the span's end", async () => {
+      const channel = await seedGpioChannel();
+      const scriptId = uuid();
+      const scriptChannel = gpioScriptChannel(scriptId, channel);
+      const point: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptChannel.id,
+        moduleType: ModuleType.gpio,
+        moduleSubType: ModuleSubType.genericGpio,
+        time: 10.0,
+        endTime: null,
+        event: { setHigh: true } as GpioEvent,
+      };
+      scriptChannel.events[point.id] = point;
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, gpioSpan(scriptChannel, 2.0, 18.5)));
+
+      expect((await repo.getScriptDurationsDS()).get(scriptId)).toBe(185);
+      expect((await repo.getScript(scriptId)).durationDS).toBe(185);
+    });
+
+    it('copying a script keeps its spans', async () => {
+      const channel = await seedGpioChannel();
+      const scriptId = uuid();
+      const scriptChannel = gpioScriptChannel(scriptId, channel);
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, gpioSpan(scriptChannel, 2.0, 18.5)));
+
+      const copy = await repo.getScript((await repo.copyScript(scriptId)).id);
+
+      const events = Object.values(copy.scriptChannels[0].events);
+      expect(events.map((e) => [e.time, e.endTime, e.event])).toEqual([
+        [2.0, 18.5, { minGapMs: 50, maxGapMs: 400 }],
+      ]);
+      expect(copy.durationDS).toBe(185);
+    });
+
     it('point events read back endTime null', async () => {
       const channel = await seedGpioChannel();
       const scriptId = uuid();
@@ -1484,7 +1562,7 @@ describe('Script Repository', () => {
     });
 
     // A span on a sub-type with no span payload (serial here) is refused on
-    // save and dropped on load (Jeff, 2026-10-27).
+    // save and left out on load.
     async function seedSerialScriptChannel(scriptId: string): Promise<ScriptChannel> {
       const moduleId = uuid();
       // For generic UART channels, the channel ID is the same as the module ID.
@@ -1536,7 +1614,7 @@ describe('Script Repository', () => {
     async function storedRowsOf(scriptId: string) {
       return db
         .selectFrom('script_events')
-        .select(['id', 'end_time'])
+        .select(['id', 'time', 'end_time'])
         .where('script_id', '=', scriptId)
         .execute();
     }
@@ -1548,13 +1626,32 @@ describe('Script Repository', () => {
       const repo = new ScriptRepository(db);
       await repo.upsertScript(scriptWith(scriptChannel, point));
 
+      // The resubmission moves the point and renames the script before the
+      // refused span, so only a rollback leaves the stored script unchanged.
       const span = serialEvent(scriptChannel, 2.0, 5.0);
-      scriptChannel.events[span.id] = span;
-      await expect(repo.upsertScript(scriptWith(scriptChannel, point))).rejects.toThrow(
-        `Random span not supported for moduleSubType: ${ModuleSubType.genericSerial}`,
-      );
+      scriptChannel.events = { [point.id]: { ...point, time: 2.5 }, [span.id]: span };
+      const resubmitted: Script = {
+        ...scriptWith(scriptChannel, scriptChannel.events[point.id]),
+        scriptName: 'Renamed',
+      };
+      const errorSpy = vi.spyOn(logger, 'error');
+      try {
+        await expect(repo.upsertScript(resubmitted)).rejects.toThrow(
+          `Random span not supported for moduleSubType: ${ModuleSubType.genericSerial}`,
+        );
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringMatching(
+            new RegExp(
+              `refusing event ${span.id} on channel .* in script ${scriptId}: Random span not supported`,
+            ),
+          ),
+        );
+      } finally {
+        errorSpy.mockRestore();
+      }
 
-      expect(await storedRowsOf(scriptId)).toEqual([{ id: point.id, end_time: null }]);
+      expect(await storedRowsOf(scriptId)).toEqual([{ id: point.id, time: 10, end_time: null }]);
+      expect((await repo.getScript(scriptId)).scriptName).toBe('Span Test Script');
     });
 
     // The refusal applies to spans only: a client that omits endTime saves
@@ -1567,7 +1664,7 @@ describe('Script Repository', () => {
 
       await new ScriptRepository(db).upsertScript(scriptWith(scriptChannel, point));
 
-      expect(await storedRowsOf(scriptId)).toEqual([{ id: point.id, end_time: null }]);
+      expect(await storedRowsOf(scriptId)).toEqual([{ id: point.id, time: 10, end_time: null }]);
     });
 
     // Seeds a saved serial script, then turns one of its rows into a span by
@@ -1596,10 +1693,31 @@ describe('Script Repository', () => {
         const events = (await repo.getScript(scriptId)).scriptChannels[0].events;
 
         expect(Object.keys(events)).toEqual([keptId]);
-        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(handCodedId));
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringMatching(
+            new RegExp(
+              `dropping random span ${handCodedId} on channel .* in script ${scriptId} ` +
+                `\\(time 30, end_time 80, data .*at 3.*\\): moduleSubType ${ModuleSubType.genericSerial} ` +
+                `has no span payload; the row is deleted when this script is next saved`,
+            ),
+          ),
+        );
       } finally {
         warnSpy.mockRestore();
       }
+    });
+
+    // Only known sub-types without a span payload are dropped: a row the
+    // server cannot interpret at all fails the read, as a point row does.
+    it('a span row with an unknown sub-type fails the read', async () => {
+      const { repo, scriptId, handCodedId } = await seedHandCodedSerialSpan();
+      await db
+        .updateTable('script_events')
+        .set({ module_sub_type: 999 })
+        .where('id', '=', handCodedId)
+        .execute();
+
+      await expect(repo.getScript(scriptId)).rejects.toThrow('Unknown moduleSubType: 999');
     });
 
     it('saving the loaded script removes the dropped span row', async () => {
@@ -1607,7 +1725,7 @@ describe('Script Repository', () => {
 
       await repo.upsertScript(await repo.getScript(scriptId));
 
-      expect(await storedRowsOf(scriptId)).toEqual([{ id: keptId, end_time: null }]);
+      expect(await storedRowsOf(scriptId)).toEqual([{ id: keptId, time: 10, end_time: null }]);
     });
   });
 });

@@ -19,28 +19,38 @@ export type ScriptEventTypes =
   | RandomMaestroEvent
   | undefined;
 
-// The sub-types with a random span payload; matches the isSpan routing in
-// moduleSubTypeToScriptEventTypes. The repository refuses to save a span on
-// any other sub-type and drops one it finds on load.
-export function supportsRandomSpan(moduleSubType: ModuleSubType): boolean {
-  return moduleSubType === ModuleSubType.genericGpio || moduleSubType === ModuleSubType.maestro;
+const RANDOM_SPAN_SUB_TYPES = [ModuleSubType.genericGpio, ModuleSubType.maestro] as const;
+type RandomSpanSubType = (typeof RANDOM_SPAN_SUB_TYPES)[number];
+
+// The sub-types with a random span payload. The repository refuses to save a
+// span on any other sub-type and leaves one it finds out of the loaded script.
+export function supportsRandomSpan(
+  moduleSubType: ModuleSubType,
+): moduleSubType is RandomSpanSubType {
+  return (RANDOM_SPAN_SUB_TYPES as readonly ModuleSubType[]).includes(moduleSubType);
 }
 
-// isSpan selects the random span payload of a sub-type (only GPIO and Maestro
-// have one); the repository passes it for rows with an end_time.
+// isSpan marks a row with an end_time: GPIO and Maestro parse as their Random*
+// payload, other sub-types throw (readScriptEvents leaves those out first).
 export function moduleSubTypeToScriptEventTypes(
   moduleSubType: ModuleSubType,
   json: string,
   isSpan = false,
 ): ScriptEventTypes {
   if (isSpan) {
+    if (!supportsRandomSpan(moduleSubType)) {
+      throw new Error(`Random span not supported for moduleSubType: ${moduleSubType}`);
+    }
     switch (moduleSubType) {
       case ModuleSubType.genericGpio:
         return JSON.parse(json) as RandomGpioEvent;
       case ModuleSubType.maestro:
         return JSON.parse(json) as RandomMaestroEvent;
-      default:
-        throw new Error(`Random span not supported for moduleSubType: ${moduleSubType}`);
+      default: {
+        // A sub-type added to RANDOM_SPAN_SUB_TYPES without a case here fails to compile.
+        const unhandled: never = moduleSubType;
+        throw new Error(`Random span not supported for moduleSubType: ${unhandled}`);
+      }
     }
   }
 

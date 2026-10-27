@@ -66,11 +66,23 @@ describe('calculateLengthDS', () => {
     const gpioCh = generateGpioScriptChannel(script.id);
     const serialCh = generateSerialScriptChannel(script.id);
     addEvent(gpioCh, generateGpioSpanEvent(2.0, 18.5, gpioCh.id));
-    // Starts after the span but ends before it.
+    // Inside the span: max(time) alone would give 100.
     addEvent(serialCh, generateCoreScriptSerialEvent(10.0, serialCh.id));
     script.scriptChannels.push(gpioCh, serialCh);
 
     expect(calculateLengthDS(script)).toBe(185);
+  });
+
+  // A client that omits endTime sends a point event.
+  it('an event without an endTime property counts at its start', () => {
+    const script = generateScript('testScriptNoEndTime');
+    const serialCh = generateSerialScriptChannel(script.id);
+    const evt = generateCoreScriptSerialEvent(4.2, serialCh.id);
+    delete (evt as Partial<ScriptEvent>).endTime;
+    addEvent(serialCh, evt);
+    script.scriptChannels.push(serialCh);
+
+    expect(calculateLengthDS(script)).toBe(42);
   });
 
   it("a point after a span's end wins", () => {

@@ -100,12 +100,12 @@ describe('migration_9: add script_events.end_time', () => {
         module_channel_type: 'mct',
       })
       .execute();
-    // Raw SQL: the v8 table has no end_time, so a typed insert can't name it.
+    // Raw SQL, so the insert names exactly the v8 columns.
     raw
       .prepare(
         `INSERT INTO script_events
            (id, script_id, script_channel_id, module_type, module_sub_type, time, data)
-         VALUES (?, ?, ?, 1, 1, ?, '{"setHigh":true}')`,
+         VALUES (?, ?, ?, 3, 301, ?, '{"setHigh":true}')`,
       )
       .run(`${id}-evt`, id, `${id}-ch`, timeDs);
   }

@@ -18,6 +18,9 @@ export const migration_9: Migration = {
     }
     await db.schema.alterTable('script_events').addColumn('end_time', 'integer').execute();
   },
+  // down only drops the column (tests use it). Span payloads stay in `data`,
+  // where a pre-migration-9 build would read them as point events, so it does
+  // not make the database safe for an older build; T-006's guard does that.
   down: async (db: Kysely<Database>): Promise<void> => {
     await db.schema.alterTable('script_events').dropColumn('end_time').execute();
   },

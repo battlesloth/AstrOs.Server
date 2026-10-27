@@ -288,7 +288,7 @@ export class ScriptRepository {
    * Map of script id → recorded duration (deciseconds) for every script.
    * Returns the raw column: unlike getScript, an invalid stored value is not
    * recomputed. Used by the playlist converter to give a Script track its
-   * runtime (up to the start of its last event) —
+   * runtime (up to its latest span end or point-event start; see calculateLengthDS) —
    * playlist track rows carry no usable duration for scripts (no editor
    * control), so the queue would otherwise treat scripts as instantaneous.
    * Intentionally unfiltered (no `enabled = 1`) so a still-referenced script's
@@ -474,7 +474,9 @@ export class ScriptRepository {
   ) {
     if (evt.endTime != null && !supportsRandomSpan(evt.moduleSubType)) {
       const err = new Error(`Random span not supported for moduleSubType: ${evt.moduleSubType}`);
-      logger.error(`ScriptRepository.saveScriptEvent: refusing event ${evt.id}: ${err.message}`);
+      logger.error(
+        `ScriptRepository.saveScriptEvent: refusing event ${evt.id} on channel ${channelId} in script ${scriptId}: ${err.message}`,
+      );
       throw err;
     }
 
@@ -521,16 +523,21 @@ export class ScriptRepository {
 
     for (const evt of events) {
       const subtype = evt.module_sub_type !== null ? evt.module_sub_type : ModuleSubType.none;
-      // A table still without end_time (read-only before migration 9 ran)
-      // yields undefined: a point event, like NULL.
+      // A database still at migration 8 (BACKUP_FAILED, or a failed migration
+      // restored) has no end_time column and yields undefined: a point event.
       const endTimeDs = evt.end_time ?? null;
 
       // Only a hand edit can store a span on a sub-type without a span payload
-      // (saveScriptEvent refuses one). Drop it so neither the editor nor the
-      // converter sees it; the editor's next save removes the row.
+      // (saveScriptEvent refuses one). Leave it out so neither the editor nor
+      // the converter sees it; the editor's next save removes the row. Parsing
+      // it as a point first makes an unknown sub-type or unreadable data fail
+      // the read, as for a point row, rather than be dropped.
       if (endTimeDs !== null && !supportsRandomSpan(subtype)) {
+        moduleSubTypeToScriptEventTypes(subtype, evt.data);
         logger.warn(
-          `ScriptRepository.readScriptEvents: dropping random span ${evt.id} in script ${scriptId}: moduleSubType ${subtype} has no span payload`,
+          `ScriptRepository.readScriptEvents: dropping random span ${evt.id} on channel ${evt.script_channel_id} in script ${scriptId} ` +
+            `(time ${evt.time}, end_time ${endTimeDs}, data ${evt.data}): moduleSubType ${subtype} has no span payload; ` +
+            'the row is deleted when this script is next saved',
         );
         continue;
       }
