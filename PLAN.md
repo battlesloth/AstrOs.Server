@@ -5,10 +5,10 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
-Now:     T-006 done on `feature/T-006-refuse-newer-database` (pre-push review addressed, QA walk 2026-10-25 passed) — awaiting push + PR to develop
-Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 (PR) → T-007 → T-008 (T-006 must merge before `migration_9` exists anywhere) → ESP T-009 bench (spans inserted by SQL) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
+Now:     T-007 next (not started) — branch `feature/T-007-persist-random-span-events` off develop; T-006 is merged, so `migration_9` can now be added
+Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 → T-008 → ESP T-009 bench (spans inserted by SQL) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
 Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
-Last:    2026-10-23 — T-006 implemented and reviewed (incompatible-database refusal); develop at `1.0.3-dev.0` (#133 merged)
+Last:    2026-10-26 — T-006 merged to develop (PR #134); develop at `1.0.3-dev.0`
 
 ## Random span events
 
@@ -16,7 +16,7 @@ Spec: `.docs/specs/20261022-0748-random-span-events-design.md` · wire format: `
 
 Phase A — database guard + span data and conversion
 
-- [x] T-006 — Refuse a database written by a newer server (`.docs/tasks/completed/T-006-refuse-newer-database.md`, branch `feature/T-006-refuse-newer-database`; bench-verified 2026-10-23, cases 9–14) — merges before T-007
+- [x] T-006 — Refuse a database written by a newer server (`.docs/tasks/completed/T-006-refuse-newer-database.md`, branch `feature/T-006-refuse-newer-database`; merged 2026-10-26, PR #134; bench-verified 2026-10-23 and QA-walked 2026-10-25, cases 9–14)
 - [ ] T-007 — Persist random span events (`.docs/tasks/T-007-persist-random-span-events.md`)
 - [ ] T-008 — Convert random spans to ESP commands 6 and 7 (`.docs/tasks/T-008-convert-random-spans.md`)
 
