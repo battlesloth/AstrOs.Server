@@ -126,3 +126,18 @@ Write these first.
 ## Failure-mode inventory
 
 N/A. This is an additive nullable column. The existing pre-migration backup/restore path in `initializeDatabase` covers a failed `migration_9`. T-006 covers an older build reading the newer DB.
+
+## Implementation checklist
+
+- [ ] RED/GREEN — `migration_9` adds nullable `end_time`, existing rows NULL, down drops it (`migration_9.test.ts`); registered in `dal/database.ts`, exported from `migrations/index.ts`, `ScriptEventsTable.end_time`, mirrored in `database.integration.test.ts` `buildProvider`
+- [ ] RED/GREEN — `moduleSubTypeToScriptEventTypes(…, isSpan)` routes GPIO / Maestro spans, throws for other sub-types, unchanged when `!isSpan` (`script_event.test.ts`); `RandomGpioEvent` / `RandomMaestroEvent` added to `ScriptEventTypes` and the model index (API + Vue)
+- [ ] RED/GREEN — repository writes `end_time` (deciseconds, `== null` → NULL) and reads `endTime` back; Maestro channel overwrite covers `RandomMaestroEvent` (`script_repository.test.ts`, the 4 pinned cases)
+- [ ] RED/GREEN — `calculateLengthDS` counts a span at its end time (`script_duration.test.ts`, the 2 pinned cases; existing cases unchanged); doc comment updated
+- [ ] `endTime: null` at every API and Vue `ScriptEvent` construction site (found by `npm run build`), including the converter's `addBufferEvent`, `ScripterView.vue` `addEvent` and `stores/scripter.ts`
+- [ ] RED/GREEN — Vue `useEventConverter` throws the pinned error when converting a span between channel types
+- [ ] Mutation checks recorded
+- [ ] QA plan: `.docs/qa/random-span-events.md` (Preconditions + Data / upgrade)
+- [ ] Pre-commit: prettier + lint (both sub-projects), both builds, full suites, code review
+- [ ] Manual check (Verification): API on a copy of the dev DB applies `9_add_script_event_end_time`; an existing script opens and saves; `end_time` count 0; duration unchanged
+- [ ] Pre-push: `/pr-review-toolkit:review-pr`
+- [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry

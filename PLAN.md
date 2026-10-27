@@ -5,7 +5,7 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
-Now:     T-007 next (not started) — branch `feature/T-007-persist-random-span-events` off develop; T-006 is merged, so `migration_9` can now be added
+Now:     T-007 in progress on `feature/T-007-persist-random-span-events`
 Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 → T-008 → ESP T-009 bench (spans inserted by SQL) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
 Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
 Last:    2026-10-26 — T-006 merged to develop (PR #134); develop at `1.0.3-dev.0`
