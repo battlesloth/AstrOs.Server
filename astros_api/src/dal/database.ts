@@ -29,6 +29,7 @@ import { SystemStatus } from '../system_status.js';
 import {
   checkPendingMigrations,
   createBackup,
+  findUnknownAppliedMigrations,
   getLastAppliedMigrationName,
   pruneOldBackups,
   restoreBackup,
@@ -171,6 +172,21 @@ export async function initializeDatabase(
   let lastApplied: string | null;
   try {
     conn = openConnection(dbFile);
+    // Checked before pending: a newer database must get no backup, migrate or
+    // prune, even when this build also has migrations the database lacks.
+    // enterReadOnly is first-wins: a code entered before this one would leave
+    // the server in plain read-only mode, where reads and login pass.
+    const unknown = await findUnknownAppliedMigrations(conn.db, activeMigrationProvider);
+    if (unknown.length > 0) {
+      systemStatus.enterReadOnly(
+        'DB_NEWER_THAN_SERVER',
+        `database has migrations this build does not know: ${unknown.join(', ')}`,
+      );
+      // A connection setting, not a write: SQLite itself refuses any write
+      // that slips past the HTTP guard, the serial skip and the WS drop.
+      conn.raw.pragma('query_only = ON');
+      return conn.db;
+    }
     pending = await checkPendingMigrations(conn.db, activeMigrationProvider);
     lastApplied = await getLastAppliedMigrationName(conn.db, activeMigrationProvider);
   } catch (err) {

@@ -1,11 +1,15 @@
 import { logger } from './logger.js';
 
+// Mirrored in astros_vue/src/types/systemStatus.ts, with a banner allowlist
+// (AstrosSystemStatusBanner.vue) and locale keys (systemStatus.reasonCode.*).
+// Keep all of them in sync.
 export type ReadOnlyReasonCode =
   | 'STARTUP_OPEN_FAILED'
   | 'BACKUP_FAILED'
   | 'MIGRATION_FAILED_NO_BACKUP'
   | 'MIGRATION_FAILED_RESTORED'
-  | 'MIGRATION_FAILED_RESTORE_FAILED';
+  | 'MIGRATION_FAILED_RESTORE_FAILED'
+  | 'DB_NEWER_THAN_SERVER';
 
 export interface SystemStatusState {
   readOnly: boolean;
@@ -23,6 +27,13 @@ export class SystemStatus {
 
   isReadOnly(): boolean {
     return this.readOnly;
+  }
+
+  // Stricter than read-only: the database belongs to a newer server, so this
+  // build must not read it either. Implies isReadOnly(); writeGuard's hot
+  // path relies on that.
+  isDbIncompatible(): boolean {
+    return this.readOnly && this.reasonCode === 'DB_NEWER_THAN_SERVER';
   }
 
   getState(): SystemStatusState {

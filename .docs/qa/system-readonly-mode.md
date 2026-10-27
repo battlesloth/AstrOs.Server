@@ -12,7 +12,7 @@ Tests for the Phase 3 Vue UI when the AstrOs.Server enters read-only mode (Phase
 
 ## Forcing read-only mode
 
-Three reliable ways to put the server into read-only mode for testing. Pick whichever matches the scenario:
+Four ways to put the server into read-only mode for testing. Pick whichever matches the scenario. (`DB_NEWER_THAN_SERVER` is not a substitute for cases 1–8: it replaces the UI and blocks login and panic. See § Incompatible (newer) database.)
 
 1. **`STARTUP_OPEN_FAILED`** — point `DATABASE_PATH` at a directory:
    ```bash
@@ -116,10 +116,90 @@ To force this scenario: temporarily edit `src/composables/useWebsocket.ts`'s `ha
 **Pass:** banner reads "The database is currently unavailable for writes." (the UNKNOWN fallback).
 **Fail:** banner reads "systemStatus.reasonCode.NOT_A_REAL_CODE" (raw key leaked).
 
+## Incompatible (newer) database
+
+`DB_NEWER_THAN_SERVER` is stricter than read-only. The server finds migrations in the database that this build does not know (the database was last used by a newer server, or by a sibling branch). It then:
+
+- answers every `/api` route except `GET /api/system/status` with 503
+- starts no serial services and drops WebSocket client messages
+- writes nothing to the database: no backup, no migration, no prune
+
+The UI shows a single notice page in place of the app.
+
+### Preconditions
+
+- Work on a **copy** of the active dev database, never the real one. That is `database.sqlite3` in the directory `DATABASE_PATH` names in `astros_api/.env` (`../.data`, i.e. `.data/database.sqlite3` at the repo root on the dev machine). It must be at this build's latest migration: the last name `SELECT name FROM kysely_migration` prints should be the last one in `dal/database.ts`'s provider. An older copy stages the branch-switch case below instead.
+  ```bash
+  mkdir -p /tmp/astros-newer-db
+  cp .data/database.sqlite3 /tmp/astros-newer-db/
+  sqlite3 /tmp/astros-newer-db/database.sqlite3 \
+    "INSERT INTO kysely_migration (name, timestamp) VALUES ('99_future', '2026-10-22T00:00:00.000Z')"
+  sha256sum /tmp/astros-newer-db/database.sqlite3 > /tmp/astros-newer-db.sha256
+  ls /tmp/astros-newer-db   # only database.sqlite3
+  ```
+- Start the API against the copy (`DATABASE_PATH` is the directory, not the file):
+  ```bash
+  cd astros_api
+  set -a && . ./.env && set +a   # start:tsx does not read astros_api/.env on its own
+  DATABASE_PATH=/tmp/astros-newer-db npm run start:tsx
+  ```
+- Vue app running: `cd astros_vue && npm run dev`.
+
+### 9. Startup refuses the database
+
+1. Start the API as above and watch its log.
+2. **Pass:** the log has `Entering read-only mode (DB_NEWER_THAN_SERVER): database has migrations this build does not know: 99_future`, and `Skipping serial port setup: database version is newer than this server supports` appears exactly once.
+3. **Fail:** any `Created pre-migration backup`, `migration "…" was executed`, or `Starting up serial port services` line.
+
+### 10. The notice page replaces the app
+
+1. Before starting the API on the copy, sign in against a healthy server and leave a tab open on the app (login itself 503s once the database is incompatible). Then restart the API on the copy.
+2. **Pass:** the open tab switches to the notice by itself within about 3 s: the WebSocket reconnects and the server pushes the reason code on connect.
+3. **Pass:** one card over the R2 schematic, reading "Incompatible database", the message ("…The database version is newer than this server supports…"), and "Update AstrOs Server, or restore a database backup made by this version." There is no login form, navigation, read-only banner or toast. Keyboard focus is on the heading (`document.activeElement` is the `h1`; a screen reader announces the message), and Tab reaches nothing on the page.
+4. Hard refresh (`Ctrl+Shift+R`), then deep-link to `http://localhost:5173/scripts`.
+5. **Pass:** both still show only the notice.
+6. Open a private window on `http://localhost:5173` (no saved session).
+7. **Pass:** the notice. The login form may flash for a fraction of a second first: the notice appears once `GET /api/system/status` answers.
+8. **Fail:** the login page or app layout stays on screen, the read-only banner shows, a "Your change was not saved" toast appears, or any raw i18n key path is visible.
+
+### 11. Every API route except status answers 503
+
+```bash
+curl -s -i localhost:3000/api/scripts
+curl -s -i -X POST localhost:3000/api/login
+curl -s -i -X POST localhost:3000/api/panicStop
+curl -s -i localhost:3000/api/system/status
+```
+
+**Pass:** the first three return `503` with `{"message":"Database version is newer than this server supports","reasonCode":"DB_NEWER_THAN_SERVER"}`. The status call returns `200` with `{"readOnly":true,"reasonCode":"DB_NEWER_THAN_SERVER","enteredAt":"…"}`.
+**Fail:** any other status, or login / panic getting through (those are allowed only in plain read-only mode).
+
+### 12. The database file is untouched
+
+1. Stop the API (`Ctrl+C`).
+2. Run `sha256sum -c /tmp/astros-newer-db.sha256` and `ls /tmp/astros-newer-db`.
+3. **Pass:** the checksum is `OK`, and the directory holds only `database.sqlite3` (no `.backup-*`, `-journal` or `-wal` file).
+4. **Fail:** checksum mismatch, or any extra file.
+
+### 13. Recovery
+
+1. With the notice page still open, stop the API and start it against a database without `99_future`. Use a fresh copy of the dev database, or the dev database itself: drop the `DATABASE_PATH=…` prefix so the value sourced from `.env` applies.
+2. **Pass:** within about 3 s (the WebSocket retry interval) the notice is replaced by the login page. This happens even with a saved session: while the database was incompatible, the router turned every navigation into `/auth`. The token is kept, so you can sign in or go straight to `/`.
+3. **Fail:** the notice persists after the reconnect.
+
+### 14. Branch switch: unknown and pending migrations
+
+`database.integration.test.ts` covers this case. To stage it by hand, repeat the preconditions with a copy of a database that is one or more migrations **behind** this build (for example, an old `~/.config/astrosserver/database.sqlite3`), plus `99_future`.
+
+**Pass:** cases 9 and 12 hold exactly as above. Nothing is applied and no `.backup-*` file appears, even though this build has migrations the database lacks.
+**Fail:** any `Created pre-migration backup` or `migration "…" was executed` line, or `MIGRATION_FAILED_RESTORED` instead of `DB_NEWER_THAN_SERVER`.
+
 ## Storybook spot-check
 
-Run `cd astros_vue && npm run storybook`. Navigate to "Components / Common / SystemStatusBanner". Verify each story renders without console errors:
+Run `cd astros_vue && npm run storybook`. Navigate to "Components / Common / AstrosSystemStatusBanner". Verify each story renders without console errors:
 
 - `Hidden` — no banner visible, only the placeholder text.
-- `StartupOpenFailed`, `BackupFailed`, `MigrationFailedNoBackup`, `MigrationFailedRestored`, `MigrationFailedRestoreFailed` — each shows the banner with the corresponding localized message.
+- `StartupOpenFailed`, `BackupFailed`, `MigrationFailedNoBackup`, `MigrationFailedRestored`, `MigrationFailedRestoreFailed`, `DbNewerThanServer` — each shows the banner with the corresponding localized message.
 - `UnknownReasonCode`, `NoReasonCode` — both show the UNKNOWN fallback.
+
+Then open "Components / Common / AstrosIncompatibleDatabaseNotice" → `Default`: the notice card renders over the schematic, with the title, message and action line, and with nothing to click.

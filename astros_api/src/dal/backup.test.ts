@@ -15,6 +15,7 @@ import { createKyselyConnection, migrateToLatest } from './database.js';
 import {
   checkPendingMigrations,
   compareMigrationNames,
+  findUnknownAppliedMigrations,
   getLastAppliedMigrationName,
   createBackup,
   pruneOldBackups,
@@ -64,6 +65,100 @@ describe('backup module', () => {
 
       const pending = await checkPendingMigrations(db, provider);
       expect(pending).toEqual([]);
+
+      await db.destroy();
+    });
+  });
+
+  describe('findUnknownAppliedMigrations', () => {
+    const noop: Migration = {
+      async up() {
+        return;
+      },
+    };
+    const knownProvider: MigrationProvider = new (class implements MigrationProvider {
+      async getMigrations(): Promise<Record<string, Migration>> {
+        return { '0_initial': noop, '2_second': noop, '10_late_addition': noop };
+      }
+    })();
+
+    // Seeds kysely_migration by hand so the applied set is exactly `names`.
+    // migrateToLatest would apply the full production provider instead.
+    function connectionWithApplied(names: string[]) {
+      const conn = createKyselyConnection();
+      conn.raw
+        .prepare('CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT NOT NULL)')
+        .run();
+      const insertMig = conn.raw.prepare('INSERT INTO kysely_migration VALUES (?, ?)');
+      for (const name of names) insertMig.run(name, '2026-10-22T00:00:00.000Z');
+      return conn;
+    }
+
+    it('findUnknownAppliedMigrations returns [] when there is no migration table', async () => {
+      const { db } = createKyselyConnection();
+
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual([]);
+
+      await db.destroy();
+    });
+
+    it('returns [] when every applied migration is known', async () => {
+      const { db } = connectionWithApplied(['0_initial', '2_second', '10_late_addition']);
+
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual([]);
+
+      await db.destroy();
+    });
+
+    it("returns ['99_future'] when the database has an extra applied migration", async () => {
+      const { db } = connectionWithApplied([
+        '0_initial',
+        '2_second',
+        '10_late_addition',
+        '99_future',
+      ]);
+
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual(['99_future']);
+
+      await db.destroy();
+    });
+
+    it('returns several unknown names in numeric-prefix order', async () => {
+      // Inserted out of order; plain .sort() would put '100_' before '99_'.
+      const { db } = connectionWithApplied(['0_initial', '100_later', '99_future']);
+
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual([
+        '99_future',
+        '100_later',
+      ]);
+
+      await db.destroy();
+    });
+
+    it('flags a sibling branch migration that shares a known number', async () => {
+      // The real branch switch: both branches added their own `2_*`. Detection
+      // must compare names, not numeric prefixes.
+      const { db } = connectionWithApplied(['0_initial', '2_second', '2_sibling_branch']);
+
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual(['2_sibling_branch']);
+
+      await db.destroy();
+    });
+
+    it('returns [] when the migration table exists but is empty', async () => {
+      // Kysely creates the table before running 0_initial, so a failed first
+      // migration leaves it empty.
+      const { db } = connectionWithApplied([]);
+
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual([]);
+
+      await db.destroy();
+    });
+
+    it('ignores pending (known, unapplied) migrations', async () => {
+      const { db } = connectionWithApplied(['0_initial']);
+
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual([]);
 
       await db.destroy();
     });

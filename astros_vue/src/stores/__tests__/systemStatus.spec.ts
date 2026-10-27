@@ -72,6 +72,40 @@ describe('systemStatus store', () => {
     });
   });
 
+  describe('dbIncompatible', () => {
+    it('dbIncompatible is true only for DB_NEWER_THAN_SERVER', () => {
+      const store = useSystemStatusStore();
+      expect(store.dbIncompatible).toBe(false);
+
+      store.setStatus({ readOnly: true, reasonCode: 'MIGRATION_FAILED_RESTORED' });
+      expect(store.dbIncompatible).toBe(false);
+
+      store.setStatus({ readOnly: true, reasonCode: 'DB_NEWER_THAN_SERVER' });
+      expect(store.dbIncompatible).toBe(true);
+    });
+
+    it.each([
+      'STARTUP_OPEN_FAILED',
+      'BACKUP_FAILED',
+      'MIGRATION_FAILED_NO_BACKUP',
+      'MIGRATION_FAILED_RESTORED',
+      'MIGRATION_FAILED_RESTORE_FAILED',
+    ] as const)('dbIncompatible is false for %s', (reasonCode) => {
+      const store = useSystemStatusStore();
+      store.setStatus({ readOnly: true, reasonCode });
+      expect(store.dbIncompatible).toBe(false);
+    });
+
+    it('dbIncompatible is false when readOnly is false', () => {
+      const store = useSystemStatusStore();
+      store.setStatus({ readOnly: true, reasonCode: 'DB_NEWER_THAN_SERVER' });
+
+      store.setStatus({ readOnly: false, reasonCode: 'DB_NEWER_THAN_SERVER' });
+
+      expect(store.dbIncompatible).toBe(false);
+    });
+  });
+
   describe('fetchStatus', () => {
     it('updates state from a successful GET response', async () => {
       apiGet.mockResolvedValueOnce({

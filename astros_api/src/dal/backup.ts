@@ -36,40 +36,51 @@ async function getProviderMigrationNames(provider: MigrationProvider): Promise<s
   return Object.keys(map).sort(compareMigrationNames);
 }
 
-export async function checkPendingMigrations(
-  db: Kysely<Database>,
-  provider: MigrationProvider,
-): Promise<string[]> {
-  const all = await getProviderMigrationNames(provider);
-
+// A fresh database has no migration table yet; that reads the same as an
+// empty one for every caller below.
+async function getAppliedMigrationNames(db: Kysely<Database>): Promise<string[]> {
   if (!(await migrationTableExists(db))) {
-    return all;
+    return [];
   }
 
   const result = await sql<{ name: string }>`
     SELECT name FROM ${sql.raw(KYSELY_MIGRATION_TABLE)}
   `.execute(db);
-  const applied = new Set(result.rows.map((r) => r.name));
+  return result.rows.map((r) => r.name);
+}
+
+export async function checkPendingMigrations(
+  db: Kysely<Database>,
+  provider: MigrationProvider,
+): Promise<string[]> {
+  const all = await getProviderMigrationNames(provider);
+  const applied = new Set(await getAppliedMigrationNames(db));
   return all.filter((n) => !applied.has(n));
+}
+
+// Applied migrations this build's provider doesn't know: the database was
+// written by a newer server (or a sibling branch). Performs no writes; names
+// come back in compareMigrationNames order.
+export async function findUnknownAppliedMigrations(
+  db: Kysely<Database>,
+  provider: MigrationProvider,
+): Promise<string[]> {
+  const known = new Set(await getProviderMigrationNames(provider));
+  const applied = await getAppliedMigrationNames(db);
+  return applied.filter((n) => !known.has(n)).sort(compareMigrationNames);
 }
 
 export async function getLastAppliedMigrationName(
   db: Kysely<Database>,
   provider: MigrationProvider,
 ): Promise<string | null> {
-  if (!(await migrationTableExists(db))) {
-    return null;
-  }
-
-  const result = await sql<{ name: string }>`
-    SELECT name FROM ${sql.raw(KYSELY_MIGRATION_TABLE)}
-  `.execute(db);
-  if (result.rows.length === 0) return null;
+  const appliedNames = await getAppliedMigrationNames(db);
+  if (appliedNames.length === 0) return null;
 
   // Provider order is canonical. Kysely's stored timestamp ties at ms resolution
   // when migrations run in quick succession (e.g. fresh DBs in tests).
   const all = await getProviderMigrationNames(provider);
-  const applied = new Set(result.rows.map((r) => r.name));
+  const applied = new Set(appliedNames);
   for (let i = all.length - 1; i >= 0; i--) {
     if (applied.has(all[i])) return all[i];
   }

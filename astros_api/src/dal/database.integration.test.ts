@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -52,6 +53,10 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
 // timeout leaves only ~3.4s of headroom; under full-suite contention that
 // margin disappears and these tests flake on CI. 15s is well above the
 // observed worst case while still failing fast if a real hang regresses in.
+function sha256(file: string): string {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
 describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   let tmpDir: string;
   let dbPath: string;
@@ -314,6 +319,113 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
       SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
     `.execute(db);
     expect(result.rows[0]?.name).toBe('8_fix_script_duration_units');
+  });
+
+  describe('a database written by a newer server', () => {
+    // Migrates a fresh file DB to this build's latest, then records a
+    // migration this build has never heard of — what a newer server leaves.
+    async function seedNewerDatabase(): Promise<void> {
+      await initializeDatabase(new SystemStatus(), { dbPath });
+      await closeDatabaseForTest();
+
+      const sqlite = new SQLite(dbPath);
+      sqlite
+        .prepare('INSERT INTO kysely_migration (name, timestamp) VALUES (?, ?)')
+        .run('99_future', '2026-10-22T00:00:00.000Z');
+      sqlite.close();
+    }
+
+    it('a database with an unknown applied migration enters DB_NEWER_THAN_SERVER and is left untouched', async () => {
+      await seedNewerDatabase();
+      const hashBefore = sha256(dbPath);
+      const filesBefore = fs.readdirSync(tmpDir).sort();
+
+      const status = new SystemStatus();
+      await initializeDatabase(status, { dbPath });
+      await closeDatabaseForTest();
+
+      expect(status.getState().reasonCode).toBe('DB_NEWER_THAN_SERVER');
+      expect(sha256(dbPath)).toBe(hashBefore);
+      // Exact listing: catches a backup file and any journal/WAL left behind.
+      expect(fs.readdirSync(tmpDir).sort()).toEqual(filesBefore);
+    });
+
+    it('a newer database with a pending migration is incompatible and nothing is applied', async () => {
+      // Branch switch: the DB has a sibling branch's migration AND this build
+      // has one the DB lacks. The unknown check must win before any backup.
+      await seedNewerDatabase();
+      const hashBefore = sha256(dbPath);
+      const filesBefore = fs.readdirSync(tmpDir).sort();
+
+      __setMigrationProviderForTest(
+        buildProvider({
+          '9_pending': {
+            async up(db) {
+              await db.schema.createTable('pending_table').addColumn('id', 'integer').execute();
+            },
+            async down() {
+              return;
+            },
+          },
+        }),
+      );
+
+      const status = new SystemStatus();
+      await initializeDatabase(status, { dbPath });
+      await closeDatabaseForTest();
+
+      expect(status.getState().reasonCode).toBe('DB_NEWER_THAN_SERVER');
+      expect(sha256(dbPath)).toBe(hashBefore);
+      expect(fs.readdirSync(tmpDir).sort()).toEqual(filesBefore);
+    });
+
+    it('a fresh database is not flagged', async () => {
+      const status = new SystemStatus();
+      await initializeDatabase(status, { dbPath });
+
+      expect(status.getState().readOnly).toBe(false);
+    });
+
+    it("a database at exactly this build's migrations is not flagged", async () => {
+      await initializeDatabase(new SystemStatus(), { dbPath });
+      await closeDatabaseForTest();
+
+      const status = new SystemStatus();
+      await initializeDatabase(status, { dbPath });
+
+      expect(status.getState().readOnly).toBe(false);
+    });
+
+    it('the incompatible connection refuses writes', async () => {
+      // Defense in depth behind the HTTP guard, the serial skip and the WS
+      // drop: SQLite itself rejects a write that reaches the connection.
+      await seedNewerDatabase();
+      const hashBefore = sha256(dbPath);
+
+      const db = await initializeDatabase(new SystemStatus(), { dbPath });
+      await expect(
+        sql`INSERT INTO kysely_migration (name, timestamp) VALUES ('100_sneaky', 'x')`.execute(db),
+      ).rejects.toThrow(/readonly/i);
+      await closeDatabaseForTest();
+
+      expect(sha256(dbPath)).toBe(hashBefore);
+    });
+  });
+
+  it('a file that opens but fails inspection → STARTUP_OPEN_FAILED, left untouched', async () => {
+    // Not a SQLite file: the open and pragma succeed, the first query (the
+    // unknown-migration check) throws. Must degrade, not crash or migrate.
+    fs.writeFileSync(dbPath, Buffer.alloc(4096, 'x'));
+    const hashBefore = sha256(dbPath);
+
+    const status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+
+    expect(status.getState().reasonCode).toBe('STARTUP_OPEN_FAILED');
+    const probe = await sql<{ one: number }>`SELECT 1 AS one`.execute(db);
+    expect(probe.rows).toEqual([{ one: 1 }]);
+    expect(sha256(dbPath)).toBe(hashBefore);
+    expect(fs.readdirSync(tmpDir)).toEqual(['database.sqlite3']);
   });
 
   it('initial open failure → enters read-only with STARTUP_OPEN_FAILED and returns a usable in-memory db', async () => {

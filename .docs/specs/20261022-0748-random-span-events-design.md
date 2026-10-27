@@ -253,7 +253,7 @@ This is a standalone task that **merges to develop before `migration_9` exists a
 - This builds on the existing read-only machinery (`SystemStatus`, `write_guard.ts`, `GET /api/system/status`, the `systemStatus` Pinia store, which `App.vue` already fetches on load).
 - It is **stricter than read-only (my call):**
   - Every API route except `GET /api/system/status` returns 503 with the reason code. That includes the GET routes and login.
-  - The serial worker and animation queue are not started, so the server never talks to the hardware.
+  - The serial worker and animation queue are not started, so the server never talks to the hardware. *(As built in T-006: the serial worker is not started; the animation queue is still constructed, because the panic-state snapshot reads it, but nothing can enqueue. The connection is also set to `query_only`, so SQLite refuses any write.)*
   - Existing read-only mode, for migration failures, keeps its current, looser behavior.
 
 ### Page

@@ -85,7 +85,7 @@ On `develop` before this fix, **Confirm did nothing** in both flows. The bug was
 
 ### Setup
 
-To force `systemStatus.readOnly = true` locally, the easiest path is to corrupt the migration sequence or use the integration test harness. For a quick manual flip:
+To force `systemStatus.readOnly = true` locally, the easiest path is to corrupt the migration sequence or use the integration test harness. (An *extra* applied migration now enters `DB_NEWER_THAN_SERVER`, which shows the incompatible-database notice instead of the UI under test. Inject a migration that fails instead.) For a quick manual flip:
 
 ```bash
 # Patch the systemStatus state via the API server's internal call (requires running tsx with debugging)

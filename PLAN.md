@@ -5,10 +5,10 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
-Now:     — (unblocked: AstrOs.ESP T-007 + T-008 merged 2026-10-22/23, PRs #62/#63; server T-006 is next)
-Next:    agreed order (2026-10-22): ESP T-007 + T-008 → server T-006 → T-007 → T-008 (T-006 must merge before `migration_9` exists anywhere) → ESP T-009 bench (spans inserted by SQL) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
+Now:     T-006 done on `feature/T-006-refuse-newer-database` (pre-push review addressed, QA walk 2026-10-25 passed) — awaiting push + PR to develop
+Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 (PR) → T-007 → T-008 (T-006 must merge before `migration_9` exists anywhere) → ESP T-009 bench (spans inserted by SQL) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
 Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
-Last:    2026-10-22 — random span events design approved (`.docs/specs/20261022-0748-random-span-events-design.md`); develop at `1.0.3-dev.0` (#133 merged)
+Last:    2026-10-23 — T-006 implemented and reviewed (incompatible-database refusal); develop at `1.0.3-dev.0` (#133 merged)
 
 ## Random span events
 
@@ -16,7 +16,7 @@ Spec: `.docs/specs/20261022-0748-random-span-events-design.md` · wire format: `
 
 Phase A — database guard + span data and conversion
 
-- [ ] T-006 — Refuse a database written by a newer server (`.docs/tasks/T-006-refuse-newer-database.md`) — merges before T-007
+- [x] T-006 — Refuse a database written by a newer server (`.docs/tasks/completed/T-006-refuse-newer-database.md`, branch `feature/T-006-refuse-newer-database`; bench-verified 2026-10-23, cases 9–14) — merges before T-007
 - [ ] T-007 — Persist random span events (`.docs/tasks/T-007-persist-random-span-events.md`)
 - [ ] T-008 — Convert random spans to ESP commands 6 and 7 (`.docs/tasks/T-008-convert-random-spans.md`)
 
@@ -118,7 +118,7 @@ From the T-004 planning (2026-09-27, script duration units):
 - `copyScript` calls `updateScriptDuration` right before `upsertScript`, which recalculates unconditionally — dead call
 - Branded time units for the script-length chain (T-004 type review): a `units.ts` with `secondsToDs`/`dsToMs` as the only constructors replacing the inline scale sites (`saveScriptEvent` ×10, `readScriptEvents` ÷10, `calculateLengthDS`, `dsToMs`, `script_converter.ts` in-place `evt.time * 1000`), then brand `ScriptEvent.time: Seconds`, `duration_ds`/`durationDS: Deciseconds`, `QueueTrack.duration`/`shuffleWait*: Milliseconds`, plus a lint rule banning `as Seconds|Deciseconds|Milliseconds` outside `units.ts`. A strict-`tsc` sketch showed the original `calculateLengthDS` bug becomes a compile error. Meanwhile, one-line unit JSDoc on those fields
 - Boot-time duration consistency check: `duration_ds` is a cached copy of `MAX(script_events.time)`, and nothing re-derives it after migration 8 — a downgrade + re-save + re-upgrade (or any out-of-band write) leaves rows in seconds forever. Recompute or warn at boot on `duration_ds != COALESCE(MAX(time), 0)`, or have `getScriptDurationsDS` derive it from `script_events`
-- `initializeDatabase` doesn't detect a DB that is *ahead* of the code (applied migrations the build doesn't know): with nothing pending it returns early and Kysely's missing-migration check never runs, so a downgraded build boots silently — log an error or go read-only
+- ~~`initializeDatabase` doesn't detect a DB that is *ahead* of the code~~ → resolved by T-006 (`DB_NEWER_THAN_SERVER`) for builds from T-006 on; older builds stay unprotected
 - `write_guard.ts` `BLOCKED_GET_PATHS` blocks `/scripts/run` and `/playlists/run` but not `GET /remotecontrol`, which calls the same `runScript`/`runPlaylist` — in read-only mode the remote can still dispatch
 - `database.integration.test.ts` failure-path tests assert only the `reasonCode`, not *why* the migration failed — a production migration missing from `buildProvider` makes them pass on "corrupted migrations" (T-004 hit exactly this); assert the logged cause or add a guard that `buildProvider` matches the production list
 - `upsertScript` insert path stores the client's `lastSaved` (`new Date(script.lastSaved).getTime()`) while the update path uses `Date.now()`; the scripter seeds new scripts with `1970-01-01`, so a script saved once shows `last_modified = 0` (seen on the T-004 bench) — use `Date.now()` on insert too
@@ -130,6 +130,18 @@ From the random span events design (2026-10-22):
   - What happens: any throw inside `ScriptConverter.convertScript` (missing GPIO channel, missing UART/I2C module, Maestro channel < 0) returns an empty map. `uploadScript` only logs it, and `createScriptUpload` sends `''` to every controller, overwriting their stored scripts. The route returns 200, so the UI shows success.
   - Fix: fail the upload visibly, or skip only the bad event (T-008 does the latter for random spans only).
 - **`.docs/protocol.md` copies have drifted between repos.** The OTA sections differ: master self-flash `FW_PROGRESS` rows on the Server side, `OTA_FLASH_RESULT` on the ESP side. § C was added identically to both on 2026-10-22, but the rest needs reconciling to one text.
+
+From the T-006 implementation (2026-10-23):
+
+- **`npm run start:tsx` never reads `astros_api/.env`.** Under `tsx`, both dotenv calls (`api_server.ts` constructor and `dal/database.ts`) resolve to `src/.env`, which doesn't exist. Only `postbuild` copies `.env` to `dist/`. `DATABASE_PATH` falls back to `~/.config/astrosserver`, and `Init()` runs `initializeDatabase` *before* `configApi()` throws on the missing `JWT_KEY` — so a failed dev boot can back up and migrate that database. Workaround: `set -a && . ./.env && set +a` first (now in `.docs/qa/system-readonly-mode.md`).
+- **Router guard turns any failed `check-session` into `/auth`** (network error, 5xx). `DB_NEWER_THAN_SERVER` is the only mode in which it 503s (GETs pass in the five plain read-only modes), so while the database is incompatible every fresh navigation becomes `/auth`, and after recovery a user with a valid token lands on the login page. The cost is small, since recovery means reinstalling. Possible fix: the guard skips the redirect on a 503 that carries `reasonCode`.
+
+From the T-006 pre-push review (2026-10-23):
+
+- **Serial-originated writes bypass the HTTP write guard in the five plain read-only modes.** Registration sync (`handleResgistraionResponse` → `insertControllers`) and similar worker callbacks write the DB without passing `writeGuard`, so a `MIGRATION_FAILED_NO_BACKUP` database can still be written. `DB_NEWER_THAN_SERVER` avoids it only because serial is skipped and the connection is `query_only`. Consider `query_only` (or a write gate in the serial handlers) for every read-only code.
+- **pino-http logs every guard 503 at error level, with no reason.** In any read-only mode each page load writes several `… 503 - failed with status code 503` error lines; after pino-roll's 10 daily files the one `Entering read-only mode (…)` line that explains them is gone. Set `res.locals.reasonCode` in the guard, surface it via `customProps`, and log guard 503s at `warn`.
+- **`STARTUP_OPEN_FAILED` catch leaks the file handle.** When the open succeeds but inspection throws (now covered by a test), the catch swaps in `:memory:` without closing the file connection, and logs "Could not open database" although it opened. Close `conn.raw` first; say "open or inspect".
+- **Uploads stream to `tmpdir()` before the guard rejects them.** The path-scoped `fileUpload` mounts for `/api/firmware/upload` and `/api/audio/savefile` run before `writeGuard`, so a blocked upload (any read-only mode, 423, or 401) can leave up to 50 MB in the temp directory. Mount `writeGuard` on `/api` before them.
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
@@ -143,6 +155,13 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-10-23 T-006 — refuse a database written by a newer server
+  - a build that finds applied migrations its provider doesn't know enters `DB_NEWER_THAN_SERVER` before the pending check: no backup, migrate or prune, and the connection is `query_only`. Every `/api` route but `GET /system/status` answers 503, serial setup is skipped, WS client messages are dropped (one warning per connection), and the Vue app replaces the router view with a notice page (focus on its heading, no toasts)
+  - the branch-switch RED showed the old behavior: a newer-and-pending DB was backed up, failed Kysely's corrupted-migrations check and was restored over (`MIGRATION_FAILED_RESTORED`); the `query_only` RED showed an INSERT going straight through the incompatible connection
+  - reviews mattered: the App test set the flag before mount on a plain object, so a lost-reactivity regression passed (fixing it exposed earlier tests' Apps still mounted — `enableAutoUnmount`); the boot byte-identical test couldn't fail until it sent an authenticated write; the banner allowlist and locale keys are now checked by `vue-tsc`
+  - QA walk with Jeff (2026-10-25): cases 9–14 pass, an open tab flips to the notice by itself; copy reworded so it no longer presumes a newer server ("the database version is newer than this server supports", "Update AstrOs Server…"), with the 503 message and log lines aligned
+  - bench (dev machine): cases 9–14 on copies of `.data` (newer-only) and the stale `~/.config` DB at `7_` (branch switch); `start:tsx` needs `.env` exported first (Backlog). Backlog also gained four pre-existing gaps the review found, notably serial-originated writes bypassing the HTTP guard in the plain read-only modes
 
 - 2026-09-28 release 1.0.2
   - develop → main via PR #131 (T-003, T-004, T-005); `dev-build.yml` bumped main to `1.0.2-dev.1`; main → release via prep-branch PR #132 (the five version-line conflicts kept to main's side, tree identical to main); `release-build.yml` stripped `1.0.2-dev.1` → `1.0.2` and pushed `astros-server:1.0.2` / `:latest`

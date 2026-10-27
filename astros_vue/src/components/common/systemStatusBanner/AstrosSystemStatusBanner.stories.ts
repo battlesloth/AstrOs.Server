@@ -54,6 +54,10 @@ export const BackupFailed = makeStory('BACKUP_FAILED');
 export const MigrationFailedNoBackup = makeStory('MIGRATION_FAILED_NO_BACKUP');
 export const MigrationFailedRestored = makeStory('MIGRATION_FAILED_RESTORED');
 export const MigrationFailedRestoreFailed = makeStory('MIGRATION_FAILED_RESTORE_FAILED');
+// App.vue shows the incompatible-database notice instead of any page with this
+// banner; the story shows the localized copy should the banner ever see the
+// code (the banner spec pins it).
+export const DbNewerThanServer = makeStory('DB_NEWER_THAN_SERVER');
 
 // Future-proofing: simulates a server reasonCode the client doesn't recognize.
 // The banner should still render with the UNKNOWN fallback message instead of
