@@ -309,6 +309,7 @@ export class ScriptConverter {
       moduleType: ModuleType.none,
       moduleSubType: ModuleSubType.none,
       time,
+      endTime: null,
       event: undefined,
     };
     map.set(time, new Array<ScriptEvent>());

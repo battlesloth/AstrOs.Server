@@ -17,6 +17,8 @@ import {
   ModuleSubType,
   MaestroEvent,
   GpioEvent,
+  RandomGpioEvent,
+  RandomMaestroEvent,
   UartModule,
   UartChannel,
   HumanCyborgRelationsEvent,
@@ -403,6 +405,7 @@ describe('Script Repository', () => {
       moduleType: ModuleType.gpio,
       moduleSubType: ModuleSubType.genericGpio,
       time: 5.5,
+      endTime: null,
       event: { setHigh: true } as GpioEvent,
     };
 
@@ -510,6 +513,7 @@ describe('Script Repository', () => {
       moduleType: ModuleType.uart,
       moduleSubType: ModuleSubType.maestro,
       time: 2.0,
+      endTime: null,
       event: maestroEvent,
     };
 
@@ -673,6 +677,7 @@ describe('Script Repository', () => {
       moduleType: ModuleType.uart,
       moduleSubType: ModuleSubType.humanCyborgRelationsSerial,
       time: 3.5,
+      endTime: null,
       event: hcrEvent,
     };
 
@@ -1067,6 +1072,7 @@ describe('Script Repository', () => {
             moduleType: ModuleType.gpio,
             moduleSubType: ModuleSubType.genericGpio,
             time: 45,
+            endTime: null,
             event: { setHigh: true } as GpioEvent,
           },
         },
@@ -1218,6 +1224,390 @@ describe('Script Repository', () => {
       } finally {
         warnSpy.mockRestore();
       }
+    });
+  });
+
+  describe('random span events', () => {
+    const maestroChannelNumber = 5;
+
+    async function seedMaestroChannel(): Promise<{ moduleId: string; channel: MaestroChannel }> {
+      const moduleId = uuid();
+      const channel = new MaestroChannel(
+        uuid(),
+        moduleId,
+        'Servo Channel 5',
+        true,
+        maestroChannelNumber,
+        true, // isServo
+        500,
+        2500,
+        1500,
+        false,
+      );
+      const maestroModule: MaestroModule = {
+        boards: [
+          {
+            id: moduleId,
+            parentId: locationId,
+            boardId: 0,
+            name: 'Test Board',
+            channelCount: 24,
+            channels: [channel],
+          },
+        ],
+      };
+      const uartModule = new UartModule(
+        0,
+        moduleId,
+        'Test Maestro',
+        locationId,
+        ModuleSubType.maestro,
+        0,
+        9600,
+      );
+      uartModule.subModule = maestroModule;
+      await db.transaction().execute(async (trx) => {
+        await upsertUartModules(trx, [uartModule]);
+      });
+      return { moduleId, channel };
+    }
+
+    async function seedGpioChannel(): Promise<GpioChannel> {
+      const gpioModule = new GpioModule(locationId);
+      const channel = new GpioChannel(uuid(), locationId, 0, true, 'Test GPIO', false);
+      gpioModule.channels.push(channel);
+      await upsertGpioModule(db, gpioModule);
+      return channel;
+    }
+
+    function scriptWith(scriptChannel: ScriptChannel, evt: ScriptEvent): Script {
+      scriptChannel.events[evt.id] = evt;
+      return {
+        id: scriptChannel.scriptId,
+        scriptName: 'Span Test Script',
+        description: '',
+        lastSaved: new Date(Date.now()),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [scriptChannel],
+      };
+    }
+
+    function gpioScriptChannel(scriptId: string, channel: GpioChannel): ScriptChannel {
+      return {
+        id: uuid(),
+        scriptId,
+        channelType: ScriptChannelType.GPIO,
+        parentModuleId: locationId,
+        moduleChannelId: channel.id,
+        moduleChannelType: ModuleChannelTypes.GpioChannel,
+        moduleChannel: channel,
+        maxDuration: 0,
+        events: {},
+      };
+    }
+
+    async function storedRow(eventId: string) {
+      return db
+        .selectFrom('script_events')
+        .select(['time', 'end_time', 'data'])
+        .where('id', '=', eventId)
+        .executeTakeFirstOrThrow();
+    }
+
+    it('round-trips a random maestro span', async () => {
+      const { moduleId, channel } = await seedMaestroChannel();
+      const scriptId = uuid();
+      const scriptChannel: ScriptChannel = {
+        id: uuid(),
+        scriptId,
+        channelType: ScriptChannelType.SERVO,
+        parentModuleId: moduleId,
+        moduleChannelId: channel.id,
+        moduleChannelType: ModuleChannelTypes.MaestroChannel,
+        moduleChannel: channel,
+        maxDuration: 0,
+        events: {},
+      };
+      const payload: RandomMaestroEvent = {
+        channel: -1,
+        isServo: true,
+        minGapMs: 400,
+        maxGapMs: 2000,
+        minPos: 20,
+        maxPos: 100,
+        minMove: 15,
+        maxMove: 60,
+        speed: 0,
+        acceleration: 0,
+      };
+      const evt: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptChannel.id,
+        moduleType: ModuleType.uart,
+        moduleSubType: ModuleSubType.maestro,
+        time: 2.0,
+        endTime: 18.5,
+        // A copy: the repository overwrites channel on the object it saves.
+        event: { ...payload },
+      };
+
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, evt));
+
+      expect(await storedRow(evt.id)).toMatchObject({ time: 20, end_time: 185 });
+
+      const saved = (await repo.getScript(scriptId)).scriptChannels[0].events[evt.id];
+      expect(saved.time).toBe(2.0);
+      expect(saved.endTime).toBe(18.5);
+      expect(saved.event).toEqual({ ...payload, channel: maestroChannelNumber });
+    });
+
+    it('round-trips a random gpio span with maxMove-free payload', async () => {
+      const channel = await seedGpioChannel();
+      const scriptId = uuid();
+      const scriptChannel = gpioScriptChannel(scriptId, channel);
+      const payload: RandomGpioEvent = { minGapMs: 50, maxGapMs: 400 };
+      const evt: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptChannel.id,
+        moduleType: ModuleType.gpio,
+        moduleSubType: ModuleSubType.genericGpio,
+        time: 0.5,
+        // x10 === 453.00000000000006: stored rounded, like time.
+        endTime: 45.2 + 0.1,
+        event: { ...payload },
+      };
+
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, evt));
+
+      expect(await storedRow(evt.id)).toMatchObject({ time: 5, end_time: 453 });
+
+      const saved = (await repo.getScript(scriptId)).scriptChannels[0].events[evt.id];
+      expect(saved.endTime).toBe(45.3);
+      expect(saved.event).toEqual(payload);
+    });
+
+    it('point events read back endTime null', async () => {
+      const channel = await seedGpioChannel();
+      const scriptId = uuid();
+      const scriptChannel = gpioScriptChannel(scriptId, channel);
+      const evt: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptChannel.id,
+        moduleType: ModuleType.gpio,
+        moduleSubType: ModuleSubType.genericGpio,
+        time: 3.0,
+        endTime: null,
+        event: { setHigh: true } as GpioEvent,
+      };
+
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, evt));
+
+      expect(await storedRow(evt.id)).toEqual({
+        time: 30,
+        end_time: null,
+        data: '{"setHigh":true}',
+      });
+      const saved = (await repo.getScript(scriptId)).scriptChannels[0].events[evt.id];
+      expect(saved.endTime).toBeNull();
+      expect(saved.event).toEqual({ setHigh: true });
+    });
+
+    // A client that predates endTime (or any JSON body that omits it) must
+    // still save a point event, not undefined * 10 = NaN.
+    it('an event object without an endTime property is stored as NULL and reads back null', async () => {
+      const channel = await seedGpioChannel();
+      const scriptId = uuid();
+      const scriptChannel = gpioScriptChannel(scriptId, channel);
+      const evt: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptChannel.id,
+        moduleType: ModuleType.gpio,
+        moduleSubType: ModuleSubType.genericGpio,
+        time: 1.5,
+        endTime: null,
+        event: { setHigh: false } as GpioEvent,
+      };
+      delete (evt as Partial<ScriptEvent>).endTime;
+      expect('endTime' in evt).toBe(false);
+
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, evt));
+
+      expect((await storedRow(evt.id)).end_time).toBeNull();
+      const saved = (await repo.getScript(scriptId)).scriptChannels[0].events[evt.id];
+      expect(saved.endTime).toBeNull();
+    });
+
+    // BACKUP_FAILED and the MIGRATION_FAILED_* modes skip or undo migration 9
+    // but still serve reads, so the table may have no end_time column: those
+    // rows are point events, not spans.
+    it('reads rows from a table without end_time as point events', async () => {
+      const channel = await seedGpioChannel();
+      const scriptId = uuid();
+      const scriptChannel = gpioScriptChannel(scriptId, channel);
+      const gpioEvt: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptChannel.id,
+        moduleType: ModuleType.gpio,
+        moduleSubType: ModuleSubType.genericGpio,
+        time: 2.5,
+        endTime: null,
+        event: { setHigh: true } as GpioEvent,
+      };
+      const serialEvt: ScriptEvent = {
+        ...gpioEvt,
+        id: uuid(),
+        time: 4.0,
+        event: { setHigh: false } as GpioEvent,
+      };
+      scriptChannel.events[serialEvt.id] = serialEvt;
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, gpioEvt));
+      // The row's sub-type drives the parser: a serial row has no span payload.
+      await db
+        .updateTable('script_events')
+        .set({ module_sub_type: ModuleSubType.genericSerial, data: '{"value":"hi"}' })
+        .where('id', '=', serialEvt.id)
+        .execute();
+      await db.schema.alterTable('script_events').dropColumn('end_time').execute();
+
+      const events = (await repo.getScript(scriptId)).scriptChannels[0].events;
+      expect(events[gpioEvt.id].endTime).toBeNull();
+      expect(events[gpioEvt.id].event).toEqual({ setHigh: true });
+      expect(events[serialEvt.id].endTime).toBeNull();
+      expect(events[serialEvt.id].event).toEqual({ value: 'hi' });
+    });
+
+    // A span on a sub-type with no span payload (serial here) is refused on
+    // save and dropped on load (Jeff, 2026-10-27).
+    async function seedSerialScriptChannel(scriptId: string): Promise<ScriptChannel> {
+      const moduleId = uuid();
+      // For generic UART channels, the channel ID is the same as the module ID.
+      const channel = new UartChannel(
+        moduleId,
+        moduleId,
+        'Serial 1',
+        ModuleSubType.genericSerial,
+        true,
+      );
+      const uartModule = new UartModule(
+        0,
+        moduleId,
+        'Test Serial',
+        locationId,
+        ModuleSubType.genericSerial,
+        0,
+        9600,
+      );
+      await db.transaction().execute(async (trx) => {
+        await upsertUartModules(trx, [uartModule]);
+      });
+      return {
+        id: uuid(),
+        scriptId,
+        channelType: ScriptChannelType.GENERIC_UART,
+        parentModuleId: moduleId,
+        moduleChannelId: moduleId,
+        moduleChannelType: ModuleChannelTypes.UartChannel,
+        moduleChannel: channel,
+        maxDuration: 0,
+        events: {},
+      };
+    }
+
+    function serialEvent(scriptChannel: ScriptChannel, time: number, endTime: number | null) {
+      const evt: ScriptEvent = {
+        id: uuid(),
+        scriptChannel: scriptChannel.id,
+        moduleType: ModuleType.uart,
+        moduleSubType: ModuleSubType.genericSerial,
+        time,
+        endTime,
+        event: { value: `at ${time}` },
+      };
+      return evt;
+    }
+
+    async function storedRowsOf(scriptId: string) {
+      return db
+        .selectFrom('script_events')
+        .select(['id', 'end_time'])
+        .where('script_id', '=', scriptId)
+        .execute();
+    }
+
+    it('saving a span on a sub-type without a span payload is refused and keeps the stored script', async () => {
+      const scriptId = uuid();
+      const scriptChannel = await seedSerialScriptChannel(scriptId);
+      const point = serialEvent(scriptChannel, 1.0, null);
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, point));
+
+      const span = serialEvent(scriptChannel, 2.0, 5.0);
+      scriptChannel.events[span.id] = span;
+      await expect(repo.upsertScript(scriptWith(scriptChannel, point))).rejects.toThrow(
+        `Random span not supported for moduleSubType: ${ModuleSubType.genericSerial}`,
+      );
+
+      expect(await storedRowsOf(scriptId)).toEqual([{ id: point.id, end_time: null }]);
+    });
+
+    // The refusal applies to spans only: a client that omits endTime saves
+    // serial point events as before.
+    it('a serial point event without an endTime property is not refused', async () => {
+      const scriptId = uuid();
+      const scriptChannel = await seedSerialScriptChannel(scriptId);
+      const point = serialEvent(scriptChannel, 1.0, null);
+      delete (point as Partial<ScriptEvent>).endTime;
+
+      await new ScriptRepository(db).upsertScript(scriptWith(scriptChannel, point));
+
+      expect(await storedRowsOf(scriptId)).toEqual([{ id: point.id, end_time: null }]);
+    });
+
+    // Seeds a saved serial script, then turns one of its rows into a span by
+    // hand, which the API cannot do.
+    async function seedHandCodedSerialSpan() {
+      const scriptId = uuid();
+      const scriptChannel = await seedSerialScriptChannel(scriptId);
+      const kept = serialEvent(scriptChannel, 1.0, null);
+      const handCoded = serialEvent(scriptChannel, 3.0, null);
+      scriptChannel.events[handCoded.id] = handCoded;
+      const repo = new ScriptRepository(db);
+      await repo.upsertScript(scriptWith(scriptChannel, kept));
+      await db
+        .updateTable('script_events')
+        .set({ end_time: 80 })
+        .where('id', '=', handCoded.id)
+        .execute();
+      return { repo, scriptId, keptId: kept.id, handCodedId: handCoded.id };
+    }
+
+    it('a hand-coded span on a sub-type without a span payload is dropped on load, with a warning', async () => {
+      const { repo, scriptId, keptId, handCodedId } = await seedHandCodedSerialSpan();
+      const warnSpy = vi.spyOn(logger, 'warn');
+
+      try {
+        const events = (await repo.getScript(scriptId)).scriptChannels[0].events;
+
+        expect(Object.keys(events)).toEqual([keptId]);
+        expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(handCodedId));
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('saving the loaded script removes the dropped span row', async () => {
+      const { repo, scriptId, keptId } = await seedHandCodedSerialSpan();
+
+      await repo.upsertScript(await repo.getScript(scriptId));
+
+      expect(await storedRowsOf(scriptId)).toEqual([{ id: keptId, end_time: null }]);
     });
   });
 });

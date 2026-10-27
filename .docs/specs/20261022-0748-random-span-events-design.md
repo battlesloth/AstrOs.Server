@@ -216,6 +216,7 @@ These rules keep the random behavior well defined. They are enforced in the dial
 - `RandomGpioEvent { minGapMs, maxGapMs }`, for ESP GPIO.
 - `RandomMaestroEvent { channel, isServo, minGapMs, maxGapMs, minPos, maxPos, minMove, maxMove: number | null, speed, acceleration }`, for Maestro servo and digital channels. When `isServo` is false, the position-range, move, speed and acceleration fields are unused.
   - The repository's existing rule that overwrites `channel` with the module channel number on save (`script_repository.ts` ~:364) must cover this type as well.
+- **Spans only on GPIO and Maestro channels (Jeff, 2026-10-27, during T-007).** The server never saves a span on any other sub-type: the save fails. A span on another sub-type that was coded by hand is removed when the script loads (with a warning in the log), so neither the scripter nor the converter sees it, and the scripter's next save deletes the row.
 
 **Older server builds on a newer database** are handled by the pre-task below, not by sentinel fields in the payload **(Jeff)**.
 

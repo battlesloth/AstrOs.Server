@@ -69,7 +69,7 @@ export function randomSpanProblems(
     - `randomGpioAsString(evt: RandomGpioEvent, gpioChannel: number, spanMs: number, next: number): string`, or
     - `randomMaestroAsString(evt: RandomMaestroEvent, uart: IUartValues, spanMs: number, next: number): string`
   - **On a missing lookup or any problem**, it `logger.warn`s `ScriptConverter: skipping random span <evt.id> on channel <evt.scriptChannel>: <problems joined>`. It then returns `noneAsString(next)`, i.e. `0|<next>|0;`, so the delay chain is unchanged.
-  - A span on any other sub-type takes the same skip path.
+  - A span on any other sub-type takes the same skip path. (Amended 2026-10-27, Jeff, during T-007: the repository refuses to save such a span and drops one it finds on load with a warning, so `getScript` never hands one to the converter. This skip stays as defense in depth; a converter test can only reach it with a hand-built `ScriptEvent`.)
   - It never throws.
 - **Delta format:** `toMsStr` is used for every delta and span value.
 

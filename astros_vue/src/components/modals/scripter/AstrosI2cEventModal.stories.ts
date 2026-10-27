@@ -52,6 +52,7 @@ function getScriptEvent(undefinedEvt = false): ScriptEvent {
     moduleType: ModuleType.I2C,
     moduleSubType: ModuleSubType.GENERIC_I2C,
     time: 5000,
+    endTime: null,
     event: undefinedEvt ? undefined : i2cEvent,
   };
 }

@@ -56,6 +56,7 @@ function getScriptEvent(undefinedEvt = false): ScriptEvent {
     moduleType: ModuleType.UART,
     moduleSubType: ModuleSubType.HUMAN_CYBORG_RELATIONS_SERIAL,
     time: 3000,
+    endTime: null,
     event: undefinedEvt ? undefined : getHcrEvents(),
   };
 }

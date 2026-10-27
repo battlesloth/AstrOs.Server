@@ -22,6 +22,7 @@ import {
   migration_6,
   migration_7,
   migration_8,
+  migration_9,
 } from './migrations/index.js';
 
 // Mirrors the production provider so injected test migrations layer on top of
@@ -42,10 +43,15 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
         '6_add_foreign_keys': migration_6,
         '7_rename_remote_config_key': migration_7,
         '8_fix_script_duration_units': migration_8,
+        '9_add_script_event_end_time': migration_9,
         ...extra,
       };
     }
   })();
+}
+
+function sha256(file: string): string {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
 // Each test deliberately drives a real SQLite migration + backup/restore
@@ -53,10 +59,6 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
 // timeout leaves only ~3.4s of headroom; under full-suite contention that
 // margin disappears and these tests flake on CI. 15s is well above the
 // observed worst case while still failing fast if a real hang regresses in.
-function sha256(file: string): string {
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-}
-
 describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   let tmpDir: string;
   let dbPath: string;
@@ -129,7 +131,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     const backupFiles = fs
       .readdirSync(tmpDir)
       .filter((f) => f.startsWith('database.sqlite3.backup-'));
-    expect(backupFiles).toEqual(['database.sqlite3.backup-8_fix_script_duration_units']);
+    expect(backupFiles).toEqual(['database.sqlite3.backup-9_add_script_event_end_time']);
     expect(status.isReadOnly()).toBe(false);
   });
 
@@ -318,7 +320,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     const result = await sql<{ name: string }>`
       SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
     `.execute(db);
-    expect(result.rows[0]?.name).toBe('8_fix_script_duration_units');
+    expect(result.rows[0]?.name).toBe('9_add_script_event_end_time');
   });
 
   describe('a database written by a newer server', () => {

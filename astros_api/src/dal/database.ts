@@ -24,6 +24,7 @@ import {
   migration_6,
   migration_7,
   migration_8,
+  migration_9,
 } from './migrations/index.js';
 import { SystemStatus } from '../system_status.js';
 import {
@@ -58,6 +59,7 @@ const defaultMigrationProvider: MigrationProvider = new (class implements Migrat
       '6_add_foreign_keys': migration_6,
       '7_rename_remote_config_key': migration_7,
       '8_fix_script_duration_units': migration_8,
+      '9_add_script_event_end_time': migration_9,
     };
   }
 })();

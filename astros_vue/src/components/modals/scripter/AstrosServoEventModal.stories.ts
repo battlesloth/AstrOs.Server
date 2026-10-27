@@ -41,6 +41,7 @@ const createScriptEvent = (
     moduleType: ModuleType.UART,
     moduleSubType: ModuleSubType.MAESTRO,
     time,
+    endTime: null,
     event,
   };
 };

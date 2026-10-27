@@ -89,6 +89,7 @@ function getScriptEvent(type: ModuleSubType, setHigh: boolean, undefinedEvt = fa
     moduleType: modType,
     moduleSubType: type,
     time: 2000,
+    endTime: null,
     event: undefinedEvt ? undefined : evt,
   };
 }

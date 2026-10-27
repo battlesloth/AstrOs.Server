@@ -146,6 +146,7 @@ function addEvent(chId: string, time: number) {
     moduleType: channel.moduleChannel.moduleType,
     moduleSubType: channel.moduleChannel.moduleSubType,
     time: time,
+    endTime: null,
     event: getDefaultScriptEvent(channel.moduleChannel),
   };
 
@@ -248,6 +249,7 @@ function testChannel(chId: string) {
     moduleType: val.moduleType,
     moduleSubType: val.moduleSubType,
     time: 0,
+    endTime: null,
     event: getDefaultScriptEvent(val.moduleChannel),
   };
 

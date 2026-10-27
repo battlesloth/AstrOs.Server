@@ -9,8 +9,10 @@ import {
   ModuleType,
   ModuleSubType,
   moduleSubTypeToScriptEventTypes,
+  supportsRandomSpan,
   ModuleClassType,
   MaestroEvent,
+  RandomMaestroEvent,
   MaestroChannel,
   isLocationName,
 } from 'src/models/index.js';
@@ -362,7 +364,7 @@ export class ScriptRepository {
       // we do this here because the channel can be changed in the UI
       // and it's simpler to do it here than in the UI
       if (ch.moduleChannelType === ModuleChannelTypes.MaestroChannel) {
-        const e = evt.event as MaestroEvent;
+        const e = evt.event as MaestroEvent | RandomMaestroEvent;
         const c = ch.moduleChannel as MaestroChannel;
         e.channel = c.channelNumber;
         evt.event = e;
@@ -470,6 +472,12 @@ export class ScriptRepository {
     channelId: string,
     evt: ScriptEvent,
   ) {
+    if (evt.endTime != null && !supportsRandomSpan(evt.moduleSubType)) {
+      const err = new Error(`Random span not supported for moduleSubType: ${evt.moduleSubType}`);
+      logger.error(`ScriptRepository.saveScriptEvent: refusing event ${evt.id}: ${err.message}`);
+      throw err;
+    }
+
     await tx
       .insertInto('script_events')
       .values({
@@ -479,6 +487,8 @@ export class ScriptRepository {
         module_type: evt.moduleType,
         module_sub_type: evt.moduleSubType,
         time: Math.round(evt.time * 10), // stored as integer scaled storage to 0.1s
+        // == null: a client that omits endTime saves a point event
+        end_time: evt.endTime == null ? null : Math.round(evt.endTime * 10),
         data: JSON.stringify(evt.event),
       })
       .execute()
@@ -511,8 +521,25 @@ export class ScriptRepository {
 
     for (const evt of events) {
       const subtype = evt.module_sub_type !== null ? evt.module_sub_type : ModuleSubType.none;
+      // A table still without end_time (read-only before migration 9 ran)
+      // yields undefined: a point event, like NULL.
+      const endTimeDs = evt.end_time ?? null;
 
-      const scriptEventType = moduleSubTypeToScriptEventTypes(subtype, evt.data);
+      // Only a hand edit can store a span on a sub-type without a span payload
+      // (saveScriptEvent refuses one). Drop it so neither the editor nor the
+      // converter sees it; the editor's next save removes the row.
+      if (endTimeDs !== null && !supportsRandomSpan(subtype)) {
+        logger.warn(
+          `ScriptRepository.readScriptEvents: dropping random span ${evt.id} in script ${scriptId}: moduleSubType ${subtype} has no span payload`,
+        );
+        continue;
+      }
+
+      const scriptEventType = moduleSubTypeToScriptEventTypes(
+        subtype,
+        evt.data,
+        endTimeDs !== null,
+      );
 
       const event: ScriptEvent = {
         id: evt.id,
@@ -520,6 +547,7 @@ export class ScriptRepository {
         moduleType: evt.module_type,
         moduleSubType: subtype,
         time: evt.time / 10, // stored as integer scaled storage to 0.1s
+        endTime: endTimeDs === null ? null : endTimeDs / 10,
         event: scriptEventType,
       };
 

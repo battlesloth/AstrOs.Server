@@ -29,6 +29,7 @@ const createScriptEvent = (time: number = 0, value: string = ''): ScriptEvent =>
     moduleType: ModuleType.UART,
     moduleSubType: ModuleSubType.GENERIC_SERIAL,
     time,
+    endTime: null,
     event: event as ScriptEvent['event'],
   };
 };

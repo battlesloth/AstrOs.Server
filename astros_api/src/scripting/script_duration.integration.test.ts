@@ -72,6 +72,7 @@ describe('script duration units, save → queue', () => {
       moduleType: ModuleType.gpio,
       moduleSubType: ModuleSubType.genericGpio,
       time: 45,
+      endTime: null,
       event: { setHigh: true } as GpioEvent,
     };
 
