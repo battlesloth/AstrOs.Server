@@ -1,6 +1,6 @@
 # T-007: Persist random span events
 
-<!-- File: .docs/tasks/T-007-persist-random-span-events.md. Branch: feature/T-007-persist-random-span-events. PR title: "T-007: Persist random span events". -->
+<!-- File: .docs/tasks/completed/T-007-persist-random-span-events.md. Branch: feature/T-007-persist-random-span-events. PR title: "T-007: Persist random span events". -->
 
 ## Context
 
@@ -157,7 +157,7 @@ Corrected 2026-10-27 (T-007 code review): the backup/restore path does not cover
     - comment and doc drift across the code, QA plan (cases 3, 4, 6, 7), spec, T-008 and PLAN.md (the Kysely ordering item merged into the existing one, 89 log sites, the swap and exposure items, Phase B notes and three open questions).
   - Declined: narrowing `migration_9`'s guard to `pragma_table_info` (a broken view fails every migration anyway, because Kysely's Migrator introspects all tables before running one); a discriminated `ScriptEvent` union (most Phase B sites write through union-typed refs the compiler doesn't check soundly); naming the union's halves; a cross-project payload-type test (no pattern in the repo yet); an `initializeDatabase`-level crash re-run test (the guard mutants are killed at the Migrator level).
   - Mutation checks (pre-push): no transaction in `upsertScript` → strengthened refused-save test; `Math.floor` → below-integer case; duration `!== null` → omitted-`endTime` test; refusal not logged / drop reason removed → log assertions; drop without the point parse → unknown-sub-type test; an injected `9_aa_…` migration that doesn't fail → `buildProvider` guard; the earlier list re-run against the type-predicate refactor, all killed except the known equivalent
-- [ ] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry
+- [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (2026-10-27, before the PR, as T-006 did)
 
 ### Mutation checks
 

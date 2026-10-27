@@ -5,10 +5,10 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
-Now:     T-007 implemented and reviewed on `feature/T-007-persist-random-span-events` (pre-push review fixes, then push + PR)
+Now:     T-007 done on `feature/T-007-persist-random-span-events` (pre-push review addressed) — awaiting push + PR to develop
 Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 → T-008 → ESP T-009 bench (spans inserted by SQL: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))`, or open and save the script once, since `duration_ds` is only recomputed on save) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
 Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
-Last:    2026-10-26 — T-006 merged to develop (PR #134); develop at `1.0.3-dev.0`
+Last:    2026-10-27 — T-007 implemented and reviewed (span data model, migration 9); develop at `1.0.3-dev.0`
 
 ## Random span events
 
@@ -17,7 +17,7 @@ Spec: `.docs/specs/20261022-0748-random-span-events-design.md` · wire format: `
 Phase A — database guard + span data and conversion
 
 - [x] T-006 — Refuse a database written by a newer server (`.docs/tasks/completed/T-006-refuse-newer-database.md`, branch `feature/T-006-refuse-newer-database`; merged 2026-10-26, PR #134; bench-verified 2026-10-23 and QA-walked 2026-10-25, cases 9–14)
-- [ ] T-007 — Persist random span events (`.docs/tasks/T-007-persist-random-span-events.md`)
+- [x] T-007 — Persist random span events (`.docs/tasks/completed/T-007-persist-random-span-events.md`, branch `feature/T-007-persist-random-span-events`; manual check and bench of QA cases 6–7 through the API, 2026-10-27) — ships with T-008
 - [ ] T-008 — Convert random spans to ESP commands 6 and 7 (`.docs/tasks/T-008-convert-random-spans.md`)
 
 Phase B — scripter (decompose at phase start; contracts already pinned by T-007):
@@ -172,6 +172,13 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-10-27 T-007 — persist random span events
+  - `ScriptEvent.endTime` (seconds, `null` for a point) in API and Vue, `RandomGpioEvent` / `RandomMaestroEvent` payloads in the existing `data` JSON, and `migration_9` (`script_events.end_time`, deciseconds); `calculateLengthDS` counts a span at its end, and the Vue converter refuses to convert spans between channel types
+  - Jeff's rule (2026-10-27): spans only on GPIO and Maestro. A save with a span anywhere else fails and rolls back; a hand-coded one is left out on load with a warning, and the editor's next save deletes it. An unknown sub-type or unreadable `data` still fails the read, as for a point row. T-008's skip bullet and the spec record it
+  - reviews mattered: reads against a database still at migration 8 (`BACKUP_FAILED`, a restored failure) treated every row as a span (a serial row threw, a GPIO row read `NaN`) until the read normalized `undefined`; `migration_9.up` was not idempotent, and with Kysely's untransacted SQLite migrations a crash between the `ALTER` and the record would have wedged every later boot; the refused-save test could not tell a rollback from a partial write
+  - manual check on a copy of `.data` (13 scripts / 173 events): migration 9 applied after the backup, durations and event dumps identical before/after, saves (with and without `endTime` keys) leave every `end_time` NULL; QA cases 6 (hand-coded HCR span dropped, then deleted on save; an API span on HCR refused) and 7 (scripts load in `BACKUP_FAILED` at migration 8) pass through the API
+  - Backlog gained the T-007 group: backup overwrite on a retried migration, the `start:tsx` serial worker, the Phase B half-done swap, 89 log calls that drop their error, the 500 for a refused span (with `endTime` validation), shipping T-007 with T-008, Phase B notes and three open questions for T-008
 
 - 2026-10-23 T-006 — refuse a database written by a newer server
   - a build that finds applied migrations its provider doesn't know enters `DB_NEWER_THAN_SERVER` before the pending check: no backup, migrate or prune, and the connection is `query_only`. Every `/api` route but `GET /system/status` answers 503, serial setup is skipped, WS client messages are dropped (one warning per connection), and the Vue app replaces the router view with a notice page (focus on its heading, no toasts)
