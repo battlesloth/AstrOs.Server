@@ -18,10 +18,11 @@ export function updateScriptDuration(script: Script): void {
 }
 
 /**
- * Calculates the length of a script in deciseconds from the latest event time across all channels.
+ * Calculates the length of a script in deciseconds from the latest span end or point-event time
+ * across all channels.
  * Event times are in seconds (0.1 s precision); the result is deciseconds, the unit
- * `scripts.duration_ds` is stored in and every consumer reads it as. The length ends
- * at the start of the last event; that event's own run time is not included.
+ * `scripts.duration_ds` is stored in and every consumer reads it as. A random span counts
+ * at its end time; a point event counts at its start, so its own run time is not included.
  * @param script The script to calculate the length for
  * @returns The length of the script in deciseconds
  */
@@ -32,7 +33,7 @@ export function calculateLengthDS(script: Script): number {
     return 0;
   }
 
-  const lastEventSeconds = Math.max(...allEvents.map((event) => event.time));
+  const lastEndSeconds = Math.max(...allEvents.map((event) => event.endTime ?? event.time));
 
-  return Math.round(lastEventSeconds * 10);
+  return Math.round(lastEndSeconds * 10);
 }

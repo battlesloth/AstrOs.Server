@@ -9,8 +9,10 @@ import {
   ModuleType,
   ModuleSubType,
   moduleSubTypeToScriptEventTypes,
+  supportsRandomSpan,
   ModuleClassType,
   MaestroEvent,
+  RandomMaestroEvent,
   MaestroChannel,
   isLocationName,
 } from 'src/models/index.js';
@@ -286,7 +288,7 @@ export class ScriptRepository {
    * Map of script id → recorded duration (deciseconds) for every script.
    * Returns the raw column: unlike getScript, an invalid stored value is not
    * recomputed. Used by the playlist converter to give a Script track its
-   * runtime (up to the start of its last event) —
+   * runtime (up to its latest span end or point-event start; see calculateLengthDS) —
    * playlist track rows carry no usable duration for scripts (no editor
    * control), so the queue would otherwise treat scripts as instantaneous.
    * Intentionally unfiltered (no `enabled = 1`) so a still-referenced script's
@@ -362,7 +364,7 @@ export class ScriptRepository {
       // we do this here because the channel can be changed in the UI
       // and it's simpler to do it here than in the UI
       if (ch.moduleChannelType === ModuleChannelTypes.MaestroChannel) {
-        const e = evt.event as MaestroEvent;
+        const e = evt.event as MaestroEvent | RandomMaestroEvent;
         const c = ch.moduleChannel as MaestroChannel;
         e.channel = c.channelNumber;
         evt.event = e;
@@ -470,6 +472,14 @@ export class ScriptRepository {
     channelId: string,
     evt: ScriptEvent,
   ) {
+    if (evt.endTime != null && !supportsRandomSpan(evt.moduleSubType)) {
+      const err = new Error(`Random span not supported for moduleSubType: ${evt.moduleSubType}`);
+      logger.error(
+        `ScriptRepository.saveScriptEvent: refusing event ${evt.id} on channel ${channelId} in script ${scriptId}: ${err.message}`,
+      );
+      throw err;
+    }
+
     await tx
       .insertInto('script_events')
       .values({
@@ -479,6 +489,8 @@ export class ScriptRepository {
         module_type: evt.moduleType,
         module_sub_type: evt.moduleSubType,
         time: Math.round(evt.time * 10), // stored as integer scaled storage to 0.1s
+        // == null: a client that omits endTime saves a point event
+        end_time: evt.endTime == null ? null : Math.round(evt.endTime * 10),
         data: JSON.stringify(evt.event),
       })
       .execute()
@@ -511,8 +523,30 @@ export class ScriptRepository {
 
     for (const evt of events) {
       const subtype = evt.module_sub_type !== null ? evt.module_sub_type : ModuleSubType.none;
+      // A database still at migration 8 (BACKUP_FAILED, or a failed migration
+      // restored) has no end_time column and yields undefined: a point event.
+      const endTimeDs = evt.end_time ?? null;
 
-      const scriptEventType = moduleSubTypeToScriptEventTypes(subtype, evt.data);
+      // Only a hand edit can store a span on a sub-type without a span payload
+      // (saveScriptEvent refuses one). Leave it out so neither the editor nor
+      // the converter sees it; the editor's next save removes the row. Parsing
+      // it as a point first makes an unknown sub-type or unreadable data fail
+      // the read, as for a point row, rather than be dropped.
+      if (endTimeDs !== null && !supportsRandomSpan(subtype)) {
+        moduleSubTypeToScriptEventTypes(subtype, evt.data);
+        logger.warn(
+          `ScriptRepository.readScriptEvents: dropping random span ${evt.id} on channel ${evt.script_channel_id} in script ${scriptId} ` +
+            `(time ${evt.time}, end_time ${endTimeDs}, data ${evt.data}): moduleSubType ${subtype} has no span payload; ` +
+            'the row is deleted when this script is next saved',
+        );
+        continue;
+      }
+
+      const scriptEventType = moduleSubTypeToScriptEventTypes(
+        subtype,
+        evt.data,
+        endTimeDs !== null,
+      );
 
       const event: ScriptEvent = {
         id: evt.id,
@@ -520,6 +554,7 @@ export class ScriptRepository {
         moduleType: evt.module_type,
         moduleSubType: subtype,
         time: evt.time / 10, // stored as integer scaled storage to 0.1s
+        endTime: endTimeDs === null ? null : endTimeDs / 10,
         event: scriptEventType,
       };
 

@@ -17,7 +17,7 @@ T-007 gave events an `endTime` and added the random payload types. This task mak
 - **Wire strings, exactly as `.docs/protocol.md` § C:**
   - `6|<delta>|<uart.idx>|<channel>|<spanMs>|<minGapMs>|<maxGapMs>|<minPos>|<maxPos>|<minMove>|<maxMove or 0>|<speed>|<acceleration>`
   - `7|<delta>|<gpioChannel>|<spanMs>|<minGapMs>|<maxGapMs>`
-  - For a digital Maestro span (`isServo: false`), the six fields after `maxGapMs` are each `0`.
+  - For a digital Maestro span (`isServo: false`), the six fields after `maxGapMs` are each `0`. (Amended 2026-10-27, Jeff: `isServo` here is the Maestro channel's current setting, not the payload's; see the Converter amendments.)
 - **`CommandType` gains `maestroRandom = 6` and `gpioRandom = 7`, appended.** Existing values are unchanged.
 - **Point-event output is byte-identical to today.** No existing expected string in `script_converter.test.ts` changes.
 - **Integer milliseconds** (amended 2026-10-22, after the AstrOs.ESP T-007 review). Seconds × 1000 is not exact in floating point: a 2.01 s gap becomes `2009.9999999999998`, and a 16.1 → 16.2 s span becomes `99.99999999999818`. The firmware rejects any non-integer field (§ C), so the time-derived values are rounded **once**, before validation and before emission:
@@ -60,7 +60,7 @@ export function randomSpanProblems(
 
 - **`mapEventsByControllerAndTime`:** after `evt.time *= 1000`, also scale `evt.endTime` when it's non-null. Bucketing is still by start time.
 - **`addBufferEvents`:** `maxDuration` becomes the max over every bucketed event of `endTime ?? time` (ms), not the max bucket key. The rest is unchanged. A location whose span ends last gets its end buffer at the span's end.
-- **`convertScriptEvents`:** an event with `endTime !== null` goes to `convertRandomSpanEvent(evt, timeToSend): string` before the `moduleType` switch.
+- **`convertScriptEvents`:** an event with `endTime !== null` goes to `convertRandomSpanEvent(evt, timeToSend): string` before the `moduleType` switch. (Note 2026-10-27, T-007 type review: `getScript` always returns `null` or a number, but API test fixtures are not type-checked, so one that omits `endTime` would take the span path with `undefined`; prefer `!= null` here and in `mapEventsByControllerAndTime`.)
 - **`convertRandomSpanEvent`:**
   - It computes `spanMs = Math.round(evt.endTime - evt.time)` (both already ms), and builds a copy of the payload with `minGapMs` and `maxGapMs` `Math.round`ed (Contract: integer milliseconds).
   - It looks up the GPIO channel (for `genericGpio`) or the UART values (for `maestro`).
@@ -69,9 +69,12 @@ export function randomSpanProblems(
     - `randomGpioAsString(evt: RandomGpioEvent, gpioChannel: number, spanMs: number, next: number): string`, or
     - `randomMaestroAsString(evt: RandomMaestroEvent, uart: IUartValues, spanMs: number, next: number): string`
   - **On a missing lookup or any problem**, it `logger.warn`s `ScriptConverter: skipping random span <evt.id> on channel <evt.scriptChannel>: <problems joined>`. It then returns `noneAsString(next)`, i.e. `0|<next>|0;`, so the delay chain is unchanged.
-  - A span on any other sub-type takes the same skip path.
+  - A span on any other sub-type takes the same skip path. (Amended 2026-10-27, Jeff, during T-007: the repository refuses to save such a span and drops one it finds on load with a warning, so `getScript` never hands one to the converter. This skip stays as defense in depth; a converter test can only reach it with a hand-built `ScriptEvent`.)
   - It never throws.
 - **Delta format:** `toMsStr` is used for every delta and span value.
+- **Amendments (Jeff, 2026-10-27, from the T-007 type review):**
+  - **Servo vs digital comes from the channel.** For a Maestro span, the `isServo` that `randomSpanProblems` receives and that picks the wire fields is the script channel's `moduleChannel` (`MaestroChannel.isServo`, which `getScript` loads from the module tables), not the payload's copy. A span whose payload says servo on a channel now configured as digital converts as digital, and the reverse is validated as servo (missing servo fields fail validation and take the skip path). `IUartValues` has no servo flag, so this needs a lookup by script channel alongside `getUartValues`. T-009 also overwrites the payload's copy on save.
+  - **A Maestro point without a numeric `position` is skipped, not sent.** In `convertMaestroEvent`, a point whose `position` is not a finite number (for example a point that carries a `RandomMaestroEvent` payload) is not serialized: `logger.warn` names the event id and channel, and its slot becomes the same `0|<next>|0;` no-op a skipped span uses, so the delay chain is unchanged. Today it is sent as `…|undefined|…`, which aborts the firmware's `std::stoi` and reboots the controller. A valid point's output is byte-identical (Contract). The existing throws in `convertMaestroEvent` (invalid channel, missing UART) are unchanged (Out of scope).
 
 ### Tests
 
@@ -114,6 +117,8 @@ Write these first.
   - `logger.warn` was called once with the event id.
 - **Review focus:** `an invalid span still extends the script to its end time`. The same fixture's end buffer is at 9000.
 - **Review focus:** `a span whose gpio channel mapping is missing is skipped, not thrown`. The other locations still convert.
+- **Review focus:** `a maestro span follows the channel's servo/digital setting, not the payload's` (amended 2026-10-27): a servo payload (`isServo: true`, position fields set) on a Maestro channel configured digital sends the digital form, with the six fields after `maxGapMs` each `0`.
+- **Review focus:** `a maestro point without a numeric position is skipped` (amended 2026-10-27): a core Maestro point whose payload is a `RandomMaestroEvent` (no `position`) and a GPIO point after it. The Maestro slot becomes `0|<delta>|0`, `logger.warn` names the event id, and the GPIO point keeps its delta.
 - **Review focus:** `a maestro span whose channel is still -1 is skipped`. Its slot becomes `0|<delta>|0`, `logger.warn` names the event id, and point events on the same location keep their deltas. The existing point-event path throws for `channel < 0`; the span path must skip, not throw.
 
 ## Acceptance criteria
@@ -121,6 +126,7 @@ Write these first.
 - [ ] All tests above are green. Every pre-existing `script_converter.test.ts` expectation is unchanged.
 - [ ] `randomSpanProblems` encodes exactly the § C ranges, each with a boundary test.
 - [ ] No code path in `convertRandomSpanEvent` throws.
+- [ ] A Maestro span is converted by its channel's current servo/digital setting, and a Maestro point without a numeric `position` is skipped with a warning (amendments 2026-10-27).
 - [ ] `.docs/qa/random-span-events.md` gains a "Server conversion" section. It covers deploying a script whose span row was inserted by hand (SQL in the plan), and checking the API log for the exact command string.
 
 ## Out of scope

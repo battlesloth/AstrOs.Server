@@ -17,6 +17,11 @@ export function useEventConverter() {
       return events;
     }
 
+    // != null: an event that omits endTime is a point, as the API saves it.
+    if (Object.values(events).some((event) => event.endTime != null)) {
+      throw new Error('Converting random spans between channel types is not supported yet');
+    }
+
     if (
       fromSubType === ModuleSubType.GENERIC_GPIO &&
       toSubType.moduleSubType === ModuleSubType.MAESTRO
@@ -51,6 +56,7 @@ export function useEventConverter() {
         moduleType: ModuleType.UART,
         moduleSubType: ModuleSubType.MAESTRO,
         time: event.time,
+        endTime: null,
         event: undefined,
       };
 
@@ -82,6 +88,7 @@ export function useEventConverter() {
         moduleType: ModuleType.GPIO,
         moduleSubType: ModuleSubType.GENERIC_GPIO,
         time: event.time,
+        endTime: null,
         event: undefined,
       };
 

@@ -25,7 +25,7 @@ export { GpioModule, getGpioScriptResources } from './control_module/gpio/gpio_m
 export type { Script } from './scripts/script.js';
 export type { ScriptChannel } from './scripts/script_channel.js';
 export type { ScriptChannelResource } from './scripts/script_channel_resource.js';
-export { moduleSubTypeToScriptEventTypes } from './scripts/script_event.js';
+export { moduleSubTypeToScriptEventTypes, supportsRandomSpan } from './scripts/script_event.js';
 export type { ScriptEvent, ScriptEventTypes } from './scripts/script_event.js';
 export { KangarooAction } from './scripts/events/kangaroo_event.js';
 export type { KangarooEvent } from './scripts/events/kangaroo_event.js';
@@ -37,6 +37,8 @@ export type { GenericSerialEvent } from './scripts/events/generic_serial_event.j
 export type { MaestroEvent } from './scripts/events/maestro_event.js';
 export type { I2cEvent } from './scripts/events/i2c_event.js';
 export type { GpioEvent } from './scripts/events/gpio_event.js';
+export type { RandomGpioEvent } from './scripts/events/random_gpio_event.js';
+export type { RandomMaestroEvent } from './scripts/events/random_maestro_event.js';
 export type { BaseResponse } from './networking/base_response.js';
 export type { ControllersResponse } from './networking/controllers_response.js';
 export type { StatusResponse } from './networking/status_response.js';

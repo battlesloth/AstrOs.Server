@@ -66,6 +66,7 @@ function getKangarooEvent(undefinedEvt = false): ScriptEvent {
     moduleType: ModuleType.UART,
     moduleSubType: ModuleSubType.KANGAROO,
     time: 5000,
+    endTime: null,
     event: undefinedEvt ? undefined : evt,
   };
 }

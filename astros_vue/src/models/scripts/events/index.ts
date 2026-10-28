@@ -4,3 +4,5 @@ export * from './humanCyborgRelationsEvent';
 export * from './i2cEvent';
 export * from './kangarooEvent';
 export * from './maestroEvent';
+export * from './randomGpioEvent';
+export * from './randomMaestroEvent';

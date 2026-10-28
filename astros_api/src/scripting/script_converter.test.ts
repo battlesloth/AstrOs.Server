@@ -551,6 +551,7 @@ function generateCoreScriptSerialEventByDecSec(tenthOfSeconds: number, chId: str
     moduleType: ModuleType.uart,
     moduleSubType: ModuleSubType.genericSerial,
     time: tenthOfSeconds,
+    endTime: null,
     event: evt,
   };
 
@@ -586,6 +587,7 @@ function coreGenericSeriaScriptCh(scriptId: string): ScriptChannel {
       moduleType: ModuleType.uart,
       moduleSubType: ModuleSubType.genericSerial,
       time: i,
+      endTime: null,
       event: evt,
     };
     scriptCh.events[uuid()] = sevt;
@@ -624,6 +626,7 @@ function domeGenericSerialScriptCh(scriptId: string): ScriptChannel {
         moduleType: ModuleType.uart,
         moduleSubType: ModuleSubType.genericSerial,
         time: i,
+        endTime: null,
         event: evt,
       };
       scriptCh.events[uuid()] = sevt;
@@ -657,6 +660,7 @@ function domeI2cScriptCh(scriptId: string): ScriptChannel {
         moduleType: ModuleType.i2c,
         moduleSubType: ModuleSubType.genericI2C,
         time: i,
+        endTime: null,
         event: evt,
       };
       scriptCh.events[uuid()] = sevt;

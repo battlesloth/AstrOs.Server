@@ -126,6 +126,7 @@ export interface ScriptEventsTable {
   module_sub_type: number;
   time: number;
   data: string;
+  end_time: number | null;
 }
 
 export type ScriptEvent = Selectable<ScriptEventsTable>;

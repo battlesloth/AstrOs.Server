@@ -22,6 +22,7 @@ import {
   migration_6,
   migration_7,
   migration_8,
+  migration_9,
 } from './migrations/index.js';
 
 // Mirrors the production provider so injected test migrations layer on top of
@@ -30,22 +31,36 @@ import {
 // "corrupted migrations" before any extra migration runs — which would short-
 // circuit tests that intend to exercise post-migration paths.
 function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider {
+  const production: Record<string, Migration> = {
+    '0_initial': migration_0,
+    '1_add_script_evt_id': migration_1,
+    '2_add_script_duration': migration_2,
+    '3_add_playlists': migration_3,
+    '4_add_random_wait': migration_4,
+    '5_fix_controller_locations_type': migration_5,
+    '6_add_foreign_keys': migration_6,
+    '7_rename_remote_config_key': migration_7,
+    '8_fix_script_duration_units': migration_8,
+    '9_add_script_event_end_time': migration_9,
+  };
+  // Kysely orders migrations by plain string sort. An injected migration that
+  // sorts before the production latest is refused as "corrupted migrations",
+  // which would let a failure-path test pass without running it.
+  const latest = Object.keys(production).sort().at(-1) ?? '';
+  for (const name of Object.keys(extra)) {
+    if (name <= latest) {
+      throw new Error(`test migration ${name} must sort after ${latest}`);
+    }
+  }
   return new (class implements MigrationProvider {
     async getMigrations(): Promise<Record<string, Migration>> {
-      return {
-        '0_initial': migration_0,
-        '1_add_script_evt_id': migration_1,
-        '2_add_script_duration': migration_2,
-        '3_add_playlists': migration_3,
-        '4_add_random_wait': migration_4,
-        '5_fix_controller_locations_type': migration_5,
-        '6_add_foreign_keys': migration_6,
-        '7_rename_remote_config_key': migration_7,
-        '8_fix_script_duration_units': migration_8,
-        ...extra,
-      };
+      return { ...production, ...extra };
     }
   })();
+}
+
+function sha256(file: string): string {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
 // Each test deliberately drives a real SQLite migration + backup/restore
@@ -53,10 +68,6 @@ function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider
 // timeout leaves only ~3.4s of headroom; under full-suite contention that
 // margin disappears and these tests flake on CI. 15s is well above the
 // observed worst case while still failing fast if a real hang regresses in.
-function sha256(file: string): string {
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
-}
-
 describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
   let tmpDir: string;
   let dbPath: string;
@@ -129,7 +140,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     const backupFiles = fs
       .readdirSync(tmpDir)
       .filter((f) => f.startsWith('database.sqlite3.backup-'));
-    expect(backupFiles).toEqual(['database.sqlite3.backup-8_fix_script_duration_units']);
+    expect(backupFiles).toEqual(['database.sqlite3.backup-9_add_script_event_end_time']);
     expect(status.isReadOnly()).toBe(false);
   });
 
@@ -318,7 +329,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     const result = await sql<{ name: string }>`
       SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
     `.execute(db);
-    expect(result.rows[0]?.name).toBe('8_fix_script_duration_units');
+    expect(result.rows[0]?.name).toBe('9_add_script_event_end_time');
   });
 
   describe('a database written by a newer server', () => {

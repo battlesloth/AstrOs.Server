@@ -7,3 +7,4 @@ export { migration_5 } from './migration_5.js';
 export { migration_6 } from './migration_6.js';
 export { migration_7 } from './migration_7.js';
 export { migration_8 } from './migration_8.js';
+export { migration_9 } from './migration_9.js';

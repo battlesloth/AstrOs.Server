@@ -9,6 +9,8 @@ import {
   ModuleType,
   ModuleChannelTypes,
   GenericSerialEvent,
+  GpioChannel,
+  RandomGpioEvent,
 } from '../models/index.js';
 import { calculateLengthDS } from './script_duration.js';
 import { v4 as uuid } from 'uuid';
@@ -54,6 +56,44 @@ describe('calculateLengthDS', () => {
     script.scriptChannels.push(generateSerialScriptChannel(script.id));
 
     expect(calculateLengthDS(script)).toBe(0);
+  });
+
+  // The cases above use point events (endTime null) and pin that they still
+  // count at their start time.
+
+  it('a span counts at its end time', () => {
+    const script = generateScript('testScriptSpanEnd');
+    const gpioCh = generateGpioScriptChannel(script.id);
+    const serialCh = generateSerialScriptChannel(script.id);
+    addEvent(gpioCh, generateGpioSpanEvent(2.0, 18.5, gpioCh.id));
+    // Inside the span: max(time) alone would give 100.
+    addEvent(serialCh, generateCoreScriptSerialEvent(10.0, serialCh.id));
+    script.scriptChannels.push(gpioCh, serialCh);
+
+    expect(calculateLengthDS(script)).toBe(185);
+  });
+
+  // A client that omits endTime sends a point event.
+  it('an event without an endTime property counts at its start', () => {
+    const script = generateScript('testScriptNoEndTime');
+    const serialCh = generateSerialScriptChannel(script.id);
+    const evt = generateCoreScriptSerialEvent(4.2, serialCh.id);
+    delete (evt as Partial<ScriptEvent>).endTime;
+    addEvent(serialCh, evt);
+    script.scriptChannels.push(serialCh);
+
+    expect(calculateLengthDS(script)).toBe(42);
+  });
+
+  it("a point after a span's end wins", () => {
+    const script = generateScript('testScriptPointAfterSpan');
+    const gpioCh = generateGpioScriptChannel(script.id);
+    const serialCh = generateSerialScriptChannel(script.id);
+    addEvent(gpioCh, generateGpioSpanEvent(0, 5.0, gpioCh.id));
+    addEvent(serialCh, generateCoreScriptSerialEvent(7.5, serialCh.id));
+    script.scriptChannels.push(gpioCh, serialCh);
+
+    expect(calculateLengthDS(script)).toBe(75);
   });
 });
 
@@ -103,8 +143,44 @@ function generateCoreScriptSerialEvent(timeSeconds: number, chId: string): Scrip
     moduleType: ModuleType.uart,
     moduleSubType: ModuleSubType.genericSerial,
     time: timeSeconds,
+    endTime: null,
     event: evt,
   };
 
   return sevt;
+}
+
+function generateGpioScriptChannel(scriptId: string): ScriptChannel {
+  const locationId = uuid();
+  const gpioChannel = new GpioChannel(uuid(), locationId, 0, true, '', false);
+
+  return {
+    id: uuid(),
+    scriptId,
+    channelType: ScriptChannelType.GPIO,
+    parentModuleId: locationId,
+    moduleChannelId: gpioChannel.id,
+    moduleChannelType: ModuleChannelTypes.GpioChannel,
+    moduleChannel: gpioChannel,
+    maxDuration: 3000,
+    events: {},
+  };
+}
+
+function generateGpioSpanEvent(
+  startSeconds: number,
+  endSeconds: number,
+  chId: string,
+): ScriptEvent {
+  const evt: RandomGpioEvent = { minGapMs: 50, maxGapMs: 400 };
+
+  return {
+    id: uuid(),
+    scriptChannel: chId,
+    moduleType: ModuleType.gpio,
+    moduleSubType: ModuleSubType.genericGpio,
+    time: startSeconds,
+    endTime: endSeconds,
+    event: evt,
+  };
 }

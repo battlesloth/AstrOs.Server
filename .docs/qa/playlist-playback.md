@@ -61,6 +61,7 @@ sends a script; the ESP logs `Queue is full` when it drops a `SCRIPT_RUN`.
   risk, T-004 / PLAN.md Backlog).
 - **Last event's own run time** is not counted: in case 4 the Wait starts when
   Forty-five's action *starts*, so a long action overlaps the Wait (Backlog).
+  This is for point events; a random span counts at its end (T-007).
 
 ## Interrupts, gaps, nested tracks, and repeat display (T-003)
 
