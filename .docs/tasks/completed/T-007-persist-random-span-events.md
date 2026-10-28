@@ -100,11 +100,11 @@ Write these first.
 
 ## Acceptance criteria
 
-- [ ] All tests above are green. The existing repository, converter and duration tests are unchanged and green.
-- [ ] `astros_api` and `astros_vue` both build (`npm run build`).
-- [ ] The integration test's `buildProvider` lists `9_add_script_event_end_time`.
-- [ ] Converting a span between channel types throws the pinned error.
-- [ ] `.docs/qa/random-span-events.md` exists with Preconditions, plus a "Data / upgrade" section. It covers: upgrade a DB with existing scripts → they load, play and report the same durations. Downgrade attempt → T-006 page.
+- [x] All tests above are green. The existing repository, converter and duration tests are unchanged and green.
+- [x] `astros_api` and `astros_vue` both build (`npm run build`).
+- [x] The integration test's `buildProvider` lists `9_add_script_event_end_time`.
+- [x] Converting a span between channel types throws the pinned error.
+- [x] `.docs/qa/random-span-events.md` exists with Preconditions, plus a "Data / upgrade" section. It covers: upgrade a DB with existing scripts → they load, play and report the same durations. Downgrade attempt → T-006 page.
 
 ## Out of scope
 
@@ -158,6 +158,14 @@ Corrected 2026-10-27 (T-007 code review): the backup/restore path does not cover
   - Declined: narrowing `migration_9`'s guard to `pragma_table_info` (a broken view fails every migration anyway, because Kysely's Migrator introspects all tables before running one); a discriminated `ScriptEvent` union (most Phase B sites write through union-typed refs the compiler doesn't check soundly); naming the union's halves; a cross-project payload-type test (no pattern in the repo yet); an `initializeDatabase`-level crash re-run test (the guard mutants are killed at the Migrator level).
   - Mutation checks (pre-push): no transaction in `upsertScript` → strengthened refused-save test; `Math.floor` → below-integer case; duration `!== null` → omitted-`endTime` test; refusal not logged / drop reason removed → log assertions; drop without the point parse → unknown-sub-type test; an injected `9_aa_…` migration that doesn't fail → `buildProvider` guard; the earlier list re-run against the type-predicate refactor, all killed except the known equivalent
 - [x] Close-out: task file → `completed/`, PLAN.md checkbox + Log entry (2026-10-27, before the PR, as T-006 did)
+- [x] QA walk (2026-10-28, Jeff in the browser, QA cases 1–7 on scratchpad copies of `.data/database.sqlite3` at `8_`): all pass.
+  - Upgrade: backup, then migration 9; no read-only banner; empty diffs.
+  - Case 3: a move-and-back save rewrote all 17 `Servo Test` rows byte-identically. A new servo event at 6.0 s and a CH 1 Relay (Maestro digital) → generic GPIO swap both stored `end_time` NULL.
+  - Case 4: `Seq AB` dispatched Short B 3.002 s after Short A (30 ds).
+  - Case 5: the `232cdc31` build logged `DB_NEWER_THAN_SERVER`, answered 503, and switched the open tab to the Incompatible database notice; checksum `OK`.
+  - Case 6: the hand-coded HCR span was missing from the timeline with the drop warning, and the save deleted its row.
+  - Case 7: `BACKUP_FAILED` with the banner up; all three scripts loaded, and two answered 304 against ETags cached from the upgraded DB (the same bytes from the v8 and v9 tables).
+  - The walk fixed two QA plan steps: case 3's swap (swaps stay within a channel type, so the only converting swap is generic GPIO ↔ Maestro digital) and case 6's missing restart of this build's API after case 5.
 
 ### Mutation checks
 

@@ -48,8 +48,8 @@ The plan grows with the project. T-007 added the data model, so this file starts
 2. **Pass:** the save succeeds. `sqlite3 $DB "SELECT count(*) FROM script_events WHERE end_time IS NOT NULL"` still prints `0`, and the script's `duration_ds` matches `/tmp/astros-span-durations-before.txt`.
 3. Add a new event to a GPIO or servo channel, save, and reload the page.
 4. **Pass:** the new event reads back at its time, and its row has `end_time` NULL: `sqlite3 $DB "SELECT time, end_time FROM script_events WHERE script_id = '<script id>' AND time = <new time × 10>"` (a save rewrites every row of the script, so the last rowid is not necessarily the new event).
-5. On a GPIO channel that has events, use the channel's swap action and pick a Maestro channel (or swap a Maestro channel to GPIO).
-6. **Pass:** the events convert as before (point events only; converting a span is refused, but none can be created through the UI yet).
+5. Swap between a generic GPIO channel and a Maestro channel set to digital. A swap stays within a channel type: a Maestro digital channel is a GPIO channel, and a servo channel only swaps with servo channels, so this is the only swap that converts events. The copy needs one of each enabled; if no generic GPIO channel is enabled, enable one with `sqlite3 $DB "UPDATE gpio_channels SET enabled = 1, name = 'QA gpio' WHERE rowid = (SELECT min(rowid) FROM gpio_channels)"` and reload; the controller page also works, but its controller sync fails under `start:tsx`. Add the Maestro digital channel to a script, give it events, use its swap action, pick the GPIO channel, and save.
+6. **Pass:** the events convert to GPIO events at the same times, and their rows have `end_time` NULL (point events only; converting a span is refused, but none can be created through the UI yet).
 7. **Fail:** a save error, a non-NULL `end_time`, or a changed duration.
 
 ### 4. Existing scripts and playlists play the same
@@ -82,6 +82,8 @@ A server built before T-007 does not know migration 9. Builds from T-006 on refu
 ### 6. A hand-coded span on a channel without span support is dropped
 
 Only GPIO and Maestro channels support spans. The API refuses to save a span anywhere else, so this case plants one by hand.
+
+Case 5 ends with no API running. Start this build's API again against the same copy (Preconditions), then reload the tab.
 
 1. Pick a script with an event on a serial, I2C, HCR or Kangaroo channel. Note one such event's id and the script id:
    `sqlite3 $DB "SELECT id, script_id, module_sub_type FROM script_events WHERE module_sub_type IN (101, 102, 103, 201, 202) LIMIT 1"`
