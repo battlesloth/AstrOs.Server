@@ -81,7 +81,7 @@ A server built before T-007 does not know migration 9. Builds from T-006 on refu
 
 ### 6. A hand-coded span on a channel without span support is dropped
 
-Only GPIO and Maestro channels support spans. The API refuses to save a span anywhere else, so this case plants one by hand.
+Only GPIO and Maestro channels support spans. The API refuses to save a span tagged with any other sub-type, so this case plants one by hand. (It checks the event's own tag; T-009 adds the check against the span's channel.)
 
 Case 5 ends with no API running. Start this build's API again against the same copy (Preconditions), then reload the tab.
 
