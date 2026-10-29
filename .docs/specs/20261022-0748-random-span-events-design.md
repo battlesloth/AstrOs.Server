@@ -214,7 +214,7 @@ These rules keep the random behavior well defined. They are enforced in the dial
 **Random parameters** ride in the existing `data` JSON blob, as two new payload types. `moduleSubTypeToScriptEventTypes` selects between them using the sub-type plus `endTime !== null`:
 
 - `RandomGpioEvent { minGapMs, maxGapMs }`, for ESP GPIO.
-- `RandomMaestroEvent { channel, isServo, minGapMs, maxGapMs, minPos, maxPos, minMove, maxMove: number | null, speed, acceleration }`, for Maestro servo and digital channels. When `isServo` is false, the position-range, move, speed and acceleration fields are unused.
+- `RandomMaestroEvent { channel, isServo, minGapMs, maxGapMs, minPos, maxPos, minMove, maxMove: number | null, speed, acceleration }`, for Maestro servo and digital channels. When the channel is digital, the position-range, move, speed and acceleration fields are unused. The payload's `isServo` is a copy; the converter reads the channel's current setting (T-008 amendment, 2026-10-27).
   - The repository's existing rule that overwrites `channel` with the module channel number on save (`script_repository.ts` ~:364) must cover this type as well.
 - **Spans only on GPIO and Maestro channels (Jeff, 2026-10-27, during T-007).** The server never saves a span on any other sub-type: the save fails. A span on another sub-type that was coded by hand is left out of the loaded script (with a warning in the log), so neither the scripter nor the converter sees it, and the scripter's next save deletes the row. Both checks use the event's own sub-type; T-009 (decided 2026-10-28, from PR #135's review) also refuses or drops a span whose sub-type differs from its channel's.
 
@@ -226,7 +226,7 @@ These rules keep the random behavior well defined. They are enforced in the dial
 ### Duration
 
 - `calculateLengthDS` becomes `max over events of (endTime ?? time)`.
-- The converter's `addBufferEvents` uses the same max, so every controller's script lasts until the last span ends. Playlists already read `durationDS`, and they need no change.
+- The converter's `addBufferEvents` uses the same max, so every controller's script lasts until the last span ends. It differs only on malformed rows: a non-finite start is ignored, and a non-finite end, or one before the start, counts as the start (T-008 pre-push review). `calculateLengthDS` still takes `endTime ?? time`; T-009 refuses such spans on save. Playlists already read `durationDS`, and they need no change.
 - No recompute migration is needed, because no span events exist yet.
 
 ### Conversion

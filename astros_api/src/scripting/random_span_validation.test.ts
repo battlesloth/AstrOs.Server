@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { randomSpanProblems } from './random_span_validation.js';
 import { RandomGpioEvent, RandomMaestroEvent } from '../models/index.js';
 
-// Each case changes one field of a valid baseline, so a rejected case must
-// report exactly the one broken rule.
+// Most cases change one field of a valid baseline and expect exactly one
+// problem, naming that field. The position cases move minPos and maxPos
+// together to keep the range valid.
 const SPAN_MS = 14000;
 
 function servo(overrides: Partial<RandomMaestroEvent> = {}): RandomMaestroEvent {
@@ -58,11 +59,26 @@ describe('randomSpanProblems', () => {
     );
   });
 
-  it('maxMove below minMove is rejected; null maxMove is valid', () => {
+  it('maxMove equal to minMove is valid; below it is rejected', () => {
+    expect(randomSpanProblems(SPAN_MS, servo({ maxMove: 15 }), true)).toEqual([]);
     expect(randomSpanProblems(SPAN_MS, servo({ maxMove: 14 }), true)).toEqual(
       oneProblemNaming('maxMove'),
     );
+  });
+
+  it('a null or missing maxMove is valid', () => {
     expect(randomSpanProblems(SPAN_MS, servo({ maxMove: null }), true)).toEqual([]);
+    const missing: Partial<RandomMaestroEvent> = servo();
+    delete missing.maxMove;
+    expect(randomSpanProblems(SPAN_MS, missing as RandomMaestroEvent, true)).toEqual([]);
+  });
+
+  it('minMove at half an odd range rounded down is valid; one more is rejected', () => {
+    // 19–100 is 81 wide: 40 ≤ 40.5, 41 > 40.5
+    expect(randomSpanProblems(SPAN_MS, servo({ minPos: 19, minMove: 40 }), true)).toEqual([]);
+    expect(randomSpanProblems(SPAN_MS, servo({ minPos: 19, minMove: 41 }), true)).toEqual(
+      oneProblemNaming('minMove'),
+    );
   });
 
   it('servo minGapMs 100 valid / 99 rejected', () => {
@@ -114,7 +130,7 @@ describe('randomSpanProblems', () => {
     );
   });
 
-  it('speed 256 is rejected', () => {
+  it('speed outside 0–255 is rejected', () => {
     expect(randomSpanProblems(SPAN_MS, servo({ speed: 255 }), true)).toEqual([]);
     expect(randomSpanProblems(SPAN_MS, servo({ speed: 256 }), true)).toEqual(
       oneProblemNaming('speed'),
@@ -124,11 +140,25 @@ describe('randomSpanProblems', () => {
     );
   });
 
-  it('acceleration 256 is rejected', () => {
+  it('acceleration outside 0–255 is rejected', () => {
     expect(randomSpanProblems(SPAN_MS, servo({ acceleration: 255 }), true)).toEqual([]);
     expect(randomSpanProblems(SPAN_MS, servo({ acceleration: 256 }), true)).toEqual(
       oneProblemNaming('acceleration'),
     );
+    expect(randomSpanProblems(SPAN_MS, servo({ acceleration: -1 }), true)).toEqual(
+      oneProblemNaming('acceleration'),
+    );
+  });
+
+  // Each value breaks only the integer rule.
+  it.each([
+    ['maxPos 99.5', { maxPos: 99.5 }],
+    ['minMove 15.5', { minMove: 15.5 }],
+    ['speed 30.5', { speed: 30.5 }],
+    ['acceleration 7.5', { acceleration: 7.5 }],
+    ['channel 2.5', { channel: 2.5 }],
+  ] as const)('a non-integer %s is rejected', (field, overrides) => {
+    expect(randomSpanProblems(SPAN_MS, servo(overrides), true)).toEqual(oneProblemNaming(field));
   });
 
   it('a non-integer minPos is rejected', () => {
@@ -153,7 +183,7 @@ describe('randomSpanProblems', () => {
     );
   });
 
-  it('a non-integer gap is rejected for gpio spans too', () => {
+  it('a non-integer gap or span length is rejected for gpio spans too', () => {
     expect(randomSpanProblems(SPAN_MS, gpio({ minGapMs: 50.5 }), false)).toEqual(
       oneProblemNaming('minGapMs 50.5'),
     );

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, MockInstance } from 'vitest';
 import { Kysely } from 'kysely';
 import { v4 as uuid } from 'uuid';
 import { Database } from '../dal/types.js';
@@ -6,6 +6,7 @@ import { createKyselyConnection, migrateToLatest } from '../dal/database.js';
 import { ScriptRepository } from '../dal/repositories/script_repository.js';
 import { upsertGpioModule } from '../dal/repositories/module_repositories/gpio_repository.js';
 import { upsertUartModules } from '../dal/repositories/module_repositories/uart_repository.js';
+import { logger } from '../logger.js';
 import { ScriptConverter } from './script_converter.js';
 import {
   GpioChannel,
@@ -24,13 +25,27 @@ import {
   UartModule,
 } from '../models/index.js';
 
+const SERVO_SPAN: RandomMaestroEvent = {
+  // -1 is the UI placeholder; the save overwrites it with the channel's number
+  channel: -1,
+  isServo: true,
+  minGapMs: 400,
+  maxGapMs: 2000,
+  minPos: 20,
+  maxPos: 100,
+  minMove: 15,
+  maxMove: 60,
+  speed: 0,
+  acceleration: 0,
+};
+
 // The unit tests mock the repository, so they can only assume how
 // getGpioChannelMap keys its map and what getScript puts in moduleChannel.
-// A wrong assumption about the GPIO key hid a bug from 2025-12 to T-008:
-// every GPIO event threw and the whole upload went out empty.
+// These tests check both against the real repository.
 describe('script conversion, save → convert', () => {
   let db: Kysely<Database>;
   let locationId: string;
+  let warnSpy: MockInstance<typeof logger.warn>;
 
   beforeEach(async () => {
     db = createKyselyConnection().db;
@@ -41,26 +56,36 @@ describe('script conversion, save → convert', () => {
       .insertInto('locations')
       .values({ id: locationId, name: 'Test Location', description: '', config_fingerprint: 'fp' })
       .execute();
+
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await db.destroy();
   });
 
-  it('gpio and maestro channels convert through the real repository', async () => {
-    const gpioChannel = new GpioChannel(uuid(), locationId, 3, true, 'GPIO 3', false);
+  async function addGpioChannel(enabled: boolean): Promise<GpioChannel> {
+    const gpioChannel = new GpioChannel(uuid(), locationId, 3, enabled, 'GPIO 3', false);
     const gpioModule = new GpioModule(locationId);
     gpioModule.channels.push(gpioChannel);
     await upsertGpioModule(db, gpioModule);
+    return gpioChannel;
+  }
 
-    const maestroModuleId = uuid();
-    const maestroChannel = new MaestroChannel(
+  // A UART module holding one board holding Maestro channel 6.
+  async function addMaestroChannel(
+    isServo: boolean,
+  ): Promise<{ moduleId: string; channel: MaestroChannel; idx: number }> {
+    const moduleId = uuid();
+    const boardId = uuid();
+    const channel = new MaestroChannel(
       uuid(),
-      maestroModuleId,
-      'Servo 6',
+      boardId,
+      'Channel 6',
       true,
       6,
-      true,
+      isServo,
       500,
       2500,
       1500,
@@ -69,18 +94,18 @@ describe('script conversion, save → convert', () => {
     const maestroModule: MaestroModule = {
       boards: [
         {
-          id: maestroModuleId,
-          parentId: locationId,
+          id: boardId,
+          parentId: moduleId,
           boardId: 0,
           name: 'Board',
           channelCount: 24,
-          channels: [maestroChannel],
+          channels: [channel],
         },
       ],
     };
     const uartModule = new UartModule(
       0,
-      maestroModuleId,
+      moduleId,
       'Maestro',
       locationId,
       ModuleSubType.maestro,
@@ -89,36 +114,17 @@ describe('script conversion, save → convert', () => {
     );
     uartModule.subModule = maestroModule;
     await db.transaction().execute((trx) => upsertUartModules(trx, [uartModule]));
+
     const { idx } = await db
       .selectFrom('uart_modules')
       .select('idx')
-      .where('id', '=', maestroModuleId)
+      .where('id', '=', moduleId)
       .executeTakeFirstOrThrow();
+    return { moduleId, channel, idx };
+  }
 
-    const scriptId = uuid();
-    const gpioCh = scriptChannel(scriptId, locationId, gpioChannel, ScriptChannelType.GPIO);
-    addEvent(gpioCh, 1, null, { setHigh: true } as GpioEvent);
-    addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
-    const maestroCh = scriptChannel(
-      scriptId,
-      maestroModuleId,
-      maestroChannel,
-      ScriptChannelType.SERVO,
-    );
-    // channel -1 is the UI placeholder; the save overwrites it with 6
-    addEvent(maestroCh, 0, 14, {
-      channel: -1,
-      isServo: true,
-      minGapMs: 400,
-      maxGapMs: 2000,
-      minPos: 20,
-      maxPos: 100,
-      minMove: 15,
-      maxMove: 60,
-      speed: 0,
-      acceleration: 0,
-    } as RandomMaestroEvent);
-
+  async function saveAndConvert(...channels: ScriptChannel[]): Promise<string | undefined> {
+    const scriptId = channels[0].scriptId;
     const repo = new ScriptRepository(db);
     await repo.upsertScript({
       id: scriptId,
@@ -128,17 +134,67 @@ describe('script conversion, save → convert', () => {
       durationDS: 0,
       playlistCount: 0,
       deploymentStatus: {},
-      scriptChannels: [gpioCh, maestroCh],
+      scriptChannels: channels,
     });
-
     const result = await new ScriptConverter(repo).convertScript(scriptId);
+    return result.get(locationId);
+  }
 
-    expect(result.get(locationId)).toBe(
-      `6|1000|${idx}|6|14000|400|2000|20|100|15|60|0|0;5|1000|3|1;7|14000|3|14000|50|400;0|0|0`,
+  it('gpio and maestro channels convert through the real repository', async () => {
+    const gpioChannel = await addGpioChannel(true);
+    const maestro = await addMaestroChannel(true);
+
+    const scriptId = uuid();
+    const gpioCh = scriptChannel(scriptId, locationId, gpioChannel, ScriptChannelType.GPIO);
+    addEvent(gpioCh, 1, null, { setHigh: true } as GpioEvent);
+    addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+    const maestroCh = scriptChannel(
+      scriptId,
+      maestro.moduleId,
+      maestro.channel,
+      ScriptChannelType.SERVO,
+    );
+    addEvent(maestroCh, 0, 14, { ...SERVO_SPAN });
+
+    expect(await saveAndConvert(gpioCh, maestroCh)).toBe(
+      `6|1000|${maestro.idx}|6|14000|400|2000|20|100|15|60|0|0;5|1000|3|1;7|14000|3|14000|50|400;0|0|0`,
+    );
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a span on a disabled gpio channel is skipped, naming the channel', async () => {
+    // getGpioChannelMap reads enabled channels only
+    const gpioChannel = await addGpioChannel(false);
+
+    const gpioCh = scriptChannel(uuid(), locationId, gpioChannel, ScriptChannelType.GPIO);
+    addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+
+    expect(await saveAndConvert(gpioCh)).toBe('0|2000|0;0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`GPIO channel 3 (${gpioChannel.id}) is disabled`),
+    );
+  });
+
+  it('a maestro channel stored as digital sends the digital form', async () => {
+    const maestro = await addMaestroChannel(false);
+
+    const maestroCh = scriptChannel(
+      uuid(),
+      maestro.moduleId,
+      maestro.channel,
+      ScriptChannelType.GPIO,
+    );
+    // the payload still says servo; the stored channel setting wins
+    addEvent(maestroCh, 0, 14, { ...SERVO_SPAN });
+
+    expect(await saveAndConvert(maestroCh)).toBe(
+      `6|14000|${maestro.idx}|6|14000|400|2000|0|0|0|0|0|0;0|0|0`,
     );
   });
 });
 
+// The script channel gets its own id, distinct from its module channel's (as
+// the Vue scripter assigns them), so a lookup by the wrong key fails here.
 function scriptChannel(
   scriptId: string,
   parentModuleId: string,
@@ -146,7 +202,6 @@ function scriptChannel(
   channelType: ScriptChannelType,
 ): ScriptChannel {
   return {
-    // a script channel has its own id, never its module channel's
     id: uuid(),
     scriptId,
     channelType,

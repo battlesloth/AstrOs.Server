@@ -41,26 +41,30 @@ export interface ISingleCommand {
   event: unknown;
 }
 
-// The wire command types of .docs/protocol.md § C. Append only.
+// The wire command types of .docs/protocol.md § C (the firmware's
+// MODULE_TYPE). Append only.
 export enum CommandType {
-  none,
-  maestro,
-  i2c,
-  genericSerial,
-  kangaroo,
-  gpio,
-  maestroRandom,
-  gpioRandom,
+  none = 0,
+  maestro = 1,
+  i2c = 2,
+  genericSerial = 3,
+  kangaroo = 4,
+  gpio = 5,
+  maestroRandom = 6,
+  gpioRandom = 7,
 }
 
 export class ScriptConverter {
   readonly TAG = 'ScriptConverter';
 
   locationIds: string[];
-  scriptChannelMap: Map<string, ScriptChannel>;
+  private readonly scriptChannelMap: Map<string, ScriptChannel>;
   scriptChannelModuleMap: Map<string, string>;
-  // keyed by the GPIO channel's own id (a script channel's moduleChannelId)
+  // enabled GPIO channels only, keyed by the GPIO channel's own id (a script
+  // channel's moduleChannelId)
   gpioChannelNumberMap: Map<string, number>;
+  // the script being converted, for log lines
+  private scriptId = '';
   modulesMap: Map<string, ModuleClassType>;
 
   constructor(private readonly scriptRepo: ScriptRepository) {
@@ -166,6 +170,7 @@ export class ScriptConverter {
     const result = new Map<string, string>();
     const eventMap = new Map<string, Map<number, Array<ScriptEvent>>>();
 
+    this.scriptId = scriptId;
     this.gpioChannelNumberMap.clear();
     this.scriptChannelMap.clear();
     this.scriptChannelModuleMap.clear();
@@ -252,13 +257,18 @@ export class ScriptConverter {
   }
 
   private addBufferEvents(map: Map<string, Map<number, Array<ScriptEvent>>>): void {
-    // the script ends at the latest event start or random span end
-    // across all locations; a non-finite end (hand-edited rows) counts as
-    // the span's start, and so does an end before it
+    // The script ends at the latest event start or span end across all
+    // locations; a span skipped as invalid still counts. A non-finite start
+    // is ignored, and a non-finite end, or one before the start, counts as
+    // the span's start, so one bad row can't poison or shorten every
+    // location's end buffer.
     let maxDuration = 0;
     for (const locationEvents of map.values()) {
       for (const events of locationEvents.values()) {
         for (const evt of events) {
+          if (!Number.isFinite(evt.time)) {
+            continue;
+          }
           const end = Number.isFinite(evt.endTime) ? Number(evt.endTime) : evt.time;
           maxDuration = Math.max(maxDuration, evt.time, end);
         }
@@ -552,10 +562,11 @@ export class ScriptConverter {
       throw new Error(`No UART module found for script channel ${evt.scriptChannel}`);
     }
 
-    // a non-numeric position reaches the firmware's std::stoi and reboots the controller
+    // a position that isn't a finite number (undefined, null, "") aborts the
+    // firmware's std::stoi and reboots the controller
     if (!Number.isFinite(maestro.position)) {
       logger.warn(
-        `${this.TAG}: skipping Maestro event ${evt.id} on channel ${evt.scriptChannel}: position ${maestro.position} is not a number`,
+        `${this.TAG}: skipping Maestro event ${evt.id} on channel ${evt.scriptChannel} in script ${this.scriptId}: position ${maestro.position} is not a number`,
       );
       return this.noneAsString(timeTillNextEvent);
     }
@@ -619,13 +630,21 @@ export class ScriptConverter {
     // both already ms; rounded once, so validation and the wire see the same value
     const spanMs = Math.round(Number(evt.endTime) - evt.time);
 
-    const result = this.randomSpanCommand(evt, spanMs, timeTillNextEvent);
+    let result: string | string[];
+    try {
+      result = this.randomSpanCommand(evt, spanMs, timeTillNextEvent);
+    } catch (err) {
+      // stored JSON can hold values that throw on Math.round or interpolation;
+      // logged at error with the stack in case it is a converter bug instead
+      logger.error({ err }, `${this.TAG}: converting random span ${evt.id} threw`);
+      result = [`unexpected error: ${err instanceof Error ? err.message : 'unknown'}`];
+    }
     if (typeof result === 'string') {
       return result;
     }
 
     logger.warn(
-      `${this.TAG}: skipping random span ${evt.id} on channel ${evt.scriptChannel}: ${result.join('; ')}`,
+      `${this.TAG}: skipping random span ${evt.id} on channel ${evt.scriptChannel} in script ${this.scriptId}: ${result.join('; ')}`,
     );
     return this.noneAsString(timeTillNextEvent);
   }
@@ -640,7 +659,7 @@ export class ScriptConverter {
       case ModuleSubType.genericGpio: {
         const gpioChannel = this.getGpioChannelNumber(evt.scriptChannel);
         if (gpioChannel === undefined) {
-          return ['no GPIO channel found'];
+          return [this.missingGpioChannelReason(evt.scriptChannel)];
         }
 
         const span = evt.event as RandomGpioEvent;
@@ -669,9 +688,11 @@ export class ScriptConverter {
           return ['no Maestro channel found'];
         }
 
-        // Every wire field by name, so one missing from the stored payload is
-        // validated (and fails) instead of being sent as "undefined". Servo
-        // or digital is the channel's current setting, not the payload's.
+        // Copy each wire field by name. Without isServo, the validator knows a
+        // Maestro payload by its channel key, so naming channel here gets it
+        // checked (and failed) when the stored payload lacks it, instead of
+        // sent as "undefined". Servo or digital is the channel's current
+        // setting, not the payload's.
         const span = evt.event as RandomMaestroEvent;
         const sent: RandomMaestroEvent = {
           channel: span.channel,
@@ -712,7 +733,7 @@ export class ScriptConverter {
   }
 
   // |___|_________|____|___|______|________|________|______|______|_______|_______|_____|_____;
-  //  evt time_till ctrl  ch  spanMs minGapMs maxGapMs minPos maxPos minMove maxMove speed accel
+  //  evt time_till ctrl ch  spanMs minGapMs maxGapMs minPos maxPos minMove maxMove speed accel
   // A digital channel sends the six fields after maxGapMs as 0; maxMove null is sent as 0.
   randomMaestroAsString(
     evt: RandomMaestroEvent,
@@ -781,6 +802,17 @@ export class ScriptConverter {
     }
 
     return this.gpioChannelNumberMap.get(channel.moduleChannelId);
+  }
+
+  // getGpioChannelMap holds enabled channels only, so a disabled one misses too
+  private missingGpioChannelReason(scriptCh: string): string {
+    const channel = this.scriptChannelMap.get(scriptCh)?.moduleChannel;
+
+    if (channel instanceof GpioChannel && !channel.enabled) {
+      return `GPIO channel ${channel.channelNumber} (${channel.id}) is disabled`;
+    }
+
+    return `no GPIO channel found for ${channel?.id || 'an unknown channel'}`;
   }
 
   getMaestroIsServo(scriptCh: string): boolean | undefined {

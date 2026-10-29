@@ -12,12 +12,16 @@ function isMaestroPayload(
 }
 
 /**
- * The rules of .docs/protocol.md § C a random span breaks, one message per
- * rule, or [] when the controller would accept it. The time fields must
- * already be rounded to whole ms. Pass isServo false for a GPIO span and for
- * a digital Maestro span: their six servo fields are sent as 0, so the
- * payload's copies are not checked. The UART idx and the GPIO channel number
- * are not in the payload; the converter checks those.
+ * The .docs/protocol.md § C rules a random span breaks, one message per rule,
+ * each starting with the field it names, or [] when it breaks none. § C sets
+ * no upper bound on the time fields or indices, so a value past int32
+ * passes here and the firmware still rejects it. The time fields must already be rounded to whole ms.
+ *
+ * Pass isServo false for a GPIO span (no servo fields) and for a digital
+ * Maestro span (its six servo fields are sent as 0, so the payload's copies
+ * aren't checked). Without isServo, a payload counts as Maestro, and its
+ * channel is checked, only if it has a channel key. The UART idx and the GPIO
+ * channel number aren't in the payload; the converter checks those.
  */
 export function randomSpanProblems(
   spanMs: number,
