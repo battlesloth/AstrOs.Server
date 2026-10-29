@@ -8,7 +8,7 @@ Active:  Random span events — Phase A (database guard, span data + conversion)
 Now:     T-008 implemented and reviewed on `feature/T-008-convert-random-spans` (per-commit and pre-push reviews addressed) — awaiting push + PR to develop. Amended 2026-10-29: GPIO points and spans look up the channel by `moduleChannelId`; GPIO point events in Vue-built scripts had never converted
 Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 → server T-009 (save validation; any time before Phase B) → ESP T-009 bench (spans inserted by SQL: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))`, or open and save the script once, since `duration_ds` is only recomputed on save) → ESP v1.3.0 release → server T-010 (report skipped spans on upload; before Phase B) → Phase B scripter (decomposed at phase start) → Phase C
 Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
-Last:    2026-10-28 — T-007 merged (PR #135); develop at `1.0.3-dev.0`
+Last:    2026-10-29 — T-008 implemented, per-commit + pre-push reviewed (3 commits on its branch; § C delta fix also on AstrOs.ESP `docs/protocol-delta-carrier`); T-010 added; develop at `1.0.3-dev.0`
 
 ## Random span events
 
