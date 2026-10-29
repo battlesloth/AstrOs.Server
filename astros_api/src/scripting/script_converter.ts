@@ -17,10 +17,14 @@ import {
   GpioChannel,
   GpioModule,
   HumanCyborgRelationsCmd,
+  MaestroChannel,
+  RandomGpioEvent,
+  RandomMaestroEvent,
 } from '../models/index.js';
 import { v4 as uuid } from 'uuid';
 import { logger } from '../logger.js';
 import { ScriptRepository } from '../dal/repositories/script_repository.js';
+import { randomSpanProblems } from './random_span_validation.js';
 
 interface IUartValues {
   idx: number;
@@ -37,6 +41,7 @@ export interface ISingleCommand {
   event: unknown;
 }
 
+// The wire command types of .docs/protocol.md § C. Append only.
 export enum CommandType {
   none,
   maestro,
@@ -44,20 +49,25 @@ export enum CommandType {
   genericSerial,
   kangaroo,
   gpio,
+  maestroRandom,
+  gpioRandom,
 }
 
 export class ScriptConverter {
   readonly TAG = 'ScriptConverter';
 
   locationIds: string[];
+  scriptChannelMap: Map<string, ScriptChannel>;
   scriptChannelModuleMap: Map<string, string>;
-  scriptChannerlGpioChannelMap: Map<string, number>;
+  // keyed by the GPIO channel's own id (a script channel's moduleChannelId)
+  gpioChannelNumberMap: Map<string, number>;
   modulesMap: Map<string, ModuleClassType>;
 
   constructor(private readonly scriptRepo: ScriptRepository) {
     this.locationIds = [];
+    this.scriptChannelMap = new Map<string, ScriptChannel>();
     this.scriptChannelModuleMap = new Map<string, string>();
-    this.scriptChannerlGpioChannelMap = new Map<string, number>();
+    this.gpioChannelNumberMap = new Map<string, number>();
     this.modulesMap = new Map<string, ModuleClassType>();
   }
 
@@ -156,7 +166,8 @@ export class ScriptConverter {
     const result = new Map<string, string>();
     const eventMap = new Map<string, Map<number, Array<ScriptEvent>>>();
 
-    this.scriptChannerlGpioChannelMap.clear();
+    this.gpioChannelNumberMap.clear();
+    this.scriptChannelMap.clear();
     this.scriptChannelModuleMap.clear();
     this.modulesMap.clear();
 
@@ -165,7 +176,7 @@ export class ScriptConverter {
       this.modulesMap = await this.scriptRepo.getModules();
       const script = await this.scriptRepo.getScript(scriptId);
 
-      this.scriptChannerlGpioChannelMap = await this.scriptRepo.getGpioChannelMap();
+      this.gpioChannelNumberMap = await this.scriptRepo.getGpioChannelMap();
 
       // sort events by the location id and time
       for (const ch of script.scriptChannels) {
@@ -213,6 +224,7 @@ export class ScriptConverter {
       return;
     }
 
+    this.scriptChannelMap.set(channel.id, channel);
     this.scriptChannelModuleMap.set(channel.id, module.id);
 
     for (const key in channel.events) {
@@ -220,6 +232,9 @@ export class ScriptConverter {
 
       // convert from seconds to ms
       evt.time = evt.time * 1000;
+      if (evt.endTime != null) {
+        evt.endTime = evt.endTime * 1000;
+      }
 
       if (map.has(locationId)) {
         if (map.get(locationId)?.has(evt.time)) {
@@ -237,22 +252,15 @@ export class ScriptConverter {
   }
 
   private addBufferEvents(map: Map<string, Map<number, Array<ScriptEvent>>>): void {
-    // get the script duration for all locations
-    // figure out which one is the longest
+    // the script ends at the latest event start or random span end
+    // across all locations; a non-finite end (hand-edited rows) counts as
+    // the span's start, and so does an end before it
     let maxDuration = 0;
-    for (const loc of map.keys()) {
-      const locationEvents = map.get(loc);
-      if (locationEvents === undefined) {
-        continue;
-      }
-
-      const times = Array.from(locationEvents.keys());
-      const sortedTimes = times.sort((n1, n2) => n1 - n2);
-
-      if (sortedTimes.length > 0) {
-        const lastTime = sortedTimes[sortedTimes.length - 1];
-        if (lastTime > maxDuration) {
-          maxDuration = lastTime;
+    for (const locationEvents of map.values()) {
+      for (const events of locationEvents.values()) {
+        for (const evt of events) {
+          const end = Number.isFinite(evt.endTime) ? Number(evt.endTime) : evt.time;
+          maxDuration = Math.max(maxDuration, evt.time, end);
         }
       }
     }
@@ -344,6 +352,11 @@ export class ScriptConverter {
         const timeToSend = j === 0 ? timeTill : 0;
 
         const event = events[j];
+        if (event.endTime != null) {
+          script = this.convertRandomSpanEvent(event, timeToSend) + script;
+          continue;
+        }
+
         switch (event.moduleType) {
           case ModuleType.uart:
             script = this.convertUartEvent(event, timeToSend) + script;
@@ -539,6 +552,14 @@ export class ScriptConverter {
       throw new Error(`No UART module found for script channel ${evt.scriptChannel}`);
     }
 
+    // a non-numeric position reaches the firmware's std::stoi and reboots the controller
+    if (!Number.isFinite(maestro.position)) {
+      logger.warn(
+        `${this.TAG}: skipping Maestro event ${evt.id} on channel ${evt.scriptChannel}: position ${maestro.position} is not a number`,
+      );
+      return this.noneAsString(timeTillNextEvent);
+    }
+
     return this.maestroAsToString(maestro, uart, timeTillNextEvent);
   }
 
@@ -575,7 +596,7 @@ export class ScriptConverter {
   convertGpioEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
     const gpio = evt.event as GpioEvent;
 
-    const gpioChannel = this.scriptChannerlGpioChannelMap.get(evt.scriptChannel);
+    const gpioChannel = this.getGpioChannelNumber(evt.scriptChannel);
     if (gpioChannel === undefined) {
       logger.error(`${this.TAG}: No GPIO channel found for script channel ${evt.scriptChannel}`);
       throw new Error(`No GPIO channel found for script channel ${evt.scriptChannel}`);
@@ -586,6 +607,124 @@ export class ScriptConverter {
 
   gpioEvtAsString(evt: GpioEvent, gpioChannel: number, timeTillNextEvent: number): string {
     return `${CommandType.gpio}|${this.toMsStr(timeTillNextEvent)}|${gpioChannel}|${evt.setHigh ? 1 : 0};`;
+  }
+
+  //#endregion
+  //#region Random span events
+
+  // A span that can't be sent becomes a buffer with the same delay, so the
+  // events after it keep their times. Never throws: a throw in convertScript
+  // empties every controller's upload.
+  convertRandomSpanEvent(evt: ScriptEvent, timeTillNextEvent: number): string {
+    // both already ms; rounded once, so validation and the wire see the same value
+    const spanMs = Math.round(Number(evt.endTime) - evt.time);
+
+    const result = this.randomSpanCommand(evt, spanMs, timeTillNextEvent);
+    if (typeof result === 'string') {
+      return result;
+    }
+
+    logger.warn(
+      `${this.TAG}: skipping random span ${evt.id} on channel ${evt.scriptChannel}: ${result.join('; ')}`,
+    );
+    return this.noneAsString(timeTillNextEvent);
+  }
+
+  // The span's command, or the reasons it can't be sent.
+  private randomSpanCommand(evt: ScriptEvent, spanMs: number, next: number): string | string[] {
+    if (evt.event === null || typeof evt.event !== 'object') {
+      return [`payload ${JSON.stringify(evt.event)} is not an object`];
+    }
+
+    switch (evt.moduleSubType) {
+      case ModuleSubType.genericGpio: {
+        const gpioChannel = this.getGpioChannelNumber(evt.scriptChannel);
+        if (gpioChannel === undefined) {
+          return ['no GPIO channel found'];
+        }
+
+        const span = evt.event as RandomGpioEvent;
+        const sent: RandomGpioEvent = {
+          minGapMs: Math.round(span.minGapMs),
+          maxGapMs: Math.round(span.maxGapMs),
+        };
+
+        const problems = randomSpanProblems(spanMs, sent, false);
+        if (!(Number.isInteger(gpioChannel) && gpioChannel >= 0)) {
+          problems.push(`GPIO channel ${gpioChannel} is not an integer ≥ 0`);
+        }
+
+        return problems.length > 0
+          ? problems
+          : this.randomGpioAsString(sent, gpioChannel, spanMs, next);
+      }
+      case ModuleSubType.maestro: {
+        const uart = this.getUartValues(evt.scriptChannel);
+        if (uart === undefined) {
+          return ['no UART module found'];
+        }
+
+        const isServo = this.getMaestroIsServo(evt.scriptChannel);
+        if (isServo === undefined) {
+          return ['no Maestro channel found'];
+        }
+
+        // Every wire field by name, so one missing from the stored payload is
+        // validated (and fails) instead of being sent as "undefined". Servo
+        // or digital is the channel's current setting, not the payload's.
+        const span = evt.event as RandomMaestroEvent;
+        const sent: RandomMaestroEvent = {
+          channel: span.channel,
+          isServo,
+          minGapMs: Math.round(span.minGapMs),
+          maxGapMs: Math.round(span.maxGapMs),
+          minPos: span.minPos,
+          maxPos: span.maxPos,
+          minMove: span.minMove,
+          maxMove: span.maxMove,
+          speed: span.speed,
+          acceleration: span.acceleration,
+        };
+
+        const problems = randomSpanProblems(spanMs, sent, isServo);
+        if (!(Number.isInteger(uart.idx) && uart.idx >= 0)) {
+          problems.push(`UART idx ${uart.idx} is not an integer ≥ 0`);
+        }
+
+        return problems.length > 0
+          ? problems
+          : this.randomMaestroAsString(sent, uart, spanMs, next);
+      }
+      default:
+        return [`moduleSubType ${evt.moduleSubType} has no random span`];
+    }
+  }
+
+  // |___|_________|____|______|________|________;
+  //  evt time_till gpio spanMs minGapMs maxGapMs
+  randomGpioAsString(
+    evt: RandomGpioEvent,
+    gpioChannel: number,
+    spanMs: number,
+    next: number,
+  ): string {
+    return `${CommandType.gpioRandom}|${this.toMsStr(next)}|${gpioChannel}|${this.toMsStr(spanMs)}|${this.toMsStr(evt.minGapMs)}|${this.toMsStr(evt.maxGapMs)};`;
+  }
+
+  // |___|_________|____|___|______|________|________|______|______|_______|_______|_____|_____;
+  //  evt time_till ctrl  ch  spanMs minGapMs maxGapMs minPos maxPos minMove maxMove speed accel
+  // A digital channel sends the six fields after maxGapMs as 0; maxMove null is sent as 0.
+  randomMaestroAsString(
+    evt: RandomMaestroEvent,
+    uart: IUartValues,
+    spanMs: number,
+    next: number,
+  ): string {
+    const servoFields = evt.isServo
+      ? [evt.minPos, evt.maxPos, evt.minMove, evt.maxMove ?? 0, evt.speed, evt.acceleration]
+      : [0, 0, 0, 0, 0, 0];
+
+    return `${CommandType.maestroRandom}|${this.toMsStr(next)}|${uart.idx}|${evt.channel}|${this.toMsStr(spanMs)}|${this.toMsStr(evt.minGapMs)}|${this.toMsStr(evt.maxGapMs)}|${servoFields.join('|')};`;
   }
 
   //#endregion
@@ -603,6 +742,10 @@ export class ScriptConverter {
       );
     }
 
+    return this.noneAsString(timeTillNextEvent);
+  }
+
+  noneAsString(timeTillNextEvent: number): string {
     return `${CommandType.none}|${this.toMsStr(timeTillNextEvent)}|0;`;
   }
 
@@ -628,6 +771,26 @@ export class ScriptConverter {
     const val = module as UartModule;
 
     return { idx: val.idx, ch: val.uartChannel, baud: val.baudRate };
+  }
+
+  getGpioChannelNumber(scriptCh: string): number | undefined {
+    const channel = this.scriptChannelMap.get(scriptCh);
+
+    if (channel === undefined) {
+      return undefined;
+    }
+
+    return this.gpioChannelNumberMap.get(channel.moduleChannelId);
+  }
+
+  getMaestroIsServo(scriptCh: string): boolean | undefined {
+    const channel = this.scriptChannelMap.get(scriptCh)?.moduleChannel;
+
+    if (!(channel instanceof MaestroChannel)) {
+      return undefined;
+    }
+
+    return channel.isServo;
   }
 
   getI2cChannel(scriptCh: string): number | undefined {

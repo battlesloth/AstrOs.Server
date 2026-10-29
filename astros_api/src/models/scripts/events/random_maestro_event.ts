@@ -1,6 +1,7 @@
 // Payload of a random span on a Maestro channel. Positions and moves are
-// percent of the channel's range; maxMove null means no max. When isServo is
-// false only channel and the gaps are used.
+// percent of the channel's range; maxMove null means no max. isServo is a
+// copy: the server converts by the channel's current servo/digital setting,
+// and a digital channel uses only channel and the gaps.
 export interface RandomMaestroEvent {
   channel: number;
   isServo: boolean;

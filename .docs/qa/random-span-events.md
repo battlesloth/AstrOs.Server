@@ -2,7 +2,7 @@
 
 Tests for random span events: a script event with an end time, inside which the ESP improvises GPIO toggles or servo moves. Spec: `.docs/specs/20261022-0748-random-span-events-design.md`.
 
-The plan grows with the project. T-007 added the data model, so this file starts with the upgrade path. The scripter can't create a span yet (Phase B). Until T-008 the converter has no span case: a GPIO or Maestro span (only possible by hand SQL or a raw API call) uploads as a point command. A GPIO one sets the pin low; a Maestro one sends `position` `undefined`, which reboots the controller. Do not upload a script with a hand-coded span on a build without T-008. The bench cases from the spec (GPIO flicker, servo twitch, panel flap, panic mid-span, padawan span, idle playlist loop, old firmware) arrive with those tasks.
+The plan grows with the project. T-007 added the data model, so this file starts with the upgrade path. The scripter can't create a span yet (Phase B), so the span cases plant rows by hand SQL. T-008 converts a span to command 6 (Maestro) or 7 (GPIO). Without T-008, the converter has no span case. A Maestro span uploads as a point command with `position` `undefined`, which reboots the controller. A script with any GPIO event (span or point) built in the Vue scripter fails to convert at all, so every controller is sent an empty script. Do not upload a script with a hand-coded span on a build without T-008. The bench cases from the spec (GPIO flicker, servo twitch, panel flap, panic mid-span, padawan span, idle playlist loop, old firmware) arrive with those tasks.
 
 ## Preconditions
 
@@ -106,8 +106,88 @@ When the pre-migration backup fails, the server skips the migration and serves r
 6. **Fail:** a script fails to open, or an event is missing.
 7. Clean up: `chmod 0700 /tmp/astros-span-readonly`.
 
+## Server conversion
+
+These cases continue on the migrated copy from case 1, with this build's API running (Preconditions).
+
+**Reading the command strings.** The upload logs its `DEPLOY_SCRIPT` payload at debug level, but no debug line reaches the log (PLAN.md Backlog). These cases read the strings by running the upload's converter against the copy instead. Create the printer once:
+
+```bash
+cat > /tmp/astros-print-conversion.mts <<'EOF'
+// Prints what the upload sends each controller. Run from astros_api/.
+const src = `${process.cwd()}/src`;
+const { createKyselyConnection } = await import(`${src}/dal/database.js`);
+const { ScriptRepository } = await import(`${src}/dal/repositories/script_repository.js`);
+const { ScriptConverter } = await import(`${src}/scripting/script_converter.js`);
+const [dbFile, scriptId] = process.argv.slice(2);
+const { db } = createKyselyConnection(dbFile);
+const locations = await db.selectFrom('locations').select(['id', 'name']).execute();
+const names = new Map(locations.map((l) => [l.id, l.name]));
+const result = await new ScriptConverter(new ScriptRepository(db)).convertScript(scriptId);
+if (result.size === 0) console.log('EMPTY MAP');
+for (const [id, script] of result) console.log(`${names.get(id)}: ${script}`);
+await db.destroy();
+EOF
+```
+
+Run it as `cd astros_api && npx tsx /tmp/astros-print-conversion.mts $DB <script id>`. It prints one `<location>: <commands>` line per location, or `EMPTY MAP` when the conversion threw (the upload would then send every controller an empty script).
+
+### 8. A GPIO point and two spans convert to commands 5, 7 and 6
+
+1. Enable GPIO channel 0 on the core (on the bench, the padawan's relay LED), then reload the scripter:
+   `sqlite3 $DB "UPDATE gpio_channels SET enabled = 1, name = 'QA gpio' WHERE location_id = (SELECT id FROM locations WHERE name = 'core') AND channel_number = 0"`
+2. Create a script named `T-008 QA`. Add the `QA gpio` channel and one Maestro **servo** channel on the body. Add a GPIO event at 1.0 s set high, then save.
+3. Note the ids: `sqlite3 $DB "SELECT s.id, sc.id, sc.module_channel_type, sc.module_channel_id FROM scripts s JOIN script_channels sc ON sc.script_id = s.id WHERE s.name = 'T-008 QA'"`. The second column is each **script channel's** id; the span rows below need it, not `module_channel_id`. The `sqlite3` shell doesn't enforce foreign keys, so a wrong id inserts without error and the span silently never loads. Then note the Maestro channel's number and its board's index: `sqlite3 $DB "SELECT mc.channel_number, u.idx FROM maestro_channels mc JOIN maestro_boards b ON b.id = mc.board_id JOIN uart_modules u ON u.id = b.parent_id WHERE mc.id = '<Maestro module_channel_id>'"`.
+4. Insert a GPIO span from 2.0 to 16.0 s and a Maestro span from 0 to 14.0 s. Times are deciseconds. `duration_ds` is recomputed only on save, so set it too:
+   ```bash
+   sqlite3 $DB "INSERT INTO script_events (id, script_id, script_channel_id, module_type, module_sub_type, time, end_time, data) VALUES
+     ('qa-t008-gpio-span', '<script id>', '<GPIO script channel id>', 3, 301, 20, 160, '{\"minGapMs\":50,\"maxGapMs\":400}'),
+     ('qa-t008-maestro-span', '<script id>', '<Maestro script channel id>', 1, 104, 0, 140, '{\"channel\":<channel number>,\"isServo\":true,\"minGapMs\":400,\"maxGapMs\":2000,\"minPos\":20,\"maxPos\":100,\"minMove\":15,\"maxMove\":60,\"speed\":0,\"acceleration\":0}');
+     UPDATE scripts SET duration_ds = 160 WHERE id = '<script id>'"
+   ```
+5. Run the printer for the script.
+6. **Pass:**
+   - `core: 0|1000|0;5|1000|0|1;7|14000|0|14000|50|400;0|0|0`. The `5|…` is the GPIO point; before T-008 a script with any GPIO point printed `EMPTY MAP`.
+   - `body: 6|16000|<idx>|<channel number>|14000|400|2000|20|100|15|60|0|0;0|0|0`
+   - `dome: 0|16000|0;0|0|0`. Every location's last command is at 16.0 s, the GPIO span's end.
+7. Upload the script from the Scripts page.
+8. **Pass:** the upload reports success, and the API log has no `skipping random span` or `Exception converting script` line.
+9. **Fail:** `EMPTY MAP`, a `5|…` or `1|…` command in a span's place, `undefined` or a `.` anywhere, or a location that ends before 16.0 s.
+
+### 9. An invalid span is skipped with a warning and keeps the timing
+
+1. Add a GPIO span from 18.0 to 19.0 s with a 10 ms min gap (the floor is 20):
+   `sqlite3 $DB "INSERT INTO script_events (id, script_id, script_channel_id, module_type, module_sub_type, time, end_time, data) VALUES ('qa-t008-bad-span', '<script id>', '<GPIO script channel id>', 3, 301, 180, 190, '{\"minGapMs\":10,\"maxGapMs\":400}')"`
+2. Upload the script from the Scripts page.
+3. **Pass:** the upload reports success. The API log has `ScriptConverter: skipping random span qa-t008-bad-span on channel <GPIO script channel id>: minGapMs 10 is below 20`.
+4. Run the printer.
+5. **Pass:**
+   - `core: 0|1000|0;5|1000|0|1;7|16000|0|14000|50|400;0|1000|0;0|0|0`. The bad span's slot is `0|1000|0`, a no-op that keeps the delay.
+   - `body: 6|19000|…` and `dome: 0|19000|0;0|0|0`. The skipped span still sets the script's end.
+6. **Fail:** `EMPTY MAP`, a `7|…|10|…` command, or a location that ends before 19.0 s.
+
+### 10. A Maestro span follows its channel's current servo/digital setting
+
+1. Switch the case 8 Maestro channel to digital on the copy: `sqlite3 $DB "UPDATE maestro_channels SET is_servo = 0 WHERE id = '<Maestro module_channel_id>'"`.
+2. Run the printer.
+3. **Pass:** `body: 6|19000|<idx>|<channel number>|14000|400|2000|0|0|0|0|0|0;0|0|0`. The span's payload still says servo, but the channel is digital, so the six fields after `maxGapMs` are `0`.
+4. Restore it: `sqlite3 $DB "UPDATE maestro_channels SET is_servo = 1 WHERE id = '<Maestro module_channel_id>'"`.
+5. **Fail:** the servo fields are sent for the digital channel.
+
 ### Edge cases covered by tests
 
+- Every validation range in `.docs/protocol.md` § C has a boundary pair (`random_span_validation.test.ts`).
+- Gaps and span lengths are rounded to whole ms before validation and sending: a 2.01 s gap is sent as `2010`, and a 16.1 → 16.2 s span with a 100 ms min gap is valid (`script_converter.test.ts`).
+- A span is skipped with a warning, and other locations still convert, when (`script_converter.test.ts`):
+  - its payload is `null` or not an object;
+  - its GPIO channel, UART module or Maestro channel setting is missing;
+  - its GPIO channel number or UART index is not an integer ≥ 0;
+  - its Maestro channel is still `-1`, or missing from the payload;
+  - its sub-type has no span payload.
+- A span whose end is before its start, `NaN` or `Infinity` doesn't move the end buffers: the script ends at its start instead (`script_converter.test.ts`).
+- Save → load → convert through a real in-memory database gives the expected strings, so the GPIO channel lookup and the Maestro channel's servo setting match what the repository actually returns (`script_converter.integration.test.ts`).
+- A digital payload on a servo channel is validated as servo and skipped when its servo fields are missing (`script_converter.test.ts`).
+- A Maestro point without a numeric `position` is skipped with a warning instead of reaching the controller as `undefined` (`script_converter.test.ts`).
 - A client that omits `endTime` (for example a browser tab loaded before the upgrade) saves point events: `end_time` is stored NULL and reads back `null` (`script_repository.test.ts`).
 - Saving a span on a sub-type with no span payload fails the whole save and leaves the stored script as it was (`script_repository.test.ts`).
 - A span row with an unknown sub-type or unreadable `data` fails the script read, as a point row does, rather than being dropped (`script_repository.test.ts` covers the sub-type).
