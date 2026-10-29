@@ -1,8 +1,10 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi, MockInstance } from 'vitest';
 import { mock, mockReset } from 'vitest-mock-extended';
 import { ScriptConverter, ISingleCommand, CommandType } from './script_converter.js';
 import { ScriptRepository } from '../dal/repositories/script_repository.js';
+import { logger } from '../logger.js';
 import {
+  BaseChannel,
   GenericSerialEvent,
   GpioChannel,
   GpioEvent,
@@ -16,15 +18,19 @@ import {
   I2cModule,
   KangarooAction,
   KangarooEvent,
+  MaestroChannel,
   MaestroEvent,
   ModuleChannelTypes,
   ModuleClassType,
   ModuleSubType,
   ModuleType,
+  RandomGpioEvent,
+  RandomMaestroEvent,
   Script,
   ScriptChannel,
   ScriptChannelType,
   ScriptEvent,
+  ScriptEventTypes,
   UartChannel,
   UartModule,
 } from '../models/index.js';
@@ -38,8 +44,10 @@ const coreGenSerialModId = '1f76c970-2d4a-486e-8b8d-af5e13dac8dd';
 const coreKangarooModId = 'c6e4e295-1b62-43cf-b430-e2ff0fc91740';
 const coreHCRModId = 'ef9ffa30-7486-4aac-80d2-a3096163665b';
 const coreMaestroModId = '29521c55-2603-4a70-bb1f-a47a8c938417';
+const coreMaestroBoardId = '6d2f0c1e-8a4b-4c7e-9f3a-5b1d2e7c9a40';
 const coreI2cModId = 'f903d2fd-eb59-48de-aeac-55b72d06d1a3';
 const coreGpioChannelId = 'a4f5c8e2-3d6b-4f4e-9f1e-2b8f4e5c6d7a';
+const coreGpioChannelNumber = 5;
 
 const domeGenSerialModId = '4af17fad-7cca-4d25-a140-667e4ade4ccd';
 const domeKangarooModId = 'c4bd126f-7947-4e1c-b501-6788d11c8d65';
@@ -254,6 +262,580 @@ describe('Script Converter Tests', () => {
     for (const [, value] of result) {
       expect(value).toBe('0|0|0');
     }
+  });
+});
+
+//#endregion
+//#region GPIO and random spans
+
+describe('GPIO and random span conversion', () => {
+  const mockRepo = mock<ScriptRepository>();
+  let warnSpy: MockInstance<typeof logger.warn>;
+
+  beforeEach(() => {
+    mockReset(mockRepo);
+    mockRepo.getModules.calledWith().mockResolvedValue(getModules());
+    mockRepo.getLocationIds.calledWith().mockResolvedValue([coreLocId, domeLocId, bodyLocId]);
+    // Keyed by the GPIO channel's own id, as ScriptRepository.getGpioChannelMap keys it.
+    mockRepo.getGpioChannelMap
+      .calledWith()
+      .mockResolvedValue(new Map([[coreGpioChannelId, coreGpioChannelNumber]]));
+    // mocked so fixture warnings stay out of the real API log
+    warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const scriptId = 'script-under-test';
+
+  async function convert(...channels: ScriptChannel[]): Promise<Map<string, string>> {
+    for (const ch of channels) {
+      ch.scriptId = scriptId;
+    }
+    mockRepo.getScript.calledWith(scriptId).mockResolvedValue(scriptWith(scriptId, channels));
+    return new ScriptConverter(mockRepo).convertScript(scriptId);
+  }
+
+  it("a gpio point event converts by its channel's moduleChannelId", async () => {
+    const gpioCh = coreGpioScriptCh();
+    expect(gpioCh.id).not.toBe(gpioCh.moduleChannelId);
+    addEvent(gpioCh, 2, null, { setHigh: true } as GpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;5|0|5|1');
+    expect(result.get(domeLocId)).toBe('0|2000|0;0|0|0');
+    expect(result.get(bodyLocId)).toBe('0|2000|0;0|0|0');
+  });
+
+  it('an event without an endTime key converts as a point', async () => {
+    const gpioCh = coreGpioScriptCh();
+    const evt: Partial<ScriptEvent> = addEvent(gpioCh, 2, null, { setHigh: true } as GpioEvent);
+    delete evt.endTime;
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;5|0|5|1');
+  });
+
+  it('gpio random span', async () => {
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;7|14000|5|14000|50|400;0|0|0');
+    expect(result.get(domeLocId)).toBe('0|16000|0;0|0|0');
+    expect(result.get(bodyLocId)).toBe('0|16000|0;0|0|0');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('maestro random span', async () => {
+    const maestroCh = coreMaestroScriptCh(true);
+    addEvent(maestroCh, 0, 14, {
+      channel: 4,
+      isServo: true,
+      minGapMs: 400,
+      maxGapMs: 2000,
+      minPos: 20,
+      maxPos: 100,
+      minMove: 15,
+      maxMove: 60,
+      speed: 0,
+      acceleration: 0,
+    } as RandomMaestroEvent);
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('6|14000|3|4|14000|400|2000|20|100|15|60|0|0;0|0|0');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('maestro random span sends speed and acceleration', async () => {
+    const maestroCh = coreMaestroScriptCh(true);
+    addEvent(maestroCh, 0, 14, servoSpan({ speed: 30, acceleration: 7 }));
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('6|14000|3|4|14000|400|2000|20|100|15|60|30|7;0|0|0');
+  });
+
+  it('null maxMove is sent as 0', async () => {
+    const maestroCh = coreMaestroScriptCh(true);
+    addEvent(maestroCh, 0, 14, servoSpan({ maxMove: null }));
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('6|14000|3|4|14000|400|2000|20|100|15|0|0|0;0|0|0');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a 2.01 s gap is sent as 2010', async () => {
+    const gpioCh = coreGpioScriptCh();
+    const minGapMs = 2.01 * 1000;
+    expect(minGapMs).toBe(2009.9999999999998);
+    addEvent(gpioCh, 0, 10, { minGapMs, maxGapMs: 3000 } as RandomGpioEvent);
+
+    const core = (await convert(gpioCh)).get(coreLocId);
+
+    expect(core).toContain('7|10000|5|10000|2010|3000');
+    expect(core).not.toContain('.');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a gpio max gap is rounded too', async () => {
+    const gpioCh = coreGpioScriptCh();
+    const maxGapMs = 2.03 * 1000;
+    expect(maxGapMs).toBe(2029.9999999999998);
+    addEvent(gpioCh, 0, 10, { minGapMs: 50, maxGapMs } as RandomGpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('7|10000|5|10000|50|2030;0|0|0');
+  });
+
+  it('maestro gaps are rounded too', async () => {
+    const maestroCh = coreMaestroScriptCh(true);
+    addEvent(maestroCh, 0, 14, servoSpan({ minGapMs: 2.01 * 1000, maxGapMs: 2.03 * 1000 }));
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('6|14000|3|4|14000|2010|2030|20|100|15|60|0|0;0|0|0');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a 16.1 → 16.2 s span with a 100 ms min gap is valid', async () => {
+    const gpioCh = coreGpioScriptCh();
+    expect(16.2 * 1000 - 16.1 * 1000).toBe(99.99999999999818);
+    addEvent(gpioCh, 16.1, 16.2, { minGapMs: 100, maxGapMs: 100 } as RandomGpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|16100|0;7|100|5|100|100|100;0|0|0');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('digital maestro span zeroes the servo fields', async () => {
+    const maestroCh = coreMaestroScriptCh(false);
+    addEvent(maestroCh, 0, 14, servoSpan({ isServo: false, speed: 30, acceleration: 7 }));
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('6|14000|3|4|14000|400|2000|0|0|0|0|0|0;0|0|0');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("a span's end extends every location's end buffer", async () => {
+    const domeCh = domeSerialScriptCh();
+    addEvent(domeCh, 5, null, { value: 'dome 5' } as GenericSerialEvent);
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 0, 20, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+
+    const result = await convert(domeCh, gpioCh);
+
+    expect(result.get(domeLocId)).toBe('0|5000|0;3|15000|2|9602|dome 5;0|0|0');
+    expect(result.get(coreLocId)).toBe('7|20000|5|20000|50|400;0|0|0');
+    expect(result.get(bodyLocId)).toBe('0|20000|0;0|0|0');
+  });
+
+  // A core Maestro span at 4.0 → 9.0 s that breaks minMove ≤ range / 2 (45 on
+  // 20–100), between GPIO points at 1.0 and 6.0 s on a second core channel.
+  function invalidSpanBetweenGpioPoints() {
+    const maestroCh = coreMaestroScriptCh(true);
+    const span = addEvent(maestroCh, 4, 9, servoSpan({ minMove: 45 }));
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 1, null, { setHigh: true } as GpioEvent);
+    addEvent(gpioCh, 6, null, { setHigh: false } as GpioEvent);
+    return { channels: [maestroCh, gpioCh], span };
+  }
+
+  it('an invalid span becomes a buffer that keeps the delay chain', async () => {
+    const { channels, span } = invalidSpanBetweenGpioPoints();
+
+    const result = await convert(...channels);
+
+    expect(result.get(coreLocId)).toBe('0|1000|0;5|3000|5|1;0|2000|0;5|3000|5|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      `ScriptConverter: skipping random span ${span.id} on channel ${channels[0].id} in script ${scriptId}: ` +
+        'minMove 45 is not between 1 and half the range (40)',
+    );
+  });
+
+  it('an invalid span still extends the script to its end time', async () => {
+    const { channels } = invalidSpanBetweenGpioPoints();
+
+    const result = await convert(...channels);
+
+    expect(result.get(domeLocId)).toBe('0|9000|0;0|0|0');
+    expect(result.get(bodyLocId)).toBe('0|9000|0;0|0|0');
+  });
+
+  it('a span whose gpio channel mapping is missing is skipped, not thrown', async () => {
+    mockRepo.getGpioChannelMap.calledWith().mockResolvedValue(new Map());
+    const gpioCh = coreGpioScriptCh();
+    const span = addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+    const domeCh = domeSerialScriptCh();
+    addEvent(domeCh, 5, null, { value: 'dome 5' } as GenericSerialEvent);
+
+    const result = await convert(gpioCh, domeCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;0|14000|0;0|0|0');
+    expect(result.get(domeLocId)).toBe('0|5000|0;3|11000|2|9602|dome 5;0|0|0');
+    expect(result.get(bodyLocId)).toBe('0|16000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+  });
+
+  it('a span whose gpio channel number is negative is skipped', async () => {
+    mockRepo.getGpioChannelMap.calledWith().mockResolvedValue(new Map([[coreGpioChannelId, -1]]));
+    const gpioCh = coreGpioScriptCh();
+    const span = addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+  });
+
+  it('a maestro span whose uart idx is negative is skipped', async () => {
+    const modules = getModules();
+    (modules.get(coreMaestroModId) as UartModule).idx = -1;
+    mockRepo.getModules.calledWith().mockResolvedValue(modules);
+    const maestroCh = coreMaestroScriptCh(true);
+    const span = addEvent(maestroCh, 0, 14, servoSpan());
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+  });
+
+  it('a maestro span with no uart module is skipped, not thrown', async () => {
+    // Parented to the core I2C module, so the UART lookup finds nothing.
+    const maestroCh = { ...coreMaestroScriptCh(true), parentModuleId: coreI2cModId };
+    const span = addEvent(maestroCh, 0, 14, servoSpan());
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+  });
+
+  it('a maestro span whose channel has no servo/digital setting is skipped', async () => {
+    const maestroCh = {
+      ...coreMaestroScriptCh(true),
+      moduleChannel: new UartChannel(uuid(), coreMaestroModId, '', ModuleSubType.maestro, true),
+    };
+    const span = addEvent(maestroCh, 0, 14, servoSpan());
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+  });
+
+  it('a span whose payload is not an object is skipped, not thrown', async () => {
+    const gpioCh = coreGpioScriptCh();
+    const nullSpan = addEvent(gpioCh, 2, 4, null as unknown as RandomGpioEvent);
+    const maestroCh = coreMaestroScriptCh(true);
+    const stringSpan = addEvent(maestroCh, 6, 8, 'junk' as unknown as RandomMaestroEvent);
+    const domeCh = domeSerialScriptCh();
+    addEvent(domeCh, 5, null, { value: 'dome 5' } as GenericSerialEvent);
+
+    const result = await convert(gpioCh, maestroCh, domeCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;0|4000|0;0|2000|0;0|0|0');
+    expect(result.get(domeLocId)).toBe('0|5000|0;3|3000|2|9602|dome 5;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(nullSpan.id));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(stringSpan.id));
+  });
+
+  it('a span whose end is before its start ends the script at its start', async () => {
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 10, 5, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|10000|0;0|0|0');
+    expect(result.get(domeLocId)).toBe('0|10000|0;0|0|0');
+  });
+
+  it.each([NaN, Infinity])('a span ending at %s does not move the end buffers', async (end) => {
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 2, end, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+    const domeCh = domeSerialScriptCh();
+    addEvent(domeCh, 5, null, { value: 'dome 5' } as GenericSerialEvent);
+
+    const result = await convert(gpioCh, domeCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;0|3000|0;0|0|0');
+    expect(result.get(domeLocId)).toBe('0|5000|0;3|0|2|9602|dome 5');
+    expect(result.get(bodyLocId)).toBe('0|5000|0;0|0|0');
+  });
+
+  it('a span whose gpio channel number is not an integer is skipped', async () => {
+    mockRepo.getGpioChannelMap.calledWith().mockResolvedValue(new Map([[coreGpioChannelId, 2.5]]));
+    const gpioCh = coreGpioScriptCh();
+    const span = addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+  });
+
+  it('a maestro span whose uart idx is not an integer is skipped', async () => {
+    const modules = getModules();
+    (modules.get(coreMaestroModId) as UartModule).idx = 1.5;
+    mockRepo.getModules.calledWith().mockResolvedValue(modules);
+    const maestroCh = coreMaestroScriptCh(true);
+    const span = addEvent(maestroCh, 0, 14, servoSpan());
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+  });
+
+  it("a maestro span sends its payload's channel, not the module channel's number", async () => {
+    // saveScriptChannel copies the module channel's number into the payload;
+    // the converter sends the payload's copy, as the point path does.
+    const maestroCh = coreMaestroScriptCh(true, 7);
+    addEvent(maestroCh, 0, 14, servoSpan({ channel: 4 }));
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('6|14000|3|4|14000|400|2000|20|100|15|60|0|0;0|0|0');
+  });
+
+  it('a gpio span followed by a point sends the delta to the point, not its span length', async () => {
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+    addEvent(gpioCh, 5, null, { setHigh: true } as GpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;7|3000|5|14000|50|400;5|11000|5|1;0|0|0');
+  });
+
+  it('two spans at one time: only the last in wire order carries the delta', async () => {
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+    addEvent(gpioCh, 5, null, { setHigh: true } as GpioEvent);
+    const maestroCh = coreMaestroScriptCh(true);
+    addEvent(maestroCh, 2, 10, servoSpan());
+
+    const result = await convert(gpioCh, maestroCh);
+
+    expect(result.get(coreLocId)).toBe(
+      '0|2000|0;6|0|3|4|8000|400|2000|20|100|15|60|0|0;7|3000|5|14000|50|400;5|11000|5|1;0|0|0',
+    );
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a span sharing its start with an earlier-listed point carries no delta', async () => {
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 1, null, { setHigh: true } as GpioEvent);
+    const maestroCh = coreMaestroScriptCh(true);
+    addEvent(maestroCh, 1, 5, servoSpan());
+
+    const result = await convert(gpioCh, maestroCh);
+
+    expect(result.get(coreLocId)).toBe(
+      '0|1000|0;6|0|3|4|4000|400|2000|20|100|15|60|0|0;5|4000|5|1;0|0|0',
+    );
+  });
+
+  it('a skipped span sharing its start with a point carries no delta', async () => {
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 1, null, { setHigh: true } as GpioEvent);
+    const maestroCh = coreMaestroScriptCh(true);
+    addEvent(maestroCh, 1, 5, servoSpan({ minMove: 45 }));
+
+    const result = await convert(gpioCh, maestroCh);
+
+    expect(result.get(coreLocId)).toBe('0|1000|0;0|0|0;5|4000|5|1;0|0|0');
+  });
+
+  it('a digital span with only the gaps and a 20 ms min gap is sent', async () => {
+    const maestroCh = coreMaestroScriptCh(false);
+    addEvent(maestroCh, 0, 14, {
+      channel: 4,
+      isServo: false,
+      minGapMs: 20,
+      maxGapMs: 50,
+    } as RandomMaestroEvent);
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('6|14000|3|4|14000|20|50|0|0|0|0|0|0;0|0|0');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a digital span with no channel in its payload is skipped', async () => {
+    const maestroCh = coreMaestroScriptCh(false);
+    const span = addEvent(maestroCh, 0, 14, {
+      isServo: false,
+      minGapMs: 400,
+      maxGapMs: 2000,
+    } as RandomMaestroEvent);
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`${span.id}.*channel undefined is not an integer`)),
+    );
+  });
+
+  it("a span whose gap can't become a primitive is skipped, not thrown", async () => {
+    // JSON can carry an object whose toString / valueOf aren't functions;
+    // Math.round and string interpolation both throw on it
+    const unprintable = { toString: 1, valueOf: 1 } as unknown as number;
+    const gpioCh = coreGpioScriptCh();
+    const gpioSpan = addEvent(gpioCh, 2, 4, { minGapMs: unprintable, maxGapMs: 400 });
+    const maestroCh = coreMaestroScriptCh(true);
+    const maestroSpan = addEvent(maestroCh, 6, 8, servoSpan({ minPos: unprintable }));
+    const domeCh = domeSerialScriptCh();
+    addEvent(domeCh, 5, null, { value: 'dome 5' } as GenericSerialEvent);
+
+    const result = await convert(gpioCh, maestroCh, domeCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;0|4000|0;0|2000|0;0|0|0');
+    expect(result.get(domeLocId)).toBe('0|5000|0;3|3000|2|9602|dome 5;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`${gpioSpan.id}.*unexpected error`)),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`${maestroSpan.id}.*unexpected error`)),
+    );
+    expect(logger.error).toHaveBeenCalledTimes(2);
+  });
+
+  // The bad row's own controller still gets a NaN delta (PLAN.md Backlog:
+  // non-finite event times); this pins only that it can't spread.
+  it("a point with a NaN start does not poison other locations' end buffers", async () => {
+    const domeCh = domeSerialScriptCh();
+    addEvent(domeCh, NaN, null, { value: 'bad row' } as GenericSerialEvent);
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 0, 10, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+
+    const result = await convert(domeCh, gpioCh);
+
+    expect(result.get(coreLocId)).toBe('7|10000|5|10000|50|400;0|0|0');
+    expect(result.get(bodyLocId)).toBe('0|10000|0;0|0|0');
+  });
+
+  it('a span on a disabled gpio channel is skipped and says so', async () => {
+    mockRepo.getGpioChannelMap.calledWith().mockResolvedValue(new Map());
+    const gpioCh = coreGpioScriptCh(false);
+    const span = addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`GPIO channel 5 (${coreGpioChannelId}) is disabled`),
+    );
+  });
+
+  it('a span whose channel type is unknown names an unknown channel', async () => {
+    // getScript leaves this placeholder (id '') for an unknown moduleChannelType
+    mockRepo.getGpioChannelMap.calledWith().mockResolvedValue(new Map());
+    const gpioCh = {
+      ...coreGpioScriptCh(),
+      moduleChannel: new BaseChannel('', '', '', ModuleType.gpio, ModuleSubType.genericGpio, false),
+    };
+    addEvent(gpioCh, 2, 16, { minGapMs: 50, maxGapMs: 400 } as RandomGpioEvent);
+
+    const result = await convert(gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|2000|0;0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('no GPIO channel found for an unknown channel'),
+    );
+  });
+
+  it('a span on a sub-type without a span payload is skipped', async () => {
+    const domeCh = domeSerialScriptCh();
+    const span = addEvent(domeCh, 1, 3, { value: 'not a span' } as GenericSerialEvent);
+
+    const result = await convert(domeCh);
+
+    expect(result.get(domeLocId)).toBe('0|1000|0;0|2000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+  });
+
+  it("a maestro span follows the channel's servo/digital setting, not the payload's", async () => {
+    const maestroCh = coreMaestroScriptCh(false);
+    addEvent(maestroCh, 0, 14, servoSpan({ isServo: true, speed: 30, acceleration: 7 }));
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('6|14000|3|4|14000|400|2000|0|0|0|0|0|0;0|0|0');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('a digital payload on a servo channel is validated as servo', async () => {
+    const maestroCh = coreMaestroScriptCh(true);
+    const span = addEvent(maestroCh, 0, 14, {
+      channel: 4,
+      isServo: false,
+      minGapMs: 400,
+      maxGapMs: 2000,
+    } as RandomMaestroEvent);
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('minPos undefined'));
+  });
+
+  it('a maestro span with no channel in its payload is skipped', async () => {
+    const maestroCh = coreMaestroScriptCh(true);
+    const payload: Partial<RandomMaestroEvent> = servoSpan();
+    delete payload.channel;
+    const span = addEvent(maestroCh, 0, 14, payload as RandomMaestroEvent);
+
+    const result = await convert(maestroCh);
+
+    expect(result.get(coreLocId)).toBe('0|14000|0;0|0|0');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
+  });
+
+  it('a maestro point without a numeric position is skipped', async () => {
+    const maestroCh = coreMaestroScriptCh(true);
+    const point = addEvent(maestroCh, 1, null, servoSpan());
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 3, null, { setHigh: true } as GpioEvent);
+
+    const result = await convert(maestroCh, gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|1000|0;0|2000|0;5|0|5|1');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      `ScriptConverter: skipping Maestro event ${point.id} on channel ${maestroCh.id} in script ${scriptId}: ` +
+        'position undefined is not a number',
+    );
+  });
+
+  it('a maestro span whose channel is still -1 is skipped', async () => {
+    const maestroCh = coreMaestroScriptCh(true);
+    const span = addEvent(maestroCh, 1, 5, servoSpan({ channel: -1 }));
+    const gpioCh = coreGpioScriptCh();
+    addEvent(gpioCh, 3, null, { setHigh: true } as GpioEvent);
+
+    const result = await convert(maestroCh, gpioCh);
+
+    expect(result.get(coreLocId)).toBe('0|1000|0;0|2000|0;5|2000|5|1;0|0|0');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining(span.id));
   });
 });
 
@@ -484,6 +1066,131 @@ describe('script commands', () => {
 });
 
 //#region Helpers
+
+function scriptWith(id: string, scriptChannels: ScriptChannel[]): Script {
+  return {
+    id,
+    scriptName: 'test',
+    description: 'test',
+    lastSaved: new Date(),
+    durationDS: 0,
+    playlistCount: 0,
+    deploymentStatus: {},
+    scriptChannels,
+  };
+}
+
+// The script channel gets its own id, distinct from its GPIO channel's (as
+// the Vue scripter assigns them), so a lookup by the wrong key fails here.
+function coreGpioScriptCh(enabled = true): ScriptChannel {
+  const gpioChannel = new GpioChannel(
+    coreGpioChannelId,
+    coreLocId,
+    coreGpioChannelNumber,
+    enabled,
+    'GPIO 5',
+    false,
+  );
+
+  return {
+    id: uuid(),
+    scriptId: '',
+    channelType: ScriptChannelType.GPIO,
+    parentModuleId: coreLocId,
+    moduleChannelId: gpioChannel.id,
+    moduleChannelType: ModuleChannelTypes.GpioChannel,
+    moduleChannel: gpioChannel,
+    maxDuration: 0,
+    events: {},
+  };
+}
+
+function coreMaestroScriptCh(isServo: boolean, channelNumber = 4): ScriptChannel {
+  // a Maestro channel's parent is its board, not the UART module
+  const maestroChannel = new MaestroChannel(
+    uuid(),
+    coreMaestroBoardId,
+    `Maestro ${channelNumber}`,
+    true,
+    channelNumber,
+    isServo,
+    500,
+    2500,
+    1500,
+    false,
+  );
+
+  return {
+    id: uuid(),
+    scriptId: '',
+    channelType: isServo ? ScriptChannelType.SERVO : ScriptChannelType.GPIO,
+    parentModuleId: coreMaestroModId,
+    moduleChannelId: maestroChannel.id,
+    moduleChannelType: ModuleChannelTypes.MaestroChannel,
+    moduleChannel: maestroChannel,
+    maxDuration: 0,
+    events: {},
+  };
+}
+
+function domeSerialScriptCh(): ScriptChannel {
+  const uartChannel = new UartChannel(
+    uuid(),
+    domeGenSerialModId,
+    '',
+    ModuleSubType.genericSerial,
+    true,
+  );
+
+  return {
+    id: uuid(),
+    scriptId: '',
+    channelType: ScriptChannelType.GENERIC_UART,
+    parentModuleId: domeGenSerialModId,
+    moduleChannelId: uartChannel.id,
+    moduleChannelType: ModuleChannelTypes.UartChannel,
+    moduleChannel: uartChannel,
+    maxDuration: 0,
+    events: {},
+  };
+}
+
+// A valid servo span payload on Maestro channel 4.
+function servoSpan(overrides: Partial<RandomMaestroEvent> = {}): RandomMaestroEvent {
+  return {
+    channel: 4,
+    isServo: true,
+    minGapMs: 400,
+    maxGapMs: 2000,
+    minPos: 20,
+    maxPos: 100,
+    minMove: 15,
+    maxMove: 60,
+    speed: 0,
+    acceleration: 0,
+    ...overrides,
+  };
+}
+
+// Times in seconds, as getScript returns them; the converter scales to ms.
+function addEvent(
+  ch: ScriptChannel,
+  time: number,
+  endTime: number | null,
+  event: ScriptEventTypes,
+): ScriptEvent {
+  const evt: ScriptEvent = {
+    id: uuid(),
+    scriptChannel: ch.id,
+    moduleType: ch.moduleChannel.moduleType,
+    moduleSubType: ch.moduleChannel.moduleSubType,
+    time,
+    endTime,
+    event,
+  };
+  ch.events[evt.id] = evt;
+  return evt;
+}
 
 function generateScript(id: string): Script {
   const script: Script = {
@@ -721,7 +1428,7 @@ function getModules() {
   const coreGpioModule = new GpioModule(coreLocId);
 
   coreGpioModule.channels.push(
-    new GpioChannel(coreGpioChannelId, coreLocId, 5, true, 'GPIO 5', false),
+    new GpioChannel(coreGpioChannelId, coreLocId, coreGpioChannelNumber, true, 'GPIO 5', false),
   );
   map.set(coreLocId, coreGpioModule);
 
