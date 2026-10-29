@@ -1,6 +1,6 @@
 # T-008: Convert random spans to ESP commands 6 and 7
 
-<!-- File: .docs/tasks/T-008-convert-random-spans.md. Branch: feature/T-008-convert-random-spans. PR title: "T-008: Convert random spans to ESP commands 6 and 7". -->
+<!-- File: .docs/tasks/completed/T-008-convert-random-spans.md. Branch: feature/T-008-convert-random-spans. PR title: "T-008: Convert random spans to ESP commands 6 and 7". -->
 
 ## Context
 
