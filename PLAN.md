@@ -5,10 +5,10 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
-Now:     T-007 done on `feature/T-007-persist-random-span-events` (pre-push review addressed) — awaiting push + PR to develop
-Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 → T-008 → server T-009 (save validation; any time before Phase B) → ESP T-009 bench (spans inserted by SQL: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))`, or open and save the script once, since `duration_ds` is only recomputed on save) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
+Now:     T-008 in progress on `feature/T-008-convert-random-spans` (amended 2026-10-29: GPIO points and spans look up the channel by `moduleChannelId`; GPIO point events in Vue-built scripts have never converted)
+Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 → server T-009 (save validation; any time before Phase B) → ESP T-009 bench (spans inserted by SQL: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))`, or open and save the script once, since `duration_ds` is only recomputed on save) → ESP v1.3.0 release → Phase B scripter (decomposed at phase start) → Phase C
 Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
-Last:    2026-10-27 — T-007 implemented and reviewed (span data model, migration 9); develop at `1.0.3-dev.0`
+Last:    2026-10-28 — T-007 merged (PR #135); develop at `1.0.3-dev.0`
 
 ## Random span events
 
@@ -17,7 +17,7 @@ Spec: `.docs/specs/20261022-0748-random-span-events-design.md` · wire format: `
 Phase A — database guard + span data and conversion
 
 - [x] T-006 — Refuse a database written by a newer server (`.docs/tasks/completed/T-006-refuse-newer-database.md`, branch `feature/T-006-refuse-newer-database`; merged 2026-10-26, PR #134; bench-verified 2026-10-23 and QA-walked 2026-10-25, cases 9–14)
-- [x] T-007 — Persist random span events (`.docs/tasks/completed/T-007-persist-random-span-events.md`, branch `feature/T-007-persist-random-span-events`; manual check and bench of QA cases 6–7 through the API, 2026-10-27) — ships with T-008
+- [x] T-007 — Persist random span events (`.docs/tasks/completed/T-007-persist-random-span-events.md`, branch `feature/T-007-persist-random-span-events`; merged 2026-10-28, PR #135; manual check and bench of QA cases 6–7 through the API, 2026-10-27) — ships with T-008
 - [ ] T-008 — Convert random spans to ESP commands 6 and 7 (`.docs/tasks/T-008-convert-random-spans.md`; amended 2026-10-27: Maestro spans follow the channel's servo/digital setting, a Maestro point without a numeric `position` is skipped)
 - [ ] T-009 — Validate random spans on save (`.docs/tasks/T-009-validate-spans-on-save.md`; server numbering, not ESP T-009) — 400 with the reason, finite `endTime` after `time`, `isServo` overwritten on save, a span's sub-type must match its channel's (PR #135 review, 2026-10-28); any time before Phase B
 
