@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { Database } from 'src/dal/types.js';
 import { ScriptRepository } from 'src/dal/repositories/script_repository.js';
 import { logger } from 'src/logger.js';
+import { ScriptValidationError } from 'src/models/index.js';
 import { Router } from 'express';
 
 const getRoute = '/scripts/';
@@ -91,7 +92,7 @@ async function getScript(db: Kysely<Database>, req: any, res: any, next: any) {
   }
 }
 
-async function saveScript(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function saveScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ScriptRepository(db);
 
@@ -105,6 +106,14 @@ async function saveScript(db: Kysely<Database>, req: any, res: any, next: any) {
       });
     }
   } catch (error) {
+    if (error instanceof ScriptValidationError) {
+      logger.warn(`saveScript: refused script ${req.body?.id}: ${error.message}`);
+
+      res.status(400);
+      res.json({ message: error.message });
+      return;
+    }
+
     logger.error(error);
 
     res.status(500);

@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, MockInstance } from 'vitest';
 import { Kysely } from 'kysely';
 import { Database } from '../types.js';
 import { createKyselyConnection, migrateToLatest } from '../database.js';
-import { ScriptRepository } from './script_repository.js';
+import { ScriptRepository, validateScriptSpans } from './script_repository.js';
 import { logger } from 'src/logger.js';
 import {
   Script,
@@ -26,6 +26,7 @@ import {
   HumanCyborgRelationsCmd,
   HcrCommandCategory,
   UploadStatus,
+  ScriptValidationError,
 } from '../../models/index.js';
 import type { MaestroModule } from '../../models/index.js';
 import { upsertGpioModule } from './module_repositories/gpio_repository.js';
@@ -1230,7 +1231,9 @@ describe('Script Repository', () => {
   describe('random span events', () => {
     const maestroChannelNumber = 5;
 
-    async function seedMaestroChannel(): Promise<{ moduleId: string; channel: MaestroChannel }> {
+    async function seedMaestroChannel(
+      isServo = true,
+    ): Promise<{ moduleId: string; channel: MaestroChannel }> {
       const moduleId = uuid();
       const channel = new MaestroChannel(
         uuid(),
@@ -1238,7 +1241,7 @@ describe('Script Repository', () => {
         'Servo Channel 5',
         true,
         maestroChannelNumber,
-        true, // isServo
+        isServo,
         500,
         2500,
         1500,
@@ -1726,6 +1729,454 @@ describe('Script Repository', () => {
       await repo.upsertScript(await repo.getScript(scriptId));
 
       expect(await storedRowsOf(scriptId)).toEqual([{ id: keptId, time: 10, end_time: null }]);
+    });
+
+    // T-009: the save refuses a bad span before its transaction, so a refused
+    // save leaves the stored script as it was.
+    describe('save validation', () => {
+      let errorSpy: MockInstance<typeof logger.error>;
+      let warnSpy: MockInstance<typeof logger.warn>;
+
+      beforeEach(() => {
+        // Refusals and loader misses log at error; keep them out of the API log.
+        errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+        warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      });
+
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      function gpioPoint(scriptChannel: ScriptChannel, time: number): ScriptEvent {
+        return {
+          id: uuid(),
+          scriptChannel: scriptChannel.id,
+          moduleType: ModuleType.gpio,
+          moduleSubType: ModuleSubType.genericGpio,
+          time,
+          endTime: null,
+          event: { setHigh: true } as GpioEvent,
+        };
+      }
+
+      async function seedSavedGpioScript() {
+        const channel = await seedGpioChannel();
+        const scriptId = uuid();
+        const scriptChannel = gpioScriptChannel(scriptId, channel);
+        const repo = new ScriptRepository(db);
+        await repo.upsertScript(scriptWith(scriptChannel, gpioPoint(scriptChannel, 1.0)));
+        return { repo, scriptId, scriptChannel };
+      }
+
+      // Resubmits the stored script renamed, with `span` added to
+      // its channel, and expects the exact refusal and no write.
+      async function expectRefused(
+        repo: ScriptRepository,
+        scriptChannels: ScriptChannel[],
+        span: ScriptEvent,
+        message: string,
+      ) {
+        const scriptId = scriptChannels[0].scriptId;
+        const spanChannel = scriptChannels.find((ch) => ch.id === span.scriptChannel);
+        if (spanChannel === undefined) throw new Error(`no script channel ${span.scriptChannel}`);
+        spanChannel.events[span.id] = span;
+        const before = await storedRowsOf(scriptId);
+
+        const err = await repo
+          .upsertScript({
+            id: scriptId,
+            scriptName: 'Renamed',
+            description: '',
+            lastSaved: new Date(Date.now()),
+            durationDS: 0,
+            playlistCount: 0,
+            deploymentStatus: {},
+            scriptChannels,
+          })
+          .catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(ScriptValidationError);
+        expect((err as Error).message).toBe(message);
+        expect(await storedRowsOf(scriptId)).toEqual(before);
+        expect((await repo.getScript(scriptId)).scriptName).toBe('Span Test Script');
+      }
+
+      it.each([
+        { label: "'5'", endTime: '5', shown: '"5"' },
+        { label: "''", endTime: '', shown: '""' },
+        { label: 'true', endTime: true, shown: 'true' },
+        { label: 'NaN', endTime: NaN, shown: 'null' },
+        { label: 'Infinity', endTime: Infinity, shown: 'null' },
+      ])(
+        'refuses a span whose endTime is not a finite number ($label)',
+        async ({ endTime, shown }) => {
+          const { repo, scriptChannel } = await seedSavedGpioScript();
+          const span = {
+            ...gpioSpan(scriptChannel, 2.0, 0),
+            endTime: endTime as unknown as number,
+          };
+
+          await expectRefused(
+            repo,
+            [scriptChannel],
+            span,
+            `Random span endTime must be a finite number, got ${shown}`,
+          );
+        },
+      );
+
+      it.each([
+        { label: 'at', endTime: 4 },
+        { label: 'before', endTime: 3 },
+      ])('refuses a span that ends $label its time', async ({ endTime }) => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          gpioSpan(scriptChannel, 4, endTime),
+          `Random span endTime must be after its time (4 s), got ${endTime} s`,
+        );
+      });
+
+      it.each([
+        { label: 'a negative start', time: -1, endTime: 1, shown: '-1 to 1' },
+        { label: 'an end past 600 s', time: 599, endTime: 600.1, shown: '599 to 600.1' },
+        { label: 'a -Infinity start', time: -Infinity, endTime: 1, shown: '-Infinity to 1' },
+        { label: 'a string start', time: '5', endTime: 10, shown: '5 to 10' },
+        // Shown as stored: -0.06 s stores as -0.1 s.
+        { label: 'a start that stores below 0', time: -0.06, endTime: 5, shown: '-0.1 to 5' },
+      ])('refuses a span outside 0–600 s: $label', async ({ time, endTime, shown }) => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+        const span = gpioSpan(scriptChannel, time as unknown as number, endTime);
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          span,
+          `Random span must lie between 0 and 600 s, got ${shown} s`,
+        );
+      });
+
+      it('a span from 0 to exactly 600 s is saved', async () => {
+        const { repo, scriptId, scriptChannel } = await seedSavedGpioScript();
+        const span = gpioSpan(scriptChannel, 0, 600);
+        scriptChannel.events[span.id] = span;
+
+        await repo.upsertScript(scriptWith(scriptChannel, span));
+
+        const saved = (await repo.getScript(scriptId)).scriptChannels[0].events[span.id];
+        expect([saved.time, saved.endTime]).toEqual([0, 600]);
+      });
+
+      // Rules 4 and 5 see the times as saveScriptEvent stores them (whole
+      // deciseconds), so no span is stored in a form its next save refuses.
+      it('a span shorter than the 0.1 s storage step is refused', async () => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          gpioSpan(scriptChannel, 0.05, 0.14),
+          'Random span endTime must be after its time (0.1 s), got 0.1 s',
+        );
+      });
+
+      it('an end that stores as 600 s is saved', async () => {
+        const { repo, scriptId, scriptChannel } = await seedSavedGpioScript();
+        const span = gpioSpan(scriptChannel, 0, 600.04);
+        scriptChannel.events[span.id] = span;
+
+        await repo.upsertScript(scriptWith(scriptChannel, span));
+
+        const saved = (await repo.getScript(scriptId)).scriptChannels[0].events[span.id];
+        expect(saved.endTime).toBe(600);
+      });
+
+      it('a start that stores as 0 s is saved', async () => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+        const span = gpioSpan(scriptChannel, -0.04, 5.0);
+        scriptChannel.events[span.id] = span;
+
+        await repo.upsertScript(scriptWith(scriptChannel, span));
+
+        expect((await storedRow(span.id)).time).toBe(0);
+      });
+
+      it('rule order: a backwards span beyond 600 s reports the order', async () => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          gpioSpan(scriptChannel, 700, 650),
+          'Random span endTime must be after its time (700 s), got 650 s',
+        );
+      });
+
+      async function seedSavedSerialScript() {
+        const scriptId = uuid();
+        const scriptChannel = await seedSerialScriptChannel(scriptId);
+        const repo = new ScriptRepository(db);
+        await repo.upsertScript(scriptWith(scriptChannel, serialEvent(scriptChannel, 1.0, null)));
+        return { repo, scriptChannel };
+      }
+
+      it('the sub-type refusal is a ScriptValidationError', async () => {
+        const { repo, scriptChannel } = await seedSavedSerialScript();
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          serialEvent(scriptChannel, 2.0, 5.0),
+          `Random span not supported for moduleSubType: ${ModuleSubType.genericSerial}`,
+        );
+      });
+
+      it('rule order: a span on an unsupported sub-type with a bad endTime reports the sub-type', async () => {
+        const { repo, scriptChannel } = await seedSavedSerialScript();
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          serialEvent(scriptChannel, 2.0, NaN),
+          `Random span not supported for moduleSubType: ${ModuleSubType.genericSerial}`,
+        );
+      });
+
+      // Directly, so the stored sub-type can be set to fail rule 2 too.
+      it('rule order: an unsupported sub-type is reported before a channel problem', async () => {
+        const scriptChannel = await seedSerialScriptChannel(uuid());
+        const script = scriptWith(scriptChannel, serialEvent(scriptChannel, 2.0, 5.0));
+        const unsupported = `Random span not supported for moduleSubType: ${ModuleSubType.genericSerial}`;
+
+        expect(() =>
+          validateScriptSpans(script, new Map([[scriptChannel.id, ModuleSubType.genericGpio]])),
+        ).toThrow(unsupported);
+        expect(() => validateScriptSpans(script, new Map())).toThrow(unsupported);
+      });
+
+      // The request body's moduleChannel is the client's word too: the
+      // stored channel decides.
+      function claimGpio(scriptChannel: ScriptChannel) {
+        scriptChannel.moduleChannel = new GpioChannel(uuid(), locationId, 0, true, 'Fake', false);
+      }
+
+      it('refuses a span whose sub-type does not match its channel', async () => {
+        const { repo, scriptChannel } = await seedSavedSerialScript();
+        claimGpio(scriptChannel);
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          gpioSpan(scriptChannel, 2.0, 5.0),
+          `Random span moduleSubType ${ModuleSubType.genericGpio} does not match its channel's (${ModuleSubType.genericSerial})`,
+        );
+      });
+
+      it('refuses a span whose channel is not in the database', async () => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+        const missingId = uuid();
+        const missing: ScriptChannel = {
+          ...gpioScriptChannel(scriptChannel.scriptId, scriptChannel.moduleChannel as GpioChannel),
+          moduleChannelId: missingId,
+          events: {},
+        };
+
+        await expectRefused(
+          repo,
+          [scriptChannel, missing],
+          gpioSpan(missing, 2.0, 5.0),
+          `Random span channel not found: ${ModuleChannelTypes.GpioChannel} ${missingId}`,
+        );
+      });
+
+      // Only a missing row is "not found": a failed channel read is not a
+      // client error and must not come back as a 400.
+      it('a channel read failure other than a missing row is not a refusal', async () => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+        const span = gpioSpan(scriptChannel, 2.0, 5.0);
+        scriptChannel.events[span.id] = span;
+        await db.schema.alterTable('gpio_channels').renameTo('gpio_channels_gone').execute();
+
+        const err = await repo
+          .upsertScript(scriptWith(scriptChannel, span))
+          .catch((e: unknown) => e);
+
+        expect(err).toBeInstanceOf(Error);
+        expect(err).not.toBeInstanceOf(ScriptValidationError);
+        expect((err as Error).message).toMatch(/no such table: gpio_channels/);
+      });
+
+      it('rule order: a mismatched span with a bad endTime reports the mismatch', async () => {
+        const { repo, scriptChannel } = await seedSavedSerialScript();
+        claimGpio(scriptChannel);
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          gpioSpan(scriptChannel, 2.0, NaN),
+          `Random span moduleSubType ${ModuleSubType.genericGpio} does not match its channel's (${ModuleSubType.genericSerial})`,
+        );
+      });
+
+      // Turns the hand-coded serial span into a GPIO-tagged one: a supported
+      // sub-type, but not its channel's.
+      async function seedHandCodedMismatchedSpan(data = '{"minGapMs":50,"maxGapMs":400}') {
+        const seeded = await seedHandCodedSerialSpan();
+        await db
+          .updateTable('script_events')
+          .set({ module_type: ModuleType.gpio, module_sub_type: ModuleSubType.genericGpio, data })
+          .where('id', '=', seeded.handCodedId)
+          .execute();
+        return seeded;
+      }
+
+      it('drops a hand-coded span whose sub-type does not match its channel', async () => {
+        const { repo, scriptId, keptId, handCodedId } = await seedHandCodedMismatchedSpan();
+
+        const events = (await repo.getScript(scriptId)).scriptChannels[0].events;
+
+        expect(Object.keys(events)).toEqual([keptId]);
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringMatching(
+            new RegExp(
+              `dropping random span ${handCodedId} on channel .* in script ${scriptId} \\(time 30, end_time 80, data .*\\): ` +
+                `moduleSubType ${ModuleSubType.genericGpio} does not match its channel's \\(${ModuleSubType.genericSerial}\\); ` +
+                'the row is deleted when this script is next saved$',
+            ),
+          ),
+        );
+
+        await repo.upsertScript(await repo.getScript(scriptId));
+        expect(await storedRowsOf(scriptId)).toEqual([{ id: keptId, time: 10, end_time: null }]);
+      });
+
+      it('a mismatched span row with unreadable data fails the read', async () => {
+        const { repo, scriptId } = await seedHandCodedMismatchedSpan('not json');
+
+        await expect(repo.getScript(scriptId)).rejects.toThrow();
+      });
+
+      it("a Maestro span takes the stored channel's isServo on save", async () => {
+        const { moduleId, channel } = await seedMaestroChannel(false);
+        // The request's copy of the channel still says servo (a stale tab);
+        // the stored channel, which is digital, decides.
+        const staleCopy = new MaestroChannel(
+          channel.id,
+          moduleId,
+          channel.channelName,
+          true,
+          maestroChannelNumber,
+          true,
+          500,
+          2500,
+          1500,
+          false,
+        );
+        const scriptId = uuid();
+        const scriptChannel: ScriptChannel = {
+          id: uuid(),
+          scriptId,
+          channelType: ScriptChannelType.GPIO,
+          parentModuleId: moduleId,
+          moduleChannelId: channel.id,
+          moduleChannelType: ModuleChannelTypes.MaestroChannel,
+          moduleChannel: staleCopy,
+          maxDuration: 0,
+          events: {},
+        };
+        const span: ScriptEvent = {
+          id: uuid(),
+          scriptChannel: scriptChannel.id,
+          moduleType: ModuleType.uart,
+          moduleSubType: ModuleSubType.maestro,
+          time: 2.0,
+          endTime: 10.0,
+          event: {
+            channel: -1,
+            isServo: true,
+            minGapMs: 400,
+            maxGapMs: 2000,
+            minPos: 20,
+            maxPos: 100,
+            minMove: 15,
+            maxMove: null,
+            speed: 0,
+            acceleration: 0,
+          } as RandomMaestroEvent,
+        };
+        const point: ScriptEvent = {
+          ...span,
+          id: uuid(),
+          time: 12.0,
+          endTime: null,
+          event: {
+            channel: -1,
+            isServo: true,
+            position: 50,
+            speed: 0,
+            acceleration: 0,
+          } as MaestroEvent,
+        };
+        scriptChannel.events[point.id] = point;
+        const repo = new ScriptRepository(db);
+
+        await repo.upsertScript(scriptWith(scriptChannel, span));
+
+        const events = (await repo.getScript(scriptId)).scriptChannels[0].events;
+        expect((events[span.id].event as RandomMaestroEvent).isServo).toBe(false);
+        expect((events[point.id].event as MaestroEvent).isServo).toBe(true);
+      });
+
+      it('a point event is never refused', async () => {
+        const scriptId = uuid();
+        const gpioChannel = gpioScriptChannel(scriptId, await seedGpioChannel());
+        const nullEnd = gpioPoint(gpioChannel, 0);
+        const omitted = gpioPoint(gpioChannel, 2.0);
+        delete (omitted as Partial<ScriptEvent>).endTime;
+        // Beyond the span bound: rule 5 is for spans only.
+        const late = gpioPoint(gpioChannel, 700);
+        gpioChannel.events = { [nullEnd.id]: nullEnd, [omitted.id]: omitted, [late.id]: late };
+        // A GPIO-tagged point on a serial channel: points keep trusting their
+        // own sub-type (PLAN.md Backlog).
+        const serialChannel = await seedSerialScriptChannel(scriptId);
+        const mismatched = gpioPoint(serialChannel, 3.0);
+        serialChannel.events[mismatched.id] = mismatched;
+        const repo = new ScriptRepository(db);
+
+        await repo.upsertScript({
+          ...scriptWith(gpioChannel, nullEnd),
+          scriptChannels: [gpioChannel, serialChannel],
+        });
+
+        const loaded = await repo.getScript(scriptId);
+        const times = loaded.scriptChannels
+          .flatMap((ch) => Object.values(ch.events))
+          .map((e) => [e.time, e.endTime])
+          .sort((a, b) => Number(a[0]) - Number(b[0]));
+        expect(times).toEqual([
+          [0, null],
+          [2.0, null],
+          [3.0, null],
+          [700, null],
+        ]);
+        expect(errorSpy).not.toHaveBeenCalled();
+      });
+
+      // The channel lookup is for spans: a points-only channel is not read on
+      // save, so a missing one neither refuses the save nor logs a loader miss.
+      it('a point on a channel missing from the database is saved without a lookup', async () => {
+        const scriptId = uuid();
+        const missing = gpioScriptChannel(scriptId, await seedGpioChannel());
+        missing.moduleChannelId = uuid();
+        const point = gpioPoint(missing, 1.0);
+
+        await new ScriptRepository(db).upsertScript(scriptWith(missing, point));
+
+        expect(await storedRowsOf(scriptId)).toEqual([{ id: point.id, time: 10, end_time: null }]);
+        expect(errorSpy).not.toHaveBeenCalled();
+      });
     });
   });
 });
