@@ -3,6 +3,8 @@ import { Kysely } from 'kysely';
 import { Database } from '../dal/types.js';
 import { createKyselyConnection, migrateToLatest } from '../dal/database.js';
 import { deleteScript, saveScript } from './scripts_controller.js';
+// The controller's own specifier: under vitest a relative import can load a
+// second module instance, and a prototype spy on it would never apply.
 import { ScriptRepository } from 'src/dal/repositories/script_repository.js';
 import { PlaylistRepository } from '../dal/repositories/playlist_repository.js';
 import { PlaylistType } from '../models/playlists/playlistType.js';
@@ -15,6 +17,7 @@ import {
   ModuleSubType,
   ModuleType,
   ScriptChannelType,
+  ScriptValidationError,
 } from '../models/index.js';
 
 function mockRes() {
@@ -110,7 +113,7 @@ describe('Scripts Controller', () => {
 
     it('a refused save answers 400 with the reason', async () => {
       const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
-      vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
       const scriptId = uuid();
       const scriptChannelId = uuid();
       // A span on a GPIO channel that is not in the database.
@@ -154,8 +157,16 @@ describe('Scripts Controller', () => {
       await saveScript(db, req, res, vi.fn());
 
       const message = `Random span channel not found: ${ModuleChannelTypes.GpioChannel} ${missingId}`;
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ message });
+      // Exactly one response: a second res.json after the 400 would throw
+      // ERR_HTTP_HEADERS_SENT out of the catch and crash the process.
+      expect(res.status.mock.calls).toEqual([[400]]);
+      expect(res.json.mock.calls).toEqual([[{ message }]]);
+      // The repository logs the refusal; the controller only warns. No error
+      // call may carry the refusal, bare or as { err }.
+      const carriesRefusal = (arg: unknown) =>
+        arg instanceof ScriptValidationError ||
+        (arg as { err?: unknown } | null)?.err instanceof ScriptValidationError;
+      expect(errorSpy.mock.calls.flat().some(carriesRefusal)).toBe(false);
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining(`script ${scriptId}: ${message}`),
       );
@@ -174,11 +185,16 @@ describe('Scripts Controller', () => {
       vi.spyOn(ScriptRepository.prototype, 'upsertScript').mockRejectedValue(failure);
       const res = mockRes();
 
-      await saveScript(db, { body: { id: uuid() } }, res, vi.fn());
+      const req = { body: { id: uuid() } };
 
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ message: 'Internal server error' });
-      expect(errorSpy).toHaveBeenCalledWith(failure);
+      await saveScript(db, req, res, vi.fn());
+
+      expect(res.status.mock.calls).toEqual([[500]]);
+      expect(res.json.mock.calls).toEqual([[{ message: 'Internal server error' }]]);
+      expect(errorSpy).toHaveBeenCalledWith(
+        { err: failure, scriptId: req.body.id },
+        'saveScript: save failed',
+      );
       expect(warnSpy).not.toHaveBeenCalled();
     });
   });

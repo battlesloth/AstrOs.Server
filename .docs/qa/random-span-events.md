@@ -143,7 +143,7 @@ Run it as `cd astros_api && npx tsx /tmp/astros-print-conversion.mts $DB <script
    `sqlite3 $DB "UPDATE gpio_channels SET enabled = 1, name = 'QA gpio' WHERE location_id = (SELECT id FROM locations WHERE name = 'core') AND channel_number = 0"`
 2. Create a script named `T-008 QA`. Add the `QA gpio` channel and one Maestro **servo** channel on the body. Add a GPIO event at 1.0 s set high, then save.
 3. Note the ids: `sqlite3 $DB "SELECT s.id, sc.id, sc.module_channel_type, sc.module_channel_id FROM scripts s JOIN script_channels sc ON sc.script_id = s.id WHERE s.name = 'T-008 QA'"`. The second column is each **script channel's** id; the span rows below need it, not `module_channel_id`. The `sqlite3` shell doesn't enforce foreign keys, so a wrong id inserts without error and the span silently never loads. Then note the Maestro channel's number and its UART module's idx (`maestroIdx` on the wire): `sqlite3 $DB "SELECT mc.channel_number, u.idx FROM maestro_channels mc JOIN maestro_boards b ON b.id = mc.board_id JOIN uart_modules u ON u.id = b.parent_id WHERE mc.id = '<Maestro module_channel_id>'"`.
-4. Insert a GPIO span from 2.0 to 16.0 s and a Maestro span from 0 to 14.0 s. Times are deciseconds. `duration_ds` is recomputed only on save, so set it too:
+4. Insert a GPIO span from 2.0 to 16.0 s and a Maestro span from 0 to 14.0 s. Times are deciseconds. `duration_ds` is recomputed only on save, so set it too. Keep any hand-inserted span within `0 ≤ time < end_time ≤ 6000`: since T-009 a stored span outside that loads, but makes every save of its script answer 400 (`SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` should return nothing):
    ```bash
    sqlite3 $DB "INSERT INTO script_events (id, script_id, script_channel_id, module_type, module_sub_type, time, end_time, data) VALUES
      ('qa-t008-gpio-span', '<script id>', '<GPIO script channel id>', 3, 301, 20, 160, '{\"minGapMs\":50,\"maxGapMs\":400}'),
@@ -255,13 +255,17 @@ get > /tmp/astros-t009-before.json
   - a sub-type other than the stored channel's (the request body's `moduleChannel` is ignored), or a channel missing from the database;
   - an `endTime` of `'5'`, `''`, `true`, `NaN` or `Infinity`, or one at or before `time`;
   - a span outside 0–600 s: a start of −1, `-Infinity` or a string, or an end of 600.1. A span from 0 to exactly 600 s is saved.
-  - Rules 4 and 5 judge the times as stored (whole deciseconds): a span from 0.05 to 0.14 s, which would store as 0.1 → 0.1 and then block every later save of the script, is refused with `(0.1 s), got 0.1 s`; an end of 600.04 stores as 600 and a start of −0.04 as 0, and both are saved; a start of −0.06 is refused as `-0.1`.
-  - Rule order is pinned: sub-type before channel, sub-type before `endTime`, mismatch before `endTime`, order before range.
-- A channel read that fails for any reason but a missing row propagates (a 500), rather than coming back as a 400 "channel not found" (`script_repository.test.ts`).
+  - The order and range checks judge the times as stored (whole deciseconds): a span from 0.05 to 0.14 s, which would store as 0.1 → 0.1 and then block every later save of the script, is refused with `(0.1 s), got 0.1 s`; an end of 600.04 stores as 600, and a start of −0.04 or −0.05 as 0, and they are saved; a start of −0.06 is refused as `-0.1`.
+  - a span without a `time` (rule 4, `(NaN s)`), and a bad span between two valid ones (every span is checked, not just the first).
+  - Rule order is pinned: sub-type before channel, sub-type before `endTime`, not-found and mismatch before `endTime`, order before range.
+  - Each refusal logs `ScriptRepository.validateScriptSpans: refusing event <id> on channel <id> in script <id>: <reason>` at error; accepted saves log no error.
+- A channel read that fails for any reason but a missing row propagates (a 500), rather than coming back as a 400 "channel not found"; a span on a channel type the server doesn't load (`PwmChannel`) is refused as not found, while a points-only channel of that type saves and reads back; a span rule 1 refuses doesn't look up its channel, so even a channel id SQLite can't bind gets rule 1's 400 (`script_repository.test.ts`).
+- Kangaroo and I2C script channels load their stored channels (`script_repository.test.ts`).
+- A write that fails inside the save's transaction rolls the whole save back (`script_repository.test.ts`).
 - Point events are never refused: `endTime` null or omitted, `time` 0 or 700, a sub-type other than its channel's, or a channel missing from the database, which a points-only channel is not even looked up for (`script_repository.test.ts`).
 - A hand-coded span whose sub-type is not its channel's is dropped on load and deleted by the next save; with unreadable `data` it fails the read instead (`script_repository.test.ts`).
-- A Maestro span's `isServo` is overwritten on save from the stored channel, even when the request's `moduleChannel` says otherwise; a Maestro point's is not (`script_repository.test.ts`).
-- `PUT /api/scripts/` answers 400 with the reason for a refusal and logs a warning with the script id; any other failure stays `500 Internal server error` (`scripts_controller.test.ts`).
+- A Maestro span's `isServo` is overwritten on save from the stored channel, in both directions and even when the request's `moduleChannel` says otherwise; a Maestro point's is not (`script_repository.test.ts`).
+- `PUT /api/scripts/` answers exactly one response: 400 with the reason for a refusal (a warning with the script id; no controller error log carries the refusal), or `500 Internal server error` for anything else (an error log with the script id) (`scripts_controller.test.ts`).
 - A span row with an unknown sub-type or unreadable `data` fails the script read, as a point row does, rather than being dropped (`script_repository.test.ts` covers the sub-type).
 - A crash between migration 9's `ALTER TABLE` and Kysely's migration record: the next boot re-runs `up`, which finds the column and does nothing (`migration_9.test.ts`).
 - Rolling `migration_9` back drops the column and keeps the rest of each row (`migration_9.test.ts`).

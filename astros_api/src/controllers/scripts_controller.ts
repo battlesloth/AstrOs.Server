@@ -106,6 +106,8 @@ export async function saveScript(db: Kysely<Database>, req: any, res: any, next:
       });
     }
   } catch (error) {
+    // Only this route maps a refusal to 400; /scripts/copy answers 500 for any
+    // failure.
     if (error instanceof ScriptValidationError) {
       logger.warn(`saveScript: refused script ${req.body?.id}: ${error.message}`);
 
@@ -114,7 +116,7 @@ export async function saveScript(db: Kysely<Database>, req: any, res: any, next:
       return;
     }
 
-    logger.error(error);
+    logger.error({ err: error, scriptId: req.body?.id }, 'saveScript: save failed');
 
     res.status(500);
     res.json({

@@ -18,6 +18,7 @@ export const MIN_SCROLL_THUMB_WIDTH = 40; // Minimum horizontal thumb width
 // ============================================================================
 
 export const PIXELS_PER_SECOND = 30;
+// astros_api's span save validation (script_repository.ts) copies this bound; change both.
 export const TIMELINE_DURATION_SECONDS = 600; // 10 minutes
 export const PIXELS_PER_MAJOR_TICK = 10 * PIXELS_PER_SECOND; // 300 pixels - consistent spacing across all zoom levels
 
