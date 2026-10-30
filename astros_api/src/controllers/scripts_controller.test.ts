@@ -111,52 +111,56 @@ describe('Scripts Controller', () => {
       vi.restoreAllMocks();
     });
 
+    // A request body whose one span is on a GPIO channel that is not in the
+    // database, and the refusal's message.
+    function missingChannelRequest(scriptId: unknown) {
+      const scriptChannelId = uuid();
+      const missingId = uuid();
+      const body = {
+        id: scriptId,
+        scriptName: 'Refused',
+        description: '',
+        lastSaved: new Date(),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [
+          {
+            id: scriptChannelId,
+            scriptId,
+            channelType: ScriptChannelType.GPIO,
+            parentModuleId: uuid(),
+            moduleChannelId: missingId,
+            moduleChannelType: ModuleChannelTypes.GpioChannel,
+            moduleChannel: new GpioChannel(missingId, uuid(), 0, true, 'GPIO 0', false),
+            maxDuration: 0,
+            events: {
+              span: {
+                id: 'span',
+                scriptChannel: scriptChannelId,
+                moduleType: ModuleType.gpio,
+                moduleSubType: ModuleSubType.genericGpio,
+                time: 2,
+                endTime: 5,
+                event: { minGapMs: 50, maxGapMs: 400 },
+              },
+            },
+          },
+        ],
+      };
+      const message = `Random span channel not found: ${ModuleChannelTypes.GpioChannel} ${missingId}`;
+      return { req: { body }, message };
+    }
+
     it('a refused save answers 400 with the reason', async () => {
       const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
       const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
       const scriptId = uuid();
-      const scriptChannelId = uuid();
-      // A span on a GPIO channel that is not in the database.
-      const missingId = uuid();
-      const req: any = {
-        body: {
-          id: scriptId,
-          scriptName: 'Refused',
-          description: '',
-          lastSaved: new Date(),
-          durationDS: 0,
-          playlistCount: 0,
-          deploymentStatus: {},
-          scriptChannels: [
-            {
-              id: scriptChannelId,
-              scriptId,
-              channelType: ScriptChannelType.GPIO,
-              parentModuleId: uuid(),
-              moduleChannelId: missingId,
-              moduleChannelType: ModuleChannelTypes.GpioChannel,
-              moduleChannel: new GpioChannel(missingId, uuid(), 0, true, 'GPIO 0', false),
-              maxDuration: 0,
-              events: {
-                span: {
-                  id: 'span',
-                  scriptChannel: scriptChannelId,
-                  moduleType: ModuleType.gpio,
-                  moduleSubType: ModuleSubType.genericGpio,
-                  time: 2,
-                  endTime: 5,
-                  event: { minGapMs: 50, maxGapMs: 400 },
-                },
-              },
-            },
-          ],
-        },
-      };
+      const { req, message } = missingChannelRequest(scriptId);
       const res = mockRes();
 
       await saveScript(db, req, res, vi.fn());
 
-      const message = `Random span channel not found: ${ModuleChannelTypes.GpioChannel} ${missingId}`;
       // Exactly one response: a second res.json after the 400 would throw
       // ERR_HTTP_HEADERS_SENT out of the catch and crash the process.
       expect(res.status.mock.calls).toEqual([[400]]);
@@ -167,15 +171,30 @@ describe('Scripts Controller', () => {
         arg instanceof ScriptValidationError ||
         (arg as { err?: unknown } | null)?.err instanceof ScriptValidationError;
       expect(errorSpy.mock.calls.flat().some(carriesRefusal)).toBe(false);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining(`script ${scriptId}: ${message}`),
-      );
+      expect(warnSpy).toHaveBeenCalledWith({ scriptId }, `saveScript: refused script: ${message}`);
       const stored = await db
         .selectFrom('scripts')
         .select('id')
         .where('id', '=', scriptId)
         .executeTakeFirst();
       expect(stored).toBeUndefined();
+    });
+
+    // The warn carries the id as a field, never converted to text: a throw in
+    // the catch would reject this async handler, which Express 4 leaves
+    // unhandled, and the process would exit.
+    it('a refused save whose script id String() throws on still answers one 400', async () => {
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      const scriptId = { toString: 0 };
+      const { req, message } = missingChannelRequest(scriptId);
+      const res = mockRes();
+
+      await expect(saveScript(db, req, res, vi.fn())).resolves.toBeUndefined();
+
+      expect(res.status.mock.calls).toEqual([[400]]);
+      expect(res.json.mock.calls).toEqual([[{ message }]]);
+      expect(warnSpy).toHaveBeenCalledWith({ scriptId }, `saveScript: refused script: ${message}`);
     });
 
     it('any other save failure still answers 500 Internal server error', async () => {

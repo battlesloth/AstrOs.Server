@@ -775,6 +775,27 @@ function toStoredDs(seconds: number): number {
   return Math.round(seconds * 10);
 }
 
+// Number() and String() for a value from the untyped request body. Both throw
+// on a JSON object with a "toString" key (its value can't be callable), or an
+// array holding one, which would turn a refusal into a 500. toNumber makes that
+// NaN, as Number({}) is; toText shows its JSON, which can't throw for parsed
+// JSON.
+function toNumber(value: unknown): number {
+  try {
+    return Number(value);
+  } catch {
+    return NaN;
+  }
+}
+
+function toText(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return JSON.stringify(value);
+  }
+}
+
 // Whether validateScriptSpans needs ch's stored channel. A span whose sub-type
 // has no span support fails rule 1 before its channel is read, so it isn't
 // looked up; any other span the validator checks must be, or it is refused
@@ -809,7 +830,7 @@ export function validateScriptSpans(
       const problem = spanProblem(evt, ch, channelSubTypes.get(ch.id));
       if (problem !== undefined) {
         logger.error(
-          `ScriptRepository.validateScriptSpans: refusing event ${evt.id} on channel ${ch.id} in script ${script.id}: ${problem}`,
+          `ScriptRepository.validateScriptSpans: refusing event ${toText(evt.id)} on channel ${toText(ch.id)} in script ${toText(script.id)}: ${problem}`,
         );
         throw new ScriptValidationError(problem);
       }
@@ -828,11 +849,11 @@ function spanProblem(
 
   // 1. A sub-type with span support.
   if (!supportsRandomSpan(moduleSubType)) {
-    return `Random span not supported for moduleSubType: ${moduleSubType}`;
+    return `Random span not supported for moduleSubType: ${toText(moduleSubType)}`;
   }
   // 2. Its channel's stored sub-type.
   if (channelSubType === undefined) {
-    return `Random span channel not found: ${ch.moduleChannelType} ${ch.moduleChannelId}`;
+    return `Random span channel not found: ${toText(ch.moduleChannelType)} ${toText(ch.moduleChannelId)}`;
   }
   if (moduleSubType !== channelSubType) {
     return `Random span moduleSubType ${moduleSubType} does not match its channel's (${channelSubType})`;
@@ -843,7 +864,7 @@ function spanProblem(
   }
   // 4 and 5 judge the times as stored, so a span can't be saved in a form its
   // next save refuses (0.05 → 0.14 s stores as 0.1 → 0.1).
-  const storedTime = toStoredDs(Number(time)) / 10;
+  const storedTime = toStoredDs(toNumber(time)) / 10;
   const storedEnd = toStoredDs(endTime) / 10;
   // 4. Ends after it starts. Negated so a NaN time fails here.
   if (!(storedEnd > storedTime)) {

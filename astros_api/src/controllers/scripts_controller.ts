@@ -109,7 +109,9 @@ export async function saveScript(db: Kysely<Database>, req: any, res: any, next:
     // Only this route maps a refusal to 400; /scripts/copy answers 500 for any
     // failure.
     if (error instanceof ScriptValidationError) {
-      logger.warn(`saveScript: refused script ${req.body?.id}: ${error.message}`);
+      // The id as a field, not in the text: converting it can throw, and a
+      // throw here rejects the handler, which Express 4 leaves unhandled.
+      logger.warn({ scriptId: req.body?.id }, `saveScript: refused script: ${error.message}`);
 
       res.status(400);
       res.json({ message: error.message });

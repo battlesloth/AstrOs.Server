@@ -200,7 +200,7 @@ get > /tmp/astros-t009-before.json
    jq '(.scriptChannels[].events[] | select(.endTime == null and .moduleSubType == 301)) |= (.endTime = .time - 1)' /tmp/astros-t009-before.json > /tmp/astros-t009-bad.json
    put /tmp/astros-t009-bad.json
    ```
-2. **Pass:** `HTTP/1.1 400` and `{"message":"Random span endTime must be after its time (1 s), got 0 s"}`. The API log has `saveScript: refused script <ID>: Random span endTime must be after …` (warn) and `ScriptRepository.validateScriptSpans: refusing event <event id> on channel <GPIO script channel id> in script <ID>: …` (error).
+2. **Pass:** `HTTP/1.1 400` and `{"message":"Random span endTime must be after its time (1 s), got 0 s"}`. The API log has `saveScript: refused script: Random span endTime must be after …` (warn, with `scriptId` <ID>) and `ScriptRepository.validateScriptSpans: refusing event <event id> on channel <GPIO script channel id> in script <ID>: …` (error).
 3. `get | diff /tmp/astros-t009-before.json -` **Pass:** empty.
 4. **Fail:** `200` or `500`, a different message, or a GET that differs.
 
@@ -257,6 +257,7 @@ get > /tmp/astros-t009-before.json
   - a span outside 0–600 s: a start of −1, `-Infinity` or a string, or an end of 600.1. A span from 0 to exactly 600 s is saved.
   - The order and range checks judge the times as stored (whole deciseconds): a span from 0.05 to 0.14 s, which would store as 0.1 → 0.1 and then block every later save of the script, is refused with `(0.1 s), got 0.1 s`; an end of 600.04 stores as 600, and a start of −0.04 or −0.05 as 0, and they are saved; a start of −0.06 is refused as `-0.1`.
   - a span without a `time` (rule 4, `(NaN s)`), and a bad span between two valid ones (every span is checked, not just the first).
+  - a value `Number()` and `String()` throw on (JSON with a `"toString"` key, or an array holding one) still gets a 400, not a 500: as a start, rule 4's `(NaN s)`; as a sub-type, rule 1; as a channel type, not found, with any id (a type that matches no case is not looked up); as the event, script channel or script id, the span's own refusal. The sub-type and channel messages, and the log line's ids, show the value as JSON. On a known channel type, an id SQLite can't bind still fails the lookup (a 500, below).
   - Rule order is pinned: sub-type before channel, sub-type before `endTime`, not-found and mismatch before `endTime`, order before range.
   - Each refusal logs `ScriptRepository.validateScriptSpans: refusing event <id> on channel <id> in script <id>: <reason>` at error; accepted saves log no error.
 - A channel read that fails for any reason but a missing row propagates (a 500), rather than coming back as a 400 "channel not found"; a span on a channel type the server doesn't load (`PwmChannel`) is refused as not found, while a points-only channel of that type saves and reads back; a span rule 1 refuses doesn't look up its channel, so even a channel id SQLite can't bind gets rule 1's 400 (`script_repository.test.ts`).

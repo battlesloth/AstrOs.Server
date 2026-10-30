@@ -5,10 +5,10 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
-Now:     T-009 implemented and reviewed on `feature/T-009-validate-spans-on-save` (per-commit, fix-delta and pre-push reviews addressed) — awaiting push + PR to develop. Amended 2026-10-29 (Jeff): rule 5 bounds a span to 0–600 s; times judged as stored; `isServo` from the stored channel. T-011 (Copy button fix) added, unscheduled. T-008 merged 2026-10-29 (PR #136), which unblocks the AstrOs.ESP T-009 bench (its Blocked line)
+Now:     T-009 in review as PR #137 (`feature/T-009-validate-spans-on-save`). Copilot's one finding (a request value whose conversion throws turned a refusal into a 500) and the code review's follow-up (the same bug in the refusal's log line) fixed 2026-10-30; awaiting Jeff's push, then the thread reply and resolve. T-011 (Copy button fix) added, unscheduled. T-008 merged 2026-10-29 (PR #136), which unblocks the AstrOs.ESP T-009 bench (its Blocked line)
 Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 ✓ → server T-009 (save validation; any time before Phase B) → ESP T-009 bench (spans inserted by SQL: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))`, or open and save the script once, since `duration_ds` is only recomputed on save; and keep each span row within `0 ≤ time < end_time ≤ 6000` ds, because since T-009 a stored span outside that makes every save of its script answer 400; check: `SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` returns nothing) → ESP v1.3.0 release → server T-010 (report skipped spans on upload; before Phase B) → Phase B scripter (decomposed at phase start) → Phase C. Unscheduled, any time: T-011 (Copy button fix)
 Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
-Last:    2026-10-29 — T-008 merged (PR #136) and closed out; T-009 implemented and reviewed on its branch (2 commits + review fixes); develop at `1.0.3-dev.0`
+Last:    2026-10-30 — PR #137 review round: Copilot's finding plus the code review's follow-up fixed on the T-009 branch; develop at `1.0.3-dev.0`
 
 ## Random span events
 

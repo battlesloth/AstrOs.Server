@@ -1929,6 +1929,20 @@ describe('Script Repository', () => {
         );
       });
 
+      // Number() throws on a JSON object with a "toString" key; that start
+      // counts as NaN, so the save is refused rather than failing with a 500.
+      it('a start Number() throws on is refused by rule 4', async () => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+        const span = gpioSpan(scriptChannel, { toString: 0 } as unknown as number, 5);
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          span,
+          'Random span endTime must be after its time (NaN s), got 5 s',
+        );
+      });
+
       it('every span is checked: a bad span between two valid ones is refused', async () => {
         const { repo, scriptChannel } = await seedSavedGpioScript();
         const first = gpioSpan(scriptChannel, 2, 5);
@@ -1973,6 +1987,22 @@ describe('Script Repository', () => {
           [scriptChannel],
           serialEvent(scriptChannel, 2.0, 5.0),
           `Random span not supported for moduleSubType: ${ModuleSubType.genericSerial}`,
+        );
+      });
+
+      // String() throws on it as Number() does; the message shows its JSON.
+      it('a sub-type String() throws on is refused by rule 1', async () => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+        const span = {
+          ...gpioSpan(scriptChannel, 2.0, 5.0),
+          moduleSubType: { toString: 0 } as unknown as ModuleSubType,
+        };
+
+        await expectRefused(
+          repo,
+          [scriptChannel],
+          span,
+          'Random span not supported for moduleSubType: {"toString":0}',
         );
       });
 
@@ -2313,6 +2343,58 @@ describe('Script Repository', () => {
           `Random span channel not found: ${ModuleChannelTypes.PwmChannel} ${pwm.moduleChannelId}`,
         );
       });
+
+      // Not looked up (the type matches no case), and the message shows each as
+      // JSON. Both throw, so dropping either conversion fails; distinct values
+      // catch the two being swapped.
+      it('a channel type and id String() throws on are refused as not found', async () => {
+        const { repo, scriptChannel } = await seedSavedGpioScript();
+        const odd: ScriptChannel = {
+          ...pwmScriptChannel(scriptChannel.scriptId),
+          moduleChannelType: { toString: 0 } as unknown as string,
+          moduleChannelId: { toString: 1 } as unknown as string,
+        };
+
+        await expectRefused(
+          repo,
+          [scriptChannel, odd],
+          gpioSpan(odd, 2.0, 5.0),
+          'Random span channel not found: {"toString":0} {"toString":1}',
+        );
+      });
+
+      // The refusal's log line shows the ids as JSON too: a log line that threw
+      // would turn the refusal into a 500.
+      it.each(['event', 'channel', 'script'] as const)(
+        'refuses a span whose %s id String() throws on',
+        async (which) => {
+          const { repo, scriptId, scriptChannel } = await seedSavedGpioScript();
+          const odd = { toString: 0 } as unknown as string;
+          const span = gpioSpan(scriptChannel, 4, 2);
+          // Keyed while span.id is still a string: an object key would throw.
+          const script = scriptWith(scriptChannel, span);
+          const shown = {
+            event: span.id,
+            channel: scriptChannel.id,
+            script: scriptId,
+            [which]: '{"toString":0}',
+          };
+          if (which === 'event') span.id = odd;
+          if (which === 'channel') scriptChannel.id = odd;
+          if (which === 'script') script.id = odd;
+          const before = await storedRowsOf(scriptId);
+
+          const err = await repo.upsertScript(script).catch((e: unknown) => e);
+
+          const message = 'Random span endTime must be after its time (4 s), got 2 s';
+          expect(err).toBeInstanceOf(ScriptValidationError);
+          expect((err as Error).message).toBe(message);
+          expect(errorSpy).toHaveBeenCalledWith(
+            `ScriptRepository.validateScriptSpans: refusing event ${shown.event} on channel ${shown.channel} in script ${shown.script}: ${message}`,
+          );
+          expect(await storedRowsOf(scriptId)).toEqual(before);
+        },
+      );
 
       it('a points-only channel of a type the server does not load saves and reads back', async () => {
         const scriptId = uuid();
