@@ -27,6 +27,7 @@ export type { ScriptChannel } from './scripts/script_channel.js';
 export type { ScriptChannelResource } from './scripts/script_channel_resource.js';
 export { moduleSubTypeToScriptEventTypes, supportsRandomSpan } from './scripts/script_event.js';
 export type { ScriptEvent, ScriptEventTypes } from './scripts/script_event.js';
+export { ScriptValidationError } from './scripts/script_validation_error.js';
 export { KangarooAction } from './scripts/events/kangaroo_event.js';
 export type { KangarooEvent } from './scripts/events/kangaroo_event.js';
 export type {

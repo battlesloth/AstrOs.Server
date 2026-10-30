@@ -15,11 +15,12 @@ import {
   RandomMaestroEvent,
   MaestroChannel,
   isLocationName,
+  ScriptValidationError,
 } from 'src/models/index.js';
 import { logger } from 'src/logger.js';
 import { Guid } from 'guid-typescript';
 import { Database } from 'src/dal/types.js';
-import { Kysely, Transaction } from 'kysely';
+import { Kysely, NoResultError, Transaction } from 'kysely';
 import {
   getAllActiveGpioChannels,
   getGpioModule,
@@ -41,6 +42,10 @@ export class ScriptRepository {
   //#region Script Create
 
   async upsertScript(script: Script): Promise<boolean> {
+    // Before calculateLengthDS, so a bad endTime is refused for what it is
+    // rather than surfacing as the duration_ds NOT NULL constraint.
+    const storedChannels = await this.loadAndValidateSpanChannels(script);
+
     // always calculate duration on save to ensure it is up
     // to date with any changes to events or channels
     script.durationDS = calculateLengthDS(script);
@@ -76,7 +81,7 @@ export class ScriptRepository {
       await this.deleteScriptChannels(tx, script.id);
 
       for (const ch of script.scriptChannels) {
-        await this.saveScriptChannel(tx, script, ch);
+        await this.saveScriptChannel(tx, script, ch, storedChannels.get(ch.id));
       }
     });
 
@@ -340,7 +345,14 @@ export class ScriptRepository {
 
   //#region Channels Create
 
-  private async saveScriptChannel(tx: Transaction<Database>, script: Script, ch: ScriptChannel) {
+  // storedChannel: the channel as stored, loaded for validation when the
+  // script channel holds a span; undefined otherwise.
+  private async saveScriptChannel(
+    tx: Transaction<Database>,
+    script: Script,
+    ch: ScriptChannel,
+    storedChannel: BaseChannel | undefined,
+  ) {
     await tx
       .insertInto('script_channels')
       .values({
@@ -367,6 +379,23 @@ export class ScriptRepository {
         const e = evt.event as MaestroEvent | RandomMaestroEvent;
         const c = ch.moduleChannel as MaestroChannel;
         e.channel = c.channelNumber;
+        // A span's isServo is a copy of the channel's setting: refresh it from
+        // the stored channel, since the request's is the client's word. A
+        // point MaestroEvent keeps its own.
+        if (evt.endTime != null) {
+          // loadAndValidateSpanChannels loads a MaestroChannel for every span
+          // on a MaestroChannel script channel, or refuses the span. Only two
+          // script channels sharing an id (the map is keyed by it) get here
+          // without one; that save fails here or on the script_channels.id
+          // primary key, and either way the transaction rolls back. Never
+          // store a stale copy silently.
+          if (!(storedChannel instanceof MaestroChannel)) {
+            throw new Error(
+              `ScriptRepository.saveScriptChannel: no stored MaestroChannel for span ${evt.id} on channel ${ch.id}`,
+            );
+          }
+          e.isServo = storedChannel.isServo;
+        }
         evt.event = e;
       }
 
@@ -406,7 +435,11 @@ export class ScriptRepository {
 
       await this.configScriptChannel(channel);
 
-      channel.events = await this.readScriptEvents(scriptId, ch.id);
+      channel.events = await this.readScriptEvents(
+        scriptId,
+        ch.id,
+        channel.moduleChannel.moduleSubType,
+      );
 
       result.push(channel);
     }
@@ -415,25 +448,73 @@ export class ScriptRepository {
   }
 
   private async configScriptChannel(channel: ScriptChannel): Promise<ScriptChannel> {
-    switch (channel.moduleChannelType) {
-      case ModuleChannelTypes.GpioChannel:
-        channel.moduleChannel = await readGpioChannel(this.db, channel.moduleChannelId);
-        break;
-      case ModuleChannelTypes.MaestroChannel:
-        channel.moduleChannel = await readMaestroChannel(this.db, channel.moduleChannelId);
-        break;
-      case ModuleChannelTypes.KangarooX2Channel:
-        channel.moduleChannel = await readKangarooChannel(this.db, channel.moduleChannelId);
-        break;
-      case ModuleChannelTypes.UartChannel:
-        channel.moduleChannel = await readUartChannel(this.db, channel.moduleChannelId);
-        break;
-      case ModuleChannelTypes.I2cChannel:
-        channel.moduleChannel = await readI2cChannel(this.db, channel.moduleChannelId);
-        break;
+    const moduleChannel = await this.readModuleChannel(
+      channel.moduleChannelType,
+      channel.moduleChannelId,
+    );
+    if (moduleChannel !== undefined) {
+      channel.moduleChannel = moduleChannel;
     }
 
     return channel;
+  }
+
+  // undefined for an unknown channel type; a missing row throws NoResultError.
+  private async readModuleChannel(
+    moduleChannelType: string,
+    moduleChannelId: string,
+  ): Promise<BaseChannel | undefined> {
+    switch (moduleChannelType) {
+      case ModuleChannelTypes.GpioChannel:
+        return readGpioChannel(this.db, moduleChannelId);
+      case ModuleChannelTypes.MaestroChannel:
+        return readMaestroChannel(this.db, moduleChannelId);
+      case ModuleChannelTypes.KangarooX2Channel:
+        return readKangarooChannel(this.db, moduleChannelId);
+      case ModuleChannelTypes.UartChannel:
+        return readUartChannel(this.db, moduleChannelId);
+      case ModuleChannelTypes.I2cChannel:
+        return readI2cChannel(this.db, moduleChannelId);
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Loads the stored channel of each script channel that holds a span, keyed
+   * by script channel id, then runs validateScriptSpans against them. The
+   * result is saveScriptChannel's only source of stored channels, so a save
+   * can't skip the validation. Reads through this.db before upsertScript's
+   * transaction (inside it, SQLite's one connection belongs to the
+   * transaction). A channel that is not in the database, or whose
+   * moduleChannelType is unknown, is left out (rule 2's "not found").
+   */
+  private async loadAndValidateSpanChannels(
+    script: Script,
+  ): Promise<ReadonlyMap<string, BaseChannel>> {
+    const result = new Map<string, BaseChannel>();
+
+    for (const ch of script.scriptChannels) {
+      if (!holdsSpan(ch)) continue;
+
+      const moduleChannel = await this.readModuleChannel(
+        ch.moduleChannelType,
+        ch.moduleChannelId,
+      ).catch((err: unknown) => {
+        // Only a missing row means "not found"; any other failure stays a 500.
+        if (err instanceof NoResultError) return undefined;
+        throw err;
+      });
+      if (moduleChannel !== undefined) {
+        result.set(ch.id, moduleChannel);
+      }
+    }
+
+    validateScriptSpans(
+      script,
+      new Map([...result].map(([id, channel]) => [id, channel.moduleSubType])),
+    );
+    return result;
   }
 
   async getGpioChannelMap(): Promise<Map<string, number>> {
@@ -472,14 +553,7 @@ export class ScriptRepository {
     channelId: string,
     evt: ScriptEvent,
   ) {
-    if (evt.endTime != null && !supportsRandomSpan(evt.moduleSubType)) {
-      const err = new Error(`Random span not supported for moduleSubType: ${evt.moduleSubType}`);
-      logger.error(
-        `ScriptRepository.saveScriptEvent: refusing event ${evt.id} on channel ${channelId} in script ${scriptId}: ${err.message}`,
-      );
-      throw err;
-    }
-
+    // No checks here: upsertScript validates every span before its transaction.
     await tx
       .insertInto('script_events')
       .values({
@@ -488,9 +562,9 @@ export class ScriptRepository {
         script_channel_id: channelId,
         module_type: evt.moduleType,
         module_sub_type: evt.moduleSubType,
-        time: Math.round(evt.time * 10), // stored as integer scaled storage to 0.1s
+        time: toStoredDs(evt.time),
         // == null: a client that omits endTime saves a point event
-        end_time: evt.endTime == null ? null : Math.round(evt.endTime * 10),
+        end_time: evt.endTime == null ? null : toStoredDs(evt.endTime),
         data: JSON.stringify(evt.event),
       })
       .execute()
@@ -507,6 +581,7 @@ export class ScriptRepository {
   private async readScriptEvents(
     scriptId: string,
     channelId: string,
+    channelSubType: ModuleSubType,
   ): Promise<Record<string, ScriptEvent>> {
     const result = {} as Record<string, ScriptEvent>;
 
@@ -527,16 +602,27 @@ export class ScriptRepository {
       // restored) has no end_time column and yields undefined: a point event.
       const endTimeDs = evt.end_time ?? null;
 
-      // Only a hand edit can store a span on a sub-type without a span payload
-      // (saveScriptEvent refuses one). Leave it out so neither the editor nor
-      // the converter sees it; the editor's next save removes the row. Parsing
-      // it as a point first makes an unknown sub-type or unreadable data fail
-      // the read, as for a point row, rather than be dropped.
+      // Only a hand edit, or a save from before validateScriptSpans existed,
+      // can store a span on a sub-type without a span payload, or on one that
+      // is not its channel's (validateScriptSpans refuses both).
+      // Leave it out so neither the editor nor the converter sees it; the
+      // editor's next save removes the row. Parsing it first makes an unknown
+      // sub-type or unreadable data fail the read, as for a point row, rather
+      // than be dropped.
       if (endTimeDs !== null && !supportsRandomSpan(subtype)) {
         moduleSubTypeToScriptEventTypes(subtype, evt.data);
         logger.warn(
           `ScriptRepository.readScriptEvents: dropping random span ${evt.id} on channel ${evt.script_channel_id} in script ${scriptId} ` +
             `(time ${evt.time}, end_time ${endTimeDs}, data ${evt.data}): moduleSubType ${subtype} has no span payload; ` +
+            'the row is deleted when this script is next saved',
+        );
+        continue;
+      }
+      if (endTimeDs !== null && subtype !== channelSubType) {
+        moduleSubTypeToScriptEventTypes(subtype, evt.data, true);
+        logger.warn(
+          `ScriptRepository.readScriptEvents: dropping random span ${evt.id} on channel ${evt.script_channel_id} in script ${scriptId} ` +
+            `(time ${evt.time}, end_time ${endTimeDs}, data ${evt.data}): moduleSubType ${subtype} does not match its channel's (${channelSubType}); ` +
             'the row is deleted when this script is next saved',
         );
         continue;
@@ -677,4 +763,116 @@ export class ScriptRepository {
   }
 
   //#endregion
+}
+
+// The scripter's timeline length (TIMELINE_DURATION_SECONDS in
+// astros_vue/src/composables/timelineConstants.ts): a span must lie inside it.
+const TIMELINE_DURATION_SECONDS = 600;
+
+// Event times are stored in whole deciseconds. Validation uses the same
+// rounding, so it judges exactly what will be stored.
+function toStoredDs(seconds: number): number {
+  return Math.round(seconds * 10);
+}
+
+// Number() and String() for a value from the untyped request body. Both throw
+// on a JSON object with a "toString" key (its value can't be callable), or an
+// array holding one, which would turn a refusal into a 500. toNumber makes that
+// NaN, as Number({}) is; toText shows its JSON, which can't throw for parsed
+// JSON.
+function toNumber(value: unknown): number {
+  try {
+    return Number(value);
+  } catch {
+    return NaN;
+  }
+}
+
+function toText(value: unknown): string {
+  try {
+    return String(value);
+  } catch {
+    return JSON.stringify(value);
+  }
+}
+
+// Whether validateScriptSpans needs ch's stored channel. A span whose sub-type
+// has no span support fails rule 1 before its channel is read, so it isn't
+// looked up; any other span the validator checks must be, or it is refused
+// as "channel not found".
+function holdsSpan(ch: ScriptChannel): boolean {
+  for (const key in ch.events) {
+    const evt = ch.events[key];
+    if (evt.endTime != null && supportsRandomSpan(evt.moduleSubType)) return true;
+  }
+  return false;
+}
+
+/**
+ * Throws ScriptValidationError for the first span (endTime != null) that
+ * breaks a rule, in the order spanProblem checks them, after logging the
+ * refusal at error. `channelSubTypes` maps a script channel's id to its
+ * channel's sub-type as stored in the database; a missing entry means the
+ * channel was not found. Point events are never checked.
+ *
+ * Exported for tests. Production code validates through upsertScript, which
+ * builds `channelSubTypes` from the channels it loads.
+ */
+export function validateScriptSpans(
+  script: Script,
+  channelSubTypes: ReadonlyMap<string, ModuleSubType>,
+): void {
+  for (const ch of script.scriptChannels) {
+    for (const key in ch.events) {
+      const evt = ch.events[key];
+      if (evt.endTime == null) continue;
+
+      const problem = spanProblem(evt, ch, channelSubTypes.get(ch.id));
+      if (problem !== undefined) {
+        logger.error(
+          `ScriptRepository.validateScriptSpans: refusing event ${toText(evt.id)} on channel ${toText(ch.id)} in script ${toText(script.id)}: ${problem}`,
+        );
+        throw new ScriptValidationError(problem);
+      }
+    }
+  }
+}
+
+// time and endTime are typed unknown: the request body is untyped JSON, so
+// they can be anything.
+function spanProblem(
+  evt: Pick<ScriptEvent, 'moduleSubType'> & { time: unknown; endTime: unknown },
+  ch: ScriptChannel,
+  channelSubType: ModuleSubType | undefined,
+): string | undefined {
+  const { moduleSubType, time, endTime } = evt;
+
+  // 1. A sub-type with span support.
+  if (!supportsRandomSpan(moduleSubType)) {
+    return `Random span not supported for moduleSubType: ${toText(moduleSubType)}`;
+  }
+  // 2. Its channel's stored sub-type.
+  if (channelSubType === undefined) {
+    return `Random span channel not found: ${toText(ch.moduleChannelType)} ${toText(ch.moduleChannelId)}`;
+  }
+  if (moduleSubType !== channelSubType) {
+    return `Random span moduleSubType ${moduleSubType} does not match its channel's (${channelSubType})`;
+  }
+  // 3. A finite endTime.
+  if (typeof endTime !== 'number' || !Number.isFinite(endTime)) {
+    return `Random span endTime must be a finite number, got ${JSON.stringify(endTime)}`;
+  }
+  // 4 and 5 judge the times as stored, so a span can't be saved in a form its
+  // next save refuses (0.05 → 0.14 s stores as 0.1 → 0.1).
+  const storedTime = toStoredDs(toNumber(time)) / 10;
+  const storedEnd = toStoredDs(endTime) / 10;
+  // 4. Ends after it starts. Negated so a NaN time fails here.
+  if (!(storedEnd > storedTime)) {
+    return `Random span endTime must be after its time (${storedTime} s), got ${storedEnd} s`;
+  }
+  // 5. Inside the timeline.
+  if (typeof time !== 'number' || !(storedTime >= 0) || storedEnd > TIMELINE_DURATION_SECONDS) {
+    return `Random span must lie between 0 and ${TIMELINE_DURATION_SECONDS} s, got ${storedTime} to ${storedEnd} s`;
+  }
+  return undefined;
 }

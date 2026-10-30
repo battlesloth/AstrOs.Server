@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { Database } from 'src/dal/types.js';
 import { ScriptRepository } from 'src/dal/repositories/script_repository.js';
 import { logger } from 'src/logger.js';
+import { ScriptValidationError } from 'src/models/index.js';
 import { Router } from 'express';
 
 const getRoute = '/scripts/';
@@ -91,7 +92,7 @@ async function getScript(db: Kysely<Database>, req: any, res: any, next: any) {
   }
 }
 
-async function saveScript(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function saveScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ScriptRepository(db);
 
@@ -105,7 +106,19 @@ async function saveScript(db: Kysely<Database>, req: any, res: any, next: any) {
       });
     }
   } catch (error) {
-    logger.error(error);
+    // Only this route maps a refusal to 400; /scripts/copy answers 500 for any
+    // failure.
+    if (error instanceof ScriptValidationError) {
+      // The id as a field, not in the text: converting it can throw, and a
+      // throw here rejects the handler, which Express 4 leaves unhandled.
+      logger.warn({ scriptId: req.body?.id }, `saveScript: refused script: ${error.message}`);
+
+      res.status(400);
+      res.json({ message: error.message });
+      return;
+    }
+
+    logger.error({ err: error, scriptId: req.body?.id }, 'saveScript: save failed');
 
     res.status(500);
     res.json({

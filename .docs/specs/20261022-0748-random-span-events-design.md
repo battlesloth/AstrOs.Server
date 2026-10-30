@@ -121,7 +121,7 @@ These rules keep the random behavior well defined. They are enforced in the dial
 **Defensive checks outside the dialog (my call):**
 
 - **Firmware:** rejects a malformed or out-of-range random command, logs it and skips it. The rest of the script keeps its timing.
-- **Server:** adds no new save-time validator, consistent with today's trust model.
+- **Server:** ~~adds no new save-time validator, consistent with today's trust model.~~ Superseded by T-009 (Jeff, 2026-10-27/28/29): `PUT /api/scripts/` answers 400 with the reason, and writes nothing, for a span on a sub-type without span support or other than its stored channel's, a span whose channel is not in the database, an `endTime` that is not a finite number after `time`, or a span outside 0–600 s (the order and range checks judge the times as stored, in whole deciseconds). It does not check the payload's fields; the dialog above and the converter's skip do.
 - **Converter:** **skips just the invalid span**. It does not throw. It logs a warning that names the script, channel and event id. The skipped span's end time still counts toward duration and the end buffer, so the rest of the script keeps its timing. This matches the firmware's skip-and-continue (my call).
   - The converter's existing throw paths are out of scope. `convertScript` turns a throw into an empty map, and the upload then sends `''` to every controller and returns 200. See Backlog notes.
 
@@ -215,8 +215,8 @@ These rules keep the random behavior well defined. They are enforced in the dial
 
 - `RandomGpioEvent { minGapMs, maxGapMs }`, for ESP GPIO.
 - `RandomMaestroEvent { channel, isServo, minGapMs, maxGapMs, minPos, maxPos, minMove, maxMove: number | null, speed, acceleration }`, for Maestro servo and digital channels. When the channel is digital, the position-range, move, speed and acceleration fields are unused. The payload's `isServo` is a copy; the converter reads the channel's current setting (T-008 amendment, 2026-10-27).
-  - The repository's existing rule that overwrites `channel` with the module channel number on save (`script_repository.ts` ~:364) must cover this type as well.
-- **Spans only on GPIO and Maestro channels (Jeff, 2026-10-27, during T-007).** The server never saves a span on any other sub-type: the save fails. A span on another sub-type that was coded by hand is left out of the loaded script (with a warning in the log), so neither the scripter nor the converter sees it, and the scripter's next save deletes the row. Both checks use the event's own sub-type; T-009 (decided 2026-10-28, from PR #135's review) also refuses or drops a span whose sub-type differs from its channel's.
+  - The repository's existing rule that overwrites `channel` with the module channel number on save (`saveScriptChannel`) covers this type as well; since T-009 it also overwrites a span's `isServo` with the stored channel's (not the request's).
+- **Spans only on GPIO and Maestro channels (Jeff, 2026-10-27, during T-007).** The server never saves a span on any other sub-type: the save fails. A span on another sub-type that was coded by hand is left out of the loaded script (with a warning in the log), so neither the scripter nor the converter sees it, and the scripter's next save deletes the row. Both checks use the event's own sub-type; T-009 (decided 2026-10-28, from PR #135's review) also refuses or drops a span whose sub-type differs from its channel's, as stored in the database.
 
 **Older server builds on a newer database** are handled by the pre-task below, not by sentinel fields in the payload **(Jeff)**.
 
