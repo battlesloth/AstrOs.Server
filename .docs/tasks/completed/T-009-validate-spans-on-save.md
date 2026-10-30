@@ -1,6 +1,6 @@
 # T-009: Validate random spans on save
 
-<!-- File: .docs/tasks/T-009-validate-spans-on-save.md. Branch: feature/T-009-validate-spans-on-save. PR title: "T-009: Validate random spans on save". -->
+<!-- File: .docs/tasks/completed/T-009-validate-spans-on-save.md. Branch: feature/T-009-validate-spans-on-save. PR title: "T-009: Validate random spans on save". -->
 
 ## Context
 
