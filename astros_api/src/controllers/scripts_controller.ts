@@ -145,11 +145,11 @@ export async function deleteScript(db: Kysely<Database>, req: any, res: any, nex
   }
 }
 
-async function copyScript(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function copyScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ScriptRepository(db);
 
-    const scripts = await repo.copyScript(req.query.id);
+    const scripts = await repo.copyScript(req.body.id);
 
     res.status(200);
     res.json(scripts);

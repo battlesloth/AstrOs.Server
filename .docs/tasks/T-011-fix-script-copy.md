@@ -65,4 +65,16 @@ Write these first.
   1. Scripts page → Copy on a script with events: the success toast appears, a `<name> (Copy)` row appears, and the API log has `POST /scripts/copy 200`.
   2. Open the copy in the scripter: the same channels and events at the same times.
   3. `sqlite3 $DB "SELECT count(*) FROM script_events WHERE script_id = '<copy id>'"` equals the original's count.
-  4. Read-only mode (as in `system-readonly-mode.md`): Copy shows the error toast, and the API answers 503.
+  4. Read-only mode: load the Scripts page against the healthy API, restart the API in scenario 1 of `system-readonly-mode.md`, then click Copy without reloading the page (scenario 1's fallback database has no tables, so a reloaded page has no rows): Copy shows the error toast, and the API answers 503. (Step amended 2026-11-21 after the code review found it could not be run as first written; what it checks is unchanged.)
+
+## Implementation checklist
+
+- [x] API tests written first (`scripts_controller.test.ts` § copyScript). The body and query-string tests failed red on the old handler (500 for a body id, 200 for a query id); the registration test passes on the old code by design, since the route was already `POST`.
+- [x] API: `copyScript` exported and reads `req.body.id`. Mutation-checked: registering the route as `router.get` fails the registration test, and a `req.body.id ?? req.query.id` fallback fails the query-string test.
+- [x] Vue spec written first (`stores/__tests__/scripts.spec.ts`); both cases failed red on the `get` call.
+- [x] Vue: `copyScript` calls `apiService.post(SCRIPTS_COPY, { id: scriptId })`.
+- [x] QA plan `.docs/qa/scripts-page.md` (Copy cases 1–9).
+- [x] Code review on the diff: no Critical findings. Fixed both Important ones: QA case 1 described a copied row's badges wrongly, and QA case 7 and Verification step 4 could not be run, because scenario 1's fallback database has no tables (fixed by loading the page first and not reloading). Fixed all five Minor ones: the registration test's comment overstated its coverage; added `copy runs the auth handler before the copy`, mutation-checked by dropping `authHandler` and by moving it after the handler; removed dead `afterEach` and mock methods from the Vue spec; softened the `COPY` fixture comment; staged the new files explicitly.
+- [x] Format + lint both sub-projects (CI prettier checks green), both builds, full suites, re-run after the review fixes.
+- [ ] Manual check, Verification steps 1–4, with Jeff.
+- [ ] Pre-push `/pr-review-toolkit:review-pr`, PR, then close-out (task file to `completed/`, PLAN.md checkbox + Log).

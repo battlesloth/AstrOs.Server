@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Kysely } from 'kysely';
 import { Database } from '../dal/types.js';
 import { createKyselyConnection, migrateToLatest } from '../dal/database.js';
-import { deleteScript, saveScript } from './scripts_controller.js';
+import { Router } from 'express';
+import {
+  copyScript,
+  deleteScript,
+  registerScriptRoutes,
+  saveScript,
+} from './scripts_controller.js';
 // The controller's own specifier: under vitest a relative import can load a
 // second module instance, and a prototype spy on it would never apply.
 import { ScriptRepository } from 'src/dal/repositories/script_repository.js';
@@ -11,8 +17,11 @@ import { PlaylistType } from '../models/playlists/playlistType.js';
 import { TrackType } from '../models/playlists/trackType.js';
 import { v4 as uuid } from 'uuid';
 import { logger } from 'src/logger.js';
+import { upsertGpioModule } from '../dal/repositories/module_repositories/gpio_repository.js';
 import {
   GpioChannel,
+  GpioEvent,
+  GpioModule,
   ModuleChannelTypes,
   ModuleSubType,
   ModuleType,
@@ -215,6 +224,138 @@ describe('Scripts Controller', () => {
         'saveScript: save failed',
       );
       expect(warnSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('copyScript', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    // A saved script named 'Wave' with one GPIO channel holding one point
+    // event at 1.5 s.
+    async function seedScript() {
+      const locationId = uuid();
+      await db
+        .insertInto('locations')
+        .values({
+          id: locationId,
+          name: 'Test Location',
+          description: '',
+          config_fingerprint: 'test-fingerprint',
+        })
+        .execute();
+      const gpioModule = new GpioModule(locationId);
+      const channel = new GpioChannel(uuid(), locationId, 0, true, 'Test GPIO', false);
+      gpioModule.channels.push(channel);
+      await upsertGpioModule(db, gpioModule);
+
+      const scriptId = uuid();
+      const scriptChannelId = uuid();
+      const eventId = uuid();
+      await new ScriptRepository(db).upsertScript({
+        id: scriptId,
+        scriptName: 'Wave',
+        description: '',
+        lastSaved: new Date(),
+        durationDS: 0,
+        playlistCount: 0,
+        deploymentStatus: {},
+        scriptChannels: [
+          {
+            id: scriptChannelId,
+            scriptId,
+            channelType: ScriptChannelType.GPIO,
+            parentModuleId: locationId,
+            moduleChannelId: channel.id,
+            moduleChannelType: ModuleChannelTypes.GpioChannel,
+            moduleChannel: channel,
+            maxDuration: 0,
+            events: {
+              [eventId]: {
+                id: eventId,
+                scriptChannel: scriptChannelId,
+                moduleType: ModuleType.gpio,
+                moduleSubType: ModuleSubType.genericGpio,
+                time: 1.5,
+                endTime: null,
+                event: { setHigh: true } as GpioEvent,
+              },
+            },
+          },
+        ],
+      });
+      return { scriptId, scriptChannelId, eventId, moduleChannelId: channel.id };
+    }
+
+    async function storedScriptIds() {
+      const rows = await db.selectFrom('scripts').select('id').execute();
+      return rows.map((r) => r.id);
+    }
+
+    const passthroughAuth = (_req: unknown, _res: unknown, next: () => void) => next();
+
+    function copyRouteLayers() {
+      const router = Router();
+      registerScriptRoutes(router, passthroughAuth, db);
+      return router.stack.filter((layer) => layer.route?.path === '/scripts/copy');
+    }
+
+    // Pins the API half of the method contract; the Vue store spec pins the
+    // other. Copy must stay POST-only: the write guard blocks POST in
+    // read-only mode and during a flash, but lets a GET to this path through.
+    it('copy is registered as POST /scripts/copy', () => {
+      expect(copyRouteLayers().map((layer) => layer.route?.methods)).toEqual([{ post: true }]);
+    });
+
+    it('copy runs the auth handler before the copy', () => {
+      const [layer] = copyRouteLayers();
+
+      const handlers = layer.route?.stack.map((routeLayer) => routeLayer.handle);
+      expect(handlers).toHaveLength(2);
+      expect(handlers?.[0]).toBe(passthroughAuth);
+    });
+
+    it('copyScript copies the script named in the body', async () => {
+      const { scriptId, scriptChannelId, eventId, moduleChannelId } = await seedScript();
+      const res = mockRes();
+
+      await copyScript(db, { body: { id: scriptId } }, res, vi.fn());
+
+      expect(res.status.mock.calls).toEqual([[200]]);
+      expect(res.json.mock.calls).toHaveLength(1);
+      const copy = res.json.mock.calls[0][0];
+      expect(copy.id).not.toBe(scriptId);
+      expect(copy.scriptName).toBe('Wave (Copy)');
+      expect(copy.scriptChannels).toEqual([]);
+
+      const stored = await new ScriptRepository(db).getScript(copy.id);
+      expect(stored.scriptChannels).toHaveLength(1);
+      const [channel] = stored.scriptChannels;
+      expect(channel.id).not.toBe(scriptChannelId);
+      expect(channel.moduleChannelId).toBe(moduleChannelId);
+      const events = Object.values(channel.events);
+      expect(events).toHaveLength(1);
+      expect(events[0].id).not.toBe(eventId);
+      expect([events[0].time, events[0].endTime, events[0].event]).toEqual([
+        1.5,
+        null,
+        { setHigh: true },
+      ]);
+    });
+
+    // Pins the body as the only source: a `req.body.id ?? req.query.id`
+    // fallback would copy here and answer 200.
+    it('copyScript ignores a query-string id', async () => {
+      vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      const { scriptId } = await seedScript();
+      const res = mockRes();
+
+      await copyScript(db, { query: { id: scriptId }, body: {} }, res, vi.fn());
+
+      expect(res.status.mock.calls).toEqual([[500]]);
+      expect(res.json.mock.calls).toEqual([[{ message: 'Internal server error' }]]);
+      expect(await storedScriptIds()).toEqual([scriptId]);
     });
   });
 });
