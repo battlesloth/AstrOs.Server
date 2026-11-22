@@ -50,3 +50,41 @@ the `sqlite3` CLI pointed at the database copy (`$DB` below).
    `firmware-ota-flash.md`). Click **Copy** while a flash is in progress.
    Expected: the API answers `423`, the copy-error toast appears, and no row is
    added.
+
+## Layout
+
+The list area below the orange title bar is the page's only scroller: the
+navbar and the title bar never move, and the window itself never scrolls.
+The Playlists page uses the same layout; run cases 10–15 there too, except
+that its table fits at any desktop width (no horizontal scrollbar in case
+10) and its rows have no tooltips (skip case 13).
+
+10. **Narrow window.** Load the page in a window about 800 px wide, with
+    enough scripts to run past the bottom of the window. The table needs
+    about 930 px (890 px plus padding), more with a long list's scrollbar.
+    A window under 768 px gets the mobile view when the page loads or you
+    navigate to it; resizing an open page below 768 px does not switch it.
+    Expected: the horizontal scrollbar is at the bottom edge of the window
+    without scrolling down first, and the vertical scrollbar at its right
+    edge. Scrolling sideways moves only the table, and the window itself
+    scrolls neither sideways nor down.
+11. **Wide window.** At 1024 px and wider: no horizontal scrollbar, and the
+    table sits centered as before. A list longer than the window scrolls
+    under the fixed title bar, with the mouse wheel anywhere below the title
+    bar, the margins beside the table included.
+12. **Pinned table header.** Scroll a long list down. Expected: the blue
+    column header row stays at the top of the list area, and rows (their
+    status badges included) pass underneath it, not over it. Scrolled
+    sideways in a narrow window, the header moves with its columns.
+13. **Tooltips.** Hover a first-row status badge, then scroll down and hover
+    a badge on the row just below the pinned header. Expected: each tooltip
+    shows in full, over the header, not hidden behind it or cut off.
+14. **Keyboard focus is never hidden.** Scroll a long list so a row sits
+    under the pinned header. Click a button on a lower row, then press
+    Shift+Tab repeatedly. Expected: the list scrolls as needed and every
+    focused button (with its focus ring) stays fully visible below the
+    header, never behind it.
+15. **Read-only mode layout.** In read-only mode (case 7's setup), hover the
+    disabled New button. Expected: its tooltip appears, and the window does
+    not scroll sideways or show a second vertical scrollbar. The tooltip may
+    be cut off at the window's right edge, as it always has been.

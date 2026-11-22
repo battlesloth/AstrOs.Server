@@ -1,5 +1,9 @@
 # QA: Playlist playback — script timing, repeat, and interrupts
 
+The Playlists page's list layout (its own scroll area, pinned table header,
+keyboard focus, read-only mode) shares its cases with the Scripts page: see
+`scripts-page.md` § Layout, cases 10–15.
+
 **Preconditions:** server running against real hardware with the Body controller UP
 on the Status page; the API log visible (`docker logs -f <container>` or the log
 file); the Body ESP serial console open if available. Two scripts saved **and
