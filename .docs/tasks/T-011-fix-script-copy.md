@@ -97,4 +97,5 @@ Write these first.
   - QA case 8 promised a 500 for a script deleted in another tab, but delete only disables a script, so the copy succeeds. Case 8 now uses an id that never existed, and the deleted-script copy is a Backlog known gap.
   - Docs and comments: QA cases 7, 11, 13 and 14; the log-line evidence above; 1.0.0 in Context; the views' layout comments; and the `PLAN.md` Now line (the ESP bench waits on a bench-server deploy of develop). Also removed a wrong drawer-checkbox Backlog item (DaisyUI already mirrors its focus ring onto the hamburger).
   - Not done: rewording commit `f8cce0aa`'s message to add 1.0.0, because rewriting it would change the hashes `PLAN.md` and this file cite; the PR body carries the correction. The cross-boundary Copy e2e and the layout e2e guard went to the Backlog.
-- [ ] PR, then close-out (task file to `completed/`, PLAN.md checkbox + Log).
+- [x] PR #138 opened against develop (2026-11-21).
+- [ ] PR review round, merge, then close-out (task file to `completed/`, PLAN.md checkbox + Log).
