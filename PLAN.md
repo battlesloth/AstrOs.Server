@@ -4,11 +4,11 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 
 ## Status
 
-Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
-Now:     no server task in progress. The AstrOs.ESP T-009 bench passed 2026-11-22 against this repo's develop (cases 1–11, spans by SQL); ESP T-009 is complete
-Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 ✓ → server T-009 ✓ → ESP T-009 bench ✓ → ESP v1.3.0 release → server T-010 (report skipped spans on upload; before Phase B) → Phase B scripter (decomposed at phase start) → Phase C. Inserting spans by SQL for a bench: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))` (or open and save the script once, since `duration_ds` is only recomputed on save), and keep each span row within `0 ≤ time < end_time ≤ 6000` ds, because since T-009 a stored span outside that makes every save of its script answer 400. Check: `SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` returns nothing
-Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
-Last:    2026-11-22 — AstrOs.ESP T-009 bench passed against server develop (driven partly through the API with `curl`); 2026-11-21 — T-011 merged (PR #138); develop at `1.0.3-dev.0`
+Active:  Per-channel servo release time (T-012–T-015, cross-repo with AstrOs.ESP T-010) and Random span events (Phase A done; T-010 and Phase B next)
+Now:     no server task in progress. Per-channel release tasks T-012–T-015 authored 2026-11-22 (spec approved by Jeff; protocol § D pinned in both repos). AstrOs.ESP v1.3.0 is held for its T-010 + T-011. The ESP T-009 bench passed 2026-11-22 against this repo's develop
+Next:    per-channel release: T-012 (migration naming) → T-013 (data model) → T-014 (8 fields + sync gate), in parallel with ESP T-010 → joint bench → ESP v1.3.0 release; T-015 (UI field) any time after T-013. Random spans, agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 ✓ → server T-009 ✓ → ESP T-009 bench ✓ → ESP v1.3.0 release (now also carrying per-channel release) → server T-010 (report skipped spans on upload; before Phase B) → Phase B scripter (decomposed at phase start) → Phase C. Inserting spans by SQL for a bench: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))` (or open and save the script once, since `duration_ds` is only recomputed on save), and keep each span row within `0 ≤ time < end_time ≤ 6000` ds, because since T-009 a stored span outside that makes every save of its script answer 400. Check: `SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` returns nothing
+Blocked: none. A server release carrying T-014 must wait for AstrOs.ESP v1.3.0 to be published: its gate refuses config sync to anything older
+Last:    2026-11-22 — per-channel release time designed and planned (T-012–T-015); AstrOs.ESP T-009 bench passed against server develop; 2026-11-21 — T-011 merged (PR #138); develop at `1.0.3-dev.0`
 
 ## Random span events
 
@@ -30,8 +30,26 @@ Phase B — scripter (decompose at phase start; contracts already pinned by T-00
 - GPIO ↔ Maestro-digital channel swap for spans (replaces T-007's throw)
 
 Phase C — release:
-- raise `MINIMUM_FIRMWARE_VERSION` to the AstrOs.ESP release carrying its T-009 (planned v1.3.0)
+- ~~raise `MINIMUM_FIRMWARE_VERSION` to the AstrOs.ESP release carrying its T-009 (planned v1.3.0)~~ → T-014 (per-channel release time, 2026-11-22), together with its config-sync gate
 - end-to-end bench QA (`.docs/qa/random-span-events.md`)
+
+## Per-channel servo release time
+
+Spec: `.docs/specs/20261122-0847-per-channel-servo-release-design.md` (approved by Jeff, 2026-11-22) · wire format: `.docs/protocol.md` § D (both repos) · firmware: AstrOs.ESP `PLAN.md` § Per-channel servo release time (its T-010; its T-011 quiets per-command logs for the same release)
+
+**What changes:**
+- Each Maestro servo channel gets a minimum on-time after each move. The controller releases at max(setting, modeled travel + 10 %); the setting defaults to 5 s, with a 1–120 s range.
+- It is sent as the 8th Maestro channel-entry field.
+- Config sync is refused, with the reason shown, to any controller below `MINIMUM_FIRMWARE_VERSION`, now 1.3.0, because 1.2.x drops 8-field entries.
+
+**Rules:**
+- T-014's gate and its 8th field ship together, so develop never sends 8 fields ungated.
+- Flash every bench controller with ESP T-010 before syncing against T-014: `1.3.0-dev` builds without it pass the gate.
+
+- [ ] T-012 — Name migrations from 10 on so they sort after `9_` (`.docs/tasks/T-012-migration-naming.md`, branch `feature/T-012-migration-naming`) — prerequisite for T-013
+- [ ] T-013 — Store a release time for each Maestro channel (`.docs/tasks/T-013-maestro-release-ms.md`, branch `feature/T-013-maestro-release-ms`) — needs T-012
+- [ ] T-014 — Send release times, and refuse config sync to firmware older than 1.3.0 (`.docs/tasks/T-014-config-sync-gate.md`, branch `feature/T-014-config-sync-gate`) — needs T-013; bench joint with ESP T-010
+- [ ] T-015 — Edit a Maestro servo channel's release time (`.docs/tasks/T-015-release-time-field.md`, branch `feature/T-015-release-time-field`) — needs T-013
 
 ## Standalone tasks
 
@@ -116,7 +134,7 @@ From the T-004 planning (2026-09-27, script duration units):
 - Script duration ends at the last point event's *start* (a random span counts at its end, T-007); the event's own run time (servo travel, audio length) is not counted, so the next dispatch can overlap it
 - Event rows the **Vue** scripter saved before deb95a40 (2026-01-07) are stored unscaled (seconds in the deciseconds column) and no data migration converted them — those scripts play 10× compressed. Angular-scripter rows were already deciseconds (the API converter then did `time * 100`, ds → ms) and play correctly, so do **not** scale pre-2026-01-07 rows wholesale
 - ESP drops `SCRIPT_RUN` silently when its 30-slot queue is full (`Queue is full`); the server never learns (pairs with the `SCRIPT_RUN` envelope item above)
-- Kysely 0.27.6 orders migrations with a plain `Object.keys(...).sort()` (`dist/esm/migration/migrator.js:457`, `#resolveMigrations` — it ignores `nameComparator`), so a future `10_*` sorts before `2_*` and fails the ordered-migrations check. A custom comparator will not help; options are a Kysely version whose resolver honors `nameComparator` (verify first) or a naming scheme that sorts as plain strings (renaming executed migrations also means rewriting `kysely_migration` rows). `allowUnorderedMigrations` is a third option. `database.integration.test.ts`'s `ORDER BY name DESC LIMIT 1` breaks the same way, and its injected test migrations (`9_safe_addition`, `9_will_fail`, `9_pending`, `9_introduces_orphan`) share the `9_` prefix with production — `buildProvider` now refuses one that sorts before the production latest (T-007). Under plain `.sort()`, `'10_'` sorts before `'1_'`: a database at or past migration 1 refuses `10_…` as "corrupted migrations", and a fresh install runs it second, before `1_…`. T-006's `compareMigrationNames` orders pending migrations and names the backup, so it would need the same scheme. Decide before migration 10
+- Kysely 0.27.6 orders migrations with a plain `Object.keys(...).sort()` (`dist/esm/migration/migrator.js:457`, `#resolveMigrations` — it ignores `nameComparator`), so a future `10_*` sorts before `2_*` and fails the ordered-migrations check. A custom comparator will not help; options are a Kysely version whose resolver honors `nameComparator` (verify first) or a naming scheme that sorts as plain strings (renaming executed migrations also means rewriting `kysely_migration` rows). `allowUnorderedMigrations` is a third option. `database.integration.test.ts`'s `ORDER BY name DESC LIMIT 1` breaks the same way, and its injected test migrations (`9_safe_addition`, `9_will_fail`, `9_pending`, `9_introduces_orphan`) share the `9_` prefix with production — `buildProvider` now refuses one that sorts before the production latest (T-007). Under plain `.sort()`, `'10_'` sorts before `'1_'`: a database at or past migration 1 refuses `10_…` as "corrupted migrations", and a fresh install runs it second, before `1_…`. T-006's `compareMigrationNames` orders pending migrations and names the backup, so it would need the same scheme. Decide before migration 10 → T-012 (Jeff, 2026-11-22: a new `m<NNN>_` prefix from `m010`, no renames; Kysely 0.29.9 sorts the same way)
 - Units misnomers that seeded the T-004 bug: `script_converter.test.ts` helper `generateCoreScriptSerialEventByDecSec(tenthOfSeconds)` is fed seconds (and its line-188 comment says 34.2 s for a 33.8 s gap); Vue `PixiChannelEvent.deciseconds` (`pixiChannelEvent.ts`, `useEventBoxes.ts`) holds seconds — rename both
 - `copyScript` calls `updateScriptDuration` right before `upsertScript`, which recalculates unconditionally — dead call
 - Branded time units for the script-length chain (T-004 type review): a `units.ts` with `secondsToDs`/`dsToMs` as the only constructors replacing the inline scale sites (`toStoredDs` ×10 in `script_repository.ts`, shared by `saveScriptEvent` and span validation since T-009, `readScriptEvents` ÷10, `calculateLengthDS`, `dsToMs`, `script_converter.ts` in-place `evt.time * 1000` and, since T-008, `evt.endTime * 1000`), then brand `ScriptEvent.time: Seconds`, `duration_ds`/`durationDS: Deciseconds`, `QueueTrack.duration`/`shuffleWait*: Milliseconds`, plus a lint rule banning `as Seconds|Deciseconds|Milliseconds` outside `units.ts`. A strict-`tsc` sketch showed the original `calculateLengthDS` bug becomes a compile error. Meanwhile, one-line unit JSDoc on those fields
@@ -202,6 +220,10 @@ From the AstrOs.ESP T-009 bench (2026-11-22):
   - The handler passes `undefined` to `ScriptRepository.getScript`, whose `executeTakeFirstOrThrow` raises Kysely's `NoResultError`, logged at error level as a failure.
   - A missing id should be a 400, and an unknown id a 404. Check the other single-resource GETs for the same pattern.
   - Seen while probing a bench JWT with `curl`; the UI always sends an id.
+
+From the per-channel servo release design (2026-11-22):
+
+- **Config sync shows no per-controller result.** The Sync button toasts "Controllers sync queued!" on the HTTP reply alone. Each controller's `DEPLOY_CONFIG_ACK`, NAK or timeout never reaches the browser: `handleConfigSync` only stores the fingerprint, and `DEPLOY_CONFIG_NAK` has no handling. T-014 reports only its gate skips, in the reply. A WebSocket config-sync result message with a Vue handler would close the rest.
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
