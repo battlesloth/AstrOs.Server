@@ -94,14 +94,17 @@ describe('backup module', () => {
       return conn;
     }
 
-    it('orders an unknown m<NNN>_ name after unknown legacy names (a downgrade after T-013)', async () => {
-      // Break: the guard listing a newer server's m0NN_ migration before an old
-      // sibling branch's legacy one, against the canonical order.
-      const { db } = connectionWithApplied(['0_initial', 'm011_future', '99_future']);
+    it('orders unknown m<NNN>_ names by number, after unknown legacy names (a downgrade after T-013)', async () => {
+      // Break: the guard listing a newer server's m-migrations out of the
+      // canonical order (slug order here runs opposite to number order), or
+      // before an old sibling branch's legacy name.
+      const { db } = connectionWithApplied(['0_initial', 'm012_a', 'm011_z', '99_future']);
       expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual([
         '99_future',
-        'm011_future',
+        'm011_z',
+        'm012_a',
       ]);
+      await db.destroy();
     });
 
     it('findUnknownAppliedMigrations returns [] when there is no migration table', async () => {
@@ -195,11 +198,13 @@ describe('backup module', () => {
       await db.destroy();
     });
 
-    it('orders migrations by numeric prefix, not lexicographically', async () => {
-      // Regression: lexicographic sort places '10_foo' before '2_foo'.
-      // We use a custom provider with mixed single- and double-digit names,
-      // pre-seed the kysely_migration table to mark them all applied, and
-      // assert getLastAppliedMigrationName returns '10_late_addition'.
+    it('orders multi-digit legacy names by number', async () => {
+      // Multi-digit legacy names can't be in the production registry
+      // (database.test.ts rejects them: Kysely's plain .sort() would run '10_'
+      // before '2_'), but one can reach a provider or database from an old
+      // sibling branch, and compareMigrationNames still orders them by number.
+      // This provider is one Kysely itself would refuse; it pins the comparator,
+      // not a registry Kysely accepts.
       const numericProvider: MigrationProvider = new (class implements MigrationProvider {
         async getMigrations(): Promise<Record<string, Migration>> {
           const noop: Migration = {
@@ -374,8 +379,9 @@ describe('backup module', () => {
 });
 
 // Kysely runs migrations in plain .sort() order (Migrator#resolveMigrations
-// ignores nameComparator, 0.27.6 through 0.29.9), so compareMigrationNames
-// must order every valid name exactly as plain .sort() does (T-012).
+// ignores nameComparator in 0.27.6, installed, and in 0.29.9), so
+// compareMigrationNames must order every valid name exactly as plain .sort()
+// does (T-012).
 describe('compareMigrationNames', () => {
   const sorted = (names: string[]) => [...names].sort(compareMigrationNames);
 
@@ -402,9 +408,15 @@ describe('compareMigrationNames', () => {
     expect(sorted(['m010_a_b', 'm010_a1'])).toEqual(['m010_a1', 'm010_a_b']);
   });
 
+  it('sorts names matching neither scheme after every valid name', () => {
+    // Break: an unrecognized name (e.g. from a tampered row) interleaved with
+    // valid ones in the newer-database guard's message.
+    expect(sorted(['foo', 'm010_x', '9_x'])).toEqual(['9_x', 'm010_x', 'foo']);
+  });
+
   it('never calls two different names equal', () => {
     // Break: returning 0 when number and slug match ('09_x' vs '9_x'), which
-    // leaves their order to the sort implementation.
+    // leaves their order to the input order (e.g. kysely_migration row order).
     expect(compareMigrationNames('09_x', '9_x')).toBeLessThan(0);
     expect(compareMigrationNames('9_x', '09_x')).toBeGreaterThan(0);
     expect(compareMigrationNames('9_x', '9_x')).toBe(0);

@@ -24,7 +24,7 @@ Four ways to put the server into read-only mode for testing. Pick whichever matc
 2. **`BACKUP_FAILED`** — drop write permissions on the dbDir before starting:
    ```bash
    chmod 0500 ~/.config/astrosserver
-   # add an unapplied migration to force a backup attempt (see git-stash a quick stub or temporarily edit migrations/index.ts)
+   # add an unapplied migration to force a backup attempt (temporarily add a stub such as `m950_test_force_backup` to `PRODUCTION_MIGRATIONS` in `dal/database.ts`, then revert it)
    npm run start
    # restore perms after: chmod 0700 ~/.config/astrosserver
    ```

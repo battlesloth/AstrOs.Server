@@ -47,13 +47,17 @@ export function resolveDatabaseDir(envValue: string | undefined): string {
   return envValue;
 }
 
-// Migration names: Kysely runs migrations in plain-string .sort() order and
-// ignores nameComparator, so a plain `10_…` would run before `1_…` and an
-// existing database would refuse it as "corrupted migrations". From 10 on,
-// names are `m<NNN>_<snake_name>` (m010_…, m011_…), which sort after every
-// legacy `<n>_` name as plain strings. Plain .sort() order must match
-// compareMigrationNames (dal/backup.ts); database.test.ts pins both (T-012).
-export const PRODUCTION_MIGRATIONS: Readonly<Record<string, Migration>> = {
+// Migration names (T-012): Kysely resolves migrations in plain-string .sort()
+// order (nameComparator only breaks ties among executed migrations' timestamps),
+// so a plain `10_…` would run before `1_…`, and a database at or past 1 would
+// refuse it as "corrupted migrations". From 10 on, names are `m<NNN>_<snake_name>`
+// (m010_…, m011_…, up to m899; m9NN is for injected test migrations), which sort
+// after every legacy `<n>_` name as plain strings. Take the next number after
+// develop's highest at merge time, and use each number once: Kysely breaks
+// executed-timestamp ties with localeCompare, which disagrees with .sort() on
+// same-number names. The legacy 0_–9_ names are frozen. database.test.ts pins
+// these rules and the match with compareMigrationNames (dal/backup.ts).
+export const PRODUCTION_MIGRATIONS: Readonly<Record<string, Migration>> = Object.freeze({
   '0_initial': migration_0,
   '1_add_script_evt_id': migration_1,
   '2_add_script_duration': migration_2,
@@ -64,7 +68,7 @@ export const PRODUCTION_MIGRATIONS: Readonly<Record<string, Migration>> = {
   '7_rename_remote_config_key': migration_7,
   '8_fix_script_duration_units': migration_8,
   '9_add_script_event_end_time': migration_9,
-};
+});
 
 const defaultMigrationProvider: MigrationProvider = new (class implements MigrationProvider {
   async getMigrations(): Promise<Record<string, Migration>> {

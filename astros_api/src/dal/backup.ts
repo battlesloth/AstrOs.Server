@@ -18,7 +18,10 @@ async function migrationTableExists(db: Kysely<Database>): Promise<boolean> {
 const LEGACY_NAME = /^(\d+)_(.*)$/;
 const M_SCHEME_NAME = /^m(\d{3})_(.*)$/;
 
-function migrationRank(name: string): { scheme: number; num: number; slug: string } | null {
+// Naming schemes in run order; compareMigrationNames subtracts them.
+type MigrationRank = { scheme: 0 /* legacy <n>_ */ | 1 /* m<NNN>_ */; num: number; slug: string };
+
+function migrationRank(name: string): MigrationRank | null {
   const legacy = LEGACY_NAME.exec(name);
   if (legacy) return { scheme: 0, num: parseInt(legacy[1], 10), slug: legacy[2] };
   const mScheme = M_SCHEME_NAME.exec(name);
@@ -38,9 +41,11 @@ function compareCodeUnits(a: string, b: string): number {
 //   - from 10 on, `m<NNN>_<slug>` (m010_…), after every legacy name, by number
 //     (a plain `10_` would sort before `1_`, see T-012);
 //   - a tie on the number compares the slug, then the whole name, by UTF-16 code
-//     unit, as .sort() does. (Kysely breaks ties among *executed* migrations with
-//     localeCompare instead; the two agree only while numbers are unique, which
-//     database.test.ts pins for the production registry.)
+//     unit, as .sort() does. (Kysely orders *executed* migrations by timestamp
+//     and breaks same-millisecond ties, common on a fresh install, with
+//     localeCompare on the whole name. That agrees with .sort() for every valid
+//     name only while numbers are unique, which database.test.ts pins for the
+//     production registry.)
 // Multi-digit legacy names only arrive from an old sibling branch's database and
 // keep numeric order. Names matching neither pattern sort last, by localeCompare.
 // Exported so tests can derive expected ordering without duplicating the rule.
