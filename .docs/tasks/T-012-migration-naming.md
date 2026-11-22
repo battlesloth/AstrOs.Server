@@ -61,4 +61,11 @@
 
 ## Implementation checklist
 
-<!-- Added when work starts. -->
+- [ ] RED: `compareMigrationNames` tests in `dal/backup.test.ts`: legacy by number, `m` names after every legacy name and by number, same-number suffixes in code-unit order (as Kysely sorts); a hand-written expected order for the production names + `m010_`/`m011_` samples
+- [ ] GREEN: `compareMigrationNames` per the Contract
+- [ ] Registry guard: export the production registry; test every name matches a pattern and plain `.sort()` equals the comparator order; mutation: a temporary `10_x` entry fails it
+- [ ] `database.integration.test.ts`: injected test migrations renamed `m9NN_test_*`; `ORDER BY name DESC` comment; cases (a)–(c) with `m010_sample_addition`
+- [ ] Notes: `database.ts` comment above the registry; CLAUDE.md § Architecture / Database; PLAN.md Backlog item struck
+- [ ] Pre-commit: prettier + lint (api), build, full vitest; code review
+- [ ] Verification: dev-DB copy startup clean (no migration, no backup, guard quiet)
+- [ ] Pre-push: /pr-review-toolkit:review-pr; QA/PLAN close-out
