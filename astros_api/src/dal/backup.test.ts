@@ -94,6 +94,16 @@ describe('backup module', () => {
       return conn;
     }
 
+    it('orders an unknown m<NNN>_ name after unknown legacy names (a downgrade after T-013)', async () => {
+      // Break: the guard listing a newer server's m0NN_ migration before an old
+      // sibling branch's legacy one, against the canonical order.
+      const { db } = connectionWithApplied(['0_initial', 'm011_future', '99_future']);
+      expect(await findUnknownAppliedMigrations(db, knownProvider)).toEqual([
+        '99_future',
+        'm011_future',
+      ]);
+    });
+
     it('findUnknownAppliedMigrations returns [] when there is no migration table', async () => {
       const { db } = createKyselyConnection();
 
@@ -360,5 +370,79 @@ describe('backup module', () => {
 
       expect(fs.readFileSync(dbPath, 'utf8')).toBe('good-data');
     });
+  });
+});
+
+// Kysely runs migrations in plain .sort() order (Migrator#resolveMigrations
+// ignores nameComparator, 0.27.6 through 0.29.9), so compareMigrationNames
+// must order every valid name exactly as plain .sort() does (T-012).
+describe('compareMigrationNames', () => {
+  const sorted = (names: string[]) => [...names].sort(compareMigrationNames);
+
+  it('orders legacy names by their number', () => {
+    // Break: comparing legacy names as plain strings puts '10_b' before '2_a'
+    // (multi-digit names can still arrive from an old sibling branch's database).
+    expect(sorted(['10_b', '2_a'])).toEqual(['2_a', '10_b']);
+  });
+
+  it('sorts m-prefixed names after every legacy name', () => {
+    // Break: an m<NNN>_ name ordered before a legacy one would make the
+    // newer-database guard and backup naming disagree with Kysely's run order.
+    expect(sorted(['m010_a', '9_z', '10_x'])).toEqual(['9_z', '10_x', 'm010_a']);
+  });
+
+  it('orders m-prefixed names by their number', () => {
+    expect(sorted(['m011_a', 'm010_z'])).toEqual(['m010_z', 'm011_a']);
+  });
+
+  it("breaks a tie on the number in code-unit order, as Kysely's resolver does", () => {
+    // Break: a locale-aware suffix compare collates '_' before digits, while
+    // plain .sort() puts digits ('1', 0x31) before '_' (0x5f).
+    expect(sorted(['9_a_b', '9_a1'])).toEqual(['9_a1', '9_a_b']);
+    expect(sorted(['m010_a_b', 'm010_a1'])).toEqual(['m010_a1', 'm010_a_b']);
+  });
+
+  it('never calls two different names equal', () => {
+    // Break: returning 0 when number and slug match ('09_x' vs '9_x'), which
+    // leaves their order to the sort implementation.
+    expect(compareMigrationNames('09_x', '9_x')).toBeLessThan(0);
+    expect(compareMigrationNames('9_x', '09_x')).toBeGreaterThan(0);
+    expect(compareMigrationNames('9_x', '9_x')).toBe(0);
+  });
+
+  it('gives the order Kysely runs migrations in, for the production names and the new scheme', () => {
+    const want = [
+      '0_initial',
+      '1_add_script_evt_id',
+      '2_add_script_duration',
+      '3_add_playlists',
+      '4_add_random_wait',
+      '5_fix_controller_locations_type',
+      '6_add_foreign_keys',
+      '7_rename_remote_config_key',
+      '8_fix_script_duration_units',
+      '9_add_script_event_end_time',
+      'm010_add_maestro_release_ms',
+      'm011_next',
+      'm900_test_safe_addition',
+    ];
+    const shuffled = [
+      want[11],
+      want[3],
+      want[12],
+      want[0],
+      want[10],
+      want[9],
+      want[5],
+      want[1],
+      want[8],
+      want[2],
+      want[7],
+      want[4],
+      want[6],
+    ];
+    expect(sorted(shuffled)).toEqual(want);
+    // The upstream assumption this rests on: plain .sort() gives the same order.
+    expect([...shuffled].sort()).toEqual(want);
   });
 });

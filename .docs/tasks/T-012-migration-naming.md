@@ -13,7 +13,7 @@
 - **Project:** PLAN.md § Per-channel servo release time. This is the prerequisite for T-013, which adds the first such migration.
 - **Ruled out:**
   - upgrading Kysely (it sorts the same way)
-  - `allowUnorderedMigrations`: on a fresh install the new migration would run before migration 6, which rebuilds `maestro_channels`
+  - `allowUnorderedMigrations`: on a fresh install the new migration would run before migration 6, which copies `maestro_channels` with `SELECT *` into a rebuilt table, so an extra column breaks it
   - renaming the executed migrations (a data rewrite on every install)
 
 ## Contract (pinned — do not change)
@@ -40,12 +40,12 @@
 
 ## Acceptance criteria
 
-- [ ] `compareMigrationNames` orders `9_add_script_event_end_time` < `m010_x` < `m011_y`, and legacy names among themselves by number.
-- [ ] The registry test fails if a production migration is named `10_x`.
+- [x] `compareMigrationNames` orders `9_add_script_event_end_time` < `m010_x` < `m011_y`, and legacy names among themselves by number.
+- [x] The registry test fails if a production migration is named `10_x`.
   - Mutation check: add a `10_x` entry temporarily and see it fail.
-- [ ] Integration cases (a)–(c) pass.
-- [ ] The injected test migrations use `m9NN_test_` names, and `buildProvider` still refuses a name that sorts before the production latest.
-- [ ] The CLAUDE.md and `database.ts` notes are added, and the Backlog item is struck.
+- [x] Integration cases (a)–(c) pass.
+- [x] The injected test migrations use `m9NN_test_` names, and `buildProvider` still refuses a name that sorts before the production latest.
+- [x] The CLAUDE.md and `database.ts` notes are added, and the Backlog item is struck.
 
 ## Out of scope
 
@@ -61,11 +61,11 @@
 
 ## Implementation checklist
 
-- [ ] RED: `compareMigrationNames` tests in `dal/backup.test.ts`: legacy by number, `m` names after every legacy name and by number, same-number suffixes in code-unit order (as Kysely sorts); a hand-written expected order for the production names + `m010_`/`m011_` samples
-- [ ] GREEN: `compareMigrationNames` per the Contract
-- [ ] Registry guard: export the production registry; test every name matches a pattern and plain `.sort()` equals the comparator order; mutation: a temporary `10_x` entry fails it
-- [ ] `database.integration.test.ts`: injected test migrations renamed `m9NN_test_*`; `ORDER BY name DESC` comment; cases (a)–(c) with `m010_sample_addition`
-- [ ] Notes: `database.ts` comment above the registry; CLAUDE.md § Architecture / Database; PLAN.md Backlog item struck
-- [ ] Pre-commit: prettier + lint (api), build, full vitest; code review
-- [ ] Verification: dev-DB copy startup clean (no migration, no backup, guard quiet)
+- [x] RED: `compareMigrationNames` tests in `dal/backup.test.ts`: legacy by number, `m` names after every legacy name and by number, same-number suffixes in code-unit order (as Kysely sorts); a hand-written expected order for the production names + `m010_`/`m011_` samples
+- [x] GREEN: `compareMigrationNames` per the Contract (the RED was the same-number slug tie: `localeCompare` collates `_` before digits; `m010_` already sorted last)
+- [x] Registry guard: export the production registry; test every name matches a pattern and plain `.sort()` equals the comparator order; mutation: a temporary `10_x` entry fails it
+- [x] `database.integration.test.ts`: injected test migrations renamed `m9NN_test_*`; `ORDER BY name DESC` comment; cases (a)–(c) with `m010_sample_addition`
+- [x] Notes: `database.ts` comment above the registry; CLAUDE.md § Architecture / Database; PLAN.md Backlog item struck
+- [x] Pre-commit: prettier + lint (api), build, full vitest 1239/1239; code review (0 Critical; 2 Important fixed: Backlog struck, registry guard also freezes the legacy names and requires unique `m` numbers from 010; minors fixed: sample renamed `m910_test_sample_addition` and proves it ran after 9, legacy-only baseline for case (b), equal-rank names never compare 0, an `m0NN` unknown name in the guard, comment/spec mechanism, `system-readonly-mode.md`)
+- [x] Verification: dev-DB copy startup clean (the copy was at 8: first start ran 9 with a backup named for 8; second start did nothing)
 - [ ] Pre-push: /pr-review-toolkit:review-pr; QA/PLAN close-out

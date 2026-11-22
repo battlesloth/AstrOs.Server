@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import appdata from 'appdata-path';
 import SQLite from 'better-sqlite3';
-import { assertNoFkViolations, resolveDatabaseDir } from './database.js';
+import { assertNoFkViolations, PRODUCTION_MIGRATIONS, resolveDatabaseDir } from './database.js';
+import { compareMigrationNames } from './backup.js';
 
 describe('assertNoFkViolations', () => {
   it('returns silently when no violations exist', () => {
@@ -97,5 +98,51 @@ describe('resolveDatabaseDir', () => {
 
   it('returns the env value verbatim for a custom path', () => {
     expect(resolveDatabaseDir('/var/lib/astros')).toBe('/var/lib/astros');
+  });
+});
+
+describe('PRODUCTION_MIGRATIONS', () => {
+  const names = Object.keys(PRODUCTION_MIGRATIONS);
+  const mNumbers = names.filter((n) => n.startsWith('m')).map((n) => parseInt(n.slice(1, 4), 10));
+
+  // Break: a migration named outside the two schemes (e.g. a plain '10_x'),
+  // which Kysely's plain .sort() would run before '1_…' and an existing
+  // database would refuse as "corrupted migrations" (T-012).
+  it('names every migration in a scheme that sorts like Kysely', () => {
+    for (const name of names) {
+      expect(name, name).toMatch(/^(\d_[a-z0-9_]+|m\d{3}_[a-z0-9_]+)$/);
+    }
+    expect([...names].sort(compareMigrationNames)).toEqual([...names].sort());
+  });
+
+  // Break: a new legacy-style name (e.g. '9_add_new') sorts before
+  // '9_add_script_event_end_time', so every existing install refuses it.
+  it('keeps the legacy names frozen', () => {
+    expect(names.filter((n) => /^\d_/.test(n))).toEqual([
+      '0_initial',
+      '1_add_script_evt_id',
+      '2_add_script_duration',
+      '3_add_playlists',
+      '4_add_random_wait',
+      '5_fix_controller_locations_type',
+      '6_add_foreign_keys',
+      '7_rename_remote_config_key',
+      '8_fix_script_duration_units',
+      '9_add_script_event_end_time',
+    ]);
+  });
+
+  it('numbers m-prefixed migrations from 010', () => {
+    for (const num of mNumbers) {
+      expect(num).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  // Break: two branches both taking the next m0NN. Kysely resolves names with
+  // plain .sort() but breaks ties among executed migrations with localeCompare;
+  // with a shared number those disagree and a fresh install's next upgrade
+  // fails as "corrupted migrations".
+  it('gives every m-prefixed migration its own number', () => {
+    expect(new Set(mNumbers).size).toBe(mNumbers.length);
   });
 });

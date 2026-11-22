@@ -6,24 +6,14 @@ import path from 'path';
 import SQLite from 'better-sqlite3';
 import { Migration, MigrationProvider, sql } from 'kysely';
 import { SystemStatus } from '../system_status.js';
+import { getLastAppliedMigrationName } from './backup.js';
 import {
   initializeDatabase,
   closeDatabaseForTest,
+  PRODUCTION_MIGRATIONS,
   __setMigrationProviderForTest,
   __resetMigrationProviderForTest,
 } from './database.js';
-import {
-  migration_0,
-  migration_1,
-  migration_2,
-  migration_3,
-  migration_4,
-  migration_5,
-  migration_6,
-  migration_7,
-  migration_8,
-  migration_9,
-} from './migrations/index.js';
 
 // Mirrors the production provider so injected test migrations layer on top of
 // the real baseline rather than truncating it. Without this, kysely sees
@@ -31,18 +21,7 @@ import {
 // "corrupted migrations" before any extra migration runs — which would short-
 // circuit tests that intend to exercise post-migration paths.
 function buildProvider(extra: Record<string, Migration> = {}): MigrationProvider {
-  const production: Record<string, Migration> = {
-    '0_initial': migration_0,
-    '1_add_script_evt_id': migration_1,
-    '2_add_script_duration': migration_2,
-    '3_add_playlists': migration_3,
-    '4_add_random_wait': migration_4,
-    '5_fix_controller_locations_type': migration_5,
-    '6_add_foreign_keys': migration_6,
-    '7_rename_remote_config_key': migration_7,
-    '8_fix_script_duration_units': migration_8,
-    '9_add_script_event_end_time': migration_9,
-  };
+  const production: Record<string, Migration> = { ...PRODUCTION_MIGRATIONS };
   // Kysely orders migrations by plain string sort. An injected migration that
   // sorts before the production latest is refused as "corrupted migrations",
   // which would let a failure-path test pass without running it.
@@ -122,7 +101,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // Inject a new migration on top of the real production baseline.
     __setMigrationProviderForTest(
       buildProvider({
-        '9_safe_addition': {
+        m900_test_safe_addition: {
           async up(db) {
             await db.schema.createTable('safe_addition').addColumn('id', 'integer').execute();
           },
@@ -161,7 +140,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // Inject a migration on top of the production baseline that throws.
     __setMigrationProviderForTest(
       buildProvider({
-        '9_will_fail': {
+        m901_test_will_fail: {
           async up() {
             throw new Error('intentional migration failure');
           },
@@ -200,7 +179,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // Inject a pending migration on top of the production baseline so a backup attempt happens.
     __setMigrationProviderForTest(
       buildProvider({
-        '9_pending': {
+        m902_test_pending: {
           async up(db) {
             await db.schema.createTable('pending_table').addColumn('id', 'integer').execute();
           },
@@ -235,7 +214,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // Inject a migration on top of the production baseline that throws
     __setMigrationProviderForTest(
       buildProvider({
-        '9_will_fail': {
+        m901_test_will_fail: {
           async up() {
             throw new Error('intentional migration failure');
           },
@@ -289,7 +268,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
 
     __setMigrationProviderForTest(
       buildProvider({
-        '9_introduces_orphan': {
+        m903_test_introduces_orphan: {
           async up(db) {
             // Insert a script_channels row with a fabricated script_id —
             // valid SQL because FKs are off during the migration window.
@@ -326,6 +305,8 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     expect(survivors).toHaveLength(0);
 
     // And the migration history shows the production latest, not the injected migration.
+    // ORDER BY name is plain string order, which T-012's naming keeps equal to
+    // the canonical compareMigrationNames order (pinned in database.test.ts).
     const result = await sql<{ name: string }>`
       SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1
     `.execute(db);
@@ -370,7 +351,7 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
 
       __setMigrationProviderForTest(
         buildProvider({
-          '9_pending': {
+          m902_test_pending: {
             async up(db) {
               await db.schema.createTable('pending_table').addColumn('id', 'integer').execute();
             },
@@ -454,5 +435,101 @@ describe('initializeDatabase safety flow', { timeout: 15_000 }, () => {
     // The returned connection must be functional (an in-memory fallback).
     const probe = await sql<{ one: number }>`SELECT 1 AS one`.execute(db);
     expect(probe.rows).toEqual([{ one: 1 }]);
+  });
+});
+
+// T-012: migrations from 10 on are named m<NNN>_…, and Kysely runs them in plain
+// .sort() order, so an m<NNN>_ migration must run after every legacy 0_…9_ one.
+// The sample (a test-range name, so a real m010_ can't collide with it) checks
+// from inside its own up() that migration 9's column already exists, and adds a
+// column to maestro_channels: migration 6 copies that table with SELECT *, so a
+// sample that ran before 6 would break the run.
+describe('the m<NNN>_ migration naming scheme', { timeout: 15_000 }, () => {
+  let tmpDir: string;
+  let dbPath: string;
+
+  const sample: Record<string, Migration> = {
+    m910_test_sample_addition: {
+      async up(db) {
+        const events = await sql<{ name: string }>`PRAGMA table_info(script_events)`.execute(db);
+        if (!events.rows.some((r) => r.name === 'end_time')) {
+          throw new Error('m910_test_sample_addition ran before 9_add_script_event_end_time');
+        }
+        await db.schema.alterTable('maestro_channels').addColumn('t012_probe', 'integer').execute();
+      },
+      async down() {
+        return;
+      },
+    },
+  };
+
+  // The frozen legacy migrations alone (database.test.ts pins them), so the
+  // legacy -> m<NNN>_ transition stays covered once real m-migrations exist.
+  const legacyOnly = Object.fromEntries(
+    Object.entries(PRODUCTION_MIGRATIONS).filter(([name]) => /^\d_/.test(name)),
+  );
+
+  function providerOf(migrations: Record<string, Migration>): MigrationProvider {
+    return {
+      async getMigrations() {
+        return { ...migrations };
+      },
+    };
+  }
+
+  async function columnNames(
+    db: Awaited<ReturnType<typeof initializeDatabase>>,
+  ): Promise<string[]> {
+    const info = await sql<{ name: string }>`PRAGMA table_info(maestro_channels)`.execute(db);
+    return info.rows.map((r) => r.name);
+  }
+
+  async function appliedNames(
+    db: Awaited<ReturnType<typeof initializeDatabase>>,
+  ): Promise<string[]> {
+    const rows = await sql<{ name: string }>`SELECT name FROM kysely_migration`.execute(db);
+    return rows.rows.map((r) => r.name);
+  }
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'astros-db-naming-'));
+    dbPath = path.join(tmpDir, 'database.sqlite3');
+  });
+
+  afterEach(async () => {
+    await closeDatabaseForTest();
+    __resetMigrationProviderForTest();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('runs an m<NNN>_ migration last on a fresh database', async () => {
+    const provider = buildProvider(sample);
+    __setMigrationProviderForTest(provider);
+    const status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+
+    expect(status.isReadOnly()).toBe(false);
+    expect(await columnNames(db)).toContain('t012_probe');
+    expect(await getLastAppliedMigrationName(db, provider)).toBe('m910_test_sample_addition');
+  });
+
+  it('applies only the m<NNN>_ migration to a database already at 9, after a backup named for 9', async () => {
+    __setMigrationProviderForTest(providerOf(legacyOnly));
+    await initializeDatabase(new SystemStatus(), { dbPath });
+    await closeDatabaseForTest();
+
+    __setMigrationProviderForTest(providerOf({ ...legacyOnly, ...sample }));
+    const status = new SystemStatus();
+    const db = await initializeDatabase(status, { dbPath });
+
+    expect(status.isReadOnly()).toBe(false);
+    expect(await columnNames(db)).toContain('t012_probe');
+    const applied = await appliedNames(db);
+    expect(applied).toHaveLength(Object.keys(legacyOnly).length + 1);
+    expect(applied).toContain('m910_test_sample_addition');
+    const backupFiles = fs
+      .readdirSync(tmpDir)
+      .filter((f) => f.startsWith('database.sqlite3.backup-'));
+    expect(backupFiles).toEqual(['database.sqlite3.backup-9_add_script_event_end_time']);
   });
 });

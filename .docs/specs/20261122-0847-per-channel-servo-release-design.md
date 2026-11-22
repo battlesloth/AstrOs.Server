@@ -117,7 +117,7 @@ Decisions marked **(Jeff)** came from Jeff in the brainstorming session. Decisio
   - It proves on a copy of a migration-9 database, and on a fresh one, that a sample `m010_` runs last.
   - Ruled out:
     - a Kysely upgrade (it sorts the same way)
-    - `allowUnorderedMigrations`: on a fresh install the new migration would run before migration 6, which rebuilds `maestro_channels` and would drop the column
+    - `allowUnorderedMigrations`: on a fresh install the new migration would run before migration 6, which copies `maestro_channels` with `SELECT *` into a rebuilt table, so the extra column would break migration 6
     - renaming every migration (a one-time data rewrite on every install)
 - **Migration `m010_add_maestro_release_ms`:** `maestro_channels.release_ms integer not null default 5000`.
   - Existing rows get 5000.

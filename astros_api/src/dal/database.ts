@@ -47,20 +47,28 @@ export function resolveDatabaseDir(envValue: string | undefined): string {
   return envValue;
 }
 
+// Migration names: Kysely runs migrations in plain-string .sort() order and
+// ignores nameComparator, so a plain `10_…` would run before `1_…` and an
+// existing database would refuse it as "corrupted migrations". From 10 on,
+// names are `m<NNN>_<snake_name>` (m010_…, m011_…), which sort after every
+// legacy `<n>_` name as plain strings. Plain .sort() order must match
+// compareMigrationNames (dal/backup.ts); database.test.ts pins both (T-012).
+export const PRODUCTION_MIGRATIONS: Readonly<Record<string, Migration>> = {
+  '0_initial': migration_0,
+  '1_add_script_evt_id': migration_1,
+  '2_add_script_duration': migration_2,
+  '3_add_playlists': migration_3,
+  '4_add_random_wait': migration_4,
+  '5_fix_controller_locations_type': migration_5,
+  '6_add_foreign_keys': migration_6,
+  '7_rename_remote_config_key': migration_7,
+  '8_fix_script_duration_units': migration_8,
+  '9_add_script_event_end_time': migration_9,
+};
+
 const defaultMigrationProvider: MigrationProvider = new (class implements MigrationProvider {
   async getMigrations(): Promise<Record<string, Migration>> {
-    return {
-      '0_initial': migration_0,
-      '1_add_script_evt_id': migration_1,
-      '2_add_script_duration': migration_2,
-      '3_add_playlists': migration_3,
-      '4_add_random_wait': migration_4,
-      '5_fix_controller_locations_type': migration_5,
-      '6_add_foreign_keys': migration_6,
-      '7_rename_remote_config_key': migration_7,
-      '8_fix_script_duration_units': migration_8,
-      '9_add_script_event_end_time': migration_9,
-    };
+    return { ...PRODUCTION_MIGRATIONS };
   }
 })();
 
