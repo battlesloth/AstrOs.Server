@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Kysely } from 'kysely';
+import { Kysely, NoResultError } from 'kysely';
 import { Database } from '../dal/types.js';
 import { createKyselyConnection, migrateToLatest } from '../dal/database.js';
 import { Router } from 'express';
@@ -308,12 +308,31 @@ describe('Scripts Controller', () => {
       expect(copyRouteLayers().map((layer) => layer.route?.methods)).toEqual([{ post: true }]);
     });
 
-    it('copy runs the auth handler before the copy', () => {
+    it('copy runs the auth handler first', () => {
       const [layer] = copyRouteLayers();
 
       const handlers = layer.route?.stack.map((routeLayer) => routeLayer.handle);
       expect(handlers).toHaveLength(2);
       expect(handlers?.[0]).toBe(passthroughAuth);
+    });
+
+    // Wiring the route to another handler would fail every copy while the
+    // registration tests above still pass. Awaiting the handler relies on the
+    // route's arrow wrapper returning copyScript's promise.
+    it('the copy route hands the request to copyScript', async () => {
+      const { scriptId } = await seedScript();
+      const [layer] = copyRouteLayers();
+      const handler = layer.route?.stack[1].handle as (
+        req: unknown,
+        res: unknown,
+        next: unknown,
+      ) => Promise<void>;
+      const res = mockRes();
+
+      await handler({ body: { id: scriptId } }, res, vi.fn());
+
+      expect(res.status.mock.calls).toEqual([[200]]);
+      expect(res.json.mock.calls[0][0].scriptName).toBe('Wave (Copy)');
     });
 
     it('copyScript copies the script named in the body', async () => {
@@ -355,7 +374,43 @@ describe('Scripts Controller', () => {
 
       expect(res.status.mock.calls).toEqual([[500]]);
       expect(res.json.mock.calls).toEqual([[{ message: 'Internal server error' }]]);
+      // Express sends on json(): a status set after it would reach the client as 200.
+      expect(res.status.mock.invocationCallOrder[0]).toBeLessThan(
+        res.json.mock.invocationCallOrder[0],
+      );
       expect(await storedScriptIds()).toEqual([scriptId]);
+    });
+
+    // The id is in the body, so no access-log line names the script; when the
+    // lookup fails, this is the only log line that does.
+    it('a failed copy logs the id it was asked for', async () => {
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      const res = mockRes();
+
+      await copyScript(db, { body: { id: 'sMissing' } }, res, vi.fn());
+
+      expect(res.status.mock.calls).toEqual([[500]]);
+      expect(errorSpy).toHaveBeenCalledWith(
+        { err: expect.any(NoResultError), scriptId: 'sMissing' },
+        'copyScript: copy failed',
+      );
+    });
+
+    // The log takes the id as a field, never converted to text: a throw in the
+    // catch would reject this async handler, which Express 4 leaves unhandled.
+    it('a failed copy whose body id String() throws on still answers one 500', async () => {
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+      const id = { toString: 0 };
+      const res = mockRes();
+
+      await expect(copyScript(db, { body: { id } }, res, vi.fn())).resolves.toBeUndefined();
+
+      expect(res.status.mock.calls).toEqual([[500]]);
+      expect(res.json.mock.calls).toEqual([[{ message: 'Internal server error' }]]);
+      expect(errorSpy).toHaveBeenCalledWith(
+        { err: expect.anything(), scriptId: id },
+        'copyScript: copy failed',
+      );
     });
   });
 });

@@ -92,7 +92,8 @@ const editPlaylist = (id: string) => {
   <AstrosLayout>
     <template v-slot:main>
       <!-- Header with buttons -->
-      <!-- overflow-x-clip: in read-only mode, New's hidden tooltip would widen the page. -->
+      <!-- overflow-x-clip: in read-only or flash mode, New's hidden tooltip (up to 320 px) would
+           widen the page. -->
       <div class="flex items-center gap-4 p-4 bg-r2-complement shrink-0 mb-4 overflow-x-clip">
         <h1 class="text-2xl font-bold">{{ $t('playlists_view.title') }}</h1>
         <div class="grow flex justify-center">
@@ -109,13 +110,14 @@ const editPlaylist = (id: string) => {
           {{ $t('playlists_view.new') }}
         </AstrosWriteButton>
       </div>
-      <!-- Same as ScriptsView: the list scrolls here, so the page never does;
-           scroll-pt-16 clears the pinned header when focus moves to a row under it. -->
+      <!-- Same as ScriptsView: the list scrolls here, so the page never does (relies on AstrosLayout's
+           100vh .drawer-content column); scroll-pt-16 clears the pinned header for focused rows. -->
       <div class="flex flex-row flex-nowrap flex-1 min-h-0 overflow-auto scroll-pt-16">
         <div class="grow"></div>
         <div class="px-5 max-w-250 grow-20">
           <table class="table w-full">
-            <!-- z-1 to match ScriptsView, whose header must stay below its rows' tooltips. -->
+            <!-- Pinned by hand, as in ScriptsView. z-1: a focused .btn gets isolation: isolate and would
+                 otherwise paint over the pinned header. -->
             <thead class="text-2xl bg-primary text-white rounded-t-lg sticky top-0 z-1">
               <tr>
                 <th class="w-1/3 first:rounded-tl-lg">{{ $t('playlists_view.playlist_name') }}</th>
