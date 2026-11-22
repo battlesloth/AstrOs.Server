@@ -5,10 +5,10 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Random span events — Phase A (database guard, span data + conversion); firmware side in AstrOs.ESP (its T-007–T-009)
-Now:     no server task in progress — T-011 merged 2026-11-21 (PR #138). Random spans: the AstrOs.ESP T-009 bench waits only on the bench server running AstrOs.Server develop (ESP PLAN.md Blocked line; server T-007–T-009 merged 2026-10-28..30)
-Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 ✓ → server T-009 ✓ → ESP T-009 bench (spans inserted by SQL: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))`, or open and save the script once, since `duration_ds` is only recomputed on save; and keep each span row within `0 ≤ time < end_time ≤ 6000` ds, because since T-009 a stored span outside that makes every save of its script answer 400; check: `SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` returns nothing) → ESP v1.3.0 release → server T-010 (report skipped spans on upload; before Phase B) → Phase B scripter (decomposed at phase start) → Phase C
+Now:     no server task in progress. The AstrOs.ESP T-009 bench passed 2026-11-22 against this repo's develop (cases 1–11, spans by SQL); ESP T-009 is complete
+Next:    agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 ✓ → server T-009 ✓ → ESP T-009 bench ✓ → ESP v1.3.0 release → server T-010 (report skipped spans on upload; before Phase B) → Phase B scripter (decomposed at phase start) → Phase C. Inserting spans by SQL for a bench: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))` (or open and save the script once, since `duration_ds` is only recomputed on save), and keep each span row within `0 ≤ time < end_time ≤ 6000` ds, because since T-009 a stored span outside that makes every save of its script answer 400. Check: `SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` returns nothing
 Blocked: none (Phase C waits on the AstrOs.ESP v1.3.0 release carrying its T-009)
-Last:    2026-11-21 — T-011 merged (PR #138) after a QA walk with Jeff (Verification steps 1–4) and a pre-push review round; the PR also carried a Scripts/Playlists list-layout quick fix from the walk and a CI pin of the Playwright job to ubuntu-24.04; develop at `1.0.3-dev.0`
+Last:    2026-11-22 — AstrOs.ESP T-009 bench passed against server develop (driven partly through the API with `curl`); 2026-11-21 — T-011 merged (PR #138); develop at `1.0.3-dev.0`
 
 ## Random span events
 
@@ -196,6 +196,13 @@ From T-007 (2026-10-27):
 - **A failed list load looks like an empty list (T-011 pre-push review, 2026-11-21).** `ScriptsView` and `PlaylistsView` ignore `{ success: false }` from their `onMounted` loads, so a 500 shows headers, no rows and no message (read-only scenario 1 does exactly this).
 - **Repository `logger.error('<Name>', err)` calls drop `err` (T-011 pre-push review, 2026-11-21).** pino ignores extra arguments when the message has no `%` placeholder, so lines like `ScriptRepository.getScript` log only the name. Use `logger.error({ err }, '<Name>')`.
 
+From the AstrOs.ESP T-009 bench (2026-11-22):
+
+- **`GET /api/scripts` without `?id=` answers 500.**
+  - The handler passes `undefined` to `ScriptRepository.getScript`, whose `executeTakeFirstOrThrow` raises Kysely's `NoResultError`, logged at error level as a failure.
+  - A missing id should be a 400, and an unknown id a 404. Check the other single-resource GETs for the same pattern.
+  - Seen while probing a bench JWT with `curl`; the UI always sends an id.
+
 Open local branches (pre-workflow threads, unmerged into `develop`):
 
 - `debug/serial-rx-frame-diag` — temp serial-RX + deploy-route diagnostics
@@ -208,6 +215,12 @@ Open local branches (pre-workflow threads, unmerged into `develop`):
 - **Remote Control Redesign + Mobile Remote** (2026-05-19 → 2026-06) — all phases shipped (final merges: Phase 2d PR #97, Phase 5 PR #106, Phase 4 mobile view PR #108). Archive: `.docs/completed_plans/2026/08/14/current_project.md`
 
 ## Log
+
+- 2026-11-22 bench — AstrOs.ESP T-009 (random spans on the controller) against this repo's develop
+  - the server ran locally on a bench copy of the database (`DATABASE_PATH` override, migrated to 9) with spans inserted by SQL; each case's wire string was checked with the real `ScriptConverter` before upload; cases 9 and 11 used `curl` on `scripts/upload`, `scripts/run`, `panicStop` and `panicClear`, so send times and both ESP consoles shared one clock
+  - all 11 firmware cases pass; results, the case 11 bound correction and the firmware Backlog items are in AstrOs.ESP `PLAN.md` (2026-11-22)
+  - server-side: the ~1.0 s between an HTTP call and the master, first measured 2026-09-07 and blamed on this repo's serial pipeline, is at least 1 s the master's own serial read (`uart_read_bytes` with a 1 s timeout, an AstrOs.ESP Backlog item). Nothing to fix here
+  - found: `GET /api/scripts` without `?id=` answers 500 (Kysely `NoResultError` from `getScript(undefined)`); Backlog
 
 - 2026-11-21 T-011 — fix the Scripts page's Copy button
   - `POST /api/scripts/copy` reads the id from the body (`req.body.id`) and the Vue store posts `{ id }`, as playlist copy does; the response contract is unchanged, and copy stays a write the guard refuses (503 read-only, 423 flash). A failed copy logs `{ err, scriptId }`, since the id no longer appears in any access-log line
