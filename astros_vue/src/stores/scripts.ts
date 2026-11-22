@@ -38,7 +38,7 @@ export const useScriptsStore = defineStore('scripts', () => {
 
   async function copyScript(scriptId: string) {
     try {
-      const response = (await apiService.get(SCRIPTS_COPY, { id: scriptId })) as Script;
+      const response = (await apiService.post(SCRIPTS_COPY, { id: scriptId })) as Script;
       scripts.value.push(response);
       return { success: true, data: response };
     } catch (error) {

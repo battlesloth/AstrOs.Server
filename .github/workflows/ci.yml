@@ -130,7 +130,10 @@ jobs:
 
   playwright:
     name: Vue – Playwright E2E Tests
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest became Ubuntu 26.04 in Nov 2026, and Playwright 1.57
+    # cannot install its browser dependencies there. Unpin after upgrading
+    # @playwright/test to a release that supports 26.04 (PLAN.md Backlog).
+    runs-on: ubuntu-24.04
     needs: [api, vue]
 
     steps:

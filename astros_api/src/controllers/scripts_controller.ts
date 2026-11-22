@@ -145,16 +145,18 @@ export async function deleteScript(db: Kysely<Database>, req: any, res: any, nex
   }
 }
 
-async function copyScript(db: Kysely<Database>, req: any, res: any, next: any) {
+export async function copyScript(db: Kysely<Database>, req: any, res: any, next: any) {
   try {
     const repo = new ScriptRepository(db);
 
-    const scripts = await repo.copyScript(req.query.id);
+    const copy = await repo.copyScript(req.body.id);
 
     res.status(200);
-    res.json(scripts);
+    res.json(copy);
   } catch (error) {
-    logger.error(error);
+    // The id travels in the body, so no access-log line carries it. As in
+    // saveScript, it is a field, not text: converting it can throw.
+    logger.error({ err: error, scriptId: req.body?.id }, 'copyScript: copy failed');
 
     res.status(500);
     res.json({
