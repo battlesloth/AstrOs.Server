@@ -1,6 +1,6 @@
 # T-011: Fix the Scripts page's Copy button
 
-<!-- File: .docs/tasks/T-011-fix-script-copy.md. Branch: feature/T-011-fix-script-copy. PR title: "T-011: Fix the Scripts page's Copy button". -->
+<!-- File: .docs/tasks/completed/T-011-fix-script-copy.md. Branch: feature/T-011-fix-script-copy. PR title: "T-011: Fix the Scripts page's Copy button". -->
 
 ## Context
 
@@ -98,4 +98,5 @@ Write these first.
   - Docs and comments: QA cases 7, 11, 13 and 14; the log-line evidence above; 1.0.0 in Context; the views' layout comments; and the `PLAN.md` Now line (the ESP bench waits on a bench-server deploy of develop). Also removed a wrong drawer-checkbox Backlog item (DaisyUI already mirrors its focus ring onto the hamburger).
   - Not done: rewording commit `f8cce0aa`'s message to add 1.0.0, because rewriting it would change the hashes `PLAN.md` and this file cite; the PR body carries the correction. The cross-boundary Copy e2e and the layout e2e guard went to the Backlog.
 - [x] PR #138 opened against develop (2026-11-21).
-- [ ] PR review round, merge, then close-out (task file to `completed/`, PLAN.md checkbox + Log).
+- [x] Merged 2026-11-21 as PR #138 (merge `f6395d95`), with no review comments. CI's Playwright E2E job first failed before any test ran: GitHub's `ubuntu-latest` became Ubuntu 26.04, where Playwright 1.57 cannot install its browser. Jeff chose to pin that job to `ubuntu-24.04` on this PR (`62f263ae`); all four checks then passed. Upgrading Playwright and unpinning is in the `PLAN.md` Backlog.
+- [x] Close-out: task file moved to `completed/`, `PLAN.md` checkbox, Status and Log. (task file to `completed/`, PLAN.md checkbox + Log).
