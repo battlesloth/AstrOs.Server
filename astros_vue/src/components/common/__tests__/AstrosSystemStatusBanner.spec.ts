@@ -70,8 +70,8 @@ describe('AstrosSystemStatusBanner', () => {
   });
 
   it('renders the interrupted-migration message for MIGRATION_INTERRUPTED, not the UNKNOWN fallback', async () => {
-    // T-016: the server found a migration run that didn't finish and couldn't
-    // restore its backup; the operator needs to know recovery is manual.
+    // T-016: a migration run didn't finish cleanly and the server stopped its
+    // automatic recovery; the operator needs to know recovery is manual.
     const store = useSystemStatusStore();
     store.setStatus({ readOnly: true, reasonCode: 'MIGRATION_INTERRUPTED' });
 

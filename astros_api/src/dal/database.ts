@@ -159,6 +159,36 @@ async function closeConnection(): Promise<void> {
   _rawSqlite = null;
 }
 
+// restoreBackup renames over dbFile, so the connection must be closed first.
+async function closeAndRestore(backupPath: string, dbFile: string): Promise<void> {
+  await closeConnection();
+  restoreBackup(backupPath, dbFile);
+}
+
+// The safe order for an operator, for a MIGRATION_INTERRUPTED detail: restore
+// first, then delete the sentinel.
+function recoveryHint(dbFile: string): string {
+  return (
+    `To recover, stop the server, copy a known-good backup (${backupCandidates(dbFile)}) over ` +
+    `${dbFile}, then delete ${migrationSentinelPath(dbFile)}; deleting only the sentinel lets ` +
+    'the next boot back up this possibly half-migrated file over the good backup'
+  );
+}
+
+function backupCandidates(dbFile: string): string {
+  const dir = path.dirname(dbFile);
+  const prefix = `${path.basename(dbFile)}.backup-`;
+  try {
+    const names = fs
+      .readdirSync(dir)
+      .filter((n) => n.startsWith(prefix))
+      .sort();
+    return names.length > 0 ? names.map((n) => path.join(dir, n)).join(', ') : 'none found';
+  } catch (err) {
+    return `none listed: ${(err as NodeJS.ErrnoException).code}`;
+  }
+}
+
 // After a failed restore: reopen the file, or, if that also fails, a bare
 // in-memory DB so the process still comes up and the read-only status endpoint
 // stays reachable. (The fallback is unmigrated — DB-backed queries fail, but
@@ -222,9 +252,9 @@ export async function initializeDatabase(
       conn.raw.pragma('query_only = ON');
       return conn.db;
     }
-    // T-016: a sentinel means the last migration run didn't finish cleanly (a
-    // power cut mid-migration, a failed restore, or a sentinel whose removal
-    // failed after a successful migration or restore), so the file may be
+    // T-016: a sentinel means the last migration run didn't finish cleanly
+    // (e.g. a power cut mid-migration, a failed restore, a sentinel whose
+    // removal failed, or one whose directory fsync failed), so the file may be
     // half-migrated. Restore the backup it names before anything else; taking
     // a new backup now would overwrite the only good copy. The newer-database
     // check above has already read the file, which rolls back any hot journal
@@ -232,52 +262,51 @@ export async function initializeDatabase(
     const sentinel = readMigrationSentinel(dbFile);
     if (sentinel !== null) {
       const sentinelFile = migrationSentinelPath(dbFile);
-      // The explicit 'unreadable' test narrows `sentinel` for the code below.
-      const problem =
-        sentinel === 'unreadable'
-          ? 'the sentinel is unreadable'
-          : sentinelBackupProblem(
-              sentinel,
-              new Set(await getProviderMigrationNames(activeMigrationProvider)),
-            );
-      if (problem !== null || sentinel === 'unreadable') {
-        systemStatus.enterReadOnly(
-          'MIGRATION_INTERRUPTED',
-          `a migration run did not finish (${sentinelFile}) and ${problem}; ` +
-            'the database and its backups are left untouched',
-        );
+      const interrupted = (detail: string): Kysely<Database> => {
+        systemStatus.enterReadOnly('MIGRATION_INTERRUPTED', detail);
         return conn.db;
+      };
+      const untouched = (problem: string): Kysely<Database> =>
+        interrupted(
+          `a migration run did not finish (${sentinelFile}) and ${problem}; the database and ` +
+            `its backups are left untouched. ${recoveryHint(dbFile)}`,
+        );
+      if (sentinel === 'unreadable') {
+        return untouched('the sentinel is unreadable');
       }
-      await closeConnection();
+      const problem = sentinelBackupProblem(
+        sentinel,
+        new Set(await getProviderMigrationNames(activeMigrationProvider)),
+      );
+      if (problem !== null) {
+        return untouched(problem);
+      }
       try {
-        restoreBackup(sentinel.backupPath, dbFile);
+        await closeAndRestore(sentinel.backupPath, dbFile);
       } catch (err) {
-        // The restore is atomic: dbFile is unchanged, or already the backup when
-        // only the directory fsync after the rename failed. Either way the
-        // sentinel is kept and the next boot restores again.
+        // Read-only first, then the reopen: its fallback logs on its own.
         systemStatus.enterReadOnly(
           'MIGRATION_INTERRUPTED',
-          `restoring ${sentinel.backupPath} after an interrupted migration failed, and ` +
-            `${sentinelFile} was kept: ${(err as Error).message}`,
+          `restoring ${sentinel.backupPath} after an interrupted migration failed (the ` +
+            'database is unchanged, or already the backup if only the directory fsync after ' +
+            `the rename failed), and ${sentinelFile} was kept: ${(err as Error).message}`,
         );
         conn = openConnectionOrMemory(dbFile);
         return conn.db;
       }
-      conn = openConnection(dbFile);
       logger.warn(
         `Restored ${sentinel.backupPath} after an interrupted migration (started ${sentinel.startedAt})`,
       );
+      conn = openConnection(dbFile);
       try {
         removeMigrationSentinel(dbFile);
       } catch (err) {
         // A sentinel left behind would restore this backup over newer data on
         // a later boot, so don't take writes until it's gone.
-        systemStatus.enterReadOnly(
-          'MIGRATION_INTERRUPTED',
+        return interrupted(
           `restored ${sentinel.backupPath} after an interrupted migration, but ${sentinelFile} ` +
-            `could not be removed: ${(err as Error).message}`,
+            `could not be removed (or its removal made durable): ${(err as Error).message}`,
         );
-        return conn.db;
       }
     }
 
@@ -285,9 +314,26 @@ export async function initializeDatabase(
     lastApplied = await getLastAppliedMigrationName(conn.db, activeMigrationProvider);
   } catch (err) {
     // The open, the introspection, or the reopen after a sentinel restore
-    // failed (perms, directory-as-file, corrupted DB, etc.). Degrade to a bare in-memory connection so the
-    // process still comes up and /api/system/status is reachable.
+    // failed (perms, directory-as-file, corrupted DB, etc.). Degrade to a bare
+    // in-memory connection so the process still comes up and
+    // /api/system/status is reachable.
     logger.error(`Could not open database at startup: ${(err as Error).message}`);
+    // A torn half-migrated file fails here, before the sentinel check, so say
+    // which backup the operator can restore. The existsSync isn't redundant:
+    // in a data dir this process can't read, readMigrationSentinel answers
+    // 'unreadable', which would claim an interrupted run that never happened.
+    const leftover = fs.existsSync(migrationSentinelPath(dbFile))
+      ? readMigrationSentinel(dbFile)
+      : null;
+    if (leftover !== null) {
+      logger.error(
+        `A migration run did not finish (${migrationSentinelPath(dbFile)})` +
+          (leftover === 'unreadable'
+            ? `, and the sentinel is unreadable. ${recoveryHint(dbFile)}`
+            : `: with the server stopped, copy its backup ${leftover.backupPath} over ${dbFile}, ` +
+              `delete any ${dbFile}-journal beside it, then delete the sentinel`),
+      );
+    }
     systemStatus.enterReadOnly('STARTUP_OPEN_FAILED', err);
     return openConnection(':memory:').db;
   }
@@ -328,18 +374,23 @@ export async function initializeDatabase(
     // Verify the migration left no FK violators (orphan-cleanup gap, etc.).
     // Throws into the catch below, where the restore-from-backup path runs.
     assertNoFkViolations(conn.raw);
-    try {
-      removeMigrationSentinel(dbFile);
-    } catch (err) {
-      // A sentinel left behind would restore the pre-migration backup over this
-      // migrated database (and anything written to it) on the next boot.
-      // Read-only keeps this boot from writing, so that restore loses nothing.
-      systemStatus.enterReadOnly(
-        'MIGRATION_INTERRUPTED',
-        `the migration succeeded, but ${migrationSentinelPath(dbFile)} could not be removed: ` +
-          `${(err as Error).message}; the next boot restores ${backupPath} and migrates again`,
-      );
-      return conn.db;
+    // A sentinel exists exactly when a backup was taken (a fresh install has neither).
+    if (backupPath !== null) {
+      try {
+        removeMigrationSentinel(dbFile);
+      } catch (err) {
+        // A sentinel left behind would restore the pre-migration backup over
+        // this migrated database (and anything written to it) on the next boot.
+        // Read-only keeps this boot from writing, so that restore loses nothing.
+        systemStatus.enterReadOnly(
+          'MIGRATION_INTERRUPTED',
+          `the migration succeeded, but ${migrationSentinelPath(dbFile)} could not be removed ` +
+            `(or its removal made durable): ${(err as Error).message}; fix the cause and ` +
+            `restart: if the sentinel is still there, the next boot restores ${backupPath} and ` +
+            'migrates again',
+        );
+        return conn.db;
+      }
     }
     pruneOldBackups(dbFile, 5);
     return conn.db;
@@ -352,16 +403,18 @@ export async function initializeDatabase(
     }
 
     try {
-      await closeConnection();
-      restoreBackup(backupPath, dbFile);
-      conn = openConnection(dbFile);
+      await closeAndRestore(backupPath, dbFile);
       logger.warn(`Restored database from backup ${backupPath} after failed migration`);
+      conn = openConnection(dbFile);
       try {
         removeMigrationSentinel(dbFile);
       } catch (removeErr) {
         // Kept: the next boot restores the same backup again, harmless while
         // read-only blocks writes.
-        logger.error(`Could not remove the migration sentinel: ${(removeErr as Error).message}`);
+        logger.error(
+          `Could not remove the migration sentinel ${migrationSentinelPath(dbFile)}: ` +
+            `${(removeErr as Error).message}; if it is still there, the next boot restores ${backupPath} again`,
+        );
       }
       // Restore succeeded — DB is at a known-good prior version. Enter read-only
       // anyway: a migration failed, and silently coming back up "as if nothing
@@ -372,7 +425,7 @@ export async function initializeDatabase(
       return conn.db;
     } catch (restoreErr) {
       systemStatus.enterReadOnly('MIGRATION_FAILED_RESTORE_FAILED', restoreErr);
-      // The original handles were destroyed by closeConnection().
+      // closeAndRestore() destroyed the handles: reopen, or fall back to memory.
       conn = openConnectionOrMemory(dbFile);
       return conn.db;
     }

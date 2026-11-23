@@ -606,10 +606,10 @@
     },
     "reasonCode": {
       "STARTUP_OPEN_FAILED": "The database could not be opened at startup. The server is running on a temporary in-memory database with no data.",
-      "BACKUP_FAILED": "A pre-migration backup could not be written. The schema upgrade was skipped.",
+      "BACKUP_FAILED": "A pre-migration backup could not be written or protected. The schema upgrade was skipped.",
       "MIGRATION_FAILED_NO_BACKUP": "A schema migration failed and there was no prior backup to restore from. The database may be in a partially-migrated state.",
       "MIGRATION_FAILED_RESTORED": "A schema migration failed but the database was successfully rolled back to the previous version. Investigate the failed migration before redeploying.",
-      "MIGRATION_FAILED_RESTORE_FAILED": "A schema migration failed and the automatic restore also failed. Manual recovery is required.",
+      "MIGRATION_FAILED_RESTORE_FAILED": "A schema migration failed and the automatic restore also failed. The server retries the restore on its next start; if that fails too, manual recovery is required.",
       "DB_NEWER_THAN_SERVER": "The database version is newer than this server supports.",
       "MIGRATION_INTERRUPTED": "A schema migration run did not finish cleanly, and automatic recovery stopped. No backup was deleted, and the in-progress marker was kept. See the server log; manual recovery is required.",
       "UNKNOWN": "The database is currently unavailable for writes."

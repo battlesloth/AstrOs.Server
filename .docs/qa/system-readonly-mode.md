@@ -31,7 +31,7 @@ Five ways to put the server into read-only mode for testing. Pick whichever matc
 
 3. **`MIGRATION_FAILED_RESTORED`** — inject a migration that throws but leave the backup mechanism intact. The system rolls back to the prior version and enters read-only with this code so operators are forced to notice and investigate. Easiest from the integration tests (`database.integration.test.ts`).
 
-4. **`MIGRATION_FAILED_RESTORE_FAILED`** — inject a migration that throws, and make the restore fail by creating a directory where its temp copy goes: `mkdir <dbDir>/database.sqlite3.restore-tmp` (remove it afterwards). See case 18.
+4. **`MIGRATION_FAILED_RESTORE_FAILED`** — inject a migration that throws, and make the restore fail by creating a directory where its temp copy goes: `mkdir <dbDir>/database.sqlite3.restore-tmp` (remove it afterwards). The sentinel it leaves makes the next boot restore first. See case 18.
 
 5. **`MIGRATION_INTERRUPTED`** — stage a migration sentinel whose backup is missing (case 16).
 
@@ -198,11 +198,11 @@ curl -s -i localhost:3000/api/system/status
 
 ## Interrupted migration (T-016)
 
-A migration run writes `<db>.migration-in-progress` (JSON: `backupPath`, `lastApplied`, `startedAt`) after its backup and removes it when the run ends. A boot that finds one restores the named backup before doing anything else, so a power cut mid-migration can't cost the only good copy.
+A migration run writes `<db>.migration-in-progress` (JSON: `backupPath`, `lastApplied`, `startedAt`) after its backup, and removes it once the run succeeds or its backup is restored. A boot that finds one restores the named backup, if the backup checks out, before taking a new backup or migrating. A power cut mid-migration therefore can't cost the only good copy.
 
 ### Preconditions
 
-- Work on a **copy** of the dev database at this build's latest migration, as in the incompatible-database preconditions above (`/tmp/astros-interrupted/database.sqlite3`).
+- Work on a **copy** of the dev database at this build's latest migration, without the `m099_future` row the incompatible-database cases insert (that would give `DB_NEWER_THAN_SERVER` in every case below): `mkdir -p /tmp/astros-interrupted && cp .data/database.sqlite3 /tmp/astros-interrupted/`. Boot it once to migrate it to latest.
 - Start the API against it with `DATABASE_PATH=/tmp/astros-interrupted` (the same command as above).
 
 ### 15. A leftover sentinel with a good backup is restored
@@ -228,11 +228,11 @@ A migration run writes `<db>.migration-in-progress` (JSON: `backupPath`, `lastAp
 3. **Pass:**
    - the banner shows "A schema migration run did not finish cleanly, and automatic recovery stopped…" (`MIGRATION_INTERRUPTED`)
    - the log names the sentinel and the missing backup
-   - the database's sha256 and the directory listing are unchanged: no backup, migrate or prune ran
-4. Repeat with the sentinel's content replaced by `{`. **Pass:** the same, with "the sentinel is unreadable".
+   - the database's sha256 and the directory listing are unchanged: nothing was restored. (With nothing pending, no backup or migrate would run anyway; the automated tests cover that with a pending migration.)
+4. Repeat with the sentinel's content replaced by `{`. **Pass:** the same, except the log says "the sentinel is unreadable" and lists the backup candidates instead of naming one.
 5. Repeat with a backup that exists but is empty (`: > database.sqlite3.backup-manual`) and the case 15 sentinel. **Pass:** the same, with "has no record of migration …": an empty file must not be restored as a fresh install.
 6. **Recovery:**
-   - restore a known-good copy by hand, or delete the sentinel if the database is known good
+   - follow the detail's recovery line: stop the server, copy a known-good backup over the database, then delete the sentinel (deleting only the sentinel is safe just when the database is known good)
    - restart: the banner clears
 
 ### 17. A migration interrupted mid-run (optional, needs a code stub)
@@ -241,9 +241,9 @@ A migration run writes `<db>.migration-in-progress` (JSON: `backupPath`, `lastAp
 2. With the API stopped, keep a copy of the pre-migration database: `cp database.sqlite3 /tmp/astros-pre-migration.sqlite3`.
 3. Start the API, and `kill -9` it during the wait. Revert the stub.
 4. Restart with the stub reverted.
-5. **Pass:** the restore log line appears, the half-made table is gone, and the database's tables match `/tmp/astros-pre-migration.sqlite3` (`sqlite3 … ".tables"` on both). Only the restore after a leftover sentinel is automated (`database.integration.test.ts` § an interrupted migration); the kill itself is manual.
+5. **Pass:** the restore log line appears, the half-made table is gone, and the database's tables match `/tmp/astros-pre-migration.sqlite3` (`sqlite3 … ".tables"` on both). The restore after a leftover sentinel, and after a hot journal from a mid-statement crash, are automated (`database.integration.test.ts` § an interrupted migration); the kill itself is manual.
 
-### 18. The reviewer's reproduction: a failed restore keeps the backup safe
+### 18. A failed migration whose restore also failed keeps the backup safe
 
 1. Temporarily add a test-range migration (e.g. `m950_test_partial`) to `PRODUCTION_MIGRATIONS` that creates a table `partial` and then throws.
 2. With the API stopped, `mkdir /tmp/astros-interrupted/database.sqlite3.restore-tmp` so the restore fails.

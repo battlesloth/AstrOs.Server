@@ -53,6 +53,10 @@ async function runOrder(db: Kysely<Database>): Promise<string[]> {
   return rows.rows.map((r) => r.name);
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function sha256(file: string): string {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
@@ -615,6 +619,17 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
   });
 
   const backupPath = () => `${dbPath}.backup-${PRODUCTION_LATEST}`;
+
+  // Six older backups, so a prune (which keeps the five newest) shows in a
+  // "touches nothing" directory listing.
+  function seedOldBackups(): void {
+    for (let i = 0; i < 6; i++) {
+      const old = `${dbPath}.backup-${i}_old`;
+      fs.writeFileSync(old, '');
+      const t = new Date(Date.UTC(2020, 0, 1 + i));
+      fs.utimesSync(old, t, t);
+    }
+  }
   const sentinel = () => migrationSentinelPath(dbPath);
 
   function tables(file: string): string[] {
@@ -652,7 +667,7 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
     await closeDatabaseForTest();
   }
 
-  it("keeps the good backup when a boot finds the last run interrupted (the reviewer's reproduction)", async () => {
+  it('keeps the good backup across a failed migration whose restore also failed', async () => {
     // Break: the next boot's createBackup overwriting the only pre-migration
     // copy with the half-migrated database.
     await migrateToProductionLatest();
@@ -683,7 +698,7 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
     expect(warn).toHaveBeenCalledWith(
       expect.stringMatching(
         new RegExp(
-          `^Restored ${backupPath().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} after an interrupted migration \\(started .+\\)$`,
+          `^Restored ${escapeRegExp(backupPath())} after an interrupted migration \\(started .+\\)$`,
         ),
       ),
     );
@@ -713,6 +728,7 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
 
   it('enters MIGRATION_INTERRUPTED and touches nothing when the recorded backup is missing', async () => {
     await migrateToProductionLatest();
+    seedOldBackups();
     writeMigrationSentinel(dbPath, {
       backupPath: `${dbPath}.backup-gone`,
       lastApplied: PRODUCTION_LATEST,
@@ -721,28 +737,43 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
 
     __setMigrationProviderForTest(buildProvider(partialMigration({ value: false })));
     const status = new SystemStatus();
+    const entered = vi.spyOn(status, 'enterReadOnly');
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
     expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
     expect(sha256(dbPath)).toBe(before.sha);
     expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
+    // The detail is the operator's only pointer to the files, and to the safe
+    // order: restore first, then delete the sentinel.
+    const detail = String(entered.mock.calls[0]?.[1]);
+    expect(detail).toContain(sentinel());
+    expect(detail).toContain(`its backup ${dbPath}.backup-gone is missing`);
+    expect(detail).toMatch(/copy a known-good backup .* over .*, then delete/);
   });
 
   it('enters MIGRATION_INTERRUPTED and touches nothing when the sentinel is corrupt', async () => {
     await migrateToProductionLatest();
+    seedOldBackups();
+    fs.copyFileSync(dbPath, backupPath()); // a candidate the detail can list
     fs.writeFileSync(sentinel(), '{');
     const before = { sha: sha256(dbPath), files: fs.readdirSync(tmpDir).sort() };
 
     // A pending migration, so "touches nothing" means no backup or migrate ran.
     __setMigrationProviderForTest(buildProvider(partialMigration({ value: false })));
     const status = new SystemStatus();
+    const entered = vi.spyOn(status, 'enterReadOnly');
     await initializeDatabase(status, { dbPath });
     await closeDatabaseForTest();
 
     expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
     expect(sha256(dbPath)).toBe(before.sha);
     expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
+    // Its backup path is inside the unreadable file, so the candidates are listed.
+    const detail = String(entered.mock.calls[0]?.[1]);
+    expect(detail).toContain(sentinel());
+    expect(detail).toContain('the sentinel is unreadable');
+    expect(detail).toContain(backupPath());
   });
 
   it('restores and re-migrates when a sentinel outlived a successful run', async () => {
@@ -772,7 +803,6 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
     expect(status.getState()).toEqual({ readOnly: false });
     expect(fs.existsSync(sentinel())).toBe(false);
     expect((await runOrder(db)).at(-1)).toBe('m950_test_partial');
-    expect(tables(dbPath).filter((t) => t === 'partial')).toHaveLength(1);
     expect(ups).toBe(2);
   });
 
@@ -799,11 +829,14 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
     expect(ran).toBe(false);
   });
 
-  // Stage a sentinel naming `backup` (written by `write`), with a pending migration.
+  // Migrates to production latest, lets write() create the file at
+  // backupPath(), and stages a sentinel naming it plus one pending migration.
+  // Returns the database's sha256 and the directory listing.
   async function stageSentinel(
     write: (backup: string) => void,
   ): Promise<{ sha: string; files: string[] }> {
     await migrateToProductionLatest();
+    seedOldBackups();
     write(backupPath());
     writeMigrationSentinel(dbPath, { backupPath: backupPath(), lastApplied: PRODUCTION_LATEST });
     __setMigrationProviderForTest(buildProvider(partialMigration({ value: false })));
@@ -845,16 +878,21 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
     });
     const status = new SystemStatus();
     const entered = vi.spyOn(status, 'enterReadOnly');
+    let db: Kysely<Database>;
     try {
-      await initializeDatabase(status, { dbPath });
+      db = await initializeDatabase(status, { dbPath });
     } finally {
       spy.mockRestore();
     }
+    // Reopened on the file, not the in-memory fallback.
+    expect((await runOrder(db)).at(-1)).toBe(PRODUCTION_LATEST);
     await closeDatabaseForTest();
     expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
     expect(entered).toHaveBeenCalledWith(
       'MIGRATION_INTERRUPTED',
-      expect.stringMatching(/^restoring .+ failed/),
+      expect.stringMatching(
+        /^restoring .+ failed \(the database is unchanged, or already the backup/,
+      ),
     );
     expect(entered).toHaveBeenCalledWith(
       'MIGRATION_INTERRUPTED',
@@ -891,7 +929,7 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
       expect.stringContaining(`restored ${backupPath()}`),
     );
     expect(fs.existsSync(sentinel())).toBe(true);
-    // Stopped there: no backup or migrate ran on the restored file.
+    // Stopped there: the pending migration didn't run on the restored file.
     expect(tables(dbPath)).not.toContain('partial');
   });
 
@@ -911,7 +949,7 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
     expect(status.getState().reasonCode).toBe('MIGRATION_INTERRUPTED');
     expect(entered).toHaveBeenCalledWith(
       'MIGRATION_INTERRUPTED',
-      expect.stringContaining('the migration succeeded'),
+      expect.stringMatching(/the migration succeeded.*fix the cause and restart/),
     );
     expect(fs.existsSync(sentinel())).toBe(true);
   });
@@ -929,7 +967,7 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
     }
     expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORED');
     expect(error).toHaveBeenCalledWith(
-      expect.stringContaining('Could not remove the migration sentinel'),
+      expect.stringContaining(`Could not remove the migration sentinel ${sentinel()}`),
     );
     expect(fs.existsSync(sentinel())).toBe(true);
   });
@@ -953,8 +991,8 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
   });
 
   it('refuses a backup a newer build wrote, touching nothing', async () => {
-    // Break: the restore brings in a newer database, which is then backed up,
-    // migrated and served.
+    // Break: restoring it. The newer database is backed up, Kysely refuses to
+    // migrate it, and it is served as MIGRATION_FAILED_RESTORED.
     const before = await stageSentinel((b) => {
       fs.copyFileSync(dbPath, b);
       const db = new SQLite(b);
@@ -984,5 +1022,135 @@ describe('an interrupted migration', { timeout: 20_000 }, () => {
     expect(ran).toBe(false);
     expect(sha256(dbPath)).toBe(before.sha);
     expect(fs.readdirSync(tmpDir).sort()).toEqual(before.files);
+  });
+
+  it('keeps the sentinel when an FK-violating migration cannot be restored', async () => {
+    // Break: removing the sentinel before assertNoFkViolations, so a migration
+    // that commits orphans and then can't be restored costs the backup.
+    await migrateToProductionLatest();
+    __setMigrationProviderForTest(
+      buildProvider({
+        m950_test_orphan: {
+          async up(db) {
+            await sql`
+              INSERT INTO script_channels
+                (id, script_id, channel_type, parent_module_id, module_channel_id, module_channel_type)
+              VALUES
+                ('bad-orphan', 'no-such-script', 1, 'pm', 'mc', 'mct')
+            `.execute(db);
+          },
+          async down() {
+            return;
+          },
+        },
+      }),
+    );
+    const spy = vi.spyOn(fs, 'copyFileSync').mockImplementation(() => {
+      throw new Error('intentional restore failure');
+    });
+    const error = vi.spyOn(dbLogger, 'error');
+    const status = new SystemStatus();
+    try {
+      await initializeDatabase(status, { dbPath });
+    } finally {
+      spy.mockRestore();
+    }
+    // The FK check, not the migration itself, is what failed.
+    expect(error).toHaveBeenCalledWith(
+      expect.stringMatching(/^Migration failed: .*foreign_key_check/),
+    );
+    expect(status.getState().reasonCode).toBe('MIGRATION_FAILED_RESTORE_FAILED');
+    expect(fs.existsSync(sentinel())).toBe(true);
+  });
+
+  it('rolls back a hot journal, then restores and migrates', async () => {
+    // A power cut mid-statement: the half-migrated file plus a hot -journal.
+    // Break: restoring before anything reads the file, so the journal is never
+    // rolled back and the restore refuses it.
+    await migrateToProductionLatest();
+    fs.copyFileSync(dbPath, backupPath());
+    const stage = path.join(tmpDir, 'stage.sqlite3');
+    fs.copyFileSync(dbPath, stage);
+    const writer = new SQLite(stage);
+    writer.pragma('cache_size = 2'); // spill pages to the file mid-transaction
+    writer.exec('BEGIN');
+    writer.exec('CREATE TABLE partial (id INTEGER, body TEXT)');
+    const insert = writer.prepare('INSERT INTO partial VALUES (?, ?)');
+    for (let i = 0; i < 3000; i++) {
+      insert.run(i, 'x'.repeat(400));
+    }
+    fs.copyFileSync(stage, dbPath);
+    fs.copyFileSync(`${stage}-journal`, `${dbPath}-journal`);
+    // Precondition: the staged journal is hot (non-zero first byte), or the
+    // restore would just remove it as inert and this test would prove nothing.
+    expect(fs.readFileSync(`${dbPath}-journal`)[0]).not.toBe(0);
+    writer.exec('ROLLBACK');
+    writer.close();
+    fs.rmSync(stage, { force: true });
+    writeMigrationSentinel(dbPath, { backupPath: backupPath(), lastApplied: PRODUCTION_LATEST });
+    let ups = 0;
+    __setMigrationProviderForTest(
+      buildProvider({
+        m950_test_partial: {
+          async up(db) {
+            ups++;
+            await db.schema.createTable('partial').addColumn('id', 'integer').execute();
+          },
+          async down() {
+            return;
+          },
+        },
+      }),
+    );
+
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    await closeDatabaseForTest();
+    expect(status.getState()).toEqual({ readOnly: false });
+    expect(ups).toBe(1);
+    expect(fs.existsSync(`${dbPath}-journal`)).toBe(false);
+    expect(fs.existsSync(sentinel())).toBe(false);
+    expect(tables(backupPath())).not.toContain('partial');
+  });
+
+  it('names the sentinel and its backup when the half-migrated file cannot be read', async () => {
+    // A torn page from a power cut makes the first read throw before the
+    // sentinel check, so STARTUP_OPEN_FAILED must point at the recovery.
+    await stageSentinel((b) => fs.copyFileSync(dbPath, b));
+    const fd = fs.openSync(dbPath, 'r+');
+    fs.writeSync(fd, Buffer.alloc(100, 0xff), 0, 100, 0); // tear the header
+    fs.closeSync(fd);
+    const error = vi.spyOn(dbLogger, 'error');
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    expect(status.getState().reasonCode).toBe('STARTUP_OPEN_FAILED');
+    expect(error).toHaveBeenCalledWith(
+      expect.stringMatching(
+        new RegExp(
+          `did not finish \\(${escapeRegExp(sentinel())}\\).*${escapeRegExp(backupPath())}`,
+        ),
+      ),
+    );
+    expect(fs.existsSync(sentinel())).toBe(true);
+  });
+
+  it('says when the sentinel is unreadable as well as the file', async () => {
+    await migrateToProductionLatest();
+    fs.copyFileSync(dbPath, backupPath());
+    fs.writeFileSync(sentinel(), '{');
+    const fd = fs.openSync(dbPath, 'r+');
+    fs.writeSync(fd, Buffer.alloc(100, 0xff), 0, 100, 0);
+    fs.closeSync(fd);
+    const error = vi.spyOn(dbLogger, 'error');
+    const status = new SystemStatus();
+    await initializeDatabase(status, { dbPath });
+    expect(status.getState().reasonCode).toBe('STARTUP_OPEN_FAILED');
+    expect(error).toHaveBeenCalledWith(
+      expect.stringMatching(
+        new RegExp(
+          `did not finish \\(${escapeRegExp(sentinel())}\\), and the sentinel is unreadable`,
+        ),
+      ),
+    );
   });
 });

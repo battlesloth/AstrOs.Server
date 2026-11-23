@@ -5,7 +5,7 @@ Workflow rules: `CLAUDE.md` (Workflow section). Rationale and templates: `.docs/
 ## Status
 
 Active:  Per-channel servo release time (T-012–T-015, cross-repo with AstrOs.ESP T-010) and Random span events (Phase A done; T-010 and Phase B next)
-Now:     no server task in progress. Per-channel release tasks T-012–T-015 authored 2026-11-22 (spec approved by Jeff; protocol § D pinned in both repos). AstrOs.ESP v1.3.0 is held for its T-010 (PR #66), T-011 (PR #67) and T-012 (serial-channel drain, found by the T-011 bench). The ESP T-009 bench passed 2026-11-22 against this repo's develop
+Now:     T-016 (interrupted-migration backup) on `feature/T-016-interrupted-migration-backup`: implementation committed, by-hand Verification passed, pre-push review fixes in; next push + PR. Per-channel release tasks T-012–T-015 authored 2026-11-22 (spec approved by Jeff; protocol § D pinned in both repos). AstrOs.ESP v1.3.0 is held for its T-010 (PR #66), T-011 (PR #67) and T-012 (serial-channel drain, found by the T-011 bench). The ESP T-009 bench passed 2026-11-22 against this repo's develop
 Next:    per-channel release: T-012 (migration naming; PR #139) → T-016 (interrupted-migration backup) → T-013 (data model) → T-014 (8 fields + sync gate), in parallel with ESP T-010 → joint bench → ESP v1.3.0 release; T-015 (UI field) any time after T-013. Random spans, agreed order (2026-10-22): ESP T-007 + T-008 ✓ → server T-006 ✓ → T-007 ✓ → T-008 ✓ → server T-009 ✓ → ESP T-009 bench ✓ → ESP v1.3.0 release (now also carrying per-channel release) → server T-010 (report skipped spans on upload; before Phase B) → Phase B scripter (decomposed at phase start) → Phase C. Inserting spans by SQL for a bench: also set `scripts.duration_ds` to `MAX(COALESCE(end_time, time))` (or open and save the script once, since `duration_ds` is only recomputed on save), and keep each span row within `0 ≤ time < end_time ≤ 6000` ds, because since T-009 a stored span outside that makes every save of its script answer 400. Check: `SELECT id FROM script_events WHERE end_time IS NOT NULL AND (end_time <= time OR time < 0 OR end_time > 6000)` returns nothing
 Blocked: none. A server release carrying T-014 must wait for AstrOs.ESP v1.3.0 to be published: its gate refuses config sync to anything older
 Last:    2026-11-22 — per-channel release time designed and planned (T-012–T-015); AstrOs.ESP T-009 bench passed against server develop; 2026-11-21 — T-011 merged (PR #138); develop at `1.0.3-dev.0`
@@ -228,7 +228,7 @@ From the per-channel servo release design (2026-11-22):
 
 From the T-012 pre-push review (2026-11-22; all pre-existing, not T-012 regressions):
 
-- **An interrupted migration overwrites the good backup on the next boot (high).**
+- ~~**An interrupted migration overwrites the good backup on the next boot (high).**~~ → T-016 (2026-11-22).
   - Where: `createBackup` (`dal/backup.ts`) unlinks and rewrites `<db>.backup-<last applied>`. While a pending migration keeps failing, the last applied name doesn't change.
   - When: after `MIGRATION_FAILED_RESTORE_FAILED`, or after a power cut mid-migration. Kysely runs a migration's statements without a transaction, and a droid's SBC losing power is realistic.
   - Effect: the next boot replaces the only pre-migration copy with the half-migrated database. It then fails again and reports `MIGRATION_FAILED_RESTORED`, having "restored" the half-migrated file.
@@ -243,11 +243,18 @@ From the T-012 pre-push review (2026-11-22; all pre-existing, not T-012 regressi
 - **The newer-database guard's message joins unknown names with `, `.** An empty or space-padded name from a tampered row is then invisible. Use `JSON.stringify` per name.
 - **`getLastAppliedMigrationName` returns `null` when applied rows exist but none is known.** A caller can't tell that from a fresh database, which skips the backup. It's safe today only because `initializeDatabase` checks for unknown migrations first. Throwing would protect a future caller.
 
-From the T-016 reviews (2026-11-22, pre-existing in `initializeDatabase`):
+From the T-016 reviews (2026-11-22): two pre-existing issues in `initializeDatabase`, then T-016's deferred items:
 
-- **The `STARTUP_OPEN_FAILED` catch opens `:memory:` without closing a file connection that is already open.** The open succeeded, but a later read threw. The handle leaks until exit, which matters only to tests that boot twice. T-016's post-restore reopen also lands here.
-- **A throw from `pruneOldBackups` (`readdir`/`stat`) inside the migrate `try` restores the backup over a successful migration.** It enters `MIGRATION_FAILED_RESTORED` for a run that worked. Move the prune out of the `try`, or catch and log it.
-- **An `'unreadable'` migration sentinel drops its cause.** The detail can't tell the operator whether it was EACCES or bad JSON (a T-016 deferred minor).
+- **The `STARTUP_OPEN_FAILED` catch opens `:memory:` without closing a file connection that is already open.** The open succeeded, but a later read threw. The handle leaks until exit, which matters only to tests that boot twice. A read that throws after T-016's post-restore reopen lands here too.
+- **A throw from `pruneOldBackups` (`readdir`/`stat`) inside the migrate `try` restores the backup over a successful migration.** It enters `MIGRATION_FAILED_RESTORED` for a run that worked. Move the prune out of the `try`, or catch and log it. Its sentinel is already removed by then, so if that restore also fails, the `MIGRATION_FAILED_RESTORE_FAILED` banner's "the server retries the restore on its next start" is wrong on that path.
+- **An `'unreadable'` migration sentinel drops its cause.** The detail can't tell the operator whether it was EACCES or bad JSON (a T-016 deferred minor). The type-design review suggests the codebase's `{ kind }` union for the read result.
+- **`query_only` while a sentinel is kept (defense in depth).**
+  - The idea: in the `MIGRATION_INTERRUPTED` states, and in the failed-migration states that keep a sentinel, the next boot restores over this file. So "this boot writes nothing" should be enforced (`query_only = ON`, as `DB_NEWER_THAN_SERVER` does), not left to the HTTP write guard.
+  - The gap: the pre-push review found one narrow bypass. A serial ACK for a request the previous process sent can reach a handler that writes (`insertControllers`, `updateLocationFingerprint`, `updateScriptControllerUploaded`).
+  - Not done in T-016: plain read-only still runs the serial worker and the WS handlers, and an unguarded write there would then throw at runtime. That needs its own audit of those handlers first.
+- **A flaky firmware test:** `chunk_streamer.test.ts` › "bus.send throws on resend path (per-chunk timeout)" failed once in a full `npx vitest run` (2026-11-22, during T-016's gate). It passed 5/5 alone and on the full rerun. It is timer-sensitive under load; look at its fake-timer setup.
+- **One runtime list of read-only reason codes.** Four test lists (API status and write guard, Vue store and interceptor) repeat every plain code by hand, and nothing fails when a new code is missing from them. Derive `ReadOnlyReasonCode` from an exported `as const` array on each side, and have the tests filter it.
+- **The sentinel's `backupPath` is stored as the process saw it** (absolute in Docker; relative under a dev `DATABASE_PATH` such as `../.data`). A data dir reached by another path later (a changed `DATABASE_PATH`, a different `$HOME` over the same volume) reads as "its backup … is missing" and stops for manual recovery. A fallback to the same basename beside the database would avoid that. Checking `backupPath === <db>.backup-<lastApplied>` would also catch a hand-edited sentinel naming any file.
 
 Open local branches (pre-workflow threads, unmerged into `develop`):
 

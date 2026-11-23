@@ -97,7 +97,12 @@ export async function findUnknownAppliedMigrations(
   provider: MigrationProvider,
 ): Promise<string[]> {
   const known = new Set(await getProviderMigrationNames(provider));
-  const applied = await getAppliedMigrationNames(db);
+  return unknownMigrations(await getAppliedMigrationNames(db), known);
+}
+
+// The applied names `known` lacks, in compareMigrationNames order. Shared by
+// the newer-database guard and the sentinel's backup check.
+function unknownMigrations(applied: readonly string[], known: ReadonlySet<string>): string[] {
   return applied.filter((n) => !known.has(n)).sort(compareMigrationNames);
 }
 
@@ -156,18 +161,30 @@ export function pruneOldBackups(dbPath: string, keep = 5): void {
   }
 }
 
-// Atomic (T-016 amendment): copyFileSync truncates its target first, so the
-// copy goes to a temp file, fsynced, then renamed over dbPath. A power cut or
-// a full disk mid-restore leaves the old file whole, never a truncated one the
-// next boot can't read. The caller must have closed its connection to dbPath.
-// It refuses while a -journal or -wal sits beside dbPath: SQLite would replay
-// the old file's journal onto the restored one, a silent mix of both that
-// still passes quick_check. A read of dbPath rolls a hot journal back first.
+// Atomic: copyFileSync truncates its target first, so the copy goes to a temp
+// file, fsynced, then renamed over dbPath. A power cut or a full disk
+// mid-restore leaves the old file whole, never a truncated one the next boot
+// can't read. The caller must have closed its connection to dbPath.
+//
+// A hot -journal beside dbPath stops it: SQLite would replay the old file's
+// journal onto the restored one, a silent mix of both that still passes
+// quick_check. Callers read dbPath before closing it (initializeDatabase's
+// newer-database check does), which rolls back and deletes a hot journal, so
+// a refusal here means one survived that read. An inert journal (empty, or a
+// zero first byte: SQLite's own "not hot" test) is left by a power cut before
+// its first fsync and that read never clears it, so it is removed instead.
+// A -wal always stops it (this database never runs in WAL mode).
 export function restoreBackup(backupPath: string, dbPath: string): void {
-  for (const suffix of ['-journal', '-wal']) {
-    if (fs.existsSync(`${dbPath}${suffix}`)) {
-      throw new Error(`not restoring over ${dbPath} while ${dbPath}${suffix} exists`);
+  if (fs.existsSync(`${dbPath}-wal`)) {
+    throw new Error(`not restoring over ${dbPath} while ${dbPath}-wal exists`);
+  }
+  const journal = `${dbPath}-journal`;
+  if (fs.existsSync(journal)) {
+    if (isHotJournal(journal)) {
+      throw new Error(`not restoring over ${dbPath} while a hot ${journal} exists`);
     }
+    logger.warn(`Removing the inert journal ${journal} before restoring ${backupPath}`);
+    fs.unlinkSync(journal);
   }
   const tmp = `${dbPath}.restore-tmp`;
   try {
@@ -175,14 +192,41 @@ export function restoreBackup(backupPath: string, dbPath: string): void {
     fsyncFile(tmp);
     fs.renameSync(tmp, dbPath);
   } catch (err) {
-    try {
-      fs.unlinkSync(tmp);
-    } catch {
-      // best effort: the copy may never have created it
-    }
+    unlinkBestEffort(tmp);
     throw err;
   }
   fsyncDirectory(path.dirname(dbPath));
+}
+
+function isHotJournal(journal: string): boolean {
+  const fd = fs.openSync(journal, 'r');
+  try {
+    const first = Buffer.alloc(1);
+    return fs.readSync(fd, first, 0, 1, 0) === 1 && first[0] !== 0;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+// Cleanup of a temp file after a failure: ENOENT (never created) is expected;
+// anything else leaves it behind, so it is logged. The next write or copy
+// overwrites a leftover file (not a directory: that keeps failing until removed).
+function unlinkBestEffort(file: string): void {
+  try {
+    fs.unlinkSync(file);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      logger.warn(`Could not remove ${file}: ${(err as Error).message}`);
+    }
+  }
+}
+
+// Node's fsync errors name no file; these name it.
+function withPath(err: unknown, what: string): Error {
+  return Object.assign(new Error(`${what} failed: ${(err as Error).message}`), {
+    code: (err as NodeJS.ErrnoException).code,
+    cause: err,
+  });
 }
 
 // Windows can only flush a handle opened for writing; elsewhere a read-only
@@ -191,6 +235,8 @@ function fsyncFile(file: string): void {
   const fd = fs.openSync(file, process.platform === 'win32' ? 'r+' : 'r');
   try {
     fs.fsyncSync(fd);
+  } catch (err) {
+    throw withPath(err, `fsync ${file}`);
   } finally {
     fs.closeSync(fd);
   }
@@ -210,9 +256,10 @@ export function migrationSentinelPath(dbFile: string): string {
   return `${dbFile}.migration-in-progress`;
 }
 
-// The rename is only durable once the directory entry is: fsync the directory
-// too. Platforms that can't open a directory for fsync (Windows dev machines)
-// skip it.
+// A rename or unlink is durable only once its directory entry is: fsync the
+// directory. A platform that can't open or fsync a directory skips it: expected
+// on Windows dev machines (debug); anywhere else it means this filesystem (a
+// FUSE or 9p mount, say) gives no durability, so it warns.
 function fsyncDirectory(dir: string): void {
   let fd: number | undefined;
   try {
@@ -221,9 +268,14 @@ function fsyncDirectory(dir: string): void {
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
     if (code !== 'EPERM' && code !== 'EISDIR' && code !== 'EINVAL') {
-      throw err;
+      throw withPath(err, `fsync ${dir}`);
     }
-    logger.debug(`Directory fsync not supported for ${dir} (${code}); skipped`);
+    const line = `Directory fsync not supported for ${dir} (${code}); skipped`;
+    if (process.platform === 'win32') {
+      logger.debug(line);
+    } else {
+      logger.warn(line);
+    }
   } finally {
     if (fd !== undefined) {
       fs.closeSync(fd);
@@ -238,7 +290,7 @@ function fsyncDirectory(dir: string): void {
 // identical to the unmigrated database).
 export function writeMigrationSentinel(
   dbFile: string,
-  entry: { backupPath: string; lastApplied: string },
+  entry: Omit<MigrationSentinel, 'startedAt'>,
 ): void {
   const target = migrationSentinelPath(dbFile);
   const tmp = `${target}.tmp`;
@@ -253,18 +305,15 @@ export function writeMigrationSentinel(
     }
     fs.renameSync(tmp, target);
   } catch (err) {
-    try {
-      fs.unlinkSync(tmp);
-    } catch {
-      // best effort: the tmp file may never have been created
-    }
-    throw err;
+    unlinkBestEffort(tmp);
+    throw withPath(err, `writing migration sentinel ${target}`);
   }
   fsyncDirectory(path.dirname(target));
 }
 
-// null: no sentinel. 'unreadable': one exists but can't be trusted (not JSON,
-// missing fields, not a file); the caller must not treat that as absent.
+// null: no sentinel. 'unreadable': any read error but ENOENT, or content that
+// isn't JSON with string backupPath / lastApplied / startedAt; the caller must
+// not treat it as absent.
 export function readMigrationSentinel(dbFile: string): MigrationSentinel | 'unreadable' | null {
   let text: string;
   try {
@@ -308,7 +357,7 @@ export function removeMigrationSentinel(dbFile: string): void {
 
 // Why the backup a sentinel names can't be restored, or null if it can. It
 // must exist, pass quick_check, and record the sentinel's last applied
-// migration (T-016 amendment): quick_check answers ok for an empty file, and
+// migration: quick_check answers ok for an empty file, and
 // restoring one would look like a fresh install that migrates from scratch.
 // It must also hold no migration outside `known` (this build's), so a backup a
 // newer build wrote is refused before anything is restored (T-006).
@@ -318,8 +367,13 @@ export function sentinelBackupProblem(
   known: ReadonlySet<string>,
 ): string | null {
   const { backupPath, lastApplied } = sentinel;
-  if (!fs.existsSync(backupPath)) {
-    return `its backup ${backupPath} is missing`;
+  try {
+    fs.statSync(backupPath);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    return code === 'ENOENT'
+      ? `its backup ${backupPath} is missing`
+      : `its backup ${backupPath} can't be accessed (${code})`;
   }
   let backup: SQLite.Database;
   try {
@@ -341,12 +395,10 @@ export function sentinelBackupProblem(
     if (!hasRow) {
       return `its backup ${backupPath} has no record of migration ${lastApplied}`;
     }
-    const unknown = (
+    const applied = (
       backup.prepare(`SELECT name FROM ${KYSELY_MIGRATION_TABLE}`).all() as { name: string }[]
-    )
-      .map((r) => r.name)
-      .filter((n) => !known.has(n))
-      .sort(compareMigrationNames);
+    ).map((r) => r.name);
+    const unknown = unknownMigrations(applied, known);
     if (unknown.length > 0) {
       return (
         `its backup ${backupPath} was written by a newer build ` +
