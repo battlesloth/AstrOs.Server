@@ -122,4 +122,9 @@ The reviewer reproduced it: a migration that creates a table and then throws, wi
 
 ## Implementation checklist
 
-<!-- Added when work starts. -->
+- [ ] RED → GREEN: `writeMigrationSentinel` / `readMigrationSentinel` / `removeMigrationSentinel` in `dal/backup.ts` (`backup.test.ts`): round-trip, atomic write leaves no `.tmp`, absent → `null`, corrupt or missing fields → `'unreadable'`
+- [ ] RED → GREEN: `initializeDatabase` sentinel steps (`database.integration.test.ts`): the reviewer's reproduction, success and restored-failure leave no sentinel, missing backup and corrupt sentinel → `MIGRATION_INTERRUPTED` with nothing touched, leftover-after-success restores and re-migrates, a failed sentinel write → `BACKUP_FAILED`; mutation-check the sentinel check
+- [ ] `MIGRATION_INTERRUPTED` in `ReadOnlyReasonCode` (API), the Vue mirror and store, the `enUS.json` banner message, store/banner specs
+- [ ] QA `system-readonly-mode.md` cases; PLAN.md
+- [ ] Pre-commit: api prettier + lint, build, vitest; vue format + lint, build, vitest; code review
+- [ ] Manual verification (Verification section); pre-push `/pr-review-toolkit:review-pr`
